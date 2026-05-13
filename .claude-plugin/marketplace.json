@@ -10,8 +10,8 @@
     {
       "name": "srd",
       "source": "./plugins/srd",
-      "version": "1.10.1",
-      "description": "Requirements Analyst — facilitates building Software Requirements Documents backed by UML artifacts through guided conversation. Recommends /sea:blueprint and /sulis-security:codebase-assess as natural downstream steps."
+      "version": "1.11.0",
+      "description": "Requirements Analyst — facilitates building Software Requirements Documents backed by UML artifacts through guided conversation. Includes intent triage (Phase 1), disambiguation sweep (Phase 3.5), and adversarial sweep (Phase 3.6 — produces MISUSE_CASES.md with negative requirements). Hands architecture work over to SEA via early or mid-session handover."
     },
     {
       "name": "sulis-strategy",
@@ -46,14 +46,20 @@
     {
       "name": "sea",
       "source": "./plugins/sea",
-      "version": "0.2.0",
-      "description": "Senior Engineering Architect — designs hardened architectures, audits brownfield code for primitive gaps, and decomposes designs into atomic Work Packages with Red-Green-Blue verification. Integrates with sulis-security findings."
+      "version": "0.3.0",
+      "description": "Senior Engineering Architect — designs hardened architectures, audits brownfield code for primitive gaps, and decomposes designs into atomic Work Packages with Red-Green-Blue verification. Consumes SRD v1.11.0 MISUSE_CASES.md, GLOSSARY.md, ## Deferred to SEA journal sections, and HANDOFF_TO_SEA.md. Integrates with sulis-security findings."
     },
     {
       "name": "sulis-security",
       "source": "./plugins/sulis-security",
       "version": "0.1.0",
       "description": "Security & Viability Reviewer — runs a 25-primitive codebase viability assessment (security, data protection, code quality, supply chain, infrastructure) via an OODA-spiral methodology. Composes with SEA for hardening and SRD for requirements-traceable findings."
+    },
+    {
+      "name": "idc",
+      "source": "./plugins/idc",
+      "version": "0.1.0",
+      "description": "Investor Deck Coach — facilitates Sequoia-style pitch deck creation through guided one-question-at-a-time conversation. Stage-aware (angel, pre-seed, seed, Series A, Series B). Produces evidence-backed market research with tiered sources, stage-appropriate financial modelling (Excel + branded HTML dashboard), adversarial investor-objection review, customer-branded PowerPoint + HTML decks (Reveal.js), and a live rehearsal drill."
     }
   ]
 }

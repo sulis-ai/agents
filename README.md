@@ -66,7 +66,8 @@ methodology:
 
 ```
 standards/
-├── marketplace.json           # Plugin registry
+├── .claude-plugin/
+│   └── marketplace.json       # Plugin registry (Claude Code reads from here)
 ├── docs/                      # Marketplace-level documentation
 ├── plugins/
 │   ├── srd/                   # Requirements Analyst

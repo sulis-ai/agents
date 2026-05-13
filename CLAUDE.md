@@ -13,7 +13,8 @@ standards/
 ├── CONTRIBUTING.md                        # Contribution & release guide
 ├── README.md                              # Marketplace + SRD plugin overview
 ├── LICENSE
-├── marketplace.json                       # Marketplace registry manifest
+├── .claude-plugin/
+│   └── marketplace.json                   # Marketplace registry manifest (Claude Code reads from here)
 ├── docs/
 │   ├── skill-authoring-guide.md           # Best practices for writing skills
 │   └── rollout-plan.md                    # Staged principle introduction
