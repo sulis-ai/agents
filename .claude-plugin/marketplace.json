@@ -4,8 +4,8 @@
     "name": "Iain"
   },
   "metadata": {
-    "version": "1.3.0",
-    "description": "Sulis AI plugin marketplace — methodology studios, requirements analysis, facilitation, context cartography, and right-sized architecture. v1.3.0 introduces SEA v0.5.0 with sFPC + ASR right-sizing (informed by IFPUG FPA and Bass/Clements/Kazman ASR) and SIZING.md as the persistent sizing artifact."
+    "version": "1.4.0",
+    "description": "Sulis AI plugin marketplace — methodology studios, requirements analysis, facilitation, context cartography, right-sized architecture, and disciplined change primitives. v1.4.0 introduces SEA v0.6.0 with the 22-primitive Minto-pyramid change catalogue, No-Band-Aid-Wrappers MUST rule, and the ports-and-adapters / wrappers distinction."
   },
   "plugins": [
     {
@@ -53,8 +53,8 @@
     {
       "name": "sea",
       "source": "./plugins/sea",
-      "version": "0.5.0",
-      "description": "Senior Engineering Architect — designs hardened architectures, audits brownfield code for primitive gaps, and decomposes designs into atomic Work Packages with Red-Green-Blue verification. Reads .context/{project}/INDEX.md (from sulis-context) at Phase 0 to apply Respect-Don't-Restate, and computes SIZING.md (sFPC + ASR + per-pillar coverage, informed by IFPUG FPA and Bass/Clements/Kazman ASR) to right-size output to the project. Consumes SRD v1.11.0+ MISUSE_CASES.md, GLOSSARY.md, ## Deferred to SEA journal sections, and HANDOFF_TO_SEA.md. Integrates with sulis-security findings."
+      "version": "0.6.0",
+      "description": "Senior Engineering Architect — designs hardened architectures, audits brownfield code for primitive gaps, and decomposes designs into atomic Work Packages with Red-Green-Blue verification. Every WP carries a change primitive (one of 22, organised into a Minto pyramid of 5 MECE groups) per references/change-primitives.md. Enforces No-Band-Aid-Wrappers (MUST) — Wrap is conditional on external subject or transitional Strangle; implementing an adapter for a domain-owned port is Create, not Wrap. Reads .context/{project}/INDEX.md (sulis-context) at Phase 0 and computes SIZING.md (sFPC + ASR) to right-size output. Consumes SRD v1.11.0+ MISUSE_CASES.md, GLOSSARY.md, ## Deferred to SEA journal sections, and HANDOFF_TO_SEA.md. Integrates with sulis-security findings."
     },
     {
       "name": "sulis-security",
