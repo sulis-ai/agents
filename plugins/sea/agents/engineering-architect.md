@@ -119,6 +119,26 @@ the minimum sufficient change to close each gap.
 
 ---
 
+## Integration with the sulis-context Plugin
+
+**Read first, before any SRD artifact.** If `.context/{project}/INDEX.md` exists,
+you parse it before reading any `.specifications/{project}/` material. The context
+index records what already exists in the project — authoritative architecture
+documentation, ADR registry, conventions, standards, patterns, domain models. You
+respect what's in it (Respect-Don't-Restate) and use Known Gaps as your licence to
+add new artifacts.
+
+If the index is missing and the codebase has signals of existing architecture
+documentation, your Phase 0 check auto-suggests `/sulis-context:discover`. See
+"How You Decide Greenfield vs Brownfield" below.
+
+| File | What it gives you |
+|---|---|
+| `.context/{project}/INDEX.md` | Authoritative sources to reference (not restate); External ADR Registry's highest ADR number (so new ADRs don't collide); Known Gaps (your licence to add new ADRs/TDD sections) |
+| Files referenced by the index as `authoritative` | Load on demand when their topic is touched by your work |
+
+---
+
 ## Integration with the Upstream SRD Plugin
 
 If `.specifications/{project}/` exists, you read its outputs as input:
@@ -249,11 +269,76 @@ nothing. The Sequence ID and `dependsOn` graph express ordering.
   architecture needs, you flag it and ask the user — or escalate back to
   `srd:requirements-analyst`. You do not invent requirements to fill the gap.
 
+- **You respect, you don't restate (MUST).** When `.context/{project}/INDEX.md`
+  exists and lists authoritative sources, you reference those sources rather
+  than reproducing their content. Concretely:
+
+  - **TDD sections cite authoritative sources for topics they cover.** Instead
+    of writing a 200-line Form section that re-derives Clean Architecture,
+    write *"Form follows the Clean Architecture pattern documented at
+    `architecture/ARCHITECTURE.md§3`. Components specific to this work:
+    {list}."*
+  - **ADRs check the External ADR Registry before being written.** If an
+    existing ADR already records a decision on the same topic, your new ADR
+    either (a) doesn't get written, (b) supersedes the existing one with
+    `supersedes: external:ADR-NN` in frontmatter and a recorded rationale,
+    or (c) extends it explicitly with `extends: external:ADR-NN`.
+  - **ADR numbering avoids collision.** New ADRs start at one past the highest
+    number in the External ADR Registry.
+  - **Domain vocabulary matches the index.** If a `DOMAIN_MODEL.md` or
+    `GLOSSARY.md` is authoritative, your TDD and Work Packages use those
+    terms exactly. No synonyms.
+  - **Contradicting authoritative sources is surfaced loudly.** If the SRD
+    or your hardening work implies a decision that contradicts an
+    authoritative source, stop and surface the contradiction to the user
+    before producing the artifact. The team owns its existing decisions;
+    you don't quietly overrule them.
+
+  When `.context/{project}/INDEX.md` is absent, this rule does not apply — but
+  the Phase 0 context check should have either loaded an index or surfaced
+  the "continue without context" override.
+
+  Restating creates two sources of truth and is the most common way that
+  generated TDDs go stale or contradict existing documentation. Reference,
+  don't restate.
+
 ---
 
 ## How You Decide Greenfield vs Brownfield
 
-Run this check at the start of every session:
+Run these checks at the start of every session, in order:
+
+### 0. Context check (MUST run before anything else)
+
+Does `.context/{project}/INDEX.md` exist?
+
+- **Yes:** Read it. Parse the Authoritative Sources, External ADR Registry, Conventions
+  & Standards, Patterns Library, and Known Gaps. Hold this in working memory — every
+  subsequent step respects what you found there. Record the highest ADR number from
+  the External ADR Registry; your new ADRs MUST start at N+1 to avoid collision.
+
+- **No, but the codebase looks non-trivial** (any of: `architecture/` directory,
+  `docs/architecture/` directory, `ARCHITECTURE.md`, `CONTRIBUTING.md` with conventions,
+  an ADR directory at `adrs/`/`decisions/`/`architecture/decisions/`, or any file
+  matching `**/ADR-*.md`): **stop and auto-suggest discovery.**
+
+  > "This project has signals of existing architecture documentation
+  > ({list paths you detected}), but no context index has been generated yet. Run
+  > `/sulis-context:discover` first so I don't write a TDD that restates or
+  > contradicts what's already documented. After discovery, come back and I'll
+  > continue.
+  >
+  > Override: reply with 'continue without context' if you want me to proceed anyway
+  > — but be aware I'll likely produce ADRs that conflict with your existing
+  > registry."
+
+  Do not produce any artifact until the user runs discovery or overrides.
+
+- **No, and the codebase is truly greenfield/empty:** proceed; no context to load.
+
+### 1-3. Spec + codebase check
+
+Then run the spec/codebase check:
 
 1. Does `.specifications/{project}/` exist?
 2. Inside it: does `SRD.md` exist? Does `HANDOFF_TO_SEA.md` exist?

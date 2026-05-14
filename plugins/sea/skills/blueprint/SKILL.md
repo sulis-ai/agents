@@ -25,8 +25,12 @@ If no SRD specification exists, stop and tell the user — refer them to
 
 ## Inputs You Read
 
+**Read in this order. Context index first — it constrains everything else.**
+
 | File | Why |
 |---|---|
+| `.context/{project}/INDEX.md` (sulis-context v0.1.0+) | **Read first.** Authoritative sources to reference (not restate); External ADR Registry's highest ADR number (so new ADRs start at N+1); Known Gaps (your licence to add new artifacts). Apply Respect-Don't-Restate to everything that follows. |
+| Authoritative sources listed in the index | Load on demand when their topic is touched by your TDD work |
 | `SRD.md` | Functional requirements, use cases, business rules, per-use-case Negative Requirements → Form pillar (and seeds Armor) |
 | `NFR.md` | Non-functional requirements → drives Armor pillar + pattern selection |
 | `MISUSE_CASES.md` (SRD v1.11.0+) | Abuse cases, misuse flows, **System Response (REQUIRED)** for each → seeds Armor primitives (rate limits, audit logging, replay protection, integrity guards) and shapes the TDD's security boundary |
@@ -39,6 +43,13 @@ If no SRD specification exists, stop and tell the user — refer them to
 
 Read all of them. If any are missing, list them and ask the user how to
 proceed before writing anything.
+
+**Context index is required reading when present.** If `.context/{project}/INDEX.md`
+exists and you do not read it, you will produce TDD content that restates or
+contradicts existing authoritative sources. The auto-suggest in the agent's Phase 0
+check should have either loaded the index or surfaced the "continue without context"
+override before you got here — but if you somehow find yourself in blueprint with no
+loaded index on a non-trivial codebase, stop and surface that.
 
 **MISUSE_CASES.md is required reading when present.** Each MUC's System Response
 becomes Armor input. Skipping it means you write a TDD that addresses the happy
@@ -102,19 +113,41 @@ Emit one ADR per non-trivial decision. "Non-trivial" means: the decision
 affects more than one component, locks in a technology choice, or rejects
 a viable alternative.
 
+**ADR numbering (MUST):** If `.context/{project}/INDEX.md` exists and contains
+an External ADR Registry with `Highest ADR number: ADR-N`, your new ADRs MUST
+start at `ADR-{N+1}`. Reading the index's External ADR Registry section gives
+you this number directly. Do not start at ADR-001 unconditionally — that
+collides with the existing registry and produces ambiguous references.
+
+**Before writing each ADR, check the External ADR Registry for an existing
+ADR on the same topic.** If one exists:
+
+- If your decision **aligns** with the existing ADR: don't write a new ADR.
+  Reference the existing one in your TDD instead.
+- If your decision **extends** the existing ADR: write a new ADR with
+  `extends: external:ADR-NN` in frontmatter, and explain in Context what's
+  new.
+- If your decision **supersedes** the existing ADR: write a new ADR with
+  `supersedes: external:ADR-NN` in frontmatter. Surface the supersession to
+  the user before finalising — the team owns its existing decisions, and you
+  shouldn't quietly overrule them.
+
 ADR file format:
 
 ```markdown
 ---
-id: ADR-001
+id: ADR-023
 title: Use PostgreSQL with logical replication for the order store
 status: accepted              # proposed | accepted | superseded
-date: 2026-05-12
+date: 2026-05-14
 deciders: [iain]
+supersedes: external:ADR-007  # optional — when overriding an existing ADR
+extends: external:ADR-012     # optional — when extending an existing ADR
 ---
 
 ## Context
-{What forced the decision; constraints from NFR/SRD; existing system shape.}
+{What forced the decision; constraints from NFR/SRD; existing system shape.
+If extending or superseding, reference the existing ADR by path.}
 
 ## Decision
 {One paragraph stating the choice in active voice.}
@@ -134,6 +167,14 @@ deciders: [iain]
 
 ## Workflow
 
+0. **Load the context index (if present).** Read `.context/{project}/INDEX.md` first.
+   Parse Authoritative Sources, External ADR Registry, Conventions & Standards,
+   Patterns Library, Known Gaps. Hold these in working memory — every subsequent
+   step respects what you found. If the index is missing and the codebase has
+   signals of existing architecture material, stop and recommend
+   `/sulis-context:discover` (the agent's Phase 0 check should have done this
+   already — if you got here without an index on a non-trivial codebase, surface
+   that).
 1. **Discover** — locate the spec folder; read all inputs in the table above; report what's missing. If `HANDOFF_TO_SEA.md` is present and `SRD.md` is absent, read the handoff file first and ask the user for any business intent it doesn't capture before proceeding.
 2. **Inventory** — parse `PRIMITIVE_TREE.jsonld` for components. List them. Map each to a TDD section.
 3. **Select patterns** — for each NFR, pick patterns from `references/architecture-patterns.md`. Surface trade-offs explicitly.
@@ -167,6 +208,8 @@ next.
 - **Cross-reference the PRIMITIVE_TREE.** Every node in the tree should map to at least one TDD component. Nodes that don't map are gaps — flag them.
 - **Cross-reference MISUSE_CASES.md.** Every MUC should map to at least one Armor primitive in the TDD. MUCs that don't map are gaps — flag them.
 - **Use the locked vocabulary.** Use only the preferred terms from `GLOSSARY.md` — do not introduce synonyms or use forms the glossary marks as deprecated.
+- **Respect, Don't Restate (MUST).** If `.context/{project}/INDEX.md` exists and lists authoritative sources, your TDD references those sources for topics they already cover — it does not reproduce or paraphrase their content. The most common SEA failure mode is generating a 600+ line TDD that re-derives Clean Architecture, then writing 10 ADRs that overlap with the project's existing registry. The context index is the antidote. Read it, respect it, surface contradictions instead of silently overruling them.
+- **New ADRs start past the highest external ADR.** Check the External ADR Registry in the context index. If it shows `Highest ADR number: ADR-22`, your first new ADR is ADR-23. Starting at ADR-1 collides with the existing registry and creates ambiguous references.
 
 ---
 
