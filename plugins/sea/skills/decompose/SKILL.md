@@ -127,28 +127,79 @@ State invariants the contract must preserve:
 
 ## Workflow
 
-1. **Read inputs** — `TDD.md`, `PRIMITIVE_TREE.jsonld`, any existing
-   `HANDOVER.md` from SRD, any prior WPs.
+1. **Read inputs** — `TDD.md`, `PRIMITIVE_TREE.jsonld`, `SIZING.md`,
+   `.context/{project}/INDEX.md`, any existing `HANDOVER.md` from SRD, any
+   prior WPs.
 2. **Inventory** — list every component, port, adapter, and resilience
    primitive mentioned in the TDD. Each becomes a candidate WP.
-3. **Atomise** — for each candidate, ask: can this be implemented in one
+3. **Assign primitive (MUST).** Per `references/change-primitives.md`,
+   walk the cross-group decision priority for each candidate WP:
+   ```
+   1. Can I Reuse existing code?
+   2. Can I Compose existing pieces?
+   3. Can I Extend through an extension point?
+   4. ✱ Before Wrap over internal: try Refactor/Move/Decompose instead
+   5. Should I Replace rather than wrap?
+   6. Do I need Strangle (gradual replace)?
+   7. Wrap (only if subject is external or transitional in Strangle)
+   8. Should I Contract (deprecate, then delete)?
+   9. Must I Generate / Create net-new?
+   REINFORCE runs orthogonally.
+   ```
+   
+   **Ports & Adapters check (MUST).** Before assigning `wrap`, apply the
+   discriminator question from `references/change-primitives.md`: *"Whose
+   interface is the public face of this new code?"* If the WP creates a
+   new module that implements a port defined inside the domain (e.g.
+   `StripePaymentGateway implements PaymentGateway`), the primitive is
+   **`create`** — you're writing an adapter, not wrapping. The Stripe SDK
+   is called *by* the adapter; the adapter is not a wrapper at the
+   architecture level. See "Ports & Adapters vs Wrappers" in the
+   catalogue.
+   
+   Record the chosen primitive in WP frontmatter (`primitive:`, `group:`).
+   For composites, record `composite_of:`. Apply mandatory fields per
+   primitive:
+   - **SUBSTITUTE-Wrap:** `subject_ownership` + `justification` + `removal_plan`
+   - **SUBSTITUTE-Strangle:** `removal_plan` with target date
+   - **REORGANISE-***: `characterisation_test` path
+4. **Atomise** — for each candidate, ask: can this be implemented in one
    commit/PR by one agent? If no, split. Typical sizes:
    - One port definition + its contract test = 1 WP
    - One adapter implementing a port = 1 WP
    - One application service / use case = 1 WP
    - One observability primitive (e.g. "wire up OpenTelemetry") = 1 WP
    - One resilience policy (timeout + retry + CB for one dependency) = 1 WP
-4. **Build the dependency graph** — for each WP, identify what must exist
-   first (`dependsOn`) and what it unlocks (`blocks`).
-5. **Estimate token cost** — rough. Input ≈ WP itself + dependency WPs +
+5. **Build the dependency graph** — for each WP, identify what must exist
+   first (`dependsOn`) and what it unlocks (`blocks`). Note: REINFORCE-Test
+   WPs are dependencies of any REORGANISE WPs that operate on the same
+   subject (characterisation tests must exist first).
+6. **Estimate token cost** — rough. Input ≈ WP itself + dependency WPs +
    relevant TDD section. Output ≈ implementation files + tests. Round to
    nearest 1k. This is for orchestrator routing, not billing.
-6. **Write WPs** — one file per WP, using the template above.
-7. **Write `INDEX.md`** — list all WPs, their statuses, the dependency
-   graph (as a markdown table and a Mermaid `graph TD` diagram), and the
-   recommended implementation order (topological sort of the graph).
-8. **Report** — total WP count, critical path length, parallelisation
-   opportunity (how many WPs can be implemented simultaneously at peak).
+7. **Wrap audit (MUST).** Scan the proposed WP set for SUBSTITUTE-Wrap
+   primitives. For each:
+   - Confirm `subject_ownership` is `external` OR `transitional`
+   - For `transitional`, confirm there's a paired Strangle in the dep graph
+     with a `removal_plan` date
+   - For any Wrap on the same subject as an existing wrapper in the
+     codebase (detected via `.context/{project}/INDEX.md` or
+     `CODE_INTELLIGENCE.md` if present): **escalate to user before
+     finalising**:
+
+     > "Proposed WP-NNN would wrap `{subject}`. Existing wrappers detected:
+     > `{path1}`, `{path2}`. Adding another defers the real fix.
+     > Recommendation: Refactor `{subject}` directly (REORGANISE-Refactor),
+     > or Replace with a new implementation and Delete existing wrappers.
+     > Proceed with Wrap anyway? (Y/N)"
+8. **Write WPs** — one file per WP, using the template above.
+9. **Write `INDEX.md`** — list all WPs, their statuses, primitive
+   distribution, the dependency graph (as a markdown table and a Mermaid
+   `graph TD` diagram), the recommended implementation order (topological
+   sort of the graph), and the wrap audit summary.
+10. **Report** — total WP count, critical path length, parallelisation
+    opportunity (how many WPs can be implemented simultaneously at peak),
+    primitive distribution, wrap audit result.
 
 ---
 
@@ -158,6 +209,7 @@ State invariants the contract must preserve:
 # Work Package Index — {Project}
 
 > **TDD:** [TDD.md](../TDD.md)
+> **SIZING:** [SIZING.md](../SIZING.md)
 > **Total WPs:** N
 > **Critical path:** WP-001 → WP-003 → WP-007 → WP-012 → WP-015 (5 packages)
 > **Peak parallelism:** 6 (after WP-003 completes, WP-004 through WP-009 are unblocked)
@@ -170,6 +222,38 @@ State invariants the contract must preserve:
 | in_progress | 0 |
 | done | 0 |
 | blocked | 0 |
+
+## Primitive Distribution
+
+| Group | Primitive | Count | WPs |
+|---|---|---|---|
+| EXPAND | Reuse | 2 | WP-005, WP-009 |
+| EXPAND | Compose | 1 | WP-012 |
+| EXPAND | Extend | 3 | WP-002, WP-006, WP-011 |
+| EXPAND | Create (incl. adapters) | 5 | WP-001, WP-003, WP-004, WP-007, WP-008 |
+| REORGANISE | Refactor | 2 | WP-013, WP-014 |
+| REORGANISE | Decompose | 1 | WP-015 |
+| SUBSTITUTE | Wrap | 0 | — |
+| REINFORCE | Test | 2 | WP-016, WP-017 |
+| REINFORCE | Instrument | 1 | WP-018 |
+| REINFORCE | Harden | 1 | WP-019 |
+
+> Adapters for ports are counted as Create. WP-004 (Stripe adapter for the
+> `PaymentGateway` port) is Create, not Wrap — see "Ports & Adapters vs
+> Wrappers" in `references/change-primitives.md`.
+
+## Wrap Audit
+
+> All Wrap WPs reviewed for No-Band-Aid-Wrappers compliance.
+
+| WP | Subject | Ownership | Removal Plan | Status |
+|---|---|---|---|---|
+| (none) | — | — | — | — |
+
+No Wraps proposed. No wrapper rot detected on existing modules.
+
+(If Wraps appear, they would be listed here with `subject_ownership` and
+`removal_plan` validated against the No-Band-Aid-Wrappers rule.)
 
 ## Dependency Graph
 
@@ -186,10 +270,13 @@ graph TD
 
 ## WP Table
 
-| ID | Title | Status | Depends On | Blocks | Token (in/out) | TDD § |
-|---|---|---|---|---|---|---|
-| WP-001 | Order entity | pending | — | WP-003, WP-008 | 4k / 2k | 3.1 |
-| WP-003 | OrderRepository port | pending | WP-001 | WP-004, WP-007 | 3k / 1k | 3.3 |
+| ID | Title | Primitive | Status | Depends On | Blocks | Token (in/out) | TDD § |
+|---|---|---|---|---|---|---|---|
+| WP-001 | Order entity | create | pending | — | WP-003, WP-008 | 4k / 2k | 3.1 |
+| WP-003 | OrderRepository port | create | pending | WP-001 | WP-004, WP-007 | 3k / 1k | 3.3 |
+| WP-004 | Stripe adapter for PaymentGateway port | create (adapter) | pending | WP-003 | WP-012 | 2k / 2k | 3.4 |
+| WP-013 | Refactor OrderService | refactor | pending | WP-016 | WP-015 | 3k / 2k | 3.6 |
+| WP-016 | Characterise OrderService | test | pending | — | WP-013 | 2k / 2k | — |
 | ... |
 
 ## Recommended Implementation Order

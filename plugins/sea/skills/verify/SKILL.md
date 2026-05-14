@@ -20,7 +20,7 @@ from the most recently modified folder in `.architecture/`.
 
 ---
 
-## The Five Perspectives
+## The Six Perspectives
 
 ### P1: Pillar Coverage (MECE-3)
 
@@ -88,6 +88,63 @@ Is everything consistent across TDD, ADRs, WPs, and code?
 
 A broken reference is a P5 gap.
 
+### P6: Change-Primitive Discipline
+
+Does every WP carry a valid primitive and satisfy the MUST rules from
+`references/change-primitives.md`?
+
+For each WP:
+
+- **`primitive:` is set** to one of the 22 in the catalogue. Missing or
+  invented primitives are P6 gaps.
+- **`group:` matches the primitive** per the catalogue's grouping.
+- **No Band-Aid Wrappers rule (MUST)** — for each `primitive: wrap`:
+  - `subject_ownership` is `external` OR `transitional`. If unset or
+    set to "internal", it is a P6 gap.
+  - If `transitional`, the `removal_plan` field is populated with a target
+    milestone and there is a paired Strangle in the dep graph. A
+    transitional Wrap with no Strangle and no removal plan is a P6 gap.
+  - If `external`, no removal plan required.
+  - **Wrapper rot check** — if the codebase already has ≥1 wrapper on the
+    same subject (detected via `.context/{project}/INDEX.md` or
+    `CODE_INTELLIGENCE.md`), the WP is a P6 gap unless the user has
+    explicitly acknowledged the trade-off in a `notes:` field.
+  - **Port-adapter sanity check** — if the WP is mis-classified as Wrap
+    when it's actually implementing an adapter for a domain-owned port
+    (Cockburn ports-and-adapters), flag it. Tell: does the WP create a
+    new module that implements a port defined inside the domain? If yes,
+    the primitive should be `create`, not `wrap`. See
+    `references/change-primitives.md` "Ports & Adapters vs Wrappers".
+- **Characterisation Tests Before Refactor (MUST)** — for each
+  `primitive: refactor | move | inline | merge | decompose | abstract`:
+  - `characterisation_test` field is populated with a real test file path.
+  - The named test exists in the repo.
+  - The named test is in the WP's `dependsOn` graph (a Test WP precedes
+    the Refactor WP) OR the test is already passing in the current codebase.
+  - Missing characterisation test is a P6 gap.
+- **Strangle Removal Plan (MUST)** — for each `primitive: strangle`:
+  - `removal_plan` includes a target date.
+  - If the target date is past and the legacy subject still exists, flag as
+    a "Stuck Strangle" P6 gap.
+- **Deprecate Before Delete (MUST)** — for each `primitive: delete` on
+  code reachable from production:
+  - A prior `primitive: deprecate` WP exists for the same subject, OR
+  - The WP's `notes:` documents the explicit acknowledgement.
+  - Delete-without-deprecate in production paths is a P6 gap.
+- **Composite recipes recorded** — for each WP with `composite_of:`:
+  - At least 2 primitives in the composite list.
+  - Each named primitive exists in the catalogue.
+
+Flags surface in the verification report's P6 section:
+
+```
+[P6] WP-007: primitive: wrap, subject_ownership not set
+[P6] WP-013: primitive: refactor, no characterisation_test
+[P6] WP-022: primitive: delete, production reachability + no deprecation
+[P6] WP-031: primitive: strangle, removal_plan date past (2026-03-15); legacy still present
+[P6] WP-034: primitive: wrap (internal), no justification — Refactor or Replace recommended
+```
+
 ---
 
 ## Workflow
@@ -131,6 +188,7 @@ A broken reference is a P5 gap.
 | P3 — Contract Test Coverage | PASS \| GAPS | N |
 | P4 — Chaos Test Coverage | PASS \| GAPS | N |
 | P5 — Referential Integrity | PASS \| GAPS | N |
+| P6 — Change-Primitive Discipline | PASS \| GAPS | N |
 
 ## P1 — Pillar Coverage
 
@@ -193,6 +251,25 @@ Gaps:
 - WP-007 references ADR-005 which does not exist.
   → Remediation: either create ADR-005 or remove the reference.
 
+## P6 — Change-Primitive Discipline
+
+| Check | Pass | Gaps |
+|---|---|---|
+| primitive: field set | 22/22 | — |
+| group: matches primitive | 22/22 | — |
+| Wrap subjects classified | 1/1 | — |
+| Wrap removal plans | 0/0 | n/a (only external Wraps) |
+| Wrapper rot check | n/a | No prior wrappers detected |
+| Refactor characterisation tests | 1/2 | WP-013 missing characterisation_test |
+| Strangle removal plans | 0/0 | No Strangles in this milestone |
+| Deprecate-before-Delete | 0/0 | No Deletes in production paths |
+| Composite recipes recorded | 1/1 | — |
+
+Gaps:
+- WP-013 (primitive: refactor) has no `characterisation_test` field.
+  → Remediation: file a Test WP first OR add the existing test path.
+  Refactor without characterisation is reckless (MUST rule violation).
+
 ## Remediation Summary
 
 | Gap | Type | Suggested Action |
@@ -202,18 +279,19 @@ Gaps:
 | PaymentGateway contract test | P3 | New WP |
 | Stripe CB chaos test | P4 | New WP |
 | WP-007 references missing ADR | P5 | Create ADR-005 or update WP-007 |
+| WP-013 missing characterisation_test | P6 | Add Test WP or reference existing test |
 
 ## Next Steps
 
-{Either: "All five perspectives PASS. Architecture is verified."
- Or: "5 gaps found. Remediate, then re-run /sea:verify."}
+{Either: "All six perspectives PASS. Architecture is verified."
+ Or: "6 gaps found. Remediate, then re-run /sea:verify."}
 ```
 
 ---
 
 ## Verdict Rules
 
-- **PASS** — all five perspectives have zero gaps.
+- **PASS** — all six perspectives have zero gaps.
 - **GAPS_FOUND** — one or more perspectives report a gap. The report lists
   every gap with a suggested remediation.
 

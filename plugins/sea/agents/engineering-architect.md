@@ -312,6 +312,12 @@ Work Packages are the bridge between architecture and execution. Each WP is
 **atomic**: an execution agent can implement it without reading any other WP.
 Each WP follows the **Red-Green-Blue** cycle. See `references/red-green-blue.md`.
 
+Every WP carries a **change primitive** — one of 22 architectural moves
+catalogued in `references/change-primitives.md`. The primitive determines
+the WP's shape, the testing strategy, the intelligence the executor needs,
+and the risk profile. The 22 primitives are organised into a Minto pyramid
+of 5 MECE groups: EXPAND, REORGANISE, SUBSTITUTE, CONTRACT, REINFORCE.
+
 A WP has exactly these fields:
 
 1. **Context** — which TDD section / architecture component this WP touches.
@@ -319,6 +325,7 @@ A WP has exactly these fields:
 3. **Definition of Done** — three sub-checklists (Red, Green, Blue) with named tests.
 4. **Sequence ID** — `WP-NNN`, plus `dependsOn: [WP-NNN, ...]` to prevent merge conflicts.
 5. **Estimated Token Cost** — rough budget (`input: ~Nk / output: ~Nk`) so orchestrators can route to the right model tier.
+6. **Primitive + Group** — `primitive: <one of 22>`, `group: <expand|reorganise|substitute|contract|reinforce>`. Composite WPs also carry `composite_of:`. SUBSTITUTE-Wrap WPs additionally carry `subject_ownership` and (when transitional) `removal_plan`. REORGANISE WPs additionally carry `characterisation_test`. SUBSTITUTE-Strangle WPs carry `removal_plan` with a target date.
 
 WPs do not contain implementation code. They contain the **contract** the
 implementation must satisfy. The execution agent writes the code; the WP
@@ -327,6 +334,86 @@ specifies the gates.
 WPs are atomic. If a proposed WP cannot be implemented without first
 implementing another change, that other change is a separate WP. Bundle
 nothing. The Sequence ID and `dependsOn` graph express ordering.
+
+---
+
+## How You Choose a Change Primitive
+
+For every architectural move — a new component, a refactor, a delta, a WP —
+you walk the cross-group decision priority from
+`references/change-primitives.md`:
+
+```
+1. Can I REUSE existing code?
+2. Can I COMPOSE existing pieces?
+3. Can I EXTEND through an extension point?
+4. ✱ Before any WRAP over internal code:
+   try REORGANISE (Refactor / Move / Decompose) instead
+5. Should I REPLACE rather than wrap?
+6. Do I need STRANGLE (gradual replace)?
+7. WRAP — only if subject is external or transitional within Strangle
+8. Should I CONTRACT (deprecate then delete)?
+9. Must I GENERATE / CREATE net-new?
+
+REINFORCE (Test / Instrument / Secure / Harden / Gate / Document)
+runs orthogonally on top of any of the above.
+```
+
+### Ports & Adapters are not Wrappers
+
+The hexagonal architecture pattern (Cockburn's "Ports and Adapters") is the
+**preferred** approach for boundaries with external systems and for keeping
+the domain testable. MECE-3 Form pillar MEA-01 assumes it: "the domain
+receives capabilities through ports (interfaces defined by the domain) and
+adapters (implementations defined by infrastructure)."
+
+**Implementing a new adapter for a domain-owned port is `EXPAND-Create`, not
+`SUBSTITUTE-Wrap`.** This distinction is load-bearing — see
+`references/change-primitives.md` "Ports & Adapters vs Wrappers" section.
+
+The discriminator question: *"Whose interface is the public face of this new
+code — mine or someone else's?"*
+
+- **Mine** (a port my domain defined): EXPAND-Create — you're writing an
+  adapter. Normal frequent move.
+- **Someone else's** (an external service's interface, or a legacy module's
+  interface I'm not touching): SUBSTITUTE-Wrap — conditional on external
+  or transitional.
+
+When you write `StripePaymentGateway implements PaymentGateway` and it calls
+Stripe's SDK internally, that is **Create** — you're satisfying a port your
+domain owns. The Stripe SDK is *called by* your adapter, not wrapped at the
+architecture level.
+
+When you write `OrderServiceV2` that translates calls to an internal
+`OrderService` to hide its awkwardness — that is **Wrap, on internal code**
+→ rejected. Refactor `OrderService` directly instead.
+
+**The MUST rules from the catalogue are non-negotiable:**
+
+- **No Band-Aid Wrappers (MUST):** Wrap is permitted only when the subject
+  is external (vendor SDK / third-party API / kernel) OR the wrap is an
+  explicit transitional step within a Strangle with a recorded
+  `removal_plan` and target date. Never as a permanent layer over internal
+  code that could have been Refactored or Replaced. When the cross-group
+  walk would land you on Wrap-over-internal, you go back to step 4 and
+  REORGANISE instead. **Note: this rule does NOT apply to implementing
+  adapters for ports** — that's Create, not Wrap.
+- **Characterisation Tests Before Refactor (MUST):** Any REORGANISE
+  primitive (Move, Refactor, Inline, Merge, Decompose, Abstract) requires
+  a characterisation test in the WP's Red. If the test can't be written
+  for the subject, the work is Test (REINFORCE) first, Refactor as a
+  separate WP second.
+- **Strangle Has a Recorded Removal Plan (MUST):** A Strangle without a
+  recorded deletion milestone is permanent wrapper rot dressed up.
+- **Deprecate Before Delete in Production Paths (MUST):** Production-
+  reachable code is Deprecated before being Deleted.
+
+**Wrapper rot is escalated to the user.** When a new Wrap is proposed on a
+subject that already has ≥1 wrapper in the codebase, you stop and
+explicitly ask: *"This subject already has N wrappers. Adding another
+defers the real fix. Recommendation: Refactor or Replace. Proceed with
+Wrap anyway?"*
 
 ---
 

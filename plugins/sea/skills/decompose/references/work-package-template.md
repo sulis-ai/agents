@@ -20,6 +20,22 @@ estimated_token_cost:
 tdd_section: "3.4 (Adapters)"            # the TDD section this WP implements
 adrs: [ADR-NNN]                          # ADRs whose decision this WP encodes
 pillar: form | armor | proof             # primary pillar this WP advances
+
+# Change primitive — required (see references/change-primitives.md)
+primitive: create                        # one of the 22
+group: expand                            # expand | reorganise | substitute | contract | reinforce
+composite_of: []                         # optional — list of primitives if this WP is a composite
+
+# Required for SUBSTITUTE-Wrap:
+# subject_ownership: external | transitional
+# justification: "Wrap is permitted only when subject is external OR transitional within Strangle."
+# removal_plan: null  # null only when subject_ownership: external
+
+# Required for SUBSTITUTE-Strangle:
+# removal_plan: "Legacy OrderService deleted by 2026-09-30 (after 100% traffic migrated)."
+
+# Required for REORGANISE primitives (Move, Refactor, Inline, Merge, Decompose, Abstract):
+# characterisation_test: "tests/legacy/characterisation/OrderService.test.ts"
 ---
 
 ## Context
@@ -133,6 +149,12 @@ Filled in by the executing agent at PR merge:
 | `estimated_token_cost` | Lets an orchestrator route to the right model tier |
 | `tdd_section` / `adrs` | Traceability — what design decision does this WP encode |
 | `pillar` | Drives audit and verification — which MECE-3 pillar this WP advances |
+| `primitive` | The change primitive (one of 22 in `references/change-primitives.md`); determines WP shape, testing strategy, and risk profile |
+| `group` | The Minto-pyramid group (expand / reorganise / substitute / contract / reinforce) — derived from primitive but recorded for clarity |
+| `composite_of` | When the WP is a composite (Migrate, Encapsulate, Branch-by-Abstraction etc.), records the recipe |
+| `subject_ownership` / `removal_plan` (Wrap WPs) | Enforces "No Band-Aid Wrappers" — Wrap is conditional on external subject or transitional within Strangle |
+| `removal_plan` (Strangle WPs) | Prevents stuck Strangles becoming permanent wrapper rot |
+| `characterisation_test` (REORGANISE WPs) | Enforces "Characterisation Tests Before Refactor" — no behaviour-preserving change without a test proving behaviour is preserved |
 | Context | One-paragraph orientation for the agent picking up the WP |
 | Contract | The unambiguous deliverable shape |
 | Red checklist | Names the failing tests up front (RGB discipline) |
