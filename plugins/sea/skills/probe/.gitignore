@@ -1,0 +1,8 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*.pyc
+.pytest_cache/
+
+# Test artifact directories that pytest creates
+tests/fixtures/*/.git/

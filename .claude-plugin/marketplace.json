@@ -4,7 +4,7 @@
     "name": "Iain"
   },
   "metadata": {
-    "version": "1.5.2",
+    "version": "1.6.0",
     "description": "Sulis AI plugin marketplace — methodology studios, requirements analysis, facilitation, context cartography, right-sized architecture, disciplined change primitives, and deterministic code intelligence. v1.5.0 introduces SEA v0.7.0 with /sea:probe — hard-tool-required structural analysis via ast-grep + lizard + scc producing CODE_INTELLIGENCE.md. Auto-installs missing tools; no LLM fallback."
   },
   "plugins": [
@@ -53,7 +53,7 @@
     {
       "name": "sea",
       "source": "./plugins/sea",
-      "version": "0.7.2",
+      "version": "0.8.0",
       "description": "Senior Engineering Architect — designs hardened architectures, audits brownfield code for primitive gaps, and decomposes designs into atomic Work Packages with Red-Green-Blue verification. /sea:probe produces deterministic CODE_INTELLIGENCE.md via ast-grep (AST queries) + lizard (cyclomatic complexity) + scc (LOC/coupling) — capability inventory, extension points, reusable abstractions, hotspots, wrapper-rot. Tools auto-install via the bundled installer; no LLM fallback. Every WP carries a change primitive (22-primitive Minto-pyramid catalogue). Enforces No-Band-Aid-Wrappers (MUST). Reads .context/{project}/INDEX.md (sulis-context); computes SIZING.md (sFPC + ASR). Consumes SRD v1.11.0+ MISUSE_CASES.md, GLOSSARY.md, ## Deferred to SEA journal sections, and HANDOFF_TO_SEA.md."
     },
     {

@@ -1,7 +1,7 @@
 {
   "name": "sea",
-  "description": "Senior Engineering Architect — designs hardened architectures, audits brownfield code for primitive gaps, and decomposes designs into atomic Work Packages with Red-Green-Blue verification. /sea:probe (v0.7.0+) uses ast-grep + lizard + scc to produce deterministic CODE_INTELLIGENCE.md (capability inventory, extension points, reusable abstractions, coupling/hotspots, wrapper-rot detection, conventions). Reads .context/{project}/INDEX.md (sulis-context); computes SIZING.md (sFPC + ASR). Every WP carries a change primitive (22-primitive Minto-pyramid catalogue). Enforces No-Band-Aid-Wrappers — Wrap is conditional; adapters for ports are Create.",
-  "version": "0.7.2",
+  "description": "Senior Engineering Architect — designs hardened architectures, audits brownfield code for primitive gaps, and decomposes designs into atomic Work Packages with Red-Green-Blue verification. /sea:probe v0.8.0 uses a Python orchestrator (scripts/probe.py) to invoke ast-grep + lizard + scc + git plus optional tools (jscpd, ts-prune, vulture, deadcode, dependency-cruiser, import-linter) across 15 deterministic phases. Outputs structured JSON + Markdown + a self-contained navigable HTML report. Works on single repos and monorepos (pnpm/lerna/nx/turborepo/cargo/maven/gradle/bazel/rush/go-workspaces). 45 unit + integration tests; no LLM fallback. Every WP carries a change primitive (22-primitive Minto-pyramid catalogue).",
+  "version": "0.8.0",
   "author": {
     "name": "Iain"
   },
@@ -15,6 +15,7 @@
     "spec-driven-development",
     "work-packages",
     "hexagonal",
-    "observability"
+    "observability",
+    "code-intelligence"
   ]
 }
