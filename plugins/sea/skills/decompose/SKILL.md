@@ -208,6 +208,20 @@ graph TD
 - **Full** (default) — fully populated WPs with named Red tests, ready for an execution agent to pick up.
 - **Single** (`/sea:decompose WP-012`) — decompose only one TDD section into WPs. Useful when a TDD section was added/changed mid-project.
 
+**Tier-aware granularity.** Read tier from `.architecture/{project}/SIZING.md`
+if present, falling back to `TDD.md`'s Sizing Report appendix. Per
+`references/right-sizing.md`:
+
+- Tier S: 3-8 WPs covering the whole TDD.
+- Tier M: 8-20 WPs; one WP per significant component or contract.
+- Tier L: 20-60 WPs; one WP per port + per adapter + per resilience primitive.
+- Tier XL: 60+ WPs organised by bounded context; per-context INDEX.md.
+
+Resist over-decomposition. If a "WP" would have a single line of work in
+its DoD, it should be merged into a sibling WP. The dependsOn graph
+captures ordering — multiple WPs for one component should be the
+exception, not the rule.
+
 ---
 
 ## Gotchas

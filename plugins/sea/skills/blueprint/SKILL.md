@@ -177,13 +177,75 @@ If extending or superseding, reference the existing ADR by path.}
    that).
 1. **Discover** — locate the spec folder; read all inputs in the table above; report what's missing. If `HANDOFF_TO_SEA.md` is present and `SRD.md` is absent, read the handoff file first and ask the user for any business intent it doesn't capture before proceeding.
 2. **Inventory** — parse `PRIMITIVE_TREE.jsonld` for components. List them. Map each to a TDD section.
-3. **Select patterns** — for each NFR, pick patterns from `references/architecture-patterns.md`. Surface trade-offs explicitly.
-4. **Translate misuse cases** — for each MUC in `MISUSE_CASES.md`, translate its `System Response (REQUIRED)` into one or more Armor-pillar primitives in the TDD. Cross-reference: every MUC ID must appear in the TDD's Armor section. See `references/hardening-deltas.md` for the MUC → delta/primitive translation pattern (the same translation applies to greenfield TDD entries).
-5. **Cover all three pillars** — for every component, ensure Form, Armor, and Proof are addressed. If you cannot address one pillar for a component, flag it in Open Questions; do not silently skip.
-6. **Draft TDD** — write `TDD.md` following the template. Use GLOSSARY.md's preferred terms exactly.
-7. **Extract ADRs** — for each non-trivial decision in the TDD, factor it out into an ADR file. The TDD references the ADR by ID.
-8. **Write `ARCH.yaml`** — link back to the source SPEC.
-9. **Report** — summarise what was produced, what patterns were chosen, what open questions remain, and which misuse cases drove which Armor primitives.
+3. **Compute SIZING.md (MUST).** Per `references/right-sizing.md`:
+   - **If `.architecture/{project}/SIZING.md` already exists and is current**
+     (all source artifact mtimes are older than SIZING.md's `Generated`
+     timestamp): read it, honour the recorded tier, skip to step 4.
+   - **Otherwise**, compute sFPC + ASR + per-pillar coverage:
+     - sFPC: count ILF (PRIMITIVE_TREE domain-entity + data-store nodes) +
+       EIF (integration nodes) + EI/EO/EQ (use cases classified by whether
+       their flow mutates / derives / retrieves)
+     - ASR: count NFRs + integrations + MUCs + cross-cutting policies +
+       hard data constraints
+     - Pillar coverage: from `.context/{project}/INDEX.md` Authoritative
+       Sources — judge whether Form, Armor, Proof are fully / partially /
+       uncovered for the work in scope
+     - Tier: from the table in the standard (take higher of sFPC-tier and
+       ASR-tier; promote to XL on multi-bounded-context)
+   
+   **Announce to the user before writing SIZING.md:**
+   
+   > "Inputs analysed:
+   >
+   > - **sFPC ≈ {N}** ({breakdown})
+   > - **ASR ≈ {M}** ({breakdown})
+   >
+   > **Tier: {S|M|L|XL}**. Target TDD ~{range} lines. Expected ADRs {range}.
+   >
+   > Pillar coverage from context index:
+   > - Form: {status} {— sources}
+   > - Armor: {status} {— sources}
+   > - Proof: {status} {— sources}
+   >
+   > Proceed, override the tier, or stop?"
+   
+   Wait for the user response. Record their choice (computed tier accepted,
+   or overridden to X). Write `.architecture/{project}/SIZING.md` per the
+   schema in `references/right-sizing.md`.
+4. **Select patterns** — for each NFR, pick patterns from `references/architecture-patterns.md`. Surface trade-offs explicitly. Skip pattern selection for any pillar marked "fully covered" in the sizing announcement; reference the authoritative source instead.
+5. **Translate misuse cases** — for each MUC in `MISUSE_CASES.md`, translate its `System Response (REQUIRED)` into one or more Armor-pillar primitives in the TDD. Cross-reference: every MUC ID must appear in the TDD's Armor section. See `references/hardening-deltas.md` for the MUC → delta/primitive translation pattern (the same translation applies to greenfield TDD entries).
+6. **Cover all three pillars at tier-appropriate depth.** For every component, ensure Form, Armor, and Proof are addressed. Per the sizing decision:
+   - Fully covered pillar → one line + reference to the authoritative source
+   - Partially covered pillar → section addresses only the gap
+   - Uncovered pillar → full tier-sized section per `references/right-sizing.md`
+   If you cannot address one pillar for a component, flag it in Open Questions; do not silently skip.
+7. **Draft TDD** — write `TDD.md` following the template. Use GLOSSARY.md's preferred terms exactly. Apply Respect-Don't-Restate throughout.
+8. **Extract ADRs** — for each non-trivial decision in the TDD, factor it out into an ADR file. The TDD references the ADR by ID. **Before writing each ADR**, check the External ADR Registry — if an existing ADR covers the same decision, reference it instead. New ADR numbering starts at one past the registry's highest. Do not write ADRs to fill a quota.
+9. **Sizing self-check (MUST).** Before writing, review your draft against the tier targets:
+   - Total TDD length > 1.5× tier target? → write a "Why is this big?" paragraph or refactor
+   - Any section restates content from an authoritative source? → refactor to a reference
+   - ADR count > tier maximum? → write an "ADR rationale" paragraph or remove the marginal ones
+   - Any pillar marked "fully covered" but actually contains content? → refactor to reference-only
+10. **Write `ARCH.yaml`** — link back to the source SPEC.
+11. **Append a Sizing Report appendix to TDD.md (MUST).** Add this as the last
+    section, cross-referencing the full SIZING.md:
+
+    ```markdown
+    ## Sizing Report
+    
+    See `SIZING.md` for the full sFPC + ASR breakdown. Highlights:
+    
+    - Tier: {S/M/L/XL} ({computed | user-overridden})
+    - TDD length: {N} lines (target: {range})
+    - ADRs produced: {N} (target: {range})
+    - Pillar coverage applied: Form={covered|gap-filled|full}; Armor={...}; Proof={...}
+    - Authoritative sources referenced: {count, listed in SIZING.md}
+    - Sections that referenced rather than restated: {list}
+    - Circuit breakers triggered: {none | list}
+    ```
+    
+    Full breakdown stays in SIZING.md to avoid duplication.
+12. **Report** — summarise what was produced, what patterns were chosen, what open questions remain, which misuse cases drove which Armor primitives, and the Sizing Report headlines.
 
 After the blueprint is accepted, the user typically runs `/sea:decompose`
 next.
@@ -192,9 +254,25 @@ next.
 
 ## Adapting Depth
 
-- **Quick** ("draft a TDD shape") — populate skeleton, leave each section's content as bullet placeholders, surface gaps. ~30 minutes.
-- **Full** (default) — complete TDD with all sections filled, ADRs for every non-trivial decision.
-- **Audit-mode** ("compare proposed TDD to MECE-3") — read an existing TDD, score it against the three pillars, return a gap list.
+Depth is governed primarily by the tier detected in step 3 of the workflow.
+The modes below are user-facing overrides — they apply on top of tier
+detection, not instead of it.
+
+- **Quick** ("draft a TDD shape") — produce a tier-skeleton only. Each
+  pillar gets one paragraph + bullet placeholders. Useful for early
+  alignment before full detail. ~30 minutes.
+- **Full** (default) — complete TDD sized to the detected tier and
+  addressable scope. ADRs for genuinely non-trivial decisions (not as a
+  quota).
+- **Audit-mode** ("compare proposed TDD to MECE-3") — read an existing TDD,
+  score it against the three pillars, return a gap list. No new TDD
+  produced.
+- **Manual tier override** — accepted at step 3 of the workflow. Up-tier
+  for growth-projection / junior-team / regulatory contexts; down-tier for
+  spike / POC / pair-programmed contexts. Recorded in the Sizing Report.
+
+See `references/right-sizing.md` for the full sizing standard, including
+when to up- or down-tier manually.
 
 ---
 
@@ -210,6 +288,9 @@ next.
 - **Use the locked vocabulary.** Use only the preferred terms from `GLOSSARY.md` — do not introduce synonyms or use forms the glossary marks as deprecated.
 - **Respect, Don't Restate (MUST).** If `.context/{project}/INDEX.md` exists and lists authoritative sources, your TDD references those sources for topics they already cover — it does not reproduce or paraphrase their content. The most common SEA failure mode is generating a 600+ line TDD that re-derives Clean Architecture, then writing 10 ADRs that overlap with the project's existing registry. The context index is the antidote. Read it, respect it, surface contradictions instead of silently overruling them.
 - **New ADRs start past the highest external ADR.** Check the External ADR Registry in the context index. If it shows `Highest ADR number: ADR-22`, your first new ADR is ADR-23. Starting at ADR-1 collides with the existing registry and creates ambiguous references.
+- **Size to addressable scope, not to the template (MUST).** The "Full" TDD template is a maximum, not a target. A 4-NFR change does not deserve a 600-line TDD. Compute the tier (S/M/L/XL) in step 3 of the workflow, then *shrink* the target by per-pillar coverage from the context index. A tier-L project with rich existing coverage may justifiably produce a 200-line TDD. See `references/right-sizing.md`. The Sizing Report you append to TDD.md makes this calibration visible.
+- **ADRs are not a quota.** They emerge when a decision affects more than one component, locks a technology choice, or rejects a viable alternative — AND no existing ADR covers it. A tier-L project where the team has already made all the major decisions may justifiably produce zero new ADRs. Resist the urge to write ADRs for "we used X" when X was the obvious choice.
+- **Chaos tests need a named NFR or MUC.** Each chaos test in the Proof section must defend a specific NFR or MUC. A chaos test for "what happens when the cache is down" without a corresponding NFR or MUC is testing imagination, not requirements — drop it.
 
 ---
 

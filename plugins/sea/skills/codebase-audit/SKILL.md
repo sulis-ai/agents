@@ -85,12 +85,49 @@ table). The non-exhaustive checklist:
 
 ## Workflow
 
+0. **Read `.context/{project}/INDEX.md` if present.** Use the Authoritative
+   Sources to constrain findings — if an authoritative standard already
+   mandates a behaviour (e.g. TLS 1.3), do not flag it as a missing
+   requirement; flag only missing implementation. The External ADR Registry
+   informs delta source-fields (`source: srd:misuse-case-MUC-NN` vs
+   `source: external:ADR-NN`).
 1. **Discover** — walk the source tree. Identify language, frameworks,
    structure. Produce a 1-paragraph summary so the user knows what you read.
    If `HANDOFF_TO_SEA.md` exists, read it first and let it shape the
    discovery scope. If `## Deferred to SEA` is present in the journal, read
    the parked items and use them to prioritise the audit.
-1a. **Misuse-case reconciliation (if MISUSE_CASES.md exists)** — for each MUC,
+1a. **Compute SIZING.md (MUST).** Per `references/right-sizing.md`'s
+   **Brownfield Equivalence** section, derive sFPC + ASR from the codebase
+   rather than from SRD artifacts:
+   - **ILF** — count distinct database schemas / ORM models / persistent
+     collections (look in `migrations/`, `models/`, `entities/`,
+     `db/schema.*`, etc.)
+   - **EIF** — count outbound HTTP/RPC/queue clients to external systems
+     (grep for HTTP client instantiation, queue subscriber setup, etc.)
+   - **EI/EO/EQ** — classify endpoints by HTTP verb + body inspection
+     (POST/PUT/PATCH/DELETE typically EI; computed GETs are EO; simple GETs
+     are EQ; message consumers are EI if they update state)
+   - **NFRs as ASRs** — inferred from observed thresholds (rate limits,
+     timeout configs, retention policies in code/config); flag as
+     "inferred, not documented" in SIZING.md
+   - **Integrations** — same as EIF count
+   - **MUCs as ASRs** — inferred from auth/audit/replay-protection code
+     paths; flag as "inferred"
+   - **Cross-cutting policies** — middleware / interceptors / decorators
+     with authz, audit, rate-limit, or observability purpose
+   
+   Apply the tier table from `references/right-sizing.md`. File count is a
+   sanity check — if sFPC + ASR suggest tier S but the codebase has 2000+
+   source files, surface the mismatch:
+   
+   > "Computed tier S but codebase has 2247 source files. Likely either
+   > substantial generated/boilerplate code, or audit scope needs narrowing.
+   > Override tier, narrow scope, or proceed?"
+   
+   Write `.architecture/{project}/SIZING.md` per the schema in
+   `references/right-sizing.md`. The audit report's depth follows the
+   resulting tier.
+1b. **Misuse-case reconciliation (if MISUSE_CASES.md exists)** — for each MUC,
    determine whether its System Response is implemented in the code. If not,
    draft a Hardening Delta with `source: srd:misuse-case-MUC-NN`. See
    `references/hardening-deltas.md` for the translation pattern.

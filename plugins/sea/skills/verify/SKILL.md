@@ -229,6 +229,24 @@ SEA's job is honesty, not gatekeeping.
 - **Full** (default) — all five perspectives.
 - **Pillar-focused** (e.g. `/sea:verify --pillar=armor`) — run P1 and P4 only, scoped to one pillar. Useful for "are we hardened enough to ship?" before release.
 
+**Tier-aware perspective depth.** Read tier from
+`.architecture/{project}/SIZING.md` if present, falling back to `TDD.md`'s
+Sizing Report appendix. Per `references/right-sizing.md`:
+
+- Tier S: every perspective in compressed form; verification report ~1 page.
+- Tier M: every perspective in standard form; ~2-4 page report.
+- Tier L: every perspective in full form; per-pillar tables of findings.
+- Tier XL: per-bounded-context verification reports + system-level summary.
+
+A tier-S verification report that runs to 20 pages is over-engineered.
+A tier-L verification report that runs to 1 page is under-engineered.
+Match the tier or surface why you're not matching it.
+
+**Verify also enforces sizing circuit breakers.** If TDD.md was shipped
+with a circuit-breaker violation (length > 1.5× target, ADRs > tier max,
+section restated authoritative source) and no justification paragraph,
+flag it as a perspective finding.
+
 ---
 
 ## Gotchas

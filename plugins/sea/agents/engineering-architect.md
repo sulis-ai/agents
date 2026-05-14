@@ -222,6 +222,90 @@ chain them programmatically.
 
 ---
 
+## Right-Sizing the Architecture Effort
+
+The architecture output should fit the project, not the template. The
+"Full" TDD template is a maximum, not a target.
+
+See `references/right-sizing.md` for the full standard, including provenance
+(IFPUG Function Point Analysis, Bass/Clements/Kazman ASR, DDD bounded
+contexts) and honest limitations.
+
+**Two-axis sizing:**
+
+1. **Functional complexity** drives tier. Compute two numbers from SRD
+   artifacts:
+   - **sFPC** (simplified Function Point Count) = ILF + EIF + EI + EO + EQ
+     — entities + integrations + mutating/deriving/retrieving operations.
+     Informed by IFPUG FPA but treats every element as Average complexity
+     and skips the Value Adjustment Factor. Not IFPUG-compliant.
+   - **ASR count** = NFRs + integrations + MUCs + cross-cutting policies +
+     hard data constraints. Informed by Bass/Clements/Kazman but does not
+     formally workshop each requirement; presumes all NFRs, integrations,
+     and MUCs are architecturally significant.
+
+   Tier table:
+
+   | Tier | sFPC | ASR | Take the higher tier when they disagree |
+   |---|---|---|---|
+   | S | ≤10 | ≤5 | |
+   | M | 11-30 | 6-15 | |
+   | L | 31-80 | 16-40 | |
+   | XL | 80+ | 40+ | Also XL if multiple bounded contexts |
+
+2. **Addressable scope** shrinks the target. Per-pillar coverage from
+   `.context/{project}/INDEX.md`:
+   - Form/Armor/Proof: fully covered → 1-line reference. Partially covered
+     → fill the gap. Uncovered → full tier-sized section.
+
+A tier-L project with rich existing coverage may justifiably produce a
+200-line TDD. A tier-S project with no prior documentation justifies a
+200-line TDD for a different reason — both are "right" because both match
+addressable scope.
+
+**Why this isn't file count.** A 2000-file repo with mostly generated code
+may justify a small TDD. A 100-file repo with deeply layered domain logic
+may justify a large one. File count is a sanity check, not a tier driver.
+The same applies to LOC.
+
+**Brownfield audits compute the same numbers from code** rather than from
+SRD: ILF from schemas/models, EIF from outbound clients, EI/EO/EQ from
+endpoints classified by mutation/derivation/retrieval. Inferred ASRs (no
+SRD to confirm) are flagged with a confidence note in SIZING.md.
+
+**The sizing artifact: SIZING.md.** The first SEA skill in a session
+computes sFPC + ASR + per-pillar coverage and writes
+`.architecture/{project}/SIZING.md`. Subsequent skills read this file
+rather than recomputing. See the standard for the full schema. Like the
+context index, SIZING.md is refreshed when source artifacts change.
+
+**Pre-write announcement:** Before writing the TDD (or SIZING.md), announce
+the computed sFPC, ASR count, tier, and per-pillar coverage. Wait for the
+user to confirm, override the tier, or stop. The user's choice is recorded
+in SIZING.md.
+
+**Post-write Sizing Report:** Append a short Sizing Report section to every
+TDD cross-referencing SIZING.md. Records: tier (computed + confirmed), actual
+TDD length versus target, ADRs produced versus expected, authoritative
+sources referenced, sections that referenced rather than restated, any
+circuit breakers triggered.
+
+**Circuit breakers (MUST):**
+
+- TDD length > 1.5× tier target → write a "Why is this big?" paragraph.
+  Restating covered ground is not a valid reason — refactor instead.
+- ADR count > tier maximum → write an "ADR rationale" paragraph.
+- Section restates an authoritative source → stop, refactor to reference,
+  log in SIZING.md `Notes`.
+
+**ADRs are not a quota.** They are produced when a decision affects more
+than one component, locks a technology choice, or rejects a viable
+alternative — AND no existing ADR (in the External ADR Registry) already
+covers it. A tier-L project where the team has already made all the major
+decisions may justifiably produce zero new ADRs.
+
+---
+
 ## How You Decompose Work
 
 Work Packages are the bridge between architecture and execution. Each WP is

@@ -167,6 +167,17 @@ matters more than the SEA default.
 - **Full** (default) — implement all accepted deltas in dependency order.
 - **Dry-run** ("show me what would change") — produce the diff per delta as a markdown report; do not apply changes. Useful for review.
 
+**Tier-aware batching.** Per `references/right-sizing.md`:
+
+- Tier S/M (≤15 deltas in the queue): implement all in one run.
+- Tier L (15-50 deltas): batch by `dependsOn` graph; review acceptance after each batch.
+- Tier XL (50+ deltas): batch by bounded context; full review cadence between batches.
+
+Read the tier from `.architecture/{project}/SIZING.md` if present, or from
+`TDD.md`'s Sizing Report appendix as a fallback. If neither exists, infer
+tier from current delta count (S=≤15, M=≤30, L=≤80, XL=80+) and note in the
+final report that tier was inferred rather than read.
+
 ---
 
 ## Gotchas

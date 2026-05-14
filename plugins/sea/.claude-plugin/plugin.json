@@ -1,7 +1,7 @@
 {
   "name": "sea",
-  "description": "Senior Engineering Architect — designs hardened architectures, audits brownfield code for primitive gaps, and decomposes designs into atomic Work Packages with Red-Green-Blue verification. Reads .context/{project}/INDEX.md (from sulis-context) before any artifact is written — applies Respect-Don't-Restate, references existing authoritative sources, and numbers new ADRs to avoid collision with external registries.",
-  "version": "0.4.0",
+  "description": "Senior Engineering Architect — designs hardened architectures, audits brownfield code for primitive gaps, and decomposes designs into atomic Work Packages with Red-Green-Blue verification. Reads .context/{project}/INDEX.md (from sulis-context) and computes a SIZING.md (sFPC + ASR + per-pillar coverage, informed by IFPUG FPA and Bass/Clements/Kazman ASR) to right-size output to the project. Applies Respect-Don't-Restate and numbers new ADRs to avoid collision with external registries.",
+  "version": "0.5.0",
   "author": {
     "name": "Iain"
   },
