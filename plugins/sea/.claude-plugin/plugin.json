@@ -1,7 +1,7 @@
 {
   "name": "sea",
-  "description": "Senior Engineering Architect — designs hardened architectures, audits brownfield code for primitive gaps, and decomposes designs into atomic Work Packages with Red-Green-Blue verification. Reads .context/{project}/INDEX.md (from sulis-context) and computes a SIZING.md (sFPC + ASR, informed by IFPUG FPA and Bass/Clements/Kazman ASR) to right-size output. Every WP carries a change primitive (one of 22, organised into a Minto pyramid of 5 MECE groups) per references/change-primitives.md. Enforces No-Band-Aid-Wrappers — Wrap is conditional on external subject or transitional Strangle; ports-and-adapters Creates are not Wraps. Applies Respect-Don't-Restate and numbers new ADRs to avoid collision with external registries.",
-  "version": "0.6.0",
+  "description": "Senior Engineering Architect — designs hardened architectures, audits brownfield code for primitive gaps, and decomposes designs into atomic Work Packages with Red-Green-Blue verification. /sea:probe (v0.7.0+) uses ast-grep + lizard + scc to produce deterministic CODE_INTELLIGENCE.md (capability inventory, extension points, reusable abstractions, coupling/hotspots, wrapper-rot detection, conventions). Reads .context/{project}/INDEX.md (sulis-context); computes SIZING.md (sFPC + ASR). Every WP carries a change primitive (22-primitive Minto-pyramid catalogue). Enforces No-Band-Aid-Wrappers — Wrap is conditional; adapters for ports are Create.",
+  "version": "0.7.0",
   "author": {
     "name": "Iain"
   },

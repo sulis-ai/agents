@@ -214,6 +214,7 @@ chain them programmatically.
 
 | Command | When you use it | What it produces |
 |---|---|---|
+| `/sea:probe` | Brownfield with non-trivial codebase — deterministic structural analysis (requires ast-grep + lizard + scc; auto-installs if missing) | `CODE_INTELLIGENCE.md` — capability inventory, extension points, abstractions, coupling/hotspots, wrapper rot, conventions, patterns |
 | `/sea:blueprint` | Greenfield — synthesise a TDD from SRD outputs | `TDD.md`, `adrs/ADR-NNN-*.md` |
 | `/sea:codebase-audit` | Brownfield — read source, find primitive gaps | `audit-report.md`, draft Hardening Deltas |
 | `/sea:harden` | Brownfield — implement accepted Hardening Deltas | Code changes + deltas marked `implemented` |
@@ -479,7 +480,7 @@ Wrap anyway?"*
 
 Run these checks at the start of every session, in order:
 
-### 0. Context check (MUST run before anything else)
+### 0a. Context check (MUST run before anything else)
 
 Does `.context/{project}/INDEX.md` exist?
 
@@ -506,6 +507,36 @@ Does `.context/{project}/INDEX.md` exist?
   Do not produce any artifact until the user runs discovery or overrides.
 
 - **No, and the codebase is truly greenfield/empty:** proceed; no context to load.
+
+### 0b. Code intelligence check (brownfield only)
+
+Does `.architecture/{project}/CODE_INTELLIGENCE.md` exist and is it current
+(every source mtime in the project is older than the file's `Generated`
+timestamp; not older than 30 days)?
+
+- **Yes:** Read it. Capability inventory, extension points, abstractions,
+  coupling map, hotspots, wrapper rot, conventions, and recommendations
+  inform every downstream decision.
+
+- **No, and codebase is non-trivial:** **stop and auto-suggest
+  `/sea:probe`.**
+
+  > "This project has a non-trivial codebase but no current
+  > CODE_INTELLIGENCE.md. `/sea:probe` produces deterministic structural
+  > analysis (capability inventory, extension points, abstractions,
+  > complexity hotspots, wrapper rot) that downstream skills (blueprint,
+  > decompose, harden, verify) depend on for informed extend / reuse /
+  > refactor / create decisions.
+  >
+  > Run `/sea:probe` first. It requires ast-grep, lizard, and scc; if not
+  > installed, the skill will offer to install them.
+  >
+  > Override: reply with 'continue without intelligence' to proceed
+  > anyway — but downstream decisions will be inference-only and you may
+  > end up with WPs that wrap-rather-than-refactor, duplicate existing
+  > abstractions, or mis-classify adapters as Wraps."
+
+- **No, and codebase is truly greenfield/empty:** proceed; nothing to probe.
 
 ### 1-3. Spec + codebase check
 
