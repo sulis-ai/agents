@@ -148,12 +148,61 @@ def write_synthesis_draft(cfg: OrchestratorConfig) -> Path:
             "{priority, primitive, target, evidence_phases: ['1.6','1.11'], "
             "rationale, confidence}"
         ),
+        "reserved_vocabulary_hint": _build_reserved_vocabulary_hint(cfg.output_dir),
         "generated_at": "",
         "generated_by": "draft",
     }
     path = cfg.output_dir / SYNTHESIS_FILE
     write_json(draft, path)
     return path
+
+
+# Words whose semantics are pinned by Kubernetes / Sulis-manifest convention.
+# Introducing a new abstract with one of these names creates a polysemy risk:
+# readers will import lifecycle expectations (persistence, reconciliation,
+# `apply` semantics) that may not hold for the new concept. Downstream skills
+# (blueprint) consume this list to gate on naming collisions.
+_INFRASTRUCTURE_RESERVED_WORDS: tuple[str, ...] = (
+    "kind", "apiVersion", "metadata", "spec", "status",
+    "apply", "reconcile", "manifest", "resource",
+)
+
+
+def _build_reserved_vocabulary_hint(raw_dir: Path) -> dict[str, Any]:
+    """Compose the vocabulary-collision hint for downstream design skills.
+
+    Reads `1_16_deployment.json` (if present) to surface every YAML `kind:`
+    value actually in use in the repo — these are the words a designer must
+    not reuse as abstract type names without an explicit ADR justifying the
+    shared dispatch semantics.
+    """
+    deployment = _load_repo_phase(raw_dir, "1.16")
+    yaml_kinds: list[str] = []
+    if deployment:
+        payload = deployment.get("payload") or {}
+        sulis_kinds = payload.get("sulis_kinds_present") or []
+        # Also surface non-Sulis YAML sub-kinds (k8s Deployment, Service, etc.)
+        # since they share the same dispatch shape.
+        other_subkinds = {
+            a.get("sub_kind")
+            for a in (payload.get("artifacts") or [])
+            if a.get("sub_kind") and a.get("kind") in ("k8s-manifest", "argocd", "flux")
+        }
+        yaml_kinds = sorted(set(sulis_kinds) | other_subkinds)
+    return {
+        "yaml_kinds_in_use": yaml_kinds,
+        "infrastructure_reserved": list(_INFRASTRUCTURE_RESERVED_WORDS),
+        "guidance": (
+            "Treat these as reserved when naming abstract types, classes, or "
+            "registry keys in downstream design (TDD, ADRs, GLOSSARY). "
+            "A new abstract that shares a name with a YAML `kind:` value "
+            "imports its dispatch shape — readers will assume shared "
+            "lifecycle semantics (persistence, convergent reconciliation, "
+            "`apply` verb). If the new concept differs on any of those, "
+            "rename it, or write an ADR explaining the shared-dispatch "
+            "intent. Blueprint's Reserved-Vocabulary Sweep enforces this."
+        ),
+    }
 
 
 # ─── Markdown rendering ───────────────────────────────────────────────────

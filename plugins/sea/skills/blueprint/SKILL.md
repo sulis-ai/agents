@@ -36,6 +36,7 @@ If no SRD specification exists, stop and tell the user — refer them to
 | `MISUSE_CASES.md` (SRD v1.11.0+) | Abuse cases, misuse flows, **System Response (REQUIRED)** for each → seeds Armor primitives (rate limits, audit logging, replay protection, integrity guards) and shapes the TDD's security boundary |
 | `PRIMITIVE_TREE.jsonld` | Structural decomposition of building blocks → component inventory |
 | `GLOSSARY.md` | Locked vocabulary from SRD Phase 3.5 Disambiguation Sweep — use preferred terms exactly in the TDD and ADRs |
+| `.architecture/{project}/probe-raw/synthesis.json` → `reserved_vocabulary_hint` | YAML kinds in use + universally K8s/Sulis-reserved words. Feeds the Reserved-Vocabulary Sweep at step 7. If the field is missing, the probe is older than v0.9.1 — recommend re-running. |
 | `diagrams/*.md` | Sequence, process, data-flow diagrams → integration design |
 | `EXPLORATION_JOURNAL.md` `## Deferred to SEA` (if present) | Architecture-and-implementation content parked by SRD mid-session — treat as additional design intent from the user |
 | `HANDOVER.md` (if present) | Suggested implementation sequence → may inform WP ordering |
@@ -219,15 +220,50 @@ If extending or superseding, reference the existing ADR by path.}
    - Partially covered pillar → section addresses only the gap
    - Uncovered pillar → full tier-sized section per `references/right-sizing.md`
    If you cannot address one pillar for a component, flag it in Open Questions; do not silently skip.
-7. **Draft TDD** — write `TDD.md` following the template. Use GLOSSARY.md's preferred terms exactly. Apply Respect-Don't-Restate throughout.
-8. **Extract ADRs** — for each non-trivial decision in the TDD, factor it out into an ADR file. The TDD references the ADR by ID. **Before writing each ADR**, check the External ADR Registry — if an existing ADR covers the same decision, reference it instead. New ADR numbering starts at one past the registry's highest. Do not write ADRs to fill a quota.
-9. **Sizing self-check (MUST).** Before writing, review your draft against the tier targets:
-   - Total TDD length > 1.5× tier target? → write a "Why is this big?" paragraph or refactor
-   - Any section restates content from an authoritative source? → refactor to a reference
-   - ADR count > tier maximum? → write an "ADR rationale" paragraph or remove the marginal ones
-   - Any pillar marked "fully covered" but actually contains content? → refactor to reference-only
-10. **Write `ARCH.yaml`** — link back to the source SPEC.
-11. **Append a Sizing Report appendix to TDD.md (MUST).** Add this as the last
+7. **Reserved-Vocabulary Sweep (MUST).** Before naming abstract types, classes, registries, or dispatch keys in the TDD, run this check. It catches polysemy collisions between proposed design vocabulary and infrastructure-coded vocabulary already in use in the repo. The kind/Kind collision (a generative-pipeline abstract sharing a name with the Sulis YAML discriminator) is the canonical failure mode this step exists to prevent.
+
+   a. **Load reserved words.** Read `.architecture/{project}/probe-raw/synthesis.json`'s `reserved_vocabulary_hint` block (emitted by `/sea:probe` v0.9.1+). It contains:
+   - `yaml_kinds_in_use` — every value seen in `apiVersion: <x>` / `kind: <y>` pairs across the repo (Sulis kinds, k8s sub-kinds, Argo, Flux). These are reserved because re-using one of these names imports its dispatch shape.
+   - `infrastructure_reserved` — universally K8s/Sulis-coded words (`kind`, `apiVersion`, `metadata`, `spec`, `status`, `apply`, `reconcile`, `manifest`, `resource`).
+   
+   If the hint is missing (older probe output), recompute it on the fly by reading `1_16_deployment.json` directly, or surface the gap and recommend re-running `/sea:probe`.
+   
+   Also load `GLOSSARY.md` (if present) — its preferred-terms list is already a vocabulary lock.
+
+   b. **List proposed abstracts.** Enumerate every new abstract type, class, registry, or dispatch concept the TDD will introduce. For tier-S this is usually 3-8; for tier-XL it can be 20+.
+
+   c. **Score each proposed abstract against the reserved set.** For every proposed abstract `P`:
+   - If `P` does not appear in `yaml_kinds_in_use` or `infrastructure_reserved` and is not flagged in GLOSSARY: proceed.
+   - If `P` matches (case-insensitive) any reserved word: trigger the lifecycle check below.
+
+   d. **4-cell lifecycle check.** For each colliding name, fill this table — for both the existing manifest resource and the proposed abstract:
+
+   | Question | Manifest resource `kind: X` | Proposed abstract `X` |
+   |---|---|---|
+   | Does it persist (DB/repo-stored)? | yes/no | yes/no |
+   | Does it converge (drift-reconciled)? | yes/no | yes/no |
+   | Does it have a natural key? | yes/no | yes/no |
+   | What does `apply -f X.yaml` mean? | bring resource into desired state / invoke a pipeline / N/A | … |
+   | Delete semantics? | convergent / explicit-only / N/A | … |
+
+   e. **Decision rule (MUST):**
+   - **All five cells match** → proceed; the shared name reflects shared semantics. Note in the TDD that the dispatch is intentionally shared.
+   - **Any cell diverges** → BLOCK. The agent MUST do one of:
+     1. **Rename the proposed abstract.** Pick a name that anchors on what's distinct (e.g. Kind → Recipe because the abstract is "instructions for producing", not "type of thing"). Update GLOSSARY.md with a "Where else this word appears" note on the old term.
+     2. **Write an ADR justifying the shared dispatch.** Cite the lifecycle differences explicitly; explain why the runtime path is genuinely the same despite different semantics. This is the rare case (e.g. when the new abstract is genuinely a new manifest resource).
+   - **Do not proceed to TDD draft until the table is filled and the decision recorded** for every collision.
+
+   f. **Report the sweep result in the TDD's "Open Questions" or "Design Decisions" section.** Even when no collisions were found, the report demonstrates the check ran: "Reserved-Vocabulary Sweep: {N} proposed abstracts checked against {M} reserved words; no collisions found."
+
+8. **Draft TDD** — write `TDD.md` following the template. Use GLOSSARY.md's preferred terms exactly. Apply Respect-Don't-Restate throughout.
+9. **Extract ADRs** — for each non-trivial decision in the TDD, factor it out into an ADR file. The TDD references the ADR by ID. **Before writing each ADR**, check the External ADR Registry — if an existing ADR covers the same decision, reference it instead. New ADR numbering starts at one past the registry's highest. Do not write ADRs to fill a quota.
+10. **Sizing self-check (MUST).** Before writing, review your draft against the tier targets:
+    - Total TDD length > 1.5× tier target? → write a "Why is this big?" paragraph or refactor
+    - Any section restates content from an authoritative source? → refactor to a reference
+    - ADR count > tier maximum? → write an "ADR rationale" paragraph or remove the marginal ones
+    - Any pillar marked "fully covered" but actually contains content? → refactor to reference-only
+11. **Write `ARCH.yaml`** — link back to the source SPEC.
+12. **Append a Sizing Report appendix to TDD.md (MUST).** Add this as the last
     section, cross-referencing the full SIZING.md:
 
     ```markdown
@@ -242,10 +278,11 @@ If extending or superseding, reference the existing ADR by path.}
     - Authoritative sources referenced: {count, listed in SIZING.md}
     - Sections that referenced rather than restated: {list}
     - Circuit breakers triggered: {none | list}
+    - Reserved-Vocabulary Sweep: {N} abstracts checked / {M} collisions / {K} renames / {L} shared-dispatch ADRs
     ```
     
     Full breakdown stays in SIZING.md to avoid duplication.
-12. **Report** — summarise what was produced, what patterns were chosen, what open questions remain, which misuse cases drove which Armor primitives, and the Sizing Report headlines.
+13. **Report** — summarise what was produced, what patterns were chosen, what open questions remain, which misuse cases drove which Armor primitives, and the Sizing Report headlines.
 
 After the blueprint is accepted, the user typically runs `/sea:decompose`
 next.
@@ -286,6 +323,7 @@ when to up- or down-tier manually.
 - **Cross-reference the PRIMITIVE_TREE.** Every node in the tree should map to at least one TDD component. Nodes that don't map are gaps — flag them.
 - **Cross-reference MISUSE_CASES.md.** Every MUC should map to at least one Armor primitive in the TDD. MUCs that don't map are gaps — flag them.
 - **Use the locked vocabulary.** Use only the preferred terms from `GLOSSARY.md` — do not introduce synonyms or use forms the glossary marks as deprecated.
+- **Reserved-Vocabulary Sweep is non-optional.** Step 7 catches polysemy collisions between proposed design vocabulary and YAML kind values already used as dispatch keys in the project's infrastructure. The canonical failure it prevents: a new abstract called `Kind` for content generation that shares a name with the Sulis YAML discriminator (`apiVersion: sulis.io/v1, kind: Workload`) — same dispatch shape, opposite lifecycle (one persists and converges, the other is a one-shot pipeline invocation). The sweep table forces lifecycle differences visible *before* TDD authorship, when renames cost minutes rather than days. If the probe synthesis is missing the `reserved_vocabulary_hint` block, re-run `/sea:probe` (v0.9.1+) before drafting.
 - **Respect, Don't Restate (MUST).** If `.context/{project}/INDEX.md` exists and lists authoritative sources, your TDD references those sources for topics they already cover — it does not reproduce or paraphrase their content. The most common SEA failure mode is generating a 600+ line TDD that re-derives Clean Architecture, then writing 10 ADRs that overlap with the project's existing registry. The context index is the antidote. Read it, respect it, surface contradictions instead of silently overruling them.
 - **New ADRs start past the highest external ADR.** Check the External ADR Registry in the context index. If it shows `Highest ADR number: ADR-22`, your first new ADR is ADR-23. Starting at ADR-1 collides with the existing registry and creates ambiguous references.
 - **Size to addressable scope, not to the template (MUST).** The "Full" TDD template is a maximum, not a target. A 4-NFR change does not deserve a 600-line TDD. Compute the tier (S/M/L/XL) in step 3 of the workflow, then *shrink* the target by per-pillar coverage from the context index. A tier-L project with rich existing coverage may justifiably produce a 200-line TDD. See `references/right-sizing.md`. The Sizing Report you append to TDD.md makes this calibration visible.
