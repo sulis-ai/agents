@@ -44,6 +44,7 @@ Every node carries these properties regardless of type:
 | source | string | yes | codebase, inferred, user |
 | parent | string | no | ID of parent node (null for root) |
 | dependencies | object[] | no | Array of `{target, type}` — see Dependency Wiring Rules |
+| leaf_category | string | conditional | One of `external-system | genesis-bootstrap | primitive-component | external-spec | existing-impl`. **Required** when `health_status: validated` AND the node has zero outgoing depends-on edges to non-terminated nodes. Set by the SRD analyst's Two-Model OODA Reconciliation rule during the Decide step, not at synthesis. Nodes synthesised from CODEBASE_INDEX.json are candidates for `existing-impl` but the category is committed during reconciliation. The five-value vocabulary is the irreducible-primitive taxonomy: external-system (outside our boundary, e.g. Stripe), genesis-bootstrap (one-time system seed, admin-plane), primitive-component (validated atom per whiteboard test + scale constraints), external-spec (specified in another SRD), existing-impl (code ships it; spec describes configuration not implementation). |
 
 
 ### domain-entity

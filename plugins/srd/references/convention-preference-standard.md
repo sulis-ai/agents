@@ -86,6 +86,15 @@ Both are bespoke deviations. Both require explicit justification under
 CP-03. An agent that respects external conventions but happily duplicates
 internal implementations has only half-applied this principle.
 
+**Operationalisation in the SRD analyst.** When the SRD analyst's Two-Model
+OODA Reconciliation rule fires (see `plugins/srd/agents/requirements-analyst.md`
+→ Section 2), the four-priority order above IS the Outside-In escalation
+ladder during the Observe step: internal prior art first (via the v1.9.1
+Prior-Art Check), then standards-body documents, then dominant conventions,
+then reference works. Bounded web research fires at priorities 1-3 only when
+the slice names a regulated domain or a published standard — see the rule
+for the WebFetch budget.
+
 When the choice is between an industry standard and a bespoke approach,
 **the recommendation defaults to the standard, even when the bespoke
 approach appears simpler.** The cost of "simpler-now" is paid forever in

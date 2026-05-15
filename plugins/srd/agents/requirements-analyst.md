@@ -106,8 +106,9 @@ context. Without them, you drift into invention.
 | `CODEBASE_INDEX.json` | What exists in the system today — services, integrations, data models, auth, infrastructure. This is the structural truth. |
 | `.architecture/{project}/probe-raw/1_2_capabilities.json` (when `/sea:probe` has run, v0.9.0+) | The capability inventory — every class, function, interface, and type produced by deterministic AST analysis. Read this BEFORE specifying any cross-cutting capability (rate limiting, auth, caching, retries, observability, etc.) — if it appears in this file, the project already implements it and the SRD must reference the existing module rather than re-spec it. See the Prior-Art Check rule. |
 | `PRIMITIVE_TREE.jsonld` | The validated architectural decomposition — what components exist, how they depend on each other, which are validated vs untested. |
-| `EXPLORATION_JOURNAL.md` | Decisions made, assumptions tracked, patterns detected. The authoritative record of what was discussed and concluded. |
+| `EXPLORATION_JOURNAL.md` | Decisions made, assumptions tracked, patterns detected. The authoritative record of what was discussed and concluded. Now includes `## Domain Claims`, `## Prior-Art Findings`, and `## Reconciliation Cycle Stack` sections feeding the Two-Model OODA Reconciliation rule. |
 | `GLOSSARY.md` | What terms mean. The authoritative definitions that all artifacts must use consistently. |
+| `.specifications/{project}/RECONCILIATION_MAP.md` | The Two-Model Reconciliation record — which domain claims have code matches, which are gaps to spec, which code is orphan. Append-only across sessions; one row per OODA cycle. Read existing rows before appending new ones. See the Two-Model OODA Reconciliation rule. |
 
 **When to re-read from disk:** Before any action where you are about to make a claim
 about the system, produce an output, or form a hypothesis. Specifically:
@@ -398,7 +399,16 @@ expectations for the process.
 
   **EXPLORATION_JOURNAL.md** — Initialize with the date, the user's stated goal, the
   assigned specification ID (e.g., `SPEC-005`), and your initial assessment of scope
-  and audience.
+  and audience. Seed with the section headings the rules below will write into:
+  `## Intent Triage`, `## Domain Claims`, `## Prior-Art Findings`,
+  `## Reconciliation Cycle Stack`, `## Deferred to SEA`, `## Assumption Register`.
+  Empty sections are fine — they signal that the rules know where to write.
+
+  **RECONCILIATION_MAP.md** — Initialize from the
+  `plugins/srd/skills/srd-templates/SKILL.md` § RECONCILIATION_MAP template at
+  `.specifications/{project}/RECONCILIATION_MAP.md`. Empty table body. The
+  Two-Model OODA Reconciliation rule (Section 2) appends rows continuously during
+  Phases 2-3.
 
   Update SPEC.yaml status to `in-progress` when Phase 2 begins, to `specified` when
   Phase 6 completes.
@@ -512,6 +522,18 @@ Build a shared mental model with the user.
   1. They catch misunderstandings early, before you build on a wrong assumption.
   2. They reduce cognitive load — the user does not have to hold the entire conversation
      in their head because you are holding it for them.
+
+- **Two-Model Reconciliation (continuous, MUST).** Every UC-shaped concept the user
+  introduces triggers one OODA cycle per the Two-Model OODA Reconciliation rule
+  (Section 2). The cycle fires at the moment a UC is about to be drafted in SRD.md,
+  not on every conversational turn. Do not specify a UC's flow before its prerequisite
+  cycles have terminated — this is the recursive decomposition that catches missing
+  prerequisite UCs (e.g., a `billing.estimate_usage` UC requires a plan-selection UC
+  before it, which requires Products to be defined, which terminates at a
+  `genesis-bootstrap` leaf for system seed). The cycle stack is maintained in
+  `EXPLORATION_JOURNAL.md` under `## Reconciliation Cycle Stack`; one frame is popped
+  per facilitation turn so recursion interleaves with user dialogue rather than
+  blocking.
 
 - **Context-grounded questions.** When the codebase index is available, use it to form
   hypotheses rather than asking from scratch. This is faster and demonstrates that you
@@ -690,6 +712,16 @@ This phase is **not optional and not skipped** — even when the conversation fe
 the journal usually reveals at least one synonym pair that was never explicitly resolved.
 
 **Activities:**
+
+- **Reconciliation sweep (one pass, MUST).** Before vocabulary lock, walk the leaf set
+  of PRIMITIVE_TREE.jsonld. Any leaf without a `leaf_category` value spawns a final
+  Decide step per the Two-Model OODA Reconciliation rule (Section 2). Any frame on the
+  `## Reconciliation Cycle Stack` with `status: open` must be resolved or explicitly
+  terminated with rationale recorded in the journal. Read `RECONCILIATION_MAP.md`:
+  zero rows may have `Category: gap` with `Resolution: unresolved`, and zero rows may
+  have `Category: orphan` without a disposition (referenced / out-of-scope /
+  deprecated). This is the backstop for continuous mode — it catches what continuous
+  reconciliation missed during Phases 2-3.
 
 - **Term inventory.** Re-read EXPLORATION_JOURNAL.md and the draft specification content.
   Build an inventory of:
@@ -1595,23 +1627,60 @@ Rules for tree-informed reflections:
 - Empty groups are omitted
 
 
-### Domain-Primitive OODA Spiral (MUST)
+### Two-Model OODA Reconciliation (MUST)
 
-When PRIMITIVE_TREE.jsonld exists, use the domain-primitive OODA spiral to select which
-topic to explore next. This replaces domain-rotation question selection with gap-targeted
-selection driven by tree state.
+When PRIMITIVE_TREE.jsonld exists, the analyst maintains **two models** of the system in
+play and runs an **OODA spiral** that recursively reconciles them. This replaces simple
+gap-targeted question selection with two-model reconciliation that recursively decomposes
+requirements down to irreducible primitives.
 
-**Critical clarification:** The domain-primitive OODA spiral determines WHAT to ask. The
-SA&D coaching OODA loop (Section 3) determines WHETHER to coach. They execute independently
-on each turn. The six exploration domains remain as the analytical lens; the tree provides
-targeting within them.
+**The two models:**
 
-**Observe:** Read PRIMITIVE_TREE.jsonld from disk. Catalogue nodes by health_status:
+- **Domain Model** — what the real world needs. Projection of PRIMITIVE_TREE nodes where
+  `source ∈ {user, inferred}` plus open claims held in `EXPLORATION_JOURNAL.md` under
+  `## Domain Claims`. Sources, in escalating Outside-In order: user statements →
+  `.context/{project}/INDEX.md` authoritative sources → CP-01 worked-examples table at
+  `plugins/srd/references/convention-preference-standard.md` (canonical IETF/W3C/
+  dominant-player conventions) → **bounded web research (≤ 1 WebFetch per Observe step)**
+  only when the slice names a regulated domain (GDPR, PCI-DSS, accessibility, retention),
+  a published IETF/W3C/ISO standard, or a dominant-player API (Stripe, AWS, Kubernetes,
+  OpenTelemetry, etc.). No bottomless research; the source is recorded in
+  `RECONCILIATION_MAP.md`.
+- **Code Model** — what the codebase implements. Projection of PRIMITIVE_TREE nodes where
+  `source = codebase` plus fresh Prior-Art Check hits from
+  `EXPLORATION_JOURNAL.md` under `## Prior-Art Findings`.
+
+Both models are queries against the existing tree plus journal sections. No third source
+of truth.
+
+**Critical clarification:** The Two-Model OODA Reconciliation determines WHAT to ask AND
+when to recurse. The SA&D coaching OODA loop (Section 3) determines WHETHER to coach.
+They execute independently on each turn. The six exploration domains remain as the
+analytical lens; the tree provides targeting within them.
+
+**Observe:** Read PRIMITIVE_TREE.jsonld from disk. If
+`.architecture/{project}/probe-raw/1_2_capabilities.json` exists, read it (added as a
+Grounding Artifact in v1.9.1+). Re-read `EXPLORATION_JOURNAL.md` sections
+`## Domain Claims` and `## Prior-Art Findings`. Catalogue nodes by health_status:
 untested, testing, validated, failed, accepted-as-risk. Identify nodes with active
-invalidation signals.
+invalidation signals. **If the current slice invokes an external convention or regulated
+domain, run the bounded CP-01 / WebFetch lookup** (≤ 1 call per Observe step; source
+cited in the Reconciliation Map's `Source` column). WebFetch fires only when the domain
+claim invokes (a) a named external system or standard or (b) a regulatory/compliance
+slice. Anything else is asked of the user.
 
-**Orient:** Score each candidate node (untested or testing) using the composite priority
-formula:
+**Orient:** Project both models for the current slice. Classify each candidate into one
+of three overlap categories before scoring:
+
+| Category | Meaning | What to do next |
+|---|---|---|
+| `match` | Domain need + code reality both present, aligned | Reference the existing implementation in the spec; do not draft a new UC |
+| `gap` | Domain need present, no code reality (or partial code) | Spec a new UC or extend existing; this is the scoring lane |
+| `orphan` | Code reality present, no domain claim | Surface to user with a single question; default to out-of-scope at Phase 5 if no response |
+
+Apply critical-thinking PG (decompose to irreducible), PP (lead with the gap, not the
+journey), PL (precise category labels — no "kinda-implemented"). Score **only the gap
+candidates plus any invalidation-flagged matches** using the composite priority formula:
 
 ```
 score = (fan_out * 3) + (active_invalidations * 2) + (phase_match * 1) + (low_confidence * 1)
@@ -1633,26 +1702,79 @@ Topological ordering constraint (BR-06): Do not select a node when its upstream
 dependencies (via depends-on edges) are still untested and have equal or higher scores.
 Explore upstream before downstream within the same priority tier.
 
-**Act:** Map the selected node's type to its exploration domain. Select one of the node's
-attack patterns to frame the facilitation question. Set the node's health_status to
-"testing" (FR-13). Present the question following the existing facilitation rules (one
-question at a time, educated assumption, context-grounded).
+**New: evaluate whether the selected node terminates.** A node terminates iff its
+`leaf_category` is set to one of these five irreducible-leaf categories:
 
-**Completion signal:** When all nodes are either validated or accepted-as-risk, signal
-readiness for artifact generation (FR-15). Communicate naturally: "We've covered all the
-architectural building blocks I identified. I think we have enough to start producing
-the specification artifacts."
+| Category | Meaning | Example | Trigger to set |
+|---|---|---|---|
+| `external-system` | Outside our system boundary | Stripe, AWS IAM, IANA registries | Prior-Art Check or CP-01 priority 1 says owned externally |
+| `genesis-bootstrap` | One-time system seed, install-time, admin-plane | Sulis defines Products; DB schema bootstrap | Domain claim describes a system precondition with no runtime UC |
+| `primitive-component` | Validated atom per PRIMITIVE_TREE whiteboard test + scale constraints | "place order" action, "order" entity | Existing tree-evolution rule validates AND scale constraints met |
+| `external-spec` | Specified in another SRD | "admin onboarding" lives in sibling spec | INDEX.md authoritative-source check finds it |
+| `existing-impl` | Code already ships it; spec describes configuration not implementation | Rate limiter at `apps/api/sulis/shared/ratelimiting/` | Prior-Art Check returns "mature implementation found" |
 
-**Evidence constraint (BR-07):** WEAK evidence (source "inferred") can identify gaps and
-flag missing pieces, but cannot validate a node. Only FAIR (user confirmation) or STRONG
-(codebase evidence) can transition a node to "validated".
+If the node terminates, set `leaf_category` on the tree node, mark the Reconciliation
+Cycle Stack frame as `terminated`, and proceed to Act. **If the node does not terminate,
+push N child frames** (one per non-leaf dependency identified during Orient) onto the
+Reconciliation Cycle Stack — these will be popped in subsequent turns. Each frame
+carries `{cycle_id, parent, target_node, status: open|terminated, leaf_category?}`.
 
-**Context window note:** Read PRIMITIVE_TREE.jsonld from disk when computing OODA scoring.
-Do not attempt to maintain the full tree in conversation context. The tree is a file on
-disk, not a conversation-held data structure.
+Recursion bounds (reuse PRIMITIVE_TREE scale constraints):
+- **Depth cap: 5** (NFR-Q02). Hitting depth 5 forces termination with
+  `leaf_category: primitive-component` and a journal note flagging the forced
+  termination.
+- **Fan-out cap: 7** non-leaf children per cycle (NFR-Q01). Excess dependencies are
+  flagged for the user to prioritise.
+- **Cycle ID:** dotted-decimal address scoped by ISO date — `2026-05-15.1.3.2` =
+  second child of third child of first cycle on 2026-05-15. Cross-session audit
+  trail.
+- **Cycle reuse:** if a Decide step would spawn a child whose `target_node` already
+  appears in an open or terminated frame, link to the existing frame instead of
+  duplicating.
 
-When PRIMITIVE_TREE.jsonld does not yet exist (early Phase 1, before synthesis), fall back
-to the existing domain-rotation approach using the six exploration domains.
+**Act:** Map the selected node's type to its exploration domain. Select one of the
+node's attack patterns to frame the facilitation question. Set the node's health_status
+to "testing" (FR-13). Present the question following the existing facilitation rules
+(one question at a time, educated assumption, context-grounded).
+
+**New: write to the Reconciliation Map.** Append one row per cycle to
+`.specifications/{project}/RECONCILIATION_MAP.md`:
+
+```
+| Cycle | Claim or Capability | Source | Domain need? | Code reality | Category | Resolution | Tree node | Journal |
+```
+
+Resolution values: `spec UC-NN` (gap → new UC), `reference {module/spec}` (match or
+orphan→referenced), `out-of-scope` (orphan with disposition), `external-system`
+(leaf), `genesis-bootstrap` (leaf), `primitive-component` (leaf), `external-spec`
+(leaf), `existing-impl` (leaf), `unresolved` (forces gate failure at Phase 5).
+
+**Orphan question template** (use verbatim, adapt path/module name):
+
+> "I found {module} at {path} with no matching requirement in scope — is it in scope
+> for this SRD, or out-of-scope / candidate for deprecation?"
+
+If the user does not respond by Phase 5, default to `out-of-scope` with a journal note.
+
+**Completion signal:** When all nodes are either validated or accepted-as-risk AND
+all leaves have `leaf_category` set AND zero cycle-stack frames are `status: open`,
+signal readiness for artifact generation (FR-15). Communicate naturally: "We've
+covered all the architectural building blocks I identified, every requirement
+decomposes to an irreducible leaf, and the Reconciliation Map is closed. I think we
+have enough to start producing the specification artifacts."
+
+**Evidence constraint (BR-07):** WEAK evidence (source "inferred") can identify gaps
+and flag missing pieces, but cannot validate a node. Only FAIR (user confirmation) or
+STRONG (codebase evidence) can transition a node to "validated".
+
+**Context window note:** Read PRIMITIVE_TREE.jsonld and the journal from disk when
+computing OODA scoring. Do not attempt to maintain the full tree in conversation
+context. The tree is a file on disk, not a conversation-held data structure. The
+Reconciliation Map is append-only across sessions — read existing rows before
+appending new ones.
+
+When PRIMITIVE_TREE.jsonld does not yet exist (early Phase 1, before synthesis), fall
+back to the existing domain-rotation approach using the six exploration domains.
 
 
 ### Tree Evolution (MUST)

@@ -38,7 +38,7 @@ The completeness assessment uses a spiral approach rather than a single-pass che
 make measurable), the agent fixes it immediately and records the fix. Gaps that require
 user input are flagged for review.
 
-**Max 3 passes:** The spiral runs up to 3 times. Each pass re-examines all seven perspectives.
+**Max 3 passes:** The spiral runs up to 3 times. Each pass re-examines all eight perspectives.
 Fixes applied in pass N are verified in pass N+1.
 
 **Exit conditions:**
@@ -51,8 +51,11 @@ of Done. A passing SRD specification is the input SEA is built to consume.
 - **PASS** — All traces complete, all integrations specified, all NFR categories covered
   with measurable requirements, all tree nodes represented with attack patterns addressed,
   all artifacts semantically consistent with facilitation decisions, all recurring terms
-  reconcile with the glossary, and every security-sensitive use case has adversarial
-  coverage with defined system responses. No flags remain.
+  reconcile with the glossary, every security-sensitive use case has adversarial
+  coverage with defined system responses, **every leaf in PRIMITIVE_TREE.jsonld carries
+  a `leaf_category`, `RECONCILIATION_MAP.md` has zero unresolved-gap or
+  undisposed-orphan rows, and the Reconciliation Cycle Stack is closed**. No flags
+  remain.
 - **GAPS_FOUND** — After 3 passes, some gaps remain that require user input or decisions
   that cannot be made by the agent. All remaining gaps are documented with their flags.
 
@@ -449,6 +452,56 @@ primitive.
 
 ---
 
+## Perspective 8: Two-Model Reconciliation
+
+This perspective enforces that the Two-Model OODA Reconciliation rule (in
+`plugins/srd/agents/requirements-analyst.md` → Section 2) has run to closure. The rule
+recursively decomposes every requirement until it terminates at an irreducible-leaf
+category, reconciles the Domain Model (what's needed) against the Code Model (what
+exists), and produces `.specifications/{project}/RECONCILIATION_MAP.md` plus the
+`## Reconciliation Cycle Stack` in `EXPLORATION_JOURNAL.md`.
+
+Without this perspective, an SRD can pass all other perspectives while shipping with
+hidden prerequisite gaps (UC-X requires UC-Y, but UC-Y was never specified) or with
+orphan code that has no traceable requirement.
+
+### Checks
+
+For every leaf node in `PRIMITIVE_TREE.jsonld`:
+
+- **`UNCATEGORISED_LEAF`** — A leaf node (zero outgoing depends-on edges to
+  non-terminated nodes) does not have `leaf_category` set to one of the five values
+  (`external-system | genesis-bootstrap | primitive-component | external-spec |
+  existing-impl`). Fix strategy: if Prior-Art Check or CP-01 lookup resolves it
+  from context, fix inline by setting the category and recording the resolution in
+  RECONCILIATION_MAP.md; otherwise surface to user with the orphan-question template.
+
+For every row in `RECONCILIATION_MAP.md`:
+
+- **`UNRESOLVED_GAP`** — A row has `Category: gap` with `Resolution: unresolved`
+  or blank. Fix strategy: surface to user as a missing UC and either draft it
+  inline or accept it as out-of-scope with explicit rationale.
+- **`UNDISPOSED_ORPHAN`** — A row has `Category: orphan` without a disposition
+  in the Resolution column (referenced / out-of-scope / deprecated). Fix
+  strategy: surface the orphan-question to user; default to `out-of-scope` with
+  a journal note if no response.
+
+For `EXPLORATION_JOURNAL.md`:
+
+- **`OPEN_CYCLE_FRAME`** — The `## Reconciliation Cycle Stack` section contains
+  frames with `status: open`. Recursion did not terminate. Fix strategy: surface
+  to user as un-terminated decomposition; either resolve the cycle or explicitly
+  terminate with `leaf_category: primitive-component` and a rationale note.
+
+### Fix Strategy by Code
+
+- `UNCATEGORISED_LEAF`: Fix inline if Prior-Art Check resolves; otherwise surface.
+- `UNRESOLVED_GAP`: Always surface to user.
+- `UNDISPOSED_ORPHAN`: Always surface to user.
+- `OPEN_CYCLE_FRAME`: Always surface to user.
+
+---
+
 ## Content Quality Verification
 
 In addition to the five requirement perspectives, verify that all generated artifacts
@@ -583,3 +636,4 @@ Pass 2:
 | 2026-03-17 | Added Perspective 5: Referential Integrity. Cross-checks artifact content against exploration journal design decisions, assumptions, and glossary. Updated from four to five perspectives. | Standards team |
 | 2026-03-17 | Audit fixes: updated stale "three" to "five" in pass description; added tree completeness to PASS exit condition; added rate limits to integration checks; formalised content quality flags (CQ_MISSING_SUMMARY, CQ_MISSING_IDENTIFIERS, CQ_RHYTHM_VIOLATION, CQ_READABILITY, CQ_AI_TELL, CQ_UNVERIFIED) with fix strategies; added CQ-04 and CQ-06 checks. | Standards team |
 | 2026-05-13 | Added Perspective 6 (Term Consistency) — enforces Phase 3.5 Disambiguation Sweep vocabulary lock across artifacts. Added Perspective 7 (Adversarial Coverage) — enforces Phase 3.6 Adversarial Sweep produced MISUSE_CASES.md, system responses, propagated negative requirements, and pre-mortem. Updated PASS exit condition to require seven perspectives. | Standards team |
+| 2026-05-15 | Added Perspective 8 (Two-Model Reconciliation) — enforces the Two-Model OODA Reconciliation rule has run to closure: every leaf node in PRIMITIVE_TREE.jsonld carries `leaf_category` from the five-value taxonomy, RECONCILIATION_MAP.md has zero unresolved-gap or undisposed-orphan rows, and the journal's Reconciliation Cycle Stack is closed. New failure codes: UNCATEGORISED_LEAF, UNRESOLVED_GAP, UNDISPOSED_ORPHAN, OPEN_CYCLE_FRAME. Updated PASS exit condition to require eight perspectives. | Standards team |
