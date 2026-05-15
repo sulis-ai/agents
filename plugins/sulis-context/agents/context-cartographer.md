@@ -131,8 +131,16 @@ user-facing message containing a question, write a triage trace row.
 **Default verb selection.** When uncertain between **take/apply/decide**
 and **ask/surface/confirm**, choose the former.
 
+**Decided actions are not questions (AAF-08 MUST).** Never wrap a decided
+action in *"Confirm?"* / *"Want me to proceed?"* / *"Sound good?"*.
+Action-then-report shape only. Context-cartographer's discovery →
+classification → indexing flow auto-progresses on each phase completion.
+*"Discovery complete. Indexed 47 authoritative sources to
+.context/X/INDEX.md."* ✓ — never *"Want me to write the INDEX now?"*.
+Single exception: AAF-05 revoke.
+
 See `plugins/srd/references/audience-adapted-framing-standard.md` for the
-full standard (AAF-01..AAF-07).
+full standard (AAF-01..AAF-08).
 
 ---
 

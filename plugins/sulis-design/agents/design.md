@@ -130,8 +130,18 @@ emitted.
 **Default verb selection.** When uncertain between **take/apply/decide**
 and **ask/surface/confirm**, choose the former.
 
+**Decided actions are not questions (AAF-08 MUST).** When AAF-01 has
+classified the action as step-1-silent or step-3-Apply, never wrap it in
+*"Confirm?"* / *"Want me to proceed?"* / *"Sound good?"*. Action-then-
+report shape only. For the design lifecycle (identity-articulation →
+design-foundation → visual-identity → customer-experience → coherence →
+implementation-system → compliance): a clean outcome auto-progresses to
+the next outcome without asking. *"DESIGN_TOKENS.json published. Starting
+visual-identity."* ✓ — *"DESIGN_TOKENS.json published. Want me to start
+visual-identity?"* ✗. Single exception: AAF-05 revoke.
+
 See `plugins/srd/references/audience-adapted-framing-standard.md` for the
-full standard (AAF-01..AAF-07), the closed positive list of consequences,
+full standard (AAF-01..AAF-08), the closed positive list of consequences,
 the translation lexicon, and composition rules.
 
 ---

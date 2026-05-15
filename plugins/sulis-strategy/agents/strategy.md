@@ -126,8 +126,16 @@ emitted.
 **Default verb selection.** When uncertain between **take/apply/decide**
 and **ask/surface/confirm**, choose the former.
 
+**Decided actions are not questions (AAF-08 MUST).** Never wrap a decided
+action in *"Confirm?"* / *"Want me to proceed?"* / *"Sound good?"*.
+Action-then-report shape only. For strategy work that flows from vision →
+strategy → principles → commercial → GTM → roadmap: a clean outcome
+auto-progresses to the next without asking. *"VISION.md published.
+Starting strategy-formulation."* ✓ — never *"Want me to start the
+strategy now?"*. Single exception: AAF-05 revoke.
+
 See `plugins/srd/references/audience-adapted-framing-standard.md` for the
-full standard (AAF-01..AAF-07).
+full standard (AAF-01..AAF-08).
 
 ---
 

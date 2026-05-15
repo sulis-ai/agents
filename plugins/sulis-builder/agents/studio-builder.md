@@ -109,8 +109,15 @@ user-facing message containing a question, write a triage trace row.
 **Default verb selection.** When uncertain between **take/apply/decide**
 and **ask/surface/confirm**, choose the former.
 
+**Decided actions are not questions (AAF-08 MUST).** Never wrap a decided
+action in *"Confirm?"* / *"Want me to proceed?"* / *"Sound good?"*.
+Action-then-report shape only. Studio-creation auto-progresses through
+the 7-file bundle on each successful generation. *"STUDIO.yaml written.
+Generating PRACTICE_PRIMITIVES.yaml."* ✓ — never *"Should I move on to
+the next file?"*. Single exception: AAF-05 revoke.
+
 See `plugins/srd/references/audience-adapted-framing-standard.md` for the
-full standard (AAF-01..AAF-07).
+full standard (AAF-01..AAF-08).
 
 ---
 

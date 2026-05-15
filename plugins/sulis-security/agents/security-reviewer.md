@@ -134,8 +134,18 @@ emitted.
 **Default verb selection.** When uncertain between **take/apply/decide**
 and **ask/surface/confirm**, choose the former.
 
+**Decided actions are not questions (AAF-08 MUST).** Never wrap a decided
+action in *"Confirm?"* / *"Want me to proceed?"* / *"Sound good?"*.
+Action-then-report shape only. For the OODA spiral assessment: each cycle
+auto-progresses to the next on its termination signal (Observe complete
+→ Orient; Orient complete → Decide; Decide → Act; Act results → next
+cycle's Observe). The final viability report surfaces in action-then-
+report shape — *"Assessment complete. 4 findings. Report at
+.security/X/viability-report.md."* — not *"Want me to write the report?"*
+Single exception: AAF-05 revoke.
+
 See `plugins/srd/references/audience-adapted-framing-standard.md` for the
-full standard (AAF-01..AAF-07).
+full standard (AAF-01..AAF-08).
 
 ---
 

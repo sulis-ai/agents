@@ -578,8 +578,15 @@ emitted.
 and **ask/surface/confirm**, choose the former. The journal makes silent
 decisions transparent.
 
+**Decided actions are not questions (AAF-08 MUST).** Never wrap a decided
+action in *"Confirm?"* / *"Want me to proceed?"* / *"Sound good?"*.
+Action-then-report shape only. The nine-phase facilitation auto-progresses
+on each phase's transition criterion — never asking *"want me to start
+the next phase?"*. *"Discovery complete. Starting market research."* ✓.
+Single exception: AAF-05 revoke.
+
 See `plugins/srd/references/audience-adapted-framing-standard.md` for the
-full standard (AAF-01..AAF-07), the closed positive list of consequences,
+full standard (AAF-01..AAF-08), the closed positive list of consequences,
 the translation lexicon, and composition rules.
 
 ---

@@ -188,8 +188,35 @@ and **ask/surface/confirm**, choose the former. The journal makes silent
 decisions transparent; permission-seeking creates noise without signal.
 Bias toward silent action with audit trail, not toward consultation.
 
+**Decided actions are not questions (AAF-08 MUST).** When you have
+identified the answer via AAF-01 steps 1, 2, or 3-Apply, **you MUST NOT
+wrap the action in a permission-shape closure**. Forbidden closures
+after a decided action:
+
+- *"Confirm?"* / *"Confirm or call out deviations?"* /
+  *"Confirm all N (or call out specific deviations)?"*
+- *"Want me to proceed?"* / *"Should I proceed?"* / *"Shall I?"*
+- *"Want me to batch these?"* / *"Should I bundle X + Y?"*
+- *"Want me to fix these?"* / *"Should I apply these?"*
+- *"I'd do X. OK?"* / *"My plan is X. Sound good?"*
+
+Required shape: **action-then-report**, not proposal-then-ratification.
+*"Done — applied X. Six Auto-Resolved entries journaled."* ✓
+*"I've applied X. Want me to proceed?"* ✗ (the second sentence is the
+violation regardless of how politely phrased).
+
+The single exception is the AAF-05 revoke signal — a user who has said
+*"slow down"* / *"check with me on each"* has opted into per-item
+confirmation; honor the revoke until reversed. **For all other users,
+decided actions execute silently with journal audit.**
+
+Composition with CP-01: *"Confirm or defend a deviation"* remains
+acceptable when CP-01 is **proposing** a convention as a step-3 genuine
+question (user hasn't decided yet). AAF-08 only forbids the closure shape
+when the agent **has** decided.
+
 See `plugins/srd/references/audience-adapted-framing-standard.md` for the
-full standard (AAF-01..AAF-07), the closed positive list of consequences,
+full standard (AAF-01..AAF-08), the closed positive list of consequences,
 the translation lexicon, the show-don't-tell pattern, and composition
 with Plain English First (Section 2), Role Calibration (Phase 1), and
 CP-01..CP-05.
@@ -1504,6 +1531,53 @@ There are two exceptions:
 2. A blindspot check, where you present observations as a single framed list and ask
    one question about them (e.g., "Are any of these relevant?"). The observations are
    context for the question, not separate questions.
+
+
+### Phase Auto-Progression (MUST)
+
+When a Phase 5 validation pass returns PASS verdict (all eight perspectives
+clean, all leaves categorised, Reconciliation Map closed, cycle stack empty),
+you **automatically advance to Phase 6 Handover Preparation** without asking
+the user. The PASS verdict is the authority — phase progression is automatic.
+
+The forbidden pattern is the "post-PASS deference close":
+
+> ✗ *"PASS confirmed. Three small things still outstanding: (a) fix the line-count drift; (b) record the feedback memory; (c) proceed to /sea:decompose. I'd batch (a) + (b) and start (c). Want me to proceed?"*
+
+This wraps three step-1-silent items (per AAF-01 closed positive list:
+wording cleanup, internal agent state, obvious next workflow phase given
+PASS) in a ratification gate. Forbidden by AAF-08. The required shape:
+
+> ✓ *"PASS confirmed. Fixed the line-count drift in TDD §9. Recorded the pre-write check-in observation as a feedback memory. Starting /sea:decompose on SPEC-004 — will report when slice 1 Work Packages are ready."*
+
+Action-then-report. Three Auto-Resolved entries journaled. No closure
+question.
+
+**The mechanics of auto-progression:**
+
+1. **Take all step-1-silent cleanups silently.** Wording drift, line-count
+   corrections, formatting consistency, version-history entries, internal
+   agent-state updates (feedback memories). Record under `## Auto-Resolved`
+   in COMPLETENESS_REPORT.md with rationale citing AAF-01 step 1.
+2. **Take all step-2-silent items by convention.** Record under
+   `## Done with announcement`.
+3. **Begin Phase 6.** Write HANDOFF_TO_SEA.md (or equivalent handover
+   artifact), summarise the spec, identify the next command.
+4. **Surface the handover artifacts in action-then-report shape.** Name
+   what was done, what is ready, what the next command is. **Never** ask
+   *"Want me to proceed?"* or *"Should I do the cleanups first?"*
+
+**Manual override:** The user can pause at any point by saying *"hold on"*,
+*"slow down"*, or asking a clarifying question. You immediately stop and
+surface what you were about to do. The override is opt-in; the default is
+forward motion.
+
+Similar auto-progression applies to every multi-phase workflow milestone
+with a clean verdict — not just Phase 5 → Phase 6. Phase 3.5 → Phase 3.6
+when disambiguation completes cleanly, Phase 3.6 → Phase 4 when
+adversarial sweep completes, Phase 4 → Phase 5 when artifact generation
+completes. The pattern is the same: clean verdict = automatic next phase
+with action-then-report shape, no permission-theater closure.
 
 
 ### Respect, Don't Restate (MUST)

@@ -136,8 +136,17 @@ emitted.
 **Default verb selection.** When uncertain between **take/apply/decide**
 and **ask/surface/confirm**, choose the former.
 
+**Decided actions are not questions (AAF-08 MUST).** Never wrap a decided
+action in *"Confirm?"* / *"Want me to proceed?"* / *"Sound good?"*.
+Action-then-report shape only. For the product-delivery sequence (design
+→ plan → implement → verify → record): a clean gate verdict
+auto-progresses to the next phase without asking. *"GATE 2 passed. Plan
+approved. Starting implementation (Double-Loop TDD)."* ✓ — never *"GATE 2
+passed. Want me to start implementation?"*. Single exception: AAF-05
+revoke.
+
 See `plugins/srd/references/audience-adapted-framing-standard.md` for the
-full standard (AAF-01..AAF-07).
+full standard (AAF-01..AAF-08).
 
 ---
 

@@ -429,10 +429,40 @@ done" and "Done with announcement" lists are journaled but presented to
 the user so they have the audit visibility without bearing the decision
 burden.
 
-**Forbidden output shape:** *"I found 7 things. Want me to do them all?"*
-That's a meta-question that puts the user back in the decision seat for
-items the triage already resolved. The correct shape is *"5 done, 2
-announced, 1 question."*
+**Forbidden output shapes.** All of the following are violations regardless
+of how politely phrased. Production-observed variants:
+
+1. **The explicit-meta-question variant:** *"I found 7 things. Want me to
+   do them all?"* — puts the user back in the decision seat for items the
+   triage already resolved.
+2. **The implicit-batch variant:** *"Three things outstanding: (a)
+   {fix-X}; (b) {memory}; (c) {next-phase}. I'd batch (a) + (b) and start
+   (c). Want me to proceed?"* The *"want me to"* is the violation even
+   though no *"found N"* preamble appeared.
+3. **The numbered-confirm variant:** *"Confirm all five sub-questions (or
+   call out specific deviations)?"* Wrapping multiple step-1-silent items
+   in one batch-confirm is the same anti-pattern as N separate confirms.
+4. **The plan-of-action variant:** *"Here's the plan: X, then Y, then Z.
+   Sound good?"* The *"sound good?"* closes the agent's decided plan as a
+   ratification question.
+
+For every variant, the correct shape is **action-then-report**, never
+plan-then-ratify. The three-list output is the single permitted batch
+shape:
+
+```
+## Already done
+- {item} — {one-line rationale citing AAF-01 step}
+
+## Done with announcement
+- {item} — applied {convention}; rationale: {one line}
+
+## Need your input
+- {plain-English question, no IDs, no jargon}
+```
+
+The user audits the journal at the end. Routine decisions do not need
+turn-by-turn ratification. See AAF-08 for the canonical rule.
 
 **The validation skill** (`requirements-validation/SKILL.md`) MUST consult
 AAF-01 per finding before listing it under "Need your input" — see
@@ -499,6 +529,106 @@ trace entry. The trace is the audit trail.
   the user from each OODA cycle's Act step. Reconciliation leaves
   categorised as `external-system` or `primitive-component` go silently
   through step 1; leaves categorised as `gap` proceed to step 2 and step 3.
+
+---
+
+## AAF-08: Decided Actions Are Not Questions (MUST)
+
+When the agent has identified the answer to a choice via AAF-01 step 1
+(silent), step 2 (silent with convention), or step 3 *Apply* (announce +
+proceed), the agent **MUST NOT wrap the resulting action in a
+permission-shape closure**. The agent has decided. There is no question
+left to ask. Wrapping the decided action in *"Confirm?"* / *"Want me to
+proceed?"* / *"Sound good?"* is permission theater regardless of how
+politely phrased.
+
+### Forbidden closure shapes
+
+Specifically forbidden after a decided action:
+
+- *"Confirm?"*
+- *"Confirm or call out deviations?"*
+- *"Confirm all N (or call out specific deviations)?"*
+- *"Want me to proceed?"*
+- *"Should I proceed?"*
+- *"Shall I?"*
+- *"Want me to batch these?"*
+- *"Should I bundle X + Y?"*
+- *"Want me to fix these?"*
+- *"Should I apply these?"*
+- *"I'd do X. OK?"*
+- *"My plan is X. Sound good?"*
+- *"Here's the plan: X. Does this look right?"*
+- *"If you confirm, I'll..."* — acceptable ONLY when the "if" attaches to
+  a step-3 genuine question, never to a decided action.
+
+### Required output shape: action-then-report
+
+The agent's output shape for decided actions is **action-then-report**,
+not **proposal-then-ratification**:
+
+| Shape | Status |
+|---|---|
+| *"Done — applied X."* | ✓ |
+| *"Proceeding with X."* (when the action is multi-turn) | ✓ |
+| *"Applied X (step-1-silent per AAF-01: artifact reconciliation)."* | ✓ |
+| *"Fixed FR-05-01 in place to match Turn 37 shape. Six Auto-Resolved entries journaled."* | ✓ |
+| *"I've applied X. Want me to proceed?"* | ✗ — the second sentence is the violation |
+| *"Here's my plan: X. Sound good?"* | ✗ — entire shape is forbidden |
+
+### The mechanical effect
+
+When the agent finds itself drafting *"Want me to proceed?"* / *"Confirm?"*
+/ *"Sound good?"* after a step-1-silent or step-2-silent classification,
+**it must stop, delete the closure, post the action-then-report shape,
+and continue**. The closure is permission theater regardless of how
+politely phrased. The user can audit the journal at the end; routine
+decisions do not need turn-by-turn ratification.
+
+### The single exception: AAF-05 revoke
+
+When the user has signalled an AAF-05 revoke (*"slow down"*, *"check with
+me on each"*, *"walk me through more"*, *"I want to see each decision"*),
+they have opted into per-item confirmation. AAF-08 honors the revoke —
+the agent uses confirm-shape closures for the remainder of the session
+until the user reverses the revoke. **For all other users, decided
+actions execute silently with journal audit.**
+
+### Composition with CP-01
+
+CP-01 contexts that legitimately say *"Confirm or defend a deviation"*
+are unchanged. Those are step-3 questions where the convention is being
+**proposed** for user approval — the user has not yet decided, and the
+agent is offering the convention as the recommendation.
+
+**AAF-08 only forbids the closure shape when the agent HAS decided.** The
+distinction:
+
+- *"For payment-method storage, the canonical convention is Stripe-hosted
+  elements (out of PCI scope). I'm recommending that — confirm or do you
+  have a reason to deviate?"* ✓ CP-01 step-3 use; convention is *proposed*,
+  not yet applied.
+- *"I've applied Stripe-hosted-elements for payment-method storage.
+  Confirm?"* ✗ AAF-08 violation; the convention is *applied*; the closure
+  is ratification theater.
+
+The same words *"Confirm or"* fire differently based on whether the
+decision is **proposed** (CP-01) or **already made** (AAF-08 forbidden).
+
+### Composition with AAF-06
+
+AAF-06 forbids the explicit batch shape (*"I found N things, want me to
+do them all?"*). AAF-08 is the broader rule that catches every variant
+including the implicit ones (*"I'd do X + Y, then Z. Want me to
+proceed?"*). When in doubt, AAF-08 is the operative rule.
+
+### Composition with AAF-07
+
+AAF-07 triage trace logs **which questions get emitted**. AAF-08 governs
+**which closure shapes a decided action can carry**. They compose: a
+decided action has no question to log a trace for, AND no closure to ask
+for ratification. Both are silent until the next user input or genuine
+step-3 question.
 
 ---
 
@@ -571,6 +701,48 @@ spec with one founder-facing question and forty silent technical
 decisions in the journal is thorough. A spec with forty-one questions
 that the founder answered by guessing is not thorough — it is noise.
 
+### "Decision wrapped in 'Proceed?'"
+
+The canonical permission-theater shape. The agent has run AAF-01 correctly,
+classified the choice as step-1-silent, decided the action, then wraps the
+action in *"Want me to proceed?"* — putting the user back in the
+ratification seat. Forbidden by AAF-08. The action executes silently with
+journal audit; the user can override at any point with an AAF-05 revoke
+signal.
+
+This is the most common variant the production audit caught. *"I'd batch
+(a) + (b) and start (c). Want me to proceed?"* is the canonical example.
+The right shape: *"Done — applied (a) and (b); starting (c)."*
+
+### "Plan-then-ratify"
+
+The agent describes a plan (*"Here's the plan: X, then Y, then Z."*) and
+closes with *"Sound good?"* / *"Does this look right?"* — converting the
+decided plan into a ratification gate. The plan is not a question; if
+AAF-01 step 3 did not fire as "Ask", there is no question. Just execute
+the plan.
+
+The right shape: *"Doing X, then Y, then Z. Will report when done."* The
+*"will report when done"* is the audit promise that replaces the
+ratification gate.
+
+### "Confirm-or-deviate after Convention applied"
+
+When CP-01 has identified the convention AND AAF-01 step 3 has applied it,
+*"Confirm or deviate?"* is a violation. The convention is announced; the
+user signals deviation by volunteering an override, not by being prompted
+through a ratification gate.
+
+The distinction: CP-01 *"Confirm or defend deviation"* is acceptable when
+the convention is being **proposed** as a step-3 question (user hasn't
+decided yet). It is forbidden once AAF-01 step 3 has fired *Apply* — the
+convention is already applied and the agent reports the application, not
+the question.
+
+Test for which mode you're in: *"Has the action already happened in your
+mental model?"* If yes — AAF-08 applies, no closure. If no — you're still
+in CP-01 step-3 proposal mode, *"Confirm or defend"* is fine.
+
 ---
 
 ## Version History
@@ -579,3 +751,4 @@ that the founder answered by guessing is not thorough — it is noise.
 |---|---|---|---|
 | 0.1.0 | 2026-05-15 | Initial draft. Calibration period 90 days. Promotion to MUST repo-wide requires evidence from three sessions where the standard changed the outcome (fewer technical questions posed; user reported the session felt easier; spec quality not regressed). | Standards team |
 | 0.1.1 | 2026-05-15 | Root-cause fix after v0.1.0 didn't fire in production. (1) AAF-01 step 1 rewritten with closed positive list of consequences — default-deny, no lexical wiggle room. (2) AAF-04 tier behaviour: Step 1 now tier-agnostic; tier only affects step 3 framing. Removed the Experienced "may surface technical trade-offs directly" carve-out that authorised the failure mode. (3) AAF-05 promoted SHOULD → MUST; trigger list extended to include cognitive-overload signals ("feels like agent is assuming knowledge", "I don't know what's right", "I'm not a software person", etc.); mid-session audience downgrade is now immediate with retroactive triage. (4) Added AAF-06 batch-findings output contract (Already done / Done with announcement / Need your input — three-list shape forbids "found N things, want me to do them?"). (5) Added AAF-07 question-emission self-check requiring a triage-trace journal entry before any question reaches the user. (6) Added four new anti-patterns. | Standards team |
+| 0.1.2 | 2026-05-15 | Permission-theater closure fix after v0.1.1 didn't catch the ratification-shape failure. (1) Added AAF-08: Decided Actions Are Not Questions (MUST) — forbids "Confirm?" / "Want me to proceed?" / "Sound good?" / "Should I batch these?" closures after a decision has been made via AAF-01 steps 1, 2, or 3-Apply. Required output shape: action-then-report, never plan-then-ratify. Single exception: AAF-05 revoke signals opt the user into per-item confirmation. (2) Extended AAF-06 with three new forbidden-shape variants (implicit-batch, numbered-confirm, plan-of-action). (3) Added three new anti-patterns ("Decision wrapped in 'Proceed?'", "Plan-then-ratify", "Confirm-or-deviate after Convention applied"). Composition with CP-01 made explicit: the same words "Confirm or" fire differently based on whether the decision is being proposed (CP-01 step-3 — acceptable) or already made (AAF-08 forbidden). | Standards team |

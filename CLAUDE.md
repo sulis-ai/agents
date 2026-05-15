@@ -114,7 +114,14 @@ Six rules. If a plan would violate any of these, the plan is wrong.
    them?" When the user signals cognitive overload (*"feels like assuming knowledge"*,
    *"I'm not a software person"*, *"I don't know what's right"*), immediately downgrade
    the audience score to Novice for the rest of the session with retroactive triage.
-   (AAF-01..AAF-07)
+   **Decided actions execute silently with journal audit, never with permission-theater
+   closures.** Forbidden closure shapes after a decided action: *"Want me to proceed?"*,
+   *"Confirm?"*, *"Confirm or call out deviations?"*, *"Sound good?"*, *"Should I batch
+   these?"*, *"My plan is X. OK?"* — these wrap decisions the user does not need to
+   ratify. Required shape is action-then-report (*"Done — applied X."* / *"Proceeding
+   with X."*). Phase progression on clean verdicts is automatic — no asking permission
+   to advance. Single exception: the user has explicitly invoked an AAF-05 revoke
+   (*"slow down"*, *"check with me on each"*). (AAF-01..AAF-08)
 
 For full detail on these principles, see `plugins/srd/references/engineering-principles.md`,
 `plugins/srd/references/security-standard.md`,

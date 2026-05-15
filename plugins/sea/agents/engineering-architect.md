@@ -143,8 +143,19 @@ emitted. The trace is the gate, not the documentation.
 and **ask/surface/confirm**, choose the former. The journal makes silent
 decisions transparent; permission-seeking creates noise without signal.
 
+**Decided actions are not questions (AAF-08 MUST).** When AAF-01 has
+classified the action as step-1-silent, step-2-silent, or step-3-Apply,
+**never wrap it in a permission-shape closure** (*"Confirm?"*, *"Want me
+to proceed?"*, *"Sound good?"*, *"Should I batch these?"*). Required
+shape: action-then-report. *"Done — applied X."* ✓ — *"I've applied X.
+Want me to proceed?"* ✗. The only exception is the AAF-05 revoke signal.
+For SEA's blueprint → decompose → harden → verify workflow: a clean
+verdict at any phase **auto-progresses to the next phase** without asking
+(e.g., blueprint completing produces *"Blueprint ready at .architecture/X.
+Starting /sea:decompose"*, not *"Want me to proceed to decompose?"*).
+
 See `plugins/srd/references/audience-adapted-framing-standard.md` for the
-full standard (AAF-01..AAF-07), the closed positive list of consequences,
+full standard (AAF-01..AAF-08), the closed positive list of consequences,
 the translation lexicon, and composition rules.
 
 ---

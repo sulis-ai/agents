@@ -67,11 +67,29 @@ explicit lists, never as "I found N things, want me to fix them all?":
 Fixes applied in pass N are verified in pass N+1.
 
 **Exit conditions:**
-When the verdict is **PASS**, recommend `/sea:blueprint` as the natural next step.
-SEA (the Senior Engineering Architect plugin in this marketplace) reads `SRD.md`,
-`NFR.md`, and `PRIMITIVE_TREE.jsonld` directly and produces a hardened Technical
-Design Document, ADRs, and atomic Work Packages with Red-Green-Blue Definitions
-of Done. A passing SRD specification is the input SEA is built to consume.
+When the verdict is **PASS**, the analyst's `Phase Auto-Progression (MUST)` rule fires:
+all step-1-silent cleanups are taken automatically (wording, line-count drift,
+formatting), Phase 6 Handover Preparation begins, and the next command
+(`/sea:blueprint .specifications/{name}/`) is surfaced in the **action-then-report
+shape**:
+
+> *"PASS confirmed. Cleaned up {N} items in COMPLETENESS_REPORT.md. HANDOFF_TO_SEA.md
+> ready. Starting `/sea:blueprint`."*
+
+**Never** as a permission-theater closure:
+
+> ✗ *"PASS. Recommend `/sea:blueprint` as the natural next step. Want me to proceed?"*
+
+This is an AAF-08 violation. The validation skill does not surface a "proceed?"
+question after PASS. Auto-progression is the analyst's responsibility (see
+`plugins/srd/agents/requirements-analyst.md` → Phase Auto-Progression rule); the
+validation skill simply reports the verdict and identifies the cleanup items as
+Auto-Resolved entries.
+
+SEA reads `SRD.md`, `NFR.md`, and `PRIMITIVE_TREE.jsonld` directly and produces a
+hardened Technical Design Document, ADRs, and atomic Work Packages with
+Red-Green-Blue Definitions of Done. A passing SRD specification is the input SEA
+is built to consume.
 
 - **PASS** — All traces complete, all integrations specified, all NFR categories covered
   with measurable requirements, all tree nodes represented with attack patterns addressed,
@@ -684,3 +702,4 @@ Pass 2:
 | 2026-05-13 | Added Perspective 6 (Term Consistency) — enforces Phase 3.5 Disambiguation Sweep vocabulary lock across artifacts. Added Perspective 7 (Adversarial Coverage) — enforces Phase 3.6 Adversarial Sweep produced MISUSE_CASES.md, system responses, propagated negative requirements, and pre-mortem. Updated PASS exit condition to require seven perspectives. | Standards team |
 | 2026-05-15 | Added Perspective 8 (Two-Model Reconciliation) — enforces the Two-Model OODA Reconciliation rule has run to closure: every leaf node in PRIMITIVE_TREE.jsonld carries `leaf_category` from the five-value taxonomy, RECONCILIATION_MAP.md has zero unresolved-gap or undisposed-orphan rows, and the journal's Reconciliation Cycle Stack is closed. New failure codes: UNCATEGORISED_LEAF, UNRESOLVED_GAP, UNDISPOSED_ORPHAN, OPEN_CYCLE_FRAME. Updated PASS exit condition to require eight perspectives. | Standards team |
 | 2026-05-15 | Replaced "Fix-as-you-go" with AAF triage gate per perspective. Every gap from every perspective now passes through the AAF-01 closed positive list before becoming a user question. Three-list output contract (AAF-06): Auto-Resolved / Done with announcement / User Input Required. Every User Input Required entry must carry a Triage Trace row per AAF-07. Removes the failure mode where Phase 5 surfaced artifact-maintenance findings (missing diagrams, glossary additions, identifier renumbering) as founder questions. | Standards team |
+| 2026-05-15 | Rewrote PASS exit prose to use action-then-report shape per AAF-08 (Decided Actions Are Not Questions). The validation skill no longer suggests "recommend `/sea:blueprint` as the natural next step. Want me to proceed?" — that pattern is now an explicit AAF-08 violation. PASS verdict triggers the analyst's Phase Auto-Progression rule; cleanups taken silently as Auto-Resolved entries; next command surfaced in action-then-report shape. | Standards team |
