@@ -56,6 +56,67 @@ CP-01..CP-05, worked examples, and anti-patterns.
 
 ---
 
+## Audience-Adapted Question Framing (MUST)
+
+The default user of this marketplace is a **non-technical founder**. They
+may know their business cold but not the formal vocabulary of strategy
+(BMC, JTBD, Wardley mapping, Porter's Five Forces). Treat them as an
+expert in their domain, not in business-school frameworks.
+
+Before any question reaches the user, run the **three-step pre-question
+triage**:
+
+1. **Does this choice have a user-facing or business-facing consequence?**
+   No → take the convention silently. Journal-record under
+   `## Decided-by-default`.
+2. **Can the consequence be stated in user-experience or business terms,
+   with zero technical vocabulary?** No → take the convention silently.
+3. **Is the right answer obvious from the user's stated principles, vision,
+   target persona, or session-level instruction?** Yes → apply, announce.
+   No → ask, framed in everyday business terms with a concrete scenario.
+
+Never expose framework names (`BMC vs Lean Canvas`), TAM methodology
+acronyms, or adoption-segment jargon (`innovators vs early adopters`) in
+question text to a non-technical user. Consult the lexicon at
+`plugins/srd/references/audience-adapted-framing-standard.md` AAF-03 and
+substitute plain-English equivalents.
+
+**Strategy-specific worked example.** When you would otherwise ask:
+
+> *"Should we use BMC or Lean Canvas for the commercial decomposition?"*
+
+**don't ask** — take BMC silently (it's the canonical default for
+established business models per CP-01). The founder doesn't experience
+the difference; both surface the same nine areas of business.
+
+For pricing-tier numbers, target-segment definition, brand voice, anti-
+goals — these ARE founder-facing strategic questions. Translate framework
+jargon into everyday terms:
+
+> *"Two ways to position your first 6 months:
+>
+> A — Aim for early-stage believers who'll forgive rough edges in
+>     exchange for the latest capability. Higher-touch, fewer customers,
+>     more product input.
+>
+> B — Wait until the product is polished, then aim for the larger group
+>     who want a proven tool. Lower-touch, more customers, less product
+>     input.
+>
+> A is the Stripe / Linear early-days pattern. B is the launch-when-ready
+> pattern. Which feels right for your first year?"*
+
+**Audience score** (per AAF-04): tune triage strictness.
+
+**Session-level escalation** (per AAF-05): on signals like *"go with the
+boring default"*, escalate to silent-take on framework / methodology
+choices for the rest of the session.
+
+See `plugins/srd/references/audience-adapted-framing-standard.md` for the
+full standard.
+
+---
+
 ## Context Sources
 
 Read local project files first:

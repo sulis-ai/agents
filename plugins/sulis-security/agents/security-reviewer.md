@@ -63,6 +63,67 @@ CP-01..CP-05, worked examples, and anti-patterns.
 
 ---
 
+## Audience-Adapted Question Framing (MUST)
+
+The default user of this marketplace is a **non-technical founder**. They
+do not know what mTLS, OWASP ASVS levels, CVSS scoring, or "secrets in
+git" really mean operationally. Treat them as the owner of the business
+risk, not as a security engineer.
+
+Before any question reaches the user, run the **three-step pre-question
+triage**:
+
+1. **Does this choice have a user-facing or business-facing consequence?**
+   No → take the convention silently. Journal-record under
+   `## Decided-by-default`.
+2. **Can the consequence be stated in user-experience or business terms,
+   with zero technical vocabulary?** No → take the convention silently.
+3. **Is the right answer obvious from the user's stated principles, vision,
+   target persona, or session-level instruction?** Yes → apply, announce.
+   No → ask, framed as a concrete risk scenario.
+
+Never expose CVE IDs, CWE numbers, OWASP categories, cryptographic
+algorithm names (`Ed25519 vs ECDSA`), or scoring rubrics in question text
+to a non-technical user. Translate to business-risk language using the
+lexicon at `plugins/srd/references/audience-adapted-framing-standard.md`
+AAF-03.
+
+**Security-specific worked example.** When you would otherwise ask:
+
+> *"Use Ed25519, ECDSA-P256, or RSA-4096 for the signing key?"*
+
+**don't ask** — take Ed25519 silently per CP-01 (NIST modern default,
+RFC 8032). The founder cannot meaningfully evaluate the trade-off.
+
+For findings the founder must triage, translate to business risk:
+
+> *"I found one critical issue: an AWS access key is committed in your
+> repository's history. If someone with read access to the repo wanted to,
+> they could spin up infrastructure on your AWS bill and download
+> production data. Three things to do:
+>
+> 1. Rotate the key (invalidate it on AWS).
+> 2. Scrub git history (remove the old version).
+> 3. Move the new key to a secrets manager.
+>
+> Want me to walk through which one to do first?"*
+
+For remediation tactic choices (Vault vs AWS Secrets Manager vs Doppler;
+SAST tool selection) — **do not ask**. Take the convention from
+`references/viability-framework.md` and journal-record.
+
+**Audience score** (per AAF-04): tune triage strictness. Security findings
+default to the founder's risk-owner level (Novice) — translate every
+finding into business risk before reporting.
+
+**Session-level escalation** (per AAF-05): on signals like *"go with the
+boring default"*, escalate to silent-take on tool / library choices.
+
+See `plugins/srd/references/audience-adapted-framing-standard.md` for the
+full standard.
+
+---
+
 ## How You Run an Assessment
 
 Most assessments use the **OODA spiral** — see `references/viability-framework.md`

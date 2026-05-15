@@ -4,44 +4,44 @@
     "name": "Iain"
   },
   "metadata": {
-    "version": "1.10.0",
-    "description": "Sulis AI plugin marketplace — methodology studios, requirements analysis, facilitation, context cartography, right-sized architecture, disciplined change primitives, and deterministic code intelligence. v1.10.0 ships Two-Model OODA Reconciliation in the SRD analyst — the existing Domain-Primitive OODA Spiral evolves into a recursive discipline that maintains TWO models (Domain Model: what the real world needs; Code Model: what the codebase implements) and decomposes every requirement until it terminates at one of five irreducible-leaf categories (external-system / genesis-bootstrap / primitive-component / external-spec / existing-impl). Outside-In external research is operationalised via bounded WebFetch (≤1 call per Observe step, regulated/standards slices only). A new RECONCILIATION_MAP.md artifact captures every cycle. Phase 5 Perspective 8 gates the SRD on closure of the cycle stack."
+    "version": "1.11.0",
+    "description": "Sulis AI plugin marketplace — methodology studios, requirements analysis, facilitation, context cartography, right-sized architecture, disciplined change primitives, and deterministic code intelligence. v1.11.0 makes a non-technical founder the default audience across every agent. New Audience-Adapted Question Framing (AAF) rule: a three-step pre-question triage decides whether to ask, decide silently, or translate to a lived-experience scenario. A 40-entry translation lexicon maps technical concepts to plain-English equivalents (OAuth → 'sign in with Google'; cursor pagination → 'load more as you scroll'; idempotency → 'won't double-charge'). Agents now decide silently on every choice that has no user-facing consequence or that can't be stated without technical vocabulary — only genuine founder decisions reach the user, and they reach in scenarios anyone can answer."
   },
   "plugins": [
     {
       "name": "srd",
       "source": "./plugins/srd",
-      "version": "1.14.0",
+      "version": "1.15.0",
       "description": "Requirements Analyst — facilitates building Software Requirements Documents backed by UML artifacts through guided conversation. Includes intent triage (Phase 1), disambiguation sweep (Phase 3.5), and adversarial sweep (Phase 3.6 — produces MISUSE_CASES.md with negative requirements). Reads .context/{project}/INDEX.md (from sulis-context) on Phase 1 to apply Respect-Don't-Restate. Hands architecture work over to SEA via early or mid-session handover."
     },
     {
       "name": "sulis-context",
       "source": "./plugins/sulis-context",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "description": "Context Cartographer — discovers existing architecture documentation, ADRs, conventions, and standards in a project; produces .context/{project}/INDEX.md so downstream plugins (SRD, SEA, sulis-security) respect prior decisions instead of restating them. Folder-structure-agnostic; works on any project shape."
     },
     {
       "name": "sulis-strategy",
       "source": "./plugins/sulis-strategy",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "description": "Business strategy studio — vision, strategy, principles, commercial, GTM, roadmap, and domain-specific research"
     },
     {
       "name": "sulis-product-development",
       "source": "./plugins/sulis-product-development",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "description": "Product development studio — design, plan, implement, complete, feature lifecycle, validation, and autonomous sub-agents"
     },
     {
       "name": "sulis-builder",
       "source": "./plugins/sulis-builder",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "description": "Studio builder — create new domain expertise packages (7-file studio bundles) using the studio-creation sequence"
     },
     {
       "name": "sulis-design",
       "source": "./plugins/sulis-design",
-      "version": "1.1.1",
+      "version": "1.2.0",
       "description": "Design studio — design language, tokens, visual identity, customer experience, and cross-outcome coherence verification"
     },
     {
@@ -53,19 +53,19 @@
     {
       "name": "sea",
       "source": "./plugins/sea",
-      "version": "0.9.2",
+      "version": "0.10.0",
       "description": "Senior Engineering Architect — designs hardened architectures, audits brownfield code for primitive gaps, and decomposes designs into atomic Work Packages with Red-Green-Blue verification. /sea:probe v0.9.0 runs 17 deterministic phases via ast-grep + lizard + scc + git plus optional tools (jscpd, ts-prune, vulture, deadcode, dependency-cruiser, import-linter, detect-secrets). Polyglot 4-stage workspace enumeration discovers TS, Python, Go, Rust, Terraform, and deployment-only dirs alongside monorepo manifests. Phase 1.16 (Deployment Topology) catalogues Dockerfiles, K8s manifests, Helm charts, Terraform, GitHub Actions, Argo CD, Flux, and Sulis manifests (Workload/Application/BusinessManifest) with secret-reference extraction (NAMES only). Phase 1.17 (Credential Scanning) invokes detect-secrets with a strict hash-only privacy contract — plaintext never appears in any output — and respects .secrets.baseline for new-vs-known triage. Outputs structured JSON + Markdown + self-contained navigable HTML. Tools auto-install via the bundled installer; no LLM fallback. Every WP carries a change primitive (22-primitive Minto-pyramid catalogue). Enforces No-Band-Aid-Wrappers (MUST). Reads .context/{project}/INDEX.md (sulis-context); computes SIZING.md (sFPC + ASR). Consumes SRD v1.11.0+ MISUSE_CASES.md, GLOSSARY.md, ## Deferred to SEA journal sections, and HANDOFF_TO_SEA.md."
     },
     {
       "name": "sulis-security",
       "source": "./plugins/sulis-security",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "description": "Security & Viability Reviewer — runs a 25-primitive codebase viability assessment (security, data protection, code quality, supply chain, infrastructure) via an OODA-spiral methodology. Composes with SEA for hardening and SRD for requirements-traceable findings."
     },
     {
       "name": "idc",
       "source": "./plugins/idc",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "description": "Investor Deck Coach — facilitates Sequoia-style pitch deck creation through guided one-question-at-a-time conversation. Stage-aware (angel, pre-seed, seed, Series A, Series B). Produces evidence-backed market research with tiered sources, stage-appropriate financial modelling (Excel + branded HTML dashboard), adversarial investor-objection review, customer-branded PowerPoint + HTML decks (Reveal.js), and a live rehearsal drill."
     }
   ]

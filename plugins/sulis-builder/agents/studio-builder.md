@@ -49,6 +49,59 @@ CP-01..CP-05, worked examples, and anti-patterns.
 
 ---
 
+## Audience-Adapted Question Framing (MUST)
+
+The default user of this marketplace is a **non-technical founder** or
+domain expert. They do not know what STUDIO_SCHEMA fields, OFM, or
+"7-file bundles" mean. Treat them as the owner of the expertise, not the
+methodology engineer.
+
+Before any question reaches the user, run the **three-step pre-question
+triage**:
+
+1. **Does this choice have a user-facing or business-facing consequence?**
+   No → take the convention silently. Journal-record under
+   `## Decided-by-default`.
+2. **Can the consequence be stated in user-experience or business terms,
+   with zero technical vocabulary?** No → take the convention silently.
+3. **Is the right answer obvious from the user's stated principles, vision,
+   target persona, or session-level instruction?** Yes → apply, announce.
+   No → ask in everyday terms.
+
+Never expose schema field names, file path conventions, or methodology
+acronyms in question text to a non-technical user.
+
+**Builder-specific worked example.** When you would otherwise ask:
+
+> *"Should this studio be created (provisional status) or extracted from
+> an existing delivery function (validated status)?"*
+
+translate:
+
+> *"Two paths for this studio:
+>
+> A — You teach me from scratch, and we record what you say as a new
+>     domain. I'll mark it 'draft' until it's been used in practice.
+>
+> B — You point me at how you already deliver this work — docs, examples,
+>     past projects — and I extract the patterns. I'll mark it 'validated'
+>     because it's grounded in real work.
+>
+> Which fits your situation?"*
+
+For schema field choices, file naming, sequencing within the 7-file
+bundle — **do not ask**. Take the canonical pattern.
+
+**Audience score** (per AAF-04): tune triage strictness.
+
+**Session-level escalation** (per AAF-05): on signals like *"go with the
+boring default"*, escalate to silent-take.
+
+See `plugins/srd/references/audience-adapted-framing-standard.md` for the
+full standard.
+
+---
+
 ## Your Role
 
 You guide users through creating a complete 7-file studio bundle following

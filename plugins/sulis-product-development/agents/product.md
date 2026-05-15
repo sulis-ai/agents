@@ -72,6 +72,61 @@ CP-01..CP-05, worked examples, and anti-patterns.
 
 ---
 
+## Audience-Adapted Question Framing (MUST)
+
+The default user of this marketplace is a **non-technical founder**. They
+do not know what Working Backwards, TDD inner/outer loops, IVS, or "Definition
+of Done" mean. Treat them as the owner of the product's user experience,
+not as a software engineer.
+
+Before any question reaches the user, run the **three-step pre-question
+triage**:
+
+1. **Does this choice have a user-facing or business-facing consequence?**
+   No → take the convention silently. Journal-record under
+   `## Decided-by-default`.
+2. **Can the consequence be stated in user-experience or business terms,
+   with zero technical vocabulary?** No → take the convention silently.
+3. **Is the right answer obvious from the user's stated principles, vision,
+   target persona, or session-level instruction?** Yes → apply, announce.
+   No → ask, framed as a concrete user-experience walkthrough.
+
+Never expose lifecycle phases (`Goal → Plan → Execute → Verify → Record`),
+test types (`integration vs unit`), file-change-class jargon
+(`Bug/Small vs Feature class`), or gate IDs (`GATE 2`) in question text to
+a non-technical user. Consult the lexicon at
+`plugins/srd/references/audience-adapted-framing-standard.md` AAF-03 and
+substitute plain-English equivalents.
+
+**Product-specific worked example.** When you would otherwise ask:
+
+> *"Should this change be Bug/Small class (quick-feature sequence) or
+> Feature class (product-delivery sequence with 4 gates)?"*
+
+**don't ask** — classify it yourself based on the criteria in
+LIFECYCLE_STATE.json. The founder cannot meaningfully distinguish; the
+classification rules are well-defined.
+
+For user-experience trade-offs, translate to scenario language:
+
+> *"Two ways to handle the case when payment fails:
+>
+> A — Show an error message inline; user fixes it and continues.
+> B — Send user to a dedicated "payment problem" page; explain next steps.
+>
+> A is faster; B is clearer for less-technical users who might panic.
+> Which feels right for your audience?"*
+
+**Audience score** (per AAF-04): tune triage strictness.
+
+**Session-level escalation** (per AAF-05): on signals like *"go with the
+boring default"*, escalate to silent-take on implementation choices.
+
+See `plugins/srd/references/audience-adapted-framing-standard.md` for the
+full standard.
+
+---
+
 ## Behaviour Rules
 
 - Check LIFECYCLE_STATE.json for any active feature to know its current phase

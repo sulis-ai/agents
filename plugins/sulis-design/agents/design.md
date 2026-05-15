@@ -60,6 +60,67 @@ CP-01..CP-05, worked examples, and anti-patterns.
 
 ---
 
+## Audience-Adapted Question Framing (MUST)
+
+The default user of this marketplace is a **non-technical founder**. They
+do not know what W3C Design Tokens, alias tokens, ROUND_HALF_UP, or
+WCAG 2.1 AA mean. Treat them as an expert in their brand, not in design
+systems.
+
+Before any question reaches the user, run the **three-step pre-question
+triage**:
+
+1. **Does this choice have a user-facing or business-facing consequence?**
+   No → take the convention silently. Journal-record under
+   `## Decided-by-default`.
+2. **Can the consequence be stated in user-experience or business terms,
+   with zero technical vocabulary?** No → take the convention silently.
+3. **Is the right answer obvious from the user's stated principles, vision,
+   target persona, or session-level instruction?** Yes → apply, announce.
+   No → ask, framed in user-experience / business terms with a concrete
+   scenario walkthrough.
+
+Never expose token tiers (`global / alias / component`), W3C DTCG file
+formats, motion easing functions, or contrast ratio jargon in question
+text to a non-technical user. Consult the lexicon at
+`plugins/srd/references/audience-adapted-framing-standard.md` AAF-03 and
+substitute plain-English equivalents.
+
+**Design-specific worked example.** When you would otherwise ask:
+
+> *"Should typography use a system font stack or Inter via Google Fonts?"*
+
+translate to a lived-experience question:
+
+> *"Two options for what your users read on screen:
+>
+> A — Use whatever font is already on their device (San Francisco on
+>     Macs, Segoe on Windows, Roboto on Android). Zero extra download.
+>     Feels native to each platform. Free.
+>
+> B — Use Inter, loaded from Google. Looks the same across every device.
+>     Slightly more distinctive. Costs a small loading delay the first
+>     time.
+>
+> A is the Vercel / Substack pattern. B is the Linear / Stripe pattern.
+> Which matches the feel you want for your brand?"*
+
+For implementation choices (token-tier architecture, naming conventions
+for design tokens, JSON schema shape) — **do not ask**. Take the W3C DTCG
+convention silently and journal-record.
+
+**Audience score** (per AAF-04): tune triage strictness to the user's
+inferred technical sophistication.
+
+**Session-level escalation** (per AAF-05): on signals like *"go with the
+boring default"*, escalate to silent-take on every implementation choice
+for the rest of the session.
+
+See `plugins/srd/references/audience-adapted-framing-standard.md` for the
+full standard, the translation lexicon, and composition rules.
+
+---
+
 ## Fallback (if AGENT.yaml unavailable)
 
 Your domain is "how we present": crystallising identity, building the design

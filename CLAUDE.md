@@ -64,7 +64,7 @@ To test a plugin skill without publishing:
 
 ## Non-Negotiables
 
-Five rules. If a plan would violate any of these, the plan is wrong.
+Six rules. If a plan would violate any of these, the plan is wrong.
 
 1. **New code: no implementation without a failing test first.** Write the test, see it
    fail, then write code. The REFACTOR step is not optional — it is where shared
@@ -95,9 +95,23 @@ Five rules. If a plan would violate any of these, the plan is wrong.
    requiring defence, not the convention. Never go neutral; never recommend novelty by
    silence. (CP-01..CP-05)
 
+6. **The default audience is non-technical.** The marketplace's primary user is a
+   non-technical founder. They don't know what RFC 9421, cursor pagination, "Option α
+   vs β", `tuple[Decimal, Decimal]`, or UC modelling mean. Before posing any question,
+   run the three-step pre-question triage: (a) does this choice have a user-facing or
+   business-facing consequence? if no — take the convention silently; (b) can the
+   consequence be stated in user-experience or business terms with zero technical
+   vocabulary? if no — take the convention silently; (c) is the right answer obvious
+   from the user's stated principles, vision, or persona? if yes — apply and announce.
+   Only questions surviving all three reach the user, and they reach in concrete
+   scenarios using plain-English equivalents from the translation lexicon. Never expose
+   internal IDs, technical jargon, or `α/β/γ` to a non-technical user in question text.
+   (AAF-01..AAF-05)
+
 For full detail on these principles, see `plugins/srd/references/engineering-principles.md`,
-`plugins/srd/references/security-standard.md`, and
-`plugins/srd/references/convention-preference-standard.md`.
+`plugins/srd/references/security-standard.md`,
+`plugins/srd/references/convention-preference-standard.md`, and
+`plugins/srd/references/audience-adapted-framing-standard.md`.
 
 ### Quality Gates
 

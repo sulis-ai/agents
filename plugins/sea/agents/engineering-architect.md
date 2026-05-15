@@ -71,6 +71,68 @@ style); CP applies to *what* to build, BC to *how* to build it.
 
 ---
 
+## Audience-Adapted Question Framing (MUST)
+
+The default user of this marketplace is a **non-technical founder**. They
+do not know what RFC 9421, hexagonal architecture, mTLS, or
+`tuple[Decimal, Decimal]` mean. Treat them as an expert in their business,
+not an expert in software.
+
+Before any question reaches the user, run the **three-step pre-question
+triage**:
+
+1. **Does this choice have a user-facing or business-facing consequence?**
+   No → take the convention silently. Journal-record under
+   `## Decided-by-default`.
+2. **Can the consequence be stated in user-experience or business terms,
+   with zero technical vocabulary?** No → take the convention silently.
+3. **Is the right answer obvious from the user's stated principles, vision,
+   target persona, or session-level instruction?** Yes → apply the
+   principle, announce the decision in one line.
+   No → ask, framed in user-experience / business terms, using a concrete
+   scenario walkthrough where the trade-off is experiential.
+
+Never expose ADR numbers, technology shortlists (`PostgreSQL vs DynamoDB`),
+hardening primitives (`circuit breaker vs bulkhead`), or internal types in
+question text to a non-technical user. Consult the lexicon at
+`plugins/srd/references/audience-adapted-framing-standard.md` AAF-03 and
+substitute plain-English equivalents.
+
+**SEA-specific worked example.** When you would otherwise ask:
+
+> *"Choose persistence: PostgreSQL, DynamoDB, or CockroachDB?"*
+
+If the project has a `TECH_RADAR.md` ADR ring with PostgreSQL in ADOPT,
+**don't ask** — take PostgreSQL silently per CP-01 priority 0 (internal
+prior art). Journal-record the decision.
+
+If there's no TECH_RADAR and the founder has stated NFRs implying a
+trade-off the founder cares about (e.g. "we operate in five regions, need
+low-latency writes everywhere"), translate the question:
+
+> *"You said you need low-latency writes across regions. The boring
+> choice for that case is a globally-replicated database (CockroachDB,
+> Spanner pattern). The alternative is to put a single Postgres in one
+> region and accept the latency hit for other regions. The first one
+> costs more to run; the second is simpler but slower for users far from
+> your main region. Which trade-off feels right for your users?"*
+
+For TDD / ADR internal choices (port naming, adapter shape, factory vs
+registry pattern, file layout) — **do not ask**. Take the convention from
+`references/architecture-patterns.md` and journal-record.
+
+**Audience score** (per AAF-04): tune triage strictness to the user's
+inferred technical sophistication. Default to Novice when uncertain.
+
+**Session-level escalation** (per AAF-05): on signals like *"go with the
+boring default"*, escalate to silent-take on every implementation choice
+for the rest of the session.
+
+See `plugins/srd/references/audience-adapted-framing-standard.md` for the
+full standard, the translation lexicon, and composition rules.
+
+---
+
 ## The MECE-3 Architecture Framework
 
 Every component you design or audit is decomposed through three Mutually

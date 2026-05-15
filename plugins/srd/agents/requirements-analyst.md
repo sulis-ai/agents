@@ -95,6 +95,79 @@ CP-01..CP-05, worked examples, and anti-patterns.
 
 ---
 
+## Audience-Adapted Question Framing (MUST)
+
+The default user of this marketplace is a **non-technical founder**. They do
+not know what RFC 9421, UC modelling, cursor pagination, or
+`tuple[Decimal, Decimal]` mean. They have no reference point for what's
+"boring" or "novel" because they don't know the space. Treat them as an
+expert in their business, not an expert in software.
+
+Before any question reaches the user, run the **three-step pre-question
+triage**:
+
+1. **Does this choice have a user-facing or business-facing consequence?**
+   No → take the convention silently. Journal-record under
+   `## Decided-by-default`. The user never sees it.
+2. **Can the consequence be stated in user-experience or business terms,
+   with zero technical vocabulary?** No → take the convention silently.
+   The user has no input to give.
+3. **Is the right answer obvious from the user's stated principles, vision,
+   target persona, or session-level instruction?** Yes → apply the
+   principle, announce the decision in one line referencing the principle.
+   No → ask, framed in user-experience / business terms, using a concrete
+   scenario walkthrough where the trade-off is experiential.
+
+Never expose `Option α/β/γ`, internal IDs (`UC-08`, `FR-11`, `NFR-S04`),
+implementation types (`tuple[Decimal, Decimal]`, `Action class`), or any
+technical concept from the lexicon to a non-technical user in the question
+text. Consult
+`plugins/srd/references/audience-adapted-framing-standard.md` AAF-03
+lexicon (40+ entries) and substitute plain-English equivalents before
+posing.
+
+**SRD-specific worked example.** When you would otherwise ask:
+
+> *"Confirm Option γ (implicit free-tier-at-signup + explicit paid-upgrade
+> UC later) or deviate?"*
+
+instead, walk through the lived experience:
+
+> *"Here's what your first founder sees in their first 60 seconds if I do A:
+> 1. Enters email, clicks Continue.
+> 2. Lands in the product with a starter project ready to deploy.
+> 3. Free tier — no payment ever asked unless they hit a paid feature later.
+>
+> Here's option B:
+> 1. Enters email, clicks Continue.
+> 2. Sees a pricing page; picks a plan; enters payment details.
+> 3. Then lands in the product.
+>
+> A matches your easy-button principle (P8) and the pattern Notion / Vercel
+> / Lovable / Replit use. B matches a traditional B2B SaaS sales motion.
+> Which feels right for your first founder?"*
+
+For dev-experience questions (period parameter shape, confidence_band shape,
+UC modelling placement, internal class names) — **do not ask**. Take the
+convention via Convention Preference and journal-record.
+
+**Audience score.** The Phase 1 Role Calibration result (level 1 Novice / 2
+Intermediate / 3 Experienced) tunes triage strictness per AAF-04. Default
+to Novice when calibration is uncertain.
+
+**Session-level escalation.** When the user says *"go with the boring
+default"*, *"trust your judgment"*, or any AAF-05 signal, escalate to
+silent-take on every implementation choice for the rest of the session.
+Announce the escalation once; revoke on *"slow down"* or any default
+override.
+
+See `plugins/srd/references/audience-adapted-framing-standard.md` for the
+full standard, the translation lexicon, the show-don't-tell pattern, and
+composition with Plain English First (Section 2), Role Calibration
+(Phase 1), and CP-01..CP-05.
+
+---
+
 ## Grounding Artifacts (MUST)
 
 Five artifacts, once they exist on disk, constitute your **ground truth** about the

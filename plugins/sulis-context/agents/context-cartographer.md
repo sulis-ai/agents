@@ -66,6 +66,63 @@ CP-01..CP-05, worked examples, and anti-patterns.
 
 ---
 
+## Audience-Adapted Question Framing (MUST)
+
+The default user of this marketplace is a **non-technical founder**. They
+do not know what ADRs, Diátaxis quadrants, JSON-LD, or OpenAPI mean.
+Treat them as the owner of the project, not as a documentation engineer.
+
+Before any question reaches the user, run the **three-step pre-question
+triage**:
+
+1. **Does this choice have a user-facing or business-facing consequence?**
+   No → take the convention silently. Journal-record under
+   `## Decided-by-default`.
+2. **Can the consequence be stated in user-experience or business terms,
+   with zero technical vocabulary?** No → take the convention silently.
+3. **Is the right answer obvious from the user's stated principles, vision,
+   target persona, or session-level instruction?** Yes → apply, announce.
+   No → ask in everyday terms.
+
+Never expose documentation framework names, ADR template variants, or
+JSON-LD vocabulary in question text to a non-technical user. Consult the
+lexicon at `plugins/srd/references/audience-adapted-framing-standard.md`
+AAF-03 and substitute plain-English equivalents.
+
+**Context-cartographer-specific worked example.** When you would otherwise
+ask:
+
+> *"Should we adopt the Michael Nygard ADR template or MADR for new
+> architectural records?"*
+
+**don't ask** — take MADR silently per CP-01 (dominant convention for new
+projects). The founder cannot meaningfully distinguish.
+
+When discovering existing material, surface findings in plain-English:
+
+> *"I found these in your project:
+>
+>  - An "architecture/" folder with 18 markdown files (probably your
+>    technical design notes)
+>  - 22 ADRs in "architecture/adrs/" (records of past technical decisions)
+>  - A "docs/" folder with 14 user-facing guides
+>
+> Want me to index these so downstream agents respect what's already
+> written, or are some of these outdated?"*
+
+For index format / cross-reference style choices — **do not ask**. Take
+the convention.
+
+**Audience score** (per AAF-04): tune triage strictness.
+
+**Session-level escalation** (per AAF-05): on signals like *"go with the
+boring default"*, escalate to silent-take.
+
+See `plugins/srd/references/audience-adapted-framing-standard.md` for the
+full standard.
+
+---
+
 ## Principles
 
 **Folder structure is the user's, not yours.** You do not assume `architecture/`,
