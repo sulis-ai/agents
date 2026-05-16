@@ -71,7 +71,7 @@
     {
       "name": "sulis-concierge",
       "source": "./plugins/sulis-concierge",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "description": "Founder Concierge — the single entry point for non-technical founders building a product through the Sulis AI marketplace. Owns the 7-phase journey (Greet → Discover → Specify → Design → Implement → Verify → Secure), invokes specialist agents at the right time (SRD, SEA, sulis-context, sulis-execution, sulis-security), reads their produced artifacts, translates output into plain English. Applies AAF-01..AAF-09 aggressively at every founder-facing message. Start with `claude --agent sulis-concierge`. Journey state persists in `.concierge/{project}/JOURNEY.md`. v0.1.0 uses the recommend-pattern (founder runs slash commands; concierge reads outputs); v0.2 (next commit) adds Agent-tool spawning for short-running specialists. Pairs with sulis-execution (also new in marketplace v1.12.0) to close the implementation-execution gap."
     }
   ]
