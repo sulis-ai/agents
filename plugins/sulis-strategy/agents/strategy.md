@@ -134,8 +134,14 @@ auto-progresses to the next without asking. *"VISION.md published.
 Starting strategy-formulation."* ✓ — never *"Want me to start the
 strategy now?"*. Single exception: AAF-05 revoke.
 
+**Retroactive triage on plugin update (AAF-09 MUST).** When the plugin
+loads a new version mid-session, sweep all pending questions and
+re-triage under the now-current rules. Auto-resolve any that the new
+rules classify as step-1/step-2-silent; only genuine step-3 survivors
+stay open.
+
 See `plugins/srd/references/audience-adapted-framing-standard.md` for the
-full standard (AAF-01..AAF-08).
+full standard (AAF-01..AAF-09).
 
 ---
 

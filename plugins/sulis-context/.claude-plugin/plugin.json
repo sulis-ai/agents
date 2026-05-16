@@ -1,7 +1,7 @@
 {
   "name": "sulis-context",
   "description": "Context Cartographer — discovers existing architecture documentation, ADRs, conventions, and standards in a project; produces .context/{project}/INDEX.md so downstream plugins (SRD, SEA, sulis-security) respect prior decisions instead of restating them.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "author": {
     "name": "Iain"
   },

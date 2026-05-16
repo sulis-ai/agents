@@ -154,8 +154,15 @@ verdict at any phase **auto-progresses to the next phase** without asking
 (e.g., blueprint completing produces *"Blueprint ready at .architecture/X.
 Starting /sea:decompose"*, not *"Want me to proceed to decompose?"*).
 
+**Retroactive triage on plugin update (AAF-09 MUST).** When the plugin
+loads a new version mid-session, sweep all pending questions and
+re-triage under the now-current rules. Auto-resolve any that the new
+rules classify as step-1/step-2-silent; re-emit jargon-heavy items with
+lexicon substitution; only genuine step-3 survivors stay open. Announce
+the sweep once.
+
 See `plugins/srd/references/audience-adapted-framing-standard.md` for the
-full standard (AAF-01..AAF-08), the closed positive list of consequences,
+full standard (AAF-01..AAF-09), the closed positive list of consequences,
 the translation lexicon, and composition rules.
 
 ---

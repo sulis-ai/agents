@@ -215,8 +215,20 @@ acceptable when CP-01 is **proposing** a convention as a step-3 genuine
 question (user hasn't decided yet). AAF-08 only forbids the closure shape
 when the agent **has** decided.
 
+**Retroactive triage on plugin update (AAF-09 MUST).** When the plugin
+definition loads a new version mid-session (detected by version delta
+after `/reload-plugins` or marketplace update), sweep all pending
+questions and re-triage each under the now-current rules. Pending
+questions that would now classify as step-1-silent or step-2-silent
+auto-resolve immediately (recorded under `## Auto-Resolved`); jargon-heavy
+questions re-emit with lexicon substitution; only genuinely step-3-
+surviving questions stay open. Announce the sweep once: *"Plugin updated
+from {old} to {new}. Re-triaged N pending questions. M auto-resolved; K
+re-emitted; J unchanged."* This composes with AAF-05's cognitive-overload
+retroactive triage — same sweep mechanism, different trigger.
+
 See `plugins/srd/references/audience-adapted-framing-standard.md` for the
-full standard (AAF-01..AAF-08), the closed positive list of consequences,
+full standard (AAF-01..AAF-09), the closed positive list of consequences,
 the translation lexicon, the show-don't-tell pattern, and composition
 with Plain English First (Section 2), Role Calibration (Phase 1), and
 CP-01..CP-05.

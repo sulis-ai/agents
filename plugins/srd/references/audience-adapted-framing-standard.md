@@ -644,6 +644,86 @@ step-3 question.
 
 ---
 
+## AAF-09: Retroactive Triage on Plugin Update (MUST)
+
+When the agent's plugin definition loads a new version mid-session — most
+commonly after the user runs `/reload-plugins` or installs a marketplace
+update — the agent MUST sweep all **pending questions** and re-triage
+each one under the now-current rules. Without this, questions posed
+before the new rules loaded keep waiting for user answers even after
+the rules would have auto-resolved them.
+
+### What counts as a pending question
+
+Any question the agent has posed but not yet received a final answer on:
+
+- Items still listed under `## Need your input` in the most recent batch.
+- Open frames in `## Reconciliation Cycle Stack` (per Two-Model OODA).
+- Rows in `## Triage Trace` with `Emitted? = yes` and no recorded user
+  response since.
+- Any question the agent is holding mid-conversation expecting the user
+  to answer next.
+
+### The sweep
+
+For each pending question, re-run AAF-01 against the current closed
+positive list:
+
+1. **Would the question now classify as step-1-silent or step-2-silent?**
+   Take the action silently and journal-record under `## Auto-Resolved`
+   in COMPLETENESS_REPORT.md with rationale citing the AAF-01 step that
+   fired. **Don't keep waiting for the user.** Don't ask for permission
+   to resolve. Just resolve.
+2. **Would the question now use different phrasing** (e.g. lexicon
+   substitution per AAF-03, removal of newly-banned jargon, plain-English
+   translation per AAF-02)? Re-emit the question with the updated
+   framing, and append a Triage Trace row noting the re-emission.
+3. **Does the question still survive step-3 unchanged?** Leave it in
+   place.
+
+### The announcement
+
+Make one announcement when the sweep completes — never a series of
+permission-shape closures (AAF-08 still applies):
+
+> *"Plugin updated from {old_version} to {new_version}. Re-triaged {N}
+> pending questions under the new rules. {M} auto-resolved silently
+> (now in Auto-Resolved); {K} re-emitted with updated phrasing; {J}
+> unchanged."*
+
+If M is 0 and K is 0, no announcement is needed — the new rules confirmed
+the existing questions still apply.
+
+### Trigger detection
+
+The agent detects a plugin update by comparing the version in
+`plugin.json` against the version it ran with on the previous turn.
+Whenever the version delta is non-zero, the sweep fires. The detection
+is automatic — no user signal required.
+
+This composes with AAF-05's cognitive-overload retroactive triage: both
+share the "sweep pending questions, apply current rules" mechanism. The
+trigger differs:
+
+- **AAF-05 retroactive triage:** user signals cognitive overload (*"I'm
+  not a software person"*, *"feels like assuming knowledge"*).
+- **AAF-09 retroactive triage:** plugin version delta detected after
+  reload.
+
+### Why this rule exists
+
+Production sessions showed agents holding open questions like *"Confirm
+all five sub-questions: TRIALING initial state, payment-fail recovery,
+mid-upgrade upgrade_in_progress error, Idempotency-Key per Stripe, plan
+downgrade scope?"* — questions posed before AAF-01's closed positive
+list named state-machine internals and idempotency-key handling as
+step-1-silent. After the rule update loaded, the questions kept sitting
+there waiting for ratification that the new rules said wasn't needed.
+The user had to manually instruct *"re-triage those under the current
+rules."* AAF-09 makes that sweep automatic.
+
+---
+
 ## Anti-Patterns
 
 ### "I'll ask just to be safe"
@@ -765,3 +845,4 @@ in CP-01 step-3 proposal mode, *"Confirm or defend"* is fine.
 | 0.1.1 | 2026-05-15 | Root-cause fix after v0.1.0 didn't fire in production. (1) AAF-01 step 1 rewritten with closed positive list of consequences — default-deny, no lexical wiggle room. (2) AAF-04 tier behaviour: Step 1 now tier-agnostic; tier only affects step 3 framing. Removed the Experienced "may surface technical trade-offs directly" carve-out that authorised the failure mode. (3) AAF-05 promoted SHOULD → MUST; trigger list extended to include cognitive-overload signals ("feels like agent is assuming knowledge", "I don't know what's right", "I'm not a software person", etc.); mid-session audience downgrade is now immediate with retroactive triage. (4) Added AAF-06 batch-findings output contract (Already done / Done with announcement / Need your input — three-list shape forbids "found N things, want me to do them?"). (5) Added AAF-07 question-emission self-check requiring a triage-trace journal entry before any question reaches the user. (6) Added four new anti-patterns. | Standards team |
 | 0.1.2 | 2026-05-15 | Permission-theater closure fix after v0.1.1 didn't catch the ratification-shape failure. (1) Added AAF-08: Decided Actions Are Not Questions (MUST) — forbids "Confirm?" / "Want me to proceed?" / "Sound good?" / "Should I batch these?" closures after a decision has been made via AAF-01 steps 1, 2, or 3-Apply. Required output shape: action-then-report, never plan-then-ratify. Single exception: AAF-05 revoke signals opt the user into per-item confirmation. (2) Extended AAF-06 with three new forbidden-shape variants (implicit-batch, numbered-confirm, plan-of-action). (3) Added three new anti-patterns ("Decision wrapped in 'Proceed?'", "Plan-then-ratify", "Confirm-or-deviate after Convention applied"). Composition with CP-01 made explicit: the same words "Confirm or" fire differently based on whether the decision is being proposed (CP-01 step-3 — acceptable) or already made (AAF-08 forbidden). | Standards team |
 | 0.1.3 | 2026-05-16 | Lifecycle-scope clarification after a production session showed the agent reading AAF as "facilitation-time only" — said: *"It's a facilitation-time rule for question phrasing during exploration, not an artifact requirement, not a new validation perspective."* That misreading let the agent produce the AAF-08-forbidden closure *"If you want, I can batch (a) + (b)..."* during post-PASS cleanup. Fix: AAF-01 now explicitly states it applies at EVERY decision point — facilitation, verification, validation, post-PASS cleanup, propagation batches, handover preparation. There is no phase where AAF does not apply. (Companion fix: per-plugin version bumps across all 9 plugins to ensure the v1.11.1 and v1.11.2 content actually reaches the agent's runtime — the previous version-unchanged updates may not have triggered the reload's delta detection.) | Standards team |
+| 0.1.4 | 2026-05-16 | Added AAF-09: Retroactive Triage on Plugin Update (MUST). v1.11.3 fixed the version-reload bug so new rules reach the agent; but questions posed BEFORE the new rules loaded kept waiting for user answers even after the new rules would have auto-resolved them. Production observation: agent held *"Confirm all five sub-questions: TRIALING / payment-fail / mid-upgrade error / Idempotency-Key / downgrade scope?"* open across multiple reloads even though state-machine internals and idempotency-key handling are explicitly on AAF-01's step-1-silent list. AAF-09 fires automatically on every plugin version delta (no user signal required) and re-triages all pending questions under the now-current rules — step-1/step-2-silent items move to `## Auto-Resolved` immediately; jargon-heavy phrasings re-emit with lexicon substitution; genuine step-3 questions stay. Composes with AAF-05's cognitive-overload retroactive triage — same sweep mechanism, different trigger. | Standards team |

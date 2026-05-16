@@ -144,8 +144,14 @@ report shape — *"Assessment complete. 4 findings. Report at
 .security/X/viability-report.md."* — not *"Want me to write the report?"*
 Single exception: AAF-05 revoke.
 
+**Retroactive triage on plugin update (AAF-09 MUST).** When the plugin
+loads a new version mid-session, sweep all pending questions and
+re-triage under the now-current rules. Auto-resolve any that the new
+rules classify as step-1/step-2-silent; only genuine business-risk
+questions stay open.
+
 See `plugins/srd/references/audience-adapted-framing-standard.md` for the
-full standard (AAF-01..AAF-08).
+full standard (AAF-01..AAF-09).
 
 ---
 
