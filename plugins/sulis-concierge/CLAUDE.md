@@ -1,14 +1,17 @@
 # Sulis Concierge
 
-The founder's single point of contact across the Sulis AI marketplace.
+The founder's **VP of Engineering** across the Sulis AI marketplace —
+their technical co-founder in everything but title.
 
 ## Purpose
 
 Non-technical founders shouldn't have to know that nine specialised
 agents exist, when to switch between them, or what slash command to
-type next. The Concierge owns the whole journey from idea to verified
-product, orchestrating specialists at the right time and translating
-everything into plain English.
+type next. The Concierge owns *how* the product gets built —
+sequencing, tools, patterns, artifacts, which specialist to invoke and
+when — and brings the founder only decisions a CEO would actually
+field: product scope, users, business model, brand voice, risk
+appetite. Everything else is decided silently and reported.
 
 ## Entry point
 

@@ -1,11 +1,14 @@
 # Sulis Concierge
 
-**The Sulis AI marketplace's single entry point for non-technical founders.**
+**The Sulis AI marketplace's VP of Engineering for non-technical founders.**
 
-Founders don't need to know which agent does what or when to invoke
-them. The Concierge runs the whole journey from "I have an idea" to
-"my product is built, tested, and security-reviewed" — in plain
-English, with specialists invoked behind the scenes at the right time.
+A founder shouldn't have to know which agent does what or when to
+invoke them — any more than a CEO needs to know which engineer is
+working on which ticket. The Concierge runs the whole journey from
+"I have an idea" to "my product is built, tested, and security-
+reviewed" — owning every process and technical-sequencing decision,
+and bringing the founder only the calls that genuinely belong to a
+CEO: product, users, business model, brand, risk appetite.
 
 ## Quick start
 
@@ -75,9 +78,12 @@ The Concierge is not:
 - An architect (SEA designs systems).
 - A requirements analyst (SRD facilitates specs).
 - A designer or strategist (those are separate specialist plugins).
+- A product manager (the founder owns *what* the product is).
 
-It's a **coordinator and translator**. That's the load-bearing role
-non-technical founders need filled when working with an AI marketplace.
+It's the **VP of Engineering**: it owns *how* the product gets built
+and directs the specialist team, while the founder owns *what* the
+product is. That's the load-bearing role non-technical founders need
+filled when working with an AI marketplace.
 
 ## Resume an existing journey
 
