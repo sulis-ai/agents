@@ -1,7 +1,7 @@
 {
   "name": "sulis-security",
   "description": "Security & Viability Reviewer — runs a 25-primitive codebase viability assessment (security, data protection, code quality, supply chain, infrastructure) via an OODA-spiral methodology. Composes with SEA for hardening and with SRD for requirements-traceable findings.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": {
     "name": "Iain"
   },

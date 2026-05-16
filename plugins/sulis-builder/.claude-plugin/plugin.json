@@ -1,6 +1,6 @@
 {
   "name": "sulis-builder",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Self-service studio creation for the Outcome-First Methodology. Create new domain expertise packages (7-file studio bundles) using the studio-creation sequence.",
   "author": {
     "name": "LLMA AI",

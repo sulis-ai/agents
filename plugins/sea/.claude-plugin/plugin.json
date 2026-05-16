@@ -1,7 +1,7 @@
 {
   "name": "sea",
   "description": "Senior Engineering Architect — designs hardened architectures, audits brownfield code for primitive gaps, and decomposes designs into atomic Work Packages with Red-Green-Blue verification. /sea:probe v0.9.0 uses a Python orchestrator (scripts/probe.py) to invoke ast-grep + lizard + scc + git plus optional tools (jscpd, ts-prune, vulture, deadcode, dependency-cruiser, import-linter, detect-secrets) across 17 deterministic phases — 15 per-workspace + 2 repo-wide (Deployment Topology with first-class Sulis manifest support, Credential Scanning hash-only / baseline-aware). Polyglot 4-stage workspace enumeration adds auxiliary packages, code-bearing dirs, and deployment-only dirs alongside the existing monorepo manifests. Outputs structured JSON + Markdown + a self-contained navigable HTML report. 88+ unit + integration tests; no LLM fallback. Every WP carries a change primitive (22-primitive Minto-pyramid catalogue).",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "author": {
     "name": "Iain"
   },

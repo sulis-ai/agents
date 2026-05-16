@@ -1,7 +1,7 @@
 {
   "name": "idc",
   "description": "Investor Deck Coach — facilitates Sequoia-style pitch deck creation through guided conversation. Stage-aware (angel, pre-seed, seed, Series A, Series B). Produces evidence-backed market research, rigorous financial modelling, adversarial review, customer-branded PowerPoint + HTML decks, Excel + HTML financial models, and a live rehearsal drill.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": {
     "name": "Iain"
   },

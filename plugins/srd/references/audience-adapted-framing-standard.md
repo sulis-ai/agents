@@ -76,6 +76,18 @@ posture is silent action**: if a check is ambiguous, the agent takes the
 convention and journal-records the decision — it does not ask. Permission-
 seeking is the failure mode this rule is written to prevent.
 
+**AAF triage applies at EVERY decision point in the agent's lifetime.**
+Not only during facilitation. Not only during exploration. AAF fires
+during: Phase 1 orientation, Phase 2 divergent exploration, Phase 3
+convergent specification, Phase 3.5 disambiguation, Phase 3.6 adversarial
+sweep, Phase 4 artifact generation, Phase 5 completeness verification,
+Phase 6 handover preparation, post-PASS cleanup, propagation batches,
+verification re-runs, and every closure of every turn. There is no phase
+where AAF triage does not apply. If the agent has identified an action
+to take and is about to surface it to the user, AAF-01 fires first;
+AAF-08 governs whether a closure-shape is permitted. The rule is
+lifecycle-wide, not facilitation-only.
+
 ```
 1. Does this choice have a user-facing or business-facing consequence?
    (Apply the closed positive list below — default-deny.)
@@ -752,3 +764,4 @@ in CP-01 step-3 proposal mode, *"Confirm or defend"* is fine.
 | 0.1.0 | 2026-05-15 | Initial draft. Calibration period 90 days. Promotion to MUST repo-wide requires evidence from three sessions where the standard changed the outcome (fewer technical questions posed; user reported the session felt easier; spec quality not regressed). | Standards team |
 | 0.1.1 | 2026-05-15 | Root-cause fix after v0.1.0 didn't fire in production. (1) AAF-01 step 1 rewritten with closed positive list of consequences — default-deny, no lexical wiggle room. (2) AAF-04 tier behaviour: Step 1 now tier-agnostic; tier only affects step 3 framing. Removed the Experienced "may surface technical trade-offs directly" carve-out that authorised the failure mode. (3) AAF-05 promoted SHOULD → MUST; trigger list extended to include cognitive-overload signals ("feels like agent is assuming knowledge", "I don't know what's right", "I'm not a software person", etc.); mid-session audience downgrade is now immediate with retroactive triage. (4) Added AAF-06 batch-findings output contract (Already done / Done with announcement / Need your input — three-list shape forbids "found N things, want me to do them?"). (5) Added AAF-07 question-emission self-check requiring a triage-trace journal entry before any question reaches the user. (6) Added four new anti-patterns. | Standards team |
 | 0.1.2 | 2026-05-15 | Permission-theater closure fix after v0.1.1 didn't catch the ratification-shape failure. (1) Added AAF-08: Decided Actions Are Not Questions (MUST) — forbids "Confirm?" / "Want me to proceed?" / "Sound good?" / "Should I batch these?" closures after a decision has been made via AAF-01 steps 1, 2, or 3-Apply. Required output shape: action-then-report, never plan-then-ratify. Single exception: AAF-05 revoke signals opt the user into per-item confirmation. (2) Extended AAF-06 with three new forbidden-shape variants (implicit-batch, numbered-confirm, plan-of-action). (3) Added three new anti-patterns ("Decision wrapped in 'Proceed?'", "Plan-then-ratify", "Confirm-or-deviate after Convention applied"). Composition with CP-01 made explicit: the same words "Confirm or" fire differently based on whether the decision is being proposed (CP-01 step-3 — acceptable) or already made (AAF-08 forbidden). | Standards team |
+| 0.1.3 | 2026-05-16 | Lifecycle-scope clarification after a production session showed the agent reading AAF as "facilitation-time only" — said: *"It's a facilitation-time rule for question phrasing during exploration, not an artifact requirement, not a new validation perspective."* That misreading let the agent produce the AAF-08-forbidden closure *"If you want, I can batch (a) + (b)..."* during post-PASS cleanup. Fix: AAF-01 now explicitly states it applies at EVERY decision point — facilitation, verification, validation, post-PASS cleanup, propagation batches, handover preparation. There is no phase where AAF does not apply. (Companion fix: per-plugin version bumps across all 9 plugins to ensure the v1.11.1 and v1.11.2 content actually reaches the agent's runtime — the previous version-unchanged updates may not have triggered the reload's delta detection.) | Standards team |
