@@ -11,8 +11,8 @@
     {
       "name": "srd",
       "source": "./plugins/srd",
-      "version": "1.16.3",
-      "description": "Requirements Analyst — facilitates building Software Requirements Documents backed by UML artifacts through guided conversation. Includes intent triage (Phase 1), disambiguation sweep (Phase 3.5), and adversarial sweep (Phase 3.6 — produces MISUSE_CASES.md with negative requirements). Reads .context/{project}/INDEX.md (from sulis-context) on Phase 1 to apply Respect-Don't-Restate. Hands architecture work over to SEA via early or mid-session handover. v1.16.2 adds the marketplace-wide git-workflow-standard.md (GIT-01..GIT-10) — two-branch dev/main model, Conventional Commits 1.0.0, direct merge to dev on CI green (no PR ceremony), branch protection rules, dev→main promotion ceremony, SemVer for release tags, and rollback procedure. v1.16.3 tightens GIT-07: local worktree cleanup at end of lifecycle (step 10, after WP marked done), not at merge (step 7); remote branch still deleted at merge; worktree left in place when scope guard fires so the BLOCKER record can point at it."
+      "version": "1.17.0",
+      "description": "Requirements Analyst — facilitates building Software Requirements Documents backed by UML artifacts through guided conversation. Includes intent triage (Phase 1), disambiguation sweep (Phase 3.5), and adversarial sweep (Phase 3.6 — produces MISUSE_CASES.md with negative requirements). Reads .context/{project}/INDEX.md (from sulis-context) on Phase 1 to apply Respect-Don't-Restate. Hands architecture work over to SEA via early or mid-session handover. v1.17.0 adds the marketplace-wide executor-loop-standard.md (EL-01..EL-08) — OODA loop on every fallible step, verbatim failure observation, Five Whys diagnosis (bounded at 5), minimum-change Decide, scope guard for out-of-scope failures, per-failure-type self-heal budget, structured BLOCKER record format. Composes with git-workflow-standard.md (v1.16.2) and CP/AAF/EP. Used by every autonomous-execution agent in the marketplace (sulis-execution, etc)."
     },
     {
       "name": "sulis-context",
