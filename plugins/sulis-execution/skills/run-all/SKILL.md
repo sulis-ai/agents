@@ -1,86 +1,100 @@
 ---
 name: run-all
 description: >
-  Dispatch the orchestrator to walk the Work Package INDEX. Picks the
-  next ready WP (no unmet dependencies), dispatches the executor for
-  it, advances on completion, records blockers, continues until all
-  ready WPs are exhausted. Usage: /sulis-execution:run-all.
+  Spawn the orchestrator agent to walk the full Work Package INDEX.
+  The orchestrator picks the next ready WP, spawns the executor for
+  it, advances on completion, records blockers, continues until the
+  ready set is exhausted. Usage: /sulis-execution:run-all.
 ---
 
 # /sulis-execution:run-all
 
-Dispatch the **orchestrator** to walk the full Work Package INDEX.
-This is the concierge's Phase 5 default path.
+This skill **spawns the orchestrator agent** to walk the entire WP
+INDEX and ship every ready WP atomically.
 
-## Usage
+## How to invoke (MUST — do not run orchestration inline)
+
+When this skill is loaded, **your sole action is to call the Agent
+tool with `subagent_type: "sulis-execution:orchestrator"`**. Do not
+read the INDEX, pick a WP, or dispatch executors directly in your
+own session — that defeats the orchestrator's purpose (it must own
+the dependency walk under its own context window and re-dispatch
+strategy).
+
+### The dispatch call
 
 ```
-/sulis-execution:run-all
+Agent({
+  subagent_type: "sulis-execution:orchestrator",
+  description: "Walk the WP INDEX and ship each ready WP atomically",
+  prompt: """
+You are dispatched to walk the Work Package INDEX, pick the next
+ready WP (no unmet dependencies), and ship it via the executor
+agent. Continue until the ready set is exhausted or a real error
+halts the loop.
+
+INDEX:   .architecture/{project}/work-packages/INDEX.md
+Existing BLOCKERs: .architecture/{project}/work-packages/BLOCKER-*.md
+
+Your contract is in agents/orchestrator.md. Key points:
+- Spawn the executor via Agent({subagent_type: "sulis-execution:executor"})
+  for each ready WP. Do not run executor work inline.
+- After each executor exit: read its outcome (done | blocked | error)
+  and update INDEX accordingly.
+- Propagate dependency_blocked transitively when a WP blocks.
+- Sequential dispatch in v0.4-v0.5; parallelism is opt-in via WP
+  frontmatter and lands in a later release.
+- Halt entirely on executor "error" (mid-lifecycle return, crash);
+  surface plainly.
+- Emit one plain-English status line per state transition for the
+  invoking session.
+
+Return when ready set is empty (all WPs done or blocked) or a real
+error halts the loop.
+""",
+})
 ```
 
-No arguments. The orchestrator reads
-`.architecture/{project}/work-packages/INDEX.md`, builds the ready
-set, and dispatches the executor on each ready WP in topological
-order (lowest `sequence_id` first; ties by ID alphabetical).
+### What you do NOT do in this skill's session
 
-## What happens during a run
+- **Do not read INDEX.md directly.** The orchestrator does it.
+- **Do not pick the next WP.** The orchestrator's dependency-walk
+  logic does it.
+- **Do not invoke the executor agent yourself.** The orchestrator
+  does it for each ready WP.
+- **Do not retry blocked WPs.** That's `/sulis-execution:retry`.
 
-1. Orchestrator reads INDEX.
-2. Picks next ready WP (status: pending, all dependsOn done).
-3. Marks WP `in_progress` in INDEX with timestamp.
-4. Dispatches executor with the WP ID.
-5. Waits for executor to finish.
-6. On `done` → advance to next ready WP.
-7. On `blocked` → record blocker; mark transitively-dependent WPs
-   `dependency_blocked`; advance to next non-blocked ready WP.
-8. Loop until ready set is exhausted.
-9. Terminal status: how many done, how many blocked, how many still
-   pending.
+### What you DO in this skill's session
 
-## What it produces
-
-- Updated `INDEX.md` reflecting all WP statuses.
-- One or more `BLOCKER-WP-NNN.md` files (if any WPs were blocked
-  during the run).
-- Updated WP files' `## Acceptance Evidence` sections for each
-  completed WP.
-- One terminal status line for the invoking session, summarising
-  the run.
+1. Verify INDEX.md exists at the expected path; if not, surface a
+   clear error: *"INDEX.md not found. Run `/sea:decompose` first to
+   produce work packages."*
+2. Make the Agent tool call above.
+3. When it returns, surface the orchestrator's terminal summary.
 
 ## When to use this skill
 
-- **The default path.** Set up a session, run this command, watch
-  the orchestrator walk the index.
-- **The concierge's Phase 5.** When the concierge enters Phase 5
-  (Implement), it spawns the orchestrator via the Agent tool, which
-  is equivalent to invoking this skill.
-
-## What it does NOT do
-
-- **It does not deploy `dev → main`.** That's the founder's
-  ceremony, surfaced by the concierge.
-- **It does not retry blocked WPs.** Use `/sulis-execution:retry
-  WP-NNN` after fixing the external blocker.
-- **It does not run executors in parallel** (in v0.4). v0.5 adds
-  opt-in parallelism per the orchestrator's parallelism rules.
+- **The default Phase 5 path.** Set up a session, run this command,
+  watch the orchestrator walk the INDEX.
+- **The concierge's spawn target.** When the concierge enters
+  Phase 5 (Implement), it spawns this same orchestrator via Agent
+  tool directly — bypassing the skill — for the same effect.
 
 ## Gotchas
 
-- The skill expects a non-empty
-  `.architecture/{project}/work-packages/INDEX.md`. If empty (no
-  WPs decomposed yet), surface a clear error: *"INDEX is empty.
-  Run `/sea:decompose` first to produce work packages."*
-- If the INDEX has WPs with primitives outside v0.1's EXPAND scope
-  (REORGANISE / SUBSTITUTE / CONTRACT / REINFORCE-beyond-Test), the
-  orchestrator will dispatch them, the executor will escalate
-  immediately with a primitive-coverage BLOCKER, and the
-  orchestrator will record the blocker and move on. v0.5 closes
-  this gap.
+- An empty INDEX surfaces a clear error. No silent no-op.
+- A WP with a primitive outside the v0.5 scope (none currently —
+  v0.5 covers all 22) will not trip the orchestrator; the executor's
+  primitive-selection check handles it.
+- An in-flight WP (orchestrator was previously running, exited
+  uncleanly) will be re-picked by the dependency walk; the
+  executor's journal-resume logic picks up where the prior
+  executor parked.
 
 ## See also
 
-- `agents/orchestrator.md` — the agent invoked.
-- `agents/executor.md` — what the orchestrator dispatches.
+- `agents/orchestrator.md` — the agent this skill spawns.
+- `agents/executor.md` — what the orchestrator dispatches per WP.
 - `/sulis-execution:run-wp WP-NNN` — single-WP dispatch path.
 - `/sulis-execution:status` — read-only INDEX summary.
 - `/sulis-execution:retry WP-NNN` — re-run a blocked WP.

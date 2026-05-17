@@ -89,6 +89,116 @@ per GIT-07.
 See `references/lifecycle.md` for the detailed per-step contract,
 success criteria, and failure-handling OODA recipes.
 
+## Continuation Discipline (MUST)
+
+**You do not return control mid-lifecycle.** The WP is not done until
+step 10 succeeds OR a BLOCKER is written. Returning control to the
+invoking session at step 7 (CI in flight), step 8 (deploy in flight),
+or step 9 (health-check in flight) is the failure mode this rule
+exists to prevent.
+
+Specifically forbidden patterns:
+
+- *"Monitors will do their work and respond when complete."* ✗
+- *"I'm parked at a polling boundary — ping me when CI is green."* ✗
+- *"Deploy is in flight; I'll resume when it lands."* ✗
+- *"Returning control while we wait for the build."* ✗
+
+These were all observed in production failures. The WP's caller
+treats *"executor returned"* as *"executor finished its work"* — if
+you return mid-lifecycle the caller marks the WP done-or-stuck and
+moves on, leaving the post-merge half unobserved.
+
+### How to wait without returning
+
+**Polling waits use blocking Bash loops** — not "return and resume
+later" patterns. The Bash call blocks the executor's turn until the
+condition is met OR the budget is exhausted:
+
+```bash
+# Wait for a named GitHub Actions workflow run to complete on a
+# specific SHA, with a 20-minute upper bound. Exit 0 = success;
+# exit 1 = failure; exit 124 = timed out (budget exhausted).
+DEADLINE=$(( $(date +%s) + 1200 ))
+while true; do
+  STATUS=$(gh run list \
+    --workflow="Deploy to Dev Environment" \
+    --commit=<sha> \
+    --limit=1 \
+    --json status,conclusion \
+    --jq '.[0]')
+  case "$(echo "$STATUS" | jq -r '.status')" in
+    completed)
+      CONCLUSION=$(echo "$STATUS" | jq -r '.conclusion')
+      if [ "$CONCLUSION" = "success" ]; then exit 0; fi
+      echo "Deploy failed: $CONCLUSION"; exit 1
+      ;;
+    in_progress|queued|requested|waiting|pending) ;;
+    *) echo "Unknown status: $(echo "$STATUS" | jq -r '.status')"; exit 1 ;;
+  esac
+  if [ "$(date +%s)" -gt "$DEADLINE" ]; then
+    echo "Timed out after 20 minutes"; exit 124
+  fi
+  sleep 30
+done
+```
+
+Adapt the exact command per host (GitHub `gh`, GitLab `glab`,
+Bitbucket API). The shape is uniform: blocking loop, status check,
+fixed sleep, deadline cap.
+
+On exit 0 → advance to the next step. On exit 1 → OODA fires per
+`executor-loop-standard.md`. On exit 124 (timeout) → budget
+exhausted; halt + escalate per EL-07.
+
+### Long-poll fallback: re-dispatch via the journal
+
+A blocking Bash poll consumes the executor's session lifetime. If a
+poll genuinely exceeds the session (rare; most projects' CI + deploy
+complete in 5-15 min, and the budgets are calibrated to fit), the
+executor's session will hit its harness limit and exit unintentionally.
+
+**Defence:** after each step transition, write the journal **before**
+attempting the next step:
+
+```markdown
+## Step trace
+| Step | Started | Completed | Outcome |
+|---:|---|---|---|
+| 1 | 2026-05-17T12:00:00Z | 2026-05-17T12:01:30Z | success |
+| 2 | 2026-05-17T12:01:30Z | 2026-05-17T12:05:00Z | success (3 tests) |
+| 3 | 2026-05-17T12:05:00Z | 2026-05-17T12:07:00Z | success |
+| 4 | 2026-05-17T12:07:00Z | 2026-05-17T12:08:30Z | success |
+| 5 | 2026-05-17T12:08:30Z | 2026-05-17T12:09:00Z | success |
+| 6 | 2026-05-17T12:09:00Z | 2026-05-17T12:09:30Z | success |
+| 7 | 2026-05-17T12:09:30Z | 2026-05-17T12:14:00Z | success — merged to dev (sha 8ff4577) |
+| 8 | 2026-05-17T12:14:00Z | (in flight; deploy run id 12345) | — |
+```
+
+On any re-dispatch (`/sulis-execution:run-wp WP-NNN` or orchestrator
+re-pick after a timeout), the executor's first action is to read the
+journal and find the last step with no completion entry. That is the
+resume point. The executor continues from there, not from step 1.
+
+This means: even if the executor's session terminates ungracefully
+mid-poll, the next executor invocation picks up where the prior one
+parked. The journal is the safety net — it does not absolve the
+executor of the Continuation Discipline rule (the executor must
+still try to complete the WP in one session), but it makes
+recovery deterministic.
+
+### Orchestrator-side defence
+
+The orchestrator (when dispatching) classifies executor exits into
+three outcomes: `done`, `blocked`, `error`. An executor that returns
+mid-lifecycle (no step 10 success AND no BLOCKER) is classified
+**`error`** — which halts the orchestrator entirely. This protects
+the WP queue from silently advancing past an incomplete WP.
+
+For single-WP dispatch via `/sulis-execution:run-wp`, the invoking
+session sees the journal's incomplete tail and re-invokes; the
+executor reads the journal and resumes from the parked step.
+
 ## Per-primitive scaffolds (v0.5 — full 22-primitive coverage)
 
 The WP's `primitive` field (one of 22 per `change-primitives.md`)

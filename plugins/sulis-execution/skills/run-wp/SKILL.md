@@ -1,79 +1,122 @@
 ---
 name: run-wp
 description: >
-  Dispatch the executor on a single Work Package. Usage:
-  /sulis-execution:run-wp WP-NNN. Power-user / debugging entry point.
-  Reads the WP file, the TDD, the ADRs, and runs the 10-step
-  lifecycle (steps 1-6 in v0.1; steps 7-10 in v0.2/v0.3).
+  Spawn the executor agent on a single Work Package. Usage:
+  /sulis-execution:run-wp WP-NNN. The skill's load-bearing action is
+  invoking the Agent tool — the executor agent then takes over and
+  runs the 10-step lifecycle under its own context window and
+  Continuation Discipline.
 ---
 
 # /sulis-execution:run-wp
 
-Dispatch the **executor** agent on a single Work Package.
+This skill **spawns the executor agent** to ship one Work Package
+atomically to `dev`.
 
-## Usage
+## How to invoke (MUST — do not run the executor's work inline)
+
+When this skill is loaded, **your sole action is to call the Agent
+tool with `subagent_type: "sulis-execution:executor"`**. Do not run
+the lifecycle steps inline in your own session — that defeats the
+executor's Continuation Discipline (the executor must own its own
+turn boundary and the polling loops). The skill exists to dispatch
+the agent, not to replace it.
+
+### The dispatch call
+
+Given the user invokes `/sulis-execution:run-wp WP-NNN`:
 
 ```
-/sulis-execution:run-wp WP-NNN
+Agent({
+  subagent_type: "sulis-execution:executor",
+  description: "Ship WP-NNN end-to-end",
+  prompt: """
+You are dispatched to ship WP-NNN through the full 10-step atomic
+lifecycle. Read your agent prompt (agents/executor.md) for the full
+contract; the user has already approved the dispatch.
+
+WP file: .architecture/{project}/work-packages/WP-NNN-<title>.md
+INDEX:   .architecture/{project}/work-packages/INDEX.md
+TDD:     .architecture/{project}/TDD.md
+ADRs:    .architecture/{project}/adrs/
+
+Continuation Discipline applies: do not return control until step 10
+succeeds OR a BLOCKER is written. Use blocking Bash polling for
+steps 7-10 per references/lifecycle.md.
+
+If the journal at .architecture/{project}/work-packages/.executor-WP-NNN.md
+exists and shows an incomplete tail, resume from the last started-but-
+not-completed step. Do not start over.
+
+Output contract:
+- On success: ## Acceptance Evidence appended to the WP file;
+  INDEX status: done; worktree removed.
+- On escalation: BLOCKER-WP-NNN.md written; INDEX status: blocked.
+
+Return ONLY when one of those output conditions is true.
+""",
+})
 ```
 
-Where `WP-NNN` is the WP ID (e.g. `WP-007`). The skill reads
-`.architecture/{project}/work-packages/WP-NNN-*.md`, the TDD section
-it references, and the ADRs it references; then dispatches the
-executor with the WP loaded as context.
+Replace `{project}` and `<title>` based on the actual project path
+and WP title. The `subagent_type` value is **exactly**
+`sulis-execution:executor` — that's the fully-qualified agent name.
 
-## What it produces
+### What you do NOT do in this skill's session
 
-Per the executor's output contract (see `agents/executor.md`):
+- **Do not read the WP file yourself.** The executor reads it.
+- **Do not run `git worktree add`.** The executor does it.
+- **Do not write tests, code, lint, commit, push, poll CI, merge,
+  deploy, or health-check.** All of those are the executor's job.
+- **Do not summarise the executor's output for the user.** When the
+  executor's Agent tool call returns, surface its terminal status
+  line directly. The concierge (if upstream) does the founder
+  translation; this skill is power-user-facing and the executor's
+  status line is already plain-English.
 
-- **Success path (steps 1-6 in v0.1):** branch on remote with the
-  WP's commit pushed, INDEX entry updated to `in_progress`,
-  acceptance evidence appended to the WP file, one plain-English
-  status line for the invoking session.
+### What you DO in this skill's session
 
-- **Escalation path:** `BLOCKER-WP-NNN.md` written to
-  `.architecture/{project}/work-packages/`, INDEX entry updated to
-  `blocked`, one plain-English status line for the invoking
-  session.
+1. Parse the WP-NNN argument from the user's invocation.
+2. Verify the WP file exists at the expected path; if not, surface
+   a clear error and exit.
+3. Make the Agent tool call above.
+4. When it returns, surface the executor's terminal status line.
+
+That is the entire skill. Three steps. The executor does the work.
 
 ## When to use this skill
 
-- **Power-user / debugging path** — when you want to run one specific
-  WP rather than walking the whole INDEX. The orchestrator's
-  `/sulis-execution:run-all` is the normal path; `run-wp` is for
-  targeted execution.
-- **Re-running a blocked WP** after fixing an external blocker.
-  Alternatively, use `/sulis-execution:retry WP-NNN` which is
-  semantically identical but more discoverable for the resume case.
-- **Manual decomposition gaps** — when the orchestrator can't make
-  progress because a WP has primitive coverage v0.1 doesn't support
-  (REORGANISE, SUBSTITUTE, etc.), you can still run individual
-  EXPAND-group WPs manually with `run-wp`.
-
-## What it does NOT do
-
-- It does not walk dependencies — if the target WP's `dependsOn` WPs
-  aren't `done`, the executor will halt at step 1 with a BLOCKER.
-  Use `/sulis-execution:run-all` for dependency-aware execution.
-- It does not promote `dev → main` — that's the concierge's
-  founder-authorised ceremony.
-- It does not modify the WP file's frontmatter (Contract, Sequence,
-  Cost) — those are SEA's. The executor only appends to the
-  `## Acceptance Evidence` section.
+- **Single-WP execution** — when you want to ship one specific WP
+  rather than walking the whole INDEX. The orchestrator's
+  `/sulis-execution:run-all` is the normal multi-WP path; this is
+  the single-shot.
+- **Re-running a blocked WP** after fixing an external blocker. The
+  semantically-clearer alternative for this case is
+  `/sulis-execution:retry WP-NNN`, which archives the prior BLOCKER
+  and dispatches a fresh executor.
 
 ## Gotchas
 
-- The skill expects a `.architecture/{project}/work-packages/`
-  directory with the WP file present. If not present, halt with a
-  clear error.
-- If the WP's `primitive` is outside the v0.1 EXPAND scope, the
-  executor escalates immediately with a BLOCKER pointing at v0.5
-  primitive coverage. This is by design — don't try to override it.
+- If the WP's `primitive` is outside the v0.5 scope (the file
+  doesn't yet define the scaffold), the executor escalates
+  immediately with a primitive-coverage BLOCKER. The skill itself
+  doesn't pre-check this — the executor's primitive-selection check
+  at step 3 handles it.
+- If the project's git remote isn't reachable, the executor will
+  fail at step 6 (push). That's a connectivity issue surfaced by
+  the executor; not the skill's problem.
+- If a prior executor session left an in-flight WP (journal shows
+  steps complete up to step N, but no step 10 success and no
+  BLOCKER), invoking this skill resumes from step N+1. Do not
+  manually delete the journal to "start fresh" — the journal is the
+  audit trail.
 
 ## See also
 
-- `agents/executor.md` — the agent invoked.
-- `references/lifecycle.md` — the 10-step contract in detail.
-- `/sulis-execution:run-all` — orchestrator path.
-- `/sulis-execution:status` — read-only INDEX summary.
-- `/sulis-execution:retry` — alias for the resume case.
+- `agents/executor.md` — the agent this skill spawns.
+- `references/lifecycle.md` — the 10-step contract.
+- `references/self-heal-budget.md` — per-failure-type budgets.
+- `/sulis-execution:run-all` — orchestrator path for the whole INDEX.
+- `/sulis-execution:status` — read-only INDEX summary (skill, not
+  agent).
+- `/sulis-execution:retry` — re-run a blocked WP with archive.

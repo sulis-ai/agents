@@ -3,12 +3,15 @@ name: status
 description: >
   Read-only INDEX summary in plain English. Usage:
   /sulis-execution:status. Shows what's done, what's in-flight, what's
-  blocked, what's pending. Does not modify anything.
+  blocked, what's pending. **Inline-only — does not spawn any agent.**
 ---
 
 # /sulis-execution:status
 
-Read-only view of the Work Package INDEX state.
+Read-only view of the Work Package INDEX state. **This skill runs
+inline in the invoking session — it does NOT spawn the executor or
+orchestrator.** No `Agent()` call required; the skill itself reads
+the INDEX and renders.
 
 ## Usage
 
@@ -18,6 +21,34 @@ Read-only view of the Work Package INDEX state.
 
 No arguments. Reads `.architecture/{project}/work-packages/INDEX.md`
 and produces a plain-English summary.
+
+## How to render
+
+Parse the INDEX file (Markdown table). For each WP, classify by
+status. Render as:
+
+```
+Work Package status:
+
+✓ Done: N
+  WP-NNN, WP-MMM, ...
+
+⏳ In flight: N
+  WP-NNN — <title> (<lifecycle step or branch reference>)
+
+⚠ Blocked: N
+  WP-NNN — <plain-English summary from BLOCKER-WP-NNN.md
+            ## Plain-English summary section>
+
+▢ Pending: N
+  WP-NNN, WP-MMM, ...
+
+▶ Next ready: WP-NNN — <title>
+```
+
+The plain-English summaries for blocked WPs come from each
+`BLOCKER-WP-NNN.md`'s `## Plain-English summary` section — that's
+the AAF-compliant text the concierge would surface to the founder.
 
 ## What it shows
 

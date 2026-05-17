@@ -275,23 +275,46 @@ collisions).
 **Input:** Branch pushed from step 6; CI triggered automatically by
 the push.
 
-**Action:**
+**Action (blocking — Continuation Discipline applies):**
 
 1. **Detect host.** Inspect `git remote get-url origin` to determine
    the host (GitHub, GitLab, Bitbucket, self-hosted).
-2. **Poll the CI status** for the branch HEAD commit:
-   - GitHub: `gh api repos/<owner>/<repo>/commits/<sha>/check-runs`
-     and filter for the required checks named in the project's
-     branch-protection config.
-   - GitLab: `glab ci status` or `glab api projects/.../pipelines`.
-   - Self-hosted: project-specific CI API call defined in the
-     `.sulis/ci-poll.sh` script if present, else fail-out with a
-     clear BLOCKER ("CI poller for host X not yet implemented;
-     hand-merge required").
-3. **Wait for green** with exponential backoff: poll at 30s, 60s,
-   120s, 240s, 480s — total ~14 min. If CI is still pending after
-   the cap, treat as a CI failure (the check is too slow or hung;
-   OODA fires).
+2. **Poll the CI status** for the branch HEAD commit in a **blocking
+   Bash loop** that does not return until terminal:
+
+```bash
+BRANCH_SHA=<sha-from-step-6>
+DEADLINE=$(( $(date +%s) + 900 ))  # 15 min cap
+
+# GitHub example. Adapt for GitLab (glab api), Bitbucket, etc.
+while true; do
+  CHECKS=$(gh api repos/<owner>/<repo>/commits/$BRANCH_SHA/check-runs \
+           --jq '[.check_runs[] | {name: .name, status: .status, conclusion: .conclusion}]')
+
+  # Are all required checks completed?
+  PENDING=$(echo "$CHECKS" | jq '[.[] | select(.status != "completed")] | length')
+
+  if [ "$PENDING" = "0" ]; then
+    # All completed. Did any fail?
+    FAILED=$(echo "$CHECKS" | jq '[.[] | select(.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral")] | length')
+    if [ "$FAILED" = "0" ]; then
+      echo "CI green"
+      break
+    fi
+    echo "CI failed: $(echo "$CHECKS" | jq -c '[.[] | select(.conclusion == "failure")]')"
+    exit 1
+  fi
+
+  if [ "$(date +%s)" -gt "$DEADLINE" ]; then
+    echo "CI poll timed out after 15 min"
+    exit 124
+  fi
+  sleep 30
+done
+```
+
+The Bash call blocks the executor's turn until CI is terminal. The
+executor does not return control mid-poll (Continuation Discipline).
 4. **On green, squash-merge to `dev`** using the host's merge API
    (no PR opened):
    - GitHub: `gh api -X POST repos/<owner>/<repo>/merges` with
@@ -355,11 +378,93 @@ discussion is invited; the PR exists for milliseconds.
 
 ---
 
-## Step 8 — Trigger Sulis SDK deploy
+## Step 8 — Wait for staging deploy
 
 **Input:** `dev` HEAD with the WP's squash-merge commit (from step 7).
 
-**Action:**
+### Deploy-mechanism detection (MUST run first)
+
+Different projects deploy in different ways. The executor detects
+the project's deploy mechanism **before** taking action:
+
+1. **Auto-deploy on push (most common in modern CD setups).** The
+   push to `dev` (from step 7) automatically triggers a CI/CD
+   workflow that deploys to staging. The deploy is **already in
+   flight** by the time step 8 begins.
+
+   Detection: look for any of these signals in the project root:
+   - `.github/workflows/*.yml` with `on: push: branches: [dev]`
+     and a deploy job.
+   - `.gitlab-ci.yml` with `deploy_to_staging:` stage triggered on
+     `dev`.
+   - `.circleci/config.yml`, `azure-pipelines.yml`, etc with
+     equivalent triggers.
+   - A `deploy-on-push: true` flag in `.sulis/manifest.yaml`.
+
+   If detected: skip the "trigger" sub-step; jump to "wait for
+   the in-flight deploy workflow to complete."
+
+2. **Explicit-trigger via Sulis SDK** (when sulis-platform-sdk is
+   integrated).
+
+   Detection: look for a `.sulis/manifest.yaml` with a `deploy:
+   sulis-sdk` field, OR a `sulis_sdk` import in the project's
+   deploy tooling.
+
+   If detected: call `client.deploy.staging(branch='dev',
+   sha=<merge_sha>, wp_ref='WP-NNN')` to trigger the deploy. Poll
+   `client.deploy.status(deployment.id)` until terminal.
+
+3. **Neither — no automated deploy** (the project doesn't have
+   continuous-deployment wired). The executor halts at step 8
+   with a BLOCKER recording the gap. Suggested next step:
+   *"Wire continuous deployment (Sulis SDK, GitHub Actions, or
+   equivalent) so the executor can complete the atomic lifecycle.
+   Or accept a partial lifecycle: mark this WP done-at-merge if
+   the project intentionally has no auto-deploy."*
+
+### Action for auto-deploy on push (most common case)
+
+```bash
+# Identify the deploy workflow's name from the project's CI config.
+# Common names: "Deploy to Dev Environment", "deploy-staging",
+# "Deploy", "CD".
+WORKFLOW="Deploy to Dev Environment"  # read from .github/workflows/
+MERGE_SHA=<sha-from-step-7>
+
+# Wait up to 20 minutes for the workflow run triggered by the merge
+# push to complete.
+DEADLINE=$(( $(date +%s) + 1200 ))
+while true; do
+  STATUS=$(gh run list \
+    --workflow="$WORKFLOW" \
+    --commit="$MERGE_SHA" \
+    --limit=1 \
+    --json status,conclusion,databaseId)
+  if [ "$(echo "$STATUS" | jq -r '.[0].status')" = "completed" ]; then
+    CONCLUSION=$(echo "$STATUS" | jq -r '.[0].conclusion')
+    if [ "$CONCLUSION" = "success" ]; then
+      echo "Deploy succeeded"
+      break
+    else
+      echo "Deploy failed: $CONCLUSION"
+      RUN_ID=$(echo "$STATUS" | jq -r '.[0].databaseId')
+      gh run view "$RUN_ID" --log-failed  # verbatim log for OODA Observe
+      exit 1
+    fi
+  fi
+  if [ "$(date +%s)" -gt "$DEADLINE" ]; then
+    echo "Deploy poll timed out after 20 minutes"
+    exit 124
+  fi
+  sleep 30
+done
+```
+
+The Bash call **blocks** until success, failure, or timeout. The
+executor does not return control during this wait.
+
+### Action for explicit Sulis SDK trigger
 
 ```python
 from sulis_sdk import client
@@ -368,21 +473,22 @@ deployment = client.deploy.staging(
     sha=<merge_sha_from_step_7>,
     wp_ref='WP-NNN',
 )
+
+# Poll in a blocking Python loop (or equivalent Bash via the SDK CLI):
+import time
+deadline = time.time() + 600  # 10 min cap
+while True:
+    status = client.deploy.status(deployment.id)
+    if status.status == 'succeeded':
+        break
+    if status.status == 'failed':
+        raise DeployFailed(status)
+    if time.time() > deadline:
+        raise DeployTimedOut(deployment.id)
+    time.sleep(15)
 ```
 
-The Sulis SDK contract (designed against, real operations in
-`sulis-platform-sdk` v0.2+):
-
-- **`client.deploy.staging(branch, sha, wp_ref)`** — triggers a
-  deploy of the named SHA to staging. Returns a `Deployment` object
-  with `id`, `status` (`pending` | `in_progress` | `succeeded` |
-  `failed`), and `url` (the deployed-application URL).
-- **`client.deploy.status(deployment_id)`** — polls. Returns the
-  current `Deployment`.
-
-**Action loop:** poll `client.deploy.status(deployment.id)` every
-15 seconds for up to 10 minutes. On `succeeded` → advance. On
-`failed` → OODA fires.
+Same discipline — the call blocks until terminal.
 
 **Success criterion:** `deployment.status == "succeeded"`.
 
@@ -407,23 +513,59 @@ The Sulis SDK contract (designed against, real operations in
 
 ## Step 9 — Poll health-checks
 
-**Input:** Deployment URL from step 8.
+**Input:** Deployment URL from step 8 (or the staging URL from the
+project's `.sulis/manifest.yaml` if auto-deploy doesn't surface a
+per-deploy URL).
 
 **Action:**
+
+Two paths depending on what's wired:
+
+### With Sulis SDK
 
 ```python
 health = client.health.staging(deployment_id)
 ```
 
-The Sulis SDK contract:
+- Returns `healthy` | `degraded` | `unhealthy` | `unknown`.
 
-- **`client.health.staging(deployment_id)`** — returns the most
-  recent health-check status (`healthy` | `degraded` | `unhealthy`
-  | `unknown`) plus the underlying probe results.
+### Without Sulis SDK — direct probe
 
-**Action loop:** poll with exponential backoff: 15s, 30s, 60s,
-120s, 240s — up to 5 attempts. On `healthy` → advance. On
-`unhealthy` after budget → rollback trigger.
+The executor hits the deployed app's health endpoint directly. The
+endpoint comes from the project's manifest or the deploy workflow's
+output URL.
+
+```bash
+HEALTH_URL=$(jq -r '.staging.health_url' .sulis/manifest.yaml \
+            2>/dev/null \
+            || echo "https://<staging-domain>/health")
+
+# Exponential backoff: 15s, 30s, 60s, 120s, 240s — up to 5 attempts.
+ATTEMPTS=0
+SLEEP=15
+while [ $ATTEMPTS -lt 5 ]; do
+  ATTEMPTS=$((ATTEMPTS + 1))
+  RESPONSE=$(curl -s -o /tmp/health-body -w "%{http_code}" "$HEALTH_URL")
+  if [ "$RESPONSE" = "200" ]; then
+    BODY=$(cat /tmp/health-body)
+    if echo "$BODY" | jq -e '.status == "healthy"' > /dev/null 2>&1; then
+      echo "Healthy"
+      break
+    fi
+  fi
+  echo "Attempt $ATTEMPTS: $RESPONSE — backing off ${SLEEP}s"
+  sleep $SLEEP
+  SLEEP=$((SLEEP * 2))
+done
+
+if [ $ATTEMPTS -ge 5 ]; then
+  echo "Health-check timed out after 5 attempts"
+  exit 1
+fi
+```
+
+**Blocking.** The Bash call does not return until healthy, budget
+exhausted, or terminal failure. Same Continuation Discipline.
 
 **Success criterion:** `health.status == "healthy"` within budget.
 
