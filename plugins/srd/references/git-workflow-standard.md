@@ -195,6 +195,24 @@ GitLab / Bitbucket branch protection rules).
   branches.
 - **Linear history required.** Squash-merge only; no merge commits from
   feature branches.
+- **CI concurrency must support concurrent runs across different
+  feature branches** (load-bearing for sulis-execution v0.8.0+ parallel
+  dispatch). Workflow concurrency rules that cancel in-progress runs
+  globally — `concurrency: group: <static>, cancel-in-progress: true`
+  — **break parallel dispatch** by terminating one branch's CI when
+  another branch pushes. The acceptable shape is **per-branch
+  concurrency keying**:
+
+  ```yaml
+  concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+  ```
+
+  This allows different branches to run concurrently while still
+  cancelling stale runs on the same branch (e.g. after a rebase push).
+  Equivalent shapes in GitLab CI, CircleCI, etc. — the principle is
+  the same: concurrency keyed by branch, not globally.
 
 ### `main` protection
 
@@ -223,12 +241,35 @@ that is the quality gate.
 2. Executor pushes the feature branch to the remote. The push triggers
    CI on the branch.
 3. Executor polls CI status (per `executor-loop-standard.md` self-heal
-   budget). On green, proceeds. On red, runs OODA + Five Whys per the
-   loop standard.
-4. Executor performs `git merge --squash` of the feature branch into
-   `dev` (or the equivalent via the host's API), using the executor's
-   commit message verbatim.
-5. Branch is deleted from the remote.
+   budget). On green, proceeds to step 4. On red, runs OODA + Five Whys
+   per the loop standard.
+4. **Verify dev hasn't advanced since CI ran (load-bearing for parallel
+   dispatch, sulis-execution v0.8.1+).** Fetch the latest dev. Compare
+   the current `origin/dev` SHA against the dev SHA recorded when the
+   branch was created (per executor lifecycle Step 1, sidecar file
+   `.executor-WP-NNN-dev-sha`).
+
+   - **dev hasn't moved** → safe to squash-merge directly; proceed to
+     step 5.
+   - **dev has moved** → rebase the branch on the new dev HEAD,
+     `git push --force-with-lease`, wait for CI on the rebased branch
+     to be green (blocking poll per Continuation Discipline), update
+     the sidecar file with the new dev SHA, then re-verify in case dev
+     moved again. Bounded by the "Merge-to-dev conflict" budget
+     (2 attempts in `self-heal-budget.md`); after exhaustion, halt +
+     BLOCKER — the branch can't catch up with a moving target.
+
+   This sub-step prevents the parallel-merge race: WP-A's CI was green
+   against dev@SHA1, but WP-B merged in between, advancing dev to
+   SHA2. A direct squash-merge would land WP-A's change against a dev
+   state different from what its CI tested. The rebase forces a
+   re-test against current dev.
+
+5. Executor performs `git merge --squash` of the (now-rebased) feature
+   branch into `dev` (or the equivalent via the host's API), using
+   the executor's commit message verbatim.
+
+6. Branch is deleted from the remote.
 
 ### Rationale
 
@@ -448,6 +489,126 @@ authorisation per GIT-06 — production rollback is itself a hard-to-
 reverse external action). The associated `dev` state is also reverted to
 keep the two branches consistent.
 
+### Rollback during parallel execution (v0.8.1+)
+
+When a rollback fires while other WPs are in-flight (the realistic case
+under `max_parallel > 1` parallel dispatch), the revert commit advances
+`dev`. Concurrent executors at GIT-05 step 4 (verify-dev-hasn't-
+advanced) detect the change and trigger their own rebase. The rebased
+branch may now fail CI because the revert undid a change the in-flight
+WP's tests depended on. **That's the right outcome** — the rebased CI
+tests against truthful current dev, surfacing the dependency.
+
+Three protocol points:
+
+1. **The rollback executor (the one writing the revert) does NOT
+   coordinate with in-flight peers.** It writes the revert, pushes,
+   and exits. In-flight peers detect the change via their own GIT-05
+   step 4 rebase logic — they don't need to be notified.
+
+2. **An in-flight peer whose CI now fails on the rebased branch**
+   enters OODA per `executor-loop-standard.md` (EL-01..08). Five Whys
+   often surfaces the revert as root cause: *"Why does test_X now
+   fail? → because the rebase pulled in revert commit Y which undid
+   the helper test_X depends on."* Scope verdict: out-of-scope (the
+   revert is upstream's work, not this WP's). The executor writes a
+   BLOCKER citing the revert SHA; the founder decides whether to also
+   revert the in-flight peer or proceed with a fix.
+
+3. **The rolled-back WP is marked `blocked`** per the standard GIT-10
+   flow (above). Its transitively-dependent WPs become
+   `dependency_blocked` automatically on the next orchestrator loop
+   iteration.
+
+The discipline is: don't let the rollback silently produce broken dev
+states elsewhere. The rebase-on-dev sub-step from GIT-05 catches the
+case for in-flight peers; the BLOCKER chain catches it for dependent
+peers.
+
+---
+
+## GIT-11: Hot-fix path for production (MUST)
+
+The standard path for any fix is feature branch → `dev` → `main` per
+GIT-05 and GIT-06. **There is one bypass for production emergencies.**
+
+A production hot-fix is a fix landed directly on a hot-fix branch off
+`main`, merged to `main`, deployed to production, and then backported
+to `dev`. This bypass exists because the standard path (fix on dev,
+wait for dev's CI, wait for dev → main promotion ceremony) is too slow
+when production is actively broken.
+
+### Severity threshold (MUST)
+
+The hot-fix path is permitted **only** when ALL of these hold:
+
+- Production is currently broken (user-facing outage, data integrity
+  issue, security incident).
+- The fix is provably small and targeted (one bug, one or a few files).
+- The standard dev → main path would take longer than the founder can
+  accept given the severity.
+
+If any of these fails, use the standard path. *"Convenience"* is not a
+hot-fix justification.
+
+### Mechanics
+
+1. **Founder authorisation.** The concierge surfaces the situation; the
+   founder explicitly approves the hot-fix path. This is a Decision
+   Discipline founder-owned call — the concierge does NOT auto-decide
+   this is a hot-fix.
+2. **Branch off `main`** (not `dev`): `git checkout -b
+   hotfix/<incident-slug> main`.
+3. **Apply the fix** with the same RGB discipline as a normal WP:
+   failing test, minimum code, mandatory refactor (RGB-01..03). No
+   skipping tests. No `--no-verify`.
+4. **CI must pass.** Branch protection on `main` requires the same
+   status checks as normal merges to `main`.
+5. **Squash-merge to `main`** with a Conventional Commits message:
+   `fix(hotfix): <subject>` and a `Refs:` footer naming the incident
+   (e.g. `Refs: INC-2026-05-18-billing-outage`).
+6. **Tag a SemVer patch release** per GIT-08 (e.g. `v1.5.0` →
+   `v1.5.1`).
+7. **Production deploy** triggered by the tag push.
+8. **Backport to `dev` immediately** by cherry-picking the hot-fix
+   commit onto a normal feature branch and running it through the
+   standard merge-to-dev flow per GIT-05. The backport may require
+   minor adaptation if `dev` has since diverged. **Do not leave
+   `main` and `dev` in semantic conflict.**
+
+### Post-mortem (MUST)
+
+Every hot-fix triggers a post-mortem document at
+`.post-mortems/<date>-<incident-slug>.md` within 48 hours. Includes:
+timeline, root cause, what failed in the normal dev → main path
+(otherwise why was hot-fix needed?), prevention measures. The
+post-mortem is a real document; not a checkbox.
+
+### What hot-fix is NOT for
+
+- Cosmetic fixes (*"the button is the wrong colour"*).
+- Performance regressions that aren't user-blocking.
+- Tech-debt cleanup.
+- Anything where the standard dev → main ceremony is *"annoying"* but
+  not actually too slow given the severity.
+
+The concierge and founder enforce this together. When a founder
+requests a hot-fix, the concierge surfaces honestly: *"This sounds
+like a hot-fix candidate. The standard path would take ~N minutes.
+Is production actively broken?"* If no, recommend the standard path.
+
+### Composition with other standards
+
+- **GIT-05 (direct merge to dev — no PR)** — still applies to the
+  backport. The hot-fix landed on `main` first; the backport lands on
+  `dev` through normal CI + rebase + squash-merge.
+- **GIT-06 (dev → main promotion)** — bypassed by hot-fix. Founder
+  authorisation per GIT-11 takes the place of the promotion ceremony.
+  Hot-fix tags are SemVer patches per GIT-08.
+- **GIT-09 (no hook bypass, no force-push)** — fully applies. Hot-fix
+  is NOT a license to bypass quality gates. The whole point is to fix
+  prod quickly *without* skipping discipline.
+
 ---
 
 ## Worked Examples
@@ -509,6 +670,59 @@ $ git push origin main --tags
 # If healthy → release announced.
 # If failing → automatic revert per GIT-10.
 ```
+
+### Example 3 — parallel-merge race condition + rebase
+
+Two executors running in parallel under `max_parallel: 2`. Both
+branches were cut from `dev@SHA1` at the same time.
+
+```
+# t=0: both executors at Step 1 — worktrees created from dev@SHA1
+$ # WP-A executor:
+$ git worktree add ../wp-007 -b feat/wp-007-cancel-flow dev
+$ echo "SHA1" > ../wp-007/.executor-WP-007-dev-sha
+
+$ # WP-B executor (in parallel):
+$ git worktree add ../wp-008 -b feat/wp-008-cancel-email dev
+$ echo "SHA1" > ../wp-008/.executor-WP-008-dev-sha
+
+# t=10min: both executors finish Step 6 (commit + push). CI starts on
+# both branches in parallel (CI workflow correctly scoped per-branch
+# concurrency, so neither cancels the other — per GIT-04).
+
+# t=25min: WP-B's CI completes first. WP-B's executor enters GIT-05
+# step 4 (verify-dev-hasn't-advanced).
+$ # WP-B executor:
+$ git fetch origin dev
+$ CURRENT_DEV=$(git rev-parse origin/dev)   # → SHA1 (still)
+$ RECORDED_DEV=$(cat .executor-WP-008-dev-sha)  # → SHA1
+$ # Equal — dev hasn't moved. Safe to squash-merge.
+$ # ... squash-merge happens via host API; dev becomes SHA2 ...
+
+# t=27min: WP-A's CI completes. WP-A's executor enters GIT-05 step 4.
+$ # WP-A executor:
+$ git fetch origin dev
+$ CURRENT_DEV=$(git rev-parse origin/dev)   # → SHA2 (WP-B merged)
+$ RECORDED_DEV=$(cat .executor-WP-007-dev-sha)  # → SHA1
+$ # Unequal — dev advanced. Rebase required.
+$ git rebase origin/dev
+$ git push --force-with-lease
+$ echo "SHA2" > .executor-WP-007-dev-sha
+$ # Wait for CI on rebased branch (blocking poll per Continuation Discipline)
+
+# t=37min: rebased CI completes green. WP-A's executor proceeds to
+# squash-merge. dev becomes SHA3.
+$ # Squash-merge via host API; dev now SHA3.
+
+# t=40min: both executors continue through Step 9-12 (deploy, health,
+# smoke, mark done). No parallel-merge race; both squash-merges are
+# against the actual dev state at merge time.
+```
+
+Without the GIT-05 step-4 rebase: WP-A would have squash-merged
+against stale dev. If WP-B's merge changed an interface WP-A's code
+depends on, WP-A's merged code would be broken on dev — but each
+individual CI run had been green.
 
 ---
 
@@ -598,3 +812,4 @@ Acceptance Evidence` section.
 |---|---|---|---|
 | 0.1.0 | 2026-05-16 | Initial draft. Calibration period: 90 days. Promotion to MUST repo-wide requires evidence from three executor sessions in which the standard was followed end-to-end and no rollback was triggered. Encodes GIT-01..GIT-10. Provenance: founder gate-blocked pickup of "Kinds and Tools" work pending a clear git/branching strategy; the standard names the convention defaults that CP-01..CP-05 implied. | Standards team |
 | 0.1.1 | 2026-05-17 | GIT-07 tightening — the original draft was ambiguous about worktree cleanup timing (prose said "after merge" while the worked example showed cleanup at end of lifecycle). Founder caught the inconsistency. Now explicit: local worktree removed at lifecycle **step 10** (after WP marked `done` in INDEX), not at the merge. Remote branch is still deleted at step 7 (separate cleanup). New subsection covers the escalation case — worktree left in place when scope guard fires, so the BLOCKER record can point at it. | Standards team |
+| 0.1.2 | 2026-05-18 | Parallel-safe merge discipline (load-bearing for sulis-execution v0.8.0+ parallel dispatch). **GIT-04** extended with CI concurrency requirement — workflows must support concurrent runs across different feature branches via per-branch concurrency keying (not global). **GIT-05** mechanics insert a step-4 fetch-dev + rebase-if-advanced + re-CI sub-step before the squash-merge — prevents the parallel-merge race condition where WP-A's CI was green against stale dev that WP-B has since advanced. **GIT-10** extended with "Rollback during parallel execution" subsection — the rollback executor doesn't coordinate with in-flight peers; peers detect via their own GIT-05 step-4 rebase logic; rebased CI surfaces semantic dependencies on the reverted code as BLOCKERs. **NEW GIT-11**: Hot-fix path for production — encodes the bypass for prod emergencies (severity threshold, founder authorisation, hotfix branch off main, RGB discipline preserved, SemVer patch tag, backport to dev within 48 hours, post-mortem MUST). New Example 3 walks through the parallel-merge race scenario showing the rebase resolving it. | Standards team |
