@@ -11,8 +11,8 @@
     {
       "name": "srd",
       "source": "./plugins/srd",
-      "version": "1.18.0",
-      "description": "Requirements Analyst — facilitates building Software Requirements Documents backed by UML artifacts through guided conversation. Includes intent triage (Phase 1), disambiguation sweep (Phase 3.5), and adversarial sweep (Phase 3.6 — produces MISUSE_CASES.md with negative requirements). v1.18.0 ships git-workflow-standard.md v0.1.2 — parallel-safe merge discipline (load-bearing for sulis-execution v0.8.0+ parallel dispatch): GIT-04 CI concurrency requirement (per-branch keying); GIT-05 step-4 fetch-dev + rebase-if-advanced + re-CI sub-step before squash-merge (prevents parallel-merge race); GIT-10 rollback-during-parallel-execution subsection; NEW GIT-11 hot-fix path for production (severity threshold, mechanics, post-mortem MUST). Plus the existing executor-loop-standard.md (EL-01..EL-08) — OODA loop, Five Whys, scope guard, self-heal budget."
+      "version": "1.18.1",
+      "description": "Requirements Analyst — facilitates building Software Requirements Documents backed by UML artifacts through guided conversation. Includes intent triage (Phase 1), disambiguation sweep (Phase 3.5), and adversarial sweep (Phase 3.6 — produces MISUSE_CASES.md with negative requirements). v1.18.1 ships git-workflow-standard.md v0.1.3 — two clarifications from WP-7 first-live-run gaps: GIT-04 new MUST subsection 'CI must run on feature branches' (with example trigger config covering Conventional Commits prefix globs) + new SHOULD subsection 'Local pre-commit fallback' for transitional projects (with explicit guard-rails: journal record, recommendation surfaced to founder); GIT-05 new anti-pattern subsection 'git switch dev from a worktree' — explicit canonical merge paths (host API preferred for all cases, refspec push acceptable shortcut for single-commit branches only, multi-commit must use host API). Composes with executor-loop-standard.md (EL-01..EL-08). v1.18.0 prior: GIT-04 concurrency + GIT-05 rebase + GIT-10 rollback-during-parallel + NEW GIT-11 hot-fix path."
     },
     {
       "name": "sulis-context",

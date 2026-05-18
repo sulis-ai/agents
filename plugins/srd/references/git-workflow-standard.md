@@ -214,6 +214,79 @@ GitLab / Bitbucket branch protection rules).
   Equivalent shapes in GitLab CI, CircleCI, etc. — the principle is
   the same: concurrency keyed by branch, not globally.
 
+### CI must run on feature branches (MUST, v0.1.3+)
+
+Required status checks fire **on every feature-branch push**, not
+only on merge to `dev`. Without feature-branch CI, the merge gate is
+*post-merge* — broken code can land on `dev` before any CI catches
+it. The executor's "verify CI green before squash-merge" step
+(GIT-05 mechanics step 3) presumes CI runs on the branch; without
+it, the executor falls back to a local pre-commit substitute (see
+the fallback subsection below) which has known weaknesses.
+
+Example trigger config for GitHub Actions (Conventional Commits
+prefix globs from GIT-02):
+
+```yaml
+on:
+  push:
+    branches:
+      - dev
+      - main
+      - 'feat/**'
+      - 'fix/**'
+      - 'chore/**'
+      - 'docs/**'
+      - 'refactor/**'
+      - 'test/**'
+      - 'perf/**'
+      - 'ci/**'
+      - 'build/**'
+      - 'style/**'
+```
+
+Equivalent shapes apply for GitLab CI (`workflow.rules` keyed on
+`$CI_COMMIT_REF_NAME`), CircleCI (`triggers` with branch filters),
+Bitbucket Pipelines (`branches:` selectors), etc.
+
+Branch protection on `dev` then names the feature-branch CI run as a
+required status check. Most hosts auto-link the status check from
+branch protection to the workflow run on the merged commit's
+ancestor SHA — so the gate fires both at the branch level (during
+the run) and at the dev-merge level (when branch protection
+verifies before allowing the merge).
+
+### Local pre-commit fallback (SHOULD when feature-branch CI is absent)
+
+When a project's CI does not yet run on feature branches (legacy
+projects, work-in-progress setup), the executor's gate becomes the
+**local pre-commit suite** (test + lint + type-check + secret-scan
+run in the worktree before push). This is acceptable as a
+transitional state but has known weaknesses:
+
+- Local machine state may differ from CI runners (Python version,
+  dependency versions, OS).
+- The executor's local pass doesn't prove the code passes on shared
+  infrastructure.
+- No audit trail external to the executor's session.
+
+When operating in fallback mode:
+
+1. The executor records the substitution in the WP journal under
+   `## Pre-commit gate (local — feature-branch CI not wired)`,
+   listing the commands run and their outcomes.
+2. The executor surfaces a recommendation in its run-all status
+   line: *"WP-NNN: feature-branch CI not configured; used local
+   pre-commit gate. Recommend wiring feature-branch CI per GIT-04
+   before scaling parallel dispatch."*
+3. The concierge surfaces this recommendation to the founder at
+   slice-end.
+
+The fallback is a SHOULD pattern, not MUST — projects must
+eventually wire feature-branch CI to satisfy GIT-04's full MUST
+requirement. The pattern exists to keep the executor unblocked
+during the transitional period, not to license the gap permanently.
+
 ### `main` protection
 
 - **Direct commits disabled** — `main` only receives merges from `dev`.
@@ -270,6 +343,58 @@ that is the quality gate.
    the executor's commit message verbatim.
 
 6. Branch is deleted from the remote.
+
+### Anti-pattern: `git switch dev` from a worktree (v0.1.3+)
+
+**Do NOT `git switch dev` (or `git checkout dev`)** from a parallel
+worktree to perform the merge locally. Two reasons:
+
+1. `git switch dev` fails when `dev` is already checked out by
+   another worktree (the founder's main session, or another parallel
+   executor's bookkeeping worktree). Git refuses multi-checkout of
+   the same ref — the operation returns *"fatal: 'dev' is already
+   checked out at '<other-path>'"*. Under v0.8.0+ parallel dispatch,
+   this is the normal state, not an exception.
+2. Even if it succeeded, local-merge-then-push doesn't generate a
+   host-API-recognised squash-merge commit shape with the right CI
+   triggers; the host's merge-API path is the canonical mechanism.
+
+The correct path is **host-API merge OR refspec push from the
+worktree** — both leave the local `dev` ref untouched:
+
+- **Host API (preferred for all cases):**
+
+  ```bash
+  gh api -X POST repos/<owner>/<repo>/merges \
+    -f base=dev \
+    -f head=feat/wp-NNN-<slug> \
+    -f merge_method=squash \
+    -f commit_message="<executor's commit message verbatim>"
+  ```
+
+  Generates a squash-merge commit on the remote with the executor's
+  commit message. Works for branches with any number of commits.
+
+- **Refspec push (acceptable shortcut for single-commit branches):**
+
+  ```bash
+  git push origin feat/wp-NNN-<slug>:dev
+  ```
+
+  Fast-forwards remote `dev` to the branch tip. Same end-state as a
+  squash-merge **when the branch has exactly one commit** (which the
+  executor's standard workflow produces — one commit per WP per
+  GIT-03 commit shape). The branch's single commit lands on dev with
+  its commit message intact.
+
+- **Multi-commit feature branches:** must use the host API, not
+  refspec push — refspec push would land all intermediate commits
+  unsquashed, violating GIT-04's linear-history requirement on dev.
+
+If the executor's worktree somehow accumulates multiple commits
+(e.g. multiple Step-3 commits during a complex WP), it must
+squash-merge via the host API, not refspec push. Single-commit is
+the default; multi-commit is the exception requiring host API.
 
 ### Rationale
 
@@ -813,3 +938,4 @@ Acceptance Evidence` section.
 | 0.1.0 | 2026-05-16 | Initial draft. Calibration period: 90 days. Promotion to MUST repo-wide requires evidence from three executor sessions in which the standard was followed end-to-end and no rollback was triggered. Encodes GIT-01..GIT-10. Provenance: founder gate-blocked pickup of "Kinds and Tools" work pending a clear git/branching strategy; the standard names the convention defaults that CP-01..CP-05 implied. | Standards team |
 | 0.1.1 | 2026-05-17 | GIT-07 tightening — the original draft was ambiguous about worktree cleanup timing (prose said "after merge" while the worked example showed cleanup at end of lifecycle). Founder caught the inconsistency. Now explicit: local worktree removed at lifecycle **step 10** (after WP marked `done` in INDEX), not at the merge. Remote branch is still deleted at step 7 (separate cleanup). New subsection covers the escalation case — worktree left in place when scope guard fires, so the BLOCKER record can point at it. | Standards team |
 | 0.1.2 | 2026-05-18 | Parallel-safe merge discipline (load-bearing for sulis-execution v0.8.0+ parallel dispatch). **GIT-04** extended with CI concurrency requirement — workflows must support concurrent runs across different feature branches via per-branch concurrency keying (not global). **GIT-05** mechanics insert a step-4 fetch-dev + rebase-if-advanced + re-CI sub-step before the squash-merge — prevents the parallel-merge race condition where WP-A's CI was green against stale dev that WP-B has since advanced. **GIT-10** extended with "Rollback during parallel execution" subsection — the rollback executor doesn't coordinate with in-flight peers; peers detect via their own GIT-05 step-4 rebase logic; rebased CI surfaces semantic dependencies on the reverted code as BLOCKERs. **NEW GIT-11**: Hot-fix path for production — encodes the bypass for prod emergencies (severity threshold, founder authorisation, hotfix branch off main, RGB discipline preserved, SemVer patch tag, backport to dev within 48 hours, post-mortem MUST). New Example 3 walks through the parallel-merge race scenario showing the rebase resolving it. | Standards team |
+| 0.1.3 | 2026-05-18 | First-live-run gaps from WP-7 execution surface two clarifications. **GIT-04** new subsection "CI must run on feature branches (MUST)" — required status checks must fire on every feature-branch push, not only on dev/main pushes. Without feature-branch CI, the merge gate is post-merge and broken code can land before any CI catches it. Example trigger config covers all Conventional Commits prefix globs (feat/, fix/, chore/, etc.) per GIT-02. Plus new subsection "Local pre-commit fallback (SHOULD when feature-branch CI is absent)" — documents the substitute pattern for transitional projects with explicit guard-rails (journal record, recommendation surfaced to founder via concierge). Fallback is SHOULD, not MUST — projects must eventually wire feature-branch CI to satisfy GIT-04's MUST. **GIT-05** new anti-pattern subsection "git switch dev from a worktree" — explicit forbidden mental model (`git switch dev` fails when dev is checked out elsewhere, which is the normal state under parallel dispatch). Canonical merge paths named: host API for all cases (preferred); refspec push (`git push origin feat/wp-NNN:dev`) acceptable shortcut for single-commit branches only; multi-commit feature branches must use host API to satisfy GIT-04's linear-history requirement. Provenance: WP-7 executor improvised both patterns correctly under stress; this commit makes them canonical. | Standards team |
