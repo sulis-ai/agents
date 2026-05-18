@@ -24,7 +24,52 @@ worktree removal (Step 12) bracket the per-executor isolation.
 
 **Input:** WP file (read), `dev` branch HEAD on remote.
 
-**Action:**
+### Pre-flight tooling check (v0.8.2+)
+
+Before the worktree is created, verify the project has the tools the
+lifecycle depends on. Each absent tool either downgrades to a
+documented fallback or escalates to BLOCKER. Outcomes are recorded
+in the journal under `## Pre-flight checks`.
+
+```bash
+# gh CLI (MUST — used at Step 8 for CI poll + merge).
+if ! gh --version >/dev/null 2>&1; then
+  echo "BLOCKER: gh CLI not installed; cannot poll CI or merge to dev."
+  exit 1
+fi
+
+# Coverage tool (SHOULD — used at Step 4/Blue for ≥90% check per RGB-02).
+if ! uv run python -m coverage --version >/dev/null 2>&1; then
+  COVERAGE_FALLBACK=true
+  echo "WARN: coverage tool not installed; will fall back to manual coverage analysis at Step 4."
+else
+  COVERAGE_FALLBACK=false
+fi
+
+# Feature-branch CI (SHOULD per GIT-04 v0.1.3+). Inspect .github/workflows
+# (or .gitlab-ci.yml, etc.) for branch globs covering feat/, fix/, etc.
+if grep -lE "'feat/\*\*'|feat/\*\*|^\s+- feat/" .github/workflows/*.yml >/dev/null 2>&1; then
+  CI_ON_BRANCH=true
+else
+  CI_ON_BRANCH=false
+  echo "WARN: feature-branch CI not configured; will fall back to local pre-commit gate at Step 7."
+  echo "  Recommend wiring feature-branch CI per GIT-04 v0.1.3+ before scaling parallel dispatch."
+fi
+```
+
+Journal entry shape:
+
+```markdown
+## Pre-flight checks
+
+| Tool / Check | Status | Fallback |
+|---|---|---|
+| gh CLI | present | — |
+| coverage tool | absent | manual analysis at Step 4 |
+| feature-branch CI | absent | local pre-commit gate at Step 7 |
+```
+
+### Worktree creation
 
 ```bash
 git fetch origin
@@ -158,7 +203,59 @@ RGB-03:
 
 **No new behaviour.** Refactor preserves the test outcomes.
 
-**Success criterion:** All tests still pass after refactor.
+**Success criterion:** All tests still pass after refactor; coverage on new files meets RGB-02's ≥ 90% threshold (verified via primary or fallback path below).
+
+### Coverage verification — primary and fallback paths (v0.8.2+)
+
+**Primary path (coverage tool installed):**
+
+```bash
+uv run pytest \
+  --cov=<new-module-path> \
+  --cov-report=term-missing \
+  --cov-fail-under=90 \
+  tests/unit/<path-to-new-tests>
+```
+
+The `--cov-fail-under=90` flag makes pytest exit non-zero if coverage
+on the new module is below 90%. RGB-02 satisfied directly.
+
+**Fallback path (coverage tool absent, per Step 1 pre-flight):**
+
+When `COVERAGE_FALLBACK=true` from Step 1, the executor performs a
+manual coverage analysis and records it in the journal under
+`## Coverage analysis (manual — coverage tool absent)`:
+
+```markdown
+## Coverage analysis (manual — coverage tool absent)
+
+File: sulis/shared/workflows/domain/sandbox.py
+
+Branches:
+- L42 (if path.is_symlink()): tested by test_symlink_outside_root_fails (line 87)
+- L45 (else): tested by test_resolves_simple_relative_path (line 56)
+- L51 (try/except UnicodeDecodeError): pragma: no cover — defensive; unprovokable in Python ≥3.12
+- L67 (else branch of for-loop): tested by test_no_dot_dot_segments (line 102)
+- ... etc
+
+Estimate: ~95% effective coverage (every reachable branch has a named test;
+defensive branches marked pragma: no cover).
+```
+
+The journal entry is the audit trail. Requirements:
+
+- **Enumerate every branch** in the new code (`if`/`elif`/`else`, exception handlers, `pragma: no cover` markers).
+- **Cite the specific test** for each branch (test name + line number).
+- **Justify each `pragma: no cover`** explicitly (defensive against
+  unprovokable error, fallback for older Python, etc.).
+- **Estimate honestly** — not a guess; a concrete reasoned number.
+
+The fallback is acceptable but weaker than tool-based: no automated
+verification, no CI gate, depends on the executor's honest analysis.
+Recommendation to wire pytest-cov is surfaced via the run-all status
+line (same shape as feature-branch-CI recommendation): *"WP-NNN:
+coverage tool not installed; used manual coverage analysis. Recommend
+installing pytest-cov for stronger guarantees."*
 
 **Failure handling:**
 
@@ -360,46 +457,122 @@ collisions).
 **Input:** Branch pushed from step 7; CI triggered automatically by
 the push.
 
-**Action (blocking — Continuation Discipline applies):**
+**Action (Continuation Discipline applies; agent-level polling loop, not single long Bash call):**
 
 1. **Detect host.** Inspect `git remote get-url origin` to determine
    the host (GitHub, GitLab, Bitbucket, self-hosted).
-2. **Poll the CI status** for the branch HEAD commit in a **blocking
-   Bash loop** that does not return until terminal:
 
-```bash
-BRANCH_SHA=<sha-from-step-6>
-DEADLINE=$(( $(date +%s) + 900 ))  # 15 min cap
+2. **Detect feature-branch CI presence.** From Step 1 pre-flight:
+   - **`CI_ON_BRANCH=true`** → proceed to step 3 (poll CI normally).
+   - **`CI_ON_BRANCH=false`** → fall back to local pre-commit gate
+     per GIT-04 v0.1.3 Local Pre-commit Fallback subsection:
+     - Run lint, type-check, full test suite, secret-scan locally
+       in the worktree.
+     - Record in journal under `## Pre-commit gate (local — feature-branch CI not wired)`.
+     - Skip to step 4 (rebase-on-dev verification).
 
-# GitHub example. Adapt for GitLab (glab api), Bitbucket, etc.
-while true; do
-  CHECKS=$(gh api repos/<owner>/<repo>/commits/$BRANCH_SHA/check-runs \
-           --jq '[.check_runs[] | {name: .name, status: .status, conclusion: .conclusion}]')
+3. **Poll CI as an agent-level turn loop, not a long-blocking Bash
+   call (v0.8.2+ — avoids harness backgrounding heuristic).**
 
-  # Are all required checks completed?
-  PENDING=$(echo "$CHECKS" | jq '[.[] | select(.status != "completed")] | length')
+   The harness backgrounds Bash calls whose runtime exceeds its
+   threshold heuristic. A `while true; do ...; sleep 30; done` loop
+   triggers this and breaks Continuation Discipline silently. The
+   fix: each poll is one short Bash call (≤ ~30-60s including
+   sleep); the agent re-issues across turns until terminal. Each
+   call exits cleanly; the harness doesn't background; the agent's
+   turn-level loop is the poll loop.
 
-  if [ "$PENDING" = "0" ]; then
-    # All completed. Did any fail?
-    FAILED=$(echo "$CHECKS" | jq '[.[] | select(.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral")] | length')
-    if [ "$FAILED" = "0" ]; then
-      echo "CI green"
-      break
-    fi
-    echo "CI failed: $(echo "$CHECKS" | jq -c '[.[] | select(.conclusion == "failure")]')"
-    exit 1
-  fi
+   Each agent turn issues one short Bash call:
 
-  if [ "$(date +%s)" -gt "$DEADLINE" ]; then
-    echo "CI poll timed out after 15 min"
-    exit 124
-  fi
-  sleep 30
-done
-```
+   ```bash
+   # First call (no sleep — immediate check):
+   gh api repos/<owner>/<repo>/commits/$BRANCH_SHA/check-runs \
+     --jq '[.check_runs[] | {name, status, conclusion}]'
+   ```
 
-The Bash call blocks the executor's turn until CI is terminal. The
-executor does not return control mid-poll (Continuation Discipline).
+   ```bash
+   # Subsequent calls (sleep 30 + one check):
+   sleep 30 && gh api repos/<owner>/<repo>/commits/$BRANCH_SHA/check-runs \
+     --jq '[.check_runs[] | {name, status, conclusion}]'
+   ```
+
+   The agent parses each result. Terminal states:
+   - All `status == "completed"` AND no `conclusion in {failure,
+     cancelled, timed_out}` → CI green → advance to step 4.
+   - Any `conclusion == "failure"` → CI failure → OODA per EL-01..08.
+   - Any `conclusion == "cancelled"` → check `cancelled_by` field:
+     - **Workflow-triggered cancellation** (concurrency / superseded
+       by newer push) → check whether a subsequent run on the same
+       branch covers this SHA or a descendant; if yes, wait for that
+       run; if no, re-trigger via `gh run rerun <run-id>`.
+     - **Human cancellation** (`cancelled_by` is a username, not a
+       bot) → see "Human cancellation mid-pipeline" subsection below.
+
+   Budget for total poll wall-time: 15 minutes (~30 agent-turn
+   iterations at 30s each). After budget, treat as CI timeout (exit
+   124-equivalent).
+
+4. (Original step 3 — see the rebase-on-dev section below.) Verify
+   dev hasn't advanced before squash-merging. Same as v0.8.1; uses
+   the same short-Bash-per-poll pattern for the re-CI wait after
+   rebase.
+
+**Continuation Discipline.** The agent does NOT return control to
+its caller (the run-all loop or the founder's session) while
+polling. Each Bash call returns; the agent reads the result and
+decides whether to re-issue. The agent's turn-level loop is the
+load-bearing mechanism; Bash's job is the single short status check.
+
+### Human cancellation mid-pipeline (v0.8.2+)
+
+A founder, ops engineer, or another tool may cancel a CI run or
+deploy via the host's UI mid-WP. The executor detects this via the
+host's API (`conclusion: cancelled` with a `cancelled_by` field
+naming a human user, not a bot or workflow trigger).
+
+When detected:
+
+1. **Read the host's API** to distinguish human cancellation from
+   workflow-triggered cancellation:
+   ```bash
+   gh api repos/<owner>/<repo>/actions/runs/<run-id> \
+     --jq '{conclusion, status, cancelled_by: .triggering_actor.login,
+            event: .event}'
+   ```
+   If `cancelled_by` is `github-actions[bot]` or empty AND `event`
+   indicates concurrency cancellation, treat as workflow-triggered
+   (handled in step 3 above). If `cancelled_by` is a real username,
+   treat as human cancellation.
+
+2. **Read the host's API** to identify whether a SUBSEQUENT run on
+   the same branch (for CI) or on dev (for deploy) covers the same
+   SHA OR a descendant SHA that includes this WP's code:
+   ```bash
+   gh run list --workflow="<workflow-name>" --branch=<branch> \
+     --json databaseId,headSha,status,conclusion --limit 10
+   ```
+
+3. **Decision:**
+   - **Covering run exists** (subsequent run on same SHA OR
+     descendant SHA): wait for that run instead. The cancellation
+     was redundant or superseded by newer work.
+   - **No covering run exists**: re-trigger the cancelled workflow
+     (`gh run rerun <run-id>` or equivalent). The executor's budget
+     for "CI failure" or "deploy failure" applies (re-triggers
+     count against the same budget as failures).
+
+4. **Journal-record the human-cancellation event** under
+   `## Human-cancellation events`:
+   ```markdown
+   - 2026-05-18T19:45Z: CI run 26056486348 cancelled by iainn.
+     Covering run identified: 26056501608 (SHA 417d1c314, descendant
+     of WP-7 SHA). Waiting for covering run.
+   ```
+
+**The pattern is: human intervention is signal, not error.** The
+executor doesn't fight it — it reads the host API, identifies the
+downstream effect on its WP, and integrates the cancellation into
+the lifecycle.
 
 3. **Verify dev hasn't advanced (GIT-05 step-4, v0.8.1+).** Before
    squash-merging, check whether dev has moved forward since this

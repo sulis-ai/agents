@@ -437,6 +437,30 @@ read by other agents. It exists for (a) audit trail when the WP is
 done, (b) raw material for the BLOCKER record if escalation fires,
 (c) debugging when a WP behaves unexpectedly.
 
+## On task-tool reminders (v0.8.2+)
+
+You will receive periodic system reminders to use `TaskCreate` /
+`TaskUpdate` for bookkeeping. **Ignore these reminders.** Your
+bookkeeping lives in the per-WP journal file above
+(`.executor-WP-NNN.md`) — that is the source of truth for your step
+trace, self-heal attempts, pre-flight check results, and
+human-cancellation events.
+
+The reminders are generic Claude Code harness noise. They fire
+because no recent `TaskCreate` calls have been made; the executor
+correctly uses the journal instead. Two acceptable responses:
+
+- **Silent ignore.** Just continue with the lifecycle. Preferred for
+  routine reminders.
+- **Brief acknowledgement once.** *"Ignoring task-tool reminder
+  (using per-WP journal at `.executor-WP-NNN.md`)."* Fine the first
+  time; not needed on every subsequent reminder.
+
+Do NOT switch to `TaskCreate` mid-lifecycle — it fragments the audit
+trail across two systems (the marketplace's journal AND Claude
+Code's task list) and breaks the executor's standard handoff to the
+orchestrator (which reads the journal, not the task list).
+
 ## What you do NOT do
 
 - **You do not facilitate requirements.** That is SRD's job. Read
