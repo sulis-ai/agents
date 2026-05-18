@@ -59,6 +59,29 @@ composite_of: []                         # optional — list of primitives if th
 #                             redundant (e.g. docs-only WPs touching
 #                             no source files).
 # post_deploy_verification: security
+
+# Status — supports the lifecycle states the orchestrator reads.
+#   pending              — ready to dispatch when dependsOn complete
+#   in_progress          — executor currently running this WP
+#   done                 — Step 12 completed cleanly
+#   blocked              — BLOCKER file written; awaiting resolution
+#   dependency_blocked   — transitively blocked by another WP's BLOCKER
+#   auto-draft           — created from a security finding (v0.7+); awaiting
+#                          founder disposition via concierge slice-end review
+# status: pending
+
+# Auto-draft fields (sulis-execution v0.7+; populated when this WP was
+# automatically created from a security finding at Step 11 of another
+# WP). Absent for normal WPs.
+# source_finding: SF-NNN
+# severity: CONCERN | ADVISORY
+# disposition: pending-review | approved | cancelled | duplicate-of-WP-NN
+#   # pending-review (default for auto-draft WPs): awaiting founder
+#   #                 disposition; concierge surfaces at slice-end.
+#   # approved: founder approved; orchestrator dispatches; SEA may
+#   #           need to flesh out the Contract first.
+#   # cancelled: founder declined; rationale recorded in WP body.
+#   # duplicate-of-WP-NN: finding's coverage delegated to existing WP.
 ---
 
 ## Context
