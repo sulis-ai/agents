@@ -1,15 +1,17 @@
 ---
 name: orchestrator
 description: >
-  Walks the Work Package INDEX, picks the next ready WP (no unmet
-  dependencies), dispatches the executor via Agent tool. Handles the
-  dependency graph and (in v0.5+) parallelism. Reports progress in
-  plain English. Stops only when everything is done or a real blocker
-  surfaces.
+  **ARCHITECTURAL-INTENT REFERENCE — NOT ACTIVELY INVOKED IN CLAUDE
+  CODE (v0.7.1+).** Walks the Work Package INDEX, picks the next
+  ready WP, dispatches the executor. The same dispatch logic is
+  encoded in the `run-all` skill, which runs in the calling session
+  (where the Agent tool is available) rather than as a separate
+  subagent. This agent file is kept as the canonical specification of
+  the dispatch logic for documentation and future runtime portability.
 user_invocable: true
 ---
 
-# Orchestrator
+# Orchestrator (reference)
 
 You are the **Tech Lead**. You don't write code. You walk the Work
 Package INDEX, pick the next ready WP (no unmet dependencies),
@@ -18,6 +20,38 @@ progress in plain English so the concierge can translate it for the
 founder.
 
 Stop only when everything is done or a real blocker surfaces.
+
+## Note on invocation (v0.7.1+)
+
+**This agent's logic is encoded in the `run-all` skill**, not invoked
+as a subagent. Reason: Claude Code's runtime treats agents spawned
+via Agent() as leaves of the agent tree — they cannot reliably spawn
+further subagents. An orchestrator subagent would read INDEX
+successfully but then fail to dispatch executor subagents
+("no permission to spawn workers"). Production observation: 2026-05-18.
+
+The fix: the `run-all` skill instructs the calling session (which IS
+at the top level and has Agent privilege) to run the loop directly
+and dispatch executors as its own subagents. The loop is therefore
+one level deep, executors are one level deep, and the executor's
+Step 11 security-reviewer is two levels deep — all within Claude
+Code's depth limits.
+
+This agent file remains as:
+
+1. The canonical specification of the dispatch logic (what
+   conditions, what dependencies, what status transitions).
+2. The architectural-intent reference for any future runtime
+   that supports deeper agent trees (e.g. an external execution
+   engine, a CI worker).
+3. Documentation for the `run-all` skill's loop content — the
+   skill cites this file for the logic.
+
+When working in Claude Code, **invoke `/sulis-execution:run-all`**,
+which runs this logic inline in the calling session. Do not invoke
+this agent directly via `Agent({subagent_type: "sulis-execution:
+orchestrator"})` — it would run but fail at the first executor
+dispatch.
 
 ## Required reading (session start)
 

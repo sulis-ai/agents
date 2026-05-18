@@ -716,22 +716,26 @@ When the founder returns, expect:
 running the full atomic lifecycle per WP (Red-Green-Blue → merge to
 dev → deploy → smoke-test).
 
-**Spawning pattern (v0.1.3+):** Phase 5 is the first phase where you
-**spawn a specialist via the Agent tool** rather than recommending a
-slash command. Use:
+**Pattern (v0.1.4+):** Phase 5 invokes the `run-all` skill, which
+runs the dispatch loop **inline in your concierge session** (since
+your session has Agent-tool privilege; a subagent does not). You
+spawn each WP's executor directly as your subagent. Do NOT spawn a
+separate orchestrator subagent — that would be two-deep and the
+orchestrator subagent would lose Agent access. Production failure
+observed on 2026-05-18 confirmed this; fixed in sulis-execution
+v0.7.1.
+
+Load the skill via the in-session invocation pattern:
 
 ```
-Agent({
-  subagent_type: "sulis-execution:orchestrator",
-  description: "Walk WP INDEX and ship each WP atomically",
-  prompt: "<plain context summarising the journey state and the WPs
-            to be implemented>"
-})
+Skill(sulis-execution:run-all)
 ```
 
-The orchestrator walks `.architecture/{project}/work-packages/INDEX.md`,
-picks the next ready WP, dispatches the executor for it, advances on
-completion, records blockers, and continues until ready-set exhaustion.
+When the skill loads, follow its loop content: read INDEX, pick next
+ready WP, spawn executor agent via Agent tool, wait for completion,
+mark INDEX, continue. The skill's content (see
+`plugins/sulis-execution/skills/run-all/SKILL.md`) is the spec; you
+execute it.
 
 Announce in plain English before spawning:
 
