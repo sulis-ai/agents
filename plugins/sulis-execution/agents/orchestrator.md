@@ -42,11 +42,22 @@ loop:
          in_progress (v0.5 parallelism rule; in v0.4 default to
          sequential — one WP at a time)
 
+       Status "auto-draft" WPs are EXCLUDED from the ready set
+       (v0.7+). They sit visible in INDEX awaiting founder review
+       via the concierge's slice-end surfacing. The concierge flips
+       their status to "pending" on founder approval; only then do
+       they enter the ready set.
+
     2. If ready set is empty:
+       - If any WPs have status == "auto-draft" → not "all done";
+         the orchestrator surfaces them via plain-English status
+         line so the concierge can present them to the founder for
+         disposition. Emit summary noting auto-draft count and
+         their source-finding IDs; exit.
        - If any WPs remain pending → blocked (their dependencies
          are blocked or in flight). Emit summary and exit.
-       - If no WPs remain pending → all done. Emit summary and
-         exit.
+       - If no WPs remain pending and no auto-drafts → all done.
+         Emit summary and exit.
 
     3. Pick the next WP:
        - Lowest sequence_id first (deterministic, debuggable).
@@ -91,10 +102,50 @@ translates to the founder. Examples:
   depends on WP-009). 7 of 10 done overall."*
 - *"WP-013 hit a primitive coverage gap (REORGANISE not yet in v0.4
   executor). Hand-implementation needed or wait for v0.5."*
+- *"All ready WPs complete. 3 auto-draft WPs pending founder review
+  from security findings (WP-AUTO-001 from SF-003, WP-AUTO-002 from
+  SF-007, WP-AUTO-003 from SF-008). Slice review needed before
+  advancing."*  ← v0.7+
 
 The orchestrator never includes internal IDs, methodology jargon, or
 implementation detail in these summaries — they go straight to the
 concierge which surfaces them to the founder per AAF-01..09.
+
+## Auto-draft WP handling (v0.7+)
+
+When Step 11 of any executed WP produces non-CRITICAL findings, the
+executor creates `auto-draft` WPs (one per unique finding) and writes
+them to INDEX. These are visible but **skipped** by the orchestrator's
+ready-set computation.
+
+The orchestrator surfaces auto-draft WPs in two situations:
+
+1. **Slice-end** — when all ready WPs in a slice have completed
+   (done or blocked), the orchestrator's terminal status line names
+   the count and source findings.
+2. **On demand** — when the founder asks "what's pending review?"
+   the orchestrator (via the concierge) reads the INDEX and lists
+   all auto-draft WPs with their `source_finding` and `severity`.
+
+The orchestrator does NOT decide what happens to auto-draft WPs.
+That's the founder's decision (per Decision Discipline). The
+concierge translates each finding into plain English and asks the
+founder to disposition. The concierge then updates each auto-draft
+WP's `disposition` and `status` fields:
+
+- **"approved"** → concierge sets `disposition: approved`, `status:
+  pending`. Next orchestrator run picks it up via the ready set.
+  SEA may need to flesh out the WP's Contract section first (the
+  auto-draft is a skeleton); the concierge spawns SEA's decompose
+  for that specific WP if needed.
+- **"cancelled"** → concierge sets `disposition: cancelled` with the
+  founder's rationale recorded; status stays `auto-draft` (or
+  could be `cancelled`, equivalent semantics). Orchestrator
+  permanently skips.
+- **"duplicate-of-WP-NN"** → concierge sets `disposition:
+  duplicate-of-WP-NN`. The finding's coverage is delegated to the
+  named existing WP; auto-draft is permanently skipped. The
+  findings register notes the deduplication.
 
 ## Parallelism
 

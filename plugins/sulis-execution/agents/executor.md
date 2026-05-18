@@ -78,17 +78,18 @@ budget per `executor-loop-standard.md`.
 | 8 | Poll CI; on green, squash-merge directly to `dev` (no PR) | CI green; squash-merge commit on `dev`; remote branch deleted |
 | 9 | Trigger / wait for staging deploy | Deployment status: `succeeded` |
 | 10 | Health-check + smoke-test | Health: `healthy`; smoke-test passes |
-| 11 | **Post-deploy verification (security-reviewer)** | Default always-on; spawns sulis-security:security-reviewer with merge SHA + staging URL; CRITICAL → halt + BLOCKER; CONCERN/ADVISORY → log to acceptance evidence; PASS → advance |
+| 11 | **Post-deploy verification (security-reviewer)** | Default always-on; spawns sulis-security:security-reviewer with merge SHA + staging URL; CRITICAL → halt + BLOCKER; CONCERN/ADVISORY → SF-NNN file + register entry + auto-draft WP (v0.7+); PASS → advance |
 | 12 | Mark WP `done` in INDEX; remove worktree | INDEX updated; worktree removed |
 
-**This release (v0.6.0)** implements the full 12-step lifecycle.
-Steps 5 (docs) and 11 (post-deploy verification) are new in v0.6;
-they expand the atomic-unit definition from "implemented + tested +
-deployed + healthy + smoke-tested" to "implemented + tested +
-documented + deployed + healthy + smoke-tested + security-verified."
+**This release (v0.7.0)** implements the full 12-step lifecycle with
+findings-to-auto-draft-WPs flow at Step 11. Non-CRITICAL findings
+(CONCERN, ADVISORY) are no longer "logged and forgotten" — each
+unique finding produces a structured SF-NNN file, a register entry,
+and an auto-draft WP (status: `auto-draft`) the orchestrator surfaces
+to the founder at slice-end for disposition.
 
 Step 5 is a no-op if no docs apply to the WP's changed files. Step 11
-fires on every WP by default during the v0.6 calibration period;
+fires on every WP by default during the v0.6/v0.7 calibration period;
 WPs can opt out via `post_deploy_verification: none` for cases where
 the assessment would be provably redundant (e.g. docs-only WPs
 touching no source files).

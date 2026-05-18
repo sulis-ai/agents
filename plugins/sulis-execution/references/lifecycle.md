@@ -736,26 +736,183 @@ deciding whether to dial the default down to opt-in.
    while the security-reviewer is running.
 
 3. Read the resulting `.security/{project}/viability-report-*.md`.
-   Triage findings by severity per the security-standard:
+   Triage findings by severity per the security-standard.
 
-   - **CRITICAL** → halt + write BLOCKER per EL-08 referencing the
-     security finding. The WP introduced or exacerbated a critical
-     issue and is not done.
-   - **CONCERN** → log to WP's `## Acceptance Evidence` under a new
-     subsection `## Post-deploy verification`; **immediately
-     advance to Step 12 — do NOT return control between Step 11
-     and Step 12.** Continuation Discipline (executor.md) covers
-     this boundary explicitly after a 2026-05-18 production failure.
-   - **ADVISORY** → log similarly; **immediately advance to Step 12
-     — do NOT return control.**
-   - **PASS** → log "no findings"; **immediately advance to Step 12
-     — do NOT return control.** This is the most-likely cognitive
-     trap (executor "feels done" after PASS verdict and exits before
-     bookkeeping).
+### CRITICAL findings — halt + BLOCKER
 
-**Success criterion:** Security-reviewer completed; no CRITICAL
-findings; results captured in acceptance evidence; **executor has
-advanced to Step 12 in the same turn.**
+Halt + write BLOCKER per EL-08 referencing the security finding.
+The WP introduced or exacerbated a critical issue and is not done.
+
+### Non-CRITICAL findings — findings register + auto-draft WPs (v0.7+)
+
+For each CONCERN or ADVISORY finding produced by the security-reviewer,
+the executor runs this sequence:
+
+1. **Compute the finding's signature.** Hash of severity + summary +
+   primary file path (e.g. SHA-1 over `CONCERN|HSTS missing on Cloud
+   Run|deploy/cloudrun.yaml`). The signature deduplicates findings
+   across WPs.
+
+2. **Check the findings register** at
+   `.security/{project}/findings-register.md`. The register is an
+   append-only ledger maintained across all WPs in the project.
+
+   - **If the signature already appears**: append a register row
+     noting "Duplicate of SF-NN observed on WP-NNN (no new draft
+     created)." Do **not** create a new SF file or auto-draft WP.
+     Cross-reference both source WPs' acceptance evidence to the
+     existing SF for traceability.
+   - **If the signature is new**: continue to step 3.
+
+3. **Allocate an SF-NNN ID.** Read+increment a counter at
+   `.security/{project}/SECURITY.yaml` (`next_finding_id` field).
+   Format: `SF-001`, `SF-002`, ...
+
+4. **Write the finding file** at
+   `.security/{project}/findings/SF-NNN-<slug>.md`:
+
+   ```markdown
+   ---
+   id: SF-NNN
+   severity: CONCERN | ADVISORY
+   signature: <hash>
+   source_wp: WP-NNN
+   detected_at: <ISO-8601>
+   primitive: SEC-NN | DAT-NN | etc. (from sulis-security catalogue)
+   ---
+
+   ## Summary
+
+   <One-paragraph plain-English summary AAF-compliant for the concierge.>
+
+   ## Evidence
+
+   <File:line, tool output snippet, response header, git range —
+   exactly as the security-reviewer produced it.>
+
+   ## Suggested fix
+
+   <Recommendation from the security-reviewer; will become the basis
+   of the auto-draft WP's Contract section.>
+
+   ## Cross-references
+
+   - Source WP: WP-NNN
+   - Auto-draft WP: WP-AUTO-NNN (created by this Step 11 run)
+   - Duplicate observations: <if any, list other WPs that observed
+     this same finding>
+   ```
+
+5. **Append the register entry** to
+   `.security/{project}/findings-register.md`:
+
+   ```markdown
+   | SF-NNN | <severity> | <one-line summary> | <source WP> | <signature> | <auto-draft WP ID> | <disposition> |
+   ```
+
+   Disposition starts as `pending-review`. Final dispositions
+   recorded by the concierge during Phase 5 slice-end review (see
+   concierge agent prompt): `approved` (run the auto-draft WP),
+   `cancelled` (founder declined; rationale required), `duplicate-of-WP-NN`
+   (founder merged into existing WP).
+
+6. **Allocate a WP-AUTO-NNN ID.** Read+increment a counter at
+   `.architecture/{project}/work-packages/INDEX.md`'s header
+   `next_auto_wp_id`.
+
+7. **Create the auto-draft WP** at
+   `.architecture/{project}/work-packages/WP-AUTO-NNN-<slug>.md`:
+
+   ```markdown
+   ---
+   id: WP-AUTO-NNN
+   title: <short title from finding summary>
+   status: auto-draft
+   sequence_id: WP-AUTO-NNN
+   dependsOn: [<source_wp>]   # the WP that surfaced the finding
+   blocks: []
+   primitive: Secure | Harden  # default per finding category
+   group: reinforce
+   source_finding: SF-NNN
+   severity: CONCERN | ADVISORY
+   disposition: pending-review
+   pillar: armor
+   estimated_token_cost: {input: ?, output: ?}  # SEA fleshes out on approval
+   tdd_section: null  # SEA fleshes out on approval
+   adrs: []
+   ---
+
+   ## Context
+
+   Auto-drafted from security finding SF-NNN (severity: <CONCERN | ADVISORY>),
+   surfaced during Step 11 of WP-NNN. See
+   `.security/{project}/findings/SF-NNN-<slug>.md` for the full finding.
+
+   ## Contract
+
+   <Skeleton — SEA fleshes out when this WP is approved by the
+   founder via the concierge's slice-end review.>
+
+   ## Definition of Done
+
+   <Skeleton — SEA fleshes out.>
+
+   Suggested fix from security-reviewer:
+
+   > <verbatim from SF-NNN's Suggested fix section>
+
+   ## Sequence
+
+   <Skeleton — SEA fleshes out.>
+   ```
+
+8. **Update INDEX.md** to include the new auto-draft WP. Its row:
+   `| WP-AUTO-NNN | <title> | Secure | auto-draft | WP-NNN | — | ? | ? |`
+   Plus a section header `### Auto-drafts from security findings (N
+   pending-review)` if not already present.
+
+9. **Append to source WP's acceptance evidence** under the
+   `## Post-deploy verification` subsection:
+
+   ```markdown
+   ## Post-deploy verification
+
+   Security-reviewer verdict: <PASS | N CONCERN | N ADVISORY findings>
+
+   New findings (this WP):
+   - SF-NNN (<severity>): <one-line summary> → auto-draft WP-AUTO-NNN
+   - SF-NNN (<severity>): <one-line summary> → auto-draft WP-AUTO-NNN
+
+   Duplicate findings (already in register):
+   - SF-NNN (<severity>): same signature observed on WP-NNN
+   ```
+
+10. **Immediately advance to Step 12 — do NOT return control.**
+    Continuation Discipline (executor.md) covers this boundary
+    explicitly. The auto-draft WPs sit in the INDEX with `status:
+    auto-draft`; the orchestrator skips them from normal dispatch
+    until the founder approves them via the concierge's slice-end
+    review.
+
+**Important: auto-draft WPs do NOT run automatically.** They're
+visible in INDEX but skipped by the orchestrator. The founder owns
+the disposition decision (run / cancel / merge into existing WP) —
+that's a real product decision about scope, not a process decision,
+per Decision Discipline. The concierge surfaces auto-draft WPs at
+slice-end in plain English; the founder dispositions them; the
+concierge updates each WP's `disposition` and `status` fields.
+
+**For PASS verdict (no findings) — same advance rule applies.**
+No SF files, no auto-drafts, no register entries beyond a
+"verdict: PASS" line in the source WP's acceptance evidence.
+Immediately advance to Step 12 — do NOT return control. This is
+the most-likely cognitive trap (executor "feels done" after PASS
+verdict and exits before bookkeeping).
+
+**Success criterion:** Security-reviewer completed; findings (if
+any) registered + auto-drafted + cross-referenced; results captured
+in source WP's acceptance evidence; **executor has advanced to Step
+12 in the same turn.**
 
 **Step 11 → Step 12 transition is part of the atomic unit.** After
 the security-reviewer returns (any non-CRITICAL verdict), the next
