@@ -71,8 +71,8 @@
     {
       "name": "sulis-execution",
       "source": "./plugins/sulis-execution",
-      "version": "0.7.1",
-      "description": "Work Package Executor. v0.7.1 fixes the orchestrator agent-tree-depth failure observed when `/sulis-execution:run-all` was invoked (Claude Code subagents cannot reliably spawn further subagents). The `run-all` skill now runs the dispatch loop inline in the calling session (which has top-level Agent privilege), spawning executors directly as one-deep subagents. The orchestrator.md agent file is retained as the architectural-intent reference for the dispatch logic — useful for documentation and future runtime portability — but is NOT actively invoked. v0.7.0 capability unchanged: findings register + auto-draft WPs from Step 11; non-CRITICAL findings produce SF-NNN files, register entries, and auto-draft WPs that the founder dispositions via the concierge's slice-end review. v0.6.1 Continuation Discipline covers all step transitions. v0.6.0 lifecycle (12 steps; Step 5 docs; Step 11 post-deploy verification)."
+      "version": "0.8.0",
+      "description": "Work Package Executor with parallel dispatch. v0.8.0 ships parallel dispatch in the run-all skill: up to max_parallel concurrent executors per batch (default 3; configurable via INDEX header), gated by graph eligibility (no shared file scope, no shared dependsOn descendant). Per-WP `executor_model` and `security_model` frontmatter overrides added as opt-in (defaults unchanged — Opus inherits from caller). Expected impact: ~37 hours sequential Opus → ~12-15 hours wall-clock for a 37-WP batch with 3× parallelism. Each parallel executor uses its own git worktree per GIT-07; one BLOCKER doesn't affect concurrent peers. v0.7.1 prior: run-all skill runs the loop inline in the calling session (fixes the agent-tree-depth failure where subagents can't reliably spawn further subagents). v0.7.0 capability unchanged: findings register + auto-draft WPs from Step 11. v0.6.1 Continuation Discipline covers all step transitions. v0.6.0 lifecycle (12 steps; Step 5 docs; Step 11 post-deploy verification)."
     },
     {
       "name": "sulis-concierge",

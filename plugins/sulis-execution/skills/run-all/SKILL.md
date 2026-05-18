@@ -1,207 +1,269 @@
 ---
 name: run-all
 description: >
-  Walk the Work Package INDEX in the calling session. Pick the next
-  ready WP (no unmet dependencies), spawn the executor agent for it
-  via the Agent tool, wait for completion, mark INDEX, continue.
-  Usage: /sulis-execution:run-all. The loop runs **inline in the
-  calling session** — not via a separate orchestrator subagent —
-  because agent-tree-depth limits in Claude Code prevent subagents
-  from reliably spawning further subagents.
+  Walk the Work Package INDEX in the calling session with parallel
+  dispatch (up to max_parallel concurrent executors per batch, gated
+  by dependency-graph eligibility). Usage: /sulis-execution:run-all.
+  The loop runs inline in the calling session — not via a separate
+  orchestrator subagent — because agent-tree-depth limits prevent
+  subagents from reliably spawning further subagents.
 ---
 
 # /sulis-execution:run-all
 
-Walk the Work Package INDEX and ship every ready WP atomically.
+Walk the Work Package INDEX and ship every ready WP atomically, with
+parallel dispatch of graph-independent WPs.
 
-## How to invoke (MUST — run the loop inline, not via a subagent)
+## How to invoke (MUST — run the loop inline, with parallel batching)
 
-**This is the marketplace's most important architectural decision.**
+**This is the marketplace's load-bearing dispatch logic.**
 
 When this skill loads, **YOU (the calling session) run the dispatch
 loop directly**. Do NOT call `Agent({subagent_type:
-"sulis-execution:orchestrator", ...})` first and let the orchestrator
-spawn executors. That two-deep pattern fails in Claude Code's
-agent-tree-depth model: spawned subagents lose the Agent tool, so
-the orchestrator subagent cannot spawn executor subagents.
+"sulis-execution:orchestrator", ...})` first. The orchestrator agent
+file is architectural-intent reference only — Claude Code's runtime
+treats spawned subagents as leaves of the agent tree, so an
+orchestrator subagent could not dispatch executor subagents
+(production failure observed 2026-05-18).
 
 The calling session DOES have Agent at the top level. So the loop
-runs in the calling session, the calling session spawns executors as
-its own subagents (one deep, which works), the calling session reads
-each executor's exit and advances.
+runs in the calling session; the calling session spawns multiple
+executors in parallel as its own subagents; each executor's Step 11
+spawns the security-reviewer as its subagent. That's one level deep
+for executors and two levels deep for the security-reviewer — both
+within Claude Code's depth limits.
 
-### The loop
+### The parallel loop
 
 ```
 loop:
     1. Read .architecture/{project}/work-packages/INDEX.md.
 
-    2. Read .architecture/{project}/work-packages/BLOCKER-*.md (any
-       existing blockers).
+    2. Read INDEX header for max_parallel (default 3 if absent).
+       Example header:
+           ## Orchestrator Config
+           max_parallel: 3
 
-    3. Build the ready set:
+    3. Read .architecture/{project}/work-packages/BLOCKER-*.md
+       (any existing blockers).
+
+    4. Build the ready set:
        - All WPs with status == "pending"
        - AND all their dependsOn WPs have status == "done"
-       - EXCLUDE status == "auto-draft" (v0.7+; these await
-         founder disposition via the concierge slice-end review)
+       - EXCLUDE status == "auto-draft" (await founder disposition
+         via concierge slice-end review)
        - EXCLUDE status == "blocked" / "cancelled" /
          "dependency_blocked"
 
-    4. If ready set is empty:
-       - If any WPs have status == "auto-draft" → surface to
-         the founder (via the concierge if active, else inline
-         plain-English) the count + source-finding IDs; ask for
-         disposition. Exit the loop. The orchestrator does not
-         decide auto-draft disposition.
+    5. If ready set is empty:
+       - If any WPs have status == "auto-draft" → surface count +
+         source-finding IDs to concierge / founder; exit.
        - If any WPs remain "pending" (deps not met) → blocked on
-         dependencies. Surface what's blocking. Exit.
-       - If no WPs remain pending and no auto-drafts → all done.
-         Celebrate. Exit.
+         dependencies; surface what's blocking; exit.
+       - If no WPs remain pending and no auto-drafts → all done;
+         celebrate; exit.
 
-    5. Pick the next WP:
-       - Lowest sequence_id first (deterministic, debuggable).
-       - Ties broken by ID alphabetical.
+    6. Compute the parallel-eligible subset (cap at max_parallel):
 
-    6. Mark the WP status: in_progress in INDEX with a timestamp.
+       Greedy selection — iterate ready set in lowest-sequence_id
+       order; pick a WP if it satisfies ALL of these vs every WP
+       already picked for THIS batch:
+           (a) Neither dependsOn the other (transitively).
+           (b) Declared file scope (from WP Contract section)
+               doesn't overlap.
+           (c) They don't share a dependsOn descendant currently
+               in the same batch (prevents racing two children
+               of the same parent on the same descendant outcome).
 
-    7. Spawn the executor as a subagent of this calling session:
+       Stop when batch has max_parallel WPs OR ready set is
+       exhausted. Single-WP batch (size 1) is fine — sequential
+       fallback when no parallelism is available.
+
+    7. Mark each picked WP status: in_progress in INDEX with
+       timestamp.
+
+    8. Dispatch ALL picked WPs in a SINGLE message containing
+       multiple Agent tool_use blocks — Claude Code runs them
+       concurrently:
 
        Agent({
          subagent_type: "sulis-execution:executor",
-         description: "Ship WP-NNN end-to-end",
-         prompt: """
-   You are dispatched by the run-all loop to ship WP-NNN through
-   the full 12-step atomic lifecycle.
-
-   WP file: .architecture/{project}/work-packages/WP-NNN-<title>.md
-   INDEX:   .architecture/{project}/work-packages/INDEX.md
-   TDD:     .architecture/{project}/TDD.md
-   ADRs:    .architecture/{project}/adrs/
-
-   Continuation Discipline applies (see agents/executor.md):
-   do not return control until Step 12 success OR a BLOCKER is
-   written. Use blocking Bash polling for steps 7-10 per
-   references/lifecycle.md. Step 11 invokes sulis-security:
-   security-reviewer via Agent — this is the executor's one
-   allowed sub-Agent call.
-
-   If the journal at .architecture/{project}/work-packages/
-   .executor-WP-NNN.md exists with an incomplete tail, resume
-   from the last started-but-not-completed step.
-
-   Output: ## Acceptance Evidence appended; INDEX status: done;
-   worktree removed. Or: BLOCKER-WP-NNN.md written; INDEX
-   status: blocked.
-
-   Return ONLY when one of those is true.
-   """,
+         description: "Ship WP-007 end-to-end",
+         model: <executor_model from WP frontmatter, if present>,
+         prompt: """<executor brief per below>""",
+       })
+       Agent({
+         subagent_type: "sulis-execution:executor",
+         description: "Ship WP-008 end-to-end",
+         model: <executor_model from WP frontmatter, if present>,
+         prompt: """<executor brief per below>""",
+       })
+       Agent({
+         subagent_type: "sulis-execution:executor",
+         description: "Ship WP-009 end-to-end",
+         model: <executor_model from WP frontmatter, if present>,
+         prompt: """<executor brief per below>""",
        })
 
-    8. Wait for the executor's Agent call to return. (Agent calls
-       block by default — the executor's "Continuation Discipline"
-       rule ensures the call only returns once the WP is done or
-       blocked.)
+       Send all three in one message. Claude Code dispatches them
+       in parallel; the calling turn blocks until ALL return.
 
-    9. Read the executor's outcome:
-       - Step 12 success — WP is done. INDEX status: done (the
-         executor wrote that). Continue.
-       - BLOCKER written — INDEX status: blocked (the executor
-         wrote that). Continue (the blocked WP doesn't block
-         others unless they depend on it transitively).
+    9. Per-WP executor brief (substitute WP-NNN, project, etc.):
+
+       You are dispatched by the run-all loop (parallel batch
+       of N) to ship WP-NNN through the full 12-step atomic
+       lifecycle.
+
+       WP file: .architecture/{project}/work-packages/WP-NNN-<title>.md
+       INDEX:   .architecture/{project}/work-packages/INDEX.md
+       TDD:     .architecture/{project}/TDD.md
+       ADRs:    .architecture/{project}/adrs/
+
+       Continuation Discipline applies (see agents/executor.md):
+       do not return control until Step 12 success OR a BLOCKER
+       is written. Use blocking Bash polling for steps 7-10 per
+       references/lifecycle.md. Step 11 invokes sulis-security:
+       security-reviewer via Agent — the executor's one allowed
+       sub-Agent call.
+
+       You are running in your own git worktree (Step 1 creates
+       it). Parallel peers are running their own worktrees. No
+       file-system collision between you.
+
+       If the journal at .architecture/{project}/work-packages/
+       .executor-WP-NNN.md exists with an incomplete tail,
+       resume from the last started-but-not-completed step.
+
+       Output: ## Acceptance Evidence appended; INDEX status:
+       done; worktree removed. Or: BLOCKER-WP-NNN.md written;
+       INDEX status: blocked.
+
+       Return ONLY when one of those is true.
+
+   10. Wait for ALL parallel Agent calls to return. Claude Code's
+       Agent tool blocks the calling turn until every parallel
+       call resolves.
+
+   11. For each executor outcome:
+       - Step 12 success — WP done. INDEX status: done (executor
+         wrote that). Cross-reference any auto-draft WPs created
+         from findings. Continue.
+       - BLOCKER written — INDEX status: blocked (executor wrote
+         that). In the next loop iteration, transitively-dependent
+         WPs get status: dependency_blocked.
        - Neither (executor exited mid-lifecycle) — classify as
-         "error". Halt entirely. Surface to the founder.
+         "error". Halt the loop entirely. Surface to founder /
+         calling session.
 
-   10. After a "blocked" outcome:
-       - Find all WPs whose dependsOn (transitively) includes the
-         blocked WP. Mark them status: dependency_blocked with a
-         pointer to the blocker. They don't consume executor
-         dispatches but stay visible in INDEX.
+   12. Emit per-batch plain-English status to the founder /
+       concierge / calling session:
+       - "Starting N in parallel: WP-A (title), WP-B (title), ..."
+       - As each completes (in the order they return):
+         "WP-A done — deployed and healthy at <url>. N-1 still in
+          flight."
+       - When the batch returns:
+         "Batch complete. M done, K blocked. Starting next batch:
+          WP-X, WP-Y, ..."
 
-   11. Emit one plain-English status line for the founder /
-       calling session:
-       - "WP-NNN done — deployed and healthy at <url>."
-       - "WP-NNN blocked — <plain-English reason from BLOCKER>."
-       - "Starting WP-MMM next — <plain title>."
-
-   12. Goto step 1.
+   13. Goto step 1.
 ```
 
-## Note on agent-tree depth
+## Concurrency limit configuration
 
-The "orchestrator agent" pattern (run-all spawns orchestrator;
-orchestrator spawns executors) does NOT work in Claude Code's
-runtime because subagents spawned via Agent() lose access to the
-Agent tool — they're leaves of the agent tree. The orchestrator
-subagent would run, read INDEX, then fail to dispatch executors,
-returning with "no permission to spawn workers."
+Default: `max_parallel: 3`. Configurable per-project via the INDEX
+header. To change:
 
-`agents/orchestrator.md` is kept in the plugin as the
-architectural-intent reference for the dispatch logic encoded here.
-It's the same logic, just expressed as a standalone agent spec.
-Some future runtime version or external execution context (a CI
-worker, a dedicated agent runtime) may use it directly. **In Claude
-Code today, this skill is the orchestrator**.
+```yaml
+## Orchestrator Config
+max_parallel: 5   # If staging cluster + machine can handle more.
+```
 
-The executor agent itself IS allowed one sub-Agent call — for
-spawning sulis-security:security-reviewer at Step 11. That's one
-level deep from the executor (which is one level deep from the
-calling session), so two-deep total. Claude Code allows the
-executor → security-reviewer path because the executor is "real"
-work, not coordination. The boundary is "subagents can do one final
-spawn for a specific Step-11 contract, not arbitrary sub-orchestration."
+Three is a safe starting point covering most graph-parallelisable
+cases without overwhelming staging. The founder can dial up as
+confidence grows.
 
-## When to use this skill
+## Per-WP model override (opt-in)
 
-- **The default Phase 5 path.** Founder approves "let it walk the
-  index" via the concierge; concierge invokes this skill in the
-  calling session.
-- **Power user path.** Set up a session, run this command, watch
-  the loop dispatch executors.
+Optional WP frontmatter field:
+
+```yaml
+executor_model: opus | sonnet | haiku
+```
+
+When present, the run-all skill includes the `model` parameter in
+that WP's Agent call:
+
+```
+Agent({
+  subagent_type: "sulis-execution:executor",
+  model: "haiku",
+  ...
+})
+```
+
+When absent (default behaviour), no `model` parameter is sent and
+the executor inherits the calling session's model (typically Opus).
+**No automatic model substitution.** The override is purely opt-in;
+defaults are unchanged from v0.7.1.
+
+## Per-executor isolation
+
+Each parallel executor uses its own `git worktree` per GIT-07. Worktree
+paths use the WP ID: `../wp-NNN-worktree/`. Concurrent worktrees do
+not share working files; they share only the bare repository's git
+objects + refs (which git handles thread-safely).
+
+Per-executor journals live at `.architecture/{project}/work-packages/
+.executor-WP-NNN.md` — one per WP, no cross-WP collisions.
+
+## Failure isolation
+
+One executor's BLOCKER doesn't affect concurrent peers. Each executor
+runs its own OODA spiral (per executor-loop-standard.md EL-01..08)
+independently. When the parallel batch returns, the calling session
+sees a mix of outcomes (some done, some blocked) and updates INDEX
+accordingly.
+
+The next loop iteration uses the updated INDEX to compute the new
+ready set. Transitively-dependent descendants of blocked WPs get
+`dependency_blocked`; the loop continues with what's still ready.
 
 ## When NOT to use
 
-- **One specific WP.** Use `/sulis-execution:run-wp WP-NNN` — the
-  same single-WP dispatch (also runs Agent in the calling session).
-- **Retry a blocked WP.** Use `/sulis-execution:retry WP-NNN`
-  after the external blocker is resolved.
-
-## What it does NOT do
-
-- **It does not promote `dev → main`.** That's the founder's
-  ceremony, surfaced by the concierge.
-- **It does not retry blocked WPs.** Use
-  `/sulis-execution:retry WP-NNN` after fixing the external
-  blocker.
-- **It does not dispatch auto-draft WPs.** They await founder
-  disposition via the concierge's slice-end review.
-- **It does not parallelise executor dispatches (v0.7).** v0.8+
-  will allow opt-in parallelism for WPs that share no file scope
-  AND no shared dependsOn descendant. v0.7 is sequential — one
-  executor at a time, waiting for each to complete before
-  dispatching the next.
+- **One specific WP.** Use `/sulis-execution:run-wp WP-NNN` — single-
+  WP dispatch (also runs Agent in the calling session; no parallel
+  logic needed).
+- **Retry a blocked WP.** Use `/sulis-execution:retry WP-NNN` after
+  the external blocker is resolved.
 
 ## Gotchas
 
 - The skill expects a non-empty
   `.architecture/{project}/work-packages/INDEX.md`. If empty,
-  surface clearly: *"INDEX is empty. Run `/sea:decompose` first."*
-- If the calling session is itself a subagent (e.g. spawned by the
-  concierge), this skill still works **only if** the concierge was
-  spawned at the top level. The concierge → run-all chain is one
-  level deep, executor is two levels deep, security-reviewer at
-  Step 11 is three levels deep. Claude Code generally allows three
-  levels; deeper chains may break.
-- If an executor's Agent call returns mid-lifecycle (no Step 12
-  success AND no BLOCKER), that's a Continuation Discipline
-  violation — classify as "error" and halt entirely.
+  surface: *"INDEX is empty. Run `/sea:decompose` first."*
+- `max_parallel: 1` in INDEX header is a valid configuration —
+  forces sequential dispatch. Useful when staging capacity is
+  constrained or the founder wants one-at-a-time observability.
+- An executor's Agent call that returns mid-lifecycle (no Step 12
+  success AND no BLOCKER) is classified as `error` and halts the
+  entire loop. This is intentional — silent advance past a
+  half-finished WP is the failure mode v0.6.1 + v0.7.1 fixed.
+- WPs with declared file scope that's *very* broad (e.g. "everywhere
+  under src/") will conflict with every other WP and effectively
+  serialise. SEA's decompose should produce narrower file scopes;
+  if your WPs systematically over-claim scope, that's a SEA
+  configuration concern, not a run-all issue.
+- The depth chain via concierge: concierge (depth 0) → run-all skill
+  (inline in concierge) → executor (depth 1) → security-reviewer at
+  Step 11 (depth 2). Two deep at deepest from concierge. Same chain
+  one level shallower from a top-level user session. Both work.
 
 ## See also
 
 - `agents/executor.md` — what the loop spawns per WP.
-- `agents/orchestrator.md` — architectural-intent reference for
-  the dispatch logic (not actually invoked in Claude Code).
+- `agents/orchestrator.md` — architectural-intent reference for the
+  dispatch logic (not actively invoked).
 - `references/lifecycle.md` — the 12-step contract per WP.
 - `/sulis-execution:run-wp WP-NNN` — single-WP dispatch.
-- `/sulis-execution:status` — read-only INDEX summary (inline; no
-  agent spawn).
+- `/sulis-execution:status` — read-only INDEX summary.
 - `/sulis-execution:retry WP-NNN` — re-run a blocked WP.

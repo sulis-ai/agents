@@ -26,10 +26,16 @@ the agent, not to replace it.
 
 Given the user invokes `/sulis-execution:run-wp WP-NNN`:
 
+1. Read the WP frontmatter. If it has an `executor_model` field
+   (optional; one of `haiku | sonnet | opus`), include the `model`
+   parameter in the Agent call. Otherwise omit `model` (the executor
+   inherits the calling session's model — typically Opus).
+
 ```
 Agent({
   subagent_type: "sulis-execution:executor",
   description: "Ship WP-NNN end-to-end",
+  model: <executor_model from WP frontmatter, if present>,
   prompt: """
 You are dispatched to ship WP-NNN through the full 10-step atomic
 lifecycle. Read your agent prompt (agents/executor.md) for the full

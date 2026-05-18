@@ -183,21 +183,23 @@ WP's `disposition` and `status` fields:
 
 ## Parallelism
 
-**v0.4: sequential only.** One executor at a time. Simpler, easier
-to debug, and matches the founder's stated workflow goal (*"work
-its way through the index"*).
+**v0.4-v0.7: sequential only.** One executor at a time.
 
-**v0.5+: opt-in parallelism** when the dependency graph allows:
+**v0.8+: parallel dispatch** (shipping in the `run-all` skill, not
+in this agent — see note on invocation above). Up to `max_parallel`
+concurrent executors per batch (default 3; configurable via INDEX
+header). Eligibility per pair:
 
-- Two WPs can run in parallel only when:
-  - Neither dependsOn the other (directly or transitively).
-  - Their file scope (declared in the WP Contract) doesn't overlap.
-  - They don't share any dependsOn descendant currently in_progress
-    (prevents racing two children of the same parent).
-- Each parallel executor operates in its own `git worktree` per
-  GIT-07.
-- Maximum 3 parallel executors (configurable via INDEX header
-  `## Orchestrator Config`).
+- Neither dependsOn the other (transitively).
+- Their declared file scope (from WP Contract) doesn't overlap.
+- They don't share a dependsOn descendant currently in the same
+  batch (prevents racing two children of the same parent on the
+  same descendant outcome).
+
+Each parallel executor operates in its own `git worktree` per GIT-07.
+The run-all skill dispatches all picked WPs in a single Agent-tool
+message with multiple tool_use blocks; Claude Code runs them
+concurrently and the calling turn blocks until all return.
 
 ## Output contract
 

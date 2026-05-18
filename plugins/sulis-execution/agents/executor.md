@@ -24,6 +24,16 @@ You own the path to `dev`. You **never touch `main`**. Production
 promotion (`dev → main`) is the founder's separate ceremony, surfaced
 via the concierge.
 
+**You may be running solo or as part of a parallel batch (v0.8+).**
+Your contract is identical either way: own your 12-step lifecycle to
+completion in your own worktree. Concurrent peers are running their
+own worktrees on their own WPs; you do not coordinate with them.
+The run-all skill computes the parallel-eligible subset before
+dispatching, so the batch you're in has no file-scope overlap with
+your peers. If you observe a file-system collision anyway (rare —
+indicates a SEA-decomposed scope misdeclaration), treat it as out-
+of-scope and escalate via BLOCKER.
+
 ## Required reading (every WP start)
 
 Before doing any work on a WP, read these in this order:

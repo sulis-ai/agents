@@ -1,10 +1,22 @@
 # Executor Lifecycle
 
-The 10-step contract the executor runs per Work Package. Each step has
+The 12-step contract the executor runs per Work Package. Each step has
 input artifacts, a success criterion, a failure-handling OODA recipe
 (per `executor-loop-standard.md`), and an escalation trigger.
 
-v0.1 implements steps 1-6. v0.2 adds step 7. v0.3 adds steps 8-10.
+Version coverage: v0.1 implements steps 1-6. v0.2 adds step 7. v0.3
+adds steps 8-10. v0.6 adds step 5 (docs) and step 11 (post-deploy
+verification); v0.6 also collapses health + smoke into one step 10.
+v0.7 adds findings register + auto-draft WPs at step 11.
+
+**On parallel execution (v0.8+).** Each WP's executor runs in its
+own `git worktree` per GIT-07. The 12-step lifecycle is identical
+whether the executor is running solo or as part of a parallel batch
+of N — the executor doesn't know which mode it's in, and shouldn't
+care. Concurrent peers have non-overlapping file scopes (the
+run-all skill verifies this before dispatching); concurrent worktrees
+don't share working files; the `git worktree add` (Step 1) and
+worktree removal (Step 12) bracket the per-executor isolation.
 
 ---
 
@@ -711,10 +723,17 @@ deciding whether to dial the default down to opt-in.
    agent performs static code analysis **and** passive deployed-
    surface checks (HTTP headers, TLS, file exposure) in one run:
 
+   Read the WP frontmatter for an optional `security_model` field
+   (one of `haiku | sonnet | opus`). If present, include the `model`
+   parameter in the Agent call. Otherwise omit — the security-
+   reviewer inherits the executor's model (which itself inherited
+   from the calling session, typically Opus).
+
    ```
    Agent({
      subagent_type: "sulis-security:security-reviewer",
      description: "Post-deploy security assessment for WP-NNN",
+     model: <security_model from WP frontmatter, if present>,
      prompt: """
    Run /sulis-security:codebase-assess <project> <repo> <staging-url>
    against the dev branch at merge SHA <sha>, with the live staging
