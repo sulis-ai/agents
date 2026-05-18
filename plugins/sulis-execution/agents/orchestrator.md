@@ -195,6 +195,13 @@ header). Eligibility per pair:
 - They don't share a dependsOn descendant currently in the same
   batch (prevents racing two children of the same parent on the
   same descendant outcome).
+- **Migration-lock serialisation (v0.8.1+).** WPs with
+  `requires_migration_lock: true` in frontmatter are dispatched
+  SOLO — never in a parallel batch. Rationale: parallel migrations
+  against the same database deadlock or race on row locks; the
+  schema is shared state that can't be safely modified concurrently.
+  Same applies for any non-idempotent shared-persistent-state
+  change (DB seeds, Redis flushes, filesystem-shared state).
 
 Each parallel executor operates in its own `git worktree` per GIT-07.
 The run-all skill dispatches all picked WPs in a single Agent-tool

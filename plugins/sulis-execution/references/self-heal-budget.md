@@ -21,7 +21,7 @@ exceed the budget. Never silently give up before the budget.**
 | **Pre-commit hook failure** | 7 | 3 | Hooks are signal. If 3 attempts to address the hook output don't satisfy it, the hook config itself is likely the issue (out of scope). |
 | **Push rejection** | 7 | 2 | Most push rejections are out-of-scope (concurrent executor collision, branch protection, auth). Low budget. |
 | **CI failure on branch** | 8 (v0.2+) | 3 | CI runs are slow (minutes); each attempt costs real time. After 3 the cause is likely environmental (out of scope). |
-| **Merge-to-dev conflict** | 8 (v0.2+) | 2 | Rebase on `dev` once; if that fails, the conflict is likely structural (another WP merged something incompatible). Out of scope after 2. |
+| **Merge-to-dev conflict / stale-dev rebase** | 8 (v0.2+) | 2 | Covers two scenarios in v0.8.1+: (a) rebase has file conflicts (another WP merged something incompatible — usually structural; out of scope after 2 attempts); (b) dev advances during the WP's CI run (parallel peer merged in between — the rebase reconciles; bounded at 2 to prevent livelock under very high parallelism where dev keeps moving). |
 | **Deploy failure** | 9 (v0.3+) | 3 | Deploys can fail transiently (registry timeout, capacity); 3 retries cover most transients. Beyond → infra issue. |
 | **Health-check timeout** | 10 (v0.3+) | 5 | Health checks need warm-up time; exponential backoff covers slow starts. Beyond 5 → rollback trigger. |
 | **Smoke-test failure** | 10 (v0.3+) | 2 | Smoke tests are deterministic; if they fail, retry rarely helps. Low budget; usually a regression or wrong assertion. |

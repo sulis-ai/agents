@@ -74,10 +74,22 @@ loop:
            (c) They don't share a dependsOn descendant currently
                in the same batch (prevents racing two children
                of the same parent on the same descendant outcome).
+           (d) **Migration-lock serialisation (v0.8.1+).** No WP
+               with `requires_migration_lock: true` in its
+               frontmatter is included unless the batch contains
+               EXACTLY that one WP. If the next-ready WP has the
+               flag, the batch is just that one WP — dispatch
+               solo, wait for completion, then continue. This
+               handles WPs that touch shared persistent state
+               non-idempotently (schema migrations, database
+               seeds, Redis flushes) where parallel execution
+               would deadlock, race on row locks, or leave the
+               schema in an inconsistent state.
 
        Stop when batch has max_parallel WPs OR ready set is
        exhausted. Single-WP batch (size 1) is fine — sequential
-       fallback when no parallelism is available.
+       fallback when no parallelism is available, or required
+       serialisation when a migration-locked WP is up.
 
     7. Mark each picked WP status: in_progress in INDEX with
        timestamp.

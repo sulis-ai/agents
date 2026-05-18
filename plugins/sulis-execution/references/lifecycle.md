@@ -30,6 +30,11 @@ worktree removal (Step 12) bracket the per-executor isolation.
 git fetch origin
 git worktree add ../wp-NNN-worktree -b feat/wp-NNN-<slug> origin/dev
 cd ../wp-NNN-worktree
+
+# Record the dev SHA at branch creation. Step 8 uses this to detect
+# whether dev has advanced (e.g. a parallel peer merged in the
+# meantime) and trigger a rebase before squash-merging.
+git rev-parse origin/dev > .executor-WP-NNN-dev-sha
 ```
 
 Where `<slug>` is kebab-case from the WP's `title`, ≤ 50 chars, per
@@ -395,8 +400,73 @@ done
 
 The Bash call blocks the executor's turn until CI is terminal. The
 executor does not return control mid-poll (Continuation Discipline).
-4. **On green, squash-merge to `dev`** using the host's merge API
-   (no PR opened):
+
+3. **Verify dev hasn't advanced (GIT-05 step-4, v0.8.1+).** Before
+   squash-merging, check whether dev has moved forward since this
+   branch was created. If it has — likely because a parallel peer
+   merged — rebase on the new dev HEAD and re-run CI before merging.
+
+```bash
+git fetch origin dev
+CURRENT_DEV=$(git rev-parse origin/dev)
+RECORDED_DEV=$(cat .executor-WP-NNN-dev-sha)
+
+REBASE_ATTEMPTS=0
+while [ "$CURRENT_DEV" != "$RECORDED_DEV" ]; do
+  REBASE_ATTEMPTS=$((REBASE_ATTEMPTS + 1))
+  if [ "$REBASE_ATTEMPTS" -gt 2 ]; then
+    # Budget exhausted — branch can't catch up with a moving target
+    # (high-parallelism workload; dev keeps advancing during each
+    # CI re-run). Halt + BLOCKER per "Merge-to-dev conflict" budget.
+    echo "Rebase budget exhausted (dev kept advancing through 2 rebases)"
+    exit 124
+  fi
+
+  echo "dev advanced ($RECORDED_DEV → $CURRENT_DEV); rebasing (attempt $REBASE_ATTEMPTS)"
+  git rebase origin/dev
+  # If rebase has file conflicts, exit non-zero — OODA fires per EL-01..08.
+  # Bash rebase exit code is the rebase outcome; check it.
+
+  git push --force-with-lease
+
+  # Record new dev SHA and wait for CI on rebased branch.
+  echo "$CURRENT_DEV" > .executor-WP-NNN-dev-sha
+  BRANCH_SHA=$(git rev-parse HEAD)
+
+  # Re-run the same CI-poll loop above (extracted for clarity here).
+  DEADLINE=$(( $(date +%s) + 900 ))
+  while true; do
+    CHECKS=$(gh api repos/<owner>/<repo>/commits/$BRANCH_SHA/check-runs ...)
+    # ... same poll logic as above ...
+  done
+
+  # Re-fetch dev — it may have moved again while we were rebasing + re-CI'ing.
+  git fetch origin dev
+  CURRENT_DEV=$(git rev-parse origin/dev)
+  RECORDED_DEV=$(cat .executor-WP-NNN-dev-sha)
+done
+
+# Loop exits when CURRENT_DEV == RECORDED_DEV — safe to merge.
+echo "dev is stable at $CURRENT_DEV; proceeding to squash-merge"
+```
+
+This sub-step prevents the parallel-merge race: WP-A's CI was green
+against dev@SHA1, but WP-B merged in between (advancing dev to SHA2).
+A direct squash-merge would land WP-A against stale-CI'd dev. The
+rebase forces re-CI against current dev.
+
+For sequential single-WP runs, dev never advances during the WP's
+lifetime, so `CURRENT_DEV == RECORDED_DEV` and the rebase loop is
+skipped entirely (zero overhead).
+
+Budget: 2 rebase attempts per `self-heal-budget.md` "Merge-to-dev
+conflict" row. If dev keeps advancing through 2 rebases (livelock
+risk under very high parallelism), halt + BLOCKER. Suggested next
+step in the BLOCKER: *"WP-A couldn't catch up with a moving dev —
+try reducing max_parallel or retry WP-A when the slice is calmer."*
+
+4. **On green AND dev-stable, squash-merge to `dev`** using the host's
+   merge API (no PR opened):
    - GitHub: `gh api -X POST repos/<owner>/<repo>/merges` with
      base=dev, head=feat/wp-NNN-<slug>, merge_method=squash. Or, if
      the host requires a PR object even for direct merges (some
