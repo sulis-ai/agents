@@ -754,22 +754,116 @@ orchestrator.
 When the orchestrator finishes:
 
 1. Read `.architecture/{project}/work-packages/INDEX.md`. Count `done`
-   vs `blocked` vs `pending`.
+   vs `blocked` vs `pending` vs **`auto-draft`** (v0.1.4+).
 2. Read each `BLOCKER-WP-NNN.md`'s `## Plain-English summary` section.
-3. Summarise in plain English: *"Built [N] of [M] features. [K]
-   blocked: [translated reason per blocker]."*
-4. For each blocker: AAF triage. If step-1-silent (process /
+3. **Read each `WP-AUTO-NNN-*.md` file's frontmatter (`source_finding`,
+   `severity`, `disposition`) and the cross-referenced
+   `.security/{project}/findings/SF-NNN-*.md` file's Summary section.**
+4. Summarise in plain English: *"Built [N] of [M] features. [K]
+   blocked: [translated reason per blocker]. [J] auto-drafted from
+   security findings (waiting for your say-so)."*
+5. For each blocker: AAF triage. If step-1-silent (process /
    sequencing / infra), resolve silently or surface action plan.
    If step-3 founder decision, ask in plain English.
-5. When all WPs are `done`, auto-progress to Phase 6.
+6. **For each auto-draft WP: see "Auto-draft slice-end review"
+   below.**
+7. When all WPs are `done` AND no auto-drafts remain in `pending-review`
+   disposition, auto-progress to Phase 6.
 
 If a blocker requires founder action (*"staging cluster needs
 capacity"*), surface it; once resolved, dispatch
 `/sulis-execution:retry WP-NNN` for the blocked WPs.
 
+### Auto-draft slice-end review (v0.1.4+)
+
+When the orchestrator surfaces auto-draft WPs at slice-end, your job
+is to translate the underlying security findings into plain English
+and walk the founder through disposition. This is the load-bearing
+moment for the marketplace's "nothing flagged falls through" promise.
+
+**For each auto-draft WP**, read:
+- The WP-AUTO-NNN file's frontmatter (`source_finding`, `severity`).
+- The SF-NNN file's `## Summary` and `## Suggested fix` sections.
+
+**Surface to the founder in plain English** — no SF-NNN / WP-AUTO-NNN
+IDs in the founder-facing message; no methodology jargon. Translation
+template per finding:
+
+> *"The security review noticed [plain-English what it noticed] when
+> we shipped [recent WP description]. It's a [severity in plain
+> terms — "concern" or "minor observation"], not a critical issue.
+> The suggested fix is [plain summary]. Want me to:
+>
+> 1. Schedule it as its own piece of work (I'll write up the
+>    specification properly and run it through the same build-test-
+>    deploy cycle the others go through)?
+> 2. Skip it (e.g. you've decided it's not worth the effort, or it's
+>    a known limitation)?
+> 3. Merge it into one of the upcoming pieces of work? (Useful when
+>    the finding overlaps with something already planned.)"*
+
+The founder responds; you translate to disposition:
+
+- **"Schedule it"** → update WP-AUTO-NNN frontmatter:
+  `disposition: approved`, `status: pending`. The orchestrator picks
+  it up on the next ready-set walk. If the WP's Contract section is
+  skeletal (auto-drafts are stubs), spawn SEA's decompose to flesh
+  it out first:
+
+  ```
+  Agent({
+    subagent_type: "sea:engineering-architect",
+    description: "Flesh out WP-AUTO-NNN from skeleton to full Contract",
+    prompt: "WP-AUTO-NNN is an auto-drafted WP created from security
+             finding SF-NNN. The frontmatter is set; Context section
+             paraphrases the finding; Contract/DoD/Sequence sections
+             are stubs. Read .security/{project}/findings/SF-NNN-*.md
+             for the full finding evidence and suggested fix.
+             Produce a full Contract, Definition of Done (Red-Green-
+             Blue), and Sequence. Cost-estimate the WP. Status stays
+             pending. Return when the WP file is ready for executor
+             dispatch."
+  })
+  ```
+
+- **"Skip it"** → ask one follow-up question for rationale (which
+  the register will record). Update WP-AUTO-NNN frontmatter:
+  `disposition: cancelled`, with `## Cancellation Rationale`
+  appended to the WP body. Also update the findings register row's
+  disposition column. The orchestrator permanently skips this WP.
+
+- **"Merge into WP-N"** → update WP-AUTO-NNN frontmatter:
+  `disposition: duplicate-of-WP-N`. Add a note to WP-N's body
+  noting the merged finding's SF-NNN. Update register. Permanently
+  skip the auto-draft.
+
+**Batch the review.** If there are 3+ auto-drafts, present them as a
+single batch with the AAF-06 three-list shape:
+
+> *"Three pieces of work have been auto-drafted from security
+> findings during this slice. None are critical. Here's the lot:
+>
+> 1. [finding 1 in plain English]. Suggested fix: [fix in plain
+>    English].
+> 2. [finding 2 in plain English]. Suggested fix: [fix in plain
+>    English].
+> 3. [finding 3 in plain English]. Suggested fix: [fix in plain
+>    English].
+>
+> Want me to schedule all of them, schedule some specific ones, or
+> walk through each in more detail before deciding?"*
+
+The founder responds with a batch decision (run all / run 1 and 3 /
+walk through). You translate.
+
+**Never skip surfacing.** Even if a finding looks trivial to you,
+the founder owns the disposition. Per Decision Discipline: this is
+a real product/scope decision, not a process decision; the founder
+owns it. Surface in plain English; let them decide.
+
 **Entry criteria:** WP INDEX exists.
 **Exit criteria:** All WPs in INDEX have `status: done` and acceptance
-evidence.
+evidence; all auto-draft WPs have a non-`pending-review` disposition.
 **Auto-progress to Phase 6.**
 
 ### Phase 6: Verify (~5-15 minutes)
