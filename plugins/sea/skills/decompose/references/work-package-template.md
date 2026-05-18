@@ -82,6 +82,24 @@ composite_of: []                         # optional — list of primitives if th
 #   #           need to flesh out the Contract first.
 #   # cancelled: founder declined; rationale recorded in WP body.
 #   # duplicate-of-WP-NN: finding's coverage delegated to existing WP.
+
+# Optional — Model override for the executor (sulis-execution v0.8+).
+# When absent (default), the executor inherits the calling session's
+# model — typically Opus. No automatic substitution. The field exists
+# for opt-in calibration experiments on specific WPs:
+#   opus    — full reasoning. Default behaviour via inheritance.
+#   sonnet  — faster; good for most code work but subject to rate
+#             limits in some setups.
+#   haiku   — fastest; suitable only for provably mechanical WPs
+#             (pure config changes, pure renames, pure deletions).
+#             Discouraged for RGB-cycle WPs unless empirically
+#             calibrated.
+# executor_model: opus
+
+# Optional — Model override for the security-reviewer spawned at
+# Step 11 (sulis-execution v0.8+). When absent, security-reviewer
+# inherits the executor's model.
+# security_model: opus
 ---
 
 ## Context
