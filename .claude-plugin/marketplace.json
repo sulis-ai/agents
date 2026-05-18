@@ -53,7 +53,7 @@
     {
       "name": "sea",
       "source": "./plugins/sea",
-      "version": "0.11.4",
+      "version": "0.11.5",
       "description": "Senior Engineering Architect — designs hardened architectures, audits brownfield code for primitive gaps, and decomposes designs into atomic Work Packages with Red-Green-Blue verification. /sea:probe v0.9.0 runs 17 deterministic phases via ast-grep + lizard + scc + git plus optional tools (jscpd, ts-prune, vulture, deadcode, dependency-cruiser, import-linter, detect-secrets). Polyglot 4-stage workspace enumeration discovers TS, Python, Go, Rust, Terraform, and deployment-only dirs alongside monorepo manifests. Phase 1.16 (Deployment Topology) catalogues Dockerfiles, K8s manifests, Helm charts, Terraform, GitHub Actions, Argo CD, Flux, and Sulis manifests (Workload/Application/BusinessManifest) with secret-reference extraction (NAMES only). Phase 1.17 (Credential Scanning) invokes detect-secrets with a strict hash-only privacy contract — plaintext never appears in any output — and respects .secrets.baseline for new-vs-known triage. Outputs structured JSON + Markdown + self-contained navigable HTML. Tools auto-install via the bundled installer; no LLM fallback. Every WP carries a change primitive (22-primitive Minto-pyramid catalogue). Enforces No-Band-Aid-Wrappers (MUST). Reads .context/{project}/INDEX.md (sulis-context); computes SIZING.md (sFPC + ASR). Consumes SRD v1.11.0+ MISUSE_CASES.md, GLOSSARY.md, ## Deferred to SEA journal sections, and HANDOFF_TO_SEA.md."
     },
     {

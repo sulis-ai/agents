@@ -100,6 +100,31 @@ composite_of: []                         # optional — list of primitives if th
 # Step 11 (sulis-execution v0.8+). When absent, security-reviewer
 # inherits the executor's model.
 # security_model: opus
+
+# Optional — Migration lock (sulis-execution v0.8.1+).
+# When true, the orchestrator dispatches this WP SOLO — never in
+# parallel with another WP. Use for WPs that touch shared
+# persistent state non-idempotently, where parallel execution
+# would deadlock, race on row locks, or leave the state in an
+# inconsistent shape:
+#   - Database schema migrations (ALTER TABLE, CREATE INDEX, etc.).
+#   - Database seed scripts.
+#   - Redis FLUSHDB / FLUSHALL.
+#   - Filesystem-shared state changes (writes to a shared volume).
+#   - Any operation that takes a process-level lock the application
+#     depends on.
+# Default: false (when field absent — WP can be parallelised).
+#
+# SEA's decompose should set this true when the WP's primitive is
+# REINFORCE-Secure or REINFORCE-Harden AND the WP's Contract section
+# touches files under conventional paths like:
+#   - migrations/ or db/migrations/ or schema/
+#   - prisma/migrations/ (Prisma), alembic/versions/ (SQLAlchemy)
+#   - drizzle/ (Drizzle ORM), knex migrations
+#   - terraform/state-modifying changes
+# Manual override is fine for cases SEA can't auto-detect.
+#
+# requires_migration_lock: true
 ---
 
 ## Context
