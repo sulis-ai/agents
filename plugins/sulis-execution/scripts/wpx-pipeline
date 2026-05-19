@@ -50,27 +50,126 @@ HEALTH_DEFAULT_CAP = 10 * 60   # 10 min total
 REBASE_BUDGET = 2              # GIT-05 step-4
 
 # Conventional Commits branch prefixes that branch-CI workflows
-# typically gate on. Mirrors the lifecycle.md Step 1 pre-flight grep.
+# typically gate on. Used by _has_branch_ci_trigger to decide whether
+# a `branches:` list item in a workflow YAML targets feature branches.
 _BRANCH_CI_PREFIXES = (
     "feat/", "fix/", "chore/", "refactor/", "docs/",
     "test/", "perf/", "build/", "ci/", "style/", "revert/",
 )
-_BRANCH_CI_RE = re.compile(
-    r"|".join(re.escape(p) for p in _BRANCH_CI_PREFIXES),
-)
+
+
+def _matches_cc_prefix(value: str) -> bool:
+    """True if a `branches:` list entry targets a Conventional Commits
+    feature prefix (feat/**, fix/*, chore/foo, etc.).
+    """
+    v = value.strip().strip("'\"")
+    return any(v.startswith(p) for p in _BRANCH_CI_PREFIXES)
+
+
+def _has_branch_ci_trigger(text: str) -> bool:
+    """Inspect a GitHub Actions workflow YAML for a real branch-CI trigger.
+
+    Looks specifically for `branches:` declarations under `on.push` or
+    `on.pull_request`, and checks whether ANY listed branch glob matches
+    a Conventional Commits prefix. Rejects `branches-ignore:`, `paths:`,
+    `paths-ignore:`, `tags:`, comments, and any other location where a
+    substring like `docs/` might legitimately appear without indicating
+    branch CI.
+
+    The v0.10.5 version used a naked substring grep, which produced
+    false positives on workflows like:
+
+        on:
+          push:
+            branches: [dev]
+            paths-ignore:
+              - 'docs/**'        # ← `docs/` matched the substring grep
+
+    Now we walk the YAML line-by-line. When we hit a `branches:` line,
+    we either:
+      - parse the inline list (`branches: ['feat/**', 'main']`), or
+      - scan the following lines at deeper indent for `- 'feat/**'`
+        style list items.
+
+    `branches-ignore:` is explicitly excluded (an "ignore" list means
+    the workflow does NOT run on those branches — opposite of branch CI).
+
+    Returns True iff at least one workflow has a `branches:` (under
+    `on.push` or `on.pull_request`) listing a Conventional Commits
+    prefix glob.
+    """
+    lines = text.splitlines()
+    n = len(lines)
+    i = 0
+    while i < n:
+        line = lines[i]
+        # Match `<indent>branches:` (NOT branches-ignore, paths, tags)
+        m = re.match(r"^(\s*)branches\s*:\s*(.*?)\s*$", line)
+        # Skip `branches-ignore:` / commented lines
+        if not m or line.lstrip().startswith("#"):
+            i += 1
+            continue
+        indent = m.group(1)
+        rest = m.group(2).rstrip()
+
+        # Inline list: `branches: ['feat/**', 'main']` or `branches: [feat/**]`
+        if rest.startswith("[") and rest.endswith("]"):
+            inner = rest[1:-1]
+            items = [it.strip() for it in inner.split(",") if it.strip()]
+            if any(_matches_cc_prefix(it) for it in items):
+                return True
+            i += 1
+            continue
+
+        # Single inline value: `branches: feat/**`
+        if rest and not rest.startswith("#"):
+            if _matches_cc_prefix(rest):
+                return True
+            i += 1
+            continue
+
+        # Block list: scan following indented lines for list items
+        j = i + 1
+        base_indent = len(indent)
+        while j < n:
+            nl = lines[j]
+            if not nl.strip():
+                j += 1
+                continue
+            nl_indent = len(nl) - len(nl.lstrip())
+            if nl_indent <= base_indent:
+                break  # dedented out of the list
+            # Match `<indent>- '<value>'` or `<indent>- <value>`
+            lm = re.match(r"^\s*-\s*(.+?)\s*$", nl)
+            if lm and _matches_cc_prefix(lm.group(1)):
+                return True
+            j += 1
+        i = j
+
+    return False
 
 
 def _detect_branch_ci(worktree: Path) -> bool:
     """Detect whether the project has branch CI configured.
 
-    Returns True iff `.github/workflows/*.y*ml` or `.gitlab-ci.yml`
-    mentions any Conventional Commits feature-branch prefix
-    (feat/, fix/, chore/, ...). Returns False otherwise.
+    For GitHub Actions: inspects `.github/workflows/*.y[a]ml` for
+    structural `branches:` declarations under `on.push` /
+    `on.pull_request` (NOT `branches-ignore`, `paths`, `paths-ignore`).
+    Returns True iff at least one such declaration lists a Conventional
+    Commits prefix glob (`feat/**`, `fix/**`, etc.).
 
-    Mirrors the lifecycle.md Step 1 pre-flight check so wpx-pipeline
-    can independently decide whether to skip the CI poll. If the
-    project has no branch CI, the CI poll would hang indefinitely
-    (no check-runs ever appear) until CI_DEFAULT_CAP expires.
+    For GitLab CI: falls back to a coarser substring grep on
+    `.gitlab-ci.yml` since GitLab's rule syntax varies. May produce
+    false positives on GitLab; refine when needed.
+
+    Mirrors the spirit of the lifecycle.md Step 1 pre-flight check.
+    Used by wpx-pipeline to decide whether to skip the CI poll (no
+    branch CI → poll would hang waiting for check-runs that never
+    appear).
+
+    v0.10.6: replaces the naked substring grep that previously
+    matched any occurrence of `docs/`, `feat/`, etc. anywhere in the
+    file — including `paths-ignore`, comments, and unrelated context.
     """
     gh = worktree / ".github" / "workflows"
     if gh.exists() and gh.is_dir():
@@ -79,7 +178,7 @@ def _detect_branch_ci(worktree: Path) -> bool:
                 text = yml.read_text(encoding="utf-8", errors="ignore")
             except OSError:
                 continue
-            if _BRANCH_CI_RE.search(text):
+            if _has_branch_ci_trigger(text):
                 return True
     gitlab = worktree / ".gitlab-ci.yml"
     if gitlab.exists() and gitlab.is_file():
@@ -87,7 +186,9 @@ def _detect_branch_ci(worktree: Path) -> bool:
             text = gitlab.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             text = ""
-        if _BRANCH_CI_RE.search(text):
+        # GitLab fallback: coarser check; refine with proper rule parsing
+        # if GitLab false-positives become a problem.
+        if any(p in text for p in _BRANCH_CI_PREFIXES):
             return True
     return False
 

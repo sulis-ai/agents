@@ -228,3 +228,103 @@ def test_auto_skip_when_no_branch_ci(
     # The WARNING about no branch CI should appear in stderr
     assert "no branch-CI" in result.stderr or "auto-detected absence" in result.stderr
     assert "Traceback" not in result.stderr
+
+
+# ─── v0.10.6 — _detect_branch_ci false-positive on paths-ignore ────────────
+
+
+def test_paths_ignore_docs_does_not_register_as_branch_ci(
+    tmp_project, local_git_repo, run_tool, mock_gh,
+):
+    """Regression for v0.10.6: a deploy-on-push-to-dev workflow with
+    `paths-ignore: - 'docs/**'` was previously misclassified as branch
+    CI because the v0.10.5 detector substring-grepped the YAML for any
+    CC prefix (`docs/` matched). The fix structurally parses
+    `branches:` lists only, rejecting `paths-ignore`, `branches-ignore`,
+    `paths`, etc.
+
+    Without the fix: pipeline hangs polling CI for 45 min on the user's
+    tria/kinds-and-tools project because deploy-dev.yml has
+    paths-ignore: ['docs/**', '**/*.md'] and `docs/` triggers the
+    substring grep.
+    """
+    workflows = local_git_repo / ".github" / "workflows"
+    workflows.mkdir(parents=True, exist_ok=True)
+    # The user's actual deploy-dev.yml shape: pushes to dev only,
+    # path filter (NOT branch filter) on docs/
+    (workflows / "deploy-dev.yml").write_text("""\
+name: Deploy to Dev Environment
+on:
+  push:
+    branches: [dev]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo deploy
+""")
+
+    mock_gh([
+        {"match": "git/refs/heads/dev", "stdout": json.dumps({"object": {"sha": "abc123"}})},
+        {"match": "compare", "stdout": json.dumps({"status": "identical"})},
+        {"match": "run list", "stdout": json.dumps([{
+            "databaseId": 1, "status": "completed",
+            "conclusion": "success", "createdAt": "2026-05-19T12:00:00Z",
+            "url": "https://example.com/run/1",
+        }])},
+    ])
+
+    result = run_tool(
+        "wpx-pipeline", "run",
+        *_common_pipeline_args(tmp_project, local_git_repo),
+    )
+    # Auto-skip must engage: the deploy workflow does NOT trigger on
+    # branch pushes (only on dev pushes); paths-ignore is a path
+    # filter, not a branch filter. Pre-fix, the substring grep on
+    # `docs/` would falsely classify this as branch CI → pipeline
+    # would hang for 45 min waiting for check-runs that never appear.
+    assert "no branch-CI" in result.stderr or "auto-detected absence" in result.stderr, (
+        f"detector failed to skip — stderr={result.stderr[-500:]!r}"
+    )
+    assert "Traceback" not in result.stderr
+
+
+def test_branches_ignore_does_not_register_as_branch_ci(
+    tmp_project, local_git_repo, run_tool, mock_gh,
+):
+    """v0.10.6: `branches-ignore: ['feat/**']` means the workflow does
+    NOT run on feature branches (opposite of branch CI). The detector
+    must NOT match this as branch CI.
+    """
+    workflows = local_git_repo / ".github" / "workflows"
+    workflows.mkdir(parents=True, exist_ok=True)
+    (workflows / "ci.yml").write_text("""\
+on:
+  push:
+    branches-ignore:
+      - 'feat/**'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps: [{run: echo}]
+""")
+
+    mock_gh([
+        {"match": "git/refs/heads/dev", "stdout": json.dumps({"object": {"sha": "abc123"}})},
+        {"match": "compare", "stdout": json.dumps({"status": "identical"})},
+        {"match": "run list", "stdout": json.dumps([{
+            "databaseId": 1, "status": "completed",
+            "conclusion": "success", "createdAt": "2026-05-19T12:00:00Z",
+            "url": "https://example.com/run/1",
+        }])},
+    ])
+
+    result = run_tool(
+        "wpx-pipeline", "run",
+        *_common_pipeline_args(tmp_project, local_git_repo),
+    )
+    # Auto-skip must engage because the workflow excludes feat/ branches
+    assert "no branch-CI" in result.stderr or "auto-detected absence" in result.stderr
