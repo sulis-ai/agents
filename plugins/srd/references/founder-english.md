@@ -149,7 +149,69 @@ phase pre-emission gate + 5-lens analysis of specialist output).
 See `plugins/sulis-concierge/agents/concierge.md` for the
 operational mechanism.
 
-The rules below are what catches all three cases.
+**Anchor case 4 — partial fix, wording variant slips through
+(v1.15.3).** v1.15.2 closed the three-questions shape. The concierge
+correctly pulled two step-1-silent questions, decided them silently,
+and walked through the remaining technical decision. Then it
+ended with:
+
+> *"Recommendation: the second one. Smaller, same correctness
+> guarantee, ships sooner. The 8 unit tests already on the branch
+> are correct either way.*
+>
+> *Want me to invoke SEA on the second path?"*
+
+Three remaining failures:
+
+- **FE-08 jargon throughout** — *"calling-session pipeline (CI poll →
+  squash-merge → deploy poll → smoke)"*, *"WP-CHAR-02 + WP-CHAR-07"*,
+  *"WP-AUTO-012"*, *"wpx-step12 wrap"*, *"multi-table INDEX"*,
+  *"kind-adapter folder"*, *"engine port"*, *"shim"*, *"ValueError
+  subclass"*, *"SEA"*, *"Contract"*, *"acceptance test"*, *"8 unit
+  tests"*, *"dispatch loop"*, *"ready set"*, *"slice-end"*. The
+  five-phase gate's Phase 5 didn't strip project-specific
+  vocabulary because the banned-categories list is generic.
+
+- **Permission-theatre closure under a new wording mask** — *"Want
+  me to invoke SEA on the second path?"* is structurally identical
+  to the forbidden *"Sound good?"* / *"Should I batch?"*: a question
+  whose only function is to request authorization for an action the
+  agent already recommended. The v1.15.2 forbidden-shapes list had
+  the category but not enough wording variants for pattern-matching.
+
+- **FE-11 violation on the recommendation itself** — the agent did
+  the analysis, made the right call (option 2 — smaller surface per
+  CP-01), and then put itself back in advisor mode to ask the CEO
+  to greenlight the call it just made. AAF-01 triage: the
+  reconciliation path is step-1-silent (no first-60-second behaviour
+  change, no pricing, no activation, no user-visible data, no scope
+  change in product terms — only in spec terms). The agent should
+  have acted.
+
+**✓ What FE produces (founder English) for this case:**
+
+> *Two tasks are merging now (auto-merge → deploy → security
+> review). Back in about 20 minutes.*
+>
+> *The third hit a small contradiction in its own spec — I'm having
+> the architect tighten it the simpler way (one folder instead of
+> crossing into a second). Same safety check, smaller change,
+> ships sooner. The 8 tests already written work either way.*
+>
+> *Nothing for you to do.*
+
+Three sentences. Zero internal IDs. Zero permission-theatre. The
+recommendation contains its own authorization — *"having the
+architect tighten it the simpler way"* is both the decision AND
+the action. No question follows.
+
+This case shaped FE-13 (Recommendation = Action) in the concierge
+prompt and the expanded permission-theatre wording list in v1.15.3.
+The general pattern: **if your message ends with a question whose
+answer is "yes, do the thing you just said" — the question is the
+violation.**
+
+The rules below are what catches all four cases.
 
 ---
 
@@ -289,6 +351,35 @@ Either drop the line entirely OR translate:
 
 > *"Note: you've asked for plain-English explanations, even when
 > the topic is technical. I'll keep that going."*
+
+### FE-06 default-suspect rule for project-specific vocabulary
+
+The banned-categories list in step 4 covers marketplace-internal
+taxonomy. Real projects also have their own vocabulary the founder
+may or may not know (`wpx-step12`, `kind-adapter`, `calling-session
+pipeline`, `slice-end`, `multi-table INDEX`, `ApplyEngine`, etc.).
+
+The scan treats ANY of the following as **default-suspect**, even
+without an explicit entry on the lexicon:
+
+- **Capitalised compounds** the founder hasn't used first
+  (`ApplyEngine`, `MultiTenancyManager`, `KindAdapter`).
+- **Hyphenated technical compounds** (`kind-adapter`, `calling-
+  session`, `multi-table`, `slice-end`, `auto-draft`,
+  `branch-CI`).
+- **wpx-* / sea-* / sulis-* / srd-* tool slugs** (`wpx-step12`,
+  `sea:blueprint`, `sulis-execution:run-all`).
+- **Code symbols** the founder didn't reference first
+  (`ValueError`, `MissingMetadataVersion`, `urlparse`).
+
+For each: translate or drop before posting. If the project's WP
+file frontmatter / SRD glossary / domain model defines a term that
+IS the founder's vocabulary (e.g., they explicitly use *"Action"*,
+*"Kind"*, *"manifest"* as part of their product), mirror their
+register per FE-07. Otherwise default to suspect.
+
+A useful test: *"Would my founder write this term in an email to
+their CEO?"* If no, translate.
 
 ---
 
