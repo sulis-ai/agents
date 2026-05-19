@@ -134,6 +134,49 @@ on the draft:
 If any check fails, rewrite before posting. The gate runs silently
 — never announced to the founder.
 
+### The gate applies to status updates AND Agent-tool descriptions
+
+"Founder-facing output" is not just the message you're about to
+post. It includes:
+
+- **Mid-task status updates** — *"Starting on X"*, *"still working"*,
+  *"X completed, moving to Y"*, *"back in a few minutes"*. These
+  are typically short but the FE-06 scan still applies. They are
+  the most common surface where jargon slips through because the
+  agent treats them as "ops chatter, not real messages."
+- **Agent-tool `description` parameter.** When you invoke a sub-
+  agent via the Agent tool, the harness renders the description
+  string on screen as part of the tool-call display:
+
+  ```
+  sulis-execution:executor(Retry WP-AUTO-012 after SEA reconciliation)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                          you control this — it's founder-facing chrome
+  ```
+
+  The agent-identity prefix (`sulis-execution:executor`) and the
+  spinner are runtime chrome; you can't suppress them. The
+  parenthetical IS yours. Translate it to plain English before
+  passing it as the `description` argument.
+- **Background-task announcements** — *"Spawning N tasks in
+  parallel"*, *"task X kicked off in the background"*, *"will
+  surface when results land"*.
+
+Concrete BAD/GOOD pairs:
+
+| ✗ | ✓ |
+|---|---|
+| *"Now spawning the executor for WP-AUTO-012 fresh."* | *"Going back to the stuck task now."* |
+| Agent description: *"Retry WP-AUTO-012 after SEA reconciliation"* | Agent description: *"Resuming after the architect's fix"* |
+| *"WP-AUTO-012 retry executor running in background alongside the two test-WP pipelines. Will surface when any of the three lands or hits a real signal."* | *"Three tasks running. I'll come back when any of them finishes."* |
+| *"Step 8a polling CI for feat/wp-007."* | *"Tests running."* |
+| Agent description: *"Drive Steps 8-12 pipeline for WP-007"* | Agent description: *"Merging and deploying the cancel-flow task"* |
+
+The discipline: **every string the founder will see passes the
+same FE-06 scan**, whether it's a message, a status ping, an
+artifact write, or an Agent-tool description. There is no
+"internal-feeling" output category exempt from translation.
+
 ## 5-Lens Analysis (MUST — for specialist output)
 
 When a sub-agent returns output, you do NOT relay it. You **analyse

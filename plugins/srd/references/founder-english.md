@@ -211,7 +211,58 @@ The general pattern: **if your message ends with a question whose
 answer is "yes, do the thing you just said" — the question is the
 violation.**
 
-The rules below are what catches all four cases.
+**Anchor case 5 — status updates + Agent-tool descriptions slip past
+the gate (v1.15.4).** v1.15.3 closed the wording-variant +
+recommendation-without-action gap. The next concierge run produced
+clean message-text but leaked jargon through three other surfaces:
+
+> *"Now spawning the executor for WP-AUTO-012 fresh."*
+>
+> `sulis-execution:executor(Retry WP-AUTO-012 after SEA reconciliation)`
+>
+> *"WP-AUTO-012 retry executor running in background alongside the
+> two test-WP pipelines. Will surface when any of the three lands or
+> hits a real signal."*
+
+Violations:
+
+- **Mid-task status updates** ("Now spawning the executor for X
+  fresh", "running in background", "will surface when any lands")
+  treated as a separate class of output that FE-06 doesn't apply
+  to. They got jargon (`WP-AUTO-012`, `executor`, `retry executor`,
+  `test-WP pipelines`) and mechanism narration straight through.
+- **Agent-tool `description` parameter** — when invoking
+  `sulis-execution:executor` via the harness's Agent tool, the
+  concierge passed `"Retry WP-AUTO-012 after SEA reconciliation"` as
+  the description. The harness renders this on screen as
+  `sulis-execution:executor(Retry WP-AUTO-012 after SEA reconciliation)`.
+  The parenthetical is founder-facing chrome the concierge controls.
+  It leaked the WP ID, "SEA", and "reconciliation".
+- **The harness chrome itself** (agent-slug prefix + spinner) isn't
+  fully suppressable — that's the runtime's tool-call rendering —
+  but the description string IS the concierge's responsibility and
+  must be in founder English.
+
+**✓ What FE produces (founder English) for this case:**
+
+> *Going back to the stuck task now with the architect's fix
+> applied.*
+>
+> `sulis-execution:executor(Resuming after the architect's fix)`
+>
+> *Three tasks running. I'll come back when any of them finishes.*
+
+The agent-identity prefix `sulis-execution:executor` stays — it's
+runtime chrome. The parenthetical reads cleanly. The surrounding
+sentences are plain English. No WP IDs, no "executor" as a noun,
+no "pipelines", no "will surface when X lands or hits a real
+signal".
+
+This case shaped the FE-06 "ALL founder-facing surfaces" extension
+in v1.15.4 — mid-task status updates and Agent-tool description
+parameters explicitly added to the FE-06 scan scope.
+
+The rules below are what catches all five cases.
 
 ---
 
@@ -351,6 +402,42 @@ Either drop the line entirely OR translate:
 
 > *"Note: you've asked for plain-English explanations, even when
 > the topic is technical. I'll keep that going."*
+
+### FE-06 applies to ALL founder-facing surfaces
+
+"Founder-facing" includes more than just chat messages and obvious
+artifact files. The full surface (v1.15.4+):
+
+- **Chat messages** the founder reads.
+- **Founder-readable artifacts** (JOURNEY.md, status reports,
+  SPEC.yaml summary cell).
+- **Mid-task status updates** — "Now starting X", "still
+  working on Y", "Z completed", "back in N minutes". Same FE-06
+  scan as any other message.
+- **Agent-tool description parameters.** When an agent invokes
+  another agent via the harness's Agent tool, the `description`
+  parameter is rendered on screen as part of the tool-call display
+  (e.g., `sulis-execution:executor(Retry WP-AUTO-012 after SEA
+  reconciliation)`). That parenthetical is founder-facing chrome.
+  Translate it.
+- **Background-task announcements.** "Spawning N tasks in
+  parallel", "task X kicked off in the background", "will surface
+  when results land". Same FE-06 scan.
+
+Concrete BAD/GOOD pairs:
+
+| ✗ Founder sees | ✓ Founder should see |
+|---|---|
+| *"Now spawning the executor for WP-AUTO-012 fresh."* | *"Going back to the stuck task now."* |
+| `sulis-execution:executor(Retry WP-AUTO-012 after SEA reconciliation)` (harness chrome) | `sulis-execution:executor(Resuming after the architect's fix)` (cleaner description; still has the agent identity prefix the harness renders, but the parenthetical reads as plain English) |
+| *"WP-AUTO-012 retry executor running in background alongside the two test-WP pipelines. Will surface when any of the three lands or hits a real signal."* | *"Three tasks running now. I'll come back when any of them finishes."* |
+| *"Backgrounded — will surface on completion."* | *"Working — back in a few minutes."* |
+| *"Step 8a polling CI for feat/wp-007."* | *"Tests running."* |
+
+The agent-identity prefix (`sulis-execution:executor`) and the spinner
+indicator are runtime chrome the harness draws — the agent doesn't
+control them. The agent DOES control the description string. Treat
+it as a one-line founder-facing label.
 
 ### FE-06 default-suspect rule for project-specific vocabulary
 
