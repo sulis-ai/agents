@@ -144,6 +144,51 @@ def _gh_ref_sha(repo: str, ref: str) -> str:
     return json.loads(out)["object"]["sha"]
 
 
+def _gh_branch_already_merged(repo: str, branch: str, base: str = "dev") -> tuple[bool, str]:
+    """Check whether `branch` is already fully merged into `base`.
+
+    Uses GitHub's compare API: `gh api repos/{repo}/compare/{base}...{branch}`
+    which returns a `status` field with one of:
+
+      - `"identical"` — branch HEAD == base HEAD; already merged (squash or ff)
+      - `"behind"`   — base has commits beyond branch; branch has no commits to merge
+      - `"ahead"`    — branch has commits beyond base; needs merge (normal case)
+      - `"diverged"` — both have unique commits; needs rebase before merge
+
+    Returns (already_merged, base_sha). When already_merged, the caller
+    should skip _gh_merge and proceed using base_sha as the merge SHA
+    (no new commit is needed; the work is already on dev).
+
+    Returns (False, "") for `ahead` / `diverged` / errors — the caller
+    should proceed with the normal merge path.
+
+    v0.10.5 — fixes the pre-existing bug where re-running wpx-pipeline
+    on an already-merged branch would crash with RuntimeError from
+    _gh_merge (POST /merges returns 409 when base already contains head).
+    """
+    rc, out, err = _run(
+        ["gh", "api", f"repos/{repo}/compare/{base}...{branch}"],
+        timeout=30,
+    )
+    if rc != 0:
+        _log(f"compare API failed (rc={rc}); falling through to normal merge path. err: {err}")
+        return False, ""
+    try:
+        data = json.loads(out)
+    except json.JSONDecodeError:
+        _log(f"compare API returned non-JSON; falling through. out: {out!r}")
+        return False, ""
+    status = data.get("status", "")
+    if status in ("identical", "behind"):
+        # Already merged. Fetch the current base HEAD as the merge SHA.
+        try:
+            base_sha = _gh_ref_sha(repo, base)
+        except RuntimeError:
+            base_sha = ""
+        return True, base_sha
+    return False, ""
+
+
 def _gh_merge(repo: str, base: str, head: str, commit_message: str) -> str:
     """Squash-merge head into base via the merges endpoint. Returns merge SHA."""
     rc, out, err = _run(
@@ -368,9 +413,20 @@ def cmd_run(args: argparse.Namespace) -> None:
             # update the cursor so the next rebase compares against current dev
             args.dev_sha_at_creation = _gh_ref_sha(repo, "dev")
 
-        # Step 8c: squash-merge
-        _log("Step 8c: squash-merging to dev")
-        merge_sha = _merge_squash(repo, args.branch, args.wp)
+        # Step 8c: squash-merge — but first check whether the branch is
+        # already merged to dev (v0.10.5 Bug 1 fix). Re-running
+        # wpx-pipeline on an already-merged branch previously crashed
+        # with RuntimeError from _gh_merge (POST /merges → 409). The
+        # compare API returns status="identical" / "behind" in that
+        # case — skip the merge and proceed with the existing dev SHA.
+        already_merged, base_sha = _gh_branch_already_merged(repo, args.branch, base="dev")
+        if already_merged:
+            _log(f"Step 8c: branch already merged to dev; using existing dev HEAD {base_sha[:8]} as merge SHA (skip merge step)")
+            merge_sha = base_sha or args.dev_sha_at_creation
+            result["merge_already_complete"] = True
+        else:
+            _log("Step 8c: squash-merging to dev")
+            merge_sha = _merge_squash(repo, args.branch, args.wp)
         result["merge_sha"] = merge_sha
 
         # Step 9: deploy poll

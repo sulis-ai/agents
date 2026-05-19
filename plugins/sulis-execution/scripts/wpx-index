@@ -77,14 +77,70 @@ def _read_config(text: str) -> dict[str, str]:
 
 
 def _find_wp_table(text: str) -> tuple[int, int, str]:
-    """Find the WP table (the one starting with | ID | header). Returns (start, end, table_text)."""
-    # Find the first Markdown table whose first column is "ID"
-    pattern = re.compile(r"(^\|\s*ID\s*\|[^\n]+\n\|[^\n]+\n(?:\|[^\n]*\n)*)",
-                          re.MULTILINE)
-    match = pattern.search(text)
-    if not match:
-        raise ValueError("Could not find WP table in INDEX.md (no | ID | header)")
-    return match.start(), match.end(), match.group(1)
+    """Find the WP table in INDEX.md (heading- and column-aware).
+
+    Resolution order (v0.10.5+):
+
+    1. First-class: a table immediately following a heading matching
+       `## Work Packages` (case-insensitive; allows "Work Package").
+       This is the canonical location SEA's decompose template puts
+       the WP table.
+
+    2. Fallback: any `| ID |`-headed Markdown table whose header row
+       ALSO includes BOTH `Status` and `Primitive` columns. These
+       two columns are unique to the WP table; the primitive-summary
+       table (which has `Group | Count`) doesn't have them.
+
+    3. Last resort: the first `| ID |`-headed table. Emits a stderr
+       warning that the WP table couldn't be identified by heading
+       or columns (helps diagnose unusual INDEX.md layouts).
+
+    The previous v0.9.0..v0.10.4 implementation took only path #3,
+    which broke for any INDEX.md that had a non-WP `| ID |` table
+    (e.g., a primitive-summary table) before the WP table.
+    """
+    # Path 1: heading-anchored ("## Work Packages" → next table)
+    heading_re = re.compile(
+        r"^##\s+Work\s+Packages?\s*$",
+        re.MULTILINE | re.IGNORECASE,
+    )
+    h_match = heading_re.search(text)
+    if h_match:
+        # Find the first | ID |-headed table after the heading
+        table_re = re.compile(
+            r"(^\|\s*ID\s*\|[^\n]+\n\|[^\n]+\n(?:\|[^\n]*\n)*)",
+            re.MULTILINE,
+        )
+        t_match = table_re.search(text, pos=h_match.end())
+        if t_match:
+            return t_match.start(), t_match.end(), t_match.group(1)
+
+    # Path 2: column-aware (find any | ID | table whose headers also
+    # have Status + Primitive)
+    table_re = re.compile(
+        r"(^\|\s*ID\s*\|[^\n]+\n\|[^\n]+\n(?:\|[^\n]*\n)*)",
+        re.MULTILINE,
+    )
+    for t_match in table_re.finditer(text):
+        # Inspect the header row (first line of the match)
+        header_line = t_match.group(1).split("\n", 1)[0]
+        # Lowercase + split on |
+        cols = [c.strip().lower() for c in header_line.strip("|").split("|")]
+        if "status" in cols and "primitive" in cols:
+            return t_match.start(), t_match.end(), t_match.group(1)
+
+    # Path 3: last-resort first match (with warning)
+    first = table_re.search(text)
+    if first:
+        sys.stderr.write(
+            "wpx-index: warning — found a `| ID |` table but it lacks "
+            "Status + Primitive columns and isn't anchored to a "
+            "`## Work Packages` heading. Treating it as the WP table; "
+            "verify INDEX.md layout if this seems wrong.\n"
+        )
+        return first.start(), first.end(), first.group(1)
+
+    raise ValueError("Could not find WP table in INDEX.md (no | ID | header)")
 
 
 def cmd_flip_status(args: argparse.Namespace) -> None:

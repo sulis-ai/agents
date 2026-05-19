@@ -264,8 +264,24 @@ contracts (CLI args + JSON output shape) follow SemVer:
 
 The plugin's version (in `plugin.json`) tracks the tools.
 
+## Running the tests (v0.10.5+)
+
+The wpx-* tools have a pytest suite at `tests/`. From the marketplace repo root:
+
+```bash
+pip install pytest
+pytest plugins/sulis-execution/scripts/tests/ -v
+```
+
+See `tests/README.md` for what's covered, the mock conventions, and the
+two regression locks (Bug 1: already-merged branch detection; Bug 2:
+multi-table INDEX.md parsing). The suite runs in CI via
+`.github/workflows/sulis-execution-tests.yml` on every push and PR
+touching `plugins/sulis-execution/scripts/**`.
+
 ## See also
 
 - `../agents/executor.md` — executor agent prompt; describes which tools the executor invokes at each step.
 - `../references/lifecycle.md` — 12-step lifecycle with tool-invocation patterns.
 - `../skills/run-all/SKILL.md` — calling-session orchestration; describes which tools the skill invokes.
+- `tests/README.md` — pytest suite walkthrough (v0.10.5+).

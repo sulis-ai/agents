@@ -1,0 +1,190 @@
+"""Integration tests for wpx-index.
+
+LOAD-BEARING: includes the regression test for v0.10.5 Bug 2 (the WP
+table finder previously matched the first `| ID |`-headed Markdown
+table, which in real projects is often a primitive-summary table, not
+the WP table).
+"""
+
+from __future__ import annotations
+
+
+def _common(tmp_project):
+    """Standard args used by every wpx-index call in this module."""
+    return [
+        "--project", tmp_project.project,
+        "--repo-root", str(tmp_project.repo_root),
+    ]
+
+
+# ─── Bug 2 regression — multi-table INDEX.md ──────────────────────────────
+
+
+def test_flip_status_finds_wp_table_after_primitive_summary(
+    tmp_project, seed_index, run_tool,
+):
+    """Regression for v0.10.5 Bug 2: wpx-index must find the canonical WP
+    table even when an earlier `| ID |`-headed table precedes it (e.g.,
+    a primitive-summary table). Pre-fix, flip-status would search the
+    first `| ID |` table — the primitive summary — and report "WP not
+    found" even though the WP exists in the second (WP) table.
+    """
+    seed_index("INDEX-multi-table.md")
+    result = run_tool(
+        "wpx-index", "flip-status",
+        "--wp", "WP-002", "--to", "done", "--expected", "in_progress",
+        *_common(tmp_project),
+    )
+    assert result.ok, f"flip-status failed: {result.error}; stderr={result.stderr}"
+    text = tmp_project.index_md.read_text()
+    # Verify WP-002's row in the WP table now reads `done`
+    assert "| WP-002 | Second | Extend | done |" in text
+    # Verify the Primitive Summary table was NOT touched
+    assert "| EXPAND | Create | 17 |" in text
+
+
+def test_list_ready_excludes_primitive_summary_rows(
+    tmp_project, seed_index, run_tool,
+):
+    """Regression for v0.10.5 Bug 2: list-ready must walk the WP table,
+    not the primitive-summary table that precedes it.
+    """
+    seed_index("INDEX-multi-table.md")
+    result = run_tool("wpx-index", "list-ready", *_common(tmp_project))
+    assert result.ok, f"list-ready failed: {result.error}"
+    # Ready set should be derived from the WP table:
+    # WP-001 done, WP-002 in_progress, WP-CHAR-01 pending (deps satisfied
+    # on WP-001 done), WP-MIG-1 pending (deps on WP-CHAR-01 still pending)
+    # → only WP-CHAR-01 is ready
+    assert "WP-CHAR-01" in result.data["ready"]
+    assert "WP-MIG-1" not in result.data["ready"]
+    # And none of the primitive-summary IDs leak into the ready set
+    assert "EXPAND" not in result.data["ready"]
+    assert "REORGANISE" not in result.data["ready"]
+
+
+def test_add_wp_targets_wp_table_not_summary_table(
+    tmp_project, seed_index, seed_wp, run_tool,
+):
+    """Regression for v0.10.5 Bug 2: add-wp must insert into the WP table,
+    not the primitive-summary table.
+    """
+    seed_index("INDEX-multi-table.md")
+    seed_wp("WP-AUTO-012-template.md", wp_id="WP-AUTO-012", slug="auto")
+    result = run_tool(
+        "wpx-index", "add-wp",
+        "--wp", "WP-AUTO-012", "--from-wp-file",
+        *_common(tmp_project),
+    )
+    assert result.ok, f"add-wp failed: {result.error}"
+    text = tmp_project.index_md.read_text()
+    # WP-AUTO-012 should land in the WP table (after WP-MIG-1)
+    assert "WP-AUTO-012" in text
+    # The primitive-summary table must remain intact: EXPAND/REORGANISE/REINFORCE
+    # are its three data rows. WP-AUTO-012 must NOT have landed in it.
+    import re as _re
+    summary_match = _re.search(
+        r"## Primitive Summary\n(.+?)## Work Packages",
+        text, _re.DOTALL,
+    )
+    assert summary_match is not None, "primitive-summary section missing"
+    summary_section = summary_match.group(1)
+    # Must contain its original 3 primitive groups, and NOT contain WP-AUTO-012
+    assert "| EXPAND |" in summary_section
+    assert "| REORGANISE |" in summary_section
+    assert "| REINFORCE |" in summary_section
+    assert "WP-AUTO-012" not in summary_section
+
+
+def test_propagate_blocked_only_touches_wp_table(
+    tmp_project, seed_index, run_tool,
+):
+    """Regression for v0.10.5 Bug 2: propagate-blocked must mark descendants
+    in the WP table, leaving the summary table untouched.
+    """
+    seed_index("INDEX-multi-table.md")
+    result = run_tool(
+        "wpx-index", "propagate-blocked",
+        "--wp", "WP-CHAR-01",
+        *_common(tmp_project),
+    )
+    assert result.ok, f"propagate-blocked failed: {result.error}"
+    text = tmp_project.index_md.read_text()
+    # WP-MIG-1 depends on WP-CHAR-01 → should be marked dependency_blocked
+    assert "| WP-MIG-1 |" in text
+    assert "dependency_blocked" in text
+
+
+# ─── Minimal INDEX tests — confirm baseline behaviour unchanged ───────────
+
+
+def test_list_ready_minimal_index(tmp_project, seed_index, run_tool):
+    seed_index("INDEX-minimal.md")
+    result = run_tool("wpx-index", "list-ready", *_common(tmp_project))
+    assert result.ok
+    # WP-001 done; WP-002 pending (deps on WP-001 satisfied); WP-003 pending (no deps)
+    ready = result.data["ready"]
+    assert "WP-002" in ready
+    assert "WP-003" in ready
+
+
+def test_flip_status_with_expected_check(tmp_project, seed_index, run_tool):
+    seed_index("INDEX-minimal.md")
+    result = run_tool(
+        "wpx-index", "flip-status",
+        "--wp", "WP-002", "--to", "in_progress", "--expected", "pending",
+        *_common(tmp_project),
+    )
+    assert result.ok
+
+
+def test_flip_status_expected_mismatch_rejected(tmp_project, seed_index, run_tool):
+    seed_index("INDEX-minimal.md")
+    # WP-001 is done, not pending
+    result = run_tool(
+        "wpx-index", "flip-status",
+        "--wp", "WP-001", "--to", "in_progress", "--expected", "pending",
+        *_common(tmp_project),
+    )
+    assert not result.ok
+    assert "expected 'pending'" in result.error
+
+
+def test_add_wp_duplicate_rejected(tmp_project, seed_index, run_tool):
+    seed_index("INDEX-minimal.md")
+    result = run_tool(
+        "wpx-index", "add-wp",
+        "--wp", "WP-001", "--title", "Dup", "--primitive", "Create",
+        *_common(tmp_project),
+    )
+    assert not result.ok
+    assert "already in INDEX" in result.error
+
+
+def test_add_wp_explicit_fields(tmp_project, seed_index, run_tool):
+    seed_index("INDEX-minimal.md")
+    result = run_tool(
+        "wpx-index", "add-wp",
+        "--wp", "WP-NEW", "--title", "Explicit",
+        "--primitive", "Create", "--status", "auto-draft",
+        "--depends-on", "WP-001", "--blocks", "",
+        *_common(tmp_project),
+    )
+    assert result.ok
+    text = tmp_project.index_md.read_text()
+    assert "WP-NEW" in text
+    assert "auto-draft" in text
+
+
+def test_sync_auto_drafts_idempotent(tmp_project, seed_index, seed_wp, run_tool):
+    seed_index("INDEX-minimal.md")
+    seed_wp("WP-AUTO-012-template.md", wp_id="WP-AUTO-012", slug="auto")
+    # First run adds the WP
+    r1 = run_tool("wpx-index", "sync-auto-drafts", *_common(tmp_project))
+    assert r1.ok
+    assert "WP-AUTO-012" in r1.data["added"]
+    # Second run is a no-op
+    r2 = run_tool("wpx-index", "sync-auto-drafts", *_common(tmp_project))
+    assert r2.ok
+    assert r2.data["added"] == []
+    assert "WP-AUTO-012" in r2.data["skipped"]
