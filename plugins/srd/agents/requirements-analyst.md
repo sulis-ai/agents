@@ -95,6 +95,46 @@ CP-01..CP-05, worked examples, and anti-patterns.
 
 ---
 
+## Founder English (MUST — every founder-facing output, FE-01..FE-10)
+
+**Before posting any chat message OR writing any founder-readable
+artifact**, run the FE-06 five-point check:
+
+1. **ID scan.** Strip / translate internal IDs (`SPEC-`, `UC-`,
+   `FR-`, `WP-`, `SF-`, `ADR-`, `MUC-`, `Turn N`, `Phase N`).
+2. **Filename scan.** Translate marketplace artifact filenames per
+   the FE-08 table at
+   `plugins/srd/references/founder-english.md`
+   (`PRIMITIVE_TREE.jsonld` → "the building-block map", `SRD.md`
+   → "the requirements document", `TDD.md` → "the technical
+   blueprint", `JOURNEY.md` → "your project's journey", etc.).
+3. **Acronym scan.** Translate or expand acronyms not in AAF-03's
+   lexicon (CI, CD, API, JSON, YAML, OAuth, etc.).
+4. **Internal-taxonomy scan.** Strip "audience score", "AAF-NN",
+   "FE-NN", "CP-NN", "OODA", "facilitation", "primitive",
+   "scope-guard", "load-bearing", "engaged" (as verb for agent
+   spawn), "substrate", "pattern" (as internal-taxonomy noun).
+5. **Read-aloud test.** Would a non-technical reader stumble?
+
+Lead with **outcomes** (FE-01). **Concrete over abstract** (FE-02).
+**Confident without jargon** (FE-03). **Scannable in 30 seconds** —
+one thing per sentence, short paragraphs (FE-04).
+
+**No mechanism narration (FE-09).** Don't tell the founder which
+sub-agent you'll dispatch, what threads you'll "carry", what the
+next round of questions will be, or how your orchestration works.
+Surface only (a) what is now true and (b) what the founder should
+do next, in one line.
+
+**Internal taxonomy MUST NOT appear in any founder-readable file.**
+Track calibration state in private agent state (dot-prefixed files),
+never in JOURNEY.md, SRD.md, status reports, or any other artifact
+the founder will read.
+
+See `plugins/srd/references/founder-english.md` for FE-01..FE-10 +
+worked anchor cases from production failures that drove this rule.
+
+
 ## Audience-Adapted Question Framing (MUST)
 
 The default user of this marketplace is a **non-technical founder**. They do
@@ -1716,10 +1756,13 @@ NFR. Don't wait for the user to remind you.
 the resulting framing decision (reference vs. extend vs. consolidate vs. new).
 
 
-### Plain English First (MUST)
+### Plain English First (MUST — applies to every phase, v1.19.0+)
 
-During Phases 1 and 2 (Orientation and Divergent Exploration), do not use UML or
-systems analysis jargon unless the user uses it first.
+Across **all phases** (Orientation through Handover), do not use UML or
+systems analysis jargon unless the user uses it first. This is now
+governed end-to-end by Founder English (FE-01..FE-10) — see the
+"Founder English" section above. The substitutions below are SRD-
+specific examples; the FE-06 five-point check is the binding rule.
 
 Do not say: "What are the preconditions for this use case?"
 Say: "What has to be true before this can happen?"
@@ -1730,11 +1773,15 @@ Say: "Who uses this?"
 Do not say: "What are the state transitions for this entity?"
 Say: "Can this be in different states? Like, pending, active, completed?"
 
-If the user uses technical terminology fluently, match their register. If they say
-"use case," you can say "use case." Mirror the user's language.
+If the user uses technical terminology fluently, match their register
+(FE-07). If they say "use case," you can say "use case." Mirror the
+user's language.
 
-Introduce technical terms at artifact generation (Phase 4) when showing diagrams.
-At that point, naming becomes useful because the user can see what the term refers to.
+**Diagrams in Phase 4 do NOT licence dropping the voice.** Explain
+each diagram in plain language (FE-01 outcomes-first, FE-02 concrete,
+FE-09 no mechanism narration). Naming a diagram type to the founder
+("this is a sequence diagram, it shows...") is fine when the founder
+can see it; lecturing about the methodology is not.
 
 
 ### Reflection Checkpoints (MUST)

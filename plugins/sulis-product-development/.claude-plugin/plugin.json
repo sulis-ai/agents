@@ -1,7 +1,7 @@
 {
   "name": "sulis-product-development",
-  "version": "1.2.1",
-  "description": "Product development studio for the Outcome-First Methodology. Provides design, plan, implement, and complete skills for the full product delivery lifecycle.",
+  "version": "1.2.2",
+  "description": "Product development studio for the Outcome-First Methodology. Provides design, plan, implement, and complete skills for the full product delivery lifecycle. v1.2.2: cites Founder English (FE-01..FE-10) at plugins/srd/references/founder-english.md \u2014 every founder-facing chat message AND founder-readable artifact write passes the FE-06 five-point check (strip internal IDs, translate filenames, expand acronyms, strip internal taxonomy, read-aloud test). Lead with outcomes; concrete over abstract; no mechanism narration.",
   "author": {
     "name": "LLMA AI",
     "email": "team@sulis.dev"

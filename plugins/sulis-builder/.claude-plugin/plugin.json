@@ -1,7 +1,7 @@
 {
   "name": "sulis-builder",
-  "version": "1.2.1",
-  "description": "Self-service studio creation for the Outcome-First Methodology. Create new domain expertise packages (7-file studio bundles) using the studio-creation sequence.",
+  "version": "1.2.2",
+  "description": "Self-service studio creation for the Outcome-First Methodology. Create new domain expertise packages (7-file studio bundles) using the studio-creation sequence. v1.2.2: cites Founder English (FE-01..FE-10) at plugins/srd/references/founder-english.md \u2014 every founder-facing chat message AND founder-readable artifact write passes the FE-06 five-point check (strip internal IDs, translate filenames, expand acronyms, strip internal taxonomy, read-aloud test). Lead with outcomes; concrete over abstract; no mechanism narration.",
   "author": {
     "name": "LLMA AI",
     "email": "team@sulis.dev"

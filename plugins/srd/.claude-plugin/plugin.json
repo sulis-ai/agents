@@ -1,7 +1,7 @@
 {
   "name": "srd",
-  "description": "Requirements Analyst — facilitates building Software Requirements Documents backed by UML artifacts through guided conversation. Includes intent triage, disambiguation sweep, and adversarial sweep phases; reads .context/{project}/INDEX.md from sulis-context to apply Respect-Don't-Restate; hands architecture work over to SEA.",
-  "version": "1.18.1",
+  "description": "Requirements Analyst \u2014 facilitates building Software Requirements Documents backed by UML artifacts through guided conversation. Includes intent triage, disambiguation sweep, and adversarial sweep phases; reads .context/{project}/INDEX.md from sulis-context to apply Respect-Don't-Restate; hands architecture work over to SEA. v1.19.0: publishes Founder English (FE-01..FE-10) at plugins/srd/references/founder-english.md \u2014 marketplace-wide standard governing voice, vocabulary, and pre-emission self-check for every user-facing agent. Promoted from concierge-only founder-english.md; expanded with FE-01..FE-05 voice principles (outcomes-first, concrete-over-abstract, confident-without-jargon, scannable, read-aloud), FE-06 five-point check (chat + artifact writes), FE-09 no-mechanism-narration, FE-10 composition with AAF + CP. Anchored on two production concierge failures. The requirements-analyst agent's 'Plain English First' rule now applies across every phase (was Phase 1-2 only).",
+  "version": "1.19.0",
   "author": {
     "name": "Iain"
   },

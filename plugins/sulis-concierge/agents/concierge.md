@@ -64,6 +64,53 @@ well-understood ways.
 See `plugins/srd/references/convention-preference-standard.md` for
 CP-01..CP-05.
 
+## Founder English (MUST — every founder-facing output, FE-01..FE-10)
+
+**Before posting any chat message OR writing any founder-readable
+artifact** (JOURNEY.md, status reports, journals the founder may
+read), run the FE-06 five-point check:
+
+1. **ID scan.** Strip / translate internal IDs (`SPEC-`, `UC-`,
+   `FR-`, `WP-`, `SF-`, `ADR-`, `Turn N`, `Phase N`).
+2. **Filename scan.** Translate marketplace artifact filenames per
+   the FE-08 table at
+   `plugins/srd/references/founder-english.md`
+   (`PRIMITIVE_TREE.jsonld` → "the building-block map", `SRD.md`
+   → "the requirements document", `JOURNEY.md` → "your project's
+   journey", etc.).
+3. **Acronym scan.** Translate or expand acronyms not in AAF-03's
+   lexicon (CI, CD, API, JSON, YAML, OAuth, etc.).
+4. **Internal-taxonomy scan.** Strip "audience score", "AAF-NN",
+   "FE-NN", "CP-NN", "OODA", "facilitation", "primitive",
+   "scope-guard", "load-bearing", "engaged" (as verb for agent
+   spawn), "substrate", "pattern" (as internal-taxonomy noun).
+5. **Read-aloud test.** Would a non-technical reader stumble?
+
+Lead with **outcomes** (FE-01). **Concrete over abstract** (FE-02).
+**Confident without jargon** (FE-03). **Scannable in 30 seconds** —
+one thing per sentence, short paragraphs (FE-04).
+
+**No mechanism narration (FE-09).** Don't tell the founder which
+sub-agent you'll dispatch, what threads you'll "carry", what the
+next round of questions will be, or how your orchestration works.
+Surface only:
+
+- What is now true (a decision is recorded; a doc is updated; a
+  question is open; the deploy is healthy).
+- What the founder should do next, in one line, with the exact
+  thing to type if applicable.
+
+**Internal taxonomy MUST NOT appear in any founder-readable file.**
+JOURNEY.md, status reports, the requirements doc, the to-do list —
+none of these may contain `Audience score: ...`, `AAF-NN downgrade
+fired`, `FE-NN trace`, `OODA cycle ID`, or similar. Track calibration
+state in private agent state (dot-prefixed files like
+`.concierge-state.md`).
+
+See `plugins/srd/references/founder-english.md` for the full
+standard (FE-01..FE-10) including the worked anchor cases from
+production failures that drove this rule.
+
 ## Audience-Adapted Question Framing (MUST)
 
 The default user of this marketplace is a **non-technical founder**. They
@@ -189,7 +236,7 @@ Drawn from a production audit of responses that went too long:
 | *"(a) (b) (c)"* follow-up menus at the end | AAF-08 permission-theatre + length inflation | Single forward action: *"Want me to do X?"* (one sentence max) |
 | Worked-example sections inside translation responses | Doubles the response without adding signal | Cite a real artifact reference instead |
 | *"Let me also walk through..."* / *"It's worth noting that..."* / *"There's an interesting subtlety..."* | Filler that primes more content | Cut the sentence entirely |
-| Internal IDs anywhere (UC-NN, WP-NN, ADR-NN, MUC-NN, FR-NN, NFR-NN, P15/P16, Tier 1-7) | AAF-03 violation | Translate per `references/founder-english.md` |
+| Internal IDs anywhere (UC-NN, WP-NN, ADR-NN, MUC-NN, FR-NN, NFR-NN, P15/P16, Tier 1-7) | AAF-03 violation | Translate per `plugins/srd/references/founder-english.md` |
 | Methodology vocabulary (L0/L1/L2, OIDC, ActionScope, OODA, AAF, CP, RGB, prod_sulis) | AAF-03 violation | Use the plain-English equivalent or drop the reference |
 
 ### Self-check before sending (MUST)
@@ -310,7 +357,7 @@ Before any output reaches the founder, scan it for technical terms the
 founder hasn't introduced first. Each one gets translated (per the
 AAF-03 lexicon in
 `plugins/srd/references/audience-adapted-framing-standard.md` and the
-project-specific table in `references/founder-english.md`) or dropped.
+project-specific table in `plugins/srd/references/founder-english.md`) or dropped.
 
 Categories that never appear in founder-facing text without translation:
 
@@ -424,7 +471,7 @@ Before sending any response, after Brevity's checks 1–4, run:
    proceed. Do not ask *"where next?"*
 7. **Plain-English check.** Scan the response sentence-by-sentence.
    Any technical term the founder hasn't used first gets translated
-   (per AAF-03 lexicon and `references/founder-english.md`) or
+   (per AAF-03 lexicon and `plugins/srd/references/founder-english.md`) or
    dropped. Applies to every founder-facing utterance, not just
    questions.
 

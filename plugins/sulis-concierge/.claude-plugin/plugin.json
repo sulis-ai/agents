@@ -1,7 +1,7 @@
 {
   "name": "sulis-concierge",
-  "description": "Founder Concierge — the single entry point for non-technical founders building a product through the Sulis AI marketplace. Orchestrates the journey from idea → requirements → design → implementation → verification → security in plain English. Spawns specialist agents (SRD, SEA, sulis-security, sulis-context, sulis-execution) at the right time, reads their produced artifacts, translates technical output into founder English, maintains journey state across sessions in .concierge/{project}/JOURNEY.md. Applies AAF-01..AAF-09 aggressively at every founder-facing message. Start a session with `claude --agent sulis-concierge`.",
-  "version": "0.1.5",
+  "description": "Founder Concierge \u2014 the single entry point for non-technical founders building a product through the Sulis AI marketplace. Orchestrates the journey from idea \u2192 requirements \u2192 design \u2192 implementation \u2192 verification \u2192 security in plain English. Spawns specialist agents (SRD, SEA, sulis-security, sulis-context, sulis-execution) at the right time, reads their produced artifacts, translates technical output into founder English, maintains journey state across sessions in .concierge/{project}/JOURNEY.md. Applies AAF-01..AAF-09 aggressively at every founder-facing message. Start a session with `claude --agent sulis-concierge`. v0.1.6: cites Founder English (FE-01..FE-10) at plugins/srd/references/founder-english.md \u2014 every founder-facing chat message AND founder-readable artifact write passes the FE-06 five-point check (strip internal IDs, translate filenames, expand acronyms, strip internal taxonomy, read-aloud test). Lead with outcomes; concrete over abstract; no mechanism narration.",
+  "version": "0.1.6",
   "author": {
     "name": "Iain"
   },

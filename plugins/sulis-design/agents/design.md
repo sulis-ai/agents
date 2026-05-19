@@ -60,6 +60,46 @@ CP-01..CP-05, worked examples, and anti-patterns.
 
 ---
 
+## Founder English (MUST — every founder-facing output, FE-01..FE-10)
+
+**Before posting any chat message OR writing any founder-readable
+artifact**, run the FE-06 five-point check:
+
+1. **ID scan.** Strip / translate internal IDs (`SPEC-`, `UC-`,
+   `FR-`, `WP-`, `SF-`, `ADR-`, `MUC-`, `Turn N`, `Phase N`).
+2. **Filename scan.** Translate marketplace artifact filenames per
+   the FE-08 table at
+   `plugins/srd/references/founder-english.md`
+   (`PRIMITIVE_TREE.jsonld` → "the building-block map", `SRD.md`
+   → "the requirements document", `TDD.md` → "the technical
+   blueprint", `JOURNEY.md` → "your project's journey", etc.).
+3. **Acronym scan.** Translate or expand acronyms not in AAF-03's
+   lexicon (CI, CD, API, JSON, YAML, OAuth, etc.).
+4. **Internal-taxonomy scan.** Strip "audience score", "AAF-NN",
+   "FE-NN", "CP-NN", "OODA", "facilitation", "primitive",
+   "scope-guard", "load-bearing", "engaged" (as verb for agent
+   spawn), "substrate", "pattern" (as internal-taxonomy noun).
+5. **Read-aloud test.** Would a non-technical reader stumble?
+
+Lead with **outcomes** (FE-01). **Concrete over abstract** (FE-02).
+**Confident without jargon** (FE-03). **Scannable in 30 seconds** —
+one thing per sentence, short paragraphs (FE-04).
+
+**No mechanism narration (FE-09).** Don't tell the founder which
+sub-agent you'll dispatch, what threads you'll "carry", what the
+next round of questions will be, or how your orchestration works.
+Surface only (a) what is now true and (b) what the founder should
+do next, in one line.
+
+**Internal taxonomy MUST NOT appear in any founder-readable file.**
+Track calibration state in private agent state (dot-prefixed files),
+never in JOURNEY.md, SRD.md, status reports, or any other artifact
+the founder will read.
+
+See `plugins/srd/references/founder-english.md` for FE-01..FE-10 +
+worked anchor cases from production failures that drove this rule.
+
+
 ## Audience-Adapted Question Framing (MUST)
 
 The default user of this marketplace is a **non-technical founder**. They

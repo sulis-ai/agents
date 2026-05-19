@@ -64,7 +64,7 @@ To test a plugin skill without publishing:
 
 ## Non-Negotiables
 
-Six rules. If a plan would violate any of these, the plan is wrong.
+Seven rules. If a plan would violate any of these, the plan is wrong.
 
 1. **New code: no implementation without a failing test first.** Write the test, see it
    fail, then write code. The REFACTOR step is not optional — it is where shared
@@ -123,6 +123,25 @@ Six rules. If a plan would violate any of these, the plan is wrong.
    to advance. Single exception: the user has explicitly invoked an AAF-05 revoke
    (*"slow down"*, *"check with me on each"*). (AAF-01..AAF-08)
 
+7. **Speak in founder English.** Beyond AAF-01's question triage, every founder-facing
+   output — chat messages AND founder-readable artifact writes (JOURNEY.md, status
+   reports, etc.) — passes the FE-06 five-point check: strip internal IDs (SPEC-,
+   UC-, FR-, WP-, SF-, ADR-, Turn N, Phase N); translate marketplace artifact
+   filenames per the FE-08 table (PRIMITIVE_TREE.jsonld → "building-block map",
+   SRD.md → "the requirements document", etc.); translate or expand acronyms not
+   in AAF-03's lexicon; strip internal taxonomy ("audience score", "AAF-NN",
+   "FE-NN", "OODA", "facilitation", "primitive", "scope-guard", "load-bearing"
+   used as internal-taxonomy nouns); read-aloud test. Lead with outcomes (FE-01).
+   Concrete over abstract (FE-02). Confident without jargon (FE-03). Scannable in
+   30 seconds (FE-04). **No mechanism narration** (FE-09): don't tell the founder
+   which sub-agent you'll dispatch, what threads you'll "carry", or what the next
+   round of questions will be — surface only what is now true and what the founder
+   should do next. **Internal taxonomy MUST NOT appear in any founder-readable
+   file**: track calibration state in private agent state (dot-prefixed files),
+   never in JOURNEY.md or similar. The agent is the expert; the founder is the
+   boss who doesn't know the jargon; the expert's job is to translate.
+   (FE-01..FE-10)
+
 For full detail on these principles, see `plugins/srd/references/engineering-principles.md`,
 `plugins/srd/references/security-standard.md`,
 `plugins/srd/references/convention-preference-standard.md`,
@@ -134,7 +153,11 @@ release tags), and
 `plugins/srd/references/executor-loop-standard.md` (EL-01..EL-08 —
 OODA loop on every fallible step, verbatim failure observation, Five
 Whys diagnosis bounded at 5, minimum-change Decide, scope guard,
-per-failure-type self-heal budget, structured BLOCKER record format).
+per-failure-type self-heal budget, structured BLOCKER record format),
+and `plugins/srd/references/founder-english.md` (FE-01..FE-10 —
+voice, vocabulary, pre-emission five-point check, no mechanism
+narration, applies to every founder-facing chat message AND
+founder-readable artifact write).
 
 ### Quality Gates
 

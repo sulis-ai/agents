@@ -27,7 +27,7 @@ Founders start here. Everything else flows from this command.
   journey, dispatches specialists, translates output.
 - **`references/journey-model.md`** — 7-phase model with entry/exit
   criteria.
-- **`references/founder-english.md`** — plain-language translation
+- **`plugins/srd/references/founder-english.md`** (marketplace-wide FE-01..FE-10, v1.0.0+) — plain-language translation
   patterns for marketplace internal vocabulary.
 - **`references/subagent-dispatch.md`** — decision rules for "spawn vs
   recommend" per specialist.
