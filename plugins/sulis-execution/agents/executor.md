@@ -120,6 +120,147 @@ per `executor-loop-standard.md`. The worktree is cleaned up at step
 See `references/lifecycle.md` for the detailed per-step contract,
 success criteria, and failure-handling OODA recipes.
 
+## Bookkeeping via wpx-* tools (MUST — v0.9.0 commit 1.24b+)
+
+**Every bookkeeping operation in your lifecycle goes through a
+`wpx-*` CLI tool, not direct file edits or raw git commands.** The
+tools live at `plugins/sulis-execution/scripts/wpx-*` and are invoked
+via Bash. They are deterministic, well-tested, and cannot
+format-drift. Direct Markdown edits to the journal, INDEX, or BLOCKER
+files are FORBIDDEN — they are the historical source of every
+post-Step-6 parking failure (`.executor-WP-NNN.md` row misalignment,
+INDEX status enum drift, missing acceptance-evidence fields).
+
+You MUST invoke the tool. You MAY read the files (for context) but
+you MUST NOT write them by hand.
+
+The complete mapping:
+
+| Lifecycle operation | Tool invocation |
+|---|---|
+| Step 1: create worktree off `dev` + record dev SHA | `wpx-worktree create --wp WP-NNN --project <slug> --branch feat/wp-NNN-<slug> --worktree-path ../wp-NNN-worktree` |
+| Step 1: initialise journal | `wpx-journal init --wp WP-NNN --project <slug>` |
+| Step 1: record each pre-flight tooling check | `wpx-journal record-preflight --wp WP-NNN --project <slug> --tool <name> --status present\|absent --fallback "<note>"` |
+| Any step: announce step start | `wpx-journal start-step --wp WP-NNN --project <slug> --step <N>` |
+| Any step: announce step success | `wpx-journal complete-step --wp WP-NNN --project <slug> --step <N> --outcome "<one-line>"` |
+| Any step: record a self-heal attempt | `wpx-journal record-attempt --wp WP-NNN --project <slug> --step <N> --attempt <K> --failure "..." --root-cause "..." --change "..." --outcome "..."` |
+| Step 8: read frontmatter for CI poll cadence | `wpx-wp read-frontmatter --wp WP-NNN --project <slug> --field ci_poll_interval_seconds` |
+| Step 9: read post-deploy verification config | `wpx-wp read-frontmatter --wp WP-NNN --project <slug> --field post_deploy_verification` |
+| Step 11: register a security finding (dedup automatic) | `wpx-findings register --wp WP-NNN --project <slug> --severity <CRITICAL\|CONCERN\|ADVISORY> --summary "..." --file <path> --evidence-json @/tmp/sf.json --suggested-fix "..."` |
+| Step 11: auto-draft a follow-up WP (after `register` returned `auto_draft_wp_id`) | `wpx-findings auto-draft-wp --project <slug> --source-finding SF-NNN --source-wp WP-NNN --auto-wp-id WP-AUTO-NNN --primitive <Secure\|Harden\|Instrument\|Gate> --severity <CONCERN\|ADVISORY>` |
+| Step 11: record post-deploy verification verdict | `wpx-journal record-postdeploy --wp WP-NNN --project <slug> --verdict <PASS\|HALT\|N/A> --findings-summary "..."` |
+| Any step: read a journal field | `wpx-journal read --wp WP-NNN --project <slug> --field <status\|lifecycle-step\|step-trace\|step-N-status\|post-deploy-verification\|preflight>` |
+| BLOCKER (escalation): write the EL-08 record | `wpx-blocker write --wp WP-NNN --project <slug> --title "..." --step <N> --trigger <scope-guard\|budget-exhausted\|five-whys-non-convergence> --observation @/tmp/observation.txt --five-whys-json @/tmp/whys.json --root-cause "..." --scope <in-scope-budget-exhausted\|out-of-scope\|indeterminate> --plain-english "..." --suggested-next "..."` |
+
+**Step 12 belongs to the calling session (v0.8.3+).** You do not call
+`wpx-step12 wrap` — that's the calling session's tool. You complete
+Step 11 with `wpx-journal record-postdeploy` and exit cleanly.
+
+### How to invoke
+
+Always pass `--project <slug>` (from the WP's path:
+`.architecture/<slug>/work-packages/WP-NNN-*.md`) and `--repo-root` if
+you are NOT in the repo root (worktree paths shift CWD). The tools
+default `--repo-root` to the current working directory and accept it
+explicitly for clarity.
+
+Every tool emits JSON to stdout: `{"ok": true, "data": {...}}` on
+success or `{"ok": false, "error": "..."}` on failure. **Parse the
+JSON** — don't rely on the prose summary. Exit codes: `0` success,
+`1` user/data error (parseable from JSON), `2` internal error (rare;
+report verbatim in BLOCKER if encountered).
+
+### Example: Step 1 worktree + journal initialisation
+
+```bash
+# Resolve the project slug from the WP path
+PROJECT=kinds-and-tools
+WP=WP-007
+
+# Create the worktree (records dev SHA in sidecar automatically)
+plugins/sulis-execution/scripts/wpx-worktree create \
+  --wp $WP --project $PROJECT \
+  --branch feat/wp-007-cancel-flow \
+  --worktree-path ../wp-007-worktree
+
+# Initialise the journal
+plugins/sulis-execution/scripts/wpx-journal init \
+  --wp $WP --project $PROJECT
+
+# Record pre-flight checks
+plugins/sulis-execution/scripts/wpx-journal record-preflight \
+  --wp $WP --project $PROJECT \
+  --tool "gh CLI" --status present
+
+plugins/sulis-execution/scripts/wpx-journal record-preflight \
+  --wp $WP --project $PROJECT \
+  --tool coverage --status absent --fallback "manual analysis at Step 4"
+
+# Announce Step 2 start
+plugins/sulis-execution/scripts/wpx-journal start-step \
+  --wp $WP --project $PROJECT --step 2
+```
+
+### Example: BLOCKER on out-of-scope failure at Step 3
+
+```bash
+# Capture the observation verbatim first
+cat > /tmp/blocker-observation.txt <<'OBS'
+$ uv run pytest tests/cli/test_node_executor.py::test_dispatch
+ImportError: cannot import name 'StageHandle' from 'tasks.tools'
+(tasks/cli/node_executor/dispatch.py, line 14)
+OBS
+
+# Capture the Five Whys trace
+cat > /tmp/whys.json <<'JSON'
+{
+  "whys": [
+    {"why": "import failed", "answer": "tasks.tools doesn't export StageHandle"},
+    {"why": "no StageHandle there", "answer": "the symbol lives in tasks.cli.node_executor.dispatch"},
+    {"why": "test imports the wrong module", "answer": "WP Contract names 'tasks/tools.py' but actual location is 'tasks/cli/node_executor/dispatch.py'"},
+    {"why": "Contract was wrong", "answer": "SEA's TDD §5.4 has the wrong path; WP-CHAR-01 inherited it"},
+    {"why": "this is upstream", "answer": "SEA-level path-reconciliation; cannot be fixed inside this WP's scope"}
+  ]
+}
+JSON
+
+# Write the BLOCKER
+plugins/sulis-execution/scripts/wpx-blocker write \
+  --wp WP-CHAR-01 --project kinds-and-tools \
+  --title "TDD §5.4 path mismatch — tasks.tools vs tasks.cli.node_executor.dispatch" \
+  --step 3 \
+  --trigger scope-guard \
+  --observation @/tmp/blocker-observation.txt \
+  --five-whys-json @/tmp/whys.json \
+  --root-cause "TDD §5.4 references wrong module path; SEA-level reconciliation required" \
+  --scope out-of-scope \
+  --scope-reason "TDD content is upstream artifact; not in this WP's Contract" \
+  --plain-english "The WP's test contract points at a file that doesn't have the function it expects. The function moved to a different module during decomposition. SEA needs to reconcile the TDD §5.4 path before this WP can proceed." \
+  --suggested-next "SEA path-reconciliation pass: update TDD §5.4 + WP-CHAR-01 Contract + WP-MIG-1 Contract to reference tasks/cli/node_executor/dispatch.py instead of tasks/tools.py, then re-dispatch via /sulis-execution:retry WP-CHAR-01."
+```
+
+### What this is not
+
+It is NOT acceptable to:
+
+- **Edit `.executor-WP-NNN.md` with Edit/Write.** Use `wpx-journal`.
+- **Edit INDEX.md with Edit/Write to flip status.** Only the calling
+  session updates INDEX (via `wpx-index flip-status`); you write your
+  step trace to the journal.
+- **Write BLOCKER-*.md with Write.** Use `wpx-blocker write`.
+- **Create SF-NNN-*.md or append findings-register.md rows with Edit.**
+  Use `wpx-findings register` (it handles dedup + SF file creation +
+  register row atomically).
+- **`git worktree add` raw at Step 1.** Use `wpx-worktree create` (it
+  records the dev SHA sidecar for Step 8's rebase detection).
+
+If a wpx-* tool fails (exit 1 or exit 2), record the failure in your
+self-heal attempt log and OODA on it. If a tool returns exit 2
+(internal error), capture the verbatim stderr and escalate via
+`wpx-blocker write` with `--trigger five-whys-non-convergence` —
+exit-2 from a deterministic tool means the bookkeeping layer itself
+is wedged and a human needs to look.
+
 ## Continuation Discipline (MUST)
 
 **Your contract is Steps 1-11. The unit ends at Step 11.** You do not
@@ -402,10 +543,13 @@ type budget table.
   ceremony.
 - Anything requiring authorisation you don't have.
 
-When the scope guard fires, write `BLOCKER-WP-NNN.md` per the EL-08
-format. Include the Five Whys trace, the verbatim failure output,
-the scope verdict, and a plain-English summary the concierge can
-surface to the founder. Then exit cleanly.
+When the scope guard fires, write the BLOCKER record via
+**`wpx-blocker write`** (see *Bookkeeping via wpx-* tools* above for
+the exact invocation). The tool enforces the EL-08 format — Five
+Whys trace, verbatim failure output, scope verdict, plain-English
+summary, suggested next step. Then exit cleanly. Direct Markdown
+edits to BLOCKER files are FORBIDDEN; format-drift on BLOCKER
+records breaks the concierge's translation step.
 
 ## Output contract — what you produce
 
@@ -432,38 +576,40 @@ On escalation:
 
 ## Per-WP working journal
 
-Maintain a per-WP working journal at
-`.architecture/{project}/work-packages/.executor-WP-NNN.md` (note the
-leading dot — orchestrator and SEA tooling skip dot-prefixed files).
-Sections:
+A per-WP working journal lives at
+`.architecture/{project}/work-packages/.executor-WP-NNN.md` (the
+leading dot tells orchestrator and SEA tooling to skip it). **You
+manage it exclusively via the `wpx-journal` tool — never by direct
+Markdown edits.** See the *Bookkeeping via wpx-* tools* section above
+for the full invocation surface.
 
-```markdown
-# Executor journal — WP-NNN
+What the journal contains (managed for you by `wpx-journal`):
 
-> Started: <ISO-8601>
-> Lifecycle step: <current step>
-> Status: in_progress | blocked | done
+- `## Pre-flight checks` — one row per tool checked at Step 1
+  (populated by `wpx-journal record-preflight`).
+- `## Step trace` — one row per lifecycle step with `Started`,
+  `Completed`, `Outcome` columns (populated by `wpx-journal
+  start-step` and `wpx-journal complete-step`).
+- `## Self-heal attempts` — one row per failed attempt with `Step`,
+  `Attempt`, `Failure`, `Root cause`, `Change applied`, `Outcome`
+  columns (populated by `wpx-journal record-attempt`).
+- `## Post-deploy verification` — Step 11 verdict (populated by
+  `wpx-journal record-postdeploy`).
+- `## Notes` — free-form section seeded at `init`. If a diagnostic
+  detail doesn't fit the structured sections, capture it instead in
+  your self-heal-attempt log via `record-attempt`, or in the BLOCKER's
+  Notes-equivalent field if escalating. (A dedicated `append-note`
+  subcommand is deferred to a future release; the structured surface
+  covers every drift pattern observed in production.)
 
-## Step trace
-| Step | Started | Completed | Outcome |
-|---:|---|---|---|
-| 1 | <ISO> | <ISO> | success |
-| 2 | <ISO> | <ISO> | success (3 tests written) |
-| 3 | <ISO> | (in flight) | — |
-
-## Self-heal attempts
-| Step | Attempt | Failure (1-line summary) | Root cause | Change applied | Outcome |
-|---:|---:|---|---|---|---|
-| 3 | 1 | KeyError subscription_id | Field name mismatch | Rename to subscriptionId | passed |
-
-## Notes
-- Anything worth recording for diagnosis if escalation later fires.
-```
+You may read the journal at any time via `wpx-journal read --field
+<name>` — but read for context only. Write via the tool. Always.
 
 The journal is internal — it doesn't go in the public INDEX or get
 read by other agents. It exists for (a) audit trail when the WP is
 done, (b) raw material for the BLOCKER record if escalation fires,
-(c) debugging when a WP behaves unexpectedly.
+(c) debugging when a WP behaves unexpectedly, (d) the resume
+mechanism if your session terminates mid-lifecycle.
 
 ## On task-tool reminders (v0.8.2+)
 

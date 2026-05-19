@@ -20,6 +20,49 @@ worktree removal (Step 12) bracket the per-executor isolation.
 
 ---
 
+## Bookkeeping via wpx-* tools (MUST — v0.9.0 commit 1.24b+)
+
+**Every bookkeeping operation in this lifecycle goes through a
+`wpx-*` CLI tool, not direct file edits or raw git commands.** The
+tools live at `plugins/sulis-execution/scripts/wpx-*` and are invoked
+via Bash. They are deterministic and cannot format-drift. The
+detailed per-step recipes below ("Worktree creation", "Pre-flight
+tooling check", etc.) describe the *intent* of each step; the
+*mechanism* is always a `wpx-*` invocation. Where this reference
+shows raw Bash, treat it as background context — the canonical
+execution path is the tool.
+
+The full mapping is in `agents/executor.md` under *Bookkeeping via
+wpx-* tools*. Key invocations referenced by this document:
+
+| Step | Tool invocation |
+|---|---|
+| 1 (worktree) | `wpx-worktree create` |
+| 1 (journal init) | `wpx-journal init` |
+| 1 (pre-flight) | `wpx-journal record-preflight` |
+| Any (step start) | `wpx-journal start-step` |
+| Any (step success) | `wpx-journal complete-step` |
+| Any (self-heal) | `wpx-journal record-attempt` |
+| 8-10 (read frontmatter cadences) | `wpx-wp read-frontmatter` |
+| 11 (post-deploy verdict) | `wpx-journal record-postdeploy` |
+| 11 (findings register + auto-draft) | `wpx-findings register` then `wpx-findings auto-draft-wp` |
+| BLOCKER | `wpx-blocker write` |
+| 12 (calling session only — NOT executor) | `wpx-step12 wrap` |
+
+Direct Markdown edits to `.executor-WP-NNN.md`, `INDEX.md`,
+`BLOCKER-*.md`, `findings-register.md`, or `SF-NNN-*.md` are
+FORBIDDEN. They are the historical source of every post-Step-6
+parking failure (`.executor-WP-NNN.md` row misalignment, INDEX status
+enum drift, missing acceptance-evidence fields, BLOCKER format
+deviation that breaks the concierge's translation step).
+
+The detailed Bash recipes that appear below each step show the
+underlying mechanism (helpful for diagnosis if a `wpx-*` tool ever
+fails internally), but the executor's first action at every
+bookkeeping moment is to invoke the appropriate tool.
+
+---
+
 ## Step 1 — Worktree + branch
 
 **Input:** WP file (read), `dev` branch HEAD on remote.
