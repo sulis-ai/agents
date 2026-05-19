@@ -1,0 +1,398 @@
+#!/usr/bin/env python3
+"""wpx-journal — manage the per-WP executor journal.
+
+The journal lives at .architecture/<project>/work-packages/.executor-<wp>.md
+and tracks step transitions, self-heal attempts, pre-flight checks, and
+post-deploy verification per WP.
+
+Subcommands:
+  init                  Create a new journal for a WP.
+  start-step            Record the start of a lifecycle step.
+  complete-step         Record the completion of a lifecycle step.
+  record-attempt        Record a self-heal attempt + outcome.
+  record-preflight      Record a pre-flight tooling check + status.
+  record-postdeploy     Record post-deploy verification verdict.
+  read                  Read a specific field/section from the journal.
+
+All subcommands take --wp WP-NNN and --project <slug>.
+
+Exit codes: 0 success, 1 user/data error, 2 internal error.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _wpxlib import (  # noqa: E402
+    MdTable,
+    WpxPaths,
+    add_common_args,
+    cli_main,
+    emit_error,
+    emit_ok,
+    find_section,
+    parse_md_table,
+    paths_from_args,
+    replace_section,
+)
+
+
+JOURNAL_TEMPLATE = """\
+# Executor journal — {wp}
+
+> Started: {started}
+> Lifecycle step: 1
+> Status: in_progress
+
+## Pre-flight checks
+
+| Tool / Check | Status | Fallback |
+|---|---|---|
+
+## Step trace
+
+| Step | Started | Completed | Outcome |
+|---:|---|---|---|
+
+## Self-heal attempts
+
+| Step | Attempt | Failure (1-line summary) | Root cause | Change applied | Outcome |
+|---:|---:|---|---|---|---|
+
+## Post-deploy verification
+
+(Not yet recorded — Step 11 fills this in.)
+
+## Notes
+
+"""
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _read_journal(paths: WpxPaths, wp: str) -> str:
+    j = paths.journal(wp)
+    if not j.exists():
+        raise FileNotFoundError(f"Journal not found: {j}")
+    return j.read_text(encoding="utf-8")
+
+
+def _write_journal(paths: WpxPaths, wp: str, text: str) -> None:
+    j = paths.journal(wp)
+    j.parent.mkdir(parents=True, exist_ok=True)
+    j.write_text(text, encoding="utf-8")
+
+
+# ────────────────────────────────────────────────────────────────────────
+
+
+def cmd_init(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+    j = paths.journal(args.wp)
+    if j.exists() and not args.force:
+        emit_error(
+            f"Journal already exists: {j}. Use --force to overwrite.",
+            context={"path": str(j)},
+        )
+    text = JOURNAL_TEMPLATE.format(wp=args.wp, started=_now())
+    _write_journal(paths, args.wp, text)
+    emit_ok(data={"path": str(j)})
+
+
+def cmd_start_step(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+    text = _read_journal(paths, args.wp)
+    # Find the Step trace table and add a new row with Started timestamp.
+    start, end = find_section(text, "## Step trace")
+    section = text[start:end]
+    table_text = "\n".join(
+        ln for ln in section.splitlines()[1:] if ln.startswith("|")
+    )
+    table = parse_md_table(table_text) if table_text.strip() else MdTable(
+        headers=["Step", "Started", "Completed", "Outcome"],
+        alignments=["---:", "---", "---", "---"],
+        rows=[],
+    )
+    # Add the new row if not already present
+    for row in table.rows:
+        if row and row[0].strip() == str(args.step):
+            emit_error(
+                f"Step {args.step} already started in journal "
+                f"(row found in Step trace)."
+            )
+    table.rows.append([str(args.step), _now(), "(in flight)", "—"])
+    new_section = "## Step trace\n\n" + table.render() + "\n\n"
+    text = text[:start] + new_section + text[end:]
+    # Also update the "Lifecycle step:" header line
+    text = _update_header(text, "Lifecycle step", str(args.step))
+    _write_journal(paths, args.wp, text)
+    emit_ok(data={"wp": args.wp, "step": args.step, "started_at": _now()})
+
+
+def cmd_complete_step(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+    text = _read_journal(paths, args.wp)
+    start, end = find_section(text, "## Step trace")
+    section = text[start:end]
+    table_text = "\n".join(
+        ln for ln in section.splitlines()[1:] if ln.startswith("|")
+    )
+    table = parse_md_table(table_text)
+    found = False
+    for row in table.rows:
+        if row and row[0].strip() == str(args.step):
+            row[2] = _now()
+            row[3] = args.outcome
+            found = True
+            break
+    if not found:
+        emit_error(
+            f"Step {args.step} not started in journal. "
+            f"Call `start-step --step {args.step}` first."
+        )
+    new_section = "## Step trace\n\n" + table.render() + "\n\n"
+    text = text[:start] + new_section + text[end:]
+    _write_journal(paths, args.wp, text)
+    emit_ok(data={"wp": args.wp, "step": args.step, "completed_at": _now()})
+
+
+def cmd_record_attempt(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+    text = _read_journal(paths, args.wp)
+    start, end = find_section(text, "## Self-heal attempts")
+    section = text[start:end]
+    table_text = "\n".join(
+        ln for ln in section.splitlines()[1:] if ln.startswith("|")
+    )
+    table = parse_md_table(table_text) if table_text.strip() else MdTable(
+        headers=[
+            "Step", "Attempt", "Failure (1-line summary)",
+            "Root cause", "Change applied", "Outcome",
+        ],
+        alignments=["---:", "---:", "---", "---", "---", "---"],
+        rows=[],
+    )
+    table.rows.append([
+        str(args.step), str(args.attempt), args.failure,
+        args.root_cause, args.change, args.outcome,
+    ])
+    new_section = "## Self-heal attempts\n\n" + table.render() + "\n\n"
+    text = text[:start] + new_section + text[end:]
+    _write_journal(paths, args.wp, text)
+    emit_ok(data={"wp": args.wp, "step": args.step, "attempt": args.attempt})
+
+
+def cmd_record_preflight(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+    text = _read_journal(paths, args.wp)
+    start, end = find_section(text, "## Pre-flight checks")
+    section = text[start:end]
+    table_text = "\n".join(
+        ln for ln in section.splitlines()[1:] if ln.startswith("|")
+    )
+    table = parse_md_table(table_text) if table_text.strip() else MdTable(
+        headers=["Tool / Check", "Status", "Fallback"],
+        alignments=["---", "---", "---"],
+        rows=[],
+    )
+    table.rows.append([args.tool, args.status, args.fallback or "—"])
+    new_section = "## Pre-flight checks\n\n" + table.render() + "\n\n"
+    text = text[:start] + new_section + text[end:]
+    _write_journal(paths, args.wp, text)
+    emit_ok(data={"wp": args.wp, "tool": args.tool, "status": args.status})
+
+
+def cmd_record_postdeploy(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+    text = _read_journal(paths, args.wp)
+    new_section_body = f"""\
+Security-reviewer verdict: {args.verdict}
+Recorded at: {_now()}
+"""
+    if args.findings_json:
+        new_section_body += f"\nFindings detail (JSON):\n```json\n{args.findings_json}\n```\n"
+    text = replace_section(text, "## Post-deploy verification", "\n" + new_section_body + "\n")
+    _write_journal(paths, args.wp, text)
+    emit_ok(data={"wp": args.wp, "verdict": args.verdict})
+
+
+def cmd_read(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+    text = _read_journal(paths, args.wp)
+
+    field = args.field
+
+    # Header fields
+    if field in ("status", "lifecycle-step", "started"):
+        value = _read_header(text, field.replace("-", " ").title()
+                             if field == "lifecycle-step" else field.title())
+        emit_ok(data={"field": field, "value": value})
+
+    # Step-N status (returns 'in_progress', 'completed', or 'not_started')
+    if field.startswith("step-") and field.endswith("-status"):
+        step_num = field.removeprefix("step-").removesuffix("-status")
+        start, end = find_section(text, "## Step trace")
+        table_text = "\n".join(
+            ln for ln in text[start:end].splitlines()[1:] if ln.startswith("|")
+        )
+        table = parse_md_table(table_text)
+        for row in table.rows:
+            if row and row[0].strip() == step_num:
+                if row[2].strip() in ("(in flight)", "—", ""):
+                    emit_ok(data={"field": field, "value": "in_progress"})
+                emit_ok(data={
+                    "field": field, "value": "completed",
+                    "completed_at": row[2].strip(),
+                    "outcome": row[3].strip() if len(row) > 3 else "",
+                })
+        emit_ok(data={"field": field, "value": "not_started"})
+
+    # Step trace, all rows
+    if field == "step-trace":
+        start, end = find_section(text, "## Step trace")
+        table_text = "\n".join(
+            ln for ln in text[start:end].splitlines()[1:] if ln.startswith("|")
+        )
+        table = parse_md_table(table_text)
+        rows = []
+        for row in table.rows:
+            if len(row) >= 4:
+                rows.append({
+                    "step": row[0].strip(),
+                    "started": row[1].strip(),
+                    "completed": row[2].strip(),
+                    "outcome": row[3].strip(),
+                })
+        emit_ok(data={"field": field, "value": rows})
+
+    # Post-deploy verification (full section body)
+    if field == "post-deploy-verification":
+        start, end = find_section(text, "## Post-deploy verification")
+        section_body = text[start:end].split("\n", 1)[1].strip()
+        emit_ok(data={"field": field, "value": section_body})
+
+    # Pre-flight checks
+    if field == "preflight":
+        start, end = find_section(text, "## Pre-flight checks")
+        table_text = "\n".join(
+            ln for ln in text[start:end].splitlines()[1:] if ln.startswith("|")
+        )
+        table = parse_md_table(table_text)
+        rows = []
+        for row in table.rows:
+            if len(row) >= 3:
+                rows.append({
+                    "tool": row[0].strip(),
+                    "status": row[1].strip(),
+                    "fallback": row[2].strip(),
+                })
+        emit_ok(data={"field": field, "value": rows})
+
+    emit_error(f"Unknown field: {field}")
+
+
+# ────────────────────────────────────────────────────────────────────────
+
+
+def _update_header(text: str, header_name: str, value: str) -> str:
+    import re
+    pattern = re.compile(rf"^(>\s*{re.escape(header_name)}:\s*).*$", re.MULTILINE)
+    if pattern.search(text):
+        return pattern.sub(rf"\g<1>{value}", text, count=1)
+    return text
+
+
+def _read_header(text: str, header_name: str) -> str:
+    import re
+    pattern = re.compile(rf"^>\s*{re.escape(header_name)}:\s*(.*)$", re.MULTILINE)
+    match = pattern.search(text)
+    return match.group(1).strip() if match else ""
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Manage the per-WP executor journal."
+    )
+    sub = parser.add_subparsers(dest="subcommand", required=True)
+
+    p_init = sub.add_parser("init", help="Create a new journal")
+    add_common_args(p_init)
+    p_init.add_argument("--wp", required=True)
+    p_init.add_argument("--force", action="store_true",
+                        help="Overwrite existing journal")
+
+    p_start = sub.add_parser("start-step", help="Record start of a step")
+    add_common_args(p_start)
+    p_start.add_argument("--wp", required=True)
+    p_start.add_argument("--step", required=True, type=int)
+
+    p_complete = sub.add_parser("complete-step", help="Record completion of a step")
+    add_common_args(p_complete)
+    p_complete.add_argument("--wp", required=True)
+    p_complete.add_argument("--step", required=True, type=int)
+    p_complete.add_argument("--outcome", required=True,
+                            help="One-line outcome (e.g. 'success: 3 tests')")
+
+    p_attempt = sub.add_parser("record-attempt",
+                               help="Record a self-heal attempt")
+    add_common_args(p_attempt)
+    p_attempt.add_argument("--wp", required=True)
+    p_attempt.add_argument("--step", required=True, type=int)
+    p_attempt.add_argument("--attempt", required=True, type=int)
+    p_attempt.add_argument("--failure", required=True,
+                           help="One-line failure summary")
+    p_attempt.add_argument("--root-cause", required=True)
+    p_attempt.add_argument("--change", required=True,
+                           help="Change applied")
+    p_attempt.add_argument("--outcome", required=True,
+                           help="passed | still-failing")
+
+    p_preflight = sub.add_parser("record-preflight",
+                                 help="Record a pre-flight tooling check")
+    add_common_args(p_preflight)
+    p_preflight.add_argument("--wp", required=True)
+    p_preflight.add_argument("--tool", required=True,
+                             help="Tool name (e.g. 'gh', 'coverage')")
+    p_preflight.add_argument("--status", required=True,
+                             help="present | absent")
+    p_preflight.add_argument("--fallback", default=None,
+                             help="Fallback strategy if absent")
+
+    p_postdeploy = sub.add_parser("record-postdeploy",
+                                  help="Record Step 11 post-deploy verification")
+    add_common_args(p_postdeploy)
+    p_postdeploy.add_argument("--wp", required=True)
+    p_postdeploy.add_argument("--verdict", required=True,
+                              help="PASS | N CONCERN | N ADVISORY | CRITICAL")
+    p_postdeploy.add_argument("--findings-json", default=None,
+                              help="Optional JSON blob with detailed findings")
+
+    p_read = sub.add_parser("read", help="Read a field from the journal")
+    add_common_args(p_read)
+    p_read.add_argument("--wp", required=True)
+    p_read.add_argument("--field", required=True,
+                        help="status | lifecycle-step | step-trace | "
+                             "step-N-status | post-deploy-verification | preflight")
+
+    return parser
+
+
+HANDLERS = {
+    "init": cmd_init,
+    "start-step": cmd_start_step,
+    "complete-step": cmd_complete_step,
+    "record-attempt": cmd_record_attempt,
+    "record-preflight": cmd_record_preflight,
+    "record-postdeploy": cmd_record_postdeploy,
+    "read": cmd_read,
+}
+
+
+if __name__ == "__main__":
+    cli_main(build_parser(), HANDLERS)

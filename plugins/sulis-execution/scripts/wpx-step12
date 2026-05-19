@@ -1,0 +1,157 @@
+#!/usr/bin/env python3
+"""wpx-step12 — atomic Step 12 bookkeeping wrap.
+
+Combines three operations into one transactional call:
+  1. Append ## Acceptance Evidence to the WP file (via wpx-wp append-evidence).
+  2. Flip INDEX status to done (via wpx-index flip-status --expected in_progress).
+  3. Remove the worktree (via wpx-worktree remove).
+
+If any step fails, prior steps are not rolled back automatically (Markdown
+file edits are not transactional); the failure is surfaced so the calling
+session can recover manually. In practice, step 1 is durable, step 2 is
+the atomic guard (status flip), and step 3 is idempotent (worktree may
+already be gone).
+
+Exit codes: 0 success, 1 user/data error, 2 internal error.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _wpxlib import (  # noqa: E402
+    add_common_args,
+    cli_main,
+    emit_error,
+    emit_ok,
+    paths_from_args,
+)
+
+
+SCRIPTS_DIR = Path(__file__).parent
+
+
+def _call_tool(tool: str, args: list[str]) -> dict:
+    """Invoke a sibling wpx-* tool; parse JSON response."""
+    cmd = [str(SCRIPTS_DIR / tool), *args]
+    proc = subprocess.run(cmd, capture_output=True, text=True)  # noqa: S603
+    if proc.returncode not in (0, 1):
+        # exit 2 = internal error in child tool
+        emit_error(
+            f"{tool} failed (exit {proc.returncode}): "
+            f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
+        )
+    try:
+        return json.loads(proc.stdout.strip().splitlines()[-1])
+    except (json.JSONDecodeError, IndexError) as e:
+        emit_error(f"{tool} did not emit JSON: {e}; stdout={proc.stdout!r}")
+    return {}  # for type checker; emit_error sys.exits
+
+
+def _read_textish(value: str) -> str:
+    if value.startswith("@"):
+        return Path(value[1:]).read_text(encoding="utf-8")
+    return value
+
+
+def cmd_wrap(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+
+    # Build evidence JSON from pipeline result + (optional) security verdict
+    pipeline_json = json.loads(_read_textish(args.pipeline_result))
+    pipeline_data = pipeline_json.get("result", pipeline_json)
+
+    evidence: dict = {
+        "branch": args.branch,
+        "merge_sha": pipeline_data.get("merge_sha"),
+        "deploy_url": pipeline_data.get("deploy_url"),
+        "health_status": pipeline_data.get("health_status"),
+        "smoke_verdict": pipeline_data.get("smoke_verdict"),
+    }
+    if args.pre_squash_sha:
+        evidence["pre_squash_sha"] = args.pre_squash_sha
+    if args.post_deploy_verification:
+        evidence["post_deploy_verification"] = args.post_deploy_verification
+
+    # Drop None values so the WP file's evidence block stays clean
+    evidence = {k: v for k, v in evidence.items() if v is not None}
+
+    summary: dict = {"wp": args.wp, "steps": {}}
+
+    # Step 12.1 — append acceptance evidence
+    evidence_path = paths.wp_dir / f".step12-evidence-{args.wp}.json"
+    evidence_path.parent.mkdir(parents=True, exist_ok=True)
+    evidence_path.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+    result_1 = _call_tool("wpx-wp", [
+        "append-evidence",
+        "--wp", args.wp,
+        "--project", paths.project,
+        "--evidence-json", f"@{evidence_path}",
+    ])
+    summary["steps"]["append_evidence"] = result_1.get("data", {})
+
+    # Step 12.2 — flip INDEX status (atomic with --expected in_progress)
+    result_2 = _call_tool("wpx-index", [
+        "flip-status",
+        "--wp", args.wp,
+        "--project", paths.project,
+        "--to", "done",
+        "--expected", "in_progress",
+    ])
+    summary["steps"]["flip_status"] = result_2.get("data", {})
+
+    # Step 12.3 — remove worktree (tolerate-missing for idempotency)
+    if args.worktree_path:
+        result_3 = _call_tool("wpx-worktree", [
+            "remove",
+            "--wp", args.wp,
+            "--project", paths.project,
+            "--worktree-path", args.worktree_path,
+            "--tolerate-missing",
+        ])
+        summary["steps"]["worktree_remove"] = result_3.get("data", {})
+    else:
+        summary["steps"]["worktree_remove"] = {"skipped": "no --worktree-path"}
+
+    # Cleanup the temp evidence file
+    try:
+        evidence_path.unlink()
+    except OSError:
+        pass
+
+    emit_ok(data=summary)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Atomic Step 12 wrap: evidence + INDEX flip + worktree remove"
+    )
+    sub = parser.add_subparsers(dest="subcommand", required=True)
+
+    p_wrap = sub.add_parser("wrap", help="Run all three Step 12 operations")
+    add_common_args(p_wrap)
+    p_wrap.add_argument("--wp", required=True)
+    p_wrap.add_argument("--branch", required=True,
+                        help="Branch name (for evidence block)")
+    p_wrap.add_argument("--pipeline-result", required=True,
+                        help="JSON output from wpx-pipeline (or @/path/to/file)")
+    p_wrap.add_argument("--pre-squash-sha", default=None,
+                        help="Pre-squash SHA on the branch (optional)")
+    p_wrap.add_argument("--worktree-path", default=None,
+                        help="Worktree path to remove (omit to skip removal)")
+    p_wrap.add_argument("--post-deploy-verification", default=None,
+                        help="Optional post-deploy verification string for WP frontmatter compatibility")
+
+    return parser
+
+
+HANDLERS = {"wrap": cmd_wrap}
+
+
+if __name__ == "__main__":
+    cli_main(build_parser(), HANDLERS)

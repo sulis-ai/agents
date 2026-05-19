@@ -1,0 +1,395 @@
+#!/usr/bin/env python3
+"""wpx-pipeline — run Steps 8-10 (CI poll + merge + deploy poll + health + smoke).
+
+Designed to be invoked by the CALLING SESSION via Bash(run_in_background:true)
+— this is the script that owns all the long-running waiting (CI 45m + deploy
+30m + health 10m). The calling session blocks on the harness notification when
+the script exits.
+
+Subcommands:
+  run                   Full pipeline: CI poll → rebase-if-needed → merge → deploy poll → health → smoke.
+
+Outputs structured JSON to stdout on completion (one line, the final `result`
+key). Exit codes: 0 success, 1 deterministic blocker, 2 internal error.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _wpxlib import (  # noqa: E402
+    add_common_args,
+    cli_main,
+    emit_internal_error,
+    emit_ok,
+    paths_from_args,
+)
+
+
+# --- Constants -----------------------------------------------------------
+
+CI_DEFAULT_INTERVAL = 300     # 5 min
+CI_DEFAULT_CAP = 45 * 60      # 45 min
+
+DEPLOY_DEFAULT_INTERVAL = 300  # 5 min
+DEPLOY_DEFAULT_CAP = 30 * 60   # 30 min
+
+HEALTH_MIN_INTERVAL = 60       # 1 min initial
+HEALTH_MAX_INTERVAL = 300      # 5 min cap (exponential backoff)
+HEALTH_DEFAULT_CAP = 10 * 60   # 10 min total
+
+REBASE_BUDGET = 2              # GIT-05 step-4
+
+
+# --- Logging -------------------------------------------------------------
+
+def _log(msg: str) -> None:
+    """Progress log to stderr so the calling session can tail it if desired."""
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    print(f"[{ts}] {msg}", file=sys.stderr, flush=True)
+
+
+def _run(cmd: list[str], cwd: Path | None = None,
+         timeout: int = 60) -> tuple[int, str, str]:
+    try:
+        proc = subprocess.run(  # noqa: S603
+            cmd, capture_output=True, text=True, cwd=cwd, timeout=timeout,
+        )
+        return proc.returncode, proc.stdout, proc.stderr
+    except subprocess.TimeoutExpired:
+        return 124, "", f"Timeout after {timeout}s"
+
+
+# --- gh API helpers ------------------------------------------------------
+
+def _gh_check_runs(repo: str, branch: str) -> dict:
+    """Return list of latest check-runs for the branch's HEAD commit."""
+    rc, out, err = _run(
+        ["gh", "api", f"repos/{repo}/commits/{branch}/check-runs",
+         "--paginate"],
+        timeout=30,
+    )
+    if rc != 0:
+        raise RuntimeError(f"gh check-runs failed: {err}")
+    return json.loads(out) if out.strip() else {"check_runs": []}
+
+
+def _gh_branch_sha(repo: str, branch: str) -> str:
+    rc, out, err = _run(
+        ["gh", "api", f"repos/{repo}/git/refs/heads/{branch}"], timeout=30,
+    )
+    if rc != 0:
+        raise RuntimeError(f"gh branch-sha failed for {branch}: {err}")
+    return json.loads(out)["object"]["sha"]
+
+
+def _gh_ref_sha(repo: str, ref: str) -> str:
+    """Get SHA for any ref (e.g., dev)."""
+    rc, out, err = _run(
+        ["gh", "api", f"repos/{repo}/git/refs/heads/{ref}"], timeout=30,
+    )
+    if rc != 0:
+        raise RuntimeError(f"gh ref-sha failed for {ref}: {err}")
+    return json.loads(out)["object"]["sha"]
+
+
+def _gh_merge(repo: str, base: str, head: str, commit_message: str) -> str:
+    """Squash-merge head into base via the merges endpoint. Returns merge SHA."""
+    rc, out, err = _run(
+        ["gh", "api", "-X", "POST", f"repos/{repo}/merges",
+         "-f", f"base={base}", "-f", f"head={head}",
+         "-f", f"commit_message={commit_message}",
+         "-F", "merge_method=squash"],
+        timeout=60,
+    )
+    if rc != 0:
+        # Some hosts use PUTs against /pulls/N/merge. The /merges endpoint
+        # returns 409 if no PR is required; fall back gracefully.
+        raise RuntimeError(f"gh merges failed: {err}\nstdout={out}")
+    return json.loads(out)["sha"]
+
+
+def _gh_deploy_runs(repo: str, workflow: str, commit: str) -> list[dict]:
+    rc, out, err = _run(
+        ["gh", "run", "list", "--workflow", workflow, "--commit", commit,
+         "--json", "databaseId,status,conclusion,createdAt,url",
+         "--limit", "5"],
+        timeout=30,
+    )
+    if rc != 0:
+        raise RuntimeError(f"gh run list failed: {err}")
+    return json.loads(out) if out.strip() else []
+
+
+# --- Phase implementations ----------------------------------------------
+
+def _poll_ci(repo: str, branch: str, interval: int, cap: int) -> str:
+    """Poll CI on branch HEAD; return verdict 'green'|'failed'|'timeout'."""
+    elapsed = 0
+    last_status = "unknown"
+    while elapsed < cap:
+        runs = _gh_check_runs(repo, branch)["check_runs"]
+        if not runs:
+            _log(f"CI poll: no check-runs yet for {branch} (elapsed {elapsed}s)")
+        else:
+            statuses = [(r["name"], r["status"], r["conclusion"]) for r in runs]
+            all_done = all(s[1] == "completed" for s in statuses)
+            if all_done:
+                if all(s[2] == "success" or s[2] == "neutral"
+                       or s[2] == "skipped" for s in statuses):
+                    _log(f"CI poll: all checks green ({len(statuses)} runs)")
+                    return "green"
+                failed = [s for s in statuses if s[2] not in
+                          ("success", "neutral", "skipped")]
+                _log(f"CI poll: failed checks: {failed}")
+                return "failed"
+            in_flight = [s[0] for s in statuses if s[1] != "completed"]
+            last_status = f"in_flight={in_flight}"
+            _log(f"CI poll: {last_status} (elapsed {elapsed}s)")
+        time.sleep(interval)
+        elapsed += interval
+    _log(f"CI poll: TIMEOUT after {cap}s; last status: {last_status}")
+    return "timeout"
+
+
+def _rebase_on_dev(repo: str, branch: str, worktree: Path,
+                   dev_sha_at_creation: str) -> tuple[bool, str]:
+    """If dev advanced past dev_sha_at_creation, rebase. Return (rebased, new_sha)."""
+    current_dev = _gh_ref_sha(repo, "dev")
+    if current_dev == dev_sha_at_creation:
+        return False, ""
+    _log(f"dev advanced from {dev_sha_at_creation[:8]} to {current_dev[:8]}; rebasing")
+    rc, _, err = _run(["git", "fetch", "origin", "dev"], cwd=worktree)
+    if rc != 0:
+        raise RuntimeError(f"git fetch failed: {err}")
+    rc, _, err = _run(["git", "rebase", "origin/dev"], cwd=worktree)
+    if rc != 0:
+        _run(["git", "rebase", "--abort"], cwd=worktree)
+        raise RuntimeError(f"git rebase failed: {err}")
+    rc, _, err = _run(
+        ["git", "push", "--force-with-lease", "origin", branch],
+        cwd=worktree,
+    )
+    if rc != 0:
+        raise RuntimeError(f"git push --force-with-lease failed: {err}")
+    rc, out, _ = _run(["git", "rev-parse", "HEAD"], cwd=worktree)
+    return True, out.strip()
+
+
+def _merge_squash(repo: str, branch: str, wp: str) -> str:
+    """Squash-merge branch into dev. Return merge SHA on dev."""
+    msg = f"feat({wp.lower()}): squash-merge from {branch}"
+    sha = _gh_merge(repo, base="dev", head=branch, commit_message=msg)
+    # Delete remote branch
+    _run(["gh", "api", "-X", "DELETE", f"repos/{repo}/git/refs/heads/{branch}"],
+         timeout=30)
+    return sha
+
+
+def _poll_deploy(repo: str, workflow: str, merge_sha: str,
+                 interval: int, cap: int) -> tuple[str, str]:
+    """Poll deploy workflow for merge_sha. Return (verdict, deploy_url)."""
+    elapsed = 0
+    while elapsed < cap:
+        runs = _gh_deploy_runs(repo, workflow, merge_sha)
+        if runs:
+            r = runs[0]
+            url = r.get("url", "")
+            status = r.get("status")
+            conclusion = r.get("conclusion")
+            _log(f"Deploy poll: status={status} conclusion={conclusion} (elapsed {elapsed}s)")
+            if status == "completed":
+                if conclusion == "success":
+                    return "green", url
+                return f"failed({conclusion})", url
+        else:
+            _log(f"Deploy poll: no run yet for {merge_sha[:8]} (elapsed {elapsed}s)")
+        time.sleep(interval)
+        elapsed += interval
+    _log(f"Deploy poll: TIMEOUT after {cap}s")
+    return "timeout", ""
+
+
+def _poll_health(url: str, cap: int) -> str:
+    """Poll health endpoint with exponential backoff (1m → 5m, capped at cap)."""
+    elapsed = 0
+    interval = HEALTH_MIN_INTERVAL
+    while elapsed < cap:
+        rc, out, err = _run(
+            ["curl", "-sf", "-o", "/dev/null", "-w", "%{http_code}", url],
+            timeout=30,
+        )
+        if rc == 0 and out.strip() == "200":
+            _log(f"Health check: OK at {url} (elapsed {elapsed}s)")
+            return "healthy"
+        _log(f"Health check: rc={rc} http={out.strip() or '?'} (elapsed {elapsed}s)")
+        time.sleep(interval)
+        elapsed += interval
+        interval = min(interval * 2, HEALTH_MAX_INTERVAL)
+    return "unhealthy"
+
+
+def _run_smoke(cmd: str, cwd: Path) -> tuple[str, str]:
+    """Run smoke command (shell). Return (verdict, output_or_reason)."""
+    if not cmd or cmd.strip() in ("—", "-", "none", "None"):
+        return "PASS", "(no smoke command configured)"
+    rc, out, err = _run(["bash", "-lc", cmd], cwd=cwd, timeout=300)
+    if rc == 0:
+        return "PASS", (out or "").strip()[:500]
+    return f"FAIL — exit {rc}", ((err or out) or "").strip()[:500]
+
+
+# --- run subcommand ------------------------------------------------------
+
+def cmd_run(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+
+    repo = args.repo or os.environ.get("GITHUB_REPOSITORY")
+    if not repo:
+        emit_internal_error(
+            "Could not determine GitHub repo (--repo or $GITHUB_REPOSITORY)"
+        )
+
+    worktree = Path(args.worktree_path).resolve() if args.worktree_path else paths.repo_root
+    ci_interval = args.ci_poll_interval or CI_DEFAULT_INTERVAL
+    deploy_interval = args.deploy_poll_interval or DEPLOY_DEFAULT_INTERVAL
+
+    result: dict = {
+        "wp": args.wp,
+        "outcome": "pending",
+        "merge_sha": None,
+        "deploy_url": None,
+        "deploy_workflow_run": None,
+        "health_status": None,
+        "smoke_verdict": None,
+        "blocker_reason": None,
+        "started_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+
+    try:
+        # Step 8a: CI poll
+        _log(f"Step 8a: polling CI for {args.branch}")
+        verdict = _poll_ci(repo, args.branch, ci_interval, CI_DEFAULT_CAP)
+        if verdict == "failed":
+            result.update(outcome="blocker", blocker_reason="CI checks failed on branch HEAD")
+            _emit_result(result, exit_code=1)
+        if verdict == "timeout":
+            result.update(outcome="blocker", blocker_reason=f"CI did not complete within {CI_DEFAULT_CAP}s")
+            _emit_result(result, exit_code=1)
+
+        # Step 8b: rebase if dev advanced
+        for attempt in range(REBASE_BUDGET):
+            rebased, new_sha = _rebase_on_dev(
+                repo, args.branch, worktree, args.dev_sha_at_creation,
+            )
+            if not rebased:
+                break
+            _log(f"Rebased onto dev (attempt {attempt+1}); re-polling CI")
+            verdict = _poll_ci(repo, args.branch, ci_interval, CI_DEFAULT_CAP)
+            if verdict != "green":
+                result.update(outcome="blocker",
+                              blocker_reason=f"CI {verdict} after rebase attempt {attempt+1}")
+                _emit_result(result, exit_code=1)
+            # update the cursor so the next rebase compares against current dev
+            args.dev_sha_at_creation = _gh_ref_sha(repo, "dev")
+
+        # Step 8c: squash-merge
+        _log("Step 8c: squash-merging to dev")
+        merge_sha = _merge_squash(repo, args.branch, args.wp)
+        result["merge_sha"] = merge_sha
+
+        # Step 9: deploy poll
+        _log(f"Step 9: polling deploy workflow '{args.deploy_workflow}' for {merge_sha[:8]}")
+        deploy_verdict, deploy_url = _poll_deploy(
+            repo, args.deploy_workflow, merge_sha,
+            deploy_interval, DEPLOY_DEFAULT_CAP,
+        )
+        result["deploy_url"] = deploy_url
+        if deploy_verdict != "green":
+            result.update(outcome="blocker", blocker_reason=f"Deploy {deploy_verdict}")
+            _emit_result(result, exit_code=1)
+
+        # Step 10a: health check
+        if args.staging_url:
+            _log(f"Step 10a: health-checking {args.staging_url}")
+            health = _poll_health(args.staging_url, HEALTH_DEFAULT_CAP)
+            result["health_status"] = health
+            if health != "healthy":
+                result.update(outcome="blocker",
+                              blocker_reason=f"Staging health check failed within {HEALTH_DEFAULT_CAP}s")
+                _emit_result(result, exit_code=1)
+        else:
+            result["health_status"] = "skipped (no --staging-url)"
+
+        # Step 10b: smoke test
+        _log("Step 10b: running smoke test")
+        smoke_verdict, smoke_output = _run_smoke(args.smoke_cmd or "", worktree)
+        result["smoke_verdict"] = smoke_verdict
+        if not smoke_verdict.startswith("PASS"):
+            result.update(outcome="blocker", blocker_reason=f"Smoke test: {smoke_verdict}; {smoke_output}")
+            _emit_result(result, exit_code=1)
+
+        result["outcome"] = "success"
+        result["completed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        _emit_result(result, exit_code=0)
+
+    except RuntimeError as exc:
+        result.update(outcome="error", blocker_reason=f"internal: {exc}")
+        _emit_result(result, exit_code=2)
+    except Exception as exc:  # noqa: BLE001
+        result.update(outcome="error", blocker_reason=f"unexpected: {type(exc).__name__}: {exc}")
+        _emit_result(result, exit_code=2)
+
+
+def _emit_result(result: dict, exit_code: int) -> None:
+    """Emit final result line + structured wrapper, then exit."""
+    if "completed_at" not in result:
+        result["completed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    emit_ok(data={"result": result}, exit_code=exit_code)
+
+
+# --- argparse ------------------------------------------------------------
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Steps 8-10 pipeline: CI poll + merge + deploy + health + smoke"
+    )
+    sub = parser.add_subparsers(dest="subcommand", required=True)
+
+    p_run = sub.add_parser("run", help="Run the full pipeline")
+    add_common_args(p_run)
+    p_run.add_argument("--wp", required=True)
+    p_run.add_argument("--branch", required=True)
+    p_run.add_argument("--worktree-path", default=None,
+                       help="Path to worktree (defaults to repo root)")
+    p_run.add_argument("--dev-sha-at-creation", required=True,
+                       help="origin/dev SHA when worktree was created (from sidecar)")
+    p_run.add_argument("--deploy-workflow", required=True,
+                       help="Deploy workflow name (e.g. 'Deploy to Dev Environment')")
+    p_run.add_argument("--staging-url", default=None,
+                       help="Staging URL for health check (optional)")
+    p_run.add_argument("--smoke-cmd", default="",
+                       help="Smoke test shell command (run after health check)")
+    p_run.add_argument("--repo", default=None,
+                       help="GitHub repo (org/name); defaults to $GITHUB_REPOSITORY")
+    p_run.add_argument("--ci-poll-interval", type=int, default=None,
+                       help=f"CI poll interval (s, default {CI_DEFAULT_INTERVAL})")
+    p_run.add_argument("--deploy-poll-interval", type=int, default=None,
+                       help=f"Deploy poll interval (s, default {DEPLOY_DEFAULT_INTERVAL})")
+
+    return parser
+
+
+HANDLERS = {"run": cmd_run}
+
+
+if __name__ == "__main__":
+    cli_main(build_parser(), HANDLERS)

@@ -1,0 +1,267 @@
+#!/usr/bin/env python3
+"""wpx-index — manage INDEX.md (status flips, ready set, config).
+
+Subcommands:
+  flip-status           Change a WP's status (e.g. in_progress → done).
+  list-ready            List ready WPs (status: pending, deps satisfied).
+  read-config           Read project config (max_parallel, etc.).
+  propagate-blocked     Mark transitively-dependent WPs as dependency_blocked.
+  set-status            Force a specific status on a WP.
+
+Exit codes: 0 success, 1 user/data error, 2 internal error.
+"""
+
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _wpxlib import (  # noqa: E402
+    add_common_args,
+    cli_main,
+    emit_error,
+    emit_ok,
+    parse_md_table,
+    paths_from_args,
+)
+
+
+# INDEX.md structure (simplified):
+#
+# ## Orchestrator Config
+# max_parallel: 3
+#
+# ## Work Packages
+#
+# | ID | Title | Primitive | Status | Depends | Blocks | Token | TDD § |
+# |--- | ...  |
+# | WP-001 | ... | Create | pending | — | WP-002 | 5k | 2.1 |
+#
+# The script parses the WP table and updates status cells.
+
+
+def _read_index(args: argparse.Namespace) -> str:
+    paths = paths_from_args(args)
+    if not paths.index_md.exists():
+        raise FileNotFoundError(f"INDEX.md not found: {paths.index_md}")
+    return paths.index_md.read_text(encoding="utf-8")
+
+
+def _write_index(args: argparse.Namespace, text: str) -> None:
+    paths = paths_from_args(args)
+    paths.index_md.write_text(text, encoding="utf-8")
+
+
+def _read_config(text: str) -> dict[str, str]:
+    """Extract Orchestrator Config block (if present)."""
+    pattern = re.compile(
+        r"^## Orchestrator Config\s*\n(.+?)(?=\n##\s|\Z)",
+        re.MULTILINE | re.DOTALL,
+    )
+    match = pattern.search(text)
+    if not match:
+        return {}
+    body = match.group(1)
+    config: dict[str, str] = {}
+    for line in body.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or line.startswith("```"):
+            continue
+        if ":" in line:
+            key, _, value = line.partition(":")
+            config[key.strip()] = value.strip()
+    return config
+
+
+def _find_wp_table(text: str) -> tuple[int, int, str]:
+    """Find the WP table (the one starting with | ID | header). Returns (start, end, table_text)."""
+    # Find the first Markdown table whose first column is "ID"
+    pattern = re.compile(r"(^\|\s*ID\s*\|[^\n]+\n\|[^\n]+\n(?:\|[^\n]*\n)*)",
+                          re.MULTILINE)
+    match = pattern.search(text)
+    if not match:
+        raise ValueError("Could not find WP table in INDEX.md (no | ID | header)")
+    return match.start(), match.end(), match.group(1)
+
+
+def cmd_flip_status(args: argparse.Namespace) -> None:
+    text = _read_index(args)
+    start, end, table_text = _find_wp_table(text)
+    table = parse_md_table(table_text)
+    # Find the status column index
+    try:
+        status_idx = next(i for i, h in enumerate(table.headers) if h.lower() == "status")
+        id_idx = next(i for i, h in enumerate(table.headers) if h.lower() == "id")
+    except StopIteration:
+        emit_error("INDEX.md WP table is missing required 'ID' or 'Status' column")
+
+    found = False
+    for row in table.rows:
+        if id_idx < len(row) and row[id_idx].strip() == args.wp:
+            if status_idx < len(row):
+                actual = row[status_idx].strip()
+                if args.expected and actual != args.expected:
+                    emit_error(
+                        f"WP {args.wp} status is '{actual}', expected '{args.expected}'"
+                    )
+                row[status_idx] = args.to
+                found = True
+    if not found:
+        emit_error(f"WP {args.wp} not found in INDEX.md")
+
+    new_table = table.render() + "\n"
+    text = text[:start] + new_table + text[end:]
+    _write_index(args, text)
+    emit_ok(data={"wp": args.wp, "status": args.to})
+
+
+def cmd_set_status(args: argparse.Namespace) -> None:
+    # Alias for flip-status without --expected
+    args.expected = None
+    cmd_flip_status(args)
+
+
+def cmd_list_ready(args: argparse.Namespace) -> None:
+    text = _read_index(args)
+    start, end, table_text = _find_wp_table(text)
+    table = parse_md_table(table_text)
+    cols = {h.lower(): i for i, h in enumerate(table.headers)}
+    required = {"id", "status", "depends"}
+    if not required <= cols.keys():
+        emit_error(
+            f"INDEX.md WP table missing required columns; have {list(cols.keys())}"
+        )
+
+    # Build map of WP-ID → status
+    status_by_id: dict[str, str] = {}
+    depends_by_id: dict[str, list[str]] = {}
+    for row in table.rows:
+        wp_id = row[cols["id"]].strip()
+        if not wp_id:
+            continue
+        status_by_id[wp_id] = row[cols["status"]].strip()
+        deps_cell = row[cols["depends"]].strip()
+        if deps_cell in ("—", "-", "", "None", "[]"):
+            depends_by_id[wp_id] = []
+        else:
+            depends_by_id[wp_id] = [
+                d.strip() for d in re.split(r"[, ]+", deps_cell) if d.strip()
+            ]
+
+    ready: list[str] = []
+    for wp_id, status in status_by_id.items():
+        if status != "pending":
+            continue
+        deps = depends_by_id.get(wp_id, [])
+        if all(status_by_id.get(d) == "done" for d in deps):
+            ready.append(wp_id)
+    ready.sort()  # deterministic order; caller can pick lowest
+
+    max_parallel = int(_read_config(text).get("max_parallel", 3))
+    emit_ok(data={
+        "ready": ready,
+        "max_parallel": max_parallel,
+        "total_pending": sum(1 for s in status_by_id.values() if s == "pending"),
+        "total_done": sum(1 for s in status_by_id.values() if s == "done"),
+        "total_blocked": sum(1 for s in status_by_id.values() if s == "blocked"),
+        "total_in_progress": sum(1 for s in status_by_id.values() if s == "in_progress"),
+    })
+
+
+def cmd_read_config(args: argparse.Namespace) -> None:
+    text = _read_index(args)
+    config = _read_config(text)
+    emit_ok(data={"config": config})
+
+
+def cmd_propagate_blocked(args: argparse.Namespace) -> None:
+    text = _read_index(args)
+    start, end, table_text = _find_wp_table(text)
+    table = parse_md_table(table_text)
+    cols = {h.lower(): i for i, h in enumerate(table.headers)}
+
+    # Build transitive descendants
+    depends_map: dict[str, list[str]] = {}
+    status_map: dict[str, str] = {}
+    for row in table.rows:
+        wp_id = row[cols["id"]].strip()
+        if not wp_id:
+            continue
+        status_map[wp_id] = row[cols["status"]].strip()
+        deps_cell = row[cols["depends"]].strip()
+        depends_map[wp_id] = (
+            [] if deps_cell in ("—", "-", "", "None", "[]")
+            else [d.strip() for d in re.split(r"[, ]+", deps_cell) if d.strip()]
+        )
+
+    # BFS: starting from args.wp, find all WPs that (transitively) depend on it
+    transitively_dependent = set()
+    queue = [args.wp]
+    while queue:
+        current = queue.pop()
+        for wp_id, deps in depends_map.items():
+            if current in deps and wp_id not in transitively_dependent:
+                transitively_dependent.add(wp_id)
+                queue.append(wp_id)
+
+    # Mark each one as dependency_blocked (only if currently pending)
+    flipped: list[str] = []
+    for row in table.rows:
+        if cols["id"] < len(row):
+            wp_id = row[cols["id"]].strip()
+            if wp_id in transitively_dependent and status_map[wp_id] == "pending":
+                row[cols["status"]] = "dependency_blocked"
+                flipped.append(wp_id)
+
+    new_table = table.render() + "\n"
+    text = text[:start] + new_table + text[end:]
+    _write_index(args, text)
+    emit_ok(data={"blocker_wp": args.wp, "flipped_to_dependency_blocked": flipped})
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Manage INDEX.md")
+    sub = parser.add_subparsers(dest="subcommand", required=True)
+
+    p_flip = sub.add_parser("flip-status", help="Change a WP's status (with check)")
+    add_common_args(p_flip)
+    p_flip.add_argument("--wp", required=True)
+    p_flip.add_argument("--to", required=True,
+                        choices=["pending", "in_progress", "done", "blocked",
+                                 "dependency_blocked", "auto-draft", "cancelled"])
+    p_flip.add_argument("--expected", default=None,
+                        help="Expected current status (atomic check)")
+
+    p_set = sub.add_parser("set-status", help="Force a WP's status (no check)")
+    add_common_args(p_set)
+    p_set.add_argument("--wp", required=True)
+    p_set.add_argument("--to", required=True)
+
+    p_list = sub.add_parser("list-ready", help="List ready WPs")
+    add_common_args(p_list)
+
+    p_config = sub.add_parser("read-config", help="Read Orchestrator Config")
+    add_common_args(p_config)
+
+    p_prop = sub.add_parser("propagate-blocked",
+                            help="Mark transitively dependent WPs as dependency_blocked")
+    add_common_args(p_prop)
+    p_prop.add_argument("--wp", required=True, help="The blocked WP ID")
+
+    return parser
+
+
+HANDLERS = {
+    "flip-status": cmd_flip_status,
+    "set-status": cmd_set_status,
+    "list-ready": cmd_list_ready,
+    "read-config": cmd_read_config,
+    "propagate-blocked": cmd_propagate_blocked,
+}
+
+
+if __name__ == "__main__":
+    cli_main(build_parser(), HANDLERS)

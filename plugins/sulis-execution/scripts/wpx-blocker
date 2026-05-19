@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+"""wpx-blocker — write BLOCKER-WP-NNN.md records per EL-08 format.
+
+Subcommands:
+  write                 Create a BLOCKER record for a WP.
+  archive               Move an existing BLOCKER to .archive/ (used by retry).
+
+Exit codes: 0 success, 1 user/data error, 2 internal error.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _wpxlib import (  # noqa: E402
+    add_common_args,
+    cli_main,
+    emit_error,
+    emit_ok,
+    paths_from_args,
+)
+
+
+def _read_textish(value: str) -> str:
+    """Read from a file (@/path) or use the literal string."""
+    if value.startswith("@"):
+        return Path(value[1:]).read_text(encoding="utf-8")
+    return value
+
+
+def cmd_write(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+    blocker_path = paths.blocker(args.wp)
+    if blocker_path.exists() and not args.force:
+        emit_error(
+            f"BLOCKER already exists: {blocker_path}. Use --force to overwrite."
+        )
+
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    observation = _read_textish(args.observation)
+    five_whys = []
+    if args.five_whys_json:
+        whys_data = json.loads(_read_textish(args.five_whys_json))
+        if isinstance(whys_data, list):
+            five_whys = whys_data
+        elif isinstance(whys_data, dict) and "whys" in whys_data:
+            five_whys = whys_data["whys"]
+
+    blocker_md = [
+        f"# BLOCKER-{args.wp}: {args.title}",
+        "",
+        f"> Created: {now} by sulis-execution executor",
+        f"> Scope: {args.wp}",
+        f"> Step: {args.step}",
+        f"> Trigger: {args.trigger}",
+        "",
+        "## Failure observation (verbatim)",
+        "",
+        "```",
+        observation,
+        "```",
+        "",
+        "## Five Whys trace",
+        "",
+    ]
+    if five_whys:
+        for i, why in enumerate(five_whys, 1):
+            if isinstance(why, dict):
+                q = why.get("why", "?")
+                a = why.get("answer", "")
+                blocker_md.append(f"{i}. **Why {q}** → {a}")
+            else:
+                blocker_md.append(f"{i}. {why}")
+    else:
+        blocker_md.append("(Not provided by caller — see --five-whys-json flag.)")
+
+    blocker_md.extend([
+        "",
+        "## Root cause",
+        "",
+        args.root_cause,
+        "",
+        "## Scope verdict",
+        "",
+        f"- [{'x' if args.scope == 'in-scope-budget-exhausted' else ' '}] in-scope (executor could fix; budget exhausted)",
+        f"- [{'x' if args.scope == 'out-of-scope' else ' '}] out-of-scope (scope guard fired)",
+        f"- [{'x' if args.scope == 'indeterminate' else ' '}] indeterminate (Five Whys non-convergence)",
+        "",
+        f"Reason: {args.scope_reason or args.root_cause}",
+        "",
+    ])
+
+    if args.attempts_json:
+        attempts = json.loads(_read_textish(args.attempts_json))
+        if attempts:
+            blocker_md.extend(["## Attempted fixes (if any)", "",
+                               "| Attempt | Change applied | Outcome |",
+                               "|---:|---|---|"])
+            for a in attempts:
+                blocker_md.append(
+                    f"| {a.get('attempt', '?')} | {a.get('change', '')} | {a.get('outcome', '')} |"
+                )
+            blocker_md.append("")
+
+    blocker_md.extend([
+        "## Plain-English summary (for the concierge / founder)",
+        "",
+        args.plain_english,
+        "",
+        "## Suggested next step",
+        "",
+        args.suggested_next,
+        "",
+    ])
+
+    blocker_path.parent.mkdir(parents=True, exist_ok=True)
+    blocker_path.write_text("\n".join(blocker_md), encoding="utf-8")
+    emit_ok(data={"wp": args.wp, "path": str(blocker_path)})
+
+
+def cmd_archive(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+    blocker_path = paths.blocker(args.wp)
+    if not blocker_path.exists():
+        emit_error(f"No BLOCKER found for {args.wp}: {blocker_path}")
+    archive_dir = paths.wp_dir / ".archive"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    archived_path = archive_dir / f"BLOCKER-{args.wp}-{ts}.md"
+    shutil.move(blocker_path, archived_path)
+    emit_ok(data={
+        "wp": args.wp,
+        "archived_to": str(archived_path),
+        "original": str(blocker_path),
+    })
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Write/archive BLOCKER records")
+    sub = parser.add_subparsers(dest="subcommand", required=True)
+
+    p_write = sub.add_parser("write", help="Create a BLOCKER record")
+    add_common_args(p_write)
+    p_write.add_argument("--wp", required=True)
+    p_write.add_argument("--title", required=True,
+                         help="One-line title (e.g. 'Staging cluster at quota')")
+    p_write.add_argument("--step", required=True,
+                         help="Step at which the BLOCKER fired (e.g. '9')")
+    p_write.add_argument(
+        "--trigger", required=True,
+        choices=["scope-guard", "budget-exhausted", "five-whys-non-convergence"],
+    )
+    p_write.add_argument("--observation", required=True,
+                         help="Verbatim failure output (or @/path/to/file)")
+    p_write.add_argument("--five-whys-json", default=None,
+                         help="Five Whys trace as JSON list (or @/path/to/file)")
+    p_write.add_argument("--root-cause", required=True,
+                         help="One-line root cause")
+    p_write.add_argument(
+        "--scope", required=True,
+        choices=["in-scope-budget-exhausted", "out-of-scope", "indeterminate"],
+    )
+    p_write.add_argument("--scope-reason", default=None,
+                         help="Why this scope verdict")
+    p_write.add_argument("--attempts-json", default=None,
+                         help="Attempts as JSON (or @/path/to/file)")
+    p_write.add_argument("--plain-english", required=True,
+                         help="Plain-English summary for the concierge")
+    p_write.add_argument("--suggested-next", required=True,
+                         help="Concrete next action")
+    p_write.add_argument("--force", action="store_true",
+                         help="Overwrite existing BLOCKER")
+
+    p_archive = sub.add_parser("archive",
+                               help="Archive a BLOCKER to .archive/")
+    add_common_args(p_archive)
+    p_archive.add_argument("--wp", required=True)
+
+    return parser
+
+
+HANDLERS = {
+    "write": cmd_write,
+    "archive": cmd_archive,
+}
+
+
+if __name__ == "__main__":
+    cli_main(build_parser(), HANDLERS)

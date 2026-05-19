@@ -1,0 +1,281 @@
+#!/usr/bin/env python3
+"""wpx-findings — manage findings register + SF files + auto-draft WPs.
+
+Subcommands:
+  register              Register a security finding (with signature-hash dedup).
+  auto-draft-wp         Create an auto-draft WP for a non-CRITICAL finding.
+
+Exit codes: 0 success, 1 user/data error, 2 internal error.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _wpxlib import (  # noqa: E402
+    add_common_args,
+    cli_main,
+    emit_error,
+    emit_ok,
+    paths_from_args,
+)
+
+
+def _read_textish(value: str) -> str:
+    if value.startswith("@"):
+        return Path(value[1:]).read_text(encoding="utf-8")
+    return value
+
+
+def _signature(severity: str, summary: str, file_path: str) -> str:
+    """Compute signature hash for dedup."""
+    raw = f"{severity}|{summary}|{file_path}".encode("utf-8")
+    return hashlib.sha1(raw).hexdigest()[:12]  # noqa: S324
+
+
+def _next_sf_id(paths) -> str:
+    """Allocate next SF-NNN ID by scanning the register."""
+    paths.security_dir.mkdir(parents=True, exist_ok=True)
+    paths.findings_dir.mkdir(parents=True, exist_ok=True)
+    if not paths.findings_register.exists():
+        return "SF-001"
+    text = paths.findings_register.read_text(encoding="utf-8")
+    existing = re.findall(r"SF-(\d{3,})", text)
+    if not existing:
+        return "SF-001"
+    next_n = max(int(x) for x in existing) + 1
+    return f"SF-{next_n:03d}"
+
+
+def _next_auto_wp_id(paths) -> str:
+    """Allocate next WP-AUTO-NNN ID."""
+    paths.wp_dir.mkdir(parents=True, exist_ok=True)
+    existing = [
+        re.match(r"WP-AUTO-(\d{3,})", p.name)
+        for p in paths.wp_dir.glob("WP-AUTO-*.md")
+    ]
+    nums = [int(m.group(1)) for m in existing if m]
+    next_n = max(nums) + 1 if nums else 1
+    return f"WP-AUTO-{next_n:03d}"
+
+
+def _find_existing_signature(paths, signature: str) -> str | None:
+    """If register already has a finding with this signature, return its SF ID."""
+    if not paths.findings_register.exists():
+        return None
+    text = paths.findings_register.read_text(encoding="utf-8")
+    pattern = re.compile(rf"\|\s*(SF-\d{{3,}})\s*\|[^|]*\|[^|]*\|[^|]*\|\s*{re.escape(signature)}\s*\|")
+    match = pattern.search(text)
+    return match.group(1) if match else None
+
+
+def cmd_register(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+    signature = _signature(args.severity, args.summary, args.file)
+
+    existing_sf = _find_existing_signature(paths, signature)
+    if existing_sf:
+        # Record a duplicate observation; don't create new SF or WP-AUTO.
+        _append_register_row(paths, args.wp, args.severity, args.summary, signature,
+                              "—", "duplicate-of-" + existing_sf, dup=True)
+        emit_ok(data={
+            "sf_id": existing_sf,
+            "is_duplicate": True,
+            "source_wp": args.wp,
+            "signature": signature,
+        })
+
+    # New finding
+    sf_id = _next_sf_id(paths)
+    auto_wp_id = _next_auto_wp_id(paths)
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Build SF file
+    sf_slug = re.sub(r"[^a-z0-9-]+", "-", args.summary.lower()).strip("-")[:50]
+    sf_filename = f"{sf_id}-{sf_slug or 'finding'}.md"
+    sf_path = paths.findings_dir / sf_filename
+
+    evidence = ""
+    if args.evidence_json:
+        try:
+            ev = json.loads(_read_textish(args.evidence_json))
+            evidence = json.dumps(ev, indent=2)
+        except json.JSONDecodeError:
+            evidence = _read_textish(args.evidence_json)
+
+    sf_md = f"""---
+id: {sf_id}
+severity: {args.severity}
+signature: {signature}
+source_wp: {args.wp}
+detected_at: {now}
+primitive: {args.primitive or "—"}
+---
+
+## Summary
+
+{args.summary}
+
+## Evidence
+
+```
+{evidence}
+```
+
+## Suggested fix
+
+{args.suggested_fix or "(Not provided.)"}
+
+## Cross-references
+
+- Source WP: {args.wp}
+- Auto-draft WP: {auto_wp_id} (created by this Step 11 run)
+- Duplicate observations: none yet
+"""
+    sf_path.parent.mkdir(parents=True, exist_ok=True)
+    sf_path.write_text(sf_md, encoding="utf-8")
+
+    _append_register_row(paths, args.wp, args.severity, args.summary, signature, sf_id, auto_wp_id)
+
+    emit_ok(data={
+        "sf_id": sf_id,
+        "auto_draft_wp_id": auto_wp_id,
+        "is_duplicate": False,
+        "source_wp": args.wp,
+        "signature": signature,
+        "sf_path": str(sf_path),
+    })
+
+
+def _append_register_row(paths, source_wp: str, severity: str, summary: str,
+                         signature: str, sf_id: str, target_or_disposition: str,
+                         dup: bool = False) -> None:
+    if not paths.findings_register.exists():
+        paths.findings_register.parent.mkdir(parents=True, exist_ok=True)
+        paths.findings_register.write_text(
+            "# Findings Register\n\n"
+            "Append-only ledger of security findings across all WPs in this project.\n\n"
+            "| SF ID | Severity | Summary | Source WP | Signature | Target / Disposition |\n"
+            "|---|---|---|---|---|---|\n",
+            encoding="utf-8",
+        )
+    summary_short = summary if len(summary) <= 80 else summary[:77] + "..."
+    summary_short = summary_short.replace("|", "\\|")
+    line = f"| {sf_id} | {severity} | {summary_short} | {source_wp} | {signature} | {target_or_disposition} |\n"
+    with paths.findings_register.open("a", encoding="utf-8") as f:
+        f.write(line)
+
+
+def cmd_auto_draft_wp(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+    sf_path = next(paths.findings_dir.glob(f"{args.source_finding}-*.md"), None)
+    if sf_path is None:
+        emit_error(f"SF file not found for {args.source_finding}")
+
+    sf_text = sf_path.read_text(encoding="utf-8")
+    # Extract Suggested fix and Summary
+    summary_match = re.search(r"^## Summary\s*\n(.+?)(?=\n##)", sf_text, re.DOTALL | re.MULTILINE)
+    summary = summary_match.group(1).strip() if summary_match else "(no summary)"
+    fix_match = re.search(r"^## Suggested fix\s*\n(.+?)(?=\n##|\Z)", sf_text, re.DOTALL | re.MULTILINE)
+    suggested_fix = fix_match.group(1).strip() if fix_match else "(no fix provided)"
+
+    auto_wp_id = args.auto_wp_id  # caller passes the ID allocated during register
+    slug = re.sub(r"[^a-z0-9-]+", "-", summary.lower())[:40].strip("-")
+    wp_filename = f"{auto_wp_id}-{slug or 'auto-draft'}.md"
+    wp_path = paths.wp_dir / wp_filename
+
+    wp_md = f"""---
+id: {auto_wp_id}
+title: Auto-draft from {args.source_finding}
+status: auto-draft
+sequence_id: {auto_wp_id}
+dependsOn: [{args.source_wp}]
+blocks: []
+primitive: {args.primitive}
+group: reinforce
+source_finding: {args.source_finding}
+severity: {args.severity}
+disposition: pending-review
+pillar: armor
+---
+
+## Context
+
+Auto-drafted from security finding {args.source_finding} (severity: {args.severity}),
+surfaced during Step 11 of {args.source_wp}. See
+`.security/{paths.project}/findings/{args.source_finding}-*.md` for the full finding.
+
+## Contract
+
+<Skeleton — SEA fleshes out when this WP is approved by the
+founder via the concierge's slice-end review.>
+
+## Definition of Done
+
+<Skeleton — SEA fleshes out.>
+
+Suggested fix from security-reviewer:
+
+> {suggested_fix}
+
+## Sequence
+
+<Skeleton — SEA fleshes out.>
+"""
+    wp_path.parent.mkdir(parents=True, exist_ok=True)
+    wp_path.write_text(wp_md, encoding="utf-8")
+    emit_ok(data={"auto_wp_id": auto_wp_id, "path": str(wp_path)})
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Manage findings register + auto-draft WPs")
+    sub = parser.add_subparsers(dest="subcommand", required=True)
+
+    p_reg = sub.add_parser("register", help="Register a security finding")
+    add_common_args(p_reg)
+    p_reg.add_argument("--wp", required=True, help="Source WP that surfaced the finding")
+    p_reg.add_argument("--severity", required=True,
+                       choices=["CRITICAL", "CONCERN", "ADVISORY"])
+    p_reg.add_argument("--summary", required=True,
+                       help="One-line plain-English summary")
+    p_reg.add_argument("--file", required=True,
+                       help="Primary file path the finding applies to")
+    p_reg.add_argument("--evidence-json", default=None,
+                       help="Evidence detail JSON (or @/path/to/file)")
+    p_reg.add_argument("--suggested-fix", default=None,
+                       help="Recommended fix (free text)")
+    p_reg.add_argument("--primitive", default=None,
+                       help="Security primitive ID (e.g. SEC-01)")
+
+    p_draft = sub.add_parser("auto-draft-wp",
+                             help="Create an auto-draft WP from a finding")
+    add_common_args(p_draft)
+    p_draft.add_argument("--source-finding", required=True,
+                         help="SF-NNN id of the source finding")
+    p_draft.add_argument("--source-wp", required=True,
+                         help="WP that surfaced the finding")
+    p_draft.add_argument("--auto-wp-id", required=True,
+                         help="WP-AUTO-NNN allocated id (from register)")
+    p_draft.add_argument("--primitive", default="Secure",
+                         choices=["Secure", "Harden", "Instrument", "Gate"])
+    p_draft.add_argument("--severity", required=True,
+                         choices=["CONCERN", "ADVISORY"])
+
+    return parser
+
+
+HANDLERS = {
+    "register": cmd_register,
+    "auto-draft-wp": cmd_auto_draft_wp,
+}
+
+
+if __name__ == "__main__":
+    cli_main(build_parser(), HANDLERS)

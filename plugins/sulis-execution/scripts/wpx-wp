@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+"""wpx-wp — read WP frontmatter; append acceptance evidence.
+
+Subcommands:
+  read-frontmatter      Read a specific field from a WP's YAML frontmatter.
+  append-evidence       Append ## Acceptance Evidence block to a WP file.
+
+Exit codes: 0 success, 1 user/data error, 2 internal error.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _wpxlib import (  # noqa: E402
+    add_common_args,
+    cli_main,
+    emit_error,
+    emit_ok,
+    paths_from_args,
+    read_frontmatter,
+)
+
+
+def cmd_read_frontmatter(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+    wp_path = paths.wp_file(args.wp)
+    fm = read_frontmatter(wp_path)
+    if args.field == "*":
+        emit_ok(data={"frontmatter": fm})
+    value = fm.get(args.field)
+    if value is None:
+        emit_ok(data={"field": args.field, "value": None, "present": False})
+    emit_ok(data={"field": args.field, "value": value, "present": True})
+
+
+def cmd_append_evidence(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+    wp_path = paths.wp_file(args.wp)
+    if args.evidence_json.startswith("@"):
+        # Read from file
+        evidence_path = Path(args.evidence_json[1:])
+        evidence_text = evidence_path.read_text(encoding="utf-8")
+    else:
+        evidence_text = args.evidence_json
+    try:
+        evidence = json.loads(evidence_text)
+    except json.JSONDecodeError as e:
+        emit_error(f"Invalid JSON: {e}")
+        return  # for type-checker; emit_error sys.exits
+
+    # Build the evidence block
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    block = ["", "## Acceptance Evidence", ""]
+    field_order = [
+        ("branch", "Branch", "{} (deleted post-merge)"),
+        ("pre_squash_sha", "Pre-squash SHA", "`{}`"),
+        ("merge_sha", "Squash-merge SHA on dev", "`{}`"),
+        ("deploy_url", "Deployment URL", "{}"),
+        ("health_status", "Health status", "`{}`"),
+        ("smoke_verdict", "Smoke-test verdict", "{}"),
+        ("post_deploy_verification", "Post-deploy verification", "{}"),
+    ]
+    for key, label, fmt in field_order:
+        if key in evidence:
+            block.append(f"- {label}: " + fmt.format(evidence[key]))
+    block.append(f"- Completed: `{now}` (Step 12 by calling session)")
+    block.append("")
+
+    existing_text = wp_path.read_text(encoding="utf-8")
+    if "## Acceptance Evidence" in existing_text:
+        emit_error(
+            f"WP file already has ## Acceptance Evidence section. "
+            f"Use --force to overwrite (not implemented)."
+        )
+    new_text = existing_text.rstrip() + "\n" + "\n".join(block)
+    wp_path.write_text(new_text, encoding="utf-8")
+    emit_ok(data={"wp": args.wp, "path": str(wp_path)})
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Read WP frontmatter; append acceptance evidence."
+    )
+    sub = parser.add_subparsers(dest="subcommand", required=True)
+
+    p_read = sub.add_parser("read-frontmatter", help="Read a frontmatter field")
+    add_common_args(p_read)
+    p_read.add_argument("--wp", required=True)
+    p_read.add_argument(
+        "--field", required=True,
+        help="Field name; use '*' to dump all"
+    )
+
+    p_append = sub.add_parser("append-evidence",
+                              help="Append ## Acceptance Evidence to WP file")
+    add_common_args(p_append)
+    p_append.add_argument("--wp", required=True)
+    p_append.add_argument(
+        "--evidence-json", required=True,
+        help="Evidence as JSON (or @/path/to/file.json)"
+    )
+
+    return parser
+
+
+HANDLERS = {
+    "read-frontmatter": cmd_read_frontmatter,
+    "append-evidence": cmd_append_evidence,
+}
+
+
+if __name__ == "__main__":
+    cli_main(build_parser(), HANDLERS)
