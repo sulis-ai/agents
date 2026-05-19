@@ -37,7 +37,14 @@ SCRIPTS_DIR = Path(__file__).parent
 
 
 def _call_tool(tool: str, args: list[str]) -> dict:
-    """Invoke a sibling wpx-* tool; parse JSON response."""
+    """Invoke a sibling wpx-* tool; parse JSON response.
+
+    Fails-fast (emit_error → exit 1) if the sub-tool crashes
+    unexpectedly (exit 2+), emits non-JSON, or returns ok:false.
+    This preserves wpx-step12's atomic-wrap semantics: if any
+    sub-call reports failure, downstream steps are not attempted
+    and the partial state is surfaced clearly via emit_error.
+    """
     cmd = [str(SCRIPTS_DIR / tool), *args]
     proc = subprocess.run(cmd, capture_output=True, text=True)  # noqa: S603
     if proc.returncode not in (0, 1):
@@ -47,10 +54,21 @@ def _call_tool(tool: str, args: list[str]) -> dict:
             f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
         )
     try:
-        return json.loads(proc.stdout.strip().splitlines()[-1])
-    except (json.JSONDecodeError, IndexError) as e:
+        # All wpx-* tools emit pretty-printed multi-line JSON via
+        # `json.dumps(..., indent=2)` in _wpxlib.emit_ok/emit_error.
+        # Parse the whole stdout — not just the last line — so the
+        # closing `}` on its own line doesn't fail the parse.
+        parsed = json.loads(proc.stdout.strip())
+    except json.JSONDecodeError as e:
         emit_error(f"{tool} did not emit JSON: {e}; stdout={proc.stdout!r}")
-    return {}  # for type checker; emit_error sys.exits
+        return {}  # unreachable; for type checker
+    if not parsed.get("ok", False):
+        # Sub-tool returned a structured failure (ok:false). Fail-fast.
+        emit_error(
+            f"{tool} reported failure: "
+            f"{parsed.get('error', 'unknown error')}"
+        )
+    return parsed
 
 
 def _read_textish(value: str) -> str:
@@ -91,6 +109,7 @@ def cmd_wrap(args: argparse.Namespace) -> None:
         "append-evidence",
         "--wp", args.wp,
         "--project", paths.project,
+        "--repo-root", str(paths.repo_root),
         "--evidence-json", f"@{evidence_path}",
     ])
     summary["steps"]["append_evidence"] = result_1.get("data", {})
@@ -100,6 +119,7 @@ def cmd_wrap(args: argparse.Namespace) -> None:
         "flip-status",
         "--wp", args.wp,
         "--project", paths.project,
+        "--repo-root", str(paths.repo_root),
         "--to", "done",
         "--expected", "in_progress",
     ])
@@ -111,6 +131,7 @@ def cmd_wrap(args: argparse.Namespace) -> None:
             "remove",
             "--wp", args.wp,
             "--project", paths.project,
+            "--repo-root", str(paths.repo_root),
             "--worktree-path", args.worktree_path,
             "--tolerate-missing",
         ])
