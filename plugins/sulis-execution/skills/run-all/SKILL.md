@@ -126,10 +126,17 @@ loop:
 
        You are dispatched by the run-all loop (parallel batch
        of N) to ship WP-NNN through Steps 1-7 of the lifecycle:
-       worktree, RGB, docs, lint, commit, push. Steps 8-12 (CI poll,
-       merge, deploy, health, smoke, security review, INDEX flip,
-       acceptance evidence, worktree removal) are the calling
-       session's responsibility — do NOT do them.
+       worktree, plan generation (Step 1.5, v0.10.0+), RGB, docs,
+       lint, commit, push. Steps 8-12 (CI poll, merge, deploy,
+       health, smoke, security review, INDEX flip, acceptance
+       evidence, worktree removal) are the calling session's
+       responsibility — do NOT do them.
+
+       At Step 1.5 you MUST emit a structured plan to the journal
+       via `wpx-journal seed-plan` before starting Step 2 (RED).
+       See agents/executor.md "Step 1.5 — Plan generation (MUST)"
+       for the approach + item-list shape. The plan is the
+       calling session's pre-execution audit surface.
 
        WP file: .architecture/{project}/work-packages/WP-NNN-<title>.md
        INDEX:   .architecture/{project}/work-packages/INDEX.md
@@ -197,13 +204,28 @@ loop:
 
            Skip Steps 8-12. Continue to next WP in the loop.
 
+           Note: a Step 1.5 scope-guard BLOCKER (executor identified
+           that the WP's Contract references files outside scope, or
+           the plan would violate scope) lands here too — surface the
+           plain-English summary normally; the upstream fix is for
+           SEA to reconcile the WP Contract.
+
        (c) **Step 7 NOT complete AND no BLOCKER** (executor returned
-           prematurely) — classify as "error". Halt the entire loop:
+           prematurely) — classify as "error". Halt the entire loop.
+           Optionally check whether the journal has a populated
+           `## Plan` section (read via `wpx-journal read --field plan`)
+           to determine where the executor parked:
 
                "WP-NNN: executor returned before Step 7 completed
-                and no BLOCKER was written. Likely parked early in
-                lifecycle. Re-dispatch via /sulis-execution:run-wp
-                WP-NNN to resume from journal."
+                and no BLOCKER was written. Plan: <N items, M done>.
+                Likely parked at <step inferred from in-progress
+                item>. Re-dispatch via /sulis-execution:run-wp WP-NNN
+                to resume from journal."
+
+           The plan in the journal makes the parked-state diagnosis
+           specific. v0.10.0+ executors that have completed Step 1.5
+           leave a readable item list showing exactly which item was
+           in-progress when the session ended.
 
    12. **For each Step-7-complete WP, run the Steps 8-12 pipeline.**
 

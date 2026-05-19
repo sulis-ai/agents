@@ -39,8 +39,15 @@ Agent({
   model: <executor_model from WP frontmatter, if present>,
   prompt: """
 You are dispatched to ship WP-NNN through Steps 1-7 of the lifecycle:
-worktree, RED, GREEN, BLUE, docs, lint, commit, push. Read your agent
-prompt (agents/executor.md) for the full contract.
+worktree, plan generation (Step 1.5, v0.10.0+), RED, GREEN, BLUE,
+docs, lint, commit, push. Read your agent prompt (agents/executor.md)
+for the full contract.
+
+At Step 1.5 you MUST emit a structured plan to the journal via
+`wpx-journal seed-plan` before starting Step 2 (RED). The plan is
+the pre-execution audit surface — this skill (the calling session)
+will read it on your return to determine where you parked if you
+didn't reach Step 7.
 
 Steps 8-12 (CI poll, squash-merge, deploy, health, smoke, security
 review, INDEX flip, acceptance evidence, worktree removal) are the
@@ -98,9 +105,18 @@ wpx-index flip-status --wp WP-NNN --project <slug> \
 ```
 
 **(c) Step 7 NOT complete AND no BLOCKER** — classify as "error".
-Surface: *"WP-NNN: executor returned before Step 7 completed. Likely
-parked early in lifecycle. Re-invoke this skill to resume from
-journal."* Do NOT proceed to Step 2.
+Optionally read the journal's plan to determine where the executor
+parked (`wpx-journal read --field plan` returns the item statuses).
+Surface:
+
+```
+WP-NNN: executor returned before Step 7 completed and no BLOCKER
+was written. Plan: <N items, M done>. Likely parked at
+<step inferred from in-progress item>. Re-invoke this skill to
+resume from journal.
+```
+
+Do NOT proceed to Step 2 (the v0.9.0 Steps 8-12 pipeline).
 
 ### Step 2 — Run the pipeline (Steps 8-10)
 

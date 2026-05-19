@@ -78,7 +78,7 @@ If any required artifact is missing or malformed, halt immediately and
 escalate (per EL-06 scope guard — the missing artifact is a contract
 breach by an upstream agent, not something you can fix).
 
-## The 7-step lifecycle (v0.9.0)
+## The 7-step lifecycle (v0.10.0)
 
 Each step has a success criterion. Only advance when the previous step
 is green. On failure, OODA + Five Whys + scope guard + self-heal
@@ -87,12 +87,13 @@ budget per `executor-loop-standard.md`.
 | # | Step | Success criterion |
 |---|---|---|
 | 1 | Worktree + branch | `wpx-worktree create` cuts a branch `feat/wp-NNN-<slug>` off `origin/dev`; dev SHA recorded in sidecar; `wpx-journal init` runs; pre-flight tooling checks recorded |
-| 2 | RED — write failing tests | Tests written per WP Contract (happy path + edge cases + hardening assertions); all fail for the right reason |
-| 3 | GREEN — minimum code | All new tests pass; full suite green; ≥90% coverage on new files; internal prior art checked before new code |
-| 4 | BLUE — mandatory refactor | Tests still green after refactor; duplication extracted at 2-consumer threshold |
-| 5 | **Documentation update** | Docs reflect the WP's behaviour change; identified via `docs_to_update` frontmatter OR auto-detected from WP's modified source files; no-op if nothing applies |
-| 6 | Lint / type / format | All checks pass |
-| 7 | Commit (Conventional Commits) + push | Push accepted; remote branch updated; journal Step 7 trace row marked Completed; **executor exits** |
+| 1.5 | **Plan generation (NEW, v0.10.0)** | `wpx-journal seed-plan` populates the journal's `## Plan` section with an approach paragraph + a structured item list (one row per test, implementation target, conditional refactor, docs, lint, commit). The plan is the agent's "here's what I'm about to do" surface — readable by the calling session + concierge before substantive work begins. |
+| 2 | RED — write failing tests | Tests written per WP Contract (happy path + edge cases + hardening assertions); all fail for the right reason; plan items for Step 2 marked `done` via `wpx-journal mark-plan-item` |
+| 3 | GREEN — minimum code | All new tests pass; full suite green; ≥90% coverage on new files; internal prior art checked before new code; plan items for Step 3 marked `done` |
+| 4 | BLUE — mandatory refactor | Tests still green after refactor; duplication extracted at 2-consumer threshold; conditional refactor plan items marked `done` or `skipped` with notes |
+| 5 | **Documentation update** | Docs reflect the WP's behaviour change; identified via `docs_to_update` frontmatter OR auto-detected from WP's modified source files; no-op if nothing applies; Step 5 plan items marked `done` |
+| 6 | Lint / type / format | All checks pass; plan items for Step 6 marked `done` |
+| 7 | Commit (Conventional Commits) + push | Push accepted; remote branch updated; journal Step 7 trace row marked Completed; Step 7 plan items marked `done`; **executor exits** |
 
 **Steps 8-12 are the calling session's responsibility (v0.9.0+).**
 The run-all skill, run-wp skill, or founder's main session takes
@@ -129,6 +130,145 @@ See `references/lifecycle.md` for the detailed per-step contract,
 success criteria, and failure-handling OODA recipes (Steps 1-7) plus
 a calling-session reference for what happens at Steps 8-12.
 
+## Step 1.5 — Plan generation (MUST — v0.10.0+)
+
+After Step 1 completes (worktree, journal init, pre-flight checks)
+and before Step 2 starts (RED), you MUST generate and write a
+structured plan to the journal's `## Plan` section. This is the
+*"here's what I'm about to do"* surface — the calling session and
+concierge can read it before any test or code is written, and it
+catches scope drift before substantive work begins.
+
+### Generating the plan
+
+Read the WP file, TDD section, and relevant ADRs (already done as part
+of "Required reading"). Then derive:
+
+1. **An "approach" summary, 2-3 sentences.** Identify the WP's
+   `primitive` (Create, Reuse, Strangle, etc.); name the scaffold from
+   `references/primitive-scaffolds.md` that applies; flag the key risk
+   or non-obvious decision. Example: *"Create primitive. New
+   `billing.cancel_subscription()` with happy + expired test cases.
+   Key risk: shared validation with `refund_subscription` — refactor
+   if 2-consumer threshold fires."*
+
+2. **A list of plan items, one JSON object each:**
+   - One item per test in the WP's Definition of Done > Red checklist.
+     Description should include the test name AND the file path:
+     `"Write test_cancel_happy in tests/test_billing.py"`.
+   - One item per implementation target identified from the Contract
+     and Definition of Done > Green: function name + module path.
+   - Zero or one refactor item from Definition of Done > Blue. If
+     it's conditional (depends on the 2-consumer rule firing), include
+     it with `notes: "conditional"` so its skip-vs-do is explicit.
+   - Zero or more docs items, one per file listed in `docs_to_update`
+     frontmatter (or auto-detected from the WP's source-file scope).
+   - **One** item for Step 6 (`"Run lint + type + format"`).
+   - **One** item for Step 7 (`"Commit + push"`).
+
+   Each item is `{"description": "...", "step": "<phase>", "notes":
+   "..." (optional)}`. The `step` value is short: `2 (RED)`,
+   `3 (GREEN)`, `4 (BLUE)`, `5 (DOCS)`, `6 (LINT)`, `7 (COMMIT)`.
+
+### Writing the plan
+
+Write the JSON to a tmp file, then invoke `wpx-journal seed-plan`:
+
+```bash
+cat > /tmp/plan-WP-NNN.json <<'JSON'
+[
+  {"description": "Write test_cancel_happy in tests/test_billing.py", "step": "2 (RED)"},
+  {"description": "Write test_cancel_expired in tests/test_billing.py", "step": "2 (RED)"},
+  {"description": "Implement cancel_subscription() in src/billing.py", "step": "3 (GREEN)"},
+  {"description": "Refactor shared validation", "step": "4 (BLUE)", "notes": "conditional"},
+  {"description": "Update docs/billing.md cancel-flow section", "step": "5 (DOCS)"},
+  {"description": "Run lint + type + format", "step": "6 (LINT)"},
+  {"description": "Commit + push", "step": "7 (COMMIT)"}
+]
+JSON
+
+plugins/sulis-execution/scripts/wpx-journal seed-plan \
+  --wp WP-NNN --project <slug> \
+  --approach "Create primitive. New billing.cancel_subscription() with happy + expired tests. Key risk: shared validation refactor if 2-consumer fires." \
+  --plan-json @/tmp/plan-WP-NNN.json
+```
+
+### Scope-guard tie-in
+
+After seeding the plan, **review the items for scope violations**.
+Every file path mentioned in any item's description MUST be inside
+the WP's Contract scope. If you find a plan item that references a
+file outside the Contract:
+
+1. Do not write any tests or code.
+2. Write a BLOCKER via `wpx-blocker write` with:
+   - `--trigger scope-guard`
+   - `--step 1.5`
+   - `--root-cause "Plan references files outside WP Contract: <list>"`
+   - `--scope out-of-scope`
+   - Plain-English summary explaining the mismatch.
+3. Exit. The calling session classifies as `blocked` and propagates
+   `dependency_blocked` to downstream WPs.
+
+This catches scope drift before any test is written — the highest-
+leverage moment in the lifecycle to fail fast.
+
+### Working through the plan during Steps 2-7
+
+As each plan item begins, flip its status to `in-progress`:
+
+```bash
+plugins/sulis-execution/scripts/wpx-journal mark-plan-item \
+  --wp WP-NNN --project <slug> \
+  --item <N> --status in-progress --expected pending
+```
+
+When the item is complete, mark `done`:
+
+```bash
+plugins/sulis-execution/scripts/wpx-journal mark-plan-item \
+  --wp WP-NNN --project <slug> \
+  --item <N> --status done --expected in-progress
+```
+
+Conditional items that don't fire (e.g., the Blue refactor when the
+2-consumer rule wasn't triggered) get `skipped` with a notes update:
+
+```bash
+plugins/sulis-execution/scripts/wpx-journal mark-plan-item \
+  --wp WP-NNN --project <slug> \
+  --item <N> --status skipped \
+  --notes "2-consumer threshold not reached; no refactor needed"
+```
+
+If reality deviates from the plan mid-run (e.g., you discover an 8th
+test is needed in Step 2 that you didn't anticipate), append it:
+
+```bash
+plugins/sulis-execution/scripts/wpx-journal add-plan-item \
+  --wp WP-NNN --project <slug> \
+  --description "Add test_cancel_null_id in tests/test_billing.py" \
+  --step "2 (RED)" \
+  --notes "discovered during implementation"
+```
+
+Newly-added items also get scope-guard reviewed before any code is
+written for them.
+
+### Resume semantics
+
+If your session terminates mid-WP (rare; the harness's session
+budget is generous for Steps 1-7), on re-dispatch read the journal
+via `wpx-journal read --field plan`. If the plan exists:
+
+- Do NOT re-seed (re-seeding without `--force` is rejected, by design).
+- Find the first item with status `in-progress` or `pending` — that's
+  the resume point.
+- Continue from there.
+
+If `## Plan` is empty (executor terminated before Step 1.5 completed),
+seed normally.
+
 ## Bookkeeping via wpx-* tools (MUST — v0.9.0 commit 1.24b+)
 
 **Every bookkeeping operation in your lifecycle goes through a
@@ -152,10 +292,13 @@ are the calling session's; their tool invocations are documented in
 | Step 1: create worktree off `dev` + record dev SHA | `wpx-worktree create --wp WP-NNN --project <slug> --branch feat/wp-NNN-<slug> --worktree-path ../wp-NNN-worktree` |
 | Step 1: initialise journal | `wpx-journal init --wp WP-NNN --project <slug>` |
 | Step 1: record each pre-flight tooling check | `wpx-journal record-preflight --wp WP-NNN --project <slug> --tool <name> --status present\|absent --fallback "<note>"` |
+| Step 1.5: seed the plan | `wpx-journal seed-plan --wp WP-NNN --project <slug> --approach "<2-3 sentence summary>" --plan-json @/tmp/plan.json` |
+| Steps 2-7: flip a plan item status | `wpx-journal mark-plan-item --wp WP-NNN --project <slug> --item <N> --status <pending\|in-progress\|done\|skipped> [--expected <current>] [--notes "..."]` |
+| Steps 2-7: append a plan item discovered mid-run | `wpx-journal add-plan-item --wp WP-NNN --project <slug> --description "..." --step "<phase>" [--notes "..."]` |
 | Any step (2-7): announce step start | `wpx-journal start-step --wp WP-NNN --project <slug> --step <N>` |
 | Any step (2-7): announce step success | `wpx-journal complete-step --wp WP-NNN --project <slug> --step <N> --outcome "<one-line>"` |
 | Any step (2-7): record a self-heal attempt | `wpx-journal record-attempt --wp WP-NNN --project <slug> --step <N> --attempt <K> --failure "..." --root-cause "..." --change "..." --outcome "..."` |
-| Any step (2-7): read your own journal | `wpx-journal read --wp WP-NNN --project <slug> --field <status\|lifecycle-step\|step-trace\|step-N-status\|preflight>` |
+| Any step (2-7): read your own journal | `wpx-journal read --wp WP-NNN --project <slug> --field <status\|lifecycle-step\|step-trace\|step-N-status\|preflight\|plan>` |
 | BLOCKER (escalation): write the EL-08 record | `wpx-blocker write --wp WP-NNN --project <slug> --title "..." --step <N> --trigger <scope-guard\|budget-exhausted\|five-whys-non-convergence> --observation @/tmp/observation.txt --five-whys-json @/tmp/whys.json --root-cause "..." --scope <in-scope-budget-exhausted\|out-of-scope\|indeterminate> --plain-english "..." --suggested-next "..."` |
 
 **Steps 8-12 belong to the calling session (v0.9.0+).** You do not

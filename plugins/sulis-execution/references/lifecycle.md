@@ -9,6 +9,7 @@ trigger.
 | # | Step | Owner |
 |---|---|---|
 | 1 | Worktree + branch | Executor |
+| 1.5 | Plan generation (v0.10.0+) | Executor |
 | 2 | RED — failing tests | Executor |
 | 3 | GREEN — minimum code | Executor |
 | 4 | BLUE — refactor | Executor |
@@ -304,6 +305,133 @@ directory in the worktree.
 **Escalation trigger:** Two budget attempts (per
 `self-heal-budget.md`) exhausted, or out-of-scope failure (no `dev`
 branch).
+
+---
+
+## Step 1.5 — Plan generation (v0.10.0+)
+
+**Input:** WP file (already read), TDD section, ADRs, journal initialised
+at Step 1 with empty `## Plan` section.
+
+**Owner:** Executor.
+
+**Purpose:** Produce a structured "here's what I'm about to do" surface
+in the journal before any test or code is written. This catches scope
+drift before substantive work begins, gives the calling session +
+concierge a readable plan to surface to the founder, and creates an
+audit record of the executor's intent independent of the eventual
+acceptance evidence.
+
+The plan generation has two halves: an **approach** paragraph
+(2-3 sentences of strategic shape) and an **item list** (concrete
+plan rows, one per testable / implementable unit of work).
+
+### Approach paragraph
+
+Identify the WP's `primitive` field (Create / Reuse / Strangle /
+Refactor / ...). Look up the matching scaffold in
+`references/primitive-scaffolds.md`. Surface in 2-3 sentences:
+
+- Which primitive applies and what scaffold shape that implies.
+- The key risk or non-obvious decision in the WP's Contract.
+- Expected scope of file changes (rough estimate: "two new tests in
+  X, one new function in Y, possibly a refactor in Z").
+
+Example: *"Create primitive. New `billing.cancel_subscription()`
+with happy + expired test cases. Key risk: shared validation with
+`refund_subscription` — refactor if 2-consumer threshold fires."*
+
+### Item list
+
+One item per testable or implementable unit of work. Each item is a
+JSON object `{description, step, notes?}`:
+
+- **Per Definition-of-Done > Red checklist line**: one item with
+  description like *"Write test_cancel_happy in tests/test_billing.py"*
+  and `step: "2 (RED)"`.
+- **Per implementation target** identified from the Contract + DoD >
+  Green: function name + module path, e.g. *"Implement
+  `cancel_subscription()` in src/billing.py"* with `step: "3 (GREEN)"`.
+- **Zero or one refactor item** from DoD > Blue. If conditional on the
+  2-consumer rule firing, include with `notes: "conditional"` so the
+  skip-vs-do decision is explicit.
+- **Zero or more docs items** from `docs_to_update` frontmatter (or
+  auto-detected): one per file.
+- **One lint item** (`step: "6 (LINT)"`).
+- **One commit + push item** (`step: "7 (COMMIT)"`).
+
+The `step` field uses short canonical phase labels: `2 (RED)`,
+`3 (GREEN)`, `4 (BLUE)`, `5 (DOCS)`, `6 (LINT)`, `7 (COMMIT)`.
+
+### Invocation
+
+```bash
+cat > /tmp/plan-WP-NNN.json <<JSON
+[
+  {"description": "Write test_cancel_happy in tests/test_billing.py", "step": "2 (RED)"},
+  {"description": "Write test_cancel_expired in tests/test_billing.py", "step": "2 (RED)"},
+  {"description": "Implement cancel_subscription() in src/billing.py", "step": "3 (GREEN)"},
+  {"description": "Refactor shared validation", "step": "4 (BLUE)", "notes": "conditional"},
+  {"description": "Update docs/billing.md cancel-flow section", "step": "5 (DOCS)"},
+  {"description": "Run lint + type + format", "step": "6 (LINT)"},
+  {"description": "Commit + push", "step": "7 (COMMIT)"}
+]
+JSON
+
+plugins/sulis-execution/scripts/wpx-journal seed-plan \
+  --wp WP-NNN --project <slug> \
+  --approach "<2-3 sentence summary>" \
+  --plan-json @/tmp/plan-WP-NNN.json
+```
+
+### Success criterion
+
+`## Plan` section in the journal contains a populated approach
+paragraph + a non-empty item table. All items have status `pending`.
+
+### Failure handling
+
+If during plan generation you identify that the WP Contract is
+internally contradictory or references files outside any plausible
+scope, do NOT seed the plan. Escalate immediately via
+`wpx-blocker write` with `--trigger scope-guard --step 1.5` and an
+observation describing the contradiction. The journal's `## Plan`
+section remains empty; the calling session sees the BLOCKER and
+flips INDEX to `blocked`.
+
+If the seed succeeds but you then notice on review that a plan item
+references a file outside the WP Contract scope, the same
+scope-guard escalation applies — you simply have a populated plan
+in the journal alongside the BLOCKER for diagnostic clarity.
+
+### Working through the plan (during Steps 2-7)
+
+As each item begins, flip `pending → in-progress`:
+
+```bash
+wpx-journal mark-plan-item --wp WP-NNN --project <slug> \
+  --item <N> --status in-progress --expected pending
+```
+
+When complete, flip `in-progress → done`:
+
+```bash
+wpx-journal mark-plan-item --wp WP-NNN --project <slug> \
+  --item <N> --status done --expected in-progress
+```
+
+Conditional items that don't fire: `--status skipped --notes "..."`.
+
+New items discovered mid-run: `wpx-journal add-plan-item`.
+
+### Resume semantics
+
+If the executor's session terminates between Step 1.5 completion and
+Step 7 success (rare), the journal's `## Plan` section is the resume
+point. On re-dispatch, the executor reads the plan via
+`wpx-journal read --field plan`, finds the first item with status
+`in-progress` or `pending`, and continues from there — does NOT
+re-seed.
 
 ---
 
