@@ -28,10 +28,11 @@ orchestrator subagent could not dispatch executor subagents
 
 The calling session DOES have Agent at the top level. So the loop
 runs in the calling session; the calling session spawns multiple
-executors in parallel as its own subagents; each executor's Step 11
-spawns the security-reviewer as its subagent. That's one level deep
-for executors and two levels deep for the security-reviewer — both
-within Claude Code's depth limits.
+executors in parallel as its own subagents (Steps 1-7); after the
+executors return, the calling session itself spawns the
+security-reviewer for Step 11 (v0.9.0+). All Agent calls are one
+level deep from the calling session — well within Claude Code's
+depth limits.
 
 ### The parallel loop
 
@@ -120,12 +121,15 @@ loop:
        Send all three in one message. Claude Code dispatches them
        in parallel; the calling turn blocks until ALL return.
 
-    9. Per-WP executor brief (substitute WP-NNN, project, etc.):
+    9. Per-WP executor brief (v0.9.0+; substitute WP-NNN, project,
+       etc.):
 
        You are dispatched by the run-all loop (parallel batch
-       of N) to ship WP-NNN through Steps 1-11 of the lifecycle.
-       Step 12 is the calling session's responsibility (v0.8.3+);
-       you complete Step 11 and exit cleanly.
+       of N) to ship WP-NNN through Steps 1-7 of the lifecycle:
+       worktree, RGB, docs, lint, commit, push. Steps 8-12 (CI poll,
+       merge, deploy, health, smoke, security review, INDEX flip,
+       acceptance evidence, worktree removal) are the calling
+       session's responsibility — do NOT do them.
 
        WP file: .architecture/{project}/work-packages/WP-NNN-<title>.md
        INDEX:   .architecture/{project}/work-packages/INDEX.md
@@ -133,91 +137,197 @@ loop:
        ADRs:    .architecture/{project}/adrs/
 
        Continuation Discipline applies (see agents/executor.md):
-       do not return control until Step 11 succeeds (journal-
-       recorded) OR a BLOCKER is written. Use the v0.8.3
-       background-poller pattern for steps 8/9/10 — kick off
-       run_in_background:true Bash with sleep 300 inside; the
-       harness auto-notifies you when complete. Step 11 invokes
-       sulis-security:security-reviewer via Agent — the executor's
-       one allowed sub-Agent call.
+       do not return control until Step 7 is journal-recorded
+       (push succeeded; wpx-journal complete-step --step 7 called
+       with the pushed SHA in --outcome) OR a BLOCKER is written
+       via wpx-blocker. No polling boundaries inside your
+       contract — Steps 1-7 are all synchronous; the calling
+       session handles the long async waits at Steps 8-10.
 
-       You are running in your own git worktree (Step 1 creates
-       it). Parallel peers are running their own worktrees. No
-       file-system collision between you.
+       You are running in your own git worktree (wpx-worktree
+       create at Step 1). Parallel peers are running their own
+       worktrees. No file-system collision between you.
+
+       Use wpx-* CLI tools for all bookkeeping (journal, blocker)
+       per "Bookkeeping via wpx-* tools" in agents/executor.md.
+       Direct Markdown edits to .executor-WP-NNN.md or BLOCKER-*.md
+       are FORBIDDEN.
 
        If the journal at .architecture/{project}/work-packages/
-       .executor-WP-NNN.md exists with an incomplete tail,
-       resume from the last started-but-not-completed step.
+       .executor-WP-NNN.md exists with an incomplete tail (read
+       via wpx-journal read --field step-trace), resume from the
+       last started-but-not-completed step.
 
-       Output: journal updated through Step 11 with Completed
-       timestamp on the Step 11 trace row AND a populated
-       ## Post-deploy verification section. The calling session
-       will read the journal and perform Step 12 (acceptance
-       evidence + INDEX update + worktree removal) inline.
+       Output: journal updated through Step 7 with Completed
+       timestamp; pushed branch + SHA in the Step 7 trace row.
 
-       Or: BLOCKER-WP-NNN.md written; INDEX status: blocked.
+       Or: BLOCKER-WP-NNN.md written via wpx-blocker.
 
-       Return when Step 11 is journal-recorded OR a BLOCKER is
-       written. Do NOT do Step 12 yourself.
+       Return when Step 7 is journal-recorded OR a BLOCKER is
+       written. Do NOT do Steps 8-12.
 
    10. Wait for ALL parallel Agent calls to return. Claude Code's
        Agent tool blocks the calling turn until every parallel
        call resolves.
 
-   11. For each executor outcome, do the calling session's
-       responsibilities (Step 12 inline, or error classification).
-       Read the executor's journal at
-       .architecture/{project}/work-packages/.executor-WP-NNN.md
-       to determine which outcome:
+   11. For each returned executor, classify the outcome by reading
+       the journal at .architecture/{project}/work-packages/
+       .executor-WP-NNN.md via:
 
-       (a) Step 11 complete with non-CRITICAL verdict — Step 11
-           trace row has Completed timestamp; ## Post-deploy
-           verification section is populated with PASS / CONCERN /
-           ADVISORY (not CRITICAL); INDEX status is still in_progress.
+           wpx-journal read --wp WP-NNN --project <slug> \
+             --field step-7-status
 
-           → DO STEP 12 INLINE per references/lifecycle.md Step 12.
+       Three branches:
 
-           Inline mechanics (Bash + Edit per WP):
+       (a) **Step 7 complete** (status: complete; outcome row
+           records branch + pushed SHA) — proceed with Steps 8-12
+           via the calling-session pipeline below.
 
-             Bash:
-               # Extract evidence from journal
-               JOURNAL=.architecture/$PROJECT/work-packages/.executor-WP-NNN.md
-               BRANCH=$(grep '^- Branch:' "$JOURNAL" | head -1 | awk '{print $3}')
-               MERGE_SHA=$(grep 'Squash-merge SHA' "$JOURNAL" | head -1 | awk '{print $NF}')
-               DEPLOY_URL=$(grep 'Deployment URL' "$JOURNAL" | head -1 | awk '{print $NF}')
-               # ... etc.
+       (b) **BLOCKER written** (BLOCKER-WP-NNN.md exists at
+           .architecture/{project}/work-packages/) — surface its
+           plain-English summary; flip INDEX to blocked:
 
-             Edit:
-               WP file at .architecture/$PROJECT/work-packages/WP-NNN-*.md
-               Append ## Acceptance Evidence block with the journal data.
+               wpx-index flip-status --wp WP-NNN --project <slug> \
+                 --to blocked --expected in_progress
 
-             Edit:
-               INDEX.md
-               Change WP-NNN row's status from in_progress to done.
+           Then propagate dependency_blocked to descendants:
 
-             Bash:
-               git worktree remove ../wp-NNN-worktree
+               wpx-index propagate-blocked --wp WP-NNN \
+                 --project <slug>
 
-           Emit plain-English status: "WP-NNN done — deployed and
-           healthy at <url>. Security: <verdict>."
+           Skip Steps 8-12. Continue to next WP in the loop.
 
-       (b) BLOCKER written — INDEX status is already blocked
-           (executor wrote that during Step 11 or earlier). Skip
-           Step 12 (WP not done). Propagate dependency_blocked to
-           transitive descendants in the next loop iteration.
+       (c) **Step 7 NOT complete AND no BLOCKER** (executor returned
+           prematurely) — classify as "error". Halt the entire loop:
 
-       (c) Step 11 NOT complete (no Completed timestamp on Step 11
-           trace row, OR ## Post-deploy verification section
-           missing/incomplete) — classify as "error". Executor
-           parked late or errored mid-lifecycle. Do NOT do Step 12
-           (substantive work not proven complete). Halt the loop
-           entirely. Surface clearly:
+               "WP-NNN: executor returned before Step 7 completed
+                and no BLOCKER was written. Likely parked early in
+                lifecycle. Re-dispatch via /sulis-execution:run-wp
+                WP-NNN to resume from journal."
 
-             "WP-NNN: executor returned before Step 11 completed.
-              Likely parked late in lifecycle. Re-dispatch via
-              /sulis-execution:run-wp WP-NNN to resume from journal."
+   12. **For each Step-7-complete WP, run the Steps 8-12 pipeline.**
 
-   12. Emit per-batch plain-English status to the founder /
+       Read frontmatter to determine pipeline arguments:
+
+           wpx-wp read-frontmatter --wp WP-NNN --project <slug> \
+             --field '*'
+
+       Capture: branch, smoke_test, deploy_workflow, staging_url,
+       ci_poll_interval_seconds, post_deploy_verification,
+       security_model, dev-sha-at-creation (from the sidecar at
+       .architecture/{project}/work-packages/.executor-WP-NNN-dev-sha).
+
+       **Step 8-10: invoke wpx-pipeline via top-level
+       Bash(run_in_background:true).** This is the load-bearing
+       v0.9.0 change — the wait happens in a deterministic Python
+       script, not in an agent's turn. Typical wall time: 15-45 min.
+
+           Bash({
+             command: """plugins/sulis-execution/scripts/wpx-pipeline run \
+                --wp WP-NNN --project <slug> \
+                --branch feat/wp-NNN-<slug> \
+                --worktree-path ../wp-NNN-worktree \
+                --dev-sha-at-creation <sha-from-sidecar> \
+                --deploy-workflow "<workflow name from frontmatter>" \
+                --staging-url <staging-url> \
+                --smoke-cmd "<smoke command from frontmatter>" \
+                --repo <org/repo> \
+                > /tmp/pipeline-WP-NNN.json 2> /tmp/pipeline-WP-NNN.log""",
+             run_in_background: true,
+             timeout: 5400000   # 90 min cap
+           })
+
+       The harness auto-notifies the calling session when the
+       background Bash exits. **No polling, no sleep, no manual
+       check.** Read /tmp/pipeline-WP-NNN.json on completion.
+
+       Inspect the JSON. If `outcome: "blocker"`:
+
+           # Write BLOCKER capturing the pipeline failure
+           plugins/sulis-execution/scripts/wpx-blocker write \
+             --wp WP-NNN --project <slug> \
+             --title "<pipeline step> failed" \
+             --step <8|9|10> \
+             --trigger budget-exhausted \
+             --observation @/tmp/pipeline-WP-NNN.log \
+             --root-cause "<from blocker_reason>" \
+             --scope out-of-scope \
+             --plain-english "..." \
+             --suggested-next "..."
+
+           wpx-index flip-status --wp WP-NNN --project <slug> \
+             --to blocked --expected in_progress
+           wpx-index propagate-blocked --wp WP-NNN --project <slug>
+           # Skip Steps 11-12; continue to next WP
+
+       If `outcome: "success"`, proceed to Step 11.
+
+       **Step 11: spawn the security-reviewer Agent.** Synchronous
+       Agent call; ~5-15 min wall time.
+
+           Agent({
+             subagent_type: "sulis-security:security-reviewer",
+             description: "Step 11 post-deploy verification for WP-NNN",
+             model: <security_model from frontmatter, if present>,
+             prompt: """
+               Review the squash-merge at <merge_sha> on dev
+               (deployed to <deploy_url>). Health: <health_status>.
+               Smoke: <smoke_verdict>.
+
+               Verify against the WP's Definition of Done. Categorise
+               findings by severity (CRITICAL / CONCERN / ADVISORY).
+               Return a structured verdict JSON in the format
+               documented at plugins/sulis-security/agents/
+               security-reviewer.md.
+             """,
+           })
+
+       Parse the returned verdict. For each non-CRITICAL finding:
+
+           # Register the finding (signature-hash dedup automatic)
+           wpx-findings register --wp WP-NNN --project <slug> \
+             --severity <CONCERN|ADVISORY> \
+             --summary "<one-line>" \
+             --file <path> \
+             --evidence-json @/tmp/finding-N.json \
+             --suggested-fix "<suggested fix>" \
+             --primitive <SEC-NN>
+
+           # If new (not is_duplicate), auto-draft the follow-up WP
+           wpx-findings auto-draft-wp --project <slug> \
+             --source-finding <SF-NNN> \
+             --source-wp WP-NNN \
+             --auto-wp-id <WP-AUTO-NNN from register output> \
+             --primitive <Secure|Harden|Instrument|Gate> \
+             --severity <CONCERN|ADVISORY>
+
+       If CRITICAL findings exist, write a BLOCKER and stop (do NOT
+       proceed to Step 12). Otherwise record the post-deploy verdict
+       in the executor's journal:
+
+           wpx-journal record-postdeploy --wp WP-NNN --project <slug> \
+             --verdict PASS \
+             --findings-summary "0 CRITICAL, N CONCERN, M ADVISORY"
+
+       **Step 12: atomic wrap.** Composes acceptance evidence + INDEX
+       flip + worktree remove into one transactional call.
+
+           # Build pipeline-result file
+           jq '.' /tmp/pipeline-WP-NNN.json > /tmp/pipeline-result-WP-NNN.json
+
+           plugins/sulis-execution/scripts/wpx-step12 wrap \
+             --wp WP-NNN --project <slug> \
+             --branch feat/wp-NNN-<slug> \
+             --pipeline-result @/tmp/pipeline-result-WP-NNN.json \
+             --worktree-path ../wp-NNN-worktree
+
+       Emit plain-English status:
+
+           "WP-NNN done — deployed and healthy at <deploy_url>.
+            Security: PASS (N CONCERN, M ADVISORY auto-drafted as
+            WP-AUTO-XXX for founder review)."
+
+   13. Emit per-batch plain-English status to the founder /
        concierge / calling session:
        - "Starting N in parallel: WP-A (title), WP-B (title), ..."
        - As each completes (in the order they return):
@@ -227,8 +337,29 @@ loop:
          "Batch complete. M done, K blocked. Starting next batch:
           WP-X, WP-Y, ..."
 
-   13. Goto step 1.
+   14. Goto step 1.
 ```
+
+### v0.9.0 sequencing — sequential post-push, parallel pre-push
+
+Steps 1-7 (the executor's contract) run in parallel: N executors
+dispatched at once via N Agent tool_use blocks in a single message.
+The harness runs them concurrently and the calling turn blocks until
+all N return.
+
+Steps 8-12 (the calling session's pipeline) run **sequentially per
+WP** in v0.9.0 — the calling session invokes `wpx-pipeline` for the
+first Step-7-complete WP, waits for the harness notification, then
+proceeds. This preserves merge ordering on `dev` (avoids racing two
+WPs trying to squash-merge concurrently) and keeps the calling
+session's reasoning simple.
+
+A future v0.9.1 may add concurrent `wpx-pipeline` invocations per WP
+(N parallel `Bash(run_in_background:true)` calls; harness aggregates
+notifications) when many WPs are in late stages simultaneously. For
+v0.9.0, the sequential pattern is enough — most projects have
+sub-five-WP batches and `wpx-pipeline` typically completes in 20-30
+min, so the wall-clock benefit of concurrent pipelines is modest.
 
 ## Concurrency limit configuration
 
@@ -306,19 +437,21 @@ ready set. Transitively-dependent descendants of blocked WPs get
 - `max_parallel: 1` in INDEX header is a valid configuration —
   forces sequential dispatch. Useful when staging capacity is
   constrained or the founder wants one-at-a-time observability.
-- An executor's Agent call that returns mid-lifecycle (no Step 12
-  success AND no BLOCKER) is classified as `error` and halts the
-  entire loop. This is intentional — silent advance past a
-  half-finished WP is the failure mode v0.6.1 + v0.7.1 fixed.
+- An executor's Agent call that returns mid-lifecycle (no Step 7
+  success AND no BLOCKER written via wpx-blocker) is classified as
+  `error` and halts the entire loop. This is intentional — silent
+  advance past a half-finished WP is the failure mode v0.6.1 +
+  v0.7.1 + v0.9.0 each tightened.
 - WPs with declared file scope that's *very* broad (e.g. "everywhere
   under src/") will conflict with every other WP and effectively
   serialise. SEA's decompose should produce narrower file scopes;
   if your WPs systematically over-claim scope, that's a SEA
   configuration concern, not a run-all issue.
-- The depth chain via concierge: concierge (depth 0) → run-all skill
-  (inline in concierge) → executor (depth 1) → security-reviewer at
-  Step 11 (depth 2). Two deep at deepest from concierge. Same chain
-  one level shallower from a top-level user session. Both work.
+- The depth chain via concierge (v0.9.0+): concierge (depth 0) →
+  run-all skill (inline in concierge) → executor at depth 1 (Steps
+  1-7) → calling session resumes → security-reviewer at depth 1
+  (Step 11). All Agent calls one level deep from the concierge.
+  Same shape one level shallower from a top-level user session.
 
 ## See also
 

@@ -1,7 +1,7 @@
 {
   "name": "sulis-execution",
-  "description": "Work Package Executor — atomic per-WP implementation via worktree → Red-Green-Blue cycle → commit → push. v0.1 stops at branch pushed to remote; v0.2 adds CI poll + direct merge to dev (no PR); v0.3 adds Sulis SDK deploy + health-check + smoke-test + mark done. Each WP is an atomic operation in the full lifecycle. Self-heals in-scope failures via OODA + Five Whys per executor-loop-standard.md; escalates out-of-scope failures via structured BLOCKER records. Follows git-workflow-standard.md (direct merge to dev, no PR ceremony). Composes with CP-01..CP-05, AAF-01..AAF-09, EP-02/03/07, RGB-01..03.",
-  "version": "0.8.3",
+  "description": "Work Package Executor — three-layer architecture per v0.9.0: (1) deterministic CLI tool library (wpx-* scripts) handles all bookkeeping; (2) executor agent owns Steps 1-7 (worktree → Red-Green-Blue → docs → lint → commit → push) and delegates bookkeeping to wpx-* tools; (3) calling session owns Steps 8-12 (CI poll + squash-merge + deploy + health + smoke via wpx-pipeline background Bash; security-reviewer Agent spawn for Step 11; wpx-step12 atomic wrap for Step 12). This fixes the structural parking failure of prior versions caused by asking a subagent to poll across turns — the harness's Bash(run_in_background) cross-turn notification works reliably for top-level agents but not subagents. Self-heals in-scope failures via OODA + Five Whys per executor-loop-standard.md; escalates out-of-scope failures via structured BLOCKER records. Follows git-workflow-standard.md (direct merge to dev, no PR ceremony). Composes with CP-01..CP-05, AAF-01..AAF-09, EP-02/03/07, RGB-01..03.",
+  "version": "0.9.0",
   "author": {
     "name": "Iain"
   },

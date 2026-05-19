@@ -1,32 +1,33 @@
 ---
 name: run-wp
 description: >
-  Spawn the executor agent on a single Work Package. Usage:
-  /sulis-execution:run-wp WP-NNN. The skill's load-bearing action is
-  invoking the Agent tool — the executor agent then takes over and
-  runs the 10-step lifecycle under its own context window and
-  Continuation Discipline.
+  Ship a single Work Package to dev. Dispatches the executor agent
+  for Steps 1-7 (worktree, RGB, docs, lint, commit, push); the
+  calling session then runs Steps 8-12 via wpx-pipeline (CI poll +
+  merge + deploy + health + smoke) + security-reviewer + wpx-step12.
+  Usage: /sulis-execution:run-wp WP-NNN.
 ---
 
 # /sulis-execution:run-wp
 
-This skill **spawns the executor agent** to ship one Work Package
-atomically to `dev`.
+This skill **dispatches the executor agent** for one Work Package's
+Steps 1-7, then runs Steps 8-12 in the calling session.
 
-## How to invoke (MUST — do not run the executor's work inline)
+## How to invoke
 
-When this skill is loaded, **your sole action is to call the Agent
-tool with `subagent_type: "sulis-execution:executor"`**. Do not run
-the lifecycle steps inline in your own session — that defeats the
-executor's Continuation Discipline (the executor must own its own
-turn boundary and the polling loops). The skill exists to dispatch
-the agent, not to replace it.
+When this skill is loaded, you (the calling session) drive the
+single-WP lifecycle. Step 1-7 work happens via an `Agent` tool call
+to the executor; Steps 8-12 happen inline in the calling session via
+the wpx-* tools (per v0.9.0).
 
-### The dispatch call
+### Step 0 — Dispatch the executor (Steps 1-7)
 
 Given the user invokes `/sulis-execution:run-wp WP-NNN`:
 
-1. Read the WP frontmatter. If it has an `executor_model` field
+1. Parse the WP-NNN argument from the user's invocation.
+2. Verify the WP file exists at the expected path; if not, surface a
+   clear error and exit.
+3. Read the WP frontmatter. If it has an `executor_model` field
    (optional; one of `haiku | sonnet | opus`), include the `model`
    parameter in the Agent call. Otherwise omit `model` (the executor
    inherits the calling session's model — typically Opus).
@@ -34,87 +35,203 @@ Given the user invokes `/sulis-execution:run-wp WP-NNN`:
 ```
 Agent({
   subagent_type: "sulis-execution:executor",
-  description: "Ship WP-NNN end-to-end",
+  description: "Ship WP-NNN Steps 1-7",
   model: <executor_model from WP frontmatter, if present>,
   prompt: """
-You are dispatched to ship WP-NNN through the full 10-step atomic
-lifecycle. Read your agent prompt (agents/executor.md) for the full
-contract; the user has already approved the dispatch.
+You are dispatched to ship WP-NNN through Steps 1-7 of the lifecycle:
+worktree, RED, GREEN, BLUE, docs, lint, commit, push. Read your agent
+prompt (agents/executor.md) for the full contract.
+
+Steps 8-12 (CI poll, squash-merge, deploy, health, smoke, security
+review, INDEX flip, acceptance evidence, worktree removal) are the
+calling session's responsibility per v0.9.0 — do NOT do them.
 
 WP file: .architecture/{project}/work-packages/WP-NNN-<title>.md
 INDEX:   .architecture/{project}/work-packages/INDEX.md
 TDD:     .architecture/{project}/TDD.md
 ADRs:    .architecture/{project}/adrs/
 
-Continuation Discipline applies: do not return control until step 10
-succeeds OR a BLOCKER is written. Use blocking Bash polling for
-steps 7-10 per references/lifecycle.md.
+Use wpx-* CLI tools for all bookkeeping (journal, blocker) per
+"Bookkeeping via wpx-* tools" in agents/executor.md. Direct Markdown
+edits to journal or BLOCKER files are FORBIDDEN.
 
-If the journal at .architecture/{project}/work-packages/.executor-WP-NNN.md
-exists and shows an incomplete tail, resume from the last started-but-
-not-completed step. Do not start over.
+Continuation Discipline applies: do not return control until Step 7
+is journal-recorded (push succeeded; wpx-journal complete-step
+--step 7 called with the pushed SHA in --outcome) OR a BLOCKER is
+written via wpx-blocker.
 
-Output contract (v0.8.3+):
-- On success: journal-recorded Step 11 with Completed timestamp +
-  populated ## Post-deploy verification section. Executor exits;
-  this skill (the calling session) performs Step 12 inline.
-- On escalation: BLOCKER-WP-NNN.md written; INDEX status: blocked.
+If the journal at .architecture/{project}/work-packages/
+.executor-WP-NNN.md exists with an incomplete tail, resume from the
+last started-but-not-completed step (read via wpx-journal read
+--field step-trace). Do not start over.
 
-Return when Step 11 is journal-recorded OR a BLOCKER is written.
-Do NOT do Step 12 yourself — the calling session takes that.
+Return when Step 7 is journal-recorded OR a BLOCKER is written. Do
+NOT do Steps 8-12.
 """,
 })
 ```
 
 Replace `{project}` and `<title>` based on the actual project path
 and WP title. The `subagent_type` value is **exactly**
-`sulis-execution:executor` — that's the fully-qualified agent name.
+`sulis-execution:executor`.
 
-### What you do NOT do in this skill's session
+### Step 1 — Classify the executor's outcome
 
-- **Do not write tests, code, lint, commit, push, poll CI, merge,
-  deploy, or health-check.** All of those are the executor's job
-  (Steps 1-11).
+When the executor returns, read its journal to determine the
+outcome:
+
+```bash
+wpx-journal read --wp WP-NNN --project <slug> --field step-7-status
+```
+
+Three branches:
+
+**(a) Step 7 complete** — proceed to Step 2 (run the pipeline).
+
+**(b) BLOCKER written** (BLOCKER-WP-NNN.md exists at
+`.architecture/{project}/work-packages/`) — surface its plain-English
+summary; flip INDEX to blocked; exit.
+
+```bash
+wpx-index flip-status --wp WP-NNN --project <slug> \
+  --to blocked --expected in_progress
+```
+
+**(c) Step 7 NOT complete AND no BLOCKER** — classify as "error".
+Surface: *"WP-NNN: executor returned before Step 7 completed. Likely
+parked early in lifecycle. Re-invoke this skill to resume from
+journal."* Do NOT proceed to Step 2.
+
+### Step 2 — Run the pipeline (Steps 8-10)
+
+Read frontmatter for pipeline arguments:
+
+```bash
+wpx-wp read-frontmatter --wp WP-NNN --project <slug> --field '*'
+```
+
+Capture: branch, smoke_test, deploy_workflow, staging_url,
+post_deploy_verification, security_model. Read the dev-SHA-at-creation
+from the sidecar at `.architecture/{project}/work-packages/
+.executor-WP-NNN-dev-sha`.
+
+**Invoke wpx-pipeline via top-level `Bash(run_in_background:true)`.**
+This is the canonical v0.9.0 long-wait mechanism — the harness
+auto-notifies the calling session when the background Bash exits.
+Typical wall time: 15-45 min.
+
+```
+Bash({
+  command: """plugins/sulis-execution/scripts/wpx-pipeline run \
+     --wp WP-NNN --project <slug> \
+     --branch feat/wp-NNN-<slug> \
+     --worktree-path ../wp-NNN-worktree \
+     --dev-sha-at-creation <sha> \
+     --deploy-workflow "<workflow name>" \
+     --staging-url <staging-url> \
+     --smoke-cmd "<smoke command>" \
+     --repo <org/repo> \
+     > /tmp/pipeline-WP-NNN.json 2> /tmp/pipeline-WP-NNN.log""",
+  run_in_background: true,
+  timeout: 5400000   # 90 min cap
+})
+```
+
+On notification, read `/tmp/pipeline-WP-NNN.json`.
+
+If `outcome: "blocker"`: write a BLOCKER via `wpx-blocker write`
+capturing the pipeline failure, flip INDEX to blocked, exit. Surface
+the plain-English summary.
+
+If `outcome: "success"`: proceed to Step 3.
+
+### Step 3 — Security review (Step 11)
+
+Spawn the `sulis-security:security-reviewer` agent synchronously
+(blocks the calling turn until the review completes; typically
+5-15 min).
+
+```
+Agent({
+  subagent_type: "sulis-security:security-reviewer",
+  description: "Step 11 post-deploy verification for WP-NNN",
+  model: <security_model from frontmatter, if present>,
+  prompt: """
+    Review the squash-merge at <merge_sha> on dev (deployed to
+    <deploy_url>). Health: <health_status>. Smoke: <smoke_verdict>.
+
+    Verify against WP-NNN's Definition of Done. Categorise findings
+    by severity (CRITICAL / CONCERN / ADVISORY). Return a structured
+    verdict JSON per plugins/sulis-security/agents/security-reviewer.md.
+  """,
+})
+```
+
+For each non-CRITICAL finding:
+
+```bash
+# Register (signature-hash dedup handled automatically)
+wpx-findings register --wp WP-NNN --project <slug> \
+  --severity <CONCERN|ADVISORY> \
+  --summary "<one-line>" \
+  --file <path> \
+  --evidence-json @/tmp/finding-N.json \
+  --suggested-fix "<suggested fix>" \
+  --primitive <SEC-NN>
+
+# If not is_duplicate, auto-draft the follow-up WP
+wpx-findings auto-draft-wp --project <slug> \
+  --source-finding <SF-NNN> \
+  --source-wp WP-NNN \
+  --auto-wp-id <WP-AUTO-NNN> \
+  --primitive <Secure|Harden|Instrument|Gate> \
+  --severity <CONCERN|ADVISORY>
+```
+
+If CRITICAL findings exist: write a BLOCKER and stop. Do NOT proceed
+to Step 4.
+
+Otherwise record the verdict:
+
+```bash
+wpx-journal record-postdeploy --wp WP-NNN --project <slug> \
+  --verdict PASS \
+  --findings-summary "0 CRITICAL, N CONCERN, M ADVISORY"
+```
+
+### Step 4 — Atomic wrap (Step 12)
+
+```bash
+jq '.' /tmp/pipeline-WP-NNN.json > /tmp/pipeline-result-WP-NNN.json
+
+plugins/sulis-execution/scripts/wpx-step12 wrap \
+  --wp WP-NNN --project <slug> \
+  --branch feat/wp-NNN-<slug> \
+  --pipeline-result @/tmp/pipeline-result-WP-NNN.json \
+  --worktree-path ../wp-NNN-worktree
+```
+
+Emit plain-English status:
+
+```
+WP-NNN done — deployed and healthy at <deploy_url>.
+Security: PASS (N CONCERN, M ADVISORY auto-drafted as WP-AUTO-XXX for
+founder review).
+```
+
+## What you do NOT do in this skill's session
+
+- **Do not write tests, code, lint, commit, or push.** Those are the
+  executor's job (Steps 1-7).
+- **Do not edit `.executor-WP-NNN.md`, `INDEX.md`, `BLOCKER-*.md`,
+  `findings-register.md`, or `SF-NNN-*.md` directly.** All updates go
+  through `wpx-*` tools.
+- **Do not poll CI / deploy / health manually.** That's `wpx-pipeline`'s
+  job, invoked once via `Bash(run_in_background:true)`.
 - **Do not summarise the executor's output for the user.** When the
   executor's Agent tool call returns, surface its terminal status
   line directly. The concierge (if upstream) does the founder
-  translation; this skill is power-user-facing and the executor's
-  status line is already plain-English.
-
-### What you DO in this skill's session
-
-1. Parse the WP-NNN argument from the user's invocation.
-2. Verify the WP file exists at the expected path; if not, surface
-   a clear error and exit.
-3. Make the Agent tool call above (executor runs Steps 1-11).
-4. When the executor returns, **read its journal** at
-   `.architecture/{project}/work-packages/.executor-WP-NNN.md` to
-   determine which outcome to handle (v0.8.3+):
-
-   (a) **Step 11 complete with non-CRITICAL verdict** — Step 11
-       trace row has Completed timestamp; ## Post-deploy
-       verification populated; INDEX status still in_progress.
-
-       → Do Step 12 inline:
-         - Bash: extract evidence from journal (BRANCH, MERGE_SHA,
-           DEPLOY_URL, smoke verdict, security verdict).
-         - Edit: append ## Acceptance Evidence to WP file.
-         - Edit: flip INDEX status WP-NNN row from in_progress
-           to done.
-         - Bash: git worktree remove ../wp-NNN-worktree
-         - Surface plain-English status: "WP-NNN done — deployed
-           and healthy at <url>. Security: <verdict>."
-
-   (b) **BLOCKER written** — INDEX already blocked; surface the
-       BLOCKER's plain-English summary; exit.
-
-   (c) **Step 11 NOT complete** — executor parked late or errored.
-       Surface clearly: *"WP-NNN: executor returned before Step 11
-       completed. Likely parked late in lifecycle. Re-invoke this
-       skill to resume from journal."* Do NOT do Step 12.
-
-That is the skill. The executor does Steps 1-11; the calling
-session does Step 12 (inline, ~30 seconds, deterministic).
+  translation; this skill is power-user-facing.
 
 ## When to use this skill
 
@@ -123,9 +240,8 @@ session does Step 12 (inline, ~30 seconds, deterministic).
   `/sulis-execution:run-all` is the normal multi-WP path; this is
   the single-shot.
 - **Re-running a blocked WP** after fixing an external blocker. The
-  semantically-clearer alternative for this case is
-  `/sulis-execution:retry WP-NNN`, which archives the prior BLOCKER
-  and dispatches a fresh executor.
+  semantically-clearer alternative is `/sulis-execution:retry WP-NNN`,
+  which archives the prior BLOCKER and dispatches a fresh executor.
 
 ## Gotchas
 
@@ -135,20 +251,25 @@ session does Step 12 (inline, ~30 seconds, deterministic).
   doesn't pre-check this — the executor's primitive-selection check
   at step 3 handles it.
 - If the project's git remote isn't reachable, the executor will
-  fail at step 6 (push). That's a connectivity issue surfaced by
+  fail at Step 7 (push). That's a connectivity issue surfaced by
   the executor; not the skill's problem.
 - If a prior executor session left an in-flight WP (journal shows
-  steps complete up to step N, but no step 10 success and no
+  steps complete up to step N, but no Step 7 success and no
   BLOCKER), invoking this skill resumes from step N+1. Do not
   manually delete the journal to "start fresh" — the journal is the
   audit trail.
+- The `wpx-pipeline` background Bash invocation has a 90-min
+  timeout. If your project's CI + deploy + smoke truly exceed
+  90 min, increase the `timeout` parameter on the `Bash()` call.
 
 ## See also
 
-- `agents/executor.md` — the agent this skill spawns.
-- `references/lifecycle.md` — the 10-step contract.
-- `references/self-heal-budget.md` — per-failure-type budgets.
-- `/sulis-execution:run-all` — orchestrator path for the whole INDEX.
-- `/sulis-execution:status` — read-only INDEX summary (skill, not
-  agent).
+- `agents/executor.md` — the Steps 1-7 contract this skill spawns.
+- `references/lifecycle.md` — the 12-step contract; Steps 8-12 are
+  the calling session's responsibility per v0.9.0.
+- `references/self-heal-budget.md` — per-failure-type budgets
+  (executor side).
+- `/sulis-execution:run-all` — multi-WP orchestrator path with
+  parallel dispatch.
+- `/sulis-execution:status` — read-only INDEX summary.
 - `/sulis-execution:retry` — re-run a blocked WP with archive.

@@ -1,13 +1,58 @@
 # Executor Lifecycle
 
-The 12-step contract the executor runs per Work Package. Each step has
-input artifacts, a success criterion, a failure-handling OODA recipe
-(per `executor-loop-standard.md`), and an escalation trigger.
+The 12-step contract per Work Package — split across two owners as of
+v0.9.0. **Executor owns Steps 1-7; calling session owns Steps 8-12.**
+Each step has input artifacts, a success criterion, a failure-handling
+OODA recipe (per `executor-loop-standard.md`), and an escalation
+trigger.
 
-Version coverage: v0.1 implements steps 1-6. v0.2 adds step 7. v0.3
-adds steps 8-10. v0.6 adds step 5 (docs) and step 11 (post-deploy
-verification); v0.6 also collapses health + smoke into one step 10.
-v0.7 adds findings register + auto-draft WPs at step 11.
+| # | Step | Owner |
+|---|---|---|
+| 1 | Worktree + branch | Executor |
+| 2 | RED — failing tests | Executor |
+| 3 | GREEN — minimum code | Executor |
+| 4 | BLUE — refactor | Executor |
+| 5 | Docs | Executor |
+| 6 | Lint / type / format | Executor |
+| 7 | Commit + push | Executor |
+| 8 | CI poll + rebase + squash-merge | Calling session (`wpx-pipeline`) |
+| 9 | Deploy poll | Calling session (`wpx-pipeline`) |
+| 10 | Health + smoke | Calling session (`wpx-pipeline`) |
+| 11 | Security review (post-deploy verification) | Calling session (`Agent({subagent_type: "sulis-security:security-reviewer"})` + `wpx-findings register`) |
+| 12 | INDEX flip + acceptance evidence + worktree removal | Calling session (`wpx-step12 wrap`) |
+
+Version coverage: v0.1 implemented steps 1-6. v0.2 added step 7. v0.3
+added steps 8-10. v0.6 added step 5 (docs) and step 11 (post-deploy
+verification); v0.6 also collapsed health + smoke into one step 10.
+v0.7 added findings register + auto-draft WPs at step 11. **v0.9.0
+moved Steps 8-12 to the calling session** — fixing the structural
+parking failure caused by asking a subagent to poll across turns,
+which the harness's cross-turn notification contract doesn't support.
+
+### Why the v0.9.0 contract split
+
+Versions 0.5.1 through 0.8.3 each moved the executor's parking failure
+to a new boundary:
+
+| Version | Parked at | Reason |
+|---|---|---|
+| v0.5.1 | Step 7 → 8 (CI poll start) | "CI is in flight; I'll wait" |
+| v0.6.1 | Step 11 → 12 | "Monitors will respond when complete" |
+| v0.7.x | Step 8 (rebase loop) | "Rebase in progress" |
+| v0.8.3 | Step 9 (deploy poll) | "Background poller will notify me" |
+
+The common root cause: **subagents have atomic turns**. `Bash(run_in_background:
+true)` cross-turn notifications work reliably for top-level agents
+but NOT for subagents — a subagent's session is one synchronous Agent
+tool invocation, and there is no continuing turn for the notification
+to fire into.
+
+v0.9.0 moves all polling out of the executor. The calling session
+(top-level, where `run_in_background` works) invokes a deterministic
+`wpx-pipeline run` script for Steps 8-10, an Agent call for Step 11,
+and `wpx-step12 wrap` for Step 12. The executor returns at Step 7
+with the branch on remote and the journal recorded; the calling
+session takes everything from there.
 
 **On parallel execution (v0.8+).** Each WP's executor runs in its
 own `git worktree` per GIT-07. The 12-step lifecycle is identical
@@ -60,6 +105,118 @@ The detailed Bash recipes that appear below each step show the
 underlying mechanism (helpful for diagnosis if a `wpx-*` tool ever
 fails internally), but the executor's first action at every
 bookkeeping moment is to invoke the appropriate tool.
+
+---
+
+## Calling-session invocations (Steps 8-12) — v0.9.0+
+
+Once the executor returns with Step 7 journal-recorded, the calling
+session (run-all skill, run-wp skill, or founder's main session) takes
+over. The full Steps 8-12 sequence is owned by the calling session.
+The detailed Step 8-12 sections later in this document remain as
+**mechanism reference** for the `wpx-pipeline` script's internals and
+for diagnosis when the pipeline fails; they are NOT actions the
+executor performs.
+
+The calling session's invocation sequence per WP:
+
+```bash
+# 0. Read what the executor produced
+plugins/sulis-execution/scripts/wpx-journal read \
+  --wp WP-NNN --project <slug> --field step-trace
+# → JSON containing branch, pushed SHA, Step 7 outcome line
+
+# Resolve frontmatter
+plugins/sulis-execution/scripts/wpx-wp read-frontmatter \
+  --wp WP-NNN --project <slug> --field '*'
+# → branch, smoke_test, ci_poll_interval_seconds, deploy_workflow,
+#   post_deploy_verification, executor_model, security_model
+
+# 1. Steps 8-10: CI poll + rebase + squash-merge + deploy + health + smoke
+# Run via top-level Bash(run_in_background:true) — typical wall time
+# 15-45 min. The harness notifies on completion.
+plugins/sulis-execution/scripts/wpx-pipeline run \
+  --wp WP-NNN --project <slug> \
+  --branch feat/wp-NNN-<slug> \
+  --worktree-path ../wp-NNN-worktree \
+  --dev-sha-at-creation "$(cat .architecture/<slug>/work-packages/.executor-WP-NNN-dev-sha)" \
+  --deploy-workflow "Deploy to Dev Environment" \
+  --staging-url https://your-staging.example.com \
+  --smoke-cmd "<smoke command from WP frontmatter>" \
+  --repo <org/repo>
+# Output JSON on completion: { outcome, merge_sha, deploy_url,
+#   health_status, smoke_verdict, blocker_reason }
+# Exit codes: 0 success / 1 blocker / 2 internal error
+```
+
+The calling session reads the JSON. If `outcome: "blocker"`, it
+writes a BLOCKER via `wpx-blocker write` describing the pipeline
+failure, then flips INDEX to `blocked` and propagates
+`dependency_blocked` to descendants. If `outcome: "success"`, it
+continues:
+
+```bash
+# 2. Step 11: security review (default always-on; opt-out via
+#    post_deploy_verification: none in WP frontmatter)
+# Spawn the security-reviewer agent via Agent tool (synchronous):
+
+Agent({
+  subagent_type: "sulis-security:security-reviewer",
+  description: "Step 11 post-deploy verification for WP-NNN",
+  prompt: """
+    Review the squash-merge at <merge_sha> on dev (deployed to
+    <deploy_url>). Health: <health_status>. Smoke: <smoke_verdict>.
+
+    Verify against the WP's Definition of Done. Categorise findings
+    by severity (CRITICAL / CONCERN / ADVISORY). Return a structured
+    verdict JSON in the format documented at
+    plugins/sulis-security/agents/security-reviewer.md.
+  """,
+})
+
+# 3. Per non-CRITICAL finding from the agent's return:
+plugins/sulis-execution/scripts/wpx-findings register \
+  --wp WP-NNN --project <slug> \
+  --severity CONCERN \
+  --summary "..." --file <path> \
+  --evidence-json @/tmp/finding.json \
+  --suggested-fix "..." \
+  --primitive SEC-NN
+# → Returns SF-NNN id (existing on dedup) + WP-AUTO-NNN id (new)
+
+plugins/sulis-execution/scripts/wpx-findings auto-draft-wp \
+  --project <slug> \
+  --source-finding SF-NNN \
+  --source-wp WP-NNN \
+  --auto-wp-id WP-AUTO-NNN \
+  --primitive Secure --severity CONCERN
+# → Creates the auto-draft WP file
+
+# 4. Record the post-deploy verdict in the journal
+plugins/sulis-execution/scripts/wpx-journal record-postdeploy \
+  --wp WP-NNN --project <slug> \
+  --verdict PASS \
+  --findings-summary "0 CRITICAL, 1 CONCERN (SF-007 → WP-AUTO-003), 2 ADVISORY"
+
+# 5. Step 12: atomic wrap (acceptance evidence + INDEX flip +
+#    worktree remove)
+cat > /tmp/pipeline-result.json <<JSON
+{ "result": <pipeline JSON output from step 1> }
+JSON
+
+plugins/sulis-execution/scripts/wpx-step12 wrap \
+  --wp WP-NNN --project <slug> \
+  --branch feat/wp-NNN-<slug> \
+  --pipeline-result @/tmp/pipeline-result.json \
+  --worktree-path ../wp-NNN-worktree
+```
+
+On `outcome: "blocker"` from `wpx-pipeline`, the calling session
+instead writes a BLOCKER and stops — it does NOT proceed to Step 11
+or Step 12.
+
+The full skill prompts for the calling session live in
+`plugins/sulis-execution/skills/run-all/SKILL.md` and `run-wp/SKILL.md`.
 
 ---
 
@@ -496,6 +653,17 @@ collisions).
 ---
 
 ## Step 8 — Poll CI; on green, squash-merge directly to `dev` (no PR)
+
+> **v0.9.0 ownership note.** Steps 8 through 11 below are run by the
+> **calling session** via `wpx-pipeline run` (Steps 8-10), the
+> `sulis-security:security-reviewer` Agent (Step 11 verdict), and
+> `wpx-findings register` / `auto-draft-wp` + `wpx-journal
+> record-postdeploy` (Step 11 bookkeeping). The mechanism descriptions
+> below are reference material for the pipeline script's internals and
+> for diagnosis when the pipeline fails. The executor does NOT perform
+> these steps. See "Calling-session invocations (Steps 8-12)" near the
+> top of this file for the canonical invocation sequence.
+
 
 **Input:** Branch pushed from step 7; CI triggered automatically by
 the push.
