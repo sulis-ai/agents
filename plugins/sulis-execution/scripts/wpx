@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# wpx — dispatch to the latest installed wpx-<subtool>.
+#
+# Resolves the wpx-* tool directory by searching the Claude Code plugin
+# cache (~/.claude/plugins/cache/.../sulis-execution/<version>/scripts/),
+# then exec's the requested subtool with the remaining arguments.
+#
+# Usage:
+#   wpx <subtool> [args...]
+#   wpx resolve              # print the resolved tool directory
+#   wpx --help               # print this help
+#
+# Subtools (one per wpx-* script):
+#   journal | index | wp | blocker | findings | worktree | pipeline | step12
+#
+# Exit codes:
+#   0    success
+#   1    subtool errored (passed through)
+#   64   bad usage (no subtool or unrecognised flag)
+#   127  tool directory not found / unknown subtool
+
+set -euo pipefail
+
+TOOL="${1:-}"
+
+if [ -z "$TOOL" ] || [ "$TOOL" = "--help" ] || [ "$TOOL" = "-h" ]; then
+  cat >&2 <<'EOF'
+usage: wpx <subtool> [args...]
+
+Subtools:
+  journal     — manage the per-WP executor journal
+  index       — manage the WP INDEX.md
+  wp          — read WP frontmatter; append acceptance evidence
+  blocker     — write/archive BLOCKER records per EL-08
+  findings    — register security findings; auto-draft follow-up WPs
+  worktree    — manage git worktrees per GIT-07
+  pipeline    — run Steps 8-10 (CI poll + merge + deploy + health + smoke)
+  step12      — atomic Step 12 wrap (acceptance + INDEX flip + worktree remove)
+  resolve     — print the resolved wpx-* tool directory (diagnostic)
+
+Run `wpx <subtool> --help` for subtool-specific options.
+EOF
+  if [ -z "$TOOL" ]; then
+    exit 64
+  fi
+  exit 0
+fi
+
+shift  # drop the subtool name from $@
+
+# Resolution — installed cache wins; dev cwd as fallback.
+WPX_DIR=$(
+  find "$HOME/.claude/plugins/cache" \
+    -name wpx-journal -type f \
+    -path '*/sulis-execution/*/scripts/*' \
+    2>/dev/null \
+  | sort -r | head -1 | xargs -I{} dirname {} 2>/dev/null
+)
+
+# Dev fallback: if `wpx` is being run from within the marketplace repo
+# (i.e., the script lives next to the other wpx-* tools), prefer that.
+if [ -z "$WPX_DIR" ] && [ -f "$(dirname "$0")/wpx-journal" ]; then
+  WPX_DIR="$(dirname "$0")"
+fi
+
+if [ -z "$WPX_DIR" ]; then
+  cat >&2 <<'EOF'
+wpx: cannot locate wpx-* scripts.
+
+The sulis-execution plugin is either not installed or its cache is in
+an unexpected location. To install:
+
+  claude plugin marketplace add https://github.com/sulis-ai/agents
+  claude plugin install sulis-execution@sulis-ai-agents
+
+If you are developing the plugin locally, run `wpx` from the
+marketplace repo root so it can find its sibling scripts.
+EOF
+  exit 127
+fi
+
+if [ "$TOOL" = "resolve" ]; then
+  echo "$WPX_DIR"
+  exit 0
+fi
+
+TOOL_PATH="$WPX_DIR/wpx-$TOOL"
+if [ ! -x "$TOOL_PATH" ]; then
+  echo "wpx: unknown subtool '$TOOL' (looked for $TOOL_PATH)" >&2
+  echo "Run 'wpx --help' for the list of available subtools." >&2
+  exit 127
+fi
+
+exec "$TOOL_PATH" "$@"

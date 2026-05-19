@@ -20,6 +20,37 @@ single-WP lifecycle. Step 1-7 work happens via an `Agent` tool call
 to the executor; Steps 8-12 happen inline in the calling session via
 the wpx-* tools (per v0.9.0).
 
+### Resolving wpx-* tool paths (MUST — first action, v0.10.1+)
+
+Before reading the WP file or dispatching the executor, resolve the
+wpx-* tool directory ONCE and capture it as `$WPX_DIR`:
+
+```bash
+WPX_DIR=$(
+  find ~/.claude/plugins/cache \
+    -name wpx-journal -type f \
+    -path '*/sulis-execution/*/scripts/*' \
+    2>/dev/null \
+  | sort -r | head -1 | xargs -I{} dirname {} 2>/dev/null
+)
+# Dev fallback: marketplace repo cwd
+if [ -z "$WPX_DIR" ] && [ -f "plugins/sulis-execution/scripts/wpx-journal" ]; then
+  WPX_DIR="$(pwd)/plugins/sulis-execution/scripts"
+fi
+if [ -z "$WPX_DIR" ]; then
+  echo "ERROR: cannot locate wpx-* scripts. Run: claude plugin install sulis-execution@sulis-ai-agents" >&2
+  exit 1
+fi
+echo "WPX_DIR=$WPX_DIR"
+```
+
+Capture the printed `WPX_DIR` and substitute it inline at every
+wpx-* invocation below (e.g., `"$WPX_DIR/wpx-journal" read ...`).
+Environment variables do NOT persist between Bash tool calls; the
+substitution lives in the prompt text you send to Bash. The
+executor subagent you dispatch has the same resolution preamble in
+`agents/executor.md` and resolves independently.
+
 ### Step 0 — Dispatch the executor (Steps 1-7)
 
 Given the user invokes `/sulis-execution:run-wp WP-NNN`:
@@ -138,7 +169,7 @@ Typical wall time: 15-45 min.
 
 ```
 Bash({
-  command: """plugins/sulis-execution/scripts/wpx-pipeline run \
+  command: """"$WPX_DIR/wpx-pipeline" run \
      --wp WP-NNN --project <slug> \
      --branch feat/wp-NNN-<slug> \
      --worktree-path ../wp-NNN-worktree \
@@ -220,7 +251,7 @@ wpx-journal record-postdeploy --wp WP-NNN --project <slug> \
 ```bash
 jq '.' /tmp/pipeline-WP-NNN.json > /tmp/pipeline-result-WP-NNN.json
 
-plugins/sulis-execution/scripts/wpx-step12 wrap \
+"$WPX_DIR/wpx-step12" wrap \
   --wp WP-NNN --project <slug> \
   --branch feat/wp-NNN-<slug> \
   --pipeline-result @/tmp/pipeline-result-WP-NNN.json \

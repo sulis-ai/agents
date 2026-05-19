@@ -32,6 +32,7 @@ For the architectural rationale, see
 | `wpx-worktree` | Create/remove worktrees; record dev SHA | Executor + calling session |
 | `wpx-pipeline` | Steps 8-10: CI poll + merge + deploy + health + smoke | Calling session (via background Bash) |
 | `wpx-step12` | Step 12 bookkeeping wrap (atomic) | Calling session |
+| `wpx` (v0.10.1+) | Dispatcher wrapper — one-time PATH install for human ad-hoc use | Humans (debug, recovery, exploration) |
 
 ## Common conventions
 
@@ -45,34 +46,90 @@ All tools share these conventions:
 
 ## Installation
 
-The tools are plain Python 3 files with `#!/usr/bin/env python3` shebang. They are invoked via their full path:
+The tools are plain Python 3 files with `#!/usr/bin/env python3` shebang. Dependencies: **stdlib only**. No `click`, no `pyyaml` required — frontmatter is parsed with a tiny inline parser sufficient for the executor's needs.
+
+When the sulis-execution plugin is installed via the Claude Code marketplace, the scripts land at:
+
+```
+~/.claude/plugins/cache/sulis-ai-agents/sulis-execution/<version>/scripts/
+```
+
+The version directory changes with each plugin upgrade, so callers cannot hard-code the path.
+
+### Agent invocation (automatic)
+
+The executor agent and the `run-all` / `run-wp` skills resolve the tool directory automatically at session start. The first Bash call in every session is a path-resolution preamble:
 
 ```bash
-python3 plugins/sulis-execution/scripts/wpx-journal init --wp WP-7
+WPX_DIR=$(
+  find ~/.claude/plugins/cache \
+    -name wpx-journal -type f \
+    -path '*/sulis-execution/*/scripts/*' \
+    2>/dev/null \
+  | sort -r | head -1 | xargs -I{} dirname {} 2>/dev/null
+)
+# Dev fallback: marketplace repo cwd
+if [ -z "$WPX_DIR" ] && [ -f "plugins/sulis-execution/scripts/wpx-journal" ]; then
+  WPX_DIR="$(pwd)/plugins/sulis-execution/scripts"
+fi
 ```
 
-Or directly (if executable bit set):
+All subsequent invocations use `"$WPX_DIR/wpx-NAME"`. See `agents/executor.md` and `skills/run-all/SKILL.md` for the canonical preamble text. **No setup is required for the agent path.**
+
+### Human invocation via the `wpx` wrapper (one-time setup, opt-in)
+
+For ad-hoc human use — manual journal reads, recovery, debugging, exploration — install the `wpx` dispatcher to your PATH:
 
 ```bash
-./plugins/sulis-execution/scripts/wpx-journal init --wp WP-7
+mkdir -p ~/.local/bin
+ln -sf "$(find ~/.claude/plugins/cache -name wpx -path '*/sulis-execution/*/scripts/*' -type f | sort -r | head -1)" ~/.local/bin/wpx
+
+# Verify (should print the resolved scripts directory)
+wpx resolve
 ```
 
-Dependencies: **stdlib only**. No `click`, no `pyyaml` required — frontmatter is parsed with a tiny inline parser sufficient for the executor's needs.
+Make sure `~/.local/bin` is on your `$PATH` (most shells include it by default; check with `echo $PATH | tr ':' '\n' | grep local`).
 
-## Path resolution
+After install, the wrapper dispatches to any wpx-* subtool by name:
 
-By default the tools resolve paths relative to the current working directory + the `--project` flag value:
+```bash
+# From any project directory
+wpx journal init   --wp WP-7  --project kinds-and-tools --repo-root .
+wpx index list-ready          --project kinds-and-tools --repo-root .
+wpx journal read   --wp WP-7  --project kinds-and-tools --repo-root . --field plan
+
+wpx --help    # list subtools
+wpx resolve   # diagnostic — print the resolved scripts directory
+```
+
+The wrapper does its own resolution at each invocation (same logic as the agent preamble), so it always dispatches to the latest installed version even when the plugin is upgraded. No re-link needed on plugin upgrade.
+
+### Direct invocation (development from the marketplace repo)
+
+If you are working inside the marketplace repo itself (this repository), the scripts are at their checked-in location:
+
+```bash
+./plugins/sulis-execution/scripts/wpx-journal init --wp WP-7 --project <slug>
+```
+
+The agent preamble's dev-fallback branch handles this case automatically.
+
+## Project-relative path resolution
+
+Once a tool is invoked, it resolves all artifact paths relative to the project root + the `--project` flag value:
 
 ```
-.architecture/<project>/work-packages/WP-NNN-*.md
-.architecture/<project>/work-packages/INDEX.md
-.architecture/<project>/work-packages/.executor-WP-NNN.md
-.architecture/<project>/work-packages/BLOCKER-WP-NNN.md
-.security/<project>/findings-register.md
-.security/<project>/findings/SF-NNN-*.md
+<repo-root>/.architecture/<project>/work-packages/WP-NNN-*.md
+<repo-root>/.architecture/<project>/work-packages/INDEX.md
+<repo-root>/.architecture/<project>/work-packages/.executor-WP-NNN.md
+<repo-root>/.architecture/<project>/work-packages/BLOCKER-WP-NNN.md
+<repo-root>/.security/<project>/findings-register.md
+<repo-root>/.security/<project>/findings/SF-NNN-*.md
 ```
 
-Override with `--repo-root <path>` if invoked from a different cwd.
+`--repo-root` defaults to the current working directory. Override explicitly with `--repo-root <path>` when invoking the tools from a directory that is not the project root (e.g., the human `wpx` wrapper from `/tmp`).
+
+This is distinct from the tool-directory resolution above: tool-directory tells you where the `wpx-*` scripts THEMSELVES live; `--repo-root` tells the script where the target project's `.architecture/` tree lives.
 
 ## JSON output shape
 

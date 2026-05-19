@@ -70,13 +70,28 @@ worktree removal (Step 12) bracket the per-executor isolation.
 
 **Every bookkeeping operation in this lifecycle goes through a
 `wpx-*` CLI tool, not direct file edits or raw git commands.** The
-tools live at `plugins/sulis-execution/scripts/wpx-*` and are invoked
+tools live inside the plugin's `scripts/` directory and are invoked
 via Bash. They are deterministic and cannot format-drift. The
 detailed per-step recipes below ("Worktree creation", "Pre-flight
 tooling check", etc.) describe the *intent* of each step; the
 *mechanism* is always a `wpx-*` invocation. Where this reference
 shows raw Bash, treat it as background context — the canonical
 execution path is the tool.
+
+**Path resolution (v0.10.1+).** When the plugin is installed in a
+downstream project, the scripts live at
+`~/.claude/plugins/cache/sulis-ai-agents/sulis-execution/<version>/scripts/`,
+not at a project-relative path. The executor agent and the
+run-all / run-wp skills MUST resolve the tool directory once per
+session and capture it as `$WPX_DIR` — see "Resolving wpx-* tool
+paths (MUST — first action)" in `agents/executor.md` for the
+canonical preamble. All invocation examples in this document use
+`"$WPX_DIR/wpx-NAME"` to reflect that contract.
+
+For ad-hoc human use (debug, recovery, ad-hoc journal reads), see
+the `wpx` wrapper documented at `scripts/README.md` — install once
+to PATH, then `wpx journal read --wp WP-NNN --project <slug>
+--field plan` works from any project directory.
 
 The full mapping is in `agents/executor.md` under *Bookkeeping via
 wpx-* tools*. Key invocations referenced by this document:
@@ -122,13 +137,17 @@ executor performs.
 The calling session's invocation sequence per WP:
 
 ```bash
+# Resolve WPX_DIR (the calling session's first Bash call — see the
+# "Resolving wpx-* tool paths" preamble in agents/executor.md and
+# the run-all / run-wp skill files).
+
 # 0. Read what the executor produced
-plugins/sulis-execution/scripts/wpx-journal read \
+"$WPX_DIR/wpx-journal" read \
   --wp WP-NNN --project <slug> --field step-trace
 # → JSON containing branch, pushed SHA, Step 7 outcome line
 
 # Resolve frontmatter
-plugins/sulis-execution/scripts/wpx-wp read-frontmatter \
+"$WPX_DIR/wpx-wp" read-frontmatter \
   --wp WP-NNN --project <slug> --field '*'
 # → branch, smoke_test, ci_poll_interval_seconds, deploy_workflow,
 #   post_deploy_verification, executor_model, security_model
@@ -136,7 +155,7 @@ plugins/sulis-execution/scripts/wpx-wp read-frontmatter \
 # 1. Steps 8-10: CI poll + rebase + squash-merge + deploy + health + smoke
 # Run via top-level Bash(run_in_background:true) — typical wall time
 # 15-45 min. The harness notifies on completion.
-plugins/sulis-execution/scripts/wpx-pipeline run \
+"$WPX_DIR/wpx-pipeline" run \
   --wp WP-NNN --project <slug> \
   --branch feat/wp-NNN-<slug> \
   --worktree-path ../wp-NNN-worktree \
@@ -176,7 +195,7 @@ Agent({
 })
 
 # 3. Per non-CRITICAL finding from the agent's return:
-plugins/sulis-execution/scripts/wpx-findings register \
+"$WPX_DIR/wpx-findings" register \
   --wp WP-NNN --project <slug> \
   --severity CONCERN \
   --summary "..." --file <path> \
@@ -185,7 +204,7 @@ plugins/sulis-execution/scripts/wpx-findings register \
   --primitive SEC-NN
 # → Returns SF-NNN id (existing on dedup) + WP-AUTO-NNN id (new)
 
-plugins/sulis-execution/scripts/wpx-findings auto-draft-wp \
+"$WPX_DIR/wpx-findings" auto-draft-wp \
   --project <slug> \
   --source-finding SF-NNN \
   --source-wp WP-NNN \
@@ -194,7 +213,7 @@ plugins/sulis-execution/scripts/wpx-findings auto-draft-wp \
 # → Creates the auto-draft WP file
 
 # 4. Record the post-deploy verdict in the journal
-plugins/sulis-execution/scripts/wpx-journal record-postdeploy \
+"$WPX_DIR/wpx-journal" record-postdeploy \
   --wp WP-NNN --project <slug> \
   --verdict PASS \
   --findings-summary "0 CRITICAL, 1 CONCERN (SF-007 → WP-AUTO-003), 2 ADVISORY"
@@ -205,7 +224,7 @@ cat > /tmp/pipeline-result.json <<JSON
 { "result": <pipeline JSON output from step 1> }
 JSON
 
-plugins/sulis-execution/scripts/wpx-step12 wrap \
+"$WPX_DIR/wpx-step12" wrap \
   --wp WP-NNN --project <slug> \
   --branch feat/wp-NNN-<slug> \
   --pipeline-result @/tmp/pipeline-result.json \
@@ -378,7 +397,7 @@ cat > /tmp/plan-WP-NNN.json <<JSON
 ]
 JSON
 
-plugins/sulis-execution/scripts/wpx-journal seed-plan \
+"$WPX_DIR/wpx-journal" seed-plan \
   --wp WP-NNN --project <slug> \
   --approach "<2-3 sentence summary>" \
   --plan-json @/tmp/plan-WP-NNN.json

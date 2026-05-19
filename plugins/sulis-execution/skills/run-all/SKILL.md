@@ -34,6 +34,48 @@ security-reviewer for Step 11 (v0.9.0+). All Agent calls are one
 level deep from the calling session — well within Claude Code's
 depth limits.
 
+### Resolving wpx-* tool paths (MUST — first action, v0.10.1+)
+
+The wpx-* CLI tools (journal, pipeline, blocker, step12, …) live
+inside the sulis-execution plugin. When the plugin is installed in
+a downstream project, the scripts are at
+`~/.claude/plugins/cache/sulis-ai-agents/sulis-execution/<version>/scripts/`,
+NOT at a project-relative path. You MUST resolve the tool directory
+ONCE at the start of every dispatch session, before reading the
+INDEX or doing anything else, and capture the result as
+`$WPX_DIR`:
+
+```bash
+WPX_DIR=$(
+  find ~/.claude/plugins/cache \
+    -name wpx-journal -type f \
+    -path '*/sulis-execution/*/scripts/*' \
+    2>/dev/null \
+  | sort -r | head -1 | xargs -I{} dirname {} 2>/dev/null
+)
+# Dev fallback: marketplace repo cwd
+if [ -z "$WPX_DIR" ] && [ -f "plugins/sulis-execution/scripts/wpx-journal" ]; then
+  WPX_DIR="$(pwd)/plugins/sulis-execution/scripts"
+fi
+if [ -z "$WPX_DIR" ]; then
+  echo "ERROR: cannot locate wpx-* scripts. Run: claude plugin install sulis-execution@sulis-ai-agents" >&2
+  exit 1
+fi
+echo "WPX_DIR=$WPX_DIR"
+```
+
+Capture the printed `WPX_DIR` value into your working memory. Every
+subsequent wpx-* invocation in this skill uses `"$WPX_DIR/wpx-NAME"`
+— substitute the resolved literal path inline at each Bash call.
+Environment variables do NOT persist between Bash tool invocations
+in Claude Code, so the substitution happens in the prompt text the
+agent sends to Bash, not in shell state.
+
+The executor subagents you spawn have the same resolution preamble
+in their own prompts (`agents/executor.md`) — they resolve
+independently in their own contexts. You do NOT pass `$WPX_DIR` to
+them; each subagent finds its own.
+
 ### The parallel loop
 
 ```
@@ -245,7 +287,7 @@ loop:
        script, not in an agent's turn. Typical wall time: 15-45 min.
 
            Bash({
-             command: """plugins/sulis-execution/scripts/wpx-pipeline run \
+             command: """"$WPX_DIR/wpx-pipeline" run \
                 --wp WP-NNN --project <slug> \
                 --branch feat/wp-NNN-<slug> \
                 --worktree-path ../wp-NNN-worktree \
@@ -266,7 +308,7 @@ loop:
        Inspect the JSON. If `outcome: "blocker"`:
 
            # Write BLOCKER capturing the pipeline failure
-           plugins/sulis-execution/scripts/wpx-blocker write \
+           "$WPX_DIR/wpx-blocker" write \
              --wp WP-NNN --project <slug> \
              --title "<pipeline step> failed" \
              --step <8|9|10> \
@@ -337,7 +379,7 @@ loop:
            # Build pipeline-result file
            jq '.' /tmp/pipeline-WP-NNN.json > /tmp/pipeline-result-WP-NNN.json
 
-           plugins/sulis-execution/scripts/wpx-step12 wrap \
+           "$WPX_DIR/wpx-step12" wrap \
              --wp WP-NNN --project <slug> \
              --branch feat/wp-NNN-<slug> \
              --pipeline-result @/tmp/pipeline-result-WP-NNN.json \

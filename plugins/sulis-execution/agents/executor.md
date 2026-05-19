@@ -130,6 +130,53 @@ See `references/lifecycle.md` for the detailed per-step contract,
 success criteria, and failure-handling OODA recipes (Steps 1-7) plus
 a calling-session reference for what happens at Steps 8-12.
 
+## Resolving wpx-* tool paths (MUST — first action, v0.10.1+)
+
+The wpx-* CLI tools (journal, blocker, worktree, …) live inside the
+sulis-execution plugin. When the plugin is installed in a downstream
+project, the scripts are at
+`~/.claude/plugins/cache/sulis-ai-agents/sulis-execution/<version>/scripts/`,
+NOT at the project's working directory. You MUST resolve the tool
+directory ONCE at the start of every session, before any bookkeeping
+operation.
+
+**Run this as your first Bash call**, before reading any artifact,
+before initialising any worktree, before doing anything else:
+
+```bash
+WPX_DIR=$(
+  find ~/.claude/plugins/cache \
+    -name wpx-journal -type f \
+    -path '*/sulis-execution/*/scripts/*' \
+    2>/dev/null \
+  | sort -r | head -1 | xargs -I{} dirname {} 2>/dev/null
+)
+# Dev fallback: marketplace repo cwd
+if [ -z "$WPX_DIR" ] && [ -f "plugins/sulis-execution/scripts/wpx-journal" ]; then
+  WPX_DIR="$(pwd)/plugins/sulis-execution/scripts"
+fi
+if [ -z "$WPX_DIR" ]; then
+  echo "ERROR: cannot locate wpx-* scripts. Run: claude plugin install sulis-execution@sulis-ai-agents" >&2
+  exit 1
+fi
+echo "WPX_DIR=$WPX_DIR"
+```
+
+Capture the printed `WPX_DIR` value into your working memory. Every
+subsequent wpx-* invocation in this prompt uses `"$WPX_DIR/wpx-NAME"`
+— substitute the resolved literal path inline at each Bash call
+(environment variables do NOT persist between Bash tool invocations
+in Claude Code).
+
+The `sort -r` ensures the latest installed plugin version wins (the
+cache directory is versioned). The dev fallback covers the case
+where you are running against a marketplace-repo checkout (e.g.,
+during plugin development before publishing).
+
+If WPX_DIR resolution fails entirely, halt and escalate via BLOCKER
+with the verbatim `ERROR: cannot locate wpx-* scripts` observation
+— the executor's contract cannot proceed without its tool library.
+
 ## Step 1.5 — Plan generation (MUST — v0.10.0+)
 
 After Step 1 completes (worktree, journal init, pre-flight checks)
@@ -187,7 +234,7 @@ cat > /tmp/plan-WP-NNN.json <<'JSON'
 ]
 JSON
 
-plugins/sulis-execution/scripts/wpx-journal seed-plan \
+"$WPX_DIR/wpx-journal" seed-plan \
   --wp WP-NNN --project <slug> \
   --approach "Create primitive. New billing.cancel_subscription() with happy + expired tests. Key risk: shared validation refactor if 2-consumer fires." \
   --plan-json @/tmp/plan-WP-NNN.json
@@ -218,7 +265,7 @@ leverage moment in the lifecycle to fail fast.
 As each plan item begins, flip its status to `in-progress`:
 
 ```bash
-plugins/sulis-execution/scripts/wpx-journal mark-plan-item \
+"$WPX_DIR/wpx-journal" mark-plan-item \
   --wp WP-NNN --project <slug> \
   --item <N> --status in-progress --expected pending
 ```
@@ -226,7 +273,7 @@ plugins/sulis-execution/scripts/wpx-journal mark-plan-item \
 When the item is complete, mark `done`:
 
 ```bash
-plugins/sulis-execution/scripts/wpx-journal mark-plan-item \
+"$WPX_DIR/wpx-journal" mark-plan-item \
   --wp WP-NNN --project <slug> \
   --item <N> --status done --expected in-progress
 ```
@@ -235,7 +282,7 @@ Conditional items that don't fire (e.g., the Blue refactor when the
 2-consumer rule wasn't triggered) get `skipped` with a notes update:
 
 ```bash
-plugins/sulis-execution/scripts/wpx-journal mark-plan-item \
+"$WPX_DIR/wpx-journal" mark-plan-item \
   --wp WP-NNN --project <slug> \
   --item <N> --status skipped \
   --notes "2-consumer threshold not reached; no refactor needed"
@@ -245,7 +292,7 @@ If reality deviates from the plan mid-run (e.g., you discover an 8th
 test is needed in Step 2 that you didn't anticipate), append it:
 
 ```bash
-plugins/sulis-execution/scripts/wpx-journal add-plan-item \
+"$WPX_DIR/wpx-journal" add-plan-item \
   --wp WP-NNN --project <slug> \
   --description "Add test_cancel_null_id in tests/test_billing.py" \
   --step "2 (RED)" \
@@ -273,19 +320,29 @@ seed normally.
 
 **Every bookkeeping operation in your lifecycle goes through a
 `wpx-*` CLI tool, not direct file edits or raw git commands.** The
-tools live at `plugins/sulis-execution/scripts/wpx-*` and are invoked
-via Bash. They are deterministic, well-tested, and cannot
-format-drift. Direct Markdown edits to the journal, INDEX, or BLOCKER
-files are FORBIDDEN — they are the historical source of every
-post-Step-6 parking failure (`.executor-WP-NNN.md` row misalignment,
-INDEX status enum drift, missing acceptance-evidence fields).
+tools live inside the plugin's `scripts/` directory; you resolved
+their location into `$WPX_DIR` at session start (see "Resolving
+wpx-* tool paths"). Every invocation below uses `"$WPX_DIR/wpx-NAME"`
+— substitute the resolved literal path inline. The tools are
+deterministic, well-tested, and cannot format-drift. Direct Markdown
+edits to the journal, INDEX, or BLOCKER files are FORBIDDEN — they
+are the historical source of every post-Step-6 parking failure
+(`.executor-WP-NNN.md` row misalignment, INDEX status enum drift,
+missing acceptance-evidence fields).
 
 You MUST invoke the tool. You MAY read the files (for context) but
 you MUST NOT write them by hand.
 
 The complete mapping for the executor (Steps 1-7 only — Steps 8-12
 are the calling session's; their tool invocations are documented in
-`skills/run-all/SKILL.md`):
+`skills/run-all/SKILL.md`).
+
+The `Tool invocation` cells below show the bare command form for
+readability — **every actual Bash invocation MUST prefix with
+`"$WPX_DIR/"`** (the path you resolved at session start). For
+example, `wpx-journal init --wp WP-NNN --project <slug>` becomes
+`"$WPX_DIR/wpx-journal" init --wp WP-NNN --project <slug>` when sent
+to Bash.
 
 | Lifecycle operation | Tool invocation |
 |---|---|
@@ -328,26 +385,26 @@ PROJECT=kinds-and-tools
 WP=WP-007
 
 # Create the worktree (records dev SHA in sidecar automatically)
-plugins/sulis-execution/scripts/wpx-worktree create \
+"$WPX_DIR/wpx-worktree" create \
   --wp $WP --project $PROJECT \
   --branch feat/wp-007-cancel-flow \
   --worktree-path ../wp-007-worktree
 
 # Initialise the journal
-plugins/sulis-execution/scripts/wpx-journal init \
+"$WPX_DIR/wpx-journal" init \
   --wp $WP --project $PROJECT
 
 # Record pre-flight checks
-plugins/sulis-execution/scripts/wpx-journal record-preflight \
+"$WPX_DIR/wpx-journal" record-preflight \
   --wp $WP --project $PROJECT \
   --tool "gh CLI" --status present
 
-plugins/sulis-execution/scripts/wpx-journal record-preflight \
+"$WPX_DIR/wpx-journal" record-preflight \
   --wp $WP --project $PROJECT \
   --tool coverage --status absent --fallback "manual analysis at Step 4"
 
 # Announce Step 2 start
-plugins/sulis-execution/scripts/wpx-journal start-step \
+"$WPX_DIR/wpx-journal" start-step \
   --wp $WP --project $PROJECT --step 2
 ```
 
@@ -375,7 +432,7 @@ cat > /tmp/whys.json <<'JSON'
 JSON
 
 # Write the BLOCKER
-plugins/sulis-execution/scripts/wpx-blocker write \
+"$WPX_DIR/wpx-blocker" write \
   --wp WP-CHAR-01 --project kinds-and-tools \
   --title "TDD §5.4 path mismatch — tasks.tools vs tasks.cli.node_executor.dispatch" \
   --step 3 \
