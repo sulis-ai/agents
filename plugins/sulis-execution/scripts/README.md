@@ -131,6 +131,103 @@ Once a tool is invoked, it resolves all artifact paths relative to the project r
 
 This is distinct from the tool-directory resolution above: tool-directory tells you where the `wpx-*` scripts THEMSELVES live; `--repo-root` tells the script where the target project's `.architecture/` tree lives.
 
+## Setting up branch CI
+
+The full v0.9.0+ executor lifecycle assumes your project runs CI on
+push to feature branches (Step 8 polls the branch's CI before merging
+to dev). Per `plugins/srd/references/git-workflow-standard.md`
+GIT-04 v0.1.3+, branch CI is the canonical safety net before squash-
+merge: if your only CI runs on push-to-dev, every WP's first run on
+dev is also its first CI run, and a broken WP can land before tests
+ever execute.
+
+### What `wpx-pipeline` does when branch CI is absent (v0.10.4+)
+
+`wpx-pipeline run` detects whether your project has a branch-CI
+workflow by checking `.github/workflows/*.y[a]ml` and `.gitlab-ci.yml`
+for any Conventional Commits prefix (`feat/`, `fix/`, `chore/`, etc.).
+If no match is found, the tool emits a `WARNING` to stderr, sets the
+result's `ci_poll_skipped` flag to `true`, and proceeds directly to
+rebase + squash-merge without polling CI. The pipeline still runs to
+completion — you just don't get the pre-merge safety net.
+
+You can also pass `--skip-ci-poll` explicitly to force the same
+behaviour even when branch CI is present (rare; useful when you want
+to bypass a known-flaky CI suite for a specific WP).
+
+### The canonical branch-CI workflow (recommended)
+
+Drop this into `.github/workflows/branch-ci.yml` in your project,
+replacing the lint / type-check / test commands with whatever your
+project uses:
+
+```yaml
+# .github/workflows/branch-ci.yml — minimal feature-branch CI per GIT-04
+name: Branch CI
+on:
+  push:
+    branches:
+      - 'feat/**'
+      - 'fix/**'
+      - 'chore/**'
+      - 'refactor/**'
+      - 'docs/**'
+      - 'test/**'
+      - 'perf/**'
+      - 'build/**'
+      - 'ci/**'
+      - 'style/**'
+      - 'revert/**'
+
+concurrency:
+  group: branch-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Replace these with your project's runtime setup
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -e .[dev]
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Type-check
+        run: mypy .
+
+      - name: Test
+        run: pytest -x
+```
+
+After committing this workflow, the next `wpx-pipeline` run on a
+feature branch will auto-detect the CI configuration and poll it
+normally — no flag changes required.
+
+### Why this matters
+
+- **Safety net before merge.** A broken WP fails CI on the branch
+  before squash-merge happens. Without branch CI, the first
+  validation is post-merge on dev — which means a broken WP lands
+  before tests ever run, and rolling back requires a revert PR or
+  `wpx-blocker` retry.
+- **Parallel dispatch.** When `run-all` dispatches N WPs in parallel,
+  branch CI runs in parallel too. Without it, post-merge dev CI runs
+  sequentially per merge, serialising the validation step.
+- **Auto-detected by `wpx-pipeline`.** The tool's `_detect_branch_ci`
+  function mirrors the Step 1 pre-flight check's heuristic — no
+  manual configuration of the marketplace is required for the
+  auto-skip to work. Adding branch CI flips wpx-pipeline back into
+  poll-mode automatically.
+
 ## JSON output shape
 
 When a tool returns data, the shape is:

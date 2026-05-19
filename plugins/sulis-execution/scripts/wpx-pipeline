@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -47,6 +48,48 @@ HEALTH_MAX_INTERVAL = 300      # 5 min cap (exponential backoff)
 HEALTH_DEFAULT_CAP = 10 * 60   # 10 min total
 
 REBASE_BUDGET = 2              # GIT-05 step-4
+
+# Conventional Commits branch prefixes that branch-CI workflows
+# typically gate on. Mirrors the lifecycle.md Step 1 pre-flight grep.
+_BRANCH_CI_PREFIXES = (
+    "feat/", "fix/", "chore/", "refactor/", "docs/",
+    "test/", "perf/", "build/", "ci/", "style/", "revert/",
+)
+_BRANCH_CI_RE = re.compile(
+    r"|".join(re.escape(p) for p in _BRANCH_CI_PREFIXES),
+)
+
+
+def _detect_branch_ci(worktree: Path) -> bool:
+    """Detect whether the project has branch CI configured.
+
+    Returns True iff `.github/workflows/*.y*ml` or `.gitlab-ci.yml`
+    mentions any Conventional Commits feature-branch prefix
+    (feat/, fix/, chore/, ...). Returns False otherwise.
+
+    Mirrors the lifecycle.md Step 1 pre-flight check so wpx-pipeline
+    can independently decide whether to skip the CI poll. If the
+    project has no branch CI, the CI poll would hang indefinitely
+    (no check-runs ever appear) until CI_DEFAULT_CAP expires.
+    """
+    gh = worktree / ".github" / "workflows"
+    if gh.exists() and gh.is_dir():
+        for yml in list(gh.glob("*.yml")) + list(gh.glob("*.yaml")):
+            try:
+                text = yml.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            if _BRANCH_CI_RE.search(text):
+                return True
+    gitlab = worktree / ".gitlab-ci.yml"
+    if gitlab.exists() and gitlab.is_file():
+        try:
+            text = gitlab.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            text = ""
+        if _BRANCH_CI_RE.search(text):
+            return True
+    return False
 
 
 # --- Logging -------------------------------------------------------------
@@ -274,16 +317,36 @@ def cmd_run(args: argparse.Namespace) -> None:
         "started_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
+    # Step 8a: CI poll — auto-skip if no branch CI configured
+    skip_ci_poll = args.skip_ci_poll
+    if not skip_ci_poll and not _detect_branch_ci(worktree):
+        _log(
+            "WARNING: no branch-CI workflow detected in "
+            ".github/workflows/ or .gitlab-ci.yml. Auto-skipping CI "
+            "poll (otherwise wpx-pipeline would hang for "
+            f"{CI_DEFAULT_CAP}s waiting for check-runs that will "
+            "never appear). See plugins/sulis-execution/scripts/"
+            "README.md#setting-up-branch-ci for the canonical "
+            "workflow snippet."
+        )
+        skip_ci_poll = True
+    result["ci_poll_skipped"] = skip_ci_poll
+
     try:
         # Step 8a: CI poll
-        _log(f"Step 8a: polling CI for {args.branch}")
-        verdict = _poll_ci(repo, args.branch, ci_interval, CI_DEFAULT_CAP)
+        if skip_ci_poll:
+            _log("Step 8a: skipping CI poll (--skip-ci-poll or auto-detected absence)")
+            verdict = "skipped"
+        else:
+            _log(f"Step 8a: polling CI for {args.branch}")
+            verdict = _poll_ci(repo, args.branch, ci_interval, CI_DEFAULT_CAP)
         if verdict == "failed":
             result.update(outcome="blocker", blocker_reason="CI checks failed on branch HEAD")
             _emit_result(result, exit_code=1)
         if verdict == "timeout":
             result.update(outcome="blocker", blocker_reason=f"CI did not complete within {CI_DEFAULT_CAP}s")
             _emit_result(result, exit_code=1)
+        # verdict in {"green", "skipped"} → proceed to rebase/merge
 
         # Step 8b: rebase if dev advanced
         for attempt in range(REBASE_BUDGET):
@@ -292,9 +355,13 @@ def cmd_run(args: argparse.Namespace) -> None:
             )
             if not rebased:
                 break
-            _log(f"Rebased onto dev (attempt {attempt+1}); re-polling CI")
-            verdict = _poll_ci(repo, args.branch, ci_interval, CI_DEFAULT_CAP)
-            if verdict != "green":
+            _log(f"Rebased onto dev (attempt {attempt+1})"
+                 + ("" if skip_ci_poll else "; re-polling CI"))
+            if skip_ci_poll:
+                verdict = "skipped"
+            else:
+                verdict = _poll_ci(repo, args.branch, ci_interval, CI_DEFAULT_CAP)
+            if verdict not in ("green", "skipped"):
                 result.update(outcome="blocker",
                               blocker_reason=f"CI {verdict} after rebase attempt {attempt+1}")
                 _emit_result(result, exit_code=1)
@@ -384,6 +451,14 @@ def build_parser() -> argparse.ArgumentParser:
                        help=f"CI poll interval (s, default {CI_DEFAULT_INTERVAL})")
     p_run.add_argument("--deploy-poll-interval", type=int, default=None,
                        help=f"Deploy poll interval (s, default {DEPLOY_DEFAULT_INTERVAL})")
+    p_run.add_argument(
+        "--skip-ci-poll", action="store_true",
+        help="Skip CI polling on the branch and proceed directly to "
+             "rebase/merge. Defaults to False; auto-set to True when "
+             ".github/workflows/ and .gitlab-ci.yml have no branch-CI "
+             "config. Use explicitly when your project has CI you don't "
+             "want gated on before merge.",
+    )
 
     return parser
 

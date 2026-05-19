@@ -104,15 +104,32 @@ def paths_from_args(args: argparse.Namespace) -> WpxPaths:
 # ─────────────────────────────────────────────────────────────────────────
 
 
-def emit_ok(data: dict | None = None, warnings: list[str] | None = None) -> None:
-    """Print success JSON to stdout and exit 0."""
+def emit_ok(
+    data: dict | None = None,
+    warnings: list[str] | None = None,
+    exit_code: int = 0,
+) -> None:
+    """Print success JSON to stdout and exit with the given code (default 0).
+
+    The `exit_code` parameter exists for tools that emit a
+    structured-JSON result alongside a non-zero exit semantic.
+    Concrete use case: `wpx-pipeline` emits a fully-formed result
+    object with `outcome="blocker"` and `exit_code=1` so the calling
+    session's `Bash(run_in_background)` notification can distinguish
+    a clean pipeline-blocker (exit 1, structured JSON readable from
+    the stdout file) from a successful pipeline (exit 0) or an
+    internal-error crash (exit 2 via emit_internal_error).
+
+    For normal success in every other wpx-* tool, the default
+    exit_code=0 preserves the prior contract.
+    """
     payload = {"ok": True}
     if data is not None:
         payload["data"] = data
     if warnings:
         payload["warnings"] = warnings
     print(json.dumps(payload, indent=2, sort_keys=True))
-    sys.exit(0)
+    sys.exit(exit_code)
 
 
 def emit_error(message: str, context: dict | None = None) -> None:

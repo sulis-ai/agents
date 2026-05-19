@@ -281,11 +281,13 @@ if grep -lE "'feat/\*\*'|feat/\*\*|^\s+- feat/" .github/workflows/*.yml >/dev/nu
 else
   CI_ON_BRANCH=false
   echo "WARN: feature-branch CI not configured; will fall back to local pre-commit gate at Step 7."
-  echo "  Recommend wiring feature-branch CI per GIT-04 v0.1.3+ before scaling parallel dispatch."
+  echo "  Recommend wiring feature-branch CI per scripts/README.md#setting-up-branch-ci (per GIT-04 v0.1.3+) before scaling parallel dispatch."
 fi
 ```
 
-Journal entry shape:
+Journal entry shape (when feature-branch CI is absent, the `Fallback`
+cell embeds the recommendation surface so the calling session and
+concierge can pass it through to the founder):
 
 ```markdown
 ## Pre-flight checks
@@ -294,8 +296,17 @@ Journal entry shape:
 |---|---|---|
 | gh CLI | present | — |
 | coverage tool | absent | manual analysis at Step 4 |
-| feature-branch CI | absent | local pre-commit gate at Step 7 |
+| feature-branch CI | absent | local pre-commit gate at Step 7; wpx-pipeline will auto-skip CI poll. Recommendation: configure branch CI per scripts/README.md#setting-up-branch-ci |
 ```
+
+**v0.10.4+ behaviour:** when `feature-branch CI = absent`, the
+calling session's `wpx-pipeline run` call auto-detects the same
+condition (via `_detect_branch_ci`) and skips CI polling with a
+clear `WARNING` log line. The pipeline still completes, just without
+the pre-merge CI safety net. To restore polling, drop the canonical
+workflow YAML in `.github/workflows/branch-ci.yml` (see
+`scripts/README.md#setting-up-branch-ci`) and re-run; no flag changes
+required.
 
 ### Worktree creation
 
