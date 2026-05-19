@@ -123,8 +123,9 @@ loop:
     9. Per-WP executor brief (substitute WP-NNN, project, etc.):
 
        You are dispatched by the run-all loop (parallel batch
-       of N) to ship WP-NNN through the full 12-step atomic
-       lifecycle.
+       of N) to ship WP-NNN through Steps 1-11 of the lifecycle.
+       Step 12 is the calling session's responsibility (v0.8.3+);
+       you complete Step 11 and exit cleanly.
 
        WP file: .architecture/{project}/work-packages/WP-NNN-<title>.md
        INDEX:   .architecture/{project}/work-packages/INDEX.md
@@ -132,11 +133,13 @@ loop:
        ADRs:    .architecture/{project}/adrs/
 
        Continuation Discipline applies (see agents/executor.md):
-       do not return control until Step 12 success OR a BLOCKER
-       is written. Use blocking Bash polling for steps 7-10 per
-       references/lifecycle.md. Step 11 invokes sulis-security:
-       security-reviewer via Agent — the executor's one allowed
-       sub-Agent call.
+       do not return control until Step 11 succeeds (journal-
+       recorded) OR a BLOCKER is written. Use the v0.8.3
+       background-poller pattern for steps 8/9/10 — kick off
+       run_in_background:true Bash with sleep 300 inside; the
+       harness auto-notifies you when complete. Step 11 invokes
+       sulis-security:security-reviewer via Agent — the executor's
+       one allowed sub-Agent call.
 
        You are running in your own git worktree (Step 1 creates
        it). Parallel peers are running their own worktrees. No
@@ -146,26 +149,73 @@ loop:
        .executor-WP-NNN.md exists with an incomplete tail,
        resume from the last started-but-not-completed step.
 
-       Output: ## Acceptance Evidence appended; INDEX status:
-       done; worktree removed. Or: BLOCKER-WP-NNN.md written;
-       INDEX status: blocked.
+       Output: journal updated through Step 11 with Completed
+       timestamp on the Step 11 trace row AND a populated
+       ## Post-deploy verification section. The calling session
+       will read the journal and perform Step 12 (acceptance
+       evidence + INDEX update + worktree removal) inline.
 
-       Return ONLY when one of those is true.
+       Or: BLOCKER-WP-NNN.md written; INDEX status: blocked.
+
+       Return when Step 11 is journal-recorded OR a BLOCKER is
+       written. Do NOT do Step 12 yourself.
 
    10. Wait for ALL parallel Agent calls to return. Claude Code's
        Agent tool blocks the calling turn until every parallel
        call resolves.
 
-   11. For each executor outcome:
-       - Step 12 success — WP done. INDEX status: done (executor
-         wrote that). Cross-reference any auto-draft WPs created
-         from findings. Continue.
-       - BLOCKER written — INDEX status: blocked (executor wrote
-         that). In the next loop iteration, transitively-dependent
-         WPs get status: dependency_blocked.
-       - Neither (executor exited mid-lifecycle) — classify as
-         "error". Halt the loop entirely. Surface to founder /
-         calling session.
+   11. For each executor outcome, do the calling session's
+       responsibilities (Step 12 inline, or error classification).
+       Read the executor's journal at
+       .architecture/{project}/work-packages/.executor-WP-NNN.md
+       to determine which outcome:
+
+       (a) Step 11 complete with non-CRITICAL verdict — Step 11
+           trace row has Completed timestamp; ## Post-deploy
+           verification section is populated with PASS / CONCERN /
+           ADVISORY (not CRITICAL); INDEX status is still in_progress.
+
+           → DO STEP 12 INLINE per references/lifecycle.md Step 12.
+
+           Inline mechanics (Bash + Edit per WP):
+
+             Bash:
+               # Extract evidence from journal
+               JOURNAL=.architecture/$PROJECT/work-packages/.executor-WP-NNN.md
+               BRANCH=$(grep '^- Branch:' "$JOURNAL" | head -1 | awk '{print $3}')
+               MERGE_SHA=$(grep 'Squash-merge SHA' "$JOURNAL" | head -1 | awk '{print $NF}')
+               DEPLOY_URL=$(grep 'Deployment URL' "$JOURNAL" | head -1 | awk '{print $NF}')
+               # ... etc.
+
+             Edit:
+               WP file at .architecture/$PROJECT/work-packages/WP-NNN-*.md
+               Append ## Acceptance Evidence block with the journal data.
+
+             Edit:
+               INDEX.md
+               Change WP-NNN row's status from in_progress to done.
+
+             Bash:
+               git worktree remove ../wp-NNN-worktree
+
+           Emit plain-English status: "WP-NNN done — deployed and
+           healthy at <url>. Security: <verdict>."
+
+       (b) BLOCKER written — INDEX status is already blocked
+           (executor wrote that during Step 11 or earlier). Skip
+           Step 12 (WP not done). Propagate dependency_blocked to
+           transitive descendants in the next loop iteration.
+
+       (c) Step 11 NOT complete (no Completed timestamp on Step 11
+           trace row, OR ## Post-deploy verification section
+           missing/incomplete) — classify as "error". Executor
+           parked late or errored mid-lifecycle. Do NOT do Step 12
+           (substantive work not proven complete). Halt the loop
+           entirely. Surface clearly:
+
+             "WP-NNN: executor returned before Step 11 completed.
+              Likely parked late in lifecycle. Re-dispatch via
+              /sulis-execution:run-wp WP-NNN to resume from journal."
 
    12. Emit per-batch plain-English status to the founder /
        concierge / calling session:

@@ -88,21 +88,30 @@ budget per `executor-loop-standard.md`.
 | 8 | Poll CI; on green, squash-merge directly to `dev` (no PR) | CI green; squash-merge commit on `dev`; remote branch deleted |
 | 9 | Trigger / wait for staging deploy | Deployment status: `succeeded` |
 | 10 | Health-check + smoke-test | Health: `healthy`; smoke-test passes |
-| 11 | **Post-deploy verification (security-reviewer)** | Default always-on; spawns sulis-security:security-reviewer with merge SHA + staging URL; CRITICAL → halt + BLOCKER; CONCERN/ADVISORY → SF-NNN file + register entry + auto-draft WP (v0.7+); PASS → advance |
-| 12 | Mark WP `done` in INDEX; remove worktree | INDEX updated; worktree removed |
+| 11 | **Post-deploy verification (security-reviewer)** | Default always-on; spawns sulis-security:security-reviewer with merge SHA + staging URL; CRITICAL → halt + BLOCKER; CONCERN/ADVISORY → SF-NNN file + register entry + auto-draft WP (v0.7+); PASS → write to journal + **exit cleanly (your contract ends here, v0.8.3+)** |
+| 12 | Mark WP `done` in INDEX; remove worktree | **(calling session — not executor; v0.8.3+).** Run-all skill, run-wp skill, or founder's main session reads the executor's journal and performs bookkeeping inline. |
 
-**This release (v0.7.0)** implements the full 12-step lifecycle with
-findings-to-auto-draft-WPs flow at Step 11. Non-CRITICAL findings
-(CONCERN, ADVISORY) are no longer "logged and forgotten" — each
-unique finding produces a structured SF-NNN file, a register entry,
-and an auto-draft WP (status: `auto-draft`) the orchestrator surfaces
-to the founder at slice-end for disposition.
+**This release (v0.8.3+)** narrows the executor's contract to Steps
+1-11. Step 12 (mark done + worktree cleanup) is now the calling
+session's responsibility. The executor completes Step 11 (security
+review with journal-recorded verdict), then exits cleanly. Rationale:
+across multiple production runs, executors at 200+ tool calls of depth
+drifted at Step 12 — *"monitor will notify me"* parking, *"advancing
+to Step 12"* exits without action, *"I know the verdict"*
+rationalisations. Step 12 is deterministic bookkeeping; it belongs in
+a fresh-context caller, not a deep-context executor. See
+`references/lifecycle.md` Step 12 for the architectural rationale.
 
-Step 5 is a no-op if no docs apply to the WP's changed files. Step 11
+Findings-to-auto-draft-WPs flow at Step 11 (v0.7.0) is preserved:
+non-CRITICAL findings produce SF-NNN files + register entries +
+auto-draft WPs. Step 5 (docs) is a no-op if no docs apply. Step 11
 fires on every WP by default during the v0.6/v0.7 calibration period;
-WPs can opt out via `post_deploy_verification: none` for cases where
-the assessment would be provably redundant (e.g. docs-only WPs
-touching no source files).
+WPs can opt out via `post_deploy_verification: none`.
+
+Pollings at Steps 8, 9, 10 use the background-poller pattern
+(v0.8.3+) — `run_in_background: true` Bash with `sleep 300` inside
+the backgrounded shell. Real CI durations of 15-30 minutes handled in
+one background lifetime; no agent-turn budget burned on waiting.
 
 Each step that can fail runs OODA + Five Whys + scope guard + budget
 per `executor-loop-standard.md`. The worktree is cleaned up at step
@@ -113,39 +122,58 @@ success criteria, and failure-handling OODA recipes.
 
 ## Continuation Discipline (MUST)
 
-**The 12-step lifecycle is one atomic unit. The unit ends at Step 12.**
-You do not return control before Step 12 succeeds OR a BLOCKER is
-written. Period. This rule applies to **every step transition**, not
-only polling boundaries.
+**Your contract is Steps 1-11. The unit ends at Step 11.** You do not
+return control before Step 11 succeeds OR a BLOCKER is written.
+Period. This rule applies to **every step transition** within your
+contract.
+
+Step 12 is the **calling session's** responsibility (run-all skill,
+run-wp skill, or founder's main session). You complete Step 11 (write
+the security verdict to the journal under `## Post-deploy
+verification` with a Completed timestamp on the Step 11 trace row),
+then exit cleanly. The calling session reads your journal and
+performs Step 12 inline. **You do not do Step 12.** This changed in
+v0.8.3 — see lifecycle.md Step 12 for the rationale.
 
 Returning at any of these transitions is a violation:
 
 - After Step 4 (Blue) → Step 5 (Docs). Sequential transition.
 - After Step 5 (Docs) → Step 6 (Lint). Sequential transition.
-- After Step 6 → Step 7 → Step 8. CI poll boundary, but the
-  *return* problem also applies after CI green.
-- After Step 8 (merge to dev) → Step 9 (deploy). Polling boundary.
-- After Step 9 (deploy) → Step 10 (health + smoke). Polling boundary.
-- **After Step 10 (smoke PASS) → Step 11 (security-reviewer).**
+- After Step 6 → Step 7 → Step 8. CI poll boundary; the return
+  problem also applies after CI green and during the rebase loop.
+- After Step 8 (merge to dev) → Step 9 (deploy). Polling boundary —
+  use the v0.8.3 background-poller pattern.
+- After Step 9 (deploy) → Step 10 (health + smoke). Polling boundary
+  — same pattern.
+- After Step 10 (smoke PASS) → Step 11 (security-reviewer).
   Agent-spawn boundary.
-- **After Step 11 (security-reviewer PASS) → Step 12 (bookkeeping).**
-  Sequential transition. ← *Production failure 2026-05-18; this rule
-  exists because returning here was observed.*
-- After Step 12 step succeeds — at that point you may exit cleanly
-  (the WP is done; you've recorded acceptance evidence; you've removed
-  the worktree).
+- During Step 11 itself (between security-reviewer return and
+  journal write). The PASS verdict must be written to the journal
+  before you exit — holding it in memory doesn't count.
+
+**After Step 11 with journal recorded, you exit cleanly.** That is
+not a Continuation Discipline violation; that is your contract
+completing. The calling session takes over for Step 12.
 
 Specifically forbidden patterns at any boundary:
 
 - *"Monitors will do their work and respond when complete."* ✗
+  (Use the v0.8.3 background-poller pattern instead — it provides
+  exactly this notification mechanism through the harness.)
 - *"I'm parked at a polling boundary — ping me when CI is green."* ✗
 - *"Deploy is in flight; I'll resume when it lands."* ✗
 - *"Returning control while we wait for the build."* ✗
-- *"Security review came back PASS — advancing to Step 12."* (✗ if
-  followed by exit; ✓ if the next thing the executor does in the
-  same turn is actually execute Step 12).
-- *"Substantive work is done; bookkeeping next."* ✗
-- *"All the hard parts are green; the WP is essentially done."* ✗
+- *"Security review came back PASS — I'll write to journal in a
+  moment."* ✗ — write to journal FIRST, then exit. The journal is
+  the load-bearing contract; the calling session reads it.
+- *"I know the security verdict is PASS; the report isn't critical
+  to persist."* ✗ — the verdict held in memory doesn't count.
+  Write it to the journal. (v0.8.3 — production drift pattern;
+  rationalising that you "know" the verdict suffices is the failure
+  mode this rule exists to prevent.)
+- *"Substantive work is done; calling session can do bookkeeping."* ✓
+  (this is correct in v0.8.3+ — but ONLY if Step 11 is journal-
+  recorded; otherwise see the "write to journal FIRST" point above.)
 
 These were observed in production. The WP's caller treats *"executor
 returned"* as *"executor finished its work."* Returning mid-lifecycle

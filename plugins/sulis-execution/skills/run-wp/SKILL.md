@@ -54,12 +54,14 @@ If the journal at .architecture/{project}/work-packages/.executor-WP-NNN.md
 exists and shows an incomplete tail, resume from the last started-but-
 not-completed step. Do not start over.
 
-Output contract:
-- On success: ## Acceptance Evidence appended to the WP file;
-  INDEX status: done; worktree removed.
+Output contract (v0.8.3+):
+- On success: journal-recorded Step 11 with Completed timestamp +
+  populated ## Post-deploy verification section. Executor exits;
+  this skill (the calling session) performs Step 12 inline.
 - On escalation: BLOCKER-WP-NNN.md written; INDEX status: blocked.
 
-Return ONLY when one of those output conditions is true.
+Return when Step 11 is journal-recorded OR a BLOCKER is written.
+Do NOT do Step 12 yourself — the calling session takes that.
 """,
 })
 ```
@@ -70,10 +72,9 @@ and WP title. The `subagent_type` value is **exactly**
 
 ### What you do NOT do in this skill's session
 
-- **Do not read the WP file yourself.** The executor reads it.
-- **Do not run `git worktree add`.** The executor does it.
 - **Do not write tests, code, lint, commit, push, poll CI, merge,
-  deploy, or health-check.** All of those are the executor's job.
+  deploy, or health-check.** All of those are the executor's job
+  (Steps 1-11).
 - **Do not summarise the executor's output for the user.** When the
   executor's Agent tool call returns, surface its terminal status
   line directly. The concierge (if upstream) does the founder
@@ -85,10 +86,35 @@ and WP title. The `subagent_type` value is **exactly**
 1. Parse the WP-NNN argument from the user's invocation.
 2. Verify the WP file exists at the expected path; if not, surface
    a clear error and exit.
-3. Make the Agent tool call above.
-4. When it returns, surface the executor's terminal status line.
+3. Make the Agent tool call above (executor runs Steps 1-11).
+4. When the executor returns, **read its journal** at
+   `.architecture/{project}/work-packages/.executor-WP-NNN.md` to
+   determine which outcome to handle (v0.8.3+):
 
-That is the entire skill. Three steps. The executor does the work.
+   (a) **Step 11 complete with non-CRITICAL verdict** — Step 11
+       trace row has Completed timestamp; ## Post-deploy
+       verification populated; INDEX status still in_progress.
+
+       → Do Step 12 inline:
+         - Bash: extract evidence from journal (BRANCH, MERGE_SHA,
+           DEPLOY_URL, smoke verdict, security verdict).
+         - Edit: append ## Acceptance Evidence to WP file.
+         - Edit: flip INDEX status WP-NNN row from in_progress
+           to done.
+         - Bash: git worktree remove ../wp-NNN-worktree
+         - Surface plain-English status: "WP-NNN done — deployed
+           and healthy at <url>. Security: <verdict>."
+
+   (b) **BLOCKER written** — INDEX already blocked; surface the
+       BLOCKER's plain-English summary; exit.
+
+   (c) **Step 11 NOT complete** — executor parked late or errored.
+       Surface clearly: *"WP-NNN: executor returned before Step 11
+       completed. Likely parked late in lifecycle. Re-invoke this
+       skill to resume from journal."* Do NOT do Step 12.
+
+That is the skill. The executor does Steps 1-11; the calling
+session does Step 12 (inline, ~30 seconds, deterministic).
 
 ## When to use this skill
 

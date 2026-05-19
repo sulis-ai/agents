@@ -471,35 +471,70 @@ the push.
      - Record in journal under `## Pre-commit gate (local — feature-branch CI not wired)`.
      - Skip to step 4 (rebase-on-dev verification).
 
-3. **Poll CI as an agent-level turn loop, not a long-blocking Bash
-   call (v0.8.2+ — avoids harness backgrounding heuristic).**
+3. **Poll CI via background poller with auto-notification (v0.8.3+
+   — handles 15-30 min real CI durations cleanly).**
 
-   The harness backgrounds Bash calls whose runtime exceeds its
-   threshold heuristic. A `while true; do ...; sleep 30; done` loop
-   triggers this and breaks Continuation Discipline silently. The
-   fix: each poll is one short Bash call (≤ ~30-60s including
-   sleep); the agent re-issues across turns until terminal. Each
-   call exits cleanly; the harness doesn't background; the agent's
-   turn-level loop is the poll loop.
+   Real CI pipelines take 15-30 minutes, not 30-60 seconds. The
+   v0.8.2 short-Bash-per-poll pattern works but burns agent turns
+   (30+ iterations per WP) and exhausts the previous 15-min budget
+   well before realistic pipelines finish. The harness's first-class
+   mechanism for "wait until done" is `run_in_background: true`:
+   the agent kicks off a background poller, the harness auto-notifies
+   the agent when it completes, no agent turns burned on waiting.
 
-   Each agent turn issues one short Bash call:
+   Per the system prompt: *"For one-shot 'wait until done,' use Bash
+   with run_in_background instead."* And: *"When an agent runs in the
+   background, you will be automatically notified when it completes
+   — do NOT sleep, poll, or proactively check on its progress."*
+
+   The polling sub-step has three parts:
+
+   **3a. Initial foreground check.** Cheap; might already be terminal.
 
    ```bash
-   # First call (no sleep — immediate check):
    gh api repos/<owner>/<repo>/commits/$BRANCH_SHA/check-runs \
      --jq '[.check_runs[] | {name, status, conclusion}]'
    ```
 
-   ```bash
-   # Subsequent calls (sleep 30 + one check):
-   sleep 30 && gh api repos/<owner>/<repo>/commits/$BRANCH_SHA/check-runs \
-     --jq '[.check_runs[] | {name, status, conclusion}]'
+   If all checks are `status == "completed"` already → parse
+   conclusions, advance based on result.
+
+   **3b. If not yet terminal, kick off the background poller.**
+   Inside a backgrounded Bash, long `sleep` is allowed (the "long
+   leading sleep blocked" rule applies to foreground Bash only — in
+   backgrounded shells, `sleep 300` runs normally).
+
+   ```
+   Bash({
+     command: """
+       until gh api repos/<owner>/<repo>/commits/$BRANCH_SHA/check-runs \
+             --jq '[.check_runs[] | .status] | all(. == "completed")' \
+             | grep -q true; do
+         sleep 300
+       done
+       gh api repos/<owner>/<repo>/commits/$BRANCH_SHA/check-runs \
+         --jq '[.check_runs[] | {name, conclusion}]'
+     """,
+     run_in_background: true,
+     timeout: 2700000   // 45 min — covers worst-case CI + buffer
+   })
    ```
 
-   The agent parses each result. Terminal states:
-   - All `status == "completed"` AND no `conclusion in {failure,
-     cancelled, timed_out}` → CI green → advance to step 4.
-   - Any `conclusion == "failure"` → CI failure → OODA per EL-01..08.
+   The background shell:
+   - Polls every 5 minutes (`sleep 300`).
+   - Exits the `until` loop when every required check has
+     `status == "completed"`.
+   - Emits the final conclusions array as stdout.
+
+   **3c. Wait for harness notification.** The agent does NOT poll
+   the background process. The harness sends a notification when
+   the background Bash exits. The agent reads the stdout (final
+   conclusions array) and:
+
+   - All `conclusion in {"success", "skipped", "neutral"}` → CI
+     green → advance to step 4.
+   - Any `conclusion == "failure"` → CI failure → OODA per
+     EL-01..08.
    - Any `conclusion == "cancelled"` → check `cancelled_by` field:
      - **Workflow-triggered cancellation** (concurrency / superseded
        by newer push) → check whether a subsequent run on the same
@@ -507,21 +542,31 @@ the push.
        run; if no, re-trigger via `gh run rerun <run-id>`.
      - **Human cancellation** (`cancelled_by` is a username, not a
        bot) → see "Human cancellation mid-pipeline" subsection below.
+   - Background timeout (45 min elapsed) → treat as terminal failure;
+     OODA.
 
-   Budget for total poll wall-time: 15 minutes (~30 agent-turn
-   iterations at 30s each). After budget, treat as CI timeout (exit
-   124-equivalent).
+   **Configurable poll interval (v0.8.3+, optional).** WPs that need
+   a different cadence can set `ci_poll_interval_seconds` in
+   frontmatter (default 300):
+
+   ```yaml
+   ci_poll_interval_seconds: 600   # 10-minute polls for slow projects
+   ```
+
+   The skill reads this and substitutes the value into the
+   background-poller `sleep` command.
 
 4. (Original step 3 — see the rebase-on-dev section below.) Verify
-   dev hasn't advanced before squash-merging. Same as v0.8.1; uses
-   the same short-Bash-per-poll pattern for the re-CI wait after
-   rebase.
+   dev hasn't advanced before squash-merging. Same as v0.8.1; the
+   re-CI wait after rebase uses the same background-poller pattern.
 
-**Continuation Discipline.** The agent does NOT return control to
-its caller (the run-all loop or the founder's session) while
-polling. Each Bash call returns; the agent reads the result and
-decides whether to re-issue. The agent's turn-level loop is the
-load-bearing mechanism; Bash's job is the single short status check.
+**Continuation Discipline at the agent level.** The agent does NOT
+return control to its caller while the background poller is running
+— it's parked on the tool result, awaiting the harness's
+notification. The agent's "session" is preserved across the
+background wait. When the notification arrives, the agent resumes
+processing in the same conversation thread. No agent-turn budget
+consumed during the wait.
 
 ### Human cancellation mid-pipeline (v0.8.2+)
 
@@ -748,44 +793,49 @@ the project's deploy mechanism **before** taking action:
 
 ### Action for auto-deploy on push (most common case)
 
-```bash
-# Identify the deploy workflow's name from the project's CI config.
-# Common names: "Deploy to Dev Environment", "deploy-staging",
-# "Deploy", "CD".
-WORKFLOW="Deploy to Dev Environment"  # read from .github/workflows/
-MERGE_SHA=<sha-from-step-7>
+Same background-poller + auto-notification pattern as Step 8 (v0.8.3+).
+Real deploys take 5-15 min; the 5-minute poll cadence matches.
 
-# Wait up to 20 minutes for the workflow run triggered by the merge
-# push to complete.
-DEADLINE=$(( $(date +%s) + 1200 ))
-while true; do
-  STATUS=$(gh run list \
-    --workflow="$WORKFLOW" \
-    --commit="$MERGE_SHA" \
-    --limit=1 \
-    --json status,conclusion,databaseId)
-  if [ "$(echo "$STATUS" | jq -r '.[0].status')" = "completed" ]; then
-    CONCLUSION=$(echo "$STATUS" | jq -r '.[0].conclusion')
-    if [ "$CONCLUSION" = "success" ]; then
-      echo "Deploy succeeded"
-      break
-    else
-      echo "Deploy failed: $CONCLUSION"
-      RUN_ID=$(echo "$STATUS" | jq -r '.[0].databaseId')
-      gh run view "$RUN_ID" --log-failed  # verbatim log for OODA Observe
-      exit 1
-    fi
-  fi
-  if [ "$(date +%s)" -gt "$DEADLINE" ]; then
-    echo "Deploy poll timed out after 20 minutes"
-    exit 124
-  fi
-  sleep 30
-done
+**Initial foreground check:**
+
+```bash
+WORKFLOW="Deploy to Dev Environment"  # read from .github/workflows/
+MERGE_SHA=<sha-from-step-8>
+
+gh run list --workflow="$WORKFLOW" --commit="$MERGE_SHA" --limit=1 \
+  --json status,conclusion,databaseId --jq '.[0]'
 ```
 
-The Bash call **blocks** until success, failure, or timeout. The
-executor does not return control during this wait.
+If `status == "completed"` already → parse `conclusion`, advance.
+
+**If not yet terminal, kick off background poller:**
+
+```
+Bash({
+  command: """
+    WORKFLOW='Deploy to Dev Environment'
+    MERGE_SHA='<sha>'
+    until gh run list --workflow="$WORKFLOW" --commit="$MERGE_SHA" \
+            --limit=1 --json status --jq '.[0].status == "completed"' \
+          | grep -q true; do
+      sleep 300
+    done
+    gh run list --workflow="$WORKFLOW" --commit="$MERGE_SHA" --limit=1 \
+      --json status,conclusion,databaseId --jq '.[0]'
+  """,
+  run_in_background: true,
+  timeout: 1800000   // 30 min — covers worst-case deploy duration
+})
+```
+
+**Wait for harness notification.** Agent does not poll the
+background process. On notification, agent reads the conclusion:
+
+- `"success"` → advance to step 10.
+- `"failure"` → OODA per EL-01..08; fetch failed logs via
+  `gh run view <run-id> --log-failed` for verbatim Observe.
+- `"cancelled"` → human-cancellation-mid-pipeline subsection below.
+- Background timeout (30 min) → treat as terminal failure; OODA.
 
 ### Action for explicit Sulis SDK trigger
 
@@ -856,14 +906,58 @@ health = client.health.staging(deployment_id)
 # Returns healthy | degraded | unhealthy | unknown
 ```
 
-**Without Sulis SDK — direct probe:**
+**Without Sulis SDK — direct probe (v0.8.3 background-poller pattern):**
+
+Health checks typically resolve within 1-5 minutes of a fresh deploy
+(container warm-up). The background-poller pattern handles this
+cleanly even when warm-up is on the slower end.
+
+**Initial foreground check:**
 
 ```bash
 HEALTH_URL=$(jq -r '.staging.health_url' .sulis/manifest.yaml \
             2>/dev/null \
             || echo "https://<staging-domain>/health")
+curl -s -o /tmp/health-body -w "%{http_code}\n" "$HEALTH_URL"
+```
 
-# Exponential backoff: 15s, 30s, 60s, 120s, 240s — up to 5 attempts.
+If `200` + body has `status == "healthy"` → advance to sub-action B.
+
+**If not yet healthy, kick off background poller:**
+
+```
+Bash({
+  command: """
+    HEALTH_URL='<url>'
+    until response=$(curl -s -o /tmp/health-body -w "%{http_code}" "$HEALTH_URL")
+          && [ "$response" = "200" ] \
+          && jq -e '.status == "healthy"' /tmp/health-body > /dev/null 2>&1; do
+      sleep 60
+    done
+    echo "healthy"
+  """,
+  run_in_background: true,
+  timeout: 600000   // 10 min — health checks resolve faster than CI/deploy
+})
+```
+
+The background shell polls every 60 seconds (health-check resolves
+quickly once the container warms up; tighter interval than CI/deploy).
+
+**Wait for harness notification.** Agent reads "healthy" → advance.
+Timeout (10 min) → treat as terminal failure; trigger rollback per
+GIT-10 and OODA.
+
+**(Legacy fallback — kept as a reference for the inline-bash pattern;
+no longer the default in v0.8.3+. The background-poller above is the
+preferred mechanism.)**
+
+```bash
+# Old v0.8.2 pattern, kept for reference only.
+HEALTH_URL=$(jq -r '.staging.health_url' .sulis/manifest.yaml \
+            2>/dev/null \
+            || echo "https://<staging-domain>/health")
+
 ATTEMPTS=0
 SLEEP=15
 while [ $ATTEMPTS -lt 5 ]; do
@@ -1173,14 +1267,16 @@ verdict and exits before bookkeeping).
 
 **Success criterion:** Security-reviewer completed; findings (if
 any) registered + auto-drafted + cross-referenced; results captured
-in source WP's acceptance evidence; **executor has advanced to Step
-12 in the same turn.**
+in journal under `## Step trace` row for Step 11 with Completed
+timestamp. **Then the executor exits cleanly — Step 12 is the
+calling session's responsibility, not the executor's (v0.8.3+).**
 
-**Step 11 → Step 12 transition is part of the atomic unit.** After
-the security-reviewer returns (any non-CRITICAL verdict), the next
-action in the same executor turn is Step 12. Returning control here
-is a Continuation Discipline violation — equivalent to returning
-after CI green pre-merge. The WP is not done until Step 12 success.
+**Step 11 is the executor's last step.** After the security-reviewer
+returns (any non-CRITICAL verdict) and the journal records the
+outcome, the executor's contract is complete. The executor exits;
+the calling session reads the journal and performs Step 12
+bookkeeping inline. This was changed in v0.8.3 — see the rationale
+in Step 12 below.
 
 **Failure handling:**
 
@@ -1211,52 +1307,156 @@ WPs only). Decision deferred until empirical evidence.
 
 ---
 
-## Step 12 — Mark done + worktree cleanup
+## Step 12 — Mark done + worktree cleanup (calling session, not executor)
 
-**Input:** Successful Step 11 (PASS, CONCERN, or ADVISORY — anything
-that wasn't CRITICAL). This step runs **in the same executor turn**
-as Step 11's completion — Continuation Discipline forbids returning
-control between Step 11 and Step 12.
+**Important architectural change (v0.8.3+):** Step 12 is no longer
+the executor's responsibility. It is performed by the **calling
+session** — typically the run-all skill, the run-wp skill, or the
+founder's main session — after the executor returns from Step 11.
 
-**This step is required.** Skipping or deferring Step 12 leaves the
-WP in an indeterminate state (INDEX not updated, worktree not
-removed, acceptance evidence not appended). The orchestrator
-classifies an executor exit without Step 12 success as `error` and
-halts; the journal-resume mechanism picks the WP back up at Step 12
-on re-dispatch. Either way the bookkeeping happens — the question is
-whether it happens cleanly in the executor's own turn (cheap,
-canonical) or via recovery (expensive, audit-trail-noisy).
+### Why this changed in v0.8.3
 
-**Action:**
+The founder observed a recurring late-lifecycle failure mode across
+multiple WPs: executors completed Steps 1-11 cleanly (substantive
+engineering done, CI green, deploy succeeded, security review PASS)
+and then drifted at Step 12. Three patterns:
 
-1. Append the full evidence block to the WP's `## Acceptance
-   Evidence` section:
+1. *"Monitor will notify me"* — executor parked waiting for a
+   notification that wasn't coming.
+2. *"Advancing to Step 12"* — executor wrote the phrase but exited
+   without doing it.
+3. *"Report not written because I know the verdict"* — executor
+   rationalised that holding the verdict in memory sufficed without
+   persisting it.
 
-   ```markdown
-   ## Acceptance Evidence
+Root cause: the executor was 200+ tool calls deep by the time it
+reached Step 12. Continuation Discipline is *policy, not mechanism*
+— the prompt forbids returning before Step 12, but nothing in the
+runtime prevents the agent from drifting at depth.
 
-   - Branch: `feat/wp-NNN-<slug>` (deleted post-merge)
-   - Pre-squash SHA: `<sha>`
-   - Squash-merge SHA on dev: `<sha>`
-   - Deployment URL: `<url>`
-   - Health status: `healthy`
-   - Smoke-test verdict: `PASS — <one-line summary>`
-   - Post-deploy verification: `<PASS | N CONCERN | N ADVISORY>` (see
-     .security/{project}/viability-report-<date>.md for detail)
-   - Completed: `<ISO-8601>`
-   ```
+**The fix is architectural, not motivational:** remove Step 12 from
+the executor. The executor's job is the engineering work (Steps
+1-11). Step 12 is deterministic bookkeeping — three Bash commands +
+one Edit + one INDEX update — and doesn't need agent reasoning. It
+belongs in a fresh-context caller (the run-all skill, run-wp skill,
+or the founder's session) that hasn't accumulated 200 tool calls of
+load.
 
-2. Update INDEX entry to `status: done`.
-3. Remove the local worktree (`git worktree remove
-   ../wp-NNN-worktree`).
-4. Emit one plain-English status line for the orchestrator / invoking
-   session: `"WP-007 done — deployed and healthy at <url>. Smoke-test
-   passed. Security assessment: PASS (no findings) / N CONCERN
-   findings logged."`
-5. Exit cleanly.
+### Calling-session responsibilities
 
-**Success criterion:** Evidence appended; INDEX updated; worktree
-removed; status line emitted.
+After the executor returns from Step 11 (regardless of outcome), the
+calling session:
+
+1. **Reads the executor's journal** at
+   `.architecture/{project}/work-packages/.executor-WP-NNN.md`.
+
+2. **Verifies Step 11 completed cleanly:**
+   - Step 11 row in journal has a Completed timestamp.
+   - `## Post-deploy verification` section is populated.
+   - No CRITICAL findings (those would have produced a BLOCKER).
+
+3. **If Step 11 NOT complete** (Completed timestamp missing, OR
+   journal shows mid-step drift) → executor parked or errored. The
+   calling session does NOT do Step 12. Instead:
+   - Classifies the executor exit as `error` per orchestrator
+     defence (v0.7.1+).
+   - Halts the run-all loop.
+   - Surfaces a clear plain-English status line: *"WP-NNN: executor
+     returned before Step 11 completed. Likely parked late in
+     lifecycle. Re-dispatch via /sulis-execution:run-wp WP-NNN to
+     resume from journal."*
+
+4. **If Step 11 complete with CRITICAL finding** → executor wrote a
+   BLOCKER per v0.6.0; INDEX status is already `blocked`. Calling
+   session does NOT do Step 12 (WP not done). Just propagates
+   `dependency_blocked` to transitive descendants and continues.
+
+5. **If Step 11 complete with non-CRITICAL verdict** → calling
+   session performs Step 12 inline:
+
+### Action (performed by calling session)
+
+```bash
+# Read journal to extract evidence (the executor wrote these during
+# Steps 1-11).
+WP=WP-NNN
+PROJECT=<project-slug>
+JOURNAL=.architecture/$PROJECT/work-packages/.executor-$WP.md
+
+# Extract from the journal's Step trace and Post-deploy verification:
+BRANCH=$(grep '^- Branch:' "$JOURNAL" | head -1 | awk '{print $3}')
+PRESQUASH=$(grep 'Pre-squash SHA' "$JOURNAL" | head -1 | awk '{print $NF}')
+MERGE_SHA=$(grep 'Squash-merge SHA on dev' "$JOURNAL" | head -1 | awk '{print $NF}')
+DEPLOY_URL=$(grep 'Deployment URL' "$JOURNAL" | head -1 | awk '{print $NF}')
+SMOKE=$(grep 'Smoke-test verdict' "$JOURNAL" | head -1 | sed 's/.*verdict: //')
+SECURITY=$(grep 'Security-reviewer verdict' "$JOURNAL" | head -1 | sed 's/.*verdict: //')
+NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+```
+
+Then via Edit tool, append to the WP file at
+`.architecture/{project}/work-packages/WP-NNN-<title>.md`:
+
+```markdown
+## Acceptance Evidence
+
+- Branch: `feat/wp-NNN-<slug>` (deleted post-merge)
+- Pre-squash SHA: `<presquash>`
+- Squash-merge SHA on dev: `<merge_sha>`
+- Deployment URL: `<deploy_url>`
+- Health status: `healthy`
+- Smoke-test verdict: `<smoke>`
+- Post-deploy verification: `<security>`
+- Completed: `<now>` (Step 12 by calling session)
+```
+
+Then update INDEX.md to flip the WP's status from `in_progress` to
+`done`.
+
+Then remove the worktree:
+```bash
+git worktree remove ../wp-NNN-worktree
+# Acceptable to use --force if the worktree has stale tracking files
+# the executor cleaned up during step 11 cleanup.
+```
+
+Then emit the plain-English status line:
+*"WP-NNN done — deployed and healthy at <url>. Smoke-test passed.
+Security assessment: <PASS | N CONCERN | N ADVISORY>."*
+
+### Success criterion (calling session)
+
+- WP file has `## Acceptance Evidence` block with all journal-derived
+  fields.
+- INDEX status is `done` with timestamp.
+- Worktree removed.
+- Status line emitted.
+
+### What this fixes
+
+- **No more late-lifecycle drift.** The executor's contract ends at
+  Step 11 success; Step 12 happens in a fresh context that hasn't
+  accumulated deep load.
+- **Bookkeeping is deterministic and reliable.** Three Bash + one
+  Edit + one INDEX update; takes ~30 seconds; can't drift because
+  there's no reasoning to drift on.
+- **Parked executors are detectable.** If the executor returns
+  without Step 11 completed in the journal, the calling session
+  classifies as `error` and surfaces explicitly. No silent
+  "looks-done-but-isn't" states.
+
+### Recovery for previously-parked WPs
+
+For WPs in the parked state from before this version (Steps 1-11
+complete on dev but no `## Acceptance Evidence` and worktree still
+present), apply the same Step 12 mechanics manually:
+
+1. Read the WP's `.executor-WP-NNN.md` journal.
+2. Append `## Acceptance Evidence` to the WP file using journal data.
+3. Edit INDEX to flip status to `done`.
+4. Remove the worktree.
+
+Roughly 30 seconds per WP. Founder or concierge can do this for any
+already-parked WPs as a one-off cleanup before next run-all.
 
 After Step 12 succeeds, the WP is **done** in the full atomic sense
 the founder articulated: implemented, tested, documented, merged,
