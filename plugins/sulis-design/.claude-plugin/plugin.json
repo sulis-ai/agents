@@ -1,7 +1,7 @@
 {
   "name": "sulis-design",
-  "version": "1.3.2",
-  "description": "Design studio for the Outcome-First Methodology. Provides design foundation, visual identity, customer experience, and design coherence skills for translating brand into design system. v1.3.2: cites Founder English (FE-01..FE-10) at plugins/srd/references/founder-english.md \u2014 every founder-facing chat message AND founder-readable artifact write passes the FE-06 five-point check (strip internal IDs, translate filenames, expand acronyms, strip internal taxonomy, read-aloud test). Lead with outcomes; concrete over abstract; no mechanism narration.",
+  "version": "1.3.3",
+  "description": "Design studio for the Outcome-First Methodology. Provides design foundation, visual identity, customer experience, and design coherence skills for translating brand into design system. v1.3.2: cites Founder English (FE-01..FE-10) at plugins/srd/references/founder-english.md \u2014 every founder-facing chat message AND founder-readable artifact write passes the FE-06 five-point check (strip internal IDs, translate filenames, expand acronyms, strip internal taxonomy, read-aloud test). Lead with outcomes; concrete over abstract; no mechanism narration. v1.3.3: adds FE-11 (Inference Over Interrogation) citation \u2014 infer from existing context before asking the founder; never relay a specialist's 'open questions' verbatim.",
   "author": {
     "name": "LLMA AI",
     "email": "team@sulis.dev"

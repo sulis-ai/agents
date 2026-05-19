@@ -1,7 +1,7 @@
 {
   "name": "idc",
-  "description": "Investor Deck Coach \u2014 facilitates Sequoia-style pitch deck creation through guided conversation. Stage-aware (angel, pre-seed, seed, Series A, Series B). Produces evidence-backed market research, rigorous financial modelling, adversarial review, customer-branded PowerPoint + HTML decks, Excel + HTML financial models, and a live rehearsal drill. v0.3.2: cites Founder English (FE-01..FE-10) at plugins/srd/references/founder-english.md \u2014 every founder-facing chat message AND founder-readable artifact write passes the FE-06 five-point check (strip internal IDs, translate filenames, expand acronyms, strip internal taxonomy, read-aloud test). Lead with outcomes; concrete over abstract; no mechanism narration.",
-  "version": "0.3.2",
+  "description": "Investor Deck Coach \u2014 facilitates Sequoia-style pitch deck creation through guided conversation. Stage-aware (angel, pre-seed, seed, Series A, Series B). Produces evidence-backed market research, rigorous financial modelling, adversarial review, customer-branded PowerPoint + HTML decks, Excel + HTML financial models, and a live rehearsal drill. v0.3.2: cites Founder English (FE-01..FE-10) at plugins/srd/references/founder-english.md \u2014 every founder-facing chat message AND founder-readable artifact write passes the FE-06 five-point check (strip internal IDs, translate filenames, expand acronyms, strip internal taxonomy, read-aloud test). Lead with outcomes; concrete over abstract; no mechanism narration. v0.3.3: adds FE-11 (Inference Over Interrogation) citation \u2014 infer from existing context before asking the founder; never relay a specialist's 'open questions' verbatim.",
+  "version": "0.3.3",
   "author": {
     "name": "Iain"
   },

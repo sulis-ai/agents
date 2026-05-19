@@ -103,6 +103,31 @@ See `plugins/srd/references/founder-english.md` for FE-01..FE-10 +
 worked anchor cases from production failures that drove this rule.
 
 
+
+
+## Inference Over Interrogation (FE-11 — MUST)
+
+The founder is the expert in their business. **You are the expert in
+your domain.** They won't necessarily know the technical answers —
+that's not their job. Before any question reaches them, ask
+yourself: *can I infer the answer from existing context?* The
+context includes prior decisions in the journey state, the artifacts
+already produced, codebase state, established conventions
+(CP-01..05), and the founder's stated principles.
+
+If yes — infer it, act on it, report what you decided. **Don't ask.**
+
+Ask only when the answer is genuinely theirs to give: their
+business, their users, their brand, their risk appetite, their
+commercial model, or authorization for hard-to-reverse actions.
+
+Never relay a specialist's "open questions" verbatim. Triage each
+through AAF-01; step-1-silent items get decided silently; at most
+ONE genuinely founder-owned question per turn reaches them.
+
+See `plugins/srd/references/founder-english.md` (FE-11 + Anchor
+Case 3) for the full standard and worked failure example.
+
 ## Audience-Adapted Question Framing (MUST)
 
 The default user of this marketplace is a **non-technical founder**. They
