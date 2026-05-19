@@ -407,6 +407,50 @@ def _poll_deploy(repo: str, workflow: str, merge_sha: str,
     return "timeout", ""
 
 
+# --- Health path resolution (v0.10.7+) ---------------------------------
+
+_URL_RE = re.compile(r"https?://[^\s'\"`]+")
+
+
+def _extract_health_path_from_smoke(smoke_cmd: str) -> str:
+    """Return the path component of the first URL in the smoke command.
+
+    Used to auto-detect the health endpoint when the project's
+    smoke_test already encodes the right path
+    (e.g. `curl -sf https://staging.example.com/health`).
+
+    Returns "" if no URL is found, or "/" if the URL has no path
+    beyond the root.
+
+    v0.10.7 — added to fix Step 10a hitting bare staging URL for APIs
+    whose root returns 404 (e.g. APIs that only serve health at /health).
+    """
+    if not smoke_cmd:
+        return ""
+    # urlparse imported lazily to keep top-of-file imports tight
+    from urllib.parse import urlparse
+
+    match = _URL_RE.search(smoke_cmd)
+    if not match:
+        return ""
+    parsed = urlparse(match.group(0))
+    return parsed.path or ""
+
+
+def _join_health_url(base: str, path: str) -> str:
+    """Join staging URL + health path; tolerate trailing slashes.
+
+    Examples:
+        _join_health_url("https://x.com",  "/health") → "https://x.com/health"
+        _join_health_url("https://x.com/", "/health") → "https://x.com/health"
+        _join_health_url("https://x.com",  "health")  → "https://x.com/health"
+        _join_health_url("https://x.com/", "")        → "https://x.com/"
+    """
+    if not path:
+        return base.rstrip("/") + "/"
+    return base.rstrip("/") + ("" if path.startswith("/") else "/") + path
+
+
 def _poll_health(url: str, cap: int) -> str:
     """Poll health endpoint with exponential backoff (1m → 5m, capped at cap)."""
     elapsed = 0
@@ -543,12 +587,29 @@ def cmd_run(args: argparse.Namespace) -> None:
 
         # Step 10a: health check
         if args.staging_url:
-            _log(f"Step 10a: health-checking {args.staging_url}")
-            health = _poll_health(args.staging_url, HEALTH_DEFAULT_CAP)
+            # Resolve health path (v0.10.7+):
+            #   1. --health-path explicit flag wins
+            #   2. else, extract path from --smoke-cmd URL if present
+            #   3. else, fall back to "/" (backward-compatible)
+            if args.health_path:
+                health_path = args.health_path
+                path_source = "--health-path flag"
+            else:
+                auto = _extract_health_path_from_smoke(args.smoke_cmd)
+                if auto and auto != "/":
+                    health_path = auto
+                    path_source = "auto-detected from --smoke-cmd"
+                else:
+                    health_path = "/"
+                    path_source = "default (root)"
+            health_url = _join_health_url(args.staging_url, health_path)
+            _log(f"Step 10a: health-checking {health_url} (path: {path_source})")
+            health = _poll_health(health_url, HEALTH_DEFAULT_CAP)
             result["health_status"] = health
+            result["health_url"] = health_url
             if health != "healthy":
                 result.update(outcome="blocker",
-                              blocker_reason=f"Staging health check failed within {HEALTH_DEFAULT_CAP}s")
+                              blocker_reason=f"Staging health check failed within {HEALTH_DEFAULT_CAP}s at {health_url}")
                 _emit_result(result, exit_code=1)
         else:
             result["health_status"] = "skipped (no --staging-url)"
@@ -600,6 +661,14 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Deploy workflow name (e.g. 'Deploy to Dev Environment')")
     p_run.add_argument("--staging-url", default=None,
                        help="Staging URL for health check (optional)")
+    p_run.add_argument(
+        "--health-path", default="",
+        help="HTTP path to use for the health check (e.g. /health, "
+             "/api/health, /healthz). Default empty: auto-detect from "
+             "--smoke-cmd if it contains a URL with a path, else fall "
+             "back to /. Use this when the smoke command's URL doesn't "
+             "match where the health endpoint actually lives.",
+    )
     p_run.add_argument("--smoke-cmd", default="",
                        help="Smoke test shell command (run after health check)")
     p_run.add_argument("--repo", default=None,

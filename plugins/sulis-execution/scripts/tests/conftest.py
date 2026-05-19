@@ -251,6 +251,79 @@ def mock_gh(tmp_path, monkeypatch):
     return _configure
 
 
+# ─── mock_curl: fake curl binary on PATH (for _poll_health tests) ────────
+
+
+_CURL_STUB_TEMPLATE = """#!/usr/bin/env bash
+# Fake curl binary for tests. Inspects the URL argument and returns
+# a canned HTTP status code per a JSON config at $CURL_MOCK_CONFIG.
+set -e
+if [ -z "${CURL_MOCK_CONFIG:-}" ]; then
+  echo "curl mock: CURL_MOCK_CONFIG env var not set" >&2
+  exit 2
+fi
+ARGS="$*"
+python3 - "$ARGS" <<'PYEOF'
+import json, os, sys
+args = sys.argv[1]
+config_path = os.environ["CURL_MOCK_CONFIG"]
+with open(config_path) as f:
+    config = json.load(f)
+
+# Find the response whose 'url_substring' is in args.
+for entry in config.get("responses", []):
+    needle = entry.get("url_substring", "")
+    if not needle or needle in args:
+        # Print the status code on stdout (mimics curl -w "%{http_code}").
+        status = str(entry.get("status", "200"))
+        print(status, end="")
+        # `curl -sf` returns 22 (HTTP error) on 4xx/5xx; replicate.
+        if entry.get("status", 200) >= 400 and "-f" in args.split():
+            sys.exit(22)
+        sys.exit(0)
+
+# Fallthrough: 404 + non-zero exit (matches curl -sf semantics)
+print("404", end="")
+sys.exit(22)
+PYEOF
+"""
+
+
+@pytest.fixture
+def mock_curl(tmp_path, monkeypatch):
+    """Installs a fake `curl` binary at the front of PATH.
+
+    Usage:
+        mock_curl([
+            {"url_substring": "/health", "status": 200},
+            {"url_substring": "",        "status": 404},  # fallback
+        ])
+
+    Each response matches by URL substring; the first match wins.
+    `curl -sf` semantics replicated: 4xx returns exit 22 with the
+    status code printed on stdout (which the wpx-pipeline parser
+    reads via the `-w "%{http_code}"` flag).
+    """
+    curl_dir = tmp_path / "_mock_curl_bin"
+    curl_dir.mkdir(parents=True, exist_ok=True)
+    curl_path = curl_dir / "curl"
+    curl_path.write_text(_CURL_STUB_TEMPLATE)
+    curl_path.chmod(curl_path.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+
+    config_path = tmp_path / "_curl_mock_config.json"
+
+    # Prepend to PATH; preserve any prior PATH manipulation from mock_gh
+    current_path = os.environ.get("PATH", "")
+    monkeypatch.setenv("PATH", f"{curl_dir}:{current_path}")
+    monkeypatch.setenv("CURL_MOCK_CONFIG", str(config_path))
+
+    def _configure(responses: list[dict]) -> None:
+        config_path.write_text(json.dumps({"responses": responses}))
+
+    _configure([])
+    return _configure
+
+
 # ─── local_git_repo: real local git for git operations ────────────────────
 
 

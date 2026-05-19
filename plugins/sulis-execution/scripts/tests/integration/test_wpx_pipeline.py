@@ -292,6 +292,165 @@ jobs:
     assert "Traceback" not in result.stderr
 
 
+# ─── v0.10.7 — health path auto-detect from --smoke-cmd ────────────────────
+
+
+def test_health_path_auto_detected_from_smoke_cmd(
+    tmp_project, local_git_repo, run_tool, mock_gh, mock_curl,
+):
+    """Regression for v0.10.7: when --smoke-cmd encodes a URL with a
+    /health path, wpx-pipeline must hit that path for Step 10a — not
+    the bare staging URL root. Pre-fix, the pipeline curled the staging
+    URL with no path appended; for APIs whose root returns 404 by
+    design, this looped for 600s and produced a spurious BLOCKER.
+    """
+    workflows = local_git_repo / ".github" / "workflows"
+    workflows.mkdir(parents=True, exist_ok=True)
+    (workflows / "ci.yml").write_text(
+        "on:\n  push:\n    branches:\n      - 'feat/**'\njobs: {}\n"
+    )
+
+    mock_gh([
+        {"match": "commits/feat/test/check-runs", "stdout": json.dumps({
+            "check_runs": [{"name": "ci", "status": "completed",
+                            "conclusion": "success"}],
+        })},
+        {"match": "git/refs/heads/dev", "stdout": json.dumps({"object": {"sha": "abc123"}})},
+        {"match": "compare", "stdout": json.dumps({"status": "identical"})},
+        {"match": "run list", "stdout": json.dumps([{
+            "databaseId": 999, "status": "completed",
+            "conclusion": "success", "createdAt": "2026-05-19T12:00:00Z",
+            "url": "https://example.com/run/999",
+        }])},
+    ])
+
+    # The user's actual repro: /health returns 200; / returns 404.
+    mock_curl([
+        {"url_substring": "/health", "status": 200},
+        {"url_substring": "", "status": 404},   # fallback for "/"
+    ])
+
+    result = run_tool(
+        "wpx-pipeline", "run",
+        *_common_pipeline_args(
+            tmp_project, local_git_repo,
+            smoke="echo 'smoke ok https://staging.example.com/health'",
+        ),
+    )
+    assert result.json is not None, f"pipeline crashed: {result.stderr[-500:]!r}"
+    outcome = result.data.get("result", {}).get("outcome")
+    assert outcome == "success", (
+        f"expected success but got {outcome}; pipeline failed at Step 10a "
+        f"despite smoke-cmd encoding /health. "
+        f"blocker_reason={result.data.get('result', {}).get('blocker_reason')}; "
+        f"health_url={result.data.get('result', {}).get('health_url')!r}"
+    )
+    # stderr should log the auto-detect
+    assert "auto-detected from --smoke-cmd" in result.stderr, (
+        f"expected auto-detect log; stderr={result.stderr[-500:]!r}"
+    )
+
+
+def test_health_path_falls_back_to_root_when_smoke_cmd_has_no_url(
+    tmp_project, local_git_repo, run_tool, mock_gh, mock_curl,
+):
+    """v0.10.7 backward-compat: when --smoke-cmd has no URL (e.g.
+    `true`, a pytest invocation, or empty), health check falls back
+    to the bare staging URL root — same behaviour as v0.10.6 and
+    earlier for projects whose root serves health.
+    """
+    workflows = local_git_repo / ".github" / "workflows"
+    workflows.mkdir(parents=True, exist_ok=True)
+    (workflows / "ci.yml").write_text(
+        "on:\n  push:\n    branches: ['feat/**']\njobs: {}\n"
+    )
+
+    mock_gh([
+        {"match": "commits/feat/test/check-runs", "stdout": json.dumps({
+            "check_runs": [{"name": "ci", "status": "completed",
+                            "conclusion": "success"}],
+        })},
+        {"match": "git/refs/heads/dev", "stdout": json.dumps({"object": {"sha": "abc123"}})},
+        {"match": "compare", "stdout": json.dumps({"status": "identical"})},
+        {"match": "run list", "stdout": json.dumps([{
+            "databaseId": 1, "status": "completed",
+            "conclusion": "success", "createdAt": "2026-05-19T12:00:00Z",
+            "url": "https://example.com/run/1",
+        }])},
+    ])
+
+    # Root returns 200 (the legacy / backward-compat case)
+    mock_curl([{"url_substring": "", "status": 200}])
+
+    result = run_tool(
+        "wpx-pipeline", "run",
+        *_common_pipeline_args(tmp_project, local_git_repo, smoke="true"),
+    )
+    assert result.json is not None
+    outcome = result.data.get("result", {}).get("outcome")
+    assert outcome == "success", (
+        f"expected success on root-served health; got {outcome}; "
+        f"reason={result.data.get('result', {}).get('blocker_reason')}"
+    )
+    # stderr should log the "default (root)" path source
+    assert "default (root)" in result.stderr, (
+        f"expected default-root log; stderr={result.stderr[-500:]!r}"
+    )
+
+
+def test_health_path_explicit_flag_wins(
+    tmp_project, local_git_repo, run_tool, mock_gh, mock_curl,
+):
+    """v0.10.7: --health-path explicit override beats auto-detect.
+    Useful when the smoke command's URL doesn't match where health
+    actually lives (e.g. smoke posts to /api/orders but health is
+    at /healthz).
+    """
+    workflows = local_git_repo / ".github" / "workflows"
+    workflows.mkdir(parents=True, exist_ok=True)
+    (workflows / "ci.yml").write_text(
+        "on:\n  push:\n    branches: ['feat/**']\njobs: {}\n"
+    )
+
+    mock_gh([
+        {"match": "commits/feat/test/check-runs", "stdout": json.dumps({
+            "check_runs": [{"name": "ci", "status": "completed",
+                            "conclusion": "success"}],
+        })},
+        {"match": "git/refs/heads/dev", "stdout": json.dumps({"object": {"sha": "abc123"}})},
+        {"match": "compare", "stdout": json.dumps({"status": "identical"})},
+        {"match": "run list", "stdout": json.dumps([{
+            "databaseId": 1, "status": "completed",
+            "conclusion": "success", "createdAt": "2026-05-19T12:00:00Z",
+            "url": "https://example.com/run/1",
+        }])},
+    ])
+
+    # /healthz returns 200; everything else (/health, /) returns 404.
+    # If the override didn't win, auto-detect would pick /health → 404.
+    mock_curl([
+        {"url_substring": "/healthz", "status": 200},
+        {"url_substring": "", "status": 404},
+    ])
+
+    result = run_tool(
+        "wpx-pipeline", "run",
+        *_common_pipeline_args(
+            tmp_project, local_git_repo,
+            smoke="echo 'smoke ok https://staging.example.com/health'",  # auto would pick /health
+        ),
+        "--health-path", "/healthz",  # explicit override
+    )
+    assert result.json is not None
+    outcome = result.data.get("result", {}).get("outcome")
+    assert outcome == "success", (
+        f"explicit --health-path /healthz should have won over "
+        f"auto-detected /health; got outcome={outcome}, "
+        f"reason={result.data.get('result', {}).get('blocker_reason')}"
+    )
+    assert "--health-path flag" in result.stderr
+
+
 def test_branches_ignore_does_not_register_as_branch_ci(
     tmp_project, local_git_repo, run_tool, mock_gh,
 ):
