@@ -2,8 +2,8 @@
 """wpx-journal — manage the per-WP executor journal.
 
 The journal lives at .architecture/<project>/work-packages/.executor-<wp>.md
-and tracks step transitions, self-heal attempts, pre-flight checks, and
-post-deploy verification per WP.
+and tracks step transitions, self-heal attempts, pre-flight checks, the
+executor's Step 1.5 plan, and post-deploy verification per WP.
 
 Subcommands:
   init                  Create a new journal for a WP.
@@ -12,6 +12,9 @@ Subcommands:
   record-attempt        Record a self-heal attempt + outcome.
   record-preflight      Record a pre-flight tooling check + status.
   record-postdeploy     Record post-deploy verification verdict.
+  seed-plan             Populate the Step 1.5 plan from --approach + --plan-json.
+  mark-plan-item        Flip a plan item's status (with atomic --expected check).
+  add-plan-item         Append a new plan item mid-run.
   read                  Read a specific field/section from the journal.
 
 All subcommands take --wp WP-NNN and --project <slug>.
@@ -53,6 +56,15 @@ JOURNAL_TEMPLATE = """\
 | Tool / Check | Status | Fallback |
 |---|---|---|
 
+## Plan
+
+**Approach.** (Not yet seeded. The executor's Step 1.5 calls
+`wpx-journal seed-plan` with an approach summary and a structured
+item list before Step 2 begins.)
+
+| # | Item | Step | Status | Notes |
+|---:|---|---|---|---|
+
 ## Step trace
 
 | Step | Started | Completed | Outcome |
@@ -70,6 +82,10 @@ JOURNAL_TEMPLATE = """\
 ## Notes
 
 """
+
+
+# Plan item status enum (validated by mark-plan-item and add-plan-item).
+PLAN_STATUSES = ("pending", "in-progress", "done", "skipped")
 
 
 def _now() -> str:
@@ -222,6 +238,168 @@ Recorded at: {_now()}
     emit_ok(data={"wp": args.wp, "verdict": args.verdict})
 
 
+def _read_plan_table(text: str) -> MdTable:
+    """Read the ## Plan section's item table (without the approach paragraph)."""
+    start, end = find_section(text, "## Plan")
+    table_text = "\n".join(
+        ln for ln in text[start:end].splitlines() if ln.startswith("|")
+    )
+    if table_text.strip():
+        return parse_md_table(table_text)
+    return MdTable(
+        headers=["#", "Item", "Step", "Status", "Notes"],
+        alignments=["---:", "---", "---", "---", "---"],
+        rows=[],
+    )
+
+
+def _read_plan_approach(text: str) -> str:
+    """Return the approach paragraph (the **Approach.** line + any trailing prose)."""
+    start, end = find_section(text, "## Plan")
+    section = text[start:end]
+    # Take everything between the heading line and the first '|' table line
+    lines_after_heading = section.split("\n", 1)[1] if "\n" in section else ""
+    approach_lines: list[str] = []
+    for ln in lines_after_heading.splitlines():
+        if ln.startswith("|"):
+            break
+        approach_lines.append(ln)
+    return "\n".join(approach_lines).strip()
+
+
+def _write_plan_section(text: str, approach: str, table: MdTable) -> str:
+    """Replace the ## Plan section with a fresh approach + table."""
+    body = f"\n**Approach.** {approach}\n\n" + table.render() + "\n\n"
+    return replace_section(text, "## Plan", body)
+
+
+def cmd_seed_plan(args: argparse.Namespace) -> None:
+    import json as _json
+    paths = paths_from_args(args)
+    text = _read_journal(paths, args.wp)
+
+    # Disallow re-seeding when items already exist (use add-plan-item or
+    # mark-plan-item for incremental changes; --force overrides for testing).
+    existing = _read_plan_table(text)
+    if existing.rows and not args.force:
+        emit_error(
+            f"Plan already seeded ({len(existing.rows)} items). "
+            f"Use mark-plan-item / add-plan-item for incremental changes, "
+            f"or pass --force to re-seed."
+        )
+
+    # Parse --plan-json (literal JSON, or @/path/to/file.json)
+    raw = args.plan_json
+    if raw.startswith("@"):
+        raw = Path(raw[1:]).read_text(encoding="utf-8")
+    try:
+        items = _json.loads(raw)
+    except _json.JSONDecodeError as e:
+        emit_error(f"Invalid --plan-json: {e}")
+        return  # for type-checker; emit_error sys.exits
+
+    if not isinstance(items, list) or not items:
+        emit_error("--plan-json must be a non-empty JSON list of item objects.")
+
+    table = MdTable(
+        headers=["#", "Item", "Step", "Status", "Notes"],
+        alignments=["---:", "---", "---", "---", "---"],
+        rows=[],
+    )
+    for idx, raw_item in enumerate(items, start=1):
+        if not isinstance(raw_item, dict):
+            emit_error(f"--plan-json item {idx} is not an object: {raw_item!r}")
+        desc = raw_item.get("description")
+        step = raw_item.get("step")
+        notes = raw_item.get("notes", "")
+        if not desc or not step:
+            emit_error(
+                f"--plan-json item {idx} missing 'description' or 'step': "
+                f"{raw_item!r}"
+            )
+        # Escape | characters in cells so they don't break the Markdown table
+        desc_cell = str(desc).replace("|", "\\|")
+        step_cell = str(step).replace("|", "\\|")
+        notes_cell = str(notes).replace("|", "\\|") if notes else "—"
+        table.rows.append([str(idx), desc_cell, step_cell, "pending", notes_cell])
+
+    text = _write_plan_section(text, args.approach, table)
+    _write_journal(paths, args.wp, text)
+    emit_ok(data={
+        "wp": args.wp,
+        "approach": args.approach,
+        "item_count": len(table.rows),
+    })
+
+
+def cmd_mark_plan_item(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+    text = _read_journal(paths, args.wp)
+    table = _read_plan_table(text)
+    if not table.rows:
+        emit_error(
+            "Plan is empty. Call `seed-plan` first before `mark-plan-item`."
+        )
+
+    if args.status not in PLAN_STATUSES:
+        emit_error(
+            f"Invalid --status '{args.status}'. "
+            f"Must be one of: {', '.join(PLAN_STATUSES)}"
+        )
+
+    found = False
+    for row in table.rows:
+        if row and row[0].strip() == str(args.item):
+            current = row[3].strip()
+            if args.expected and current != args.expected:
+                emit_error(
+                    f"Plan item {args.item} status is '{current}', "
+                    f"expected '{args.expected}'."
+                )
+            row[3] = args.status
+            if args.notes:
+                # Replace Notes column (escape pipes)
+                row[4] = args.notes.replace("|", "\\|")
+            found = True
+            break
+    if not found:
+        emit_error(f"Plan item {args.item} not found in journal.")
+
+    approach = _read_plan_approach(text).removeprefix("**Approach.**").strip()
+    text = _write_plan_section(text, approach, table)
+    _write_journal(paths, args.wp, text)
+    emit_ok(data={
+        "wp": args.wp, "item": args.item, "status": args.status,
+    })
+
+
+def cmd_add_plan_item(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+    text = _read_journal(paths, args.wp)
+    table = _read_plan_table(text)
+    # Next item ID = max existing + 1 (or 1 if empty)
+    existing_ids = []
+    for row in table.rows:
+        try:
+            existing_ids.append(int(row[0].strip()))
+        except (ValueError, IndexError):
+            continue
+    next_id = max(existing_ids) + 1 if existing_ids else 1
+
+    desc_cell = args.description.replace("|", "\\|")
+    step_cell = args.step.replace("|", "\\|")
+    notes_cell = (args.notes or "—").replace("|", "\\|")
+    table.rows.append([str(next_id), desc_cell, step_cell, "pending", notes_cell])
+
+    approach = _read_plan_approach(text).removeprefix("**Approach.**").strip()
+    text = _write_plan_section(text, approach, table)
+    _write_journal(paths, args.wp, text)
+    emit_ok(data={
+        "wp": args.wp, "item": next_id, "description": args.description,
+        "step": args.step, "status": "pending",
+    })
+
+
 def cmd_read(args: argparse.Namespace) -> None:
     paths = paths_from_args(args)
     text = _read_journal(paths, args.wp)
@@ -293,6 +471,30 @@ def cmd_read(args: argparse.Namespace) -> None:
                     "fallback": row[2].strip(),
                 })
         emit_ok(data={"field": field, "value": rows})
+
+    # Plan (approach + structured items)
+    if field == "plan":
+        table = _read_plan_table(text)
+        approach_raw = _read_plan_approach(text)
+        # Strip the **Approach.** prefix if present
+        approach = approach_raw
+        if approach.startswith("**Approach.**"):
+            approach = approach[len("**Approach.**"):].strip()
+        items = []
+        for row in table.rows:
+            if len(row) >= 4:
+                items.append({
+                    "item": row[0].strip(),
+                    "description": row[1].strip().replace("\\|", "|"),
+                    "step": row[2].strip().replace("\\|", "|"),
+                    "status": row[3].strip(),
+                    "notes": (row[4].strip().replace("\\|", "|")
+                              if len(row) > 4 else ""),
+                })
+        emit_ok(data={
+            "field": field,
+            "value": {"approach": approach, "items": items},
+        })
 
     emit_error(f"Unknown field: {field}")
 
@@ -373,12 +575,50 @@ def build_parser() -> argparse.ArgumentParser:
     p_postdeploy.add_argument("--findings-json", default=None,
                               help="Optional JSON blob with detailed findings")
 
+    p_seed = sub.add_parser("seed-plan",
+                            help="Populate the Step 1.5 plan section")
+    add_common_args(p_seed)
+    p_seed.add_argument("--wp", required=True)
+    p_seed.add_argument("--approach", required=True,
+                        help="2-3 sentence summary of the executor's mental model")
+    p_seed.add_argument("--plan-json", required=True,
+                        help="JSON list of item objects {description, step, "
+                             "notes?} or @/path/to/file.json")
+    p_seed.add_argument("--force", action="store_true",
+                        help="Re-seed even if items already exist (testing)")
+
+    p_mark = sub.add_parser("mark-plan-item",
+                            help="Flip a plan item's status")
+    add_common_args(p_mark)
+    p_mark.add_argument("--wp", required=True)
+    p_mark.add_argument("--item", required=True, type=int,
+                        help="Item number (1-indexed)")
+    p_mark.add_argument("--status", required=True,
+                        choices=list(PLAN_STATUSES),
+                        help="pending | in-progress | done | skipped")
+    p_mark.add_argument("--expected", default=None,
+                        help="Atomic check: expected current status")
+    p_mark.add_argument("--notes", default=None,
+                        help="Overwrite the Notes column (optional)")
+
+    p_add = sub.add_parser("add-plan-item",
+                           help="Append a new plan item mid-run")
+    add_common_args(p_add)
+    p_add.add_argument("--wp", required=True)
+    p_add.add_argument("--description", required=True,
+                       help="Plan item description")
+    p_add.add_argument("--step", required=True,
+                       help="Step assignment (e.g. '2 (RED)', '3 (GREEN)')")
+    p_add.add_argument("--notes", default=None,
+                       help="Optional Notes column value")
+
     p_read = sub.add_parser("read", help="Read a field from the journal")
     add_common_args(p_read)
     p_read.add_argument("--wp", required=True)
     p_read.add_argument("--field", required=True,
                         help="status | lifecycle-step | step-trace | "
-                             "step-N-status | post-deploy-verification | preflight")
+                             "step-N-status | post-deploy-verification | "
+                             "preflight | plan")
 
     return parser
 
@@ -390,6 +630,9 @@ HANDLERS = {
     "record-attempt": cmd_record_attempt,
     "record-preflight": cmd_record_preflight,
     "record-postdeploy": cmd_record_postdeploy,
+    "seed-plan": cmd_seed_plan,
+    "mark-plan-item": cmd_mark_plan_item,
+    "add-plan-item": cmd_add_plan_item,
     "read": cmd_read,
 }
 
