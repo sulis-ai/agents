@@ -222,6 +222,191 @@ def cmd_propagate_blocked(args: argparse.Namespace) -> None:
     emit_ok(data={"blocker_wp": args.wp, "flipped_to_dependency_blocked": flipped})
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# add-wp / sync-auto-drafts (v0.10.3)
+# ─────────────────────────────────────────────────────────────────────────
+
+
+def _cells_from_frontmatter(fm: dict, wp_id: str) -> list[str]:
+    """Build the 8 row cells from a parsed WP frontmatter dict.
+
+    Column order matches the canonical WP table header:
+      | ID | Title | Primitive | Status | Depends | Blocks | Token | TDD § |
+    """
+    def _esc(value: str) -> str:
+        return str(value).replace("|", "\\|")
+
+    def _list_cell(value) -> str:
+        if not value:
+            return "—"
+        if isinstance(value, list):
+            items = [str(v).strip() for v in value if str(v).strip()]
+            return _esc(", ".join(items)) if items else "—"
+        return _esc(str(value).strip()) if str(value).strip() else "—"
+
+    title = fm.get("title", "")
+    primitive = fm.get("primitive", "")
+    status = fm.get("status", "auto-draft")
+    depends = _list_cell(fm.get("dependsOn"))
+    blocks = _list_cell(fm.get("blocks"))
+    # token estimate may be a scalar string ("1k", "?") or a dict (input/output Nk)
+    token_raw = fm.get("estimated_token_cost") or fm.get("token", "")
+    if isinstance(token_raw, dict):
+        # Common shape from SEA WP templates: {input: "1k", output: "1k"}
+        token = (
+            f"{token_raw.get('input', '?')}/"
+            f"{token_raw.get('output', '?')}"
+        )
+    else:
+        token = str(token_raw).strip() if str(token_raw).strip() else "?"
+    tdd = fm.get("tdd_section") or "—"
+    return [
+        _esc(wp_id),
+        _esc(title),
+        _esc(primitive),
+        _esc(status),
+        depends,
+        blocks,
+        _esc(token),
+        _esc(str(tdd)),
+    ]
+
+
+def _append_wp_row(text: str, cells: list[str]) -> str:
+    """Append a new row to the WP table in INDEX.md text. Returns new text."""
+    start, end, table_text = _find_wp_table(text)
+    table = parse_md_table(table_text)
+    table.rows.append(cells)
+    new_table = table.render() + "\n"
+    return text[:start] + new_table + text[end:]
+
+
+def _index_has_wp(text: str, wp_id: str) -> bool:
+    """True if INDEX.md's WP table contains a row with this WP ID."""
+    try:
+        _, _, table_text = _find_wp_table(text)
+    except ValueError:
+        return False
+    table = parse_md_table(table_text)
+    try:
+        id_idx = next(i for i, h in enumerate(table.headers) if h.lower() == "id")
+    except StopIteration:
+        return False
+    for row in table.rows:
+        if id_idx < len(row) and row[id_idx].strip() == wp_id:
+            return True
+    return False
+
+
+def cmd_add_wp(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+    text = _read_index(args)
+
+    # Reject duplicates
+    if _index_has_wp(text, args.wp):
+        emit_error(
+            f"WP {args.wp} is already in INDEX. Use flip-status / set-status "
+            f"to change an existing row."
+        )
+
+    if args.from_wp_file:
+        # Read the WP file's frontmatter
+        try:
+            wp_path = paths.wp_file(args.wp)
+        except (FileNotFoundError, ValueError) as e:
+            emit_error(f"--from-wp-file: {e}")
+            return  # for type checker
+        from _wpxlib import read_frontmatter  # local import to avoid top-clutter
+        fm = read_frontmatter(wp_path)
+        if not fm.get("id"):
+            emit_error(f"--from-wp-file: {wp_path} has no `id` in frontmatter")
+        if fm.get("id") != args.wp:
+            emit_error(
+                f"--from-wp-file: frontmatter id={fm.get('id')!r} "
+                f"does not match --wp={args.wp}"
+            )
+        cells = _cells_from_frontmatter(fm, args.wp)
+    else:
+        # Explicit-fields mode
+        if not args.title or not args.primitive:
+            emit_error(
+                "--title and --primitive are required when --from-wp-file is not set"
+            )
+        fm = {
+            "id": args.wp,
+            "title": args.title,
+            "primitive": args.primitive,
+            "status": args.status,
+            "dependsOn": args.depends_on.split(",") if args.depends_on else [],
+            "blocks": args.blocks.split(",") if args.blocks else [],
+            "estimated_token_cost": args.token_estimate or "?",
+        }
+        if args.tdd:
+            fm["tdd_section"] = args.tdd
+        cells = _cells_from_frontmatter(fm, args.wp)
+
+    new_text = _append_wp_row(text, cells)
+    _write_index(args, new_text)
+
+    # Compute the new row index for diagnostic output
+    _, _, table_text = _find_wp_table(new_text)
+    table = parse_md_table(table_text)
+    emit_ok(data={
+        "wp": args.wp,
+        "title": cells[1].replace("\\|", "|"),
+        "status": cells[3].replace("\\|", "|"),
+        "row_index": len(table.rows),
+    })
+
+
+def cmd_sync_auto_drafts(args: argparse.Namespace) -> None:
+    paths = paths_from_args(args)
+    text = _read_index(args)
+
+    from _wpxlib import read_frontmatter  # local import
+
+    added: list[str] = []
+    skipped: list[str] = []
+    errors: list[dict] = []
+
+    candidates = sorted(paths.wp_dir.glob("WP-AUTO-*.md"))
+    # Filter out dot-prefixed / BLOCKER- per WpxPaths.wp_file convention
+    candidates = [
+        p for p in candidates
+        if not p.name.startswith(".") and not p.name.startswith("BLOCKER-")
+    ]
+    total_found = len(candidates)
+
+    for wp_path in candidates:
+        try:
+            fm = read_frontmatter(wp_path)
+            wp_id = fm.get("id")
+            if not wp_id:
+                errors.append({
+                    "path": str(wp_path),
+                    "error": "no `id` in frontmatter",
+                })
+                continue
+            if _index_has_wp(text, str(wp_id)):
+                skipped.append(str(wp_id))
+                continue
+            cells = _cells_from_frontmatter(fm, str(wp_id))
+            text = _append_wp_row(text, cells)
+            added.append(str(wp_id))
+        except Exception as e:  # noqa: BLE001
+            errors.append({"path": str(wp_path), "error": str(e)})
+
+    if added:
+        _write_index(args, text)
+
+    emit_ok(data={
+        "added": added,
+        "skipped": skipped,
+        "errors": errors,
+        "total_found": total_found,
+    })
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Manage INDEX.md")
     sub = parser.add_subparsers(dest="subcommand", required=True)
@@ -251,6 +436,42 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_args(p_prop)
     p_prop.add_argument("--wp", required=True, help="The blocked WP ID")
 
+    p_add = sub.add_parser(
+        "add-wp",
+        help="Insert a new WP row into INDEX.md (idempotent: rejects duplicates)",
+    )
+    add_common_args(p_add)
+    p_add.add_argument("--wp", required=True, help="The WP ID to add")
+    p_add.add_argument(
+        "--from-wp-file", action="store_true",
+        help="Read fields from the WP file's frontmatter (recommended)",
+    )
+    p_add.add_argument("--title", default=None,
+                       help="WP title (required if --from-wp-file is not set)")
+    p_add.add_argument("--primitive", default=None,
+                       help="Change primitive (required if --from-wp-file is not set)")
+    p_add.add_argument(
+        "--status", default="auto-draft",
+        choices=["pending", "in_progress", "done", "blocked",
+                 "dependency_blocked", "auto-draft", "cancelled"],
+        help="Initial status (default: auto-draft)",
+    )
+    p_add.add_argument("--depends-on", default="",
+                       help="Comma-separated dependsOn WP IDs (or empty)")
+    p_add.add_argument("--blocks", default="",
+                       help="Comma-separated blocks WP IDs (or empty)")
+    p_add.add_argument("--token-estimate", default="?",
+                       help="Token estimate cell value (default: ?)")
+    p_add.add_argument("--tdd", default=None,
+                       help="TDD § reference (default: —)")
+
+    p_sync = sub.add_parser(
+        "sync-auto-drafts",
+        help="Scan work-packages/ for orphaned WP-AUTO-*.md files; "
+             "add any missing from INDEX. Idempotent.",
+    )
+    add_common_args(p_sync)
+
     return parser
 
 
@@ -260,6 +481,8 @@ HANDLERS = {
     "list-ready": cmd_list_ready,
     "read-config": cmd_read_config,
     "propagate-blocked": cmd_propagate_blocked,
+    "add-wp": cmd_add_wp,
+    "sync-auto-drafts": cmd_sync_auto_drafts,
 }
 
 

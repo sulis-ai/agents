@@ -106,7 +106,7 @@ wpx-* tools*. Key invocations referenced by this document:
 | Any (self-heal) | `wpx-journal record-attempt` |
 | 8-10 (read frontmatter cadences) | `wpx-wp read-frontmatter` |
 | 11 (post-deploy verdict) | `wpx-journal record-postdeploy` |
-| 11 (findings register + auto-draft) | `wpx-findings register` then `wpx-findings auto-draft-wp` |
+| 11 (findings register + auto-draft) | `wpx-findings register` → `wpx-findings auto-draft-wp` → `wpx-index add-wp --from-wp-file` (v0.10.3+) |
 | BLOCKER | `wpx-blocker write` |
 | 12 (calling session only — NOT executor) | `wpx-step12 wrap` |
 
@@ -211,6 +211,14 @@ Agent({
   --auto-wp-id WP-AUTO-NNN \
   --primitive Secure --severity CONCERN
 # → Creates the auto-draft WP file
+
+# 3b. (v0.10.3+) Register the new auto-draft WP in INDEX.md so
+#     downstream dispatch + wpx-step12 wrap can see it. Status stays
+#     `auto-draft` until the founder promotes it via the concierge.
+"$WPX_DIR/wpx-index" add-wp \
+  --wp WP-AUTO-NNN --project <slug> --from-wp-file
+# → Inserts a row in INDEX with status=auto-draft, depends/blocks
+#   inferred from the WP file's frontmatter
 
 # 4. Record the post-deploy verdict in the journal
 "$WPX_DIR/wpx-journal" record-postdeploy \

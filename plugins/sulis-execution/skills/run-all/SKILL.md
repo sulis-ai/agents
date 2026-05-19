@@ -358,12 +358,21 @@ loop:
              --primitive <SEC-NN>
 
            # If new (not is_duplicate), auto-draft the follow-up WP
-           wpx-findings auto-draft-wp --project <slug> \
+           "$WPX_DIR/wpx-findings" auto-draft-wp --project <slug> \
              --source-finding <SF-NNN> \
              --source-wp WP-NNN \
              --auto-wp-id <WP-AUTO-NNN from register output> \
              --primitive <Secure|Harden|Instrument|Gate> \
              --severity <CONCERN|ADVISORY>
+
+           # (v0.10.3+) Register the new auto-draft WP in INDEX so
+           # downstream dispatch + wpx-step12 wrap can see it. The
+           # tool reads the WP file's frontmatter (id, title,
+           # primitive, dependsOn, blocks, status) and appends a row.
+           # Status remains `auto-draft` — the founder promotes to
+           # `pending` via the concierge's slice-end review.
+           "$WPX_DIR/wpx-index" add-wp \
+             --wp WP-AUTO-NNN --project <slug> --from-wp-file
 
        If CRITICAL findings exist, write a BLOCKER and stop (do NOT
        proceed to Step 12). Otherwise record the post-deploy verdict

@@ -25,7 +25,7 @@ For the architectural rationale, see
 | Tool | Purpose | Typical caller |
 |---|---|---|
 | `wpx-journal` | Manage `.executor-WP-NNN.md` per-WP journal | Executor agent |
-| `wpx-index` | Manage INDEX.md (status flips, ready set, config) | Calling session + executor |
+| `wpx-index` | Manage INDEX.md: flip-status, set-status, list-ready, read-config, propagate-blocked, add-wp (v0.10.3+), sync-auto-drafts (v0.10.3+) | Calling session + executor |
 | `wpx-wp` | Read WP frontmatter; append acceptance evidence | Calling session + executor |
 | `wpx-blocker` | Write BLOCKER-WP-NNN.md per EL-08 format | Executor agent |
 | `wpx-findings` | Findings register + SF files + auto-draft WPs | Calling session |
