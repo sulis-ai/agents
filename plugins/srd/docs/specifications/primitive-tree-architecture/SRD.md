@@ -67,8 +67,8 @@ See [GLOSSARY.md](GLOSSARY.md) for the full domain glossary.
 
 | Document | Location | Relevance |
 |----------|----------|-----------|
-| Tria PRIMITIVE_TREE_SCHEMA.jsonld v1.2.0 | `/Users/iain/Documents/repos/tria/methodology/standards/PRIMITIVE_TREE_SCHEMA.jsonld` | Source pattern for DAG structure, dependency types, health statuses, open vocabulary |
-| Tria primitive-testing OUTCOME.md | `/Users/iain/Documents/repos/tria/methodology/outcomes/blueprint/primitive-testing/OUTCOME.md` | Source for health status transition mechanics, evidence grading, topological ordering |
+| Tria PRIMITIVE_TREE_SCHEMA.jsonld v1.2.0 | `/Users/iain/Documents/repos/platform/methodology/standards/PRIMITIVE_TREE_SCHEMA.jsonld` | Source pattern for DAG structure, dependency types, health statuses, open vocabulary |
+| Tria primitive-testing OUTCOME.md | `/Users/iain/Documents/repos/platform/methodology/outcomes/blueprint/primitive-testing/OUTCOME.md` | Source for health status transition mechanics, evidence grading, topological ordering |
 | SRD Plugin requirements-analyst agent | `srd/agents/requirements-analyst.md` | Current facilitation model this feature extends |
 | Codebase-mapping skill | `srd/skills/codebase-mapping/` | Upstream dependency — produces CODEBASE_INDEX.json consumed by tree synthesis |
 

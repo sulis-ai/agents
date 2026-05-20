@@ -210,7 +210,7 @@
 **Domain:** Integrations & Data / Business Rules
 **Question:** N/A — user surfaced the tria project's existing PRIMITIVE_TREE implementation
 **Key points — MAJOR NEW CONTEXT:**
-- The tria project at /Users/iain/Documents/repos/tria/ has a MATURE primitive tree implementation
+- The tria project at /Users/iain/Documents/repos/platform/ has a MATURE primitive tree implementation
 - primitive-decomposition outcome: produces PRIMITIVE_TREE.jsonld with Decomposition Quality Triad
 - primitive-testing outcome: adversarial testing with dual-path (Scout/Tribunal), evidence-graded health_status transitions
 - product-capability-decomposition: bridges primitives to buildable product capabilities

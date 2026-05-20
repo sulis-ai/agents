@@ -173,7 +173,7 @@ The user wants to change how the requirements-analyst agent facilitates conversa
 - **Scope expansion:** coaching annotations should NOT be limited to the five mindset skills
 - Also cover: technical concepts, frameworks, conventions
 - "If there is an opportunity to clarify a technical concept or a framework or convention, I don't want to miss that opportunity"
-- User referenced design standards document at `/Users/iain/Documents/repos/tria/methodology/delivery/design/STANDARDS.md`
+- User referenced design standards document at `/Users/iain/Documents/repos/platform/methodology/delivery/design/STANDARDS.md`
 
 **Analysis of scope expansion:**
 The coaching annotation system now has THREE categories of teachable content:
