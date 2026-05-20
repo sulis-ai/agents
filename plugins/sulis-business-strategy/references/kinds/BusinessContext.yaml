@@ -1,0 +1,288 @@
+# Kind: BusinessContext
+#
+# A four-stage Kind that captures structured business context across nine
+# domains through conversational intake. Produces a scored, provenance-tracked
+# BUSINESS_CONTEXT.md that every downstream business-strategy Kind (Identity,
+# Brand, Strategy, Commercial, etc.) consumes as their primary input.
+#
+# Replaces the legacy business-context-intake outcome's triad model (Domain
+# Expert / Assumption Challenger / Completeness Monitor) with the Kind
+# schema's evaluate + decide loop — the rubric encodes what the three lenses
+# collectively checked.
+#
+# Run this FIRST. Other business-strategy Kinds (starting with Identity)
+# declare BUSINESS_CONTEXT.md as a required input.
+
+apiVersion: business-strategy/v1alpha1
+kind: BusinessContext
+
+metadata:
+  name: business-context
+  version: 0.1.0
+  owner: business-strategy-studio
+  status: draft
+
+spec:
+  # Overall iteration cap for the find → generate → evaluate → decide loop.
+  max_iterations: 3
+
+  # ─────────────────────────────────────────────────────────────────
+  # Stage 1: find — scan workspace, determine mode, hash existing artifacts
+  # ─────────────────────────────────────────────────────────────────
+  find:
+    purpose: >
+      Scan the workspace for existing business-context artifacts, determine
+      the session mode (greenfield / baseline / progressive), compute SHA-256
+      hashes for any existing artifacts (for downstream reconciliation), and
+      build a reconciliation summary. Emit a CONTEXT_BRIEF_PACK.md that the
+      generate stage uses to skip already-answered questions and drive only
+      the gaps.
+
+    toolkit: [read_file, glob, ripgrep, bash]
+
+    inputs_to_scan:
+      # The canonical output — if present, mode is baseline or progressive
+      - "product/context/BUSINESS_CONTEXT.md"
+
+      # Prior intake artifacts (legacy outcome may have produced these)
+      - "product/context/INTAKE_RESPONSES.md"
+      - "product/context/ASSUMPTION_REVIEW.md"
+      - "product/context/COMPLETENESS_SCORES.md"
+
+      # The context ledger — entries the founder has captured separately
+      - "product/context/ledger/INDEX.md"
+      - "product/context/ledger/entries/*.md"
+
+      # Existing strategic artifacts — cross-validate against during intake
+      - "product/organization/IDENTITY.md"
+      - "product/organization/BRAND.md"
+      - "product/organization/TONE_OF_VOICE.md"
+      - "product/organization/PRINCIPLES.md"
+      - "product/offerings/primary/VISION.md"
+      - "product/offerings/primary/STRATEGY.md"
+      - "product/offerings/primary/ANTI_GOALS.md"
+
+      # Personas and journeys ground the customer + market answers
+      - "product/experience/PERSONAS.md"
+      - "product/experience/EXPERIENCE_JOURNEYS.md"
+
+      # Research outputs ground market + competition answers
+      - "product/research/**/*.md"
+
+      # Founder transcripts and sessions are richest source of inferred answers
+      - "transcripts/**/*.md"
+      - "transcripts/**/*.txt"
+      - ".sulis/threads/sessions/*.jsonl"
+
+      # Architecture and operational state inform Technology & Deployment domain
+      - "architecture/ARCHITECTURE.md"
+      - "architecture/decisions/*.md"
+      - "product/MANIFEST.yaml"
+
+    output_artifacts:
+      - path: find-output/CONTEXT_BRIEF_PACK.md
+        schema_ref: context_brief_pack_v1alpha1
+      - path: find-output/CONVERSATION_TRACE.md
+        schema_ref: references/kinds/schemas/conversation-trace.md
+        # Find writes the trace's frontmatter + empty section headers (Phase A,
+        # Phase B, Phase C, Phase D, Self-check log). Generate appends
+        # incrementally as the conversation unfolds. See conversation-trace.md
+        # for the recording discipline. The trace is the audit artifact that
+        # makes the diverge-then-converge rhythm reviewable post-hoc, and
+        # enables the Phase B self-check against the Claude Code session log.
+
+    context_budget:
+      tokens: 8000
+
+    context:
+      input: {}
+      processing:
+        mode_determination: >
+          greenfield = no BUSINESS_CONTEXT.md exists.
+          baseline = BUSINESS_CONTEXT.md exists but no SHA-256 provenance
+                     in frontmatter; compute hashes for existing artifacts.
+          progressive = BUSINESS_CONTEXT.md exists with valid provenance;
+                       enumerate downstream artifacts that may need
+                       propagation if context changes.
+        hashing: >
+          For each existing artifact identified in scan, compute SHA-256
+          (via `sha256sum` or equivalent). Record hash + path in the brief
+          pack so generate can preserve them in BUSINESS_CONTEXT.md frontmatter.
+        gap_detection: >
+          Cross-reference 9 domains × 34 questions against existing artifacts.
+          For each question, determine whether an answer can be inferred from
+          existing content (mark "candidate-from-existing") or whether it's
+          a true gap (mark "needs-intake"). The generate stage drives only
+          the gaps conversationally.
+      output:
+        sections:
+          - session_mode                    # greenfield | baseline | progressive + rationale
+          - existing_artifacts              # list with SHA-256 hash + path
+          - candidate_answers_from_existing # per-question pre-population from existing artifacts
+          - gap_inventory                   # per-question gaps that need conversational intake
+          - reconciliation_summary          # for baseline/progressive: what changed since last hash
+
+  # ─────────────────────────────────────────────────────────────────
+  # Stage 2: generate — drive conversational intake, produce BUSINESS_CONTEXT.md
+  # ─────────────────────────────────────────────────────────────────
+  generate:
+    target_file: product/context/BUSINESS_CONTEXT.md
+    spec_ref: references/kinds/schemas/business-context-instance.md
+    inputs: []  # reads BRIEF_PACK only
+
+    constraints:
+      - "9 domains × 34 questions: cover all domains; questions skipped only with explicit rationale."
+      - "V/A/U scoring: every answer tagged Validated (concrete evidence) | Assumed (defensible hypothesis) | Unknown (gap acknowledged)."
+      - "Provenance: every Validated and Assumed answer cites its source (transcript reference, research file, founder quote, prior artifact)."
+      - "Defensibility: every Assumed answer includes a one-line rationale for the assumption."
+      - "No prescription: this Kind captures WHAT the founder knows. It does NOT produce strategic recommendations, positioning advice, or commercial model proposals — those are downstream Kinds."
+      - "Plain English: no methodology codes, no internal taxonomy, no schema field names in the output body."
+      - "Inference over interrogation: where the brief pack shows a candidate answer from existing artifacts, surface it as a hypothesis for confirmation rather than re-asking from scratch."
+
+    token_budget:
+      input: 12000
+      output: 8000
+
+    context:
+      input: {}
+      processing:
+        intake_style: conversational    # not a form — a guided dialogue
+        diverge_then_converge: >
+          The 34 questions are the COVERAGE TARGET, not the CONVERSATION
+          SCRIPT. Drive the conversation in four phases:
+
+          PHASE A — DIVERGENT (open the territory).
+          Open with the broadest possible thread, hypothesis-first where
+          BRIEF_PACK has signals: "Reading your transcripts, the thread that
+          jumps out is X — is that the live story?" If no signals exist, open
+          with "What are you building, and why now?" Then FOLLOW THE THREAD
+          THE FOUNDER LEADS WITH — never pivot to "Q1: Why does this exist?"
+          just because Q1 is first on the list. A founder talking about why
+          now often answers Q1 + Q2 + Q6 + Q7 in one breath; capture all of
+          them. Maintain an internal coverage map (which of the 34 questions
+          have been touched, in what depth, with what V/A/U signal). Reflect
+          every 3-4 turns ("Let me mirror back: [summary]. Landing?").
+          Apply reality probes sparingly at natural pauses (max 1 per
+          reflection): scope creep, assumption stacking, NFR neglect,
+          competitor invisibility.
+
+          Stay in Phase A until ONE of:
+          (a) Saturation signal — last 3 turns introduce no new concepts;
+          (b) Floor reached — 25 conversational turns elapsed (forward
+              progress over perfection — the rubric tolerates partial
+              context with explicit gaps).
+
+          PHASE B — SATURATION CHECK.
+          Build the coverage map. Surface it to the founder in plain English:
+          "Here's where we've got to. Strong signal on [domains X, Y, Z];
+          lighter on [domain W]. Want to keep going wide on [open thread],
+          or pin down the lighter areas?" Their answer routes you.
+
+          PHASE C — CONVERGENT (targeted gaps).
+          For each genuine gap, ask ONE question — still hypothesis-first
+          where possible ("From your principles doc I'd guess you'd say X —
+          is that right?"). Honour explicit skip with rationale ("no pricing
+          yet — pre-commercial"). 5-10 turns typically.
+
+          PHASE D — CONSOLIDATION.
+          Apply V/A/U scoring with provenance. Surface the completeness
+          dashboard to the founder. Confirm before writing BUSINESS_CONTEXT.md.
+        plain_english: >
+          MANDATORY. Never use methodology codes (FE-NN, B-06, C-07, V/A/U as
+          letters), schema field names, internal taxonomy, or jargon in
+          questions to the founder. "Validated / Assumed / Unknown" stays
+          internal — surface to the founder as "do you have concrete evidence
+          for this?" / "is this a hypothesis or a fact?". The output uses
+          V/A/U tags; the conversation never does.
+        one_question_at_a_time: >
+          MANDATORY. Ask ONE question. Wait for the response. Never batch.
+          Multi-part questions split attention and produce shallow answers.
+          The exception is a reflection checkpoint, which mirrors back
+          understanding and asks one verification question.
+        skip_protocol: >
+          For each question, FIRST check the brief pack's
+          candidate_answers_from_existing. If a confident candidate exists,
+          confirm with the founder in one line ("Your prior identity doc
+          says X — still true?") rather than re-asking from scratch.
+          Inference over interrogation.
+        v_a_u_rules: >
+          Validated = founder confirmed with concrete evidence (a sale, a
+          contract, an interview transcript, a measured metric).
+          Assumed = founder's hypothesis with a defensible rationale, but
+          no concrete evidence yet.
+          Unknown = founder doesn't know, hasn't decided, or hasn't tested.
+          These tags are internal — never surface the letters to the founder.
+        domain_skip: >
+          A founder can skip a question with explicit rationale (e.g., "no
+          revenue model yet — pre-commercial"). Skipped questions are
+          tracked but don't count against completeness — the rubric
+          distinguishes "answered as Unknown" from "explicitly skipped".
+        reality_probes: >
+          Watch silently for these patterns. Surface only at reflection
+          checkpoints, max one per reflection:
+            - Scope creep: scope expanding with each turn; ask whether a
+              boundary should be drawn.
+            - Assumption stacking: multiple claims building on un-validated
+              foundations; surface the load-bearing assumption.
+            - NFR neglect: 15+ turns without performance, security, scale,
+              or compliance discussion; ask whether they exist.
+            - Competitor invisibility: positioning discussed without ever
+              naming competitors; ask "who else does something like this?"
+            - Gold plating: deep detail on secondary concerns while primary
+              gaps remain.
+      output:
+        section_order:
+          - completeness_dashboard
+          - identity_and_team
+          - problem_and_market
+          - solution_and_product
+          - customers
+          - business_model
+          - competition
+          - go_to_market
+          - technology_and_deployment
+          - risks
+          - provenance_frontmatter  # appended to top: SHA-256 hashes of inputs
+
+  # ─────────────────────────────────────────────────────────────────
+  # Stage 3: evaluate — apply the rubric, emit a Verdict
+  # ─────────────────────────────────────────────────────────────────
+  evaluate:
+    rubric_ref: references/kinds/rubrics/business-context-rubric.md
+    verdict_path: find-output/CONTEXT_VERDICT.md
+    verdict_schema_version: v1alpha1
+
+    blocking_criteria:
+      # If these fail, decide routes to `stop` regardless of reason class.
+      - "fewer_than_three_domains_addressed"     # context too thin to be useful
+      - "no_validated_answers_at_all"             # everything Unknown / Assumed → not context, just speculation
+      - "missing_provenance_on_validated"         # Validated without source citation is a contradiction
+      - "prescription_drift"                      # output contains strategic recommendations (boundary violation)
+
+    context:
+      input: {}
+      processing: {}
+      output: {}
+
+    token_budget:
+      input: 8000
+      output: 2000
+
+  # ─────────────────────────────────────────────────────────────────
+  # Stage 4: decide — route on Verdict
+  # ─────────────────────────────────────────────────────────────────
+  decide:
+    max_iterations: 3
+    on_max_iterations: stop
+    five_whys_iterations: 5
+
+    reason_class_routing:
+      content_deficient: regenerate   # rubric flagged weak domains → re-question those domains
+      context_deficient: re_find       # rubric flagged that existing artifacts weren't scanned well → re-find with broader scan
+      technical_transient: retry
+      technical_fatal: stop
+
+    context:
+      input: {}
+      processing: {}
+      output: {}
