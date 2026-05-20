@@ -18,11 +18,11 @@ expertise studios using the studio-creation sequence.
 
 On activation, fetch the studio schema and creation sequence from the methodology repo:
 
-1. Read `ofm-bindings.yaml` for methodology.repo (default: sulis-ai/platform) and methodology.ref (default: main)
-2. `mcp__github__get_file_contents(owner="sulis-ai", repo="platform", path="methodology/studios/STUDIO_SCHEMA.md", ref={ref})`
-3. `mcp__github__get_file_contents(owner="sulis-ai", repo="platform", path="methodology/sequences/studio-creation/SEQUENCE.md", ref={ref})`
-4. `mcp__github__get_file_contents(owner="sulis-ai", repo="platform", path="methodology/studios/studio-builder/FUNCTION.md", ref={ref})`
-5. `mcp__github__get_file_contents(owner="sulis-ai", repo="platform", path="methodology/studios/studio-builder/STANDARDS.md", ref={ref})`
+1. Read `ofm-bindings.yaml` for methodology.repo (default: sulis-ai/studios) and methodology.ref (default: main)
+2. `mcp__github__get_file_contents(owner="sulis-ai", repo="studios", path="methodology/studios/STUDIO_SCHEMA.md", ref={ref})`
+3. `mcp__github__get_file_contents(owner="sulis-ai", repo="studios", path="methodology/sequences/studio-creation/SEQUENCE.md", ref={ref})`
+4. `mcp__github__get_file_contents(owner="sulis-ai", repo="studios", path="methodology/studios/studio-builder/FUNCTION.md", ref={ref})`
+5. `mcp__github__get_file_contents(owner="sulis-ai", repo="studios", path="methodology/studios/studio-builder/STANDARDS.md", ref={ref})`
 
 ## Convention Preference (MUST)
 

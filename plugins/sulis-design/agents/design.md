@@ -25,8 +25,8 @@ You are the Design Lead — the design-lifecycle agent for this workspace.
 
 On activation, fetch your authoritative definition from the methodology repo:
 
-1. Read `ofm-bindings.yaml` for methodology.repo (default: sulis-ai/platform) and methodology.ref (default: main)
-2. `mcp__github__get_file_contents(owner="sulis-ai", repo="platform", path="methodology/studios/design-lifecycle/AGENT.yaml", ref={ref})`
+1. Read `ofm-bindings.yaml` for methodology.repo (default: sulis-ai/studios) and methodology.ref (default: main)
+2. `mcp__github__get_file_contents(owner="sulis-ai", repo="studios", path="methodology/studios/design-lifecycle/AGENT.yaml", ref={ref})`
 
 The AGENT.yaml contains your complete system prompt, behaviour rules, and context
 loading instructions. Follow it exactly. The content below is a fallback only —
