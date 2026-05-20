@@ -90,7 +90,7 @@ substance is captured.
 
 As terms surface that have multiple meanings (e.g., "CAC", competitor
 product names), stop and lock them in `GLOSSARY.md` per CL-06 and ND-09.
-Cross-reference the lock in `EXPLORATION_JOURNAL.md`.
+Cross-reference the lock in `journal/{YYYY-MM-DD}-{topic}.md`.
 
 ### Step 5: Capture open questions
 

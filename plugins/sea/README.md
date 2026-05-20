@@ -47,6 +47,7 @@ claude --agent sea:engineering-architect --dangerously-skip-permissions
 | `/sea:harden` | Brownfield — implement accepted Hardening Deltas through the Red-Green-Blue cycle |
 | `/sea:decompose` | Break a TDD into atomic Work Packages with dependency graph and token-cost estimates |
 | `/sea:verify` | Run five-perspective completeness check; produce `COMPLETENESS_REPORT.md` |
+| `/code-review <PR\|branch\|range>` | PR-scoped review — runs architecture, security, and quality lenses in parallel; produces one merged report under `.architecture/{project}/code-reviews/` plus draft Hardening Deltas. Advisory only (no PR comments, no status checks, no auto-blocking). |
 
 ---
 

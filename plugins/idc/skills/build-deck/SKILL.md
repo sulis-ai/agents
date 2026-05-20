@@ -1,9 +1,9 @@
 ---
 name: build-deck
 description: >
-  Phase 8 of the Investor Deck Coach. Renders slides/NN-*.md plus brand-assets
+  Phase 8 of the Investor Deck Coach. Renders 04-narrative/slides/NN-*.md plus brand-assets
   into the two deck deliverables: PITCH_DECK.pptx (Microsoft PowerPoint via
-  python-pptx) and PITCH_DECK.html (Reveal.js via build_html_deck.py). Both
+  python-pptx) and 04-narrative/DECK.html (Reveal.js via build_html_deck.py). Both
   wear the customer brand. Pre-checks ensure adversarial-review findings are
   addressed and chunk limits respected.
 user_invocable: true
@@ -41,10 +41,10 @@ Verify before invoking the scripts:
 | Check | If fails |
 |---|---|
 | `brand-assets/tokens.css`, `tokens.json`, `logo.svg`, `type-stack.md` all exist | Return to `/idc:brand-discovery` |
-| Every `slides/NN-*.md` has front matter with `headline`, `investor_question`, `layout`, `chunk_count` | Return to `/idc:narrative` |
+| Every `04-narrative/slides/NN-*.md` has front matter with `headline`, `investor_question`, `layout`, `chunk_count` | Return to `/idc:narrative` |
 | Every `chunk_count` in slide front matter ≤ 5 | Return to `/idc:narrative` |
 | Every numerical claim references a `pp-NNN` in slide front matter | Return to `/idc:market-research` or `/idc:narrative` |
-| `ADVERSARIAL_REPORT.md` exists and all Weak / None items are either addressed in slides or acknowledged in the report | Return to `/idc:adversarial-review` |
+| `ADVERSARIAL_REVIEW.md` exists and all Weak / None items are either addressed in slides or acknowledged in the report | Return to `/idc:adversarial-review` |
 | No `[TODO]` or `[PENDING]` markers in any slide file | Resolve before building |
 
 If any check fails, surface the specific failure to the founder and
@@ -52,28 +52,62 @@ propose the corrective skill. Do not proceed.
 
 ### Step 2: Confirm slide order with founder
 
-Read each `slides/NN-*.md` headline aloud (in order). Confirm with
+Read each `04-narrative/slides/NN-*.md` headline aloud (in order). Confirm with
 the founder that the order matches `NARRATIVE.md`. If the founder
 wants to reorder, do it now — the file rename is mechanical, the
 build is deterministic.
 
 ### Step 3: Run the build scripts
 
-```bash
-python3 scripts/build_pptx.py \
-    .pitch/{slug}/slides/ \
-    .pitch/{slug}/brand-assets/tokens.json \
-    .pitch/{slug}/PITCH.yaml \
-    .pitch/{slug}/deck/PITCH_DECK.pptx
-```
+Five scripts run in this phase. The first two render the presenter deck;
+the next three render the investor-facing HTML pages shared externally.
+
+**Presenter deck** (for live partner meetings):
 
 ```bash
+# Microsoft PowerPoint
+python3 scripts/build_pptx.py \
+    .pitch/{slug}/04-narrative/slides/ \
+    .pitch/{slug}/brand-assets/tokens.json \
+    .pitch/{slug}/PITCH.yaml \
+    .pitch/{slug}/04-narrative/DECK.pptx
+
+# Reveal.js HTML (slide-by-slide, presenter notes view)
 python3 scripts/build_html_deck.py \
-    .pitch/{slug}/slides/ \
+    .pitch/{slug}/04-narrative/slides/ \
     .pitch/{slug}/brand-assets/tokens.css \
     .pitch/{slug}/PITCH.yaml \
-    .pitch/{slug}/deck/PITCH_DECK.html
+    .pitch/{slug}/04-narrative/DECK.html
 ```
+
+**Investor-facing HTML pages** (for DocSend-style sharing):
+
+```bash
+# Long-form scrollable web pitch (root PITCH.html)
+python3 scripts/build_web_pitch.py \
+    .pitch/{slug}/04-narrative/slides/ \
+    .pitch/{slug}/brand-assets/tokens.css \
+    .pitch/{slug}/PITCH.yaml \
+    .pitch/{slug}/PITCH.html
+
+# Investor-facing financial summary (root FINANCIALS.html)
+python3 scripts/build_investor_financials.py \
+    .pitch/{slug}/03-financials/MODEL.yaml \
+    .pitch/{slug}/brand-assets/tokens.css \
+    .pitch/{slug}/PITCH.yaml \
+    .pitch/{slug}/FINANCIALS.html
+
+# Investor-facing adversarial-review summary (root REVIEW.html)
+python3 scripts/build_review_html.py \
+    .pitch/{slug}/05-adversarial/ADVERSARIAL_REVIEW.md \
+    .pitch/{slug}/brand-assets/tokens.css \
+    .pitch/{slug}/PITCH.yaml \
+    .pitch/{slug}/REVIEW.html
+```
+
+All five outputs share the same brand tokens. The presenter deck is for
+talking through live; the three root HTML pages are for asynchronous
+investor sharing.
 
 The scripts emit warnings to stderr for:
 
@@ -87,12 +121,12 @@ Surface warnings to the founder. They may be acceptable in context
 ### Step 4: Concatenate speaker notes
 
 The build scripts emit per-slide notes; concatenate them into
-`deck/speaker-notes.md` for printing. Format: one slide per section,
+`04-narrative/speaker-notes.md` for printing. Format: one slide per section,
 heading is the slide title.
 
 ### Step 5: Walk the deck with the founder
 
-Open `PITCH_DECK.html` and walk slide-by-slide. For each slide:
+Open `04-narrative/DECK.html` and walk slide-by-slide. For each slide:
 
 - Read the headline aloud
 - Confirm the visual conveys the takeaway
@@ -128,7 +162,7 @@ If accepted, propose `/idc:rehearsal`. If declined, propose
 
 ### `build_pptx.py`
 
-- Reads each `slides/NN-*.md` and its YAML front matter
+- Reads each `04-narrative/slides/NN-*.md` and its YAML front matter
 - Loads `brand-assets/tokens.json` for colour / type / spacing
 - Selects the python-pptx layout based on `layout:` front matter
 - Renders headline, body, image, chart, and footer (with proof-point
@@ -138,7 +172,7 @@ If accepted, propose `/idc:rehearsal`. If declined, propose
 
 ### `build_html_deck.py`
 
-- Reads each `slides/NN-*.md` and its YAML front matter
+- Reads each `04-narrative/slides/NN-*.md` and its YAML front matter
 - Loads `brand-assets/tokens.css` and inlines it
 - Wraps each slide as a Reveal.js `<section>` with the appropriate
   layout class
@@ -197,11 +231,15 @@ Refuse if:
 ## Output checklist
 
 - [ ] All pre-flight checks pass
-- [ ] `deck/PITCH_DECK.pptx` written
-- [ ] `deck/PITCH_DECK.html` written
-- [ ] `deck/speaker-notes.md` written
+- [ ] `04-narrative/DECK.pptx` written (presenter — PowerPoint)
+- [ ] `04-narrative/DECK.html` written (presenter — Reveal.js)
+- [ ] `04-narrative/speaker-notes.md` written
+- [ ] `PITCH.html` written (investor-facing — long-form web pitch)
+- [ ] `FINANCIALS.html` written (investor-facing — financial summary)
+- [ ] `REVIEW.html` written (investor-facing — adversarial summary)
 - [ ] Build warnings surfaced to founder
 - [ ] Founder walked through the rendered deck
+- [ ] Founder reviewed `PITCH.html` (the shareable long-form version) and confirmed
 - [ ] Visual issues either resolved or recorded
-- [ ] Journal entry written
+- [ ] Journal entry written (new file in `journal/`)
 - [ ] Rehearsal proposed (or `/idc:validate` if declined)

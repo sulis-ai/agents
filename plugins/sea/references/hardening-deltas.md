@@ -83,6 +83,7 @@ The optional **`source`** field records where the delta came from. Recognised fo
 | `srd:negative-requirement-NR-NN` | Delta implements a per-use-case negative requirement from SRD.md |
 | `sulis-security:viability-report-{date}#SEC-NN` | Delta closes a finding from a sulis-security viability report |
 | `nfr:NFR-NN` | Delta implements a non-functional requirement from NFR.md |
+| `code-review:PR-NN` | Delta closes a finding from a `/code-review` run against a pull request, branch, or commit range (SEA v0.12.0+). The delta also carries a `lens:` field (`architecture` / `security` / `quality`) identifying which reviewer produced it. |
 
 The source field is for traceability — when SRD or sulis-security re-run, the upstream
 artifact's status can be reconciled against the delta's status without manual matching.

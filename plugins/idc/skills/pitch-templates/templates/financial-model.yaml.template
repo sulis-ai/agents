@@ -161,5 +161,5 @@ sensitivity:
 
 # Audit trail
 provenance:
-  facilitator_notes: "EXPLORATION_JOURNAL.md"
-  rigor_check: "COMPLETENESS_REPORT.md"
+  facilitator_notes: "journal/"
+  rigor_check: "06-verification/VERIFICATION_REPORT.md"

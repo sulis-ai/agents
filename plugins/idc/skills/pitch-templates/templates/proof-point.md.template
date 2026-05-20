@@ -55,5 +55,5 @@ What this claim does NOT support:
 Which artifacts cite this proof-point:
 
 - slides/{{NN-name}}.md — {{specific claim on slide}}
-- financial/financial-model.yaml — {{which assumption or input}}
+- 03-financials/MODEL.yaml — {{which assumption or input}}
 - MARKET_RESEARCH.md — {{which section}}

@@ -41,11 +41,14 @@ artifacts:
   discovery: ".pitch/{{slug}}/DISCOVERY.md"
   brand: ".pitch/{{slug}}/BRAND.md"
   market_research: ".pitch/{{slug}}/MARKET_RESEARCH.md"
-  financial_model: ".pitch/{{slug}}/financial/financial-model.yaml"
+  financial_model: ".pitch/{{slug}}/03-financials/MODEL.yaml"
   narrative: ".pitch/{{slug}}/NARRATIVE.md"
-  adversarial_report: ".pitch/{{slug}}/ADVERSARIAL_REPORT.md"
-  deck_pptx: ".pitch/{{slug}}/deck/PITCH_DECK.pptx"
-  deck_html: ".pitch/{{slug}}/deck/PITCH_DECK.html"
+  adversarial_review: ".pitch/{{slug}}/05-adversarial/ADVERSARIAL_REVIEW.md"
+  deck_pptx: ".pitch/{{slug}}/04-narrative/DECK.pptx"
+  deck_html: ".pitch/{{slug}}/04-narrative/DECK.html"
+  web_pitch: ".pitch/{{slug}}/PITCH.html"
+  investor_financials: ".pitch/{{slug}}/FINANCIALS.html"
+  investor_review: ".pitch/{{slug}}/REVIEW.html"
 
 # Optional links to upstream specs (idc is self-contained, but may read context)
 upstream:

@@ -108,7 +108,7 @@ Slide count: {{N}} (must be 10–15)
 
 ## Adversarial rebuttal coverage (IO-)
 
-- Total objections scored in ADVERSARIAL_REPORT.md: {{N}}
+- Total objections scored in ADVERSARIAL_REVIEW.md: {{N}}
 - Weak / None rebuttals remaining: {{N}}
 - Founder-acknowledged residual risks: {{N}}
 

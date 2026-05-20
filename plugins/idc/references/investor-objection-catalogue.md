@@ -12,7 +12,7 @@ applies.
 
 The catalogue is the working set for `/idc:adversarial-review`. The skill
 selects 10–15 stage-relevant objections, ranks them by risk to *this* pitch
-(weakest claim first), and produces `ADVERSARIAL_REPORT.md` with founder
+(weakest claim first), and produces `05-adversarial/ADVERSARIAL_REVIEW.md` with founder
 rebuttal scoring.
 
 The catalogue is not exhaustive — partner-specific objections (e.g., a fund's
@@ -583,7 +583,7 @@ Each objection follows this format:
 3. **Read the deck artifacts** (NARRATIVE.md, slides/, MARKET_RESEARCH.md, financial-model.yaml, proof-points/).
 4. **Score current rebuttal strength** for each filtered objection: Strong / Medium / Weak / None — based on whether the deck contains the evidence required to ace it.
 5. **Rank riskiest-first** (per AT, riskiest-by-impact-then-by-lowest-evidence first).
-6. **Select 10–15** for `ADVERSARIAL_REPORT.md`.
+6. **Select 10–15** for `05-adversarial/ADVERSARIAL_REVIEW.md`.
 7. **For each selected objection**, produce: investor voice, weakest claim it targets, current rebuttal score, mitigation path (with at least two concrete options).
 
 The skill does not invent objections beyond the catalogue at this version.

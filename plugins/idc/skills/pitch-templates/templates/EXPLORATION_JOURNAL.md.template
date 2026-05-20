@@ -1,64 +1,73 @@
-# Exploration Journal — {{COMPANY_NAME}}
+# {{YYYY-MM-DD}} — {{topic}}
 
-The facilitation record. Append-only. Captures decisions, assumptions,
-patterns detected, term locks, and approvals across the engagement.
+<!--
+v0.4 convention: this file represents ONE journal entry, written to
+`.pitch/{slug}/journal/{YYYY-MM-DD}-{topic}.md`. The journal is multi-
+file (one per session or topic), NOT a single rolling file. This
+matches the production convention proven on the sulis pre-seed deck.
 
-This file is consulted at every phase transition. It is the agent's
-memory across sessions.
+Topic slugs that work well: `discovery`, `brand-discovery`, `market-research`,
+`financial-model`, `narrative`, `adversarial-review`, `build-deck`,
+`rehearsal`, `verification-pass`, `addendum`, `handover`, etc. Pick a
+topic that describes what changed; if multiple things changed in one
+session, write multiple journal entries.
+-->
+
+**Phase:** {{N}} ({{phase-name}})
+**Time started:** {{HH:MM}}
+**Time ended:** {{HH:MM}}
 
 ---
 
-## Session log
+## Summary
 
-### {{YYYY-MM-DD HH:MM}} — Phase {{N}} ({{phase-name}})
+{{ONE_PARAGRAPH — what this session set out to do and what was settled.}}
 
-**Summary:** {{ONE_LINE}}
+---
 
-**Decisions:**
+## Decisions
 
-- {{DECISION + rationale}}
+- {{DECISION + rationale + who approved}}
 
-**Assumptions captured:**
+---
 
-- {{ASSUMPTION + flag for validation}}
+## Assumptions captured
 
-**Term locks:**
+- {{ASSUMPTION + flag for validation + risk if wrong}}
 
-- {{TERM}} → {{DEFINITION}} (entered in GLOSSARY.md)
+---
 
-**Patterns / coaching observations:**
+## Term locks
+
+Cross-referenced into `GLOSSARY.md`:
+
+- {{TERM}} → {{DEFINITION}}
+
+---
+
+## Patterns / coaching observations
+
+Not for the deck — these inform facilitation.
 
 - {{OBSERVATION}}
 
-**Open questions for next session:**
+---
+
+## Open questions for next session
 
 - [ ] {{QUESTION}}
 
-**Approvals (founder sign-off):**
+---
 
-- {{ARTIFACT or DECISION}} — approved by {{FOUNDER_NAME}}
+## Approvals (founder sign-off)
+
+- {{ARTIFACT or DECISION}} — approved by {{FOUNDER_NAME}} at {{HH:MM}}
 
 ---
 
-### {{YYYY-MM-DD HH:MM}} — Phase {{N}}
+## Hat-change log (Phase 7 only)
 
-(repeat)
-
----
-
-## Term-lock register (cross-reference for GLOSSARY.md)
-
-| Date | Term | Locked definition | Reason |
-|---|---|---|---|
-| {{YYYY-MM-DD}} | {{e.g., CAC}} | {{Blended CAC: total S&M ÷ new customers acquired in period}} | {{disambiguation from paid-only}} |
-
----
-
-## Hat-change log
-
-When the agent enters or exits adversarial mode.
-
-| Date | Phase | Direction | Confirmed by founder |
-|---|---|---|---|
-| {{YYYY-MM-DD}} | 7 | coaching → adversarial | yes |
-| {{YYYY-MM-DD}} | 7 | adversarial → coaching | (automatic at end of phase) |
+| Time | Direction | Confirmed by founder |
+|---|---|---|
+| {{HH:MM}} | coaching → adversarial | yes |
+| {{HH:MM}} | adversarial → coaching | (automatic at end of phase) |

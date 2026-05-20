@@ -15,6 +15,7 @@ skills:
   - harden
   - decompose
   - verify
+  - code-review
 ---
 
 # Senior Engineering Architect — System Prompt

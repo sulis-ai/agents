@@ -15,20 +15,20 @@ This skill is a template library. It is not invoked by slash command. The
 
 ## Templates Provided
 
-| Template | Produces |
+| Template | Produces (v0.4 paths) |
 |---|---|
 | `templates/PITCH.yaml.template` | `.pitch/{project}/PITCH.yaml` — metadata, stage, ask |
 | `templates/DISCOVERY.md.template` | `.pitch/{project}/DISCOVERY.md` |
-| `templates/MARKET_RESEARCH.md.template` | `.pitch/{project}/MARKET_RESEARCH.md` |
-| `templates/source.md.template` | `sources/src-NNN-*.md` — per-source dossier |
-| `templates/proof-point.md.template` | `proof-points/pp-NNN-*.md` — atomic claim file |
-| `templates/financial-model.yaml.template` | `financial/financial-model.yaml` |
-| `templates/NARRATIVE.md.template` | `.pitch/{project}/NARRATIVE.md` |
-| `templates/slide.md.template` | `slides/NN-*.md` — per-slide working file |
-| `templates/ADVERSARIAL_REPORT.md.template` | `.pitch/{project}/ADVERSARIAL_REPORT.md` |
-| `templates/REHEARSAL_NOTES.md.template` | `.pitch/{project}/REHEARSAL_NOTES.md` |
-| `templates/COMPLETENESS_REPORT.md.template` | `.pitch/{project}/COMPLETENESS_REPORT.md` |
-| `templates/EXPLORATION_JOURNAL.md.template` | `.pitch/{project}/EXPLORATION_JOURNAL.md` |
+| `templates/MARKET_RESEARCH.md.template` | `.pitch/{project}/02-research/MARKET_RESEARCH.md` |
+| `templates/source.md.template` | `.pitch/{project}/sources/src-NNN-*.md` |
+| `templates/proof-point.md.template` | `.pitch/{project}/proof-points/pp-NNN-*.md` |
+| `templates/financial-model.yaml.template` | `.pitch/{project}/03-financials/MODEL.yaml` |
+| `templates/NARRATIVE.md.template` | `.pitch/{project}/04-narrative/NARRATIVE.md` |
+| `templates/slide.md.template` | `.pitch/{project}/04-narrative/slides/NN-*.md` |
+| `templates/ADVERSARIAL_REPORT.md.template` | `.pitch/{project}/05-adversarial/ADVERSARIAL_REVIEW.md` |
+| `templates/REHEARSAL_NOTES.md.template` | `.pitch/{project}/06-verification/REHEARSAL_NOTES.md` |
+| `templates/COMPLETENESS_REPORT.md.template` | `.pitch/{project}/06-verification/VERIFICATION_REPORT.md` |
+| `templates/EXPLORATION_JOURNAL.md.template` | `.pitch/{project}/journal/{YYYY-MM-DD}-{topic}.md` — one file per session/topic, not a single rolling file |
 | `templates/GLOSSARY.md.template` | `.pitch/{project}/GLOSSARY.md` |
 
 ## How Skills Use Templates

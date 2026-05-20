@@ -5,7 +5,7 @@ description: >
   coaching to adversarial mode. Reads PITCH.yaml stage, filters
   investor-objection-catalogue by stage, scores rebuttal strength against
   deck artifacts, ranks riskiest-first (impact × (1 − rebuttal strength)),
-  produces ADVERSARIAL_REPORT.md with 10–15 selected objections.
+  produces ADVERSARIAL_REVIEW.md with 10–15 selected objections.
 user_invocable: true
 ---
 
@@ -42,7 +42,7 @@ running the analysis, signal the change verbally:
 > wrong. Ready?"
 
 Wait for the founder's go-ahead. Record the hat-change entry in
-`EXPLORATION_JOURNAL.md`.
+`journal/{YYYY-MM-DD}-{topic}.md`.
 
 At the end of Phase 7, return to coaching mode with an equally explicit
 signal:
@@ -115,7 +115,7 @@ explicitly:
 > adversarial review can't fix on its own. I recommend revisiting
 > [specific issue] before continuing."
 
-### Step 6: Produce ADVERSARIAL_REPORT.md
+### Step 6: Produce ADVERSARIAL_REVIEW.md
 
 Use the template. Sections:
 
@@ -207,7 +207,7 @@ Refuse if:
 - [ ] Per-objection rebuttal strength scored
 - [ ] Objections ranked riskiest-first (AT)
 - [ ] 10–15 objections selected
-- [ ] `ADVERSARIAL_REPORT.md` produced from template
+- [ ] `ADVERSARIAL_REVIEW.md` produced from template
 - [ ] Top 3 walked through with founder
 - [ ] Each Weak / None has a decision (address or acknowledge)
 - [ ] Hat returned to coaching

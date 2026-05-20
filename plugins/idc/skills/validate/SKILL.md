@@ -6,14 +6,14 @@ description: >
   coverage, financial rigor, narrative composition, visual layout,
   adversarial rebuttal coverage, claim-to-proof traceability, term
   consistency, brand application. Up to three fix-as-you-go passes. Emits
-  COMPLETENESS_REPORT.md with PASS or GAPS_FOUND verdict.
+  VERIFICATION_REPORT.md with PASS or GAPS_FOUND verdict.
 user_invocable: true
 ---
 
 # Validate
 
 When invoked, run multi-perspective verification across all pitch
-artifacts and produce `COMPLETENESS_REPORT.md`. This is the
+artifacts and produce `VERIFICATION_REPORT.md`. This is the
 pre-handoff check — the verdict determines whether the pitch is
 stage-conformant and ready for delivery.
 
@@ -82,7 +82,7 @@ Common failures:
 
 Verify:
 
-- `ADVERSARIAL_REPORT.md` exists
+- `ADVERSARIAL_REVIEW.md` exists
 - Every Weak / None objection has either been addressed in the
   current slides OR explicitly acknowledged as residual risk by the
   founder
@@ -106,7 +106,7 @@ claims, sources without proof-points).
 ### 7. Term consistency (CL-06 / ND-09)
 
 Walk every named term in `slides/`, `NARRATIVE.md`,
-`MARKET_RESEARCH.md`, and `financial-model.yaml`. Verify each term
+`MARKET_RESEARCH.md`, and `03-financials/MODEL.yaml`. Verify each term
 appears in `GLOSSARY.md` with a single definition and is used
 consistently across artifacts.
 
@@ -162,7 +162,7 @@ After fixes, re-run the affected perspective. If a perspective still
 fails after three passes, escalate to manual review (a fourth
 pass would indicate either structural issue or fix loop).
 
-### Step 3: Compose COMPLETENESS_REPORT.md
+### Step 3: Compose VERIFICATION_REPORT.md
 
 Use the template. Sections:
 
@@ -244,7 +244,7 @@ Refuse if:
 - [ ] Findings classified by severity
 - [ ] CRITICAL items addressed or explicitly acknowledged
 - [ ] Up to 3 fix-as-you-go passes completed
-- [ ] `COMPLETENESS_REPORT.md` written from template
+- [ ] `VERIFICATION_REPORT.md` written from template
 - [ ] Verdict: PASS or GAPS_FOUND
 - [ ] Closing summary delivered to founder
 - [ ] Journal entry written

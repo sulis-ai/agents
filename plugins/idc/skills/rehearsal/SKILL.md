@@ -3,7 +3,7 @@ name: rehearsal
 description: >
   Phase 9 of the Investor Deck Coach. Times the founder against the Sequoia
   5/15/30 arc, runs 8–10 in-character mock investor questions drawn from
-  ADVERSARIAL_REPORT.md, scores answer strength (Strong/Medium/Weak/Evaded),
+  ADVERSARIAL_REVIEW.md, scores answer strength (Strong/Medium/Weak/Evaded),
   and produces REHEARSAL_NOTES.md with timing breakdown, transcript, and
   weak-answer drill list. Agent-proposed at the end of /idc:build-deck.
 user_invocable: true
@@ -44,7 +44,7 @@ Confirm the rehearsal scenario:
 
 Default is mock partner meeting. Adjust timing targets accordingly.
 
-Record the mode in `EXPLORATION_JOURNAL.md`.
+Record the mode in `journal/{YYYY-MM-DD}-{topic}.md`.
 
 ### Step 2: Time the walkthrough
 
@@ -72,7 +72,7 @@ After the walkthrough, the agent switches into investor character for
 - Sceptical angel (founder-focused, defensibility-focused)
 - Domain-expert LP (regulatory, technical, scale-of-outcome focused)
 
-Questions come from `ADVERSARIAL_REPORT.md`'s top-10 list, asked in
+Questions come from `ADVERSARIAL_REVIEW.md`'s top-10 list, asked in
 the appropriate character's voice. The founder answers; the agent
 scores:
 

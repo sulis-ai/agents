@@ -21,22 +21,36 @@ The plugin runs a guided, one-question-at-a-time facilitation across nine phases
 
 ## Deliverables
 
-Written to `.pitch/{project}/` in the user's repository:
+Written to `.pitch/{project}/` in the user's repository. As of v0.4 the
+layout uses numbered phase folders and adds three investor-facing HTML
+pages at root.
+
+### Root — founder + investor-facing
 
 | File | Purpose |
 |---|---|
-| `deck/PITCH_DECK.pptx` | Microsoft PowerPoint deck, branded |
-| `deck/PITCH_DECK.html` | Reveal.js HTML deck, branded |
-| `financial/financial-model.xlsx` | Working Excel model |
-| `financial/financial-summary.html` | Branded interactive dashboard |
-| `BRAND.md` + `brand-assets/` | Customer brand (extracted or proposed) |
-| `MARKET_RESEARCH.md` + `sources/` + `proof-points/` | Evidence dossier |
-| `ADVERSARIAL_REPORT.md` | Investor objections and mitigation |
-| `REHEARSAL_NOTES.md` | Timing and Q&A drill output |
-| `COMPLETENESS_REPORT.md` | Pre-handoff verification |
+| `PITCH.html` | **Long-form scrollable web pitch** for DocSend-style sharing. Distinct from the presenter deck. |
+| `FINANCIALS.html` | **Investor-facing financial summary** page (clean, focused). Distinct from the internal phase-3 dashboard. |
+| `REVIEW.html` | **Investor-facing adversarial-review summary** page. Distinct from the working `ADVERSARIAL_REVIEW.md`. |
+| `PITCH.yaml` | Project metadata, stage, ask. |
+| `BRAND.md` + `brand-assets/` | Customer brand (extracted or proposed); tokens drive every visual deliverable. |
+| `DISCOVERY.md` | Founder + company context. |
+| `GLOSSARY.md` | Locked vocabulary. |
+| `journal/YYYY-MM-DD-{topic}.md` | Multi-file facilitation record (one file per session/topic, not a single rolling file). |
 
-Every numerical claim in any artifact is traceable to a proof-point, and every
-proof-point to a tiered source.
+### Phase folders — working artifacts
+
+| Folder | Contents |
+|---|---|
+| `02-research/` | `MARKET_RESEARCH.md` + `sources/` + `proof-points/` — evidence dossier with tiered sources. |
+| `03-financials/` | `MODEL.yaml` (source of truth) + `MODEL.xlsx` (Excel) + `DASHBOARD.html` (internal dashboard) + `FINANCIAL_SUMMARY.md`. |
+| `04-narrative/` | `NARRATIVE.md` + `slides/NN-*.md` + `DECK.pptx` (PowerPoint) + `DECK.html` (Reveal.js presenter deck) + `speaker-notes.md`. |
+| `05-adversarial/` | `ADVERSARIAL_REVIEW.md` — investor objections and mitigation paths. |
+| `06-verification/` | `VERIFICATION_REPORT.md` + `REHEARSAL_NOTES.md`. |
+
+Every numerical claim in any artifact is traceable to a proof-point in
+`02-research/proof-points/`, and every proof-point to a tiered source in
+`02-research/sources/`.
 
 ## Stage-awareness
 
@@ -55,13 +69,13 @@ The plugin adapts to the funding stage captured in `PITCH.yaml`:
 |---|---|---|
 | `/idc:discovery` | 1–2 | `DISCOVERY.md`, `PITCH.yaml` |
 | `/idc:brand-discovery` | 3 | `BRAND.md`, `brand-assets/` |
-| `/idc:market-research` | 4 | `MARKET_RESEARCH.md`, `sources/`, `proof-points/` |
-| `/idc:financial-model` | 5 | `financial/*.{yaml,xlsx,html}` |
-| `/idc:narrative` | 6 | `NARRATIVE.md`, `slides/*.md` |
-| `/idc:adversarial-review` | 7 | `ADVERSARIAL_REPORT.md` |
-| `/idc:build-deck` | 8 | `deck/PITCH_DECK.{pptx,html}` |
-| `/idc:rehearsal` | 9 | `REHEARSAL_NOTES.md` |
-| `/idc:validate` | post-9 | `COMPLETENESS_REPORT.md` |
+| `/idc:market-research` | 4 | `02-research/MARKET_RESEARCH.md`, `sources/`, `proof-points/` |
+| `/idc:financial-model` | 5 | `03-financials/MODEL.{yaml,xlsx}`, `03-financials/DASHBOARD.html` |
+| `/idc:narrative` | 6 | `04-narrative/NARRATIVE.md`, `04-narrative/slides/*.md` |
+| `/idc:adversarial-review` | 7 | `05-adversarial/ADVERSARIAL_REVIEW.md` |
+| `/idc:build-deck` | 8 | `04-narrative/DECK.{pptx,html}` + `PITCH.html` + `FINANCIALS.html` + `REVIEW.html` |
+| `/idc:rehearsal` | 9 | `06-verification/REHEARSAL_NOTES.md` |
+| `/idc:validate` | post-9 | `06-verification/VERIFICATION_REPORT.md` |
 
 ## Reference standards
 

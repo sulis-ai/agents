@@ -162,15 +162,15 @@ Invoke the build scripts:
 
 ```bash
 python3 scripts/build_xlsx.py \
-    .pitch/{slug}/financial/financial-model.yaml \
-    .pitch/{slug}/financial/financial-model.xlsx
+    .pitch/{slug}/03-financials/MODEL.yaml \
+    .pitch/{slug}/03-financials/MODEL.xlsx
 ```
 
 ```bash
 python3 scripts/build_finance_html.py \
-    .pitch/{slug}/financial/financial-model.yaml \
+    .pitch/{slug}/03-financials/MODEL.yaml \
     .pitch/{slug}/brand-assets/tokens.css \
-    .pitch/{slug}/financial/financial-summary.html
+    .pitch/{slug}/03-financials/DASHBOARD.html
 ```
 
 Verify outputs render correctly. If a render fails, surface the error
