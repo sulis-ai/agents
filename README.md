@@ -57,7 +57,7 @@ Or add to your settings.json:
 
 ```bash
 git clone https://github.com/sulis-ai/agents.git
-claude --plugin-dir ./standards/plugins/sulis-strategy
+claude --plugin-dir ./agents/plugins/sulis-strategy
 ```
 
 ## Architecture
