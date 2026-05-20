@@ -1,29 +1,43 @@
 ---
 name: code-review
 description: >
-  Use when reviewing a pull request, branch, or commit range. Runs three
-  reviews in one pass — architectural (Form / Armor / Proof gaps),
-  security (secrets, injection, dependency CVEs, headers), and general code
-  quality — then merges findings into a single report under
-  `.architecture/{project}/code-reviews/`. Draft fixes are emitted as
-  Hardening Deltas the author can hand to `/sea:harden` to implement.
-  Does not block merge — it advises.
+  Use when reviewing a pull request, branch, or commit range. Implements the
+  Code Review Standard (CR-01..CR-08) at
+  `../../references/code-review-standard.md`. Runs a mandatory mechanical
+  baseline (typecheck + lint) before any lens runs (CR-01), then dispatches
+  three lenses in parallel — architectural (Form / Armor / Proof gaps),
+  security (the diff-scoped viability assessment), and general code quality
+  with procedural checks (CR-02, CR-07). Reads every changed file >50 lines
+  end-to-end (CR-03). Findings cite file:line + quoted text (CR-04). Severity
+  is rubric-driven (CR-05) and verdict is computed with auto-downgrade rules
+  (CR-06). Self-attestation in the report's Methodology section (CR-08).
+  Outputs a single merged report at `.architecture/{project}/code-reviews/`
+  plus draft Hardening Deltas. Advisory only — never posts to the PR, never
+  sets status checks, never blocks merge.
 ---
 
-# Code Review — Three Lenses, One Report
+# Code Review — Three Lenses, Mechanical Floor, One Report
 
-When invoked, take a target (PR number, branch ref, or commit range) and run
-**three reviews in parallel**:
+This skill is the implementation of the **Code Review Standard** at
+[`../../references/code-review-standard.md`](../../references/code-review-standard.md).
+Every workflow step below traces to one or more CR-01..CR-08 rules. Read the
+standard first — it defines what a complete code-review report must
+contain, how findings must be evidenced, how severity and verdict are
+assigned, and how the reviewing agent attests to its own coverage.
 
-1. **Architectural** — Form / Armor / Proof gaps the changes introduce or expose.
-2. **Security** — the relevant subset of the 25-primitive viability assessment, scoped to the diff.
-3. **General quality** — code correctness, readability, test coverage on the diff itself.
+When invoked, take a target (PR number, branch ref, or commit range) and
+produce:
 
-Merge the findings into a single report at
-`.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DD}.md` and draft
-Hardening Deltas for the fixes. Do **not** post comments on the PR, do **not**
-set status checks, do **not** block merge. The report is advisory — the author
-or reviewer decides what to act on.
+1. A merged report at `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DD}.md`
+   that satisfies CR-01..CR-08.
+2. Draft Hardening Deltas under `.architecture/{project}/hardening-deltas/`
+   for accepted findings, with `source: code-review:PR-NNN` and
+   `lens: architecture | security | quality`.
+3. A short conversational summary of the top findings — strip internal IDs,
+   speak founder English (FE-01..FE-11).
+
+Do **not** post comments on the PR, do **not** set status checks, do **not**
+block merge. The report is advisory.
 
 ---
 
@@ -50,14 +64,14 @@ If arguments are missing, ask the user — do not invent.
 
 ---
 
-## Scope
+## Scope — Two Rings
 
 You look at **two rings** of code:
 
 | Ring | What it covers | Why |
 |---|---|---|
-| **The changes** | Every line in the diff | Gaps the PR introduces directly — these are the ones the author can fix before merge. |
-| **The neighbours** | Code that calls into the changes, code the changes call into, modules sharing imports with changed files | Gaps the PR exposes by integrating with existing code — surfaced but never grounds to block merge. |
+| **The changes** | Every line in the diff | Gaps the PR introduces directly. Findings here carry full severity (CR-05). |
+| **The neighbours** | Code that calls into the changes, code the changes call into, modules sharing imports with changed files | Gaps the PR exposes by integrating with existing code. Findings here are downgraded one severity notch (CR-05); `low` neighbour findings are dropped. |
 
 You do **not** scan beyond the neighbours. If a neighbour finding points at a
 gap that pervades the codebase, surface it once with the note
@@ -66,7 +80,7 @@ list every site.
 
 **Neighbour cap: 20 files.** When the diff touches widely-imported utility
 code, the neighbour ring can explode. When it does, narrow to the 20 most
-strongly-coupled files and note the cap in the report's Methodology.
+strongly-coupled files and note the cap in Methodology.
 
 ---
 
@@ -90,7 +104,64 @@ git diff --name-only "$BASE...$HEAD" > "$WORK/changed-files.txt"
 git diff "$BASE...$HEAD" > "$WORK/diff.patch"
 ```
 
-### 2. Expand to neighbours
+Capture diff size (lines + file count) for the CR-02 carve-out decision.
+
+### 2. Mechanical baseline (CR-01 MUST — before any lens runs)
+
+Run the project's typechecker and linter on **both** `BASE` and `HEAD`,
+diff the outputs, surface PR-introduced errors. Detection commands per the
+CR-01 table:
+
+| Language signal | Commands to run |
+|---|---|
+| `tsconfig.json` exists | `npx tsc --noEmit` |
+| `.eslintrc*` exists | `npx eslint <changed-files>` |
+| `pyproject.toml` with mypy/pyright/ruff config | the configured one |
+| `go.mod` exists | `go build ./...` then `go vet ./...` |
+| `Cargo.toml` exists | `cargo check` |
+| `package.json` has `typecheck`/`lint` scripts | prefer those |
+
+Multiple language signals → run all applicable checks.
+
+```bash
+# BASE run
+git checkout "$BASE"
+$PROJECT_CHECK_CMD > "$WORK/typecheck-base.log" 2>&1 || true
+
+# HEAD run
+git checkout "$HEAD"
+$PROJECT_CHECK_CMD > "$WORK/typecheck-head.log" 2>&1 || true
+
+# Delta — only errors absent on BASE and present on HEAD are PR-introduced
+diff "$WORK/typecheck-base.log" "$WORK/typecheck-head.log" \
+  | grep '^> ' > "$WORK/typecheck-delta.log"
+```
+
+For monorepos with slow typecheckers, scope to the changed app/package
+(`tsc --noEmit -p apps/<changed-app>`) rather than the workspace root. Note
+the scope in Methodology.
+
+**If no check command is detectable**, record a coverage gap in Methodology
+with the reason. Do not skip silently. Per CR-01, the coverage-gap entry is
+the visible mark of an unverified mechanical floor.
+
+**Outcome.** Every PR-introduced error from `typecheck-delta.log` becomes a
+`critical (quality)` finding in the report's **Build Verification** section,
+which appears above all lens findings. Per CR-06, this section non-empty →
+verdict cannot be `PASS`.
+
+### 3. Decide the dispatch shape (CR-02 MUST)
+
+| Diff size | Dispatch shape |
+|---|---|
+| ≤200 lines **AND** ≤5 files | Single-reader pass permitted. Record in Methodology: *"Single-reader pass justified by diff size: N lines, M files."* |
+| >200 lines **OR** >5 files | **Parallel dispatch required.** No exceptions. Reading the diff yourself in place of dispatching is forbidden. |
+
+The carve-out is a size limit, not a budget choice. Above the threshold, the
+agent **must** dispatch the three lenses concurrently as sub-agents via the
+Agent tool — it cannot decline.
+
+### 4. Expand to neighbours
 
 For each changed file, find direct callers and callees of the symbols the
 diff touched. Tools, in order of preference:
@@ -101,18 +172,23 @@ diff touched. Tools, in order of preference:
 | `gh pr diff` + `git grep` | Fast string-based caller scan when ast-grep is unavailable |
 | Probe output at `.architecture/{project}/CODE_INTELLIGENCE.html` | Pre-computed import graph; avoid recomputing |
 
-Cap at 20 files. Record the expansion in the report.
+Cap at 20 files. Record the expansion (which files, which excluded, why) in
+Methodology.
 
-### 3. Run the three reviews in parallel
+### 5. Run the three lenses (CR-07 MUST produce structured output per lens)
 
-Use the Agent tool to dispatch three reviewers concurrently against the
-resolved diff + neighbour set. Each returns a list of findings.
+Each lens reads every changed file >50 lines **end-to-end** (CR-03 — sampling
+forbidden). Each lens produces structured output before claiming "complete";
+a lens that surfaced no findings emits an explicit *"nothing surfaced. Checks
+run: …"* entry — never silence.
 
-#### Architectural review (Form / Armor / Proof)
+#### Architecture lens
 
 Apply the gap-type checklist from
-[`../codebase-audit/SKILL.md`](../codebase-audit/SKILL.md). Most relevant
-to a PR:
+[`../codebase-audit/SKILL.md`](../codebase-audit/SKILL.md). Each finding is
+tagged with the HD-02 gap type from `references/hardening-deltas.md`
+(`dependency-direction`, `timeout`, `circuit-breaker`, `secrets`,
+`observability`, `contract-test`, etc.). Most relevant to a PR:
 
 **Structure (Form)**
 - New code that imports from `infrastructure/`, `db/`, `http/` into domain
@@ -137,89 +213,156 @@ to a PR:
 - New integration tests using mocks instead of real adapters/testcontainers
 - New resiliency primitives (CB, timeout, retry) with no chaos test
 
-#### Security review (diff-scoped viability assessment)
+**Completion output:** list of findings tagged with HD-02 gap type, OR
+explicit *"Architecture lens: nothing surfaced. Checks run: …"*.
+
+#### Security lens (CR-07 — must produce structured output)
 
 Invoke `/sulis-security:codebase-assess` in "Quick" mode — Cycle 1 + Cycle 2
-only, scoped to the diff. Focus categories: **SEC** (access control, auth,
-injection, validation, XSS, SSRF, secrets exposure) and **SC** (dependency
-CVEs). Other categories run if signals are present in the diff (e.g. new
-Dockerfile → INF-01; new logging call → DAT-03).
+only, scoped to the diff plus neighbour ring. Findings against the 25
+primitives at `plugins/sulis-security/skills/codebase-assess/references/primitives.md`,
+filtered to those applicable.
 
-Pass `--scope=diff` semantics by limiting Gitleaks / Semgrep / Trivy to the
-changed file paths plus the neighbour ring.
+Focus categories: **SEC** (access control, auth, injection, validation, XSS,
+SSRF, secrets exposure) and **SC** (dependency CVEs). Other categories run
+if signals are present in the diff (new Dockerfile → INF-01; new logging
+call → DAT-03).
 
-#### General quality review
+**Completion output:** list of findings keyed by primitive ID, OR explicit
+*"Security lens: nothing surfaced. Primitives checked: SEC-01..07, SC-01..04, INF-04. Scanners run: Gitleaks, Semgrep, Trivy."*.
 
-Built-in code review concerns scoped to the diff:
+#### Quality lens (CR-07 — must produce all six outputs)
 
-- Correctness — obvious bugs in changed lines
-- Readability — naming, complexity, comment quality
-- Test coverage — does the diff include tests for new behaviour?
-- Style consistency with surrounding code
-- Dead code, unused imports, TODO/FIXME density introduced
+Runs after the CR-01 mechanical baseline. Reads every changed file
+end-to-end (CR-03). Produces **all** of:
 
-This lens is intentionally lighter-weight than the architectural and
-security lenses — it's checking the *changes themselves*, not the system.
+1. **Build Verification follow-up.** For every CR-01 finding, a translated
+   entry with file:line, quoted text, recommended fix. Don't restate raw
+   typecheck output.
+2. **JSX / template identifier scan.** For every TSX/JSX/Vue/Svelte file
+   in the diff, grep for `{identifier}` and `${identifier}` patterns
+   introduced by the diff; verify each identifier is in lexical scope.
+   Save to `$WORK/jsx-ident-scan.log`. Catches the PR-168 class of bug
+   (`hasMore` referenced in JSX but never declared) regardless of TS
+   strictness.
 
-### 4. Score severity
+   ```bash
+   for f in $(grep -lE '\.(tsx|jsx|vue|svelte)$' "$WORK/changed-files.txt"); do
+     # Extract identifier references the diff introduced
+     git diff "$BASE...$HEAD" -- "$f" \
+       | grep '^+' \
+       | grep -oE '\{[a-zA-Z_][a-zA-Z0-9_]*\}|\$\{[a-zA-Z_][a-zA-Z0-9_]*\}' \
+       >> "$WORK/jsx-ident-scan.log"
+   done
+   # Then verify each identifier resolves in the file's lexical scope.
+   ```
 
-Same rubric across all three lenses:
+3. **Dead-surface findings.** Unused props/state/exports, unreferenced
+   imports, JSDoc contracts the code doesn't honour.
+4. **Contract-drift findings.** Enum/union values the implementation never
+   emits, DTO fields the service never sets, response shapes whose consumer
+   assumes more than the producer provides.
+5. **Test-coverage observation.** Does the diff include tests for new
+   behaviour? A source-only diff with no tests is a finding.
+6. **Style / readability** — naming, complexity, comments, TODO/FIXME
+   density. Lowest priority; come last. May be empty without blocking
+   completion.
 
-- `critical` — security flaw exploitable now, or correctness bug that breaks production
-- `high` — production incident probable within 90 days
-- `medium` — operational pain or test gap
-- `low` — drift that has not yet caused failure
+A quality lens missing any of items 1–5 is **incomplete** — return to the
+step that produced the gap.
 
-Findings in **the changes** can be any severity. Findings in **the neighbours**
-are downgraded one notch (a neighbour `critical` becomes `high` in the report)
-because the PR didn't introduce them — it exposed them.
+### 6. Score severity (CR-05 MUST — objective conditions, not vibes)
 
-### 5. Merge findings
+Severity by condition, not vibes:
 
-Deduplicate across the three lenses — a hardcoded secret in the diff will be
-flagged by both the security and architectural lenses. Keep one entry; cite
-both lenses as evidence sources.
+| Severity | Triggering conditions (any one is sufficient) |
+|---|---|
+| **critical** | Exploitable security flaw now (hardcoded production credential, missing authz on data-mutating endpoint, injection vector). OR correctness bug breaks production (build/typecheck error, runtime crash on golden-path render, data corruption). |
+| **high** | Production incident probable within 90 days (unbounded external call on hot path, missing circuit breaker on payment provider, race condition under documented load). |
+| **medium** | Operational pain or test gap (missing observability on handler, mock-based integration test, dead surface, contract drift). |
+| **low** | Drift that has not yet caused failure (naming, complexity in non-hot code, comments, TODO density). |
 
-### 6. Draft Hardening Deltas
+**Ring downgrade.** Findings in the diff carry full severity. Findings in
+the neighbour ring are downgraded one notch (neighbour `critical` →
+`high`); neighbour `low` is dropped entirely.
 
-One logical change per delta file under
-`.architecture/{project}/hardening-deltas/`. Mark provenance:
+Do not inflate severity to drive attention. `medium` is real.
+
+### 7. Merge findings across lenses
+
+Deduplicate — a hardcoded secret will surface in both security and
+architecture lenses. Keep one entry; cite all lenses as evidence sources in
+the finding's `lens:` field (e.g., `lens: security + architecture`).
+
+### 8. Compute the verdict (CR-06 MUST — agent cannot override)
+
+Verdict is **computed**, not chosen:
+
+| Verdict | Conditions |
+|---|---|
+| **PASS** | No critical/high in diff AND Build Verification empty AND every file >50 lines was read end-to-end AND all three lenses produced output. |
+| **Approve with fixes** | Only medium/low in diff. No merge-blockers. All CR-01/03/07 floors satisfied. |
+| **Request changes** | At least one `high` in the diff. |
+| **Block** | At least one `critical` in the diff, OR Build Verification non-empty, OR any file >50 lines not read end-to-end. |
+
+**Auto-downgrade rules — agent cannot override:**
+
+1. Build Verification non-empty → minimum verdict `Block`.
+2. Any file >50 lines not read end-to-end → minimum verdict `Request changes`.
+3. Any lens produced no output (literal silence, not "nothing surfaced") →
+   minimum verdict `Request changes`.
+
+### 9. Self-attestation (CR-08 MUST — before report write)
+
+Write the Methodology section with the CR-01..CR-07 checklist before
+proceeding to the report body. Each box is `[✓]`, `[✗]`, or `[—]` with a
+one-line reason.
+
+If any box claims `[✓]` without a reason, the report is malformed —
+regenerate.
+
+If any box is `[✗]`, the corresponding verdict downgrade per CR-06 applies.
+
+### 10. Draft Hardening Deltas
+
+One logical change per delta under `.architecture/{project}/hardening-deltas/`.
+Provenance:
 
 ```yaml
 source: code-review:PR-142
-lens: security        # or "architecture" or "quality"
+lens: security                # or "architecture" or "quality" or "security + architecture"
 ```
 
-Each delta references a failing characterisation test that proves the gap.
-If you cannot construct that test, drop the delta — theoretical gaps belong
-in the report's "Watch List" section, not in the delta queue.
+Per CR-04, each delta references a failing characterisation test. If you
+cannot construct it, drop the delta — theoretical gaps belong in the
+report's **Watch List**, not in the delta queue.
 
-### 7. Write the report
+### 11. Cross-reference sibling artifacts
 
-See structure below.
+- `.security/{project}/viability-report-*.md` from prior
+  `sulis-security:codebase-assess` runs → cite findings instead of restating.
+- `.architecture/{project}/hardening-deltas/` accepted deltas → cite existing
+  delta ID instead of drafting a duplicate.
 
-### 8. Cross-reference siblings
+### 12. Write the report
 
-- If `.security/{project}/viability-report-*.md` exists from a prior
-  `sulis-security:codebase-assess` run, cite findings instead of restating.
-- If `.architecture/{project}/hardening-deltas/` already has accepted deltas
-  covering findings in this PR, cite the existing delta ID instead of
-  drafting a duplicate.
+See structure below. Methodology section appears with the CR-08
+self-attestation checklist filled in.
 
-### 9. Summarise to the user
+### 13. Summarise to the user (FE-01..FE-11 MUST)
 
-Walk through the top 3-5 findings conversationally — **not** the full report.
-The report is the persistent artifact; the conversation is for the human to
-understand what matters.
+Walk through the top 3-5 findings conversationally — **not** the full
+report. The report is the persistent artifact; the conversation is for
+the human to understand what matters.
 
 In the summary:
-- Strip internal IDs (HD-NNN, Form/Armor/Proof, SEC-NN, etc.)
-- Use plain language: "structure", "resilience", "verification" — or just
-  describe the gap directly
+- Strip internal IDs (HD-NNN, CR-NN, Form/Armor/Proof, SEC-NN, etc.).
+- Use plain language. Translate "MECE-3 Armor gap" → "missing timeout";
+  translate "CR-01 finding" → "the compiler caught X".
 - Lead with the merge-blocking findings (if any), then exposures, then
-  hygiene
-- End with: *"Report at `.architecture/{project}/code-reviews/...`. {N}
-  draft fixes ready. Hand to `/sea:harden` to implement."*
+  hygiene.
+- End with: *"Report at `.architecture/{project}/code-reviews/...`. Verdict:
+  {verdict}. {N} draft fixes ready. Hand to `/sea:harden` to implement."*
 
 ---
 
@@ -234,14 +377,14 @@ Write to `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DD}.md`.
 > **Author:** {author}
 > **Base:** {baseRef} → **Head:** {headRef}
 > **Files changed:** N (+ N neighbours)
-> **Lenses run:** architecture, security, quality
+> **Verdict:** {Block / Request changes / Approve with fixes / PASS}
 
 ## Summary
 
+- **Build Verification:** {N} PR-introduced errors (CR-01)
 - **In the changes:** {N} findings ({N} critical, {N} high, {N} medium, {N} low)
-- **In the neighbours:** {N} findings (all downgraded by one severity)
+- **In the neighbours:** {N} findings (downgraded one severity per CR-05)
 - **Draft fixes:** {N}
-- **Suggested action:** {Block / Request changes / Approve with fixes / Approve}
 
 | Lens | In changes | In neighbours | Top concern |
 |---|---|---|---|
@@ -249,29 +392,38 @@ Write to `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DD}.md`.
 | Security | N | N | Hardcoded Stripe key in `src/config/...` |
 | Quality | N | N | New handler missing tests |
 
-## Findings in the Changes
+## Build Verification (CR-01)
 
-{Critical and high first. Each finding has file:line, evidence, recommendation, draft delta ID, originating lens.}
+{Each PR-introduced typecheck/lint error becomes a critical (quality) finding here. File:line, quoted error, recommended fix. Empty section shows "No PR-introduced errors detected. Commands run: <list>."}
 
-### `src/payments/stripe-client.ts:42` — high (architecture)
+### `apps/dashboard/app/coupons/page.tsx:264` — critical (quality)
 
-**Gap:** New `fetch(stripeUrl)` call has no timeout, no retry policy, no circuit breaker.
+**Error:** `TS2304: Cannot find name 'hasMore'.`
 
-**Why it matters:** Stripe outages happen. An unbounded fetch blocks the request thread for ~75s on Linux, starving the request pool.
+**Quoted text:**
+```typescript
+{loading ? "Loading..." : `${codes.length}${hasMore ? "+" : ""} code${codes.length === 1 ? "" : "s"} shown`}
+```
 
-**Recommendation:** Wrap in the project's existing resilience policy at `src/lib/http-client.ts`.
+**Why it matters:** `hasMore` is a type-annotation field on the response shape (line 113), never destructured or stored in state. Build fails under `--strict`; runtime throws `ReferenceError` on every render.
 
-**Draft fix:** HD-018 — "Add timeout + circuit breaker to Stripe client"
+**Recommendation:** Destructure `hasMore` from the response and store in state alongside `codes` and `total`.
+
+**Draft fix:** HD-019 — "Declare hasMore as runtime variable in coupons page"
 
 ---
 
+## Findings in the Changes
+
+{Critical and high first. Each finding: file:line, quoted text, recommendation, draft delta ID, lens.}
+
 ## Findings in the Neighbours
 
-{Pre-existing gaps the PR touched but didn't introduce. Downgraded severity. No draft deltas — listed for awareness.}
+{Pre-existing gaps the PR touched but didn't introduce. Downgraded severity per CR-05. No draft deltas — listed for awareness.}
 
 ## Watch List
 
-{Theoretical gaps with no failing-test grounding. No deltas. Just notes.}
+{Theoretical gaps with no failing-test grounding (CR-04 incomplete). No deltas. Just notes.}
 
 ## Cross-Reference
 
@@ -281,46 +433,91 @@ Write to `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DD}.md`.
 
 ## Methodology
 
+### Code Review Standard self-attestation (CR-08)
+
+- [✓] **CR-01 Mechanical baseline ran.** Commands: `npx tsc --noEmit -p apps/dashboard`; `npx eslint <changed>`. Base: 0 errors. Head: 1 new error (see Build Verification). Coverage gap: none.
+- [✓] **CR-02 Parallel dispatch used.** Three lenses dispatched concurrently. Diff: {N} lines / {N} files ({above carve-out threshold | within carve-out — single-reader justified}).
+- [✓] **CR-03 Full-file reads.** All {N} changed files >50 lines read end-to-end. Unread files: none.
+- [✓] **CR-04 Evidence discipline.** All findings cite file:line and quoted text.
+- [✓] **CR-05 Severity rubric.** Applied. {N} critical, {N} high, {N} medium, {N} low.
+- [✓] **CR-06 Verdict computed.** Verdict: {value}. Auto-downgrade triggers: {list any that fired, e.g. "CR-01 Build Verification non-empty → minimum Block"}.
+- [✓] **CR-07 Lens completion.** Architecture: {N} findings + scan log. Security: {N findings | "nothing surfaced"} + scan log. Quality: {N findings} + jsx-ident-scan.log + dead-surface + contract-drift + test-coverage observation.
+
+### Run details
+
 - **Diff source:** {gh pr / git diff range}
 - **Neighbour expansion:** {ast-grep | git grep | probe output}
 - **Neighbour cap:** {N of N considered, N excluded due to 20-file cap}
-- **Tools run:** {gitleaks, trivy, semgrep, ...}
-- **Tools unavailable:** {list — explains coverage gaps}
-- **Lenses run in parallel:** yes ({wall-clock seconds})
+- **Scanners run:** {gitleaks, trivy, semgrep, ...}
+- **Scanners unavailable:** {list — explains coverage gaps}
+- **Lenses dispatched in parallel:** yes ({wall-clock seconds})
 ```
 
 ---
 
 ## Depth modes
 
-- **Quick** ("smoke check before approve") — changes only (no neighbour ring), severity `high`+ only, architectural + security lenses only. ~5 minutes.
-- **Standard** (default) — changes + neighbours (20-file cap), all severities, all three lenses, draft fixes.
-- **Deep** ("this PR touches load-bearing code") — changes + neighbours (no cap), all three lenses, recommend full `/sea:codebase-audit` afterwards.
+- **Quick** ("smoke check before approve") — CR-01 mechanical baseline + architecture + security lenses only, severity `high`+ only. CR-02 carve-out path. ~5 minutes.
+- **Standard** (default) — full CR-01..CR-08 compliance, all three lenses, all severities, draft fixes.
+- **Deep** ("this PR touches load-bearing code") — Standard + no neighbour cap, recommend full `/sea:codebase-audit` afterwards.
 
 ---
 
 ## Composition
 
-- **With `/sulis-security:codebase-assess`** — `/code-review` invokes it in Quick mode internally. If a full security audit already exists, cite findings instead of re-running.
-- **With `/sea:harden`** — the draft fixes this skill produces are handed to `/sea:harden` if the user accepts them. Provenance preserved via `source: code-review:PR-NNN`.
-- **With `/sea:codebase-audit`** — when neighbour-ring patterns suggest a broader gap, recommend the full audit. Don't try to do its job.
+- **With the Code Review Standard** — every workflow step traces to a
+  CR-NN rule. When the standard changes, this skill changes with it.
+- **With `/sulis-security:codebase-assess`** — invoked in Quick mode internally
+  for the security lens. If a full security audit already exists in
+  `.security/{project}/`, cite it instead of re-running.
+- **With `/sea:harden`** — draft fixes produced here are handed to
+  `/sea:harden` if accepted. Provenance preserved via
+  `source: code-review:PR-NNN`.
+- **With `/sea:codebase-audit`** — when neighbour-ring patterns suggest a
+  broader gap, recommend the full audit. Don't try to do its job.
 
 ---
 
 ## Gotchas
 
-- **No auto-blocking.** This skill never sets a status check, never posts to the PR, never enforces. It reports. Branch protection and human reviewers own the gate.
-- **Neighbour findings never block.** A finding in pre-existing code the PR merely touched isn't grounds to block merge. Surface it as exposure, not as introduction.
-- **One-hop can explode on utility changes.** When a PR touches `lib/logger.ts` or similar, every file is a neighbour. The 20-file cap exists for this reason — narrow to highest-coupling files and note the cap explicitly.
-- **Severity is operational, not aesthetic.** Don't inflate findings to drive attention. `medium` is real; not every PR finding is `high`.
-- **Test discipline still applies.** A draft fix without a failing characterisation test is theoretical. Drop it to the Watch List.
-- **Speak plain in the summary.** The PR author may not be the architect. Strip internal IDs. Translate "MECE-3 Armor gap" to "missing timeout"; translate "SEC-07 finding" to "API key exposed in code".
-- **Don't double-count across lenses.** A hardcoded secret will be flagged by both security and architecture. Merge into one finding; cite both lenses as evidence.
+- **CR-01 is non-negotiable.** Skipping the mechanical baseline because
+  "the agent already read the file" is the failure mode this skill exists
+  to prevent. The cheapest tooling has to run first; agent judgement sits
+  on top of it.
+- **CR-02 carve-out is a size limit, not a budget.** Above 200 lines or 5
+  files, parallel dispatch is required. Single-reader is forbidden even
+  if the agent feels confident.
+- **CR-03 forbids sampling.** Reading lines 1-100 of a 344-line file is
+  not coverage. Per CR-06 auto-downgrade, the verdict cannot be PASS if
+  any file >50 lines was sampled.
+- **CR-06 verdict is computed, not chosen.** The agent declares findings;
+  the verdict follows from the findings + the auto-downgrade rules. The
+  agent cannot say "looks fine" when the compiler disagrees.
+- **CR-08 self-attestation cannot be silent.** A report missing the
+  Methodology checklist is malformed. Regenerate.
+- **No PR comments, no status checks, no auto-blocking.** The skill never
+  posts to the PR, never sets status, never enforces. Branch protection
+  and human reviewers own the gate.
+- **Neighbour findings never block.** A finding in pre-existing code the
+  PR merely touched isn't grounds to block merge. Surface as exposure,
+  not as introduction.
+- **One-hop can explode on utility changes.** When a PR touches
+  `lib/logger.ts` or similar, every file is a neighbour. The 20-file cap
+  exists for this reason — narrow to highest-coupling files and note the
+  cap in Methodology.
+- **Founder English on the conversational summary.** Strip internal IDs.
+  Translate `CR-NN`, `HD-NNN`, `MECE-3`, `Form/Armor/Proof` to plain
+  language for the chat surface; the report Methodology section is for
+  the technical reader and may carry the rule IDs verbatim.
+- **Test discipline applies to draft fixes.** A delta without a failing
+  characterisation test is theoretical. Move to Watch List, drop from
+  the delta queue.
 
 ---
 
 ## See Also
 
+- [`../../references/code-review-standard.md`](../../references/code-review-standard.md) — **the standard this skill implements** (CR-01..CR-08, anchor cases, calibration)
 - [`../codebase-audit/SKILL.md`](../codebase-audit/SKILL.md) — full-repo architectural audit (same gap types, broader scope)
 - [`../harden/SKILL.md`](../harden/SKILL.md) — implementing accepted fixes
 - [`../../references/hardening-deltas.md`](../../references/hardening-deltas.md) — fix file format and `source:` field schema

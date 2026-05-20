@@ -47,7 +47,7 @@ claude --agent sea:engineering-architect --dangerously-skip-permissions
 | `/sea:harden` | Brownfield — implement accepted Hardening Deltas through the Red-Green-Blue cycle |
 | `/sea:decompose` | Break a TDD into atomic Work Packages with dependency graph and token-cost estimates |
 | `/sea:verify` | Run five-perspective completeness check; produce `COMPLETENESS_REPORT.md` |
-| `/code-review <PR\|branch\|range>` | PR-scoped review — runs architecture, security, and quality lenses in parallel; produces one merged report under `.architecture/{project}/code-reviews/` plus draft Hardening Deltas. Advisory only (no PR comments, no status checks, no auto-blocking). |
+| `/code-review <PR\|branch\|range>` | PR-scoped review implementing the Code Review Standard ([CR-01..CR-08](references/code-review-standard.md)). Runs a mandatory mechanical baseline (typecheck + lint) before any lens (CR-01); dispatches three lenses in parallel above the 200-line / 5-file carve-out (CR-02); reads every changed file >50 lines end-to-end (CR-03); computes verdict with auto-downgrade rules the agent cannot override (CR-06); self-attests in the report's Methodology (CR-08). Produces one merged report under `.architecture/{project}/code-reviews/` plus draft Hardening Deltas. Advisory only — no PR comments, no status checks, no auto-blocking. |
 
 ---
 
@@ -283,6 +283,7 @@ SEA makes.
 | [`references/boring-code.md`](references/boring-code.md) | The Green-stage code standard |
 | [`references/hardening-deltas.md`](references/hardening-deltas.md) | The brownfield delta format (OpenSpec-style) |
 | [`references/architecture-patterns.md`](references/architecture-patterns.md) | Catalogue of vetted architecture patterns |
+| [`references/code-review-standard.md`](references/code-review-standard.md) | The Code Review Standard (CR-01..CR-08) — mechanical baseline, parallel dispatch, full-file reads, evidence discipline, severity rubric, computed verdict with auto-downgrade, lens completion criteria, self-attestation |
 
 ---
 
