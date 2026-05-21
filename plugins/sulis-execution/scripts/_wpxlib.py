@@ -1403,3 +1403,294 @@ def write_train_run_record(record_path: Path, record: dict) -> None:
                 else:
                     lines.append(f"    {k}: {v}")
     record_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+# --- Phase 3: failure handling helpers ----------------------------------
+
+def flip_index_status_via_cli(
+    scripts_dir: Path,
+    paths: WpxPaths,
+    wp_id: str,
+    to_status: str,
+    expected: str | None = None,
+) -> tuple[bool, str]:
+    """Shell out to wpx-index flip-status. Returns (success, message).
+
+    Doesn't raise — the caller (failure-path code in wpx-train) wants
+    to keep going even if one INDEX flip fails. The error is returned
+    so the caller can surface it in the train BLOCKER record.
+    """
+    args = [
+        str(scripts_dir / "wpx-index"), "flip-status",
+        "--project", paths.project,
+        "--repo-root", str(paths.repo_root),
+        "--wp", wp_id,
+        "--to", to_status,
+    ]
+    if expected:
+        args.extend(["--expected", expected])
+    rc, out, err = _run(args, timeout=30)
+    if rc == 0:
+        return True, ""
+    return False, err or out or f"wpx-index flip-status rc={rc}"
+
+
+def write_wp_blocker_via_cli(
+    scripts_dir: Path,
+    paths: WpxPaths,
+    wp_id: str,
+    title: str,
+    observation: str,
+    root_cause: str,
+    plain_english: str,
+    suggested_next: str,
+    step: str = "Step 8 (train run)",
+    trigger: str = "wpx-train",
+) -> tuple[bool, str]:
+    """Shell out to wpx-blocker write. Returns (success, message)."""
+    args = [
+        str(scripts_dir / "wpx-blocker"), "write",
+        "--project", paths.project,
+        "--repo-root", str(paths.repo_root),
+        "--wp", wp_id,
+        "--title", title,
+        "--step", step,
+        "--trigger", trigger,
+        "--observation", observation,
+        "--root-cause", root_cause,
+        "--scope", "indeterminate",
+        "--scope-reason", "Identified by train failure-path; needs human triage",
+        "--plain-english", plain_english,
+        "--suggested-next", suggested_next,
+        "--force",
+    ]
+    rc, out, err = _run(args, timeout=30)
+    if rc == 0:
+        return True, ""
+    return False, err or out or f"wpx-blocker write rc={rc}"
+
+
+def write_train_blocker(
+    paths: WpxPaths,
+    train_id: str,
+    reason: str,
+    bundle: list[dict],
+    suspected_wp_id: str | None = None,
+    evidence: str = "",
+) -> Path:
+    """Write a train-level BLOCKER-train-{ts}.md.
+
+    Distinct from per-WP BLOCKER files: this records the train as a
+    whole, lists all bundled WPs and which (if any) was flagged as the
+    likely culprit by the file-overlap heuristic.
+    """
+    blocker_path = paths.wp_dir / f"BLOCKER-{train_id}.md"
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    lines = [
+        f"# BLOCKER-{train_id}",
+        "",
+        f"> Created: {now} by sulis-execution wpx-train",
+        f"> Scope: train run {train_id}",
+        f"> Reason: {reason}",
+        "",
+        "## What happened",
+        "",
+        reason,
+        "",
+        "## Bundled Work Packages",
+        "",
+        "| WP | Branch | Pre-train SHA | Merged? |",
+        "|---|---|---|---|",
+    ]
+    for entry in bundle:
+        merge_sha = entry.get("merge_sha_on_dev") or "—"
+        lines.append(
+            f"| {entry.get('wp', '?')} | {entry.get('branch', '?')} | "
+            f"{(entry.get('pre_train_sha') or '?')[:8]} | {merge_sha[:8] if merge_sha != '—' else '—'} |"
+        )
+
+    lines.extend(["", "## Suggested culprit (file-overlap heuristic)", ""])
+    if suspected_wp_id:
+        lines.append(f"**Most likely culprit: {suspected_wp_id}**")
+        lines.append("")
+        lines.append(
+            "The file-overlap heuristic compared each WP's changed-file set "
+            "to file names mentioned in the failure output. The WP with the "
+            "most overlap is named above. This is a starting point — verify "
+            "before holding the WP back from the next train."
+        )
+    else:
+        lines.append(
+            "The file-overlap heuristic could not identify a specific "
+            "culprit. Investigate each WP in the bundle individually."
+        )
+
+    if evidence:
+        lines.extend(["", "## Evidence", "", "```", evidence[:4000], "```"])
+
+    lines.extend([
+        "",
+        "## Plain-English summary (for the founder)",
+        "",
+        f"The train run {train_id} did not complete. {reason}. "
+        f"All {len(bundle)} WPs in the batch have been moved to "
+        f"`step-7-blocked` status. Investigate the suspected culprit "
+        f"first, then re-queue the rest for the next train.",
+        "",
+        "## Suggested next step",
+        "",
+        "1. Read the evidence above to confirm the suspected culprit",
+        "2. Investigate that WP's branch locally if needed",
+        "3. Flip its status back to `step-7-complete` (or fix and re-push) "
+        "when ready",
+        "4. The next `wpx-train run` will pick up the remaining WPs",
+        "",
+    ])
+    blocker_path.parent.mkdir(parents=True, exist_ok=True)
+    blocker_path.write_text("\n".join(lines), encoding="utf-8")
+    return blocker_path
+
+
+def compute_culprit_heuristic(
+    bundle: list[dict],
+    clone_dir: Path,
+    failure_text: str,
+) -> str | None:
+    """Best-effort: which WP in the bundle most likely caused the failure?
+
+    For each WP, lists files changed by its branch (via git diff against
+    its pre_train_sha base). Counts overlap with file names mentioned in
+    failure_text. The WP with the most overlap wins.
+
+    Returns the WP id, or None if no overlap detected.
+
+    This is heuristic — it's right often enough to save investigation
+    time; not right enough to auto-eject a WP silently. The train
+    BLOCKER surfaces it as a "suggested" culprit only.
+    """
+    if not bundle or not failure_text:
+        return None
+    best_wp: str | None = None
+    best_score = 0
+    for entry in bundle:
+        branch = entry.get("branch")
+        pre_sha = entry.get("pre_train_sha")
+        if not branch or not pre_sha:
+            continue
+        rc, out, _ = _run(
+            ["git", "diff", "--name-only", pre_sha, "HEAD"],
+            cwd=clone_dir, timeout=30,
+        )
+        if rc != 0:
+            continue
+        files = [f.strip() for f in out.splitlines() if f.strip()]
+        score = sum(1 for f in files if f and f in failure_text)
+        if score > best_score:
+            best_score = score
+            best_wp = entry.get("wp")
+    return best_wp
+
+
+def revert_train_on_dev(
+    repo: str,
+    clone_dir: Path,
+    bundle: list[dict],
+    reason: str,
+    train_id: str,
+) -> tuple[bool, str]:
+    """Revert all merged WPs in the bundle in reverse order, push to dev.
+
+    Produces a single wrapper commit
+    `revert(train-{ts}): rollback {WPs} — {reason}` on `dev`.
+
+    Returns (success, message). On failure, the caller should NOT
+    attempt branch restoration — investigate manually.
+    """
+    merged = [e for e in bundle if e.get("merge_sha_on_dev")]
+    if not merged:
+        return True, "no merged WPs to revert"
+
+    # Checkout dev, fetch latest
+    rc, _, err = _run(["git", "fetch", "origin", "dev"], cwd=clone_dir,
+                     timeout=60)
+    if rc != 0:
+        return False, f"git fetch dev failed: {err}"
+    rc, _, err = _run(["git", "checkout", "-B", "dev", "origin/dev"],
+                     cwd=clone_dir, timeout=30)
+    if rc != 0:
+        return False, f"git checkout dev failed: {err}"
+
+    # Revert each merge SHA in reverse order; --no-commit to stage all
+    # changes into a single wrapper commit
+    for entry in reversed(merged):
+        sha = entry["merge_sha_on_dev"]
+        rc, _, err = _run(
+            ["git", "revert", "--no-commit", "-m", "1", sha],
+            cwd=clone_dir, timeout=60,
+        )
+        if rc != 0:
+            # If it's not a merge commit (-m fails), try plain revert
+            rc, _, err = _run(["git", "revert", "--no-commit", sha],
+                             cwd=clone_dir, timeout=60)
+            if rc != 0:
+                return False, f"git revert {sha[:8]} failed: {err}"
+
+    wp_list = ", ".join(e.get("wp", "?") for e in merged)
+    msg = f"revert({train_id}): rollback {wp_list} — {reason}"
+    rc, _, err = _run(["git", "commit", "-m", msg], cwd=clone_dir, timeout=30)
+    if rc != 0:
+        return False, f"git commit (revert wrapper) failed: {err}"
+    rc, _, err = _run(["git", "push", "origin", "dev"], cwd=clone_dir,
+                     timeout=60)
+    if rc != 0:
+        return False, f"git push dev (revert) failed: {err}"
+    return True, f"reverted {len(merged)} merges under wrapper commit"
+
+
+def restore_branch_with_guard(
+    repo: str,
+    clone_dir: Path,
+    branch: str,
+    pre_train_sha: str,
+    rebased_to_sha: str,
+) -> tuple[bool, str]:
+    """Restore a branch to its pre_train_sha — but only if no new push happened.
+
+    Force-push guard: fetch origin/{branch}'s current SHA; if it matches
+    rebased_to_sha (what the train left), force-push pre_train_sha.
+    If it differs, the founder (or another agent) pushed in the
+    meantime — abort the restore with a warning.
+
+    Returns (success, message). Success=False with message="newer push"
+    is the guard firing; the caller surfaces this in the BLOCKER.
+    """
+    rc, _, err = _run(["git", "fetch", "origin", branch], cwd=clone_dir,
+                     timeout=60)
+    if rc != 0:
+        return False, f"git fetch {branch} failed: {err}"
+    rc, out, _ = _run(
+        ["git", "rev-parse", f"origin/{branch}"],
+        cwd=clone_dir, timeout=10,
+    )
+    if rc != 0:
+        return False, f"git rev-parse origin/{branch} failed"
+    current = out.strip()
+
+    if current != rebased_to_sha:
+        return False, (
+            f"newer push detected: origin/{branch} is at {current[:8]}, "
+            f"train left {rebased_to_sha[:8]}. Skipping force-reset to "
+            f"avoid overwriting unrelated work."
+        )
+
+    # Safe to restore
+    rc, _, err = _run(
+        ["git", "push", "--force-with-lease="
+         f"{branch}:{rebased_to_sha}",
+         "origin", f"+{pre_train_sha}:refs/heads/{branch}"],
+        cwd=clone_dir, timeout=60,
+    )
+    if rc != 0:
+        return False, f"git push --force-with-lease failed: {err}"
+    return True, "restored"

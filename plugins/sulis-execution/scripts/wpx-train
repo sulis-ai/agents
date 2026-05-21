@@ -52,12 +52,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+_SCRIPTS_DIR = Path(__file__).parent
+
 from _wpxlib import (  # noqa: E402
     CI_DEFAULT_CAP,
     CI_DEFAULT_INTERVAL,
     DEPLOY_DEFAULT_CAP,
     DEPLOY_DEFAULT_INTERVAL,
     HEALTH_DEFAULT_CAP,
+    TRAIN_BLOCKED_STATUS,
     EligibilityResult,
     TrainOverrides,
     WPRow,
@@ -74,18 +77,24 @@ from _wpxlib import (  # noqa: E402
     check_train_trigger,
     cli_main,
     clone_repo_to_temp,
+    compute_culprit_heuristic,
     emit_error,
     emit_internal_error,
     emit_ok,
     emit_result,
     find_eligible_branches,
+    flip_index_status_via_cli,
     pack_batches,
     parse_index_md,
     paths_from_args,
     read_overrides,
     rebase_branch_in_clone,
+    restore_branch_with_guard,
+    revert_train_on_dev,
     write_overrides,
+    write_train_blocker,
     write_train_run_record,
+    write_wp_blocker_via_cli,
 )
 
 
@@ -337,6 +346,69 @@ import shutil  # noqa: E402  (deferred to here to keep top-of-file imports clean
 import tempfile  # noqa: E402
 
 
+def _handle_post_merge_failure(
+    *,
+    record: dict,
+    bundle: list[dict],
+    reason: str,
+    clone_dir: Path,
+    repo: str,
+    paths,
+    train_id: str,
+    failure_text: str = "",
+) -> None:
+    """Revert the train + restore branches + write BLOCKER + flip statuses.
+
+    Called when deploy / health / smoke fails after merges have landed.
+    Emits the final result and exits (does not return).
+    """
+    _log(f"POST-MERGE FAILURE: {reason}. Reverting + restoring.")
+
+    # Revert the merges on dev (single wrapper commit)
+    revert_ok, revert_msg = revert_train_on_dev(
+        repo, clone_dir, bundle, reason, train_id,
+    )
+
+    # Restore each branch to its pre_train_sha (with force-push guard)
+    restore_log: list[dict] = []
+    for entry in bundle:
+        if not entry.get("merge_sha_on_dev"):
+            continue  # never merged; nothing to restore
+        ok, msg = restore_branch_with_guard(
+            repo, clone_dir,
+            entry["branch"],
+            entry["pre_train_sha"],
+            entry["rebased_to_sha"],
+        )
+        restore_log.append({
+            "wp": entry["wp"], "branch": entry["branch"],
+            "restored": ok, "detail": msg,
+        })
+
+    # Flip all bundled WPs to step-7-blocked
+    for entry in bundle:
+        flip_index_status_via_cli(
+            _SCRIPTS_DIR, paths, entry["wp"], TRAIN_BLOCKED_STATUS,
+        )
+
+    # Heuristic culprit + train BLOCKER
+    culprit = compute_culprit_heuristic(bundle, clone_dir, failure_text or reason)
+    train_blocker_path = write_train_blocker(
+        paths, train_id, reason, bundle,
+        suspected_wp_id=culprit,
+        evidence=failure_text or reason,
+    )
+
+    record["outcome"] = "blocker"
+    record["outcome_reason"] = reason
+    record["revert"] = {"ok": revert_ok, "detail": revert_msg}
+    record["restore_log"] = restore_log
+    record["train_blocker_path"] = str(train_blocker_path)
+    record["suspected_culprit"] = culprit
+    write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
+    emit_result(record, exit_code=1)
+
+
 def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestration)
     """Fire the train. Picks up eligible WPs, packs into batches, rebases,
     runs bundled-tip CI, sequential-merges to dev, one deploy/health/smoke.
@@ -399,14 +471,59 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
         clone_repo_to_temp(repo, clone_dir)
 
         # Step: rebase chain. Each branch is rebased onto the previous
-        # rebased branch's HEAD (sequential rebase). The last branch's
-        # HEAD is the bundle tip.
+        # rebased branch's HEAD (sequential rebase). If a branch's rebase
+        # conflicts, remove it from the batch, flip its status to
+        # step-7-blocked, write a per-WP BLOCKER, and continue with the
+        # remaining branches (Phase 3 D7-rebase-conflict failure mode).
         bundle: list[dict] = []
+        rebase_failures: list[dict] = []
         onto_sha = _gh_ref_sha(repo, "dev")  # start from current dev
         for e in batch:
-            pre_train_sha = _gh_branch_sha(repo, e.branch)
+            try:
+                pre_train_sha = _gh_branch_sha(repo, e.branch)
+            except RuntimeError as exc:
+                _log(f"WARN: could not fetch pre_train_sha for {e.branch}: {exc}")
+                rebase_failures.append({"wp": e.wp, "branch": e.branch,
+                                         "reason": str(exc)})
+                continue
             _log(f"Rebasing {e.branch} onto {onto_sha[:8]} (pre={pre_train_sha[:8]})")
-            rebased_sha = rebase_branch_in_clone(clone_dir, e.branch, onto_sha)
+            try:
+                rebased_sha = rebase_branch_in_clone(clone_dir, e.branch, onto_sha)
+            except RuntimeError as exc:
+                _log(f"REBASE CONFLICT: {e.branch} → {exc}")
+                # Flip INDEX status; write per-WP BLOCKER; continue
+                flip_ok, flip_err = flip_index_status_via_cli(
+                    _SCRIPTS_DIR, paths, e.wp, TRAIN_BLOCKED_STATUS,
+                )
+                blocker_ok, blocker_err = write_wp_blocker_via_cli(
+                    _SCRIPTS_DIR, paths, e.wp,
+                    title=f"Rebase conflict during {train_id}",
+                    observation=str(exc),
+                    root_cause=(
+                        "git rebase failed when stacking onto the previous "
+                        "rebased branch in the train. Likely a merge "
+                        "conflict against a sibling WP's changes."
+                    ),
+                    plain_english=(
+                        f"This WP's branch couldn't be cleanly rebased on "
+                        f"top of the other WPs in the train (their changes "
+                        f"conflict). The other WPs are continuing. Resolve "
+                        f"the conflict locally, push, then flip this WP "
+                        f"back to step-7-complete."
+                    ),
+                    suggested_next=(
+                        "Pull origin/dev, rebase this branch, resolve "
+                        "conflicts, push. Then re-flip INDEX status."
+                    ),
+                )
+                rebase_failures.append({
+                    "wp": e.wp,
+                    "branch": e.branch,
+                    "reason": str(exc),
+                    "index_flipped": flip_ok,
+                    "blocker_written": blocker_ok,
+                })
+                continue
             bundle.append({
                 "wp": e.wp,
                 "branch": e.branch,
@@ -415,16 +532,46 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
                 "merge_sha_on_dev": None,
             })
             onto_sha = rebased_sha
+
+        # If every branch failed to rebase, the train can't continue
+        if not bundle:
+            record["outcome"] = "blocker"
+            record["outcome_reason"] = (
+                f"all {len(batch)} branches failed to rebase; see per-WP BLOCKERs"
+            )
+            record["rebase_failures"] = rebase_failures
+            write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
+            emit_result(record, exit_code=1)
+
         record["bundle"] = bundle
-        bundle_tip_branch = batch[-1].branch
+        record["rebase_failures"] = rebase_failures
+        bundle_tip_branch = bundle[-1]["branch"]
 
         # Step: bundled-tip CI
         ci_interval = args.ci_poll_interval or CI_DEFAULT_INTERVAL
         _log(f"Bundled-tip CI: polling {bundle_tip_branch}")
         ci_verdict = _poll_ci(repo, bundle_tip_branch, ci_interval, CI_DEFAULT_CAP)
         if ci_verdict != "green":
+            # Bundle-CI failed → no merge. Flip all in-bundle WPs to
+            # step-7-blocked and write a train BLOCKER with the file-overlap
+            # heuristic naming the likely culprit. (Phase 3 D7 / CI fail mode.)
+            _log(f"BUNDLED-TIP CI {ci_verdict}: blocking all {len(bundle)} WPs")
+            reason = f"bundled-tip CI {ci_verdict} on {bundle_tip_branch}"
+
+            culprit = compute_culprit_heuristic(bundle, clone_dir, reason)
+            for entry in bundle:
+                flip_index_status_via_cli(
+                    _SCRIPTS_DIR, paths, entry["wp"], TRAIN_BLOCKED_STATUS,
+                )
+            train_blocker_path = write_train_blocker(
+                paths, train_id, reason, bundle,
+                suspected_wp_id=culprit,
+                evidence=f"CI verdict: {ci_verdict} on branch {bundle_tip_branch}",
+            )
             record["outcome"] = "blocker"
-            record["outcome_reason"] = f"bundled-tip CI {ci_verdict}"
+            record["outcome_reason"] = reason
+            record["train_blocker_path"] = str(train_blocker_path)
+            record["suspected_culprit"] = culprit
             write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
             emit_result(record, exit_code=1)
 
@@ -446,10 +593,13 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
         )
         record["deploy_url"] = deploy_url
         if deploy_verdict != "green":
-            record["outcome"] = "blocker"
-            record["outcome_reason"] = f"deploy {deploy_verdict}"
-            write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
-            emit_result(record, exit_code=1)
+            _handle_post_merge_failure(
+                record=record, bundle=bundle,
+                reason=f"deploy {deploy_verdict}",
+                clone_dir=clone_dir, repo=repo, paths=paths,
+                train_id=train_id,
+                failure_text=f"Deploy workflow result: {deploy_verdict}",
+            )
 
         # Step: health check (optional — only if staging URL provided)
         if args.staging_url:
@@ -459,13 +609,13 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
             health = _poll_health(health_url, HEALTH_DEFAULT_CAP)
             record["health_status"] = health
             if health != "healthy":
-                record["outcome"] = "blocker"
-                record["outcome_reason"] = (
-                    f"health check failed at {health_url}"
+                _handle_post_merge_failure(
+                    record=record, bundle=bundle,
+                    reason=f"health check failed at {health_url}",
+                    clone_dir=clone_dir, repo=repo, paths=paths,
+                    train_id=train_id,
+                    failure_text=f"Health check: {health} at {health_url}",
                 )
-                write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml",
-                                       record)
-                emit_result(record, exit_code=1)
         else:
             record["health_status"] = "skipped (no --staging-url)"
 
@@ -475,11 +625,13 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
             smoke_verdict, smoke_out = _run_smoke(args.smoke_cmd, clone_dir)
             record["smoke_verdict"] = smoke_verdict
             if not smoke_verdict.startswith("PASS"):
-                record["outcome"] = "blocker"
-                record["outcome_reason"] = f"smoke {smoke_verdict}; {smoke_out}"
-                write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml",
-                                       record)
-                emit_result(record, exit_code=1)
+                _handle_post_merge_failure(
+                    record=record, bundle=bundle,
+                    reason=f"smoke {smoke_verdict}",
+                    clone_dir=clone_dir, repo=repo, paths=paths,
+                    train_id=train_id,
+                    failure_text=f"Smoke output:\n{smoke_out}",
+                )
         else:
             record["smoke_verdict"] = "skipped (no --smoke-cmd)"
 
