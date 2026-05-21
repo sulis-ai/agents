@@ -1694,3 +1694,400 @@ def restore_branch_with_guard(
     if rc != 0:
         return False, f"git push --force-with-lease failed: {err}"
     return True, "restored"
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# sulis-change helpers (CW-01..CW-08)
+# ─────────────────────────────────────────────────────────────────────────
+#
+# The Change Work Standard at plugins/srd/references/change-work-standard.md
+# defines a change as the unit of work — every piece of work that evolves
+# the system is bounded by a change/{primitive}-{slug} branch with a
+# dedicated git worktree. The helpers below support the sulis-change CLI.
+#
+
+
+# CW-02: allowed primitives. Full 22 from change-primitives.md +
+# Conventional Commits fallbacks for unclassified work.
+_CHANGE_PRIMITIVES_EXPAND = ("create", "extend", "reuse", "compose", "generate")
+_CHANGE_PRIMITIVES_REORGANISE = ("move", "refactor", "inline", "merge",
+                                  "decompose", "abstract")
+_CHANGE_PRIMITIVES_SUBSTITUTE = ("replace", "strangle", "wrap")
+_CHANGE_PRIMITIVES_CONTRACT = ("deprecate", "delete")
+_CHANGE_PRIMITIVES_REINFORCE = ("test", "instrument", "secure", "harden",
+                                 "gate", "document")
+_CHANGE_PRIMITIVES_CC_FALLBACK = ("feat", "fix", "chore")
+
+ALLOWED_CHANGE_PRIMITIVES = (
+    _CHANGE_PRIMITIVES_EXPAND
+    + _CHANGE_PRIMITIVES_REORGANISE
+    + _CHANGE_PRIMITIVES_SUBSTITUTE
+    + _CHANGE_PRIMITIVES_CONTRACT
+    + _CHANGE_PRIMITIVES_REINFORCE
+    + _CHANGE_PRIMITIVES_CC_FALLBACK
+)
+
+# CW-02 slug rule: 2-5 kebab-case words. First word must start with a
+# letter; subsequent words may be alphanumeric (so `wp-001` is valid).
+_CHANGE_SLUG_RE = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+){1,4}$")
+
+
+def validate_change_slug(slug: str) -> tuple[bool, str]:
+    """Return (ok, reason). Slug must be 2-5 kebab-case words."""
+    if not slug:
+        return False, "slug is empty"
+    if not _CHANGE_SLUG_RE.match(slug):
+        return False, (
+            f"slug '{slug}' is not 2-5 kebab-case words "
+            f"(e.g. 'introduce-payments', 'extract-http-client')"
+        )
+    return True, ""
+
+
+def validate_change_primitive(primitive: str) -> tuple[bool, str]:
+    """Return (ok, reason). Primitive must be one of ALLOWED_CHANGE_PRIMITIVES."""
+    if not primitive:
+        return False, "primitive is empty"
+    if primitive.lower() not in ALLOWED_CHANGE_PRIMITIVES:
+        return False, (
+            f"primitive '{primitive}' not in allowed set: "
+            f"{', '.join(ALLOWED_CHANGE_PRIMITIVES)}"
+        )
+    return True, ""
+
+
+def compose_change_branch(primitive: str, slug: str) -> str:
+    """Compose a CW-02 branch name: change/{primitive}-{slug}.
+
+    Raises ValueError on invalid primitive or slug.
+    """
+    ok, reason = validate_change_primitive(primitive)
+    if not ok:
+        raise ValueError(reason)
+    ok, reason = validate_change_slug(slug)
+    if not ok:
+        raise ValueError(reason)
+    return f"change/{primitive.lower()}-{slug.lower()}"
+
+
+def parse_change_branch(branch: str) -> tuple[str, str] | None:
+    """Inverse of compose_change_branch. Returns (primitive, slug) or None."""
+    if not branch.startswith("change/"):
+        return None
+    rest = branch[len("change/"):]
+    # The primitive is the first dash-separated token; the slug is the rest.
+    if "-" not in rest:
+        return None
+    first, _, slug = rest.partition("-")
+    if first not in ALLOWED_CHANGE_PRIMITIVES:
+        return None
+    return (first, slug)
+
+
+def change_worktree_path(repo_root: Path, primitive: str, slug: str) -> Path:
+    """Compose the worktree path for a change.
+
+    Convention: sibling of the main repo at
+    `<repo-parent>/<repo-name>-change-<primitive>-<slug>/`.
+    """
+    return repo_root.parent / f"{repo_root.name}-change-{primitive}-{slug}"
+
+
+def write_change_metadata(metadata_path: Path, data: dict) -> None:
+    """Write a .changes/{primitive}-{slug}.yaml metadata file.
+
+    Uses the same YAML-lite emitter pattern as write_train_run_record.
+    Schema fields:
+      slug: str
+      primitive: str
+      branch: str
+      worktree_path: str
+      base_branch: str
+      base_sha: str
+      started_at: ISO 8601 UTC
+      adopted_from_sha: str | null   (only present for adopt)
+      adopt_mode: str | null         (forward | rewrite)
+    """
+    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    lines: list[str] = []
+    for k in ("slug", "primitive", "branch", "worktree_path", "base_branch",
+              "base_sha", "started_at", "adopted_from_sha", "adopt_mode"):
+        if k not in data:
+            continue
+        v = data[k]
+        if v is None:
+            lines.append(f"{k}: null")
+        elif isinstance(v, (int, float)):
+            lines.append(f"{k}: {v}")
+        else:
+            escaped = str(v).replace('"', '\\"')
+            lines.append(f'{k}: "{escaped}"')
+    metadata_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def read_change_metadata(metadata_path: Path) -> dict:
+    """Read a metadata file written by write_change_metadata. Returns {} if missing."""
+    if not metadata_path.exists():
+        return {}
+    out: dict = {}
+    for raw in metadata_path.read_text(encoding="utf-8").splitlines():
+        line = raw.rstrip()
+        if not line or line.startswith("#"):
+            continue
+        if ":" not in line:
+            continue
+        key, _, rest = line.partition(":")
+        key = key.strip()
+        rest = rest.strip()
+        if rest == "null":
+            out[key] = None
+        elif rest.startswith('"') and rest.endswith('"'):
+            out[key] = rest[1:-1]
+        else:
+            try:
+                out[key] = int(rest)
+            except ValueError:
+                out[key] = rest
+    return out
+
+
+def git_worktree_add(repo_root: Path, branch: str, dest: Path,
+                     base_ref: str = "dev") -> tuple[bool, str]:
+    """Create a worktree at `dest` for a new branch off `base_ref`.
+
+    If the branch already exists, the worktree is added on the existing
+    branch. If `dest` already exists, returns (False, "destination exists").
+
+    Returns (ok, message_or_error).
+    """
+    if dest.exists():
+        return False, f"destination already exists: {dest}"
+
+    # Check if branch already exists locally
+    rc, out, _ = _run(["git", "rev-parse", "--verify", f"refs/heads/{branch}"],
+                     cwd=repo_root, timeout=10)
+    branch_exists = rc == 0
+
+    if branch_exists:
+        rc, _, err = _run(["git", "worktree", "add", str(dest), branch],
+                         cwd=repo_root, timeout=60)
+    else:
+        rc, _, err = _run(["git", "worktree", "add", "-b", branch,
+                          str(dest), base_ref],
+                         cwd=repo_root, timeout=60)
+    if rc != 0:
+        return False, f"git worktree add failed: {err}"
+    return True, str(dest)
+
+
+def git_worktree_remove(repo_root: Path, dest: Path,
+                        force: bool = False) -> tuple[bool, str]:
+    """Remove a worktree at `dest`. Tolerates a missing worktree.
+
+    Returns (ok, message).
+    """
+    if not dest.exists():
+        # Try `git worktree prune` in case the worktree was deleted manually
+        _run(["git", "worktree", "prune"], cwd=repo_root, timeout=10)
+        return True, "worktree already absent (pruned)"
+    args = ["git", "worktree", "remove", str(dest)]
+    if force:
+        args.append("--force")
+    rc, _, err = _run(args, cwd=repo_root, timeout=30)
+    if rc != 0:
+        return False, f"git worktree remove failed: {err}"
+    return True, "removed"
+
+
+def detect_adopt_state(repo_root: Path,
+                      remote_ref: str = "origin/dev") -> dict:
+    """Inspect the current repo state for `sulis-change adopt`.
+
+    Returns a dict:
+      {
+        "current_branch": str,
+        "has_uncommitted": bool,
+        "uncommitted_files": list[str],
+        "local_commits_ahead": list[str],   # commit SHAs
+        "pushed_commits_can_rewrite": bool, # only true when current branch = remote tracking branch and there's no work upstream
+        "base_sha": str,                     # remote_ref's SHA
+      }
+
+    Used by sulis-change adopt to pick the right retrofit flavour.
+    """
+    out: dict = {
+        "current_branch": "",
+        "has_uncommitted": False,
+        "uncommitted_files": [],
+        "local_commits_ahead": [],
+        "pushed_commits_can_rewrite": False,
+        "base_sha": "",
+    }
+
+    # Current branch
+    rc, branch_out, _ = _run(["git", "branch", "--show-current"],
+                             cwd=repo_root, timeout=10)
+    if rc == 0:
+        out["current_branch"] = branch_out.strip()
+
+    # Uncommitted changes
+    rc, status_out, _ = _run(["git", "status", "--porcelain"],
+                             cwd=repo_root, timeout=10)
+    if rc == 0 and status_out.strip():
+        out["has_uncommitted"] = True
+        out["uncommitted_files"] = [
+            line[3:].strip() for line in status_out.splitlines()
+            if line.strip()
+        ]
+
+    # Fetch the remote ref's SHA (best-effort)
+    rc, remote_sha_out, _ = _run(["git", "rev-parse", remote_ref],
+                                 cwd=repo_root, timeout=10)
+    if rc == 0:
+        out["base_sha"] = remote_sha_out.strip()
+
+    # Commits ahead of remote
+    rc, ahead_out, _ = _run(
+        ["git", "rev-list", f"{remote_ref}..HEAD"],
+        cwd=repo_root, timeout=10,
+    )
+    if rc == 0 and ahead_out.strip():
+        out["local_commits_ahead"] = [
+            sha.strip() for sha in ahead_out.splitlines() if sha.strip()
+        ]
+
+    # "Pushed commits to retrofit" requires --mode rewrite; we don't auto-detect
+    # this state because it's ambiguous without intent. The caller passes
+    # --mode rewrite to enter that path.
+
+    return out
+
+
+def adopt_uncommitted_into_change(
+    repo_root: Path,
+    branch: str,
+    base_ref: str,
+    worktree_dest: Path,
+    uncommitted_files: list[str],
+) -> tuple[bool, str]:
+    """Retrofit case 1: stash uncommitted changes, create change branch +
+    worktree, unstash into the worktree.
+
+    Returns (ok, message).
+    """
+    if not uncommitted_files:
+        # Nothing to move — caller should not call this
+        return True, "no uncommitted changes; nothing to adopt"
+
+    # Stash the uncommitted work
+    rc, _, err = _run(["git", "stash", "push", "-u", "-m",
+                       f"sulis-change adopt {branch}"],
+                     cwd=repo_root, timeout=30)
+    if rc != 0:
+        return False, f"git stash push failed: {err}"
+
+    # Create the change branch + worktree
+    ok, msg = git_worktree_add(repo_root, branch, worktree_dest, base_ref)
+    if not ok:
+        # Try to restore the stash before returning the error
+        _run(["git", "stash", "pop"], cwd=repo_root, timeout=30)
+        return False, f"worktree creation failed: {msg}; stash restored"
+
+    # Pop the stash into the new worktree (git stash pop in the worktree
+    # restores the changes there)
+    rc, _, err = _run(["git", "stash", "pop"], cwd=worktree_dest, timeout=30)
+    if rc != 0:
+        return False, f"git stash pop in worktree failed: {err}"
+
+    return True, f"adopted {len(uncommitted_files)} uncommitted change(s) into {branch}"
+
+
+def adopt_local_commits_into_change(
+    repo_root: Path,
+    branch: str,
+    base_ref: str,
+    worktree_dest: Path,
+    local_commits: list[str],
+) -> tuple[bool, str]:
+    """Retrofit case 2: cherry-pick local-only commits onto the change
+    branch, then reset local dev to the remote.
+
+    Returns (ok, message).
+    """
+    if not local_commits:
+        return True, "no local commits to retrofit"
+
+    current_branch = ""
+    rc, branch_out, _ = _run(["git", "branch", "--show-current"],
+                             cwd=repo_root, timeout=10)
+    if rc == 0:
+        current_branch = branch_out.strip()
+
+    # Create change branch + worktree (off the base ref, which is the
+    # remote tip — the place we want to relocate FROM)
+    ok, msg = git_worktree_add(repo_root, branch, worktree_dest, base_ref)
+    if not ok:
+        return False, f"worktree creation failed: {msg}"
+
+    # Cherry-pick the local commits (in chronological order) into the worktree.
+    # local_commits is newest-first from rev-list, so reverse for cherry-pick order.
+    for sha in reversed(local_commits):
+        rc, _, err = _run(["git", "cherry-pick", sha],
+                         cwd=worktree_dest, timeout=60)
+        if rc != 0:
+            # Abort + return; user can investigate
+            _run(["git", "cherry-pick", "--abort"], cwd=worktree_dest, timeout=10)
+            return False, f"cherry-pick {sha[:8]} failed: {err}"
+
+    # Reset local current_branch (the place we relocated FROM) to the remote tip
+    if current_branch:
+        rc, _, err = _run(
+            ["git", "reset", "--hard", base_ref],
+            cwd=repo_root, timeout=30,
+        )
+        if rc != 0:
+            return False, (
+                f"reset {current_branch} to {base_ref} failed: {err}. "
+                f"Change branch was created; you may need to manually reset "
+                f"{current_branch}."
+            )
+
+    return True, (
+        f"retrofitted {len(local_commits)} commit(s) from "
+        f"{current_branch} onto {branch}; {current_branch} reset to {base_ref}"
+    )
+
+
+def find_change_branches(repo_root: Path) -> list[dict]:
+    """List all change/* branches in the local repo with basic state.
+
+    Returns a list of dicts:
+      [{"branch": str, "primitive": str, "slug": str, "current": bool}, ...]
+    """
+    rc, out, _ = _run(["git", "branch", "--list", "change/*"],
+                     cwd=repo_root, timeout=10)
+    if rc != 0:
+        return []
+
+    result: list[dict] = []
+    for raw in out.splitlines():
+        line = raw.rstrip()
+        if not line:
+            continue
+        # git branch output: "* branch" (current), "+ branch" (other
+        # worktree), "  branch" (uncheckout). Strip the marker.
+        is_current = line.startswith("* ")
+        branch = line.lstrip("*+ \t").strip()
+        if not branch:
+            continue
+        parsed = parse_change_branch(branch)
+        if parsed is None:
+            continue
+        primitive, slug = parsed
+        result.append({
+            "branch": branch,
+            "primitive": primitive,
+            "slug": slug,
+            "current": is_current,
+        })
+    return result

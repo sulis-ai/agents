@@ -1,0 +1,534 @@
+#!/usr/bin/env python3
+"""sulis-change — manage change branches and worktrees (CW-01..CW-08).
+
+A change is the unit of work in the Sulis marketplace: a dedicated git
+branch + worktree, named `change/{primitive}-{slug}` where `primitive`
+is one of SEA's 22 change primitives. All artifacts for the change live
+on that branch; multiple changes run in parallel on separate branches;
+merge to dev ends the change.
+
+This CLI manages the lifecycle:
+
+  start        Create a new change branch + worktree off the current dev
+  adopt        Retrofit in-flight work (uncommitted / unpushed commits)
+               into a change branch
+  finish       Rebase the change onto dev, merge or open a PR, clean up
+               the worktree
+  list         Enumerate active change branches
+  status       One change's summary (SHA, ahead/behind dev, WPs queued)
+
+Reads + writes change metadata at `.changes/{primitive}-{slug}.yaml`
+on the change branch.
+
+Outputs structured JSON to stdout. Exit codes: 0 success, 1 expected
+failure (slug taken, etc.), 2 internal error.
+
+Specification: plugins/srd/references/change-work-standard.md
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _wpxlib import (  # noqa: E402
+    ALLOWED_CHANGE_PRIMITIVES,
+    _gh_ref_sha,
+    _log,
+    _run,
+    add_common_args,
+    adopt_local_commits_into_change,
+    adopt_uncommitted_into_change,
+    change_worktree_path,
+    cli_main,
+    compose_change_branch,
+    detect_adopt_state,
+    emit_error,
+    emit_internal_error,
+    emit_ok,
+    find_change_branches,
+    git_worktree_add,
+    git_worktree_remove,
+    parse_change_branch,
+    read_change_metadata,
+    validate_change_primitive,
+    validate_change_slug,
+    write_change_metadata,
+)
+
+
+# ─── Helpers ─────────────────────────────────────────────────────────────
+
+def _resolve_repo_root(args: argparse.Namespace) -> Path:
+    """Resolve the repo root from --repo-root or cwd."""
+    repo_root = Path(getattr(args, "repo_root", None) or os.getcwd()).resolve()
+    if not (repo_root / ".git").exists():
+        emit_error(
+            f"Not a git repo: {repo_root}",
+            context={"hint": "Run from inside a git repo or pass --repo-root."},
+        )
+    return repo_root
+
+
+def _resolve_primitive_and_slug(args: argparse.Namespace) -> tuple[str, str]:
+    """Validate and return (primitive, slug)."""
+    primitive = (args.primitive or "feat").lower()
+    slug = args.slug.lower()
+    ok, reason = validate_change_primitive(primitive)
+    if not ok:
+        emit_error(reason)
+    ok, reason = validate_change_slug(slug)
+    if not ok:
+        emit_error(reason)
+    return primitive, slug
+
+
+def _metadata_path(repo_root: Path, primitive: str, slug: str) -> Path:
+    return repo_root / ".changes" / f"{primitive}-{slug}.yaml"
+
+
+# ─── Subcommand: start ────────────────────────────────────────────────────
+
+def cmd_start(args: argparse.Namespace) -> None:
+    repo_root = _resolve_repo_root(args)
+    primitive, slug = _resolve_primitive_and_slug(args)
+    branch = compose_change_branch(primitive, slug)
+    base_ref = args.base or "dev"
+
+    # Check the branch doesn't already exist
+    rc, _, _ = _run(["git", "rev-parse", "--verify", f"refs/heads/{branch}"],
+                   cwd=repo_root, timeout=10)
+    if rc == 0:
+        emit_error(
+            f"Change branch already exists: {branch}",
+            context={"hint": f"Run `sulis-change list` to see active changes, "
+                             f"or `sulis-change finish --slug {slug}` to ship it."},
+        )
+
+    # Determine worktree path
+    worktree_dest = change_worktree_path(repo_root, primitive, slug)
+
+    # Create the worktree + branch
+    ok, msg = git_worktree_add(repo_root, branch, worktree_dest, base_ref)
+    if not ok:
+        emit_error(f"Worktree creation failed: {msg}")
+
+    # Get the SHA we branched off
+    rc, base_sha_out, _ = _run(["git", "rev-parse", base_ref],
+                               cwd=repo_root, timeout=10)
+    base_sha = base_sha_out.strip() if rc == 0 else ""
+
+    # Write metadata into the worktree (it lives on the change branch)
+    metadata = {
+        "slug": slug,
+        "primitive": primitive,
+        "branch": branch,
+        "worktree_path": str(worktree_dest),
+        "base_branch": base_ref,
+        "base_sha": base_sha,
+        "started_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    write_change_metadata(_metadata_path(worktree_dest, primitive, slug),
+                          metadata)
+
+    _log(f"Change started: {branch} at {worktree_dest}")
+    emit_ok(data={
+        "branch": branch,
+        "primitive": primitive,
+        "slug": slug,
+        "worktree_path": str(worktree_dest),
+        "base_branch": base_ref,
+        "base_sha": base_sha,
+        "metadata_path": str(_metadata_path(worktree_dest, primitive, slug)),
+    })
+
+
+# ─── Subcommand: adopt ────────────────────────────────────────────────────
+
+def cmd_adopt(args: argparse.Namespace) -> None:
+    repo_root = _resolve_repo_root(args)
+    primitive, slug = _resolve_primitive_and_slug(args)
+    branch = compose_change_branch(primitive, slug)
+    base_ref = args.base or "dev"
+    mode = (args.mode or "forward").lower()
+    remote_ref = args.remote_ref or "origin/dev"
+
+    if mode not in ("forward", "rewrite"):
+        emit_error(f"--mode must be 'forward' or 'rewrite' (got '{mode}')")
+
+    # Check the branch doesn't already exist
+    rc, _, _ = _run(["git", "rev-parse", "--verify", f"refs/heads/{branch}"],
+                   cwd=repo_root, timeout=10)
+    if rc == 0:
+        emit_error(f"Change branch already exists: {branch}")
+
+    # Inspect current state
+    state = detect_adopt_state(repo_root, remote_ref=remote_ref)
+    worktree_dest = change_worktree_path(repo_root, primitive, slug)
+
+    has_uncommitted = state["has_uncommitted"]
+    local_commits = state["local_commits_ahead"]
+
+    # Mode handling
+    if mode == "rewrite" and not args.force:
+        emit_error(
+            "--mode rewrite is destructive (rewrites history on the source "
+            "branch). Re-run with --force to confirm.",
+            context={"local_commits_ahead": len(local_commits)},
+        )
+
+    # Case 1: uncommitted only — stash + worktree + unstash
+    # Case 2: local commits (and maybe uncommitted) — cherry-pick path
+    # Case 3 (rewrite): same as case 2 but with --force semantics
+
+    moved_what: list[str] = []
+
+    if local_commits:
+        # Case 2 / 3: relocate local commits onto the change branch.
+        # The change branch starts at the REMOTE ref (clean state), not
+        # the local ref (which already has the commits we want to
+        # relocate — cherry-picking onto it would produce empty commits).
+        if has_uncommitted:
+            # Stash first so cherry-pick is clean
+            rc, _, err = _run(["git", "stash", "push", "-u", "-m",
+                              f"sulis-change adopt {branch}"],
+                             cwd=repo_root, timeout=30)
+            if rc != 0:
+                emit_error(f"git stash push failed: {err}")
+            moved_what.append(f"{len(state['uncommitted_files'])} uncommitted change(s) stashed")
+
+        ok, msg = adopt_local_commits_into_change(
+            repo_root, branch, remote_ref, worktree_dest, local_commits,
+        )
+        if not ok:
+            emit_error(f"adopt local-commits failed: {msg}")
+        moved_what.append(msg)
+
+        if has_uncommitted:
+            # Pop the stash in the worktree (where the work belongs now)
+            rc, _, err = _run(["git", "stash", "pop"],
+                             cwd=worktree_dest, timeout=30)
+            if rc != 0:
+                # Best-effort warning; the stash is recoverable manually
+                moved_what.append(f"WARN: stash pop in worktree failed: {err}")
+
+    elif has_uncommitted:
+        # Case 1: uncommitted only
+        ok, msg = adopt_uncommitted_into_change(
+            repo_root, branch, base_ref, worktree_dest,
+            state["uncommitted_files"],
+        )
+        if not ok:
+            emit_error(f"adopt uncommitted failed: {msg}")
+        moved_what.append(msg)
+
+    else:
+        # Nothing to adopt — but still create the branch + worktree (forward-only)
+        ok, msg = git_worktree_add(repo_root, branch, worktree_dest, base_ref)
+        if not ok:
+            emit_error(f"worktree creation failed: {msg}")
+        moved_what.append("nothing to retrofit; change branch + worktree created forward-only")
+
+    # Get the SHA we branched off
+    rc, base_sha_out, _ = _run(["git", "rev-parse", base_ref],
+                               cwd=repo_root, timeout=10)
+    base_sha = base_sha_out.strip() if rc == 0 else ""
+
+    metadata = {
+        "slug": slug,
+        "primitive": primitive,
+        "branch": branch,
+        "worktree_path": str(worktree_dest),
+        "base_branch": base_ref,
+        "base_sha": base_sha,
+        "started_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "adopted_from_sha": state["base_sha"],
+        "adopt_mode": mode,
+    }
+    write_change_metadata(_metadata_path(worktree_dest, primitive, slug),
+                          metadata)
+
+    emit_ok(data={
+        "branch": branch,
+        "primitive": primitive,
+        "slug": slug,
+        "worktree_path": str(worktree_dest),
+        "adopt_mode": mode,
+        "moved": moved_what,
+        "uncommitted_count": len(state["uncommitted_files"]),
+        "local_commits_count": len(local_commits),
+    })
+
+
+# ─── Subcommand: finish ───────────────────────────────────────────────────
+
+def cmd_finish(args: argparse.Namespace) -> None:
+    repo_root = _resolve_repo_root(args)
+    primitive, slug = _resolve_primitive_and_slug(args)
+    branch = compose_change_branch(primitive, slug)
+    base_ref = args.base or "dev"
+
+    # Verify the branch exists
+    rc, _, _ = _run(["git", "rev-parse", "--verify", f"refs/heads/{branch}"],
+                   cwd=repo_root, timeout=10)
+    if rc != 0:
+        emit_error(f"Change branch not found: {branch}")
+
+    worktree_dest = change_worktree_path(repo_root, primitive, slug)
+
+    # Fetch latest origin/{base_ref}
+    rc, _, err = _run(["git", "fetch", "origin", base_ref],
+                     cwd=repo_root, timeout=60)
+    if rc != 0:
+        emit_error(f"git fetch origin {base_ref} failed: {err}")
+
+    # Decide path: --merge (squash-merge to dev, push) or --pr (open PR via gh)
+    if args.pr:
+        # Push the branch; open a PR
+        rc, _, err = _run(["git", "push", "-u", "origin", branch],
+                         cwd=repo_root, timeout=60)
+        if rc != 0:
+            emit_error(f"git push origin {branch} failed: {err}")
+
+        # Compose PR body from metadata
+        meta = read_change_metadata(_metadata_path(worktree_dest, primitive, slug))
+        pr_body = (
+            f"Change: `{branch}`\n\n"
+            f"Primitive: {meta.get('primitive', primitive)}\n"
+            f"Started at: {meta.get('started_at', 'unknown')}\n"
+        )
+        rc, out, err = _run(
+            ["gh", "pr", "create",
+             "--base", base_ref,
+             "--head", branch,
+             "--title", f"{branch}",
+             "--body", pr_body],
+            cwd=repo_root, timeout=60,
+        )
+        if rc != 0:
+            emit_error(f"gh pr create failed: {err}")
+        pr_url = out.strip().splitlines()[-1] if out.strip() else ""
+        outcome = {"mode": "pr", "pr_url": pr_url}
+
+    elif args.merge:
+        # Squash-merge locally
+        # 1. Checkout base
+        rc, _, err = _run(["git", "checkout", base_ref], cwd=repo_root, timeout=30)
+        if rc != 0:
+            emit_error(f"git checkout {base_ref} failed: {err}")
+        rc, _, err = _run(["git", "pull", "origin", base_ref],
+                         cwd=repo_root, timeout=60)
+        if rc != 0:
+            emit_error(f"git pull origin {base_ref} failed: {err}")
+
+        # 2. Squash-merge
+        rc, _, err = _run(["git", "merge", "--squash", branch],
+                         cwd=repo_root, timeout=30)
+        if rc != 0:
+            emit_error(f"git merge --squash {branch} failed: {err}")
+
+        # 3. Commit (only if there's anything staged)
+        rc, status_out, _ = _run(["git", "status", "--porcelain"],
+                                 cwd=repo_root, timeout=10)
+        if status_out.strip():
+            commit_msg = f"feat({branch.replace('change/', '')}): squash-merge {branch}"
+            rc, _, err = _run(["git", "commit", "-m", commit_msg],
+                             cwd=repo_root, timeout=30)
+            if rc != 0:
+                emit_error(f"git commit (merge) failed: {err}")
+
+        # 4. Push
+        rc, _, err = _run(["git", "push", "origin", base_ref],
+                         cwd=repo_root, timeout=60)
+        if rc != 0:
+            emit_error(f"git push origin {base_ref} failed: {err}")
+
+        outcome = {"mode": "merge"}
+    else:
+        emit_error("Pass --merge (squash-merge locally) or --pr (open a PR).")
+
+    # Cleanup (default; unless --no-cleanup)
+    cleanup_summary: dict = {}
+    if not args.no_cleanup:
+        # Force-remove the worktree. --force is needed because the
+        # `.changes/{primitive}-{slug}.yaml` metadata file is untracked
+        # by design (ephemeral lifecycle state). The work itself has
+        # already merged to dev, so discarding the untracked metadata
+        # is the correct cleanup.
+        ok, msg = git_worktree_remove(repo_root, worktree_dest, force=True)
+        cleanup_summary["worktree_removed"] = ok
+        cleanup_summary["worktree_detail"] = msg
+
+        # Prune any stale worktree refs before deleting the branch
+        _run(["git", "worktree", "prune"], cwd=repo_root, timeout=10)
+
+        # Delete the local branch
+        rc, out, err = _run(["git", "branch", "-D", branch],
+                           cwd=repo_root, timeout=10)
+        cleanup_summary["branch_deleted"] = rc == 0
+        if rc != 0:
+            cleanup_summary["branch_detail"] = (err or out or
+                                                "branch delete returned non-zero").strip()
+
+    emit_ok(data={
+        "branch": branch,
+        "primitive": primitive,
+        "slug": slug,
+        "outcome": outcome,
+        "cleanup": cleanup_summary,
+    })
+
+
+# ─── Subcommand: list ────────────────────────────────────────────────────
+
+def cmd_list(args: argparse.Namespace) -> None:
+    repo_root = _resolve_repo_root(args)
+    changes = find_change_branches(repo_root)
+
+    # Enrich each with worktree path + dirty state
+    enriched: list[dict] = []
+    for c in changes:
+        dest = change_worktree_path(repo_root, c["primitive"], c["slug"])
+        item = dict(c)
+        item["worktree_path"] = str(dest)
+        item["worktree_present"] = dest.exists()
+        if item["worktree_present"]:
+            rc, status_out, _ = _run(
+                ["git", "status", "--porcelain"],
+                cwd=dest, timeout=10,
+            )
+            item["dirty"] = bool(rc == 0 and status_out.strip())
+        else:
+            item["dirty"] = False
+        enriched.append(item)
+
+    emit_ok(data={
+        "active_count": len(enriched),
+        "changes": enriched,
+    })
+
+
+# ─── Subcommand: status ──────────────────────────────────────────────────
+
+def cmd_status(args: argparse.Namespace) -> None:
+    repo_root = _resolve_repo_root(args)
+    primitive, slug = _resolve_primitive_and_slug(args)
+    branch = compose_change_branch(primitive, slug)
+    base_ref = args.base or "dev"
+
+    rc, _, _ = _run(["git", "rev-parse", "--verify", f"refs/heads/{branch}"],
+                   cwd=repo_root, timeout=10)
+    if rc != 0:
+        emit_error(f"Change branch not found: {branch}")
+
+    worktree_dest = change_worktree_path(repo_root, primitive, slug)
+    metadata = read_change_metadata(_metadata_path(worktree_dest, primitive, slug))
+
+    # SHAs + ahead/behind
+    rc, branch_sha_out, _ = _run(["git", "rev-parse", branch],
+                                 cwd=repo_root, timeout=10)
+    branch_sha = branch_sha_out.strip() if rc == 0 else ""
+    rc, base_sha_out, _ = _run(["git", "rev-parse", base_ref],
+                               cwd=repo_root, timeout=10)
+    base_sha = base_sha_out.strip() if rc == 0 else ""
+
+    # ahead / behind
+    rc, ahead_out, _ = _run(
+        ["git", "rev-list", "--count", f"{base_ref}..{branch}"],
+        cwd=repo_root, timeout=10,
+    )
+    ahead = int(ahead_out.strip()) if rc == 0 and ahead_out.strip().isdigit() else 0
+    rc, behind_out, _ = _run(
+        ["git", "rev-list", "--count", f"{branch}..{base_ref}"],
+        cwd=repo_root, timeout=10,
+    )
+    behind = int(behind_out.strip()) if rc == 0 and behind_out.strip().isdigit() else 0
+
+    emit_ok(data={
+        "branch": branch,
+        "primitive": primitive,
+        "slug": slug,
+        "worktree_path": str(worktree_dest),
+        "worktree_present": worktree_dest.exists(),
+        "branch_sha": branch_sha,
+        "base_sha": base_sha,
+        "ahead_of_base": ahead,
+        "behind_base": behind,
+        "metadata": metadata,
+    })
+
+
+# ─── argparse ────────────────────────────────────────────────────────────
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=(
+            "sulis-change — manage change branches and worktrees (CW-01..CW-08). "
+            "A change is the unit of work: change/{primitive}-{slug} branch + "
+            "dedicated worktree. See plugins/srd/references/change-work-standard.md."
+        ),
+    )
+    sub = parser.add_subparsers(dest="subcommand", required=True)
+
+    def _common(p: argparse.ArgumentParser, include_slug: bool = True) -> None:
+        p.add_argument("--repo-root", default=os.getcwd(),
+                       help="Path to the repo root (default: cwd)")
+        if include_slug:
+            p.add_argument("--slug", required=True,
+                           help="Change slug, kebab-case, 2-5 words "
+                                "(e.g. introduce-payments)")
+            p.add_argument("--primitive", default="feat",
+                           help=f"Change primitive (default: feat). "
+                                f"Allowed: {', '.join(ALLOWED_CHANGE_PRIMITIVES)}")
+        p.add_argument("--base", default=None,
+                       help="Base ref for the change (default: dev)")
+
+    p_start = sub.add_parser("start", help="Create a new change branch + worktree")
+    _common(p_start)
+
+    p_adopt = sub.add_parser("adopt", help="Retrofit in-flight work into a change")
+    _common(p_adopt)
+    p_adopt.add_argument("--mode", default="forward",
+                         choices=["forward", "rewrite"],
+                         help="forward (default): create branch from current "
+                              "dev, leave existing commits where they are. "
+                              "rewrite: destructive — relocates commits.")
+    p_adopt.add_argument("--remote-ref", default="origin/dev",
+                         help="Remote ref to compare local against "
+                              "(default: origin/dev)")
+    p_adopt.add_argument("--force", action="store_true",
+                         help="Required for --mode rewrite (history rewrite confirmation)")
+
+    p_finish = sub.add_parser("finish", help="Rebase + merge/PR + cleanup")
+    _common(p_finish)
+    p_finish.add_argument("--merge", action="store_true",
+                          help="Squash-merge to base locally + push")
+    p_finish.add_argument("--pr", action="store_true",
+                          help="Push branch + open PR via gh")
+    p_finish.add_argument("--no-cleanup", action="store_true",
+                          help="Skip worktree + branch cleanup")
+
+    p_list = sub.add_parser("list", help="List active change branches")
+    _common(p_list, include_slug=False)
+
+    p_status = sub.add_parser("status", help="Show one change's state")
+    _common(p_status)
+
+    return parser
+
+
+HANDLERS = {
+    "start": cmd_start,
+    "adopt": cmd_adopt,
+    "finish": cmd_finish,
+    "list": cmd_list,
+    "status": cmd_status,
+}
+
+
+if __name__ == "__main__":
+    cli_main(build_parser(), HANDLERS)
