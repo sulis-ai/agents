@@ -1,6 +1,6 @@
 # SDK Implementation Validation Rubric
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 **Date:** 2026-05-21
 **Status:** Retrospective rubric — runnable by an agent to validate a newly
 implemented SDK against the three governing specifications
@@ -210,6 +210,7 @@ Phase 12 applies CTS to the implementation overall.
 | ID | Severity | Check | Pass criterion | Evidence |
 |---|---|---|---|---|
 | **4.01** | MUST | Generated Python client exists | Importable Python package | `pip install` + `import` succeeds |
+| **4.01a** | MUST | Editable install succeeds in a clean venv | `pip install -e .` (or `-e .[test]` for dev) exits 0 in a fresh virtual environment; package then imports cleanly. Added in rubric v0.2.0 after a real bug (broken `license = { file = "..." }` relative path) was caught only by attempting an editable install in a peer SDK. | `python -m venv /tmp/probe && /tmp/probe/bin/pip install -e <sdk-path>` |
 | **4.02** | MUST | Both sync and async clients exported | `MySDK` (sync) and `AsyncMySDK` (async) classes both available | Import test |
 | **4.03** | MUST | Pydantic v2 used for JSON-wire response shapes | Response models are Pydantic v2 `BaseModel` subclasses | Inspect generated model files |
 | **4.04** | MUST | Snake_case field names preserved from wire (when wire is JSON) | Generated models use `snake_case` field names matching the schema | Inspect 3 random response models |
@@ -231,6 +232,7 @@ Phase 12 applies CTS to the implementation overall.
 | ID | Severity | Check | Pass criterion | Evidence |
 |---|---|---|---|---|
 | **5.01** | MUST | Generated TypeScript client exists | Installable npm package | `npm install` + `import` succeeds |
+| **5.01a** | MUST | Fresh-install succeeds (npm install + build in a clean checkout) | `npm install` + `npm run build` exit 0 against the package's pristine state (no node_modules / dist pre-existing). Added in rubric v0.2.0 as the TypeScript counterpart to 4.01a. | `rm -rf node_modules dist && npm install && npm run build` |
 | **5.02** | MUST | Methods return Promises (async-only) | No sync method variants | Inspect TS method signatures |
 | **5.03** | MUST | Generated `.d.ts` interfaces for response shapes | Type definitions present | Inspect type definitions |
 | **5.04** | MUST | Snake_case field names preserved from wire (when wire is JSON) | Generated interfaces use `snake_case` field names | Inspect 3 random response interfaces |
@@ -316,6 +318,7 @@ Phase 12 applies CTS to the implementation overall.
 | **10.A.02** | MUST | Setup tutorial per supported transport | E.g., `tutorials/mcp/with-claude-desktop.md` if MCP is a transport | Docs structure |
 | **10.A.03** | SHOULD | Tutorial length ≤15 min | Read-and-follow time | Estimate by length / 200 wpm read speed |
 | **10.A.04** | MUST | Tutorial leads to working code | Final state of each tutorial is a runnable example | Try following one |
+| **10.A.04a** | MUST | Tutorial actually executes end-to-end from a clean state | Following the tutorial VERBATIM, in a fresh environment (no insider context), produces the documented result without errors. Added in rubric v0.2.0 — the previous 10.A.04 was satisfied by "the snippet looks runnable" but didn't catch broken install commands or assumed-but-not-published packages. | Tutorial-execution transcript or recording |
 
 ### 10.B — How-to guides
 
@@ -427,6 +430,8 @@ not just claim compliance with the spec?
 | **12.06** | SHOULD | Outside-in reasoning evident | The SDK design starts from "what does an agent need?" not "what does framework X do?" | Inspect spec/README |
 | **12.07** | MUST | Pre-mortem documented | "If this fails after 6 months, the most likely reasons are…" | Inspect for pre-mortem |
 | **12.08** | SHOULD | Anti-pattern self-check ran | AP-01..AP-09 checked on the design itself | Inspect for AP self-check |
+| **12.09** | SHOULD | Vocabulary coherence — package + repo names match what users will look for | A first-time user's natural-language question about the domain doesn't require the SDK or its docs to correct the user's terminology. E.g., if the repo is called `bids` but actually contains adapters, that's incoherent. Added in rubric v0.2.0 after a real user session where the SDK had to spend a full turn explaining "this isn't what the name implies." | Pose 2-3 natural questions a first-time user might ask; verify the docs don't have to redirect terminology |
+| **12.10** | SHOULD | Internal-jargon prefixes documented or glossed | If the SDK wraps tools with cryptic-prefix names (e.g., `wpx-*`, `gcr-*`, `lt-*`), the SDK README or first reference doc explains what the prefix means in one sentence. New readers shouldn't have to guess. | Grep the docs for the prefix; verify at least one sentence-level explanation appears near the top of the README or a tutorial |
 
 ---
 
@@ -594,3 +599,4 @@ This rubric is in calibration. Falsification criteria (FR):
 | Version | Date | Change |
 |---|---|---|
 | 0.1.0 | 2026-05-21 | Initial rubric. 12 phases. ~124 checks. Severity convention (MUST/SHOULD/MAY). Output template. Worked example. Anti-patterns for the rubric run itself. Falsifiability criteria. |
+| 0.2.0 | 2026-05-21 | Added 5 checks (4.01a editable install probe; 5.01a TS fresh-install probe; 10.A.04a tutorial-executes-from-clean-state; 12.09 vocabulary coherence; 12.10 internal-jargon prefixes glossed). Each surfaced from a real adapter-test session where a peer SDK (following the v0.1.0 rubric) passed validation but then broke for a first-time user: a broken relative `license = { file = ... }` path made `pip install -e .` fail (caught by 4.01a); tutorials assumed PyPI-published packages that hadn't shipped yet (caught by 10.A.04a); repo name implied one thing but contained another (caught by 12.09); cryptic prefix `wpx-*` / `gtr-*` etc. left readers guessing (caught by 12.10). |

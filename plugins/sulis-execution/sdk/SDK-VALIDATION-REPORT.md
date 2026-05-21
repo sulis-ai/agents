@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-21
 **Validator:** Phase 6 of the implementation plan
-**Rubric:** [`sdk-implementation-validation-rubric.md`](../docs/research/sdk-implementation-validation-rubric.md) v0.1.0
+**Rubric:** [`sdk-implementation-validation-rubric.md`](../docs/research/sdk-implementation-validation-rubric.md) v0.2.0 (updated after a peer-SDK test session surfaced new checks; the SDK was re-validated against the new checks)
 
 ## Verdict
 
@@ -279,6 +279,24 @@ This validation report supports release of sulis-execution SDK v0.1.0:
 - Python package (sulis-execution v0.1.0), TypeScript package
   (@sulis-ai/execution v0.1.0), and MCP server (sulis-execution-mcp
   v0.1.0) ready to publish
+
+## Rubric v0.2.0 re-validation (added after initial PASS)
+
+After the initial validation, a peer SDK test session surfaced 5 new
+rubric checks (4.01a, 5.01a, 10.A.04a, 12.09, 12.10). All 5 were
+re-run against this SDK with the following results:
+
+| Check | Severity | Result | Evidence |
+|---|---|---|---|
+| 4.01a | MUST | **PASS** | Fresh venv: `python -m venv /tmp/sulis-sdk-probe-venv && /tmp/sulis-sdk-probe-venv/bin/pip install -e plugins/sulis-execution/sdk/python/` → installs cleanly; `import sulis_execution` succeeds. Also verified for the MCP server: `pip install -e plugins/sulis-execution/sdk/mcp-server/` → installs cleanly; `import sulis_execution_mcp` succeeds. |
+| 5.01a | MUST | **PASS** | Fresh clone: `rm -rf node_modules dist && npm install && npm run build` → installs cleanly; `dist/index.js`, `dist/index.d.ts` produced. |
+| 10.A.04a | MUST | **PASS** | Followed Python getting-started tutorial verbatim from the fresh venv: import → client construction → first call. All three steps work as documented; the missing-binary case raises `BinaryNotFoundError` exactly as the tutorial promises. |
+| 12.09 | SHOULD | **PASS** | "sulis-execution SDK" maps cleanly to "the SDK for the sulis-execution plugin." Natural-language questions about the domain don't require the docs to correct the user's terminology. |
+| 12.10 | SHOULD | **PASS (after remediation)** | Initial grep found 19 mentions of `wpx-` across README + mental-model with zero gloss. Remediated by adding a one-paragraph note near the top of the SDK README explaining "wpx = Work Package eXecutor" and noting that callers use `client.pipeline` / `client.train` / etc. rather than the wpx-* names directly. |
+
+Updated verdict: still **PASS-WITH-RATIONALE**. The single PASS-after-
+remediation (12.10) was a documentation gap, not a structural defect;
+the README now contains the gloss. No new MUST failures surfaced.
 
 ## Re-run schedule
 

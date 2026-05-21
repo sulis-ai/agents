@@ -11,6 +11,16 @@ sulis-change.
 **38 operations across 10 resources, available in Python, TypeScript,
 and as an MCP server.**
 
+> **A note on the `wpx-` prefix.** The underlying CLI tools have names
+> like `wpx-pipeline`, `wpx-train`, `wpx-index` (where `wpx` is short
+> for "Work Package eXecutor" — an internal-jargon prefix from the
+> plugin's earlier history). The SDK wraps these under cleaner public
+> names: `client.pipeline`, `client.train`, `client.index`, etc.
+> Most callers never need to touch the `wpx-*` names directly. The
+> only place they surface is in `BinaryNotFoundError` messages
+> (which name the underlying binary that couldn't be located) and
+> in the `wpx_dir` / `WPX_DIR` configuration.
+
 ---
 
 ## What this is for
