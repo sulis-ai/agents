@@ -53,20 +53,39 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _wpxlib import (  # noqa: E402
+    CI_DEFAULT_CAP,
+    CI_DEFAULT_INTERVAL,
+    DEPLOY_DEFAULT_CAP,
+    DEPLOY_DEFAULT_INTERVAL,
+    HEALTH_DEFAULT_CAP,
     EligibilityResult,
     TrainOverrides,
     WPRow,
+    _gh_branch_sha,
+    _gh_ref_sha,
+    _join_health_url,
+    _log,
+    _merge_squash,
+    _poll_ci,
+    _poll_deploy,
+    _poll_health,
+    _run_smoke,
     add_common_args,
+    check_train_trigger,
     cli_main,
+    clone_repo_to_temp,
     emit_error,
     emit_internal_error,
     emit_ok,
+    emit_result,
     find_eligible_branches,
     pack_batches,
     parse_index_md,
     paths_from_args,
     read_overrides,
+    rebase_branch_in_clone,
     write_overrides,
+    write_train_run_record,
 )
 
 
@@ -312,24 +331,186 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     })
 
 
-# --- Subcommand: run (Phase 2 placeholder) ------------------------------
+# --- Subcommand: run (happy path) ---------------------------------------
 
-def cmd_run(args: argparse.Namespace) -> None:
-    """Fire the train. Phase 2 — happy path implementation pending.
+import shutil  # noqa: E402  (deferred to here to keep top-of-file imports clean)
+import tempfile  # noqa: E402
 
-    Currently returns a structured "not_implemented" result so callers
-    can detect the v0.11.0 skeleton vs the v0.12.0+ functional train.
+
+def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestration)
+    """Fire the train. Picks up eligible WPs, packs into batches, rebases,
+    runs bundled-tip CI, sequential-merges to dev, one deploy/health/smoke.
+
+    Happy path only (Phase 2). Failure handling (rebase conflicts,
+    bundled-tip CI red, post-merge deploy/smoke fail with revert + branch
+    restoration) is implemented in Phase 3.
     """
-    emit_ok(data={
-        "outcome": "not_implemented",
-        "skeleton_version": "0.11.0",
-        "message": (
-            "wpx-train run is a Phase 2 capability. In v0.11.0 only the "
-            "queue subcommands + status + doctor are functional. The run "
-            "happy path (rebase loop → bundled-tip CI → sequential merge "
-            "→ deploy/health/smoke) ships in v0.12.0+."
-        ),
-    }, exit_code=1)
+    paths = paths_from_args(args)
+    repo = _resolve_repo(args)
+
+    if not paths.index_md.exists():
+        emit_error(f"INDEX.md not found at {paths.index_md}")
+
+    # Discovery (re-uses Phase 1 algorithm)
+    wps = parse_index_md(paths.index_md)
+    overrides = read_overrides(paths.train_overrides)
+    results = find_eligible_branches(wps, repo, paths.wp_dir, overrides)
+    eligible = [r for r in results if r.eligible]
+
+    # Trigger check
+    should_fire, trigger_reason = check_train_trigger(eligible, force=args.force)
+    if not should_fire:
+        emit_ok(data={
+            "outcome": "not_triggered",
+            "trigger_reason": trigger_reason,
+            "eligible_count": len(eligible),
+            "eligible_wps": [r.wp for r in eligible],
+        })
+
+    # Pack batches (Phase 2: ship the first batch; later trains pick up rest)
+    batches = pack_batches(eligible, max_per_batch=args.max_batch_size)
+    if not batches:
+        emit_ok(data={"outcome": "nothing_to_pack", "eligible_count": 0})
+    batch = batches[0]
+
+    # Train metadata
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
+    train_id = f"train-{timestamp}"
+    started_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    record: dict = {
+        "train_id": train_id,
+        "started_at": started_at,
+        "outcome": "pending",
+        "batch_size": len(batch),
+        "bundle": [],
+        "deploy_url": None,
+        "deploy_workflow_run": None,
+        "health_status": None,
+        "smoke_verdict": None,
+    }
+
+    # Sandbox clone — reused across all rebases in this train
+    clone_dir = Path(tempfile.mkdtemp(prefix=f"wpx-train-{train_id}-"))
+
+    try:
+        _log(f"{train_id}: trigger={trigger_reason}; batch_size={len(batch)}; "
+             f"WPs={[e.wp for e in batch]}")
+        clone_repo_to_temp(repo, clone_dir)
+
+        # Step: rebase chain. Each branch is rebased onto the previous
+        # rebased branch's HEAD (sequential rebase). The last branch's
+        # HEAD is the bundle tip.
+        bundle: list[dict] = []
+        onto_sha = _gh_ref_sha(repo, "dev")  # start from current dev
+        for e in batch:
+            pre_train_sha = _gh_branch_sha(repo, e.branch)
+            _log(f"Rebasing {e.branch} onto {onto_sha[:8]} (pre={pre_train_sha[:8]})")
+            rebased_sha = rebase_branch_in_clone(clone_dir, e.branch, onto_sha)
+            bundle.append({
+                "wp": e.wp,
+                "branch": e.branch,
+                "pre_train_sha": pre_train_sha,
+                "rebased_to_sha": rebased_sha,
+                "merge_sha_on_dev": None,
+            })
+            onto_sha = rebased_sha
+        record["bundle"] = bundle
+        bundle_tip_branch = batch[-1].branch
+
+        # Step: bundled-tip CI
+        ci_interval = args.ci_poll_interval or CI_DEFAULT_INTERVAL
+        _log(f"Bundled-tip CI: polling {bundle_tip_branch}")
+        ci_verdict = _poll_ci(repo, bundle_tip_branch, ci_interval, CI_DEFAULT_CAP)
+        if ci_verdict != "green":
+            record["outcome"] = "blocker"
+            record["outcome_reason"] = f"bundled-tip CI {ci_verdict}"
+            write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
+            emit_result(record, exit_code=1)
+
+        # Step: sequential squash-merge
+        final_merge_sha = None
+        for entry in bundle:
+            _log(f"Squash-merging {entry['wp']} ({entry['branch']}) to dev")
+            sha = _merge_squash(repo, entry["branch"], entry["wp"])
+            entry["merge_sha_on_dev"] = sha
+            final_merge_sha = sha
+        record["bundle"] = bundle  # refresh with merge_sha_on_dev populated
+
+        # Step: deploy poll
+        deploy_interval = args.deploy_poll_interval or DEPLOY_DEFAULT_INTERVAL
+        _log(f"Polling deploy '{args.deploy_workflow}' for {final_merge_sha[:8]}")
+        deploy_verdict, deploy_url = _poll_deploy(
+            repo, args.deploy_workflow, final_merge_sha,
+            deploy_interval, DEPLOY_DEFAULT_CAP,
+        )
+        record["deploy_url"] = deploy_url
+        if deploy_verdict != "green":
+            record["outcome"] = "blocker"
+            record["outcome_reason"] = f"deploy {deploy_verdict}"
+            write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
+            emit_result(record, exit_code=1)
+
+        # Step: health check (optional — only if staging URL provided)
+        if args.staging_url:
+            health_path = args.health_path or "/"
+            health_url = _join_health_url(args.staging_url, health_path)
+            _log(f"Health check: {health_url}")
+            health = _poll_health(health_url, HEALTH_DEFAULT_CAP)
+            record["health_status"] = health
+            if health != "healthy":
+                record["outcome"] = "blocker"
+                record["outcome_reason"] = (
+                    f"health check failed at {health_url}"
+                )
+                write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml",
+                                       record)
+                emit_result(record, exit_code=1)
+        else:
+            record["health_status"] = "skipped (no --staging-url)"
+
+        # Step: smoke test (optional — only if smoke cmd provided)
+        if args.smoke_cmd:
+            _log("Running smoke test")
+            smoke_verdict, smoke_out = _run_smoke(args.smoke_cmd, clone_dir)
+            record["smoke_verdict"] = smoke_verdict
+            if not smoke_verdict.startswith("PASS"):
+                record["outcome"] = "blocker"
+                record["outcome_reason"] = f"smoke {smoke_verdict}; {smoke_out}"
+                write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml",
+                                       record)
+                emit_result(record, exit_code=1)
+        else:
+            record["smoke_verdict"] = "skipped (no --smoke-cmd)"
+
+        # Train complete — write record + emit success
+        record["outcome"] = "success"
+        record["completed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
+        emit_result({
+            "train_id": train_id,
+            "outcome": "success",
+            "wps_shipped": [e.wp for e in batch],
+            "deploy_url": deploy_url,
+            "final_merge_sha": final_merge_sha,
+            "record_path": str(paths.train_runs_dir / f"{train_id}.yaml"),
+        }, exit_code=0)
+
+    except RuntimeError as exc:
+        record["outcome"] = "error"
+        record["outcome_reason"] = f"internal: {exc}"
+        record["completed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        try:
+            write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
+        except Exception:  # noqa: BLE001
+            pass
+        emit_result(record, exit_code=2)
+    except SystemExit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        emit_internal_error(exc)
+    finally:
+        shutil.rmtree(clone_dir, ignore_errors=True)
 
 
 # --- argparse -----------------------------------------------------------
@@ -369,10 +550,26 @@ def build_parser() -> argparse.ArgumentParser:
     p_doctor = sub.add_parser("doctor", help="Diagnose drift (missing branches, unmet deps, etc.)")
     _common(p_doctor)
 
-    p_run = sub.add_parser("run", help="Fire the train (Phase 2 — placeholder in v0.11.0)")
+    p_run = sub.add_parser("run", help="Fire the train (happy path; failure handling in Phase 3)")
     _common(p_run)
     p_run.add_argument("--force", action="store_true",
-                       help="Bypass size/staleness trigger (Phase 2)")
+                       help="Bypass size/staleness trigger")
+    p_run.add_argument("--deploy-workflow", required=True,
+                       help="Deploy workflow name (e.g. 'Deploy to Dev Environment')")
+    p_run.add_argument("--staging-url", default=None,
+                       help="Staging URL for health check (optional)")
+    p_run.add_argument(
+        "--health-path", default="",
+        help="HTTP path to use for the health check (default /)",
+    )
+    p_run.add_argument("--smoke-cmd", default="",
+                       help="Smoke test shell command (run after health check)")
+    p_run.add_argument("--ci-poll-interval", type=int, default=None,
+                       help=f"CI poll interval (s, default {CI_DEFAULT_INTERVAL})")
+    p_run.add_argument("--deploy-poll-interval", type=int, default=None,
+                       help=f"Deploy poll interval (s, default {DEPLOY_DEFAULT_INTERVAL})")
+    p_run.add_argument("--max-batch-size", type=int, default=5,
+                       help="Cap WPs per batch (default 5)")
 
     return parser
 

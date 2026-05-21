@@ -1215,3 +1215,191 @@ def pack_batches(
     if current:
         batches.append(current)
     return batches
+
+
+# --- Train run helpers (Phase 2) ---------------------------------------
+
+# Trigger thresholds. Documented in ADR-212 D1. The amendment notes
+# these should be revisited once the DAG-level batch unit is in
+# (PH-research follow-up item 6).
+TRAIN_TRIGGER_MIN_SIZE = 3
+TRAIN_TRIGGER_STALENESS_SECONDS = 4 * 60 * 60  # 4 hours
+
+
+def check_train_trigger(
+    eligible: list[EligibilityResult],
+    force: bool = False,
+    queued_at_lookup: dict[str, str] | None = None,
+    now: datetime | None = None,
+) -> tuple[bool, str]:
+    """Decide whether the train should fire.
+
+    Triggers (any one is sufficient):
+      - force:        --force flag passed
+      - size:         >= TRAIN_TRIGGER_MIN_SIZE eligible WPs
+      - staleness:    >= 1 eligible WP older than TRAIN_TRIGGER_STALENESS_SECONDS
+
+    Returns (should_fire, reason).
+
+    `queued_at_lookup` maps wp_id → ISO 8601 UTC timestamp string.
+    Missing entries are treated as "just queued" (no staleness pressure).
+
+    `now` is for testability — defaults to datetime.now(UTC).
+    """
+    if force:
+        return True, "force"
+    if not eligible:
+        return False, "no eligible WPs"
+    if len(eligible) >= TRAIN_TRIGGER_MIN_SIZE:
+        return True, f"size trigger: {len(eligible)} >= {TRAIN_TRIGGER_MIN_SIZE}"
+    # Staleness check
+    now = now or datetime.now(timezone.utc)
+    queued_at_lookup = queued_at_lookup or {}
+    for e in eligible:
+        ts_str = queued_at_lookup.get(e.wp)
+        if not ts_str:
+            continue
+        try:
+            ts = datetime.strptime(ts_str, "%Y-%m-%dT%H:%M:%SZ").replace(
+                tzinfo=timezone.utc,
+            )
+        except (ValueError, TypeError):
+            continue
+        age = (now - ts).total_seconds()
+        if age >= TRAIN_TRIGGER_STALENESS_SECONDS:
+            return True, (
+                f"staleness trigger: {e.wp} queued "
+                f"{int(age // 60)}m ago "
+                f"(>= {TRAIN_TRIGGER_STALENESS_SECONDS // 60}m)"
+            )
+    return False, (
+        f"{len(eligible)} eligible (need {TRAIN_TRIGGER_MIN_SIZE} for size "
+        f"or >={TRAIN_TRIGGER_STALENESS_SECONDS // 60}m staleness on one WP)"
+    )
+
+
+def clone_repo_to_temp(repo: str, dest: Path) -> None:
+    """Clone the repo to `dest` for the duration of a train run.
+
+    Uses `gh repo clone` (preferred — handles auth) with a fallback to
+    `git clone` from origin via the GITHUB_TOKEN env var if available.
+
+    Raises RuntimeError on failure.
+    """
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    rc, _, err = _run(
+        ["gh", "repo", "clone", repo, str(dest), "--", "--depth", "100"],
+        timeout=120,
+    )
+    if rc == 0:
+        return
+    # Fallback: direct git clone using GITHUB_TOKEN if present
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if token:
+        url = f"https://x-access-token:{token}@github.com/{repo}.git"
+    else:
+        url = f"https://github.com/{repo}.git"
+    rc, _, err = _run(["git", "clone", "--depth", "100", url, str(dest)],
+                     timeout=120)
+    if rc != 0:
+        raise RuntimeError(f"clone failed for {repo}: {err}")
+
+
+def rebase_branch_in_clone(
+    clone_dir: Path,
+    branch: str,
+    onto: str,
+) -> str:
+    """Within an existing clone: fetch, checkout, rebase, push --force-with-lease.
+
+    `onto` is a SHA or ref the branch should be rebased on top of.
+    Returns the new HEAD SHA after rebase + push.
+
+    Raises RuntimeError on rebase conflict; the caller (Phase 3) catches
+    this and removes the offending WP from the batch.
+    """
+    # Fetch latest of both
+    rc, _, err = _run(["git", "fetch", "origin", branch], cwd=clone_dir,
+                     timeout=60)
+    if rc != 0:
+        raise RuntimeError(f"git fetch {branch} failed: {err}")
+    rc, _, err = _run(["git", "fetch", "origin", "dev"], cwd=clone_dir,
+                     timeout=60)
+    if rc != 0:
+        raise RuntimeError(f"git fetch dev failed: {err}")
+
+    # Checkout the branch (creating a local tracking branch if needed)
+    rc, _, err = _run(["git", "checkout", "-B", branch,
+                       f"origin/{branch}"], cwd=clone_dir, timeout=30)
+    if rc != 0:
+        raise RuntimeError(f"git checkout {branch} failed: {err}")
+
+    # Rebase onto the target SHA / ref
+    rc, _, err = _run(["git", "rebase", onto], cwd=clone_dir, timeout=120)
+    if rc != 0:
+        _run(["git", "rebase", "--abort"], cwd=clone_dir, timeout=30)
+        raise RuntimeError(f"git rebase {branch} onto {onto[:8]} failed: {err}")
+
+    # Push --force-with-lease (safe: only force if remote matches what we fetched)
+    rc, _, err = _run(["git", "push", "--force-with-lease", "origin", branch],
+                     cwd=clone_dir, timeout=60)
+    if rc != 0:
+        raise RuntimeError(f"git push --force-with-lease {branch} failed: {err}")
+
+    # Read the new HEAD SHA
+    rc, out, _ = _run(["git", "rev-parse", "HEAD"], cwd=clone_dir, timeout=10)
+    if rc != 0:
+        raise RuntimeError(f"git rev-parse HEAD failed in {clone_dir}")
+    return out.strip()
+
+
+def write_train_run_record(record_path: Path, record: dict) -> None:
+    """Write a train run record to .architecture/{project}/train-runs/train-{ts}.yaml.
+
+    Uses a YAML-lite emitter (no pyyaml dep). The record schema:
+
+        train_id: train-{TIMESTAMP}
+        started_at: ISO 8601 UTC
+        completed_at: ISO 8601 UTC
+        outcome: success | blocker | error
+        outcome_reason: str (when not success)
+        batch_size: N
+        bundle:
+          - wp: WP-X
+            branch: feat/wp-x-slug
+            pre_train_sha: <sha>
+            rebased_to_sha: <sha>
+            merge_sha_on_dev: <sha or null>
+        deploy_url: str | null
+        deploy_workflow_run: str | null
+        health_status: str | null
+        smoke_verdict: str | null
+    """
+    record_path.parent.mkdir(parents=True, exist_ok=True)
+    lines: list[str] = []
+    for k in ("train_id", "started_at", "completed_at", "outcome",
+              "outcome_reason", "batch_size", "deploy_url",
+              "deploy_workflow_run", "health_status", "smoke_verdict"):
+        if k in record:
+            value = record[k]
+            if value is None:
+                lines.append(f"{k}: null")
+            elif isinstance(value, (int, float)):
+                lines.append(f"{k}: {value}")
+            else:
+                # Quote strings to be safe
+                escaped = str(value).replace('"', '\\"')
+                lines.append(f'{k}: "{escaped}"')
+    bundle = record.get("bundle", [])
+    if bundle:
+        lines.append("bundle:")
+        for item in bundle:
+            lines.append(f"  - wp: {item.get('wp', '')}")
+            for k in ("branch", "pre_train_sha", "rebased_to_sha",
+                      "merge_sha_on_dev"):
+                v = item.get(k)
+                if v is None:
+                    lines.append(f"    {k}: null")
+                else:
+                    lines.append(f"    {k}: {v}")
+    record_path.write_text("\n".join(lines) + "\n", encoding="utf-8")

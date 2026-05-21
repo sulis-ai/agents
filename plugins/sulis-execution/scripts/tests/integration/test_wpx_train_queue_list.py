@@ -218,18 +218,52 @@ def test_doctor_reports_missing_wp_file(tmp_project, run_tool):
     assert missing[0]["wp"] == "WP-002"
 
 
-def test_run_subcommand_returns_not_implemented_in_skeleton(
-    tmp_project, run_tool
+def test_run_subcommand_not_triggered_when_no_eligible(
+    tmp_project, run_tool, mock_gh
 ):
-    """`wpx-train run` in v0.11.0 is a placeholder; returns structured stub."""
+    """`wpx-train run` with no eligible WPs exits cleanly with not_triggered."""
+    _write_index(tmp_project, [
+        ("WP-001", "Pending", "create", "pending", "—", "—"),
+    ])
+    _seed_wp_files(tmp_project, [("WP-001", "pending")])
+    mock_gh([])  # no gh calls expected — nothing reaches branch checks
+
     result = run_tool(
         "wpx-train", "run",
         "--project", tmp_project.project,
         "--repo-root", str(tmp_project.repo_root),
         "--repo", "acme/x",
+        "--deploy-workflow", "Deploy to Dev",
     )
-    assert result.returncode == 1  # exit 1 = expected failure (not_implemented)
-    assert result.json is not None
-    assert result.json.get("ok") is True  # JSON shape is still OK
-    assert result.data["outcome"] == "not_implemented"
-    assert result.data["skeleton_version"] == "0.11.0"
+    assert result.ok, f"run failed: stderr={result.stderr}"
+    assert result.data["outcome"] == "not_triggered"
+    assert result.data["eligible_count"] == 0
+
+
+def test_run_subcommand_not_triggered_with_one_eligible_no_force(
+    tmp_project, run_tool, mock_gh
+):
+    """1 eligible WP and no --force → not_triggered (need ≥3 for size)."""
+    _write_index(tmp_project, [
+        ("WP-001", "Ready", "create", "step-7-complete", "—", "—"),
+    ])
+    _seed_wp_files(tmp_project, [("WP-001", "ready")])
+    mock_gh([
+        {"match": "git/refs/heads/feat/wp-001-ready",
+         "stdout": '{"object": {"sha": "deadbeef"}}'},
+        {"match": "commits/feat/wp-001-ready/check-runs",
+         "stdout": '{"check_runs": [{"name": "ci", "status": "completed", "conclusion": "success"}]}'},
+    ])
+
+    result = run_tool(
+        "wpx-train", "run",
+        "--project", tmp_project.project,
+        "--repo-root", str(tmp_project.repo_root),
+        "--repo", "acme/x",
+        "--deploy-workflow", "Deploy to Dev",
+    )
+    assert result.ok, f"run failed: stderr={result.stderr}"
+    assert result.data["outcome"] == "not_triggered"
+    assert "need" in result.data["trigger_reason"]
+    assert result.data["eligible_count"] == 1
+    assert result.data["eligible_wps"] == ["WP-001"]
