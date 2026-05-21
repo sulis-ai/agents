@@ -26,12 +26,80 @@ targets:
       install_command: pip install sulis-execution-mcp
 
 # Resource tree — flat OpenAPI paths grouped into resource.method
-# In Phase 0 (pilot) only pipeline.run is implemented; Phase 1 grows
-# this to cover all 36 subcommands.
+# 38 operations across 10 resources.
 resources:
   pipeline:
     operations:
       run: pipelineRun
+  train:
+    operations:
+      queue_list: trainQueueList
+      queue_add: trainQueueAdd
+      queue_remove: trainQueueRemove
+      status: trainStatus
+      doctor: trainDoctor
+      run: trainRun
+  index:
+    operations:
+      flip_status: indexFlipStatus
+      set_status: indexSetStatus
+      list_ready: indexListReady
+      read_config: indexReadConfig
+      propagate_blocked: indexPropagateBlocked
+      add_wp: indexAddWp
+      sync_auto_drafts: indexSyncAutoDrafts
+  journal:
+    operations:
+      init: journalInit
+      start_step: journalStartStep
+      complete_step: journalCompleteStep
+      record_attempt: journalRecordAttempt
+      record_preflight: journalRecordPreflight
+      record_postdeploy: journalRecordPostdeploy
+      seed_plan: journalSeedPlan
+      mark_plan_item: journalMarkPlanItem
+      add_plan_item: journalAddPlanItem
+      read: journalRead
+  blocker:
+    operations:
+      write: blockerWrite
+      archive: blockerArchive
+  findings:
+    operations:
+      register: findingsRegister
+      auto_draft_wp: findingsAutoDraftWp
+  wp:
+    operations:
+      read_frontmatter: wpReadFrontmatter
+      append_evidence: wpAppendEvidence
+  worktree:
+    operations:
+      create: worktreeCreate
+      remove: worktreeRemove
+  step12:
+    operations:
+      wrap: step12Wrap
+  change:
+    operations:
+      start: changeStart
+      adopt: changeAdopt
+      finish: changeFinish
+      list: changeList
+      status: changeStatus
+
+# Binary name per resource — used by the codegen + the MCP server to
+# resolve which CLI binary to invoke for each operation.
+binary_per_resource:
+  pipeline: wpx-pipeline
+  train: wpx-train
+  index: wpx-index
+  journal: wpx-journal
+  blocker: wpx-blocker
+  findings: wpx-findings
+  wp: wpx-wp
+  worktree: wpx-worktree
+  step12: wpx-step12
+  change: sulis-change
 
 # Error mapping per v0.2.0 Part 3 — three universal categories +
 # wpx-domain extensions defined in Python/TypeScript client modules.

@@ -10,20 +10,24 @@ info:
     (v0.2.0), this schema is the source of truth for typed Python +
     TypeScript clients and an MCP server. The transport is
     Subprocess + JSON-on-stdout (v0.2.0 Part 4.3) — paths and HTTP
-    response codes here are used as schema containers only; the
-    actual transport spawns the underlying CLI binary
-    (`wpx-pipeline`, `wpx-train`, etc.) and reads structured JSON
-    from stdout, mapping exit codes 0/1/2 to outcome categories
-    (Protocol / Expected / Internal) per v0.2.0 Part 3.
+    response codes here are used as schema containers only; the actual
+    transport spawns the underlying CLI binary (`wpx-pipeline`,
+    `wpx-train`, `sulis-change`, etc.) and reads structured JSON from
+    stdout, mapping exit codes 0/1/2 to outcome categories (Protocol /
+    Expected / Internal) per v0.2.0 Part 3.
 
     A second transport binding (JSON-RPC over stdio / MCP, v0.2.0
     Part 4.2) is provided by the sulis-execution-mcp server, which
     reads this schema and registers each operation as an MCP tool.
+
+    Surface: 38 operations across 10 resources.
   contact:
     name: Sulis AI
     url: https://github.com/sulis-ai/agents
 
 paths:
+
+  # ─── pipeline ────────────────────────────────────────────────────────
   /pipeline/run:
     post:
       operationId: pipelineRun
@@ -31,62 +35,571 @@ paths:
       description: |
         Polls CI for the WP's branch, rebases if the base branch has
         advanced, squash-merges to the base branch, polls the deploy
-        workflow, runs health + smoke. Returns a structured result
-        with outcome (success / blocker / error) and per-step verdicts.
+        workflow, runs health + smoke. Returns a structured result with
+        outcome (success / blocker / error) and per-step verdicts.
 
-        Use this for hotfix / solo-ship paths. For batched shipping,
-        use train.run.
+        Use for hotfix / solo-ship paths. For batched shipping, use
+        train.run.
 
         Failure modes (returned as successful operations with
         outcome: blocker — the SDK does NOT raise an exception):
-        - CI poll timeout or red → outcome: blocker
-        - Rebase conflict → outcome: blocker
-        - Deploy workflow timeout or red → outcome: blocker
-        - Health check unhealthy → outcome: blocker
-        - Smoke test fail → outcome: blocker
+        CI poll timeout or red; rebase conflict; deploy timeout or red;
+        health check unhealthy; smoke fail.
 
-        Errors (the SDK raises):
-        - Invalid arguments → ExpectedError
-        - Tool crash → InternalError
-        - Tool not found / permission denied → ProtocolError
+        Errors (the SDK raises): invalid arguments → ExpectedError;
+        crash → InternalError; binary missing → ProtocolError.
       requestBody:
         required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PipelineRunRequest'
+        content: { application/json: { schema: { $ref: '#/components/schemas/PipelineRunRequest' } } }
       responses:
-        '200':
-          description: |
-            Pipeline completed. Outcome may be success or blocker;
-            both are normal results, not errors.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PipelineResult'
-        '400':
-          $ref: '#/components/responses/ExpectedError'
-        '500':
-          $ref: '#/components/responses/InternalError'
+        '200': { description: Pipeline completed. Outcome may be success or blocker; both are normal results., content: { application/json: { schema: { $ref: '#/components/schemas/PipelineResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  # ─── train ──────────────────────────────────────────────────────────
+  /train/queue-list:
+    post:
+      operationId: trainQueueList
+      summary: List WPs eligible for the next train + their reasons
+      description: |
+        Reads INDEX.md, derives eligibility per WP (status, deps,
+        branch on origin, CI green), applies queue overrides
+        (includes / holds). Returns both eligible and ineligible
+        WPs with reasons. Read-only.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TrainStandardRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TrainQueueListResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /train/queue-add:
+    post:
+      operationId: trainQueueAdd
+      summary: Force-include a WP in the next train
+      description: |
+        Adds the WP to train-overrides.yaml's `includes`. Useful when
+        eligibility detection is wrong (e.g., CI status unavailable but
+        you know the branch is green). Idempotent.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TrainQueueAddRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TrainOverrideResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /train/queue-remove:
+    post:
+      operationId: trainQueueRemove
+      summary: Hold a WP back from the next train
+      description: |
+        Adds the WP to train-overrides.yaml's `holds`. Useful when a
+        WP is technically eligible but the founder wants to pause it.
+        Idempotent.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TrainQueueRemoveRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TrainOverrideResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /train/status:
+    post:
+      operationId: trainStatus
+      summary: Train queue summary (size, trigger state, last run)
+      description: |
+        Compact read-only view. Counts eligible WPs, reports trigger
+        state (not_ready / ready_size / waiting), names the last train
+        run record. Used by /sulis-execution:status to render train
+        context.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TrainStandardRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TrainStatusResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /train/doctor:
+    post:
+      operationId: trainDoctor
+      summary: Diagnose drift between INDEX, branches, and CI
+      description: |
+        Surfaces issues that would block a train run: missing WP files,
+        unmet dependencies, orphan branches, INDEX status mismatches.
+        Read-only; produces a list of issues for human triage.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TrainStandardRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TrainDoctorResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /train/run:
+    post:
+      operationId: trainRun
+      summary: Fire the train — batched merge + deploy + health + smoke
+      description: |
+        Per ADR-212: rebases each eligible WP onto previous, runs
+        bundled-tip CI, squash-merges sequentially, runs ONE deploy +
+        health + smoke for the whole batch. Failure modes (per WP
+        rebase conflict; bundled-tip CI red; post-merge deploy/health/
+        smoke fail) produce structured outcome (success / blocker /
+        error / not_triggered / nothing_to_pack).
+
+        Outcomes returned as normal results, NOT exceptions. Inspect
+        result.outcome.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TrainRunRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TrainRunResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  # ─── index ──────────────────────────────────────────────────────────
+  /index/flip-status:
+    post:
+      operationId: indexFlipStatus
+      summary: Atomic status flip with CAS-style guard
+      description: |
+        Changes a WP's status in INDEX.md. If `expected` is provided
+        and the current status doesn't match, raises ExpectedError
+        (the caller's assumption was stale).
+
+        Allowed statuses: pending, in_progress, done, blocked,
+        dependency_blocked, auto-draft, cancelled, step-7-complete,
+        step-7-held, step-7-blocked.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/IndexFlipStatusRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/IndexFlipStatusResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /index/set-status:
+    post:
+      operationId: indexSetStatus
+      summary: Force a WP's status (no CAS guard)
+      description: |
+        Like flip-status but without the `expected` check. Use only
+        when you have a reason to bypass — e.g., manual override
+        after a stuck state.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/IndexSetStatusRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/IndexFlipStatusResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /index/list-ready:
+    post:
+      operationId: indexListReady
+      summary: List WPs ready for execution (pending + deps satisfied)
+      description: |
+        Returns WP IDs whose status is pending AND whose
+        dependencies are all done. Also returns counts by status.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/StandardRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/IndexListReadyResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /index/read-config:
+    post:
+      operationId: indexReadConfig
+      summary: Read Orchestrator Config block from INDEX.md
+      description: |
+        Returns key-value pairs from the Orchestrator Config section
+        of INDEX.md (max_parallel, project metadata, etc.).
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/StandardRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/IndexReadConfigResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /index/propagate-blocked:
+    post:
+      operationId: indexPropagateBlocked
+      summary: Flip transitively-dependent WPs to dependency_blocked
+      description: |
+        Given a blocker WP, walks the dependency graph and flips all
+        WPs that depend on it (directly or transitively) to
+        `dependency_blocked` status. Returns the list of flipped WPs.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/IndexPropagateBlockedRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/IndexPropagateBlockedResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /index/add-wp:
+    post:
+      operationId: indexAddWp
+      summary: Add a row to INDEX.md
+      description: |
+        Inserts a new WP row. Either pass --from-wp-file (read fields
+        from the existing WP-NNN-*.md file's frontmatter), or pass
+        title / primitive / status / depends_on / blocks / token_estimate /
+        tdd explicitly.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/IndexAddWpRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/IndexAddWpResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /index/sync-auto-drafts:
+    post:
+      operationId: indexSyncAutoDrafts
+      summary: Register WP-AUTO-*.md files in INDEX.md
+      description: |
+        Scans work-packages/ for WP-AUTO-*.md files; for each one not
+        already in INDEX.md, adds a row with status `auto-draft`.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/StandardRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/IndexSyncAutoDraftsResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  # ─── journal ────────────────────────────────────────────────────────
+  /journal/init:
+    post:
+      operationId: journalInit
+      summary: Create the per-WP executor journal
+      description: Initialises .architecture/{project}/work-packages/.executor-{wp}.md.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JournalInitRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/JournalPathResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /journal/start-step:
+    post:
+      operationId: journalStartStep
+      summary: Record a lifecycle step start
+      description: Marks Step N as started in the journal with a timestamp.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JournalStepRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/JournalStepResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /journal/complete-step:
+    post:
+      operationId: journalCompleteStep
+      summary: Record a lifecycle step completion + outcome
+      description: Marks Step N as complete with the outcome (short freeform string).
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JournalCompleteStepRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/JournalStepResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /journal/record-attempt:
+    post:
+      operationId: journalRecordAttempt
+      summary: Record an attempted fix during a step
+      description: Per EL-08, an attempt records the failure, root cause, applied change, and outcome.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JournalRecordAttemptRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/JournalAttemptResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /journal/record-preflight:
+    post:
+      operationId: journalRecordPreflight
+      summary: Record preflight tool availability
+      description: Records whether a required tool (gh, git, jq, etc.) is present, with optional fallback note.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JournalRecordPreflightRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/JournalPreflightResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /journal/record-postdeploy:
+    post:
+      operationId: journalRecordPostdeploy
+      summary: Record post-deploy verification verdict
+      description: Records the Step 11 security-review verdict (PASS / N CONCERN / N ADVISORY / CRITICAL).
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JournalRecordPostdeployRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/JournalPostdeployResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /journal/seed-plan:
+    post:
+      operationId: journalSeedPlan
+      summary: Seed the executor's plan section (Step 1.5)
+      description: |
+        Per v0.10.0+, the executor writes a plan (approach + numbered
+        items) at Step 1.5 before TDD begins. This seeds it; use
+        --force to overwrite an existing plan.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JournalSeedPlanRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/JournalSeedPlanResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /journal/mark-plan-item:
+    post:
+      operationId: journalMarkPlanItem
+      summary: Update a plan item's status
+      description: |
+        Per-item status transition. Optional `expected` for CAS-style
+        guard (e.g., flip from in-progress to done only if currently
+        in-progress).
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JournalMarkPlanItemRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/JournalMarkPlanItemResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /journal/add-plan-item:
+    post:
+      operationId: journalAddPlanItem
+      summary: Append a new plan item
+      description: Mid-flight plan additions when the executor discovers extra work.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JournalAddPlanItemRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/JournalAddPlanItemResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /journal/read:
+    post:
+      operationId: journalRead
+      summary: Read a specific journal field
+      description: |
+        Returns the value of a single field. Allowed fields: status,
+        lifecycle-step, started, step-trace, step-N-status (with N as
+        an integer), post-deploy-verification, preflight, plan.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JournalReadRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/JournalReadResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  # ─── blocker ────────────────────────────────────────────────────────
+  /blocker/write:
+    post:
+      operationId: blockerWrite
+      summary: Write an EL-08 BLOCKER record
+      description: |
+        Creates BLOCKER-{wp}.md with the canonical sections:
+        failure observation (verbatim), Five Whys trace, root cause,
+        scope verdict, optional attempts, plain-English summary,
+        suggested next step. Use --force to overwrite.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BlockerWriteRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/BlockerWriteResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /blocker/archive:
+    post:
+      operationId: blockerArchive
+      summary: Move a BLOCKER file to .archive/
+      description: Archives the file with a timestamp suffix; clears the active blocker for the WP.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BlockerArchiveRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/BlockerArchiveResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  # ─── findings ───────────────────────────────────────────────────────
+  /findings/register:
+    post:
+      operationId: findingsRegister
+      summary: Register a security finding (with dedup) + auto-draft WP
+      description: |
+        Adds an entry to .security/{project}/findings-register.md.
+        Dedupes by signature (sha1 of severity|summary|file). If new,
+        creates a corresponding WP-AUTO-NNN.md draft so the finding
+        gets queued for remediation. Returns the SF-NNN ID and
+        WP-AUTO-NNN ID.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FindingsRegisterRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/FindingsRegisterResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /findings/auto-draft-wp:
+    post:
+      operationId: findingsAutoDraftWp
+      summary: Generate the WP-AUTO-NNN.md skeleton from a finding
+      description: |
+        Internal — usually called by findings.register. Produces the
+        WP file with primitive + severity + reference to the source
+        finding.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FindingsAutoDraftWpRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/FindingsAutoDraftWpResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  # ─── wp ─────────────────────────────────────────────────────────────
+  /wp/read-frontmatter:
+    post:
+      operationId: wpReadFrontmatter
+      summary: Read YAML frontmatter from a WP file
+      description: Returns one field's value, or the whole frontmatter dict if field is "*".
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/WpReadFrontmatterRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/WpReadFrontmatterResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /wp/append-evidence:
+    post:
+      operationId: wpAppendEvidence
+      summary: Append acceptance-evidence section to a WP file
+      description: |
+        Adds `## Acceptance Evidence` with the pipeline-result fields
+        (branch, pre_squash_sha, merge_sha, deploy_url, health,
+        smoke, post-deploy verification, completed_at).
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/WpAppendEvidenceRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/WpAppendEvidenceResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  # ─── worktree ───────────────────────────────────────────────────────
+  /worktree/create:
+    post:
+      operationId: worktreeCreate
+      summary: Create the executor's per-WP git worktree
+      description: |
+        Fetches origin/dev, branches at that SHA, creates the worktree
+        at the given path, records the dev SHA in a sidecar file
+        (.executor-{wp}-dev-sha) for later rebase reference.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/WorktreeCreateRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/WorktreeCreateResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /worktree/remove:
+    post:
+      operationId: worktreeRemove
+      summary: Remove the executor's per-WP git worktree
+      description: |
+        Runs `git worktree remove`; cleans up the sidecar file. Use
+        --force to remove dirty worktrees; --tolerate-missing to
+        succeed if the worktree is already gone.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/WorktreeRemoveRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/WorktreeRemoveResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  # ─── step12 ─────────────────────────────────────────────────────────
+  /step12/wrap:
+    post:
+      operationId: step12Wrap
+      summary: Atomic Step 12 — evidence + INDEX flip + worktree remove
+      description: |
+        Chains three operations fail-fast: wp.append-evidence;
+        index.flip-status (expected: in_progress → done); worktree.remove.
+        If any fails, returns details of what succeeded vs failed.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Step12WrapRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Step12WrapResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  # ─── change (sulis-change) ──────────────────────────────────────────
+  /change/start:
+    post:
+      operationId: changeStart
+      summary: Start a new change — branch + worktree per CW-04
+      description: |
+        Creates `change/{primitive}-{slug}` branched off base (default
+        dev), provisions a sibling worktree, writes
+        .changes/{primitive}-{slug}.yaml metadata.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ChangeStartRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ChangeStartResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /change/adopt:
+    post:
+      operationId: changeAdopt
+      summary: Retrofit in-flight work into a change branch
+      description: |
+        Three retrofit flavours: uncommitted-only (stash + worktree +
+        unstash); local-commits (cherry-pick onto change branch +
+        reset local); pushed-commits (--mode rewrite, destructive,
+        requires --force).
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ChangeAdoptRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ChangeAdoptResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /change/finish:
+    post:
+      operationId: changeFinish
+      summary: Ship a change — merge or PR; cleanup branch + worktree
+      description: |
+        With --merge: rebase onto base, squash-merge, push, then
+        cleanup. With --pr: push branch, open PR via gh, optionally
+        cleanup. Cleanup defaults on; use --no-cleanup to retain.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ChangeFinishRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ChangeFinishResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /change/list:
+    post:
+      operationId: changeList
+      summary: List active change branches + worktree state
+      description: Returns all change/* branches with worktree presence + dirty status.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ChangeListRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ChangeListResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /change/status:
+    post:
+      operationId: changeStatus
+      summary: One change's detailed status
+      description: Returns branch SHA, ahead/behind base, worktree presence, full metadata.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ChangeStatusRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ChangeStatusResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
 
 components:
+
   schemas:
-    PipelineRunRequest:
+
+    # ─── Shared bases ─────────────────────────────────────────────────
+    StandardRequest:
       type: object
-      required:
-        - wp
-        - branch
-        - project
-        - dev_sha_at_creation
-        - deploy_workflow
+      required: [project]
       properties:
-        wp:
-          type: string
-          pattern: '^WP-[A-Z0-9-]+$'
-          description: Work Package ID (e.g. WP-001)
-        branch:
-          type: string
-          description: Feature branch name (typically feat/wp-NNN-slug)
         project:
           type: string
           description: Project slug (resolves .architecture/<project>/ paths)
@@ -94,128 +607,781 @@ components:
           type: string
           default: '.'
           description: Repository root directory
-        repo:
-          type: string
-          description: GitHub repo as org/name; defaults to $GITHUB_REPOSITORY env var
-        worktree_path:
-          type: string
-          description: Path to executor worktree (defaults to repo root)
-        dev_sha_at_creation:
-          type: string
-          pattern: '^[0-9a-f]{7,40}$'
-          description: origin/dev (or base-branch) SHA captured at worktree creation
-        deploy_workflow:
-          type: string
-          description: Deploy workflow name (e.g. "Deploy to Dev Environment")
-        staging_url:
-          type: string
-          format: uri
-          description: Staging URL; if set, triggers health check
-        health_path:
-          type: string
-          default: ''
-          description: HTTP path for health check (auto-detected from smoke_cmd if empty)
-        smoke_cmd:
-          type: string
-          default: ''
-          description: Smoke test shell command
-        ci_poll_interval:
-          type: integer
-          minimum: 30
-          default: 300
-        deploy_poll_interval:
-          type: integer
-          minimum: 30
-          default: 300
-        skip_ci_poll:
-          type: boolean
-          default: false
-        base_branch:
-          type: string
-          default: 'dev'
-          description: |
-            Base ref for rebase + merge (CW-04). When invoked inside
-            a change worktree, callers pass the change branch name
-            so WPs ship to the change branch rather than directly to
-            dev.
+
+    TrainStandardRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          properties:
+            repo:
+              type: string
+              description: GitHub repo as org/name; defaults to $GITHUB_REPOSITORY env var
+
+    # ─── pipeline ─────────────────────────────────────────────────────
+    PipelineRunRequest:
+      type: object
+      required: [wp, branch, project, dev_sha_at_creation, deploy_workflow]
+      properties:
+        wp: { type: string, pattern: '^WP-[A-Z0-9-]+$' }
+        branch: { type: string }
+        project: { type: string }
+        repo_root: { type: string, default: '.' }
+        repo: { type: string }
+        worktree_path: { type: string }
+        dev_sha_at_creation: { type: string, pattern: '^[0-9a-f]{7,40}$' }
+        deploy_workflow: { type: string }
+        staging_url: { type: string, format: uri }
+        health_path: { type: string, default: '' }
+        smoke_cmd: { type: string, default: '' }
+        ci_poll_interval: { type: integer, minimum: 30 }
+        deploy_poll_interval: { type: integer, minimum: 30 }
+        skip_ci_poll: { type: boolean, default: false }
+        base_branch: { type: string, default: 'dev' }
 
     PipelineResult:
       type: object
-      required:
-        - wp
-        - outcome
-        - started_at
+      required: [wp, outcome, started_at]
       properties:
-        wp:
-          type: string
-        outcome:
-          type: string
-          enum: [success, blocker, error, pending]
-          description: |
-            success = pipeline completed cleanly.
-            blocker = pipeline ran but reported a deterministic
-              failure (CI red, deploy timed out, smoke failed).
-              Inspect blocker_reason. This is NOT an exception;
-              the SDK returns this result.
-            error = unexpected internal state (rare).
-            pending = transient state during execution (not seen by
-              callers; only present in intermediate result records).
-        merge_sha:
-          type: [string, 'null']
-        deploy_url:
-          type: [string, 'null']
-          format: uri
-        deploy_workflow_run:
-          type: [string, 'null']
-        health_status:
-          type: [string, 'null']
-          enum: [healthy, unhealthy, skipped, null]
-        health_url:
-          type: [string, 'null']
-        smoke_verdict:
-          type: [string, 'null']
-        blocker_reason:
-          type: [string, 'null']
-        ci_poll_skipped:
-          type: boolean
-          default: false
-        merge_already_complete:
-          type: boolean
-          default: false
-        started_at:
-          type: string
-          format: date-time
-        completed_at:
-          type: [string, 'null']
-          format: date-time
+        wp: { type: string }
+        outcome: { type: string, enum: [success, blocker, error, pending] }
+        merge_sha: { type: [string, 'null'] }
+        deploy_url: { type: [string, 'null'] }
+        deploy_workflow_run: { type: [string, 'null'] }
+        health_status: { type: [string, 'null'], enum: [healthy, unhealthy, skipped, null] }
+        health_url: { type: [string, 'null'] }
+        smoke_verdict: { type: [string, 'null'] }
+        blocker_reason: { type: [string, 'null'] }
+        ci_poll_skipped: { type: boolean, default: false }
+        merge_already_complete: { type: boolean, default: false }
+        started_at: { type: string, format: date-time }
+        completed_at: { type: [string, 'null'], format: date-time }
 
+    # ─── train ────────────────────────────────────────────────────────
+    EligibilityEntry:
+      type: object
+      required: [wp, eligible, reason]
+      properties:
+        wp: { type: string }
+        branch: { type: string }
+        eligible: { type: boolean }
+        reason: { type: string }
+        primitive: { type: string }
+        forced: { type: boolean, default: false }
+
+    TrainOverrides:
+      type: object
+      properties:
+        includes: { type: array, items: { type: string } }
+        holds: { type: array, items: { type: string } }
+
+    TrainQueueListResult:
+      type: object
+      required: [project, eligible_count, ineligible_count, eligible, ineligible]
+      properties:
+        project: { type: string }
+        index_md: { type: string }
+        eligible_count: { type: integer }
+        ineligible_count: { type: integer }
+        eligible: { type: array, items: { $ref: '#/components/schemas/EligibilityEntry' } }
+        ineligible: { type: array, items: { $ref: '#/components/schemas/EligibilityEntry' } }
+        overrides: { $ref: '#/components/schemas/TrainOverrides' }
+
+    TrainQueueAddRequest:
+      allOf:
+        - $ref: '#/components/schemas/TrainStandardRequest'
+        - type: object
+          required: [wp]
+          properties:
+            wp: { type: string }
+            reason: { type: string, default: '' }
+
+    TrainQueueRemoveRequest:
+      allOf:
+        - $ref: '#/components/schemas/TrainStandardRequest'
+        - type: object
+          required: [wp]
+          properties:
+            wp: { type: string }
+            reason: { type: string, default: '' }
+
+    TrainOverrideResult:
+      type: object
+      required: [wp, action]
+      properties:
+        wp: { type: string }
+        action: { type: string, enum: [force_include_added, hold_added, noop] }
+        reason: { type: string }
+        overrides_path: { type: string }
+        includes: { type: array, items: { type: string } }
+        holds: { type: array, items: { type: string } }
+
+    TrainStatusResult:
+      type: object
+      required: [project, eligible_count, ineligible_count, trigger_state]
+      properties:
+        project: { type: string }
+        eligible_count: { type: integer }
+        eligible_wps: { type: array, items: { type: string } }
+        ineligible_count: { type: integer }
+        overrides: { $ref: '#/components/schemas/TrainOverrides' }
+        trigger_state: { type: string, enum: [not_ready, ready_size, waiting] }
+        trigger_reason: { type: string }
+        last_train_run: { type: [string, 'null'] }
+
+    TrainDoctorIssue:
+      type: object
+      required: [kind, detail]
+      properties:
+        kind: { type: string }
+        wp: { type: string }
+        detail: { type: string }
+
+    TrainDoctorResult:
+      type: object
+      required: [project, issue_count, issues]
+      properties:
+        project: { type: string }
+        issue_count: { type: integer }
+        issues: { type: array, items: { $ref: '#/components/schemas/TrainDoctorIssue' } }
+        note_orphan_branches: { type: string }
+
+    TrainRunRequest:
+      allOf:
+        - $ref: '#/components/schemas/TrainStandardRequest'
+        - type: object
+          required: [deploy_workflow]
+          properties:
+            force: { type: boolean, default: false }
+            deploy_workflow: { type: string }
+            staging_url: { type: string, format: uri }
+            health_path: { type: string, default: '' }
+            smoke_cmd: { type: string, default: '' }
+            ci_poll_interval: { type: integer, minimum: 30 }
+            deploy_poll_interval: { type: integer, minimum: 30 }
+            max_batch_size: { type: integer, default: 5 }
+            base_branch: { type: string, default: 'dev' }
+
+    TrainBundleEntry:
+      type: object
+      properties:
+        wp: { type: string }
+        branch: { type: string }
+        pre_train_sha: { type: string }
+        rebased_to_sha: { type: string }
+        merge_sha_on_dev: { type: [string, 'null'] }
+
+    TrainRunResult:
+      type: object
+      required: [train_id, outcome]
+      properties:
+        train_id: { type: string }
+        outcome: { type: string, enum: [success, not_triggered, nothing_to_pack, blocker, error] }
+        wps_shipped: { type: array, items: { type: string } }
+        eligible_count: { type: integer }
+        eligible_wps: { type: array, items: { type: string } }
+        deploy_url: { type: [string, 'null'] }
+        final_merge_sha: { type: [string, 'null'] }
+        record_path: { type: [string, 'null'] }
+        bundle: { type: array, items: { $ref: '#/components/schemas/TrainBundleEntry' } }
+        rebase_failures: { type: array, items: { type: object } }
+        train_blocker_path: { type: [string, 'null'] }
+
+    # ─── index ────────────────────────────────────────────────────────
+    IndexFlipStatusRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp, to]
+          properties:
+            wp: { type: string }
+            to:
+              type: string
+              enum: [pending, in_progress, done, blocked, dependency_blocked, auto-draft, cancelled, step-7-complete, step-7-held, step-7-blocked]
+            expected: { type: [string, 'null'] }
+
+    IndexSetStatusRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp, to]
+          properties:
+            wp: { type: string }
+            to: { type: string }
+
+    IndexFlipStatusResult:
+      type: object
+      required: [wp, status]
+      properties:
+        wp: { type: string }
+        status: { type: string }
+
+    IndexListReadyResult:
+      type: object
+      required: [ready, max_parallel, total_pending, total_done, total_blocked, total_in_progress]
+      properties:
+        ready: { type: array, items: { type: string } }
+        max_parallel: { type: integer }
+        total_pending: { type: integer }
+        total_done: { type: integer }
+        total_blocked: { type: integer }
+        total_in_progress: { type: integer }
+
+    IndexReadConfigResult:
+      type: object
+      required: [config]
+      properties:
+        config: { type: object, additionalProperties: { type: string } }
+
+    IndexPropagateBlockedRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp]
+          properties:
+            wp: { type: string }
+
+    IndexPropagateBlockedResult:
+      type: object
+      required: [blocker_wp, flipped_to_dependency_blocked]
+      properties:
+        blocker_wp: { type: string }
+        flipped_to_dependency_blocked: { type: array, items: { type: string } }
+
+    IndexAddWpRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp]
+          properties:
+            wp: { type: string }
+            from_wp_file: { type: boolean, default: false }
+            title: { type: [string, 'null'] }
+            primitive: { type: [string, 'null'] }
+            status: { type: string, default: 'pending' }
+            depends_on: { type: string, default: '' }
+            blocks: { type: string, default: '' }
+            token_estimate: { type: string, default: '?' }
+            tdd: { type: [string, 'null'] }
+
+    IndexAddWpResult:
+      type: object
+      required: [wp, added]
+      properties:
+        wp: { type: string }
+        added: { type: boolean }
+
+    IndexSyncAutoDraftsResult:
+      type: object
+      required: [synced_count, synced]
+      properties:
+        synced_count: { type: integer }
+        synced: { type: array, items: { type: string } }
+
+    # ─── journal ──────────────────────────────────────────────────────
+    JournalInitRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp]
+          properties:
+            wp: { type: string }
+            force: { type: boolean, default: false }
+
+    JournalPathResult:
+      type: object
+      required: [path]
+      properties:
+        path: { type: string }
+
+    JournalStepRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp, step]
+          properties:
+            wp: { type: string }
+            step: { type: integer }
+
+    JournalCompleteStepRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp, step, outcome]
+          properties:
+            wp: { type: string }
+            step: { type: integer }
+            outcome: { type: string }
+
+    JournalStepResult:
+      type: object
+      required: [wp, step]
+      properties:
+        wp: { type: string }
+        step: { type: integer }
+        started_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time }
+
+    JournalRecordAttemptRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp, step, attempt, failure, root_cause, change, outcome]
+          properties:
+            wp: { type: string }
+            step: { type: integer }
+            attempt: { type: integer }
+            failure: { type: string }
+            root_cause: { type: string }
+            change: { type: string }
+            outcome: { type: string }
+
+    JournalAttemptResult:
+      type: object
+      required: [wp, step, attempt]
+      properties:
+        wp: { type: string }
+        step: { type: integer }
+        attempt: { type: integer }
+
+    JournalRecordPreflightRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp, tool, status]
+          properties:
+            wp: { type: string }
+            tool: { type: string }
+            status: { type: string, enum: [present, absent] }
+            fallback: { type: string }
+
+    JournalPreflightResult:
+      type: object
+      required: [wp, tool, status]
+      properties:
+        wp: { type: string }
+        tool: { type: string }
+        status: { type: string }
+
+    JournalRecordPostdeployRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp, verdict]
+          properties:
+            wp: { type: string }
+            verdict: { type: string }
+            findings_json: { type: string }
+
+    JournalPostdeployResult:
+      type: object
+      required: [wp, verdict]
+      properties:
+        wp: { type: string }
+        verdict: { type: string }
+
+    JournalSeedPlanRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp, approach, plan_json]
+          properties:
+            wp: { type: string }
+            approach: { type: string }
+            plan_json: { type: string }
+            force: { type: boolean, default: false }
+
+    JournalSeedPlanResult:
+      type: object
+      required: [wp, approach, item_count]
+      properties:
+        wp: { type: string }
+        approach: { type: string }
+        item_count: { type: integer }
+
+    JournalMarkPlanItemRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp, item, status]
+          properties:
+            wp: { type: string }
+            item: { type: integer }
+            status: { type: string, enum: [pending, in-progress, done, skipped] }
+            expected: { type: string }
+            notes: { type: string }
+
+    JournalMarkPlanItemResult:
+      type: object
+      required: [wp, item, status]
+      properties:
+        wp: { type: string }
+        item: { type: integer }
+        status: { type: string }
+
+    JournalAddPlanItemRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp, description, step]
+          properties:
+            wp: { type: string }
+            description: { type: string }
+            step: { type: string }
+            notes: { type: string }
+
+    JournalAddPlanItemResult:
+      type: object
+      required: [wp, item, description, step, status]
+      properties:
+        wp: { type: string }
+        item: { type: integer }
+        description: { type: string }
+        step: { type: string }
+        status: { type: string }
+
+    JournalReadRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp, field]
+          properties:
+            wp: { type: string }
+            field:
+              type: string
+              description: One of status / lifecycle-step / started / step-trace / step-N-status / post-deploy-verification / preflight / plan
+
+    JournalReadResult:
+      type: object
+      required: [field, value]
+      properties:
+        field: { type: string }
+        value:
+          description: Type depends on the field; can be string, int, array of objects, or object.
+
+    # ─── blocker ──────────────────────────────────────────────────────
+    BlockerWriteRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp, title, step, trigger, observation, root_cause, scope, plain_english, suggested_next]
+          properties:
+            wp: { type: string }
+            title: { type: string }
+            step: { type: string }
+            trigger: { type: string, enum: [scope-guard, budget-exhausted, five-whys-non-convergence] }
+            observation: { type: string, description: "Verbatim failure observation or @/path to file" }
+            five_whys_json: { type: string, description: "JSON array of why steps or @/path" }
+            root_cause: { type: string }
+            scope: { type: string, enum: [in-scope-budget-exhausted, out-of-scope, indeterminate] }
+            scope_reason: { type: string }
+            attempts_json: { type: string }
+            plain_english: { type: string }
+            suggested_next: { type: string }
+            force: { type: boolean, default: false }
+
+    BlockerWriteResult:
+      type: object
+      required: [wp, path]
+      properties:
+        wp: { type: string }
+        path: { type: string }
+
+    BlockerArchiveRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp]
+          properties:
+            wp: { type: string }
+
+    BlockerArchiveResult:
+      type: object
+      required: [wp, archived_to, original]
+      properties:
+        wp: { type: string }
+        archived_to: { type: string }
+        original: { type: string }
+
+    # ─── findings ─────────────────────────────────────────────────────
+    FindingsRegisterRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp, severity, summary, file]
+          properties:
+            wp: { type: string, description: Source WP that surfaced the finding }
+            severity: { type: string, enum: [CRITICAL, CONCERN, ADVISORY] }
+            summary: { type: string }
+            file: { type: string }
+            evidence_json: { type: string, description: "JSON or @/path" }
+            suggested_fix: { type: string }
+            primitive: { type: string }
+
+    FindingsRegisterResult:
+      type: object
+      required: [sf_id, is_duplicate, source_wp, signature]
+      properties:
+        sf_id: { type: string }
+        is_duplicate: { type: boolean }
+        auto_draft_wp_id: { type: [string, 'null'] }
+        source_wp: { type: string }
+        signature: { type: string }
+        sf_path: { type: [string, 'null'] }
+
+    FindingsAutoDraftWpRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [source_finding, source_wp, auto_wp_id, severity]
+          properties:
+            source_finding: { type: string }
+            source_wp: { type: string }
+            auto_wp_id: { type: string }
+            primitive: { type: string, default: 'Secure', enum: [Secure, Harden, Instrument, Gate] }
+            severity: { type: string, enum: [CONCERN, ADVISORY] }
+
+    FindingsAutoDraftWpResult:
+      type: object
+      required: [auto_wp_id, path]
+      properties:
+        auto_wp_id: { type: string }
+        path: { type: string }
+
+    # ─── wp ───────────────────────────────────────────────────────────
+    WpReadFrontmatterRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp, field]
+          properties:
+            wp: { type: string }
+            field: { type: string, description: 'Field name, or "*" for all' }
+
+    WpReadFrontmatterResult:
+      type: object
+      required: [field, present]
+      properties:
+        field: { type: string }
+        value:
+          description: Type depends on the field
+        frontmatter: { type: object, additionalProperties: true }
+        present: { type: boolean }
+
+    WpAppendEvidenceRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp, evidence_json]
+          properties:
+            wp: { type: string }
+            evidence_json: { type: string, description: "JSON object or @/path" }
+
+    WpAppendEvidenceResult:
+      type: object
+      required: [wp, path]
+      properties:
+        wp: { type: string }
+        path: { type: string }
+
+    # ─── worktree ─────────────────────────────────────────────────────
+    WorktreeCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp, branch, worktree_path]
+          properties:
+            wp: { type: string }
+            branch: { type: string }
+            worktree_path: { type: string }
+
+    WorktreeCreateResult:
+      type: object
+      required: [wp, worktree_path, branch, dev_sha_at_creation, sidecar]
+      properties:
+        wp: { type: string }
+        worktree_path: { type: string }
+        branch: { type: string }
+        dev_sha_at_creation: { type: string }
+        sidecar: { type: string }
+
+    WorktreeRemoveRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp, worktree_path]
+          properties:
+            wp: { type: string }
+            worktree_path: { type: string }
+            force: { type: boolean, default: false }
+            tolerate_missing: { type: boolean, default: false }
+
+    WorktreeRemoveResult:
+      type: object
+      required: [wp, removed]
+      properties:
+        wp: { type: string }
+        removed: { type: string }
+
+    # ─── step12 ───────────────────────────────────────────────────────
+    Step12WrapRequest:
+      allOf:
+        - $ref: '#/components/schemas/StandardRequest'
+        - type: object
+          required: [wp, branch, pipeline_result]
+          properties:
+            wp: { type: string }
+            branch: { type: string }
+            pipeline_result: { type: string, description: "JSON or @/path" }
+            pre_squash_sha: { type: string }
+            worktree_path: { type: string }
+            post_deploy_verification: { type: string }
+
+    Step12WrapResult:
+      type: object
+      required: [wp, steps]
+      properties:
+        wp: { type: string }
+        steps:
+          type: object
+          properties:
+            append_evidence: { type: object, additionalProperties: true }
+            flip_status: { type: object, additionalProperties: true }
+            worktree_remove: { type: object, additionalProperties: true }
+
+    # ─── change (sulis-change) ────────────────────────────────────────
+    ChangeStartRequest:
+      type: object
+      required: [slug]
+      properties:
+        slug: { type: string, description: "2-5 word kebab-case (e.g. introduce-payments)" }
+        primitive: { type: string, default: 'feat' }
+        base: { type: string, default: 'dev' }
+        repo_root: { type: string, default: '.' }
+
+    ChangeStartResult:
+      type: object
+      required: [branch, primitive, slug, worktree_path, base_branch]
+      properties:
+        branch: { type: string }
+        primitive: { type: string }
+        slug: { type: string }
+        worktree_path: { type: string }
+        base_branch: { type: string }
+        base_sha: { type: string }
+        metadata_path: { type: string }
+
+    ChangeAdoptRequest:
+      type: object
+      required: [slug]
+      properties:
+        slug: { type: string }
+        primitive: { type: string, default: 'feat' }
+        base: { type: string, default: 'dev' }
+        mode: { type: string, enum: [forward, rewrite], default: 'forward' }
+        remote_ref: { type: string, default: 'origin/dev' }
+        force: { type: boolean, default: false }
+        repo_root: { type: string, default: '.' }
+
+    ChangeAdoptResult:
+      type: object
+      required: [branch, primitive, slug, worktree_path, adopt_mode]
+      properties:
+        branch: { type: string }
+        primitive: { type: string }
+        slug: { type: string }
+        worktree_path: { type: string }
+        adopt_mode: { type: string }
+        moved: { type: array, items: { type: string } }
+        uncommitted_count: { type: integer }
+        local_commits_count: { type: integer }
+
+    ChangeFinishRequest:
+      type: object
+      required: [slug]
+      properties:
+        slug: { type: string }
+        primitive: { type: string, default: 'feat' }
+        base: { type: string, default: 'dev' }
+        merge: { type: boolean, default: false }
+        pr: { type: boolean, default: false }
+        no_cleanup: { type: boolean, default: false }
+        repo_root: { type: string, default: '.' }
+
+    ChangeFinishResult:
+      type: object
+      required: [branch, primitive, slug, outcome]
+      properties:
+        branch: { type: string }
+        primitive: { type: string }
+        slug: { type: string }
+        outcome:
+          type: object
+          properties:
+            mode: { type: string, enum: [merge, pr] }
+            pr_url: { type: string }
+        cleanup: { type: object, additionalProperties: true }
+
+    ChangeListRequest:
+      type: object
+      properties:
+        base: { type: string, default: 'dev' }
+        repo_root: { type: string, default: '.' }
+
+    ChangeListEntry:
+      type: object
+      required: [primitive, slug, branch, worktree_present]
+      properties:
+        primitive: { type: string }
+        slug: { type: string }
+        branch: { type: string }
+        worktree_path: { type: string }
+        worktree_present: { type: boolean }
+        dirty: { type: boolean }
+
+    ChangeListResult:
+      type: object
+      required: [active_count, changes]
+      properties:
+        active_count: { type: integer }
+        changes: { type: array, items: { $ref: '#/components/schemas/ChangeListEntry' } }
+
+    ChangeStatusRequest:
+      type: object
+      required: [slug]
+      properties:
+        slug: { type: string }
+        primitive: { type: string, default: 'feat' }
+        base: { type: string, default: 'dev' }
+        repo_root: { type: string, default: '.' }
+
+    ChangeStatusResult:
+      type: object
+      required: [branch, primitive, slug, worktree_present]
+      properties:
+        branch: { type: string }
+        primitive: { type: string }
+        slug: { type: string }
+        worktree_path: { type: string }
+        worktree_present: { type: boolean }
+        branch_sha: { type: string }
+        base_sha: { type: string }
+        ahead_of_base: { type: integer }
+        behind_base: { type: integer }
+        metadata: { type: object, additionalProperties: true }
+
+    # ─── Shared error envelope ────────────────────────────────────────
     Error:
       type: object
-      required:
-        - ok
-        - error
+      required: [ok, error]
       properties:
-        ok:
-          type: boolean
-          enum: [false]
-        error:
-          type: string
-          description: Human-readable error message
-        context:
-          type: object
-          additionalProperties: true
-          description: Optional structured context
+        ok: { type: boolean, enum: [false] }
+        error: { type: string }
+        context: { type: object, additionalProperties: true }
 
   responses:
     ExpectedError:
-      description: Expected failure (invalid input, file not found, etc.)
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
+      description: Expected failure (invalid input, file not found, conflict, etc.)
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
     InternalError:
       description: Internal crash (bug)
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
