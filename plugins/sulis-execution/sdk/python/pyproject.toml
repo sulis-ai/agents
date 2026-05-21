@@ -46,9 +46,11 @@ test = [
     "pytest-asyncio >= 0.23",
 ]
 
-[tool.setuptools]
-packages = ["sulis_execution", "sulis_execution.resources"]
-package-data = { "sulis_execution" = ["py.typed"] }
+[tool.setuptools.packages.find]
+include = ["sulis_execution*"]
+
+[tool.setuptools.package-data]
+"sulis_execution" = ["py.typed"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

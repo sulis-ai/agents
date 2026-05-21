@@ -1,13 +1,15 @@
 """Client classes for the sulis-execution SDK.
 
 Per agent-consumable SDK spec v0.2.0 Part 5: ship BOTH a sync
-(`SulisExecution`) and an async (`AsyncSulisExecution`) client from the
-same module.
+(`SulisExecution`) and an async (`AsyncSulisExecution`) client from
+the same module.
 
 The resource tree is built lazily — each resource is a cached property
-that wraps a shared transport. Each resource module (pipeline.py in
-Phase 0; train.py, index.py, ... in Phase 2) contains the actual method
-implementations.
+that wraps a shared transport. Each resource module contains the actual
+method implementations.
+
+Resources (10): pipeline, train, index, journal, blocker, findings,
+                wp, worktree, step12, change.
 """
 from __future__ import annotations
 
@@ -20,26 +22,53 @@ from sulis_execution.transport import (
     SubprocessTransport,
     TransportConfig,
 )
+from sulis_execution.resources.blocker import AsyncBlockerResource, BlockerResource
+from sulis_execution.resources.change import AsyncChangeResource, ChangeResource
+from sulis_execution.resources.findings import (
+    AsyncFindingsResource,
+    FindingsResource,
+)
+from sulis_execution.resources.index import AsyncIndexResource, IndexResource
+from sulis_execution.resources.journal import AsyncJournalResource, JournalResource
 from sulis_execution.resources.pipeline import (
     AsyncPipelineResource,
     PipelineResource,
 )
+from sulis_execution.resources.step12 import AsyncStep12Resource, Step12Resource
+from sulis_execution.resources.train import AsyncTrainResource, TrainResource
+from sulis_execution.resources.worktree import (
+    AsyncWorktreeResource,
+    WorktreeResource,
+)
+from sulis_execution.resources.wp import AsyncWpResource, WpResource
 
 
 class SulisExecution:
-    """Sync client.
+    """Sync client for the sulis-execution CLI surface.
 
     Usage:
 
         from sulis_execution import SulisExecution
 
         client = SulisExecution(repo_root='.', project='my-project')
-        result = client.pipeline.run(
-            wp='WP-001',
-            branch='feat/wp-001-x',
-            dev_sha_at_creation='abc123',
-            deploy_workflow='Deploy to Dev',
-        )
+
+        # Pipeline (one operation: run)
+        result = client.pipeline.run(wp='WP-001', branch='feat/wp-001-x', ...)
+
+        # Train (6 operations)
+        eligibility = client.train.queue_list()
+        client.train.queue_add(wp='WP-001')
+
+        # Index (7 operations)
+        client.index.flip_status(wp='WP-001', to='done', expected='in_progress')
+
+        # Journal (10 operations)
+        client.journal.init(wp='WP-001')
+
+        # Blocker, Findings, WP, Worktree, Step12 — see resource modules.
+
+        # Change (5 operations — project-independent)
+        client.change.start(slug='introduce-payments', primitive='create')
     """
 
     def __init__(
@@ -62,24 +91,45 @@ class SulisExecution:
     def pipeline(self) -> PipelineResource:
         return PipelineResource(self._transport, self._config)
 
+    @cached_property
+    def train(self) -> TrainResource:
+        return TrainResource(self._transport, self._config)
+
+    @cached_property
+    def index(self) -> IndexResource:
+        return IndexResource(self._transport, self._config)
+
+    @cached_property
+    def journal(self) -> JournalResource:
+        return JournalResource(self._transport, self._config)
+
+    @cached_property
+    def blocker(self) -> BlockerResource:
+        return BlockerResource(self._transport, self._config)
+
+    @cached_property
+    def findings(self) -> FindingsResource:
+        return FindingsResource(self._transport, self._config)
+
+    @cached_property
+    def wp(self) -> WpResource:
+        return WpResource(self._transport, self._config)
+
+    @cached_property
+    def worktree(self) -> WorktreeResource:
+        return WorktreeResource(self._transport, self._config)
+
+    @cached_property
+    def step12(self) -> Step12Resource:
+        return Step12Resource(self._transport, self._config)
+
+    @cached_property
+    def change(self) -> ChangeResource:
+        return ChangeResource(self._transport, self._config)
+
 
 class AsyncSulisExecution:
-    """Async client.
-
-    Same shape as SulisExecution; methods return awaitables.
-
-    Usage:
-
-        from sulis_execution import AsyncSulisExecution
-
-        client = AsyncSulisExecution(repo_root='.', project='my-project')
-        result = await client.pipeline.run(
-            wp='WP-001',
-            branch='feat/wp-001-x',
-            dev_sha_at_creation='abc123',
-            deploy_workflow='Deploy to Dev',
-        )
-    """
+    """Async client. Same resource tree; methods return awaitables."""
 
     def __init__(
         self,
@@ -100,3 +150,39 @@ class AsyncSulisExecution:
     @cached_property
     def pipeline(self) -> AsyncPipelineResource:
         return AsyncPipelineResource(self._transport, self._config)
+
+    @cached_property
+    def train(self) -> AsyncTrainResource:
+        return AsyncTrainResource(self._transport, self._config)
+
+    @cached_property
+    def index(self) -> AsyncIndexResource:
+        return AsyncIndexResource(self._transport, self._config)
+
+    @cached_property
+    def journal(self) -> AsyncJournalResource:
+        return AsyncJournalResource(self._transport, self._config)
+
+    @cached_property
+    def blocker(self) -> AsyncBlockerResource:
+        return AsyncBlockerResource(self._transport, self._config)
+
+    @cached_property
+    def findings(self) -> AsyncFindingsResource:
+        return AsyncFindingsResource(self._transport, self._config)
+
+    @cached_property
+    def wp(self) -> AsyncWpResource:
+        return AsyncWpResource(self._transport, self._config)
+
+    @cached_property
+    def worktree(self) -> AsyncWorktreeResource:
+        return AsyncWorktreeResource(self._transport, self._config)
+
+    @cached_property
+    def step12(self) -> AsyncStep12Resource:
+        return AsyncStep12Resource(self._transport, self._config)
+
+    @cached_property
+    def change(self) -> AsyncChangeResource:
+        return AsyncChangeResource(self._transport, self._config)
