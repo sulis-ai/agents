@@ -1,0 +1,391 @@
+#!/usr/bin/env python3
+"""wpx-train — batched merge queue (Steps 8b/9/10 per-batch).
+
+Per-batch sibling of wpx-pipeline. Discovers eligible Work Packages
+from INDEX.md + origin branches + per-WP CI status (no separate queue
+file — see ADR-212 D6 amended). When the train fires, it packs eligible
+WPs into batches, rebases each branch independently onto current dev,
+runs bundled-tip CI, sequential squash-merges into dev, then one
+deploy/health/smoke per batch. Per-WP security review stays per-WP
+(Step 11) — the train doesn't collapse it.
+
+Subcommands:
+
+  queue-list           List eligible (and ineligible-with-reason) WPs.
+                       Read-only; runs the discovery algorithm and
+                       prints the result.
+
+  queue-add            Force-include a WP in the next train despite
+                       red CI or other ineligibility. Writes a marker
+                       to train-overrides.yaml.
+
+  queue-remove         Hold a WP back from the next train. Writes a
+                       hold marker to train-overrides.yaml.
+
+  status               Read-only summary: eligible count, trigger
+                       state, last train result.
+
+  doctor               Diagnose drift: WPs marked step-7-complete with
+                       missing branches; orphan origin branches not in
+                       INDEX.md; etc.
+
+  run                  Fire the train. (Phase 2 — not yet implemented
+                       in v0.11.0 skeleton; will be added in Phase 2.)
+
+Eligibility (per ADR-212 D6 amended):
+  1. status == step-7-complete                         (or force-include)
+  2. branch exists on origin
+  3. branch CI is green                                (or force-include)
+  4. all depends_on WPs have status == done
+  5. WP is not hold-overridden
+
+Outputs structured JSON to stdout. Exit codes: 0 success, 1 expected
+failure (e.g. nothing eligible + no force), 2 internal error.
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _wpxlib import (  # noqa: E402
+    EligibilityResult,
+    TrainOverrides,
+    WPRow,
+    add_common_args,
+    cli_main,
+    emit_error,
+    emit_internal_error,
+    emit_ok,
+    find_eligible_branches,
+    pack_batches,
+    parse_index_md,
+    paths_from_args,
+    read_overrides,
+    write_overrides,
+)
+
+
+# --- Helpers shared across subcommands ----------------------------------
+
+def _resolve_repo(args: argparse.Namespace) -> str:
+    repo = args.repo or os.environ.get("GITHUB_REPOSITORY")
+    if not repo:
+        emit_error(
+            "Could not determine GitHub repo (--repo or $GITHUB_REPOSITORY)"
+        )
+    return repo
+
+
+def _eligibility_to_dict(e: EligibilityResult) -> dict:
+    return {
+        "wp": e.wp,
+        "branch": e.branch,
+        "eligible": e.eligible,
+        "reason": e.reason,
+        "primitive": e.primitive,
+        "forced": e.forced,
+    }
+
+
+# --- Subcommand: queue-list ---------------------------------------------
+
+def cmd_queue_list(args: argparse.Namespace) -> None:
+    """Run the eligibility algorithm and print eligible + ineligible WPs."""
+    paths = paths_from_args(args)
+    repo = _resolve_repo(args)
+
+    if not paths.index_md.exists():
+        emit_error(
+            f"INDEX.md not found at {paths.index_md}",
+            context={"hint": "Has /sea:decompose been run for this project?"},
+        )
+
+    wps = parse_index_md(paths.index_md)
+    overrides = read_overrides(paths.train_overrides)
+    results = find_eligible_branches(wps, repo, paths.wp_dir, overrides)
+
+    eligible = [r for r in results if r.eligible]
+    ineligible = [r for r in results if not r.eligible]
+
+    emit_ok(data={
+        "project": args.project,
+        "index_md": str(paths.index_md),
+        "eligible_count": len(eligible),
+        "ineligible_count": len(ineligible),
+        "eligible": [_eligibility_to_dict(e) for e in eligible],
+        "ineligible": [_eligibility_to_dict(e) for e in ineligible],
+        "overrides": {
+            "includes": overrides.includes,
+            "holds": overrides.holds,
+        },
+    })
+
+
+# --- Subcommand: queue-add (force-include override) ---------------------
+
+def cmd_queue_add(args: argparse.Namespace) -> None:
+    """Force-include a WP in the next train run.
+
+    Use cases:
+      - CI is red but the failure is unrelated to this WP and the
+        founder wants to bundle anyway
+      - WP status is not step-7-complete but the founder wants to ship
+        the current branch state (rare; usually means a manual workflow
+        bypassed the status update)
+
+    Writes to .architecture/{project}/train-overrides.yaml.
+    """
+    paths = paths_from_args(args)
+    overrides = read_overrides(paths.train_overrides)
+
+    if args.wp in overrides.includes:
+        emit_ok(data={
+            "wp": args.wp,
+            "action": "noop",
+            "reason": f"{args.wp} already in includes",
+        })
+
+    # If WP was previously held, clear the hold before adding to includes
+    if args.wp in overrides.holds:
+        overrides.holds.remove(args.wp)
+
+    overrides.includes.append(args.wp)
+    write_overrides(paths.train_overrides, overrides)
+
+    emit_ok(data={
+        "wp": args.wp,
+        "action": "force_include_added",
+        "overrides_path": str(paths.train_overrides),
+        "includes": overrides.includes,
+        "holds": overrides.holds,
+    })
+
+
+# --- Subcommand: queue-remove (hold override) ---------------------------
+
+def cmd_queue_remove(args: argparse.Namespace) -> None:
+    """Hold a WP back from the next train run.
+
+    Use cases:
+      - WP is step-7-complete and CI-green but the founder wants to
+        ship it solo (will run wpx-pipeline directly afterwards)
+      - WP needs investigation but the founder doesn't want to flip
+        INDEX status to step-7-blocked yet
+
+    Writes to .architecture/{project}/train-overrides.yaml.
+    """
+    paths = paths_from_args(args)
+    overrides = read_overrides(paths.train_overrides)
+
+    if args.wp in overrides.holds:
+        emit_ok(data={
+            "wp": args.wp,
+            "action": "noop",
+            "reason": f"{args.wp} already on hold",
+        })
+
+    # If WP was force-included, clear that before adding the hold
+    if args.wp in overrides.includes:
+        overrides.includes.remove(args.wp)
+
+    overrides.holds.append(args.wp)
+    write_overrides(paths.train_overrides, overrides)
+
+    emit_ok(data={
+        "wp": args.wp,
+        "action": "hold_added",
+        "overrides_path": str(paths.train_overrides),
+        "includes": overrides.includes,
+        "holds": overrides.holds,
+    })
+
+
+# --- Subcommand: status -------------------------------------------------
+
+def cmd_status(args: argparse.Namespace) -> None:
+    """Read-only summary of train state."""
+    paths = paths_from_args(args)
+    repo = _resolve_repo(args)
+
+    if not paths.index_md.exists():
+        emit_error(f"INDEX.md not found at {paths.index_md}")
+
+    wps = parse_index_md(paths.index_md)
+    overrides = read_overrides(paths.train_overrides)
+    results = find_eligible_branches(wps, repo, paths.wp_dir, overrides)
+
+    eligible = [r for r in results if r.eligible]
+
+    # Most recent train run, if any
+    last_train_run = None
+    if paths.train_runs_dir.exists():
+        runs = sorted(paths.train_runs_dir.glob("train-*.yaml"))
+        if runs:
+            last_train_run = str(runs[-1])
+
+    # Trigger preview
+    trigger_state = "not_ready"
+    trigger_reason = f"{len(eligible)} eligible (need ≥3 for size trigger)"
+    if len(eligible) >= 3:
+        trigger_state = "ready_size"
+        trigger_reason = f"{len(eligible)} eligible (size trigger met)"
+    elif len(eligible) >= 1:
+        # Staleness check is Phase 2 — for now just note we have ≥1
+        trigger_state = "waiting"
+        trigger_reason = f"{len(eligible)} eligible; staleness check pending in Phase 2"
+
+    emit_ok(data={
+        "project": args.project,
+        "eligible_count": len(eligible),
+        "eligible_wps": [r.wp for r in eligible],
+        "ineligible_count": sum(1 for r in results if not r.eligible),
+        "overrides": {
+            "includes": overrides.includes,
+            "holds": overrides.holds,
+        },
+        "trigger_state": trigger_state,
+        "trigger_reason": trigger_reason,
+        "last_train_run": last_train_run,
+    })
+
+
+# --- Subcommand: doctor (drift diagnosis) -------------------------------
+
+def cmd_doctor(args: argparse.Namespace) -> None:
+    """Diagnose drift between INDEX.md, WP files, and origin branches."""
+    paths = paths_from_args(args)
+    repo = _resolve_repo(args)
+
+    issues: list[dict] = []
+
+    if not paths.index_md.exists():
+        emit_error(f"INDEX.md not found at {paths.index_md}")
+
+    wps = parse_index_md(paths.index_md)
+    by_id = {wp.id: wp for wp in wps}
+
+    # Check: every WP in INDEX.md has a matching WP file
+    for wp in wps:
+        try:
+            paths.wp_file(wp.id)
+        except (FileNotFoundError, ValueError) as exc:
+            issues.append({
+                "kind": "wp_file_missing",
+                "wp": wp.id,
+                "detail": str(exc),
+            })
+
+    # Check: every WP at step-7-complete has dependencies satisfied
+    for wp in wps:
+        if wp.status != "step-7-complete":
+            continue
+        for dep_id in wp.depends_on:
+            dep = by_id.get(dep_id)
+            if dep is None:
+                issues.append({
+                    "kind": "depends_on_unknown_wp",
+                    "wp": wp.id,
+                    "detail": f"depends on {dep_id} which is not in INDEX.md",
+                })
+            elif dep.status != "done":
+                issues.append({
+                    "kind": "depends_on_unmerged",
+                    "wp": wp.id,
+                    "detail": f"depends on {dep_id} (status: {dep.status})",
+                })
+
+    # Note: orphan-branch detection (branches on origin not in INDEX.md)
+    # would require listing all origin branches. Skipped in Phase 1 for
+    # cost reasons — gh api repos/{repo}/branches paginates and can be
+    # large. Surface this as a future doctor extension.
+
+    emit_ok(data={
+        "project": args.project,
+        "issue_count": len(issues),
+        "issues": issues,
+        "note_orphan_branches": "skipped in Phase 1 (cost); see doctor source",
+    })
+
+
+# --- Subcommand: run (Phase 2 placeholder) ------------------------------
+
+def cmd_run(args: argparse.Namespace) -> None:
+    """Fire the train. Phase 2 — happy path implementation pending.
+
+    Currently returns a structured "not_implemented" result so callers
+    can detect the v0.11.0 skeleton vs the v0.12.0+ functional train.
+    """
+    emit_ok(data={
+        "outcome": "not_implemented",
+        "skeleton_version": "0.11.0",
+        "message": (
+            "wpx-train run is a Phase 2 capability. In v0.11.0 only the "
+            "queue subcommands + status + doctor are functional. The run "
+            "happy path (rebase loop → bundled-tip CI → sequential merge "
+            "→ deploy/health/smoke) ships in v0.12.0+."
+        ),
+    }, exit_code=1)
+
+
+# --- argparse -----------------------------------------------------------
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Batched merge queue (per-batch sibling of wpx-pipeline). "
+            "Discovers eligible WPs from INDEX.md + origin + CI status. "
+            "v0.11.0 skeleton — queue + status + doctor are functional; "
+            "run lands in v0.12.0+."
+        ),
+    )
+    sub = parser.add_subparsers(dest="subcommand", required=True)
+
+    def _common(p: argparse.ArgumentParser) -> None:
+        add_common_args(p)
+        p.add_argument("--repo", default=None,
+                       help="GitHub repo (org/name); defaults to $GITHUB_REPOSITORY")
+
+    p_list = sub.add_parser("queue-list", help="List eligible + ineligible WPs")
+    _common(p_list)
+
+    p_add = sub.add_parser("queue-add", help="Force-include a WP in next train")
+    _common(p_add)
+    p_add.add_argument("--wp", required=True, help="WP ID (e.g. WP-AUTO-018)")
+    p_add.add_argument("--reason", default="", help="Optional human reason (recorded but not enforced)")
+
+    p_remove = sub.add_parser("queue-remove", help="Hold a WP back from next train")
+    _common(p_remove)
+    p_remove.add_argument("--wp", required=True, help="WP ID (e.g. WP-AUTO-018)")
+    p_remove.add_argument("--reason", default="", help="Optional human reason")
+
+    p_status = sub.add_parser("status", help="Read-only summary of train state")
+    _common(p_status)
+
+    p_doctor = sub.add_parser("doctor", help="Diagnose drift (missing branches, unmet deps, etc.)")
+    _common(p_doctor)
+
+    p_run = sub.add_parser("run", help="Fire the train (Phase 2 — placeholder in v0.11.0)")
+    _common(p_run)
+    p_run.add_argument("--force", action="store_true",
+                       help="Bypass size/staleness trigger (Phase 2)")
+
+    return parser
+
+
+HANDLERS = {
+    "queue-list": cmd_queue_list,
+    "queue-add": cmd_queue_add,
+    "queue-remove": cmd_queue_remove,
+    "status": cmd_status,
+    "doctor": cmd_doctor,
+    "run": cmd_run,
+}
+
+
+if __name__ == "__main__":
+    cli_main(build_parser(), HANDLERS)

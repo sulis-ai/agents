@@ -61,6 +61,14 @@ class WpxPaths:
     def journal(self, wp: str) -> Path:
         return self.wp_dir / f".executor-{wp}.md"
 
+    @property
+    def train_overrides(self) -> Path:
+        return self.arch_root / "train-overrides.yaml"
+
+    @property
+    def train_runs_dir(self) -> Path:
+        return self.arch_root / "train-runs"
+
     def blocker(self, wp: str) -> Path:
         return self.wp_dir / f"BLOCKER-{wp}.md"
 
@@ -788,3 +796,422 @@ def emit_result(result: dict, exit_code: int = 0) -> None:
     if "completed_at" not in result:
         result["completed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     emit_ok(data={"result": result}, exit_code=exit_code)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# wpx-train helpers — INDEX parsing, eligibility, batching, overrides
+# ─────────────────────────────────────────────────────────────────────────
+#
+# Used by wpx-train (per-batch path). The eligibility algorithm reads
+# state that already exists (INDEX.md + origin branches + per-WP CI
+# status) rather than maintaining a separate queue file. See ADR-212
+# D6 (amended) for the rationale.
+#
+
+
+# Status values that indicate a WP has finished coding (Steps 1-7) and
+# is waiting for batched integration (Steps 8-11).
+TRAIN_ELIGIBLE_STATUS = "step-7-complete"
+TRAIN_HELD_STATUS = "step-7-held"
+TRAIN_BLOCKED_STATUS = "step-7-blocked"
+TRAIN_DONE_STATUS = "done"  # Steps 8-11 complete; on dev
+
+
+# WP table header signature. parse_index_md uses this to find tables.
+# We match loosely — the WP table is any markdown table whose header
+# row begins with `| ID | Title |`.
+_WP_TABLE_HEADER_RE = re.compile(
+    r"^\|\s*ID\s*\|\s*Title\s*\|", re.MULTILINE
+)
+
+
+@dataclass
+class WPRow:
+    """One Work Package row parsed from an INDEX.md table."""
+
+    id: str
+    title: str
+    primitive: str = ""
+    status: str = ""
+    depends_on: list[str] = field(default_factory=list)
+    blocks: list[str] = field(default_factory=list)
+    # Extra columns the parser tolerates without using:
+    extras: dict[str, str] = field(default_factory=dict)
+
+
+def _split_csv_or_dash(cell: str) -> list[str]:
+    """Parse a comma-separated list cell. Empty / dash → []."""
+    s = cell.strip()
+    if not s or s in ("—", "-", "none", "None"):
+        return []
+    return [item.strip() for item in s.split(",") if item.strip()]
+
+
+def parse_index_md(index_path: Path) -> list[WPRow]:
+    """Parse all WP tables in an INDEX.md file. Returns flat list of rows.
+
+    INDEX.md typically contains multiple WP tables — one per section
+    (Cross-cutting Armor, Slice 1, Migration track, etc.). This walks
+    the document, finds every table whose header begins with `| ID | Title |`,
+    and concatenates their rows.
+
+    Recognises the standard columns: ID, Title, Primitive, Status,
+    Depends On (or "Depends on"), Blocks. Other columns (Token, TDD §,
+    ADR) are tolerated and stored under `extras`.
+
+    Raises FileNotFoundError if the path doesn't exist.
+    """
+    text = index_path.read_text(encoding="utf-8")
+    rows: list[WPRow] = []
+
+    # Find every WP table header position
+    for match in _WP_TABLE_HEADER_RE.finditer(text):
+        start = match.start()
+        # Extract the table block: from header to first blank line or EOF
+        end = text.find("\n\n", start)
+        if end == -1:
+            end = len(text)
+        table_text = text[start:end]
+
+        table = parse_md_table(table_text)
+        if not table.headers:
+            continue
+
+        # Map column names to indices (case-insensitive, strip whitespace)
+        col_index: dict[str, int] = {}
+        for i, h in enumerate(table.headers):
+            key = h.strip().lower().replace("on", "on").rstrip(" *")
+            col_index[key] = i
+
+        def get(row: list[str], name: str, default: str = "") -> str:
+            key = name.lower()
+            i = col_index.get(key)
+            if i is None or i >= len(row):
+                return default
+            return row[i].strip()
+
+        for row in table.rows:
+            if not row or not row[0].strip():
+                continue
+            wp_id = row[0].strip()
+            # Skip rows that aren't actually WPs (e.g. summary rows)
+            if not wp_id.startswith("WP-"):
+                continue
+
+            extras: dict[str, str] = {}
+            standard_keys = {"id", "title", "primitive", "status",
+                             "depends on", "blocks"}
+            for i, h in enumerate(table.headers):
+                key = h.strip().lower()
+                if key in standard_keys or i >= len(row):
+                    continue
+                extras[h.strip()] = row[i].strip()
+
+            rows.append(WPRow(
+                id=wp_id,
+                title=get(row, "title"),
+                primitive=get(row, "primitive"),
+                status=get(row, "status"),
+                depends_on=_split_csv_or_dash(get(row, "depends on")),
+                blocks=_split_csv_or_dash(get(row, "blocks")),
+                extras=extras,
+            ))
+
+    return rows
+
+
+# --- Overrides (force-include / hold) -----------------------------------
+
+@dataclass
+class TrainOverrides:
+    """Force-include and hold-back markers for the next train run."""
+
+    includes: list[str] = field(default_factory=list)
+    holds: list[str] = field(default_factory=list)
+
+
+def read_overrides(overrides_path: Path) -> TrainOverrides:
+    """Read .architecture/{project}/train-overrides.yaml; tolerate absence.
+
+    File format (YAML-lite, no pyyaml needed):
+
+        includes:
+          - WP-X
+          - WP-Y
+        holds:
+          - WP-Z
+
+    Missing file → empty overrides (the common case).
+    """
+    if not overrides_path.exists():
+        return TrainOverrides()
+    text = overrides_path.read_text(encoding="utf-8")
+    includes: list[str] = []
+    holds: list[str] = []
+    current: list[str] | None = None
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        if not line or line.startswith("#"):
+            continue
+        if line == "includes:":
+            current = includes
+            continue
+        if line == "holds:":
+            current = holds
+            continue
+        if current is not None and line.startswith("  - "):
+            value = line[4:].strip().strip("'\"")
+            # Cells may be objects like `{wp: WP-X, reason: "..."}`. Pull the WP.
+            if value.startswith("{") and "wp:" in value:
+                # Tiny inline-object extraction
+                m = re.search(r"wp\s*:\s*([A-Za-z0-9-]+)", value)
+                if m:
+                    current.append(m.group(1))
+            else:
+                current.append(value)
+    return TrainOverrides(includes=includes, holds=holds)
+
+
+def write_overrides(overrides_path: Path, overrides: TrainOverrides) -> None:
+    """Write the overrides file. Creates parent directory if needed."""
+    overrides_path.parent.mkdir(parents=True, exist_ok=True)
+    lines: list[str] = [
+        "# wpx-train overrides — force-include / hold-back markers",
+        "# Managed by wpx-train queue-add / queue-remove subcommands.",
+        "# Eligibility derives from INDEX.md + origin branches + CI status;",
+        "# overrides here are the explicit founder layer on top.",
+        "",
+    ]
+    if overrides.includes:
+        lines.append("includes:")
+        for wp in overrides.includes:
+            lines.append(f"  - {wp}")
+        lines.append("")
+    if overrides.holds:
+        lines.append("holds:")
+        for wp in overrides.holds:
+            lines.append(f"  - {wp}")
+        lines.append("")
+    overrides_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+# --- Eligibility --------------------------------------------------------
+
+@dataclass
+class EligibilityResult:
+    """One WP's eligibility verdict + reason."""
+
+    wp: str
+    branch: str
+    eligible: bool
+    reason: str
+    primitive: str = ""
+    forced: bool = False
+
+
+def _wp_slug_from_file(wp_dir: Path, wp_id: str) -> str | None:
+    """Derive the WP's branch slug from its WP file name.
+
+    File convention: `WP-{ID}-{slug}.md`. Returns the slug, or None if
+    no matching file exists.
+    """
+    matches = list(wp_dir.glob(f"{wp_id}-*.md"))
+    matches = [
+        m for m in matches
+        if not m.name.startswith(".")
+        and not m.name.startswith("BLOCKER-")
+    ]
+    if not matches:
+        return None
+    # Strip "WP-{ID}-" prefix and ".md" suffix
+    name = matches[0].stem  # WP-AUTO-018-observability-adapter
+    prefix = f"{wp_id}-"
+    if not name.startswith(prefix):
+        return None
+    return name[len(prefix):]
+
+
+def _branch_name(wp_id: str, slug: str) -> str:
+    """Compose the feature-branch name from WP id + slug.
+
+    Convention: `feat/wp-{id-lower}-{slug}`.
+    """
+    return f"feat/wp-{wp_id.lower().removeprefix('wp-')}-{slug}"
+
+
+def _gh_branch_exists(repo: str, branch: str) -> bool:
+    """True if origin/{branch} exists. Best-effort; returns False on gh error."""
+    rc, out, _ = _run(
+        ["gh", "api", f"repos/{repo}/git/refs/heads/{branch}"],
+        timeout=30,
+    )
+    return rc == 0 and bool(out.strip())
+
+
+def _gh_branch_ci_green(repo: str, branch: str) -> bool:
+    """True if the branch's most recent CI run is green / completed-success.
+
+    Returns False if checks are pending, failed, or absent. Pending checks
+    are treated as "not green" — the train waits for them to complete on a
+    future invocation.
+    """
+    try:
+        data = _gh_check_runs(repo, branch)
+    except RuntimeError:
+        return False
+    runs = data.get("check_runs", [])
+    if not runs:
+        # No CI configured → degenerate "green" (matches wpx-pipeline behaviour)
+        return True
+    all_done = all(r.get("status") == "completed" for r in runs)
+    if not all_done:
+        return False
+    return all(
+        r.get("conclusion") in ("success", "neutral", "skipped")
+        for r in runs
+    )
+
+
+def _all_deps_merged(wp: WPRow, by_id: dict[str, WPRow]) -> bool:
+    """True if every WP in wp.depends_on has status TRAIN_DONE_STATUS.
+
+    A missing dependency (not in INDEX.md) is treated as a soft failure —
+    we cannot prove it's merged, so we conservatively block. Surface this
+    via doctor.
+    """
+    for dep_id in wp.depends_on:
+        dep = by_id.get(dep_id)
+        if dep is None:
+            return False
+        if dep.status != TRAIN_DONE_STATUS:
+            return False
+    return True
+
+
+def find_eligible_branches(
+    wps: list[WPRow],
+    repo: str,
+    wp_dir: Path,
+    overrides: TrainOverrides | None = None,
+) -> list[EligibilityResult]:
+    """Discover which WPs are eligible for the next train.
+
+    Per the amended ADR-212 D6:
+
+      1. status == step-7-complete (or force-include override)
+      2. branch exists on origin
+      3. branch CI is green (or force-include override)
+      4. all dependencies have status == done
+      5. WP is not hold-overridden
+
+    Returns one EligibilityResult per WP — both eligible and ineligible
+    are returned so the caller (queue-list / status / doctor) can show
+    the founder the full picture.
+    """
+    overrides = overrides or TrainOverrides()
+    by_id = {wp.id: wp for wp in wps}
+    results: list[EligibilityResult] = []
+
+    for wp in wps:
+        # Skip WPs that aren't candidates at all (done, cancelled, blocked).
+        if wp.status in (TRAIN_DONE_STATUS, "cancelled"):
+            continue
+
+        is_held = wp.id in overrides.holds
+        is_forced = wp.id in overrides.includes
+
+        # Derive branch
+        slug = _wp_slug_from_file(wp_dir, wp.id)
+        if slug is None:
+            results.append(EligibilityResult(
+                wp=wp.id, branch="", eligible=False,
+                reason=f"no WP file found at {wp_dir}/{wp.id}-*.md",
+                primitive=wp.primitive,
+            ))
+            continue
+        branch = _branch_name(wp.id, slug)
+
+        if is_held:
+            results.append(EligibilityResult(
+                wp=wp.id, branch=branch, eligible=False,
+                reason="held by override (train-overrides.yaml)",
+                primitive=wp.primitive,
+            ))
+            continue
+
+        # Status check
+        if wp.status != TRAIN_ELIGIBLE_STATUS and not is_forced:
+            results.append(EligibilityResult(
+                wp=wp.id, branch=branch, eligible=False,
+                reason=f"status is '{wp.status}', not '{TRAIN_ELIGIBLE_STATUS}'",
+                primitive=wp.primitive,
+            ))
+            continue
+
+        # Branch existence
+        if not _gh_branch_exists(repo, branch):
+            results.append(EligibilityResult(
+                wp=wp.id, branch=branch, eligible=False,
+                reason="status step-7-complete but origin branch missing",
+                primitive=wp.primitive,
+            ))
+            continue
+
+        # CI check (skipped when forced)
+        if not is_forced and not _gh_branch_ci_green(repo, branch):
+            results.append(EligibilityResult(
+                wp=wp.id, branch=branch, eligible=False,
+                reason="branch CI not green (pending or failed)",
+                primitive=wp.primitive,
+            ))
+            continue
+
+        # Dependency check
+        if not _all_deps_merged(wp, by_id):
+            unmet = [
+                d for d in wp.depends_on
+                if by_id.get(d) is None or by_id[d].status != TRAIN_DONE_STATUS
+            ]
+            results.append(EligibilityResult(
+                wp=wp.id, branch=branch, eligible=False,
+                reason=f"dependencies not merged: {', '.join(unmet)}",
+                primitive=wp.primitive,
+            ))
+            continue
+
+        results.append(EligibilityResult(
+            wp=wp.id, branch=branch, eligible=True,
+            reason="ready" + (" (force-included)" if is_forced else ""),
+            primitive=wp.primitive,
+            forced=is_forced,
+        ))
+
+    return results
+
+
+# --- Batch packing ------------------------------------------------------
+
+def pack_batches(
+    eligible: list[EligibilityResult],
+    max_per_batch: int = 5,
+) -> list[list[EligibilityResult]]:
+    """Pack eligible WPs into batches respecting the max_per_batch ceiling.
+
+    For Phase 2: batches honour the order in `eligible` (which is INDEX.md
+    order — already topologically sorted by SEA's decompose).
+
+    Phase 5 (deferred) will refine this to use per-primitive batch_hint
+    ceilings (CONTRACT-Delete=1, REORGANISE=2-3, EXPAND=5-8). For now,
+    flat max_per_batch.
+    """
+    ready = [e for e in eligible if e.eligible]
+    batches: list[list[EligibilityResult]] = []
+    current: list[EligibilityResult] = []
+    for e in ready:
+        if len(current) >= max_per_batch:
+            batches.append(current)
+            current = []
+        current.append(e)
+    if current:
+        batches.append(current)
+    return batches
