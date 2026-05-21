@@ -858,6 +858,71 @@ specialist — you tell the founder the exact command to type, they run it,
 they come back to you, you read the produced artifacts and continue. v0.2
 adds subagent spawning for short-running specialists.
 
+### Starting a change (CW-04, v0.2.0+)
+
+Per the Change Work Standard, every piece of work is bounded by a
+**change branch + worktree**. Before invoking any specialist that
+produces artifacts (SRD, SEA, execution), the founder needs an active
+change. You initiate it by running `sulis-change start` for them.
+
+When the founder declares intent — *"I want to add payments"* — and
+you're about to enter Phase 2 (Discover) or Phase 3 (Specify):
+
+1. **Pick a primitive + slug from the founder's intent.** Use the
+   22-primitive vocabulary (see `plugins/sea/references/change-primitives.md`).
+   "Add payments" → primitive: `create`, slug: `introduce-payments`.
+   "Replace Redis with Valkey" → primitive: `replace`, slug:
+   `replace-redis-with-valkey`. If genuinely uncertain, default to
+   `feat` (Conventional Commits fallback).
+2. **Surface the choice in plain English to the founder.** *"I'm going
+   to set up an isolated workspace for this — call it 'introduce
+   payments'. Your work will live on its own branch, separate from
+   anything else in flight. OK?"*
+3. **Run sulis-change start.** The command:
+
+   ```bash
+   "$WPX_DIR/sulis-change" start \
+     --slug introduce-payments \
+     --primitive create \
+     --repo-root <repo-root>
+   ```
+
+   This creates `change/create-introduce-payments` + a worktree at
+   `<repo-parent>/<repo-name>-change-create-introduce-payments/`.
+   The JSON output gives you the worktree path.
+4. **Subsequent specialist invocations happen inside that worktree.**
+   When you recommend `/srd:start`, tell the founder to run it from
+   the change worktree directory. When you spawn the executor (v0.1.3+),
+   pass `--repo-root <worktree-path>` so it operates on the change branch.
+5. **Record the active change in JOURNEY.md** (see Journey State below).
+
+### Finishing a change
+
+When all artifacts for the change are complete and the implementation
+is verified, run:
+
+```bash
+"$WPX_DIR/sulis-change" finish \
+  --slug introduce-payments --primitive create \
+  --merge \
+  --repo-root <repo-root>
+```
+
+This squash-merges the change branch into `dev`, removes the worktree,
+deletes the local branch. The founder sees: *"All done. Your changes
+are now on dev and ready to ship to production via the normal deploy
+flow."*
+
+### When change is **not** required
+
+The trivial-change carve-out (CW-05) applies for small edits:
+- Diff ≤30 lines
+- No new artifacts (no new SRD, TDD, WP)
+- Text/comment/config-only changes
+
+For these, work directly on `dev`. Don't make the founder go through
+the change ceremony for a typo fix.
+
 ---
 
 ## Journey State — `.concierge/{project}/JOURNEY.md`
@@ -873,9 +938,19 @@ This is the source of truth for *where the founder is* across sessions.
 > Last updated: {ISO-8601}
 > Current phase: {1-7}
 > Audience score: {Novice|Intermediate|Experienced} (default Novice)
+> Active change: {change/{primitive}-{slug} OR "(none yet — on dev)"}
+> Worktree: {path OR "(none)"}
 
 ## Goal
 {plain-English statement of what the founder is building}
+
+## Active Change (CW-04)
+{Filled when sulis-change start has been run. Cleared when finish runs.}
+- Branch: change/{primitive}-{slug}
+- Primitive: {one of the 22 SEA primitives + feat/fix/chore}
+- Worktree: {path}
+- Started at: {ISO}
+- Base branch: {dev usually}
 
 ## Phase History
 | Phase | Started | Completed | Specialist invoked | Artifacts produced |
