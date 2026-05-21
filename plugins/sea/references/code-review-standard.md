@@ -252,6 +252,11 @@ The reviewing agent **cannot** override these:
 3. **Any lens produced no output (not "nothing surfaced" — *no output*) →
    verdict cannot be PASS.** Minimum verdict: `Request changes`. (Silent
    lens absence is the PR-168 failure mode.)
+4. **PR Hygiene Standard PH-03 high finding → verdict cannot be PASS.**
+   Minimum verdict: `Request changes`. A high-severity Safety signal
+   (4+ migrations, plaintext secret in diff, etc.) requires explicit
+   reviewer attention before merge. (Per CR-09; see
+   `plugins/srd/references/pr-hygiene-standard.md`.)
 
 ### Advisory only
 
@@ -342,6 +347,63 @@ verdict downgrade.
 The self-attestation cannot be silent. A report missing the Methodology
 checklist is malformed and must be regenerated. A box claiming `[✓]`
 without a one-line reason is malformed.
+
+---
+
+## CR-09: PR Hygiene Application (MUST)
+
+The reviewing agent applies the **PR Hygiene Standard** at
+`plugins/srd/references/pr-hygiene-standard.md` (PH-01..PH-08) alongside
+the three lenses. Hygiene checks run **before** lens dispatch — they
+inform how cautious the lens work needs to be (a 6,000-line / 53-file PR
+with 5 migrations warrants more conservative lens severity scoring than
+a 150-line / 3-file single-concern PR).
+
+### Output location
+
+Hygiene findings appear in a dedicated **PR Hygiene** section of the
+report, **between** Build Verification and the lens findings. Hygiene
+findings do **not** mix with lens findings — they have different
+provenance (artifact shape vs code defects) and different remediations
+(split PR vs fix code).
+
+### Signal table
+
+The hygiene check produces the deterministic PH-06 signal table verbatim.
+The signal table is the contract between this skill and any future
+PR-touching skill — readers (human or agent) can recompute the verdict
+from the signals.
+
+### Severity feed into CR-06
+
+PH-03 `high` severity findings (4+ migrations, plaintext secret pattern,
+etc.) feed CR-06 auto-downgrade rule 4 — minimum verdict `Request
+changes`. Other hygiene severities (`medium`, `low`, `note`) appear in
+the report but do not trigger CR-06 auto-downgrades; they inform agent
+judgement only.
+
+### Hygiene findings do not produce Hardening Deltas
+
+Lens findings (Architecture / Security / Quality) produce Hardening
+Deltas with `source: code-review:PR-NN`. Hygiene findings produce
+**recommendations to the PR author** (split, add tests, review migration
+order) — not deltas. Splitting a PR is not a delta-shaped change; it's a
+restructuring of the change itself.
+
+### Calibration disclosure
+
+The PR Hygiene Standard is in its own 90-day calibration window (see
+PH-07). The reviewing agent records each hygiene finding's severity and
+the threshold that triggered it in the report's PR Hygiene section, so
+threshold calibration data accrues across real reviews.
+
+### Self-attestation row
+
+The CR-08 Methodology checklist gains one row:
+
+```markdown
+- [✓] **CR-09 PR Hygiene applied.** PH-01 Scope: medium (feat+refactor mix). PH-02 Size: high (1,847 lines / 32 files). PH-03 Safety: high (4 migrations). PH-04 Completeness: medium (4 new source files, no tests). PH-03 high → CR-06 auto-downgrade to Request changes minimum.
+```
 
 ---
 

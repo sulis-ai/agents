@@ -47,7 +47,7 @@ claude --agent sea:engineering-architect --dangerously-skip-permissions
 | `/sea:harden` | Brownfield — implement accepted Hardening Deltas through the Red-Green-Blue cycle |
 | `/sea:decompose` | Break a TDD into atomic Work Packages with dependency graph and token-cost estimates |
 | `/sea:verify` | Run five-perspective completeness check; produce `COMPLETENESS_REPORT.md` |
-| `/code-review <PR\|branch\|range>` | PR-scoped review implementing the Code Review Standard ([CR-01..CR-08](references/code-review-standard.md)). Runs a mandatory mechanical baseline (typecheck + lint) before any lens (CR-01); dispatches three lenses in parallel above the 200-line / 5-file carve-out (CR-02); reads every changed file >50 lines end-to-end (CR-03); computes verdict with auto-downgrade rules the agent cannot override (CR-06); self-attests in the report's Methodology (CR-08). Produces one merged report under `.architecture/{project}/code-reviews/` plus draft Hardening Deltas. Advisory only — no PR comments, no status checks, no auto-blocking. |
+| `/code-review <PR\|branch\|range>` | PR-scoped review implementing the Code Review Standard ([CR-01..CR-09](references/code-review-standard.md)) and applying the PR Hygiene Standard ([PH-01..PH-08](../srd/references/pr-hygiene-standard.md)). Runs a mandatory mechanical baseline (typecheck + lint) before any lens (CR-01); computes the PR Hygiene signal table — Scope / Size / Safety / Completeness — before lens dispatch (CR-09); dispatches three lenses in parallel above the 200-line / 5-file carve-out (CR-02); reads every changed file >50 lines end-to-end (CR-03); computes verdict with four auto-downgrade rules the agent cannot override including PH-03 high-severity hygiene findings (CR-06); self-attests in the report's Methodology (CR-08). Produces one merged report under `.architecture/{project}/code-reviews/` plus draft Hardening Deltas (lens findings only; hygiene findings are author recommendations). Advisory only — no PR comments, no status checks, no auto-blocking. |
 
 ---
 
@@ -283,7 +283,8 @@ SEA makes.
 | [`references/boring-code.md`](references/boring-code.md) | The Green-stage code standard |
 | [`references/hardening-deltas.md`](references/hardening-deltas.md) | The brownfield delta format (OpenSpec-style) |
 | [`references/architecture-patterns.md`](references/architecture-patterns.md) | Catalogue of vetted architecture patterns |
-| [`references/code-review-standard.md`](references/code-review-standard.md) | The Code Review Standard (CR-01..CR-08) — mechanical baseline, parallel dispatch, full-file reads, evidence discipline, severity rubric, computed verdict with auto-downgrade, lens completion criteria, self-attestation |
+| [`references/code-review-standard.md`](references/code-review-standard.md) | The Code Review Standard (CR-01..CR-09) — mechanical baseline, parallel dispatch, full-file reads, evidence discipline, severity rubric, computed verdict with auto-downgrade, lens completion criteria, self-attestation, PR Hygiene application |
+| `plugins/srd/references/pr-hygiene-standard.md` | The PR Hygiene Standard (PH-01..PH-08) — Scope / Size / Safety / Completeness primitives for change-artifact shape; consumed by `/code-review` via CR-09 |
 
 ---
 

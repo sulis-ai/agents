@@ -2,18 +2,22 @@
 name: code-review
 description: >
   Use when reviewing a pull request, branch, or commit range. Implements the
-  Code Review Standard (CR-01..CR-08) at
-  `../../references/code-review-standard.md`. Runs a mandatory mechanical
-  baseline (typecheck + lint) before any lens runs (CR-01), then dispatches
-  three lenses in parallel — architectural (Form / Armor / Proof gaps),
-  security (the diff-scoped viability assessment), and general code quality
-  with procedural checks (CR-02, CR-07). Reads every changed file >50 lines
+  Code Review Standard (CR-01..CR-09) at
+  `../../references/code-review-standard.md` and applies the PR Hygiene
+  Standard (PH-01..PH-08) at `plugins/srd/references/pr-hygiene-standard.md`.
+  Runs a mandatory mechanical baseline (typecheck + lint) before any lens
+  (CR-01); computes the PR Hygiene signal table — Scope / Size / Safety /
+  Completeness — before lens dispatch (CR-09); dispatches three lenses in
+  parallel — architectural (Form / Armor / Proof gaps), security
+  (diff-scoped viability assessment), and general code quality with
+  procedural checks (CR-02, CR-07). Reads every changed file >50 lines
   end-to-end (CR-03). Findings cite file:line + quoted text (CR-04). Severity
-  is rubric-driven (CR-05) and verdict is computed with auto-downgrade rules
-  (CR-06). Self-attestation in the report's Methodology section (CR-08).
-  Outputs a single merged report at `.architecture/{project}/code-reviews/`
-  plus draft Hardening Deltas. Advisory only — never posts to the PR, never
-  sets status checks, never blocks merge.
+  is rubric-driven (CR-05); verdict is computed with four auto-downgrade
+  rules including PH-03 high findings (CR-06). Self-attestation in the
+  report's Methodology section (CR-08). Outputs a single merged report at
+  `.architecture/{project}/code-reviews/` plus draft Hardening Deltas (lens
+  findings only — hygiene findings are author recommendations). Advisory
+  only — never posts to the PR, never sets status checks, never blocks merge.
 ---
 
 # Code Review — Three Lenses, Mechanical Floor, One Report
@@ -150,7 +154,64 @@ the visible mark of an unverified mechanical floor.
 which appears above all lens findings. Per CR-06, this section non-empty →
 verdict cannot be `PASS`.
 
-### 3. Decide the dispatch shape (CR-02 MUST)
+### 3. PR Hygiene check (CR-09 MUST — before lens dispatch)
+
+Apply the **PR Hygiene Standard** at
+`plugins/srd/references/pr-hygiene-standard.md` (PH-01..PH-08). Compute
+the PH-06 signal table from the diff:
+
+```bash
+# Diff metrics (PH-02)
+git diff --shortstat "$BASE...$HEAD" > "$WORK/diff-shortstat.txt"
+git diff --name-only "$BASE...$HEAD" | wc -l > "$WORK/files-changed.txt"
+
+# Scope signals (PH-01) — Conventional Commit type spread + module fan-out
+git log --format='%s' "$BASE..$HEAD" \
+  | grep -oE '^[a-z]+(\([^)]+\))?:' \
+  | sort -u > "$WORK/commit-types.txt"
+git diff --name-only "$BASE...$HEAD" \
+  | awk -F/ '{print $1}' | sort -u > "$WORK/top-dirs.txt"
+
+# Safety signals (PH-03)
+git diff --name-only "$BASE...$HEAD" \
+  | grep -E '(migrations?/|db/migrate/|alembic/versions/|prisma/migrations/)' \
+  > "$WORK/migrations.txt"
+git diff --name-only "$BASE...$HEAD" \
+  | grep -iE '\.(sql|proto|graphql|avsc)$|openapi\.(ya?ml|json)|swagger\.json' \
+  > "$WORK/schema-files.txt"
+git diff --name-only "$BASE...$HEAD" \
+  | grep -E '(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|Cargo\.lock|Gemfile\.lock|poetry\.lock|go\.sum)' \
+  > "$WORK/lock-files.txt"
+git diff --name-only "$BASE...$HEAD" \
+  | grep -iE '(\.tf$|\.tfvars$|Dockerfile|docker-compose|k8s/|kubernetes/|\.github/workflows/|\.gitlab-ci)' \
+  > "$WORK/infra-files.txt"
+
+# Completeness signals (PH-04)
+git diff --name-only --diff-filter=A "$BASE...$HEAD" \
+  | grep -vE '(test|spec|__tests__)' > "$WORK/new-source.txt"
+git diff --name-only --diff-filter=A "$BASE...$HEAD" \
+  | grep -E '(test|spec|__tests__)' > "$WORK/new-tests.txt"
+```
+
+Apply the severity rubric from PH-01..PH-04. Produce the **PR Hygiene**
+section of the report between Build Verification and the lens findings.
+
+**Hygiene-informed dispatch (interaction with CR-02).** When hygiene
+severity is `high` on any primitive, the lens work runs with extra
+conservatism: severity scoring tilts toward higher rather than lower,
+neighbour ring expansion is more eager. The hygiene severity is recorded
+in Methodology.
+
+**Auto-downgrade trigger.** PH-03 `high` finding (4+ migrations,
+plaintext secret pattern, etc.) feeds CR-06 auto-downgrade rule 4 →
+minimum verdict `Request changes`. Record the trigger in Methodology.
+
+**Hygiene findings do not produce Hardening Deltas.** Per CR-09 in the
+Code Review Standard, hygiene findings are recommendations to the PR
+author (split, add tests, review migration order) — not deltas. Lens
+findings still produce deltas as before.
+
+### 4. Decide the dispatch shape (CR-02 MUST)
 
 | Diff size | Dispatch shape |
 |---|---|
@@ -161,7 +222,7 @@ The carve-out is a size limit, not a budget choice. Above the threshold, the
 agent **must** dispatch the three lenses concurrently as sub-agents via the
 Agent tool — it cannot decline.
 
-### 4. Expand to neighbours
+### 5. Expand to neighbours
 
 For each changed file, find direct callers and callees of the symbols the
 diff touched. Tools, in order of preference:
@@ -175,7 +236,7 @@ diff touched. Tools, in order of preference:
 Cap at 20 files. Record the expansion (which files, which excluded, why) in
 Methodology.
 
-### 5. Run the three lenses (CR-07 MUST produce structured output per lens)
+### 6. Run the three lenses (CR-07 MUST produce structured output per lens)
 
 Each lens reads every changed file >50 lines **end-to-end** (CR-03 — sampling
 forbidden). Each lens produces structured output before claiming "complete";
@@ -271,7 +332,7 @@ end-to-end (CR-03). Produces **all** of:
 A quality lens missing any of items 1–5 is **incomplete** — return to the
 step that produced the gap.
 
-### 6. Score severity (CR-05 MUST — objective conditions, not vibes)
+### 7. Score severity (CR-05 MUST — objective conditions, not vibes)
 
 Severity by condition, not vibes:
 
@@ -288,13 +349,13 @@ the neighbour ring are downgraded one notch (neighbour `critical` →
 
 Do not inflate severity to drive attention. `medium` is real.
 
-### 7. Merge findings across lenses
+### 8. Merge findings across lenses
 
 Deduplicate — a hardcoded secret will surface in both security and
 architecture lenses. Keep one entry; cite all lenses as evidence sources in
 the finding's `lens:` field (e.g., `lens: security + architecture`).
 
-### 8. Compute the verdict (CR-06 MUST — agent cannot override)
+### 9. Compute the verdict (CR-06 MUST — agent cannot override)
 
 Verdict is **computed**, not chosen:
 
@@ -311,10 +372,12 @@ Verdict is **computed**, not chosen:
 2. Any file >50 lines not read end-to-end → minimum verdict `Request changes`.
 3. Any lens produced no output (literal silence, not "nothing surfaced") →
    minimum verdict `Request changes`.
+4. PR Hygiene Standard PH-03 `high` finding (4+ migrations, plaintext
+   secret pattern, etc.) → minimum verdict `Request changes`.
 
-### 9. Self-attestation (CR-08 MUST — before report write)
+### 10. Self-attestation (CR-08 MUST — before report write)
 
-Write the Methodology section with the CR-01..CR-07 checklist before
+Write the Methodology section with the CR-01..CR-09 checklist before
 proceeding to the report body. Each box is `[✓]`, `[✗]`, or `[—]` with a
 one-line reason.
 
@@ -323,7 +386,7 @@ regenerate.
 
 If any box is `[✗]`, the corresponding verdict downgrade per CR-06 applies.
 
-### 10. Draft Hardening Deltas
+### 11. Draft Hardening Deltas
 
 One logical change per delta under `.architecture/{project}/hardening-deltas/`.
 Provenance:
@@ -337,19 +400,19 @@ Per CR-04, each delta references a failing characterisation test. If you
 cannot construct it, drop the delta — theoretical gaps belong in the
 report's **Watch List**, not in the delta queue.
 
-### 11. Cross-reference sibling artifacts
+### 12. Cross-reference sibling artifacts
 
 - `.security/{project}/viability-report-*.md` from prior
   `sulis-security:codebase-assess` runs → cite findings instead of restating.
 - `.architecture/{project}/hardening-deltas/` accepted deltas → cite existing
   delta ID instead of drafting a duplicate.
 
-### 12. Write the report
+### 13. Write the report
 
 See structure below. Methodology section appears with the CR-08
 self-attestation checklist filled in.
 
-### 13. Summarise to the user (FE-01..FE-11 MUST)
+### 14. Summarise to the user (FE-01..FE-11 MUST)
 
 Walk through the top 3-5 findings conversationally — **not** the full
 report. The report is the persistent artifact; the conversation is for
@@ -382,9 +445,10 @@ Write to `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DD}.md`.
 ## Summary
 
 - **Build Verification:** {N} PR-introduced errors (CR-01)
+- **PR Hygiene:** {N} findings ({N} high — split recommended, {N} medium, {N} note) (CR-09 / PH-01..PH-04)
 - **In the changes:** {N} findings ({N} critical, {N} high, {N} medium, {N} low)
 - **In the neighbours:** {N} findings (downgraded one severity per CR-05)
-- **Draft fixes:** {N}
+- **Draft fixes:** {N} (lens findings only — hygiene findings are author recommendations, not deltas)
 
 | Lens | In changes | In neighbours | Top concern |
 |---|---|---|---|
@@ -410,6 +474,50 @@ Write to `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DD}.md`.
 **Recommendation:** Destructure `hasMore` from the response and store in state alongside `codes` and `total`.
 
 **Draft fix:** HD-019 — "Declare hasMore as runtime variable in coupons page"
+
+---
+
+## PR Hygiene (CR-09 — applies PH-01..PH-08)
+
+### Signal table (PH-06)
+
+```
+Scope (PH-01):
+  commit_type_spread: {feat, refactor}        → smell
+  module_fan_out: 4 distinct top-level dirs    → smell
+  severity: medium (2 concerns bundled)
+
+Size (PH-02):
+  lines_added: 1043, lines_removed: 157, total: 1200
+  files_changed: 18
+  generated_ratio: 0.05
+  lock_file_ratio: 0.02
+  severity: medium (501-1000 line band; 16-30 file band)
+
+Safety (PH-03):
+  migration_count: 3                           → medium concern
+  schema_idl_count: 0
+  infra_files: 0
+  secret_pattern_hits: 0
+  severity: medium (review migration order + atomicity)
+
+Completeness (PH-04):
+  new_source_without_test: 4                   → medium
+  api_change_without_schema: false
+  severity: medium
+```
+
+### Findings
+
+{Each hygiene primitive with severity, signal, and recommendation. Hygiene findings are author recommendations — they do NOT produce Hardening Deltas. Lens findings remain the source of deltas.}
+
+#### PH-03 Safety — medium: 3 migrations in this PR
+
+**Signal:** `safety.migration_count = 3` — exceeds the "single migration" threshold; within the "review ordering" band.
+
+**Why it matters:** Multiple schema changes deployed atomically increase rollback complexity. Apply order matters; running code mid-deploy may see an intermediate state.
+
+**Recommendation:** Confirm migrations are designed to apply in any order, OR enforce a strict apply order in the deploy plan. Verify Expand-Contract was applied if any consumer changes are paired with the schema. Consider splitting into per-migration PRs if not.
 
 ---
 
@@ -442,6 +550,7 @@ Write to `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DD}.md`.
 - [✓] **CR-05 Severity rubric.** Applied. {N} critical, {N} high, {N} medium, {N} low.
 - [✓] **CR-06 Verdict computed.** Verdict: {value}. Auto-downgrade triggers: {list any that fired, e.g. "CR-01 Build Verification non-empty → minimum Block"}.
 - [✓] **CR-07 Lens completion.** Architecture: {N} findings + scan log. Security: {N findings | "nothing surfaced"} + scan log. Quality: {N findings} + jsx-ident-scan.log + dead-surface + contract-drift + test-coverage observation.
+- [✓] **CR-09 PR Hygiene applied.** PH-01 Scope: {severity} ({signal summary}). PH-02 Size: {severity} ({N} lines / {N} files). PH-03 Safety: {severity} ({migrations: N, schemas: N, secrets: N, infra: N}). PH-04 Completeness: {severity} ({signal summary}). PH-03 high → CR-06 auto-downgrade fired: {yes/no, with reason}.
 
 ### Run details
 
@@ -458,7 +567,7 @@ Write to `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DD}.md`.
 ## Depth modes
 
 - **Quick** ("smoke check before approve") — CR-01 mechanical baseline + architecture + security lenses only, severity `high`+ only. CR-02 carve-out path. ~5 minutes.
-- **Standard** (default) — full CR-01..CR-08 compliance, all three lenses, all severities, draft fixes.
+- **Standard** (default) — full CR-01..CR-09 compliance, all three lenses, all severities, draft fixes, PR Hygiene signal table.
 - **Deep** ("this PR touches load-bearing code") — Standard + no neighbour cap, recommend full `/sea:codebase-audit` afterwards.
 
 ---
@@ -467,12 +576,18 @@ Write to `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DD}.md`.
 
 - **With the Code Review Standard** — every workflow step traces to a
   CR-NN rule. When the standard changes, this skill changes with it.
+- **With the PR Hygiene Standard** — CR-09 applies PH-01..PH-08. Hygiene
+  findings inform lens severity scoring and feed the CR-06 verdict
+  auto-downgrade for PH-03 high findings. When PH thresholds calibrate
+  (per PH-07), this skill picks them up by reference.
 - **With `/sulis-security:codebase-assess`** — invoked in Quick mode internally
   for the security lens. If a full security audit already exists in
   `.security/{project}/`, cite it instead of re-running.
 - **With `/sea:harden`** — draft fixes produced here are handed to
   `/sea:harden` if accepted. Provenance preserved via
-  `source: code-review:PR-NNN`.
+  `source: code-review:PR-NNN`. **Hygiene findings do not produce deltas**
+  — they are author recommendations (split, add tests, review migration
+  order).
 - **With `/sea:codebase-audit`** — when neighbour-ring patterns suggest a
   broader gap, recommend the full audit. Don't try to do its job.
 
@@ -517,7 +632,8 @@ Write to `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DD}.md`.
 
 ## See Also
 
-- [`../../references/code-review-standard.md`](../../references/code-review-standard.md) — **the standard this skill implements** (CR-01..CR-08, anchor cases, calibration)
+- [`../../references/code-review-standard.md`](../../references/code-review-standard.md) — **the standard this skill implements** (CR-01..CR-09, anchor cases, calibration)
+- `plugins/srd/references/pr-hygiene-standard.md` — **PR Hygiene Standard** (PH-01..PH-08) applied via CR-09; Scope / Size / Safety / Completeness primitives + computed signal table
 - [`../codebase-audit/SKILL.md`](../codebase-audit/SKILL.md) — full-repo architectural audit (same gap types, broader scope)
 - [`../harden/SKILL.md`](../harden/SKILL.md) — implementing accepted fixes
 - [`../../references/hardening-deltas.md`](../../references/hardening-deltas.md) — fix file format and `source:` field schema
