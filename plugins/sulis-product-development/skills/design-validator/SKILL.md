@@ -194,7 +194,7 @@ report = generate_final_report(results, final_status)
 ### Step 5: Save Report
 
 ```
-Save to: features/{feature}/reviews/design-validator-{date}.md
+Save to: features/{feature}/reviews/design-validator-{YYYY-MM-DDTHHMMSSZ}.md
 ```
 
 ---
@@ -277,7 +277,7 @@ You MUST return a JSON object following this EXACT structure:
 # Design Validator Report
 
 **Feature:** {feature_name}
-**Validation Date:** {date}
+**Validation Date:** {YYYY-MM-DDTHHMMSSZ}
 **Validated By:** Design Validator Orchestrator (v2.4.0)
 
 ## Executive Summary
@@ -422,7 +422,7 @@ Collate all results into the final report format and determine overall status:
 ### 6. Save Report
 
 ```
-Save to: features/{feature}/reviews/design-validator-{date}.md
+Save to: features/{feature}/reviews/design-validator-{YYYY-MM-DDTHHMMSSZ}.md
 ```
 
 ### 7. Present Results

@@ -1,8 +1,8 @@
-# {{YYYY-MM-DD}} — {{topic}}
+# {{YYYY-MM-DDTHHMMSSZ}} — {{topic}}
 
 <!--
 v0.4 convention: this file represents ONE journal entry, written to
-`.pitch/{slug}/journal/{YYYY-MM-DD}-{topic}.md`. The journal is multi-
+`.pitch/{slug}/journal/{YYYY-MM-DDTHHMMSSZ}-{topic}.md`. The journal is multi-
 file (one per session or topic), NOT a single rolling file. This
 matches the production convention proven on the sulis pre-seed deck.
 

@@ -405,7 +405,7 @@ loosened in future once we have enough experience to identify safe exceptions.
 ```
 COMPLETENESS SPIRAL ASSESSMENT
 Feature: {feature-name}
-Date: {date}
+Date: {YYYY-MM-DDTHHMMSSZ}
 Classification: {classification}
 Passes completed: {1|2|3}
 

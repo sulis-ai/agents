@@ -51,7 +51,7 @@ claude --agent sulis-security:security-reviewer --dangerously-skip-permissions
 | Command | What It Does |
 |---|---|
 | `claude --agent sulis-security:security-reviewer` | Conversational security reviewer — drives assessments, answers ad-hoc questions |
-| `/sulis-security:codebase-assess <project> <repo> [url]` | Run the 25-primitive viability assessment, produce `viability-report-{date}.md` |
+| `/sulis-security:codebase-assess <project> <repo> [url]` | Run the 25-primitive viability assessment, produce `viability-report-{YYYY-MM-DDTHHMMSSZ}.md` (ISO 8601 UTC timestamp, prevents same-day collisions) |
 
 ---
 
@@ -119,7 +119,7 @@ parallel to SRD's `.specifications/` and SEA's `.architecture/`:
 ```
 .security/{project}/
 ├── SEC.yaml                              # metadata, scores, related SPEC/ARCH IDs
-├── viability-report-{YYYY-MM-DD}.md      # the main report
+├── viability-report-{YYYY-MM-DDTHHMMSSZ}.md  # ISO 8601 UTC timestamp; main report
 ├── tool-outputs/                         # raw outputs
 │   ├── gitleaks.sarif
 │   ├── trivy.json

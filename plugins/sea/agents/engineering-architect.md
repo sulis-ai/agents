@@ -383,7 +383,7 @@ in `/sea:codebase-audit`. Cross-reference the report to avoid
 double-counting:
 
 - A finding already in the viability report → convert to a Hardening Delta
-  with `source: sulis-security:viability-report-{date}#SEC-XX` in frontmatter.
+  with `source: sulis-security:viability-report-{timestamp}#SEC-XX` in frontmatter (timestamp is ISO 8601 UTC, e.g. `2026-05-21T143052Z`).
 - A new gap not in the viability report → file a delta as normal and note
   that the viability report missed it (gives feedback for the next
   assessment).

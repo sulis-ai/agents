@@ -44,7 +44,7 @@ Confirm the rehearsal scenario:
 
 Default is mock partner meeting. Adjust timing targets accordingly.
 
-Record the mode in `journal/{YYYY-MM-DD}-{topic}.md`.
+Record the mode in `journal/{YYYY-MM-DDTHHMMSSZ}-{topic}.md`.
 
 ### Step 2: Time the walkthrough
 

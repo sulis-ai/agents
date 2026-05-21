@@ -81,7 +81,7 @@ The optional **`source`** field records where the delta came from. Recognised fo
 | (omitted) | Delta originated from a `/sea:codebase-audit` finding with no upstream spec |
 | `srd:misuse-case-MUC-NN` | Delta implements the System Response required by an SRD misuse case (SRD v1.11.0+) |
 | `srd:negative-requirement-NR-NN` | Delta implements a per-use-case negative requirement from SRD.md |
-| `sulis-security:viability-report-{date}#SEC-NN` | Delta closes a finding from a sulis-security viability report |
+| `sulis-security:viability-report-{timestamp}#SEC-NN` | Delta closes a finding from a sulis-security viability report. `timestamp` is the ISO 8601 UTC stamp embedded in the report filename (e.g., `2026-05-21T143052Z`). |
 | `nfr:NFR-NN` | Delta implements a non-functional requirement from NFR.md |
 | `code-review:PR-NN` | Delta closes a finding from a `/code-review` run against a pull request, branch, or commit range (SEA v0.12.0+). The delta also carries a `lens:` field (`architecture` / `security` / `quality`) identifying which reviewer produced it. |
 

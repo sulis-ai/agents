@@ -204,7 +204,7 @@ contract tests, chaos tests, referential integrity.
 **Exit criteria:** Viability report produced; concierge has presented
 the final journey summary to the founder.
 
-**Produces:** `.security/{project}/viability-report-{YYYY-MM-DD}.md`.
+**Produces:** `.security/{project}/viability-report-{YYYY-MM-DDTHHMMSSZ}.md` (ISO 8601 UTC timestamp, prevents same-day rerun collisions).
 
 **Final summary** (action-then-report shape, never permission-theater):
 

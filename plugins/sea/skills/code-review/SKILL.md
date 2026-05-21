@@ -39,7 +39,7 @@ assigned, and how the reviewing agent attests to its own coverage.
 When invoked, take a target (PR number, branch ref, or commit range) and
 produce:
 
-1. A merged report at `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DD}.md`
+1. A merged report at `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DDTHHMMSSZ}.md` (ISO 8601 UTC timestamp prevents same-day rerun collisions)
    that satisfies CR-01..CR-08.
 2. Draft Hardening Deltas under `.architecture/{project}/hardening-deltas/`
    for accepted findings, with `source: code-review:PR-NNN` and
@@ -455,17 +455,17 @@ author should do next.
 >
 > {The single most important thing to look at, in one sentence — without restating the report.}
 >
-> Full review at `.architecture/{project}/code-reviews/PR-{number}-{date}.md`. {If draft fixes were queued: "N draft fixes are ready — run `/sea:harden` to apply them when you're ready."}
+> Full review at `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DDTHHMMSSZ}.md`. {If draft fixes were queued: "N draft fixes are ready — run `/sea:harden` to apply them when you're ready."}
 
 **Examples**
 
 Clean PR:
 
-> Reviewed your pull request. **Ready to merge.** No build errors, well-scoped, tests included. Full review at `.architecture/acme/code-reviews/PR-142-2026-05-21.md`.
+> Reviewed your pull request. **Ready to merge.** No build errors, well-scoped, tests included. Full review at `.architecture/acme/code-reviews/PR-142-2026-05-21T143052Z.md`.
 
 Problem PR:
 
-> Reviewed your pull request. **Don't merge yet.** The build is failing — there's a variable referenced in the coupons page that was never actually declared, so the page would crash. Full review at `.architecture/acme/code-reviews/PR-168-2026-05-21.md`. Two draft fixes are ready — run `/sea:harden` to apply them.
+> Reviewed your pull request. **Don't merge yet.** The build is failing — there's a variable referenced in the coupons page that was never actually declared, so the page would crash. Full review at `.architecture/acme/code-reviews/PR-168-2026-05-21T091200Z.md`. Two draft fixes are ready — run `/sea:harden` to apply them.
 
 **Anti-patterns** (MUST NOT in the chat summary):
 
@@ -500,12 +500,18 @@ The translation table for severity and verdict, used in Tier 1:
 | Severity `medium` | **Worth fixing** |
 | Severity `low` / `note` | **Minor — for awareness** |
 
-Write to `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DD}.md`.
+Write to `.architecture/{project}/code-reviews/PR-{number}-{TIMESTAMP}.md` where `TIMESTAMP` is an ISO 8601 UTC timestamp generated at report-write time. This prevents same-day rerun collisions (e.g., reviewing the same PR twice in one morning).
+
+```bash
+TIMESTAMP=$(date -u +%Y-%m-%dT%H%M%SZ)
+# Produces: 2026-05-21T143052Z
+# Example file: PR-142-2026-05-21T143052Z.md
+```
 
 ```markdown
 # Code Review: PR-{number} — {title}
 
-> **Date:** YYYY-MM-DD
+> **Timestamp:** YYYY-MM-DDTHHMMSSZ (ISO 8601 UTC)
 > **Author:** {author}
 > **Branch:** {headRef} → {baseRef}
 > **Files changed:** N

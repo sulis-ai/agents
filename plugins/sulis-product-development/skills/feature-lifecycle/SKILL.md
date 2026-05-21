@@ -1047,7 +1047,7 @@ Task(
 
 **Store Report:**
 ```
-features/{feature}/reviews/completion-validator-{date}.md
+features/{feature}/reviews/completion-validator-{YYYY-MM-DDTHHMMSSZ}.md
 ```
 
 ### User Sign-off Presentation
@@ -1079,7 +1079,7 @@ CODE:
 
 QUALITY:
 ✓ Production Guardian: APPROVED
-✓ Report: features/{feature}/reviews/production-guardian-{date}.md
+✓ Report: features/{feature}/reviews/production-guardian-{YYYY-MM-DDTHHMMSSZ}.md
 
 DOCUMENTATION:
 ✓ Platform conventions updated: {Yes/No}
@@ -1120,10 +1120,10 @@ Every feature MUST have these artifacts in `features/{feature}/`:
 | PLAN.md | IMPLEMENTATION | YES | All classifications |
 | TASKS.md | IMPLEMENTATION | YES | All classifications |
 | CHANGELOG.md | IMPLEMENTATION | YES | All classifications |
-| reviews/design-validator-{date}.md | DESIGN | YES | All classifications |
-| reviews/production-guardian-{date}.md | RELEASE | YES | All classifications |
+| reviews/design-validator-{YYYY-MM-DDTHHMMSSZ}.md | DESIGN | YES | All classifications |
+| reviews/production-guardian-{YYYY-MM-DDTHHMMSSZ}.md | RELEASE | YES | All classifications |
 | **DOCUMENTATION_CHECKLIST.md** | COMPLETION | **YES** | All classifications - 20 triggers evaluated |
-| reviews/completion-validator-{date}.md | COMPLETION | YES | All classifications |
+| reviews/completion-validator-{YYYY-MM-DDTHHMMSSZ}.md | COMPLETION | YES | All classifications |
 | LIFECYCLE_STATE.json | All | YES | All classifications |
 
 ### ServiceSpec Artifact Requirements by Classification
@@ -1271,7 +1271,7 @@ Task(
 **Decision Handling:**
 - **PASSED** → Proceed to GATE 1 (User Approval)
 - **BLOCKED** → Fix ALL issues, then re-run Design Validator
-- Report stored at: `features/{feature}/reviews/design-validator-{date}.md`
+- Report stored at: `features/{feature}/reviews/design-validator-{YYYY-MM-DDTHHMMSSZ}.md`
 
 See `skills/design-validator/SKILL.md` for full agent specification.
 

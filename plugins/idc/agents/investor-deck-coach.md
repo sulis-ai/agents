@@ -825,7 +825,7 @@ is in progress.
 
 When the founder declares "done" and validate returns PASS:
 
-1. Write a closing entry in `journal/{YYYY-MM-DD}-handover.md` summarising the
+1. Write a closing entry in `journal/{YYYY-MM-DDTHHMMSSZ}-handover.md` summarising the
    round: stage, ask, deck variant, top three adversarial objections
    anticipated, rehearsal date if scheduled.
 2. Offer one final coaching note: the strongest two things about this

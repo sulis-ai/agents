@@ -28,7 +28,7 @@ This skill is a template library. It is not invoked by slash command. The
 | `templates/ADVERSARIAL_REPORT.md.template` | `.pitch/{project}/05-adversarial/ADVERSARIAL_REVIEW.md` |
 | `templates/REHEARSAL_NOTES.md.template` | `.pitch/{project}/06-verification/REHEARSAL_NOTES.md` |
 | `templates/COMPLETENESS_REPORT.md.template` | `.pitch/{project}/06-verification/VERIFICATION_REPORT.md` |
-| `templates/EXPLORATION_JOURNAL.md.template` | `.pitch/{project}/journal/{YYYY-MM-DD}-{topic}.md` — one file per session/topic, not a single rolling file |
+| `templates/EXPLORATION_JOURNAL.md.template` | `.pitch/{project}/journal/{YYYY-MM-DDTHHMMSSZ}-{topic}.md` — one file per session/topic, not a single rolling file |
 | `templates/GLOSSARY.md.template` | `.pitch/{project}/GLOSSARY.md` |
 
 ## How Skills Use Templates

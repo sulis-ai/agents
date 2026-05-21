@@ -44,7 +44,7 @@ Ask one question at a time:
 If any answer is "yes", proceed to **extraction flow**. If all are "no",
 proceed to **proposal flow**.
 
-Record the triage decision in `journal/{YYYY-MM-DD}-{topic}.md`.
+Record the triage decision in `journal/{YYYY-MM-DDTHHMMSSZ}-{topic}.md`.
 
 ### Step 2A: Extraction flow
 
@@ -88,7 +88,7 @@ Apply `references/brand-proposal-standard.md` (BP-01..10):
    mock chart with the proposed tokens. Iterate per founder feedback
    (typically 1–3 rounds).
 10. On founder approval, write `BRAND.md` with `page-build-ready: true`
-    and record approval in `journal/{YYYY-MM-DD}-{topic}.md` (BP-10).
+    and record approval in `journal/{YYYY-MM-DDTHHMMSSZ}-{topic}.md` (BP-10).
 
 ### Step 3: Lock the brand
 

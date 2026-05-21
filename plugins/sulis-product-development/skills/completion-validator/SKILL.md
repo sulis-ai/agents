@@ -380,7 +380,7 @@ Produce your report in this exact format:
 # Completion Validator Report
 
 **Feature:** {feature_name}
-**Validation Date:** {date}
+**Validation Date:** {YYYY-MM-DDTHHMMSSZ}
 **Validated By:** Completion Validator Agent
 
 ## Executive Summary
@@ -541,9 +541,9 @@ Store Completion Validator reports for audit trail:
 ```
 features/{feature}/
 ├── reviews/
-│   ├── design-validator-{date}.md
-│   ├── production-guardian-{date}.md
-│   └── completion-validator-{date}.md  # NEW
+│   ├── design-validator-{YYYY-MM-DDTHHMMSSZ}.md
+│   ├── production-guardian-{YYYY-MM-DDTHHMMSSZ}.md
+│   └── completion-validator-{YYYY-MM-DDTHHMMSSZ}.md  # NEW
 └── DOCUMENTATION_CHECKLIST.md  # NEW mandatory artifact
 ```
 

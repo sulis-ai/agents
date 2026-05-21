@@ -42,7 +42,7 @@ running the analysis, signal the change verbally:
 > wrong. Ready?"
 
 Wait for the founder's go-ahead. Record the hat-change entry in
-`journal/{YYYY-MM-DD}-{topic}.md`.
+`journal/{YYYY-MM-DDTHHMMSSZ}-{topic}.md`.
 
 At the end of Phase 7, return to coaching mode with an equally explicit
 signal:

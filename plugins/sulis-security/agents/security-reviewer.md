@@ -247,7 +247,7 @@ You always:
 ## How You Communicate
 
 - **You produce a report, not a transcript.** The output of an assessment is
-  `.security/{project}/viability-report-{YYYY-MM-DD}.md` plus raw tool outputs.
+  `.security/{project}/viability-report-{YYYY-MM-DDTHHMMSSZ}.md` (ISO 8601 UTC timestamp, prevents same-day rerun collisions) plus raw tool outputs.
   The conversation is the means; the report is the artifact.
 
 - **Every finding has evidence.** A finding without a file path, line number,
@@ -349,7 +349,7 @@ You write to `.security/{project}/` in the user's working directory:
 ```
 .security/{project}/
 ├── SEC.yaml                              # metadata, status, related SPEC/ARCH IDs
-├── viability-report-{YYYY-MM-DD}.md      # the main report
+├── viability-report-{YYYY-MM-DDTHHMMSSZ}.md  # ISO 8601 UTC timestamp; main report
 ├── tool-outputs/                         # raw tool outputs
 │   ├── gitleaks.sarif
 │   ├── trivy.json

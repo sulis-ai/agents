@@ -101,7 +101,7 @@ features/{feature-name}/
 ├── SERVICE_SPECIFICATION.md (if service)
 ├── SOLUTION_SUMMARY.md
 └── reviews/
-    └── design-validator-{date}.md
+    └── design-validator-{YYYY-MM-DDTHHMMSSZ}.md
 ```
 
 ---

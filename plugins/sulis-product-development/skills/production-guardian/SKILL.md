@@ -707,7 +707,7 @@ Produce your report in this exact format:
 # Production Guardian Report
 
 **Feature:** {feature_name}
-**Review Date:** {date}
+**Review Date:** {YYYY-MM-DDTHHMMSSZ}
 **Reviewed By:** Production Guardian Agent
 **Mode:** STRICT (No Deferrals)
 
@@ -1037,5 +1037,5 @@ features/{feature}/
 ├── SERVICE_SPECIFICATION_DELTA.md  # (if service_enhancement)
 ├── ENTITY_MODEL_DELTA.md           # (if entity changes)
 └── reviews/
-    └── production-guardian-{date}.md
+    └── production-guardian-{YYYY-MM-DDTHHMMSSZ}.md
 ```

@@ -290,7 +290,13 @@ This avoids double-counting between security review and architectural hardening.
 
 ## Report Format
 
-Write the report to `.security/{project}/viability-report-{YYYY-MM-DD}.md`.
+Write the report to `.security/{project}/viability-report-{TIMESTAMP}.md` where `TIMESTAMP` is an ISO 8601 UTC timestamp generated at report-write time. This prevents same-day rerun collisions (e.g., running a security assessment twice in one day after applying fixes between runs).
+
+```bash
+TIMESTAMP=$(date -u +%Y-%m-%dT%H%M%SZ)
+# Produces: 2026-05-21T143052Z
+# Example file: viability-report-2026-05-21T143052Z.md
+```
 
 ```markdown
 # Codebase Viability Assessment: {Project Name}
