@@ -97,6 +97,16 @@ See [`references/red-green-blue.md`](references/red-green-blue.md) for full deta
 
 ## What It Produces
 
+Per the Change Work Standard (CW-01..CW-08, see
+`plugins/srd/references/change-work-standard.md`), SEA's artifacts
+live on a **change branch** (`change/{primitive}-{slug}`) when work
+happens inside a change worktree. The artifact directory paths are
+unchanged — `.architecture/{project}/` stays where it is — but the
+branch they live on is the change branch, not `dev` directly. When
+the change is shipped via `sulis-change finish`, the TDD + ADRs +
+Work Packages merge to `dev` in one squash commit alongside the
+implementation code.
+
 For greenfield work, SEA writes to `.architecture/{project}/` parallel to
 SRD's `.specifications/{project}/`:
 

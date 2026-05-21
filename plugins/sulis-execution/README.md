@@ -68,6 +68,45 @@ founder's separate ceremony via the Concierge.
 See `plugins/srd/references/git-workflow-standard.md` for the full
 spec.
 
+## Working inside a change (CW-04, v0.12.0+)
+
+Per the Change Work Standard at
+`plugins/srd/references/change-work-standard.md`, every piece of work
+is bounded by a **change** — a dedicated git branch + worktree. The
+`sulis-change` tool provisions and tears down those workspaces.
+
+### CLI
+
+| Command | What it does |
+|---------|-------------|
+| `sulis-change start --slug X --primitive Y` | Create branch `change/{primitive}-{slug}` + worktree at `<repo-parent>/<repo-name>-change-{primitive}-{slug}/`. Writes metadata to `.changes/{primitive}-{slug}.yaml` on the change branch. |
+| `sulis-change adopt --slug X --primitive Y` | Retrofit in-flight work (uncommitted / unpushed commits) into a change branch. Three modes: forward (default — leave already-pushed commits where they are), rewrite (destructive — relocates pushed commits; requires `--force`). |
+| `sulis-change finish --slug X --primitive Y --merge OR --pr` | Rebase change onto dev, merge (or open PR), clean up worktree + branch. |
+| `sulis-change list` | Enumerate active change branches with worktree + dirty state. |
+| `sulis-change status --slug X --primitive Y` | One change's summary: SHA, ahead/behind base, worktree presence. |
+
+### Two-level worktree hierarchy
+
+```
+~/repo                                ← main / dev tracked here
+~/repo-change-create-payments         ← change worktree (CW-04 top)
+  └── ~/repo-wp-001-schema            ← executor WP worktree (CW-04 inner)
+  └── ~/repo-wp-002-handler           ← executor WP worktree (CW-04 inner)
+```
+
+The executor's WP worktree branches off the change branch, not `dev`.
+The train ships WPs into the change branch. When the change is
+verified end-to-end, `sulis-change finish` merges the change branch
+into `dev` in one squash commit.
+
+### Backward compatibility
+
+When `/sulis-execution:run-wp` or `/sulis-execution:run-all` are
+invoked **outside** a change worktree (directly on `dev`), the
+`--base-branch` parameter defaults to `dev` and behaviour is identical
+to v0.11.0. The change-bounded path is opt-in: activate it by running
+`sulis-change start` before doing the work.
+
 ## What it's not
 
 - It's not the architect (SEA designs).

@@ -41,6 +41,75 @@ moved Steps 8-12 to the calling session** — fixing the structural
 parking failure caused by asking a subagent to poll across turns,
 which the harness's cross-turn notification contract doesn't support.
 
+## Where a WP sits — inside a change (CW-04, v0.12.0+)
+
+Per the Change Work Standard at
+`plugins/srd/references/change-work-standard.md`, every WP exists
+inside a **change** — a dedicated git branch with its own worktree.
+The worktree hierarchy is **two levels**:
+
+```
+~/repo                                ← main / dev tracked here
+~/repo-change-create-payments         ← change worktree (CW-04 top)
+  └── ~/repo-wp-001-schema            ← executor WP worktree (CW-04 inner)
+  └── ~/repo-wp-002-handler           ← executor WP worktree (CW-04 inner)
+```
+
+The executor's WP worktree branches off the **change branch**
+(`change/create-payments`), NOT directly off `dev`. The merge target
+for the WP is the change branch. When all the change's WPs are
+merged into the change branch and the change is verified end-to-end,
+the change branch merges into `dev` via `sulis-change finish`.
+
+### What this means per step
+
+- **Steps 1–7 (executor):** unchanged in mechanics. The worktree is
+  created at `<change-worktree>/../<change-worktree-name>-wp-NNN-<slug>/`,
+  branched off the change branch's HEAD. The dev-SHA-at-creation sidecar
+  records that change-branch HEAD, not origin/dev.
+- **Steps 8a/b/c (CI poll + rebase + merge):** rebase target and merge
+  target are both the **change branch**. The calling session passes
+  `--base-branch <change-branch>` to wpx-pipeline / wpx-train. The
+  helper functions `_rebase_on_dev` and `_merge_squash` take a
+  `base_branch` parameter that defaults to `dev` but accepts the
+  change branch when set.
+- **Steps 9-10 (deploy / health / smoke):** the change branch's HEAD
+  is what's deploying. Deploy workflows in the project's CI must run
+  on push to `change/*` branches (covered by RC-06 reference workflows
+  with `branches: ['change/**']` in the trigger).
+- **Step 11 (security review):** per-WP, in parallel, after the
+  batch deploy. Unchanged in shape by CW-04.
+- **Step 12 (cleanup):** unchanged. The WP worktree is removed; the
+  WP's INDEX status flips from `step-7-complete` → `done`. The
+  change branch retains the WP's squash commit.
+
+### The train, within a change
+
+`wpx-train` operates inside a change. Its eligibility set is the
+WPs whose status is `step-7-complete` AND whose feature branches
+are on origin AND whose CI is green AND whose dependencies are
+merged — all relative to the change branch.
+
+When the train fires inside a change worktree:
+
+1. Reads `--base-branch <change-branch>` from the calling session
+2. Rebases each eligible WP's branch onto the previous rebased
+   branch's HEAD (still chained, but starting from the change branch)
+3. Runs bundled-tip CI on the change branch
+4. Sequential squash-merges into the change branch
+5. One deploy + health + smoke against the change branch's HEAD
+
+The change is shipped to `dev` only when `sulis-change finish`
+runs. Before that, every train run lands on the change branch only.
+
+### Backward compatibility
+
+When run-wp / run-all are invoked **outside** a change worktree
+(directly on `dev`), `--base-branch` defaults to `dev` and the
+behaviour is identical to v0.11.0. The change-bounded path is
+opt-in: it activates when `sulis-change start` has provisioned a
+worktree and the calling session is operating inside it.
+
 ### Why the v0.9.0 contract split
 
 Versions 0.5.1 through 0.8.3 each moved the executor's parking failure
