@@ -1,0 +1,21 @@
+# Python build artifacts
+**/*.egg-info/
+**/__pycache__/
+**/*.pyc
+build/
+dist/
+.eggs/
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node.js / TypeScript build artifacts (for Phase 3)
+**/node_modules/
+**/dist/
+**/*.tsbuildinfo
+
+# Docs build (for Phase 5)
+docs/site/
+docs/_build/

@@ -1,0 +1,221 @@
+openapi: 3.1.0
+info:
+  title: sulis-execution SDK
+  version: 0.1.0
+  description: |
+    Typed surface for the sulis-execution plugin's CLI tools.
+
+    Per the agent-consumable SDK spec at
+    `plugins/sulis-execution/docs/research/agent-consumable-sdk-spec.md`
+    (v0.2.0), this schema is the source of truth for typed Python +
+    TypeScript clients and an MCP server. The transport is
+    Subprocess + JSON-on-stdout (v0.2.0 Part 4.3) — paths and HTTP
+    response codes here are used as schema containers only; the
+    actual transport spawns the underlying CLI binary
+    (`wpx-pipeline`, `wpx-train`, etc.) and reads structured JSON
+    from stdout, mapping exit codes 0/1/2 to outcome categories
+    (Protocol / Expected / Internal) per v0.2.0 Part 3.
+
+    A second transport binding (JSON-RPC over stdio / MCP, v0.2.0
+    Part 4.2) is provided by the sulis-execution-mcp server, which
+    reads this schema and registers each operation as an MCP tool.
+  contact:
+    name: Sulis AI
+    url: https://github.com/sulis-ai/agents
+
+paths:
+  /pipeline/run:
+    post:
+      operationId: pipelineRun
+      summary: Run the per-WP Steps 8-10 pipeline
+      description: |
+        Polls CI for the WP's branch, rebases if the base branch has
+        advanced, squash-merges to the base branch, polls the deploy
+        workflow, runs health + smoke. Returns a structured result
+        with outcome (success / blocker / error) and per-step verdicts.
+
+        Use this for hotfix / solo-ship paths. For batched shipping,
+        use train.run.
+
+        Failure modes (returned as successful operations with
+        outcome: blocker — the SDK does NOT raise an exception):
+        - CI poll timeout or red → outcome: blocker
+        - Rebase conflict → outcome: blocker
+        - Deploy workflow timeout or red → outcome: blocker
+        - Health check unhealthy → outcome: blocker
+        - Smoke test fail → outcome: blocker
+
+        Errors (the SDK raises):
+        - Invalid arguments → ExpectedError
+        - Tool crash → InternalError
+        - Tool not found / permission denied → ProtocolError
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PipelineRunRequest'
+      responses:
+        '200':
+          description: |
+            Pipeline completed. Outcome may be success or blocker;
+            both are normal results, not errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PipelineResult'
+        '400':
+          $ref: '#/components/responses/ExpectedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  schemas:
+    PipelineRunRequest:
+      type: object
+      required:
+        - wp
+        - branch
+        - project
+        - dev_sha_at_creation
+        - deploy_workflow
+      properties:
+        wp:
+          type: string
+          pattern: '^WP-[A-Z0-9-]+$'
+          description: Work Package ID (e.g. WP-001)
+        branch:
+          type: string
+          description: Feature branch name (typically feat/wp-NNN-slug)
+        project:
+          type: string
+          description: Project slug (resolves .architecture/<project>/ paths)
+        repo_root:
+          type: string
+          default: '.'
+          description: Repository root directory
+        repo:
+          type: string
+          description: GitHub repo as org/name; defaults to $GITHUB_REPOSITORY env var
+        worktree_path:
+          type: string
+          description: Path to executor worktree (defaults to repo root)
+        dev_sha_at_creation:
+          type: string
+          pattern: '^[0-9a-f]{7,40}$'
+          description: origin/dev (or base-branch) SHA captured at worktree creation
+        deploy_workflow:
+          type: string
+          description: Deploy workflow name (e.g. "Deploy to Dev Environment")
+        staging_url:
+          type: string
+          format: uri
+          description: Staging URL; if set, triggers health check
+        health_path:
+          type: string
+          default: ''
+          description: HTTP path for health check (auto-detected from smoke_cmd if empty)
+        smoke_cmd:
+          type: string
+          default: ''
+          description: Smoke test shell command
+        ci_poll_interval:
+          type: integer
+          minimum: 30
+          default: 300
+        deploy_poll_interval:
+          type: integer
+          minimum: 30
+          default: 300
+        skip_ci_poll:
+          type: boolean
+          default: false
+        base_branch:
+          type: string
+          default: 'dev'
+          description: |
+            Base ref for rebase + merge (CW-04). When invoked inside
+            a change worktree, callers pass the change branch name
+            so WPs ship to the change branch rather than directly to
+            dev.
+
+    PipelineResult:
+      type: object
+      required:
+        - wp
+        - outcome
+        - started_at
+      properties:
+        wp:
+          type: string
+        outcome:
+          type: string
+          enum: [success, blocker, error, pending]
+          description: |
+            success = pipeline completed cleanly.
+            blocker = pipeline ran but reported a deterministic
+              failure (CI red, deploy timed out, smoke failed).
+              Inspect blocker_reason. This is NOT an exception;
+              the SDK returns this result.
+            error = unexpected internal state (rare).
+            pending = transient state during execution (not seen by
+              callers; only present in intermediate result records).
+        merge_sha:
+          type: [string, 'null']
+        deploy_url:
+          type: [string, 'null']
+          format: uri
+        deploy_workflow_run:
+          type: [string, 'null']
+        health_status:
+          type: [string, 'null']
+          enum: [healthy, unhealthy, skipped, null]
+        health_url:
+          type: [string, 'null']
+        smoke_verdict:
+          type: [string, 'null']
+        blocker_reason:
+          type: [string, 'null']
+        ci_poll_skipped:
+          type: boolean
+          default: false
+        merge_already_complete:
+          type: boolean
+          default: false
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: [string, 'null']
+          format: date-time
+
+    Error:
+      type: object
+      required:
+        - ok
+        - error
+      properties:
+        ok:
+          type: boolean
+          enum: [false]
+        error:
+          type: string
+          description: Human-readable error message
+        context:
+          type: object
+          additionalProperties: true
+          description: Optional structured context
+
+  responses:
+    ExpectedError:
+      description: Expected failure (invalid input, file not found, etc.)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InternalError:
+      description: Internal crash (bug)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

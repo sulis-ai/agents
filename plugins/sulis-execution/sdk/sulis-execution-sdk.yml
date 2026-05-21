@@ -1,0 +1,78 @@
+# sulis-execution SDK codegen configuration
+#
+# Companion file to sulis-execution.openapi.yaml. Defines the shape of
+# generated clients (resource tree, naming, errors, retries) without
+# polluting the schema itself.
+#
+# Per the agent-consumable SDK spec (v0.2.0), this file is the codegen
+# config layer; the OpenAPI file is the schema layer. They're separable
+# — different generators can read the same OpenAPI with a different
+# codegen config.
+
+organization: sulis-ai
+project: sulis-execution-sdk
+
+# Generation targets
+targets:
+  - python:
+      package_name: sulis_execution
+      distribution_name: sulis-execution
+      install_command: pip install sulis-execution
+  - typescript:
+      package_name: '@sulis-ai/execution'
+      install_command: npm install @sulis-ai/execution
+  - mcp_server:
+      package_name: sulis-execution-mcp
+      install_command: pip install sulis-execution-mcp
+
+# Resource tree — flat OpenAPI paths grouped into resource.method
+# In Phase 0 (pilot) only pipeline.run is implemented; Phase 1 grows
+# this to cover all 36 subcommands.
+resources:
+  pipeline:
+    operations:
+      run: pipelineRun
+
+# Error mapping per v0.2.0 Part 3 — three universal categories +
+# wpx-domain extensions defined in Python/TypeScript client modules.
+errors:
+  classes:
+    SulisExecutionError:
+      python: SulisExecutionError
+      typescript: SulisExecutionError
+    ProtocolError:
+      extends: SulisExecutionError
+      python: ProtocolError
+      typescript: ProtocolError
+    ExpectedError:
+      extends: SulisExecutionError
+      python: ExpectedError
+      typescript: ExpectedError
+    InternalError:
+      extends: SulisExecutionError
+      python: InternalError
+      typescript: InternalError
+
+# Exit-code → category mapping (per Phase 0)
+transport:
+  binding: subprocess
+  binary_lookup:
+    strategy: env-or-path
+    env_var: WPX_DIR
+    fallback: $PATH
+  exit_code_mapping:
+    0: success
+    1: expected_error
+    2: internal_error
+  protocol_error_signals:
+    - binary_not_found
+    - permission_denied
+    - exec_failure
+
+# Client settings
+client_settings:
+  default_timeout_seconds: 5400
+  retries:
+    enabled: false   # Local subprocess transport; no transient failures to retry
+  telemetry:
+    correlation_id_source: pid_plus_timestamp
