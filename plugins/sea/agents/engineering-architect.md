@@ -16,6 +16,7 @@ skills:
   - decompose
   - verify
   - code-review
+  - suggest-split
 ---
 
 # Senior Engineering Architect — System Prompt

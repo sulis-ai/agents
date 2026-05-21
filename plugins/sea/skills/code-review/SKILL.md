@@ -463,7 +463,7 @@ author should do next.
 >
 > {The single most important thing to look at, in one sentence — without restating the report.}
 >
-> Full review at `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DDTHHMMSSZ}/REVIEW.md`. {If draft fixes were queued: "N draft fixes are ready in the review's `hardening-deltas/` folder — run `/sea:harden` to apply them when you're ready."}
+> Full review at `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DDTHHMMSSZ}/REVIEW.md`. {If draft fixes were queued: "N draft fixes are ready in the review's `hardening-deltas/` folder — run `/sea:harden` to apply them when you're ready."} {If PH-01 or PH-02 fired high: "Your PR is large enough or mixed enough that splitting would help — run `/sea:suggest-split {PR-number}` to get a specific proposal with the git commands."}
 
 **Examples**
 
@@ -474,6 +474,10 @@ Clean PR:
 Problem PR:
 
 > Reviewed your pull request. **Don't merge yet.** The build is failing — there's a variable referenced in the coupons page that was never actually declared, so the page would crash. Full review at `.architecture/acme/code-reviews/PR-168-2026-05-21T091200Z/REVIEW.md`. Two draft fixes are ready in the review's `hardening-deltas/` folder — run `/sea:harden` to apply them.
+
+Large / mixed PR:
+
+> Reviewed your pull request. **Needs changes before merge.** It covers a lot of ground — a refactor, three migrations, and a new feature in one go — and a 6,000-line review like this is hard to do thoroughly. Full review at `.architecture/acme/code-reviews/PR-168-2026-05-21T091200Z/REVIEW.md`. The biggest help right now would be to split this into smaller PRs — run `/sea:suggest-split 168` and I'll propose the specific cuts plus the git commands to make them.
 
 **Anti-patterns** (MUST NOT in the chat summary):
 
@@ -613,6 +617,22 @@ There are 3 database migrations in this pull request. Database migrations change
 **Completeness — worth looking at**
 
 You added 4 new source files and 0 new test files. Tests are how the codebase protects against future changes breaking the thing you just built. Without tests, the next person to change this code (which may be you, six months from now) has no safety net.
+
+### How to split this pull request
+
+> **Only include this subsection when PH-01 Scope OR PH-02 Size fires high.**
+> Omit otherwise — small / single-concern pull requests don't need a split tutorial.
+
+A pull request this size or this mixed usually contains 2-4 logical pieces. The way to split:
+
+1. **Identify the pieces.** Look at the changes and group them by purpose. Common groupings: a refactor that doesn't change behaviour; database migrations; new infrastructure (CI files, Dockerfiles); the new feature itself.
+2. **One branch per piece.** For each group, make a new branch off `main` and bring only that group's files into it.
+3. **Order matters.** Merge the pieces with no dependencies first (usually a behaviour-preserving refactor). Each later piece is built on top of the previous merged PR.
+4. **One pull request per piece.** Open them in order; wait for each to merge before opening the next.
+
+**If this sounds unfamiliar, run `/sea:suggest-split {PR-number}`** — it reads the changes, proposes a specific split for *this* pull request, and gives you the exact git commands for each piece. You can copy and run them yourself, or share them with a developer.
+
+The split is a recommendation, not a requirement. If you'd rather not split, address the other findings above in the current PR and merge as one.
 
 ## Things to take away
 
