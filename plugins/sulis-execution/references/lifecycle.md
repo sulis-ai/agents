@@ -16,11 +16,22 @@ trigger.
 | 5 | Docs | Executor |
 | 6 | Lint / type / format | Executor |
 | 7 | Commit + push | Executor |
-| 8 | CI poll + rebase + squash-merge | Calling session (`wpx-pipeline`) |
-| 9 | Deploy poll | Calling session (`wpx-pipeline`) |
-| 10 | Health + smoke | Calling session (`wpx-pipeline`) |
-| 11 | Security review (post-deploy verification) | Calling session (`Agent({subagent_type: "sulis-security:security-reviewer"})` + `wpx-findings register`) |
-| 12 | INDEX flip + acceptance evidence + worktree removal | Calling session (`wpx-step12 wrap`) |
+| 8 | CI poll + rebase + squash-merge | **v0.11.0+:** `wpx-train` (per-batch). **--force-single / hotfix:** `wpx-pipeline` (per-WP). |
+| 9 | Deploy poll | **v0.11.0+:** `wpx-train` (per-batch — ONE deploy per train). **--force-single:** `wpx-pipeline`. |
+| 10 | Health + smoke | **v0.11.0+:** `wpx-train` (per-batch — ONE health+smoke per train). **--force-single:** `wpx-pipeline`. |
+| 11 | Security review (post-deploy verification) | Calling session (`Agent({subagent_type: "sulis-security:security-reviewer"})` + `wpx-findings register`) — runs **per-WP in parallel after batch deploy** (per ADR-212 amendment) |
+| 12 | INDEX flip + acceptance evidence + worktree removal | Calling session (`wpx-step12 wrap`) — flips `step-7-complete` → `done` after train succeeds |
+
+> **v0.11.0+ change (ADR-212):** Steps 8-10 are now per-batch via
+> `wpx-train` (the default). Per-WP `wpx-pipeline` shipping remains
+> available via `/sulis-execution:run-wp WP-X --force-single` for
+> hotfixes. Step 11 stays per-WP in parallel (each WP's security
+> review verdict is distinct; the train doesn't collapse this).
+> See ADR-212 (`platform/.architecture/kinds-and-tools/adrs/`) for
+> the design rationale and the cicd-batching-analysis research
+> (`plugins/sulis-execution/docs/research/cicd-batching-analysis.md`)
+> for the convention citations (Bors / Shopify Shipit / GitHub
+> Merge Queue / Mergify).
 
 Version coverage: v0.1 implemented steps 1-6. v0.2 added step 7. v0.3
 added steps 8-10. v0.6 added step 5 (docs) and step 11 (post-deploy

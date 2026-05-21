@@ -3,7 +3,12 @@ name: run-all
 description: >
   Walk the Work Package INDEX in the calling session with parallel
   dispatch (up to max_parallel concurrent executors per batch, gated
-  by dependency-graph eligibility). Usage: /sulis-execution:run-all.
+  by dependency-graph eligibility). After each executor batch returns,
+  the loop polls wpx-train for eligibility and fires `wpx-train run`
+  when the train trigger is met (size ≥3 OR ≥1 WP older than 4h OR
+  --force) — Steps 8-11 happen per-train, not per-WP, in v0.11.0+.
+  Per-WP wpx-pipeline shipping remains available via `/sulis-execution:run-wp
+  WP-X --force-single` for hotfixes. Usage: /sulis-execution:run-all.
   The loop runs inline in the calling session — not via a separate
   orchestrator subagent — because agent-tree-depth limits prevent
   subagents from reliably spawning further subagents.
@@ -11,8 +16,19 @@ description: >
 
 # /sulis-execution:run-all
 
-Walk the Work Package INDEX and ship every ready WP atomically, with
-parallel dispatch of graph-independent WPs.
+Walk the Work Package INDEX and ship every ready WP, with parallel
+executor dispatch and train-based integration:
+
+- **Per-WP (executors, Steps 1-7):** parallel — `max_parallel` executors
+  at a time, gated by INDEX dependency graph.
+- **Per-batch (Steps 8-11, wpx-train):** after each executor batch
+  returns success and WPs are flipped to `step-7-complete`, this
+  skill polls `wpx-train queue-list` and fires `wpx-train run` if
+  the trigger is met. The train batches up to 5 WPs into one rebase
+  + bundled-tip CI + sequential merge + deploy + health + smoke.
+- **Per-WP again (Step 12):** worktree cleanup + INDEX flip from
+  `step-7-complete` → `done`. Owned by the WP's executor return
+  contract; documented in lifecycle.md.
 
 ## How to invoke (MUST — run the loop inline, with parallel batching)
 
@@ -269,7 +285,48 @@ loop:
            leave a readable item list showing exactly which item was
            in-progress when the session ended.
 
-   12. **For each Step-7-complete WP, run the Steps 8-12 pipeline.**
+   12. **For each Step-7-complete WP, flip INDEX status; the train ships them as a batch.**
+
+       In v0.11.0+, individual WPs do NOT invoke wpx-pipeline directly
+       at the end of run-all's executor batch. Instead:
+
+       - Flip the WP's INDEX status to `step-7-complete` (the executor
+         contract emits this via the journal).
+       - After all WPs in this run-all parallel batch are flipped,
+         invoke `wpx-train run` ONCE for the project. The train picks
+         up all `step-7-complete` WPs (whose dependencies are merged
+         and whose branches are CI-green) and batches them into one
+         rebase / merge / deploy / health / smoke pass.
+
+       ```bash
+       "$WPX_DIR/wpx-train" run \
+         --project <slug> \
+         --repo <org/repo> \
+         --deploy-workflow "<workflow name>" \
+         --staging-url "<staging-url>" \
+         --smoke-cmd "<smoke command>" \
+         --health-path "<health-path>" \
+         # Add --force to bypass size/staleness trigger
+       ```
+
+       If the train trigger isn't met (e.g. only 1 WP eligible and no
+       force), `wpx-train run` exits cleanly with `outcome:
+       not_triggered`. The eligible WPs wait for the next invocation
+       (typically the next run-all loop, or a manual
+       `wpx-train run --force`).
+
+       For backwards-compatibility / hotfix shipping of a single WP,
+       see `/sulis-execution:run-wp WP-X --force-single` which preserves
+       the wpx-pipeline per-WP path.
+
+       The remainder of this section (the historical Steps 8-12
+       per-WP flow via wpx-pipeline) is preserved below as v0.10.7
+       fallback documentation. **Do not invoke this in v0.11.0+ —
+       wpx-train is the path.**
+
+       ---
+
+       **(v0.10.7 fallback — preserved for reference)**
 
        Read frontmatter to determine pipeline arguments:
 

@@ -1,17 +1,30 @@
 ---
 name: run-wp
 description: >
-  Ship a single Work Package to dev. Dispatches the executor agent
-  for Steps 1-7 (worktree, RGB, docs, lint, commit, push); the
-  calling session then runs Steps 8-12 via wpx-pipeline (CI poll +
-  merge + deploy + health + smoke) + security-reviewer + wpx-step12.
-  Usage: /sulis-execution:run-wp WP-NNN.
+  Ship a single Work Package. Dispatches the executor agent for Steps
+  1-7 (worktree, RGB, docs, lint, commit, push). After Step 7 lands,
+  the WP is queued for the next train (the default; wpx-train batches
+  multiple ready WPs into one merge / deploy / health / smoke pass).
+  For hotfix or solo-ship cases, pass `--force-single` to use
+  wpx-pipeline directly (per-WP CI poll + merge + deploy + health +
+  smoke + security review + Step 12 bookkeeping, as before). Usage:
+  /sulis-execution:run-wp WP-NNN [--force-single]. Sulis-execution
+  v0.11.0+ (ADR-212).
 ---
 
 # /sulis-execution:run-wp
 
 This skill **dispatches the executor agent** for one Work Package's
-Steps 1-7, then runs Steps 8-12 in the calling session.
+Steps 1-7. What happens after Step 7 depends on the flag:
+
+- **Default (train path):** flip INDEX status to `step-7-complete` and
+  report back. The next `wpx-train run` invocation picks it up (along
+  with any other `step-7-complete` WPs) and batches them through Steps
+  8-11.
+- **`--force-single` (hotfix path):** invoke `wpx-pipeline run` for
+  Steps 8-12 immediately, the same way runs worked pre-v0.11.0. Use
+  when you need to ship a single WP urgently without waiting for the
+  train trigger (size ≥3 or 4h staleness).
 
 ## How to invoke
 
@@ -149,7 +162,38 @@ resume from journal.
 
 Do NOT proceed to Step 2 (the v0.9.0 Steps 8-12 pipeline).
 
-### Step 2 — Run the pipeline (Steps 8-10)
+### Step 2 — Queue for the next train (default path, v0.11.0+)
+
+**Skip this step and jump to Step 2b if the caller passed `--force-single`.**
+
+After the executor returns success and the WP file is on disk with the
+feature branch pushed, **flip the INDEX status to `step-7-complete`**
+and report back. The next `wpx-train run` invocation (typically fired
+by `/sulis-execution:run-all` at the end of its parallel batch) picks
+this WP up along with any other ready WPs.
+
+```bash
+"$WPX_DIR/wpx-index" flip-status \
+  --wp WP-NNN \
+  --project <slug> \
+  --to step-7-complete \
+  --expected in_progress
+```
+
+Then report to the calling session in plain English:
+
+> WP-NNN queued for the next train. Train fires when 3 WPs are ready
+> or after 4 hours staleness. Run `/sulis-execution:status` to see
+> the queue.
+
+Do NOT proceed to Step 2b (wpx-pipeline). Steps 8-11 (CI, merge,
+deploy, health, smoke, security review) happen per-train, not
+per-WP, in v0.11.0+.
+
+### Step 2b — Run wpx-pipeline directly (`--force-single` path)
+
+Only invoke this step when the caller passed `--force-single` (hotfix
+or solo-ship). Otherwise Step 2 above is the path.
 
 Read frontmatter for pipeline arguments:
 

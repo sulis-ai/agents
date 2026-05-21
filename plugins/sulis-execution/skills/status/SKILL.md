@@ -36,6 +36,9 @@ Work Package status:
 ⏳ In flight: N
   WP-NNN — <title> (<lifecycle step or branch reference>)
 
+▣ Queued for train: N        ← v0.11.0+ (step-7-complete status)
+  WP-NNN — <title>
+
 ⚠ Blocked: N
   WP-NNN — <plain-English summary from BLOCKER-WP-NNN.md
             ## Plain-English summary section>
@@ -44,7 +47,16 @@ Work Package status:
   WP-NNN, WP-MMM, ...
 
 ▶ Next ready: WP-NNN — <title>
+
+Train state:                   ← v0.11.0+
+  N eligible WPs ready. Trigger: <ready_size|waiting|not_ready>.
+  Last train run: <path or "none yet">.
 ```
+
+For the **Queued for train** + **Train state** sections, invoke
+`"$WPX_DIR/wpx-train" status --project <slug> --repo <org/repo>` and
+parse the JSON. Render the `eligible_count`, `eligible_wps`, and
+`trigger_state` directly.
 
 The plain-English summaries for blocked WPs come from each
 `BLOCKER-WP-NNN.md`'s `## Plain-English summary` section — that's
