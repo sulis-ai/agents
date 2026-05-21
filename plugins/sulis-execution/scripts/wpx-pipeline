@@ -66,6 +66,7 @@ def cmd_run(args: argparse.Namespace) -> None:
     worktree = Path(args.worktree_path).resolve() if args.worktree_path else paths.repo_root
     ci_interval = args.ci_poll_interval or CI_DEFAULT_INTERVAL
     deploy_interval = args.deploy_poll_interval or DEPLOY_DEFAULT_INTERVAL
+    base_branch = args.base_branch or "dev"
 
     result: dict = {
         "wp": args.wp,
@@ -110,14 +111,16 @@ def cmd_run(args: argparse.Namespace) -> None:
             emit_result(result, exit_code=1)
         # verdict in {"green", "skipped"} → proceed to rebase/merge
 
-        # Step 8b: rebase if dev advanced
+        # Step 8b: rebase if base_branch advanced (default "dev"; the change
+        # branch when running inside a change worktree per CW-04)
         for attempt in range(REBASE_BUDGET):
             rebased, new_sha = _rebase_on_dev(
                 repo, args.branch, worktree, args.dev_sha_at_creation,
+                base_branch=base_branch,
             )
             if not rebased:
                 break
-            _log(f"Rebased onto dev (attempt {attempt+1})"
+            _log(f"Rebased onto {base_branch} (attempt {attempt+1})"
                  + ("" if skip_ci_poll else "; re-polling CI"))
             if skip_ci_poll:
                 verdict = "skipped"
@@ -127,8 +130,8 @@ def cmd_run(args: argparse.Namespace) -> None:
                 result.update(outcome="blocker",
                               blocker_reason=f"CI {verdict} after rebase attempt {attempt+1}")
                 emit_result(result, exit_code=1)
-            # update the cursor so the next rebase compares against current dev
-            args.dev_sha_at_creation = _gh_ref_sha(repo, "dev")
+            # update the cursor so the next rebase compares against current base
+            args.dev_sha_at_creation = _gh_ref_sha(repo, base_branch)
 
         # Step 8c: squash-merge — but first check whether the branch is
         # already merged to dev (v0.10.5 Bug 1 fix). Re-running
@@ -136,14 +139,15 @@ def cmd_run(args: argparse.Namespace) -> None:
         # with RuntimeError from _gh_merge (POST /merges → 409). The
         # compare API returns status="identical" / "behind" in that
         # case — skip the merge and proceed with the existing dev SHA.
-        already_merged, base_sha = _gh_branch_already_merged(repo, args.branch, base="dev")
+        already_merged, base_sha = _gh_branch_already_merged(repo, args.branch, base=base_branch)
         if already_merged:
-            _log(f"Step 8c: branch already merged to dev; using existing dev HEAD {base_sha[:8]} as merge SHA (skip merge step)")
+            _log(f"Step 8c: branch already merged to {base_branch}; using existing {base_branch} HEAD {base_sha[:8]} as merge SHA (skip merge step)")
             merge_sha = base_sha or args.dev_sha_at_creation
             result["merge_already_complete"] = True
         else:
-            _log("Step 8c: squash-merging to dev")
-            merge_sha = _merge_squash(repo, args.branch, args.wp)
+            _log(f"Step 8c: squash-merging to {base_branch}")
+            merge_sha = _merge_squash(repo, args.branch, args.wp,
+                                      base_branch=base_branch)
         result["merge_sha"] = merge_sha
 
         # Step 9: deploy poll
@@ -249,6 +253,13 @@ def build_parser() -> argparse.ArgumentParser:
              ".github/workflows/ and .gitlab-ci.yml have no branch-CI "
              "config. Use explicitly when your project has CI you don't "
              "want gated on before merge.",
+    )
+    p_run.add_argument(
+        "--base-branch", default=None,
+        help="Base ref for rebase + merge target. Defaults to 'dev'. Per "
+             "CW-04, when invoked from inside a change worktree, callers "
+             "pass the change branch name (e.g. change/feat-payments) so "
+             "WPs ship to the change branch, not directly to dev.",
     )
 
     return parser

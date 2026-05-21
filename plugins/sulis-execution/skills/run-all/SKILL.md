@@ -298,10 +298,21 @@ loop:
          and whose branches are CI-green) and batches them into one
          rebase / merge / deploy / health / smoke pass.
 
+       Per CW-04, when run-all is invoked from inside a change worktree,
+       detect the change branch first and pass it as `--base-branch`:
+
        ```bash
+       CURRENT_BRANCH=$(git -C <repo-root> branch --show-current)
+       if [[ "$CURRENT_BRANCH" == change/* ]]; then
+           BASE_BRANCH="$CURRENT_BRANCH"
+       else
+           BASE_BRANCH="dev"
+       fi
+
        "$WPX_DIR/wpx-train" run \
          --project <slug> \
          --repo <org/repo> \
+         --base-branch "$BASE_BRANCH" \
          --deploy-workflow "<workflow name>" \
          --staging-url "<staging-url>" \
          --smoke-cmd "<smoke command>" \

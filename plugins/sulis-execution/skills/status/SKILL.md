@@ -58,6 +58,29 @@ For the **Queued for train** + **Train state** sections, invoke
 parse the JSON. Render the `eligible_count`, `eligible_wps`, and
 `trigger_state` directly.
 
+### Change context (CW-04, v0.12.0+)
+
+When run from inside a change worktree, prepend a "Change" section
+to the status output. Detect via `git branch --show-current`; if it
+starts with `change/`, run:
+
+```bash
+"$WPX_DIR/sulis-change" status --slug <slug> --primitive <primitive>
+```
+
+and render:
+
+```
+Change: change/{primitive}-{slug}
+  Started: <ISO timestamp>
+  Branch SHA: <sha> (ahead of base by N, behind by M)
+  Worktree: <path>
+```
+
+Then continue with the Work Package status table — those are the WPs
+inside this change. (Or if not in a change worktree, just show the WP
+status directly — the original behaviour.)
+
 The plain-English summaries for blocked WPs come from each
 `BLOCKER-WP-NNN.md`'s `## Plain-English summary` section — that's
 the AAF-compliant text the concierge would surface to the founder.

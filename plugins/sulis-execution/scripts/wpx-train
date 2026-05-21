@@ -477,7 +477,11 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
         # remaining branches (Phase 3 D7-rebase-conflict failure mode).
         bundle: list[dict] = []
         rebase_failures: list[dict] = []
-        onto_sha = _gh_ref_sha(repo, "dev")  # start from current dev
+        # Base for rebase chain: per CW-04, when inside a change worktree,
+        # the caller passes --base-branch to ship WPs to the change branch
+        # rather than directly to dev.
+        base_branch = args.base_branch or "dev"
+        onto_sha = _gh_ref_sha(repo, base_branch)
         for e in batch:
             try:
                 pre_train_sha = _gh_branch_sha(repo, e.branch)
@@ -579,7 +583,8 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
         final_merge_sha = None
         for entry in bundle:
             _log(f"Squash-merging {entry['wp']} ({entry['branch']}) to dev")
-            sha = _merge_squash(repo, entry["branch"], entry["wp"])
+            sha = _merge_squash(repo, entry["branch"], entry["wp"],
+                                base_branch=base_branch)
             entry["merge_sha_on_dev"] = sha
             final_merge_sha = sha
         record["bundle"] = bundle  # refresh with merge_sha_on_dev populated
@@ -722,6 +727,11 @@ def build_parser() -> argparse.ArgumentParser:
                        help=f"Deploy poll interval (s, default {DEPLOY_DEFAULT_INTERVAL})")
     p_run.add_argument("--max-batch-size", type=int, default=5,
                        help="Cap WPs per batch (default 5)")
+    p_run.add_argument("--base-branch", default=None,
+                       help="Base ref for rebase + merge target (default: dev). "
+                            "Per CW-04, when run inside a change worktree, "
+                            "callers pass the change branch name so WPs ship "
+                            "to the change branch rather than directly to dev.")
 
     return parser
 

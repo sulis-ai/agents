@@ -64,7 +64,32 @@ substitution lives in the prompt text you send to Bash. The
 executor subagent you dispatch has the same resolution preamble in
 `agents/executor.md` and resolves independently.
 
-### Step 0 — Dispatch the executor (Steps 1-7)
+### Step 0 — Detect change context (CW-04, v0.12.0+)
+
+Before dispatching the executor, check whether this skill is running
+inside a change worktree:
+
+```bash
+CURRENT_BRANCH=$(git -C <repo-root> branch --show-current)
+if [[ "$CURRENT_BRANCH" == change/* ]]; then
+    BASE_BRANCH="$CURRENT_BRANCH"
+else
+    BASE_BRANCH="dev"
+fi
+```
+
+`BASE_BRANCH` is the ref the WP's feature branch will rebase against
+and merge into. In v0.11.0+ this is `dev` directly; in a change-bounded
+workflow (v0.12.0+) it's the change branch. Pass it as `--base-branch
+$BASE_BRANCH` to wpx-pipeline (Step 2b) and wpx-train (when run-all
+fires the train). The dev-SHA-at-creation sidecar uses
+`origin/$BASE_BRANCH`'s SHA, not `origin/dev` directly.
+
+The executor itself does not need to know about the change context —
+it just works in its WP worktree, branched off whatever the calling
+session tells it.
+
+### Step 0a — Dispatch the executor (Steps 1-7)
 
 Given the user invokes `/sulis-execution:run-wp WP-NNN`:
 
@@ -218,6 +243,7 @@ Bash({
      --branch feat/wp-NNN-<slug> \
      --worktree-path ../wp-NNN-worktree \
      --dev-sha-at-creation <sha> \
+     --base-branch <BASE_BRANCH> \
      --deploy-workflow "<workflow name>" \
      --staging-url <staging-url> \
      --smoke-cmd "<smoke command>" \

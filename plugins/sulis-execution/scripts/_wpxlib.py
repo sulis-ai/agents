@@ -656,16 +656,23 @@ def _poll_ci(repo: str, branch: str, interval: int, cap: int) -> str:
 
 
 def _rebase_on_dev(repo: str, branch: str, worktree: Path,
-                   dev_sha_at_creation: str) -> tuple[bool, str]:
-    """If dev advanced past dev_sha_at_creation, rebase. Return (rebased, new_sha)."""
-    current_dev = _gh_ref_sha(repo, "dev")
-    if current_dev == dev_sha_at_creation:
+                   dev_sha_at_creation: str,
+                   base_branch: str = "dev") -> tuple[bool, str]:
+    """If base_branch advanced past dev_sha_at_creation, rebase. Return (rebased, new_sha).
+
+    `base_branch` parameterises the rebase target — defaults to "dev" for
+    backward compatibility, but per CW-04 the executor inside a change
+    worktree passes the change branch name here so the rebase target is
+    the change branch's HEAD, not origin/dev.
+    """
+    current_base = _gh_ref_sha(repo, base_branch)
+    if current_base == dev_sha_at_creation:
         return False, ""
-    _log(f"dev advanced from {dev_sha_at_creation[:8]} to {current_dev[:8]}; rebasing")
-    rc, _, err = _run(["git", "fetch", "origin", "dev"], cwd=worktree)
+    _log(f"{base_branch} advanced from {dev_sha_at_creation[:8]} to {current_base[:8]}; rebasing")
+    rc, _, err = _run(["git", "fetch", "origin", base_branch], cwd=worktree)
     if rc != 0:
         raise RuntimeError(f"git fetch failed: {err}")
-    rc, _, err = _run(["git", "rebase", "origin/dev"], cwd=worktree)
+    rc, _, err = _run(["git", "rebase", f"origin/{base_branch}"], cwd=worktree)
     if rc != 0:
         _run(["git", "rebase", "--abort"], cwd=worktree)
         raise RuntimeError(f"git rebase failed: {err}")
@@ -679,10 +686,16 @@ def _rebase_on_dev(repo: str, branch: str, worktree: Path,
     return True, out.strip()
 
 
-def _merge_squash(repo: str, branch: str, wp: str) -> str:
-    """Squash-merge branch into dev. Return merge SHA on dev."""
+def _merge_squash(repo: str, branch: str, wp: str,
+                  base_branch: str = "dev") -> str:
+    """Squash-merge branch into base_branch. Return merge SHA on base_branch.
+
+    `base_branch` defaults to "dev" for backward compatibility, but per
+    CW-04 the executor inside a change worktree passes the change branch
+    name here so the merge target is the change branch, not dev.
+    """
     msg = f"feat({wp.lower()}): squash-merge from {branch}"
-    sha = _gh_merge(repo, base="dev", head=branch, commit_message=msg)
+    sha = _gh_merge(repo, base=base_branch, head=branch, commit_message=msg)
     # Delete remote branch
     _run(["gh", "api", "-X", "DELETE", f"repos/{repo}/git/refs/heads/{branch}"],
          timeout=30)
