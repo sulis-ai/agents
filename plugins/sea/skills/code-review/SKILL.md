@@ -39,12 +39,20 @@ assigned, and how the reviewing agent attests to its own coverage.
 When invoked, take a target (PR number, branch ref, or commit range) and
 produce:
 
-1. A merged report at `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DDTHHMMSSZ}.md` (ISO 8601 UTC timestamp prevents same-day rerun collisions)
-   that satisfies CR-01..CR-08.
-2. Draft Hardening Deltas under `.architecture/{project}/hardening-deltas/`
-   for accepted findings, with `source: code-review:PR-NNN` and
-   `lens: architecture | security | quality`.
-3. A short conversational summary of the top findings — strip internal IDs,
+1. A self-contained review bundle at `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DDTHHMMSSZ}/` containing:
+   - `REVIEW.md` — the report
+   - `hardening-deltas/HD-NNN-*.md` — draft fixes produced by this review
+   - `signals.json` — the PH-06 signal table in machine-readable form
+   - `tool-outputs/` — raw outputs from typecheck, lint, scanners (when produced)
+
+   The bundle satisfies CR-01..CR-09. Draft Hardening Deltas inside the
+   bundle carry `source: code-review:PR-NNN` and `lens: architecture |
+   security | quality`. `/sea:harden` discovers them recursively under
+   `.architecture/{project}/` and only implements those whose status is
+   `accepted` — the bundle holds drafts at status `proposed` until you
+   accept them.
+
+2. A short conversational summary of the top findings — strip internal IDs,
    speak founder English (FE-01..FE-11).
 
 Do **not** post comments on the PR, do **not** set status checks, do **not**
@@ -455,17 +463,17 @@ author should do next.
 >
 > {The single most important thing to look at, in one sentence — without restating the report.}
 >
-> Full review at `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DDTHHMMSSZ}.md`. {If draft fixes were queued: "N draft fixes are ready — run `/sea:harden` to apply them when you're ready."}
+> Full review at `.architecture/{project}/code-reviews/PR-{number}-{YYYY-MM-DDTHHMMSSZ}/REVIEW.md`. {If draft fixes were queued: "N draft fixes are ready in the review's `hardening-deltas/` folder — run `/sea:harden` to apply them when you're ready."}
 
 **Examples**
 
 Clean PR:
 
-> Reviewed your pull request. **Ready to merge.** No build errors, well-scoped, tests included. Full review at `.architecture/acme/code-reviews/PR-142-2026-05-21T143052Z.md`.
+> Reviewed your pull request. **Ready to merge.** No build errors, well-scoped, tests included. Full review at `.architecture/acme/code-reviews/PR-142-2026-05-21T143052Z/REVIEW.md`.
 
 Problem PR:
 
-> Reviewed your pull request. **Don't merge yet.** The build is failing — there's a variable referenced in the coupons page that was never actually declared, so the page would crash. Full review at `.architecture/acme/code-reviews/PR-168-2026-05-21T091200Z.md`. Two draft fixes are ready — run `/sea:harden` to apply them.
+> Reviewed your pull request. **Don't merge yet.** The build is failing — there's a variable referenced in the coupons page that was never actually declared, so the page would crash. Full review at `.architecture/acme/code-reviews/PR-168-2026-05-21T091200Z/REVIEW.md`. Two draft fixes are ready in the review's `hardening-deltas/` folder — run `/sea:harden` to apply them.
 
 **Anti-patterns** (MUST NOT in the chat summary):
 
@@ -500,13 +508,42 @@ The translation table for severity and verdict, used in Tier 1:
 | Severity `medium` | **Worth fixing** |
 | Severity `low` / `note` | **Minor — for awareness** |
 
-Write to `.architecture/{project}/code-reviews/PR-{number}-{TIMESTAMP}.md` where `TIMESTAMP` is an ISO 8601 UTC timestamp generated at report-write time. This prevents same-day rerun collisions (e.g., reviewing the same PR twice in one morning).
+Write the bundle to `.architecture/{project}/code-reviews/PR-{number}-{TIMESTAMP}/` where `TIMESTAMP` is an ISO 8601 UTC timestamp generated at report-write time. This prevents same-day rerun collisions (e.g., reviewing the same PR twice in one morning).
 
 ```bash
 TIMESTAMP=$(date -u +%Y-%m-%dT%H%M%SZ)
 # Produces: 2026-05-21T143052Z
-# Example file: PR-142-2026-05-21T143052Z.md
+
+BUNDLE_DIR=".architecture/${PROJECT}/code-reviews/PR-${PR_NUMBER}-${TIMESTAMP}"
+mkdir -p "${BUNDLE_DIR}/hardening-deltas" "${BUNDLE_DIR}/tool-outputs"
+# REVIEW.md     → the report
+# hardening-deltas/HD-NNN-*.md → draft fixes (status: proposed)
+# signals.json  → PH-06 signal table, machine-readable
+# tool-outputs/ → raw typecheck/lint/scanner outputs (when produced)
 ```
+
+### Bundle layout
+
+```
+.architecture/{project}/code-reviews/PR-{number}-{TIMESTAMP}/
+├── REVIEW.md                       ← the report (Tier 1 + Tier 2)
+├── hardening-deltas/
+│   ├── INDEX.md                    ← drafts produced by this review
+│   ├── HD-018-add-timeout-stripe.md
+│   └── HD-019-declare-hasMore.md
+├── signals.json                    ← PH-06 signal table
+└── tool-outputs/                   ← raw scanner / typecheck outputs
+    ├── typecheck-base.log
+    ├── typecheck-head.log
+    ├── jsx-ident-scan.log
+    └── ...
+```
+
+Self-contained: reading any one bundle tells the full story of that
+review. `/sea:harden` finds the deltas because it scans
+`.architecture/{project}/` recursively for `HD-*.md`. Drafts ship at
+`status: proposed`; promoting to `status: accepted` in the delta's
+frontmatter is what tells `/sea:harden` to implement them.
 
 ```markdown
 # Code Review: PR-{number} — {title}

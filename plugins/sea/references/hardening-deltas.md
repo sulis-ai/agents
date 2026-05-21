@@ -38,17 +38,39 @@ This is practitioner knowledge, not peer-reviewed research.
 
 ## File Layout
 
-Hardening Deltas live under the per-project architecture folder:
+Hardening Deltas live under the per-project architecture folder in **one
+of two locations**:
+
+**1. Canonical flat location** — for deltas from audit, security, MUC,
+NFR, and other non-review sources:
 
 ```
 .architecture/{project}/hardening-deltas/
+  INDEX.md
   HD-001-add-payment-timeout.md
   HD-002-redact-pii-from-logs.md
-  HD-003-extract-circuit-breaker.md
   ...
 ```
 
-Files are numbered sequentially. The slug describes the change in 3-5 words.
+**2. Per-review bundle** — for deltas drafted by `/code-review` runs:
+
+```
+.architecture/{project}/code-reviews/PR-{number}-{TIMESTAMP}/hardening-deltas/
+  INDEX.md
+  HD-018-add-timeout-stripe.md
+  HD-019-declare-hasMore.md
+```
+
+Both locations are valid. `/sea:harden` discovers deltas recursively
+under `.architecture/{project}/` (matches `HD-*.md` anywhere in the
+tree). The `status:` field in each delta's frontmatter still gates
+whether harden implements it — only `accepted` runs; `proposed`,
+`rejected`, `implemented` are skipped.
+
+Files are numbered sequentially **per ID-space** (HD-001..HD-NNN
+globally, not per-location — keep IDs unique across the whole project
+to avoid ambiguity in delta cross-references and `dependsOn` graphs).
+
 A delta is one logical change — not "harden everything in service X". If
 service X has five gaps, that is five deltas.
 

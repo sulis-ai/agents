@@ -29,14 +29,17 @@ Otherwise list available projects and ask.
 
 | Source | Why |
 |---|---|
-| `.architecture/{project}/hardening-deltas/HD-*.md` | The deltas themselves — ADDED/MODIFIED/REMOVED instructions |
-| `.architecture/{project}/hardening-deltas/INDEX.md` | The acceptance order and dependency graph |
+| `.architecture/{project}/**/HD-*.md` (recursive) | The deltas themselves — ADDED/MODIFIED/REMOVED instructions. Discovered with `find .architecture/{project}/ -name 'HD-*.md' -type f`. Deltas may live in the canonical flat `hardening-deltas/` (audit/security/MUC/NFR sources) OR in per-review bundles under `code-reviews/PR-NN-{timestamp}/hardening-deltas/` (code-review-sourced drafts). |
+| `.architecture/{project}/**/hardening-deltas/INDEX.md` (recursive) | The acceptance order and dependency graph. The top-level `hardening-deltas/INDEX.md` tracks deltas from non-review sources; per-review bundles carry their own INDEX.md tracking only the drafts produced by that review. |
 | `.specifications/{project}/MISUSE_CASES.md` (if present) | When a delta's `source` field references `srd:misuse-case-MUC-NN`, you read the originating misuse case for full context — the abuse pattern, the System Response (REQUIRED), and the related NFRs. The MUC is the load-bearing requirement; the delta is its implementation. |
 | `.specifications/{project}/NFR.md` (if present) | NFRs derived from the adversarial sweep (rate limits, retention periods, integrity thresholds) often parameterise hardening implementations — e.g., MUC-02's rate-limit response references NFR-12's specific limit. |
 | The codebase | The current state of the files the delta touches |
 
 You only implement deltas with `status: accepted`. Deltas at `proposed`,
-`rejected`, or `implemented` are skipped.
+`rejected`, or `implemented` are skipped. Code-review drafts ship at
+`status: proposed` inside their review bundle; the user (or a follow-on
+agent) promotes them to `accepted` in the delta's frontmatter to queue
+them for this skill.
 
 **Misuse-case-sourced deltas are first-class.** When a delta's frontmatter has
 `source: srd:misuse-case-MUC-NN`, treat it as a contract bound to the MUC's

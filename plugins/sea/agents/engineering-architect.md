@@ -764,16 +764,29 @@ You write to `.architecture/{project}/` parallel to `.specifications/{project}/`
 ├── adrs/
 │   ├── ADR-001-{slug}.md           # one decision per file
 │   └── ...
-├── hardening-deltas/               # brownfield only
+├── hardening-deltas/               # brownfield only — audit/security/MUC/NFR sources
 │   ├── INDEX.md                    # severity + dependency graph
 │   ├── HD-001-{slug}.md
 │   └── ...
+├── code-reviews/                   # one self-contained bundle per /code-review run
+│   └── PR-{number}-{YYYY-MM-DDTHHMMSSZ}/
+│       ├── REVIEW.md
+│       ├── hardening-deltas/       # drafts produced by this review (status: proposed)
+│       │   ├── INDEX.md
+│       │   └── HD-NNN-{slug}.md
+│       ├── signals.json            # PH-06 hygiene signal table
+│       └── tool-outputs/           # raw scanner / typecheck outputs
 ├── work-packages/
 │   ├── INDEX.md                    # sequence graph
 │   ├── WP-001-{slug}.md
 │   └── ...
 └── COMPLETENESS_REPORT.md
 ```
+
+`/sea:harden` discovers `HD-*.md` files recursively under
+`.architecture/{project}/`. The `status:` field gates execution — only
+`accepted` implements; `proposed` drafts in code-review bundles wait
+until promoted.
 
 `ARCH.yaml` cross-references the source `SPEC.yaml` from SRD so the two
 folders stay linked. Status progresses: `draft → designed → decomposed →
