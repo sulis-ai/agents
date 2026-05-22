@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sulis-execution-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP server for the sulis-execution plugin's CLI tools (wpx-pipeline, wpx-train, sulis-change, etc.)"
 readme = "README.md"
 license = { text = "MIT" }
@@ -13,7 +13,7 @@ authors = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "sulis-execution >= 0.1.0",
+    "sulis-execution >= 0.2.0",
     "mcp >= 1.0.0",
     "pyyaml >= 6.0",
 ]

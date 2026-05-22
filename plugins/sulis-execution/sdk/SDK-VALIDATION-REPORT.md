@@ -1,7 +1,7 @@
-# SDK Validation Report: sulis-execution v0.1.0
+# SDK Validation Report: sulis-execution v0.2.0
 
-**Date:** 2026-05-21
-**Validator:** Phase 6 of the implementation plan
+**Date:** 2026-05-22 (re-validation after naming sweep)
+**Validator:** Rename Commit 5 of the v0.2.0 naming sweep
 **Rubric:** [`sdk-implementation-validation-rubric.md`](../docs/research/sdk-implementation-validation-rubric.md) v0.2.0 (updated after a peer-SDK test session surfaced new checks; the SDK was re-validated against the new checks)
 
 ## Verdict
@@ -297,6 +297,35 @@ re-run against this SDK with the following results:
 Updated verdict: still **PASS-WITH-RATIONALE**. The single PASS-after-
 remediation (12.10) was a documentation gap, not a structural defect;
 the README now contains the gloss. No new MUST failures surfaced.
+
+## v0.2.0 re-validation (after naming sweep)
+
+After the naming sweep (Rename Commits 1-4), the rubric was re-run
+against the renamed SDK. Results:
+
+| Phase | Status | Notes |
+|---|---|---|
+| 1 Schema layer | PASS | 38 ops still present; 10 renamed operationIds + 9 x-cli-subcommand extensions verified; descriptions still LLM-grade |
+| 2 Error model | PASS | Error hierarchy unchanged; no class renames |
+| 3 Transport bindings | PASS | Subprocess transport unchanged; MCP server now honours x-cli-subcommand override |
+| 4 Python client | PASS (+ 4.01a verified again in fresh venv) | All 25 tests pass; new resource names (lifecycle, work_package) installable + importable |
+| 5 TypeScript client | PASS (+ 5.01a verified again with rm -rf node_modules) | 9 tests pass; typecheck clean; build produces dist |
+| 6 Parity | PASS | Resource trees match (lifecycle, work_package); 10 result interface names identical Py↔TS; method-name patterns match (createPlan ↔ create_plan, etc.) |
+| 7 Authentication | PASS (same SHOULD deferrals as v0.1.0) | No auth changes |
+| 8 Streaming/batching | N/A | No streaming ops added |
+| 9 Telemetry | PASS (same SHOULD deferrals as v0.1.0) | Correlation IDs unchanged |
+| 10 Documentation | PASS (+ 10.A.04a re-verified) | Per-rename docs swept; migration note written; tutorial works from clean venv |
+| 11 Integration review | N/A | First version with consumers; per Rename plan, no external consumers existed at v0.1.0 → v0.2.0 so no review needed. From v0.2.0 onwards, future breaking changes WILL require integration review per the rubric. |
+| 12 CTS overall | PASS (+ 12.09 + 12.10 PASS) | 12.09 vocabulary coherence: passes (lifecycle, work_package self-describe). 12.10 jargon glossed: passes (wpx- prefix gloss in README still applies; new resource names don't introduce new jargon). |
+
+Test counts (post-rename): **209 tests pass** (155 wpx CLI + 25 Python
+SDK + 9 TypeScript + 20 MCP — +3 from v0.1.0's 206 due to new
+x-cli-subcommand routing tests in Phase 3 of the rename).
+
+Verdict unchanged: **PASS-WITH-RATIONALE** (same 6 SHOULD deferrals
+as v0.1.0). The rename addressed the rubric v0.2.0 SHOULD check 12.10
+(jargon glossed) by removing the jargon at its source rather than just
+adding glosses.
 
 ## Re-run schedule
 
