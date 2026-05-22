@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "sulis-execution-mcp": {
+      "command": "sulis-execution-mcp",
+      "args": [],
+      "env": {
+        "SULIS_EXECUTION_REPO_ROOT": "${SULIS_EXECUTION_REPO_ROOT:-.}",
+        "SULIS_EXECUTION_PROJECT": "${SULIS_EXECUTION_PROJECT:-default}",
+        "WPX_DIR": "${WPX_DIR:-${CLAUDE_PLUGIN_ROOT}/scripts}",
+        "SULIS_EXECUTION_OPENAPI_SPEC": "${CLAUDE_PLUGIN_ROOT}/sdk/sulis-execution.openapi.yaml"
+      }
+    }
+  }
+}

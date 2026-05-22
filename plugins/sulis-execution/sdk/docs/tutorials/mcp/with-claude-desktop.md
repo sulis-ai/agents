@@ -1,12 +1,20 @@
 # Using sulis-execution-mcp with Claude Desktop
 
-**Applies to:** sulis-execution-mcp v0.1.0
+**Applies to:** sulis-execution-mcp v0.2.0
 **Time:** ~5 minutes
+
+> **If you're using the sulis-execution Claude Code plugin (v0.15.0+),
+> the MCP server auto-loads.** You only need section 1 below
+> (install the server). The plugin's `.mcp.json` declares the server
+> with sensible env-var defaults — `/reload-plugins` or restart your
+> session and you're done. Sections 2-4 below are for non-plugin
+> setups (Claude Desktop, Cursor, custom JSON-RPC clients).
 
 ## What you'll do
 
 Configure Claude Desktop so the model can discover and invoke the 38
-wpx-* tools directly via MCP.
+wpx tools directly via MCP. (For Claude Code with the plugin
+installed, this happens automatically — see the note above.)
 
 ## Prerequisites
 
