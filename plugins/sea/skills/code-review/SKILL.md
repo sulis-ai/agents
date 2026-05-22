@@ -2,7 +2,7 @@
 name: code-review
 description: >
   Use when reviewing a pull request, branch, or commit range. Implements the
-  Code Review Standard (CR-01..CR-09) at
+  Code Review Standard (CR-01..CR-10) at
   `../../references/code-review-standard.md` and applies the PR Hygiene
   Standard (PH-01..PH-08) at `plugins/srd/references/pr-hygiene-standard.md`.
   Runs a mandatory mechanical baseline (typecheck + lint) before any lens
@@ -31,7 +31,7 @@ description: >
 
 This skill is the implementation of the **Code Review Standard** at
 [`../../references/code-review-standard.md`](../../references/code-review-standard.md).
-Every workflow step below traces to one or more CR-01..CR-08 rules. Read the
+Every workflow step below traces to one or more CR-01..CR-10 rules. Read the
 standard first — it defines what a complete code-review report must
 contain, how findings must be evidenced, how severity and verdict are
 assigned, and how the reviewing agent attests to its own coverage.
@@ -45,7 +45,7 @@ produce:
    - `signals.json` — the PH-06 signal table in machine-readable form
    - `tool-outputs/` — raw outputs from typecheck, lint, scanners (when produced)
 
-   The bundle satisfies CR-01..CR-09. Draft Hardening Deltas inside the
+   The bundle satisfies CR-01..CR-10. Draft Hardening Deltas inside the
    bundle carry `source: code-review:PR-NNN` and `lens: architecture |
    security | quality`. `/sea:harden` discovers them recursively under
    `.architecture/{project}/` and only implements those whose status is
@@ -307,7 +307,7 @@ call → DAT-03).
 **Completion output:** list of findings keyed by primitive ID, OR explicit
 *"Security lens: nothing surfaced. Primitives checked: SEC-01..07, SC-01..04, INF-04. Scanners run: Gitleaks, Semgrep, Trivy."*.
 
-#### Quality lens (CR-07 — must produce all six outputs)
+#### Quality lens (CR-07 — must produce all seven outputs)
 
 Runs after the CR-01 mechanical baseline. Reads every changed file
 end-to-end (CR-03). Produces **all** of:
@@ -343,9 +343,38 @@ end-to-end (CR-03). Produces **all** of:
 6. **Style / readability** — naming, complexity, comments, TODO/FIXME
    density. Lowest priority; come last. May be empty without blocking
    completion.
+7. **Performance procedural checks (CR-10).** Scan the diff for the
+   ten patterns in
+   [`../../references/performance-procedural-checks.md`](../../references/performance-procedural-checks.md):
+   N+1 DB query, N+1 RPC, N+1 filesystem, O(N²) over same collection,
+   synchronous waterfall, unbounded materialisation, repeated invariant
+   computation in loop, wasted DB roundtrips, string concat in hot
+   loop, scan-heavy filter on non-indexed column. Each detection has a
+   regex signature + file-type filter + severity default per CR-05.
+   For each match: read the surrounding context (per CR-03) before
+   including in the report; downgrade or omit with one-line
+   justification if context shows the match is benign. May be empty
+   without blocking completion (record "no anti-pattern matches" in
+   the lens output).
 
-A quality lens missing any of items 1–5 is **incomplete** — return to the
-step that produced the gap.
+   ```bash
+   # Pattern 1 example — N+1 DB query in Python
+   for f in $(grep -lE '\.(py|js|ts|tsx|go|java|rb)$' "$WORK/changed-files.txt"); do
+     # Find loops with DB calls in their body (next 20 lines)
+     awk '
+       /^\s*(for|while)\b|^\s*\.(map|forEach)\(/ { in_loop = 1; loop_start = NR; next }
+       in_loop && NR - loop_start <= 20 && /\b(\.get\(|\.first\(|\.objects\.filter|db\.query|prisma\.\w+\.findUnique)\b/ {
+         print FILENAME ":" NR ": " $0
+         in_loop = 0
+       }
+       NR - loop_start > 20 { in_loop = 0 }
+     ' "$f" >> "$WORK/cr10-n-plus-one-db.log"
+   done
+   # Repeat per pattern; see performance-procedural-checks.md for the full catalog
+   ```
+
+A quality lens missing any of items 1–5 or 7 is **incomplete** — return
+to the step that produced the gap. Items 6 may be empty.
 
 ### 7. Score severity (CR-05 MUST — objective conditions, not vibes)
 

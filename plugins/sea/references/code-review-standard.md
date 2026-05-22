@@ -12,8 +12,8 @@ the agent to attest to coverage before the report is written. Applies to
 code-review report.
 <!-- /summary -->
 
-> **Version:** 0.1.0
-> **Status:** Active — Calibration Period (90 days from 2026-05-20)
+> **Version:** 0.2.0
+> **Status:** Active — Calibration Period (90 days from 2026-05-20; CR-10 calibration window starts 2026-05-22)
 > **Applies to:** `/code-review` (SEA v0.13.0+). Designed for extension to any future
 > code-review-producing skill in the marketplace.
 
@@ -334,6 +334,7 @@ rule in the report's Methodology section. The checklist appears verbatim:
 - [✓] **CR-05 Severity rubric.** Applied. 1 critical, 2 high, 5 medium, 3 low.
 - [✓] **CR-06 Verdict computed.** Verdict: Block (Build Verification finding + CR-03 unread file).
 - [✓] **CR-07 Lens completion.** Architecture: 3 findings + scan log. Security: nothing surfaced + scan log. Quality: 4 findings + jsx-ident-scan.log + dead-surface findings + contract-drift findings + test-coverage observation.
+- [✓] **CR-10 Performance procedural checks.** Patterns scanned: 10. Findings: 1 N+1 DB (HIGH) at `apps/api/services/notifications.py:42`.
 ```
 
 Each box is `[✓]`, `[✗]`, or `[—]` (N/A) with a one-line reason.
@@ -403,6 +404,113 @@ The CR-08 Methodology checklist gains one row:
 
 ```markdown
 - [✓] **CR-09 PR Hygiene applied.** PH-01 Scope: medium (feat+refactor mix). PH-02 Size: high (1,847 lines / 32 files). PH-03 Safety: high (4 migrations). PH-04 Completeness: medium (4 new source files, no tests). PH-03 high → CR-06 auto-downgrade to Request changes minimum.
+```
+
+---
+
+## CR-10: Performance Procedural Checks (MUST)
+
+Scan the diff for a defined set of performance anti-patterns and report
+any matches as findings. The patterns are mechanically detectable
+(regex + file-type filter) and applied uniformly across reviews, so
+the same N+1 / O(N²) / waterfall / unbounded-materialisation defects
+get caught on every review regardless of which language model is
+dispatching the quality lens.
+
+CR-10 fills a real gap surfaced from a live production session: an
+executor session against the platform repo composed two WPs in
+parallel — one added `get_user(id)`; the other added a notifications
+loop — that together became an N+1 query in production. Neither WP
+in isolation looked wrong; the LLM-driven quality lens didn't flag
+the composition. Mechanical checks scan the diff for the signature
+regardless of which review path runs.
+
+### Pattern catalog
+
+Defined in [`performance-procedural-checks.md`](performance-procedural-checks.md)
+(sibling doc; same directory as this standard). Ten patterns at v0.1.0:
+
+1. **N+1 DB query** — loop body contains ORM call (HIGH default; CRITICAL on hot path)
+2. **N+1 RPC / HTTP** — loop body contains network call (HIGH; CRITICAL on hot path)
+3. **N+1 filesystem read** — loop body contains file-open (HIGH)
+4. **O(N²) over same collection** — nested iteration over same variable (HIGH if unbounded; CONCERN otherwise)
+5. **Synchronous waterfall** — chained `await` where outputs are independent (CONCERN)
+6. **Unbounded materialisation** — `.all()` / `list(qs)` / `.collect()` without limit (HIGH if request-bound; CONCERN otherwise)
+7. **Repeated invariant computation in loop** — `len(items)` or similar invariant recomputed each iteration (ADVISORY)
+8. **Wasted DB roundtrips** — multiple sequential `.first()` / `.get()` (CONCERN)
+9. **String concat in hot loop** — `+=` on string in Python/Java loops (ADVISORY)
+10. **Scan-heavy filter on non-indexed column** — filter expression on column known to be non-indexed (CONCERN; requires schema knowledge — best-effort)
+
+The sibling doc has, per pattern: detection signature (regex + file-type
+filter), severity default per CR-05, evidence-template citing CR-04
+(file:line + quoted text), and false-positive guidance.
+
+### When detection fires
+
+Each detection produces a finding under the Quality lens (CR-07
+output item 7 — see SKILL.md) with:
+
+- **Severity:** per the pattern's severity default; reviewer agent may
+  adjust per CR-05's rubric (e.g., downgrade if outside hot path; upgrade
+  if request-handler-scoped) with a one-line justification
+- **Evidence:** file:line + the matched line verbatim + at minimum 2
+  lines of surrounding context (per CR-04)
+- **Rule cite:** `CR-10 pattern #N` referencing the catalog entry
+- **Recommendation:** the pattern's standard remediation (e.g., "batch
+  with `select_related` / `prefetch_related`"; "wrap in `Promise.all`";
+  "stream via paginated query"); follows CP-01..CP-05 (Convention
+  Preference)
+
+### When patterns don't fire
+
+Empty CR-10 output is valid. The Quality lens records:
+
+```markdown
+**CR-10 performance procedural scan:** No anti-pattern matches in the diff.
+```
+
+This is the same self-attestation shape as the quality lens's
+"nothing surfaced" patterns elsewhere.
+
+### Verdict implication
+
+CR-10 findings flow through the standard CR-05 severity rubric and
+CR-06 verdict computation:
+
+- 1+ CRITICAL → verdict `Block` minimum
+- 2+ HIGH → verdict `Request changes` minimum
+- Otherwise: findings contribute to verdict without auto-downgrade
+
+The standard's existing auto-downgrade rules apply unchanged; CR-10
+doesn't add new downgrade rules.
+
+### False positives
+
+Regex-based detection produces false positives. Two mitigations:
+
+1. **Reviewer review**: the agent reads each CR-10 finding's surrounding
+   context (per CR-03) before including it in the report. If the
+   context shows the pattern is safe (e.g., the "loop with DB call"
+   is bounded to N≤3 items in a one-shot init path), the agent may
+   downgrade to ADVISORY or omit with a one-line justification in the
+   self-attestation row.
+2. **Calibration window**: same 90-day window as CR-08 + PH-07. The
+   reviewer records each CR-10 finding's severity + downgrade
+   justification (if any) so threshold + signature calibration data
+   accrues.
+
+### Cost note
+
+CR-10 detection runs in the same loop as CR-01 mechanical baseline
+(grep over diff hunks). Per-review cost is O(diff lines) — negligible
+compared to the LLM cost of the three lens reads.
+
+### Self-attestation row
+
+The CR-08 Methodology checklist gains one row:
+
+```markdown
+- [✓] **CR-10 Performance procedural checks ran.** Patterns scanned: 10. Findings: 1 N+1 DB (HIGH) in `apps/api/services/notifications.py:42`; downgraded from CRITICAL because the loop is bounded by `limit(50)`.
 ```
 
 ---
