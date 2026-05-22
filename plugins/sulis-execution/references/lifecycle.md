@@ -20,6 +20,7 @@ trigger.
 | 8 | CI poll + rebase + squash-merge | **v0.11.0+:** `wpx-train` (per-batch). **--force-single / hotfix:** `wpx-pipeline` (per-WP). |
 | 9 | Deploy poll | **v0.11.0+:** `wpx-train` (per-batch — ONE deploy per train). **--force-single:** `wpx-pipeline`. |
 | 10 | Health + smoke | **v0.11.0+:** `wpx-train` (per-batch — ONE health+smoke per train). **--force-single:** `wpx-pipeline`. |
+| 10.5 | **Train-batch code-review gate (DEFERRED — design only)** | Calling session — see "Step 10.5 (deferred)" below |
 | 11 | Security review (post-deploy verification) | Calling session (`Agent({subagent_type: "sulis-security:security-reviewer"})` + `wpx-findings register`) — runs **per-WP in parallel after batch deploy** (per ADR-212 amendment) |
 | 12 | INDEX flip + acceptance evidence + worktree removal | Calling session (`wpx-step12 wrap`) — flips `step-7-complete` → `done` after train succeeds |
 
@@ -1567,6 +1568,64 @@ Once health is `healthy`, run the smoke test per the WP's
 After Step 10 advances, the deploy is functionally correct. The WP
 is **not yet done** — Step 11 (post-deploy verification) runs next
 to catch any security/quality regression before final mark-done.
+
+---
+
+## Step 10.5 — Train-batch code-review gate (DEFERRED — design captured here)
+
+**Status:** Design committed; implementation deferred to a follow-on
+release. Currently NOT enforced by `wpx-train`.
+
+**Design intent.** Between bundled-tip CI passing (Step 8 boundary)
+and sequential squash-merges (start of Step 9), the train pauses
+while the calling session runs `/code-review` against the
+bundled-tip diff. This is the COMPOSITION gate that mirrors Step 6.5
+(per-WP gate, before push). Step 6.5 catches what's wrong INSIDE one
+WP; Step 10.5 catches what's wrong in the COMPOSITION of multiple
+WPs (e.g., WP-A adds `get_user(id)`; WP-B adds a loop calling it →
+N+1 query at runtime that neither WP saw in isolation).
+
+**Why deferred.** Requires splitting `wpx-train run` into two phases
+so the calling session can pause between bundled-tip CI and merge.
+Per the v0.9.0 contract, `wpx-train` (Python CLI) cannot spawn LLM
+subagents; the calling session must orchestrate the gate. The split
+involves: extracting Phase 1-4 (eligibility + rebase + CI) into a
+new `cmd_rebase_and_ci` command; extracting Phase 5-7 (merge +
+deploy + health/smoke) into `cmd_continue_merge_and_deploy
+--train-id <id>`; adding `cmd_abort_pre_merge --train-id <id>` for
+gate-block recovery; keeping `cmd_run` as a deprecated compat
+wrapper. State persists between phases via `train-runs/{train_id}.yaml`.
+
+This refactor is substantial (cmd_run is ~300 lines with many error
+paths) and warrants a focused session with real-fixture integration
+testing rather than a rushed final commit. Rather than risk shipping
+a half-broken train flow, it's tracked as a real follow-on.
+
+**Workflow when implemented.** Calling session (`run-all` skill):
+
+```
+1. wpx-train rebase-and-ci → {train_id, bundled_tip_branch, bundled_tip_sha}
+2. /code-review <bundled_tip_branch> <project>
+3. Read verdict + findings list
+4. If findings remain unaddressed (mirror Step 6.5 binary verdict):
+     wpx-train abort-pre-merge --train-id <id>
+     # → restores branches to pre-rebase SHAs; flips WPs to step-7-held
+5. If addressed (zero findings, or all auto-drafted, or exception):
+     wpx-train continue-merge-and-deploy --train-id <id>
+     # → Phases 5-7 as today
+```
+
+**Why it matters.** Without Step 10.5, cross-WP composition issues
+(N+1 queries, contract drift between sibling WPs, integration
+regressions) only surface after deploy. The bundled-tip CI catches
+correctness regressions (tests fail) but not design or performance
+issues that a human-shape review catches.
+
+**Companion gate at Step 6.5.** Step 6.5 (per-WP code-review, executor
+layer) is shipped and enforced in v0.16.0. It catches per-WP defects
+before push. Step 10.5 is the COMPOSITION analog at the train layer
+and shouldn't be skipped permanently. Tracked for a near-term
+follow-on once the wpx-train split is appropriately scoped.
 
 ---
 
