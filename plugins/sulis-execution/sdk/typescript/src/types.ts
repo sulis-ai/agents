@@ -134,6 +134,34 @@ export interface TrainRunListing {
  * Without train_id: contains runs + count listing (snapshot fields
  * absent).
  */
+export interface TrainAbortResult {
+  train_id?: string;
+  outcome?: string;
+  phase_at_abort?: string;
+  post_merge?: boolean;
+  restore_log?: Array<Record<string, unknown>>;
+  wps_flipped?: Array<Record<string, unknown>>;
+  train_blocker_path?: string | null;
+  suspected_culprit?: string | null;
+  revert?: Record<string, unknown>;
+}
+
+export interface TrainSkipWpResult {
+  train_id?: string;
+  skipped_wp?: string;
+  index_flipped?: boolean;
+  remaining_bundle?: string[];
+  next_step?: string;
+}
+
+export interface TrainRetryWpResult {
+  train_id?: string;
+  retry_wp?: string;
+  cleared_outcomes?: string[];
+  index_restored_to?: string;
+  next_step?: string;
+}
+
 export interface TrainInspectResult {
   // Snapshot fields (when train_id provided)
   train_id?: string;

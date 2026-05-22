@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sulis-execution"
-version = "0.2.2"
+version = "0.2.3"
 description = "Typed Python SDK for the sulis-execution plugin's CLI tools (wpx-pipeline, wpx-train, sulis-change, etc.)"
 readme = "README.md"
 license = { text = "MIT" }

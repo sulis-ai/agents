@@ -5,8 +5,11 @@ import type {
   TransportConfig,
 } from '../transport.js';
 import type {
+  TrainAbortResult,
   TrainDoctorResult,
   TrainInspectResult,
+  TrainRetryWpResult,
+  TrainSkipWpResult,
   TrainOverrideResult,
   TrainQueueListResult,
   TrainRunResult,
@@ -99,6 +102,35 @@ export class TrainResource {
    * Resume a paused train (pre-merge phases only in v0.19.0a). See
    * OpenAPI train.resume for full semantics.
    */
+  abort(params: { train_id: string }): TrainAbortResult {
+    return resultPayload(
+      this.transport.invoke(BINARY, 'abort', {
+        ...common(this.config, undefined),
+        train_id: params.train_id,
+      }),
+    ) as unknown as TrainAbortResult;
+  }
+
+  skipWp(params: { train_id: string; wp: string }): TrainSkipWpResult {
+    return resultPayload(
+      this.transport.invoke(BINARY, 'skip-wp', {
+        ...common(this.config, undefined),
+        train_id: params.train_id,
+        wp: params.wp,
+      }),
+    ) as unknown as TrainSkipWpResult;
+  }
+
+  retryWp(params: { train_id: string; wp: string }): TrainRetryWpResult {
+    return resultPayload(
+      this.transport.invoke(BINARY, 'retry-wp', {
+        ...common(this.config, undefined),
+        train_id: params.train_id,
+        wp: params.wp,
+      }),
+    ) as unknown as TrainRetryWpResult;
+  }
+
   resume(params: {
     train_id: string;
     deploy_workflow?: string;
@@ -202,6 +234,35 @@ export class AsyncTrainResource {
     return resultPayload(
       await this.transport.invoke(BINARY, 'doctor', common(this.config, opts.repo)),
     ) as unknown as TrainDoctorResult;
+  }
+
+  async abort(params: { train_id: string }): Promise<TrainAbortResult> {
+    return resultPayload(
+      await this.transport.invoke(BINARY, 'abort', {
+        ...common(this.config, undefined),
+        train_id: params.train_id,
+      }),
+    ) as unknown as TrainAbortResult;
+  }
+
+  async skipWp(params: { train_id: string; wp: string }): Promise<TrainSkipWpResult> {
+    return resultPayload(
+      await this.transport.invoke(BINARY, 'skip-wp', {
+        ...common(this.config, undefined),
+        train_id: params.train_id,
+        wp: params.wp,
+      }),
+    ) as unknown as TrainSkipWpResult;
+  }
+
+  async retryWp(params: { train_id: string; wp: string }): Promise<TrainRetryWpResult> {
+    return resultPayload(
+      await this.transport.invoke(BINARY, 'retry-wp', {
+        ...common(this.config, undefined),
+        train_id: params.train_id,
+        wp: params.wp,
+      }),
+    ) as unknown as TrainRetryWpResult;
   }
 
   async resume(params: {

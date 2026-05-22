@@ -85,8 +85,8 @@ def test_openapi_spec_loads():
 def test_tool_registry_covers_all_operations():
     spec = load_openapi_spec(OPENAPI_SPEC)
     registry = build_tool_registry(spec)
-    # 40 operations as of v0.2.2 (Phase 3.1 added train.resume)
-    assert len(registry) == 40
+    # 43 operations as of v0.2.3 (Phase 3.2 + 3.3 added abort + skip-wp + retry-wp)
+    assert len(registry) == 43
 
     # Sanity check some named tools exist (using renamed v0.2.0 names)
     assert "pipeline_run" in registry
@@ -94,6 +94,9 @@ def test_tool_registry_covers_all_operations():
     assert "train_run" in registry
     assert "train_inspect" in registry                   # v0.2.1 added
     assert "train_resume" in registry                    # v0.2.2 added
+    assert "train_abort" in registry                     # v0.2.3 added
+    assert "train_skip_wp" in registry                   # v0.2.3 added
+    assert "train_retry_wp" in registry                  # v0.2.3 added
     assert "index_flip_status" in registry
     assert "index_add" in registry                       # was index_add_wp
     assert "index_mark_downstream_blocked" in registry   # was index_propagate_blocked

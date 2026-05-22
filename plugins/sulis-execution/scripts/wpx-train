@@ -300,6 +300,403 @@ def cmd_status(args: argparse.Namespace) -> None:
 
 # --- Subcommand: doctor (drift diagnosis) -------------------------------
 
+def cmd_skip_wp(args: argparse.Namespace) -> None:
+    """Drop one WP from a paused train's bundle (v0.19.0c).
+
+    The dropped WP is flipped to step-7-held (founder-paused; can be
+    re-included in a future train manually or via train-overrides.yaml).
+    The state file is updated to reflect the smaller bundle.
+
+    Pragmatic implementation: this command MUTATES THE STATE only. It
+    does NOT auto-resume the train — the founder calls `wpx-train
+    resume <id>` next to fire the smaller bundle.
+
+    Use case: a paused train has 5 WPs, 1 of which is genuinely broken.
+    Skip that WP; resume continues with the other 4.
+
+    For pre-merge paused: dropping is clean (no merge happened).
+    For post-merge paused: dropping after the WP has been merged is
+    a no-op for the merge (it's already on dev) — this command just
+    removes the WP from the bundle for any subsequent resume's
+    consideration. The merge stays on dev.
+    """
+    paths = paths_from_args(args)
+    state_path = train_state_path(paths.train_runs_dir, args.train_id)
+
+    if not state_path.exists():
+        emit_error(
+            f"Train {args.train_id!r} has no in-flight state file at "
+            f"{state_path}. skip-wp only operates on in-flight (paused) "
+            f"trains."
+        )
+        return
+
+    try:
+        state = read_train_state(state_path)
+    except RuntimeError as exc:
+        emit_error(str(exc))
+        return
+
+    if state.get("phase") in ("success", "failed", "aborted"):
+        emit_error(
+            f"Train {args.train_id!r} is in terminal phase "
+            f"{state.get('phase')!r}; can't skip-wp on a terminal train."
+        )
+        return
+
+    bundle = state.get("bundle", [])
+    target_entry = None
+    for entry in bundle:
+        if entry.get("wp") == args.wp:
+            target_entry = entry
+            break
+    if target_entry is None:
+        emit_error(
+            f"WP {args.wp!r} not in train {args.train_id!r}'s bundle "
+            f"({[e.get('wp') for e in bundle]}). Inspect via `wpx-train "
+            f"inspect {args.train_id}` to see the actual bundle."
+        )
+        return
+
+    try:
+        lock = TrainLock(paths.train_runs_dir, args.train_id)
+        lock.__enter__()
+    except RuntimeError as exc:
+        emit_error(str(exc))
+        return
+
+    try:
+        # Flip the skipped WP to step-7-held (founder-paused)
+        flip_ok, flip_err = flip_index_status_via_cli(
+            _SCRIPTS_DIR, paths, args.wp, TRAIN_HELD_STATUS,
+        )
+        # Remove from state bundle
+        state["bundle"] = [e for e in bundle if e.get("wp") != args.wp]
+        from _wpxlib import write_train_state  # noqa: E402
+        write_train_state(state_path, state)
+    finally:
+        lock.__exit__(None, None, None)
+
+    emit_ok(data={
+        "train_id": args.train_id,
+        "skipped_wp": args.wp,
+        "index_flipped": flip_ok,
+        "remaining_bundle": [e.get("wp") for e in state["bundle"]],
+        "next_step": (
+            f"Run `wpx-train resume {args.train_id}` to fire the "
+            f"smaller bundle."
+        ),
+    })
+
+
+def cmd_retry_wp(args: argparse.Namespace) -> None:
+    """Clear one WP's per-phase outcomes within a paused train (v0.19.0c).
+
+    Pragmatic implementation: mutates state. Clears the named WP's
+    `phase_outcomes` dict so when the train is next resumed, that WP
+    is treated as fresh (rebase + CI + merge re-attempted).
+
+    Use case: a paused train has a WP whose specific issue was
+    transient (CI flake on its individual branch, network blip during
+    its rebase). The founder retries just that WP — the others keep
+    their progress.
+
+    For v0.19.0c (pragmatic): this command mutates state but does NOT
+    re-execute. The founder calls `wpx-train resume <id>` after, which
+    re-fires the train; the retried WP is in the eligible bundle
+    again with its phase_outcomes cleared.
+
+    Limitation: in the current re-fire-based resume (v0.19.0a), the
+    ENTIRE train re-fires — there's no "retry just this WP" surgical
+    re-execution. That comes with the deferred full per-phase cmd_run
+    factoring. Until then, retry-wp is meaningful only in combination
+    with skip-wp on the WPs that DON'T need retrying.
+    """
+    paths = paths_from_args(args)
+    state_path = train_state_path(paths.train_runs_dir, args.train_id)
+
+    if not state_path.exists():
+        emit_error(
+            f"Train {args.train_id!r} has no in-flight state file. "
+            f"retry-wp only operates on in-flight (paused) trains."
+        )
+        return
+
+    try:
+        state = read_train_state(state_path)
+    except RuntimeError as exc:
+        emit_error(str(exc))
+        return
+
+    if state.get("phase") in ("success", "failed", "aborted"):
+        emit_error(
+            f"Train {args.train_id!r} is in terminal phase "
+            f"{state.get('phase')!r}; can't retry-wp on a terminal train."
+        )
+        return
+
+    bundle = state.get("bundle", [])
+    target = None
+    for entry in bundle:
+        if entry.get("wp") == args.wp:
+            target = entry
+            break
+    if target is None:
+        emit_error(
+            f"WP {args.wp!r} not in train {args.train_id!r}'s bundle "
+            f"({[e.get('wp') for e in bundle]})."
+        )
+        return
+
+    try:
+        lock = TrainLock(paths.train_runs_dir, args.train_id)
+        lock.__enter__()
+    except RuntimeError as exc:
+        emit_error(str(exc))
+        return
+
+    try:
+        cleared = target.get("phase_outcomes", {})
+        target["phase_outcomes"] = {}
+        # Restore step-7-complete if the WP was flipped to step-7-blocked
+        flip_ok, _ = flip_index_status_via_cli(
+            _SCRIPTS_DIR, paths, args.wp, TRAIN_ELIGIBLE_STATUS,
+        )
+        from _wpxlib import write_train_state  # noqa: E402
+        write_train_state(state_path, state)
+    finally:
+        lock.__exit__(None, None, None)
+
+    emit_ok(data={
+        "train_id": args.train_id,
+        "retry_wp": args.wp,
+        "cleared_outcomes": list(cleared.keys()) if cleared else [],
+        "index_restored_to": TRAIN_ELIGIBLE_STATUS,
+        "next_step": (
+            f"Run `wpx-train resume {args.train_id}` to re-fire the "
+            f"train with {args.wp}'s outcomes cleared."
+        ),
+    })
+
+
+def cmd_abort(args: argparse.Namespace) -> None:
+    """Abort a paused or in-flight train (v0.19.0b).
+
+    Phase-aware abort:
+
+    - **Pre-merge phases** (pending, rebasing, ci_running, paused
+      without `merging` in phase history): no merges have landed.
+      Restore the bundled WP branches to their pre_train_sha via
+      restore_branch_with_guard (v0.15.2; handles auto-deleted
+      branches too). Flip WPs to step-7-held (founder-paused;
+      explicitly distinct from step-7-blocked). Mark state=aborted.
+
+    - **Post-merge phases** (merging mid-batch, deploying, verifying,
+      paused with `merging` in history): merges are on dev. Run the
+      ADR-212 revert path — single wrapper-revert commit, restore
+      branches, flip WPs to step-7-blocked, write train BLOCKER.
+      Mark state=aborted.
+
+    - **Terminal phases** (success, failed, aborted): error — nothing
+      to abort.
+
+    Both paths cleanup the in-flight state file after writing the
+    historical .yaml record + the audit-trail state=aborted entry.
+    """
+    paths = paths_from_args(args)
+    repo = _resolve_repo(args)
+    state_path = train_state_path(paths.train_runs_dir, args.train_id)
+
+    if not state_path.exists():
+        emit_error(
+            f"Train {args.train_id!r} has no in-flight state file. "
+            f"If you need to undo a terminal train, use the git revert "
+            f"workflow manually — `wpx-train abort` only acts on "
+            f"in-flight states."
+        )
+        return
+
+    try:
+        state = read_train_state(state_path)
+    except RuntimeError as exc:
+        emit_error(str(exc))
+        return
+
+    phase = state.get("phase")
+    if phase in ("success", "failed", "aborted"):
+        emit_error(
+            f"Train {args.train_id!r} is in terminal phase {phase!r}; "
+            f"nothing to abort."
+        )
+        return
+
+    # Determine pre-merge vs post-merge from phase_history
+    phase_history = state.get("phase_history", [])
+    phases_seen = {e.get("phase") for e in phase_history}
+    is_post_merge = "merging" in phases_seen or phase == "merging"
+
+    _log(f"ABORTING train {args.train_id} (phase={phase}, "
+         f"post_merge={is_post_merge})")
+
+    try:
+        lock = TrainLock(paths.train_runs_dir, args.train_id)
+        lock.__enter__()
+    except RuntimeError as exc:
+        emit_error(str(exc))
+        return
+
+    abort_result: dict = {
+        "train_id": args.train_id,
+        "phase_at_abort": phase,
+        "post_merge": is_post_merge,
+        "restore_log": [],
+        "wps_flipped": [],
+    }
+
+    try:
+        bundle = state.get("bundle", [])
+
+        if is_post_merge:
+            # Post-merge: ADR-212 revert path
+            import tempfile as _tempfile
+            from _wpxlib import (  # noqa: E402
+                clone_repo_to_temp,
+                compute_culprit_heuristic,
+                revert_train_on_dev,
+                restore_branch_with_guard,
+                write_train_blocker,
+            )
+            clone_dir = Path(_tempfile.mkdtemp(
+                prefix=f"wpx-abort-{args.train_id}-",
+            ))
+            try:
+                clone_repo_to_temp(repo, clone_dir)
+                reason = (
+                    f"Train aborted by founder via `wpx-train abort` "
+                    f"at phase {phase}"
+                )
+                # Revert + restore + flip
+                revert_ok, revert_msg = revert_train_on_dev(
+                    repo, clone_dir, bundle, reason, args.train_id,
+                )
+                abort_result["revert"] = {"ok": revert_ok, "detail": revert_msg}
+                for entry in bundle:
+                    if entry.get("merge_sha_on_dev"):
+                        ok, msg = restore_branch_with_guard(
+                            repo, clone_dir,
+                            entry["branch"],
+                            entry["pre_train_sha"],
+                            entry.get("rebased_to_sha") or entry["pre_train_sha"],
+                        )
+                        abort_result["restore_log"].append({
+                            "wp": entry["wp"],
+                            "branch": entry["branch"],
+                            "restored": ok,
+                            "detail": msg,
+                        })
+                # Flip WPs to step-7-blocked (post-merge convention)
+                for entry in bundle:
+                    flip_index_status_via_cli(
+                        _SCRIPTS_DIR, paths, entry["wp"], TRAIN_BLOCKED_STATUS,
+                    )
+                    abort_result["wps_flipped"].append(
+                        {"wp": entry["wp"], "to": TRAIN_BLOCKED_STATUS}
+                    )
+                # Write train BLOCKER
+                culprit = compute_culprit_heuristic(bundle, clone_dir, reason)
+                blocker_path = write_train_blocker(
+                    paths, args.train_id, reason, bundle,
+                    suspected_wp_id=culprit,
+                    evidence=f"Founder-initiated abort at phase {phase}",
+                )
+                abort_result["train_blocker_path"] = str(blocker_path)
+                abort_result["suspected_culprit"] = culprit
+            finally:
+                import shutil as _shutil
+                _shutil.rmtree(clone_dir, ignore_errors=True)
+        else:
+            # Pre-merge: restore branches + flip to step-7-held
+            from _wpxlib import restore_branch_with_guard  # noqa: E402
+            import tempfile as _tempfile
+            from _wpxlib import clone_repo_to_temp  # noqa: E402
+            clone_dir = Path(_tempfile.mkdtemp(
+                prefix=f"wpx-abort-{args.train_id}-",
+            ))
+            try:
+                clone_repo_to_temp(repo, clone_dir)
+                for entry in bundle:
+                    if entry.get("rebased_to_sha"):
+                        ok, msg = restore_branch_with_guard(
+                            repo, clone_dir,
+                            entry["branch"],
+                            entry["pre_train_sha"],
+                            entry["rebased_to_sha"],
+                        )
+                        abort_result["restore_log"].append({
+                            "wp": entry["wp"],
+                            "branch": entry["branch"],
+                            "restored": ok,
+                            "detail": msg,
+                        })
+                # Flip WPs to step-7-held (pre-merge convention — founder
+                # explicitly chose to pause; distinct from step-7-blocked
+                # which signals a system-detected failure)
+                for entry in bundle:
+                    flip_index_status_via_cli(
+                        _SCRIPTS_DIR, paths, entry["wp"], TRAIN_HELD_STATUS,
+                    )
+                    abort_result["wps_flipped"].append(
+                        {"wp": entry["wp"], "to": TRAIN_HELD_STATUS}
+                    )
+            finally:
+                import shutil as _shutil
+                _shutil.rmtree(clone_dir, ignore_errors=True)
+
+        # Mark state=aborted and write the historical .yaml record
+        update_train_phase(
+            state_path, "aborted",
+            pause_reason=f"Founder-initiated abort at phase {phase}",
+            recovery_hint=(
+                "Train aborted. Affected WPs flipped to " +
+                (
+                    f"{TRAIN_BLOCKED_STATUS} (post-merge; ADR-212 revert ran)"
+                    if is_post_merge
+                    else f"{TRAIN_HELD_STATUS} (pre-merge; branches restored)"
+                ) + ". Inspect via `wpx-train inspect " + args.train_id + "`."
+            ),
+        )
+
+        record = {
+            "train_id": args.train_id,
+            "started_at": state.get("started_at"),
+            "completed_at": state.get("completed_at"),
+            "outcome": "aborted",
+            "outcome_reason": f"founder-initiated abort at phase {phase}",
+            "batch_size": len(bundle),
+            "bundle": bundle,
+            "deploy_url": None,
+            "deploy_workflow_run": None,
+            "health_status": None,
+            "smoke_verdict": None,
+        }
+        if is_post_merge:
+            record["revert"] = abort_result.get("revert")
+            record["restore_log"] = abort_result["restore_log"]
+            record["train_blocker_path"] = abort_result.get("train_blocker_path")
+            record["suspected_culprit"] = abort_result.get("suspected_culprit")
+
+        write_train_run_record(
+            paths.train_runs_dir / f"{args.train_id}.yaml", record,
+        )
+        cleanup_train_state(paths.train_runs_dir, args.train_id)
+
+    finally:
+        lock.__exit__(None, None, None)
+
+    abort_result["outcome"] = "aborted"
+    emit_ok(data=abort_result)
+
+
 def cmd_resume(args: argparse.Namespace) -> None:
     """Resume a paused train (v0.19.0a).
 
@@ -1176,6 +1573,32 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit machine-readable JSON (default: founder-friendly plain English)",
     )
 
+    p_abort = sub.add_parser(
+        "abort",
+        help="Abort a paused or in-flight train (revert if post-merge; restore if pre-merge)",
+    )
+    _common(p_abort)
+    p_abort.add_argument(
+        "--train-id", required=True,
+        help="Train ID to abort (from wpx-train inspect).",
+    )
+
+    p_skip_wp = sub.add_parser(
+        "skip-wp",
+        help="Drop one WP from a paused train's bundle; flip to step-7-held",
+    )
+    _common(p_skip_wp)
+    p_skip_wp.add_argument("--train-id", required=True, help="Train ID")
+    p_skip_wp.add_argument("--wp", required=True, help="WP ID to drop")
+
+    p_retry_wp = sub.add_parser(
+        "retry-wp",
+        help="Clear one WP's per-phase outcomes in a paused train (for next resume)",
+    )
+    _common(p_retry_wp)
+    p_retry_wp.add_argument("--train-id", required=True, help="Train ID")
+    p_retry_wp.add_argument("--wp", required=True, help="WP ID to retry")
+
     p_resume = sub.add_parser(
         "resume",
         help="Resume a paused train (re-fires the train with same args after the founder's fix)",
@@ -1264,6 +1687,9 @@ HANDLERS = {
     "status": cmd_status,
     "inspect": cmd_inspect,
     "resume": cmd_resume,
+    "abort": cmd_abort,
+    "skip-wp": cmd_skip_wp,
+    "retry-wp": cmd_retry_wp,
     "doctor": cmd_doctor,
     "run": cmd_run,
 }

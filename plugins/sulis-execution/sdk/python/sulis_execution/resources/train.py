@@ -13,8 +13,11 @@ from sulis_execution.transport import (
     TransportConfig,
 )
 from sulis_execution.types import (
+    TrainAbortResult,
     TrainDoctorResult,
     TrainInspectResult,
+    TrainRetryWpResult,
+    TrainSkipWpResult,
     TrainOverrideResult,
     TrainQueueListResult,
     TrainRunResult,
@@ -67,6 +70,29 @@ class TrainResource:
         envelope = self._transport.invoke(BINARY, "doctor",
                                           _train_common(self._config, repo))
         return TrainDoctorResult.model_validate(_result_payload(envelope))
+
+    def abort(self, *, train_id: str) -> TrainAbortResult:
+        """Abort a paused or in-flight train (v0.19.0b)."""
+        params = _train_common(self._config, None)
+        params["train_id"] = train_id
+        envelope = self._transport.invoke(BINARY, "abort", params)
+        return TrainAbortResult.model_validate(_result_payload(envelope))
+
+    def skip_wp(self, *, train_id: str, wp: str) -> TrainSkipWpResult:
+        """Drop one WP from a paused train's bundle (v0.19.0c)."""
+        params = _train_common(self._config, None)
+        params["train_id"] = train_id
+        params["wp"] = wp
+        envelope = self._transport.invoke(BINARY, "skip-wp", params)
+        return TrainSkipWpResult.model_validate(_result_payload(envelope))
+
+    def retry_wp(self, *, train_id: str, wp: str) -> TrainRetryWpResult:
+        """Clear one WP's per-phase outcomes in a paused train (v0.19.0c)."""
+        params = _train_common(self._config, None)
+        params["train_id"] = train_id
+        params["wp"] = wp
+        envelope = self._transport.invoke(BINARY, "retry-wp", params)
+        return TrainRetryWpResult.model_validate(_result_payload(envelope))
 
     def resume(
         self,
@@ -193,6 +219,26 @@ class AsyncTrainResource:
             BINARY, "doctor", _train_common(self._config, repo)
         )
         return TrainDoctorResult.model_validate(_result_payload(envelope))
+
+    async def abort(self, *, train_id: str) -> TrainAbortResult:
+        params = _train_common(self._config, None)
+        params["train_id"] = train_id
+        envelope = await self._transport.invoke(BINARY, "abort", params)
+        return TrainAbortResult.model_validate(_result_payload(envelope))
+
+    async def skip_wp(self, *, train_id: str, wp: str) -> TrainSkipWpResult:
+        params = _train_common(self._config, None)
+        params["train_id"] = train_id
+        params["wp"] = wp
+        envelope = await self._transport.invoke(BINARY, "skip-wp", params)
+        return TrainSkipWpResult.model_validate(_result_payload(envelope))
+
+    async def retry_wp(self, *, train_id: str, wp: str) -> TrainRetryWpResult:
+        params = _train_common(self._config, None)
+        params["train_id"] = train_id
+        params["wp"] = wp
+        envelope = await self._transport.invoke(BINARY, "retry-wp", params)
+        return TrainRetryWpResult.model_validate(_result_payload(envelope))
 
     async def resume(
         self,

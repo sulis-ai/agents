@@ -123,6 +123,57 @@ paths:
         '400': { $ref: '#/components/responses/ExpectedError' }
         '500': { $ref: '#/components/responses/InternalError' }
 
+  /train/abort:
+    post:
+      operationId: trainAbort
+      summary: Abort a paused or in-flight train (revert if post-merge; restore if pre-merge)
+      description: |
+        Phase-aware abort. Pre-merge: restore branches via
+        restore_branch_with_guard; flip WPs to step-7-held. Post-merge:
+        run ADR-212 revert (single wrapper-revert commit, restore
+        branches, flip WPs to step-7-blocked, write train BLOCKER).
+        Marks state=aborted; writes historical .yaml record; cleans
+        up state file.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TrainAbortRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TrainAbortResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /train/skip-wp:
+    post:
+      operationId: trainSkipWp
+      summary: Drop one WP from a paused train's bundle
+      description: |
+        Removes one WP from a paused train's bundle; flips the dropped
+        WP to step-7-held; founder calls train.resume next to fire the
+        smaller bundle.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TrainSkipWpRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TrainSkipWpResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /train/retry-wp:
+    post:
+      operationId: trainRetryWp
+      summary: Clear one WP's per-phase outcomes in a paused train
+      description: |
+        Mutates state — clears the named WP's phase_outcomes so a
+        subsequent train.resume treats the WP as fresh. Index status
+        restored to step-7-complete. Founder calls train.resume next.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TrainRetryWpRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TrainRetryWpResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
   /train/resume:
     post:
       operationId: trainResume
@@ -787,6 +838,63 @@ components:
         trigger_state: { type: string, enum: [not_ready, ready_size, waiting] }
         trigger_reason: { type: string }
         last_train_run: { type: [string, 'null'] }
+
+    TrainAbortRequest:
+      allOf:
+        - $ref: '#/components/schemas/TrainStandardRequest'
+        - type: object
+          required: [train_id]
+          properties:
+            train_id: { type: string }
+
+    TrainAbortResult:
+      type: object
+      properties:
+        train_id: { type: string }
+        outcome: { type: string }
+        phase_at_abort: { type: string }
+        post_merge: { type: boolean }
+        restore_log: { type: array, items: { type: object } }
+        wps_flipped: { type: array, items: { type: object } }
+        train_blocker_path: { type: [string, 'null'] }
+        suspected_culprit: { type: [string, 'null'] }
+        revert: { type: object }
+
+    TrainSkipWpRequest:
+      allOf:
+        - $ref: '#/components/schemas/TrainStandardRequest'
+        - type: object
+          required: [train_id, wp]
+          properties:
+            train_id: { type: string }
+            wp: { type: string }
+
+    TrainSkipWpResult:
+      type: object
+      properties:
+        train_id: { type: string }
+        skipped_wp: { type: string }
+        index_flipped: { type: boolean }
+        remaining_bundle: { type: array, items: { type: string } }
+        next_step: { type: string }
+
+    TrainRetryWpRequest:
+      allOf:
+        - $ref: '#/components/schemas/TrainStandardRequest'
+        - type: object
+          required: [train_id, wp]
+          properties:
+            train_id: { type: string }
+            wp: { type: string }
+
+    TrainRetryWpResult:
+      type: object
+      properties:
+        train_id: { type: string }
+        retry_wp: { type: string }
+        cleared_outcomes: { type: array, items: { type: string } }
+        index_restored_to: { type: string }
+        next_step: { type: string }
 
     TrainResumeRequest:
       allOf:

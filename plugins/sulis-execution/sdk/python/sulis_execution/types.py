@@ -138,6 +138,34 @@ class TrainRunListing(_Base):
     in_flight: bool = False
 
 
+class TrainAbortResult(_Base):
+    train_id: Optional[str] = None
+    outcome: Optional[str] = None
+    phase_at_abort: Optional[str] = None
+    post_merge: Optional[bool] = None
+    restore_log: list = []
+    wps_flipped: list = []
+    train_blocker_path: Optional[str] = None
+    suspected_culprit: Optional[str] = None
+    revert: Optional[dict] = None
+
+
+class TrainSkipWpResult(_Base):
+    train_id: Optional[str] = None
+    skipped_wp: Optional[str] = None
+    index_flipped: Optional[bool] = None
+    remaining_bundle: list[str] = []
+    next_step: Optional[str] = None
+
+
+class TrainRetryWpResult(_Base):
+    train_id: Optional[str] = None
+    retry_wp: Optional[str] = None
+    cleared_outcomes: list[str] = []
+    index_restored_to: Optional[str] = None
+    next_step: Optional[str] = None
+
+
 class TrainInspectResult(_Base):
     """Result of train.inspect.
 
