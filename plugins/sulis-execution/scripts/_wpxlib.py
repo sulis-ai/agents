@@ -1570,6 +1570,281 @@ def rebase_branch_in_clone(
     return out.strip()
 
 
+# ─── v0.17.0: train state machine (Phase 1.1) ───────────────────────────
+#
+# In-flight train state lives at .architecture/{project}/train-runs/
+# {train_id}.state.json — separate from the historical .yaml record so
+# the YAML stays the audit-trail format (unchanged) and JSON gives us
+# trivial nested round-tripping without adding pyyaml as a dep.
+#
+# State file lifecycle:
+# - Created at the start of `wpx-train run` (phase=pending)
+# - Updated at every phase boundary + every per-WP outcome
+# - On terminal state (success / failed / aborted): YAML record written
+#   as the historical archive; state file DELETED (no longer needed)
+# - On non-terminal pause (phase=paused): state file retained;
+#   `wpx-train resume <id>` reads it to pick up
+#
+# Concurrency: a sibling lock file train-runs/{train_id}.lock is held
+# via flock for the duration of any mutating wpx-train command. Second
+# concurrent invocation gets a clear "already being acted on by PID
+# <N>" error.
+
+
+PHASES = (
+    "pending",       # train_id assigned; bundle selected; no work yet
+    "rebasing",      # cloning + sequential rebases in temp clone
+    "ci_running",    # bundled-tip CI polling
+    "merging",       # sequential squash-merges to base branch
+    "deploying",     # deploy workflow polling
+    "verifying",     # health + smoke
+    "success",       # terminal success
+    "failed",        # terminal failure (ADR-212 revert completed)
+    "paused",        # needs attention; resume possible
+    "aborted",       # founder-initiated abort completed
+)
+
+TERMINAL_PHASES = frozenset({"success", "failed", "aborted"})
+
+
+def train_state_path(train_runs_dir: Path, train_id: str) -> Path:
+    """Path to a train's in-flight state JSON."""
+    return train_runs_dir / f"{train_id}.state.json"
+
+
+def train_lock_path(train_runs_dir: Path, train_id: str) -> Path:
+    """Path to a train's flock file."""
+    return train_runs_dir / f"{train_id}.lock"
+
+
+def read_train_state(state_path: Path) -> dict:
+    """Read an in-flight train state. Returns the dict (raises on missing/corrupt)."""
+    if not state_path.exists():
+        raise FileNotFoundError(
+            f"Train state file not found: {state_path}. "
+            f"Either the train was never started, or it completed and "
+            f"the state file was cleaned up (check the .yaml record)."
+        )
+    try:
+        with state_path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"Train state file at {state_path} is corrupt: {exc}. "
+            f"This is a bug — please report with the file contents."
+        ) from exc
+
+
+def write_train_state(state_path: Path, state: dict) -> None:
+    """Atomic write: write to tmp + rename. Caller MUST hold the lock."""
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = state_path.with_suffix(state_path.suffix + ".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
+        json.dump(state, f, indent=2, sort_keys=False)
+        f.write("\n")
+    tmp.replace(state_path)
+
+
+def _utcnow_iso() -> str:
+    """Current UTC time as ISO 8601 with seconds precision."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+class TrainLock:
+    """Context manager for the train's flock file.
+
+    Usage:
+        with TrainLock(train_runs_dir, train_id):
+            state = read_train_state(...)
+            ... mutate state ...
+            write_train_state(...)
+
+    Second concurrent acquisition raises RuntimeError with the existing
+    holder's PID (best-effort; PID may be stale if the previous holder
+    died without releasing).
+    """
+
+    def __init__(self, train_runs_dir: Path, train_id: str) -> None:
+        self.lock_path = train_lock_path(train_runs_dir, train_id)
+        self.train_id = train_id
+        self._fh = None
+
+    def __enter__(self) -> "TrainLock":
+        import fcntl
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        self._fh = open(self.lock_path, "w", encoding="utf-8")
+        try:
+            fcntl.flock(self._fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            existing_pid = self.lock_path.read_text().strip() or "unknown"
+            self._fh.close()
+            self._fh = None
+            raise RuntimeError(
+                f"Train {self.train_id} is being acted on by PID "
+                f"{existing_pid}. Wait or kill that process before retrying."
+            )
+        self._fh.write(f"{os.getpid()}\n")
+        self._fh.flush()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        import fcntl
+        if self._fh is not None:
+            try:
+                fcntl.flock(self._fh.fileno(), fcntl.LOCK_UN)
+            finally:
+                self._fh.close()
+                self._fh = None
+                try:
+                    self.lock_path.unlink()
+                except FileNotFoundError:
+                    pass
+
+
+def init_train_state(
+    train_runs_dir: Path,
+    train_id: str,
+    bundle: list[dict],
+    args_repr: dict,
+) -> dict:
+    """Create the initial train state at phase=pending.
+
+    `bundle` is the list of WPs selected for the train (each dict with
+    wp + branch + pre_train_sha keys, matching the existing bundle
+    schema). `args_repr` is a dict of the wpx-train run arguments
+    (project, repo, deploy_workflow, etc.) used by resume to re-invoke
+    the same parameters.
+
+    Caller MUST hold the TrainLock before calling.
+    """
+    now = _utcnow_iso()
+    state = {
+        "train_id": train_id,
+        "started_at": now,
+        "phase": "pending",
+        "phase_started_at": now,
+        "phase_history": [
+            {"phase": "pending", "started_at": now, "ended_at": None, "outcome": None},
+        ],
+        "pause_reason": None,
+        "recovery_hint": None,
+        "args": args_repr,  # for resume to re-invoke with same params
+        "bundle": [
+            {
+                "wp": item.get("wp", ""),
+                "branch": item.get("branch", ""),
+                "pre_train_sha": item.get("pre_train_sha"),
+                "rebased_to_sha": item.get("rebased_to_sha"),
+                "merge_sha_on_dev": item.get("merge_sha_on_dev"),
+                "phase_outcomes": {},
+            }
+            for item in bundle
+        ],
+    }
+    write_train_state(train_state_path(train_runs_dir, train_id), state)
+    return state
+
+
+def update_train_phase(
+    state_path: Path,
+    new_phase: str,
+    outcome: str = "advanced",
+    pause_reason: str | None = None,
+    recovery_hint: str | None = None,
+) -> dict:
+    """Atomically transition the train to a new phase.
+
+    Closes out the previous phase in `phase_history` (sets ended_at +
+    outcome) and opens a new entry for `new_phase`. Caller MUST hold
+    the TrainLock.
+
+    For paused/failed/aborted phases, set pause_reason + recovery_hint
+    so `wpx-train inspect` shows a clear next action.
+
+    Returns the updated state dict.
+    """
+    if new_phase not in PHASES:
+        raise ValueError(
+            f"Unknown phase {new_phase!r}; must be one of {PHASES}"
+        )
+    state = read_train_state(state_path)
+    now = _utcnow_iso()
+    # Close out the previous phase
+    if state.get("phase_history"):
+        last = state["phase_history"][-1]
+        if last.get("ended_at") is None:
+            last["ended_at"] = now
+            last["outcome"] = outcome
+    # Open the new phase (unless it's the same as current — idempotent)
+    if state.get("phase") != new_phase:
+        state["phase"] = new_phase
+        state["phase_started_at"] = now
+        state["phase_history"].append({
+            "phase": new_phase,
+            "started_at": now,
+            "ended_at": None,
+            "outcome": None,
+        })
+    if pause_reason is not None:
+        state["pause_reason"] = pause_reason
+    if recovery_hint is not None:
+        state["recovery_hint"] = recovery_hint
+    # Terminal phases get an ended_at + completed_at marker
+    if new_phase in TERMINAL_PHASES:
+        state["completed_at"] = now
+        state["phase_history"][-1]["ended_at"] = now
+        state["phase_history"][-1]["outcome"] = new_phase
+    write_train_state(state_path, state)
+    return state
+
+
+def update_wp_phase_outcome(
+    state_path: Path,
+    wp: str,
+    phase: str,
+    outcome: str,
+) -> dict:
+    """Atomically record a per-WP outcome for the named phase.
+
+    E.g., after WP-001's rebase completes:
+        update_wp_phase_outcome(path, "WP-001", "rebasing", "rebased")
+
+    Or after its rebase conflicts:
+        update_wp_phase_outcome(path, "WP-001", "rebasing", "conflict")
+
+    Caller MUST hold the TrainLock. Returns the updated state dict.
+    """
+    if phase not in PHASES:
+        raise ValueError(
+            f"Unknown phase {phase!r}; must be one of {PHASES}"
+        )
+    state = read_train_state(state_path)
+    for entry in state.get("bundle", []):
+        if entry.get("wp") == wp:
+            entry.setdefault("phase_outcomes", {})[phase] = outcome
+            write_train_state(state_path, state)
+            return state
+    raise ValueError(
+        f"WP {wp!r} not in train state's bundle "
+        f"(bundle: {[e.get('wp') for e in state.get('bundle', [])]})"
+    )
+
+
+def cleanup_train_state(train_runs_dir: Path, train_id: str) -> None:
+    """Delete the in-flight state file (called on terminal phases after
+    the .yaml record has been written). Lock file is cleaned up by
+    TrainLock's __exit__."""
+    state_path = train_state_path(train_runs_dir, train_id)
+    try:
+        state_path.unlink()
+    except FileNotFoundError:
+        pass
+
+
+# ─── Existing record writer (unchanged) ─────────────────────────────────
+
+
 def write_train_run_record(record_path: Path, record: dict) -> None:
     """Write a train run record to .architecture/{project}/train-runs/train-{ts}.yaml.
 
