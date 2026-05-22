@@ -1,7 +1,7 @@
 # Agent-Consumable SDK Specification
 
-**Version:** 0.2.0 (universal restructure; the v0.1.0 was HTTP-shaped)
-**Date:** 2026-05-21
+**Version:** 0.3.0 (added monorepo install-graph section to Part 9)
+**Date:** 2026-05-22
 **Status:** Specification — implementation reference for agents building Sulis SDKs
 **Audience:** Agents tasked with building or extending a Sulis-marketplace SDK
 **Standards applied:** CP-01 (Convention Preference), the Critical Thinking Standard
@@ -659,6 +659,122 @@ agent hand-authors all three outputs (Python client, TS client, optional MCP
 server) by following Parts 2-7 as a checklist. This is more work but
 reproducible from this spec alone.
 
+### Monorepo install graphs
+
+When an SDK ships **multiple co-located packages** that share a repo
+(typically `python/` + `mcp/`, sometimes `typescript/` too), the
+inter-package install graph is a recurring source of brittleness. Two
+anti-patterns observed in production SDKs:
+
+**Anti-pattern 1 — relative `file:` dependency.** `mcp/pyproject.toml`
+declares:
+
+```toml
+dependencies = [
+    "mcp >= 1.0.0",
+    "my-sdk @ file:../python",        # broken outside mcp/
+]
+```
+
+pip resolves `file:` URIs against **the shell's current working directory
+at install time**, NOT against the pyproject.toml's location. `pip install
+-e mcp/` from inside `mcp/` works; `pip install -e my-sdk/mcp` from one
+level up hits `No such file or directory: my-sdk/python`. The error is
+cryptic and CWD-dependent — easy to ship, hard to diagnose.
+
+**Anti-pattern 2 — relative LICENSE / README references.** `license = { file
+= "../../../LICENSE" }` in a deeply nested pyproject.toml. setuptools
+refuses to read files outside the package root during editable installs
+(security boundary), so even when the relative path is technically correct
+the editable install fails. The wheel build (which copies the file in)
+succeeds, masking the bug in CI until a real user runs `pip install -e .`.
+
+#### Two valid conventions
+
+Pick exactly one. Document the choice prominently in the repo README.
+Don't mix them — that hands every consumer a worse install experience than
+they'd get from either convention alone.
+
+**(a) Standalone packages with documented install order.** Each member
+package is self-contained — no inter-package `file:` references in
+`dependencies`. Runtime coupling is import-time only (e.g. `mcp/server.py`
+imports `my-sdk` at load time, but pip's resolver doesn't see this). The
+README documents the install order:
+
+```bash
+cd my-sdk/python && pip install -e .
+cd ../mcp        && pip install -e .
+```
+
+Pros: works in any environment that has pip. No tooling dependency on
+consumers. Robust against CWD.
+
+Cons: two commands instead of one. Developers re-typing `cd ..` for every
+fresh checkout.
+
+**(b) Workspace pyproject (uv / pdm).** A top-level pyproject at the SDK
+repo root declares each member as a workspace member and lists them as
+dependencies of the workspace root. `[tool.uv.sources]` maps the
+inter-package coupling to the local workspace path so resolution doesn't
+attempt PyPI:
+
+```toml
+# my-sdk/pyproject.toml (workspace root)
+[project]
+name = "my-sdk-workspace"
+dependencies = ["my-sdk", "my-sdk-mcp"]
+
+[tool.uv.workspace]
+members = ["python", "mcp"]
+
+[tool.uv.sources]
+my-sdk     = { workspace = true }
+my-sdk-mcp = { workspace = true }
+```
+
+```bash
+cd my-sdk && uv sync   # single command installs everything
+```
+
+Pros: one command. Reproducible via `uv.lock`. Same shape uv ships for
+Anthropic's first-party Python projects.
+
+Cons: requires consumers to have uv (or pdm equivalent) installed. v0.0.x
+of uv's workspace support shipped in 2025 but has matured fast — by 2026
+it's the convention for Python monorepos.
+
+#### The "both worlds" pattern (recommended for SDKs with broad reach)
+
+Many published SDKs offer BOTH paths:
+- Workspace pyproject for the developer-experience recommended path
+- Standalone member packages so pip-only consumers still get a working install
+
+The trade-off: pyproject files exist at three levels (workspace root + each
+member) instead of two. The workspace root carries the meta-coordination;
+each member stays independently installable. This is the pattern
+plugin-builder uses (v0.2.0+) — `uv sync` is the recommended developer
+path, two-step pip install is the fallback.
+
+#### Validation hook
+
+Rubric check **4.01a — Editable install succeeds in a clean venv** (added
+in validation rubric v0.2.0) catches the brittle-install class of bug
+mechanically. Every SDK author MUST run it before merging any pyproject
+change. CI integration:
+
+```yaml
+- name: Probe editable install in a clean venv
+  run: |
+    python -m venv /tmp/probe
+    /tmp/probe/bin/pip install -e ./python
+    /tmp/probe/bin/pip install -e ./mcp     # if mcp/ ships
+    /tmp/probe/bin/python -c "from my_sdk_mcp import server; assert server.TOOL_REGISTRY"
+```
+
+The probe MUST run from the SDK repo root (not from inside `python/` or
+`mcp/`) — that's the consumer-facing entry point, and the CWD where
+relative-`file:` anti-patterns will fail.
+
 ---
 
 ## Part 10 — Telemetry (per-transport)
@@ -927,3 +1043,4 @@ Before shipping a generated SDK from this spec, verify:
 |---|---|---|
 | 0.1.0 | 2026-05-21 | Initial spec. HTTP-shaped throughout. Treated MCP as a codegen target alongside Python and TypeScript. Single Anthropic+OpenAI source baseline. |
 | 0.2.0 | 2026-05-21 | Universal restructure following CTS-based gap analysis. Schema/transport split made explicit (PG). Per-transport bindings (HTTP / JSON-RPC / subprocess / library / gRPC / GraphQL / WebSocket / database / message queue) with independent sources cited per transport (BI + SI). Error model rebased on three outcome categories (Protocol / Expected / Internal) with per-transport mapping. MCP elevated from codegen target to transport peer. Authentication, streaming, batching, long-running operations added. Adversarial Testing pass (Part 11), Falsifiability criteria (Part 12), and Confidence Calibration disclosure (top of spec) added per CTS requirements. Quality checklist (Part 13) expanded to cover schema, error, transport-binding, language, and parity axes. |
+| 0.3.0 | 2026-05-22 | Added "Monorepo install graphs" subsection to Part 9. Two anti-patterns documented (relative `file:` deps; relative LICENSE/README paths) — both observed in production SDKs that passed the v0.2.0 rubric but broke for first-time users. Two valid conventions specified: (a) standalone packages with documented install order, (b) workspace pyproject (uv / pdm), plus the "both worlds" pattern. Cross-references rubric check 4.01a (Editable install succeeds in a clean venv). Surfaced from independent failures in `bids/complai/adapters/ukri` and `plugin-builder` — both hit the same gap, signal-strength for adding to the spec itself. |
