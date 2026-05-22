@@ -319,19 +319,61 @@ seed normally.
 ## Bookkeeping via wpx-* tools (MUST — v0.9.0 commit 1.24b+)
 
 **Every bookkeeping operation in your lifecycle goes through a
-`wpx-*` CLI tool, not direct file edits or raw git commands.** The
-tools live inside the plugin's `scripts/` directory; you resolved
-their location into `$WPX_DIR` at session start (see "Resolving
-wpx-* tool paths"). Every invocation below uses `"$WPX_DIR/wpx-NAME"`
-— substitute the resolved literal path inline. The tools are
-deterministic, well-tested, and cannot format-drift. Direct Markdown
-edits to the journal, INDEX, or BLOCKER files are FORBIDDEN — they
-are the historical source of every post-Step-6 parking failure
-(`.executor-WP-NNN.md` row misalignment, INDEX status enum drift,
-missing acceptance-evidence fields).
+`wpx-*` CLI tool, not direct file edits or raw git commands.** Two
+invocation paths are available:
 
-You MUST invoke the tool. You MAY read the files (for context) but
-you MUST NOT write them by hand.
+### MCP path (preferred, sulis-execution v0.15.0+)
+
+If the sulis-execution-mcp server is loaded in your session (run
+`/mcp` to verify — it should be there if the plugin is enabled), call
+the typed MCP tools directly. Tool names follow the pattern
+`mcp__sulis-execution-mcp__<resource>_<method>` (snake_case).
+
+Quick lookup for the executor's bookkeeping operations:
+
+| CLI command | MCP tool name |
+|---|---|
+| `wpx-worktree create` | `mcp__sulis-execution-mcp__worktree_create` |
+| `wpx-worktree remove` | `mcp__sulis-execution-mcp__worktree_remove` |
+| `wpx-journal init` | `mcp__sulis-execution-mcp__journal_init` |
+| `wpx-journal start-step` | `mcp__sulis-execution-mcp__journal_start_step` |
+| `wpx-journal complete-step` | `mcp__sulis-execution-mcp__journal_complete_step` |
+| `wpx-journal record-attempt` | `mcp__sulis-execution-mcp__journal_record_attempt` |
+| `wpx-journal record-preflight` | `mcp__sulis-execution-mcp__journal_record_preflight` |
+| `wpx-journal seed-plan` | `mcp__sulis-execution-mcp__journal_create_plan` *(SDK-renamed in v0.2.0; CLI subcommand stays `seed-plan`)* |
+| `wpx-journal mark-plan-item` | `mcp__sulis-execution-mcp__journal_update_plan_item` *(SDK-renamed)* |
+| `wpx-journal add-plan-item` | `mcp__sulis-execution-mcp__journal_add_plan_item` |
+| `wpx-journal read` | `mcp__sulis-execution-mcp__journal_read` |
+| `wpx-blocker write` | `mcp__sulis-execution-mcp__blocker_write` |
+| `wpx-blocker archive` | `mcp__sulis-execution-mcp__blocker_archive` |
+| `wpx-findings register` | `mcp__sulis-execution-mcp__findings_register` |
+| `wpx-findings auto-draft-wp` | `mcp__sulis-execution-mcp__findings_draft_remediation` *(SDK-renamed)* |
+| `wpx-wp read-frontmatter` | `mcp__sulis-execution-mcp__work_package_read_metadata` *(SDK-renamed)* |
+| `wpx-wp append-evidence` | `mcp__sulis-execution-mcp__work_package_append_evidence` *(SDK-renamed)* |
+| `wpx-index flip-status` | `mcp__sulis-execution-mcp__index_flip_status` |
+
+MCP tools take the same params as the CLI (snake_case keys), return
+typed Pydantic-style results, and raise typed exceptions (`ExpectedError`
+/ `InternalError` / `ProtocolError`) on failure.
+
+### Bash CLI path (fallback / canonical reference)
+
+If the MCP server isn't available (the sulis-execution-mcp Python
+package isn't installed; you're running against a bare checkout;
+`/mcp` shows nothing), fall back to direct Bash invocation against
+the CLI binaries. You resolved their location into `$WPX_DIR` at
+session start (see "Resolving wpx-* tool paths"). Every invocation
+below uses `"$WPX_DIR/wpx-NAME"` — substitute the resolved literal
+path inline.
+
+The tools are deterministic, well-tested, and cannot format-drift.
+Direct Markdown edits to the journal, INDEX, or BLOCKER files are
+FORBIDDEN — they are the historical source of every post-Step-6
+parking failure (`.executor-WP-NNN.md` row misalignment, INDEX
+status enum drift, missing acceptance-evidence fields).
+
+You MUST invoke the tool (MCP or Bash; either is fine). You MAY read
+the files (for context) but you MUST NOT write them by hand.
 
 The complete mapping for the executor (Steps 1-7 only — Steps 8-12
 are the calling session's; their tool invocations are documented in
