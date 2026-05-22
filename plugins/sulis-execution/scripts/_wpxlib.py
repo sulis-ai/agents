@@ -863,7 +863,56 @@ def _split_csv_or_dash(cell: str) -> list[str]:
     return [item.strip() for item in s.split(",") if item.strip()]
 
 
-def parse_index_md(index_path: Path) -> list[WPRow]:
+def _normalise_wp_reference(
+    ref: str, known_wps: set[str],
+) -> tuple[str, str]:
+    """Normalise a WP reference to its canonical full ID.
+
+    Used to resolve short names in INDEX.md's "Depends On" / "Blocks"
+    columns. Founders commonly write `PERMS, MANIFEST, MCP-STUB`
+    instead of `WP-S2-PERMS, WP-S2-MANIFEST, WP-S2-MCP-STUB` for
+    visual brevity. Without normalisation, dependency checks compare
+    short-vs-full and silently treat deps as not-merged.
+
+    Resolution rules:
+    1. Already a full WP ID (starts with `WP-`) → pass through unchanged
+    2. Exact match in known_wps → pass through unchanged
+    3. Unique suffix match (e.g., `PERMS` matches `WP-S2-PERMS`) → normalise
+    4. No match → return original; caller can warn
+    5. Ambiguous (multiple suffix matches) → raise ValueError naming candidates
+
+    Returns (normalised_ref, status) where status is one of:
+    - "passthrough" — was already full or matched exactly
+    - "normalised" — short name resolved to full ID
+    - "unknown" — no match in known_wps (kept as-is)
+    """
+    if ref in known_wps:
+        return (ref, "passthrough")
+    if ref.startswith("WP-"):
+        # Full-looking ID that isn't in known_wps — treat as unknown
+        # but pass through (likely a typo or WP not yet added)
+        return (ref, "unknown")
+    # Short name — look for unique suffix match
+    candidates = [
+        wp_id for wp_id in known_wps
+        if wp_id.endswith(f"-{ref}") or wp_id.endswith(ref)
+    ]
+    if len(candidates) == 1:
+        return (candidates[0], "normalised")
+    if len(candidates) == 0:
+        return (ref, "unknown")
+    # Ambiguous
+    raise ValueError(
+        f"Ambiguous WP reference {ref!r}: matches multiple WPs "
+        f"({', '.join(sorted(candidates))}). Disambiguate in INDEX.md "
+        f"by using the full WP ID."
+    )
+
+
+def parse_index_md(
+    index_path: Path,
+    verbose_normalisations: bool = False,
+) -> list[WPRow]:
     """Parse all WP tables in an INDEX.md file. Returns flat list of rows.
 
     INDEX.md typically contains multiple WP tables — one per section
@@ -932,6 +981,43 @@ def parse_index_md(index_path: Path) -> list[WPRow]:
                 blocks=_split_csv_or_dash(get(row, "blocks")),
                 extras=extras,
             ))
+
+    # v0.16.2 — normalise short WP references in deps + blocks to full IDs.
+    # Without this, founders writing `PERMS, MANIFEST` (instead of
+    # `WP-S2-PERMS, WP-S2-MANIFEST`) get silent dep-not-merged failures.
+    known_wps = {row.id for row in rows}
+    normalised_count = 0
+    for row in rows:
+        new_deps = []
+        for dep in row.depends_on:
+            resolved, status = _normalise_wp_reference(dep, known_wps)
+            new_deps.append(resolved)
+            if status == "normalised":
+                normalised_count += 1
+                if verbose_normalisations:
+                    _log(f"INDEX: normalised dep {dep!r} → {resolved!r} in {row.id}")
+            elif status == "unknown" and verbose_normalisations:
+                _log(
+                    f"INDEX: dep {dep!r} in {row.id} matches no known WP — "
+                    f"left as-is (typo or WP not yet added?)"
+                )
+        row.depends_on = new_deps
+
+        new_blocks = []
+        for blk in row.blocks:
+            resolved, status = _normalise_wp_reference(blk, known_wps)
+            new_blocks.append(resolved)
+            if status == "normalised":
+                normalised_count += 1
+                if verbose_normalisations:
+                    _log(f"INDEX: normalised block {blk!r} → {resolved!r} in {row.id}")
+        row.blocks = new_blocks
+
+    if normalised_count > 0 and verbose_normalisations:
+        _log(
+            f"INDEX: normalised {normalised_count} short WP reference(s) "
+            f"to full IDs. Consider rewriting INDEX.md to use full IDs for clarity."
+        )
 
     return rows
 

@@ -295,7 +295,10 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     if not paths.index_md.exists():
         emit_error(f"INDEX.md not found at {paths.index_md}")
 
-    wps = parse_index_md(paths.index_md)
+    # Verbose normalisations: doctor reports short-name resolutions so the
+    # founder knows their INDEX uses shorthand (and can choose to rewrite
+    # to full IDs for clarity).
+    wps = parse_index_md(paths.index_md, verbose_normalisations=True)
     by_id = {wp.id: wp for wp in wps}
 
     # Check: every WP in INDEX.md has a matching WP file
