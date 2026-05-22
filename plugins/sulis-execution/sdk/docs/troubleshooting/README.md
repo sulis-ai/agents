@@ -10,6 +10,7 @@ and the doc takes you to the cause.
 | Symptom | Likely cause |
 |---|---|
 | `BinaryNotFoundError: Could not find binary 'wpx-...'` | [Binary not on PATH](binary-not-found.md) |
+| MCP server doesn't show in `/mcp` after plugin install | [Verify MCP auto-load](verify-mcp-autoload.md) |
 | `ExpectedError: status was 'X', expected 'Y'` | [Status mismatch on flip-status](index-status-mismatch.md) |
 | MCP tools don't appear in Claude / Cursor | [MCP server didn't start](mcp-server-not-found.md) |
 | `result.outcome == 'blocker'` after a clean-looking run | [Pipeline blocker](pipeline-blocker.md) |
