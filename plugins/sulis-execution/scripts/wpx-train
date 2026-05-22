@@ -140,7 +140,10 @@ def cmd_queue_list(args: argparse.Namespace) -> None:
 
     wps = parse_index_md(paths.index_md)
     overrides = read_overrides(paths.train_overrides)
-    results = find_eligible_branches(wps, repo, paths.wp_dir, overrides)
+    results = find_eligible_branches(
+        wps, repo, paths.wp_dir, overrides,
+        strict_ci=getattr(args, "strict_ci", False),
+    )
 
     eligible = [r for r in results if r.eligible]
     ineligible = [r for r in results if not r.eligible]
@@ -250,7 +253,10 @@ def cmd_status(args: argparse.Namespace) -> None:
 
     wps = parse_index_md(paths.index_md)
     overrides = read_overrides(paths.train_overrides)
-    results = find_eligible_branches(wps, repo, paths.wp_dir, overrides)
+    results = find_eligible_branches(
+        wps, repo, paths.wp_dir, overrides,
+        strict_ci=getattr(args, "strict_ci", False),
+    )
 
     eligible = [r for r in results if r.eligible]
 
@@ -522,7 +528,10 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
     # Discovery (re-uses Phase 1 algorithm)
     wps = parse_index_md(paths.index_md)
     overrides = read_overrides(paths.train_overrides)
-    results = find_eligible_branches(wps, repo, paths.wp_dir, overrides)
+    results = find_eligible_branches(
+        wps, repo, paths.wp_dir, overrides,
+        strict_ci=getattr(args, "strict_ci", False),
+    )
     eligible = [r for r in results if r.eligible]
 
     # Trigger check
@@ -843,6 +852,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_list = sub.add_parser("queue-list", help="List eligible + ineligible WPs")
     _common(p_list)
+    p_list.add_argument(
+        "--strict-ci", action="store_true",
+        help="Also require per-WP branch CI green before eligibility. "
+             "Default (v0.18.0+): optimistic — branch CI is informational only; "
+             "the bundled-tip CI gate at Step 8 is the real gate.",
+    )
 
     p_add = sub.add_parser("queue-add", help="Force-include a WP in next train")
     _common(p_add)
@@ -856,6 +871,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_status = sub.add_parser("status", help="Read-only summary of train state")
     _common(p_status)
+    p_status.add_argument(
+        "--strict-ci", action="store_true",
+        help="Compute eligibility with the v0.11.0 strict CI gate. "
+             "Default (v0.18.0+): optimistic — eligibility doesn't require "
+             "per-WP CI green; the bundled-tip CI is the real gate.",
+    )
 
     p_inspect = sub.add_parser("inspect", help="Inspect a train's in-flight or historical state")
     _common(p_inspect)
@@ -876,6 +897,14 @@ def build_parser() -> argparse.ArgumentParser:
     _common(p_run)
     p_run.add_argument("--force", action="store_true",
                        help="Bypass size/staleness trigger")
+    p_run.add_argument(
+        "--strict-ci", action="store_true",
+        help="Strict eligibility — require per-WP branch CI green before "
+             "including a WP in the batch. Default (v0.18.0+): optimistic — "
+             "bundled-tip CI at Step 8 is the gate; per-WP CI is informational. "
+             "Strict mode preserves the v0.11.0 behaviour for callers that want "
+             "pre-batch confidence on individual branches.",
+    )
     p_run.add_argument("--deploy-workflow", required=True,
                        help="Deploy workflow name (e.g. 'Deploy to Dev Environment')")
     p_run.add_argument("--staging-url", default=None,

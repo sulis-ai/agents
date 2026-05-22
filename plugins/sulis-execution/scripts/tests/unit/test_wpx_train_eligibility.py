@@ -228,8 +228,12 @@ def test_find_eligible_branch_missing(tmp_project, monkeypatch):
     assert "branch missing" in results[0].reason
 
 
-def test_find_eligible_ci_red(tmp_project, monkeypatch):
-    """Branch exists but CI is red → ineligible."""
+def test_find_eligible_ci_red_strict_mode(tmp_project, monkeypatch):
+    """Strict mode (v0.11.0 behaviour): branch exists but CI is red → ineligible.
+
+    With default (optimistic, v0.18.0+), CI red would NOT block eligibility —
+    see test_find_eligible_ci_red_optimistic_passes below.
+    """
     _write_index(tmp_project.wp_dir, [
         ("WP-001", "Red", "create", "step-7-complete", "—", "—"),
     ])
@@ -238,9 +242,36 @@ def test_find_eligible_ci_red(tmp_project, monkeypatch):
              branches_present={"feat/wp-001-red"},
              green_branches=set())  # CI not green
     rows = parse_index_md(tmp_project.index_md)
-    results = find_eligible_branches(rows, repo="acme/x", wp_dir=tmp_project.wp_dir)
+    results = find_eligible_branches(
+        rows, repo="acme/x", wp_dir=tmp_project.wp_dir, strict_ci=True,
+    )
     assert not results[0].eligible
     assert "CI not green" in results[0].reason
+
+
+def test_find_eligible_ci_red_optimistic_passes(tmp_project, monkeypatch):
+    """v0.18.0+ default (optimistic): CI red is informational, not gating.
+
+    Bundled-tip CI at Step 8 is the real gate; per-WP CI is a hint.
+    The WP-with-red-CI is still eligible; bundled-tip CI will catch
+    any genuine breakage during the train run.
+    """
+    _write_index(tmp_project.wp_dir, [
+        ("WP-001", "Red", "create", "step-7-complete", "—", "—"),
+    ])
+    _seed_wp_files(tmp_project.wp_dir, [("WP-001", "red")])
+    _stub_gh(monkeypatch,
+             branches_present={"feat/wp-001-red"},
+             green_branches=set())  # CI not green
+    rows = parse_index_md(tmp_project.index_md)
+    # Default: strict_ci omitted → False → optimistic
+    results = find_eligible_branches(
+        rows, repo="acme/x", wp_dir=tmp_project.wp_dir,
+    )
+    assert results[0].eligible, (
+        f"Expected WP-001 eligible under optimistic mode despite red CI; "
+        f"got reason: {results[0].reason}"
+    )
 
 
 def test_find_eligible_unmet_deps(tmp_project, monkeypatch):
@@ -308,3 +339,62 @@ def test_find_eligible_no_wp_file(tmp_project, monkeypatch):
     results = find_eligible_branches(rows, repo="acme/x", wp_dir=tmp_project.wp_dir)
     assert not results[0].eligible
     assert "no WP file found" in results[0].reason
+
+
+# ─── v0.18.0+ optimistic-vs-strict eligibility ──────────────────────────
+
+
+def test_optimistic_includes_pending_ci(tmp_project, monkeypatch):
+    """v0.18.0+ optimistic mode: a WP with pending (not green) CI is still
+    eligible. Bundled-tip CI at Step 8 is the real gate."""
+    _write_index(tmp_project.wp_dir, [
+        ("WP-001", "Pending CI", "create", "step-7-complete", "—", "—"),
+    ])
+    _seed_wp_files(tmp_project.wp_dir, [("WP-001", "pending-ci")])
+    _stub_gh(monkeypatch,
+             branches_present={"feat/wp-001-pending-ci"},
+             green_branches=set())  # CI pending (not green)
+    rows = parse_index_md(tmp_project.index_md)
+    results = find_eligible_branches(
+        rows, repo="acme/x", wp_dir=tmp_project.wp_dir,
+    )  # Default = optimistic
+    assert results[0].eligible
+
+
+def test_strict_excludes_pending_ci(tmp_project, monkeypatch):
+    """Strict mode: same WP-with-pending-CI is ineligible (v0.11.0 behaviour)."""
+    _write_index(tmp_project.wp_dir, [
+        ("WP-001", "Pending CI", "create", "step-7-complete", "—", "—"),
+    ])
+    _seed_wp_files(tmp_project.wp_dir, [("WP-001", "pending-ci")])
+    _stub_gh(monkeypatch,
+             branches_present={"feat/wp-001-pending-ci"},
+             green_branches=set())
+    rows = parse_index_md(tmp_project.index_md)
+    results = find_eligible_branches(
+        rows, repo="acme/x", wp_dir=tmp_project.wp_dir, strict_ci=True,
+    )
+    assert not results[0].eligible
+    assert "CI not green" in results[0].reason
+    assert "strict-ci" in results[0].reason  # explains it's the strict flag
+
+
+def test_optimistic_and_strict_agree_when_all_ci_green(tmp_project, monkeypatch):
+    """When all branches have green CI, optimistic + strict produce identical results."""
+    _write_index(tmp_project.wp_dir, [
+        ("WP-001", "A", "create", "step-7-complete", "—", "—"),
+        ("WP-002", "B", "create", "step-7-complete", "—", "—"),
+    ])
+    _seed_wp_files(tmp_project.wp_dir, [("WP-001", "a"), ("WP-002", "b")])
+    _stub_gh(monkeypatch,
+             branches_present={"feat/wp-001-a", "feat/wp-002-b"},
+             green_branches={"feat/wp-001-a", "feat/wp-002-b"})
+    rows = parse_index_md(tmp_project.index_md)
+    optimistic = find_eligible_branches(
+        rows, repo="acme/x", wp_dir=tmp_project.wp_dir,
+    )
+    strict = find_eligible_branches(
+        rows, repo="acme/x", wp_dir=tmp_project.wp_dir, strict_ci=True,
+    )
+    assert [r.eligible for r in optimistic] == [r.eligible for r in strict]
+    assert all(r.eligible for r in optimistic)

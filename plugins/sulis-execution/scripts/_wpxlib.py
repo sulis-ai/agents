@@ -1195,16 +1195,30 @@ def find_eligible_branches(
     repo: str,
     wp_dir: Path,
     overrides: TrainOverrides | None = None,
+    strict_ci: bool = False,
 ) -> list[EligibilityResult]:
     """Discover which WPs are eligible for the next train.
 
-    Per the amended ADR-212 D6:
+    Default criteria (optimistic; v0.18.0+):
 
       1. status == step-7-complete (or force-include override)
       2. branch exists on origin
-      3. branch CI is green (or force-include override)
-      4. all dependencies have status == done
-      5. WP is not hold-overridden
+      3. all dependencies have status == done
+      4. WP is not hold-overridden
+
+    The bundled-tip CI (Step 8 of the lifecycle) remains the real
+    gate; per-WP branch CI status is informational only. This
+    matches how modern merge queues work (GitHub Merge Queue,
+    Bors, Shopify Shipit): the queue handles batching + integration
+    CI; per-branch CI is a hint, not a gate.
+
+    Strict mode (ADR-212 D6 original; backward-compatible):
+
+      Set `strict_ci=True` to also require per-WP branch CI green
+      before considering a WP eligible. Use this when you want
+      pre-merge confidence on each individual branch (e.g., trains
+      against very slow integration CI that can't afford to
+      sequence flaky-but-passable branches together).
 
     Returns one EligibilityResult per WP — both eligible and ineligible
     are returned so the caller (queue-list / status / doctor) can show
@@ -1259,11 +1273,12 @@ def find_eligible_branches(
             ))
             continue
 
-        # CI check (skipped when forced)
-        if not is_forced and not _gh_branch_ci_green(repo, branch):
+        # CI check — gated only in strict mode (v0.18.0+: bundled-tip CI
+        # is the gate by default; per-WP CI is informational).
+        if strict_ci and not is_forced and not _gh_branch_ci_green(repo, branch):
             results.append(EligibilityResult(
                 wp=wp.id, branch=branch, eligible=False,
-                reason="branch CI not green (pending or failed)",
+                reason="branch CI not green (pending or failed); strict-ci mode",
                 primitive=wp.primitive,
             ))
             continue
