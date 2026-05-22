@@ -89,11 +89,16 @@ from _wpxlib import (  # noqa: E402
     paths_from_args,
     read_overrides,
     PatchesAlreadyAppliedError,
+    TrainLock,
+    cleanup_train_state,
+    init_train_state,
     list_train_runs,
     read_train_state,
     rebase_branch_in_clone,
     render_train_state_plain_english,
     train_state_path,
+    update_train_phase,
+    update_wp_phase_outcome,
     restore_branch_with_guard,
     revert_train_on_dev,
     write_overrides,
@@ -448,6 +453,51 @@ import shutil  # noqa: E402  (deferred to here to keep top-of-file imports clean
 import tempfile  # noqa: E402
 
 
+def _pause_train_state(
+    *,
+    paths,
+    train_id: str,
+    record: dict,
+    pause_reason: str,
+    recovery_hint: str,
+    bundle: list[dict],
+    write_yaml: bool = True,
+) -> None:
+    """Transition the train to phase=paused (v0.18.0+).
+
+    Non-fatal failures (bundled-tip CI flake, deploy timeout) route here
+    instead of `_handle_post_merge_failure`. The state file is updated;
+    no revert happens; no INDEX flip. The founder can inspect the
+    train and decide whether to resume (Phase 3.1; once the WP-S2-LOADER
+    behind it lands), abort (Phase 3.2), or just leave it.
+
+    Exits the process with exit code 1 to signal "needs attention",
+    but the founder workflow is:
+        wpx-train inspect <train_id>      # see what happened
+        ... investigate / fix ...
+        wpx-train resume <train_id>       # continue (when Phase 3.1 lands)
+        wpx-train abort <train_id>        # unwind (when Phase 3.2 lands)
+
+    Today (v0.18.0): inspect works. Resume + abort ship in v0.19.0;
+    until then the founder uses the existing manual recovery paths
+    (which the recovery_hint string should describe).
+    """
+    _log(f"PAUSED: {pause_reason}. State written; no auto-revert.")
+    state_path = train_state_path(paths.train_runs_dir, train_id)
+    if state_path.exists():
+        update_train_phase(
+            state_path, "paused",
+            pause_reason=pause_reason,
+            recovery_hint=recovery_hint,
+        )
+    record["outcome"] = "paused"
+    record["outcome_reason"] = pause_reason
+    record["recovery_hint"] = recovery_hint
+    if write_yaml:
+        write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
+    emit_result(record, exit_code=1)
+
+
 def _handle_post_merge_failure(
     *,
     record: dict,
@@ -508,6 +558,24 @@ def _handle_post_merge_failure(
     record["train_blocker_path"] = str(train_blocker_path)
     record["suspected_culprit"] = culprit
     write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
+    # v0.18.0+ — terminal failure (revert ran). Update state to phase=failed
+    # then clean up the in-flight state file; the .yaml record is the
+    # historical archive from here.
+    state_path = train_state_path(paths.train_runs_dir, train_id)
+    if state_path.exists():
+        try:
+            update_train_phase(
+                state_path, "failed",
+                pause_reason=reason,
+                recovery_hint=(
+                    "Train failed after merges landed; ADR-212 revert ran. "
+                    "Affected WPs flipped to step-7-blocked + BLOCKER written. "
+                    f"See BLOCKER at {train_blocker_path}."
+                ),
+            )
+        except Exception:  # noqa: BLE001
+            pass  # best-effort; the .yaml record is the source of truth
+        cleanup_train_state(paths.train_runs_dir, train_id)
     emit_result(record, exit_code=1)
 
 
@@ -567,12 +635,36 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
         "smoke_verdict": None,
     }
 
+    # v0.18.0+ — write initial state YAML (phase=pending) for inspect /
+    # resume / abort to read. cmd_run drives phase transitions inline;
+    # full per-phase factoring (so cmd_resume can re-enter) is Phase 3.1.
+    args_repr = {
+        "project": args.project,
+        "repo_root": str(paths.repo_root),
+        "repo": args.repo,
+        "deploy_workflow": args.deploy_workflow,
+        "staging_url": getattr(args, "staging_url", None),
+        "smoke_cmd": getattr(args, "smoke_cmd", ""),
+        "base_branch": base_branch,
+        "force": getattr(args, "force", False),
+        "strict_ci": getattr(args, "strict_ci", False),
+    }
+    initial_bundle = [
+        {"wp": e.wp, "branch": e.branch, "pre_train_sha": None}
+        for e in batch
+    ]
+    init_train_state(paths.train_runs_dir, train_id, initial_bundle, args_repr)
+
     # Sandbox clone — reused across all rebases in this train
     clone_dir = Path(tempfile.mkdtemp(prefix=f"wpx-train-{train_id}-"))
 
     try:
         _log(f"{train_id}: trigger={trigger_reason}; batch_size={len(batch)}; "
              f"WPs={[e.wp for e in batch]}")
+        # Phase transition: pending → rebasing
+        update_train_phase(
+            train_state_path(paths.train_runs_dir, train_id), "rebasing",
+        )
         clone_repo_to_temp(repo, clone_dir)
 
         # Step: rebase chain. Each branch is rebased onto the previous
@@ -711,33 +803,46 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
         record["rebase_failures"] = rebase_failures
         bundle_tip_branch = bundle[-1]["branch"]
 
+        # Phase transition: rebasing → ci_running
+        update_train_phase(
+            train_state_path(paths.train_runs_dir, train_id), "ci_running",
+        )
+
         # Step: bundled-tip CI
         ci_interval = args.ci_poll_interval or CI_DEFAULT_INTERVAL
         _log(f"Bundled-tip CI: polling {bundle_tip_branch}")
         ci_verdict = _poll_ci(repo, bundle_tip_branch, ci_interval, CI_DEFAULT_CAP)
         if ci_verdict != "green":
-            # Bundle-CI failed → no merge. Flip all in-bundle WPs to
-            # step-7-blocked and write a train BLOCKER with the file-overlap
-            # heuristic naming the likely culprit. (Phase 3 D7 / CI fail mode.)
-            _log(f"BUNDLED-TIP CI {ci_verdict}: blocking all {len(bundle)} WPs")
+            # v0.18.0+ — bundled-tip CI red/timeout is a NON-FATAL pre-merge
+            # failure. No merges have happened. Route to paused so the
+            # founder can inspect, fix the underlying CI failure, and
+            # resume (Phase 3.1) — OR abort (Phase 3.2) to flip WPs to
+            # step-7-blocked and write the train BLOCKER.
+            culprit = compute_culprit_heuristic(bundle, clone_dir,
+                                               f"bundled-tip CI {ci_verdict}")
             reason = f"bundled-tip CI {ci_verdict} on {bundle_tip_branch}"
-
-            culprit = compute_culprit_heuristic(bundle, clone_dir, reason)
-            for entry in bundle:
-                flip_index_status_via_cli(
-                    _SCRIPTS_DIR, paths, entry["wp"], TRAIN_BLOCKED_STATUS,
-                )
-            train_blocker_path = write_train_blocker(
-                paths, train_id, reason, bundle,
-                suspected_wp_id=culprit,
-                evidence=f"CI verdict: {ci_verdict} on branch {bundle_tip_branch}",
+            hint = (
+                f"Bundled-tip CI is {ci_verdict}. Likely culprit "
+                f"(file-overlap heuristic): {culprit or '<no signal>'}. "
+                f"Inspect via `wpx-train inspect {train_id}`. "
+                f"Once you've identified + fixed the failing branch, run "
+                f"`wpx-train resume {train_id}` (Phase 3.1, ships v0.19.0). "
+                f"To unwind the rebases + free the WPs back to step-7-complete, "
+                f"`wpx-train abort {train_id}` (Phase 3.2). Until v0.19.0, "
+                f"manual recovery: flip affected WPs back to step-7-complete "
+                f"after fixing CI; re-run wpx-train run."
             )
-            record["outcome"] = "blocker"
-            record["outcome_reason"] = reason
-            record["train_blocker_path"] = str(train_blocker_path)
+            record["bundle"] = bundle
             record["suspected_culprit"] = culprit
-            write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
-            emit_result(record, exit_code=1)
+            _pause_train_state(
+                paths=paths, train_id=train_id, record=record,
+                pause_reason=reason, recovery_hint=hint, bundle=bundle,
+            )
+
+        # Phase transition: ci_running → merging
+        update_train_phase(
+            train_state_path(paths.train_runs_dir, train_id), "merging",
+        )
 
         # Step: sequential squash-merge
         final_merge_sha = None
@@ -749,6 +854,11 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
             final_merge_sha = sha
         record["bundle"] = bundle  # refresh with merge_sha_on_dev populated
 
+        # Phase transition: merging → deploying
+        update_train_phase(
+            train_state_path(paths.train_runs_dir, train_id), "deploying",
+        )
+
         # Step: deploy poll
         deploy_interval = args.deploy_poll_interval or DEPLOY_DEFAULT_INTERVAL
         deploy_cap = args.deploy_cap or DEPLOY_DEFAULT_CAP
@@ -759,7 +869,30 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
             deploy_interval, deploy_cap,
         )
         record["deploy_url"] = deploy_url
+        if deploy_verdict == "timeout":
+            # v0.18.0+ — deploy timeout is ambiguous (the deploy may still
+            # complete after our cap). Route to paused rather than running
+            # the revert; the founder can check the deploy URL + resume
+            # if it completed, or abort if it genuinely failed.
+            hint = (
+                f"Deploy poll timed out after {deploy_cap}s. The deploy may "
+                f"still be in progress. Check {deploy_url} for the current "
+                f"status. If completed: `wpx-train resume {train_id}` (v0.19.0+) "
+                f"will continue to verify. If it failed: `wpx-train abort "
+                f"{train_id}` to run the ADR-212 revert. Or raise --deploy-cap "
+                f"and re-run via the manual `wpx-train run --strict-ci` "
+                f"escape hatch."
+            )
+            record["bundle"] = bundle
+            _pause_train_state(
+                paths=paths, train_id=train_id, record=record,
+                pause_reason=f"deploy poll timeout after {deploy_cap}s",
+                recovery_hint=hint, bundle=bundle,
+            )
         if deploy_verdict != "green":
+            # Explicit deploy failure (workflow conclusion = failure /
+            # cancelled / etc.) — production verdict is bad; run the
+            # existing ADR-212 revert path.
             _handle_post_merge_failure(
                 record=record, bundle=bundle,
                 reason=f"deploy {deploy_verdict}",
@@ -767,6 +900,11 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
                 train_id=train_id,
                 failure_text=f"Deploy workflow result: {deploy_verdict}",
             )
+
+        # Phase transition: deploying → verifying
+        update_train_phase(
+            train_state_path(paths.train_runs_dir, train_id), "verifying",
+        )
 
         # Step: health check (optional — only if staging URL provided)
         if args.staging_url:
@@ -802,10 +940,16 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
         else:
             record["smoke_verdict"] = "skipped (no --smoke-cmd)"
 
-        # Train complete — write record + emit success
+        # Phase transition: verifying → success (terminal)
+        update_train_phase(
+            train_state_path(paths.train_runs_dir, train_id), "success",
+        )
+
+        # Train complete — write record + cleanup state file + emit success
         record["outcome"] = "success"
         record["completed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
+        cleanup_train_state(paths.train_runs_dir, train_id)
         emit_result({
             "train_id": train_id,
             "outcome": "success",
