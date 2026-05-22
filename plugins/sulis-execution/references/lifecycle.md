@@ -146,12 +146,42 @@ worktree removal (Step 12) bracket the per-executor isolation.
 
 ---
 
+## Bookkeeping: MCP tools (default, v0.15.0+) vs Bash CLI (fallback)
+
+The sulis-execution plugin (v0.15.0+) auto-loads an MCP server
+(`sulis-execution-mcp`) that exposes all 38 wpx operations as typed
+MCP tools — addressable as `mcp__sulis-execution-mcp__<tool_name>`.
+The skills use these MCP tools by default for short-running operations
+(status, list_ready, queue_list, flip_status, blocker.write,
+journal.read, etc.).
+
+**Long-running operations stay as Bash invocations** because MCP tool
+calls are synchronous and don't have an equivalent to Bash's
+`run_in_background: true` with a 90-min cap:
+
+| Operation | Path | Why |
+|---|---|---|
+| `pipeline.run` (Steps 8-10 for one WP) | Bash `wpx-pipeline run` with `run_in_background: true` | 15-45 min wall time; needs to return control to the session immediately and notify on completion |
+| `train.run` (Steps 8-10 for a batch) | Bash `wpx-train run` with `run_in_background: true` | Same — 20-60 min wall time |
+| Everything else (status, flips, journal writes, blocker writes, findings, lifecycle.complete, etc.) | MCP tool call | Subseconds to seconds; fits the synchronous tool-call shape |
+
+If the plugin is loaded but the MCP server didn't start (the
+`sulis-execution-mcp` Python package isn't installed), the skills fall
+back to direct Bash invocation against the same wpx-* binaries. The
+fallback paths produce identical results — same wire format, same
+exit codes — and the skill markdown documents the fallback after each
+MCP-tool reference.
+
+A future v0.3.0 of the SDK could add MCP progress notifications to
+support long-running ops natively; until then the split above stands.
+
 ## Bookkeeping via wpx-* tools (MUST — v0.9.0 commit 1.24b+)
 
 **Every bookkeeping operation in this lifecycle goes through a
 `wpx-*` CLI tool, not direct file edits or raw git commands.** The
 tools live inside the plugin's `scripts/` directory and are invoked
-via Bash. They are deterministic and cannot format-drift. The
+via MCP (preferred, v0.15.0+) or Bash (fallback / long-running ops).
+They are deterministic and cannot format-drift. The
 detailed per-step recipes below ("Worktree creation", "Pre-flight
 tooling check", etc.) describe the *intent* of each step; the
 *mechanism* is always a `wpx-*` invocation. Where this reference

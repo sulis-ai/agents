@@ -53,22 +53,30 @@ Train state:                   ← v0.11.0+
   Last train run: <path or "none yet">.
 ```
 
-For the **Queued for train** + **Train state** sections, invoke
-`"$WPX_DIR/wpx-train" status --project <slug> --repo <org/repo>` and
-parse the JSON. Render the `eligible_count`, `eligible_wps`, and
-`trigger_state` directly.
+For the **Queued for train** + **Train state** sections, invoke the
+MCP tool `mcp__sulis-execution-mcp__train_status` with `project: <slug>`
+and `repo: <org/repo>`. The result is a typed `TrainStatusResult` —
+read `eligible_count`, `eligible_wps`, and `trigger_state` directly.
+
+> **Fallback (no MCP):** if the sulis-execution-mcp server isn't
+> available in this session (e.g. the plugin isn't installed; running
+> against a bare checkout), fall back to
+> `"$WPX_DIR/wpx-train" status --project <slug> --repo <org/repo>` and
+> parse the JSON. Same result shape; just unwrap from the
+> `{"ok": true, "data": {...}}` envelope.
 
 ### Change context (CW-04, v0.12.0+)
 
 When run from inside a change worktree, prepend a "Change" section
 to the status output. Detect via `git branch --show-current`; if it
-starts with `change/`, run:
+starts with `change/`, invoke the MCP tool
+`mcp__sulis-execution-mcp__change_status` with `slug: <slug>` and
+`primitive: <primitive>`.
 
-```bash
-"$WPX_DIR/sulis-change" status --slug <slug> --primitive <primitive>
-```
+> **Fallback (no MCP):** `"$WPX_DIR/sulis-change" status --slug <slug>
+> --primitive <primitive>` produces the same shape.
 
-and render:
+Then render:
 
 ```
 Change: change/{primitive}-{slug}

@@ -237,10 +237,12 @@ loop:
 
    11. For each returned executor, classify the outcome by reading
        the journal at .architecture/{project}/work-packages/
-       .executor-WP-NNN.md via:
+       .executor-WP-NNN.md. Use the MCP tool
+       `mcp__sulis-execution-mcp__journal_read` with
+       `wp: WP-NNN, project: <slug>, field: step-7-status`.
 
-           wpx-journal read --wp WP-NNN --project <slug> \
-             --field step-7-status
+       (Fallback if the MCP server isn't loaded:
+       `wpx-journal read --wp WP-NNN --project <slug> --field step-7-status`.)
 
        Three branches:
 
@@ -250,15 +252,17 @@ loop:
 
        (b) **BLOCKER written** (BLOCKER-WP-NNN.md exists at
            .architecture/{project}/work-packages/) — surface its
-           plain-English summary; flip INDEX to blocked:
+           plain-English summary; flip INDEX to blocked via MCP tool
+           `mcp__sulis-execution-mcp__index_flip_status` with
+           `wp: WP-NNN, project: <slug>, to: blocked, expected: in_progress`.
 
-               wpx-index flip-status --wp WP-NNN --project <slug> \
-                 --to blocked --expected in_progress
+           Then propagate dependency_blocked to descendants via MCP
+           tool `mcp__sulis-execution-mcp__index_mark_downstream_blocked`
+           with `wp: WP-NNN, project: <slug>`.
 
-           Then propagate dependency_blocked to descendants:
-
-               wpx-index propagate-blocked --wp WP-NNN \
-                 --project <slug>
+           (Fallbacks if MCP unavailable:
+           `wpx-index flip-status --wp ... --to blocked --expected in_progress`,
+           then `wpx-index propagate-blocked --wp ...` — same wire format.)
 
            Skip Steps 8-12. Continue to next WP in the loop.
 

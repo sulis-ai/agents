@@ -154,11 +154,11 @@ and WP title. The `subagent_type` value is **exactly**
 ### Step 1 — Classify the executor's outcome
 
 When the executor returns, read its journal to determine the
-outcome:
+outcome using the MCP tool `mcp__sulis-execution-mcp__journal_read`
+with `wp: WP-NNN, project: <slug>, field: step-7-status`.
 
-```bash
-wpx-journal read --wp WP-NNN --project <slug> --field step-7-status
-```
+> Fallback (no MCP):
+> `wpx-journal read --wp WP-NNN --project <slug> --field step-7-status`
 
 Three branches:
 
@@ -166,12 +166,15 @@ Three branches:
 
 **(b) BLOCKER written** (BLOCKER-WP-NNN.md exists at
 `.architecture/{project}/work-packages/`) — surface its plain-English
-summary; flip INDEX to blocked; exit.
+summary; flip INDEX to blocked via MCP tool
+`mcp__sulis-execution-mcp__index_flip_status` with
+`wp: WP-NNN, project: <slug>, to: blocked, expected: in_progress`; exit.
 
-```bash
-wpx-index flip-status --wp WP-NNN --project <slug> \
-  --to blocked --expected in_progress
-```
+> Fallback (no MCP):
+> ```bash
+> wpx-index flip-status --wp WP-NNN --project <slug> \
+>   --to blocked --expected in_progress
+> ```
 
 **(c) Step 7 NOT complete AND no BLOCKER** — classify as "error".
 Optionally read the journal's plan to determine where the executor
@@ -197,13 +200,17 @@ and report back. The next `wpx-train run` invocation (typically fired
 by `/sulis-execution:run-all` at the end of its parallel batch) picks
 this WP up along with any other ready WPs.
 
-```bash
-"$WPX_DIR/wpx-index" flip-status \
-  --wp WP-NNN \
-  --project <slug> \
-  --to step-7-complete \
-  --expected in_progress
-```
+Use the MCP tool `mcp__sulis-execution-mcp__index_flip_status` with
+`wp: WP-NNN, project: <slug>, to: step-7-complete, expected: in_progress`.
+
+> Fallback (no MCP):
+> ```bash
+> "$WPX_DIR/wpx-index" flip-status \
+>   --wp WP-NNN \
+>   --project <slug> \
+>   --to step-7-complete \
+>   --expected in_progress
+> ```
 
 Then report to the calling session in plain English:
 
