@@ -88,6 +88,7 @@ from _wpxlib import (  # noqa: E402
     parse_index_md,
     paths_from_args,
     read_overrides,
+    PatchesAlreadyAppliedError,
     rebase_branch_in_clone,
     restore_branch_with_guard,
     revert_train_on_dev,
@@ -492,7 +493,62 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
                 continue
             _log(f"Rebasing {e.branch} onto {onto_sha[:8]} (pre={pre_train_sha[:8]})")
             try:
-                rebased_sha = rebase_branch_in_clone(clone_dir, e.branch, onto_sha)
+                rebased_sha = rebase_branch_in_clone(
+                    clone_dir, e.branch, onto_sha, base_branch=base_branch,
+                )
+            except PatchesAlreadyAppliedError as exc:
+                # v0.15.3 — branch's patches already in base history (typically
+                # post-revert). Emit a specific BLOCKER with the manual git
+                # revert command so the founder can recover deterministically.
+                _log(f"PATCHES ALREADY APPLIED: {e.branch} → {exc}")
+                flip_ok, flip_err = flip_index_status_via_cli(
+                    _SCRIPTS_DIR, paths, e.wp, TRAIN_BLOCKED_STATUS,
+                )
+                applied_short = ", ".join(s[:8] for s in exc.applied_shas)
+                blocker_ok, blocker_err = write_wp_blocker_via_cli(
+                    _SCRIPTS_DIR, paths, e.wp,
+                    title=f"Patches already in {exc.base_branch} during {train_id}",
+                    observation=(
+                        f"git cherry shows {len(exc.applied_shas)} of this "
+                        f"WP's commits are already present in "
+                        f"origin/{exc.base_branch}: {applied_short}. "
+                        f"git rebase would silently drop them; GitHub's merge "
+                        f"endpoint would then return 204 No Content."
+                    ),
+                    root_cause=(
+                        "An earlier train likely shipped this WP, then "
+                        "reverted (via _handle_post_merge_failure or a manual "
+                        "revert commit). The revert neutralised the content "
+                        "but the original squash-merge commits remain in "
+                        f"{exc.base_branch}'s graph. Re-shipping the branch "
+                        "as-is is impossible without first restoring the "
+                        "content."
+                    ),
+                    plain_english=(
+                        "This work's changes are already in the codebase's "
+                        "history — likely from an earlier shipment that was "
+                        "reverted. Trying to ship it again now would silently "
+                        "skip it. To recover, find the revert commit on "
+                        f"{exc.base_branch} and revert THAT (which brings the "
+                        "content back); then mark this WP done directly."
+                    ),
+                    suggested_next=(
+                        f"On {exc.base_branch}: identify the revert commit "
+                        f"(e.g. `git log --oneline {exc.base_branch} | grep "
+                        f"-i Revert`); run `git revert -m 1 <revert_sha>` "
+                        "to restore the content; push; then flip this WP "
+                        "to done via `wpx-index flip-status --to done "
+                        "--expected step-7-complete`."
+                    ),
+                )
+                rebase_failures.append({
+                    "wp": e.wp,
+                    "branch": e.branch,
+                    "reason": "patches_already_applied",
+                    "applied_shas": exc.applied_shas,
+                    "index_flipped": flip_ok,
+                })
+                continue
             except RuntimeError as exc:
                 _log(f"REBASE CONFLICT: {e.branch} → {exc}")
                 # Flip INDEX status; write per-WP BLOCKER; continue

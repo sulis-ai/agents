@@ -1321,18 +1321,93 @@ def clone_repo_to_temp(repo: str, dest: Path) -> None:
         raise RuntimeError(f"clone failed for {repo}: {err}")
 
 
+class PatchesAlreadyAppliedError(RuntimeError):
+    """Raised when a feature branch's patches are already in the base
+    branch's history.
+
+    Typically happens after an earlier train merged the branch and was
+    then reverted: the revert commit neutralises the content but the
+    original squash commits remain in the graph with their patch-ids
+    intact. `git rebase` would silently drop the already-applied
+    patches, leaving the branch HEAD equal to base HEAD; GitHub's
+    `/merges` endpoint would then return 204 No Content; the train
+    fails opaquely.
+
+    Detect this case BEFORE rebase so we can emit a useful BLOCKER with
+    the manual recovery command instead of a confusing late-failure.
+
+    Subclasses RuntimeError so existing rebase-failure handling still
+    catches it; callers that want to handle this case specifically can
+    `except PatchesAlreadyAppliedError`.
+    """
+
+    def __init__(
+        self, branch: str, base_branch: str, applied_shas: list[str]
+    ) -> None:
+        self.branch = branch
+        self.base_branch = base_branch
+        self.applied_shas = applied_shas
+        super().__init__(
+            f"{len(applied_shas)} patch(es) from {branch} are already in "
+            f"{base_branch}'s history; rebase would drop them. SHAs: "
+            f"{', '.join(sha[:8] for sha in applied_shas)}"
+        )
+
+
+def detect_already_applied_patches(
+    clone_dir: Path, base_branch: str, feature_branch: str,
+) -> list[str]:
+    """Return commit SHAs from `feature_branch` whose patch-ids are
+    already present in `base_branch`'s history.
+
+    Uses `git cherry origin/<base> origin/<feature>`. Output lines:
+      `+ <sha>` → patch NOT yet in base (would land cleanly via rebase)
+      `- <sha>` → patch ALREADY in base (would be dropped silently)
+
+    Empty result list means it's safe to rebase. Non-empty means the
+    caller must decide what to do (typically: emit a BLOCKER with
+    manual revert-the-revert instructions).
+
+    Assumes `origin/<base>` and `origin/<feature>` are present in
+    `clone_dir` (caller has already fetched).
+    """
+    rc, out, err = _run(
+        ["git", "cherry",
+         f"origin/{base_branch}",
+         f"origin/{feature_branch}"],
+        cwd=clone_dir, timeout=30,
+    )
+    if rc != 0:
+        raise RuntimeError(f"git cherry failed: {err}")
+    applied: list[str] = []
+    for line in out.strip().splitlines():
+        line = line.strip()
+        if line.startswith("- "):
+            sha = line[2:].strip()
+            if sha:
+                applied.append(sha)
+    return applied
+
+
 def rebase_branch_in_clone(
     clone_dir: Path,
     branch: str,
     onto: str,
+    base_branch: str = "dev",
 ) -> str:
     """Within an existing clone: fetch, checkout, rebase, push --force-with-lease.
 
     `onto` is a SHA or ref the branch should be rebased on top of.
+    `base_branch` is the merge target (default "dev"; pass the change
+    branch name when training inside a change worktree). Used for the
+    patch-id-already-applied detection before rebase.
+
     Returns the new HEAD SHA after rebase + push.
 
-    Raises RuntimeError on rebase conflict; the caller (Phase 3) catches
-    this and removes the offending WP from the batch.
+    Raises:
+        PatchesAlreadyAppliedError: branch's patches are already in
+            base_branch's history (typically post-revert).
+        RuntimeError: any other rebase conflict.
     """
     # Fetch latest of both. Use explicit refspec for the branch so the
     # remote-tracking ref refs/remotes/origin/<branch> is created even
@@ -1347,10 +1422,26 @@ def rebase_branch_in_clone(
     if rc != 0:
         raise RuntimeError(f"git fetch {branch} failed: {err}")
     rc, _, err = _run(["git", "fetch", "origin",
-                       "dev:refs/remotes/origin/dev"],
+                       f"{base_branch}:refs/remotes/origin/{base_branch}"],
                      cwd=clone_dir, timeout=60)
     if rc != 0:
-        raise RuntimeError(f"git fetch dev failed: {err}")
+        raise RuntimeError(f"git fetch {base_branch} failed: {err}")
+
+    # v0.15.3 — patch-id-already-applied detection. If any of this
+    # branch's patches are already in base_branch's history (typically
+    # because an earlier train merged it and was reverted), bail out
+    # with a specific exception so the caller can emit a useful
+    # BLOCKER instead of failing opaquely later (rebase would drop
+    # the patches → empty branch → GitHub merge returns 204).
+    already_applied = detect_already_applied_patches(
+        clone_dir, base_branch, branch,
+    )
+    if already_applied:
+        raise PatchesAlreadyAppliedError(
+            branch=branch,
+            base_branch=base_branch,
+            applied_shas=already_applied,
+        )
 
     # Capture the pre-rebase SHA so we can use --force-with-lease with
     # an explicit expected value (safer than plain --force; also works
