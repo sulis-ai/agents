@@ -31,14 +31,24 @@ executor dispatch and train-based integration:
   skill polls `wpx-train queue-list` and fires `wpx-train run` if
   the trigger is met. The train batches up to 5 WPs into one rebase
   + bundled-tip CI + sequential merge + deploy + health + smoke.
-- **Per-batch (Step 11, in the calling session):** after `wpx-train
-  run` returns `outcome: success`, the calling session iterates over
-  the batch's `wps_shipped` and dispatches the `sulis-security:
-  security-reviewer` Agent per WP. Findings register; non-duplicate
-  findings auto-draft remediation WPs (`WP-AUTO-*`). CRITICAL
-  findings BLOCKER + `step-11-blocked`. The distributed loop
-  terminates when a subsequent train's Step 11 produces zero NEW
-  findings (signature-hash dedup ensures convergence).
+- **Per-batch (Step 10.5, in the calling session, v0.21.1+):** after
+  `wpx-train run` returns `outcome: success`, the calling session
+  dispatches `/sea:code-review` against the BATCH DIFF RANGE
+  (`<first WP's pre_train_sha>..<last WP's merge_sha_on_dev>`).
+  Catches cross-WP composition issues — N+1 across sibling WPs,
+  integration regressions, contract drift between interdependent
+  WPs. Findings auto-draft remediation WPs (`WP-AUTO-*`); CRITICAL
+  findings BLOCKER batch-wide. **Note:** this is post-merge — it
+  catches + remediates but doesn't pre-merge-gate; the pre-merge
+  variant is deferred future work.
+- **Per-batch (Step 11, in the calling session):** after Step 10.5,
+  the calling session iterates over the batch's `wps_shipped` and
+  dispatches the `sulis-security:security-reviewer` Agent per WP.
+  Findings register; non-duplicate findings auto-draft remediation
+  WPs (`WP-AUTO-*`). CRITICAL findings BLOCKER + `step-11-blocked`.
+  The distributed loop terminates when a subsequent train's Step 11
+  produces zero NEW findings (signature-hash dedup ensures
+  convergence).
 - **Per-WP again (Step 12):** worktree cleanup + INDEX flip from
   `step-7-complete` → `done`. Owned by the WP's executor return
   contract; documented in lifecycle.md.
@@ -352,7 +362,119 @@ loop:
        fallback documentation. **Do not invoke this in v0.11.0+ —
        wpx-train is the path.**
 
-   13. **Step 11 (per-batch, v0.20.0+): post-deploy security review
+   13. **Step 10.5 (per-batch, v0.21.1+): bundled-tip code-review
+       for cross-WP composition issues.**
+
+       After `wpx-train run` returns `outcome: success`, but BEFORE
+       Step 11, review the composition of all WPs in the batch via
+       `/sea:code-review` against the batch's diff range on the base
+       branch. This catches issues only visible when WPs compose:
+       N+1 queries across sibling WPs, integration regressions,
+       contract drift between interdependent WPs.
+
+       Dispatch ONLY when `outcome: "success"`. If `outcome` is
+       `not_triggered`, `paused`, `failed`, or `blocker`, **skip Step 10.5**
+       — the train's own recovery flow owns those states.
+
+       Capture the batch diff range from the train state YAML:
+
+           BATCH_START_SHA=$(jq -r '.data.result.bundle[0].pre_train_sha' \
+             /tmp/train-result.json)
+           BATCH_END_SHA=$(jq -r '.data.result.final_merge_sha' \
+             /tmp/train-result.json)
+
+           # Diff range: from "just before the train started" to
+           # "after the last squash-merge lands".
+           # Equivalent: <BATCH_START_SHA>..<BATCH_END_SHA> on the base branch.
+
+       Invoke `/sea:code-review` against the range:
+
+           /code-review "${BATCH_START_SHA}..${BATCH_END_SHA}" <project>
+
+       The skill writes its bundle to:
+           .architecture/<project>/code-reviews/PR-<range-or-hash>-<TS>/
+             REVIEW.md
+             signals.json
+             tool-outputs/
+
+       Capture the bundle path:
+
+           BUNDLE_DIR=$(ls -td .architecture/<project>/code-reviews/PR-*-*/ \
+             | head -1)
+
+       Parse `signals.json`. For each finding (mirroring Step 11's
+       loop pattern):
+
+       - **CRITICAL** → write a BLOCKER for the batch; SKIP Step 12
+         for the affected WPs; founder responds via remediation WPs
+         that ship in the next train:
+
+             "$WPX_DIR/wpx-blocker" write \
+               --wp <project>-train-<train_id> --project <project> \
+               --title "Step 10.5 CRITICAL composition finding" \
+               --step "Step 10.5 (bundled-tip code-review)" \
+               --trigger "step-10.5-critical" \
+               --observation "<finding summary>" \
+               --root-cause "Cross-WP composition issue surfaced by /sea:code-review against batch diff <range>" \
+               --scope in-scope \
+               --suggested-next "Founder review; auto-drafted remediation WPs ship in next train cycle"
+
+       - **CONCERN or ADVISORY** → register the finding (signature-hash
+         dedup automatic); if not a duplicate, auto-draft a follow-up
+         WP and register it in INDEX:
+
+             # 1. Register
+             "$WPX_DIR/wpx-findings" register \
+               --wp <project>-train-<train_id> --project <project> \
+               --severity <CONCERN|ADVISORY> \
+               --summary "<one-line>" \
+               --file <path> \
+               --evidence-json @/tmp/finding-N.json \
+               --suggested-fix "<suggested fix>" \
+               --primitive <CR-NN code>
+
+             # 2. Auto-draft (only if is_duplicate == false)
+             "$WPX_DIR/wpx-findings" auto-draft-wp --project <project> \
+               --source-finding <SF-NNN> \
+               --source-wp <project>-train-<train_id> \
+               --auto-wp-id <WP-AUTO-NNN from register output> \
+               --primitive Refactor \
+               --severity <CONCERN|ADVISORY>
+
+             # 3. Register in INDEX
+             "$WPX_DIR/wpx-index" add-wp \
+               --wp WP-AUTO-NNN --project <project> --from-wp-file
+
+       Record the verdict in the journal:
+
+           "$WPX_DIR/wpx-journal" record-step \
+             --wp <project>-train-<train_id> --project <project> \
+             --step 10.5 \
+             --outcome "addressed: <K_total> findings (<K_critical> CRITICAL, <K_concern> CONCERN, <K_advisory> ADVISORY); bundle=<BUNDLE_DIR>"
+
+       Emit a plain-English summary, then proceed to Step 11 (security
+       review per-WP — same batch, complementary perspective):
+
+           "Step 10.5 complete for train <train_id>.
+            Bundled-tip code-review against <range>.
+            <K_total> findings (<K_critical> CRITICAL → BLOCKER;
+             <K_new_drafts> CONCERN/ADVISORY → WP-AUTO-* drafted;
+             <K_duplicates> duplicates skipped).
+            Founder: review the drafted WPs in INDEX; promote to
+            `pending` for the next train cycle. The next train's
+            Step 10.5 will re-review the new bundled-tip — this is
+            the loop-until-clean closure (the distributed loop
+            terminates when an iteration produces zero NEW findings)."
+
+       **Honesty about this post-merge variant:** Step 10.5 catches
+       cross-WP findings AFTER merges land — it doesn't pre-merge-gate
+       them. CRITICAL findings result in BLOCKER + remediation-WP
+       cycle, not in a halt of the deploy. The TRUE pre-merge gate
+       (cmd_run pause/resume; v0.16.1 deferred design) is still
+       future work; this commit ships the visibility + remediation
+       loop without that refactor.
+
+   14. **Step 11 (per-batch, v0.20.0+): post-deploy security review
        for every WP shipped by the train.**
 
        Read the train's JSON envelope (the `/tmp/train-result.json`

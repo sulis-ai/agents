@@ -1921,6 +1921,7 @@ def render_train_state_plain_english(state: dict) -> str:
         "pending": "Selected the bundle of work; about to start rebasing.",
         "rebasing": "Rebasing the feature branches onto each other in a temp clone.",
         "ci_running": "Waiting for the bundled-tip CI to come back.",
+        "code_review": "Bundled-tip CI passed; waiting on Step 10.5 code-review against the composition. The calling session dispatches /sea:code-review; on PASS the train resumes to merging.",
         "merging": "Squash-merging each branch to the base in order.",
         "deploying": "Waiting for the deploy workflow to complete.",
         "verifying": "Running health + smoke checks against the deploy.",

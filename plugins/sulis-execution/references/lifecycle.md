@@ -20,7 +20,7 @@ trigger.
 | 8 | CI poll + rebase + squash-merge | **v0.11.0+:** `wpx-train` (per-batch). **--force-single / hotfix:** `wpx-pipeline` (per-WP). |
 | 9 | Deploy poll | **v0.11.0+:** `wpx-train` (per-batch — ONE deploy per train). **--force-single:** `wpx-pipeline`. |
 | 10 | Health + smoke | **v0.11.0+:** `wpx-train` (per-batch — ONE health+smoke per train). **--force-single:** `wpx-pipeline`. |
-| 10.5 | **Train-batch code-review gate (DEFERRED — design only)** | Calling session — see "Step 10.5 (deferred)" below |
+| 10.5 | **Train-batch code-review (IMPLEMENTED v0.21.1+ as post-merge variant)** | Calling session (`/sea:code-review` against the batch diff range `<bundle[0].pre_train_sha>..<bundle[-1].merge_sha_on_dev>` after `wpx-train run` returns success). Catches cross-WP composition issues (N+1 across siblings, integration regressions). CRITICAL → BLOCKER batch-wide + auto-draft remediation WPs; CONCERN/ADVISORY → SF registered + WP-AUTO-* auto-drafted. The TRUE pre-merge gate (cmd_run pause/resume) is still deferred — see "Step 10.5 (post-merge variant)" below. |
 | 11 | Security review (post-deploy verification) | Calling session (`Agent({subagent_type: "sulis-security:security-reviewer"})` + `wpx-findings register`) — runs **per-WP sequentially after `wpx-train run` returns outcome=success**. Dispatched by the run-all skill (v0.20.0+), one WP at a time over the batch's `wps_shipped`. CRITICAL → BLOCKER + `step-11-blocked` + Step 12 skipped for that WP; CONCERN/ADVISORY → SF registered + WP-AUTO-* auto-drafted. The loop is **distributed across trains** — terminates when a subsequent train's Step 11 produces zero NEW (non-duplicate) findings. |
 | 12 | INDEX flip + acceptance evidence + worktree removal | Calling session (`wpx-step12 wrap`) — flips `step-7-complete` → `done` after train succeeds |
 
@@ -1573,61 +1573,51 @@ to catch any security/quality regression before final mark-done.
 
 ---
 
-## Step 10.5 — Train-batch code-review gate (DEFERRED — design captured here)
+## Step 10.5 — Train-batch code-review (IMPLEMENTED v0.21.1; post-merge variant)
 
-**Status:** Design committed; implementation deferred to a follow-on
-release. Currently NOT enforced by `wpx-train`.
+**Status:** Post-merge variant IMPLEMENTED in v0.21.1; pre-merge gate variant still DEFERRED.
 
-**Design intent.** Between bundled-tip CI passing (Step 8 boundary)
-and sequential squash-merges (start of Step 9), the train pauses
-while the calling session runs `/code-review` against the
-bundled-tip diff. This is the COMPOSITION gate that mirrors Step 6.5
-(per-WP gate, before push). Step 6.5 catches what's wrong INSIDE one
-WP; Step 10.5 catches what's wrong in the COMPOSITION of multiple
-WPs (e.g., WP-A adds `get_user(id)`; WP-B adds a loop calling it →
-N+1 query at runtime that neither WP saw in isolation).
+**What ships (v0.21.1 post-merge).** After `wpx-train run` returns
+`outcome: success`, the `run-all` skill dispatches `/sea:code-review`
+against the batch's diff range (`<bundle[0].pre_train_sha>..<bundle[-1].merge_sha_on_dev>` on the base branch). Findings are registered
+via `wpx-findings`; CONCERN/ADVISORY auto-draft remediation WPs;
+CRITICAL writes a BLOCKER + auto-draft. The loop is **distributed
+across trains** — next train's Step 10.5 reviews its new bundled-tip
+diff; the dedupe in `wpx-findings register` ensures convergence;
+loop terminates when an iteration produces zero NEW findings.
 
-**Why deferred.** Requires splitting `wpx-train run` into two phases
-so the calling session can pause between bundled-tip CI and merge.
-Per the v0.9.0 contract, `wpx-train` (Python CLI) cannot spawn LLM
-subagents; the calling session must orchestrate the gate. The split
-involves: extracting Phase 1-4 (eligibility + rebase + CI) into a
-new `cmd_rebase_and_ci` command; extracting Phase 5-7 (merge +
-deploy + health/smoke) into `cmd_continue_merge_and_deploy
---train-id <id>`; adding `cmd_abort_pre_merge --train-id <id>` for
-gate-block recovery; keeping `cmd_run` as a deprecated compat
-wrapper. State persists between phases via `train-runs/{train_id}.yaml`.
+**Cross-WP composition rationale.** Step 6.5 (per-WP code-review) catches
+defects INSIDE one WP. Step 10.5 catches what's wrong in the
+COMPOSITION of multiple WPs (e.g., WP-A adds `get_user(id)`; WP-B
+adds a loop calling it → N+1 query at runtime that neither WP saw
+in isolation; contract drift between interdependent WPs;
+integration regressions).
 
-This refactor is substantial (cmd_run is ~300 lines with many error
-paths) and warrants a focused session with real-fixture integration
-testing rather than a rushed final commit. Rather than risk shipping
-a half-broken train flow, it's tracked as a real follow-on.
+**Honest limitation (post-merge variant).** Step 10.5 in this form
+catches + remediates cross-WP findings but doesn't GATE the merges
+— they've already happened by the time `/code-review` runs. If a
+CRITICAL composition issue is found, the merges stay on dev; the
+founder responds via remediation WPs that ship in the next train
+cycle. This is the same shape as Step 11 (post-deploy security
+review) and inherits the same trade-off: visibility + remediation
+loop, no pre-merge halt.
 
-**Workflow when implemented.** Calling session (`run-all` skill):
-
-```
-1. wpx-train rebase-and-ci → {train_id, bundled_tip_branch, bundled_tip_sha}
-2. /code-review <bundled_tip_branch> <project>
-3. Read verdict + findings list
-4. If findings remain unaddressed (mirror Step 6.5 binary verdict):
-     wpx-train abort-pre-merge --train-id <id>
-     # → restores branches to pre-rebase SHAs; flips WPs to step-7-held
-5. If addressed (zero findings, or all auto-drafted, or exception):
-     wpx-train continue-merge-and-deploy --train-id <id>
-     # → Phases 5-7 as today
-```
-
-**Why it matters.** Without Step 10.5, cross-WP composition issues
-(N+1 queries, contract drift between sibling WPs, integration
-regressions) only surface after deploy. The bundled-tip CI catches
-correctness regressions (tests fail) but not design or performance
-issues that a human-shape review catches.
+**Pre-merge gate (still DEFERRED).** A true pre-merge Step 10.5 — the
+v0.16.1 design — would pause the train between bundled-tip CI passing
+and the merge loop; the calling session runs `/code-review` against
+the bundled-tip; on PASS the train resumes to merging; on CRITICAL
+the train aborts. This requires splitting `cmd_run` into
+`cmd_rebase_and_ci` / `cmd_continue_merge_and_deploy` /
+`cmd_abort_pre_merge` and ~300 lines of integration testing.
+Tracked as future work — to be scheduled when the post-merge variant
+proves insufficient in practice.
 
 **Companion gate at Step 6.5.** Step 6.5 (per-WP code-review, executor
-layer) is shipped and enforced in v0.16.0. It catches per-WP defects
-before push. Step 10.5 is the COMPOSITION analog at the train layer
-and shouldn't be skipped permanently. Tracked for a near-term
-follow-on once the wpx-train split is appropriately scoped.
+layer) is enforced since v0.16.0 (hardened with bundle-path verification
+in v0.20.1). The combination of Step 6.5 (per-WP forward gate),
+Step 10.5 (cross-WP post-merge review), Step 11 (per-WP post-deploy
+security review), `backfill-code-review` (historical recovery), and
+`backfill-gates` (security backfill) covers the gate surface holistically.
 
 ---
 
