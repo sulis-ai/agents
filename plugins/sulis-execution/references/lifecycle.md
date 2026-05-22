@@ -15,6 +15,7 @@ trigger.
 | 4 | BLUE — refactor | Executor |
 | 5 | Docs | Executor |
 | 6 | Lint / type / format | Executor |
+| 6.5 | **Code-review gate (v0.16.0+)** | Executor — runs `/code-review` against local diff; every finding must be addressed (inline fix / auto-drafted remediation WP / founder-flagged exception) before Step 7 |
 | 7 | Commit + push | Executor |
 | 8 | CI poll + rebase + squash-merge | **v0.11.0+:** `wpx-train` (per-batch). **--force-single / hotfix:** `wpx-pipeline` (per-WP). |
 | 9 | Deploy poll | **v0.11.0+:** `wpx-train` (per-batch — ONE deploy per train). **--force-single:** `wpx-pipeline`. |
@@ -867,6 +868,59 @@ not the executor's to fix.
 
 **Budget:** 5 attempts per `self-heal-budget.md`. Lint is the most
 auto-fixable category and warrants the highest budget.
+
+---
+
+## Step 6.5 — Code-review gate (MUST — v0.16.0+)
+
+**Input:** Step 6 complete (lint, type, format all green); WP branch
+has uncommitted changes in the worktree.
+
+**Output:** `/code-review` report at
+`.architecture/{project}/code-reviews/PR-{branch}-{TIMESTAMP}/REVIEW.md`;
+all findings addressed (inline fix, auto-drafted remediation WP, or
+founder-flagged exception); Step 6.5 journal trace complete with
+outcome `addressed: ...`.
+
+**Why this step.** /code-review's quality + architecture lenses
+catch defects that lint + tests don't — design issues, hygiene
+issues, and (per CR-10) performance anti-patterns like N+1 queries.
+Without a gate at the executor layer, those findings surface only
+when /code-review is invoked manually (often after merge, sometimes
+never). Step 6.5 makes the gate mandatory.
+
+**Workflow:** see `agents/executor.md` Step 6.5 section for the full
+detail. Summary:
+
+1. `wpx-journal start-step --step 6.5` (or MCP equivalent)
+2. Invoke `/code-review <branch> <project>` against the local diff
+3. Read every finding from the produced report
+4. For each finding: fix inline → re-run /code-review → loop until
+   zero, OR auto-draft a remediation WP via
+   `findings_draft_remediation`, OR (rare) BLOCKER for founder
+   exception review
+5. When all findings addressed: `wpx-journal complete-step --step 6.5
+   --outcome "addressed: N inline + M remediation + K exceptions"`;
+   proceed to Step 7
+6. If findings remain unresolved: write BLOCKER
+   (trigger=`code-review-unaddressed`); flip INDEX to
+   `step-7-blocked`; **executor exits**
+
+**Budget:** 3 inline-fix iterations max. Each iteration =
+modify-code + re-run /code-review. If 3 iterations don't drive
+findings to zero, escalate via auto-draft remediation OR BLOCKER.
+
+**Companion gate at Step 10.5.** Step 10.5 (train-batch code-review)
+runs against the BUNDLED-tip diff to catch CROSS-WP integration
+issues (e.g., WP-A adds `get_user(id)`; WP-B adds a loop calling
+it → N+1 query at runtime). Step 6.5 catches what's wrong INSIDE
+one WP; Step 10.5 catches what's wrong in COMPOSITION.
+
+**Anti-pattern:** suppressing /code-review findings (changing
+`/code-review` invocation flags to silence specific patterns; deleting
+findings from the report; declaring step-6.5 complete without
+actually addressing them) is FORBIDDEN. Each finding has an
+auditable resolution path; the journal records all three.
 
 ---
 

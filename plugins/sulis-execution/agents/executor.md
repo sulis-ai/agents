@@ -93,6 +93,7 @@ budget per `executor-loop-standard.md`.
 | 4 | BLUE — mandatory refactor | Tests still green after refactor; duplication extracted at 2-consumer threshold; conditional refactor plan items marked `done` or `skipped` with notes |
 | 5 | **Documentation update** | Docs reflect the WP's behaviour change; identified via `docs_to_update` frontmatter OR auto-detected from WP's modified source files; no-op if nothing applies; Step 5 plan items marked `done` |
 | 6 | Lint / type / format | All checks pass; plan items for Step 6 marked `done` |
+| 6.5 | **Code-review gate (NEW, v0.16.0)** | `/code-review` runs against the local diff vs `origin/dev` (or change branch). **Every finding must be addressed before Step 7.** Addressed = inline fix OR auto-drafted remediation WP OR founder-flagged exception (BLOCKER). Binary verdict: addressed (proceed to Step 7) / not-addressed (write BLOCKER + flip INDEX to step-7-blocked + exit). |
 | 7 | Commit (Conventional Commits) + push | Push accepted; remote branch updated; journal Step 7 trace row marked Completed; Step 7 plan items marked `done`; **executor exits** |
 
 **Steps 8-12 are the calling session's responsibility (v0.9.0+).**
@@ -315,6 +316,128 @@ via `wpx-journal read --field plan`. If the plan exists:
 
 If `## Plan` is empty (executor terminated before Step 1.5 completed),
 seed normally.
+
+## Step 6.5 — Code-review gate (MUST — v0.16.0+)
+
+After Step 6 (lint / type / format) passes and before Step 7 (commit
++ push), every WP runs through `/code-review` against its own local
+diff. The gate's contract: **every finding the review surfaces must
+be addressed before step-7-complete.** The executor doesn't get to
+ship a WP knowing there are issues; if issues exist, they're either
+fixed inline, drafted as remediation WPs, or escalated as a BLOCKER
+for founder review.
+
+### Why this step exists
+
+The /code-review skill catches code hygiene + design + performance
+anti-patterns (CR-01..CR-10 in the Code Review Standard). Without
+this step, those findings only surface when /code-review is invoked
+manually — typically after merge, sometimes never. Adding the gate
+at the executor layer means every WP is reviewed before it's
+visible to the train.
+
+The companion gate at the train (Step 10.5 — bundled-tip review)
+catches CROSS-WP integration issues that no per-WP review can see
+(e.g., WP-A adds `get_user(id)`; WP-B adds a loop calling it →
+N+1 query). Step 6.5 catches what's wrong INSIDE one WP; Step 10.5
+catches what's wrong in the COMPOSITION.
+
+### Workflow
+
+After Step 6 marks complete:
+
+```bash
+# 6.5.a — Mark step started
+wpx-journal start-step --wp WP-NNN --project <slug> --step 6.5
+
+# 6.5.b — Invoke /code-review against the local branch's diff
+# The skill produces a report at:
+#   .architecture/{project}/code-reviews/PR-{branch-or-sha}-{TIMESTAMP}/REVIEW.md
+/code-review feat/wp-NNN-<slug> <project-name>
+
+# 6.5.c — Read the report's findings list
+# Each finding has: severity, file:line, evidence (quoted text),
+# recommendation, rule cite (CR-NN or CR-10 pattern #N)
+```
+
+### Addressing findings
+
+Every finding must be addressed before Step 7. Three valid paths:
+
+**A. Inline fix** (the default for most findings)
+- Modify the code in the current WP to resolve the finding
+- Re-run `/code-review` on the updated diff
+- Loop until zero findings
+- This is the right path when the fix fits within the WP's scope and
+  is bounded (≤ a few additional lines)
+
+**B. Auto-drafted remediation WP**
+- For findings out-of-scope for the current WP (e.g., a CR-10
+  performance pattern in a file the WP didn't touch but happens to
+  pass through), OR findings whose fix would significantly expand
+  the WP's surface
+- Invoke `mcp__sulis-execution-mcp__findings_draft_remediation`
+  (or Bash fallback: `wpx-findings auto-draft-wp ...`) to create a
+  WP-AUTO-NNN.md file capturing the finding, its location, and the
+  recommended fix
+- The auto-drafted WP enters INDEX with status `auto-draft`; SEA's
+  next planning pass picks it up
+- Record in the journal: "Finding F-NN drafted as WP-AUTO-NNN
+  because <one-line scope reason>"
+
+**C. Founder-flagged exception** (uncommon)
+- For findings that aren't applicable (e.g., a CR-10 pattern with a
+  documented reason it's safe in this specific case — bounded N≤3,
+  upstream invariant, etc.)
+- Write a BLOCKER with `trigger=code-review-exception`, observation
+  citing the finding, and `plain_english` explaining why the
+  exception is appropriate
+- **Do NOT proceed to Step 7.** The founder reviews and either:
+  - Approves the exception (flips INDEX status back to `in_progress`,
+    executor resumes from Step 7) — but Step 6.5 is now `complete`
+    with outcome `exception-granted`
+  - Rejects the exception (the finding must be fixed inline or
+    auto-drafted; executor re-runs Step 6.5)
+
+### Verdict
+
+Binary, deterministic:
+
+| State | Verdict | Outcome |
+|---|---|---|
+| `/code-review` produces zero findings | **addressed** | Mark Step 6.5 complete; proceed to Step 7 |
+| All findings have been resolved (inline) OR drafted (remediation WPs) OR flagged (BLOCKER + founder-approval received) | **addressed** | Mark Step 6.5 complete with outcome detailing the resolution (N inline + M remediation + K exceptions); proceed to Step 7 |
+| At least one finding remains unresolved (budget exhausted, complexity exceeded in-scope, executor unable to determine path) | **not-addressed** | Write BLOCKER (trigger=`code-review-unaddressed`); mark Step 6.5 complete with outcome `blocked: K findings unaddressed`; **flip INDEX status to `step-7-blocked`**; **executor exits** |
+
+### Calls to make
+
+Use the MCP tools if the sulis-execution-mcp server is available
+(check `/mcp` for `sulis-execution-mcp`); fall back to Bash if not.
+
+| Operation | MCP tool | Bash fallback |
+|---|---|---|
+| Start step | `mcp__sulis-execution-mcp__journal_start_step` | `wpx-journal start-step --step 6.5` |
+| Complete step (success) | `mcp__sulis-execution-mcp__journal_complete_step` | `wpx-journal complete-step --step 6.5 --outcome "addressed: ..."` |
+| Auto-draft remediation | `mcp__sulis-execution-mcp__findings_draft_remediation` | `wpx-findings auto-draft-wp ...` |
+| Write BLOCKER | `mcp__sulis-execution-mcp__blocker_write` | `wpx-blocker write --step 6.5 --trigger ...` |
+| Flip INDEX status (on BLOCKER) | `mcp__sulis-execution-mcp__index_flip_status` | `wpx-index flip-status --to step-7-blocked --expected in_progress` |
+
+### Anti-patterns for Step 6.5
+
+The executor MUST NOT:
+
+- **Skip /code-review** because "the WP is small / clean". Even
+  one-line WPs go through the gate; the skill's mechanical baseline
+  (CR-01 typecheck + lint) takes seconds.
+- **Suppress findings without addressing them.** If a CR-10 N+1
+  detection fires, the executor either fixes inline, drafts a
+  remediation, or BLOCKERs with an exception explanation. Silently
+  ignoring is forbidden.
+- **Skip the re-run after inline fixes.** After modifying code to
+  address findings, /code-review must re-run; the executor verifies
+  zero findings remain before proceeding.
+- **Proceed to Step 7 with unaddressed findings.** The whole point
+  of Step 6.5 is the gate; bypassing it defeats the purpose.
 
 ## Bookkeeping via wpx-* tools (MUST — v0.9.0 commit 1.24b+)
 
