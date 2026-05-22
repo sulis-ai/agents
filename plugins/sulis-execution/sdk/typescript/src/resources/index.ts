@@ -5,12 +5,12 @@ import type {
   TransportConfig,
 } from '../transport.js';
 import type {
-  IndexAddWpResult,
+  IndexAddResult,
   IndexFlipStatusResult,
   IndexListReadyResult,
-  IndexPropagateBlockedResult,
+  IndexMarkDownstreamBlockedResult,
   IndexReadConfigResult,
-  IndexSyncAutoDraftsResult,
+  IndexRegisterPendingDraftsResult,
 } from '../types.js';
 
 const BINARY = 'wpx-index';
@@ -25,7 +25,7 @@ export interface IndexFlipStatusParams {
   expected?: string;
 }
 
-export interface IndexAddWpParams {
+export interface IndexAddParams {
   wp: string;
   from_wp_file?: boolean;
   title?: string;
@@ -70,28 +70,28 @@ export class IndexResource {
     ) as unknown as IndexReadConfigResult;
   }
 
-  propagateBlocked(params: { wp: string }): IndexPropagateBlockedResult {
+  markDownstreamBlocked(params: { wp: string }): IndexMarkDownstreamBlockedResult {
     return resultPayload(
       this.transport.invoke(BINARY, 'propagate-blocked', {
         ...common(this.config),
         ...params,
       }),
-    ) as unknown as IndexPropagateBlockedResult;
+    ) as unknown as IndexMarkDownstreamBlockedResult;
   }
 
-  addWp(params: IndexAddWpParams): IndexAddWpResult {
+  add(params: IndexAddParams): IndexAddResult {
     return resultPayload(
       this.transport.invoke(BINARY, 'add-wp', {
         ...common(this.config),
         ...kwargsToParams(params),
       }),
-    ) as unknown as IndexAddWpResult;
+    ) as unknown as IndexAddResult;
   }
 
-  syncAutoDrafts(): IndexSyncAutoDraftsResult {
+  registerPendingDrafts(): IndexRegisterPendingDraftsResult {
     return resultPayload(
       this.transport.invoke(BINARY, 'sync-auto-drafts', common(this.config)),
-    ) as unknown as IndexSyncAutoDraftsResult;
+    ) as unknown as IndexRegisterPendingDraftsResult;
   }
 }
 
@@ -128,27 +128,27 @@ export class AsyncIndexResource {
     ) as unknown as IndexReadConfigResult;
   }
 
-  async propagateBlocked(params: { wp: string }): Promise<IndexPropagateBlockedResult> {
+  async markDownstreamBlocked(params: { wp: string }): Promise<IndexMarkDownstreamBlockedResult> {
     return resultPayload(
       await this.transport.invoke(BINARY, 'propagate-blocked', {
         ...common(this.config),
         ...params,
       }),
-    ) as unknown as IndexPropagateBlockedResult;
+    ) as unknown as IndexMarkDownstreamBlockedResult;
   }
 
-  async addWp(params: IndexAddWpParams): Promise<IndexAddWpResult> {
+  async add(params: IndexAddParams): Promise<IndexAddResult> {
     return resultPayload(
       await this.transport.invoke(BINARY, 'add-wp', {
         ...common(this.config),
         ...kwargsToParams(params),
       }),
-    ) as unknown as IndexAddWpResult;
+    ) as unknown as IndexAddResult;
   }
 
-  async syncAutoDrafts(): Promise<IndexSyncAutoDraftsResult> {
+  async registerPendingDrafts(): Promise<IndexRegisterPendingDraftsResult> {
     return resultPayload(
       await this.transport.invoke(BINARY, 'sync-auto-drafts', common(this.config)),
-    ) as unknown as IndexSyncAutoDraftsResult;
+    ) as unknown as IndexRegisterPendingDraftsResult;
   }
 }

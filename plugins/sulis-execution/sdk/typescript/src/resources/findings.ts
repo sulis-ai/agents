@@ -5,7 +5,7 @@ import type {
   TransportConfig,
 } from '../transport.js';
 import type {
-  FindingsAutoDraftWpResult,
+  FindingsDraftRemediationResult,
   FindingsRegisterResult,
 } from '../types.js';
 
@@ -25,7 +25,7 @@ export interface FindingsRegisterParams {
   primitive?: string;
 }
 
-export interface FindingsAutoDraftWpParams {
+export interface FindingsDraftRemediationParams {
   source_finding: string;
   source_wp: string;
   auto_wp_id: string;
@@ -48,14 +48,14 @@ export class FindingsResource {
     ) as unknown as FindingsRegisterResult;
   }
 
-  autoDraftWp(params: FindingsAutoDraftWpParams): FindingsAutoDraftWpResult {
+  draftRemediation(params: FindingsDraftRemediationParams): FindingsDraftRemediationResult {
     return resultPayload(
       this.transport.invoke(BINARY, 'auto-draft-wp', {
         ...common(this.config),
         primitive: 'Secure',
         ...params,
       }),
-    ) as unknown as FindingsAutoDraftWpResult;
+    ) as unknown as FindingsDraftRemediationResult;
   }
 }
 
@@ -74,15 +74,15 @@ export class AsyncFindingsResource {
     ) as unknown as FindingsRegisterResult;
   }
 
-  async autoDraftWp(
-    params: FindingsAutoDraftWpParams,
-  ): Promise<FindingsAutoDraftWpResult> {
+  async draftRemediation(
+    params: FindingsDraftRemediationParams,
+  ): Promise<FindingsDraftRemediationResult> {
     return resultPayload(
       await this.transport.invoke(BINARY, 'auto-draft-wp', {
         ...common(this.config),
         primitive: 'Secure',
         ...params,
       }),
-    ) as unknown as FindingsAutoDraftWpResult;
+    ) as unknown as FindingsDraftRemediationResult;
   }
 }

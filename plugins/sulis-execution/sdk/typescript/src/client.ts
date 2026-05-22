@@ -15,13 +15,19 @@ import {
   PipelineResource,
   AsyncPipelineResource,
 } from './resources/pipeline.js';
-import { Step12Resource, AsyncStep12Resource } from './resources/step12.js';
+import {
+  LifecycleResource,
+  AsyncLifecycleResource,
+} from './resources/lifecycle.js';
 import { TrainResource, AsyncTrainResource } from './resources/train.js';
 import {
   WorktreeResource,
   AsyncWorktreeResource,
 } from './resources/worktree.js';
-import { WpResource, AsyncWpResource } from './resources/wp.js';
+import {
+  WorkPackageResource,
+  AsyncWorkPackageResource,
+} from './resources/work_package.js';
 
 export interface SulisExecutionOptions {
   repoRoot?: string;
@@ -50,9 +56,9 @@ export class SulisExecution {
   public readonly journal: JournalResource;
   public readonly blocker: BlockerResource;
   public readonly findings: FindingsResource;
-  public readonly wp: WpResource;
+  public readonly work_package: WorkPackageResource;
   public readonly worktree: WorktreeResource;
-  public readonly step12: Step12Resource;
+  public readonly lifecycle: LifecycleResource;
   public readonly change: ChangeResource;
 
   constructor(options: SulisExecutionOptions) {
@@ -69,9 +75,9 @@ export class SulisExecution {
     this.journal = new JournalResource(this.transport, config);
     this.blocker = new BlockerResource(this.transport, config);
     this.findings = new FindingsResource(this.transport, config);
-    this.wp = new WpResource(this.transport, config);
+    this.work_package = new WorkPackageResource(this.transport, config);
     this.worktree = new WorktreeResource(this.transport, config);
-    this.step12 = new Step12Resource(this.transport, config);
+    this.lifecycle = new LifecycleResource(this.transport, config);
     this.change = new ChangeResource(this.transport, config);
   }
 }
@@ -96,9 +102,9 @@ export class AsyncSulisExecution {
   public readonly journal: AsyncJournalResource;
   public readonly blocker: AsyncBlockerResource;
   public readonly findings: AsyncFindingsResource;
-  public readonly wp: AsyncWpResource;
+  public readonly work_package: AsyncWorkPackageResource;
   public readonly worktree: AsyncWorktreeResource;
-  public readonly step12: AsyncStep12Resource;
+  public readonly lifecycle: AsyncLifecycleResource;
   public readonly change: AsyncChangeResource;
 
   constructor(options: SulisExecutionOptions) {
@@ -115,9 +121,9 @@ export class AsyncSulisExecution {
     this.journal = new AsyncJournalResource(this.transport, config);
     this.blocker = new AsyncBlockerResource(this.transport, config);
     this.findings = new AsyncFindingsResource(this.transport, config);
-    this.wp = new AsyncWpResource(this.transport, config);
+    this.work_package = new AsyncWorkPackageResource(this.transport, config);
     this.worktree = new AsyncWorktreeResource(this.transport, config);
-    this.step12 = new AsyncStep12Resource(this.transport, config);
+    this.lifecycle = new AsyncLifecycleResource(this.transport, config);
     this.change = new AsyncChangeResource(this.transport, config);
   }
 }

@@ -128,17 +128,17 @@ export interface IndexReadConfigResult {
   config: Record<string, string>;
 }
 
-export interface IndexPropagateBlockedResult {
+export interface IndexMarkDownstreamBlockedResult {
   blocker_wp: string;
   flipped_to_dependency_blocked: string[];
 }
 
-export interface IndexAddWpResult {
+export interface IndexAddResult {
   wp: string;
   added: boolean;
 }
 
-export interface IndexSyncAutoDraftsResult {
+export interface IndexRegisterPendingDraftsResult {
   synced_count: number;
   synced: string[];
 }
@@ -168,18 +168,18 @@ export interface JournalPreflightResult {
   status: string;
 }
 
-export interface JournalPostdeployResult {
+export interface JournalSecurityVerdictResult {
   wp: string;
   verdict: string;
 }
 
-export interface JournalSeedPlanResult {
+export interface JournalCreatePlanResult {
   wp: string;
   approach: string;
   item_count: number;
 }
 
-export interface JournalMarkPlanItemResult {
+export interface JournalUpdatePlanItemResult {
   wp: string;
   item: number;
   status: string;
@@ -222,21 +222,21 @@ export interface FindingsRegisterResult {
   sf_path?: string | null;
 }
 
-export interface FindingsAutoDraftWpResult {
+export interface FindingsDraftRemediationResult {
   auto_wp_id: string;
   path: string;
 }
 
-// ─── wp ──────────────────────────────────────────────────────────────
+// ─── work_package ────────────────────────────────────────────────────
 
-export interface WpReadFrontmatterResult {
+export interface WorkPackageReadMetadataResult {
   field: string;
   value?: unknown;
   frontmatter?: Record<string, unknown> | null;
   present: boolean;
 }
 
-export interface WpAppendEvidenceResult {
+export interface WorkPackageAppendEvidenceResult {
   wp: string;
   path: string;
 }
@@ -256,9 +256,9 @@ export interface WorktreeRemoveResult {
   removed: string;
 }
 
-// ─── step12 ──────────────────────────────────────────────────────────
+// ─── lifecycle ───────────────────────────────────────────────────────
 
-export interface Step12WrapResult {
+export interface LifecycleCompleteResult {
   wp: string;
   steps: Record<string, unknown>;
 }

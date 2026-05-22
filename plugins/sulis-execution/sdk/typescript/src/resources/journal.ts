@@ -7,12 +7,12 @@ import type {
 import type {
   JournalAddPlanItemResult,
   JournalAttemptResult,
-  JournalMarkPlanItemResult,
+  JournalUpdatePlanItemResult,
   JournalPathResult,
-  JournalPostdeployResult,
+  JournalSecurityVerdictResult,
   JournalPreflightResult,
   JournalReadResult,
-  JournalSeedPlanResult,
+  JournalCreatePlanResult,
   JournalStepResult,
 } from '../types.js';
 
@@ -94,46 +94,46 @@ export class JournalResource {
     ) as unknown as JournalPreflightResult;
   }
 
-  recordPostdeploy(params: {
+  recordSecurityVerdict(params: {
     wp: string;
     verdict: string;
     findings_json?: string;
-  }): JournalPostdeployResult {
+  }): JournalSecurityVerdictResult {
     return resultPayload(
       this.transport.invoke(BINARY, 'record-postdeploy', {
         ...common(this.config),
         ...kwargsToParams(params),
       }),
-    ) as unknown as JournalPostdeployResult;
+    ) as unknown as JournalSecurityVerdictResult;
   }
 
-  seedPlan(params: {
+  createPlan(params: {
     wp: string;
     approach: string;
     plan_json: string;
     force?: boolean;
-  }): JournalSeedPlanResult {
+  }): JournalCreatePlanResult {
     return resultPayload(
       this.transport.invoke(BINARY, 'seed-plan', {
         ...common(this.config),
         ...params,
       }),
-    ) as unknown as JournalSeedPlanResult;
+    ) as unknown as JournalCreatePlanResult;
   }
 
-  markPlanItem(params: {
+  updatePlanItem(params: {
     wp: string;
     item: number;
     status: string;
     expected?: string;
     notes?: string;
-  }): JournalMarkPlanItemResult {
+  }): JournalUpdatePlanItemResult {
     return resultPayload(
       this.transport.invoke(BINARY, 'mark-plan-item', {
         ...common(this.config),
         ...kwargsToParams(params),
       }),
-    ) as unknown as JournalMarkPlanItemResult;
+    ) as unknown as JournalUpdatePlanItemResult;
   }
 
   addPlanItem(params: {
@@ -222,46 +222,46 @@ export class AsyncJournalResource {
     ) as unknown as JournalPreflightResult;
   }
 
-  async recordPostdeploy(params: {
+  async recordSecurityVerdict(params: {
     wp: string;
     verdict: string;
     findings_json?: string;
-  }): Promise<JournalPostdeployResult> {
+  }): Promise<JournalSecurityVerdictResult> {
     return resultPayload(
       await this.transport.invoke(BINARY, 'record-postdeploy', {
         ...common(this.config),
         ...kwargsToParams(params),
       }),
-    ) as unknown as JournalPostdeployResult;
+    ) as unknown as JournalSecurityVerdictResult;
   }
 
-  async seedPlan(params: {
+  async createPlan(params: {
     wp: string;
     approach: string;
     plan_json: string;
     force?: boolean;
-  }): Promise<JournalSeedPlanResult> {
+  }): Promise<JournalCreatePlanResult> {
     return resultPayload(
       await this.transport.invoke(BINARY, 'seed-plan', {
         ...common(this.config),
         ...params,
       }),
-    ) as unknown as JournalSeedPlanResult;
+    ) as unknown as JournalCreatePlanResult;
   }
 
-  async markPlanItem(params: {
+  async updatePlanItem(params: {
     wp: string;
     item: number;
     status: string;
     expected?: string;
     notes?: string;
-  }): Promise<JournalMarkPlanItemResult> {
+  }): Promise<JournalUpdatePlanItemResult> {
     return resultPayload(
       await this.transport.invoke(BINARY, 'mark-plan-item', {
         ...common(this.config),
         ...kwargsToParams(params),
       }),
-    ) as unknown as JournalMarkPlanItemResult;
+    ) as unknown as JournalUpdatePlanItemResult;
   }
 
   async addPlanItem(params: {
