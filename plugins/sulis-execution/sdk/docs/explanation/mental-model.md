@@ -37,9 +37,9 @@ client
 ├── journal           # wpx-journal     (10 ops)
 ├── blocker           # wpx-blocker     (2 ops)
 ├── findings          # wpx-findings    (2 ops)
-├── wp                # wpx-wp          (2 ops)
+├── work_package      # wpx-wp          (2 ops)
 ├── worktree          # wpx-worktree    (2 ops)
-├── step12            # wpx-step12      (1 op: wrap)
+├── lifecycle         # wpx-step12      (1 op: complete)
 └── change            # sulis-change    (5 ops)
 ```
 

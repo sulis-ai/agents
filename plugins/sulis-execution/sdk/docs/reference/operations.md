@@ -48,9 +48,9 @@ Run the per-WP Steps 8-10 pipeline.
 | `index.set_status` | `wp`, `to` | `IndexFlipStatusResult` |
 | `index.list_ready` | — | `IndexListReadyResult` |
 | `index.read_config` | — | `IndexReadConfigResult` |
-| `index.propagate_blocked` | `wp` (the blocker WP) | `IndexPropagateBlockedResult` |
-| `index.add_wp` | `wp`; optional metadata or `from_wp_file` | `IndexAddWpResult` |
-| `index.sync_auto_drafts` | — | `IndexSyncAutoDraftsResult` |
+| `index.mark_downstream_blocked` | `wp` (the blocker WP) | `IndexMarkDownstreamBlockedResult` |
+| `index.add` | `wp`; optional metadata or `from_wp_file` | `IndexAddResult` |
+| `index.register_pending_drafts` | — | `IndexRegisterPendingDraftsResult` |
 
 `to` accepts: pending, in_progress, done, blocked, dependency_blocked,
 auto-draft, cancelled, step-7-complete, step-7-held, step-7-blocked.
@@ -66,13 +66,13 @@ auto-draft, cancelled, step-7-complete, step-7-held, step-7-blocked.
 | `journal.complete_step` | `wp`, `step`, `outcome` | `JournalStepResult` |
 | `journal.record_attempt` | `wp`, `step`, `attempt`, `failure`, `root_cause`, `change`, `outcome` | `JournalAttemptResult` |
 | `journal.record_preflight` | `wp`, `tool`, `status` | `JournalPreflightResult` |
-| `journal.record_postdeploy` | `wp`, `verdict` | `JournalPostdeployResult` |
-| `journal.seed_plan` | `wp`, `approach`, `plan_json` | `JournalSeedPlanResult` |
-| `journal.mark_plan_item` | `wp`, `item`, `status` | `JournalMarkPlanItemResult` |
+| `journal.record_security_verdict` | `wp`, `verdict` | `JournalSecurityVerdictResult` |
+| `journal.create_plan` | `wp`, `approach`, `plan_json` | `JournalCreatePlanResult` |
+| `journal.update_plan_item` | `wp`, `item`, `status` | `JournalUpdatePlanItemResult` |
 | `journal.add_plan_item` | `wp`, `description`, `step` | `JournalAddPlanItemResult` |
 | `journal.read` | `wp`, `field` | `JournalReadResult` |
 
-`status` (mark_plan_item) accepts: pending, in-progress, done, skipped.
+`status` (update_plan_item) accepts: pending, in-progress, done, skipped.
 
 `field` (read) accepts: status, lifecycle-step, started, step-trace,
 step-N-status (N is an int), post-deploy-verification, preflight, plan.
@@ -96,19 +96,19 @@ step-N-status (N is an int), post-deploy-verification, preflight, plan.
 | Operation | Required | Returns |
 |---|---|---|
 | `findings.register` | `wp`, `severity`, `summary`, `file` | `FindingsRegisterResult` |
-| `findings.auto_draft_wp` | `source_finding`, `source_wp`, `auto_wp_id`, `severity` | `FindingsAutoDraftWpResult` |
+| `findings.draft_remediation` | `source_finding`, `source_wp`, `auto_wp_id`, `severity` | `FindingsDraftRemediationResult` |
 
 `severity` (register) accepts: CRITICAL, CONCERN, ADVISORY.
-`severity` (auto_draft_wp) accepts: CONCERN, ADVISORY.
+`severity` (draft_remediation) accepts: CONCERN, ADVISORY.
 
 ---
 
-## wp (2 operations)
+## work_package (2 operations)
 
 | Operation | Required | Returns |
 |---|---|---|
-| `wp.read_frontmatter` | `wp`, `field` (or `*`) | `WpReadFrontmatterResult` |
-| `wp.append_evidence` | `wp`, `evidence_json` | `WpAppendEvidenceResult` |
+| `work_package.read_metadata` | `wp`, `field` (or `*`) | `WorkPackageReadMetadataResult` |
+| `work_package.append_evidence` | `wp`, `evidence_json` | `WorkPackageAppendEvidenceResult` |
 
 ---
 
@@ -121,17 +121,17 @@ step-N-status (N is an int), post-deploy-verification, preflight, plan.
 
 ---
 
-## step12 (1 operation)
+## lifecycle (1 operation)
 
-### `step12.wrap`
+### `lifecycle.complete`
 
-Atomic Step 12 — append evidence + flip INDEX + remove worktree.
+Atomically complete a Work Package's lifecycle — append evidence + flip INDEX + remove worktree.
 
 | Required | Optional |
 |---|---|
 | `wp`, `branch`, `pipeline_result` | `pre_squash_sha`, `worktree_path`, `post_deploy_verification` |
 
-**Returns:** `Step12WrapResult`.
+**Returns:** `LifecycleCompleteResult`.
 
 ---
 

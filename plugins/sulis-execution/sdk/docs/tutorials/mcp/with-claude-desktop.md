@@ -67,7 +67,7 @@ In a Claude chat, type something like:
 > What tools do you have available from the sulis-execution server?
 
 Claude should list 38 tools across pipeline, train, index, journal,
-blocker, findings, wp, worktree, step12, and change.
+blocker, findings, work_package, worktree, lifecycle, and change.
 
 ## 5. Try a call
 
