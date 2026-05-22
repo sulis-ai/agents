@@ -201,6 +201,43 @@ State invariants the contract must preserve:
     opportunity (how many WPs can be implemented simultaneously at peak),
     primitive distribution, wrap audit result.
 
+11. **Validate** — apply the
+    [Decompose Validation Rubric](../../references/decompose-validation-rubric.md)
+    (v0.1.0+; SEA v0.19.0+) to the produced WP set. Write the
+    validation report to
+    `.architecture/{project}/work-packages/DECOMPOSE_VALIDATION.md`.
+
+    The rubric runs six phases mechanically where possible:
+    - **P1 Inventory completeness** — every WP has Context, Contract,
+      DoD/RGB, Sequence, Token cost, Dependencies
+    - **P2 Atomicity** — single responsibility per WP; touch surface
+      ≤ 15 files (MUST), ≤ 8 (SHOULD); no "and" in titles or purpose
+    - **P3 Module naming + clean code** — no jargon prefixes, no
+      single-letter abbreviations, descriptive kebab-case slugs
+    - **P4 Dependency graph correctness** — no cycles, all targets
+      exist, transitive depth ≤ 8, valid topological order
+    - **P5 Performance + non-functional reqs** — endpoint/handler WPs
+      have a `## Performance` section with measurable bounds
+    - **P6 Peer-collision risk** — no two WPs `Create` the same file
+      (catches the `loader/__init__.py` collision class at breakdown
+      time, before any executor dispatches)
+
+    Verdict is computed deterministically:
+    - **PASS** — every MUST passes; no SHOULD failures
+    - **PASS-WITH-RATIONALE** — every MUST passes; SHOULD failures
+      with documented rationale
+    - **FAIL** — ≥1 MUST failure
+
+    On `FAIL`: do NOT declare the decompose done. Surface the blocking
+    gaps in plain English to the founder and return to the appropriate
+    step (e.g., a peer-collision failure means re-running step 5
+    "Detect overlaps + atomicity violations" with the rubric's
+    findings in hand).
+
+    On `PASS` / `PASS-WITH-RATIONALE`: report the validation outcome
+    in the chat summary so the founder sees that the breakdown was
+    formally validated, not just produced.
+
 ---
 
 ## INDEX.md Structure
