@@ -123,6 +123,33 @@ paths:
         '400': { $ref: '#/components/responses/ExpectedError' }
         '500': { $ref: '#/components/responses/InternalError' }
 
+  /train/resume:
+    post:
+      operationId: trainResume
+      summary: Resume a paused train (pre-merge phases only in v0.19.0a)
+      description: |
+        Resume semantics in v0.19.0a:
+        - **Pre-merge paused** (rebasing/ci_running/pending): re-fires the
+          train with the args saved in state. The founder fixes the
+          underlying issue (CI flake, conflict resolution) first; then
+          calls resume.
+        - **Post-merge paused** (merging/deploying/verifying): errors
+          with "use abort" guidance. Post-merge resume defers to a
+          future release; today's recovery is `train.abort` (which runs
+          ADR-212 revert) or manual `index.flip_status` for the merged
+          WPs if production is fine.
+        - **Terminal phases** (success/failed/aborted): errors —
+          nothing to resume; start a fresh `train.run` instead.
+        Returns the same envelope shape as `train.run` (success or
+        blocker/error result for the new train fired by resume).
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TrainResumeRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TrainRunResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
   /train/inspect:
     post:
       operationId: trainInspect
@@ -760,6 +787,35 @@ components:
         trigger_state: { type: string, enum: [not_ready, ready_size, waiting] }
         trigger_reason: { type: string }
         last_train_run: { type: [string, 'null'] }
+
+    TrainResumeRequest:
+      allOf:
+        - $ref: '#/components/schemas/TrainStandardRequest'
+        - type: object
+          required: [train_id]
+          properties:
+            train_id:
+              type: string
+              description: Train ID to resume (from train.inspect).
+            deploy_workflow:
+              type: [string, 'null']
+              description: "Override deploy workflow (default: from state)."
+            staging_url:
+              type: [string, 'null']
+            health_path:
+              type: [string, 'null']
+            smoke_cmd:
+              type: [string, 'null']
+            deploy_cap:
+              type: [integer, 'null']
+            base_branch:
+              type: [string, 'null']
+            force:
+              type: boolean
+              default: false
+            strict_ci:
+              type: boolean
+              default: false
 
     TrainInspectRequest:
       allOf:

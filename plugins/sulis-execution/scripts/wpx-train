@@ -300,6 +300,148 @@ def cmd_status(args: argparse.Namespace) -> None:
 
 # --- Subcommand: doctor (drift diagnosis) -------------------------------
 
+def cmd_resume(args: argparse.Namespace) -> None:
+    """Resume a paused train (v0.19.0a).
+
+    Reads the train's state file and dispatches based on the paused phase:
+
+    - **Pre-merge paused** (rebasing, ci_running): no merges have landed.
+      Safe to redo from scratch. Cleans up the state file, flips bundled
+      WPs back to step-7-complete (in case the prior failure-handler
+      blocked them), then re-invokes cmd_run with the args captured in
+      the state file. From the founder's perspective: paused → fix
+      issue → `wpx-train resume <id>` → train re-fires with same args.
+
+    - **Post-merge paused** (deploying, verifying): merges are on dev;
+      can't just start over. v0.19.0a emits a clear "use abort" error
+      pointing at the post-merge recovery path. The full post-merge
+      resume (re-poll deploy / re-run smoke) lands when a real need
+      surfaces; until then, founders use `wpx-train abort` (Phase 3.2)
+      to invoke the ADR-212 revert, or manually flip WPs to done if
+      production is actually fine.
+
+    - **Terminal phases** (success, failed, aborted): error — nothing to
+      resume.
+    """
+    paths = paths_from_args(args)
+    state_path = train_state_path(paths.train_runs_dir, args.train_id)
+
+    if not state_path.exists():
+        emit_error(
+            f"Train {args.train_id!r} has no in-flight state file at "
+            f"{state_path}. Either it never started, or it completed "
+            f"and the state file was cleaned up. Run `wpx-train inspect "
+            f"{args.train_id}` to see the historical record."
+        )
+        return
+
+    try:
+        state = read_train_state(state_path)
+    except RuntimeError as exc:
+        emit_error(str(exc))
+        return
+
+    phase = state.get("phase")
+    if phase in ("success", "failed", "aborted"):
+        emit_error(
+            f"Train {args.train_id!r} is in terminal phase {phase!r}; "
+            f"nothing to resume. Inspect via `wpx-train inspect "
+            f"{args.train_id}`; start a fresh train via `wpx-train run`."
+        )
+        return
+
+    if phase in ("merging", "deploying", "verifying"):
+        emit_error(
+            f"Train {args.train_id!r} is paused at phase {phase!r}, "
+            f"AFTER merges landed on dev. Post-merge resume isn't "
+            f"available in v0.19.0a. Options:\n"
+            f"  • If production is healthy (deploy completed, smoke green): "
+            f"manually flip the merged WPs to done via `wpx-index "
+            f"flip-status --to done --expected step-7-complete`.\n"
+            f"  • If production is broken: `wpx-train abort {args.train_id}` "
+            f"(when Phase 3.2 ships) to invoke ADR-212 revert.\n"
+            f"  • Inspect via `wpx-train inspect {args.train_id}` to see "
+            f"the recovery_hint for this specific failure."
+        )
+        return
+
+    # Pre-merge resume (phase in pending/rebasing/ci_running/paused-pre-merge)
+    _log(f"RESUMING train {args.train_id} from phase {phase!r}")
+
+    # Hold the lock for the resume operation
+    try:
+        lock = TrainLock(paths.train_runs_dir, args.train_id)
+        lock.__enter__()
+    except RuntimeError as exc:
+        emit_error(str(exc))
+        return
+
+    try:
+        # Restore any WPs that got flipped to step-7-blocked by the
+        # prior failure handler (so they're eligible again).
+        for entry in state.get("bundle", []):
+            wp = entry.get("wp")
+            if wp:
+                flip_index_status_via_cli(
+                    _SCRIPTS_DIR, paths, wp, TRAIN_ELIGIBLE_STATUS,
+                )
+
+        # Mark state as aborted before re-running cmd_run (which will
+        # create a fresh state file with a new train_id). The old
+        # train_id's audit trail is preserved as the .yaml record.
+        update_train_phase(
+            state_path, "aborted",
+            pause_reason="Superseded by resume (re-fired with same args)",
+            recovery_hint=(
+                f"This train was resumed; a fresh train was fired with "
+                f"the same arguments. See newer train via `wpx-train "
+                f"inspect` (no --train-id)."
+            ),
+        )
+        # Preserve the historical .yaml record before cleanup
+        record = {
+            "train_id": args.train_id,
+            "started_at": state.get("started_at"),
+            "completed_at": state.get("completed_at"),
+            "outcome": "aborted",
+            "outcome_reason": "superseded by resume",
+            "batch_size": len(state.get("bundle", [])),
+            "bundle": state.get("bundle", []),
+            "deploy_url": None,
+            "deploy_workflow_run": None,
+            "health_status": None,
+            "smoke_verdict": None,
+        }
+        write_train_run_record(
+            paths.train_runs_dir / f"{args.train_id}.yaml", record,
+        )
+        cleanup_train_state(paths.train_runs_dir, args.train_id)
+    finally:
+        lock.__exit__(None, None, None)
+
+    # Re-derive the cmd_run args from state["args"], merge with CLI args
+    # (allows --deploy-cap override on resume), and re-invoke cmd_run.
+    saved_args = state.get("args", {})
+    _log(f"Re-firing train with args: {saved_args}")
+
+    # Build a fresh args namespace combining saved + current
+    import argparse as _argparse
+    fresh_args = _argparse.Namespace(**vars(args))
+    for key, value in saved_args.items():
+        if not hasattr(fresh_args, key) or getattr(fresh_args, key) is None:
+            setattr(fresh_args, key, value)
+    # Ensure required args are populated (deploy_workflow especially)
+    if not getattr(fresh_args, "deploy_workflow", None):
+        emit_error(
+            f"Cannot resume: deploy_workflow missing from train state "
+            f"and not provided on CLI. Pass --deploy-workflow explicitly."
+        )
+        return
+
+    # Recursive call into cmd_run — fires a fresh train with the same args
+    cmd_run(fresh_args)
+
+
 def cmd_inspect(args: argparse.Namespace) -> None:
     """Read-only inspection of train state.
 
@@ -1034,6 +1176,43 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit machine-readable JSON (default: founder-friendly plain English)",
     )
 
+    p_resume = sub.add_parser(
+        "resume",
+        help="Resume a paused train (re-fires the train with same args after the founder's fix)",
+    )
+    _common(p_resume)
+    p_resume.add_argument(
+        "--train-id", required=True,
+        help="Train ID to resume (e.g., train-2026-05-22T123000Z). "
+             "Get from `wpx-train inspect`.",
+    )
+    # Pre-merge resume re-invokes cmd_run; allow CLI overrides for any
+    # arg cmd_run would accept (deploy_workflow, staging_url, etc.).
+    # The state's saved args provide defaults; CLI values win when set.
+    p_resume.add_argument("--deploy-workflow", default=None,
+                          help="Override deploy workflow (default: from state)")
+    p_resume.add_argument("--staging-url", default=None,
+                          help="Override staging URL (default: from state)")
+    p_resume.add_argument("--health-path", default="",
+                          help="Override health path (default: from state)")
+    p_resume.add_argument("--smoke-cmd", default="",
+                          help="Override smoke command (default: from state)")
+    p_resume.add_argument("--ci-poll-interval", type=int, default=None,
+                          help="Override CI poll interval")
+    p_resume.add_argument("--deploy-poll-interval", type=int, default=None,
+                          help="Override deploy poll interval")
+    p_resume.add_argument("--deploy-cap", type=int, default=None,
+                          help="Override deploy poll cap (s)")
+    p_resume.add_argument("--max-batch-size", type=int, default=5,
+                          help="Cap WPs per batch (default 5)")
+    p_resume.add_argument("--base-branch", default=None,
+                          help="Override base branch (default: from state)")
+    # --repo is provided by _common (above)
+    p_resume.add_argument("--force", action="store_true",
+                          help="Bypass size/staleness trigger on re-fire")
+    p_resume.add_argument("--strict-ci", action="store_true",
+                          help="Use strict-CI eligibility on re-fire")
+
     p_doctor = sub.add_parser("doctor", help="Diagnose drift (missing branches, unmet deps, etc.)")
     _common(p_doctor)
 
@@ -1084,6 +1263,7 @@ HANDLERS = {
     "queue-remove": cmd_queue_remove,
     "status": cmd_status,
     "inspect": cmd_inspect,
+    "resume": cmd_resume,
     "doctor": cmd_doctor,
     "run": cmd_run,
 }

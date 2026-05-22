@@ -95,6 +95,38 @@ export class TrainResource {
    *
    * Without train_id: returns a listing of recent trains.
    */
+  /**
+   * Resume a paused train (pre-merge phases only in v0.19.0a). See
+   * OpenAPI train.resume for full semantics.
+   */
+  resume(params: {
+    train_id: string;
+    deploy_workflow?: string;
+    staging_url?: string;
+    health_path?: string;
+    smoke_cmd?: string;
+    deploy_cap?: number;
+    base_branch?: string;
+    force?: boolean;
+    strict_ci?: boolean;
+  }): TrainRunResult {
+    const callParams: Record<string, unknown> = {
+      ...common(this.config, undefined),
+      train_id: params.train_id,
+    };
+    if (params.deploy_workflow !== undefined) callParams.deploy_workflow = params.deploy_workflow;
+    if (params.staging_url !== undefined) callParams.staging_url = params.staging_url;
+    if (params.health_path !== undefined) callParams.health_path = params.health_path;
+    if (params.smoke_cmd !== undefined) callParams.smoke_cmd = params.smoke_cmd;
+    if (params.deploy_cap !== undefined) callParams.deploy_cap = params.deploy_cap;
+    if (params.base_branch !== undefined) callParams.base_branch = params.base_branch;
+    if (params.force) callParams.force = true;
+    if (params.strict_ci) callParams.strict_ci = true;
+    return resultPayload(
+      this.transport.invoke(BINARY, 'resume', callParams),
+    ) as unknown as TrainRunResult;
+  }
+
   inspect(opts: { train_id?: string } = {}): TrainInspectResult {
     const params: Record<string, unknown> = {
       ...common(this.config, undefined),
@@ -170,6 +202,34 @@ export class AsyncTrainResource {
     return resultPayload(
       await this.transport.invoke(BINARY, 'doctor', common(this.config, opts.repo)),
     ) as unknown as TrainDoctorResult;
+  }
+
+  async resume(params: {
+    train_id: string;
+    deploy_workflow?: string;
+    staging_url?: string;
+    health_path?: string;
+    smoke_cmd?: string;
+    deploy_cap?: number;
+    base_branch?: string;
+    force?: boolean;
+    strict_ci?: boolean;
+  }): Promise<TrainRunResult> {
+    const callParams: Record<string, unknown> = {
+      ...common(this.config, undefined),
+      train_id: params.train_id,
+    };
+    if (params.deploy_workflow !== undefined) callParams.deploy_workflow = params.deploy_workflow;
+    if (params.staging_url !== undefined) callParams.staging_url = params.staging_url;
+    if (params.health_path !== undefined) callParams.health_path = params.health_path;
+    if (params.smoke_cmd !== undefined) callParams.smoke_cmd = params.smoke_cmd;
+    if (params.deploy_cap !== undefined) callParams.deploy_cap = params.deploy_cap;
+    if (params.base_branch !== undefined) callParams.base_branch = params.base_branch;
+    if (params.force) callParams.force = true;
+    if (params.strict_ci) callParams.strict_ci = true;
+    return resultPayload(
+      await this.transport.invoke(BINARY, 'resume', callParams),
+    ) as unknown as TrainRunResult;
   }
 
   async inspect(opts: { train_id?: string } = {}): Promise<TrainInspectResult> {

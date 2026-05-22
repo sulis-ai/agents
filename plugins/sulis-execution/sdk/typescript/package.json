@@ -1,6 +1,6 @@
 {
   "name": "@sulis-ai/execution",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Typed TypeScript SDK for the sulis-execution plugin's CLI tools (wpx-pipeline, wpx-train, sulis-change, etc.)",
   "type": "module",
   "main": "./dist/index.js",

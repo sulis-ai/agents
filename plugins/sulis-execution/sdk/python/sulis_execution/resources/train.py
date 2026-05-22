@@ -68,6 +68,45 @@ class TrainResource:
                                           _train_common(self._config, repo))
         return TrainDoctorResult.model_validate(_result_payload(envelope))
 
+    def resume(
+        self,
+        *,
+        train_id: str,
+        deploy_workflow: Optional[str] = None,
+        staging_url: Optional[str] = None,
+        health_path: Optional[str] = None,
+        smoke_cmd: Optional[str] = None,
+        deploy_cap: Optional[int] = None,
+        base_branch: Optional[str] = None,
+        force: bool = False,
+        strict_ci: bool = False,
+    ) -> TrainRunResult:
+        """Resume a paused train (pre-merge phases only in v0.19.0a).
+
+        See OpenAPI train.resume description for the full semantics +
+        post-merge / terminal-phase behaviour.
+        """
+        params = _train_common(self._config, None)
+        params["train_id"] = train_id
+        if deploy_workflow is not None:
+            params["deploy_workflow"] = deploy_workflow
+        if staging_url is not None:
+            params["staging_url"] = staging_url
+        if health_path is not None:
+            params["health_path"] = health_path
+        if smoke_cmd is not None:
+            params["smoke_cmd"] = smoke_cmd
+        if deploy_cap is not None:
+            params["deploy_cap"] = deploy_cap
+        if base_branch is not None:
+            params["base_branch"] = base_branch
+        if force:
+            params["force"] = True
+        if strict_ci:
+            params["strict_ci"] = True
+        envelope = self._transport.invoke(BINARY, "resume", params)
+        return TrainRunResult.model_validate(_result_payload(envelope))
+
     def inspect(self, *, train_id: Optional[str] = None) -> "TrainInspectResult":
         """Inspect a train's in-flight or historical state.
 
@@ -154,6 +193,40 @@ class AsyncTrainResource:
             BINARY, "doctor", _train_common(self._config, repo)
         )
         return TrainDoctorResult.model_validate(_result_payload(envelope))
+
+    async def resume(
+        self,
+        *,
+        train_id: str,
+        deploy_workflow: Optional[str] = None,
+        staging_url: Optional[str] = None,
+        health_path: Optional[str] = None,
+        smoke_cmd: Optional[str] = None,
+        deploy_cap: Optional[int] = None,
+        base_branch: Optional[str] = None,
+        force: bool = False,
+        strict_ci: bool = False,
+    ) -> TrainRunResult:
+        params = _train_common(self._config, None)
+        params["train_id"] = train_id
+        if deploy_workflow is not None:
+            params["deploy_workflow"] = deploy_workflow
+        if staging_url is not None:
+            params["staging_url"] = staging_url
+        if health_path is not None:
+            params["health_path"] = health_path
+        if smoke_cmd is not None:
+            params["smoke_cmd"] = smoke_cmd
+        if deploy_cap is not None:
+            params["deploy_cap"] = deploy_cap
+        if base_branch is not None:
+            params["base_branch"] = base_branch
+        if force:
+            params["force"] = True
+        if strict_ci:
+            params["strict_ci"] = True
+        envelope = await self._transport.invoke(BINARY, "resume", params)
+        return TrainRunResult.model_validate(_result_payload(envelope))
 
     async def inspect(self, *, train_id: Optional[str] = None) -> "TrainInspectResult":
         params = _train_common(self._config, None)
