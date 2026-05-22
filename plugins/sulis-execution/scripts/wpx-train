@@ -1174,6 +1174,15 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
         "smoke_verdict": None,
     }
 
+    # Base for rebase chain: per CW-04, when inside a change worktree,
+    # the caller passes --base-branch to ship WPs to the change branch
+    # rather than directly to dev. Resolved here (before args_repr below)
+    # because v0.18.0+ writes the initial train-state YAML using these
+    # args; the v0.18.0 commit moved init_train_state ABOVE this
+    # assignment by mistake, causing an UnboundLocalError on `base_branch`
+    # at any wpx-train run invocation. Fixed by hoisting the assignment.
+    base_branch = args.base_branch or "dev"
+
     # v0.18.0+ — write initial state YAML (phase=pending) for inspect /
     # resume / abort to read. cmd_run drives phase transitions inline;
     # full per-phase factoring (so cmd_resume can re-enter) is Phase 3.1.
@@ -1213,10 +1222,7 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
         # remaining branches (Phase 3 D7-rebase-conflict failure mode).
         bundle: list[dict] = []
         rebase_failures: list[dict] = []
-        # Base for rebase chain: per CW-04, when inside a change worktree,
-        # the caller passes --base-branch to ship WPs to the change branch
-        # rather than directly to dev.
-        base_branch = args.base_branch or "dev"
+        # base_branch was resolved above (pre-init_train_state); reuse it here
         onto_sha = _gh_ref_sha(repo, base_branch)
         for e in batch:
             try:
