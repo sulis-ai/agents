@@ -9,7 +9,7 @@ from sulis_execution.transport import (
     SubprocessTransport,
     TransportConfig,
 )
-from sulis_execution.types import FindingsAutoDraftWpResult, FindingsRegisterResult
+from sulis_execution.types import FindingsDraftRemediationResult, FindingsRegisterResult
 
 BINARY = "wpx-findings"
 
@@ -45,7 +45,7 @@ class FindingsResource:
         envelope = self._transport.invoke(BINARY, "register", params)
         return FindingsRegisterResult.model_validate(_result_payload(envelope))
 
-    def auto_draft_wp(
+    def draft_remediation(
         self,
         *,
         source_finding: str,
@@ -53,14 +53,14 @@ class FindingsResource:
         auto_wp_id: str,
         severity: str,
         primitive: str = "Secure",
-    ) -> FindingsAutoDraftWpResult:
+    ) -> FindingsDraftRemediationResult:
         params = {
             **_common(self._config),
             "source_finding": source_finding, "source_wp": source_wp,
             "auto_wp_id": auto_wp_id, "severity": severity, "primitive": primitive,
         }
         envelope = self._transport.invoke(BINARY, "auto-draft-wp", params)
-        return FindingsAutoDraftWpResult.model_validate(_result_payload(envelope))
+        return FindingsDraftRemediationResult.model_validate(_result_payload(envelope))
 
 
 class AsyncFindingsResource:
@@ -90,7 +90,7 @@ class AsyncFindingsResource:
         envelope = await self._transport.invoke(BINARY, "register", params)
         return FindingsRegisterResult.model_validate(_result_payload(envelope))
 
-    async def auto_draft_wp(
+    async def draft_remediation(
         self,
         *,
         source_finding: str,
@@ -98,11 +98,11 @@ class AsyncFindingsResource:
         auto_wp_id: str,
         severity: str,
         primitive: str = "Secure",
-    ) -> FindingsAutoDraftWpResult:
+    ) -> FindingsDraftRemediationResult:
         params = {
             **_common(self._config),
             "source_finding": source_finding, "source_wp": source_wp,
             "auto_wp_id": auto_wp_id, "severity": severity, "primitive": primitive,
         }
         envelope = await self._transport.invoke(BINARY, "auto-draft-wp", params)
-        return FindingsAutoDraftWpResult.model_validate(_result_payload(envelope))
+        return FindingsDraftRemediationResult.model_validate(_result_payload(envelope))

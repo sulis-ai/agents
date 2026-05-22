@@ -11,8 +11,8 @@ categories (Protocol / Expected / Internal) per v0.2.0 Part 3.
 For LLM-direct invocation, see the sibling sulis-execution-mcp package.
 
 38 operations across 10 resources: pipeline (1), train (6), index (7),
-journal (10), blocker (2), findings (2), wp (2), worktree (2),
-step12 (1), change (5).
+journal (10), blocker (2), findings (2), work_package (2),
+worktree (2), lifecycle (1), change (5).
 """
 from __future__ import annotations
 
@@ -43,17 +43,17 @@ from sulis_execution.types import (
     IndexFlipStatusResult,
     IndexListReadyResult,
     IndexReadConfigResult,
-    IndexPropagateBlockedResult,
-    IndexAddWpResult,
-    IndexSyncAutoDraftsResult,
+    IndexMarkDownstreamBlockedResult,
+    IndexAddResult,
+    IndexRegisterPendingDraftsResult,
     # journal
     JournalPathResult,
     JournalStepResult,
     JournalAttemptResult,
     JournalPreflightResult,
-    JournalPostdeployResult,
-    JournalSeedPlanResult,
-    JournalMarkPlanItemResult,
+    JournalSecurityVerdictResult,
+    JournalCreatePlanResult,
+    JournalUpdatePlanItemResult,
     JournalAddPlanItemResult,
     JournalReadResult,
     # blocker
@@ -61,15 +61,15 @@ from sulis_execution.types import (
     BlockerArchiveResult,
     # findings
     FindingsRegisterResult,
-    FindingsAutoDraftWpResult,
+    FindingsDraftRemediationResult,
     # wp
-    WpReadFrontmatterResult,
-    WpAppendEvidenceResult,
+    WorkPackageReadMetadataResult,
+    WorkPackageAppendEvidenceResult,
     # worktree
     WorktreeCreateResult,
     WorktreeRemoveResult,
     # step12
-    Step12WrapResult,
+    LifecycleCompleteResult,
     # change
     ChangeStartResult,
     ChangeAdoptResult,
@@ -108,27 +108,27 @@ __all__ = [
     "IndexFlipStatusResult",
     "IndexListReadyResult",
     "IndexReadConfigResult",
-    "IndexPropagateBlockedResult",
-    "IndexAddWpResult",
-    "IndexSyncAutoDraftsResult",
+    "IndexMarkDownstreamBlockedResult",
+    "IndexAddResult",
+    "IndexRegisterPendingDraftsResult",
     "JournalPathResult",
     "JournalStepResult",
     "JournalAttemptResult",
     "JournalPreflightResult",
-    "JournalPostdeployResult",
-    "JournalSeedPlanResult",
-    "JournalMarkPlanItemResult",
+    "JournalSecurityVerdictResult",
+    "JournalCreatePlanResult",
+    "JournalUpdatePlanItemResult",
     "JournalAddPlanItemResult",
     "JournalReadResult",
     "BlockerWriteResult",
     "BlockerArchiveResult",
     "FindingsRegisterResult",
-    "FindingsAutoDraftWpResult",
-    "WpReadFrontmatterResult",
-    "WpAppendEvidenceResult",
+    "FindingsDraftRemediationResult",
+    "WorkPackageReadMetadataResult",
+    "WorkPackageAppendEvidenceResult",
     "WorktreeCreateResult",
     "WorktreeRemoveResult",
-    "Step12WrapResult",
+    "LifecycleCompleteResult",
     "ChangeStartResult",
     "ChangeAdoptResult",
     "ChangeFinishResult",

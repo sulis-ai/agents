@@ -17,12 +17,12 @@ from sulis_execution.transport import (
 from sulis_execution.types import (
     JournalAddPlanItemResult,
     JournalAttemptResult,
-    JournalMarkPlanItemResult,
+    JournalUpdatePlanItemResult,
     JournalPathResult,
-    JournalPostdeployResult,
+    JournalSecurityVerdictResult,
     JournalPreflightResult,
     JournalReadResult,
-    JournalSeedPlanResult,
+    JournalCreatePlanResult,
     JournalStepResult,
 )
 
@@ -86,27 +86,27 @@ class JournalResource:
         envelope = self._transport.invoke(BINARY, "record-preflight", params)
         return JournalPreflightResult.model_validate(_result_payload(envelope))
 
-    def record_postdeploy(
+    def record_security_verdict(
         self, *, wp: str, verdict: str, findings_json: Optional[str] = None
-    ) -> JournalPostdeployResult:
+    ) -> JournalSecurityVerdictResult:
         params = _kwargs_to_params({
             **_common(self._config),
             "wp": wp, "verdict": verdict, "findings_json": findings_json,
         })
         envelope = self._transport.invoke(BINARY, "record-postdeploy", params)
-        return JournalPostdeployResult.model_validate(_result_payload(envelope))
+        return JournalSecurityVerdictResult.model_validate(_result_payload(envelope))
 
-    def seed_plan(
+    def create_plan(
         self, *, wp: str, approach: str, plan_json: str, force: bool = False
-    ) -> JournalSeedPlanResult:
+    ) -> JournalCreatePlanResult:
         params = {
             **_common(self._config),
             "wp": wp, "approach": approach, "plan_json": plan_json, "force": force,
         }
         envelope = self._transport.invoke(BINARY, "seed-plan", params)
-        return JournalSeedPlanResult.model_validate(_result_payload(envelope))
+        return JournalCreatePlanResult.model_validate(_result_payload(envelope))
 
-    def mark_plan_item(
+    def update_plan_item(
         self,
         *,
         wp: str,
@@ -114,14 +114,14 @@ class JournalResource:
         status: str,
         expected: Optional[str] = None,
         notes: Optional[str] = None,
-    ) -> JournalMarkPlanItemResult:
+    ) -> JournalUpdatePlanItemResult:
         params = _kwargs_to_params({
             **_common(self._config),
             "wp": wp, "item": item, "status": status, "expected": expected,
             "notes": notes,
         })
         envelope = self._transport.invoke(BINARY, "mark-plan-item", params)
-        return JournalMarkPlanItemResult.model_validate(_result_payload(envelope))
+        return JournalUpdatePlanItemResult.model_validate(_result_payload(envelope))
 
     def add_plan_item(
         self, *, wp: str, description: str, step: str, notes: Optional[str] = None
@@ -192,27 +192,27 @@ class AsyncJournalResource:
         envelope = await self._transport.invoke(BINARY, "record-preflight", params)
         return JournalPreflightResult.model_validate(_result_payload(envelope))
 
-    async def record_postdeploy(
+    async def record_security_verdict(
         self, *, wp: str, verdict: str, findings_json: Optional[str] = None
-    ) -> JournalPostdeployResult:
+    ) -> JournalSecurityVerdictResult:
         params = _kwargs_to_params({
             **_common(self._config),
             "wp": wp, "verdict": verdict, "findings_json": findings_json,
         })
         envelope = await self._transport.invoke(BINARY, "record-postdeploy", params)
-        return JournalPostdeployResult.model_validate(_result_payload(envelope))
+        return JournalSecurityVerdictResult.model_validate(_result_payload(envelope))
 
-    async def seed_plan(
+    async def create_plan(
         self, *, wp: str, approach: str, plan_json: str, force: bool = False
-    ) -> JournalSeedPlanResult:
+    ) -> JournalCreatePlanResult:
         params = {
             **_common(self._config),
             "wp": wp, "approach": approach, "plan_json": plan_json, "force": force,
         }
         envelope = await self._transport.invoke(BINARY, "seed-plan", params)
-        return JournalSeedPlanResult.model_validate(_result_payload(envelope))
+        return JournalCreatePlanResult.model_validate(_result_payload(envelope))
 
-    async def mark_plan_item(
+    async def update_plan_item(
         self,
         *,
         wp: str,
@@ -220,14 +220,14 @@ class AsyncJournalResource:
         status: str,
         expected: Optional[str] = None,
         notes: Optional[str] = None,
-    ) -> JournalMarkPlanItemResult:
+    ) -> JournalUpdatePlanItemResult:
         params = _kwargs_to_params({
             **_common(self._config),
             "wp": wp, "item": item, "status": status, "expected": expected,
             "notes": notes,
         })
         envelope = await self._transport.invoke(BINARY, "mark-plan-item", params)
-        return JournalMarkPlanItemResult.model_validate(_result_payload(envelope))
+        return JournalUpdatePlanItemResult.model_validate(_result_payload(envelope))
 
     async def add_plan_item(
         self, *, wp: str, description: str, step: str, notes: Optional[str] = None

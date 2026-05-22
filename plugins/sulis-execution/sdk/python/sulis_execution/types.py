@@ -143,17 +143,17 @@ class IndexReadConfigResult(_Base):
     config: dict[str, str]
 
 
-class IndexPropagateBlockedResult(_Base):
+class IndexMarkDownstreamBlockedResult(_Base):
     blocker_wp: str
     flipped_to_dependency_blocked: list[str] = []
 
 
-class IndexAddWpResult(_Base):
+class IndexAddResult(_Base):
     wp: str
     added: bool
 
 
-class IndexSyncAutoDraftsResult(_Base):
+class IndexRegisterPendingDraftsResult(_Base):
     synced_count: int
     synced: list[str] = []
 
@@ -184,18 +184,18 @@ class JournalPreflightResult(_Base):
     status: str
 
 
-class JournalPostdeployResult(_Base):
+class JournalSecurityVerdictResult(_Base):
     wp: str
     verdict: str
 
 
-class JournalSeedPlanResult(_Base):
+class JournalCreatePlanResult(_Base):
     wp: str
     approach: str
     item_count: int
 
 
-class JournalMarkPlanItemResult(_Base):
+class JournalUpdatePlanItemResult(_Base):
     wp: str
     item: int
     status: str
@@ -240,22 +240,22 @@ class FindingsRegisterResult(_Base):
     sf_path: Optional[str] = None
 
 
-class FindingsAutoDraftWpResult(_Base):
+class FindingsDraftRemediationResult(_Base):
     auto_wp_id: str
     path: str
 
 
-# ─── wp ──────────────────────────────────────────────────────────────
+# ─── work_package ────────────────────────────────────────────────────
 
 
-class WpReadFrontmatterResult(_Base):
+class WorkPackageReadMetadataResult(_Base):
     field: str
     value: Any = None
     frontmatter: Optional[dict[str, Any]] = None
     present: bool
 
 
-class WpAppendEvidenceResult(_Base):
+class WorkPackageAppendEvidenceResult(_Base):
     wp: str
     path: str
 
@@ -276,10 +276,10 @@ class WorktreeRemoveResult(_Base):
     removed: str
 
 
-# ─── step12 ──────────────────────────────────────────────────────────
+# ─── lifecycle ───────────────────────────────────────────────────────
 
 
-class Step12WrapResult(_Base):
+class LifecycleCompleteResult(_Base):
     wp: str
     steps: dict[str, Any]
 

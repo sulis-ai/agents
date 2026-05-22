@@ -1,7 +1,11 @@
 """Index resource — wraps `wpx-index` subcommands.
 
 Operations: flip_status, set_status, list_ready, read_config,
-propagate_blocked, add_wp, sync_auto_drafts.
+mark_downstream_blocked, add, register_pending_drafts.
+
+Underlying CLI subcommands keep the original names (`propagate-blocked`,
+`add-wp`, `sync-auto-drafts`); the SDK exposes self-describing
+method names.
 """
 from __future__ import annotations
 
@@ -14,12 +18,12 @@ from sulis_execution.transport import (
     TransportConfig,
 )
 from sulis_execution.types import (
-    IndexAddWpResult,
+    IndexAddResult,
     IndexFlipStatusResult,
     IndexListReadyResult,
-    IndexPropagateBlockedResult,
+    IndexMarkDownstreamBlockedResult,
     IndexReadConfigResult,
-    IndexSyncAutoDraftsResult,
+    IndexRegisterPendingDraftsResult,
 )
 
 BINARY = "wpx-index"
@@ -58,12 +62,12 @@ class IndexResource:
         envelope = self._transport.invoke(BINARY, "read-config", _common(self._config))
         return IndexReadConfigResult.model_validate(_result_payload(envelope))
 
-    def propagate_blocked(self, *, wp: str) -> IndexPropagateBlockedResult:
+    def mark_downstream_blocked(self, *, wp: str) -> IndexMarkDownstreamBlockedResult:
         params = {**_common(self._config), "wp": wp}
         envelope = self._transport.invoke(BINARY, "propagate-blocked", params)
-        return IndexPropagateBlockedResult.model_validate(_result_payload(envelope))
+        return IndexMarkDownstreamBlockedResult.model_validate(_result_payload(envelope))
 
-    def add_wp(
+    def add(
         self,
         *,
         wp: str,
@@ -75,7 +79,7 @@ class IndexResource:
         blocks: str = "",
         token_estimate: str = "?",
         tdd: Optional[str] = None,
-    ) -> IndexAddWpResult:
+    ) -> IndexAddResult:
         params = _kwargs_to_params({
             **_common(self._config),
             "wp": wp,
@@ -89,13 +93,13 @@ class IndexResource:
             "tdd": tdd,
         })
         envelope = self._transport.invoke(BINARY, "add-wp", params)
-        return IndexAddWpResult.model_validate(_result_payload(envelope))
+        return IndexAddResult.model_validate(_result_payload(envelope))
 
-    def sync_auto_drafts(self) -> IndexSyncAutoDraftsResult:
+    def register_pending_drafts(self) -> IndexRegisterPendingDraftsResult:
         envelope = self._transport.invoke(
             BINARY, "sync-auto-drafts", _common(self._config)
         )
-        return IndexSyncAutoDraftsResult.model_validate(_result_payload(envelope))
+        return IndexRegisterPendingDraftsResult.model_validate(_result_payload(envelope))
 
 
 class AsyncIndexResource:
@@ -131,12 +135,12 @@ class AsyncIndexResource:
         )
         return IndexReadConfigResult.model_validate(_result_payload(envelope))
 
-    async def propagate_blocked(self, *, wp: str) -> IndexPropagateBlockedResult:
+    async def mark_downstream_blocked(self, *, wp: str) -> IndexMarkDownstreamBlockedResult:
         params = {**_common(self._config), "wp": wp}
         envelope = await self._transport.invoke(BINARY, "propagate-blocked", params)
-        return IndexPropagateBlockedResult.model_validate(_result_payload(envelope))
+        return IndexMarkDownstreamBlockedResult.model_validate(_result_payload(envelope))
 
-    async def add_wp(
+    async def add(
         self,
         *,
         wp: str,
@@ -148,7 +152,7 @@ class AsyncIndexResource:
         blocks: str = "",
         token_estimate: str = "?",
         tdd: Optional[str] = None,
-    ) -> IndexAddWpResult:
+    ) -> IndexAddResult:
         params = _kwargs_to_params({
             **_common(self._config),
             "wp": wp,
@@ -162,10 +166,10 @@ class AsyncIndexResource:
             "tdd": tdd,
         })
         envelope = await self._transport.invoke(BINARY, "add-wp", params)
-        return IndexAddWpResult.model_validate(_result_payload(envelope))
+        return IndexAddResult.model_validate(_result_payload(envelope))
 
-    async def sync_auto_drafts(self) -> IndexSyncAutoDraftsResult:
+    async def register_pending_drafts(self) -> IndexRegisterPendingDraftsResult:
         envelope = await self._transport.invoke(
             BINARY, "sync-auto-drafts", _common(self._config)
         )
-        return IndexSyncAutoDraftsResult.model_validate(_result_payload(envelope))
+        return IndexRegisterPendingDraftsResult.model_validate(_result_payload(envelope))

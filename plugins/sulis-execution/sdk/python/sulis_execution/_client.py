@@ -9,7 +9,7 @@ that wraps a shared transport. Each resource module contains the actual
 method implementations.
 
 Resources (10): pipeline, train, index, journal, blocker, findings,
-                wp, worktree, step12, change.
+                work_package, worktree, lifecycle, change.
 """
 from __future__ import annotations
 
@@ -34,13 +34,19 @@ from sulis_execution.resources.pipeline import (
     AsyncPipelineResource,
     PipelineResource,
 )
-from sulis_execution.resources.step12 import AsyncStep12Resource, Step12Resource
+from sulis_execution.resources.lifecycle import (
+    AsyncLifecycleResource,
+    LifecycleResource,
+)
 from sulis_execution.resources.train import AsyncTrainResource, TrainResource
 from sulis_execution.resources.worktree import (
     AsyncWorktreeResource,
     WorktreeResource,
 )
-from sulis_execution.resources.wp import AsyncWpResource, WpResource
+from sulis_execution.resources.work_package import (
+    AsyncWorkPackageResource,
+    WorkPackageResource,
+)
 
 
 class SulisExecution:
@@ -112,16 +118,16 @@ class SulisExecution:
         return FindingsResource(self._transport, self._config)
 
     @cached_property
-    def wp(self) -> WpResource:
-        return WpResource(self._transport, self._config)
+    def work_package(self) -> WorkPackageResource:
+        return WorkPackageResource(self._transport, self._config)
 
     @cached_property
     def worktree(self) -> WorktreeResource:
         return WorktreeResource(self._transport, self._config)
 
     @cached_property
-    def step12(self) -> Step12Resource:
-        return Step12Resource(self._transport, self._config)
+    def lifecycle(self) -> LifecycleResource:
+        return LifecycleResource(self._transport, self._config)
 
     @cached_property
     def change(self) -> ChangeResource:
@@ -172,16 +178,16 @@ class AsyncSulisExecution:
         return AsyncFindingsResource(self._transport, self._config)
 
     @cached_property
-    def wp(self) -> AsyncWpResource:
-        return AsyncWpResource(self._transport, self._config)
+    def work_package(self) -> AsyncWorkPackageResource:
+        return AsyncWorkPackageResource(self._transport, self._config)
 
     @cached_property
     def worktree(self) -> AsyncWorktreeResource:
         return AsyncWorktreeResource(self._transport, self._config)
 
     @cached_property
-    def step12(self) -> AsyncStep12Resource:
-        return AsyncStep12Resource(self._transport, self._config)
+    def lifecycle(self) -> AsyncLifecycleResource:
+        return AsyncLifecycleResource(self._transport, self._config)
 
     @cached_property
     def change(self) -> AsyncChangeResource:

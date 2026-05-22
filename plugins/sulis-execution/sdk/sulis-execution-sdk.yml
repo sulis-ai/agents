@@ -45,9 +45,9 @@ resources:
       set_status: indexSetStatus
       list_ready: indexListReady
       read_config: indexReadConfig
-      propagate_blocked: indexPropagateBlocked
-      add_wp: indexAddWp
-      sync_auto_drafts: indexSyncAutoDrafts
+      mark_downstream_blocked: indexMarkDownstreamBlocked
+      add: indexAdd
+      register_pending_drafts: indexRegisterPendingDrafts
   journal:
     operations:
       init: journalInit
@@ -55,9 +55,9 @@ resources:
       complete_step: journalCompleteStep
       record_attempt: journalRecordAttempt
       record_preflight: journalRecordPreflight
-      record_postdeploy: journalRecordPostdeploy
-      seed_plan: journalSeedPlan
-      mark_plan_item: journalMarkPlanItem
+      record_security_verdict: journalRecordSecurityVerdict
+      create_plan: journalCreatePlan
+      update_plan_item: journalUpdatePlanItem
       add_plan_item: journalAddPlanItem
       read: journalRead
   blocker:
@@ -67,18 +67,18 @@ resources:
   findings:
     operations:
       register: findingsRegister
-      auto_draft_wp: findingsAutoDraftWp
-  wp:
+      draft_remediation: findingsDraftRemediation
+  work_package:
     operations:
-      read_frontmatter: wpReadFrontmatter
-      append_evidence: wpAppendEvidence
+      read_metadata: workPackageReadMetadata
+      append_evidence: workPackageAppendEvidence
   worktree:
     operations:
       create: worktreeCreate
       remove: worktreeRemove
-  step12:
+  lifecycle:
     operations:
-      wrap: step12Wrap
+      complete: lifecycleComplete
   change:
     operations:
       start: changeStart
@@ -96,9 +96,9 @@ binary_per_resource:
   journal: wpx-journal
   blocker: wpx-blocker
   findings: wpx-findings
-  wp: wpx-wp
+  work_package: wpx-wp
   worktree: wpx-worktree
-  step12: wpx-step12
+  lifecycle: wpx-step12
   change: sulis-change
 
 # Error mapping per v0.2.0 Part 3 — three universal categories +

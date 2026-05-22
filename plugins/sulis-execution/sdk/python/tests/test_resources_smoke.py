@@ -142,7 +142,7 @@ def test_index_list_ready(make_fake_binary, client):
     assert result.max_parallel == 5
 
 
-def test_index_propagate_blocked(make_fake_binary, client):
+def test_index_mark_downstream_blocked(make_fake_binary, client):
     make_fake_binary(
         "wpx-index",
         stdout_payload=_ok({
@@ -150,7 +150,7 @@ def test_index_propagate_blocked(make_fake_binary, client):
             "flipped_to_dependency_blocked": ["WP-002", "WP-003"],
         }),
     )
-    result = client.index.propagate_blocked(wp="WP-001")
+    result = client.index.mark_downstream_blocked(wp="WP-001")
     assert result.blocker_wp == "WP-001"
     assert "WP-002" in result.flipped_to_dependency_blocked
 
@@ -247,7 +247,7 @@ def test_findings_register(make_fake_binary, client):
 # ─── wp ──────────────────────────────────────────────────────────────
 
 
-def test_wp_read_frontmatter(make_fake_binary, client):
+def test_work_package_read_metadata(make_fake_binary, client):
     make_fake_binary(
         "wpx-wp",
         stdout_payload=_ok({
@@ -256,7 +256,7 @@ def test_wp_read_frontmatter(make_fake_binary, client):
             "present": True,
         }),
     )
-    result = client.wp.read_frontmatter(wp="WP-001", field="branch")
+    result = client.work_package.read_metadata(wp="WP-001", field="branch")
     assert result.field == "branch"
     assert result.present is True
     assert result.value == "feat/wp-001-introduce-payments"
@@ -285,10 +285,10 @@ def test_worktree_create(make_fake_binary, client):
     assert result.worktree_path == "/tmp/wp-001-worktree"
 
 
-# ─── step12 ──────────────────────────────────────────────────────────
+# ─── lifecycle ───────────────────────────────────────────────────────
 
 
-def test_step12_wrap(make_fake_binary, client):
+def test_lifecycle_complete(make_fake_binary, client):
     make_fake_binary(
         "wpx-step12",
         stdout_payload=_ok({
@@ -300,7 +300,7 @@ def test_step12_wrap(make_fake_binary, client):
             },
         }),
     )
-    result = client.step12.wrap(
+    result = client.lifecycle.complete(
         wp="WP-001",
         branch="feat/wp-001-x",
         pipeline_result='{"merge_sha": "abc"}',

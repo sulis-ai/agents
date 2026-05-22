@@ -228,9 +228,10 @@ paths:
         '400': { $ref: '#/components/responses/ExpectedError' }
         '500': { $ref: '#/components/responses/InternalError' }
 
-  /index/propagate-blocked:
+  /index/mark-downstream-blocked:
     post:
-      operationId: indexPropagateBlocked
+      operationId: indexMarkDownstreamBlocked
+      x-cli-subcommand: propagate-blocked
       summary: Flip transitively-dependent WPs to dependency_blocked
       description: |
         Given a blocker WP, walks the dependency graph and flips all
@@ -238,15 +239,16 @@ paths:
         `dependency_blocked` status. Returns the list of flipped WPs.
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/IndexPropagateBlockedRequest' } } }
+        content: { application/json: { schema: { $ref: '#/components/schemas/IndexMarkDownstreamBlockedRequest' } } }
       responses:
-        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/IndexPropagateBlockedResult' } } } }
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/IndexMarkDownstreamBlockedResult' } } } }
         '400': { $ref: '#/components/responses/ExpectedError' }
         '500': { $ref: '#/components/responses/InternalError' }
 
-  /index/add-wp:
+  /index/add:
     post:
-      operationId: indexAddWp
+      operationId: indexAdd
+      x-cli-subcommand: add-wp
       summary: Add a row to INDEX.md
       description: |
         Inserts a new WP row. Either pass --from-wp-file (read fields
@@ -255,15 +257,16 @@ paths:
         tdd explicitly.
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/IndexAddWpRequest' } } }
+        content: { application/json: { schema: { $ref: '#/components/schemas/IndexAddRequest' } } }
       responses:
-        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/IndexAddWpResult' } } } }
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/IndexAddResult' } } } }
         '400': { $ref: '#/components/responses/ExpectedError' }
         '500': { $ref: '#/components/responses/InternalError' }
 
-  /index/sync-auto-drafts:
+  /index/register-pending-drafts:
     post:
-      operationId: indexSyncAutoDrafts
+      operationId: indexRegisterPendingDrafts
+      x-cli-subcommand: sync-auto-drafts
       summary: Register WP-AUTO-*.md files in INDEX.md
       description: |
         Scans work-packages/ for WP-AUTO-*.md files; for each one not
@@ -272,7 +275,7 @@ paths:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/StandardRequest' } } }
       responses:
-        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/IndexSyncAutoDraftsResult' } } } }
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/IndexRegisterPendingDraftsResult' } } } }
         '400': { $ref: '#/components/responses/ExpectedError' }
         '500': { $ref: '#/components/responses/InternalError' }
 
@@ -332,42 +335,45 @@ paths:
         '400': { $ref: '#/components/responses/ExpectedError' }
         '500': { $ref: '#/components/responses/InternalError' }
 
-  /journal/record-postdeploy:
+  /journal/record-security-verdict:
     post:
-      operationId: journalRecordPostdeploy
-      summary: Record post-deploy verification verdict
+      operationId: journalRecordSecurityVerdict
+      x-cli-subcommand: record-postdeploy
+      summary: Record post-deploy security-review verdict
       description: Records the Step 11 security-review verdict (PASS / N CONCERN / N ADVISORY / CRITICAL).
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JournalRecordPostdeployRequest' } } } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JournalRecordSecurityVerdictRequest' } } } }
       responses:
-        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/JournalPostdeployResult' } } } }
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/JournalSecurityVerdictResult' } } } }
         '400': { $ref: '#/components/responses/ExpectedError' }
         '500': { $ref: '#/components/responses/InternalError' }
 
-  /journal/seed-plan:
+  /journal/create-plan:
     post:
-      operationId: journalSeedPlan
-      summary: Seed the executor's plan section (Step 1.5)
+      operationId: journalCreatePlan
+      x-cli-subcommand: seed-plan
+      summary: Create the executor's plan section (Step 1.5)
       description: |
         Per v0.10.0+, the executor writes a plan (approach + numbered
-        items) at Step 1.5 before TDD begins. This seeds it; use
+        items) at Step 1.5 before TDD begins. This creates it; use
         --force to overwrite an existing plan.
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JournalSeedPlanRequest' } } } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JournalCreatePlanRequest' } } } }
       responses:
-        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/JournalSeedPlanResult' } } } }
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/JournalCreatePlanResult' } } } }
         '400': { $ref: '#/components/responses/ExpectedError' }
         '500': { $ref: '#/components/responses/InternalError' }
 
-  /journal/mark-plan-item:
+  /journal/update-plan-item:
     post:
-      operationId: journalMarkPlanItem
+      operationId: journalUpdatePlanItem
+      x-cli-subcommand: mark-plan-item
       summary: Update a plan item's status
       description: |
         Per-item status transition. Optional `expected` for CAS-style
         guard (e.g., flip from in-progress to done only if currently
         in-progress).
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JournalMarkPlanItemRequest' } } } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JournalUpdatePlanItemRequest' } } } }
       responses:
-        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/JournalMarkPlanItemResult' } } } }
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/JournalUpdatePlanItemResult' } } } }
         '400': { $ref: '#/components/responses/ExpectedError' }
         '500': { $ref: '#/components/responses/InternalError' }
 
@@ -440,43 +446,47 @@ paths:
         '400': { $ref: '#/components/responses/ExpectedError' }
         '500': { $ref: '#/components/responses/InternalError' }
 
-  /findings/auto-draft-wp:
+  /findings/draft-remediation:
     post:
-      operationId: findingsAutoDraftWp
-      summary: Generate the WP-AUTO-NNN.md skeleton from a finding
+      operationId: findingsDraftRemediation
+      x-cli-subcommand: auto-draft-wp
+      summary: Draft a remediation work item from a finding
       description: |
-        Internal — usually called by findings.register. Produces the
-        WP file with primitive + severity + reference to the source
-        finding.
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FindingsAutoDraftWpRequest' } } } }
+        Internal — usually called by findings.register. Produces a
+        remediation work item (encoded as a WP-AUTO-NNN.md file under
+        work-packages/) carrying the primitive + severity + reference
+        to the source finding.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FindingsDraftRemediationRequest' } } } }
       responses:
-        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/FindingsAutoDraftWpResult' } } } }
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/FindingsDraftRemediationResult' } } } }
         '400': { $ref: '#/components/responses/ExpectedError' }
         '500': { $ref: '#/components/responses/InternalError' }
 
-  # ─── wp ─────────────────────────────────────────────────────────────
-  /wp/read-frontmatter:
+  # ─── work_package ───────────────────────────────────────────────────
+  /work-package/read-metadata:
     post:
-      operationId: wpReadFrontmatter
-      summary: Read YAML frontmatter from a WP file
-      description: Returns one field's value, or the whole frontmatter dict if field is "*".
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/WpReadFrontmatterRequest' } } } }
+      operationId: workPackageReadMetadata
+      x-cli-subcommand: read-frontmatter
+      summary: Read metadata from a Work Package file
+      description: Returns one frontmatter field's value, or the whole frontmatter dict if field is "*".
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/WorkPackageReadMetadataRequest' } } } }
       responses:
-        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/WpReadFrontmatterResult' } } } }
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/WorkPackageReadMetadataResult' } } } }
         '400': { $ref: '#/components/responses/ExpectedError' }
         '500': { $ref: '#/components/responses/InternalError' }
 
-  /wp/append-evidence:
+  /work-package/append-evidence:
     post:
-      operationId: wpAppendEvidence
-      summary: Append acceptance-evidence section to a WP file
+      operationId: workPackageAppendEvidence
+      x-cli-subcommand: append-evidence
+      summary: Append acceptance-evidence section to a Work Package file
       description: |
         Adds `## Acceptance Evidence` with the pipeline-result fields
         (branch, pre_squash_sha, merge_sha, deploy_url, health,
         smoke, post-deploy verification, completed_at).
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/WpAppendEvidenceRequest' } } } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/WorkPackageAppendEvidenceRequest' } } } }
       responses:
-        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/WpAppendEvidenceResult' } } } }
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/WorkPackageAppendEvidenceResult' } } } }
         '400': { $ref: '#/components/responses/ExpectedError' }
         '500': { $ref: '#/components/responses/InternalError' }
 
@@ -509,18 +519,21 @@ paths:
         '400': { $ref: '#/components/responses/ExpectedError' }
         '500': { $ref: '#/components/responses/InternalError' }
 
-  # ─── step12 ─────────────────────────────────────────────────────────
-  /step12/wrap:
+  # ─── lifecycle ──────────────────────────────────────────────────────
+  /lifecycle/complete:
     post:
-      operationId: step12Wrap
-      summary: Atomic Step 12 — evidence + INDEX flip + worktree remove
+      operationId: lifecycleComplete
+      x-cli-subcommand: wrap
+      summary: Atomically complete a Work Package's lifecycle
       description: |
-        Chains three operations fail-fast: wp.append-evidence;
-        index.flip-status (expected: in_progress → done); worktree.remove.
-        If any fails, returns details of what succeeded vs failed.
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Step12WrapRequest' } } } }
+        Chains three operations fail-fast: work_package.append-evidence;
+        index.flip-status (expected: in_progress → done);
+        worktree.remove. If any fails, returns details of what
+        succeeded vs failed. This is the closing ceremony for a WP
+        after the pipeline succeeds.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/LifecycleCompleteRequest' } } } }
       responses:
-        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Step12WrapResult' } } } }
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LifecycleCompleteResult' } } } }
         '400': { $ref: '#/components/responses/ExpectedError' }
         '500': { $ref: '#/components/responses/InternalError' }
 
@@ -832,7 +845,7 @@ components:
       properties:
         config: { type: object, additionalProperties: { type: string } }
 
-    IndexPropagateBlockedRequest:
+    IndexMarkDownstreamBlockedRequest:
       allOf:
         - $ref: '#/components/schemas/StandardRequest'
         - type: object
@@ -840,14 +853,14 @@ components:
           properties:
             wp: { type: string }
 
-    IndexPropagateBlockedResult:
+    IndexMarkDownstreamBlockedResult:
       type: object
       required: [blocker_wp, flipped_to_dependency_blocked]
       properties:
         blocker_wp: { type: string }
         flipped_to_dependency_blocked: { type: array, items: { type: string } }
 
-    IndexAddWpRequest:
+    IndexAddRequest:
       allOf:
         - $ref: '#/components/schemas/StandardRequest'
         - type: object
@@ -863,14 +876,14 @@ components:
             token_estimate: { type: string, default: '?' }
             tdd: { type: [string, 'null'] }
 
-    IndexAddWpResult:
+    IndexAddResult:
       type: object
       required: [wp, added]
       properties:
         wp: { type: string }
         added: { type: boolean }
 
-    IndexSyncAutoDraftsResult:
+    IndexRegisterPendingDraftsResult:
       type: object
       required: [synced_count, synced]
       properties:
@@ -962,7 +975,7 @@ components:
         tool: { type: string }
         status: { type: string }
 
-    JournalRecordPostdeployRequest:
+    JournalRecordSecurityVerdictRequest:
       allOf:
         - $ref: '#/components/schemas/StandardRequest'
         - type: object
@@ -972,14 +985,14 @@ components:
             verdict: { type: string }
             findings_json: { type: string }
 
-    JournalPostdeployResult:
+    JournalSecurityVerdictResult:
       type: object
       required: [wp, verdict]
       properties:
         wp: { type: string }
         verdict: { type: string }
 
-    JournalSeedPlanRequest:
+    JournalCreatePlanRequest:
       allOf:
         - $ref: '#/components/schemas/StandardRequest'
         - type: object
@@ -990,7 +1003,7 @@ components:
             plan_json: { type: string }
             force: { type: boolean, default: false }
 
-    JournalSeedPlanResult:
+    JournalCreatePlanResult:
       type: object
       required: [wp, approach, item_count]
       properties:
@@ -998,7 +1011,7 @@ components:
         approach: { type: string }
         item_count: { type: integer }
 
-    JournalMarkPlanItemRequest:
+    JournalUpdatePlanItemRequest:
       allOf:
         - $ref: '#/components/schemas/StandardRequest'
         - type: object
@@ -1010,7 +1023,7 @@ components:
             expected: { type: string }
             notes: { type: string }
 
-    JournalMarkPlanItemResult:
+    JournalUpdatePlanItemResult:
       type: object
       required: [wp, item, status]
       properties:
@@ -1128,7 +1141,7 @@ components:
         signature: { type: string }
         sf_path: { type: [string, 'null'] }
 
-    FindingsAutoDraftWpRequest:
+    FindingsDraftRemediationRequest:
       allOf:
         - $ref: '#/components/schemas/StandardRequest'
         - type: object
@@ -1140,7 +1153,7 @@ components:
             primitive: { type: string, default: 'Secure', enum: [Secure, Harden, Instrument, Gate] }
             severity: { type: string, enum: [CONCERN, ADVISORY] }
 
-    FindingsAutoDraftWpResult:
+    FindingsDraftRemediationResult:
       type: object
       required: [auto_wp_id, path]
       properties:
@@ -1148,7 +1161,7 @@ components:
         path: { type: string }
 
     # ─── wp ───────────────────────────────────────────────────────────
-    WpReadFrontmatterRequest:
+    WorkPackageReadMetadataRequest:
       allOf:
         - $ref: '#/components/schemas/StandardRequest'
         - type: object
@@ -1157,7 +1170,7 @@ components:
             wp: { type: string }
             field: { type: string, description: 'Field name, or "*" for all' }
 
-    WpReadFrontmatterResult:
+    WorkPackageReadMetadataResult:
       type: object
       required: [field, present]
       properties:
@@ -1167,7 +1180,7 @@ components:
         frontmatter: { type: object, additionalProperties: true }
         present: { type: boolean }
 
-    WpAppendEvidenceRequest:
+    WorkPackageAppendEvidenceRequest:
       allOf:
         - $ref: '#/components/schemas/StandardRequest'
         - type: object
@@ -1176,7 +1189,7 @@ components:
             wp: { type: string }
             evidence_json: { type: string, description: "JSON object or @/path" }
 
-    WpAppendEvidenceResult:
+    WorkPackageAppendEvidenceResult:
       type: object
       required: [wp, path]
       properties:
@@ -1223,7 +1236,7 @@ components:
         removed: { type: string }
 
     # ─── step12 ───────────────────────────────────────────────────────
-    Step12WrapRequest:
+    LifecycleCompleteRequest:
       allOf:
         - $ref: '#/components/schemas/StandardRequest'
         - type: object
@@ -1236,7 +1249,7 @@ components:
             worktree_path: { type: string }
             post_deploy_verification: { type: string }
 
-    Step12WrapResult:
+    LifecycleCompleteResult:
       type: object
       required: [wp, steps]
       properties:
