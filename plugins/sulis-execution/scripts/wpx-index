@@ -472,7 +472,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_flip.add_argument("--wp", required=True)
     p_flip.add_argument("--to", required=True,
                         choices=["pending", "in_progress", "done", "blocked",
-                                 "dependency_blocked", "auto-draft", "cancelled"])
+                                 "dependency_blocked", "auto-draft", "cancelled",
+                                 "step-7-complete", "step-7-held", "step-7-blocked"])
     p_flip.add_argument("--expected", default=None,
                         help="Expected current status (atomic check)")
 

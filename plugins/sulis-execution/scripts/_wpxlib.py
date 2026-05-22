@@ -1331,15 +1331,33 @@ def rebase_branch_in_clone(
     Raises RuntimeError on rebase conflict; the caller (Phase 3) catches
     this and removes the offending WP from the batch.
     """
-    # Fetch latest of both
-    rc, _, err = _run(["git", "fetch", "origin", branch], cwd=clone_dir,
-                     timeout=60)
+    # Fetch latest of both. Use explicit refspec for the branch so the
+    # remote-tracking ref refs/remotes/origin/<branch> is created even
+    # when the clone was made with --depth/--single-branch (which is
+    # how `gh repo clone --depth 100` works). Without the explicit
+    # refspec, `git fetch origin <branch>` updates FETCH_HEAD but does
+    # NOT create the tracking ref under those clone modes, and the
+    # subsequent `git checkout -B <branch> origin/<branch>` then fails.
+    rc, _, err = _run(["git", "fetch", "origin",
+                       f"{branch}:refs/remotes/origin/{branch}"],
+                     cwd=clone_dir, timeout=60)
     if rc != 0:
         raise RuntimeError(f"git fetch {branch} failed: {err}")
-    rc, _, err = _run(["git", "fetch", "origin", "dev"], cwd=clone_dir,
-                     timeout=60)
+    rc, _, err = _run(["git", "fetch", "origin",
+                       "dev:refs/remotes/origin/dev"],
+                     cwd=clone_dir, timeout=60)
     if rc != 0:
         raise RuntimeError(f"git fetch dev failed: {err}")
+
+    # Capture the pre-rebase SHA so we can use --force-with-lease with
+    # an explicit expected value (safer than plain --force; also works
+    # around an implicit-comparison bug when the remote-tracking ref
+    # was just created via refspec-form fetch above).
+    rc, out, _ = _run(["git", "rev-parse", f"origin/{branch}"],
+                     cwd=clone_dir, timeout=10)
+    if rc != 0:
+        raise RuntimeError(f"git rev-parse origin/{branch} failed")
+    pre_rebase_sha = out.strip()
 
     # Checkout the branch (creating a local tracking branch if needed)
     rc, _, err = _run(["git", "checkout", "-B", branch,
@@ -1353,9 +1371,15 @@ def rebase_branch_in_clone(
         _run(["git", "rebase", "--abort"], cwd=clone_dir, timeout=30)
         raise RuntimeError(f"git rebase {branch} onto {onto[:8]} failed: {err}")
 
-    # Push --force-with-lease (safe: only force if remote matches what we fetched)
-    rc, _, err = _run(["git", "push", "--force-with-lease", "origin", branch],
-                     cwd=clone_dir, timeout=60)
+    # Push --force-with-lease with explicit expected SHA (refuses if
+    # someone else pushed to origin/<branch> between our fetch and
+    # this push).
+    rc, _, err = _run(
+        ["git", "push",
+         f"--force-with-lease={branch}:{pre_rebase_sha}",
+         "origin", branch],
+        cwd=clone_dir, timeout=60,
+    )
     if rc != 0:
         raise RuntimeError(f"git push --force-with-lease {branch} failed: {err}")
 
@@ -1678,8 +1702,12 @@ def restore_branch_with_guard(
     Returns (success, message). Success=False with message="newer push"
     is the guard firing; the caller surfaces this in the BLOCKER.
     """
-    rc, _, err = _run(["git", "fetch", "origin", branch], cwd=clone_dir,
-                     timeout=60)
+    # Explicit refspec — see rationale in rebase_branch_in_clone above
+    # (single-branch shallow clones don't auto-create origin/<branch>
+    # tracking ref without the refspec).
+    rc, _, err = _run(["git", "fetch", "origin",
+                       f"{branch}:refs/remotes/origin/{branch}"],
+                     cwd=clone_dir, timeout=60)
     if rc != 0:
         return False, f"git fetch {branch} failed: {err}"
     rc, out, _ = _run(

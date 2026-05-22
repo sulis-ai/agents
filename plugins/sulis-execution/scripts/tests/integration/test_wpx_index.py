@@ -8,6 +8,8 @@ the WP table).
 
 from __future__ import annotations
 
+import pytest
+
 
 def _common(tmp_project):
     """Standard args used by every wpx-index call in this module."""
@@ -148,6 +150,34 @@ def test_flip_status_expected_mismatch_rejected(tmp_project, seed_index, run_too
     )
     assert not result.ok
     assert "expected 'pending'" in result.error
+
+
+@pytest.mark.parametrize("status", [
+    "step-7-complete",
+    "step-7-held",
+    "step-7-blocked",
+])
+def test_flip_status_accepts_step_7_enum_values(
+    tmp_project, seed_index, run_tool, status,
+):
+    """Regression: v0.11.0 added step-7-* status values to the SDK + train
+    eligibility logic, but wpx-index's flip-status argparse choices weren't
+    updated. Result: the SDK declared these statuses valid, the train queried
+    on them, but `wpx-index flip-status --to step-7-complete` rejected at
+    argparse — surfaced in a real platform-repo executor session.
+
+    Fixed in v0.15.1 by extending the choices list. Test pins the contract.
+    """
+    seed_index("INDEX-minimal.md")
+    result = run_tool(
+        "wpx-index", "flip-status",
+        "--wp", "WP-002", "--to", status, "--expected", "pending",
+        *_common(tmp_project),
+    )
+    assert result.ok, (
+        f"flip-status --to {status} should be accepted; got stderr: "
+        f"{result.stderr}"
+    )
 
 
 def test_add_wp_duplicate_rejected(tmp_project, seed_index, run_tool):
