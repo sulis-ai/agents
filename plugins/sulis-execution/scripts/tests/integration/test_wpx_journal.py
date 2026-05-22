@@ -49,6 +49,69 @@ def test_journal_step_trace_round_trip(tmp_project, run_tool):
     assert r3.data["value"] == "completed"
 
 
+def test_step_trace_accepts_half_step_six_point_five(tmp_project, run_tool):
+    """v0.20.1+: --step 6.5 is accepted (used by the executor's Step 6.5
+    code-review gate). Pre-v0.20.1 the script rejected 6.5 because --step
+    was type=int — which may have driven executors to substitute inline
+    judgement rather than invoke /sea:code-review at all.
+
+    The half-step renders as "6.5" in the trace (not "6.5.0" or "6").
+    """
+    run_tool("wpx-journal", "init", "--wp", "WP-001", *_common(tmp_project))
+    r1 = run_tool(
+        "wpx-journal", "start-step",
+        "--wp", "WP-001", "--step", "6.5",
+        *_common(tmp_project),
+    )
+    assert r1.ok, f"start-step --step 6.5 should succeed; got {r1.stderr}"
+    r2 = run_tool(
+        "wpx-journal", "complete-step",
+        "--wp", "WP-001", "--step", "6.5",
+        "--outcome", "addressed: 0 findings (bundle at PR-feat-wp-001-...)",
+        *_common(tmp_project),
+    )
+    assert r2.ok
+    # Round-trip through read --field
+    r3 = run_tool(
+        "wpx-journal", "read",
+        "--wp", "WP-001", "--field", "step-6.5-status",
+        *_common(tmp_project),
+    )
+    assert r3.ok
+    assert r3.data["value"] == "completed", (
+        f"Step 6.5 should be completed; got {r3.data}"
+    )
+
+
+def test_step_trace_integer_step_renders_without_trailing_zero(tmp_project, run_tool):
+    """v0.20.1+ flips --step to type=float; integer steps must still
+    render as "6", not "6.0", or existing journals would diverge."""
+    run_tool("wpx-journal", "init", "--wp", "WP-001", *_common(tmp_project))
+    run_tool(
+        "wpx-journal", "start-step",
+        "--wp", "WP-001", "--step", "6",
+        *_common(tmp_project),
+    )
+    r = run_tool(
+        "wpx-journal", "complete-step",
+        "--wp", "WP-001", "--step", "6",
+        "--outcome", "lint clean",
+        *_common(tmp_project),
+    )
+    assert r.ok
+    # Look at the journal file: the row's first column must be "6", not "6.0"
+    text = tmp_project.journal("WP-001").read_text()
+    # The trace table row: | 6 | <started> | <completed> | lint clean |
+    assert "| 6 |" in text, (
+        f"Integer step must render as '6' (no trailing .0); "
+        f"journal text was:\n{text}"
+    )
+    assert "| 6.0 |" not in text, (
+        f"Integer step accidentally rendered as '6.0'; "
+        f"journal text was:\n{text}"
+    )
+
+
 def test_seed_plan_populates_plan_section(tmp_project, run_tool, tmp_path):
     run_tool("wpx-journal", "init", "--wp", "WP-001", *_common(tmp_project))
     plan = tmp_path / "plan.json"

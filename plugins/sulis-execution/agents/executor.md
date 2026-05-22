@@ -342,22 +342,64 @@ catches CROSS-WP integration issues that no per-WP review can see
 N+1 query). Step 6.5 catches what's wrong INSIDE one WP; Step 10.5
 catches what's wrong in the COMPOSITION.
 
-### Workflow
+### Workflow (HARDENED — v0.20.1+)
 
 After Step 6 marks complete:
 
 ```bash
 # 6.5.a — Mark step started
+# (v0.20.1+ accepts --step 6.5; pre-v0.20.1 the script rejected float
+# values, which may have driven prior executors to skip /code-review)
 wpx-journal start-step --wp WP-NNN --project <slug> --step 6.5
 
-# 6.5.b — Invoke /code-review against the local branch's diff
-# The skill produces a report at:
-#   .architecture/{project}/code-reviews/PR-{branch-or-sha}-{TIMESTAMP}/REVIEW.md
+# 6.5.b — Invoke /code-review against the local branch's diff (MANDATORY)
+# The skill produces a bundle at:
+#   .architecture/{project}/code-reviews/PR-{branch-or-sha}-{TIMESTAMP}/
+#     REVIEW.md          — human-readable two-tier report
+#     signals.json       — machine-readable PH-06 signal table
+#     hardening-deltas/  — draft fixes (if any findings)
+#     tool-outputs/      — raw typecheck/lint/scanner logs
 /code-review feat/wp-NNN-<slug> <project-name>
 
-# 6.5.c — Read the report's findings list
+# 6.5.c — VERIFY THE BUNDLE WAS PRODUCED (otherwise → BLOCKER)
+# This guards against the v0.16.0–v0.20.0 failure mode where executors
+# substituted inline self-attestation for actual /code-review invocation.
+# The slice-2 audit (2026-05-22) found 9 of 12 WPs had no bundle.
+BUNDLE_DIR=$(ls -td .architecture/<project>/code-reviews/PR-feat-wp-NNN-*/ 2>/dev/null | head -1)
+if [ -z "$BUNDLE_DIR" ] || [ ! -f "$BUNDLE_DIR/REVIEW.md" ]; then
+  # /code-review wasn't actually invoked or didn't produce a bundle.
+  # This is an anti-pattern (see "Anti-patterns for Step 6.5" below).
+  wpx-blocker write --wp WP-NNN --project <slug> \
+    --title "Step 6.5 /code-review bundle missing" \
+    --step "Step 6.5 (code-review gate)" \
+    --trigger "code-review-skipped" \
+    --observation "No bundle at .architecture/<project>/code-reviews/PR-feat-wp-NNN-*/" \
+    --root-cause "/code-review was not invoked OR exited without writing REVIEW.md" \
+    --scope in-scope \
+    --suggested-next "Re-invoke /code-review feat/wp-NNN-<slug> <project>; then resume Step 6.5"
+  wpx-index flip-status --wp WP-NNN --project <slug> \
+    --to step-7-blocked --expected in_progress
+  exit 1
+fi
+if [ ! -f "$BUNDLE_DIR/signals.json" ]; then
+  # Bundle exists but is incomplete (no machine-readable signals)
+  wpx-blocker write --wp WP-NNN --project <slug> \
+    --title "Step 6.5 /code-review bundle incomplete" \
+    --step "Step 6.5 (code-review gate)" \
+    --trigger "code-review-incomplete" \
+    --observation "$BUNDLE_DIR/REVIEW.md exists but signals.json missing" \
+    --root-cause "/code-review produced a partial bundle; cannot programmatically verify verdict" \
+    --scope in-scope \
+    --suggested-next "Re-invoke /code-review; ensure both REVIEW.md and signals.json are produced"
+  wpx-index flip-status --wp WP-NNN --project <slug> \
+    --to step-7-blocked --expected in_progress
+  exit 1
+fi
+
+# 6.5.d — Read the report's findings list
 # Each finding has: severity, file:line, evidence (quoted text),
 # recommendation, rule cite (CR-NN or CR-10 pattern #N)
+# Parse signals.json for the machine-readable view; REVIEW.md for human context.
 ```
 
 ### Addressing findings
@@ -367,7 +409,12 @@ Every finding must be addressed before Step 7. Three valid paths:
 **A. Inline fix** (the default for most findings)
 - Modify the code in the current WP to resolve the finding
 - Re-run `/code-review` on the updated diff
-- Loop until zero findings
+- Loop until zero findings — **budget: 3 iterations** (per
+  `references/self-heal-budget.md`). Most fixes converge in 1-2
+  cycles; the 3rd is a safety margin. On the 3rd unsuccessful loop
+  with findings still remaining, **stop the loop and switch to Path B
+  (auto-draft remediation WP)** for the unresolved findings, OR
+  Path C (founder-flagged exception) if no remediation is feasible
 - This is the right path when the fix fits within the WP's scope and
   is bounded (≤ a few additional lines)
 
@@ -422,13 +469,22 @@ Use the MCP tools if the sulis-execution-mcp server is available
 | Write BLOCKER | `mcp__sulis-execution-mcp__blocker_write` | `wpx-blocker write --step 6.5 --trigger ...` |
 | Flip INDEX status (on BLOCKER) | `mcp__sulis-execution-mcp__index_flip_status` | `wpx-index flip-status --to step-7-blocked --expected in_progress` |
 
-### Anti-patterns for Step 6.5
+### Anti-patterns for Step 6.5 (HARDENED v0.20.1+)
 
 The executor MUST NOT:
 
 - **Skip /code-review** because "the WP is small / clean". Even
   one-line WPs go through the gate; the skill's mechanical baseline
-  (CR-01 typecheck + lint) takes seconds.
+  (CR-01 typecheck + lint) takes seconds. **Enforcement (v0.20.1+):**
+  Step 6.5.c verifies the bundle file exists at
+  `.architecture/{project}/code-reviews/PR-feat-wp-NNN-*/REVIEW.md`.
+  If absent → BLOCKER `trigger=code-review-skipped` + `step-7-blocked`.
+- **Substitute inline self-attestation for /code-review invocation.**
+  "I read the diff and saw 0 findings" is NOT acceptable evidence
+  the gate ran. The bundle file IS the evidence. (The slice-2
+  audit on 2026-05-22 found 9 of 12 WPs took this shortcut; the
+  Step 6.5.c verification was added in v0.20.1 to make it
+  impossible.)
 - **Suppress findings without addressing them.** If a CR-10 N+1
   detection fires, the executor either fixes inline, drafts a
   remediation, or BLOCKERs with an exception explanation. Silently
@@ -436,8 +492,18 @@ The executor MUST NOT:
 - **Skip the re-run after inline fixes.** After modifying code to
   address findings, /code-review must re-run; the executor verifies
   zero findings remain before proceeding.
+- **Exceed the inline-fix budget without escalating.** The
+  inline-fix loop is bounded to **3 iterations** per
+  `references/self-heal-budget.md`. On the 3rd unsuccessful
+  iteration: switch the unresolved findings to Path B (auto-draft
+  remediation WP) OR Path C (founder-flagged exception). Do not
+  loop indefinitely.
 - **Proceed to Step 7 with unaddressed findings.** The whole point
   of Step 6.5 is the gate; bypassing it defeats the purpose.
+- **Declare Step 6.5 complete without `wpx-journal complete-step`.**
+  The journal entry IS the audit signal the calling session uses
+  to verify the gate ran. No journal entry → not addressed → the
+  calling session writes BLOCKER.
 
 ## Bookkeeping via wpx-* tools (MUST — v0.9.0 commit 1.24b+)
 

@@ -108,6 +108,19 @@ def _write_journal(paths: WpxPaths, wp: str, text: str) -> None:
 # ────────────────────────────────────────────────────────────────────────
 
 
+def _format_step(step: float) -> str:
+    """Render a step number without trailing .0 for integer values.
+
+    The --step argument accepts float (v0.20.1+) so half-steps like 6.5
+    work for the executor's code-review gate. Integer values must still
+    render as "6", not "6.0", to match existing journal entries written
+    before the float migration.
+    """
+    if step == int(step):
+        return str(int(step))
+    return str(step)
+
+
 def cmd_init(args: argparse.Namespace) -> None:
     paths = paths_from_args(args)
     j = paths.journal(args.wp)
@@ -137,16 +150,16 @@ def cmd_start_step(args: argparse.Namespace) -> None:
     )
     # Add the new row if not already present
     for row in table.rows:
-        if row and row[0].strip() == str(args.step):
+        if row and row[0].strip() == _format_step(args.step):
             emit_error(
                 f"Step {args.step} already started in journal "
                 f"(row found in Step trace)."
             )
-    table.rows.append([str(args.step), _now(), "(in flight)", "—"])
+    table.rows.append([_format_step(args.step), _now(), "(in flight)", "—"])
     new_section = "## Step trace\n\n" + table.render() + "\n\n"
     text = text[:start] + new_section + text[end:]
     # Also update the "Lifecycle step:" header line
-    text = _update_header(text, "Lifecycle step", str(args.step))
+    text = _update_header(text, "Lifecycle step", _format_step(args.step))
     _write_journal(paths, args.wp, text)
     emit_ok(data={"wp": args.wp, "step": args.step, "started_at": _now()})
 
@@ -162,7 +175,7 @@ def cmd_complete_step(args: argparse.Namespace) -> None:
     table = parse_md_table(table_text)
     found = False
     for row in table.rows:
-        if row and row[0].strip() == str(args.step):
+        if row and row[0].strip() == _format_step(args.step):
             row[2] = _now()
             row[3] = args.outcome
             found = True
@@ -195,7 +208,7 @@ def cmd_record_attempt(args: argparse.Namespace) -> None:
         rows=[],
     )
     table.rows.append([
-        str(args.step), str(args.attempt), args.failure,
+        _format_step(args.step), str(args.attempt), args.failure,
         args.root_cause, args.change, args.outcome,
     ])
     new_section = "## Self-heal attempts\n\n" + table.render() + "\n\n"
@@ -532,12 +545,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_start = sub.add_parser("start-step", help="Record start of a step")
     add_common_args(p_start)
     p_start.add_argument("--wp", required=True)
-    p_start.add_argument("--step", required=True, type=int)
+    # v0.20.1+: accept float (e.g. 6.5) for half-steps. Was type=int —
+    # which rejected --step 6.5 with an unfriendly argparse error and
+    # may have driven executors to skip /code-review (Step 6.5) entirely.
+    p_start.add_argument("--step", required=True, type=float)
 
     p_complete = sub.add_parser("complete-step", help="Record completion of a step")
     add_common_args(p_complete)
     p_complete.add_argument("--wp", required=True)
-    p_complete.add_argument("--step", required=True, type=int)
+    p_complete.add_argument("--step", required=True, type=float)
     p_complete.add_argument("--outcome", required=True,
                             help="One-line outcome (e.g. 'success: 3 tests')")
 
@@ -545,7 +561,7 @@ def build_parser() -> argparse.ArgumentParser:
                                help="Record a self-heal attempt")
     add_common_args(p_attempt)
     p_attempt.add_argument("--wp", required=True)
-    p_attempt.add_argument("--step", required=True, type=int)
+    p_attempt.add_argument("--step", required=True, type=float)
     p_attempt.add_argument("--attempt", required=True, type=int)
     p_attempt.add_argument("--failure", required=True,
                            help="One-line failure summary")
