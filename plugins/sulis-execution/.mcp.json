@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "sulis-execution-mcp": {
-      "command": "sulis-execution-mcp",
+      "command": "${CLAUDE_PLUGIN_ROOT}/sdk/mcp-server/bin/sulis-execution-mcp-launcher",
       "args": [],
       "env": {
         "SULIS_EXECUTION_REPO_ROOT": "${SULIS_EXECUTION_REPO_ROOT:-.}",

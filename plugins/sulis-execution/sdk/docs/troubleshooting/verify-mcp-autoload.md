@@ -67,34 +67,72 @@ Expected: `✓ 38 tools registered`.
 
 ## If `/mcp` doesn't show it
 
-Three common causes, in order of likelihood:
+Four common causes, in order of likelihood:
 
 ### 1. The `sulis-execution-mcp` package isn't installed
 
-The plugin's `.mcp.json` references `sulis-execution-mcp` as a console
-script. If the Python package isn't installed, the command isn't on
-PATH and the MCP server can't start.
+The plugin uses a launcher script that tries multiple Python
+interpreters to find the install. If no Python has the package
+importable, the launcher emits a clear "could not find" error.
 
 ```bash
 pip install -e /path/to/agents/plugins/sulis-execution/sdk/mcp-server/
-which sulis-execution-mcp   # should print a path
+pip show sulis-execution-mcp     # should print the version
 ```
 
-After install, restart your Claude session or run `/reload-plugins`.
+After install, run `/reload-plugins`.
 
-### 2. PATH issue (pyenv, multi-Python setups)
+### 2. PATH issue (Claude Code launched from GUI vs terminal — fixed in v0.19.1)
 
-If you installed via `pip install -e ...` but the binary still isn't
-on PATH, your shell's PATH may not include the right Python's
-`bin/` directory.
+On macOS, Claude Code launched from Finder / Spotlight / Launchpad
+inherits `launchctl`'s minimal PATH (`/usr/bin:/bin:/usr/sbin:/sbin`)
+and cannot see pyenv shims or user-local `bin/` directories. Versions
+of the plugin before v0.19.1 used `command: sulis-execution-mcp` in
+`.mcp.json`, which relies on shell PATH to find the console script.
+If your PATH didn't include the Python install's bin/, the MCP
+server failed to spawn with "1 error during load."
+
+v0.19.1+ ships `sdk/mcp-server/bin/sulis-execution-mcp-launcher` — a
+small shell wrapper that tries multiple Python interpreters
+(`python3`, `python3.12`, `~/.pyenv/shims/python3`, `~/.pyenv/versions/3.X/bin/python3`,
+`/usr/local/bin/python3`, `/opt/homebrew/bin/python3`, `/usr/bin/python3`)
+and execs the first one that can import `sulis_execution_mcp`. The
+`.mcp.json` references the launcher by absolute path via
+`${CLAUDE_PLUGIN_ROOT}`, so it works regardless of shell PATH.
+
+If you're on v0.19.1+ and still see the error, run the launcher
+directly to diagnose:
 
 ```bash
-pip show sulis-execution-mcp     # confirms install
-pyenv which sulis-execution-mcp  # finds the binary via pyenv
-# add the printed directory to PATH if missing
+PLUGIN_ROOT=$(ls -td ~/.claude/plugins/cache/sulis-ai-agents/sulis-execution/*/ | head -1)
+"$PLUGIN_ROOT/sdk/mcp-server/bin/sulis-execution-mcp-launcher" < /dev/null
+# Exit 0 = launcher found a working Python (server is up; press Ctrl-C to quit)
+# Exit 1 = launcher reports which Pythons it tried; install missing
 ```
 
-### 3. Env vars not resolving
+If the launcher exits 1, install the package into one of the
+candidate Pythons:
+
+```bash
+~/.pyenv/shims/python3 -m pip install -e \
+  "$PLUGIN_ROOT/sdk/mcp-server/"
+```
+
+### 3. The cached plugin is stale (older version than the marketplace has)
+
+`/reload-plugins` reconnects MCP servers using the currently-cached
+plugin. If the marketplace has a newer version, you may need to
+re-install the plugin to get the new manifest + spec. Check:
+
+```bash
+ls -lt ~/.claude/plugins/cache/sulis-ai-agents/sulis-execution/ | head -3
+# Most recent dir = current cached version
+```
+
+If the cache is missing the latest version, re-install from
+Claude Code's plugin UI / command (depends on Claude Code version).
+
+### 4. Env vars not resolving
 
 The `.mcp.json` uses `${CLAUDE_PLUGIN_ROOT}` for default WPX_DIR + OpenAPI
 spec paths. `CLAUDE_PLUGIN_ROOT` is set by Claude Code per its plugin
