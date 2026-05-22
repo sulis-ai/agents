@@ -6,7 +6,12 @@ description: >
   by dependency-graph eligibility). After each executor batch returns,
   the loop polls wpx-train for eligibility and fires `wpx-train run`
   when the train trigger is met (size ≥3 OR ≥1 WP older than 4h OR
-  --force) — Steps 8-11 happen per-train, not per-WP, in v0.11.0+.
+  --force). The train handles Steps 8-10 (rebase / bundled-tip CI /
+  sequential merge / deploy / health / smoke); after the train returns
+  outcome=success, the calling session dispatches Step 11 per-WP
+  (security-reviewer Agent) over the batch's wps_shipped, drafting
+  remediation WPs for any findings — the distributed loop closes when
+  a subsequent train's Step 11 produces zero NEW findings (v0.20.0+).
   Per-WP wpx-pipeline shipping remains available via `/sulis-execution:run-wp
   WP-X --force-single` for hotfixes. Usage: /sulis-execution:run-all.
   The loop runs inline in the calling session — not via a separate
@@ -21,11 +26,19 @@ executor dispatch and train-based integration:
 
 - **Per-WP (executors, Steps 1-7):** parallel — `max_parallel` executors
   at a time, gated by INDEX dependency graph.
-- **Per-batch (Steps 8-11, wpx-train):** after each executor batch
+- **Per-batch (Steps 8-10, wpx-train):** after each executor batch
   returns success and WPs are flipped to `step-7-complete`, this
   skill polls `wpx-train queue-list` and fires `wpx-train run` if
   the trigger is met. The train batches up to 5 WPs into one rebase
   + bundled-tip CI + sequential merge + deploy + health + smoke.
+- **Per-batch (Step 11, in the calling session):** after `wpx-train
+  run` returns `outcome: success`, the calling session iterates over
+  the batch's `wps_shipped` and dispatches the `sulis-security:
+  security-reviewer` Agent per WP. Findings register; non-duplicate
+  findings auto-draft remediation WPs (`WP-AUTO-*`). CRITICAL
+  findings BLOCKER + `step-11-blocked`. The distributed loop
+  terminates when a subsequent train's Step 11 produces zero NEW
+  findings (signature-hash dedup ensures convergence).
 - **Per-WP again (Step 12):** worktree cleanup + INDEX flip from
   `step-7-complete` → `done`. Owned by the WP's executor return
   contract; documented in lifecycle.md.
@@ -338,6 +351,134 @@ loop:
        per-WP flow via wpx-pipeline) is preserved below as v0.10.7
        fallback documentation. **Do not invoke this in v0.11.0+ —
        wpx-train is the path.**
+
+   13. **Step 11 (per-batch, v0.20.0+): post-deploy security review
+       for every WP shipped by the train.**
+
+       Read the train's JSON envelope (the `/tmp/train-result.json`
+       file from the previous step):
+
+           jq -r '.data.result | {outcome, train_id, wps_shipped, deploy_url, final_merge_sha}' \
+             /tmp/train-result.json > /tmp/train-summary.json
+
+       Dispatch only when `outcome: "success"`. If `outcome` is
+       `not_triggered`, `paused`, `failed`, or `blocker`, **skip Step 11**
+       — the train's own recovery flow owns the WPs in those states.
+
+       For each `wp_id` in `result.wps_shipped`, spawn the
+       security-reviewer Agent ONCE. Iterate sequentially (subagent
+       calls are synchronous and one level deep). Up to 2 attempts per
+       WP if the subagent errors out transiently; on third failure
+       write a BLOCKER and skip that WP's Step 12.
+
+           # For each wp_id in wps_shipped:
+           Agent({
+             subagent_type: "sulis-security:security-reviewer",
+             description: "Step 11 post-batch verification for <wp_id>",
+             model: <security_model from frontmatter, if present>,
+             prompt: """
+               Review the squash-merge at <merge_sha> on dev
+               (deployed to <deploy_url>). Health: <health_status>.
+               Smoke: <smoke_verdict>.
+
+               Verify against <wp_id>'s Definition of Done. Categorise
+               findings by severity (CRITICAL / CONCERN / ADVISORY).
+               Return a structured verdict JSON in the format
+               documented at plugins/sulis-security/agents/
+               security-reviewer.md.
+             """,
+           })
+
+       Parse the returned verdict. For each finding from this WP:
+
+       - **CRITICAL** → write a BLOCKER for the WP; flip status to
+         `step-11-blocked`; **skip Step 12 for this WP only**; continue
+         with the next WP in `wps_shipped` (do NOT halt the whole
+         per-batch loop):
+
+             "$WPX_DIR/wpx-blocker" write \
+               --wp <wp_id> --project <slug> \
+               --title "Step 11 CRITICAL finding on <wp_id>" \
+               --step "Step 11 (post-deploy security review)" \
+               --trigger "step-11-critical" \
+               --observation "<finding summary>" \
+               --root-cause "<root cause from verdict>" \
+               --scope in-scope \
+               --suggested-next "Founder review; remediate before next train cycle"
+
+             "$WPX_DIR/wpx-index" flip-status \
+               --wp <wp_id> --project <slug> \
+               --to step-11-blocked --expected done
+
+       - **CONCERN or ADVISORY** → register the finding (signature-hash
+         dedup automatic); if not a duplicate, auto-draft a follow-up
+         WP and register it in INDEX:
+
+             # 1. Register
+             "$WPX_DIR/wpx-findings" register --wp <wp_id> --project <slug> \
+               --severity <CONCERN|ADVISORY> \
+               --summary "<one-line>" \
+               --file <path> \
+               --evidence-json @/tmp/finding-N.json \
+               --suggested-fix "<suggested fix>" \
+               --primitive <SEC-NN>
+
+             # 2. Auto-draft (only if is_duplicate == false in register output)
+             "$WPX_DIR/wpx-findings" auto-draft-wp --project <slug> \
+               --source-finding <SF-NNN> \
+               --source-wp <wp_id> \
+               --auto-wp-id <WP-AUTO-NNN from register output> \
+               --primitive <Secure|Harden|Instrument|Gate> \
+               --severity <CONCERN|ADVISORY>
+
+             # 3. Register in INDEX (status: auto-draft; founder promotes)
+             "$WPX_DIR/wpx-index" add-wp \
+               --wp WP-AUTO-NNN --project <slug> --from-wp-file
+
+       After ALL findings handled for this WP (and assuming no CRITICAL),
+       record the verdict in the journal:
+
+           "$WPX_DIR/wpx-journal" record-postdeploy \
+             --wp <wp_id> --project <slug> \
+             --verdict <PASS|PASS-WITH-FOLLOW-UPS> \
+             --findings-summary "0 CRITICAL, <N> CONCERN, <M> ADVISORY"
+
+       After the loop completes — every WP in `wps_shipped` reviewed —
+       emit a plain-English summary:
+
+           "Step 11 complete for train <train_id>.
+            <N> WPs reviewed; <K_total> findings registered
+            (<K_critical> CRITICAL → BLOCKER + step-11-blocked;
+             <K_new> CONCERN/ADVISORY new → <K_new> WP-AUTO-* drafted;
+             <K_dup> duplicates skipped).
+            Founder: review the auto-drafted WPs in INDEX (status
+            `auto-draft`); promote to `pending` for the next train
+            cycle. The next train's Step 11 will re-review their
+            merge SHAs — this is the loop-until-clean closure (the
+            distributed loop terminates when an iteration produces
+            zero NEW findings)."
+
+       **Loop-until-clean semantic (the user-required behaviour):**
+
+       Step 11 doesn't tight-loop within one train run (re-spawning
+       the reviewer per WP after a fix isn't useful — the merge is
+       already on dev). Instead, the loop is DISTRIBUTED across trains:
+
+       - This train's Step 11 produces N findings + M auto-drafted WPs
+       - Founder promotes WP-AUTO-* to `pending`
+       - The next train ships them
+       - That train's Step 11 re-reviews their merge SHAs
+       - If new findings → more WP-AUTO; if zero new findings → loop
+         closes (the codebase is clean from Step 11's perspective)
+
+       `wpx-findings register`'s signature-hash dedup ensures
+       previously-registered findings don't generate duplicate
+       WP-AUTO drafts (the loop converges, doesn't oscillate).
+
+       For an explicit, retroactive sweep over WPs that shipped
+       before v0.20.0 (i.e., slice-1 and slice-2's 12 WPs that
+       missed Step 11), invoke `/sulis-execution:backfill-gates`
+       (v0.20.2+).
 
        ---
 

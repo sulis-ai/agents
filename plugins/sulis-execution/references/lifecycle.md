@@ -21,7 +21,7 @@ trigger.
 | 9 | Deploy poll | **v0.11.0+:** `wpx-train` (per-batch — ONE deploy per train). **--force-single:** `wpx-pipeline`. |
 | 10 | Health + smoke | **v0.11.0+:** `wpx-train` (per-batch — ONE health+smoke per train). **--force-single:** `wpx-pipeline`. |
 | 10.5 | **Train-batch code-review gate (DEFERRED — design only)** | Calling session — see "Step 10.5 (deferred)" below |
-| 11 | Security review (post-deploy verification) | Calling session (`Agent({subagent_type: "sulis-security:security-reviewer"})` + `wpx-findings register`) — runs **per-WP in parallel after batch deploy** (per ADR-212 amendment) |
+| 11 | Security review (post-deploy verification) | Calling session (`Agent({subagent_type: "sulis-security:security-reviewer"})` + `wpx-findings register`) — runs **per-WP sequentially after `wpx-train run` returns outcome=success**. Dispatched by the run-all skill (v0.20.0+), one WP at a time over the batch's `wps_shipped`. CRITICAL → BLOCKER + `step-11-blocked` + Step 12 skipped for that WP; CONCERN/ADVISORY → SF registered + WP-AUTO-* auto-drafted. The loop is **distributed across trains** — terminates when a subsequent train's Step 11 produces zero NEW (non-duplicate) findings. |
 | 12 | INDEX flip + acceptance evidence + worktree removal | Calling session (`wpx-step12 wrap`) — flips `step-7-complete` → `done` after train succeeds |
 
 > **v0.11.0+ change (ADR-212):** Steps 8-10 are now per-batch via
@@ -79,8 +79,10 @@ the change branch merges into `dev` via `sulis-change finish`.
   is what's deploying. Deploy workflows in the project's CI must run
   on push to `change/*` branches (covered by RC-06 reference workflows
   with `branches: ['change/**']` in the trigger).
-- **Step 11 (security review):** per-WP, in parallel, after the
-  batch deploy. Unchanged in shape by CW-04.
+- **Step 11 (security review):** per-WP **sequentially**, after the
+  train returns outcome=success (dispatched by the run-all skill,
+  v0.20.0+). Loop is distributed across trains and converges when an
+  iteration produces zero NEW findings. Unchanged in shape by CW-04.
 - **Step 12 (cleanup):** unchanged. The WP worktree is removed; the
   WP's INDEX status flips from `step-7-complete` → `done`. The
   change branch retains the WP's squash commit.
