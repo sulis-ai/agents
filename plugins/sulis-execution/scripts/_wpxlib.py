@@ -1831,6 +1831,139 @@ def update_wp_phase_outcome(
     )
 
 
+def list_train_runs(train_runs_dir: Path) -> list[dict]:
+    """Enumerate trains in train_runs_dir. Returns most-recent first.
+
+    Each entry has: train_id, started_at, phase (if state file exists)
+    or terminal_outcome (if only the .yaml record exists).
+
+    Used by `wpx-train inspect` (no --train-id) to show recent trains.
+    """
+    if not train_runs_dir.exists():
+        return []
+    runs: list[dict] = []
+    # State files (in-flight trains)
+    for state_file in train_runs_dir.glob("train-*.state.json"):
+        try:
+            state = read_train_state(state_file)
+        except Exception:
+            continue
+        runs.append({
+            "train_id": state.get("train_id"),
+            "started_at": state.get("started_at"),
+            "phase": state.get("phase"),
+            "pause_reason": state.get("pause_reason"),
+            "in_flight": True,
+        })
+    # Historical YAML records (terminal trains)
+    in_flight_ids = {r["train_id"] for r in runs}
+    for yaml_file in train_runs_dir.glob("train-*.yaml"):
+        # Extract train_id from filename: train-2026-01-01T120000Z.yaml
+        train_id = yaml_file.stem
+        if train_id in in_flight_ids:
+            continue  # in-flight version takes precedence
+        # Parse out a few fields from the YAML-lite format
+        outcome = None
+        started_at = None
+        for line in yaml_file.read_text(encoding="utf-8").splitlines():
+            if line.startswith("outcome:"):
+                outcome = line.split(":", 1)[1].strip().strip('"')
+            elif line.startswith("started_at:"):
+                started_at = line.split(":", 1)[1].strip().strip('"')
+        runs.append({
+            "train_id": train_id,
+            "started_at": started_at,
+            "phase": outcome,  # terminal phase from .yaml
+            "pause_reason": None,
+            "in_flight": False,
+        })
+    # Most-recent first by started_at (None → tail)
+    runs.sort(key=lambda r: r.get("started_at") or "", reverse=True)
+    return runs
+
+
+def render_train_state_plain_english(state: dict) -> str:
+    """Render a train-state dict as a founder-friendly plain-English summary.
+
+    FE-06 compliant: no internal IDs, no jargon. Translates phase names
+    to action-oriented language; surfaces pause_reason + recovery_hint
+    when present.
+
+    Used by `wpx-train inspect <train_id>` for the default rendering.
+    """
+    train_id = state.get("train_id", "unknown")
+    phase = state.get("phase", "unknown")
+    started_at = state.get("started_at", "?")
+    bundle = state.get("bundle", [])
+
+    lines = [
+        f"Train {train_id}",
+        f"  Started: {started_at}",
+        f"  Phase: {phase}",
+    ]
+
+    phase_descriptions = {
+        "pending": "Selected the bundle of work; about to start rebasing.",
+        "rebasing": "Rebasing the feature branches onto each other in a temp clone.",
+        "ci_running": "Waiting for the bundled-tip CI to come back.",
+        "merging": "Squash-merging each branch to the base in order.",
+        "deploying": "Waiting for the deploy workflow to complete.",
+        "verifying": "Running health + smoke checks against the deploy.",
+        "success": "Done. All work merged + deployed + verified.",
+        "failed": "Failed. The revert path ran; branches restored.",
+        "paused": "Paused. Needs attention before it can continue.",
+        "aborted": "Aborted by founder. Branches restored to their pre-train state.",
+    }
+    description = phase_descriptions.get(phase)
+    if description:
+        lines.append(f"    → {description}")
+
+    if state.get("pause_reason"):
+        lines.append(f"  Pause reason: {state['pause_reason']}")
+    if state.get("recovery_hint"):
+        lines.append(f"  What to do: {state['recovery_hint']}")
+
+    if bundle:
+        lines.append("")
+        lines.append(f"  Bundle ({len(bundle)} work packages):")
+        for entry in bundle:
+            wp = entry.get("wp", "?")
+            outcomes = entry.get("phase_outcomes", {})
+            merge_sha = entry.get("merge_sha_on_dev")
+            outcome_summary = (
+                f"merged as {merge_sha[:8]}" if merge_sha
+                else _summarise_wp_outcomes(outcomes)
+            )
+            lines.append(f"    - {wp}: {outcome_summary}")
+
+    history = state.get("phase_history", [])
+    if history and len(history) > 1:
+        lines.append("")
+        lines.append("  Phase history:")
+        for entry in history:
+            outcome = entry.get("outcome") or "in progress"
+            lines.append(
+                f"    - {entry['phase']}: {entry.get('started_at', '?')} "
+                f"→ {entry.get('ended_at') or 'now'} ({outcome})"
+            )
+
+    return "\n".join(lines)
+
+
+def _summarise_wp_outcomes(outcomes: dict) -> str:
+    """Compact summary of a WP's per-phase outcomes for the bundle listing."""
+    if not outcomes:
+        return "pending"
+    # Show the latest phase reached
+    phase_order = (
+        "rebasing", "ci_running", "merging", "deploying", "verifying"
+    )
+    for phase in reversed(phase_order):
+        if phase in outcomes:
+            return f"{phase}: {outcomes[phase]}"
+    return ", ".join(f"{k}={v}" for k, v in outcomes.items())
+
+
 def cleanup_train_state(train_runs_dir: Path, train_id: str) -> None:
     """Delete the in-flight state file (called on terminal phases after
     the .yaml record has been written). Lock file is cleaned up by

@@ -6,6 +6,7 @@ import type {
 } from '../transport.js';
 import type {
   TrainDoctorResult,
+  TrainInspectResult,
   TrainOverrideResult,
   TrainQueueListResult,
   TrainRunResult,
@@ -85,6 +86,28 @@ export class TrainResource {
     ) as unknown as TrainDoctorResult;
   }
 
+  /**
+   * Inspect a train's in-flight or historical state.
+   *
+   * With train_id: returns the train's state snapshot (phase,
+   * phase_history, per-WP outcomes, pause_reason + recovery_hint
+   * when present).
+   *
+   * Without train_id: returns a listing of recent trains.
+   */
+  inspect(opts: { train_id?: string } = {}): TrainInspectResult {
+    const params: Record<string, unknown> = {
+      ...common(this.config, undefined),
+      json: true,
+    };
+    if (opts.train_id !== undefined) {
+      params.train_id = opts.train_id;
+    }
+    return resultPayload(
+      this.transport.invoke(BINARY, 'inspect', params),
+    ) as unknown as TrainInspectResult;
+  }
+
   run(params: TrainRunParams): TrainRunResult {
     return resultPayload(
       this.transport.invoke(BINARY, 'run', {
@@ -147,6 +170,19 @@ export class AsyncTrainResource {
     return resultPayload(
       await this.transport.invoke(BINARY, 'doctor', common(this.config, opts.repo)),
     ) as unknown as TrainDoctorResult;
+  }
+
+  async inspect(opts: { train_id?: string } = {}): Promise<TrainInspectResult> {
+    const params: Record<string, unknown> = {
+      ...common(this.config, undefined),
+      json: true,
+    };
+    if (opts.train_id !== undefined) {
+      params.train_id = opts.train_id;
+    }
+    return resultPayload(
+      await this.transport.invoke(BINARY, 'inspect', params),
+    ) as unknown as TrainInspectResult;
   }
 
   async run(params: TrainRunParams): Promise<TrainRunResult> {

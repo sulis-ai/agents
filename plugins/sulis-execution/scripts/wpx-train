@@ -89,7 +89,11 @@ from _wpxlib import (  # noqa: E402
     paths_from_args,
     read_overrides,
     PatchesAlreadyAppliedError,
+    list_train_runs,
+    read_train_state,
     rebase_branch_in_clone,
+    render_train_state_plain_english,
+    train_state_path,
     restore_branch_with_guard,
     revert_train_on_dev,
     write_overrides,
@@ -284,6 +288,94 @@ def cmd_status(args: argparse.Namespace) -> None:
 
 
 # --- Subcommand: doctor (drift diagnosis) -------------------------------
+
+def cmd_inspect(args: argparse.Namespace) -> None:
+    """Read-only inspection of train state.
+
+    - With --train-id: render the train's in-flight state (or terminal
+      .yaml record if state file is gone). Plain English by default;
+      --json for machine-readable.
+    - Without --train-id: list recent trains (most recent first) with
+      their phase + start time. Always JSON when --json is set.
+    """
+    paths = paths_from_args(args)
+
+    if args.train_id:
+        state_path = train_state_path(paths.train_runs_dir, args.train_id)
+        # Prefer in-flight state file; fall back to historical .yaml record
+        if state_path.exists():
+            try:
+                state = read_train_state(state_path)
+            except RuntimeError as exc:
+                emit_error(str(exc))
+                return
+        else:
+            # Check for terminal YAML record
+            yaml_path = paths.train_runs_dir / f"{args.train_id}.yaml"
+            if not yaml_path.exists():
+                emit_error(
+                    f"Train {args.train_id!r} not found. "
+                    f"No in-flight state at {state_path} and no historical "
+                    f"record at {yaml_path}. "
+                    f"Run `wpx-train inspect` (no --train-id) to list "
+                    f"recent trains."
+                )
+                return
+            # Terminal trains: minimal synthetic state from the YAML record
+            state = _synthesise_state_from_yaml_record(yaml_path, args.train_id)
+
+        if args.json:
+            emit_ok(data=state)
+        else:
+            # Plain-English to stdout, exit 0
+            print(render_train_state_plain_english(state))
+            sys.exit(0)
+        return
+
+    # No --train-id: list recent trains
+    runs = list_train_runs(paths.train_runs_dir)
+    if args.json:
+        emit_ok(data={"runs": runs, "count": len(runs)})
+        return
+    if not runs:
+        print(f"No trains found in {paths.train_runs_dir}")
+        sys.exit(0)
+    print(f"Recent trains in {paths.train_runs_dir} ({len(runs)} total):")
+    for r in runs[:20]:
+        status = (
+            f"phase: {r['phase']} (paused: {r['pause_reason']})"
+            if r.get("pause_reason")
+            else f"phase: {r['phase']}"
+        )
+        flight = " [in-flight]" if r.get("in_flight") else ""
+        print(f"  - {r['train_id']}: {status}{flight}")
+        print(f"    started: {r.get('started_at') or '?'}")
+    if len(runs) > 20:
+        print(f"  ... and {len(runs) - 20} older trains")
+    sys.exit(0)
+
+
+def _synthesise_state_from_yaml_record(yaml_path, train_id: str) -> dict:
+    """Build a minimal state dict from a terminal .yaml record.
+
+    Used by `inspect <id>` when the state file has been cleaned up
+    (terminal phase) but the historical record exists. Returns a dict
+    with the same keys render_train_state_plain_english needs.
+    """
+    record_text = yaml_path.read_text(encoding="utf-8")
+    state: dict = {"train_id": train_id, "bundle": [], "phase_history": []}
+    for line in record_text.splitlines():
+        if ":" not in line or line.startswith("  "):
+            continue
+        key, _, val = line.partition(":")
+        key = key.strip()
+        val = val.strip().strip('"')
+        if key in ("started_at", "completed_at", "outcome", "outcome_reason"):
+            state[key] = val if val != "null" else None
+    state["phase"] = state.get("outcome") or "unknown"
+    state["pause_reason"] = state.get("outcome_reason")
+    return state
+
 
 def cmd_doctor(args: argparse.Namespace) -> None:
     """Diagnose drift between INDEX.md, WP files, and origin branches."""
@@ -765,6 +857,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_status = sub.add_parser("status", help="Read-only summary of train state")
     _common(p_status)
 
+    p_inspect = sub.add_parser("inspect", help="Inspect a train's in-flight or historical state")
+    _common(p_inspect)
+    p_inspect.add_argument(
+        "--train-id", default=None,
+        help="Train ID to inspect (e.g., train-2026-05-22T123000Z). "
+             "Omit to list recent trains.",
+    )
+    p_inspect.add_argument(
+        "--json", action="store_true",
+        help="Emit machine-readable JSON (default: founder-friendly plain English)",
+    )
+
     p_doctor = sub.add_parser("doctor", help="Diagnose drift (missing branches, unmet deps, etc.)")
     _common(p_doctor)
 
@@ -806,6 +910,7 @@ HANDLERS = {
     "queue-add": cmd_queue_add,
     "queue-remove": cmd_queue_remove,
     "status": cmd_status,
+    "inspect": cmd_inspect,
     "doctor": cmd_doctor,
     "run": cmd_run,
 }

@@ -34,6 +34,11 @@ from sulis_execution.types import (
     TrainOverrideResult,
     TrainStatusResult,
     TrainDoctorResult,
+    TrainInspectResult,
+    TrainStateSnapshot,
+    TrainRunListing,
+    TrainPhaseHistoryEntry,
+    TrainBundleEntryWithOutcomes,
     TrainRunResult,
     EligibilityEntry,
     TrainBundleEntry,
@@ -80,7 +85,7 @@ from sulis_execution.types import (
     ChangeStatusResult,
 )
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 __all__ = [
     # Clients
@@ -100,6 +105,11 @@ __all__ = [
     "TrainOverrideResult",
     "TrainStatusResult",
     "TrainDoctorResult",
+    "TrainInspectResult",
+    "TrainStateSnapshot",
+    "TrainRunListing",
+    "TrainPhaseHistoryEntry",
+    "TrainBundleEntryWithOutcomes",
     "TrainRunResult",
     "EligibilityEntry",
     "TrainBundleEntry",

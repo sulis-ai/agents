@@ -98,6 +98,72 @@ class TrainDoctorResult(_Base):
     note_orphan_branches: Optional[str] = None
 
 
+class TrainPhaseHistoryEntry(_Base):
+    phase: Optional[str] = None
+    started_at: Optional[str] = None
+    ended_at: Optional[str] = None
+    outcome: Optional[str] = None
+
+
+class TrainBundleEntryWithOutcomes(_Base):
+    """Bundle entry with per-phase outcomes (v0.17.0+; resumable train)."""
+    wp: Optional[str] = None
+    branch: Optional[str] = None
+    pre_train_sha: Optional[str] = None
+    rebased_to_sha: Optional[str] = None
+    merge_sha_on_dev: Optional[str] = None
+    phase_outcomes: dict = {}
+
+
+class TrainStateSnapshot(_Base):
+    """Snapshot of a train's state machine; returned by train.inspect(train_id=...)."""
+    train_id: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    phase: Optional[str] = None
+    phase_started_at: Optional[str] = None
+    phase_history: list[TrainPhaseHistoryEntry] = []
+    pause_reason: Optional[str] = None
+    recovery_hint: Optional[str] = None
+    bundle: list[TrainBundleEntryWithOutcomes] = []
+    args: dict = {}
+
+
+class TrainRunListing(_Base):
+    """One entry in the train.inspect (no train_id) listing."""
+    train_id: Optional[str] = None
+    started_at: Optional[str] = None
+    phase: Optional[str] = None
+    pause_reason: Optional[str] = None
+    in_flight: bool = False
+
+
+class TrainInspectResult(_Base):
+    """Result of train.inspect.
+
+    When called with train_id: behaves as TrainStateSnapshot.
+    When called without train_id: contains `runs` + `count` listing.
+
+    Pydantic `extra=allow` (inherited from _Base) means callers see
+    whichever fields are populated; the other branch's fields are
+    None / empty.
+    """
+    # Snapshot fields (when train_id provided)
+    train_id: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    phase: Optional[str] = None
+    phase_started_at: Optional[str] = None
+    phase_history: list[TrainPhaseHistoryEntry] = []
+    pause_reason: Optional[str] = None
+    recovery_hint: Optional[str] = None
+    bundle: list[TrainBundleEntryWithOutcomes] = []
+    args: dict = {}
+    # Listing fields (when train_id omitted)
+    runs: Optional[list[TrainRunListing]] = None
+    count: Optional[int] = None
+
+
 class TrainBundleEntry(_Base):
     wp: Optional[str] = None
     branch: Optional[str] = None

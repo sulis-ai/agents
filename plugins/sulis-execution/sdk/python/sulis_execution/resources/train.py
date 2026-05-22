@@ -14,6 +14,7 @@ from sulis_execution.transport import (
 )
 from sulis_execution.types import (
     TrainDoctorResult,
+    TrainInspectResult,
     TrainOverrideResult,
     TrainQueueListResult,
     TrainRunResult,
@@ -66,6 +67,22 @@ class TrainResource:
         envelope = self._transport.invoke(BINARY, "doctor",
                                           _train_common(self._config, repo))
         return TrainDoctorResult.model_validate(_result_payload(envelope))
+
+    def inspect(self, *, train_id: Optional[str] = None) -> "TrainInspectResult":
+        """Inspect a train's in-flight or historical state.
+
+        - With train_id: returns the train's state snapshot (phase,
+          phase_history, per-WP outcomes, pause_reason + recovery_hint
+          when present).
+        - Without train_id: returns a listing of recent trains
+          (most-recent first; mix of in-flight + terminal).
+        """
+        params = _train_common(self._config, None)
+        if train_id is not None:
+            params["train_id"] = train_id
+        params["json"] = True  # SDK consumers always want machine-readable
+        envelope = self._transport.invoke(BINARY, "inspect", params)
+        return TrainInspectResult.model_validate(_result_payload(envelope))
 
     def run(
         self,
@@ -137,6 +154,14 @@ class AsyncTrainResource:
             BINARY, "doctor", _train_common(self._config, repo)
         )
         return TrainDoctorResult.model_validate(_result_payload(envelope))
+
+    async def inspect(self, *, train_id: Optional[str] = None) -> "TrainInspectResult":
+        params = _train_common(self._config, None)
+        if train_id is not None:
+            params["train_id"] = train_id
+        params["json"] = True
+        envelope = await self._transport.invoke(BINARY, "inspect", params)
+        return TrainInspectResult.model_validate(_result_payload(envelope))
 
     async def run(
         self,

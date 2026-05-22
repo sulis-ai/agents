@@ -123,6 +123,26 @@ paths:
         '400': { $ref: '#/components/responses/ExpectedError' }
         '500': { $ref: '#/components/responses/InternalError' }
 
+  /train/inspect:
+    post:
+      operationId: trainInspect
+      summary: Inspect a train's in-flight or historical state
+      description: |
+        Read-only inspection. With train_id, returns the train's
+        current state machine (phase, phase_history, per-WP outcomes,
+        pause_reason + recovery_hint when present). Without train_id,
+        lists recent trains (in-flight + terminal) most-recent first.
+        The state machine surfaces "needs attention" via pause_reason
+        + recovery_hint when phase = paused; this is how a calling
+        session knows to invoke wpx-train resume vs abort vs continue.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TrainInspectRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TrainInspectResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
   /train/doctor:
     post:
       operationId: trainDoctor
@@ -740,6 +760,94 @@ components:
         trigger_state: { type: string, enum: [not_ready, ready_size, waiting] }
         trigger_reason: { type: string }
         last_train_run: { type: [string, 'null'] }
+
+    TrainInspectRequest:
+      allOf:
+        - $ref: '#/components/schemas/TrainStandardRequest'
+        - type: object
+          properties:
+            train_id:
+              type: [string, 'null']
+              description: |
+                Train ID to inspect (e.g., train-2026-05-22T123000Z).
+                Omit to list recent trains instead.
+
+    TrainPhaseHistoryEntry:
+      type: object
+      properties:
+        phase: { type: string }
+        started_at: { type: string }
+        ended_at: { type: [string, 'null'] }
+        outcome: { type: [string, 'null'] }
+
+    TrainBundleEntry:
+      type: object
+      properties:
+        wp: { type: string }
+        branch: { type: string }
+        pre_train_sha: { type: [string, 'null'] }
+        rebased_to_sha: { type: [string, 'null'] }
+        merge_sha_on_dev: { type: [string, 'null'] }
+        phase_outcomes:
+          type: object
+          description: Map of phase name to per-WP outcome for that phase.
+          additionalProperties: { type: string }
+
+    TrainStateSnapshot:
+      type: object
+      description: |
+        Snapshot of a train's state machine at a moment in time. Returned
+        by train.inspect when called with a train_id.
+      properties:
+        train_id: { type: string }
+        started_at: { type: string }
+        completed_at: { type: [string, 'null'] }
+        phase:
+          type: string
+          enum: [pending, rebasing, ci_running, merging, deploying, verifying, success, failed, paused, aborted, unknown]
+        phase_started_at: { type: [string, 'null'] }
+        phase_history:
+          type: array
+          items: { $ref: '#/components/schemas/TrainPhaseHistoryEntry' }
+        pause_reason:
+          type: [string, 'null']
+          description: Structured reason name when phase=paused (e.g., bundled-tip-ci-red).
+        recovery_hint:
+          type: [string, 'null']
+          description: Plain-English instructions for the founder when phase=paused.
+        bundle:
+          type: array
+          items: { $ref: '#/components/schemas/TrainBundleEntry' }
+        args:
+          type: object
+          description: The arguments wpx-train run was invoked with (for resume).
+          additionalProperties: true
+
+    TrainRunListing:
+      type: object
+      properties:
+        train_id: { type: string }
+        started_at: { type: [string, 'null'] }
+        phase: { type: [string, 'null'] }
+        pause_reason: { type: [string, 'null'] }
+        in_flight:
+          type: boolean
+          description: |
+            True if the in-flight state.json file exists (non-terminal
+            phase or paused). False if only the historical .yaml record
+            exists (terminal phase, state file cleaned up).
+
+    TrainInspectResult:
+      oneOf:
+        - $ref: '#/components/schemas/TrainStateSnapshot'
+        - type: object
+          description: Listing form (returned when train_id is null).
+          required: [runs, count]
+          properties:
+            runs:
+              type: array
+              items: { $ref: '#/components/schemas/TrainRunListing' }
+            count: { type: integer }
 
     TrainDoctorIssue:
       type: object

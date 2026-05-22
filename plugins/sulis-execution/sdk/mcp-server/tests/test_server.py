@@ -1,7 +1,7 @@
 """Tests for the sulis-execution MCP server.
 
 Verifies:
-1. OpenAPI spec loads and produces a tool per operation (~38)
+1. OpenAPI spec loads and produces a tool per operation (~39)
 2. operationId → tool name conversion (camelCase → snake_case)
 3. requestBody schema becomes inputSchema (allOf flattened)
 4. tools/list returns the right shape
@@ -85,13 +85,14 @@ def test_openapi_spec_loads():
 def test_tool_registry_covers_all_operations():
     spec = load_openapi_spec(OPENAPI_SPEC)
     registry = build_tool_registry(spec)
-    # 38 operations per Phase 1 spec
-    assert len(registry) == 38
+    # 39 operations as of v0.2.1 (Phase 1.2 added train.inspect)
+    assert len(registry) == 39
 
     # Sanity check some named tools exist (using renamed v0.2.0 names)
     assert "pipeline_run" in registry
     assert "train_queue_list" in registry
     assert "train_run" in registry
+    assert "train_inspect" in registry                   # v0.2.1 added
     assert "index_flip_status" in registry
     assert "index_add" in registry                       # was index_add_wp
     assert "index_mark_downstream_blocked" in registry   # was index_propagate_blocked

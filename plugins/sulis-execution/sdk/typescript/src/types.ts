@@ -86,6 +86,71 @@ export interface TrainDoctorResult {
   note_orphan_branches?: string | null;
 }
 
+// v0.17.0+ — Resumable Train state machine
+
+export interface TrainPhaseHistoryEntry {
+  phase?: string;
+  started_at?: string;
+  ended_at?: string | null;
+  outcome?: string | null;
+}
+
+export interface TrainBundleEntryWithOutcomes {
+  wp?: string;
+  branch?: string;
+  pre_train_sha?: string | null;
+  rebased_to_sha?: string | null;
+  merge_sha_on_dev?: string | null;
+  phase_outcomes?: Record<string, string>;
+}
+
+export interface TrainStateSnapshot {
+  train_id?: string;
+  started_at?: string;
+  completed_at?: string | null;
+  phase?: string;
+  phase_started_at?: string | null;
+  phase_history?: TrainPhaseHistoryEntry[];
+  pause_reason?: string | null;
+  recovery_hint?: string | null;
+  bundle?: TrainBundleEntryWithOutcomes[];
+  args?: Record<string, unknown>;
+}
+
+export interface TrainRunListing {
+  train_id?: string;
+  started_at?: string | null;
+  phase?: string | null;
+  pause_reason?: string | null;
+  in_flight?: boolean;
+}
+
+/**
+ * Result of train.inspect.
+ *
+ * When called with train_id: behaves as TrainStateSnapshot (snapshot
+ * fields populated; runs + count absent).
+ *
+ * Without train_id: contains runs + count listing (snapshot fields
+ * absent).
+ */
+export interface TrainInspectResult {
+  // Snapshot fields (when train_id provided)
+  train_id?: string;
+  started_at?: string;
+  completed_at?: string | null;
+  phase?: string;
+  phase_started_at?: string | null;
+  phase_history?: TrainPhaseHistoryEntry[];
+  pause_reason?: string | null;
+  recovery_hint?: string | null;
+  bundle?: TrainBundleEntryWithOutcomes[];
+  args?: Record<string, unknown>;
+  // Listing fields (when train_id omitted)
+  runs?: TrainRunListing[];
+  count?: number;
+}
+
 export interface TrainBundleEntry {
   wp?: string | null;
   branch?: string | null;
