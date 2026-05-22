@@ -184,15 +184,19 @@ def test_culprit_heuristic_empty_inputs_returns_none(tmp_path):
 # ─── restore_branch_with_guard ────────────────────────────────────────────
 
 
+def _branch_present_on_origin_lsremote(branch: str, sha: str = "abc123") -> str:
+    """Format the ls-remote output for a branch that exists on origin."""
+    return f"{sha}\trefs/heads/{branch}\n"
+
+
 def test_restore_guard_detects_newer_push(tmp_path, monkeypatch):
     """If origin/{branch} has advanced beyond rebased_to_sha, abort restore."""
-    # Build a fake clone with `git rev-parse` returning a different SHA
-    # We monkeypatch _run instead of building a real repo for speed.
-
     calls = []
 
     def fake_run(cmd, cwd=None, timeout=60):
         calls.append(cmd)
+        if cmd[:2] == ["git", "ls-remote"]:
+            return 0, _branch_present_on_origin_lsremote("feat/wp-001"), ""
         if cmd[:2] == ["git", "fetch"]:
             return 0, "", ""
         if cmd[:2] == ["git", "rev-parse"]:
@@ -222,6 +226,8 @@ def test_restore_guard_passes_when_sha_matches(tmp_path, monkeypatch):
     push_attempted = []
 
     def fake_run(cmd, cwd=None, timeout=60):
+        if cmd[:2] == ["git", "ls-remote"]:
+            return 0, _branch_present_on_origin_lsremote("feat/wp-001", rebased), ""
         if cmd[:2] == ["git", "fetch"]:
             return 0, "", ""
         if cmd[:2] == ["git", "rev-parse"]:
@@ -246,8 +252,10 @@ def test_restore_guard_passes_when_sha_matches(tmp_path, monkeypatch):
 
 
 def test_restore_guard_fails_on_fetch_error(tmp_path, monkeypatch):
-    """git fetch failure → guard returns False with the fetch error."""
+    """git fetch failure (branch exists on origin) → guard returns False with the fetch error."""
     def fake_run(cmd, cwd=None, timeout=60):
+        if cmd[:2] == ["git", "ls-remote"]:
+            return 0, _branch_present_on_origin_lsremote("feat/wp-001"), ""
         if cmd[:2] == ["git", "fetch"]:
             return 1, "", "fetch failed: 404"
         return 0, "", ""
@@ -263,3 +271,69 @@ def test_restore_guard_fails_on_fetch_error(tmp_path, monkeypatch):
     )
     assert ok is False
     assert "fetch" in msg
+
+
+def test_restore_guard_handles_auto_deleted_branch(tmp_path, monkeypatch):
+    """v0.15.2 regression: GitHub's delete-branch-on-merge auto-deletes
+    the feature branch after squash-merge. If the train then decides to
+    revert, restore_branch_with_guard must NOT fail on missing-on-origin —
+    it should push pre_train_sha as a fresh branch create.
+
+    The pre-v0.15.2 code did `git fetch origin <branch>` first; that fetch
+    failed because origin had no such ref. The fix probes `git ls-remote
+    --heads` first and creates the branch fresh when it's missing.
+    """
+    pre = "pre" + "0" * 37
+
+    push_calls = []
+
+    def fake_run(cmd, cwd=None, timeout=60):
+        if cmd[:2] == ["git", "ls-remote"]:
+            # Empty output → branch missing on origin (auto-deleted)
+            return 0, "", ""
+        if cmd[:2] == ["git", "push"]:
+            push_calls.append(cmd)
+            return 0, "", ""
+        return 1, "", f"unexpected call: {cmd}"
+
+    monkeypatch.setattr(_wpxlib, "_run", fake_run)
+
+    ok, msg = restore_branch_with_guard(
+        repo="acme/x",
+        clone_dir=tmp_path,
+        branch="feat/wp-001",
+        pre_train_sha=pre,
+        rebased_to_sha="rebased" + "0" * 33,
+    )
+    assert ok is True, f"expected success on auto-deleted-branch path; got: {msg}"
+    assert "auto-deleted" in msg
+    # Verify the fresh-create push was attempted with the right refspec
+    assert len(push_calls) == 1
+    push_cmd = push_calls[0]
+    assert push_cmd == [
+        "git", "push", "origin", f"{pre}:refs/heads/feat/wp-001"
+    ]
+
+
+def test_restore_guard_auto_deleted_branch_push_failure_propagates(tmp_path, monkeypatch):
+    """If the fresh-create push fails for the auto-deleted-branch case
+    (permissions, branch-protection, network), surface the error."""
+    def fake_run(cmd, cwd=None, timeout=60):
+        if cmd[:2] == ["git", "ls-remote"]:
+            return 0, "", ""  # missing on origin
+        if cmd[:2] == ["git", "push"]:
+            return 1, "", "permission denied"
+        return 1, "", f"unexpected: {cmd}"
+
+    monkeypatch.setattr(_wpxlib, "_run", fake_run)
+
+    ok, msg = restore_branch_with_guard(
+        repo="acme/x",
+        clone_dir=tmp_path,
+        branch="feat/wp-001",
+        pre_train_sha="pre" + "0" * 37,
+        rebased_to_sha="rebased",
+    )
+    assert ok is False
+    assert "auto-deleted" in msg
+    assert "permission denied" in msg

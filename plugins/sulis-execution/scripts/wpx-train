@@ -591,10 +591,12 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
 
         # Step: deploy poll
         deploy_interval = args.deploy_poll_interval or DEPLOY_DEFAULT_INTERVAL
-        _log(f"Polling deploy '{args.deploy_workflow}' for {final_merge_sha[:8]}")
+        deploy_cap = args.deploy_cap or DEPLOY_DEFAULT_CAP
+        _log(f"Polling deploy '{args.deploy_workflow}' for {final_merge_sha[:8]} "
+             f"(interval={deploy_interval}s, cap={deploy_cap}s)")
         deploy_verdict, deploy_url = _poll_deploy(
             repo, args.deploy_workflow, final_merge_sha,
-            deploy_interval, DEPLOY_DEFAULT_CAP,
+            deploy_interval, deploy_cap,
         )
         record["deploy_url"] = deploy_url
         if deploy_verdict != "green":
@@ -725,6 +727,10 @@ def build_parser() -> argparse.ArgumentParser:
                        help=f"CI poll interval (s, default {CI_DEFAULT_INTERVAL})")
     p_run.add_argument("--deploy-poll-interval", type=int, default=None,
                        help=f"Deploy poll interval (s, default {DEPLOY_DEFAULT_INTERVAL})")
+    p_run.add_argument("--deploy-cap", type=int, default=None,
+                       help=f"Max total deploy-poll time before declaring failure "
+                            f"(s, default {DEPLOY_DEFAULT_CAP}). Raise for slow "
+                            f"deploys to avoid ADR-212 revert on a still-running deploy.")
     p_run.add_argument("--max-batch-size", type=int, default=5,
                        help="Cap WPs per batch (default 5)")
     p_run.add_argument("--base-branch", default=None,

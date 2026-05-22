@@ -66,6 +66,7 @@ def cmd_run(args: argparse.Namespace) -> None:
     worktree = Path(args.worktree_path).resolve() if args.worktree_path else paths.repo_root
     ci_interval = args.ci_poll_interval or CI_DEFAULT_INTERVAL
     deploy_interval = args.deploy_poll_interval or DEPLOY_DEFAULT_INTERVAL
+    deploy_cap = args.deploy_cap or DEPLOY_DEFAULT_CAP
     base_branch = args.base_branch or "dev"
 
     result: dict = {
@@ -154,7 +155,7 @@ def cmd_run(args: argparse.Namespace) -> None:
         _log(f"Step 9: polling deploy workflow '{args.deploy_workflow}' for {merge_sha[:8]}")
         deploy_verdict, deploy_url = _poll_deploy(
             repo, args.deploy_workflow, merge_sha,
-            deploy_interval, DEPLOY_DEFAULT_CAP,
+            deploy_interval, deploy_cap,
         )
         result["deploy_url"] = deploy_url
         if deploy_verdict != "green":
@@ -246,6 +247,9 @@ def build_parser() -> argparse.ArgumentParser:
                        help=f"CI poll interval (s, default {CI_DEFAULT_INTERVAL})")
     p_run.add_argument("--deploy-poll-interval", type=int, default=None,
                        help=f"Deploy poll interval (s, default {DEPLOY_DEFAULT_INTERVAL})")
+    p_run.add_argument("--deploy-cap", type=int, default=None,
+                       help=f"Max total deploy-poll time before declaring failure "
+                            f"(s, default {DEPLOY_DEFAULT_CAP}). Raise for slow deploys.")
     p_run.add_argument(
         "--skip-ci-poll", action="store_true",
         help="Skip CI polling on the branch and proceed directly to "

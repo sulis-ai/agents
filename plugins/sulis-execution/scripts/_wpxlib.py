@@ -347,7 +347,10 @@ CI_DEFAULT_INTERVAL = 300     # 5 min
 CI_DEFAULT_CAP = 45 * 60      # 45 min
 
 DEPLOY_DEFAULT_INTERVAL = 300  # 5 min
-DEPLOY_DEFAULT_CAP = 30 * 60   # 30 min
+DEPLOY_DEFAULT_CAP = 60 * 60   # 60 min — raised from 30 in v0.15.2 after a real
+                               # platform-repo deploy took ~35 min, triggered
+                               # ADR-212 revert even though the deploy actually
+                               # succeeded. Override via --deploy-cap.
 
 HEALTH_MIN_INTERVAL = 60       # 1 min initial
 HEALTH_MAX_INTERVAL = 300      # 5 min cap (exponential backoff)
@@ -1694,17 +1697,52 @@ def restore_branch_with_guard(
 ) -> tuple[bool, str]:
     """Restore a branch to its pre_train_sha — but only if no new push happened.
 
-    Force-push guard: fetch origin/{branch}'s current SHA; if it matches
-    rebased_to_sha (what the train left), force-push pre_train_sha.
-    If it differs, the founder (or another agent) pushed in the
-    meantime — abort the restore with a warning.
+    Three paths:
+    1. Branch missing on origin (GitHub's delete-branch-on-merge fired after
+       the train's squash-merge, then the train decided to revert).
+       → Push pre_train_sha as a fresh branch create. No guard needed
+       because there's nothing on origin to clobber.
+    2. Branch present on origin and matches `rebased_to_sha` (what the train
+       left after rebase + push).
+       → Force-push pre_train_sha. Standard restore.
+    3. Branch present but doesn't match — someone else pushed since the
+       train left it.
+       → Abort with "newer push" warning; caller surfaces in BLOCKER.
 
     Returns (success, message). Success=False with message="newer push"
-    is the guard firing; the caller surfaces this in the BLOCKER.
+    is the guard firing.
     """
-    # Explicit refspec — see rationale in rebase_branch_in_clone above
-    # (single-branch shallow clones don't auto-create origin/<branch>
-    # tracking ref without the refspec).
+    # Path 1 check: is the branch still on origin at all? Use ls-remote
+    # (read-only; doesn't care about local clone state).
+    rc, out, _ = _run(
+        ["git", "ls-remote", "--heads", "origin", branch],
+        cwd=clone_dir, timeout=30,
+    )
+    if rc != 0:
+        return False, f"git ls-remote origin {branch} failed"
+    branch_on_origin = bool(out.strip())
+
+    if not branch_on_origin:
+        # GitHub auto-deleted the branch after squash-merge; restore via
+        # fresh create-push of pre_train_sha. No --force needed.
+        rc, _, err = _run(
+            ["git", "push", "origin",
+             f"{pre_train_sha}:refs/heads/{branch}"],
+            cwd=clone_dir, timeout=60,
+        )
+        if rc != 0:
+            return False, (
+                f"branch missing on origin (likely auto-deleted by "
+                f"delete-branch-on-merge); fresh-create push of "
+                f"{pre_train_sha[:8]} failed: {err}"
+            )
+        return True, (
+            f"branch was auto-deleted on origin; restored via fresh-create "
+            f"push of pre_train_sha {pre_train_sha[:8]}"
+        )
+
+    # Path 2 / 3: branch exists on origin. Fetch with explicit refspec
+    # (single-branch shallow clones don't auto-create the tracking ref).
     rc, _, err = _run(["git", "fetch", "origin",
                        f"{branch}:refs/remotes/origin/{branch}"],
                      cwd=clone_dir, timeout=60)
