@@ -2233,6 +2233,119 @@ def compute_culprit_heuristic(
     return best_wp
 
 
+def is_sha_on_branch(repo: str, sha: str, branch: str = "dev") -> bool:
+    """Check whether `sha` is reachable from origin/<branch>.
+
+    Uses GitHub's compare API: `gh api repos/{repo}/compare/{branch}...{sha}`.
+    Status "identical" or "behind" means sha is reachable from branch
+    (identical = same commit; behind = sha is in branch's history with
+    branch having more commits on top). Status "ahead" or "diverged"
+    means sha is NOT reachable from branch.
+
+    Returns False on any API error (conservative — caller decides what
+    to do; a True return must be trustworthy).
+
+    Used by `wpx-train doctor` to detect INDEX status drift (v0.21.2+):
+    a WP with status=done whose merge_sha_on_dev is not on origin/dev
+    means the work has been reverted or never landed — the INDEX
+    state is wrong.
+    """
+    rc, out, err = _run(
+        ["gh", "api", f"repos/{repo}/compare/{branch}...{sha}"],
+        timeout=30,
+    )
+    if rc != 0:
+        _log(
+            f"is_sha_on_branch: compare API failed for "
+            f"{branch}...{sha[:8]} (rc={rc}); returning False conservatively. "
+            f"err: {err}"
+        )
+        return False
+    try:
+        data = json.loads(out)
+    except json.JSONDecodeError:
+        _log(f"is_sha_on_branch: compare API returned non-JSON. out: {out!r}")
+        return False
+    return data.get("status", "") in ("identical", "behind")
+
+
+def find_wp_merge_sha(train_runs_dir: Path, wp_id: str) -> str | None:
+    """Find a WP's most-recent merge_sha_on_dev across all train records.
+
+    Walks train-runs/{*.yaml, *.state.json} in reverse chronological order
+    (by file mtime). For each file, parses the `bundle` list looking for
+    an entry where wp == wp_id; returns the first matching entry's
+    merge_sha_on_dev if populated. Returns None if no such entry exists.
+
+    JSON files (.state.json, v0.17.0+ in-flight) parsed via json.load.
+    YAML files (.yaml, historical archive) parsed via a small bespoke
+    parser matching the format `write_train_run_record` emits — see that
+    function's docstring for the schema.
+
+    Used by `wpx-train doctor` to detect drift: a WP with status=done
+    that has no merge_sha in any train record means it was never shipped
+    via the train (either manually flipped or shipped via wpx-pipeline);
+    a WP whose merge_sha exists but is no longer on dev means it was
+    shipped and reverted.
+    """
+    if not train_runs_dir.exists():
+        return None
+    candidates: list[Path] = []
+    candidates.extend(train_runs_dir.glob("*.state.json"))
+    candidates.extend(train_runs_dir.glob("*.yaml"))
+    # Most recent first
+    candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    for path in candidates:
+        try:
+            if path.suffix == ".json":
+                with path.open("r", encoding="utf-8") as f:
+                    state = json.load(f)
+                for entry in state.get("bundle", []):
+                    if entry.get("wp") == wp_id:
+                        sha = entry.get("merge_sha_on_dev")
+                        if sha:
+                            return sha
+            else:
+                # Bespoke YAML — only need the bundle entries.
+                # Schema: top-level keys, then `bundle:` followed by
+                # lines like `  - wp: WP-NNN` and `    merge_sha_on_dev: <sha>`.
+                in_bundle = False
+                current_wp: str | None = None
+                current_sha: str | None = None
+                with path.open("r", encoding="utf-8") as f:
+                    for raw_line in f:
+                        line = raw_line.rstrip("\n")
+                        if line.rstrip() == "bundle:":
+                            in_bundle = True
+                            continue
+                        if not in_bundle:
+                            continue
+                        # Bundle entries are indented 2 spaces for `- wp:`
+                        # and 4 spaces for fields. Out-of-bundle would
+                        # be flush-left.
+                        if line and not line.startswith(" "):
+                            in_bundle = False
+                            continue
+                        stripped = line.strip()
+                        if stripped.startswith("- wp:"):
+                            # Commit previous entry if it matched
+                            if current_wp == wp_id and current_sha:
+                                return current_sha
+                            current_wp = stripped[len("- wp:"):].strip()
+                            current_sha = None
+                        elif stripped.startswith("merge_sha_on_dev:"):
+                            val = stripped[len("merge_sha_on_dev:"):].strip()
+                            if val and val != "null":
+                                current_sha = val
+                    # End of file: commit any pending entry
+                    if current_wp == wp_id and current_sha:
+                        return current_sha
+        except (json.JSONDecodeError, OSError, ValueError) as exc:
+            _log(f"find_wp_merge_sha: skipping {path.name} (parse error: {exc})")
+            continue
+    return None
+
+
 def revert_train_on_dev(
     repo: str,
     clone_dir: Path,

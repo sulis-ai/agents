@@ -61,6 +61,7 @@ from _wpxlib import (  # noqa: E402
     DEPLOY_DEFAULT_INTERVAL,
     HEALTH_DEFAULT_CAP,
     TRAIN_BLOCKED_STATUS,
+    TRAIN_DONE_STATUS,
     EligibilityResult,
     TrainOverrides,
     WPRow,
@@ -83,6 +84,8 @@ from _wpxlib import (  # noqa: E402
     emit_ok,
     emit_result,
     find_eligible_branches,
+    find_wp_merge_sha,
+    is_sha_on_branch,
     flip_index_status_via_cli,
     pack_batches,
     parse_index_md,
@@ -972,6 +975,51 @@ def cmd_doctor(args: argparse.Namespace) -> None:
                     "wp": wp.id,
                     "detail": f"depends on {dep_id} (status: {dep.status})",
                 })
+
+    # v0.21.2 — INDEX status drift detection. For each WP with status=done,
+    # confirm its merge SHA is actually present in origin/<base_branch>'s
+    # history. Drift surfaces if a WP was: (a) manually flipped to done
+    # without ever shipping via train; (b) shipped via train then reverted
+    # without status being unflipped; (c) shipped via wpx-pipeline (legacy);
+    # (d) corrupted state from an external operation.
+    #
+    # Detection only — does NOT auto-reconcile. Founder uses
+    # `wpx-index flip-status --wp WP-NNN --to step-7-blocked --expected done`
+    # per-WP after reviewing each case. The per-WP CAS check (--expected)
+    # is the safety primitive; bulk auto-flip would bypass it.
+    base_branch = getattr(args, "base_branch", None) or "dev"
+    for wp in wps:
+        if wp.status != TRAIN_DONE_STATUS:
+            continue
+        merge_sha = find_wp_merge_sha(paths.train_runs_dir, wp.id)
+        if merge_sha is None:
+            issues.append({
+                "kind": "status_drift_done_no_merge_history",
+                "wp": wp.id,
+                "detail": (
+                    f"INDEX says done but no merge SHA in any train-runs "
+                    f"record. Possible causes: shipped via wpx-pipeline "
+                    f"(legacy per-WP path; harmless) OR manually flipped "
+                    f"without train OR state lost. To reconcile if needed: "
+                    f"`wpx-index flip-status --wp {wp.id} --project "
+                    f"{args.project} --to step-7-blocked --expected done`."
+                ),
+            })
+            continue
+        if not is_sha_on_branch(repo, merge_sha, base_branch):
+            issues.append({
+                "kind": "status_drift_done_not_on_dev",
+                "wp": wp.id,
+                "detail": (
+                    f"INDEX says done but merge SHA {merge_sha[:8]} not "
+                    f"reachable from origin/{base_branch} (reverted or "
+                    f"never pushed). To reconcile: confirm via `git log "
+                    f"origin/{base_branch} | grep {merge_sha[:8]}` (should "
+                    f"be empty); then `wpx-index flip-status --wp {wp.id} "
+                    f"--project {args.project} --to step-7-blocked "
+                    f"--expected done`."
+                ),
+            })
 
     # Note: orphan-branch detection (branches on origin not in INDEX.md)
     # would require listing all origin branches. Skipped in Phase 1 for
