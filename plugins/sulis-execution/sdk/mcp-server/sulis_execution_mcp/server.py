@@ -42,9 +42,9 @@ RESOURCE_BINARIES = {
     "journal": "wpx-journal",
     "blocker": "wpx-blocker",
     "findings": "wpx-findings",
-    "wp": "wpx-wp",
+    "work-package": "wpx-wp",        # SDK resource `work_package`; URL path `work-package`
     "worktree": "wpx-worktree",
-    "step12": "wpx-step12",
+    "lifecycle": "wpx-step12",       # SDK resource `lifecycle`; CLI keeps wpx-step12
     "change": "sulis-change",
 }
 
@@ -64,19 +64,31 @@ def _operation_to_tool_name(operation_id: str) -> str:
 
 
 def _operation_to_resource_subcommand(
-    operation_id: str, path: str
+    operation_id: str,
+    path: str,
+    operation: dict[str, Any] | None = None,
 ) -> tuple[str, str, str]:
     """Resolve an operationId + path to (binary, subcommand, resource_name).
 
     Path like /pipeline/run → ('wpx-pipeline', 'run', 'pipeline').
     Path like /train/queue-list → ('wpx-train', 'queue-list', 'train').
+
+    If the operation declares `x-cli-subcommand`, that overrides the
+    path-derived subcommand. This is needed when the SDK method name
+    differs from the underlying CLI subcommand (e.g. SDK
+    `lifecycle.complete` calls CLI `wpx-step12 wrap`).
     """
     parts = path.strip("/").split("/")
     resource = parts[0]
-    subcommand = parts[1] if len(parts) > 1 else ""
+    path_derived_subcommand = parts[1] if len(parts) > 1 else ""
     binary = RESOURCE_BINARIES.get(resource)
     if not binary:
         raise ValueError(f"Unknown resource: {resource}")
+    # `x-cli-subcommand` extension overrides the path-derived subcommand
+    if operation and "x-cli-subcommand" in operation:
+        subcommand = operation["x-cli-subcommand"]
+    else:
+        subcommand = path_derived_subcommand
     return binary, subcommand, resource
 
 
@@ -150,7 +162,7 @@ def build_tool_registry(spec: dict[str, Any]) -> dict[str, dict[str, Any]]:
                 continue
             try:
                 binary, subcommand, resource = _operation_to_resource_subcommand(
-                    operation["operationId"], path
+                    operation["operationId"], path, operation,
                 )
             except ValueError:
                 continue
