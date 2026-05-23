@@ -75,8 +75,9 @@ operation: nothing is "done" until it's live in dev and healthy.
 
 ## Sibling plugins it pairs with
 
-- **`sulis-concierge`** — Phase 5 (Implement) spawns the orchestrator;
-  translates BLOCKER plain-English summaries into founder updates.
+- **`sulis`** (concierge agent) — Phase 5 (Implement) spawns the
+  orchestrator; translates BLOCKER plain-English summaries into founder
+  updates. Previously `sulis-concierge`; absorbed at sulis v0.2.0.
 - **`sea`** (`sea:decompose`) — produces the WPs the executor
   consumes; `sea:verify` confirms the executor's output is complete.
 - **`sulis-platform-sdk`** — provides the deploy + health-check

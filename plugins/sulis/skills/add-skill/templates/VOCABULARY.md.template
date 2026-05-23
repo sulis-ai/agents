@@ -1,0 +1,50 @@
+# Vocabulary
+
+This section defines the domain-specific terms this skill introduces. It is
+the contract for future deepens of the skill: when a term drifts from this
+definition in SKILL.md or `references/`, the artifact is wrong and needs
+reconciliation.
+
+## Terms
+
+### {{term-1}}
+
+**Definition:** {{one-sentence definition; do not cross-reference other
+terms in this skill until they are defined}}.
+
+**Why it exists:** {{the failure mode the term names; what would be unclear
+without it}}.
+
+**Collisions:** {{if this term is used in another skill with a different
+meaning, name that skill and disambiguate}}.
+
+**Deprecated alternatives:** {{any prior terms this replaces, with why
+they were dropped}}.
+
+### {{term-2}}
+
+{{Same structure}}
+
+## Naming discipline
+
+The vocabulary above is the skill's load-bearing terminology. When using
+these terms in SKILL.md, references, scripts, or templates:
+
+- Use exactly the form defined here (e.g., `BRIEF_PACK` not `brief pack`
+  or `BriefPack` if defined uppercase-snake)
+- Do not abbreviate or expand without updating this section
+- If a new term emerges during authoring, add it here BEFORE using it in
+  the body
+
+## How to update
+
+A term's definition can be revised only by:
+
+1. Updating this section
+2. Updating every occurrence in SKILL.md, references/, scripts/, and
+   templates/ to match the new definition
+3. Adding a note in the skill's COMPLETENESS_REPORT.md under "Vocabulary
+   changes" recording the revision
+
+Silent term drift between SKILL.md and supporting files is the failure
+mode this section prevents.

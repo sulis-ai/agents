@@ -15,7 +15,7 @@ that maintain their own process.
 > **Version:** 0.1.0
 > **Status:** Active — Calibration Period (90 days from 2026-05-19)
 > **Applies to:** All Sulis marketplace agents that operate on a GitHub
-> repository (`sulis-execution`, `sulis-concierge` when dispatching the
+> repository (`sulis-execution`, `sulis` (concierge) when dispatching the
 > executor, `sea` when proposing infrastructure work).
 
 ---

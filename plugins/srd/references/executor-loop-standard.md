@@ -644,7 +644,7 @@ of the loop, not in spite of it.
   loop on failure; flat, bounded, terminating. Both inherit from
   John Boyd's original Observe-Orient-Decide-Act shape but operate
   on different inputs and produce different outputs.
-- **Decision Discipline (sulis-concierge)** — the concierge owns
+- **Decision Discipline (sulis concierge)** — the concierge owns
   the decision of *when to surface a BLOCKER to the founder* (it
   always does — blockers are founder-facing by definition) and
   *how to phrase it* (per AAF). The agent owns the decision of

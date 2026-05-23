@@ -8,6 +8,28 @@ For the marketplace-facing summary, see `plugin.json`.
 
 ---
 
+## v0.3.0 — 2026-05-23 — DEPRECATED
+
+This plugin has been retired. All functionality moved to the canonical
+`sulis` plugin at v0.2.0.
+
+- `agents/concierge.md` → `plugins/sulis/agents/concierge.md`
+- `skills/start/` → `plugins/sulis/skills/start/`
+- `skills/handoff/` → `plugins/sulis/skills/handoff/`
+- `skills/status/` → `plugins/sulis/skills/status/`
+- `references/journey-model.md` → `plugins/sulis/references/journey-model.md`
+- `references/subagent-dispatch.md` → `plugins/sulis/references/subagent-dispatch.md`
+
+This directory is retained as a deprecation shim. The skills/ + agents/
+directories have been emptied so the plugin loader exposes no invocations
+under `/sulis-concierge:*`. Anyone running `claude --agent sulis-concierge`
+will fail; they should run `claude --agent sulis` instead.
+
+See `README.md` for the migration table and `plugins/sulis/CHANGELOG.md`
+v0.2.0 for the rationale.
+
+---
+
 ## Cumulative history (through v0.2.0)
 
 > Migrated from `plugin.json` description, 2026-05-23.

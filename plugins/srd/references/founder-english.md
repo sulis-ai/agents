@@ -68,7 +68,8 @@ mechanism narration).
 **Anchor case 3 — specialist-output relay + three questions
 (v1.15.2).** This one happened AFTER v1.15.0 shipped the original
 FE block. The concierge, inside a `claude --agent
-sulis-concierge:concierge` session, invoked `/sulis-execution:run-all`
+sulis:concierge` session (then sulis-concierge:concierge, pre-v0.2.0
+migration), invoked `/sulis-execution:run-all`
 and produced:
 
 > *"Batch 1 complete.*
@@ -146,7 +147,7 @@ to do."
 This case shaped FE-11 (inference over interrogation) and motivated
 the v1.15.2 concierge restructure (consolidated voice block + five-
 phase pre-emission gate + 5-lens analysis of specialist output).
-See `plugins/sulis-concierge/agents/concierge.md` for the
+See `plugins/sulis/agents/concierge.md` for the
 operational mechanism.
 
 **Anchor case 4 — partial fix, wording variant slips through

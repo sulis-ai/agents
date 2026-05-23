@@ -7,7 +7,7 @@ description: >
 user_invocable: true
 ---
 
-# /sulis-concierge:start — Resume Journey
+# /sulis:start — Resume Journey
 
 When invoked, read `.concierge/{project}/JOURNEY.md` and resume from the
 current phase.
@@ -43,7 +43,7 @@ current phase.
 
 ## When to use
 
-- The founder runs `claude --agent sulis-concierge` in a project where a
+- The founder runs `claude --agent sulis` in a project where a
   journey already exists.
 - The founder returns to the concierge session after running a specialist
   slash command.

@@ -294,7 +294,7 @@ during the transitional period, not to license the gap permanently.
   production-gate checks (e.g. canary deploy succeeded on dev).
 - **Force-push disabled.**
 - **Promotion requires founder authorisation** — per Decision Discipline
-  (sulis-concierge), `main` promotion is a hard-to-reverse external-
+  (sulis concierge), `main` promotion is a hard-to-reverse external-
   blast-radius action. The concierge surfaces it to the founder; the
   founder confirms; only then does the executor or orchestrator perform
   the promotion (GIT-06).

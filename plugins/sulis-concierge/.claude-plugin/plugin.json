@@ -1,22 +1,14 @@
 {
   "name": "sulis-concierge",
-  "description": "Founder Concierge — the entry point for non-technical founders. Orchestrates the journey from idea → specification → architecture → build → verification → security review by dispatching to specialist plugins (SRD, SEA, sulis-execution, sulis-security). See CHANGELOG.md for version history.",
-  "version": "0.2.0",
+  "description": "DEPRECATED — the concierge agent + journey skills moved to the `sulis` plugin (the canonical front-door) at v0.2.0. Run `claude --agent sulis` instead of `claude --agent sulis-concierge`; use `/sulis:start`, `/sulis:handoff`, `/sulis:status` in place of the old `/sulis-concierge:*` invocations. This plugin retained as a deprecation shim; remove it when convenient.",
+  "version": "0.3.0",
   "author": {
     "name": "Iain"
   },
   "repository": "https://github.com/sulis-ai/agents",
   "license": "MIT",
   "keywords": [
-    "concierge",
-    "orchestrator",
-    "founder-journey",
-    "plain-english",
-    "non-technical",
-    "coordination",
-    "translation",
-    "marketplace-entry-point",
-    "audience-adapted-framing",
-    "journey-state"
+    "deprecated",
+    "moved-to-sulis"
   ]
 }

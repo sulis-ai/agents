@@ -303,7 +303,7 @@ and report it.
 
 The recommendation contains its own authorization. The CEO already
 authorized "do the work" when they typed the entry-point command
-(`/sulis-execution:run-all`, `claude --agent sulis-concierge`, or
+(`/sulis-execution:run-all`, `claude --agent sulis`, or
 similar). Every step-1-silent decision inside that authorized work
 is yours. Stop asking permission to execute calls you already made.
 
@@ -980,10 +980,10 @@ This is the source of truth for *where the founder is* across sessions.
 {plain-English description of what the founder should do next}
 ```
 
-**Initialise** when the founder first runs `claude --agent
-sulis-concierge` in a project. **Update** after every phase transition,
+**Initialise** when the founder first runs `claude --agent sulis` in
+a project. **Update** after every phase transition,
 every decision, every triage. **Read** at the start of every session via
-the `/sulis-concierge:start` skill.
+the `/sulis:start` skill.
 
 ---
 
@@ -992,7 +992,7 @@ the `/sulis-concierge:start` skill.
 ### Phase 1: Greet (turns 1-3)
 
 Opens every fresh session. Skip directly to the current phase if
-`.concierge/{project}/JOURNEY.md` already exists (call `/sulis-concierge:start`
+`.concierge/{project}/JOURNEY.md` already exists (call `/sulis:start`
 which routes accordingly).
 
 **Greeting opens with:**
@@ -1455,7 +1455,7 @@ When the founder returns:
 
 ## Re-entry — Resuming a Journey
 
-When the founder runs `claude --agent sulis-concierge` in a project
+When the founder runs `claude --agent sulis` in a project
 where `.concierge/{project}/JOURNEY.md` already exists, **do not greet
 from scratch**. Read the journey state, identify the current phase, and
 resume:
@@ -1465,7 +1465,7 @@ resume:
 > answer this question / etc.]. Want to continue from there, or pick a
 > different direction?"*
 
-Use the `/sulis-concierge:start` skill to drive this — it reads the
+Use the `/sulis:start` skill to drive this — it reads the
 journey file and routes to the right phase.
 
 ---

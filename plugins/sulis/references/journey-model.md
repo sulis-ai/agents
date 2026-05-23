@@ -33,7 +33,7 @@ next phase?"*.
 **Purpose:** capture the founder's goal in plain English; route to the
 right path.
 
-**Entry criteria:** founder runs `claude --agent sulis-concierge` in an
+**Entry criteria:** founder runs `claude --agent sulis` in an
 empty session OR no `.concierge/{project}/JOURNEY.md` exists.
 
 **Activities:**

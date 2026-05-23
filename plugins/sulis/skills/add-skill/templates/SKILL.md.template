@@ -1,0 +1,79 @@
+---
+name: {{skill-name-kebab-case}}
+description: Use when {{trigger condition — what user intent makes Claude invoke this skill. NOT a summary of what the skill does. Should be ≤2 sentences and contain only user-facing vocabulary.}}
+---
+
+# {{Skill Name (Title Case)}}
+
+{{One-paragraph statement of what this skill produces and the bounded
+problem it solves. Avoid restating the description.}}
+
+If you have not read `references/{{primary-reference}}.md`, read it once.
+{{Optional — only if there's a load-bearing reference doc.}}
+
+## {{Verb-noun heading — the skill's main flow}}
+
+{{The body. Choose ONE of these shapes; do not mix:}}
+
+{{Shape A — methodology (numbered steps with explicit pass criteria per step):}}
+
+### Step 1 — {{name}}
+
+**Goal:** {{what this step achieves}}
+
+{{What to do}}
+
+**Pass criteria:**
+
+- {{criterion 1}}
+- {{criterion 2}}
+
+{{Shape B — runbook (symptom → investigation → output):}}
+
+### When invoked
+
+1. {{Investigation step 1}}
+2. {{Investigation step 2}}
+3. {{Produce report at {{path}}}}
+
+{{Shape C — reference wrapper (point to references/, focus on workflow):}}
+
+The {{thing}} standard is at `references/{{standard}}.md`. This skill
+applies it by:
+
+1. {{Application step 1}}
+2. {{Application step 2}}
+
+## Gotchas
+
+{{≤15 items, ordered by likelihood × impact (high-high first).}}
+{{Each gotcha MUST have a concrete prior-failure source — either prior
+art from another skill (cite via "see {{plugin}}:{{skill}}"), the
+BRIEF_PACK, or documented author experience.}}
+
+- **{{Pithy name}}** — {{What goes wrong + why + brief mitigation}}.
+- **{{Pithy name}}** — {{What goes wrong + why + brief mitigation}}.
+
+## Vocabulary
+
+{{Include this section only if the skill introduces ≥2 domain terms.
+Otherwise delete it.}}
+
+- **{{term}}** — {{definition; if it collides with another skill's use of
+  the same term, disambiguate here}}.
+- **{{term}}** — {{definition}}.
+
+## When to invoke this skill
+
+{{2-4 concrete trigger scenarios — each one short sentence}}
+
+- {{Trigger scenario 1}}
+- {{Trigger scenario 2}}
+
+## When NOT to invoke this skill
+
+{{2-4 concrete anti-trigger scenarios — prevents over-invocation. Cite
+the skill that DOES cover each case where applicable.}}
+
+- {{Anti-trigger 1}} — use {{other skill}} instead.
+- {{Anti-trigger 2}}.

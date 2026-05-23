@@ -8,7 +8,7 @@ description: >
 user_invocable: true
 ---
 
-# /sulis-concierge:handoff — Specialist Handoff
+# /sulis:handoff — Specialist Handoff
 
 When invoked, the concierge is about to hand off to a specialist agent
 (via a recommended slash command). This skill writes the handoff context

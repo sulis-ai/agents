@@ -7,7 +7,7 @@ description: >
 user_invocable: true
 ---
 
-# /sulis-concierge:status — Journey Status
+# /sulis:status — Journey Status
 
 When invoked, produce a plain-English snapshot of the founder's current
 journey state. Read-only.
@@ -16,7 +16,7 @@ journey state. Read-only.
 
 1. **Read `.concierge/{project}/JOURNEY.md`.** If it doesn't exist, tell
    the founder: *"No journey started yet for this project. Run `claude
-   --agent sulis-concierge` to begin."*
+   --agent sulis` to begin."*
 2. **Read produced artifacts** to verify what's actually on disk matches
    what JOURNEY.md says. If there's drift (artifacts exist that JOURNEY.md
    doesn't reflect), note it.
