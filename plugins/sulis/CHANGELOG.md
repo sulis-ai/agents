@@ -1,5 +1,92 @@
 # Sulis — Changelog
 
+## v0.6.0 — 2026-05-23
+
+Tier 3 (Works) ships. First regression-detection skill. Wires into the
+code-health orchestrator so the comprehensive check now answers "did
+anything that was working stop working?" for tests.
+
+### Added
+
+- `skills/check-tests/` — the regression check. Detects test framework
+  (pytest, jest, vitest, go test in v1; rspec / mocha planned), runs
+  the suite (or reads cached results), compares against a baseline,
+  reports newly-failing tests as regressions. Pre-existing failures
+  stay invisible — only NEW failures surface. Audience=both with
+  `--raw` flag. First skill in the marketplace to introduce a
+  **baseline mechanism** at `.checkup/{project}/baseline.json` with
+  signature-hash dedup.
+  - `SKILL.md` — three-mode invocation (cached / fresh / detection-only)
+  - `scripts/regression.py` (~480 lines) — framework detection
+    registry; per-framework runners; pytest-verbose parser; baseline
+    capture + load; delta computation; flaky-test suppression
+  - `references/framework-detection.md` — per-framework signals, run
+    commands, parser notes; the extensibility contract for adding new
+    frameworks
+  - `references/check-tests-known-flaky.md` — marketplace-shared
+    flaky-test allow-list; per-project overrides documented
+  - `COMPLETENESS_REPORT.md` — five-gate audit trail (15 methodology
+    gaps now queued for add-skill v0.6.0)
+
+### Changed
+
+- `skills/code-health/scripts/orchestrator.py` — wires tier 3 to
+  invoke `check-tests/scripts/regression.py`. Two important fixes
+  along the way:
+  - Tier scripts resolve from the **marketplace root** (the orchestrator's
+    own location), not the target repo. Enables code-health to operate
+    on any target repo while tier-scripts live in the sulis cache.
+  - New `extra_args` field on `TierSpec` lets each tier pass tier-
+    specific flags. Tier 3 passes `--run --timeout 60` so code-health
+    actually executes the test suite (with a tighter timeout than
+    check-tests' standalone 120s default to avoid blocking the whole
+    checkup).
+- `skills/code-health/references/tier-registry.md` — tier 3 now marked
+  `wired: true`, `wired_in: "0.6.0"`, `founder_skill: "/sulis:check-tests"`,
+  `extra_args: ["--run", "--timeout", "60"]`.
+
+### Dogfood findings
+
+This was dogfood run #4 of `sulis:add-skill v0.4.0`. Four new methodology
+gaps queued for add-skill v0.6.0 (joining 11 already queued = 15 total):
+
+- Audit-pattern + baseline-pattern compose (this is the first skill
+  combining both)
+- Framework-detection-registry mirrors code-health's tier-registry —
+  worth naming "registry-driven extensibility" as a pattern
+- Real-state fixture limitation: marketplace-as-fixture FAILED for
+  check-tests (the marketplace's tests aren't discoverable from
+  marketplace root); regression-pattern skills need synthetic fixtures
+- Mid-flight Gate 4 P3 refinement (pytest -q → -v) strengthens the
+  case for v0.4.0's "misuse cases can surface during Gate 4" allowance
+
+### Verification
+
+- Synthetic fixture (3 tests, 1 deliberate regression): first run
+  captured baseline at commit `c04d3c5`; second run (with deliberate
+  break) correctly flagged `test_one_passing` as newly-failing while
+  the pre-existing `test_three_failing` stayed invisible.
+- `--raw` mode validates; orchestrator-compatible `findings` array
+  populated only with regressions (newly-failing tests).
+- End-to-end via code-health: tier 3 reports `❌ failed (1 item)` with
+  the regression detail; tier 5 stays `✅ Clear`; stubbed tiers stay
+  visually distinct.
+
+### Open risks accepted at publication
+
+1. **First-run UX may confuse founders expecting immediate regression
+   output.** Mitigated by explicit "First run. Captured baseline..."
+   message but founders may not read carefully. Revisit if real founder
+   reports confusion.
+2. **Trigger-condition captures test-design questions** (no
+   `sea:test-audit` ships yet). check-tests partially answers; founder
+   may not realise. Revisit when sea:test-audit lands.
+
+### Versions
+
+  sulis: 0.5.0 → 0.6.0 (minor — tier 3 wires)
+  marketplace: 1.46.0 → 1.47.0
+
 ## v0.5.0 — 2026-05-23
 
 First two founder-facing tier skills ship. Establishes the Maslow-for-code

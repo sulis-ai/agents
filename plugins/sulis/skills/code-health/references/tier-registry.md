@@ -40,14 +40,16 @@ tiers:
   - number: 3
     name: Works
     founder_question: "Do the tests pass? Does it do what it should?"
-    wired: false
-    wired_in: planned
-    founder_skill: null
-    operator_skills: null  # future: sea:verify wrapped + spec-less test-pass mode
+    wired: true
+    wired_in: "0.6.0"
+    founder_skill: "/sulis:check-tests"
+    operator_skills: null  # regression logic lives directly in check-tests; sulis is the everything-plugin
+    extra_args: ["--run", "--timeout", "60"]  # code-health passes --run by default; tighter timeout than check-tests' standalone default
     covers:
       - "Tests pass when run"
-      - "Functional spec parity (when spec exists)"
-      - "Smoke / deploy verification"
+      - "Regressions (newly-failing tests vs baseline)"
+      - "Functional spec parity (when spec exists; future)"
+      - "Smoke / deploy verification (future)"
 
   - number: 4
     name: Survives

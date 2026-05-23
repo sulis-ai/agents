@@ -47,6 +47,10 @@ class TierSpec:
     founder_skill: str | None
     invoke_script: str | None  # path relative to repo root
     covers: list[str] = field(default_factory=list)
+    # Extra args passed to the underlying script — per-tier needs (e.g.,
+    # check-tests needs --run to actually execute, with a shorter timeout
+    # than its default so code-health doesn't block on slow test suites).
+    extra_args: list[str] = field(default_factory=list)
 
 
 TIER_REGISTRY: list[TierSpec] = [
@@ -67,9 +71,14 @@ TIER_REGISTRY: list[TierSpec] = [
     TierSpec(
         number=3, name="Works",
         founder_question="Do the tests pass? Does it do what it should?",
-        wired=False, wired_in="planned",
-        founder_skill=None, invoke_script=None,
-        covers=["Tests pass when run", "Functional spec parity", "Smoke / deploy"],
+        wired=True, wired_in="0.6.0",
+        founder_skill="/sulis:check-tests",
+        invoke_script="plugins/sulis/skills/check-tests/scripts/regression.py",
+        covers=["Tests pass when run", "Regressions (newly-failing tests)", "Functional spec parity (future)", "Smoke / deploy (future)"],
+        # check-tests defaults to detection-only; pass --run so code-health
+        # actually exercises the suite. Tighter timeout than check-tests'
+        # default 120s so a slow suite doesn't block the whole checkup.
+        extra_args=["--run", "--timeout", "60"],
     ),
     TierSpec(
         number=4, name="Survives",
@@ -132,6 +141,16 @@ class CheckupReport:
 # ─── Tier invocation ────────────────────────────────────────────────
 
 
+def _marketplace_root() -> Path:
+    """The sulis marketplace root, derived from this script's location.
+
+    orchestrator.py lives at
+      plugins/sulis/skills/code-health/scripts/orchestrator.py
+    so the marketplace root is 5 levels up.
+    """
+    return Path(__file__).resolve().parents[5]
+
+
 def invoke_tier(
     tier: TierSpec,
     repo_root: Path,
@@ -139,7 +158,14 @@ def invoke_tier(
     base_branch: str | None,
     pr_number: int | None,
 ) -> TierResult:
-    """Invoke a wired tier's underlying script; collect its JSON findings."""
+    """Invoke a wired tier's underlying script; collect its JSON findings.
+
+    The tier script LIVES in the sulis marketplace (where the orchestrator
+    lives). The tier script OPERATES on the target repo (where --repo-root
+    points). These can be the same or different — e.g., when checking a
+    founder's project, marketplace = /Users/iain/.claude/.../sulis/ and
+    target = /path/to/founder/project/.
+    """
     if not tier.wired or not tier.invoke_script:
         return TierResult(
             tier=tier.number, name=tier.name,
@@ -148,20 +174,26 @@ def invoke_tier(
             error_message=None,
         )
 
-    script_path = repo_root / tier.invoke_script
+    script_path = _marketplace_root() / tier.invoke_script
     if not script_path.is_file():
         return TierResult(
             tier=tier.number, name=tier.name,
             status="error", finding_count=0,
             findings=[], wired_in=tier.wired_in,
-            error_message=f"underlying script missing: {tier.invoke_script}",
+            error_message=f"underlying script missing: {script_path}",
         )
 
-    cmd = ["python3", str(script_path), "--raw", "--scope", scope]
+    cmd = [
+        "python3", str(script_path),
+        "--raw",
+        "--scope", scope,
+        "--repo-root", str(repo_root),
+    ]
     if base_branch:
         cmd.extend(["--base-branch", base_branch])
     if pr_number:
         cmd.extend(["--pr-number", str(pr_number)])
+    cmd.extend(tier.extra_args)
 
     try:
         proc = subprocess.run(

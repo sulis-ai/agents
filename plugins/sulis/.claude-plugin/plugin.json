@@ -1,7 +1,7 @@
 {
   "name": "sulis",
   "description": "Sulis — the canonical front-door plugin for the Sulis AI marketplace. Hosts the founder-facing concierge agent + journey skills (start/handoff/status) and the meta-skill methodology (add-skill) used to author other plugins. Founders interact via /sulis:* commands; specialist domain plugins (srd/sea/sulis-execution/sulis-security/etc) remain operator-facing internals.",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "author": {
     "name": "Iain"
   },
