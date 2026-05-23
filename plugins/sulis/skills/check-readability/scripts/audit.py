@@ -73,10 +73,13 @@ PROTOCOL_METHOD_NAMES = {
     "render", "parse", "format", "serialize", "deserialize",
 }
 
-# Common loop-variable / index names that SHOULD be short
+# Common loop-variable / index names that SHOULD be short.
+# Includes Node.js stdlib aliases (`fs` / `os` / `vm`) and common
+# language-keyword adjacents that aren't abbreviations.
 ACCEPTABLE_SHORT_NAMES = {
     "i", "j", "k", "n", "x", "y", "z", "_", "id", "ok", "fn", "fd",
     "to", "of", "in", "on", "at", "as", "is", "or", "by", "up", "no",
+    "fs", "os", "vm", "io", "db", "ws", "rx", "tx",
 }
 
 # Path patterns that exempt files from specific heuristics
@@ -339,17 +342,28 @@ def extract_identifiers(text: str, file_path: str) -> list[tuple[int, str, str, 
     return out
 
 
-def is_magic_name(name: str, is_class_method: bool = False) -> bool:
+def is_magic_name(name: str, is_class_method: bool = False, file_path: str = "") -> bool:
     """Detect magic / placeholder names.
 
     Protocol-method names (run, execute, handle, get, set, add, find, save,
     load, etc.) are legitimate when on a class but suspicious as standalone
     functions — `is_class_method` discriminates.
+
+    Filename-disambiguation: if the function's name is a prefix of the
+    filename stem, it's NOT magic (e.g., `def build()` in `build_pptx.py`
+    is meaningfully named — the file says what's being built).
     """
     lower = name.lower()
     if lower in MAGIC_METHOD_PATTERNS:
         return True
     if lower in PROTOCOL_METHOD_NAMES and not is_class_method:
+        # File-context disambiguation: if filename stem starts with the
+        # function name + non-alpha boundary (e.g. `build_X`, `run-Y`),
+        # the file says what's being run/built/etc. Not magic.
+        if file_path:
+            stem = Path(file_path).stem.lower()
+            if stem == lower or re.match(rf"^{re.escape(lower)}[_\-.]", stem):
+                return False
         return True
     # do_X / process_X with single-token suffix
     if re.match(r"^(do|process|handle)_[a-z]{1,3}$", lower):
@@ -518,7 +532,7 @@ def audit_file(
         if test_file and name.startswith("test_"):
             continue
 
-        if is_magic_name(name, is_class_method=is_method):
+        if is_magic_name(name, is_class_method=is_method, file_path=rel_path):
             findings.append(Finding(
                 heuristic="naming-clarity",
                 severity="advisory",
