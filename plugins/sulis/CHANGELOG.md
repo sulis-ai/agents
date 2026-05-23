@@ -1,5 +1,93 @@
 # Sulis — Changelog
 
+## v0.5.0 — 2026-05-23
+
+First two founder-facing tier skills ship. Establishes the Maslow-for-code
+architecture: a 7-tier health framework with the wrapper layer in place even
+though only 1 of 7 tiers is wired. Adds the CTS analysis (PG-grounded
+two-primitive architecture; verb-first naming convention) as a durable
+artefact at `.architecture/sulis-checkup/`.
+
+### Added
+
+- `skills/check-readability/` — the stranger-reader audit. Audits naming
+  clarity, module cohesion (kitchen-sink-file detection), and jargon
+  density. Auto-detects PR-scope (local diff or `--pr-number`) vs
+  codebase-scope. Audience=both with `--raw` flag for operator JSON.
+  Audit logic lives directly inside the skill — sulis is becoming the
+  everything-plugin per user direction; no `sea:code-hygiene` operator
+  skill needed.
+  - `SKILL.md` — verb-first trigger; founder/operator modes; gotchas; vocab
+  - `scripts/audit.py` — three heuristic families with 4 false-positive-
+    refinement iterations (238 → 13 findings on this marketplace)
+  - `references/founder-translation.md` — operator → founder vocab table
+  - `COMPLETENESS_REPORT.md` — five-gate audit trail
+
+- `skills/code-health/` — the comprehensive code-health wrapper. v1 wires
+  tier 5 (invokes check-readability); other 6 tiers render as "not yet
+  checked (planned)" — visually distinct from passing tiers. Walks the
+  tier registry; renders a tiered CHECKUP report. NO LangGraph yet
+  (single-tier means no orchestration logic needed).
+  - `SKILL.md` — tier-walking flow; founder/operator modes; tier-gating
+    semantics (no-op in v1)
+  - `scripts/orchestrator.py` — invokes wired tier-skills via subprocess;
+    JSON-merges results; renders markdown for founder mode
+  - `references/tier-registry.md` — canonical 7-tier list; wired-status
+    flags; operator-ID → founder-vocab translation table; "how to wire a
+    new tier" instructions
+  - `COMPLETENESS_REPORT.md` — five-gate audit trail
+
+- `.architecture/sulis-checkup/` (durable artefacts from prior conversation)
+  - `TDD.md` — SEA-authored architectural design (Maslow tiers, healing
+    prototypes, graph architecture, founder surface)
+  - `adrs/ADR-001` through `ADR-006` — engine, gating, healing, OODA
+    bounding, two-tier report format, SRD gap
+  - `CTS-ANALYSIS.md` — Critical Thinking Standard verification of the
+    layer model: primitive grounding (two primitives, not three), MECE
+    + primitive coverage cross-check (4 additional gaps surfaced),
+    verb-first naming convention, 5-argument adversarial test, falsification
+    criteria + pre-mortem
+
+### Dogfood findings
+
+This was dogfood run #2 and #3 of `sulis:add-skill v0.4.0`. Eleven
+methodology gaps queued for `add-skill v0.6.0`:
+
+- From check-readability (5): audit-pattern sub-family; Gate 4 P3
+  false-positive iteration is the methodology working; marketplace-as-
+  fixture pattern; `--raw` mode-selection works cleanly; shared
+  PROTOCOL_METHOD_NAMES set worth extracting
+- From code-health (4): wrapper-pattern sub-family (third confirmation
+  after aggregator + audit); scope auto-detection is third instance of
+  same pattern; three uses of "tier" in marketplace is a vocabulary
+  smell; stubbed-vs-active rendering deserves MUC-F6
+- Plus 2 deferred from inbox dogfood (inventory.py domain-aware mode +
+  founder jargon-density check)
+
+### Verification
+
+- check-readability: real-state test against marketplace (145 files);
+  surfaced `_wpxlib.py` kitchen-sink finding exactly as predicted by
+  the original session conversation; 13 final findings after refinement
+- code-health v1 against marketplace: 1 wired tier (tier 5) reports 13
+  findings; 6 stubbed tiers render visually distinct from passing tiers;
+  --raw JSON mode validates; --tier 5 filter works; tier-gating logic
+  in place but no-op (tiers 1+2 unwired)
+
+### Open risks accepted at publication (across both skills)
+
+1. **Overwhelm risk when more tiers wire** (MUC-F4). 13 findings on a
+   145-file codebase is fine; 50+ after wave-2 may overwhelm. Revisit
+   when second tier wires.
+2. **In-session dismissals not persisted.** Founders manually update
+   `check-readability-vocabulary.md`. Revisit if same finding re-flags
+   across 3+ runs.
+3. **PR-scope auto-detection on non-standard base branches.** Mitigation:
+   echo detected base in every report; founder verifies.
+4. **Single-tier scope masks future single-tier-skill overlap.** When
+   check-security or others ship, code-health's broad trigger may steal
+   their intent. Stubbed-tier rendering names what's missing.
+
 ## v0.4.0 — 2026-05-23
 
 `add-skill` methodology update from sulis:inbox v0.3.0 dogfood findings.

@@ -1,7 +1,9 @@
 # SEA probe / architecture outputs — generated artifacts, not source.
-# At the marketplace root: fully ignored (leading slash anchors to root,
-# so this does NOT match nested .architecture/ inside plugins).
-/.architecture/
+# At the marketplace root: ignore contents EXCEPT sulis-checkup/ which is
+# the durable architectural design for the founder-facing code-health
+# system (TDD + ADRs + CTS analysis; source-of-truth, not generated).
+/.architecture/*
+!/.architecture/sulis-checkup/
 # Inside plugins: ignore contents except hardening-deltas/ (which ARE
 # source-of-truth audit records for structural fixes to the plugin code).
 # Pattern note: we must ignore the CONTENTS rather than the directory itself,
