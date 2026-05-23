@@ -1,5 +1,84 @@
 # Sulis — Changelog
 
+## v0.8.0 — 2026-05-23
+
+Tier 2 (Safe) ships. code-health now answers "could anyone be harmed?"
+in addition to "does it build?", "do tests pass?", and "is it readable?".
+**Four of seven tiers wired.**
+
+### Added
+
+- `skills/check-security/` — pattern-based credential + dangerous-code
+  scanner. Designed for **low false-positive rate**, not exhaustive
+  coverage (for that, use `sulis-security:codebase-assess`). Same
+  baseline + signature-dedup pattern as check-tests + check-build.
+  Per-project allowlist at `.checkup/{project}/security-allowlist.md`
+  with reason annotation.
+  - `SKILL.md`, `scripts/scanner.py` (~430 lines), `references/security-patterns.md`
+  - 16 credential patterns: AWS / GitHub (6 token types) / Stripe (3) /
+    OpenAI / Anthropic / Slack (2) / private keys
+  - 10 dangerous-pattern detectors: eval/exec/pickle/subprocess(shell=True)/
+    os.system/yaml.load/JS eval/dangerouslySetInnerHTML/innerHTML/SQL-fmt
+
+### Changed
+
+- `skills/code-health/scripts/orchestrator.py` — tier 2 wired.
+- `skills/code-health/references/tier-registry.md` — tier 2 marked
+  wired with `/sulis:check-security`.
+
+### What it surfaced + what's clean
+
+Running `/sulis:code-health` against the marketplace now (4 tiers wired):
+
+```
+Tier 1 — Exists:         ❌ failed (19 items)  [bloated descriptions from HD-004 gap]
+Tier 2 — Safe:           ✅ Clear              [4 fixture AWS keys allowlisted]
+Tier 3 — Works:          ⚠️  couldn't check    [no top-level pytest config — known]
+Tier 4 — Survives:       ⏳ not yet checked (planned)
+Tier 5 — Understandable: 🟡 needs attention (13 items)
+Tier 6 — Evolves:        ⏳ not yet checked (planned)
+Tier 7 — Polished:       ⏳ not yet checked (planned)
+```
+
+Tier 2 initially flagged 4 AWS keys in sea:probe's test-credential-runner
+files (intentional fake keys for testing the credential detector itself).
+Added to per-project allowlist at `.checkup/agents/security-allowlist.md`
+with reason annotation. Verdict went from "4 pre-existing findings" to
+"✓ Clear (4 allowlisted)." Demonstrates the allowlist mechanism working
+end-to-end.
+
+### Cross-skill validation (4 skills now)
+
+The validation matrix completed for this batch:
+
+| Tested | By check-readability | Findings |
+|---|---|---|
+| audit.py | self-test | 0 |
+| orchestrator.py | self-test | 0 |
+| regression.py | sibling | 0 |
+| builder.py | sibling | 0 |
+| scanner.py | sibling | 0 |
+
+All five new Python scripts from this thread pass the readability check.
+This is genuine evidence that the methodology produces consistent-quality
+code, not just consistent-quality skills.
+
+### Dogfood findings (run #6 of sulis:add-skill v0.4.0)
+
+3 new methodology gaps for add-skill v0.6.0:
+1. Security skills need a "false-positive philosophy" Gate 2 lock item
+2. Allowlist pattern is consistent across 3 skills now — extract a
+   shared `allowlist_loader.py` helper
+3. Cross-skill self-test pattern is genuinely working — document as
+   "self-test via sibling skills" in methodology.md
+
+20 methodology gaps queued for add-skill v0.6.0.
+
+### Versions
+
+  sulis: 0.7.0 → 0.8.0 (minor — tier 2 wires)
+  marketplace: 1.48.0 → 1.49.0
+
 ## v0.7.0 — 2026-05-23
 
 Tier 1 (Exists) ships. Code-health now answers "does it build?" in

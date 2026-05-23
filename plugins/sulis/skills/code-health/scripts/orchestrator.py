@@ -67,10 +67,12 @@ TIER_REGISTRY: list[TierSpec] = [
     ),
     TierSpec(
         number=2, name="Safe",
-        founder_question="Could anyone be harmed? (security, leaked credentials, PII)",
-        wired=False, wired_in="planned",
-        founder_skill=None, invoke_script=None,
-        covers=["Security vulnerabilities", "Data protection", "Supply chain"],
+        founder_question="Could anyone be harmed? (security, leaked credentials, dangerous patterns)",
+        wired=True, wired_in="0.8.0",
+        founder_skill="/sulis:check-security",
+        invoke_script="plugins/sulis/skills/check-security/scripts/scanner.py",
+        covers=["Credential leaks (AWS / GitHub / Stripe / OpenAI / Anthropic / Slack patterns)", "Dangerous code patterns (eval / exec / SQL injection / XSS)", "For deeper analysis: sulis-security:codebase-assess (25 primitives)"],
+        extra_args=[],  # scanner runs always (cheap, read-only)
     ),
     TierSpec(
         number=3, name="Works",

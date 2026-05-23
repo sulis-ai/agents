@@ -27,16 +27,16 @@ tiers:
 
   - number: 2
     name: Safe
-    founder_question: "Could anyone be harmed? (security, leaked credentials, PII)"
-    wired: false
-    wired_in: planned
-    founder_skill: null
-    operator_skills: null  # future: sulis-security:codebase-assess wrapped
+    founder_question: "Could anyone be harmed? (security, leaked credentials, dangerous patterns)"
+    wired: true
+    wired_in: "0.8.0"
+    founder_skill: "/sulis:check-security"
+    operator_skills: "sulis-security:codebase-assess for deeper 25-primitive audit"
+    extra_args: []
     covers:
-      - "Security vulnerabilities (SEC-01..07)"
-      - "Data protection (DAT-01..05)"
-      - "Supply chain (SC-01..04)"
-      - "Infrastructure-side secrets handling"
+      - "Credential leaks (AWS / GitHub / Stripe / OpenAI / Anthropic / Slack patterns)"
+      - "Dangerous code patterns (eval / exec / SQL injection / XSS)"
+      - "Pattern-based; for deeper analysis use sulis-security:codebase-assess"
 
   - number: 3
     name: Works
