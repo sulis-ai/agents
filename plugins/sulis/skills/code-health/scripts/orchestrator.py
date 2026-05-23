@@ -89,9 +89,11 @@ TIER_REGISTRY: list[TierSpec] = [
     TierSpec(
         number=4, name="Survives",
         founder_question="Does it handle failure gracefully?",
-        wired=False, wired_in="planned",
-        founder_skill=None, invoke_script=None,
-        covers=["Timeouts / retries", "Observability", "Error handling", "Data integrity"],
+        wired=True, wired_in="0.10.0",
+        founder_skill="/sulis:check-reliability",
+        invoke_script="plugins/sulis/skills/check-reliability/scripts/scanner.py",
+        covers=["Missing timeouts on HTTP / subprocess calls", "Silent-except (try/except/pass)", "Broad-except without re-raise", "For deeper analysis: sulis-security:codebase-assess (Armor pillar)"],
+        extra_args=[],
     ),
     TierSpec(
         number=5, name="Understandable",

@@ -1,0 +1,20 @@
+{
+  "tier_4_findings": [
+    "broad-except::plugins/idc/scripts/build_pptx.py::407",
+    "broad-except::plugins/sea/skills/probe/scripts/probe.py::179",
+    "broad-except::plugins/sea/skills/probe/scripts/probe/runners/architecture_runner.py::101",
+    "broad-except::plugins/sea/skills/probe/scripts/probe/runners/architecture_runner.py::136",
+    "broad-except::plugins/sea/skills/probe/scripts/probe/runners/deadcode_runner.py::72",
+    "broad-except::plugins/sea/skills/probe/scripts/probe/runners/deadcode_runner.py::82",
+    "broad-except::plugins/sea/skills/probe/scripts/probe/runners/deadcode_runner.py::91",
+    "broad-except::plugins/sea/skills/probe/scripts/probe/runners/deployment_runner.py::337",
+    "broad-except::plugins/sea/skills/probe/scripts/probe/runners/duplication_runner.py::55",
+    "broad-except::plugins/sea/skills/probe/scripts/probe/runners/lint_runner.py::112",
+    "broad-except::plugins/sea/skills/probe/scripts/probe/runners/test_runner.py::158",
+    "broad-except::plugins/sea/skills/probe/scripts/probe/runners/test_runner.py::211",
+    "broad-except::plugins/sea/skills/probe/scripts/probe/workspace.py::137",
+    "broad-except::plugins/sulis-execution/scripts/_wpxlib.py::177",
+    "broad-except::plugins/sulis-execution/scripts/_wpxlib.py::2139"
+  ],
+  "tier_4_findings_captured_at": "2026-05-23T22:07:45Z"
+}

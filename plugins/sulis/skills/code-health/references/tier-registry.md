@@ -55,15 +55,16 @@ tiers:
   - number: 4
     name: Survives
     founder_question: "Does it handle failure gracefully?"
-    wired: false
-    wired_in: planned
-    founder_skill: null
-    operator_skills: null  # future: sea:codebase-audit (Armor pillar) + sea:failure-mode-audit
+    wired: true
+    wired_in: "0.10.0"
+    founder_skill: "/sulis:check-reliability"
+    operator_skills: "sulis-security:codebase-assess for deeper Armor-pillar analysis"
+    extra_args: []
     covers:
-      - "Timeouts / retries / circuit breakers on external calls (MEA-04)"
-      - "Observability — every operation logs (MEA-07)"
-      - "Error handling (INF-04)"
-      - "No data-loss paths"
+      - "Missing timeouts on HTTP / subprocess / DB calls"
+      - "Silent-except (try/except/pass)"
+      - "Broad-except without re-raise"
+      - "Pattern-based; for chaos / data-integrity / distributed-systems use sulis-security:codebase-assess"
 
   - number: 5
     name: Understandable

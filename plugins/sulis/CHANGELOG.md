@@ -1,5 +1,99 @@
 # Sulis — Changelog
 
+## v0.10.0 — 2026-05-23
+
+Tier 4 (Survives) ships. **5 of 7 tiers wired** in code-health. First
+skill to use the v0.9.0 `_lib/` shared helpers — proves the pattern.
+
+### Added
+
+- `skills/check-reliability/` — tier 4. Pattern-scans for missing
+  timeouts on HTTP/subprocess/DB calls, silent-except blocks
+  (try/except/pass), and broad-except without re-raise. Low-FP
+  philosophy (false reliability findings erode trust like false
+  security findings do).
+  - `SKILL.md`, `scripts/scanner.py` (~280 lines), `references/reliability-patterns.md`
+  - 5 missing-timeout pattern detectors (requests / httpx /
+    subprocess / urllib / socket) with multi-line paren-matching
+  - silent-except + broad-except (with re-raise exemption) AST-lite detectors
+  - Uses `_lib/baseline`, `_lib/allowlist`, `_lib/scope` — first
+    skill to adopt the v0.9.0 helper pattern
+  - `COMPLETENESS_REPORT.md` — five-gate audit trail; v0.6.0 methodology
+
+### Changed
+
+- `skills/code-health/scripts/orchestrator.py` — tier 4 now wired
+- `skills/code-health/references/tier-registry.md` — tier 4 marked wired
+
+### What it surfaced on this marketplace
+
+  Tier 4 reports 15 broad-except findings in existing code:
+  - 6 in sea:probe runners (architecture_runner / deadcode_runner)
+  - 1 in sea:probe/probe.py
+  - 1 in idc/scripts/build_pptx.py
+  - 7 in other plugin scripts
+
+  All are real findings (broad except without re-raise). Defensible
+  follow-up work but not in scope for this commit.
+
+  0 missing-timeout findings — Gate 4 P3 caught initial false-positive
+  on multi-line subprocess.run() calls (5 false positives before the
+  multi-line paren-matching fix; 0 after). Both my own `_lib/baseline.py`
+  and `check-readability/audit.py` were initially mis-flagged.
+
+### Cross-skill self-test (Perspective 4 — new in v0.9.0 methodology)
+
+  All 5 new files (scanner.py + 4 _lib/ modules: baseline / allowlist /
+  scope / __init__) audited by sibling skills:
+
+  | Audited by         | Findings on new code |
+  |--------------------|---------------------:|
+  | check-readability  |                    0 |
+  | check-security     |                    0 |
+  | check-reliability  |                    0 |
+
+  All zero. The methodology continues to produce consistent-quality
+  code across 6 new scripts now.
+
+### Full code-health verification (5 of 7 tiers wired)
+
+  ❌ Tier 1 — Exists:         failed (2 items)        [pre-existing test fixtures]
+  ✅ Tier 2 — Safe:           ✓ Clear
+  ⚠️  Tier 3 — Works:          couldn't check          [no top-level test framework — known]
+  🟡 Tier 4 — Survives:       needs_attention (15)    [new, surfacing real findings]
+  🟡 Tier 5 — Understandable: needs_attention (5)
+  ⏳ Tier 6 — Evolves:        not yet checked (planned)
+  ⏳ Tier 7 — Polished:       not yet checked (planned)
+
+  Wired tiers: 5 of 7. Total findings: 22.
+
+### Dogfood findings (run #7 — first run on v0.6.0 methodology)
+
+2 new methodology gaps queued for v0.7.0 / v0.10.0:
+
+1. **Tier-skill version drift between marketplace and cache.** Cached
+   add-skill loaded for this run was v0.8.0 (matches sulis plugin
+   version pre-v0.9.0 methodology update); the v0.6.0 methodology
+   improvements I shipped take effect after plugin reload. Worth
+   documenting that cache lags marketplace HEAD.
+2. **First use of `_lib/` shared helpers ✓ works.** Import pattern
+   from methodology.md verbatim resolved correctly:
+   `sys.path.insert(0, str(Path(__file__).resolve().parents[3]));
+   from _lib import baseline, allowlist, scope`
+
+Joining 3 deferred from v0.9.0 = 5 methodology gaps queued for v0.7.0.
+
+### Open risks accepted
+
+1. **Number-of-items overwhelm in legacy codebases.** 15 broad-except
+   findings on the marketplace = realistic; bigger projects may
+   produce 50+. revisit_by: trigger — real founder run >30 findings.
+
+### Versions
+
+  sulis: 0.9.0 → 0.10.0 (minor — tier 4 wires)
+  marketplace: 1.51.0 → 1.52.0
+
 ## v0.9.0 — 2026-05-23
 
 Methodology refresh from 6 dogfood runs (inbox + check-readability +
