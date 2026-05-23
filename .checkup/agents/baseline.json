@@ -1,4 +1,46 @@
 {
+  "tier_6_findings": [
+    "dead-class::plugins/sea/skills/probe/scripts/probe/models.py::413::SulisWorkloadExtras",
+    "dead-class::plugins/sea/skills/probe/scripts/probe/models.py::525::SynthesisPayload",
+    "dead-class::plugins/sea/skills/probe/scripts/probe/runners/base.py::54::ToolVersionError",
+    "dead-class::plugins/sulis-execution/scripts/_wpxlib.py::1859::PlanResult",
+    "dead-class::plugins/sulis-execution/scripts/_wpxlib.py::1875::CommitResult",
+    "dead-class::plugins/sulis-execution/scripts/_wpxlib.py::1883::VerifyResult",
+    "dead-constant::plugins/sea/skills/probe/scripts/probe/config.py::567::HIGH_LINT_WARNINGS_PER_FILE",
+    "dead-constant::plugins/sea/skills/probe/scripts/probe/config.py::599::REPO_WIDE_PHASES",
+    "dead-constant::plugins/sea/skills/probe/scripts/probe/runners/deployment_runner.py::61::_METADATA_NAME_RE",
+    "dead-constant::plugins/sea/skills/probe/scripts/probe/runners/scc_runner.py::26::_SCC_LANGUAGE_MAP",
+    "dead-constant::plugins/sulis-execution/scripts/_wpxlib.py::1019::TRAIN_HELD_STATUS",
+    "dead-constant::plugins/sulis-execution/scripts/_wpxlib.py::1020::TRAIN_BLOCKED_STATUS",
+    "dead-constant::plugins/sulis-execution/scripts/_wpxlib.py::347::CI_DEFAULT_INTERVAL",
+    "dead-constant::plugins/sulis-execution/scripts/_wpxlib.py::348::CI_DEFAULT_CAP",
+    "dead-constant::plugins/sulis-execution/scripts/_wpxlib.py::350::DEPLOY_DEFAULT_INTERVAL",
+    "dead-constant::plugins/sulis-execution/scripts/_wpxlib.py::351::DEPLOY_DEFAULT_CAP",
+    "dead-constant::plugins/sulis-execution/scripts/_wpxlib.py::358::HEALTH_DEFAULT_CAP",
+    "dead-constant::plugins/sulis-execution/scripts/_wpxlib.py::360::REBASE_BUDGET",
+    "dead-function::plugins/sea/skills/probe/scripts/probe/filesystem.py::184::find_first_manifest",
+    "dead-function::plugins/sea/skills/probe/scripts/probe/filesystem.py::200::files_for_language",
+    "dead-function::plugins/sea/skills/probe/scripts/probe/models.py::559::read_json",
+    "dead-function::plugins/sea/skills/probe/scripts/probe/render.py::1369::render_markdown_only",
+    "dead-function::plugins/sulis-execution/scripts/_wpxlib.py::110::paths_from_args",
+    "dead-function::plugins/sulis-execution/scripts/_wpxlib.py::163::cli_main",
+    "dead-function::plugins/sulis-execution/scripts/_wpxlib.py::3219::git_worktree_remove",
+    "dead-function::plugins/sulis-execution/scripts/_wpxlib.py::3302::adopt_uncommitted_into_change",
+    "dead-function::plugins/sulis-execution/scripts/_wpxlib.py::3341::adopt_local_commits_into_change",
+    "dead-function::plugins/sulis-execution/scripts/_wpxlib.py::3397::find_change_branches",
+    "dead-function::plugins/sulis-execution/scripts/_wpxlib.py::96::add_common_args",
+    "dead-import::plugins/sea/skills/probe/scripts/probe/orchestrator.py::17::Sequence"
+  ],
+  "tier_6_findings_captured_at": "2026-05-23T22:20:44Z",
+  "tier_7_findings": [
+    "docs-completeness::sulis-builder::DC-001",
+    "docs-completeness::sulis-concierge::DC-004",
+    "docs-completeness::sulis-context::DC-002",
+    "docs-completeness::sulis-design::DC-001",
+    "docs-completeness::sulis-product-development::DC-001",
+    "docs-completeness::sulis-strategy::DC-001"
+  ],
+  "tier_7_findings_captured_at": "2026-05-23T22:24:07Z",
   "tier_4_findings": [
     "broad-except::plugins/idc/scripts/build_pptx.py::407",
     "broad-except::plugins/sea/skills/probe/scripts/probe.py::179",
@@ -16,5 +58,5 @@
     "broad-except::plugins/sulis-execution/scripts/_wpxlib.py::177",
     "broad-except::plugins/sulis-execution/scripts/_wpxlib.py::2139"
   ],
-  "tier_4_findings_captured_at": "2026-05-23T22:07:45Z"
+  "tier_4_findings_captured_at": "2026-05-23T22:24:27Z"
 }

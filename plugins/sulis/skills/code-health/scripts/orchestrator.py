@@ -106,16 +106,20 @@ TIER_REGISTRY: list[TierSpec] = [
     TierSpec(
         number=6, name="Evolves",
         founder_question="Can we change it without breaking things?",
-        wired=False, wired_in="planned",
-        founder_skill=None, invoke_script=None,
-        covers=["Dead code", "Migration completion", "Surface contract drift", "Test quality"],
+        wired=True, wired_in="0.11.0",
+        founder_skill="/sulis:check-maintainability",
+        invoke_script="plugins/sulis/skills/check-maintainability/scripts/scanner.py",
+        covers=["Dead code (unused functions / classes / imports)", "Migration completion (deferred to v1.1)", "Surface contract drift (deferred to v1.1)", "Test quality (deferred to v1.1)"],
+        extra_args=[],
     ),
     TierSpec(
         number=7, name="Polished",
-        founder_question="Performance, accessibility, design quality?",
-        wired=False, wired_in="deferred",
-        founder_skill=None, invoke_script=None,
-        covers=["Performance", "Accessibility", "UX consistency", "Documentation"],
+        founder_question="Does the project feel professional?",
+        wired=True, wired_in="0.11.0",
+        founder_skill="/sulis:check-polish",
+        invoke_script="plugins/sulis/skills/check-polish/scripts/scanner.py",
+        covers=["Documentation completeness (README, CHANGELOG, LICENSE)", "Tech-debt density (TODO/FIXME/HACK)", "File hygiene (trailing whitespace, mixed line endings)", "Performance / a11y / UX deferred — need upstream design choice"],
+        extra_args=[],
     ),
 ]
 

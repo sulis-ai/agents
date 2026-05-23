@@ -81,28 +81,30 @@ tiers:
   - number: 6
     name: Evolves
     founder_question: "Can we change it without breaking things?"
-    wired: false
-    wired_in: planned
-    founder_skill: null
-    operator_skills: null  # future: dead-code, surface-parity, test-audit, migration-completion
+    wired: true
+    wired_in: "0.11.0"
+    founder_skill: "/sulis:check-maintainability"
+    operator_skills: null  # audit logic is INSIDE check-maintainability
+    extra_args: []
     covers:
-      - "Dead code"
-      - "Migration completion"
-      - "Surface contract drift (CLI ↔ SDK ↔ MCP ↔ OpenAPI)"
-      - "Test quality beyond coverage"
+      - "Dead code (unused functions / classes / imports / constants) — advisory-default per FP-philosophy"
+      - "Migration completion (deferred to v1.1 — needs migration-marker convention)"
+      - "Surface contract drift (deferred to v1.1 — project-specific)"
+      - "Test quality beyond coverage (deferred to v1.1)"
 
   - number: 7
     name: Polished
-    founder_question: "Performance, accessibility, design quality?"
-    wired: false
-    wired_in: deferred  # not planned for any near-term release
-    founder_skill: null
+    founder_question: "Does the project feel professional?"
+    wired: true
+    wired_in: "0.11.0"
+    founder_skill: "/sulis:check-polish"
     operator_skills: null
+    extra_args: []
     covers:
-      - "Performance budgets"
-      - "Accessibility (a11y)"
-      - "Design/UX consistency"
-      - "Documentation completeness"
+      - "Documentation completeness (README, CHANGELOG, LICENSE, plugin.json keywords)"
+      - "Tech-debt density (TODO/FIXME/HACK markers)"
+      - "File hygiene (trailing whitespace, mixed line endings, trailing newline)"
+      - "Performance / accessibility / UX deferred — need upstream design choice (which perf budget? which a11y standard?)"
 ```
 
 ## Tier-gating semantics
