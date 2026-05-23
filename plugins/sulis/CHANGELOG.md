@@ -1,5 +1,94 @@
 # Sulis — Changelog
 
+## v0.11.1 — 2026-05-23
+
+Cleanup release. Uses the tier-1/5/7 skills to drive real cleanup of
+the marketplace, then migrates 3 of the 4 original skills to the
+v0.9.0 _lib/ helpers (deferred from v0.9.0 — now done where it fits
+cleanly).
+
+### Added — Documentation (resolves 5 of 6 tier-7 findings)
+
+- `plugins/sulis-builder/README.md` (53 lines)
+- `plugins/sulis-design/README.md` (45 lines)
+- `plugins/sulis-product-development/README.md` (52 lines)
+- `plugins/sulis-strategy/README.md` (48 lines)
+- `plugins/sulis-context/CHANGELOG.md` (35 lines — reconstructed from
+  current state, dates approximate)
+
+Tier-7 polish findings dropped from 6 → 1 (remaining is sulis-concierge
+keyword count — legitimate, it's a deprecation shim).
+
+### Changed — Migration to _lib/ helpers (3 of 4 skills)
+
+- `skills/check-security/scripts/scanner.py` — 462 → 426 LOC. Removed
+  inline `baseline_path` / `load_baseline_tier2` / `save_baseline_tier2`
+  / `load_allowlist`; replaced with `_lib.baseline` + `_lib.allowlist`
+  calls.
+- `skills/check-build/scripts/builder.py` — 641 → 622 LOC. Removed
+  inline `baseline_path` / `load_baseline_tier1` / `save_baseline_tier1`;
+  replaced with `_lib.baseline.load_namespace` / `save_namespace`.
+- `skills/check-readability/scripts/audit.py` — 783 → 720 LOC. Removed
+  inline `detect_base_branch` / `detect_scope` / `fetch_pr_files` /
+  `list_codebase_files` / `_git` / `_run`; replaced with `_lib.scope`
+  calls. Wrapper functions preserve the original call signatures so
+  the rest of the file is unchanged.
+
+**Total LOC saved:** ~118 across 3 scripts. Plus the pattern is now
+established: future skills import from `_lib/`, original skills are
+now consistent with the new check-* siblings.
+
+### NOT migrated (deferred with documented reason)
+
+- `skills/check-tests/scripts/regression.py` — uses a richer baseline
+  shape (full `Baseline` dataclass with framework + per-test results,
+  stored at the TOP level of baseline.json, not as a tier_N_* sub-key).
+  Migrating would change the baseline file format and require existing
+  baselines to be regenerated. The `_lib/baseline.save_namespace`
+  pattern is designed for signature-set namespaces (which most skills
+  use); it's not the right fit for check-tests's full-state baseline.
+  Defensible scope-limit of the helper; not a regression.
+
+### Phase C survey (tier-4 findings)
+
+  15 broad-except findings all in legacy plugins:
+  - 11 in sea:probe runners + helpers
+  - 2 in sulis-execution _wpxlib.py
+  - 1 in idc:build_pptx.py
+  - 1 in sea:probe/probe.py
+
+  Zero findings in code we own (sulis plugin or new check-* skills).
+  No cleanup work for this phase — findings remain captured in
+  baseline; per-plugin maintainers can address with engineering
+  judgement (broad-except CAN be correct; needs per-case review).
+
+### Verification
+
+  Full code-health sweep after all changes:
+
+    ❌ Tier 1 — Exists:         failed (2 items)        [test fixtures]
+    ✅ Tier 2 — Safe:           ✓ Clear
+    ⚠️  Tier 3 — Works:          couldn't check          [no top-level test framework]
+    🟡 Tier 4 — Survives:       needs_attention (15)    [unchanged]
+    🟡 Tier 5 — Understandable: needs_attention (5)     [unchanged]
+    🟡 Tier 6 — Evolves:        needs_attention (30)    [unchanged]
+    🟡 Tier 7 — Polished:       needs_attention (1)     [6→1 from Phase A]
+    Total: 53 (was 58)
+
+  Cross-skill self-test on the 3 refactored scripts:
+    check-readability on all sulis scripts: 0 findings
+    check-security:                          0 findings (4 allowlisted)
+    check-reliability on sulis scripts:      0 findings
+
+  Baseline persistence verified — existing baseline.json from
+  pre-refactor still reads correctly via the new `_lib.baseline`
+  wrappers (sub-key format unchanged for the 3 migrated skills).
+
+### Versions
+
+  sulis: 0.11.0 → 0.11.1 (patch — cleanup, no surface change)
+  marketplace: 1.53.0 → 1.53.1
+
 ## v0.11.0 — 2026-05-23
 
 **Tiers 6 + 7 ship. 7 of 7 tiers wired — complete Maslow-for-code

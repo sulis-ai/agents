@@ -22,13 +22,16 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import re
 import subprocess
 import sys
-import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+
+# _lib/ shared helpers (canonical pattern per add-skill v0.6.0).
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from _lib import allowlist as _allowlist  # noqa: E402
+from _lib import baseline as _baseline  # noqa: E402
 
 
 # ─── Source-file selection ──────────────────────────────────────────
@@ -179,33 +182,9 @@ class ScanReport:
 
 
 # ─── Allowlist loading ──────────────────────────────────────────────
-
-
-def load_allowlist(repo_root: Path, project: str) -> set[str]:
-    """Per-project allowlist of signatures or literal strings."""
-    allowlist: set[str] = set()
-    path = repo_root / ".checkup" / project / "security-allowlist.md"
-    if not path.is_file():
-        return allowlist
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return allowlist
-    for line in text.splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        # Allow `signature: reason` where signature itself may contain ":"
-        # (e.g., "AWS Access Key ID::file.py::42::AKIA1234"). The reason
-        # comes AFTER the last ": " (colon-space) separator. If no ": "
-        # found, the whole line is the signature.
-        sep_idx = line.rfind(": ")
-        if sep_idx > 0:
-            sig = line[:sep_idx].strip()
-        else:
-            sig = line
-        allowlist.add(sig)
-    return allowlist
+# (Inline implementation removed in v0.11.x — uses _lib/allowlist.
+# Keep this comment as a pointer for future maintainers.)
+# Pre-existing allowlist path: .checkup/{project}/security-allowlist.md
 
 
 # ─── Scanner ────────────────────────────────────────────────────────
@@ -265,36 +244,20 @@ def scan_file(rel_path: str, repo_root: Path, all_patterns: list[Pattern]) -> li
     return findings
 
 
-# ─── Baseline (tier_2 namespace in shared baseline.json) ───────────
-
-
-def baseline_path(repo_root: Path, project: str) -> Path:
-    return repo_root / ".checkup" / project / "baseline.json"
+# ─── Baseline (tier_2 namespace) ───────────────────────────────────
+# Inline implementation removed in v0.11.x — uses _lib/baseline.
+# Wrappers below preserve the original call signatures so the rest of
+# the file doesn't change.
 
 
 def load_baseline_tier2(repo_root: Path, project: str) -> set[str]:
-    path = baseline_path(repo_root, project)
-    if not path.is_file():
-        return set()
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        return set(data.get("tier_2_findings", []))
-    except (json.JSONDecodeError, OSError):
-        return set()
+    return set(_baseline.load_namespace(repo_root, project, "tier_2_findings", []))
 
 
 def save_baseline_tier2(repo_root: Path, project: str, signatures: set[str]) -> None:
-    path = baseline_path(repo_root, project)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    existing: dict = {}
-    if path.is_file():
-        try:
-            existing = json.loads(path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            existing = {}
-    existing["tier_2_findings"] = sorted(signatures)
-    existing["tier_2_captured_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+    _baseline.save_namespace(
+        repo_root, project, "tier_2_findings", sorted(signatures)
+    )
 
 
 # ─── Rendering ──────────────────────────────────────────────────────
@@ -407,7 +370,8 @@ def main() -> int:
         args.project = repo_root.name
 
     files = list_source_files(repo_root)
-    allowlist = load_allowlist(repo_root, args.project)
+    allowlist_path = repo_root / ".checkup" / args.project / "security-allowlist.md"
+    allowlist = _allowlist.load_allowlist(allowlist_path)
     all_patterns = CREDENTIAL_PATTERNS + DANGEROUS_PATTERNS
 
     findings: list[Finding] = []

@@ -37,10 +37,13 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+
+# _lib/ shared helpers (canonical pattern per add-skill v0.6.0).
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from _lib import scope as _scope  # noqa: E402
 
 
 # ─── Constants ───────────────────────────────────────────────────────
@@ -136,95 +139,29 @@ class AuditEnvelope:
 
 
 # ─── Scope detection ────────────────────────────────────────────────
+# Inline implementation removed in v0.11.x — uses _lib/scope.
+# Wrappers below preserve the original call signatures so the rest of
+# the file doesn't need to change.
 
 
 def detect_base_branch(repo_root: Path) -> str:
-    """Find the project's main branch. Order: main, master, trunk, then git's HEAD upstream."""
-    for candidate in ("main", "master", "trunk"):
-        rc, _, _ = _git(repo_root, ["rev-parse", "--verify", f"refs/heads/{candidate}"])
-        if rc == 0:
-            return candidate
-    # Fallback: ask git for the upstream's default
-    rc, out, _ = _git(repo_root, ["symbolic-ref", "refs/remotes/origin/HEAD"])
-    if rc == 0 and "/" in out:
-        return out.strip().split("/")[-1]
-    return "main"  # last resort
+    return _scope.detect_base_branch(repo_root)
 
 
 def detect_scope(repo_root: Path, base_branch: str) -> tuple[str, list[str]]:
-    """Auto-detect PR vs codebase scope. Returns (scope, files)."""
-    # Check current branch
-    rc, current, _ = _git(repo_root, ["rev-parse", "--abbrev-ref", "HEAD"])
-    if rc != 0:
-        return "codebase", []
-    current = current.strip()
-
-    if current == base_branch:
-        # On the base branch — codebase scope
-        return "codebase", []
-
-    # Feature branch — check for diverging commits
-    rc, out, _ = _git(
-        repo_root,
-        ["diff", "--name-only", f"{base_branch}...HEAD"],
-    )
-    if rc != 0:
-        # base branch doesn't exist locally; fall back to uncommitted changes
-        rc, out, _ = _git(repo_root, ["diff", "--name-only", "HEAD"])
-
-    files = [f for f in out.strip().splitlines() if f]
-    if not files:
-        # No diff — treat as codebase scope
-        return "codebase", []
-
-    return "pr", files
+    return _scope.detect_scope(repo_root, base_branch)
 
 
 def fetch_pr_files(pr_number: int, repo_root: Path) -> tuple[list[str], list[str]]:
-    """Fetch files in a PR via gh CLI. Returns (files, errors)."""
-    rc, out, err = _run(["gh", "pr", "diff", str(pr_number), "--name-only"], repo_root)
-    if rc != 0:
-        return [], [f"gh pr diff failed (rc={rc}): {err}"]
-    files = [f for f in out.strip().splitlines() if f]
-    return files, []
+    return _scope.fetch_pr_files(pr_number, repo_root)
 
 
 def list_codebase_files(repo_root: Path) -> list[str]:
-    """List all source files in the repo, respecting .gitignore."""
-    rc, out, _ = _git(repo_root, ["ls-files"])
-    if rc != 0:
-        return []
-    return [
-        f for f in out.strip().splitlines()
-        if Path(f).suffix in SOURCE_EXTENSIONS
-    ]
+    return _scope.list_codebase_files(repo_root, SOURCE_EXTENSIONS)
 
 
 def filter_source_files(files: list[str]) -> list[str]:
     return [f for f in files if Path(f).suffix in SOURCE_EXTENSIONS]
-
-
-# ─── Git / subprocess helpers ───────────────────────────────────────
-
-
-def _git(repo_root: Path, args: list[str]) -> tuple[int, str, str]:
-    return _run(["git", *args], repo_root)
-
-
-def _run(cmd: list[str], cwd: Path) -> tuple[int, str, str]:
-    try:
-        proc = subprocess.run(
-            cmd,
-            cwd=str(cwd),
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        return proc.returncode, proc.stdout, proc.stderr
-    except subprocess.TimeoutExpired:
-        return 124, "", "timeout"
-    except FileNotFoundError as exc:
-        return 127, "", str(exc)
 
 
 # ─── Vocabulary loading ─────────────────────────────────────────────

@@ -27,9 +27,12 @@ import json
 import re
 import subprocess
 import sys
-import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+
+# _lib/ shared helpers (canonical pattern per add-skill v0.6.0).
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from _lib import baseline as _baseline  # noqa: E402
 
 
 DEFAULT_TIMEOUT_SECONDS = 180
@@ -402,37 +405,15 @@ def _check_package_json(path: Path, rel: str) -> list[HygieneFinding]:
     return findings
 
 
-# ─── Baseline (shared with check-tests via tier_1_* namespace) ─────
-
-
-def baseline_path(repo_root: Path, project: str) -> Path:
-    return repo_root / ".checkup" / project / "baseline.json"
+# ─── Baseline (tier_1 namespace; uses _lib/baseline since v0.11.x) ─
 
 
 def load_baseline_tier1(repo_root: Path, project: str) -> dict[str, str]:
-    """Load tier_1 (build) baseline: system → status."""
-    path = baseline_path(repo_root, project)
-    if not path.is_file():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        return data.get("tier_1_systems", {})
-    except (json.JSONDecodeError, OSError):
-        return {}
+    return _baseline.load_namespace(repo_root, project, "tier_1_systems", {})
 
 
 def save_baseline_tier1(repo_root: Path, project: str, systems: dict[str, str]) -> None:
-    path = baseline_path(repo_root, project)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    existing: dict = {}
-    if path.is_file():
-        try:
-            existing = json.loads(path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            existing = {}
-    existing["tier_1_systems"] = systems
-    existing["tier_1_captured_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+    _baseline.save_namespace(repo_root, project, "tier_1_systems", systems)
 
 
 # ─── Rendering ──────────────────────────────────────────────────────
