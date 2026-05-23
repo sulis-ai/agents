@@ -1,5 +1,68 @@
 # Sulis — Changelog
 
+## v0.4.0 — 2026-05-23
+
+`add-skill` methodology update from sulis:inbox v0.3.0 dogfood findings.
+Closes 8 of the 10 methodology gaps surfaced; the remaining 2 (inventory.py
+domain-aware mode + audience-conditional jargon check) deferred to v0.5.0.
+
+### Added
+
+- `references/founder-facing-conventions.md` — the canonical conventions
+  for any skill / agent / surface in this marketplace whose Audience lock
+  is founder-facing or both. Five rules: apply FE-06 to every founder-
+  visible string; lead with founder-readable name (ID parenthetical);
+  echo-before-act + prompt-before-destroy; translate operator vocabulary
+  at output time (not at storage); error messages explain in founder
+  terms what happened AND what to do. Includes a sixth-perspective
+  "Founder-readability" Gate 4 check + audience-conditional Gate 5
+  misuse-case catalogue (MUC-F1..F5).
+
+### Changed
+
+- `skills/add-skill/SKILL.md` Gate 2 — added `Audience` lock item
+  (founder-facing / operator-facing / both). Six → seven items locked.
+  Audience determines downstream conventions (founder-facing-conventions.md
+  application) and Gate 5 misuse-case catalogue extension.
+- `skills/add-skill/SKILL.md` Gate 5 — added audience-conditional
+  misuse-case catalogue (MUC-F1..F5 for founder-facing or both skills).
+  Mandatory: 3+ of MUC-F1..F5 addressed.
+- `skills/add-skill/templates/COMPLETENESS_REPORT.md.template` —
+  Audience row added to Scope Lock table; structured `revisit_by:` field
+  added to Open Risks (date / event / trigger / never).
+- `skills/add-skill/references/methodology.md` — new "Patterns to
+  recognise" section (Aggregator-pattern + Founder-facing + Operator-
+  facing families with shared concerns); new "Misuse cases sometimes
+  surface during Gate 4" subsection explicitly allowing emergent misuse-
+  case discovery during functional testing.
+- `skills/add-skill/references/completeness-perspectives.md` —
+  Perspective 3 extended with fixtures pattern (real-state preferred +
+  synthetic populated for full coverage); explicit hand-off for emergent
+  misuse cases discovered during P3 to Gate 5.
+- Categories list extended in SKILL.md Gate 2: existing seven operator
+  categories + three founder categories (Founder UX & Navigation,
+  Concierge Translation, Founder Aggregator).
+
+### Methodology gaps closed (8 of 10 from sulis:inbox dogfood)
+
+| # | Gap | Resolution |
+|---|---|---|
+| 1 | Gate 2 missing Audience lock | Added to SKILL.md + template |
+| 2 | Categories list operator-biased | Extended with 3 founder categories |
+| 5 | Gate 5 needs audience-conditional items | MUC-F1..F5 added |
+| 6 | founder-facing-conventions.md missing | Authored |
+| 7 | Gate 4 P3 needs fixture guidance | Real-state + synthetic patterns documented |
+| 8 | Misuse cases surface during Gate 4 | Methodology now explicitly allows |
+| 9 | OPEN_RISK needs revisit-trigger | Structured field in template |
+| 10 | Aggregator-pattern recognition | Documented in methodology.md |
+
+### Deferred to v0.5.0 (2 gaps)
+
+| # | Gap | Why deferred |
+|---|---|---|
+| 3 | inventory.py not domain-aware (aggregators) | Bigger design question — `--skill-type` vs `--data-sources` vs auto-detect; ship correctly, not quickly |
+| 4 | Founder jargon-density check in Find | Pairs with #3 (audience-conditional check needs the domain-aware foundation first) |
+
 ## v0.3.0 — 2026-05-23
 
 First founder-facing aggregator skill ships. Also the first dogfood run of

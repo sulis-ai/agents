@@ -40,10 +40,12 @@
 |---|---|
 | Skill name | `{{kebab-case}}` |
 | Plugin home | `{{plugin}}` |
-| Category | {{one of: Library/API · Product Verification · Data Fetching · Business Process · Code Scaffolding · Code Quality · Runbook}} |
-| Trigger condition | {{verbatim text that will appear in `description:`}} |
-| Top-N gotchas | {{list 5 — each with source: prior-art / BRIEF_PACK / author-experience}} |
+| Audience | {{founder-facing / operator-facing / both}} — if founder-facing or both, founder-facing-conventions.md was read; if both, declare mode-selection strategy below |
+| Category | {{operator: Library/API · Product Verification · Data Fetching · Business Process · Code Scaffolding · Code Quality · Runbook OR founder: Founder UX & Navigation · Concierge Translation · Founder Aggregator}} |
+| Trigger condition | {{verbatim text that will appear in `description:`; founder-facing must use ONLY user-facing vocabulary}} |
+| Top-N gotchas | {{list 5 — each with source: prior-art / BRIEF_PACK / author-experience; founder-facing must include ≥1 about operator-vocab leakage and ≥1 about destructive-action confirmation}} |
 | Depth modes | {{none / Quick-Full / Quick-Full-Audit ; selection strategy: auto / user-explicit / context-derived}} |
+| Mode-selection strategy (if Audience=both) | {{outermost-invocation / explicit-flag / context-derived}} |
 
 **Vocabulary terms to be introduced:** {{list, with collision resolution from Gate 1}}
 
@@ -119,11 +121,24 @@ methodology-gap / scenario-mismatch}}
 ## Open risks accepted at publication
 
 {{Summary of any DEFERRED verdicts, OPEN_RISK misuse cases, or known
-limitations that the skill ships with. Each should have:}}
+limitations that the skill ships with. Each MUST have a structured
+revisit_by field — one of:
+  - revisit_by: date | YYYY-MM-DD            (calendar trigger)
+  - revisit_by: event | <description>        (observable event trigger)
+  - revisit_by: trigger | <condition>        (state-condition trigger)
+  - revisit_by: never                        (acknowledged permanent limitation)}}
 
-- **Risk name:** {{name}}
-- **Why accepted:** {{rationale}}
-- **Revisit by:** {{date or trigger condition for revisiting}}
+### Risk 1: {{name}}
+
+- **Description:** {{what could go wrong}}
+- **Why accepted:** {{rationale — usually: low likelihood, low impact, or
+  blocker for a future-version dependency}}
+- **revisit_by:** {{date | event | trigger | never}}: {{detail}}
+- **Workaround for users in the meantime:** {{if any}}
+
+### Risk 2: {{name}}
+
+{{Same structure}}
 
 ---
 

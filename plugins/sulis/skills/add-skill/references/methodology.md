@@ -140,6 +140,21 @@ The kinds-and-tools spec's completeness report uses five perspectives; this
 skill uses three because the simpler shape (skill, not full spec) needs less
 coverage. If the skill grows in complexity, add perspectives.
 
+### Misuse cases sometimes surface during Gate 4
+
+The five gates are sequential, but misuse-case discovery is not strictly
+gate-bounded. Real-state functional testing in Gate 4 perspective 3
+often reveals failure modes the author didn't anticipate at Gate 5's
+abstract-thinking moment.
+
+The methodology allows this: maintain a running misuse-case candidate
+list during Gate 4; finalise + categorise (PREVENTED / OPEN_RISK) at
+Gate 5. This is not a methodology violation; it's the methodology
+working as designed — real evidence beats speculation.
+
+The COMPLETENESS_REPORT.md template has space for "misuse cases
+identified during Gate 4 (then formalised at Gate 5)" — use it.
+
 ### Why DEFERRED is valid but FAIL is not
 
 DEFERRED means the perspective could not be evaluated (e.g., not enough real
@@ -176,6 +191,51 @@ Documenting them (with name, impact, and rationale for acceptance) means
 future authors can find them and decide whether the trade-off still holds.
 Silent open risks accumulate into the kind of cumulative drift the quality
 coverage matrix is meant to surface.
+
+## Patterns to recognise
+
+Skills cluster into recognisable families. The methodology applies to all of
+them, but each family has shared concerns worth knowing about.
+
+### Aggregator-pattern skills
+
+A skill that reads from multiple sources and presents a unified view.
+`sulis:inbox` is the prototype; future examples include `sulis:next` (over
+inbox + journey state), starter-pack discovery (over template registry),
+and any "what's the state of X across these N sources?" tool.
+
+Shared concerns:
+
+- **Source-discovery brittleness.** If a state source moves, the aggregator
+  silently misses items. Mitigation: deterministic source-discovery via a
+  registry or convention, plus a `--doctor` check.
+- **No-cache discipline.** Aggregators must recompute on every invocation;
+  caching produces stale-on-read failures.
+- **Vocabulary translation at output.** Each source has its own vocabulary
+  (operator); the aggregator's audience may want different vocabulary
+  (founder). Translate at the seam, not at storage.
+- **Filter discipline.** Aggregators include items; equally important is
+  what they exclude. Verify both paths in Gate 4 P3.
+- **Number-of-items overwhelm.** Real-state can surface more items than
+  expected (inbox's first real test surfaced 16 findings). Plan a
+  presentation cap from the start.
+
+If the skill being authored is an aggregator, all five concerns should
+become gotchas in Gate 2 — they ground in concrete prior failures from
+HD-008 (source brittleness, no-cache) and inbox's own Gate 4 (overwhelm,
+filter discipline).
+
+### Founder-facing skills (any family)
+
+Subject to `plugins/sulis/references/founder-facing-conventions.md` —
+FE-06 application, no internal IDs in chrome, echo-before-act,
+prompt-before-destroy, error-as-resolution-guidance, vocabulary
+translation at output.
+
+### Operator-facing skills (any family)
+
+Free to use technical vocabulary directly; audience preference. The
+conventions doc explicitly does NOT apply.
 
 ## On the COMPLETENESS_REPORT.md
 

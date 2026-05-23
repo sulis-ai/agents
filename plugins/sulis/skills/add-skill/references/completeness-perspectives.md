@@ -84,11 +84,8 @@ scenarios?
 
 ### How to evaluate
 
-1. Construct 3–5 real scenarios from the skill's target category. Each
-   scenario should:
-   - Be representative of typical use (not edge cases)
-   - Have a clear expected output (what the skill should produce)
-   - Be runnable end-to-end against the skill
+1. Construct 3–5 scenarios from the skill's target category. Use the
+   fixtures pattern below to make this repeatable.
 2. Run the skill against each scenario. Record the output.
 3. For each, judge: did the output match the expected shape? Did Claude
    follow the methodology? Were the gotchas applied?
@@ -98,6 +95,59 @@ scenarios?
      a methodology update
    - **Scenario mismatch** — the scenario wasn't actually in scope (revise
      either scenario or skill scope)
+5. Watch for **emergent misuse cases** during this perspective —
+   real-state testing often reveals failure modes the author didn't
+   anticipate. Add them to a running misuse-case candidate list to be
+   finalised at Gate 5.
+
+### Fixtures pattern
+
+Two complementary fixture types — use both when possible:
+
+**Real-state fixture (preferred):** point the skill at a real, in-use
+project directory. Tests against actual data; exposes failure modes that
+synthetic fixtures miss (HD-013 was discovered this way). Limitation: you
+can only exercise the categories that happen to be populated.
+
+```bash
+# Example: aggregator-pattern skill tested against real platform repo
+python3 my-skill/scripts/aggregator.py \
+  --project some-real-project \
+  --repo-root /path/to/real/repo \
+  --format markdown
+```
+
+**Synthetic populated fixture:** tempdir with hand-crafted state files
+that exercise every category — including the ones the real-state fixture
+left empty. Verifies filter discipline (do excluded items stay excluded?
+do edge cases like malformed YAML get handled?).
+
+```bash
+# Example: synthetic fixture pattern
+tmpdir=$(mktemp -d)
+mkdir -p "$tmpdir/.architecture/test-proj/{train-runs,work-packages}"
+
+# Synthetic positive case
+cat > "$tmpdir/.architecture/test-proj/train-runs/abc.state.json" <<'EOF'
+{"phase": "paused", "pause_reason": "..."}
+EOF
+
+# Synthetic negative case (verify filter excludes this)
+cat > "$tmpdir/.architecture/test-proj/train-runs/xyz.state.json" <<'EOF'
+{"phase": "success"}
+EOF
+
+python3 my-skill/scripts/script.py --project test-proj --repo-root "$tmpdir"
+rm -rf "$tmpdir"
+```
+
+The synthetic fixture should include at least one positive and one
+negative case per category, so the test verifies both the inclusion path
+and the filter discipline.
+
+**Document fixture inventories.** When a skill ships, record in its
+COMPLETENESS_REPORT.md which scenarios were tested + which fixture type
+was used. Future maintainers can re-run them.
 
 ### Pass criteria
 

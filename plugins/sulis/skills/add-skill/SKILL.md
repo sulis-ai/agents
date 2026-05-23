@@ -72,21 +72,35 @@ The author commits to:
 
 - **Skill name** (kebab-case; verified non-colliding via Gate 1)
 - **Plugin home** (which plugin will own it; create new plugin only if no existing one fits)
-- **Category** from `docs/skill-authoring-guide.md` (Library/API Reference,
-  Product Verification, Data Fetching, Business Process, Code Scaffolding, Code
-  Quality, Runbook) — pick exactly one
+- **Audience** — `founder-facing` / `operator-facing` / `both`. Affects every
+  subsequent gate. Founder-facing skills MUST follow
+  `plugins/sulis/references/founder-facing-conventions.md` (FE-06 application,
+  no internal IDs in chrome, echo-before-act, prompt-before-destroy, etc.).
+  `both` requires declaring a mode-selection strategy.
+- **Category** — pick exactly one from:
+  - Operator-facing categories (from `docs/skill-authoring-guide.md`):
+    Library/API Reference, Product Verification, Data Fetching, Business
+    Process, Code Scaffolding, Code Quality, Runbook
+  - Founder-facing categories: Founder UX & Navigation, Concierge Translation,
+    Founder Aggregator (sub-family for skills that aggregate state across
+    sources — see methodology gap #10)
 - **Trigger condition** (the one-line `description:` field — a trigger, not a
-  summary; see `references/methodology.md` for the convention)
+  summary; see `references/methodology.md` for the convention). If Audience is
+  founder-facing or both, the trigger condition uses ONLY user-facing
+  vocabulary (no operator jargon, even if accurate).
 - **Top 5 gotchas** the skill must address (from Gate 1's prior-art harvest plus
-  the author's domain knowledge)
+  the author's domain knowledge). If Audience is founder-facing or both, at
+  least one gotcha addresses operator-vocab leakage and one addresses
+  destructive-action confirmation.
 - **Depth modes** if the skill needs them (Quick / Full / Audit) — declare the
   selection strategy (auto / user-explicit / context-derived)
 
 **Pass criteria for Gate 2:**
 
-- All six items above are written down in `COMPLETENESS_REPORT.md`'s "Scope
+- All seven items above are written down in `COMPLETENESS_REPORT.md`'s "Scope
   Lock" section (use `templates/COMPLETENESS_REPORT.md.template`)
 - No item is "TBD"; if something cannot be locked, return to Gate 1
+- For founder-facing or both: founder-facing-conventions.md has been read
 
 ### Gate 3 — Generate (authoring, LLM-driven)
 
@@ -156,8 +170,13 @@ Run three perspectives:
 bad outcomes. For each, either prevent it in the skill or document it as an
 open risk.
 
+Misuse cases sometimes surface during Gate 4 (especially during functional-
+completeness testing when real-state scenarios reveal failure modes the
+author didn't anticipate). Add to a running "Misuse cases candidate" list
+during Gate 4; finalise + categorise at Gate 5.
+
 Per `references/methodology.md` (the kinds-and-tools turn 28 adversarial sweep
-pattern), the categories to consider:
+pattern), the categories to consider (audience-agnostic):
 
 - Trigger-condition jargon leakage (Claude triggers it without context)
 - Premature commitment to a reference version
@@ -168,17 +187,33 @@ pattern), the categories to consider:
 - Trigger condition matches too broadly
 - Depth-mode selection ambiguity
 
-For each of the top 3 risks identified:
+**Additional audience-conditional categories** (founder-facing or both):
 
-- **Name** the misuse case
+- **MUC-F1: Operator jargon leak in error string.** Skill body produces
+  clean strings but a wrapped script's error bubbles up untranslated.
+- **MUC-F2: Shortcut acts on stale state without echoing.**
+- **MUC-F3: Destructive action triggered by ambiguous founder phrasing.**
+- **MUC-F4: Number-of-items overwhelm** (aggregator skills especially).
+- **MUC-F5: Source-of-truth false-positive** (state not updated after
+  out-of-band resolution).
+
+Founder-facing or both skills MUST address at least 3 of MUC-F1..F5 in
+addition to the audience-agnostic categories.
+
+For each of the top 3+ risks identified:
+
+- **Name** the misuse case (use MUC-F numbering for the audience-conditional
+  ones; free-form for others)
 - **Describe** what Claude might do wrong
-- **State** what the skill does to prevent it (or mark as "open risk")
+- **State** what the skill does to prevent it (or mark as OPEN_RISK with
+  structured `revisit_by:` trigger — see template)
 
 **Pass criteria for Gate 5:**
 
 - 3+ misuse cases named in `COMPLETENESS_REPORT.md`'s "Adversarial Review" section
+- For founder-facing or both: at least 3 of those are MUC-F1..F5
 - All marked as either PREVENTED (with mechanism) or OPEN_RISK (with documented
-  impact and rationale for accepting)
+  impact, rationale for accepting, AND structured revisit-trigger)
 
 ## Publishing
 
