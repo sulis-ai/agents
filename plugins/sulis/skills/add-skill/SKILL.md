@@ -92,6 +92,12 @@ The author commits to:
   the author's domain knowledge). If Audience is founder-facing or both, at
   least one gotcha addresses operator-vocab leakage and one addresses
   destructive-action confirmation.
+- **False-positive philosophy** (audit-pattern skills only) — declare the
+  FP/FN trade-off explicitly. Security and code-quality skills face
+  different stakes: a false positive on a security finding ("AWS key
+  leaked!" — wasn't) erodes trust; a false negative (missed real leak)
+  is worse. State the lock: "v1 prioritises low-FP" or "v1 prioritises
+  high-recall." Affects pattern selection + allowlist UX.
 - **Depth modes** if the skill needs them (Quick / Full / Audit) — declare the
   selection strategy (auto / user-explicit / context-derived)
 
@@ -196,8 +202,12 @@ pattern), the categories to consider (audience-agnostic):
 - **MUC-F4: Number-of-items overwhelm** (aggregator skills especially).
 - **MUC-F5: Source-of-truth false-positive** (state not updated after
   out-of-band resolution).
+- **MUC-F6: Stubbed-vs-active rendering blur** (wrapper skills with
+  partial coverage). A "not yet checked" tier rendered with the same
+  styling as "passed" leads founders to think coverage is complete when
+  it isn't. Visually distinct badges (⏳ vs ✅) are mandatory.
 
-Founder-facing or both skills MUST address at least 3 of MUC-F1..F5 in
+Founder-facing or both skills MUST address at least 3 of MUC-F1..F6 in
 addition to the audience-agnostic categories.
 
 For each of the top 3+ risks identified:

@@ -183,6 +183,43 @@ The three verdicts (PASS / FAIL / DEFERRED) compose like this:
 DEFERRED is for "could not evaluate"; FAIL is for "evaluated and didn't
 meet the bar." Conflating them is how skills with known issues ship.
 
+## Perspective 4 (optional but encouraged) — Self-test via sibling skills
+
+For batches where multiple skills are authored in sequence, run each
+newly-authored skill against ITS OWN code via the relevant sibling skill.
+
+### How to evaluate
+
+For each new skill's source files:
+1. Run `sulis:check-readability` against the new code (if Python/JS/TS).
+2. Run `sulis:check-build` (manifest hygiene on any new plugin.json).
+3. Run `sulis:check-security` (credential leaks in test fixtures often
+   slip through).
+4. Tier-3 (`sulis:check-tests`) doesn't apply if the new skill doesn't
+   ship tests (most don't in v1).
+
+### Pass criteria
+
+- **PASS:** 0 findings from each sibling skill against the new code.
+- **FAIL:** ≥1 finding from any sibling skill. Either fix the new code
+  OR refine the sibling skill's heuristic if the finding is a false
+  positive caused by the new code's legitimate pattern. Both are
+  legitimate resolutions — document which you chose and why.
+
+### Track record
+
+The cross-skill self-test pattern has 5 data points (check-readability,
+check-tests, code-health, check-build, check-security). All 5 self-tests
+returned 0 findings. Evidence that the methodology produces
+consistent-quality code, not just consistent-quality skill metadata.
+
+### When NOT to run this perspective
+
+- Single-skill authoring with no sibling skills available
+- Skill is operator-facing and the only available sibling skills are
+  founder-facing (the audience-conditional gotchas don't apply)
+- Skill ships before any sibling skill exists (early bootstrapping)
+
 ## Why three perspectives, not more
 
 The kinds-and-tools spec uses five completeness perspectives (requirement

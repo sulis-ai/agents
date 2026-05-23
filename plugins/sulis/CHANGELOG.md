@@ -1,5 +1,106 @@
 # Sulis — Changelog
 
+## v0.9.0 — 2026-05-23
+
+Methodology refresh from 6 dogfood runs (inbox + check-readability +
+code-health + check-tests + check-build + check-security). Closes 23
+queued gaps. Extracts shared helpers so the next tier skills don't
+reimplement infrastructure.
+
+### Added
+
+- `_lib/` — three shared helper modules (imported by tier-skills'
+  scripts; not invoked directly):
+  - `baseline.py` — tier-namespaced `.checkup/{project}/baseline.json`
+    operations (`load_namespace`, `save_namespace`, `current_sha`,
+    `now_iso`). Used by audit-pattern skills.
+  - `allowlist.py` — per-project + per-skill allowlist loading with
+    `signature: reason` parse (handles signatures containing `:` via
+    rfind on `: `). Used by check-tests, check-security, check-readability.
+  - `scope.py` — PR-vs-codebase scope auto-detection
+    (`resolve_scope`, `detect_base_branch`, `detect_scope`,
+    `fetch_pr_files`, `list_codebase_files`). Used by 4 of the 4 tier
+    skills.
+  - `__init__.py` — package docstring describing the helper layout
+
+### Methodology updates (sulis:add-skill v0.6.0 effective)
+
+- **MUC-F6 added** — stubbed-vs-active rendering blur. Wrapper skills
+  with partial coverage (like code-health with only 4 of 7 tiers
+  wired) MUST visually distinguish `⏳ not yet checked` from
+  `✅ passed`. Founder-facing or both skills now address ≥3 of
+  MUC-F1..F6 (was F1..F5).
+- **False-positive philosophy lock** — Gate 2 now includes a "false-
+  positive philosophy" item for audit-pattern skills. Security and
+  code-quality have different FP/FN trade-offs; the lock makes the
+  trade-off explicit. (8 → 9 Gate 2 lock items for audit-pattern.)
+- **Pattern catalogue** added to `methodology.md`:
+  - **Aggregator-pattern** (inbox) — 5 shared concerns
+  - **Audit-pattern** (check-* skills) — 5 shared concerns + FP philosophy
+  - **Wrapper-pattern** (code-health) — 5 shared concerns including MUC-F6
+  - **Registry-driven extensibility** (sub-pattern across all 3)
+  - **Cross-skill self-test** validation pattern (5 data points so far)
+- **Perspective 4 added** to completeness-perspectives.md — self-test
+  via sibling skills (optional but encouraged). Track record: 5/5 passes.
+- **Shared helpers section** added to methodology.md with import
+  pattern for tier-skills.
+
+### Open methodology gaps queued (3 remaining of 23 originally)
+
+Resolved in v0.9.0 / v0.6.0:
+
+- (5/5) Audience lock, categories list, MUC-F1..F5, founder-facing-
+  conventions.md, OPEN_RISK revisit_by — already shipped in v0.4.0
+- (4/4) check-readability gaps — pattern catalogue + Gate 4 P3 iteration
+  + marketplace-as-fixture + --raw mode-selection
+- (4/4) code-health gaps — wrapper-pattern + scope auto-detection +
+  "tier" vocabulary + MUC-F6
+- (4/4) check-tests gaps — audit+baseline composition + registry-driven
+  extensibility + real-state-fixture limitation + mid-flight-Gate-4-P3-fix
+- (2/2) check-build gaps — shared baseline_helper.py + manifest-hygiene-
+  crosses-tiers
+- (3/3) check-security gaps — FP philosophy + allowlist_loader.py +
+  self-test pattern
+
+Deferred to v0.7.0:
+
+- (2/2 from inbox) inventory.py domain-aware mode + founder
+  jargon-density check — both need inventory.py refactor; deferred
+  to avoid breaking BRIEF_PACK contract that 4 already-shipped skills
+  depend on
+- (1/3 from check-security) extract allowlist_loader.py — done as
+  `_lib/allowlist.py`; existing skills still have inline implementations
+  (deferred migration to avoid risk; new skills import from helper)
+
+### Verification
+
+- code-health full sweep after methodology updates:
+    Tier 1 — Exists:         failed (2 items)
+    Tier 2 — Safe:           ✓ Clear
+    Tier 3 — Works:          couldn't check (no top-level framework)
+    Tier 5 — Understandable: needs_attention (5 items)
+    Other tiers: unchanged (no regressions)
+- check-readability self-test on _lib/baseline.py, allowlist.py,
+  scope.py: 0 findings (new helpers pass legibility check)
+
+### Pragmatic decision: helpers NOT yet used by existing skills
+
+The 4 existing skills (check-readability / check-tests / check-build /
+check-security) still have inline implementations of baseline +
+allowlist + scope-detection logic. Migrating them to the new helpers
+would be a behaviour-preserving refactor of working code — non-zero
+regression risk for no immediate value.
+
+Decision: ship `_lib/` as the canonical pattern for NEW skills (starting
+with check-reliability in the next release); existing skills can
+migrate in future patch releases without urgency. Documented in
+methodology.md's "Shared helpers" section.
+
+### Versions
+
+  sulis: 0.8.1 → 0.9.0 (minor — methodology refresh + shared helpers)
+  marketplace: 1.50.1 → 1.51.0
+
 ## v0.8.0 — 2026-05-23
 
 Tier 2 (Safe) ships. code-health now answers "could anyone be harmed?"

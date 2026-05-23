@@ -225,6 +225,81 @@ become gotchas in Gate 2 — they ground in concrete prior failures from
 HD-008 (source brittleness, no-cache) and inbox's own Gate 4 (overwhelm,
 filter discipline).
 
+### Audit-pattern skills
+
+A skill that walks source code looking for issues per a pattern catalogue,
+reports findings, supports baseline-aware regression detection.
+`sulis:check-readability` is the prototype; `check-tests`, `check-build`,
+`check-security`, `check-reliability` all follow this family.
+
+Shared concerns:
+
+- **False-positive philosophy must be locked.** Different audit domains
+  have different FP/FN trade-offs. Security: FPs erode trust; FNs are
+  worse. Readability: FPs are noise; FNs are tolerable. State the lock
+  in Gate 2 (see SKILL.md Gate 2 "False-positive philosophy" item).
+- **Baseline-aware regression.** First-run captures the state; subsequent
+  runs report what's NEW since baseline. Use the shared
+  `plugins/sulis/_lib/baseline.py` helper (tier-namespaced sub-keys in
+  `.checkup/{project}/baseline.json`).
+- **Allowlist mechanism.** Some findings are intentional (test fixtures,
+  domain vocabulary, conscious accept). Use the shared
+  `plugins/sulis/_lib/allowlist.py` helper for per-project + per-skill
+  allowlist loading.
+- **Pattern-registry extensibility.** Adding a new pattern shouldn't
+  require rewriting the scanner. Use a registry list of `Pattern` /
+  `Framework` / `Heuristic` entries; document the "adding a new entry"
+  contract in the skill's `references/` doc.
+- **In-loop Gate 4 P3 refinement is the methodology working.** Real-state
+  testing surfaces false positives that pure-thinking misses. Iterate
+  the heuristic during Gate 4 P3 (running candidate misuse-case list
+  documented in COMPLETENESS_REPORT.md), then formalise at Gate 5.
+
+If the skill being authored is an audit, all five concerns should
+become gotchas at Gate 2.
+
+### Wrapper-pattern skills
+
+A skill that orchestrates other skills, presenting a unified view.
+`sulis:code-health` is the prototype; future examples include skill
+composition pipelines.
+
+Shared concerns:
+
+- **Stubbed-vs-active distinction (MUC-F6).** When wrapping a registry
+  of N skills where K < N are wired, the unwired tiers MUST render
+  visually distinct from passing ones. `⏳ not yet checked (planned)`
+  vs `✅ Clear`.
+- **Registry-driven extensibility.** Adding a wired tier is a registry
+  update (the `wired:true` + `invoke_script` flag flip) — not an
+  orchestrator rewrite. Pattern same as audit-pattern's pattern-registry.
+- **Per-tier extra_args.** Different tiers need different invocation
+  flags (check-tests needs `--run`; check-readability doesn't). Each
+  TierSpec carries `extra_args: list[str]`.
+- **Marketplace-root vs target-root resolution.** Tier scripts live in
+  the marketplace (where the orchestrator lives); they OPERATE on a
+  target repo (where `--repo-root` points). Resolve tier scripts from
+  `Path(__file__).parents[N]` (marketplace), not `--repo-root` (target).
+- **Output contract.** Each wired tier emits `--raw` JSON with a common
+  shape including `findings[]` so the orchestrator can aggregate
+  uniformly.
+
+### Registry-driven extensibility (sub-pattern)
+
+Aggregator + audit + wrapper skills all benefit from registry-driven
+extensibility: the entry-list lives separately from the engine. Adding
+a new entry doesn't touch the engine code. Examples:
+
+- `check-tests` framework-detection registry (`KNOWN_FRAMEWORKS`)
+- `check-build` build-system registry (`KNOWN_SYSTEMS`)
+- `check-security` pattern catalogue (`CREDENTIAL_PATTERNS` + `DANGEROUS_PATTERNS`)
+- `code-health` tier registry (`TIER_REGISTRY`)
+
+The contract: an entry is a dataclass with detection/match criteria +
+the action (command / regex / sub-skill invocation). The engine walks
+the list generically. Document the "adding a new entry" contract in
+the skill's `references/`.
+
 ### Founder-facing skills (any family)
 
 Subject to `plugins/sulis/references/founder-facing-conventions.md` —
@@ -236,6 +311,57 @@ translation at output.
 
 Free to use technical vocabulary directly; audience preference. The
 conventions doc explicitly does NOT apply.
+
+### Cross-skill self-test (validation pattern)
+
+When authoring multiple skills in a batch, run each newly-authored
+skill against ITS OWN code via sibling skills. Example:
+
+- After authoring `check-tests`, run `check-readability` against
+  `regression.py` → expect 0 findings (the new code passes its own
+  legibility check).
+- After authoring `check-build`, run all sibling skills against
+  `builder.py` → expect 0 findings each.
+
+If a self-test produces findings, either:
+1. Fix the issue in the new code (preferred), or
+2. Refine the sibling skill's heuristic (if the finding is a false
+   positive caused by the new code's legitimate pattern)
+
+The cross-skill self-test pattern has accumulated 5 data points so far
+(check-readability, check-tests, code-health, check-build,
+check-security) — all 5 self-tests passed. Evidence the methodology
+produces consistent-quality code, not just consistent-quality skills.
+
+## Shared helpers (sulis v0.6.0+)
+
+The audit-pattern + wrapper-pattern shared concerns are now codified
+as importable helpers at `plugins/sulis/_lib/`:
+
+- `baseline.py` — tier-namespaced `.checkup/{project}/baseline.json`
+  read/write. Functions: `load_namespace()`, `save_namespace()`,
+  `current_sha()`, `now_iso()`.
+- `allowlist.py` — per-project + per-skill allowlist loading. Functions:
+  `load_allowlist(*paths)`, `project_allowlist_path()`,
+  `marketplace_allowlist_path()`.
+- `scope.py` — PR-vs-codebase scope auto-detection. Functions:
+  `resolve_scope()` (one-call top-level), `detect_base_branch()`,
+  `detect_scope()`, `fetch_pr_files()`, `list_codebase_files()`.
+
+New skills should import from these helpers rather than reimplementing.
+Existing skills (check-readability / check-tests / check-build /
+check-security) authored before v0.6.0 still have inline
+implementations; migration to helpers can happen in future patch
+releases without behaviour change.
+
+Import pattern from a tier-skill's `scripts/`:
+
+```python
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from _lib import baseline, allowlist, scope
+```
 
 ## On the COMPLETENESS_REPORT.md
 
