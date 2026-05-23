@@ -20,6 +20,7 @@ import traceback
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Protocol, runtime_checkable
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -521,40 +522,233 @@ def _run(cmd: list[str], cwd: Path | None = None,
         return 124, "", f"Timeout after {timeout}s"
 
 
+# --- GHClient protocol (HD-005) ------------------------------------------
+#
+# The train + pipeline + helpers reach GitHub through ten distinct
+# `_run(["gh", ...])` callsites scattered across this module. Without a
+# named seam between "what we ask of GitHub" and "how we ask it (shell-out
+# to gh)", integration tests have to monkeypatch every helper one at a
+# time, and the merge-queue strategy dispatcher landing in HD-001 has
+# nowhere clean to swap in a fake.
+#
+# The Protocol below defines the surface; `RealGHClient` is the production
+# adapter (each method is the existing shell-out, moved verbatim). The
+# helpers below the Protocol gain an optional `gh: GHClient | None = None`
+# parameter — when unset they delegate to a module-level singleton,
+# preserving every existing callsite without change.
+#
+# This is EXPAND-Create over an external subject (the gh CLI / GitHub API),
+# not Wrap over internal code; the Protocol is owned by this module and
+# the gh CLI is *called by* RealGHClient, not wrapped at the architecture
+# level. See HD-005.
+
+
+@runtime_checkable
+class GHClient(Protocol):
+    """The GitHub-API surface the train and pipeline depend on.
+
+    Methods correspond one-to-one with the ten distinct ``gh`` shell-outs
+    historically scattered across this module. Each returns parsed JSON
+    (or a string SHA) and raises ``RuntimeError`` on failure — matching
+    the existing helpers' contract so callers don't need to special-case
+    real vs fake clients.
+
+    Test doubles implement this Protocol to drive train scenarios
+    deterministically; see scripts/tests/integration/testbed.py
+    (FakeGHClient) per HD-002.
+    """
+
+    def check_runs(self, repo: str, branch: str) -> dict:
+        """Return the JSON envelope from ``gh api repos/{repo}/commits/{branch}/check-runs``."""
+        ...
+
+    def branch_sha(self, repo: str, branch: str) -> str:
+        """Return the head commit SHA of ``branch`` via ``gh api .../git/refs/heads/{branch}``."""
+        ...
+
+    def ref_sha(self, repo: str, ref: str) -> str:
+        """Return the SHA at ``ref`` via ``gh api .../git/refs/heads/{ref}``."""
+        ...
+
+    def compare(self, repo: str, base: str, head: str) -> dict:
+        """Return ``gh api repos/{repo}/compare/{base}...{head}`` as parsed JSON."""
+        ...
+
+    def merge(self, repo: str, base: str, head: str, commit_message: str) -> str:
+        """Squash-merge ``head`` into ``base`` via ``gh api -X POST .../merges``; return merge SHA."""
+        ...
+
+    def deploy_runs(self, repo: str, workflow: str, commit: str) -> list[dict]:
+        """List workflow runs for ``commit`` via ``gh run list``."""
+        ...
+
+    def delete_branch(self, repo: str, branch: str) -> None:
+        """Delete the remote ``branch`` via ``gh api -X DELETE .../git/refs/heads/{branch}``.
+
+        Best-effort; never raises (matches the pre-HD-005 behaviour of
+        ``_merge_squash``'s post-merge branch delete).
+        """
+        ...
+
+    def branch_exists(self, repo: str, branch: str) -> bool:
+        """True if origin/{branch} exists. Best-effort; returns False on gh error."""
+        ...
+
+    def clone(self, repo: str, dest: Path) -> tuple[int, str]:
+        """Clone ``repo`` to ``dest`` via ``gh repo clone --depth 100``.
+
+        Returns ``(rc, stderr)`` so callers can fall back to a direct
+        ``git clone`` on failure (preserves ``clone_repo_to_temp``'s
+        existing fallback shape).
+        """
+        ...
+
+
+class RealGHClient:
+    """Production GHClient — every method shells out to the ``gh`` CLI.
+
+    The bodies are byte-for-byte the same subprocess invocations the
+    pre-HD-005 ``_gh_*`` helpers used. This class is the *only* place that
+    knows about the shape of the ``gh`` command line; everything else
+    talks to the GHClient Protocol.
+
+    Stateless. Constructed once at module load as ``_default_gh_client``;
+    constructed again ad-hoc only in tests.
+    """
+
+    def check_runs(self, repo: str, branch: str) -> dict:
+        rc, out, err = _run(
+            ["gh", "api", f"repos/{repo}/commits/{branch}/check-runs",
+             "--paginate"],
+            timeout=30,
+        )
+        if rc != 0:
+            raise RuntimeError(f"gh check-runs failed: {err}")
+        return json.loads(out) if out.strip() else {"check_runs": []}
+
+    def branch_sha(self, repo: str, branch: str) -> str:
+        rc, out, err = _run(
+            ["gh", "api", f"repos/{repo}/git/refs/heads/{branch}"], timeout=30,
+        )
+        if rc != 0:
+            raise RuntimeError(f"gh branch-sha failed for {branch}: {err}")
+        return json.loads(out)["object"]["sha"]
+
+    def ref_sha(self, repo: str, ref: str) -> str:
+        rc, out, err = _run(
+            ["gh", "api", f"repos/{repo}/git/refs/heads/{ref}"], timeout=30,
+        )
+        if rc != 0:
+            raise RuntimeError(f"gh ref-sha failed for {ref}: {err}")
+        return json.loads(out)["object"]["sha"]
+
+    def compare(self, repo: str, base: str, head: str) -> dict:
+        rc, out, err = _run(
+            ["gh", "api", f"repos/{repo}/compare/{base}...{head}"],
+            timeout=30,
+        )
+        if rc != 0:
+            raise RuntimeError(f"gh compare failed: {err}")
+        if not out.strip():
+            return {}
+        try:
+            return json.loads(out)
+        except json.JSONDecodeError:
+            # Defensive: pre-HD-005 callers (e.g. _gh_branch_already_merged,
+            # is_sha_on_branch) handled non-JSON output by logging and
+            # falling through. Preserve that shape so they keep working.
+            return {}
+
+    def merge(self, repo: str, base: str, head: str, commit_message: str) -> str:
+        rc, out, err = _run(
+            ["gh", "api", "-X", "POST", f"repos/{repo}/merges",
+             "-f", f"base={base}", "-f", f"head={head}",
+             "-f", f"commit_message={commit_message}",
+             "-F", "merge_method=squash"],
+            timeout=60,
+        )
+        if rc != 0:
+            raise RuntimeError(f"gh merges failed: {err}\nstdout={out}")
+        return json.loads(out)["sha"]
+
+    def deploy_runs(self, repo: str, workflow: str, commit: str) -> list[dict]:
+        rc, out, err = _run(
+            ["gh", "run", "list", "--workflow", workflow, "--commit", commit,
+             "--json", "databaseId,status,conclusion,createdAt,url",
+             "--limit", "5"],
+            timeout=30,
+        )
+        if rc != 0:
+            raise RuntimeError(f"gh run list failed: {err}")
+        return json.loads(out) if out.strip() else []
+
+    def delete_branch(self, repo: str, branch: str) -> None:
+        # Best-effort; matches the pre-HD-005 fire-and-forget shape in
+        # _merge_squash. We swallow errors here so a failed branch-delete
+        # doesn't mask a successful merge.
+        _run(
+            ["gh", "api", "-X", "DELETE",
+             f"repos/{repo}/git/refs/heads/{branch}"],
+            timeout=30,
+        )
+
+    def branch_exists(self, repo: str, branch: str) -> bool:
+        rc, out, _err = _run(
+            ["gh", "api", f"repos/{repo}/git/refs/heads/{branch}"],
+            timeout=30,
+        )
+        return rc == 0 and bool(out.strip())
+
+    def clone(self, repo: str, dest: Path) -> tuple[int, str]:
+        rc, _out, err = _run(
+            ["gh", "repo", "clone", repo, str(dest), "--", "--depth", "100"],
+            timeout=120,
+        )
+        return rc, err
+
+
+# Module-level singleton. Helpers below use this when no explicit
+# `gh` parameter is passed. Tests can swap it via monkeypatch (the
+# TrainTestbed fixture does so in scripts/tests/integration/testbed.py).
+_default_gh_client: GHClient = RealGHClient()
+
+
+def _resolve_gh(gh: GHClient | None) -> GHClient:
+    """Return the caller's gh client, or the module default if None.
+
+    Tiny helper used by every shim below; centralising the resolution
+    means tests can monkeypatch `_default_gh_client` in one place if they
+    want to swap the default without rewriting every callsite.
+    """
+    return gh if gh is not None else _default_gh_client
+
+
 # --- gh API helpers ------------------------------------------------------
+#
+# These shims preserve the pre-HD-005 public surface (function names,
+# positional signatures). Each accepts an optional `gh: GHClient | None`
+# kw-arg so tests can inject a fake without monkeypatching every helper;
+# default behaviour (no gh passed) is unchanged.
 
-def _gh_check_runs(repo: str, branch: str) -> dict:
+def _gh_check_runs(repo: str, branch: str,
+                   *, gh: GHClient | None = None) -> dict:
     """Return list of latest check-runs for the branch's HEAD commit."""
-    rc, out, err = _run(
-        ["gh", "api", f"repos/{repo}/commits/{branch}/check-runs",
-         "--paginate"],
-        timeout=30,
-    )
-    if rc != 0:
-        raise RuntimeError(f"gh check-runs failed: {err}")
-    return json.loads(out) if out.strip() else {"check_runs": []}
+    return _resolve_gh(gh).check_runs(repo, branch)
 
 
-def _gh_branch_sha(repo: str, branch: str) -> str:
-    rc, out, err = _run(
-        ["gh", "api", f"repos/{repo}/git/refs/heads/{branch}"], timeout=30,
-    )
-    if rc != 0:
-        raise RuntimeError(f"gh branch-sha failed for {branch}: {err}")
-    return json.loads(out)["object"]["sha"]
+def _gh_branch_sha(repo: str, branch: str,
+                   *, gh: GHClient | None = None) -> str:
+    return _resolve_gh(gh).branch_sha(repo, branch)
 
 
-def _gh_ref_sha(repo: str, ref: str) -> str:
+def _gh_ref_sha(repo: str, ref: str,
+                *, gh: GHClient | None = None) -> str:
     """Get SHA for any ref (e.g., dev)."""
-    rc, out, err = _run(
-        ["gh", "api", f"repos/{repo}/git/refs/heads/{ref}"], timeout=30,
-    )
-    if rc != 0:
-        raise RuntimeError(f"gh ref-sha failed for {ref}: {err}")
-    return json.loads(out)["object"]["sha"]
+    return _resolve_gh(gh).ref_sha(repo, ref)
 
 
-def _gh_branch_already_merged(repo: str, branch: str, base: str = "dev") -> tuple[bool, str]:
+def _gh_branch_already_merged(repo: str, branch: str, base: str = "dev",
+                              *, gh: GHClient | None = None) -> tuple[bool, str]:
     """Check whether `branch` is already fully merged into `base`.
 
     Uses GitHub's compare API: `gh api repos/{repo}/compare/{base}...{branch}`
@@ -576,55 +770,38 @@ def _gh_branch_already_merged(repo: str, branch: str, base: str = "dev") -> tupl
     on an already-merged branch would crash with RuntimeError from
     _gh_merge (POST /merges returns 409 when base already contains head).
     """
-    rc, out, err = _run(
-        ["gh", "api", f"repos/{repo}/compare/{base}...{branch}"],
-        timeout=30,
-    )
-    if rc != 0:
-        _log(f"compare API failed (rc={rc}); falling through to normal merge path. err: {err}")
-        return False, ""
+    client = _resolve_gh(gh)
     try:
-        data = json.loads(out)
-    except json.JSONDecodeError:
-        _log(f"compare API returned non-JSON; falling through. out: {out!r}")
+        data = client.compare(repo, base, branch)
+    except RuntimeError as exc:
+        _log(
+            f"compare API failed; falling through to normal merge path. "
+            f"err: {exc}"
+        )
+        return False, ""
+    if not isinstance(data, dict):
+        _log(f"compare API returned non-dict; falling through. data: {data!r}")
         return False, ""
     status = data.get("status", "")
     if status in ("identical", "behind"):
         # Already merged. Fetch the current base HEAD as the merge SHA.
         try:
-            base_sha = _gh_ref_sha(repo, base)
+            base_sha = client.ref_sha(repo, base)
         except RuntimeError:
             base_sha = ""
         return True, base_sha
     return False, ""
 
 
-def _gh_merge(repo: str, base: str, head: str, commit_message: str) -> str:
+def _gh_merge(repo: str, base: str, head: str, commit_message: str,
+              *, gh: GHClient | None = None) -> str:
     """Squash-merge head into base via the merges endpoint. Returns merge SHA."""
-    rc, out, err = _run(
-        ["gh", "api", "-X", "POST", f"repos/{repo}/merges",
-         "-f", f"base={base}", "-f", f"head={head}",
-         "-f", f"commit_message={commit_message}",
-         "-F", "merge_method=squash"],
-        timeout=60,
-    )
-    if rc != 0:
-        # Some hosts use PUTs against /pulls/N/merge. The /merges endpoint
-        # returns 409 if no PR is required; fall back gracefully.
-        raise RuntimeError(f"gh merges failed: {err}\nstdout={out}")
-    return json.loads(out)["sha"]
+    return _resolve_gh(gh).merge(repo, base, head, commit_message)
 
 
-def _gh_deploy_runs(repo: str, workflow: str, commit: str) -> list[dict]:
-    rc, out, err = _run(
-        ["gh", "run", "list", "--workflow", workflow, "--commit", commit,
-         "--json", "databaseId,status,conclusion,createdAt,url",
-         "--limit", "5"],
-        timeout=30,
-    )
-    if rc != 0:
-        raise RuntimeError(f"gh run list failed: {err}")
-    return json.loads(out) if out.strip() else []
+def _gh_deploy_runs(repo: str, workflow: str, commit: str,
+                    *, gh: GHClient | None = None) -> list[dict]:
+    return _resolve_gh(gh).deploy_runs(repo, workflow, commit)
 
 
 # --- Phase implementations ----------------------------------------------
@@ -690,18 +867,19 @@ def _rebase_on_dev(repo: str, branch: str, worktree: Path,
 
 
 def _merge_squash(repo: str, branch: str, wp: str,
-                  base_branch: str = "dev") -> str:
+                  base_branch: str = "dev",
+                  *, gh: GHClient | None = None) -> str:
     """Squash-merge branch into base_branch. Return merge SHA on base_branch.
 
     `base_branch` defaults to "dev" for backward compatibility, but per
     CW-04 the executor inside a change worktree passes the change branch
     name here so the merge target is the change branch, not dev.
     """
+    client = _resolve_gh(gh)
     msg = f"feat({wp.lower()}): squash-merge from {branch}"
-    sha = _gh_merge(repo, base=base_branch, head=branch, commit_message=msg)
-    # Delete remote branch
-    _run(["gh", "api", "-X", "DELETE", f"repos/{repo}/git/refs/heads/{branch}"],
-         timeout=30)
+    sha = client.merge(repo, base=base_branch, head=branch, commit_message=msg)
+    # Delete remote branch (best-effort; matches pre-HD-005 fire-and-forget).
+    client.delete_branch(repo, branch)
     return sha
 
 
@@ -1141,13 +1319,10 @@ def _branch_name(wp_id: str, slug: str) -> str:
     return f"feat/wp-{wp_id.lower().removeprefix('wp-')}-{slug}"
 
 
-def _gh_branch_exists(repo: str, branch: str) -> bool:
+def _gh_branch_exists(repo: str, branch: str,
+                      *, gh: GHClient | None = None) -> bool:
     """True if origin/{branch} exists. Best-effort; returns False on gh error."""
-    rc, out, _ = _run(
-        ["gh", "api", f"repos/{repo}/git/refs/heads/{branch}"],
-        timeout=30,
-    )
-    return rc == 0 and bool(out.strip())
+    return _resolve_gh(gh).branch_exists(repo, branch)
 
 
 def _gh_branch_ci_green(repo: str, branch: str) -> bool:
@@ -1395,7 +1570,8 @@ def check_train_trigger(
     )
 
 
-def clone_repo_to_temp(repo: str, dest: Path) -> None:
+def clone_repo_to_temp(repo: str, dest: Path,
+                       *, gh: GHClient | None = None) -> None:
     """Clone the repo to `dest` for the duration of a train run.
 
     Uses `gh repo clone` (preferred — handles auth) with a fallback to
@@ -1404,10 +1580,7 @@ def clone_repo_to_temp(repo: str, dest: Path) -> None:
     Raises RuntimeError on failure.
     """
     dest.parent.mkdir(parents=True, exist_ok=True)
-    rc, _, err = _run(
-        ["gh", "repo", "clone", repo, str(dest), "--", "--depth", "100"],
-        timeout=120,
-    )
+    rc, err = _resolve_gh(gh).clone(repo, dest)
     if rc == 0:
         return
     # Fallback: direct git clone using GITHUB_TOKEN if present
@@ -2233,7 +2406,8 @@ def compute_culprit_heuristic(
     return best_wp
 
 
-def is_sha_on_branch(repo: str, sha: str, branch: str = "dev") -> bool:
+def is_sha_on_branch(repo: str, sha: str, branch: str = "dev",
+                     *, gh: GHClient | None = None) -> bool:
     """Check whether `sha` is reachable from origin/<branch>.
 
     Uses GitHub's compare API: `gh api repos/{repo}/compare/{branch}...{sha}`.
@@ -2250,21 +2424,17 @@ def is_sha_on_branch(repo: str, sha: str, branch: str = "dev") -> bool:
     means the work has been reverted or never landed — the INDEX
     state is wrong.
     """
-    rc, out, err = _run(
-        ["gh", "api", f"repos/{repo}/compare/{branch}...{sha}"],
-        timeout=30,
-    )
-    if rc != 0:
+    try:
+        data = _resolve_gh(gh).compare(repo, branch, sha)
+    except RuntimeError as exc:
         _log(
             f"is_sha_on_branch: compare API failed for "
-            f"{branch}...{sha[:8]} (rc={rc}); returning False conservatively. "
-            f"err: {err}"
+            f"{branch}...{sha[:8]}; returning False conservatively. "
+            f"err: {exc}"
         )
         return False
-    try:
-        data = json.loads(out)
-    except json.JSONDecodeError:
-        _log(f"is_sha_on_branch: compare API returned non-JSON. out: {out!r}")
+    if not isinstance(data, dict):
+        _log(f"is_sha_on_branch: compare API returned non-dict. data: {data!r}")
         return False
     return data.get("status", "") in ("identical", "behind")
 
