@@ -187,9 +187,32 @@ export interface TrainBundleEntry {
   merge_sha_on_dev?: string | null;
 }
 
+/**
+ * HD-007 — payload returned by `train.run` when the train pauses at
+ * the `verifying_gates` phase boundary (outcome=awaiting_gates).
+ *
+ * Tells the calling session what diff range to dispatch code-review
+ * against, which WPs to dispatch per-WP security review against, and
+ * how to finalise via `train.markGatesComplete`.
+ */
+export interface TrainGateHandoff {
+  batch_start_sha?: string | null;
+  batch_end_sha?: string | null;
+  diff_range?: string | null;
+  wps?: string[];
+  next_action?: string;
+}
+
 export interface TrainRunResult {
   train_id: string;
-  outcome: 'success' | 'not_triggered' | 'nothing_to_pack' | 'blocker' | 'error';
+  outcome:
+    | 'success'
+    | 'not_triggered'
+    | 'nothing_to_pack'
+    | 'blocker'
+    | 'error'
+    | 'awaiting_gates' // HD-007 — paused at verifying_gates
+    | 'paused'; // transient — surfaced by paused-path exit envelope
   wps_shipped: string[];
   eligible_count?: number | null;
   eligible_wps: string[];
@@ -199,6 +222,20 @@ export interface TrainRunResult {
   bundle: TrainBundleEntry[];
   rebase_failures: Record<string, unknown>[];
   train_blocker_path?: string | null;
+  /** HD-007 — populated only when outcome === 'awaiting_gates'. */
+  gate_handoff?: TrainGateHandoff | null;
+}
+
+/**
+ * HD-007 — result of `train.markGatesComplete`. Two terminal outcomes:
+ * `success` (clean gates) or `gate_blocker` (CRITICAL finding surfaced;
+ * no ADR-212 revert ran).
+ */
+export interface TrainMarkGatesCompleteResult {
+  train_id: string;
+  outcome: 'success' | 'gate_blocker';
+  phase: 'success' | 'failed';
+  record_path?: string | null;
 }
 
 // ─── index ───────────────────────────────────────────────────────────

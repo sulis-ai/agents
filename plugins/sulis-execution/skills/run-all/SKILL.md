@@ -344,8 +344,27 @@ loop:
          --staging-url "<staging-url>" \
          --smoke-cmd "<smoke command>" \
          --health-path "<health-path>" \
+         --enable-gate-handoff \
          # Add --force to bypass size/staleness trigger
        ```
+
+       **v0.23.0 (HD-007): pass `--enable-gate-handoff`** so the train
+       stops at the new `verifying_gates` phase after deploy/health/smoke
+       complete green, instead of going directly to terminal success.
+       The train emits `outcome: awaiting_gates` (exit 0) with a
+       `gate_handoff` envelope describing the batch diff range +
+       wps_shipped. The calling session (this skill) then dispatches
+       Step 10.5 + Step 11 inside that phase and invokes
+       `wpx-train mark-gates-complete --train-id <id>` to finalise (see
+       Step 14.5 below). The gates are now part of the train's
+       transaction in lifecycle terms — the dispatch mechanism stays
+       here because a Python CLI can't spawn Agents.
+
+       **Legacy fallback:** if `--enable-gate-handoff` is omitted, the
+       train returns `outcome: success` directly (today's pre-v0.23.0
+       behaviour) and Steps 13-14 below run as post-train follow-on.
+       Both shapes are supported during the deprecation cycle; new
+       projects SHOULD pass the flag.
 
        If the train trigger isn't met (e.g. only 1 WP eligible and no
        force), `wpx-train run` exits cleanly with `outcome:
@@ -365,16 +384,26 @@ loop:
    13. **Step 10.5 (per-batch, v0.21.1+): bundled-tip code-review
        for cross-WP composition issues.**
 
-       After `wpx-train run` returns `outcome: success`, but BEFORE
-       Step 11, review the composition of all WPs in the batch via
-       `/sea:code-review` against the batch's diff range on the base
-       branch. This catches issues only visible when WPs compose:
-       N+1 queries across sibling WPs, integration regressions,
-       contract drift between interdependent WPs.
+       After `wpx-train run` returns, but BEFORE Step 11, review the
+       composition of all WPs in the batch via `/sea:code-review` against
+       the batch's diff range on the base branch. This catches issues
+       only visible when WPs compose: N+1 queries across sibling WPs,
+       integration regressions, contract drift between interdependent
+       WPs.
 
-       Dispatch ONLY when `outcome: "success"`. If `outcome` is
-       `not_triggered`, `paused`, `failed`, or `blocker`, **skip Step 10.5**
-       — the train's own recovery flow owns those states.
+       **Trigger outcome (v0.23.0, HD-007):**
+
+       - When `--enable-gate-handoff` was passed (recommended), the
+         train returns `outcome: awaiting_gates` (exit 0) and the train
+         state is in phase=`verifying_gates`. Dispatch Step 10.5 + 11
+         INSIDE this phase. The `gate_handoff` envelope on the result
+         JSON carries the diff range + wps_shipped — use those instead
+         of reading the train state YAML.
+       - When `--enable-gate-handoff` was omitted (legacy), dispatch
+         ONLY when `outcome: "success"` per pre-v0.23.0 semantics.
+       - In either case: if `outcome` is `not_triggered`, `paused`,
+         `failed`, or `blocker`, **skip Step 10.5** — the train's own
+         recovery flow owns those states.
 
        Capture the batch diff range from the train state YAML:
 
@@ -601,6 +630,47 @@ loop:
        before v0.20.0 (i.e., slice-1 and slice-2's 12 WPs that
        missed Step 11), invoke `/sulis-execution:backfill-gates`
        (v0.20.2+).
+
+   14.5. **HD-007 gate completion (v0.23.0+, only when `--enable-gate-handoff`
+        was passed at Step 12).**
+
+        After Step 10.5 + Step 11 have both completed for every WP in
+        the batch, finalise the train by invoking the new
+        `mark-gates-complete` subcommand:
+
+            # Clean verdict — no CRITICAL found in Step 10.5 OR Step 11:
+            "$WPX_DIR/wpx-train" mark-gates-complete \
+              --project <slug> \
+              --train-id <train_id from train-result.json> \
+              --gate-findings "$BUNDLE_DIR/REVIEW.md"
+
+            # CRITICAL verdict — at least one Step 10.5 or Step 11 CRITICAL
+            # finding fired (and the dispatcher above already wrote BLOCKERs +
+            # drafted remediation WPs):
+            "$WPX_DIR/wpx-train" mark-gates-complete \
+              --project <slug> \
+              --train-id <train_id> \
+              --gate-findings "$BUNDLE_DIR/REVIEW.md" \
+              --critical-found
+
+        Behaviour:
+
+        - **Clean** → train transitions to terminal `success`; YAML
+          record's `outcome` becomes `success`; state file cleaned up.
+          Exits 0.
+        - **`--critical-found`** → transitions to terminal `failed`;
+          YAML record's `outcome` becomes `gate_blocker`. **No ADR-212
+          revert runs** — the gate dispatchers above (Steps 13-14)
+          already wrote per-WP BLOCKERs + drafted remediation WPs.
+          Production stays live; the founder owns the remediation
+          cycle (the next train ships the remediation WPs and that
+          train's Step 10.5 + 11 re-evaluate). Exits 1.
+
+        **Skip this step when `--enable-gate-handoff` was NOT passed at
+        Step 12** — the train already transitioned to terminal `success`
+        on its own, and `mark-gates-complete` will reject the call with
+        "expected phase=verifying_gates" since the state file no longer
+        exists.
 
        ---
 

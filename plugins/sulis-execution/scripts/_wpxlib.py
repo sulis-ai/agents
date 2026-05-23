@@ -1780,19 +1780,72 @@ def rebase_branch_in_clone(
 
 
 PHASES = (
-    "pending",       # train_id assigned; bundle selected; no work yet
-    "rebasing",      # cloning + sequential rebases in temp clone
-    "ci_running",    # bundled-tip CI polling
-    "merging",       # sequential squash-merges to base branch
-    "deploying",     # deploy workflow polling
-    "verifying",     # health + smoke
-    "success",       # terminal success
-    "failed",        # terminal failure (ADR-212 revert completed)
-    "paused",        # needs attention; resume possible
-    "aborted",       # founder-initiated abort completed
+    "pending",          # train_id assigned; bundle selected; no work yet
+    "rebasing",         # cloning + sequential rebases in temp clone
+    "ci_running",       # bundled-tip CI polling
+    "merging",          # sequential squash-merges to base branch
+    "deploying",        # deploy workflow polling
+    "verifying",        # health + smoke
+    "verifying_gates",  # HD-007 — deploy/health/smoke done; Step 10.5 + Step 11 pending
+    "success",          # terminal success
+    "failed",           # terminal failure (ADR-212 revert completed)
+    "paused",           # needs attention; resume possible
+    "aborted",          # founder-initiated abort completed
 )
 
 TERMINAL_PHASES = frozenset({"success", "failed", "aborted"})
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# HD-001 — Phase-result dataclasses for cmd_run's plan / commit / verify split.
+#
+# Each phase function in scripts/wpx-train returns one of these (or raises;
+# failure handlers terminate the process via emit_result, so the dataclasses
+# are populated only on success). They flow forward between phases so the
+# orchestration in cmd_run reduces to four function calls + a finaliser.
+# ─────────────────────────────────────────────────────────────────────────
+
+
+@dataclass
+class PlanResult:
+    """Output of _plan_phase. Read-only-against-base-branch work complete:
+    bundle assembled, sequential rebases done, bundled-tip CI green.
+
+    The base branch itself has not been mutated yet — that happens in
+    _commit_phase. Feature branches in the bundle HAVE been force-pushed
+    with their rebased tips (this is mutating, but only to branches the
+    train owns)."""
+    bundle: list[dict]
+    base_branch: str
+    bundle_tip_branch: str
+    ci_verdict: str
+    rebase_failures: list[dict]
+
+
+@dataclass
+class CommitResult:
+    """Output of _commit_phase. Squash-merges have landed on the base
+    branch; bundle entries are updated in-place with merge_sha_on_dev."""
+    merge_shas: dict[str, str]
+    final_merge_sha: str
+
+
+@dataclass
+class VerifyResult:
+    """Output of _verify_phase. Deploy + health + smoke have all returned
+    green verdicts (failure paths terminate the process via the existing
+    _handle_post_merge_failure / _pause_train_state helpers).
+
+    ``ready_for_gates`` is HD-007's signal: when the caller passed
+    --enable-gate-handoff, this flag is True and cmd_run transitions to
+    the verifying_gates phase instead of going directly to terminal
+    success. The calling LLM session then dispatches Step 10.5 + Step 11
+    and invokes ``wpx-train mark-gates-complete`` to finalise."""
+    deploy_url: str | None
+    deploy_verdict: str
+    health_status: str
+    smoke_verdict: str
+    ready_for_gates: bool = False
 
 
 def train_state_path(train_runs_dir: Path, train_id: str) -> Path:
@@ -2094,10 +2147,16 @@ def render_train_state_plain_english(state: dict) -> str:
         "pending": "Selected the bundle of work; about to start rebasing.",
         "rebasing": "Rebasing the feature branches onto each other in a temp clone.",
         "ci_running": "Waiting for the bundled-tip CI to come back.",
-        "code_review": "Bundled-tip CI passed; waiting on Step 10.5 code-review against the composition. The calling session dispatches /sea:code-review; on PASS the train resumes to merging.",
         "merging": "Squash-merging each branch to the base in order.",
         "deploying": "Waiting for the deploy workflow to complete.",
         "verifying": "Running health + smoke checks against the deploy.",
+        "verifying_gates": (
+            "Deploy + health + smoke green. Waiting on the calling "
+            "session to dispatch Step 10.5 (code-review against the "
+            "bundled diff) and Step 11 (per-WP security review). When "
+            "both gates complete, the session runs `wpx-train "
+            "mark-gates-complete` to finalise this train to success."
+        ),
         "success": "Done. All work merged + deployed + verified.",
         "failed": "Failed. The revert path ran; branches restored.",
         "paused": "Paused. Needs attention before it can continue.",
@@ -2167,6 +2226,22 @@ def cleanup_train_state(train_runs_dir: Path, train_id: str) -> None:
 # ─── Existing record writer (unchanged) ─────────────────────────────────
 
 
+# Top-level scalar keys the YAML-lite emitter writes (in order). HD-007
+# added awaiting_gates_at, final_merge_sha, gate_findings_path so the
+# gate-handoff record carries enough state for downstream tools.
+_TRAIN_RECORD_SCALAR_KEYS: tuple[str, ...] = (
+    "train_id", "started_at", "completed_at", "outcome",
+    "outcome_reason", "batch_size", "deploy_url",
+    "deploy_workflow_run", "health_status", "smoke_verdict",
+    "awaiting_gates_at", "final_merge_sha", "gate_findings_path",
+)
+
+# Per-bundle-entry keys (in order).
+_TRAIN_RECORD_BUNDLE_KEYS: tuple[str, ...] = (
+    "branch", "pre_train_sha", "rebased_to_sha", "merge_sha_on_dev",
+)
+
+
 def write_train_run_record(record_path: Path, record: dict) -> None:
     """Write a train run record to .architecture/{project}/train-runs/train-{ts}.yaml.
 
@@ -2175,7 +2250,7 @@ def write_train_run_record(record_path: Path, record: dict) -> None:
         train_id: train-{TIMESTAMP}
         started_at: ISO 8601 UTC
         completed_at: ISO 8601 UTC
-        outcome: success | blocker | error
+        outcome: success | blocker | error | awaiting_gates | gate_blocker
         outcome_reason: str (when not success)
         batch_size: N
         bundle:
@@ -2188,12 +2263,13 @@ def write_train_run_record(record_path: Path, record: dict) -> None:
         deploy_workflow_run: str | null
         health_status: str | null
         smoke_verdict: str | null
+        awaiting_gates_at: ISO 8601 UTC (HD-007 — when paused for gates)
+        final_merge_sha: <sha> | null (HD-007 — last bundled merge SHA)
+        gate_findings_path: str | null (HD-007 — path to gate findings JSON)
     """
     record_path.parent.mkdir(parents=True, exist_ok=True)
     lines: list[str] = []
-    for k in ("train_id", "started_at", "completed_at", "outcome",
-              "outcome_reason", "batch_size", "deploy_url",
-              "deploy_workflow_run", "health_status", "smoke_verdict"):
+    for k in _TRAIN_RECORD_SCALAR_KEYS:
         if k in record:
             value = record[k]
             if value is None:
@@ -2209,14 +2285,88 @@ def write_train_run_record(record_path: Path, record: dict) -> None:
         lines.append("bundle:")
         for item in bundle:
             lines.append(f"  - wp: {item.get('wp', '')}")
-            for k in ("branch", "pre_train_sha", "rebased_to_sha",
-                      "merge_sha_on_dev"):
+            for k in _TRAIN_RECORD_BUNDLE_KEYS:
                 v = item.get(k)
                 if v is None:
                     lines.append(f"    {k}: null")
                 else:
                     lines.append(f"    {k}: {v}")
     record_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def read_train_run_record(record_path: Path) -> dict:
+    """Read a train run record produced by ``write_train_run_record``.
+
+    Inverse of the YAML-lite emitter above. Parses the top-level scalar
+    keys (with quoted strings, numeric scalars, and ``null`` for None)
+    and the ``bundle:`` list of per-WP entries.
+
+    HD-010 — added so ``cmd_mark_gates_complete`` can read the
+    awaiting-gates record stub before re-writing it. Without this reader,
+    the previous implementation truncated the file on every successful
+    gate-handoff finalisation (silent data loss on bundle / deploy_url /
+    final_merge_sha / started_at / batch_size). Mirrors the YAML-lite
+    subset parser used by ``find_wp_merge_sha`` but returns the full
+    record rather than a single field.
+
+    Returns ``{}`` if the file is missing. Raises ``OSError`` /
+    ``ValueError`` on read errors — callers MUST handle the failure
+    rather than swallow it (the previous swallow-and-truncate pattern
+    was the root cause of HD-010).
+    """
+    if not record_path.exists():
+        return {}
+    text = record_path.read_text(encoding="utf-8")
+    out: dict = {}
+    bundle: list[dict] = []
+    cur_item: dict | None = None
+    in_bundle = False
+    for raw_line in text.splitlines():
+        line = raw_line.rstrip()
+        if line == "bundle:":
+            in_bundle = True
+            continue
+        if in_bundle:
+            # End of bundle: any flush-left non-blank line that is not a
+            # bundle indent. Bundle items are indented at least 2 spaces.
+            if line and not raw_line.startswith(" "):
+                in_bundle = False
+                # Fall through to scalar-key handling for this line.
+            else:
+                stripped = line.strip()
+                if stripped.startswith("- wp:"):
+                    if cur_item is not None:
+                        bundle.append(cur_item)
+                    cur_item = {"wp": stripped[len("- wp:"):].strip()}
+                    continue
+                if cur_item is not None and ":" in stripped:
+                    k, _, v = stripped.partition(":")
+                    v = v.strip()
+                    cur_item[k.strip()] = None if v == "null" else v
+                continue
+        # Top-level scalar key.
+        if ":" in line and not line.startswith(" "):
+            k, _, v = line.partition(":")
+            v = v.strip()
+            if v == "null":
+                out[k.strip()] = None
+            elif v.startswith('"') and v.endswith('"') and len(v) >= 2:
+                # Quoted string — unescape \" → "
+                out[k.strip()] = v[1:-1].replace('\\"', '"')
+            else:
+                # Numeric or unquoted scalar.
+                try:
+                    out[k.strip()] = int(v)
+                except ValueError:
+                    try:
+                        out[k.strip()] = float(v)
+                    except ValueError:
+                        out[k.strip()] = v
+    if cur_item is not None:
+        bundle.append(cur_item)
+    if bundle:
+        out["bundle"] = bundle
+    return out
 
 
 # --- Phase 3: failure handling helpers ----------------------------------

@@ -200,10 +200,31 @@ class TrainBundleEntry(_Base):
     merge_sha_on_dev: Optional[str] = None
 
 
+class TrainGateHandoff(_Base):
+    """HD-007 — payload returned by `train.run` when the train pauses
+    at the `verifying_gates` phase boundary (outcome=awaiting_gates).
+
+    Tells the calling session what diff range to dispatch code-review
+    against, which WPs to dispatch per-WP security review against, and
+    how to finalise via `train.mark_gates_complete`.
+    """
+    batch_start_sha: Optional[str] = None
+    batch_end_sha: Optional[str] = None
+    diff_range: Optional[str] = None
+    wps: list[str] = []
+    next_action: Optional[str] = None
+
+
 class TrainRunResult(_Base):
     train_id: str
     outcome: Literal[
-        "success", "not_triggered", "nothing_to_pack", "blocker", "error"
+        "success",
+        "not_triggered",
+        "nothing_to_pack",
+        "blocker",
+        "error",
+        "awaiting_gates",  # HD-007 — paused at verifying_gates
+        "paused",          # transient — surfaced by paused-path exit envelope
     ]
     wps_shipped: list[str] = []
     eligible_count: Optional[int] = None
@@ -214,6 +235,18 @@ class TrainRunResult(_Base):
     bundle: list[TrainBundleEntry] = []
     rebase_failures: list[dict[str, Any]] = []
     train_blocker_path: Optional[str] = None
+    # HD-007 — populated only when outcome == "awaiting_gates"
+    gate_handoff: Optional[TrainGateHandoff] = None
+
+
+class TrainMarkGatesCompleteResult(_Base):
+    """HD-007 — result of `train.mark_gates_complete`. Two terminal
+    outcomes: `success` (clean gates) or `gate_blocker` (CRITICAL
+    finding surfaced; no ADR-212 revert ran)."""
+    train_id: str
+    outcome: Literal["success", "gate_blocker"]
+    phase: Literal["success", "failed"]
+    record_path: Optional[str] = None
 
 
 # ─── index ───────────────────────────────────────────────────────────

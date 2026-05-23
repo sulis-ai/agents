@@ -6,4 +6,4 @@ Reads sulis-execution.openapi.yaml at startup, registers each operation
 as an MCP tool, and dispatches tools/call to the underlying CLI subprocess
 via the Python SDK's transport.
 """
-__version__ = "0.2.3"
+__version__ = "0.2.4"

@@ -85,8 +85,10 @@ def test_openapi_spec_loads():
 def test_tool_registry_covers_all_operations():
     spec = load_openapi_spec(OPENAPI_SPEC)
     registry = build_tool_registry(spec)
-    # 43 operations as of v0.2.3 (Phase 3.2 + 3.3 added abort + skip-wp + retry-wp)
-    assert len(registry) == 43
+    # 44 operations after HD-012 added train.mark-gates-complete (HD-007
+    # complement in the SDK). Previous count: 43 (v0.2.3 — abort, skip-wp,
+    # retry-wp).
+    assert len(registry) == 44
 
     # Sanity check some named tools exist (using renamed v0.2.0 names)
     assert "pipeline_run" in registry
@@ -97,6 +99,7 @@ def test_tool_registry_covers_all_operations():
     assert "train_abort" in registry                     # v0.2.3 added
     assert "train_skip_wp" in registry                   # v0.2.3 added
     assert "train_retry_wp" in registry                  # v0.2.3 added
+    assert "train_mark_gates_complete" in registry       # HD-012 added (HD-007 SDK parity)
     assert "index_flip_status" in registry
     assert "index_add" in registry                       # was index_add_wp
     assert "index_mark_downstream_blocked" in registry   # was index_propagate_blocked

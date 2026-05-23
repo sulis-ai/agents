@@ -16,6 +16,7 @@ from sulis_execution.types import (
     TrainAbortResult,
     TrainDoctorResult,
     TrainInspectResult,
+    TrainMarkGatesCompleteResult,
     TrainRetryWpResult,
     TrainSkipWpResult,
     TrainOverrideResult,
@@ -161,8 +162,17 @@ class TrainResource:
         deploy_poll_interval: Optional[int] = None,
         max_batch_size: int = 5,
         base_branch: Optional[str] = None,
+        enable_gate_handoff: bool = False,
         repo: Optional[str] = None,
     ) -> TrainRunResult:
+        """Fire the train.
+
+        HD-007 — when ``enable_gate_handoff=True``, the train pauses at
+        the new ``verifying_gates`` phase after deploy/health/smoke
+        complete green, returning outcome=``awaiting_gates`` with a
+        ``gate_handoff`` envelope. Calling session dispatches Step 10.5
+        + Step 11, then invokes :meth:`mark_gates_complete` to finalise.
+        """
         params = _kwargs_to_params({
             **_train_common(self._config, repo),
             "force": force,
@@ -174,9 +184,41 @@ class TrainResource:
             "deploy_poll_interval": deploy_poll_interval,
             "max_batch_size": max_batch_size,
             "base_branch": base_branch,
+            "enable_gate_handoff": enable_gate_handoff,
         })
         envelope = self._transport.invoke(BINARY, "run", params)
         return TrainRunResult.model_validate(_result_payload(envelope))
+
+    def mark_gates_complete(
+        self,
+        *,
+        train_id: str,
+        gate_findings: Optional[str] = None,
+        critical_found: bool = False,
+        repo: Optional[str] = None,
+    ) -> TrainMarkGatesCompleteResult:
+        """HD-007 — finalise a train paused at ``verifying_gates``.
+
+        Two terminal paths:
+
+        - **Clean gates** (default): transitions to ``phase=success``,
+          ``outcome=success``.
+        - **CRITICAL finding** (``critical_found=True``): transitions to
+          ``phase=failed``, ``outcome=gate_blocker``. The gate
+          dispatchers are expected to have written per-WP BLOCKERs +
+          drafted remediation WPs already; this call records the train
+          outcome only (no ADR-212 revert).
+
+        Errors when the train is not in ``phase=verifying_gates``.
+        """
+        params = _kwargs_to_params({
+            **_train_common(self._config, repo),
+            "train_id": train_id,
+            "gate_findings": gate_findings,
+            "critical_found": critical_found,
+        })
+        envelope = self._transport.invoke(BINARY, "mark-gates-complete", params)
+        return TrainMarkGatesCompleteResult.model_validate(_result_payload(envelope))
 
 
 class AsyncTrainResource:
@@ -294,8 +336,13 @@ class AsyncTrainResource:
         deploy_poll_interval: Optional[int] = None,
         max_batch_size: int = 5,
         base_branch: Optional[str] = None,
+        enable_gate_handoff: bool = False,
         repo: Optional[str] = None,
     ) -> TrainRunResult:
+        """Async parity for :meth:`TrainResource.run`. HD-007 —
+        ``enable_gate_handoff`` pauses the train at ``verifying_gates``
+        for Step 10.5 + Step 11 handoff; finalise via
+        :meth:`mark_gates_complete`."""
         params = _kwargs_to_params({
             **_train_common(self._config, repo),
             "force": force,
@@ -307,6 +354,25 @@ class AsyncTrainResource:
             "deploy_poll_interval": deploy_poll_interval,
             "max_batch_size": max_batch_size,
             "base_branch": base_branch,
+            "enable_gate_handoff": enable_gate_handoff,
         })
         envelope = await self._transport.invoke(BINARY, "run", params)
         return TrainRunResult.model_validate(_result_payload(envelope))
+
+    async def mark_gates_complete(
+        self,
+        *,
+        train_id: str,
+        gate_findings: Optional[str] = None,
+        critical_found: bool = False,
+        repo: Optional[str] = None,
+    ) -> TrainMarkGatesCompleteResult:
+        """Async parity for :meth:`TrainResource.mark_gates_complete`."""
+        params = _kwargs_to_params({
+            **_train_common(self._config, repo),
+            "train_id": train_id,
+            "gate_findings": gate_findings,
+            "critical_found": critical_found,
+        })
+        envelope = await self._transport.invoke(BINARY, "mark-gates-complete", params)
+        return TrainMarkGatesCompleteResult.model_validate(_result_payload(envelope))

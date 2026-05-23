@@ -112,6 +112,139 @@ def test_train_run_not_triggered(make_fake_binary, client):
     assert result.eligible_count == 1
 
 
+def test_train_run_awaiting_gates(make_fake_binary, client):
+    """HD-012 RED — outcome=awaiting_gates is a normal result returned
+    by `train.run` when called with enable_gate_handoff=True. The
+    TrainRunResult Literal must accept it and Pydantic must validate
+    the `gate_handoff` envelope.
+    """
+    make_fake_binary(
+        "wpx-train",
+        stdout_payload=_ok({
+            "result": {
+                "train_id": "train-2026-05-23T130000Z",
+                "outcome": "awaiting_gates",
+                "wps_shipped": ["WP-001", "WP-002"],
+                "deploy_url": "https://x.example.com/runs/123",
+                "final_merge_sha": "abc1234",
+                "record_path": "/tmp/train-runs/train-2026-05-23T130000Z.yaml",
+                "gate_handoff": {
+                    "batch_start_sha": "0000000",
+                    "batch_end_sha": "abc1234",
+                    "diff_range": "0000000..abc1234",
+                    "wps": ["WP-001", "WP-002"],
+                    "next_action": (
+                        "Dispatch /sea:code-review against diff_range; "
+                        "then per-WP security review."
+                    ),
+                },
+            }
+        }),
+    )
+    result = client.train.run(
+        deploy_workflow="Deploy to Dev",
+        enable_gate_handoff=True,
+    )
+    assert result.outcome == "awaiting_gates"
+    assert result.wps_shipped == ["WP-001", "WP-002"]
+    assert result.gate_handoff is not None
+    assert result.gate_handoff.diff_range == "0000000..abc1234"
+    assert result.gate_handoff.wps == ["WP-001", "WP-002"]
+
+
+def test_train_mark_gates_complete_success(make_fake_binary, client):
+    """HD-012 RED — TrainResource.mark_gates_complete promotes a train
+    paused at verifying_gates to terminal phase=success."""
+    make_fake_binary(
+        "wpx-train",
+        stdout_payload=_ok({
+            "result": {
+                "train_id": "train-2026-05-23T130000Z",
+                "outcome": "success",
+                "phase": "success",
+                "record_path": "/tmp/train-runs/train-2026-05-23T130000Z.yaml",
+            }
+        }),
+    )
+    result = client.train.mark_gates_complete(
+        train_id="train-2026-05-23T130000Z",
+    )
+    assert result.outcome == "success"
+    assert result.phase == "success"
+    assert result.train_id == "train-2026-05-23T130000Z"
+
+
+def test_train_mark_gates_complete_critical_found(make_fake_binary, client):
+    """HD-012 RED — critical_found=True returns outcome=gate_blocker
+    (phase=failed) without an exception. The Literal must accept both
+    success and gate_blocker."""
+    make_fake_binary(
+        "wpx-train",
+        stdout_payload=_ok({
+            "result": {
+                "train_id": "train-2026-05-23T130000Z",
+                "outcome": "gate_blocker",
+                "phase": "failed",
+                "record_path": "/tmp/train-runs/train-2026-05-23T130000Z.yaml",
+            }
+        }),
+    )
+    result = client.train.mark_gates_complete(
+        train_id="train-2026-05-23T130000Z",
+        gate_findings="/tmp/findings.json",
+        critical_found=True,
+    )
+    assert result.outcome == "gate_blocker"
+    assert result.phase == "failed"
+
+
+def test_train_resource_run_accepts_enable_gate_handoff():
+    """HD-012 RED — Static contract check: TrainResource.run accepts
+    enable_gate_handoff per HD-007. Catches accidental kwarg removal."""
+    import inspect
+    from sulis_execution.resources.train import (
+        TrainResource, AsyncTrainResource,
+    )
+    sig = inspect.signature(TrainResource.run)
+    assert "enable_gate_handoff" in sig.parameters, (
+        "HD-012: TrainResource.run missing enable_gate_handoff kwarg"
+    )
+    async_sig = inspect.signature(AsyncTrainResource.run)
+    assert "enable_gate_handoff" in async_sig.parameters, (
+        "HD-012: AsyncTrainResource.run missing enable_gate_handoff kwarg"
+    )
+
+
+def test_train_resource_has_mark_gates_complete():
+    """HD-012 RED — TrainResource and AsyncTrainResource expose
+    mark_gates_complete corresponding to the wpx-train CLI subcommand."""
+    from sulis_execution.resources.train import (
+        TrainResource, AsyncTrainResource,
+    )
+    assert hasattr(TrainResource, "mark_gates_complete"), (
+        "HD-012: TrainResource missing mark_gates_complete; "
+        "SDK lags HD-007 CLI surface"
+    )
+    assert hasattr(AsyncTrainResource, "mark_gates_complete"), (
+        "HD-012: AsyncTrainResource missing mark_gates_complete"
+    )
+
+
+def test_train_run_result_outcome_literal_includes_awaiting_gates():
+    """HD-012 RED — TrainRunResult.outcome Literal must accept the
+    awaiting_gates outcome introduced by HD-007. Pydantic validation
+    must NOT fail on a synthetic awaiting_gates envelope."""
+    from sulis_execution.types import TrainRunResult
+    result = TrainRunResult.model_validate({
+        "train_id": "train-test",
+        "outcome": "awaiting_gates",
+        "wps_shipped": ["WP-001"],
+        "deploy_url": "https://x.example.com",
+        "final_merge_sha": "abc1234",
+    })
+    assert result.outcome == "awaiting_gates"
+
+
 # ─── index ───────────────────────────────────────────────────────────
 
 

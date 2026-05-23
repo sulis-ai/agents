@@ -20,8 +20,8 @@ trigger.
 | 8 | CI poll + rebase + squash-merge | **v0.11.0+:** `wpx-train` (per-batch). **--force-single / hotfix:** `wpx-pipeline` (per-WP). |
 | 9 | Deploy poll | **v0.11.0+:** `wpx-train` (per-batch — ONE deploy per train). **--force-single:** `wpx-pipeline`. |
 | 10 | Health + smoke | **v0.11.0+:** `wpx-train` (per-batch — ONE health+smoke per train). **--force-single:** `wpx-pipeline`. |
-| 10.5 | **Train-batch code-review (IMPLEMENTED v0.21.1+ as post-merge variant)** | Calling session (`/sea:code-review` against the batch diff range `<bundle[0].pre_train_sha>..<bundle[-1].merge_sha_on_dev>` after `wpx-train run` returns success). Catches cross-WP composition issues (N+1 across siblings, integration regressions). CRITICAL → BLOCKER batch-wide + auto-draft remediation WPs; CONCERN/ADVISORY → SF registered + WP-AUTO-* auto-drafted. The TRUE pre-merge gate (cmd_run pause/resume) is still deferred — see "Step 10.5 (post-merge variant)" below. |
-| 11 | Security review (post-deploy verification) | Calling session (`Agent({subagent_type: "sulis-security:security-reviewer"})` + `wpx-findings register`) — runs **per-WP sequentially after `wpx-train run` returns outcome=success**. Dispatched by the run-all skill (v0.20.0+), one WP at a time over the batch's `wps_shipped`. CRITICAL → BLOCKER + `step-11-blocked` + Step 12 skipped for that WP; CONCERN/ADVISORY → SF registered + WP-AUTO-* auto-drafted. The loop is **distributed across trains** — terminates when a subsequent train's Step 11 produces zero NEW (non-duplicate) findings. |
+| 10.5 | **Train-batch code-review (IMPLEMENTED v0.21.1+ as post-merge variant; folded into `_verify_phase` boundary at v0.23.0 per HD-007)** | Calling session (`/sea:code-review` against the batch diff range `<bundle[0].pre_train_sha>..<bundle[-1].merge_sha_on_dev>` after `wpx-train run` returns). Catches cross-WP composition issues (N+1 across siblings, integration regressions). CRITICAL → BLOCKER batch-wide + auto-draft remediation WPs; CONCERN/ADVISORY → SF registered + WP-AUTO-* auto-drafted. **HD-007 (v0.23.0)**: when callers pass `--enable-gate-handoff` to `wpx-train run`, the train stops at the new `verifying_gates` phase with `outcome: awaiting_gates` (exit 0); the calling session dispatches Step 10.5 + Step 11 inside that phase and invokes `wpx-train mark-gates-complete` to finalise. The gates are now part of the train's transaction (in lifecycle terms) — the dispatch mechanism stays in the calling LLM session (a Python CLI can't spawn Agents). Legacy callers (no `--enable-gate-handoff`) continue to dispatch Step 10.5 + Step 11 as post-train follow-on. |
+| 11 | Security review (post-deploy verification) | Calling session (`Agent({subagent_type: "sulis-security:security-reviewer"})` + `wpx-findings register`) — runs **per-WP sequentially after `wpx-train run` returns**. Dispatched by the run-all skill (v0.20.0+), one WP at a time over the batch's `wps_shipped`. CRITICAL → BLOCKER + `step-11-blocked` + Step 12 skipped for that WP; CONCERN/ADVISORY → SF registered + WP-AUTO-* auto-drafted. The loop is **distributed across trains** — terminates when a subsequent train's Step 11 produces zero NEW (non-duplicate) findings. **HD-007 (v0.23.0)**: when `--enable-gate-handoff` was set on `wpx-train run`, Step 11 fires inside the `verifying_gates` phase and the calling session invokes `wpx-train mark-gates-complete --train-id <id>` once both Step 10.5 + Step 11 dispatches complete (or `--critical-found` if any CRITICAL surfaced). |
 | 12 | INDEX flip + acceptance evidence + worktree removal | Calling session (`wpx-step12 wrap`) — flips `step-7-complete` → `done` after train succeeds |
 
 > **v0.11.0+ change (ADR-212):** Steps 8-10 are now per-batch via
@@ -147,6 +147,97 @@ care. Concurrent peers have non-overlapping file scopes (the
 run-all skill verifies this before dispatching); concurrent worktrees
 don't share working files; the `git worktree add` (Step 1) and
 worktree removal (Step 12) bracket the per-executor isolation.
+
+---
+
+## Train phases and `_verify_phase`'s gate-handoff boundary (v0.23.0, HD-001 + HD-007)
+
+`wpx-train`'s `cmd_run` is split into three phase functions with explicit
+transaction boundaries (HD-001):
+
+| Phase function | Mutates base branch? | Returns |
+|---|---|---|
+| `_plan_phase` | **No** (force-pushes rebased *feature* branches; never touches the base branch) | `PlanResult(bundle, base_branch, bundle_tip_branch, ci_verdict, rebase_failures)` |
+| `_commit_phase` | **Yes** — only phase that mutates the base branch (squash-merge). Strategy dispatcher: today `_commit_via_rebase_loop` is the only strategy; merge-queue strategy lands in a follow-up delta per the spike's PARTIAL recommendation | `CommitResult(merge_shas, final_merge_sha)` |
+| `_verify_phase` | No (read-only — deploy poll + health + smoke) | `VerifyResult(deploy_url, deploy_verdict, health_status, smoke_verdict, ready_for_gates)` |
+
+cmd_run reduces to: discovery → batch packing → train-state init → three
+phase-function calls → finalise → exception handler. Each phase either
+returns its dataclass result or terminates the process via the existing
+failure handlers (`_pause_train_state` for pre-merge non-fatal pauses;
+`_handle_post_merge_failure` for post-merge ADR-212 revert).
+
+### State-machine phases
+
+```
+pending → rebasing → ci_running → merging → deploying → verifying
+                                                            ↓
+                                  ┌─────────────────────────┤
+                                  ↓                         ↓
+                             (handoff off)             (handoff on)
+                                  ↓                         ↓
+                              success ←───── verifying_gates ──→  (CRITICAL)
+                                              │                        ↓
+                                              └─→ mark-gates-complete  failed
+                                                  (--critical-found)   (gate_blocker)
+                                                  ↓
+                                                  success
+```
+
+`verifying_gates` is the HD-007 addition: deploy/health/smoke completed
+green; Step 10.5 + Step 11 dispatch pending. Reached only when callers
+pass `--enable-gate-handoff` to `wpx-train run`. Without the flag,
+`_verify_phase` returns `ready_for_gates=False` and cmd_run transitions
+directly to terminal `success` (the legacy path).
+
+### `mark-gates-complete` — finalising a gate-handoff train
+
+The calling LLM session (typically `skills/run-all/SKILL.md`) dispatches
+Step 10.5 + Step 11 while the train sits at `verifying_gates`, then
+signals completion:
+
+```
+wpx-train mark-gates-complete --train-id <id> \
+  [--gate-findings <path-to-bundle-or-findings-json>] \
+  [--critical-found]
+```
+
+Behaviour:
+
+- **No `--critical-found`** (clean gates) → transitions to terminal `success`;
+  writes `outcome: success` to the train YAML; cleans up the state file;
+  exits 0.
+- **`--critical-found`** → transitions to terminal `failed` with
+  `outcome: gate_blocker`; records the findings path. **No ADR-212 revert
+  runs** — the gate dispatchers (Step 10.5 / Step 11) already wrote
+  per-WP BLOCKERs and drafted remediation WPs; production stays live;
+  the founder owns the remediation cycle. Exits 1.
+
+The subcommand is intentionally tiny: state-machine transition + YAML
+write, no git operations, no shell-outs.
+
+### Why the boundary lives where it does
+
+A Python CLI can't directly spawn LLM Agents (the Step 10.5 + Step 11
+dispatch). Two architectures could resolve this:
+
+- **(a) Pause-then-resume.** `_verify_phase` writes a structured "needs
+  gate" pause record; cmd_run exits paused; calling session dispatches
+  gates; cmd_run re-invoked via `wpx-train resume <id>` continues from
+  where it left off. Reuses resume machinery but adds a new branch to
+  cmd_resume's pre-merge-vs-post-merge logic.
+- **(b) Stop-at-boundary with explicit gate-complete signal.** cmd_run
+  reaches the gate boundary, transitions to `verifying_gates`, emits
+  `outcome: awaiting_gates`. Calling session dispatches gates inline,
+  invokes `mark-gates-complete` to finalise. Adds one tiny subcommand;
+  cmd_resume unchanged.
+
+We chose **(b)**. The dispatch boundary stays in the calling LLM
+session (which is where Agent calls have to live anyway); the new
+subcommand is single-purpose and easy to reason about; `cmd_resume`'s
+existing pre-merge-vs-post-merge logic does not gain a third case.
+`--enable-gate-handoff` is opt-in (default off) so the 9 integration
+tests + every legacy caller see no behavioural change.
 
 ---
 

@@ -249,6 +249,16 @@ paths:
         smoke fail) produce structured outcome (success / blocker /
         error / not_triggered / nothing_to_pack).
 
+        HD-007 — when `enable_gate_handoff: true` is set, the train
+        pauses at the new `verifying_gates` phase after deploy + health
+        + smoke complete green, emits outcome=`awaiting_gates` (exit 0)
+        with a `gate_handoff` envelope describing the batch diff range,
+        WPs shipped, and next action. The calling LLM session dispatches
+        Step 10.5 (code-review) + Step 11 (per-WP security review), then
+        invokes `train.mark_gates_complete` to finalise the train to
+        terminal success (or gate_blocker if a CRITICAL finding
+        surfaces).
+
         Outcomes returned as normal results, NOT exceptions. Inspect
         result.outcome.
       requestBody:
@@ -256,6 +266,40 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/TrainRunRequest' } } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TrainRunResult' } } } }
+        '400': { $ref: '#/components/responses/ExpectedError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /train/mark-gates-complete:
+    post:
+      operationId: trainMarkGatesComplete
+      summary: Finalise a train paused at verifying_gates (HD-007)
+      description: |
+        HD-007 — complement to `train.run` with
+        `enable_gate_handoff: true`. The train pauses at the
+        `verifying_gates` phase after deploy/health/smoke green; this
+        operation finalises the train to terminal state once Step 10.5
+        (code-review) + Step 11 (per-WP security review) have completed.
+
+        Two terminal paths:
+
+        - **Clean gates** (default): transitions to `phase=success`,
+          `outcome=success`. Exit code 0.
+        - **CRITICAL finding** (`critical_found=true`): transitions to
+          `phase=failed`, `outcome=gate_blocker`. Exit code 1. The gate
+          dispatchers are expected to have already written per-WP
+          BLOCKERs and drafted remediation WPs before this call; this
+          operation just records the train outcome. No ADR-212 revert
+          runs because production is live (founder owns the remediation
+          cycle; the next train picks up the remediation WPs).
+
+        Errors when the train is not in `phase=verifying_gates`
+        (returns ExpectedError) — only trains that paused at the gate
+        handoff boundary can be finalised this way.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TrainMarkGatesCompleteRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TrainMarkGatesCompleteResult' } } } }
         '400': { $ref: '#/components/responses/ExpectedError' }
         '500': { $ref: '#/components/responses/InternalError' }
 
@@ -968,7 +1012,7 @@ components:
         completed_at: { type: [string, 'null'] }
         phase:
           type: string
-          enum: [pending, rebasing, ci_running, merging, deploying, verifying, success, failed, paused, aborted, unknown]
+          enum: [pending, rebasing, ci_running, merging, deploying, verifying, verifying_gates, success, failed, paused, aborted, unknown]
         phase_started_at: { type: [string, 'null'] }
         phase_history:
           type: array
@@ -1045,6 +1089,90 @@ components:
             deploy_poll_interval: { type: integer, minimum: 30 }
             max_batch_size: { type: integer, default: 5 }
             base_branch: { type: string, default: 'dev' }
+            enable_gate_handoff:
+              type: boolean
+              default: false
+              description: |
+                HD-007 — when true, the train pauses at the new
+                `verifying_gates` phase after deploy/health/smoke green
+                instead of going directly to terminal success. Emits
+                outcome=`awaiting_gates` with a `gate_handoff` envelope.
+                Calling session dispatches Step 10.5 (code-review) +
+                Step 11 (per-WP security review), then invokes
+                `train.mark_gates_complete` to finalise.
+
+    TrainMarkGatesCompleteRequest:
+      allOf:
+        - $ref: '#/components/schemas/TrainStandardRequest'
+        - type: object
+          required: [train_id]
+          properties:
+            train_id:
+              type: string
+              description: Train ID to finalise (must be in phase=verifying_gates).
+            gate_findings:
+              type: [string, 'null']
+              description: |
+                Optional path to the gate findings JSON produced by
+                Step 10.5 + Step 11. Recorded in the historical YAML
+                record's `gate_findings_path` field for audit.
+            critical_found:
+              type: boolean
+              default: false
+              description: |
+                When true, transitions the train to phase=failed and
+                outcome=gate_blocker (exit 1). The gate dispatchers are
+                expected to have already written per-WP BLOCKERs and
+                drafted remediation WPs; this call just records the
+                train outcome (no ADR-212 revert).
+
+    TrainMarkGatesCompleteResult:
+      type: object
+      required: [train_id, outcome, phase]
+      properties:
+        train_id: { type: string }
+        outcome:
+          type: string
+          enum: [success, gate_blocker]
+          description: |
+            `success` when the gates passed clean; `gate_blocker` when
+            `critical_found=true` was passed.
+        phase:
+          type: string
+          enum: [success, failed]
+          description: Terminal phase the train transitioned to.
+        record_path:
+          type: string
+          description: |
+            Absolute path to the train's historical YAML record. The
+            full record (bundle, deploy_url, started_at, batch_size,
+            final_merge_sha) is preserved across the gate boundary.
+
+    TrainGateHandoff:
+      type: object
+      description: |
+        HD-007 — payload returned by `train.run` when the train pauses
+        at `verifying_gates` (outcome=awaiting_gates). Tells the calling
+        session what to dispatch and how to finalise.
+      properties:
+        batch_start_sha:
+          type: [string, 'null']
+          description: SHA on base branch BEFORE the bundle started landing.
+        batch_end_sha:
+          type: [string, 'null']
+          description: SHA on base branch AFTER all bundle entries landed.
+        diff_range:
+          type: [string, 'null']
+          description: |
+            Convenience: `<batch_start_sha>..<batch_end_sha>`, suitable
+            for `git diff` / `gh pr diff` / `/sea:code-review`.
+        wps:
+          type: array
+          items: { type: string }
+          description: WPs shipped in the bundle (for per-WP Step 11).
+        next_action:
+          type: string
+          description: Plain-English instructions for the calling session.
 
     TrainBundleEntry:
       type: object
@@ -1060,7 +1188,16 @@ components:
       required: [train_id, outcome]
       properties:
         train_id: { type: string }
-        outcome: { type: string, enum: [success, not_triggered, nothing_to_pack, blocker, error] }
+        outcome:
+          type: string
+          enum:
+            - success
+            - not_triggered
+            - nothing_to_pack
+            - blocker
+            - error
+            - awaiting_gates  # HD-007 — paused at verifying_gates
+            - paused          # transient — surfaced by paused-path exit envelope
         wps_shipped: { type: array, items: { type: string } }
         eligible_count: { type: integer }
         eligible_wps: { type: array, items: { type: string } }
@@ -1070,6 +1207,16 @@ components:
         bundle: { type: array, items: { $ref: '#/components/schemas/TrainBundleEntry' } }
         rebase_failures: { type: array, items: { type: object } }
         train_blocker_path: { type: [string, 'null'] }
+        gate_handoff:
+          oneOf:
+            - { type: 'null' }
+            - $ref: '#/components/schemas/TrainGateHandoff'
+          description: |
+            HD-007 — populated only when outcome=`awaiting_gates`.
+            Tells the calling session what to dispatch (code-review +
+            per-WP security review) before invoking
+            `train.mark_gates_complete` to finalise.
+          default: null
 
     # ─── index ────────────────────────────────────────────────────────
     IndexFlipStatusRequest:

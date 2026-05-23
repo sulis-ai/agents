@@ -8,6 +8,7 @@ import type {
   TrainAbortResult,
   TrainDoctorResult,
   TrainInspectResult,
+  TrainMarkGatesCompleteResult,
   TrainRetryWpResult,
   TrainSkipWpResult,
   TrainOverrideResult,
@@ -42,6 +43,32 @@ export interface TrainRunParams {
   deploy_poll_interval?: number;
   max_batch_size?: number;
   base_branch?: string;
+  /**
+   * HD-007 — when true, the train pauses at the new `verifying_gates`
+   * phase after deploy/health/smoke green instead of going directly to
+   * terminal success. Emits outcome=`awaiting_gates` with a
+   * `gate_handoff` envelope. Calling session dispatches Step 10.5 +
+   * Step 11, then invokes `markGatesComplete` to finalise.
+   */
+  enable_gate_handoff?: boolean;
+  repo?: string;
+}
+
+export interface TrainMarkGatesCompleteParams {
+  train_id: string;
+  /**
+   * Optional path to the gate findings JSON produced by Step 10.5 +
+   * Step 11. Recorded in the historical YAML record's
+   * `gate_findings_path` field for audit.
+   */
+  gate_findings?: string | null;
+  /**
+   * When true, transitions the train to phase=failed,
+   * outcome=gate_blocker (exit 1). The gate dispatchers are expected to
+   * have already written per-WP BLOCKERs and drafted remediation WPs;
+   * this call just records the train outcome (no ADR-212 revert).
+   */
+  critical_found?: boolean;
   repo?: string;
 }
 
@@ -186,9 +213,39 @@ export class TrainResource {
           deploy_poll_interval: params.deploy_poll_interval,
           max_batch_size: params.max_batch_size ?? 5,
           base_branch: params.base_branch,
+          enable_gate_handoff: params.enable_gate_handoff ?? false,
         }),
       }),
     ) as unknown as TrainRunResult;
+  }
+
+  /**
+   * HD-007 — finalise a train paused at `verifying_gates`. Pair with
+   * `train.run({ enable_gate_handoff: true })`. Two terminal paths:
+   *
+   * - **Clean gates** (default): transitions to `phase=success`,
+   *   `outcome=success`.
+   * - **CRITICAL finding** (`critical_found: true`): transitions to
+   *   `phase=failed`, `outcome=gate_blocker`. The gate dispatchers are
+   *   expected to have written per-WP BLOCKERs + drafted remediation WPs
+   *   already; this call records the train outcome only (no ADR-212
+   *   revert).
+   *
+   * Errors when the train is not in `phase=verifying_gates`.
+   */
+  markGatesComplete(
+    params: TrainMarkGatesCompleteParams,
+  ): TrainMarkGatesCompleteResult {
+    return resultPayload(
+      this.transport.invoke(BINARY, 'mark-gates-complete', {
+        ...common(this.config, params.repo),
+        ...kwargsToParams({
+          train_id: params.train_id,
+          gate_findings: params.gate_findings,
+          critical_found: params.critical_found ?? false,
+        }),
+      }),
+    ) as unknown as TrainMarkGatesCompleteResult;
   }
 }
 
@@ -320,8 +377,28 @@ export class AsyncTrainResource {
           deploy_poll_interval: params.deploy_poll_interval,
           max_batch_size: params.max_batch_size ?? 5,
           base_branch: params.base_branch,
+          enable_gate_handoff: params.enable_gate_handoff ?? false,
         }),
       }),
     ) as unknown as TrainRunResult;
+  }
+
+  /**
+   * Async parity for `TrainResource.markGatesComplete`. HD-007 —
+   * finalise a train paused at `verifying_gates`.
+   */
+  async markGatesComplete(
+    params: TrainMarkGatesCompleteParams,
+  ): Promise<TrainMarkGatesCompleteResult> {
+    return resultPayload(
+      await this.transport.invoke(BINARY, 'mark-gates-complete', {
+        ...common(this.config, params.repo),
+        ...kwargsToParams({
+          train_id: params.train_id,
+          gate_findings: params.gate_findings,
+          critical_found: params.critical_found ?? false,
+        }),
+      }),
+    ) as unknown as TrainMarkGatesCompleteResult;
   }
 }

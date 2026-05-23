@@ -238,3 +238,61 @@ def test_state_can_be_json_serialised_for_inspect_json_output(tmp_path):
     parsed = json.loads(serialised)
     assert parsed["train_id"] == "train-test"
     assert parsed["phase"] == "ci_running"
+
+
+# ─── HD-011 — phase_descriptions ↔ PHASES consistency ─────────────────
+
+
+def test_phase_descriptions_covers_every_non_terminal_phase(tmp_path):
+    """HD-011 RED — render_train_state_plain_english must produce a
+    description line (the ``  → ...`` row) for every phase in PHASES.
+
+    Catches the verifying_gates case where HD-007 added the phase to
+    PHASES but forgot to extend the phase_descriptions dict in
+    render_train_state_plain_english — founders running `wpx-train
+    inspect` saw the phase name with no explanation.
+    """
+    from _wpxlib import PHASES
+    for phase in PHASES:
+        state = _make_state(phase, tmp_path)
+        rendered = render_train_state_plain_english(state)
+        assert " → " in rendered, (
+            f"HD-011: phase {phase!r} has no description in "
+            f"render_train_state_plain_english.phase_descriptions. "
+            f"Founder running `wpx-train inspect` would see the phase "
+            f"name with no explanation.\nRendered:\n{rendered}"
+        )
+
+
+def test_phase_descriptions_has_no_dead_keys_outside_phases():
+    """HD-011 RED — phase_descriptions must not contain keys that are
+    not in PHASES.
+
+    Catches the dead ``code_review`` key left over from a rejected HD-007
+    design alternative (Option A — pause-then-resume; superseded by
+    Option B — verifying_gates + mark-gates-complete). Dead keys mislead
+    future contributors into thinking the phase exists.
+    """
+    import inspect as inspect_mod
+    from _wpxlib import PHASES, render_train_state_plain_english
+    src = inspect_mod.getsource(render_train_state_plain_english)
+    # The dead key from the rejected pause-then-resume design.
+    assert "code_review" not in src, (
+        "HD-011: render_train_state_plain_english still references the "
+        "dead `code_review` phase from HD-007's rejected design. The "
+        "chosen design uses `verifying_gates` + the mark-gates-complete "
+        "subcommand instead."
+    )
+    # Defensive: any non-PHASES key would mislead the reader.
+    known_phases = set(PHASES)
+    # Extract any quoted phase keys from the dict literal in src.
+    # We look for `        "key": ` to avoid false positives in
+    # description text (which uses different leading whitespace).
+    import re
+    keys_in_dict = set(re.findall(r'^        "([a-z_]+)":\s', src, re.MULTILINE))
+    unknown = keys_in_dict - known_phases
+    assert not unknown, (
+        f"HD-011: phase_descriptions contains keys not in PHASES: "
+        f"{sorted(unknown)}. Either add them to PHASES or remove them "
+        f"from phase_descriptions."
+    )
