@@ -1438,11 +1438,42 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
         )
 
         # Step: sequential squash-merge
+        #
+        # HD-003: each per-entry merge is wrapped in try/except so that a
+        # failure on entry N — after entries 1..N-1 have already landed
+        # on dev — routes through the existing ADR-212 revert path rather
+        # than propagating up to the outer `except RuntimeError`. The
+        # outer handler writes outcome=error and exits without reverting,
+        # which would leave dev in a half-state. _handle_post_merge_failure
+        # already filters the bundle to merged entries (those with a
+        # populated merge_sha_on_dev), so passing the partial bundle here
+        # is correct: only the merges that actually landed get reverted,
+        # and only their branches get restored.
         final_merge_sha = None
         for entry in bundle:
             _log(f"Squash-merging {entry['wp']} ({entry['branch']}) to dev")
-            sha = _merge_squash(repo, entry["branch"], entry["wp"],
-                                base_branch=base_branch)
+            try:
+                sha = _merge_squash(repo, entry["branch"], entry["wp"],
+                                    base_branch=base_branch)
+            except Exception as exc:  # noqa: BLE001
+                # Per-merge failure mid-loop. Capture partial progress on
+                # the record so the post-mortem yaml reflects which merges
+                # landed, then hand off to the existing revert path.
+                _log(
+                    f"MERGE FAILURE: {entry['wp']} ({entry['branch']}) "
+                    f"failed mid-batch: {exc}"
+                )
+                record["bundle"] = bundle
+                _handle_post_merge_failure(
+                    record=record, bundle=bundle,
+                    reason=f"merge of {entry['wp']} failed: {exc}",
+                    clone_dir=clone_dir, repo=repo, paths=paths,
+                    train_id=train_id,
+                    failure_text=(
+                        f"_merge_squash raised on {entry['wp']} "
+                        f"({entry['branch']}): {exc}"
+                    ),
+                )
             entry["merge_sha_on_dev"] = sha
             final_merge_sha = sha
         record["bundle"] = bundle  # refresh with merge_sha_on_dev populated
