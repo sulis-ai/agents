@@ -1381,6 +1381,9 @@ def find_eligible_branches(
     wp_dir: Path,
     overrides: TrainOverrides | None = None,
     strict_ci: bool = False,
+    *,
+    paths: "WpxPaths | None" = None,
+    base_branch: str = "dev",
 ) -> list[EligibilityResult]:
     """Discover which WPs are eligible for the next train.
 
@@ -1405,6 +1408,23 @@ def find_eligible_branches(
       against very slow integration CI that can't afford to
       sequence flaky-but-passable branches together).
 
+    Computed-status mode (HD-008, v0.24.0+):
+
+      Pass ``paths`` (a WpxPaths) to consult ``compute_wp_status`` for
+      both the eligibility status check AND the dependency-merged
+      check. With ``paths`` set, the function treats the *computed*
+      status as authoritative: a WP whose stored cell says ``done``
+      but whose computed status is ``step-7-complete`` (because the
+      merge SHA was reverted) is re-considered for eligibility; a WP
+      whose dep's stored cell says ``done`` but whose computed value
+      is not ``done`` is treated as having an unmet dep.
+
+      Without ``paths`` (the historical signature), the function reads
+      ``wp.status`` from the INDEX parse as it did pre-HD-008. This
+      preserves the contract for the existing in-memory test suite
+      (``test_wpx_train_eligibility.py``) which stubs WPRow.status
+      directly and doesn't need network access.
+
     Returns one EligibilityResult per WP — both eligible and ineligible
     are returned so the caller (queue-list / status / doctor) can show
     the founder the full picture.
@@ -1413,9 +1433,25 @@ def find_eligible_branches(
     by_id = {wp.id: wp for wp in wps}
     results: list[EligibilityResult] = []
 
+    # HD-008 — compute effective status per WP up-front when paths is set,
+    # so the loop below treats `effective_status[wp.id]` consistently for
+    # both the candidate-skip check AND the eligibility check.
+    if paths is not None:
+        effective_status: dict[str, str] = {
+            wp.id: compute_wp_status(
+                wp.id, paths, repo, base_branch,
+                stored_status=wp.status,
+            )
+            for wp in wps
+        }
+    else:
+        effective_status = {wp.id: wp.status for wp in wps}
+
     for wp in wps:
+        wp_status = effective_status[wp.id]
+
         # Skip WPs that aren't candidates at all (done, cancelled, blocked).
-        if wp.status in (TRAIN_DONE_STATUS, "cancelled"):
+        if wp_status in (TRAIN_DONE_STATUS, "cancelled"):
             continue
 
         is_held = wp.id in overrides.holds
@@ -1441,10 +1477,10 @@ def find_eligible_branches(
             continue
 
         # Status check
-        if wp.status != TRAIN_ELIGIBLE_STATUS and not is_forced:
+        if wp_status != TRAIN_ELIGIBLE_STATUS and not is_forced:
             results.append(EligibilityResult(
                 wp=wp.id, branch=branch, eligible=False,
-                reason=f"status is '{wp.status}', not '{TRAIN_ELIGIBLE_STATUS}'",
+                reason=f"status is '{wp_status}', not '{TRAIN_ELIGIBLE_STATUS}'",
                 primitive=wp.primitive,
             ))
             continue
@@ -1468,12 +1504,15 @@ def find_eligible_branches(
             ))
             continue
 
-        # Dependency check
-        if not _all_deps_merged(wp, by_id):
-            unmet = [
-                d for d in wp.depends_on
-                if by_id.get(d) is None or by_id[d].status != TRAIN_DONE_STATUS
-            ]
+        # Dependency check — uses effective_status when paths is set so a
+        # reverted dep (stored=done, computed=step-7-complete) correctly
+        # blocks downstream WPs from shipping on a false done signal.
+        unmet = [
+            d for d in wp.depends_on
+            if d not in effective_status
+            or effective_status[d] != TRAIN_DONE_STATUS
+        ]
+        if unmet:
             results.append(EligibilityResult(
                 wp=wp.id, branch=branch, eligible=False,
                 reason=f"dependencies not merged: {', '.join(unmet)}",
@@ -2393,7 +2432,41 @@ def flip_index_status_via_cli(
     Doesn't raise — the caller (failure-path code in wpx-train) wants
     to keep going even if one INDEX flip fails. The error is returned
     so the caller can surface it in the train BLOCKER record.
+
+    .. deprecated:: 0.24.0 (HD-008)
+       Status for the computed-eligible set ({done, step-7-shipping,
+       step-7-complete}) is now derived from authoritative sources
+       (origin git state + train-runs/ records) via
+       ``compute_wp_status``. This function still writes the INDEX.md
+       cache for backward compatibility — readers that haven't migrated
+       yet continue to see an approximately-correct stored cell — but
+       new callers should compute status and rely on
+       ``compute_wp_status`` rather than treating the cache as
+       authoritative.
+
+       Removal target: when all 8 existing callsites in ``wpx-train``
+       and ``skills/run-all/SKILL.md`` have been migrated to rely on
+       computed status instead of cache writes. Tracking via HD-008's
+       follow-on deltas (one per callsite group).
+
+       A ``DeprecationWarning`` is emitted on every call to make the
+       drift visible in CI logs without breaking production paths.
     """
+    import warnings
+    warnings.warn(
+        "flip_index_status_via_cli is deprecated as of HD-008 (v0.24.0). "
+        "Status for the computed-eligible set is now derived from origin + "
+        "train-runs via compute_wp_status; this function still writes the "
+        "cache for backward compatibility but new callers should not rely "
+        "on it.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    _log(
+        f"flip_index_status_via_cli: deprecated call site flipping "
+        f"{wp_id} -> {to_status} (HD-008: prefer computed status via "
+        f"compute_wp_status)"
+    )
     args = [
         str(scripts_dir / "wpx-index"), "flip-status",
         "--project", paths.project,

@@ -2185,3 +2185,108 @@ When the spiral terminates with escalation, the BLOCKER record
 (EL-08 format) goes to
 `.architecture/{project}/work-packages/BLOCKER-WP-NNN.md`. The
 executor exits cleanly after writing it.
+
+---
+
+## Computed status (HD-008, v0.24.0+)
+
+`INDEX.md`'s `Status` column historically was the **sole** source of
+truth for WP status — flipped by `wpx-index flip-status` from the
+executor (Step 7), the train (Step 8 success), Step 12 wrap, and the
+train's failure paths. The single stored cell encoded six conceptually
+distinct things, six writers raced for it, and `wpx-train doctor`
+existed to catch the drift class that arose when the cache disagreed
+with the authoritative git/origin state.
+
+HD-008 splits the status surface in two:
+
+### States that are now **computed**
+
+Three states are derived from authoritative sources on every read:
+
+| Computed status | Derived from |
+|---|---|
+| `done` | A `merge_sha_on_dev` recorded for the WP in any `train-runs/` record AND `is_sha_on_branch(repo, sha, base_branch)` returns True (the work is on origin/`<base_branch>`) |
+| `step-7-shipping` | An in-flight `*.state.json` (phase ∈ {pending, rebasing, ci_running, merging, deploying, verifying, verifying_gates, paused}) lists the WP in its `bundle` |
+| `step-7-complete` | The origin feature branch `feat/wp-<slug>` exists AND the two cases above are False |
+
+`compute_wp_status(wp_id, paths, repo, base_branch, *, gh,
+stored_status)` in `_wpxlib.py` is the single helper that produces
+these values. It is conservative: a `done` return is trustworthy
+(`is_sha_on_branch` returns False on any API error), but
+`step-7-complete` may degrade to the stored value when the
+branch-exists check fails transiently. Read-only — does not write
+INDEX.md.
+
+### States that remain **stored**
+
+States that record operator or executor intent — and have no
+authoritative-state correlate — remain in INDEX.md's cell:
+
+| Stored status | Meaning |
+|---|---|
+| `pending` | Default for new WPs; no work started |
+| `in_progress` | Executor has claimed the WP (Step 1) |
+| `auto-draft` | Auto-drafted remediation WP awaiting founder disposition |
+| `dependency_blocked` | Propagated from a BLOCKER on a dep |
+| `blocked` / `step-7-blocked` / `step-7-held` | BLOCKER recorded or override applied |
+| `cancelled` | Founder cancelled the WP |
+
+These states are owned by humans or the executor — not derivable from
+git. The cache stays valid for them.
+
+### The doctor's drift detection
+
+`wpx-train doctor` deliberately keeps using the lower-level
+`find_wp_merge_sha` + `is_sha_on_branch` primitives rather than going
+through `compute_wp_status`. The reason: the doctor MUST distinguish
+"API error" from "SHA is not on dev". `compute_wp_status` is
+conservative and falls back to the stored value on transient errors
+(correct for eligibility); the doctor wants the explicit two-step
+check so a network blip doesn't silently look like agreement.
+
+The doctor reports two drift kinds:
+
+- `status_drift_done_no_merge_history` — stored `done`, no
+  `merge_sha_on_dev` recorded in any train record. Causes:
+  manual flip, legacy `wpx-pipeline` ship (harmless), or lost state.
+- `status_drift_done_not_on_dev` — stored `done`, merge SHA recorded
+  but `is_sha_on_branch` returns False. Cause: revert (or
+  never-actually-landed).
+
+Detection only — does NOT auto-reconcile. The founder runs `wpx-index
+flip-status --wp WP-NNN --to step-7-blocked --expected done` per-WP
+after reviewing each case. The `--expected` CAS check is the safety
+primitive.
+
+### Eligibility uses computed status
+
+`find_eligible_branches(..., paths=paths, base_branch=...)` consults
+`compute_wp_status` for the eligibility-shape check AND for the
+dependency-merged check. This closes the operational anchor that
+motivated HD-008: a WP at stored `done` whose work was reverted no
+longer falsely unblocks downstream WPs from boarding a train. The
+downstream WP's dep is computed against authoritative state, not the
+stored cell.
+
+Callers that don't pass `paths` (the historical test-only signature)
+continue to use the stored cell as before — no network access, no
+behaviour change.
+
+### `flip_index_status_via_cli` is deprecated
+
+The helper that shells out to `wpx-index flip-status` emits a
+`DeprecationWarning` on every call. The body is unchanged — it still
+writes the cache for backward compatibility — but readers should not
+treat the stored cell as authoritative for the computed-eligible set.
+Removal target: when all 8 existing callsites have been migrated to
+rely on computed status instead of cache writes. Tracking via HD-008's
+follow-on deltas (one per callsite group).
+
+### Why the split is principled
+
+States that the system can derive from git + train-runs are derived.
+States that record human or executor intent are stored. The drift
+class disappears for the derived states (no cache, no divergence);
+the cache remains valid for the operator-intent states (where there
+is no authoritative correlate to disagree with).

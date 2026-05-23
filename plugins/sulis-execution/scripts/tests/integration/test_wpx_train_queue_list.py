@@ -32,11 +32,20 @@ def _seed_wp_files(tmp_project, ids_slugs: list[tuple[str, str]]) -> None:
 def test_queue_list_emits_eligible_and_ineligible_lists(
     tmp_project, run_tool, mock_gh
 ):
-    """End-to-end: 3 WPs, 1 eligible, 2 ineligible — JSON shape matches contract."""
+    """End-to-end: 3 WPs, 1 eligible, 2 ineligible — JSON shape matches contract.
+
+    HD-008 (v0.24.0+): status is computed from authoritative sources.
+    To test the "WP-002 marked pending is ineligible" case under the
+    computed model, the WP-002 origin branch MUST NOT exist (else its
+    computed status would be step-7-complete and it would become
+    eligible, which is the intended new behaviour). The pre-HD-008
+    version of this test mocked the branch as existing AND expected
+    the stored `pending` cell to win — that contract is gone.
+    """
     _write_index(tmp_project, [
         # Ready: step-7-complete, branch exists, CI green, no deps
         ("WP-001", "Ready", "create", "step-7-complete", "—", "—"),
-        # Pending: not step-7-complete
+        # Pending: no origin branch → computed status falls back to stored pending
         ("WP-002", "Pending", "create", "pending", "—", "—"),
         # Done WPs are filtered out entirely (not even in ineligible list)
         ("WP-003", "Old", "create", "done", "—", "—"),
@@ -45,7 +54,15 @@ def test_queue_list_emits_eligible_and_ineligible_lists(
         ("WP-001", "ready"), ("WP-002", "pending"), ("WP-003", "old"),
     ])
 
-    # Mock gh: WP-001 branch exists and is green
+    # Mock gh:
+    #   - WP-001 branch exists + green (eligible)
+    #   - WP-002 branch does NOT exist (rc=1) → computed status = pending
+    #   - WP-003 done — HD-008 verifies merge SHA reachability; with no
+    #     train record + no branch, computed value differs from stored
+    #     done; for THIS test we don't go down the doctor path, but the
+    #     candidate-skip check looks at the computed status — which for
+    #     a done WP with no merge SHA falls through to the stored value
+    #     (per compute_wp_status case 4), so WP-003 still skips
     mock_gh([
         {
             "match": "git/refs/heads/feat/wp-001-ready",
@@ -53,14 +70,11 @@ def test_queue_list_emits_eligible_and_ineligible_lists(
         },
         {
             "match": "git/refs/heads/feat/wp-002-pending",
-            "stdout": '{"object": {"sha": "cafebabe"}}',
+            "exit_code": 1,
+            "stderr": "404 Not Found",
         },
         {
             "match": "commits/feat/wp-001-ready/check-runs",
-            "stdout": '{"check_runs": [{"name": "ci", "status": "completed", "conclusion": "success"}]}',
-        },
-        {
-            "match": "commits/feat/wp-002-pending/check-runs",
             "stdout": '{"check_runs": [{"name": "ci", "status": "completed", "conclusion": "success"}]}',
         },
     ])

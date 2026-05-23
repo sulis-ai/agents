@@ -153,9 +153,13 @@ def cmd_queue_list(args: argparse.Namespace) -> None:
 
     wps = parse_index_md(paths.index_md)
     overrides = read_overrides(paths.train_overrides)
+    # HD-008 — pass paths so eligibility uses computed status
+    # (origin git state + train records), not the stored INDEX cell.
     results = find_eligible_branches(
         wps, repo, paths.wp_dir, overrides,
         strict_ci=getattr(args, "strict_ci", False),
+        paths=paths,
+        base_branch=getattr(args, "base_branch", None) or "dev",
     )
 
     eligible = [r for r in results if r.eligible]
@@ -266,9 +270,13 @@ def cmd_status(args: argparse.Namespace) -> None:
 
     wps = parse_index_md(paths.index_md)
     overrides = read_overrides(paths.train_overrides)
+    # HD-008 — pass paths so the status snapshot reflects authoritative
+    # state (origin + train records), not the stored INDEX cell.
     results = find_eligible_branches(
         wps, repo, paths.wp_dir, overrides,
         strict_ci=getattr(args, "strict_ci", False),
+        paths=paths,
+        base_branch=getattr(args, "base_branch", None) or "dev",
     )
 
     eligible = [r for r in results if r.eligible]
@@ -997,6 +1005,24 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     # without status being unflipped; (c) shipped via wpx-pipeline (legacy);
     # (d) corrupted state from an external operation.
     #
+    # HD-008 note: the doctor deliberately uses the lower-level
+    # ``find_wp_merge_sha`` + ``is_sha_on_branch`` primitives rather than
+    # going through ``compute_wp_status`` for the done case. Reason:
+    # ``compute_wp_status`` is conservative — when ``is_sha_on_branch``
+    # fails (transient API error) it falls back to the stored cell so
+    # eligibility decisions don't oscillate on network blips. The doctor
+    # WANTS to distinguish "API error" from "SHA is not on dev" so it
+    # only reports drift in the latter case. Pre-HD-008 the doctor's
+    # explicit two-step check already gave us this; HD-008's migration
+    # of eligibility doesn't change that.
+    #
+    # ``compute_wp_status`` remains the right tool for the eligibility
+    # checks (where transient-error tolerance is correct), and for any
+    # future per-WP status report; the doctor's deliberate use of the
+    # explicit primitives is documented here so a future maintainer
+    # doesn't "simplify" this into a compute_wp_status call and
+    # accidentally make drift detection silent on network errors.
+    #
     # Detection only — does NOT auto-reconcile. Founder uses
     # `wpx-index flip-status --wp WP-NNN --to step-7-blocked --expected done`
     # per-WP after reviewing each case. The per-WP CAS check (--expected)
@@ -1697,9 +1723,14 @@ def cmd_run(args: argparse.Namespace) -> None:
     # Discovery
     wps = parse_index_md(paths.index_md)
     overrides = read_overrides(paths.train_overrides)
+    # HD-008 — computed status drives eligibility + dep-merged checks.
+    # Reverts and missing-from-dev cases now block downstream WPs from
+    # boarding a train on a false done signal.
     results = find_eligible_branches(
         wps, repo, paths.wp_dir, overrides,
         strict_ci=getattr(args, "strict_ci", False),
+        paths=paths,
+        base_branch=getattr(args, "base_branch", None) or "dev",
     )
     eligible = [r for r in results if r.eligible]
 

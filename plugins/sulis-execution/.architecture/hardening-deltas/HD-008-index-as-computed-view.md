@@ -1,13 +1,14 @@
 ---
 id: HD-008
 title: INDEX.md becomes a computed view (status derives from origin + train records)
-status: proposed
+status: implemented
 severity: HIGH
 pillar: form
 sources:
   - SEA audit report 2026-05-23 (Pattern C — INDEX.md is a stored source of truth for WP status, which can drift from authoritative git/origin state; the drift class is what motivated `wpx-train doctor`'s status-drift detection at v0.21.2; the right move is to make the cache disappear so the drift class disappears)
   - Operational anchor: 2026-05-22 slice-2 audit surfaced 3 WPs at INDEX status `done` whose work was never on dev; ad-hoc reconciliation followed; HD-007/HD-001 closed the dispatch boundary so this delta can now close the state-of-record boundary
 created: 2026-05-23
+implemented: 2026-05-23
 ---
 
 ## Context
@@ -341,6 +342,47 @@ Splitting lets `/sea:code-review` run twice with focused diffs each
 time, instead of one 800-line diff that's hard to review thoroughly.
 This matches the operational pattern PH-02 (PR Hygiene Size) was
 calibrated against in batches 4 and 5.
+
+## Implementation notes (post-landing)
+
+**Commit A** added `compute_wp_status`, `_in_flight_train_has_wp`,
+`_IN_FLIGHT_TRAIN_PHASES`, the `wpx-index status` subcommand, and 15
+characterisation tests. No callers migrated. Tests: 313 wpx pass
+(298 + 15); 31 sdk-python; 20 sdk-mcp; 1 pre-existing flaky
+`test_train_lock_second_acquisition_raises`.
+
+**Commit B** migrated three call sites of `find_eligible_branches`
+(`queue-list`, `status`, `run`) in `wpx-train` to pass `paths` +
+`base_branch`, enabling computed-status eligibility. Added 4 caller
+tests (3 for `find_eligible_branches` + 1 for the deprecation
+warning).
+
+**Deviation from the original plan: `cmd_doctor` was NOT migrated to
+`compute_wp_status`.** During implementation we discovered that
+`compute_wp_status` is *deliberately conservative*: when
+`is_sha_on_branch` returns False (which happens on both "SHA is not
+on dev" AND "API call failed"), the function falls through to the
+caller-supplied `stored_status` so eligibility decisions don't
+oscillate on transient network errors. That's the correct posture
+for eligibility, but the WRONG posture for drift detection — the
+doctor specifically wants to distinguish the two cases. Pre-HD-008's
+doctor already did the right two-step check (`find_wp_merge_sha`,
+then `is_sha_on_branch`) so we kept it as-is and documented the
+deliberate non-use of `compute_wp_status` in the doctor's docstring.
+Net effect: drift-detection behaviour is unchanged from v0.21.2 —
+which is what we want.
+
+**Test count adjusted:** existing
+`scripts/tests/integration/test_wpx_train_queue_list.py::test_queue_list_emits_eligible_and_ineligible_lists`
+was updated to reflect HD-008's new semantics — under the computed
+model, a WP with stored `pending` AND an origin branch that exists
+is now correctly evaluated as `step-7-complete` (the work IS pushed)
+rather than respecting the stale cache. The test was tightened to
+assert this by NOT mocking the origin branch for the pending WP.
+
+**Commit shas:**
+- Commit A: `abbbaf6`
+- Commit B: (this commit; see git log)
 
 ## Why HIGH severity
 

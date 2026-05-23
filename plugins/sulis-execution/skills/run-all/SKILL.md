@@ -137,6 +137,21 @@ loop:
        - EXCLUDE status == "blocked" / "cancelled" /
          "dependency_blocked"
 
+       HD-008 note (v0.24.0+): status here refers to the STORED
+       INDEX.md cell for "pending" / "auto-draft" / "blocked" / etc.
+       (operator/executor intent — no authoritative-state correlate)
+       and to the COMPUTED status for the "done" check on dependencies
+       (derived from origin + train-runs via compute_wp_status). The
+       ready-set rule is therefore: stored pending + computed-done
+       deps. In practice the loop reads stored cells from INDEX.md
+       and treats them as authoritative for operator-intent states;
+       the computed-done check fires through wpx-index status
+       (--mode computed) or implicitly through wpx-train queue-list
+       which now uses computed status per HD-008. A dep whose stored
+       cell says done but whose computed status is step-7-complete
+       (reverted) correctly blocks the downstream WP from entering
+       the ready set.
+
     5. If ready set is empty:
        - If any WPs have status == "auto-draft" → surface count +
          source-finding IDs to concierge / founder; exit.
