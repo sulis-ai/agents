@@ -1,5 +1,69 @@
 # Sulis — Changelog
 
+## v0.7.0 — 2026-05-23
+
+Tier 1 (Exists) ships. Code-health now answers "does it build?" in
+addition to readability + tests. First skill to find genuinely-useful
+work on the marketplace itself.
+
+### Added
+
+- `skills/check-build/` — tier 1. Build-system detection (pip / npm /
+  yarn / pnpm / go / cargo / docker / make) + manifest hygiene
+  (plugin.json / marketplace.json / package.json semantic correctness
+  per HD-004). Baseline + signature-dedup over per-system pass/fail.
+  Hygiene runs always (cheap, no side effects); `--run` opt-in for
+  actual builds. Dangerous-target blocklist for Make (publish, deploy,
+  release skipped by default).
+  - `SKILL.md`, `scripts/builder.py` (~520 lines), `references/build-systems.md`
+  - `COMPLETENESS_REPORT.md` — five-gate audit trail
+
+### Changed
+
+- `skills/code-health/scripts/orchestrator.py` — tier 1 now wired.
+- `skills/code-health/references/tier-registry.md` — tier 1 marked
+  wired with `/sulis:check-build`.
+
+### What the new tier surfaces on this marketplace
+
+Running `/sulis:code-health` against the marketplace itself now reports
+**19 tier-1 findings:**
+- 2 high (test-fixture package.json files missing `version` — known
+  intentional but flagged for awareness)
+- 17 concern (description bloat across 9 plugins that didn't get the
+  HD-004 cleanup migration — `idc`, `sulis-builder`, `sulis-security`,
+  `sulis-business-strategy`, `sulis-design`, `sulis-strategy`,
+  `sulis-product-development` — see marketplace.json plugin descriptions)
+
+This is genuine value — the new tool surfaced unfinished work from
+the HD-004 cleanup earlier in this session.
+
+### Dogfood findings (run #5 of sulis:add-skill v0.4.0)
+
+2 new methodology gaps for add-skill v0.6.0:
+- Three regression-pattern skills now (check-tests, check-build,
+  soon check-security) all reimplement the baseline mechanism — extract
+  to a shared `baseline_helper.py`
+- Manifest hygiene crosses tiers (also tier 5 — bloated descriptions
+  are also a readability concern). Currently tier 1 (foundational
+  "does it parse"); worth noting the overlap
+
+Joining 15 already queued = **17 methodology gaps queued for add-skill v0.6.0**.
+
+### Cross-skill validation
+
+- check-readability run on builder.py: **0 findings** (the new code
+  passes its own legibility check)
+- code-health with tiers 1 + 5 wired: produces a clean tiered report
+  with stubbed tiers visually distinct
+- tier 3 reports "couldn't check" against marketplace root (no
+  top-level test framework — known limit)
+
+### Versions
+
+  sulis: 0.6.0 → 0.7.0 (minor — tier 1 wires)
+  marketplace: 1.47.0 → 1.48.0
+
 ## v0.6.0 — 2026-05-23
 
 Tier 3 (Works) ships. First regression-detection skill. Wires into the

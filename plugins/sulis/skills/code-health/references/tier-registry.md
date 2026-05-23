@@ -14,15 +14,16 @@ implements it (when wired), and the operator-side concerns it covers.
 tiers:
   - number: 1
     name: Exists
-    founder_question: "Does it build? Do the tests run at all?"
-    wired: false
-    wired_in: planned
-    founder_skill: null
-    operator_skills: null  # future: extended sea:probe with --build-artefact, --run-tests
+    founder_question: "Does it build? Do the basics work?"
+    wired: true
+    wired_in: "0.7.0"
+    founder_skill: "/sulis:check-build"
+    operator_skills: null  # build logic + manifest hygiene live directly in check-build
+    extra_args: []  # hygiene-only by default; --run is opt-in (builds have side effects)
     covers:
-      - "Build artefact produces (Dockerfile builds; binary compiles)"
-      - "Tests are runnable (not necessarily passing — see tier 3)"
-      - "Manifest files are semantically correct (plugin.json, marketplace.json — beyond JSON-parseability)"
+      - "Build artefact produces (multi-system detection: pip / npm / go / cargo / docker / make)"
+      - "Manifest hygiene (plugin.json / marketplace.json / package.json semantic correctness; per HD-004)"
+      - "Tests are runnable — actual test-pass at tier 3"
 
   - number: 2
     name: Safe

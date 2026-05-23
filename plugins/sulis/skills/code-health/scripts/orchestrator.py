@@ -56,10 +56,14 @@ class TierSpec:
 TIER_REGISTRY: list[TierSpec] = [
     TierSpec(
         number=1, name="Exists",
-        founder_question="Does it build? Do the tests run at all?",
-        wired=False, wired_in="planned",
-        founder_skill=None, invoke_script=None,
-        covers=["Build artefact produces", "Tests are runnable", "Manifest hygiene"],
+        founder_question="Does it build? Do the basics work?",
+        wired=True, wired_in="0.7.0",
+        founder_skill="/sulis:check-build",
+        invoke_script="plugins/sulis/skills/check-build/scripts/builder.py",
+        covers=["Build artefact produces", "Manifest hygiene (plugin.json / marketplace.json / package.json semantics)", "Multi-system detection (pip / npm / go / cargo / docker / make)"],
+        # Hygiene-only by default (cheap, no side effects); --run is opt-in
+        # because actual builds can have side effects (npm install, docker pull)
+        extra_args=[],
     ),
     TierSpec(
         number=2, name="Safe",
