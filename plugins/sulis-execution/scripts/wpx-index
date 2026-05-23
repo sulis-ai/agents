@@ -22,8 +22,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 from _wpxlib import (  # noqa: E402
     add_common_args,
     cli_main,
+    compute_wp_status,
     emit_error,
     emit_ok,
+    parse_index_md,
     parse_md_table,
     paths_from_args,
 )
@@ -463,6 +465,132 @@ def cmd_sync_auto_drafts(args: argparse.Namespace) -> None:
     })
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# HD-008 — wpx-index status (read-only computed view)
+# ─────────────────────────────────────────────────────────────────────────
+
+
+# States the system can derive from authoritative sources. When a WP's
+# stored cell reports one of these AND the computed value disagrees,
+# THAT is drift (in the sense `wpx-train doctor` reports). Operator-set
+# states (pending, in_progress, auto-draft, cancelled, etc.) are not
+# in this set — they have no authoritative-state correlate to disagree
+# with.
+_COMPUTED_ELIGIBLE_STATUSES: frozenset[str] = frozenset({
+    "done", "step-7-shipping", "step-7-complete",
+})
+
+
+def _is_drift(stored: str, computed: str) -> bool:
+    """True iff stored ≠ computed AND at least one is in the
+    computed-eligible set.
+
+    A disagreement on operator-only states (e.g., stored=pending vs
+    computed=pending) is not drift. A disagreement on
+    done-vs-step-7-complete IS drift (the work moved off dev, or never
+    landed). The doctor uses the same rule for issue classification.
+    """
+    if stored == computed:
+        return False
+    return (stored in _COMPUTED_ELIGIBLE_STATUSES) or (
+        computed in _COMPUTED_ELIGIBLE_STATUSES
+    )
+
+
+def _build_status_entry(
+    wp_id: str,
+    stored: str,
+    *,
+    paths,
+    repo: str,
+    base_branch: str,
+    mode: str,
+) -> dict:
+    """Build one {wp, stored, computed, drift} entry per mode.
+
+    Modes:
+      - "stored"   → returns {wp, stored} (no network).
+      - "computed" → returns {wp, computed} (uses compute_wp_status).
+      - "both"     → returns {wp, stored, computed, drift}.
+    """
+    entry: dict = {"wp": wp_id}
+    if mode == "stored":
+        entry["stored"] = stored
+        return entry
+    computed = compute_wp_status(
+        wp_id, paths, repo, base_branch, stored_status=stored,
+    )
+    if mode == "computed":
+        entry["computed"] = computed
+        return entry
+    # both
+    entry["stored"] = stored
+    entry["computed"] = computed
+    entry["drift"] = _is_drift(stored, computed)
+    return entry
+
+
+def cmd_status(args: argparse.Namespace) -> None:
+    """Report stored / computed / drift status for one or all WPs.
+
+    Read-only. Uses ``compute_wp_status`` for the computed view. The
+    stored view is the INDEX.md cell. Drift is reported when the two
+    disagree on a status in the computed-eligible set.
+
+    Repo defaults from --repo or, when absent, the project's git
+    ``origin`` (when --mode requires it). For --mode stored, --repo
+    is optional (no API calls are made).
+    """
+    mode = args.mode
+    if mode not in ("stored", "computed", "both"):
+        emit_error(f"--mode must be stored|computed|both, got {mode!r}")
+
+    paths = paths_from_args(args)
+    if not paths.index_md.exists():
+        emit_error(f"INDEX.md not found at {paths.index_md}")
+
+    repo = args.repo or ""
+    base_branch = args.base_branch or "dev"
+    if mode != "stored" and not repo:
+        emit_error(
+            "--repo is required for --mode computed|both "
+            "(format: OWNER/REPO)"
+        )
+
+    wps = parse_index_md(paths.index_md)
+    by_id = {wp.id: wp for wp in wps}
+
+    if args.wp:
+        if args.wp not in by_id:
+            emit_error(f"WP {args.wp} not found in INDEX.md")
+        wp = by_id[args.wp]
+        entry = _build_status_entry(
+            wp.id, wp.status,
+            paths=paths, repo=repo, base_branch=base_branch, mode=mode,
+        )
+        emit_ok(data=entry)
+        return
+
+    # --all
+    entries: list[dict] = []
+    for wp in wps:
+        entry = _build_status_entry(
+            wp.id, wp.status,
+            paths=paths, repo=repo, base_branch=base_branch, mode=mode,
+        )
+        if args.show_disagreements_only and not entry.get("drift", False):
+            continue
+        entries.append(entry)
+
+    emit_ok(data={
+        "mode": mode,
+        "base_branch": base_branch,
+        "total_wps": len(wps),
+        "reported": len(entries),
+        "entries": entries,
+    })
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Manage INDEX.md")
     sub = parser.add_subparsers(dest="subcommand", required=True)
@@ -529,6 +657,42 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_common_args(p_sync)
 
+    # HD-008 — read-only computed-status view.
+    p_status = sub.add_parser(
+        "status",
+        help="Report stored / computed / drift status (read-only; HD-008).",
+    )
+    add_common_args(p_status)
+    p_status_grp = p_status.add_mutually_exclusive_group(required=True)
+    p_status_grp.add_argument(
+        "--wp", default=None,
+        help="Report status for a single WP (returns one entry).",
+    )
+    p_status_grp.add_argument(
+        "--all", dest="all_wps", action="store_true",
+        help="Report status for every WP in INDEX.md.",
+    )
+    p_status.add_argument(
+        "--mode", default="both",
+        choices=["stored", "computed", "both"],
+        help="stored: cache only (no network). computed: derived from "
+             "origin + train-runs. both (default): stored + computed + "
+             "drift flag.",
+    )
+    p_status.add_argument(
+        "--repo", default=None,
+        help="GitHub OWNER/REPO slug (required for --mode computed|both).",
+    )
+    p_status.add_argument(
+        "--base-branch", default="dev",
+        help="Branch to check merge-SHA reachability against (default: dev).",
+    )
+    p_status.add_argument(
+        "--show-disagreements-only", action="store_true",
+        help="With --all + --mode both, report only WPs where stored "
+             "and computed disagree on a computed-eligible state.",
+    )
+
     return parser
 
 
@@ -540,6 +704,7 @@ HANDLERS = {
     "propagate-blocked": cmd_propagate_blocked,
     "add-wp": cmd_add_wp,
     "sync-auto-drafts": cmd_sync_auto_drafts,
+    "status": cmd_status,
 }
 
 

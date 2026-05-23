@@ -2676,6 +2676,146 @@ def find_wp_merge_sha(train_runs_dir: Path, wp_id: str) -> str | None:
     return None
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# HD-008 — Status as a computed view
+#
+# Status for the computed-eligible set ({done, step-7-shipping,
+# step-7-complete}) is derived from authoritative sources (origin git
+# state + train-runs/ records). The stored INDEX.md cell remains the
+# source for operator/executor-intent states (pending, in_progress,
+# auto-draft, cancelled, dependency_blocked, blocked, step-7-blocked,
+# step-7-held) that have no authoritative-state correlate.
+#
+# See HD-008 for the full rationale; this is the load-bearing helper
+# that callers (wpx-index status, find_eligible_branches, cmd_doctor)
+# delegate to. The function is read-only — it does not mutate INDEX.md.
+# ─────────────────────────────────────────────────────────────────────────
+
+
+# In-flight phases — a train in any of these is still actively shipping
+# its bundle. A WP in such a bundle is in step-7-shipping. Terminal
+# phases (success / failed / aborted) are not in-flight; paused is also
+# considered "still owns the WP" because the bundle hasn't been merged
+# or unwound. verifying_gates is in-flight (HD-007 — deploy landed but
+# Step 10.5 + Step 11 still pending).
+_IN_FLIGHT_TRAIN_PHASES: frozenset[str] = frozenset({
+    "pending", "rebasing", "ci_running", "merging",
+    "deploying", "verifying", "verifying_gates", "paused",
+})
+
+
+def _in_flight_train_has_wp(train_runs_dir: Path, wp_id: str) -> bool:
+    """True if any *.state.json in train_runs_dir is in-flight and
+    its ``bundle`` lists ``wp_id``.
+
+    Walks `*.state.json` files only (terminal trains delete their state
+    file and leave only the `*.yaml` archive — HD-008 cares only about
+    in-flight, so we scan the JSON tier exclusively).
+
+    Returns False on any IO / parse error per-file (logs and continues);
+    a single corrupt state file MUST NOT mask other in-flight trains.
+    Returns False if the directory does not exist.
+    """
+    if not train_runs_dir.exists():
+        return False
+    for path in train_runs_dir.glob("*.state.json"):
+        try:
+            with path.open("r", encoding="utf-8") as f:
+                state = json.load(f)
+        except (json.JSONDecodeError, OSError) as exc:
+            _log(f"_in_flight_train_has_wp: skipping {path.name} ({exc})")
+            continue
+        phase = state.get("phase", "")
+        if phase not in _IN_FLIGHT_TRAIN_PHASES:
+            continue
+        for entry in state.get("bundle", []):
+            if entry.get("wp") == wp_id:
+                return True
+    return False
+
+
+def compute_wp_status(
+    wp_id: str,
+    paths: "WpxPaths",
+    repo: str,
+    base_branch: str = "dev",
+    *,
+    gh: GHClient | None = None,
+    stored_status: str | None = None,
+) -> str:
+    """Return the computed status for ``wp_id``.
+
+    Resolution order — the four authoritative-derivable cases first,
+    falling through to ``stored_status`` for operator/executor-intent
+    states that have no authoritative-state correlate:
+
+    1. **done** — ``find_wp_merge_sha`` returns a SHA AND
+       ``is_sha_on_branch`` confirms it is reachable from
+       ``origin/<base_branch>``. The work landed and has not been
+       reverted.
+    2. **step-7-shipping** — an in-flight ``*.state.json`` in
+       ``paths.train_runs_dir`` lists this WP in its ``bundle``
+       (regardless of merge-SHA presence — the train is mid-flight and
+       the WP's authoritative state is owned by the train, not the
+       INDEX cell).
+    3. **step-7-complete** — ``origin/<feature-branch>`` exists AND
+       cases 1 + 2 are both False. The WP's work is pushed but not
+       merged (or shipped via wpx-pipeline and lacking a train record).
+    4. **fall-through** — none of the above. Return ``stored_status``
+       if provided, otherwise ``"pending"``. The stored cell remains
+       the source of truth for operator/executor intent (pending,
+       in_progress, auto-draft, cancelled, dependency_blocked, blocked,
+       step-7-blocked, step-7-held).
+
+    The function is conservative: a True return for ``done`` is
+    trustworthy (``is_sha_on_branch`` returns False on any API error),
+    but step-7-complete may degrade to the stored value when the
+    branch-exists check fails transiently. Callers MUST pass
+    ``stored_status`` if they want the cached value as the fallback;
+    omitting it defaults the fallback to ``"pending"``.
+
+    Read-only — does not write INDEX.md, does not call
+    ``flip_index_status_via_cli``. The caller decides whether to
+    reconcile a stored/computed disagreement.
+
+    Args:
+        wp_id: The full WP ID (e.g., ``WP-S2-LOADER``).
+        paths: A WpxPaths instance (provides train_runs_dir + wp_dir).
+        repo: ``OWNER/REPO`` GitHub slug used by gh API calls.
+        base_branch: Branch to check merge-SHA reachability against;
+            defaults to ``dev``.
+        gh: Optional GHClient injection; default uses the module-level
+            ``_default_gh_client``.
+        stored_status: The INDEX.md cell value to fall back to when no
+            authoritative signal is present. Pass the parsed cell from
+            ``parse_index_md``; defaults to ``None`` → ``"pending"``.
+
+    Returns:
+        One of: ``"done"``, ``"step-7-shipping"``, ``"step-7-complete"``,
+        or ``stored_status`` / ``"pending"``.
+    """
+    # Case 1: done — merge SHA recorded AND reachable from base branch.
+    merge_sha = find_wp_merge_sha(paths.train_runs_dir, wp_id)
+    if merge_sha and is_sha_on_branch(repo, merge_sha, base_branch, gh=gh):
+        return "done"
+
+    # Case 2: step-7-shipping — in-flight train has this WP in its bundle.
+    # Checked before step-7-complete because a WP whose branch exists AND
+    # is mid-flight is owned by the train, not the cache.
+    if _in_flight_train_has_wp(paths.train_runs_dir, wp_id):
+        return "step-7-shipping"
+
+    # Case 3: step-7-complete — origin branch exists, no train signal.
+    slug = _wp_slug_from_file(paths.wp_dir, wp_id)
+    if slug is not None:
+        branch = _branch_name(wp_id, slug)
+        if _gh_branch_exists(repo, branch, gh=gh):
+            return "step-7-complete"
+
+    # Case 4: fall-through — defer to the stored cell (operator intent).
+    return stored_status if stored_status else "pending"
+
+
 def revert_train_on_dev(
     repo: str,
     clone_dir: Path,
