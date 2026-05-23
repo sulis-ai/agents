@@ -1,6 +1,6 @@
 {
   "name": "sulis-security",
-  "description": "Security & Viability Reviewer \u2014 runs a 25-primitive codebase viability assessment (security, data protection, code quality, supply chain, infrastructure) via an OODA-spiral methodology. Composes with SEA for hardening and with SRD for requirements-traceable findings. v0.3.2: cites Founder English (FE-01..FE-10) at plugins/srd/references/founder-english.md \u2014 every founder-facing chat message AND founder-readable artifact write passes the FE-06 five-point check (strip internal IDs, translate filenames, expand acronyms, strip internal taxonomy, read-aloud test). Lead with outcomes; concrete over abstract; no mechanism narration. v0.3.3: adds FE-11 (Inference Over Interrogation) citation \u2014 infer from existing context before asking the founder; never relay a specialist's 'open questions' verbatim. v0.4.0: viability-report filenames now use ISO 8601 UTC compact timestamps (viability-report-YYYY-MM-DDTHHMMSSZ.md) instead of date-only stamps. Closes user feedback that same-day reruns of /sulis-security:codebase-assess collide. Source-field schema in /sea Hardening Deltas updated correspondingly (source: sulis-security:viability-report-{timestamp}#SEC-NN).",
+  "description": "Security & Viability Reviewer — runs a 25-primitive codebase viability assessment (security, data protection, code quality, supply chain, infrastructure) via an OODA-spiral methodology. Produces evidence-backed reports with scores, attack chains, and hypotheses.",
   "version": "0.4.0",
   "author": {
     "name": "Iain"

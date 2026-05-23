@@ -1,7 +1,7 @@
 {
   "name": "sulis-strategy",
   "version": "1.3.3",
-  "description": "Business strategy studio for the Outcome-First Methodology. Provides vision, strategy, principles, commercial, GTM, and roadmap skills for strategic foundation work. v1.3.2: cites Founder English (FE-01..FE-10) at plugins/srd/references/founder-english.md \u2014 every founder-facing chat message AND founder-readable artifact write passes the FE-06 five-point check (strip internal IDs, translate filenames, expand acronyms, strip internal taxonomy, read-aloud test). Lead with outcomes; concrete over abstract; no mechanism narration. v1.3.3: adds FE-11 (Inference Over Interrogation) citation \u2014 infer from existing context before asking the founder; never relay a specialist's 'open questions' verbatim.",
+  "description": "Business strategy studio for the Outcome-First Methodology. Provides vision, strategy, principles, commercial, gtm-planning, roadmap, identity, brand-research, company-research, competitive-research, anti-goals, and win-loss-analysis skills.",
   "author": {
     "name": "LLMA AI",
     "email": "team@sulis.dev"
