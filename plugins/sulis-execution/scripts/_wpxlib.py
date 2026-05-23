@@ -648,15 +648,25 @@ class RealGHClient:
             timeout=30,
         )
         if rc != 0:
-            raise RuntimeError(f"gh compare failed: {err}")
+            # HD-013: include rc in the message so callers can distinguish
+            # auth-expired, rate-limit, network-blip from each other in logs.
+            raise RuntimeError(f"gh compare failed (rc={rc}): {err}")
         if not out.strip():
+            # HD-013: restore the diagnostic log lost in HD-005's extraction.
+            _log(
+                f"compare API returned empty output for "
+                f"{base}...{head} on {repo}; returning empty dict"
+            )
             return {}
         try:
             return json.loads(out)
         except json.JSONDecodeError:
-            # Defensive: pre-HD-005 callers (e.g. _gh_branch_already_merged,
-            # is_sha_on_branch) handled non-JSON output by logging and
-            # falling through. Preserve that shape so they keep working.
+            # HD-013: restore the diagnostic log for non-JSON output.
+            preview = out[:200] + ("..." if len(out) > 200 else "")
+            _log(
+                f"compare API returned non-JSON for {base}...{head} "
+                f"on {repo}; returning empty dict. out: {preview!r}"
+            )
             return {}
 
     def merge(self, repo: str, base: str, head: str, commit_message: str) -> str:

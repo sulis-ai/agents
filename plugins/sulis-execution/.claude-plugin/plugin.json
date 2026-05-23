@@ -1,7 +1,7 @@
 {
   "name": "sulis-execution",
   "description": "Work Package Executor + Resumable Train — atomic per-WP lifecycle (worktree → RGB → Step 6.5 code-review → commit → push) plus a per-batch train (rebase → CI → merge → deploy → Step 10.5 + Step 11 gates). Self-heals via OODA + Five Whys. See CHANGELOG.md for version history.",
-  "version": "0.23.0",
+  "version": "0.23.1",
   "author": {
     "name": "Iain"
   },

@@ -173,6 +173,69 @@ def test_is_sha_on_branch_uses_compare_via_injected_client():
 # ─── Test 4: legacy seam preserved ────────────────────────────────────
 
 
+def test_compare_logs_diagnostic_on_non_json_response(monkeypatch, capsys):
+    """HD-013: RealGHClient.compare must log on non-JSON responses.
+
+    Pre-HD-005, is_sha_on_branch + _gh_branch_already_merged emitted
+    `_log` calls with the raw output when gh compare returned non-JSON
+    (auth-expired HTML, rate-limit pages, etc.). HD-005's extraction
+    dropped those logs. HD-013 restores them. This test pins the
+    diagnostic-log contract so future refactors can't silently drop it.
+    """
+    monkeypatch.setattr(_wpxlib, "_run",
+                        lambda *a, **kw: (0, "not-json-content-here", ""))
+    client = _wpxlib.RealGHClient()
+    result = client.compare("owner/repo", "main", "branch")
+    assert result == {}, "compare should return empty dict on non-JSON"
+    captured = capsys.readouterr()
+    # _log writes to stderr
+    assert "compare API returned non-JSON" in captured.err, (
+        f"expected diagnostic log on non-JSON response; "
+        f"stderr was: {captured.err!r}"
+    )
+    assert "not-json-content-here" in captured.err, (
+        f"expected raw output preview in log; stderr was: {captured.err!r}"
+    )
+
+
+def test_compare_logs_diagnostic_on_empty_response(monkeypatch, capsys):
+    """HD-013: RealGHClient.compare must log on empty responses.
+
+    An empty body from `gh api compare` is anomalous (token expired
+    mid-request; network disconnect; etc.). Operators need a log entry
+    to diagnose; otherwise `is_sha_on_branch == False` shows up
+    downstream with no signal why.
+    """
+    monkeypatch.setattr(_wpxlib, "_run",
+                        lambda *a, **kw: (0, "", ""))
+    client = _wpxlib.RealGHClient()
+    result = client.compare("owner/repo", "main", "branch")
+    assert result == {}, "compare should return empty dict on empty response"
+    captured = capsys.readouterr()
+    assert "compare API returned empty output" in captured.err, (
+        f"expected diagnostic log on empty response; "
+        f"stderr was: {captured.err!r}"
+    )
+
+
+def test_compare_runtime_error_includes_rc(monkeypatch):
+    """HD-013: when gh compare exits non-zero, the RuntimeError carries
+    the rc value so operators can distinguish failure modes (auth-expired
+    rc=4 vs rate-limit rc=22 vs network-failure rc=other) in logs."""
+    monkeypatch.setattr(_wpxlib, "_run",
+                        lambda *a, **kw: (4, "", "HTTP 401: bad credentials"))
+    client = _wpxlib.RealGHClient()
+    try:
+        client.compare("owner/repo", "main", "branch")
+        raise AssertionError("expected RuntimeError")
+    except RuntimeError as exc:
+        msg = str(exc)
+        assert "rc=4" in msg, f"expected 'rc=4' in error message; got {msg!r}"
+        assert "bad credentials" in msg, (
+            f"expected stderr context in error message; got {msg!r}"
+        )
+
+
 def test_legacy_gh_helpers_still_importable():
     """The pre-HD-005 ``_gh_*`` symbols remain on _wpxlib for
     backward-compat with monkeypatch-based tests.
