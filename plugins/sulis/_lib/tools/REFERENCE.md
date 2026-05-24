@@ -50,15 +50,15 @@ def run(args: list[str], *, repo_root: str | None = None) -> ToolResult:
 
 | Tool | Wrapper file | Status | Used by | Primitives covered |
 |------|--------------|--------|---------|--------------------|
-| Semgrep | `semgrep.py` | NEW — to be created | check-security, check-reliability | SEC-01, SEC-03, SEC-04, SEC-05, SEC-06, DAT-03, INF-04 |
-| Gitleaks | `gitleaks.py` | NEW — to be created | check-security, check-build | SEC-07 (history), DAT-04, INF-02 |
-| Trivy | `trivy.py` | NEW — to be created | check-security, check-build | SC-01, SC-02, SC-03, SC-04, INF-01 (base image) |
-| lizard | `lizard.py` | NEW — to be created | check-readability | CQ-01 |
-| jscpd | `jscpd.py` | NEW — to be created | check-readability | CQ-03 |
-| hadolint | `hadolint.py` | NEW — to be created | check-build | INF-01 (Dockerfile) |
-| testssl.sh | `testssl.py` | NEW — to be created | check-security (when --url) | DAT-02 |
-| curl | `curl_probe.py` | NEW — to be created | check-security (when --url) | INF-03 |
-| coverage tools | `coverage.py` | NEW — to be created | check-tests | CQ-02 |
+| Semgrep | `semgrep.py` | AVAILABLE (v0.19.0+) | check-security, check-reliability | SEC-01, SEC-03, SEC-04, SEC-05, SEC-06, DAT-03, INF-04 |
+| Gitleaks | `gitleaks.py` | AVAILABLE (v0.19.0+) | check-security, check-build | SEC-07 (history), DAT-04, INF-02 |
+| Trivy | `trivy.py` | AVAILABLE (v0.19.0+) | check-security, check-build | SC-01, SC-02, SC-03, SC-04, INF-01 (base image) |
+| lizard | `lizard.py` | AVAILABLE (v0.19.0+) | check-readability | CQ-01 |
+| jscpd | `jscpd.py` | AVAILABLE (v0.19.0+) | check-readability | CQ-03 |
+| hadolint | `hadolint.py` | AVAILABLE (v0.19.0+) | check-build | INF-01 (Dockerfile) |
+| testssl.sh | `testssl.py` | AVAILABLE (v0.19.0+) | check-security (when --url) | DAT-02 |
+| curl | `curl_probe.py` | AVAILABLE (v0.19.0+) | check-security (when --url) | INF-03 |
+| coverage tools | `coverage.py` | AVAILABLE (v0.19.0+; pytest-cov supported; vitest/jest follow-up) | check-tests | CQ-02 |
 
 **Foundation files (this commit):**
 

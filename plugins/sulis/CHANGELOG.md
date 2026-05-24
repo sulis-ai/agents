@@ -1,5 +1,99 @@
 # Sulis — Changelog
 
+## v0.19.0 — 2026-05-24
+
+**Phase 2 iteration 2 (foundation): 9 tool wrappers + hypothesis + spiral
+infrastructure.** The NEW entities flagged in v0.16.0 iteration 1 are
+now AVAILABLE. Skills can be wired in v0.19.0+ commits.
+
+### Files added
+
+**_lib/ shared helpers:**
+
+- `plugins/sulis/_lib/hypothesis.py` — `Hypothesis` dataclass + `Confidence`
+  enum (VALIDATED / SUPPORTED / EMERGING / UNVALIDATED / CONTRADICTED per
+  CRITICAL_THINKING_STANDARD CC). `to_dict()` for --raw mode;
+  `to_founder_markdown()` for "## Things to verify with the team" section.
+- `plugins/sulis/_lib/spiral.py` — `SpiralContext` + `SpiralResult` + `run_spiral()`
+  OODA-cycle helper. Observe / orient / decide / act / hypothesise phases;
+  max-iterations cap; termination on sufficient / max_iterations /
+  irreducible_blocker.
+
+**_lib/tools/ per-tool wrappers (9):**
+
+- `semgrep.py` — Docker (returntocorp/semgrep:latest) or native. Multi-config
+  invocation (p/security-audit, p/owasp-top-ten, p/python, etc.). Maps
+  Semgrep severity ERROR/WARNING/INFO → critical/high/advisory. Live-
+  tested: detected subprocess shell=True in fixture.
+- `gitleaks.py` — Docker (zricethezav/gitleaks:latest) or native. Writes
+  JSON report to a temp file under repo_root (more reliable than
+  /dev/stdout under Docker). `scan_history` flag toggles SEC-07 git
+  history scan vs HEAD-only. Live-tested: detected GitHub PAT + Stripe
+  key in fixture.
+- `trivy.py` — Docker (aquasec/trivy:latest) or native. Filesystem scan;
+  severity filter (HIGH,CRITICAL default). Maps Trivy CRITICAL/HIGH/MEDIUM/LOW
+  → sulis severities.
+- `hadolint.py` — Docker (hadolint/hadolint:latest) or native. Reads
+  Dockerfile via stdin under Docker (with file-path retag); native takes
+  path directly. Maps error/warning/info/style → severity.
+- `lizard.py` — Native (pip-installable). CSV output (avoids xml.etree
+  dependency broken in Python 3.14 on macOS). Default CCN threshold 15
+  (concern), 25+ (high). Live-tested: 20 findings in sulis plugin itself.
+- `jscpd.py` — Docker (sebbo2002/jscpd:latest) or native or npx fallback.
+  Output written to temp dir per invocation; parsed from JSON report.
+- `coverage.py` — Native (pytest-cov / vitest / jest). pytest-cov path
+  implemented; vitest/jest follow-up. Flags low overall coverage + low
+  per-file coverage.
+- `testssl.py` — Docker (drwetter/testssl.sh:latest) or native. JSON
+  output via --jsonfile-pretty. Maps testssl CRITICAL/HIGH/MEDIUM/LOW/WARN
+  → sulis severities. Filters non-actionable OK/INFO/DEBUG.
+- `curl_probe.py` — Native (curl universally available). Probes HTTP
+  security headers (HSTS / X-Frame-Options / CSP / X-Content-Type-Options /
+  Referrer-Policy); flags missing headers as advisories. Live-tested:
+  found 3 missing headers on anthropic.com.
+
+### Path normalisation fix
+
+All Docker-mode wrappers strip the `/src/` prefix from tool output paths
+before relativising against repo_root. Prevents the "absolute path
+appears in finding" issue when wrappers run under Docker.
+
+### Availability matrix (this development environment)
+
+| Tool | Mode | Live-tested |
+|------|------|-------------|
+| semgrep | DOCKER | ✓ (subprocess shell=True detected) |
+| gitleaks | DOCKER | ✓ (5 leaks detected) |
+| trivy | DOCKER | (smoke-test only; full integration in scanner.py wiring commit) |
+| hadolint | DOCKER | (smoke-test only) |
+| lizard | NATIVE | ✓ (20 findings in sulis itself) |
+| jscpd | DOCKER | (smoke-test only) |
+| coverage | NATIVE (pytest+cov) | (smoke-test only) |
+| testssl | DOCKER | (smoke-test only) |
+| curl_probe | NATIVE | ✓ (3 headers missing on anthropic.com) |
+
+### Plugin metadata
+
+- plugins/sulis/.claude-plugin/plugin.json: 0.18.0 → 0.19.0
+- .claude-plugin/marketplace.json: sulis 0.18.0 → 0.19.0; marketplace
+  1.61.0 → 1.62.0
+
+### REFERENCE.md updated
+
+Tool catalogue table marks all 9 wrappers as AVAILABLE (v0.19.0+).
+
+### What's next
+
+- Wire wrappers into check-* scanner.py files (one commit per skill OR
+  batched)
+- Update each skill's iterations/2/VERIFICATION_REPORT.md showing real
+  primitive coverage
+- Update expected_divergence.md as parity climbs
+- Re-evaluate codebase-assess deprecation status (parity ≥ 95% triggers
+  [DEPRECATED] banner)
+
+---
+
 ## v0.18.0 — 2026-05-24
 
 **Phase 4 iteration 1: cross-validation framework vs codebase-assess.**
