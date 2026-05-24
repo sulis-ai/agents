@@ -43,9 +43,13 @@ import json
 import re
 import subprocess
 import sys
-import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+
+# _lib/ shared helpers (canonical pattern per add-skill v0.6.0).
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from _lib import allowlist as _allowlist  # noqa: E402
+from _lib import baseline as _baseline  # noqa: E402
 
 
 DEFAULT_TIMEOUT_SECONDS = 120
@@ -297,70 +301,82 @@ def run_framework(framework: str, repo_root: Path, timeout: int) -> tuple[list[T
 
 
 # ─── Baseline storage ───────────────────────────────────────────────
+# Inline implementation removed in v0.11.2 — uses _lib/baseline.
+# Baseline now lives under tier_3_tests sub-key (was root of
+# baseline.json pre-v0.11.2; legacy detection below warns + ignores).
 
 
 def baseline_path(repo_root: Path, project: str) -> Path:
+    """Retained for legacy-detection messaging; the actual read/write
+    goes through _lib.baseline now."""
     return repo_root / ".checkup" / project / "baseline.json"
 
 
 def load_baseline(repo_root: Path, project: str) -> Baseline | None:
-    path = baseline_path(repo_root, project)
-    if not path.is_file():
+    """Load via _lib.baseline; detect legacy root-shape + warn."""
+    data = _baseline.load_namespace(repo_root, project, "tier_3_tests", None)
+    if data is None:
+        # Check for legacy root-shape baseline (pre-v0.11.2)
+        path = baseline_path(repo_root, project)
+        if path.is_file():
+            try:
+                root_data = json.loads(path.read_text(encoding="utf-8"))
+                if "captured_at" in root_data and "results" in root_data:
+                    print(
+                        f"warn: legacy baseline format at {path} (root-level "
+                        "Baseline); v0.11.2+ stores under tier_3_tests sub-key. "
+                        "Re-capture with --update-baseline to migrate.",
+                        file=sys.stderr,
+                    )
+            except (OSError, json.JSONDecodeError):
+                pass
         return None
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
         return Baseline(
             captured_at=data["captured_at"],
             captured_at_sha=data["captured_at_sha"],
             framework=data["framework"],
             results=data["results"],
         )
-    except (OSError, json.JSONDecodeError, KeyError) as exc:
-        print(f"warn: baseline at {path} unreadable: {exc}", file=sys.stderr)
+    except (KeyError, TypeError) as exc:
+        print(
+            f"warn: tier_3_tests baseline unreadable: {exc}",
+            file=sys.stderr,
+        )
         return None
 
 
 def save_baseline(repo_root: Path, project: str, baseline: Baseline) -> None:
-    path = baseline_path(repo_root, project)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(asdict(baseline), indent=2), encoding="utf-8")
+    """Save the full Baseline dataclass as a dict under tier_3_tests."""
+    _baseline.save_namespace(
+        repo_root, project, "tier_3_tests", asdict(baseline)
+    )
 
 
 def current_sha(repo_root: Path) -> str:
-    try:
-        proc = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            cwd=str(repo_root), capture_output=True, text=True, timeout=5,
-        )
-        return proc.stdout.strip() if proc.returncode == 0 else "unknown"
-    except (subprocess.SubprocessError, FileNotFoundError):
-        return "unknown"
+    return _baseline.current_sha(repo_root)
 
 
 # ─── Known-flaky loading ────────────────────────────────────────────
+# Inline implementation removed in v0.11.2 — uses _lib/allowlist.
 
 
 def load_known_flaky(repo_root: Path, project: str) -> set[str]:
-    """Load known-flaky test signatures from per-project + skill-shared lists."""
-    flaky: set[str] = set()
-    candidates = [
-        repo_root / ".checkup" / project / "known-flaky.md",
-        repo_root / "plugins" / "sulis" / "skills" / "check-tests"
-            / "references" / "check-tests-known-flaky.md",
-    ]
-    for path in candidates:
-        if not path.is_file():
-            continue
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        # Each non-blank, non-# line is a signature
-        for line in text.splitlines():
-            line = line.strip()
-            if line and not line.startswith("#"):
-                flaky.add(line)
-    return flaky
+    """Load known-flaky test signatures from per-project + marketplace-
+    shared lists. Both files use the same `signature: reason` (or bare
+    signature) format that _lib/allowlist understands.
+    """
+    project_path = repo_root / ".checkup" / project / "known-flaky.md"
+    marketplace_path = (
+        repo_root
+        / "plugins"
+        / "sulis"
+        / "skills"
+        / "check-tests"
+        / "references"
+        / "check-tests-known-flaky.md"
+    )
+    return _allowlist.load_allowlist(project_path, marketplace_path)
 
 
 # ─── Delta computation ──────────────────────────────────────────────
@@ -638,7 +654,7 @@ def main() -> int:
     # First-run baseline capture
     if results_source == "fresh-run" and baseline is None and results:
         new_baseline = Baseline(
-            captured_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            captured_at=_baseline.now_iso(),
             captured_at_sha=current_sha(repo_root),
             framework=framework,
             results={r.signature: r.status for r in results},
@@ -650,7 +666,7 @@ def main() -> int:
     # Explicit baseline update
     if args.update_baseline and results_source == "fresh-run" and results:
         new_baseline = Baseline(
-            captured_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            captured_at=_baseline.now_iso(),
             captured_at_sha=current_sha(repo_root),
             framework=framework,
             results={r.signature: r.status for r in results},

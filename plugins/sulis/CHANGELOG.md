@@ -1,5 +1,86 @@
 # Sulis — Changelog
 
+## v0.11.2 — 2026-05-24
+
+Completes the `_lib/` migration arc. The 4th and final original skill
+(`check-tests`) now uses the shared helpers — all 4 first-wave skills
+are now consistent with the 3 new-wave skills (check-reliability /
+check-maintainability / check-polish).
+
+### Changed
+
+- `skills/check-tests/scripts/regression.py` — migrated to `_lib/`:
+  - **Baseline**: previously stored at TOP level of `.checkup/{project}/baseline.json`;
+    now stored under `tier_3_tests` sub-key (consistent with other tiers).
+    The full `Baseline` dataclass (framework + per-test results +
+    captured_at + captured_at_sha) serialises as a dict.
+  - **Legacy-format detection**: if a pre-v0.11.2 baseline.json exists
+    (with root-level Baseline shape), `load_baseline()` prints a warning
+    pointing to `--update-baseline` for migration. Quiet path: no warning,
+    just first-run capture.
+  - **Known-flaky loading**: replaced inline reader with
+    `_allowlist.load_allowlist(project_path, marketplace_path)` —
+    handles both files in one call.
+  - **current_sha**: replaced with `_baseline.current_sha`.
+  - **time.strftime**: replaced with `_baseline.now_iso()`.
+
+  698 → 714 LOC (slight increase: +16 lines for legacy-format detection
+  + wrapper docstrings explaining the migration). LOC reduction is NOT
+  the goal — the value is **consistency with sibling skills**.
+
+### Migration impact
+
+  Existing `.checkup/{project}/baseline.json` files with check-tests's
+  pre-v0.11.2 root-level baseline format will trigger the legacy warning
+  and require re-capture (`--update-baseline` or a fresh first-run).
+
+  In this marketplace specifically: there's no check-tests baseline
+  because there's no top-level test framework (check-tests reports
+  "couldn't check" — known limit). So zero migration friction here.
+
+### All 4 first-wave skills now consistent
+
+  | Skill | Pre-v0.11.x | v0.11.x | _lib/ adoption |
+  |---|---:|---:|---|
+  | check-readability | 783 | 720 (-63) | uses _lib/scope |
+  | check-tests | 698 | 714 (+16) | uses _lib/baseline + _lib/allowlist |
+  | check-build | 641 | 622 (-19) | uses _lib/baseline |
+  | check-security | 462 | 426 (-36) | uses _lib/baseline + _lib/allowlist |
+
+  Net: -102 LOC across the 4 original skills. All 7 wired tier-skills
+  now follow the same `_lib/` import pattern (canonical per add-skill
+  v0.6.0 methodology).
+
+### Verification
+
+  Synthetic-fixture end-to-end test:
+  1. First-run: captures baseline under `tier_3_tests` sub-key ✓
+  2. baseline.json top-level keys: `["tier_3_tests", "tier_3_tests_captured_at"]` ✓
+  3. tier_3_tests dict keys: `["captured_at", "captured_at_sha", "framework", "results"]` ✓
+  4. Second-run with deliberate regression: correctly flags
+     `test_one_passing` as newly-failing while pre-existing
+     `test_three_failing` stays suppressed (signature-dedup intact) ✓
+
+  Cross-skill self-test:
+    check-readability on regression.py: 0 findings
+    check-security on regression.py:    0 findings
+    check-reliability on regression.py: 0 findings
+
+  Full code-health sweep: unchanged shape from v0.11.1.
+
+### Methodology — _lib/ migration arc complete
+
+  Started in v0.9.0 (helpers shipped), continued in v0.11.1 (3 of 4
+  skills migrated where it fit cleanly), completed in v0.11.2 (4th
+  skill with legacy-format handling). The pragmatic deferral path
+  worked as intended: ship helpers → adopt where easy → finish where
+  it needs extra design (legacy-format detection).
+
+### Versions
+
+  sulis: 0.11.1 → 0.11.2 (patch — refactor, no surface change)
+  marketplace: 1.53.1 → 1.53.2
+
 ## v0.11.1 — 2026-05-23
 
 Cleanup release. Uses the tier-1/5/7 skills to drive real cleanup of
