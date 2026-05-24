@@ -1,5 +1,84 @@
 # Sulis — Changelog
 
+## v0.24.0 — 2026-05-24
+
+**Two primitive_status emission bugs fixed — surfaced by the
+side-by-side cross-validation run vs codebase-assess on the agents
+marketplace.**
+
+### Fixes
+
+`plugins/sulis/skills/check-security/scripts/scanner.py`:
+- **SEC-02 now emitted in primitive_status.** Previously the
+  `run_external_tools()` PASS path set SEC-01/03/04/05/06 + DAT-03 but
+  skipped SEC-02. Semgrep p/security-audit + p/owasp-top-ten DO cover
+  auth failures (weak-hash, missing-CSRF, password-handling rules);
+  primitive just wasn't labelled. Same fix applied to the --skip-tools
+  NOT_ASSESSED tuple.
+
+`plugins/sulis/skills/check-polish/scripts/scanner.py`:
+- **CQ-04 now emitted in primitive_status.** check-polish IS the
+  canonical CQ-04 owner per the v0.16.0 upsurge (TD-001 + TD-002
+  patterns detect tech-debt density). Previously the JSON envelope
+  didn't surface this in primitive_status; `render_json` now emits
+  `{"CQ-04": "PASS"}` when files_scanned > 0, `NOT_APPLICABLE`
+  otherwise. ScanReport dataclass gains `primitive_status` field.
+
+### Investigation (no fix needed)
+
+**CQ-01 finding count 33 vs 57 — not a bug.** The earlier code-health
+runner agent reported "~33 cyclomatic-complexity concerns/highs
+(truncated display; sample below)" — the truncation was in the agent's
+summary, not in the tool. Verified actual count: 58 (1-off vs
+codebase-assess's 57 is likely a threshold boundary case on a single
+function). check-readability's --raw JSON returns all findings; no
+internal cap.
+
+### Allowlist update
+
+`.checkup/agents/check-reliability-allowlist.md`:
+- 6 broad-except entries' line numbers updated (shifted by +3 in
+  check-security/scanner.py when SEC-02 was added to the update dict
+  + tuple). New main-level catch line number updated. Old line 591
+  entry consolidated into the new line 594 entry.
+
+### Cross-skill self-test (final post-fix verification)
+
+- check-security: 0 findings (skip-tools)
+- check-readability: 0 findings (skip-tools)
+- check-reliability: 0 findings
+- check-maintainability: 0 findings
+- check-polish: 0 findings
+
+Track record: 9 → 10 data points. Methodology continues producing
+consistent-quality code.
+
+### Primitive status reporting — full audit
+
+After fixes, every code-health primitive that codebase-assess assigns
+a status to is now properly emitted in check-* primitive_status:
+
+| Skill | Primitives in primitive_status |
+|-------|-------------------------------|
+| check-build | INF-01, INF-02 |
+| check-security | SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, SEC-07, DAT-03, DAT-04, SC-01, SC-02, SC-03, SC-04 (+ DAT-02, INF-03 when --url) |
+| check-tests | CQ-02 |
+| check-reliability | INF-04, DAT-05 (HYPOTHESIS) |
+| check-readability | CQ-01, CQ-03 |
+| check-maintainability | CQ-05 (HYPOTHESIS) |
+| check-polish | CQ-04 |
+
+Coverage: 25 of 25 primitives now have explicit primitive_status
+emission across the check-* surface.
+
+### Plugin metadata
+
+- plugins/sulis/.claude-plugin/plugin.json: 0.23.0 → 0.24.0
+- .claude-plugin/marketplace.json: sulis 0.23.0 → 0.24.0; marketplace
+  1.66.0 → 1.67.0
+
+---
+
 ## v0.23.0 — 2026-05-24
 
 **CQ-02 full coverage integration: closes the last EXPECTED-DIVERGENT

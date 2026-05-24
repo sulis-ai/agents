@@ -258,14 +258,17 @@ def run_external_tools(
             result = semgrep.run(repo_root=repo_root_str, timeout=timeout_per_tool)
             for tf in semgrep.parse_findings(result, repo_root_str):
                 findings.append(_tool_finding_to_finding(tf, "semgrep-security"))
+            # SEC-02 covered by p/security-audit + p/owasp-top-ten (weak-hash,
+            # missing-CSRF, password-handling rules)
             primitive_status.update({
-                "SEC-01": "PASS", "SEC-03": "PASS", "SEC-04": "PASS",
-                "SEC-05": "PASS", "SEC-06": "PASS", "DAT-03": "PASS",
+                "SEC-01": "PASS", "SEC-02": "PASS", "SEC-03": "PASS",
+                "SEC-04": "PASS", "SEC-05": "PASS", "SEC-06": "PASS",
+                "DAT-03": "PASS",
             })
         except Exception as exc:  # noqa: BLE001 — boundary catch for tool wrapper
             errors.append(f"semgrep invocation failed: {exc}")
     else:
-        for prim in ("SEC-01", "SEC-03", "SEC-04", "SEC-05", "SEC-06", "DAT-03"):
+        for prim in ("SEC-01", "SEC-02", "SEC-03", "SEC-04", "SEC-05", "SEC-06", "DAT-03"):
             primitive_status[prim] = "NOT_ASSESSED"
 
     # Gitleaks — SEC-07 + DAT-04
@@ -592,7 +595,7 @@ def main() -> int:
             tool_errors.append(f"external tool integration failed: {exc}")
     else:
         # All wrapper-covered primitives marked NOT_ASSESSED
-        for prim in ("SEC-01", "SEC-03", "SEC-04", "SEC-05", "SEC-06", "SEC-07",
+        for prim in ("SEC-01", "SEC-02", "SEC-03", "SEC-04", "SEC-05", "SEC-06", "SEC-07",
                      "DAT-03", "DAT-04", "SC-01", "SC-02", "SC-03", "SC-04"):
             primitive_status[prim] = "NOT_ASSESSED"
         if args.url:

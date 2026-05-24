@@ -14,7 +14,7 @@ import argparse
 import json
 import re
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 
@@ -88,6 +88,7 @@ class ScanReport:
     allowlisted_count: int
     captured_baseline: bool
     errors: list[str]
+    primitive_status: dict = field(default_factory=dict)
 
 
 # ─── Documentation completeness (per plugin) ───────────────────────
@@ -290,6 +291,7 @@ def render_json(report: ScanReport) -> str:
         "allowlisted_count": report.allowlisted_count,
         "captured_baseline": report.captured_baseline,
         "errors": report.errors,
+        "primitive_status": report.primitive_status,
     }, indent=2)
 
 
@@ -418,6 +420,15 @@ def main() -> int:
         baseline.save_namespace(repo_root, args.project, "tier_7_findings", sorted(current_sigs))
         captured_baseline = True
 
+    # CQ-04 primitive_status emission (v0.24.0+). check-polish is the
+    # canonical CQ-04 owner per the v0.16.0 upsurge: TD-001 (density > 5%)
+    # + TD-002 (>20 markers in single file) detect technical debt
+    # accumulation. PASS = primitive was assessed (regardless of whether
+    # any TD findings surfaced). Note: when files_scanned == 0 (no source
+    # files in scope), CQ-04 is NOT_APPLICABLE.
+    primitive_status: dict[str, str] = {}
+    primitive_status["CQ-04"] = "PASS" if len(files) > 0 else "NOT_APPLICABLE"
+
     report = ScanReport(
         project=args.project, scope=resolved_scope,
         plugins_audited=plugins_audited, files_scanned=len(files),
@@ -425,6 +436,7 @@ def main() -> int:
         newly_found=newly_found, newly_resolved=newly_resolved,
         allowlisted_count=allowlisted_count,
         captured_baseline=captured_baseline, errors=scope_errors,
+        primitive_status=primitive_status,
     )
 
     if args.raw:
