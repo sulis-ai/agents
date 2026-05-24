@@ -1,5 +1,90 @@
 # Sulis — Changelog
 
+## v0.15.0 — 2026-05-24
+
+**Phase 2 foundation: `_lib/tools/` shared tool-integration layer.**
+Detection + degradation primitives + tool-catalogue reference. Sets
+the contract every per-tool wrapper (semgrep / gitleaks / trivy /
+lizard / jscpd / hadolint / testssl / curl / coverage) must follow.
+
+### Files added
+
+- `plugins/sulis/_lib/tools/__init__.py` — public exports
+- `plugins/sulis/_lib/tools/_detection.py` — `ToolMode` enum +
+  `docker_available()`, `native_available()`, `tool_available()`.
+  Docker mode requires explicit opt-in via `docker_image=` kwarg
+  (prevents misleading "DOCKER available" when no image was specified).
+- `plugins/sulis/_lib/tools/_runner.py` — `ToolResult` dataclass +
+  `run_tool()`. Captures stdout / stderr / exit_code / mode_used /
+  version / elapsed_seconds. Degradation: NOT_AVAILABLE mode returns
+  ToolResult without invoking, exit_code=127.
+- `plugins/sulis/_lib/tools/REFERENCE.md` — tool catalogue + contract
+  + degradation policy. Mirrors `plugins/sulis-security/skills/codebase-assess/references/tool-commands.md`
+  shape but sulis-local. Catalogue currently lists 9 tools as
+  "NEW — to be created" pending per-skill upsurge commits.
+
+### Degradation policy (canonical)
+
+- **Docker preferred** — clean environment + version pinning. Requires
+  caller to specify `docker_image=` in `tool_available()`.
+- **Native binary fallback** — PATH lookup; whatever version is
+  installed.
+- **NOT_AVAILABLE** — wrapper returns a `ToolResult` with
+  `mode_used=NOT_AVAILABLE`, `exit_code=127`. Calling skill MUST treat
+  as NOT_ASSESSED for affected primitives. **Never silent regex
+  fallback** — founders need to see explicitly which primitives could
+  not be checked.
+
+### Smoke test
+
+```python
+>>> from _lib.tools import tool_available, ToolMode
+>>> tool_available("git")  # native available, no docker_image
+ToolMode.NATIVE
+>>> tool_available("nonexistent-xyz")  # neither
+ToolMode.NOT_AVAILABLE
+>>> tool_available("semgrep", docker_image="returntocorp/semgrep:latest")  # docker opt-in
+ToolMode.DOCKER  # if Docker daemon up
+```
+
+### Cross-skill self-test
+
+- check-readability: 0 findings (157 files)
+- check-reliability: 0 findings (91 files)
+- check-security: 0 findings (197 files)
+
+### Why this comes before the per-tool wrappers
+
+Per-tool wrappers (semgrep.py, gitleaks.py, trivy.py, etc.) need a
+shared detection + degradation pattern. Centralising that pattern in
+`_lib/tools/_detection.py` + `_runner.py` means:
+
+- Every wrapper degrades identically (no skill silently weakens to
+  regex while another reports NOT_ASSESSED)
+- One place to fix detection bugs (e.g., the v0.15.0 fix that requires
+  explicit `docker_image=` opt-in)
+- Codebase Referential Integrity (Gate 4 of add-skill) has a canonical
+  place to check tool wrapper existence
+
+### Plugin metadata
+
+- plugins/sulis/.claude-plugin/plugin.json: 0.14.0 → 0.15.0
+- .claude-plugin/marketplace.json: sulis 0.14.0 → 0.15.0; marketplace
+  1.56.0 → 1.57.0
+
+### What's next
+
+Per-skill upsurges, one commit per skill. Each upsurge that needs a
+tool wrapper builds the wrapper in the same commit:
+
+- check-security upsurge → builds semgrep.py, gitleaks.py, trivy.py
+- check-build upsurge → builds hadolint.py (Trivy already exists from
+  check-security)
+- check-readability upsurge → builds lizard.py, jscpd.py
+- check-tests upsurge → builds coverage.py
+
+---
+
 ## v0.14.0 — 2026-05-24
 
 **add-skill rewritten to v0.7.0 — standards-grounded methodology.**
