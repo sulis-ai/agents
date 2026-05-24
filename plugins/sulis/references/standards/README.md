@@ -1,6 +1,6 @@
 # Sulis Standards
 
-> **Five cross-cutting standards** ported from the platform (`/Users/iain/Documents/repos/platform/methodology/standards/`) and optimised for sulis scale. They ground reasoning, decomposition, verification, cross-reference integrity, and standards-phase classification across every sulis skill.
+> **Six cross-cutting standards.** Five ported from the platform (`/Users/iain/Documents/repos/platform/methodology/standards/`) and optimised for sulis scale; the sixth (`WORK_PACKAGE_STANDARD`) authored sulis-local in v0.27.0 to codify the WP primitive between detection / characterisation / execution skills. They ground reasoning, decomposition, verification, cross-reference integrity, standards-phase classification, and the unit of execution work across every sulis skill.
 
 This is the entry point. Read this first; then read each standard in the order below.
 
@@ -105,6 +105,34 @@ Enforcement currently manual. Sulis-local validator script (`plugins/sulis/_lib/
 
 Cited by: every sulis skill in its `related_skills:` frontmatter block.
 
+### 6. WORK_PACKAGE_STANDARD.md (~580 lines) — sulis-local, NEW in v0.27.0
+
+**What it governs:** the canonical unit of executable work. 11 requirements (WP-01..WP-11) covering identity, scope, lineage, status lifecycle, executor dispatch, composition, and loop-closed verification.
+
+**Primary phase:** `processing` (consumed by characterisation skills; produced by them too)
+
+**The kinds:**
+
+- `backend` — RGB-TDD loop; unit + integration + smoke gates
+- `frontend` — visual diff + a11y + perf budget gates (NEW; executor TBD)
+- `async` — chaos test + idempotency + DLQ gates (NEW; executor TBD)
+- `docs` — link-integrity + a11y (NEW; light executor TBD)
+- `infra` — Terraform plan + drift + staging destroy-test (NEW; executor TBD)
+- `composite` — orchestrates child WPs of different kinds; merges atomically
+
+**The lineage chain (PROV-O-aligned YAML):**
+
+- `derived_from` — which findings this WP came from
+- `generated_by` — which characterisation activity + agent created it
+- `addresses_findings` — finding signatures the loop-closed check will verify gone
+- `invalidated_by` — set when the loop closes (proof the finding is gone)
+
+Field names borrow W3C PROV-O vocabulary; format stays YAML (no JSON-LD machinery). Migration path to JSON-LD preserved via field-name alignment.
+
+**The status lifecycle:** `todo` → `in_progress` → `done` → `closed` (loop-closed) → optionally `regressed`. Also `blocked`, `sleeping`, `abandoned`.
+
+Cited by: `/sulis:address-findings` (produces WPs), `sulis-execution:executor` (consumes), `/sulis:execute` (founder-facing dispatcher). Per-kind execution mechanics live in companion standards (`WP_BACKEND_STANDARD`, `WP_FRONTEND_STANDARD`, `WP_ASYNC_STANDARD`, etc.) — to be authored alongside each kind's executor.
+
 ---
 
 ## Adoption order
@@ -115,7 +143,8 @@ If you're new to sulis standards, read in this order:
 2. **DECOMPOSITION_PROCEDURE** — the operational complement to PG. Read after Critical Thinking §11.
 3. **SPIRAL_TEMPLATES** — the verification rubric. Once you can think and decompose, this is how you prove the skill is done.
 4. **STANDARDS_RUBRIC** — how to declare which standards apply. Practical glue for new skill authors.
-5. **REFERENTIAL_INTEGRITY_STANDARD** — cross-skill hygiene. The last layer; matters most as the skill ecosystem grows.
+5. **REFERENTIAL_INTEGRITY_STANDARD** — cross-skill hygiene. Matters as the skill ecosystem grows.
+6. **WORK_PACKAGE_STANDARD** — the unit of executable work. Read last, only when you start producing or executing WPs (skills that emit findings into the pipeline, characterisation skills, and the executor).
 
 ---
 
@@ -153,7 +182,9 @@ related_skills:
 
 ## Provenance and divergence from platform
 
-All five standards are adapted from `/Users/iain/Documents/repos/platform/methodology/standards/`. Each ported file's header records the platform source version + the sulis-local version. The Version History section in each file lists what was trimmed / adapted.
+Five of the six standards are adapted from `/Users/iain/Documents/repos/platform/methodology/standards/`. Each ported file's header records the platform source version + the sulis-local version. The Version History section in each file lists what was trimmed / adapted.
+
+`WORK_PACKAGE_STANDARD.md` (the sixth) is **sulis-local with no platform precedent.** It codifies the WP primitive that `sulis-execution` uses informally, plus the per-kind execution shapes the methodology needs going forward (frontend, async, etc.). Authored in v0.27.0 alongside the deep-mode code-health architecture so the find → plan → execute → verify loop has a canonical unit.
 
 What's NOT ported (deliberate):
 

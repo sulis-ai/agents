@@ -1,5 +1,106 @@
 # Sulis — Changelog
 
+## v0.27.0 — 2026-05-24
+
+**6th sulis-local standard: WORK_PACKAGE_STANDARD.md.** Codifies the
+WP primitive between detection skills (code-health / check-*),
+characterisation skills (/sulis:address-findings — to be authored), and
+execution skills (sulis-execution:executor + future per-kind
+executors).
+
+### Files added
+
+- `plugins/sulis/references/standards/WORK_PACKAGE_STANDARD.md` (~580
+  lines). 11 requirements (WP-01..WP-11) covering:
+  - **Identity** (WP-01): id / title / kind / source / parent_phase
+  - **Atomic scope** (WP-02): one-branch + one-engineer tests
+  - **Acceptance criteria** (WP-03): falsifiable + verifiable + specific
+  - **Test plan** (WP-04): tests at named levels with exact paths
+  - **Verification gates** (WP-05): per-kind minimum sets
+  - **Lineage** (WP-06): PROV-O-aligned vocabulary in YAML (no JSON-LD
+    machinery; migration path preserved via field-name alignment).
+    Fields: derived_from / generated_by / addresses_findings /
+    invalidated_by. PROV-O terms borrowed for semantic familiarity +
+    optional migration path; no tooling tax today.
+  - **Status lifecycle** (WP-07): todo → in_progress → done → closed
+    (loop-closed) → optionally regressed. Plus blocked / sleeping /
+    abandoned.
+  - **Composite WPs** (WP-08): parent + per-kind children for cross-
+    kind work. Multi-kind WPs (kinds: [backend, async]) only for
+    genuinely atomic cross-kind changes.
+  - **Loop-closed verification** (WP-09): next scanner run confirms
+    finding signatures gone; advances status done → closed. Regression
+    detection auto-creates new WP with lineage pointing to both
+    original and regression scan.
+  - **Index regeneration** (WP-10): INDEX.md derived from per-WP
+    files; never hand-edited. Buckets by status, sub-grouped by kind.
+  - **File layout** (WP-11): .architecture/{project}/work-packages/
+    plus characterisation-artifact subdirectories (hardening-deltas/
+    / refactor-plans/ / skill-proposals/).
+
+### Files modified
+
+- `plugins/sulis/references/standards/README.md` — extended to list 6
+  standards; new "6. WORK_PACKAGE_STANDARD" section. Adoption order
+  updated (read last; only when producing or executing WPs). Provenance
+  section notes the sixth standard is sulis-local with no platform
+  precedent.
+
+### Five kinds + composite
+
+| Kind | Min verification gates | Executor (today / future) |
+|------|------------------------|---------------------------|
+| backend | unit + integration + smoke | sulis-execution:executor (today) |
+| frontend | unit + component + visual diff + a11y + perf | sulis:execute-frontend (NEW) |
+| async | unit + integration + chaos + idempotency + DLQ | sulis:execute-async (NEW) |
+| docs | link-integrity + a11y for rendered output | sulis:execute-docs (NEW; light) |
+| infra | Terraform plan + drift + destroy-test | sulis:execute-infra (NEW) |
+| composite | union of child gates; atomic merge | sulis:execute-composite (NEW; orchestrator) |
+
+Per-kind execution standards (WP_BACKEND_STANDARD,
+WP_FRONTEND_STANDARD, WP_ASYNC_STANDARD, WP_DOCS_STANDARD,
+WP_INFRA_STANDARD) deferred — authored alongside each executor.
+
+### Why the PROV-O alignment without JSON-LD
+
+The lineage chain is shallow (5 hops) and operationally simple. Full
+JSON-LD adds tooling tax + breaks founder-readability. PROV-O
+vocabulary terms (`derived_from`, `wasGeneratedBy`-style names) cost
+nothing in YAML, give semantic familiarity to anyone who knows the
+W3C standard, and preserve migration path — if a year from now we
+want graph queries, adding `@context` to each WP file gets us full
+JSON-LD without changing field names.
+
+### Cross-skill self-test
+
+All 5 skills 0 findings. Track record: 11 → 12 data points.
+
+### Plugin metadata
+
+- plugins/sulis/.claude-plugin/plugin.json: 0.26.0 → 0.27.0
+- .claude-plugin/marketplace.json: sulis 0.26.0 → 0.27.0;
+  marketplace 1.69.0 → 1.70.0
+
+### What's next
+
+The standard ships first. Implementations follow as needed:
+
+1. **wp_index.py** (plugins/sulis/_lib/wp_index.py) — INDEX.md
+   generator per WP-10. Small Python script; scans work-packages/*.md,
+   renders INDEX.md.
+2. **/sulis:address-findings** — characterisation skill that turns
+   findings into WP files matching this standard. Authored alongside
+   the INDEX generator so the produced WPs flow into the queue.
+3. **/sulis:execute** — thin founder-facing wrapper around
+   sulis-execution:executor for backend WPs. First migration step
+   toward bringing the executor into sulis.
+4. **WP_BACKEND_STANDARD.md** — codifies what executor already does;
+   pure documentation, no new code.
+5. **wp-{frontend,async,docs,infra}-standard.md + executors** — as
+   each kind has real work to validate against.
+
+---
+
 ## v0.26.0 — 2026-05-24
 
 **Deep is now the default invocation mode for code-health.** Fast
