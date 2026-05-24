@@ -1,176 +1,231 @@
 ---
 name: code-health
-description: Use when the founder wants to know if everything is OK — runs a comprehensive code-health check across multiple tiers (safety, works, reliability, readability, maintainability) and produces one prioritised report. Read-only; never modifies code.
+description: Use when the founder wants to know if everything is OK — runs a comprehensive code-health check across all 7 tiers (Exists / Safe / Works / Survives / Understandable / Evolves / Polished) and produces one prioritised report covering 25 primitives across security / data protection / code quality / supply chain / infrastructure. Read-only; never modifies code.
+standards:
+  input: [REFERENTIAL_INTEGRITY_STANDARD]
+  processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]
+  output: [CRITICAL_THINKING_STANDARD]
+verification_spiral:
+  tier: heavy
+  template_base: HEAVY_TIER_DEFAULT
+  custom_dimensions:
+    - name: "Tier MECE Coverage"
+      threshold: ">= 4/5"
+      standard_reference: "plugins/sulis/skills/code-health/references/tier-registry.md MECE footer"
+      scorer: generating_agent
+      evidence_required: "25 of 25 codebase-assess primitives map to exactly one tier; no orphans; Maslow ordering holds"
+    - name: "Independence Check via fresh-context dispatch (Audited mode)"
+      threshold: ">= 3/5"
+      standard_reference: "SPIRAL_TEMPLATES.md HEAVY_TIER_DEFAULT Independence Check"
+      scorer: external_sub_agent
+      evidence_required: "In Audited mode, one tier is re-dispatched as an independent Agent (Explore subagent_type, fresh context, no shared reasoning); divergence flagged"
+related_skills:
+  - relationship: depends_on
+    skill: check-build
+  - relationship: depends_on
+    skill: check-security
+  - relationship: depends_on
+    skill: check-tests
+  - relationship: depends_on
+    skill: check-reliability
+  - relationship: depends_on
+    skill: check-readability
+  - relationship: depends_on
+    skill: check-maintainability
+  - relationship: depends_on
+    skill: check-polish
+  - relationship: depends_on
+    skill: _lib/baseline
+  - relationship: depends_on
+    skill: _lib/scope
 ---
 
 # Code Health
 
-The one comprehensive check. Walks seven tiers of code health in order, runs
-the wired tiers, and produces a single tiered report so the founder sees
-the most-load-bearing thing to fix first.
+## Conclusion (Pyramid)
 
-In v1, only **tier 5 (Understandable)** is wired — invokes
-`/sulis:check-readability`. Other tiers render as "not yet checked" with
-the planned-release noted. The framework establishes the report shape; tiers
-slot in as their underlying skills ship.
+The one comprehensive code-health check. Walks all 7 tiers; runs them in one of three modes; produces a single tiered CHECKUP.md. All 7 tiers are wired (since v0.16.0) and tool-integrated (since v0.20.0); cross-validation against `codebase-assess` shows 100% primitive-level parity (v0.23.0+; see `tests/cross_validation/expected_divergence.md`).
 
-The audit is read-only. It NEVER modifies code. Findings include rename and
-refactor suggestions; they are *advisory text only*.
+The audit is read-only. It NEVER modifies code. Findings include rename and refactor suggestions; they are *advisory text only*.
 
 ## The seven tiers
 
-| Tier | Founder question | v1 status |
+All wired (since v0.16.0); all tool-integrated (since v0.20.0):
+
+| Tier | Founder question | Tool stack |
 |---|---|---|
-| 1 Exists | Does it build? Do the tests run at all? | ⏳ planned |
-| 2 Safe | Could anyone be harmed? (security, leaked credentials, PII) | ⏳ planned |
-| 3 Works | Do the tests pass? Does it do what it should? | ⏳ planned |
-| 4 Survives | Does it handle failure gracefully? | ⏳ planned |
-| **5 Understandable** | **Can a new person read it?** | ✅ wired (`/sulis:check-readability`) |
-| 6 Evolves | Can we change it without breaking things? | ⏳ planned |
-| 7 Polished | Performance, accessibility, design quality | ⏳ deferred |
+| 1 Exists | Does it build? Manifest hygiene? Container security? Deploy secrets? | builder + hadolint + Trivy + Gitleaks |
+| 2 Safe | Could anyone be harmed? (SEC-01..07, DAT-01..05, SC-01..04) | Semgrep + Gitleaks + Trivy + testssl + curl_probe |
+| 3 Works | Do the tests pass? Test coverage quality? | per-framework + pytest-cov / vitest / jest |
+| 4 Survives | Does it handle failure gracefully? Verbose-error / debug mode? Audit logging? | regex + Semgrep + hypothesis |
+| 5 Understandable | Can a new person read it? Cyclomatic complexity? Duplication? | regex + lizard + jscpd |
+| 6 Evolves | Can we change it without breaking things? Review practices? | regex + git-log + hypothesis |
+| 7 Polished | Documentation / tech-debt density / file hygiene | regex (canonical CQ-04 owner) |
 
 Tier registry lives at `references/tier-registry.md` — adding a wired tier
 is a registry update + a tier-skill, not a SKILL.md rewrite.
 
-## Two modes
+## Three invocation modes
 
-- **Founder mode (default).** Tiered report in plain English with FE-06
-  applied. Per-tier traffic-light. Drill-down only for failed tiers. No
-  internal IDs in chrome.
-- **Operator mode (`--raw`).** Tiered JSON envelope with per-tier raw
-  findings. For piping or for engineers wanting machine-readable output.
+### Fast mode (default)
+
+`orchestrator.py` shells out to each `check-*/scripts/*.py`. Zero tokens. Mechanical. Deterministic. Suitable for CI / cron / ambient monitoring. Matches the v0.16.0..v0.24.0 behaviour.
+
+### Deep mode
+
+Claude (the session running `/sulis:code-health`) dispatches 7 `Agent` calls in parallel — one per tier. Each agent runs in **fresh context** with its own subagent_type, invokes its tier's scanner script, applies contextual interpretation lenses (NOT_APPLICABLE-for-non-web-repos, MUC-F4 cap, test-fixture recognition, etc.), and returns a structured JSON + founder-mode markdown. Claude aggregates the 7 returns into a single CHECKUP.md.
+
+Unlocks: NOT_APPLICABLE framing for non-web repos / re-routing of findings to their semantically-right primitive / per-tier MUC-F4 overwhelm cap / test-fixture identification without allowlist entries.
+
+Cost: ~50k tokens per code-health run (7 agents × ~5–10k each).
+
+### Audited mode
+
+Deep mode + a second-pass Independence Check per `SPIRAL_TEMPLATES.md` HEAVY_TIER_DEFAULT. One of the 7 tier responses is re-dispatched as a fresh-context `Agent(subagent_type=Explore, ...)` call with NO access to the prior agent's reasoning. Divergence between the two runs flagged in the CHECKUP.
+
+Unlocks: SPIRAL_TEMPLATES HEAVY-tier compliance — the Independence Check requirement is satisfied for free by the dispatched-agent fresh-context property.
+
+Cost: ~55k tokens (deep mode + 1 extra agent).
+
+## Two output modes (orthogonal to invocation mode)
+
+- **Founder mode (default).** Tiered report in plain English with FE-06 applied. Per-tier traffic-light. Drill-down only for failed tiers. No internal IDs in chrome.
+- **Operator mode (`--raw`).** Tiered JSON envelope with per-tier raw findings. For piping or for engineers wanting machine-readable output.
 
 ## Scope auto-detection
 
-Same as `/sulis:check-readability`: PR-scope (local diff vs auto-detected
-base branch) or codebase-scope. Override with `--scope`, `--base-branch`,
-or `--pr-number`. The orchestrator passes the resolved scope to each wired
-tier.
+PR-scope (local diff vs auto-detected base branch) or codebase-scope. Override with `--scope`, `--base-branch`, or `--pr-number`. The orchestrator (fast mode) and the per-tier agents (deep/audited) all honour the resolved scope.
 
-## When invoked
+## When invoked — FAST mode (subprocess; default)
 
-1. **Resolve scope.** Auto-detect PR vs codebase. Echo it:
-   *"Checking everything on this branch's changes (comparing against main)."*
-   or
-   *"Checking the whole codebase — 312 files."*
-
+1. **Resolve scope.** Auto-detect PR vs codebase. Echo it.
 2. **Run the orchestrator.**
    ```bash
    python3 plugins/sulis/skills/code-health/scripts/orchestrator.py \
+     --mode fast \
      [--scope auto|pr|codebase] \
      [--pr-number N] \
      [--raw]
    ```
+3. **Translate to founder English.** For each tier render per-tier verdict + drill-down for non-passing.
+4. **Present the CHECKUP.** Use the template below.
 
-3. **Translate to founder English** (founder mode). For each tier:
-   - **Wired tier with findings:** translate via the tier skill's own
-     translation (check-readability has its own `founder-translation.md`).
-     code-health does not re-translate; it composes.
-   - **Wired tier passing:** show `✅ {Tier name}: Clear`.
-   - **Stubbed tier:** show `⏳ {Tier name}: not yet checked (planned)`.
+## When invoked — DEEP mode
 
-4. **Present the CHECKUP.** Use this template:
+The orchestrator can't dispatch Agents (it's pure Python). The dispatch logic lives here, executed by Claude in the session running `/sulis:code-health`.
+
+1. **Resolve scope.** Auto-detect PR vs codebase. Echo it.
+
+2. **Read the agent prompt templates** under `agent_prompts/`. There are 7 of them, one per tier.
+
+3. **Dispatch 7 Agent calls in a single message** (parallel — same primitive as the cross-validation runner pattern):
 
    ```
-   🩺 Code Health — {scope description}
-
-   At a glance:
-     Tier 1 — Exists:         ⏳ not yet checked (planned)
-     Tier 2 — Safe:           ⏳ not yet checked (planned)
-     Tier 3 — Works:          ⏳ not yet checked (planned)
-     Tier 4 — Survives:       ⏳ not yet checked (planned)
-     Tier 5 — Understandable: 🟡 needs attention (1 file)
-     Tier 6 — Evolves:        ⏳ not yet checked (planned)
-     Tier 7 — Polished:       ⏳ deferred
-
-   What needs your attention:
-
-   🟡 Tier 5 — Understandable
-     The work-package-lib file is doing too many jobs (`_wpxlib.py`).
-     It's 3,429 lines covering 25 distinct concerns. Worth splitting into
-     focused files when convenient.
-
-   What's not yet checked:
-
-   Tier 1-4, 6, 7 checks are planned for upcoming releases. They aren't
-   silently passing — they aren't running. When more tier-skills ship,
-   they'll be wired in automatically.
+   Agent(check-build,           subagent_type=Explore,        prompt=agent_prompts/check-build.md)
+   Agent(check-security,        subagent_type=general-purpose, prompt=agent_prompts/check-security.md)
+   Agent(check-tests,           subagent_type=general-purpose, prompt=agent_prompts/check-tests.md)
+   Agent(check-reliability,     subagent_type=Explore,        prompt=agent_prompts/check-reliability.md)
+   Agent(check-readability,     subagent_type=Explore,        prompt=agent_prompts/check-readability.md)
+   Agent(check-maintainability, subagent_type=Explore,        prompt=agent_prompts/check-maintainability.md)
+   Agent(check-polish,          subagent_type=Explore,        prompt=agent_prompts/check-polish.md)
    ```
 
-5. **Handle shortcuts** the founder might ask for:
-   - **Safe shortcuts:** `[N] drill into tier N findings`,
-     `[N] open file at finding`. Echo-before-act.
-   - **No fix shortcut.** This skill never modifies code (see Gotcha #4).
+   Substitute `{repo_root}`, `{scope}`, and `{project}` into each prompt template before dispatching.
+
+4. **Each agent returns a structured response.** Per the prompt template contract, each agent emits:
+   - A `## Per-tier verdict` line: `PASS | NEEDS_ATTENTION | FAILED | NOT_YET_CHECKED`
+   - A `## Findings` list (file:line — severity — message), capped per the MUC-F4 presentation cap (≤ 10 per category)
+   - A `## Primitive coverage` table mapping each primitive to PASS / ADVISORY / CONCERN / CRITICAL / HYPOTHESIS / NOT_ASSESSED / NOT_APPLICABLE
+   - A `## Founder-mode summary` paragraph (1-3 sentences for the CHECKUP)
+
+5. **Aggregate.** Invoke `scripts/aggregator.py` with the 7 agent responses as `--tier-response <path>` args; it merges into a single CHECKUP.md.
+
+6. **Present the CHECKUP** (template below).
+
+## When invoked — AUDITED mode
+
+Like deep mode, plus an Independence Check second pass per `SPIRAL_TEMPLATES.md` HEAVY tier:
+
+1. Run deep mode (steps 1-5 above).
+
+2. **Pick the highest-stakes tier** from the deep-mode response (typically tier 2 Safe, since security findings carry highest founder-trust weight).
+
+3. **Re-dispatch the same tier as a fresh-context Independence Check:**
+   ```
+   Agent(<same tier>, subagent_type=Explore, prompt=agent_prompts/independence-check.md)
+   ```
+
+   `independence-check.md` instructs the sub-agent to score the original agent's findings against the standards, with explicit exclusion: NO access to the original agent's reasoning chain; only the SKILL.md + standards + the raw scanner output.
+
+4. **Compare** the original tier-2 response and the Independence Check's verdict. Flag divergence in the CHECKUP under `## Independence Check`.
+
+5. **Aggregate + present** — the CHECKUP gains an Independence Check section.
+
+## Founder-mode CHECKUP template
+
+```
+🩺 Code Health — {scope description}
+Mode: {fast | deep | audited}
+
+At a glance:
+  Tier 1 — Exists:         ✅ Clear
+  Tier 2 — Safe:           🟡 needs attention (3 findings)
+  Tier 3 — Works:          ⏸ no test framework
+  Tier 4 — Survives:       ✅ Clear
+  Tier 5 — Understandable: 🟡 needs attention (58 complexity hotspots)
+  Tier 6 — Evolves:        ⚠ things to verify (1 hypothesis)
+  Tier 7 — Polished:       ✅ Clear
+
+What needs your attention:
+
+🟡 Tier 2 — Safe
+  Three security concerns surfaced (semgrep deep scan):
+  1. `plugins/sea/skills/probe/scripts/probe/workspace.py:40` — XXE
+     vulnerability (use defusedxml instead of native xml lib)
+  ...
+
+Things to verify with the team:
+
+  - {CQ-05 hypothesis}: Review practices likely informal:
+    100% direct-to-main commits last 90 days; no PR template.
+    Confidence: SUPPORTED.
+
+What's not yet checked:
+
+  Tier 3 — no test framework detected at repo root.
+```
+
+## Handle shortcuts
+
+- **Safe shortcuts:** `[N] drill into tier N findings`, `[N] open file at finding`. Echo-before-act.
+- **No fix shortcut.** This skill never modifies code (see Gotcha #4).
 
 ## Gotchas
 
-- **Stubbed tiers must look different from passing tiers.** A founder
-  glancing at 6 ✅ green lights might think everything passed — but most
-  of those were "we didn't look." The presentation template uses
-  `⏳ not yet checked (planned)` distinct styling vs `✅ Clear` and
-  `🟡 needs attention` / `❌ failed`.
-  *Source: canonical partial-coverage UX failure.*
-
-- **Don't fabricate verdicts for stubbed tiers.** Tempting to mark them
-  "presumed pass" so the report looks cleaner. They're NOT checked.
-  Honesty matters more than visual tidiness.
-  *Source: founder-facing-conventions Rule 5 (explain what + what-to-do — applies to "I didn't check" too).*
-
-- **Tier-gating is forward-architecture, not active in v1.** The TDD's
-  ADR-002 specifies hard-stop on tier 1/2 critical findings. In v1 those
-  tiers aren't wired, so the rule literally never fires. When tiers 1+2
-  ship, gating activates. Documented here so future readers don't think
-  the gating logic is broken.
-  *Source: this skill's scope — 1/7 tiers wired in v1.*
-
-- **Founder might assume code-health can fix things.** Same destructive-
-  action ambiguity as check-readability. The wrapper composes read-only
-  audits; it never modifies code. Rename, refactor, split — those are
-  separate engineering actions requiring explicit founder consent.
-  *Source: founder-facing-conventions Rule 3; check-readability gotcha #5 prior art.*
-
-- **Tier names are founder-vocab; operator IDs must stay hidden.** Tier
-  names (Exists, Safe, Works, Survives, Understandable, Evolves, Polished)
-  were chosen to be founder-readable. Operator-side primitive IDs (MEA-04,
-  CQ-01, SEC-07) must NEVER appear in founder mode. The tier-registry
-  maps operator IDs to founder names for translation.
-  *Source: founder-translation.md pattern from check-readability.*
+- **Mode selection matters.** Fast is the default for ambient monitoring. Deep is for founder-interactive runs where contextual interpretation matters. Audited is for production-readiness reviews + SPIRAL_TEMPLATES HEAVY compliance. Don't dispatch agents for every routine CI run — burn tokens for nothing.
+- **The orchestrator can't dispatch agents.** Deep/audited mode logic lives in this SKILL.md (Claude executes); `orchestrator.py` is the fast-mode default + the tool the per-tier agents call. Same pattern as `sulis-execution`'s run-all skill.
+- **Stubbed tiers must look different from passing tiers.** Founder glancing at 6 ✅ might think everything passed — but some are "didn't run" (e.g., CQ-02 when no test framework). Use `⏸ no test framework` or `⏳ not yet checked` distinct from `✅ Clear`.
+- **Don't fabricate verdicts for NOT_ASSESSED primitives.** Honest "tool unavailable" beats false-green.
+- **Founder might assume code-health can fix things.** This skill composes read-only audits; it never modifies code. Suggestions are advisory text only.
+- **Tier names are founder-vocab; operator IDs must stay hidden.** Primitive IDs (SEC-07, CQ-01) must NEVER appear in founder mode. Per-tier agents handle translation.
 
 ## Vocabulary
 
 - **code-health** — the umbrella property this skill measures.
-  Multi-tier well-formedness of a codebase.
-- **tier** — a Maslow-for-code level (1 through 7). Disambiguates from
-  `idc:market-research`'s research-source tiers (Tier 1 / Tier 2 sources)
-  and `sea:code-review`'s report tiers (founder-tier / technical-tier).
-- **checkup** — the report this skill produces (tiered traffic-light +
-  findings). The output file is `CHECKUP.md` per session/run.
-- **tier-gating** — the rule that lower-tier failures de-prioritise higher
-  tiers. Forward-architecture per `.architecture/sulis-checkup/TDD.md`
-  ADR-002; no-op in v1 since tiers 1+2 aren't wired.
-- **not-yet-checked** — explicit state for tiers without underlying skills
-  wired. Distinct from "passed" and "failed." Always renders with `⏳`.
-- **wired tier** — a tier whose underlying skill exists and is invoked by
-  the orchestrator. v1: tier 5 only.
+- **tier** — a Maslow-for-code level (1 through 7).
+- **checkup** — the report this skill produces.
+- **fast / deep / audited mode** — invocation modes; see "Three invocation modes" above.
+- **Independence Check** — SPIRAL_TEMPLATES HEAVY tier requirement; satisfied in audited mode by re-dispatching a tier as a fresh-context agent.
+- **NOT_APPLICABLE** — contextual judgment from deep/audited mode that a primitive doesn't apply to this codebase shape (e.g., SEC-01 on a CLI-only repo). Distinct from NOT_ASSESSED (tool unavailable).
 
 ## When to invoke this skill
 
-- Founder asks "is everything OK?", "give me a comprehensive check",
-  "is my code in good shape?", "is the codebase healthy?"
-- Founder is preparing for a major release or external review and wants
-  a full picture
-- Founder is onboarding and wants to understand the codebase's overall
-  state across multiple dimensions
+- Founder asks "is everything OK?", "give me a comprehensive check", "is my code in good shape?", "is the codebase healthy?"
+- Production-readiness review or external audit preparation (use AUDITED mode)
+- CI / cron ambient monitoring (use FAST mode)
 
 ## When NOT to invoke this skill
 
-- Founder asks specifically "is the code readable?" — use
-  `/sulis:check-readability` directly (single tier; cleaner output;
-  faster).
-- Founder asks about a specific other tier we have a single-tier skill
-  for (when those ship: `/sulis:check-security`, `/sulis:check-tests`,
-  etc.) — use the single-tier skill.
-- Founder wants to fix something — this skill suggests; it doesn't act.
-  Take suggestions into a real engineering session.
-- Operator wants per-WP detail or technical findings — use the
-  underlying skills directly (in `--raw` mode if needed).
+- Founder asks specifically about one tier — use that tier's skill directly (`/sulis:check-security`, etc.)
+- Founder wants to fix something — this skill suggests; doesn't act
+- Operator wants per-tier raw JSON — invoke the individual `check-*` scripts with `--raw`

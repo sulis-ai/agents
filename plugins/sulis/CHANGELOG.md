@@ -1,5 +1,110 @@
 # Sulis — Changelog
 
+## v0.25.0 — 2026-05-24
+
+**code-health gains Deep + Audited modes — Agent-dispatch architecture
+for LLM-mediated per-tier interpretation.** Cross-validation against
+codebase-assess showed agent-mediated runs unlock 4 things subprocess
+can't (NOT_APPLICABLE framing, finding re-routing, contextual SSRF
+judgment, test-fixture recognition); deep mode brings those to
+code-health.
+
+### New files
+
+- `plugins/sulis/skills/code-health/agent_prompts/_shared-contract.md`
+  — output contract every tier agent must follow (verdict / primitive
+  coverage / findings cap / hypotheses / founder summary)
+- `plugins/sulis/skills/code-health/agent_prompts/check-{build,security,
+  tests,reliability,readability,maintainability,polish}.md` — 7 per-tier
+  agent prompt templates. Each declares the scanner command, the
+  interpretation lenses to apply (NOT_APPLICABLE / test-fixture
+  recognition / re-routing / MUC-F4 cap), and the verdict-assignment
+  rules.
+- `plugins/sulis/skills/code-health/agent_prompts/independence-check.md`
+  — Audited mode second-pass prompt. Sub-agent re-runs a tier with NO
+  access to the prior agent's reasoning; reports CONFIRMED / DIVERGENT /
+  INCONCLUSIVE verdict + per-primitive divergence + missed/disputed
+  findings. Satisfies SPIRAL_TEMPLATES HEAVY Independence Check.
+- `plugins/sulis/skills/code-health/scripts/aggregator.py` — parses
+  per-tier agent markdown responses (per the shared contract) + merges
+  into a single CHECKUP.md (founder mode) or JSON envelope (--raw).
+  Handles independence-check section in audited mode.
+
+### Files modified
+
+- `plugins/sulis/skills/code-health/SKILL.md`: full rewrite to v0.7.0
+  spec — frontmatter blocks (standards / verification_spiral /
+  related_skills), Conclusion + Pyramid structure, three-mode
+  documentation (fast / deep / audited), per-mode workflow described
+  step-by-step. Tier table updated: all 7 wired + tool-integrated since
+  v0.20.0; cross-validation 100% parity since v0.23.0. Adds custom
+  dimension "Independence Check via fresh-context dispatch" satisfied
+  in audited mode.
+- `plugins/sulis/skills/code-health/scripts/orchestrator.py`: new
+  `--mode {fast,deep,audited}` flag. fast = today's subprocess
+  behaviour (unchanged default). deep/audited = print dispatch
+  instructions for Claude to execute (orchestrator is pure Python; it
+  can't invoke Agents — only Claude in the session can). New
+  `_print_dispatch_instructions()` function emits the full Agent
+  dispatch plan + aggregator invocation hint.
+
+### Three modes
+
+| Mode | Tokens | Use case | What's new |
+|------|--------|----------|-----------|
+| **fast** | 0 | CI / cron / ambient monitoring | Default; matches v0.16.0–v0.24.0 |
+| **deep** | ~50k | Founder-interactive runs | 7 parallel Agent dispatches; per-tier interpretation lenses |
+| **audited** | ~55k | Production-readiness reviews | deep + Independence Check second pass; SPIRAL_TEMPLATES HEAVY-compliant |
+
+### Architecture note
+
+Same pattern as `sulis-execution`'s `run-all` skill: the dispatch loop
+lives in SKILL.md because Claude in the calling session is the only
+entity with the Agent tool. orchestrator.py stays as the fast-mode
+default + as the underlying scanner-invocation tool the per-tier agents
+call.
+
+### What this unlocks (proven via the recent cross-validation run)
+
+The codebase-assess agent produced 4 things the code-health subprocess
+mode didn't:
+1. **NOT_APPLICABLE framing** for non-web repos (SEC-01, DAT-01, SC-04)
+2. **Finding re-routing** (XXE+SHA1 → INF-04 semantic bucket)
+3. **Contextual judgment** (SEC-06 SSRF hardening note)
+4. **Test-fixture recognition** (no allowlist entry needed)
+
+Deep mode brings all 4 to code-health. The interpretation lenses are
+documented per-tier in `agent_prompts/` and inherited from
+`_shared-contract.md`.
+
+### Aggregator smoke test
+
+```bash
+$ python3 plugins/sulis/skills/code-health/scripts/aggregator.py \
+    --tier-response 1:t1.md --tier-response 2:t2.md \
+    --scope codebase --project agents --mode deep
+
+🩺 Code Health — agents — codebase
+Mode: deep
+At a glance:
+  Tier 1 — Exists             ✅ Clear
+  Tier 2 — Safe               🟡 needs attention (2 findings)
+  Tier 3-7                    ⏳ not yet checked
+...
+```
+
+### Cross-skill self-test
+
+All 5 self-test-runnable skills: 0 findings. Track record: 10 → 11.
+
+### Plugin metadata
+
+- plugins/sulis/.claude-plugin/plugin.json: 0.24.0 → 0.25.0
+- .claude-plugin/marketplace.json: sulis 0.24.0 → 0.25.0;
+  marketplace 1.67.0 → 1.68.0
+
+---
+
 ## v0.24.0 — 2026-05-24
 
 **Two primitive_status emission bugs fixed — surfaced by the

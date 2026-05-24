@@ -405,6 +405,70 @@ def render_json(report: CheckupReport) -> str:
 # ─── Main ────────────────────────────────────────────────────────────
 
 
+def _print_dispatch_instructions(mode: str, repo_root: str, scope: str) -> None:
+    """Print Agent-dispatch instructions for Claude to execute.
+
+    Called when --mode=deep or --mode=audited. The orchestrator itself
+    cannot invoke Agents (no Agent tool available to a Python subprocess);
+    only Claude in the calling session has the Agent tool. So we print
+    the dispatch plan; Claude reads it and acts.
+
+    This mirrors the pattern in sulis-execution's run-all skill.
+    """
+    project = Path(repo_root).resolve().name
+    prompt_dir = Path(__file__).resolve().parent.parent / "agent_prompts"
+
+    print(f"# code-health {mode} mode — dispatch plan")
+    print()
+    print("The orchestrator cannot dispatch Agents (pure Python). Claude must")
+    print("execute the following dispatches in the calling session.")
+    print()
+    print("## Inputs (substitute into each prompt template):")
+    print(f"  repo_root = {repo_root}")
+    print(f"  project   = {project}")
+    print(f"  scope     = {scope}")
+    print(f"  mode      = {mode}")
+    print()
+    print("## Dispatches (issue ALL in a single message for parallelism):")
+    print()
+    tier_to_skill = {
+        1: ("check-build", "Explore"),
+        2: ("check-security", "general-purpose"),
+        3: ("check-tests", "general-purpose"),
+        4: ("check-reliability", "Explore"),
+        5: ("check-readability", "Explore"),
+        6: ("check-maintainability", "Explore"),
+        7: ("check-polish", "Explore"),
+    }
+    for n in range(1, 8):
+        skill, subagent_type = tier_to_skill[n]
+        prompt_path = prompt_dir / f"{skill}.md"
+        print(f"  Agent(subagent_type={subagent_type!r}, description={skill!r},")
+        print(f"        prompt=<read+substitute {prompt_path}>)")
+    print()
+    if mode == "audited":
+        print("## After deep-mode dispatches return:")
+        print()
+        print("Pick the highest-stakes tier (typically check-security), then re-dispatch:")
+        ind_path = prompt_dir / "independence-check.md"
+        print(f"  Agent(subagent_type='Explore', description='independence-check',")
+        print(f"        prompt=<read+substitute {ind_path} with prior tier-2 response>)")
+        print()
+    print("## Aggregate (after all dispatches return):")
+    print()
+    print("Write each agent's response to a temp file, then invoke:")
+    print()
+    print("  python3 plugins/sulis/skills/code-health/scripts/aggregator.py \\")
+    for n in range(1, 8):
+        skill, _ = tier_to_skill[n]
+        print(f"      --tier-response {n}:<path/to/{skill}-response.md> \\")
+    if mode == "audited":
+        print("      --independence-check <path/to/independence-response.md> \\")
+    print("      --scope", scope, "--project", project)
+    print()
+    print("The aggregator emits the CHECKUP.md (founder mode) or JSON envelope (--raw).")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Code-health orchestrator (7-tier wrapper).")
     parser.add_argument("--scope", choices=("auto", "pr", "codebase"), default="auto")
@@ -414,7 +478,19 @@ def main() -> int:
     parser.add_argument("--tier", type=int, default=None, help="Run only tier N")
     parser.add_argument("--check-everything", action="store_true", help="Disable hard-stop gating")
     parser.add_argument("--repo-root", default=".")
+    parser.add_argument("--mode", choices=("fast", "deep", "audited"), default="fast",
+        help="Invocation mode. fast (default) = subprocess-only. deep + audited = Agent dispatch "
+             "from the calling Claude session; orchestrator prints dispatch instructions and exits.")
     args = parser.parse_args()
+
+    if args.mode in ("deep", "audited"):
+        # The orchestrator (pure Python) can't dispatch Agents; only Claude in
+        # the calling session can invoke the Agent tool. Print the dispatch
+        # instructions for Claude to act on, then exit cleanly. See
+        # plugins/sulis/skills/code-health/SKILL.md "When invoked — DEEP mode"
+        # and "AUDITED mode" sections for the full workflow.
+        _print_dispatch_instructions(args.mode, args.repo_root, args.scope)
+        return 0
 
     repo_root = Path(args.repo_root).resolve()
     if not (repo_root / ".git").exists():
