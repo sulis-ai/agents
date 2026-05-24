@@ -1,5 +1,92 @@
 # Sulis — Changelog
 
+## v0.13.0 — 2026-05-24
+
+**Five cross-cutting standards ported from the platform** into
+`plugins/sulis/references/standards/`. Foundation for the upsurge
+plan (Phase 0): every subsequent skill authoring or upsurge cites
+these standards at specific gates / phases.
+
+### New files (5 standards + README)
+
+- `plugins/sulis/references/standards/README.md` — entry point;
+  adoption guide; how skills cite the standards in frontmatter.
+- `plugins/sulis/references/standards/CRITICAL_THINKING_STANDARD.md`
+  — 13 principles (BI / SI / CC / NH / MECE / PP / DF / FR / HU /
+  EH / PG / OI / AT) + 9 anti-patterns + Quality Checklist. Near-1:1
+  port from platform v1.5.0. Application-to-Skills section rewritten
+  for sulis (authoring / assessment / aggregator skill groupings).
+- `plugins/sulis/references/standards/DECOMPOSITION_PROCEDURE.md`
+  — 6 requirements (PD-01..PD-06) governing decomposition procedure.
+  Near-1:1 port from platform v1.0.0. Applicability table rewritten
+  for sulis activities (add-skill primitive discovery; per-skill
+  upsurge; tier composition review; code-health tier registry).
+- `plugins/sulis/references/standards/SPIRAL_TEMPLATES.md` —
+  three tier templates (LIGHT / STANDARD / HEAVY) + ACCA universal
+  dimension + Codebase Referential Integrity rubric (high-value
+  ADR-164 import) + Independence Check mechanics +
+  VERIFICATION_REPORT.md template + Domain-Specific Spiral pattern.
+  Significant trim from platform v2.1.0: Wired Outcomes Registry
+  (50-outcome listing) dropped; Sub-Agent Dispatches sub-section
+  reduced to deferred-pattern note; Registered Domain-Specific
+  Spirals listing reset to empty. ACCA inlined from platform
+  EXECUTION_STANDARD §1 so the port is self-contained. SKILL.md
+  frontmatter examples replace OUTCOME.md / GRAPH.yaml examples.
+- `plugins/sulis/references/standards/STANDARDS_RUBRIC.md` —
+  phase classification model (input / processing / output /
+  governance) + typical combinations by skill action type. Significant
+  trim from platform v1.0.0: 26-standard inventory reduced to 5
+  sulis-local entries. How-to-Use example switched to SKILL.md
+  frontmatter `standards:` block.
+- `plugins/sulis/references/standards/REFERENTIAL_INTEGRITY_STANDARD.md`
+  — 4 canonical relationship types (depends_on / optional_input /
+  related_to / supersedes) + declaration rules + 5 validation rules
+  (RI-01..05). Meaningful trim from platform v1.0.1: Migration
+  sections dropped (sulis adopts all-at-once). Two declaration forms
+  documented (frontmatter recommended; markdown supported). Validator
+  script deferred to follow-up commit.
+
+### Plugin metadata
+
+- Description extended to mention the standards directory.
+- Version: 0.12.0 → 0.13.0.
+- Marketplace version: 1.54.0 → 1.55.0.
+
+### Why this matters
+
+Foundation for the upsurge plan. add-skill v0.8.0 has its own thin
+methodology; the five ported standards replace it with rigor proven
+at platform scale. Every check-* skill that gets upsurged in Phase 2
+will be scored under SPIRAL_TEMPLATES' STANDARD or HEAVY tier,
+producing a VERIFICATION_REPORT.md on disk that single-filesystem-
+check determines compliance.
+
+The highest-leverage addition: **Codebase Referential Integrity**
+(derived from platform ADR-164). Every tool / file / path a skill
+claims to use must trace to the codebase with a verified file path,
+or be explicitly flagged as "NEW — to be created." Catches the
+hallucination failure mode ("we use Semgrep" without actually wiring
+it) that the current methodology cannot.
+
+### What's next (Phase 1 of the upsurge plan)
+
+- Rewrite `plugins/sulis/skills/add-skill/SKILL.md` to v0.7.0:
+  - Gate 1 (Find) adopts BI / SI / CC + adds Primitive Discovery
+    (PG-01..04 + PD-01..06)
+  - Gate 2 (Scope Lock) adopts STANDARDS_RUBRIC phase classification
+  - Gate 3 (Generate) adopts MECE + Pyramid + SCQA + Linguistic Audit
+  - Gate 4 (Evaluate) adopts SPIRAL_TEMPLATES tier + produces
+    VERIFICATION_REPORT.md
+  - Gate 5 (Adversarial) adopts AT + Independence Check
+  - Cross-cutting: REFERENTIAL_INTEGRITY for inter-skill relationships
+- COMPLETENESS_REPORT.md.template → VERIFICATION_REPORT.md.template
+- SKILL.md.template frontmatter gains `standards:` +
+  `verification_spiral:` + `related_skills:` blocks
+
+See `/Users/iain/.claude/plans/eager-crunching-quail.md`.
+
+---
+
 ## v0.12.0 — 2026-05-24
 
 **All 7 tiers green** after a cleanup-iteration loop using the framework
