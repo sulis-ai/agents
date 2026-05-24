@@ -17,12 +17,15 @@ tiers:
     founder_question: "Does it build? Do the basics work?"
     wired: true
     wired_in: "0.7.0"
+    deepened_in: "0.16.0"
     founder_skill: "/sulis:check-build"
-    operator_skills: null  # build logic + manifest hygiene live directly in check-build
+    operator_skills: null  # build logic + manifest hygiene + container/deploy checks live directly in check-build
     extra_args: []  # hygiene-only by default; --run is opt-in (builds have side effects)
     covers:
       - "Build artefact produces (multi-system detection: pip / npm / go / cargo / docker / make)"
       - "Manifest hygiene (plugin.json / marketplace.json / package.json semantic correctness; per HD-004)"
+      - "INF-01 container security (hadolint Dockerfile lint + Trivy base-image CVE scan; wrappers NEW)"
+      - "INF-02 deploy-config secrets (Gitleaks yaml/k8s/CI scope; wrapper NEW)"
       - "Tests are runnable — actual test-pass at tier 3"
 
   - number: 2
@@ -30,25 +33,30 @@ tiers:
     founder_question: "Could anyone be harmed? (security, leaked credentials, dangerous patterns)"
     wired: true
     wired_in: "0.8.0"
+    deepened_in: "0.16.0"  # Phase 2 iteration 1 of upsurge plan: primitive catalogue declared
     founder_skill: "/sulis:check-security"
-    operator_skills: "sulis-security:codebase-assess for deeper 25-primitive audit"
+    operator_skills: null  # codebase-assess scheduled for Phase 5 retirement; SEC + DAT + SC primitives migrate into check-security
     extra_args: []
     covers:
-      - "Credential leaks (AWS / GitHub / Stripe / OpenAI / Anthropic / Slack patterns)"
-      - "Dangerous code patterns (eval / exec / SQL injection / XSS)"
-      - "Pattern-based; for deeper analysis use sulis-security:codebase-assess"
+      - "SEC-01..07 (access control / authentication / injection / input validation / XSS / SSRF / secrets in git history)"
+      - "DAT-01..05 (encryption at rest / TLS / PII / secrets management / audit logging)"
+      - "SC-01..04 (CVE / freshness / SBOM / transitive depth)"
+      - "Optional when --url: DAT-02 TLS analysis + INF-03 HTTP headers"
+      - "Tool wrappers (semgrep / gitleaks / trivy / testssl / curl) flagged NEW pending Phase 2 iteration 2"
 
   - number: 3
     name: Works
     founder_question: "Do the tests pass? Does it do what it should?"
     wired: true
     wired_in: "0.6.0"
+    deepened_in: "0.16.0"
     founder_skill: "/sulis:check-tests"
-    operator_skills: null  # regression logic lives directly in check-tests; sulis is the everything-plugin
+    operator_skills: null  # regression logic + coverage logic live directly in check-tests
     extra_args: ["--run", "--timeout", "60"]  # code-health passes --run by default; tighter timeout than check-tests' standalone default
     covers:
-      - "Tests pass when run"
-      - "Regressions (newly-failing tests vs baseline)"
+      - "Tests pass when run (existing)"
+      - "Regressions (newly-failing tests vs baseline) (existing)"
+      - "CQ-02 test coverage quality (pytest-cov / vitest coverage / jest coverage; wrapper NEW)"
       - "Functional spec parity (when spec exists; future)"
       - "Smoke / deploy verification (future)"
 
@@ -57,52 +65,59 @@ tiers:
     founder_question: "Does it handle failure gracefully?"
     wired: true
     wired_in: "0.10.0"
+    deepened_in: "0.16.0"
     founder_skill: "/sulis:check-reliability"
-    operator_skills: "sulis-security:codebase-assess for deeper Armor-pillar analysis"
+    operator_skills: null  # codebase-assess Armor primitives migrating into check-reliability
     extra_args: []
     covers:
-      - "Missing timeouts on HTTP / subprocess / DB calls"
-      - "Silent-except (try/except/pass)"
-      - "Broad-except without re-raise"
-      - "Pattern-based; for chaos / data-integrity / distributed-systems use sulis-security:codebase-assess"
+      - "Missing timeouts on HTTP / subprocess / DB calls (existing)"
+      - "Silent-except (try/except/pass) (existing)"
+      - "Broad-except without re-raise (existing)"
+      - "INF-04 verbose-error / debug-mode-in-prod (Semgrep wrapper NEW)"
+      - "DAT-05 audit-logging (manual hypothesis; HYPOTHESIS infrastructure NEW)"
 
   - number: 5
     name: Understandable
     founder_question: "Can a new person read it?"
     wired: true
     wired_in: "0.5.0"
+    deepened_in: "0.16.0"
     founder_skill: "/sulis:check-readability"
-    operator_skills: null  # audit logic is INSIDE check-readability (sulis is becoming the everything-plugin)
+    operator_skills: null  # audit logic is INSIDE check-readability
     covers:
-      - "Naming clarity (per identifier)"
-      - "Module cohesion (kitchen-sink-file detection)"
-      - "Jargon density (per module)"
+      - "Naming clarity per identifier (existing)"
+      - "Module cohesion / kitchen-sink-file detection (existing)"
+      - "Jargon density per module (existing)"
+      - "CQ-01 cyclomatic complexity (lizard wrapper NEW)"
+      - "CQ-03 code duplication (jscpd wrapper NEW)"
 
   - number: 6
     name: Evolves
     founder_question: "Can we change it without breaking things?"
     wired: true
     wired_in: "0.11.0"
+    deepened_in: "0.16.0"
     founder_skill: "/sulis:check-maintainability"
-    operator_skills: null  # audit logic is INSIDE check-maintainability
+    operator_skills: null
     extra_args: []
     covers:
-      - "Dead code (unused functions / classes / imports / constants) — advisory-default per FP-philosophy"
-      - "Migration completion (deferred to v1.1 — needs migration-marker convention)"
-      - "Surface contract drift (deferred to v1.1 — project-specific)"
-      - "Test quality beyond coverage (deferred to v1.1)"
+      - "Dead code (unused functions / classes / imports / constants) — advisory-default (existing)"
+      - "CQ-05 review practices via git-log analysis (manual hypothesis; HYPOTHESIS infrastructure NEW)"
+      - "Migration completion (deferred to future iteration — needs migration-marker convention)"
+      - "Surface contract drift (deferred to future iteration — project-specific)"
 
   - number: 7
     name: Polished
     founder_question: "Does the project feel professional?"
     wired: true
     wired_in: "0.11.0"
+    deepened_in: "0.16.0"
     founder_skill: "/sulis:check-polish"
     operator_skills: null
     extra_args: []
     covers:
       - "Documentation completeness (README, CHANGELOG, LICENSE, plugin.json keywords)"
-      - "Tech-debt density (TODO/FIXME/HACK markers)"
+      - "CQ-04 technical debt density (TODO/FIXME/HACK markers) — check-polish is the canonical CQ-04 owner; codebase-assess defers here post-Phase 5"
       - "File hygiene (trailing whitespace, mixed line endings, trailing newline)"
       - "Performance / accessibility / UX deferred — need upstream design choice (which perf budget? which a11y standard?)"
 ```
@@ -120,10 +135,16 @@ Per `.architecture/sulis-checkup/TDD.md` ADR-002:
 - **Per-finding gating:** a single finding may opt into hard-stop semantics
   by declaring `gate: hard-stop` in its metadata.
 
-**v1 note:** tiers 1+2 aren't wired. Hard-stop logic literally never fires
-in v1. The gating code path is in the orchestrator (`_apply_gating()`) but
-is a no-op until those tiers ship. Documented here so future readers don't
-think it's broken.
+**v0.16.0 note:** all 7 tiers are wired (since v0.11.0; deepened against
+v0.7.0 methodology in v0.16.0). Hard-stop logic for tier 1/2 CRITICAL
+findings is in `orchestrator._apply_gating()` and fires when applicable.
+
+For each tier, primitive coverage is documented in the consuming skill's
+SKILL.md frontmatter (`verification_spiral.custom_dimensions` → Primitive
+Coverage Completeness) and scored under SPIRAL_TEMPLATES in
+`iterations/{N}/VERIFICATION_REPORT.md`. Per-tool wrappers flagged NEW
+in iteration 1 (v0.16.0) are scheduled for build-out in iteration 2 +
+later commits.
 
 ## Founder override flags
 
@@ -153,17 +174,27 @@ Adding a tier-skill (e.g., `/sulis:check-security` for tier 2):
 Operator-side primitive IDs (MEA-04, CQ-01, SEC-07, INF-02, DAT-04, SC-03,
 etc.) MUST NEVER appear in founder mode. The translation:
 
-| Operator concept | Founder vocab |
-|---|---|
-| MECE-3 Armor pillar | Tier 4 (Survives) |
-| MECE-3 Form pillar | Tier 5 (Understandable) + Tier 6 (Evolves) — split |
-| MECE-3 Proof pillar | Tier 3 (Works) + Tier 6 (Evolves) — split |
-| SEC-01..07 | Tier 2 (Safe) — security category |
-| DAT-01..05 | Tier 2 (Safe) — data-protection category |
-| SC-01..04 | Tier 2 (Safe) — supply-chain category |
-| INF-01..04 | Tier 1 (Exists) + Tier 4 (Survives) — split per primitive |
-| CQ-01 (complexity) | Tier 5 (Understandable) primarily, Tier 6 (Evolves) secondarily |
-| CQ-02 (test coverage) | Tier 3 (Works) + Tier 6 (Evolves) — split |
-| CQ-03 (duplication) | Tier 6 (Evolves) |
-| CQ-04 (tech debt) | Tier 6 (Evolves) |
-| CQ-05 (review practices) | Tier 6 (Evolves) — process-side |
+| Operator primitive | Canonical tier (post-v0.16.0 upsurge) | Rationale |
+|---|---|---|
+| SEC-01..07 | Tier 2 (Safe) | security category — direct fit |
+| DAT-01 encryption at rest | Tier 2 (Safe) | data-protection — hypothesis primitive |
+| DAT-02 TLS | Tier 2 (Safe) when --url | data-protection deployed surface |
+| DAT-03 PII / PHI | Tier 2 (Safe) | data-protection direct fit |
+| DAT-04 secrets management | Tier 2 (Safe) | data-protection direct fit (overlap with SEC-07 git history) |
+| DAT-05 audit logging | Tier 4 (Survives) | hypothesis primitive — failure-mode-adjacent (auth events) |
+| SC-01..04 | Tier 2 (Safe) | supply-chain — direct fit |
+| INF-01 container security | Tier 1 (Exists) | build-time concern |
+| INF-02 deploy-config secrets | Tier 1 (Exists) | build-time / deployment manifest concern |
+| INF-03 HTTP headers | Tier 2 (Safe) when --url | deployed surface adjacent to TLS |
+| INF-04 verbose-error / debug-mode | Tier 4 (Survives) | reliability failure mode |
+| CQ-01 cyclomatic complexity | Tier 5 (Understandable) | readability concern |
+| CQ-02 test coverage quality | Tier 3 (Works) | works = tested |
+| CQ-03 code duplication | Tier 5 (Understandable) | readability — duplication harms clarity |
+| CQ-04 technical debt density | Tier 7 (Polished) | check-polish is canonical CQ-04 owner |
+| CQ-05 review practices | Tier 6 (Evolves) | process-side maintainability |
+
+**MECE check (post-v0.16.0):**
+
+- **Mutually exclusive:** each primitive belongs to exactly one tier. DAT-04 + SEC-07 overlap in coverage (git history secret scan) but live in the same tier (Tier 2) so no cross-tier collision.
+- **Collectively exhaustive within declared scope:** the 25 codebase-assess primitives all map to a tier; no orphan primitives.
+- **Maslow ordering holds:** tier-1 failure (no build) implies tier-2 (can't be safe if it doesn't run), tier-3 (can't pass tests), tier-4..7 cascade.

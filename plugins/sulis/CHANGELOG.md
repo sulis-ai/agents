@@ -1,5 +1,65 @@
 # Sulis — Changelog
 
+## v0.17.0 — 2026-05-24
+
+**Phase 3: tier composition review post-upsurge.** MECE + Primitive
+Grounding applied to the 7-tier layout. No major reshuffles — existing
+composition holds; documentation aligned with v0.16.0 upsurge reality.
+
+### Files modified
+
+- `plugins/sulis/skills/code-health/references/tier-registry.md`:
+  - Per-tier `covers:` blocks updated to reflect declared primitive
+    coverage from the v0.16.0 upsurge (Tier 1 + INF-01/INF-02; Tier 2 +
+    SEC-01..07 + DAT-01..05 + SC-01..04 + DAT-02/INF-03 when --url;
+    Tier 3 + CQ-02; Tier 4 + INF-04 + DAT-05; Tier 5 + CQ-01 + CQ-03;
+    Tier 6 + CQ-05; Tier 7 + CQ-04 canonical ownership)
+  - New `deepened_in:` field on each tier (set to "0.16.0" for tiers
+    deepened in Phase 2 iteration 1)
+  - "v1 note: tiers 1+2 aren't wired" — removed (stale; all 7 wired
+    since v0.11.0)
+  - Founder-vocab translation table rewritten as canonical primitive-
+    to-tier mapping with rationale; replaces the prior "split" /
+    "primarily/secondarily" approximations with single-tier canonical
+    placements (e.g., CQ-04 → Tier 7 unambiguously; CQ-03 → Tier 5
+    unambiguously)
+  - New MECE-check footer documenting mutual-exclusivity + collective-
+    exhaustiveness + Maslow ordering preservation
+
+### MECE-check verdicts
+
+- **Mutually exclusive:** each codebase-assess primitive belongs to
+  exactly one tier post-upsurge. DAT-04 + SEC-07 overlap in coverage
+  (both involve secret scanning) but live in the same tier (Tier 2);
+  no cross-tier collision.
+- **Collectively exhaustive within declared scope:** all 25 codebase-
+  assess primitives map to a tier. No orphan primitives.
+- **Maslow ordering holds:** tier-1 failure (no build) implies tier-2
+  (can't be safe if it doesn't run); tier-3 (can't pass tests);
+  tier-4..7 cascade as before.
+
+### Orchestrator unchanged
+
+The orchestrator's TierSpec dataclass and TIER_REGISTRY are unchanged.
+The new `deepened_in:` field is documentation-only (lives in
+tier-registry.md, not in code). orchestrator works from its existing
+TierSpec contract.
+
+### Plugin metadata
+
+- plugins/sulis/.claude-plugin/plugin.json: 0.16.0 → 0.17.0
+- .claude-plugin/marketplace.json: sulis 0.16.0 → 0.17.0; marketplace
+  1.58.0 → 1.59.0
+
+### What's next
+
+- Phase 4 cross-validation vs codebase-assess (planning Phase 4 covers
+  divergence reporting at the primitive level; iteration 2 tool-wrapper
+  build-outs will close most remaining divergence)
+- Phase 5 codebase-assess deprecation (after Phase 4 parity verified)
+
+---
+
 ## v0.16.0 — 2026-05-24
 
 **Phase 2 iteration 1: all 7 check-* skills upsurged to v0.7.0
