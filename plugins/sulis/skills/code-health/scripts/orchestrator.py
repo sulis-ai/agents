@@ -478,9 +478,12 @@ def main() -> int:
     parser.add_argument("--tier", type=int, default=None, help="Run only tier N")
     parser.add_argument("--check-everything", action="store_true", help="Disable hard-stop gating")
     parser.add_argument("--repo-root", default=".")
-    parser.add_argument("--mode", choices=("fast", "deep", "audited"), default="fast",
-        help="Invocation mode. fast (default) = subprocess-only. deep + audited = Agent dispatch "
-             "from the calling Claude session; orchestrator prints dispatch instructions and exits.")
+    parser.add_argument("--mode", choices=("fast", "deep", "audited"), default="deep",
+        help="Invocation mode. deep (default; founder-interactive) = Agent dispatch from the "
+             "calling Claude session; orchestrator prints dispatch instructions and exits. "
+             "fast = subprocess-only (zero tokens; use for CI / cron / ambient monitoring). "
+             "audited = deep + Independence Check second pass (SPIRAL_TEMPLATES HEAVY compliant; "
+             "use for production-readiness reviews).")
     args = parser.parse_args()
 
     if args.mode in ("deep", "audited"):

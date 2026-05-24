@@ -1,5 +1,59 @@
 # Sulis — Changelog
 
+## v0.26.0 — 2026-05-24
+
+**Deep is now the default invocation mode for code-health.** Fast
+becomes opt-in (CI / cron / ambient monitoring).
+
+### Why
+
+The v0.25.0 cross-validation showed that subprocess-only output
+misleads founders on non-web repos (PASS on SEC-01 when the codebase
+has no HTTP routes, etc.). Deep mode's contextual interpretation
+(NOT_APPLICABLE framing, finding re-routing, test-fixture recognition)
+is the founder-correct behaviour. Token cost (~50k per run) is worth
+it for interactive runs — without it, the founder gets misleading
+verdicts.
+
+### Files modified
+
+- `plugins/sulis/skills/code-health/scripts/orchestrator.py`:
+  `--mode` default flipped `fast` → `deep`. `--help` text updated to
+  describe each mode's use case.
+- `plugins/sulis/skills/code-health/SKILL.md`:
+  - Three-modes section reordered: Deep first (DEFAULT), Audited
+    second, Fast last (opt-in)
+  - "When invoked" sections reordered to match
+  - Fast-mode section explicitly notes the trade-off: "may show PASS
+    on primitives that deep mode would mark NOT_APPLICABLE"
+  - Frontmatter `description:` mentions the default mode + when to use
+    `--mode fast` / `--mode audited`
+  - Gotchas updated: "Deep is the default … Don't run audited per
+    commit — it's a deliberate review action."
+
+### Invocation patterns after this change
+
+- `/sulis:code-health` (no args) → deep mode → 7 Agent dispatches +
+  aggregator
+- `/sulis:code-health --mode fast` → today's subprocess behaviour (CI
+  / cron)
+- `/sulis:code-health --mode audited` → deep + Independence Check
+
+### What founders see
+
+A founder running `/sulis:code-health` on a CLI-only marketplace
+now gets NOT_APPLICABLE on SEC-01 / SEC-02 / DAT-01 (correct per
+cross-validation framing) rather than PASS (misleading subprocess-
+mechanical output).
+
+### Plugin metadata
+
+- plugins/sulis/.claude-plugin/plugin.json: 0.25.0 → 0.26.0
+- .claude-plugin/marketplace.json: sulis 0.25.0 → 0.26.0;
+  marketplace 1.68.0 → 1.69.0
+
+---
+
 ## v0.25.0 — 2026-05-24
 
 **code-health gains Deep + Audited modes — Agent-dispatch architecture

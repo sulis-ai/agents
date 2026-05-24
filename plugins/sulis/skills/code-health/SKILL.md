@@ -1,6 +1,6 @@
 ---
 name: code-health
-description: Use when the founder wants to know if everything is OK — runs a comprehensive code-health check across all 7 tiers (Exists / Safe / Works / Survives / Understandable / Evolves / Polished) and produces one prioritised report covering 25 primitives across security / data protection / code quality / supply chain / infrastructure. Read-only; never modifies code.
+description: Use when the founder wants to know if everything is OK — runs a comprehensive code-health check across all 7 tiers (Exists / Safe / Works / Survives / Understandable / Evolves / Polished) and produces one prioritised report covering 25 primitives across security / data protection / code quality / supply chain / infrastructure. Default mode is "deep" — dispatches 7 parallel agents for LLM-mediated per-tier interpretation (NOT_APPLICABLE framing, finding re-routing, contextual judgment). Use --mode fast for CI / cron (subprocess-only, zero tokens). Use --mode audited for production-readiness reviews (deep + Independence Check). Read-only; never modifies code.
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]
   processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]
@@ -67,17 +67,13 @@ is a registry update + a tier-skill, not a SKILL.md rewrite.
 
 ## Three invocation modes
 
-### Fast mode (default)
-
-`orchestrator.py` shells out to each `check-*/scripts/*.py`. Zero tokens. Mechanical. Deterministic. Suitable for CI / cron / ambient monitoring. Matches the v0.16.0..v0.24.0 behaviour.
-
-### Deep mode
+### Deep mode (DEFAULT — founder-interactive)
 
 Claude (the session running `/sulis:code-health`) dispatches 7 `Agent` calls in parallel — one per tier. Each agent runs in **fresh context** with its own subagent_type, invokes its tier's scanner script, applies contextual interpretation lenses (NOT_APPLICABLE-for-non-web-repos, MUC-F4 cap, test-fixture recognition, etc.), and returns a structured JSON + founder-mode markdown. Claude aggregates the 7 returns into a single CHECKUP.md.
 
 Unlocks: NOT_APPLICABLE framing for non-web repos / re-routing of findings to their semantically-right primitive / per-tier MUC-F4 overwhelm cap / test-fixture identification without allowlist entries.
 
-Cost: ~50k tokens per code-health run (7 agents × ~5–10k each).
+Cost: ~50k tokens per code-health run (7 agents × ~5–10k each). The founder-facing improvement is worth the cost for interactive runs — without contextual interpretation, founders see misleading subprocess output (PASS on SEC-01 for a CLI-only repo, etc.).
 
 ### Audited mode
 
@@ -86,6 +82,10 @@ Deep mode + a second-pass Independence Check per `SPIRAL_TEMPLATES.md` HEAVY_TIE
 Unlocks: SPIRAL_TEMPLATES HEAVY-tier compliance — the Independence Check requirement is satisfied for free by the dispatched-agent fresh-context property.
 
 Cost: ~55k tokens (deep mode + 1 extra agent).
+
+### Fast mode (opt-in — CI / cron / ambient monitoring)
+
+`orchestrator.py --mode fast` shells out to each `check-*/scripts/*.py`. Zero tokens. Mechanical. Deterministic. **Explicitly opt-in** since v0.26.0 — use when running without Claude in the loop (CI pipelines, cron jobs, ambient monitoring dashboards). Subprocess output is honest but lacks contextual judgment — founders running ad-hoc should use deep mode.
 
 ## Two output modes (orthogonal to invocation mode)
 
@@ -96,21 +96,7 @@ Cost: ~55k tokens (deep mode + 1 extra agent).
 
 PR-scope (local diff vs auto-detected base branch) or codebase-scope. Override with `--scope`, `--base-branch`, or `--pr-number`. The orchestrator (fast mode) and the per-tier agents (deep/audited) all honour the resolved scope.
 
-## When invoked — FAST mode (subprocess; default)
-
-1. **Resolve scope.** Auto-detect PR vs codebase. Echo it.
-2. **Run the orchestrator.**
-   ```bash
-   python3 plugins/sulis/skills/code-health/scripts/orchestrator.py \
-     --mode fast \
-     [--scope auto|pr|codebase] \
-     [--pr-number N] \
-     [--raw]
-   ```
-3. **Translate to founder English.** For each tier render per-tier verdict + drill-down for non-passing.
-4. **Present the CHECKUP.** Use the template below.
-
-## When invoked — DEEP mode
+## When invoked — DEEP mode (DEFAULT)
 
 The orchestrator can't dispatch Agents (it's pure Python). The dispatch logic lives here, executed by Claude in the session running `/sulis:code-health`.
 
@@ -141,6 +127,24 @@ The orchestrator can't dispatch Agents (it's pure Python). The dispatch logic li
 5. **Aggregate.** Invoke `scripts/aggregator.py` with the 7 agent responses as `--tier-response <path>` args; it merges into a single CHECKUP.md.
 
 6. **Present the CHECKUP** (template below).
+
+## When invoked — FAST mode (opt-in; CI / cron)
+
+Invoke when running without Claude in the loop. Honest mechanical output; no contextual interpretation.
+
+1. **Resolve scope.** Auto-detect PR vs codebase. Echo it.
+2. **Run the orchestrator.**
+   ```bash
+   python3 plugins/sulis/skills/code-health/scripts/orchestrator.py \
+     --mode fast \
+     [--scope auto|pr|codebase] \
+     [--pr-number N] \
+     [--raw]
+   ```
+3. **Translate to founder English** (if a human will read it). For each tier render per-tier verdict + drill-down for non-passing.
+4. **Present the CHECKUP** per the founder-mode template below.
+
+Note: fast mode output may show PASS on primitives that deep mode would mark NOT_APPLICABLE (e.g., SEC-01 on a CLI-only repo). This is acceptable for mechanical CI checks; not acceptable for founder-interactive runs.
 
 ## When invoked — AUDITED mode
 
@@ -202,7 +206,7 @@ What's not yet checked:
 
 ## Gotchas
 
-- **Mode selection matters.** Fast is the default for ambient monitoring. Deep is for founder-interactive runs where contextual interpretation matters. Audited is for production-readiness reviews + SPIRAL_TEMPLATES HEAVY compliance. Don't dispatch agents for every routine CI run — burn tokens for nothing.
+- **Mode selection matters.** Deep is the default for founder-interactive runs where contextual interpretation matters. Fast is opt-in for ambient monitoring (CI / cron). Audited is for production-readiness reviews + SPIRAL_TEMPLATES HEAVY compliance. Don't run audited per commit — it's a deliberate review action.
 - **The orchestrator can't dispatch agents.** Deep/audited mode logic lives in this SKILL.md (Claude executes); `orchestrator.py` is the fast-mode default + the tool the per-tier agents call. Same pattern as `sulis-execution`'s run-all skill.
 - **Stubbed tiers must look different from passing tiers.** Founder glancing at 6 ✅ might think everything passed — but some are "didn't run" (e.g., CQ-02 when no test framework). Use `⏸ no test framework` or `⏳ not yet checked` distinct from `✅ Clear`.
 - **Don't fabricate verdicts for NOT_ASSESSED primitives.** Honest "tool unavailable" beats false-green.
