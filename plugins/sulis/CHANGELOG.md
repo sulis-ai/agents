@@ -1,5 +1,112 @@
 # Sulis — Changelog
 
+## v0.14.0 — 2026-05-24
+
+**add-skill rewritten to v0.7.0 — standards-grounded methodology.**
+Phase 1 of the upsurge plan. Replaces add-skill's ad-hoc methodology
+with explicit citations to the five v0.13.0 standards at each of the
+five gates.
+
+### Files modified
+
+- `plugins/sulis/skills/add-skill/SKILL.md` — rewritten:
+  - Frontmatter gains `standards:` / `verification_spiral:` /
+    `related_skills:` blocks per the v0.13.0 standards
+  - Conclusion section leads with Pyramid Principle answer
+  - Each gate cites specific principles from
+    CRITICAL_THINKING_STANDARD / DECOMPOSITION_PROCEDURE /
+    SPIRAL_TEMPLATES / STANDARDS_RUBRIC / REFERENTIAL_INTEGRITY
+  - Gate 1 gains Primitive Discovery sub-step (PG-01..04 + PD-01..06)
+  - Gate 2 gains standards-phase classification, verification tier,
+    tool stack, related skills lock items
+  - Gate 3 gains Pyramid + MECE + No Hyperbole linguistic audit pass
+    criteria
+  - Gate 4 rewritten as Spiral Verification scored against
+    SPIRAL_TEMPLATES dimensions (ACCA + Evidence Grounding +
+    Structural Coherence + Honest Uncertainty + Codebase Referential
+    Integrity + Outcome-Specific Rigor + Independence Check)
+  - Gate 5 adopts AT-01..03 + Independence Check for HEAVY-tier
+  - Three modes documented: greenfield / deepening (upsurge) /
+    standards-grounded re-author
+  - Removed FP-philosophy / fast-vs-deep framing — skills are deep +
+    thorough, never fast
+- `plugins/sulis/skills/add-skill/references/methodology.md` —
+  augmented:
+  - New "v0.7.0 — Standards-grounded methodology" intro section
+  - New "Skills are deep + thorough, never fast" section
+  - Audit-pattern section rewritten: tool stack declaration mandatory;
+    degradation policy required (Docker → native → NOT_ASSESSED, never
+    silent regex fallback); hypothesis output for manual primitives
+  - New Primitive Decomposition pattern (PG + PD)
+  - New Spiral Verification pattern (SPIRAL_TEMPLATES)
+  - New Deepening (upsurge) pattern
+  - COMPLETENESS_REPORT.md references updated to VERIFICATION_REPORT.md
+  - On-the-VERIFICATION_REPORT section gains forcing-function rationale
+- `plugins/sulis/skills/add-skill/references/completeness-perspectives.md`
+  — re-cast as the Outcome-Specific Rigor dimension detail-page (HEAVY
+  tier). Three perspectives preserved as sub-perspectives under that
+  dimension; aggregate score = min of three.
+
+### Files renamed
+
+- `plugins/sulis/skills/add-skill/templates/COMPLETENESS_REPORT.md.template`
+  → `plugins/sulis/skills/add-skill/templates/VERIFICATION_REPORT.md.template`
+  — structure aligned with SPIRAL_TEMPLATES.md VERIFICATION_REPORT.md
+  template; per-dimension scoring sections + Independence Check section
+  + Primitive Discovery section (Gate 1 sub-step). The pre-v0.7.0 file
+  removed via git rm; pre-existing skills' COMPLETENESS_REPORT.md files
+  remain valid until those skills are upsurged.
+
+### Files updated
+
+- `plugins/sulis/skills/add-skill/templates/SKILL.md.template` —
+  frontmatter template gains the three new blocks (`standards:` /
+  `verification_spiral:` / `related_skills:`) with sensible defaults.
+  Body template gains Conclusion (Pyramid) section + Standards citation
+  per gate + MECE check note on When-to/When-not-to + ≤ 7 gotchas
+  per-PD-02.
+
+### Plugin metadata
+
+- Version: 0.13.0 → 0.14.0
+- Marketplace: 1.55.0 → 1.56.0
+
+### Why this matters
+
+add-skill is the methodology skill — it authors every other skill. With
+v0.7.0 standards-grounding in place, the upsurge plan's Phase 2
+per-skill loops have a measurable rigor bar to score against:
+
+- VERIFICATION_REPORT.md on disk (forcing function)
+- Per-dimension scores with thresholds (ACCA ≥ 4, Evidence Grounding ≥
+  4, Structural Coherence ≥ 4, Honest Uncertainty ≥ 3, Codebase
+  Referential Integrity ≥ 4; HEAVY adds Outcome-Specific Rigor ≥ 4 and
+  Independence Check ≥ 3)
+- Codebase Referential Integrity catches "uses Semgrep" hallucination
+- Tool stack declaration in Gate 2 forces audit-pattern depth
+- Deepening mode preserves existing wiring (orchestrator entries,
+  baseline format, allowlist semantics) — critical for the per-skill
+  upsurges that don't break code-health integration
+
+### What's next (Phase 2 of /Users/iain/.claude/plans/eager-crunching-quail.md)
+
+Per-skill upsurge loops, one commit each:
+
+- check-security (HEAVY tier; biggest expansion — SEC-01..07 +
+  DAT-01..05 + SC-01..04 + DAT-02 + INF-03)
+- check-build (INF-01 + INF-02)
+- check-reliability (INF-04 + DAT-05 hypothesis)
+- check-readability (CQ-01 + CQ-03)
+- check-tests (CQ-02)
+- check-maintainability (CQ-05 hypothesis)
+- check-polish (CQ-04 canonical ownership)
+
+Each upsurge runs add-skill in deepening mode against the new
+methodology. Each produces a VERIFICATION_REPORT.md scored under
+SPIRAL_TEMPLATES.
+
+---
+
 ## v0.13.0 — 2026-05-24
 
 **Five cross-cutting standards ported from the platform** into

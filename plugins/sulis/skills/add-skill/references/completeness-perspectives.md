@@ -1,8 +1,19 @@
-# Completeness Perspectives — Gate 4 Verification
+# Completeness Perspectives — Outcome-Specific Rigor (HEAVY tier)
 
-Detailed criteria for evaluating a skill at Gate 4. Each perspective gets an
-explicit verdict (PASS / FAIL / DEFERRED) recorded in
-`COMPLETENESS_REPORT.md`.
+Detailed criteria for the Outcome-Specific Rigor dimension when an
+authoring skill (like `add-skill`) runs under the HEAVY tier of
+SPIRAL_TEMPLATES. Each of the three perspectives below becomes a
+sub-score under that dimension; aggregate Outcome-Specific Rigor
+score is the minimum of the three.
+
+For STANDARD-tier skills (most check-* skills): the three perspectives
+remain useful as a sanity check but are not formally scored as a single
+dimension — they're absorbed into Evidence Grounding (P1, P2) and
+ACCA-Actionable (P3).
+
+Each perspective gets an explicit sub-verdict (PASS / FAIL / DEFERRED)
+recorded in `VERIFICATION_REPORT.md` under the Outcome-Specific Rigor
+section.
 
 ## Perspective 1 — Trigger accuracy
 
@@ -146,7 +157,7 @@ negative case per category, so the test verifies both the inclusion path
 and the filter discipline.
 
 **Document fixture inventories.** When a skill ships, record in its
-COMPLETENESS_REPORT.md which scenarios were tested + which fixture type
+VERIFICATION_REPORT.md which scenarios were tested + which fixture type
 was used. Future maintainers can re-run them.
 
 ### Pass criteria
@@ -177,7 +188,7 @@ The three verdicts (PASS / FAIL / DEFERRED) compose like this:
 |---|---|
 | All PASS | Approved — proceed to Gate 5 |
 | Any FAIL | Blocked — fix and rerun Gate 4 |
-| 1+ DEFERRED, no FAIL | Approved with risk — proceed to Gate 5; risks documented in COMPLETENESS_REPORT.md |
+| 1+ DEFERRED, no FAIL | Approved with risk — proceed to Gate 5; risks documented in VERIFICATION_REPORT.md |
 | 2+ DEFERRED | Block; the skill needs more grounding before publication |
 
 DEFERRED is for "could not evaluate"; FAIL is for "evaluated and didn't

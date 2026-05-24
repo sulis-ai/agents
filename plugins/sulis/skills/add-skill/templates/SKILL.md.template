@@ -1,12 +1,27 @@
 ---
 name: {{skill-name-kebab-case}}
-description: Use when {{trigger condition — what user intent makes Claude invoke this skill. NOT a summary of what the skill does. Should be ≤2 sentences and contain only user-facing vocabulary.}}
+description: Use when {{trigger condition — what user intent makes Claude invoke this skill. NOT a summary of what the skill does. Should be ≤2 sentences and contain only user-facing vocabulary if the skill is founder-facing.}}
+standards:
+  input: [REFERENTIAL_INTEGRITY_STANDARD]  # if skill names pre-existing cross-references
+  processing: [CRITICAL_THINKING_STANDARD]  # add DECOMPOSITION_PROCEDURE if skill has primitive-level decomposition
+  output: [CRITICAL_THINKING_STANDARD]  # secondary; for SCQA / Pyramid framing in founder mode
+verification_spiral:
+  tier: {{standard | heavy | light}}  # heavy for methodology + founder-visible verdict skills; light only with justification
+  template_base: {{STANDARD_TIER_DEFAULT | HEAVY_TIER_DEFAULT | LIGHT_TIER_DEFAULT}}
+  custom_dimensions: []  # add domain-specific dimensions here per SPIRAL_TEMPLATES "Declaring a Custom Spiral"
+related_skills:
+  - relationship: depends_on  # depends_on / optional_input / related_to / supersedes per REFERENTIAL_INTEGRITY_STANDARD
+    skill: {{e.g., code-health, _lib/baseline, ../../references/standards/CRITICAL_THINKING_STANDARD.md}}
+    notes: {{semantic context for this relationship}}
 ---
 
 # {{Skill Name (Title Case)}}
 
-{{One-paragraph statement of what this skill produces and the bounded
-problem it solves. Avoid restating the description.}}
+## Conclusion (Pyramid Principle — PP-01 — lead with the answer)
+
+{{One-paragraph statement of what this skill produces, the bounded
+problem it solves, and the user's expected next action. Avoid restating
+the description.}}
 
 If you have not read `references/{{primary-reference}}.md`, read it once.
 {{Optional — only if there's a load-bearing reference doc.}}
@@ -18,6 +33,8 @@ If you have not read `references/{{primary-reference}}.md`, read it once.
 {{Shape A — methodology (numbered steps with explicit pass criteria per step):}}
 
 ### Step 1 — {{name}}
+
+**Standards:** {{cite specific principles, e.g., "BI-01..04 + PG-01..04"}}
 
 **Goal:** {{what this step achieves}}
 
@@ -46,10 +63,11 @@ applies it by:
 
 ## Gotchas
 
-{{≤15 items, ordered by likelihood × impact (high-high first).}}
+{{≤ 7 items per PD-02 fan-out constraint, ordered by likelihood × impact (high-high first).}}
 {{Each gotcha MUST have a concrete prior-failure source — either prior
 art from another skill (cite via "see {{plugin}}:{{skill}}"), the
-BRIEF_PACK, or documented author experience.}}
+BRIEF_PACK, or documented author experience. Speculation-sourced gotchas
+fail Gate 4 Gotchas-Coverage and get removed.}}
 
 - **{{Pithy name}}** — {{What goes wrong + why + brief mitigation}}.
 - **{{Pithy name}}** — {{What goes wrong + why + brief mitigation}}.
@@ -66,6 +84,8 @@ Otherwise delete it.}}
 ## When to invoke this skill
 
 {{2-4 concrete trigger scenarios — each one short sentence}}
+{{MECE check: must be mutually exclusive (no scenario overlap)
+and collectively exhaustive (covers the declared scope)}}
 
 - {{Trigger scenario 1}}
 - {{Trigger scenario 2}}

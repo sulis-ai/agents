@@ -1,0 +1,247 @@
+# VERIFICATION_REPORT.md — {{plugin}}:{{skill-name}}
+
+**Skill:** `{{plugin}}/{{skill-name}}`
+**Iteration:** {{N — 1 for first run; increment per upsurge}}
+**Produced:** {{ISO-8601 timestamp}}
+**Methodology:** `sulis:add-skill` v0.7.0+ (standards-grounded; replaces COMPLETENESS_REPORT.md from v0.6.x)
+
+---
+
+## Spiral Summary
+
+**Tier:** {{light | standard | heavy}}
+**Template base:** {{LIGHT_TIER_DEFAULT | STANDARD_TIER_DEFAULT | HEAVY_TIER_DEFAULT}}
+**Iterations used:** {{1-3}}
+**Termination reason:** {{sufficient | max_iterations | irreducible_blocker}}
+**Verdict:** {{PASS | BLOCKED}}
+
+**Publication decision:** {{APPROVED | APPROVED-WITH-RISK | BLOCKED}}
+
+---
+
+## Gate 1 — Find (BI / SI / CC + Primitive Discovery)
+
+**BRIEF_PACK generated:** `{{path or "regenerated on each run"}}`
+
+**BI counter-search performed:** {{yes / no — list counter-queries}}
+
+**SI verification:** {{N distinct sources / M total references → consolidated to N independent}}
+
+**CC verdict on "no existing skill covers this":** {{VALIDATED | SUPPORTED | EMERGING | UNVALIDATED}}
+
+**Collisions flagged + resolved:**
+
+- {{collision}}: {{rename / scope-disambiguated / waived because …}}
+
+### Primitive Discovery (analysis skills only)
+
+**Level of analysis:** {{e.g., "check-security primitive scope at the skill-level"}}
+
+**Primitives identified:**
+
+| Primitive | Provenance | Independence test | Termination test |
+|-----------|------------|-------------------|------------------|
+| {{ID + name}} | extracted / inferred / user-stated | PASS / FAIL with rationale | PASS / FAIL with rationale |
+
+**Dependencies (typed per PD-05):** {{depends-on / enables / conflicts-with edges}}
+
+**Scale check (PD-02):** fan-out = {{N}}, depth = {{M}} (both ≤ 7 / ≤ 5)
+
+---
+
+## Gate 2 — Scope Lock
+
+| Item | Locked value |
+|---|---|
+| Skill name | `{{kebab-case}}` |
+| Plugin home | `{{plugin}}` |
+| Audience | {{founder-facing / operator-facing / both}} |
+| Category | {{see SKILL.md Gate 2}} |
+| Trigger condition | {{verbatim text appearing in `description:` frontmatter}} |
+| Standards-phase classification | input: {{...}} / processing: {{...}} / output: {{...}} |
+| Verification tier | {{LIGHT / STANDARD / HEAVY}} (with justification if LIGHT) |
+| Tool stack | {{Semgrep / Gitleaks / Trivy / lizard / jscpd / hadolint / testssl / curl / ...}} (or "regex-only — justification: ...") |
+| Top-N gotchas | {{list ≤ 7 — each with source: prior-art / BRIEF_PACK / author-experience}} |
+| Related skills | {{depends_on / optional_input / related_to / supersedes declarations}} |
+| Depth modes | {{none / Full / Full+Audit}} (no "Quick" for audit-pattern skills) |
+| Mode-selection strategy (if Audience=both) | {{outermost-invocation / explicit-flag / context-derived}} |
+
+**Vocabulary terms introduced:** {{list with collision resolution from Gate 1}}
+
+---
+
+## Gate 3 — Generate
+
+**Files produced:**
+
+- `plugins/{{plugin}}/skills/{{name}}/SKILL.md`
+- `plugins/{{plugin}}/skills/{{name}}/references/...` {{or "none"}}
+- `plugins/{{plugin}}/skills/{{name}}/scripts/...` {{or "none"}}
+- `plugins/{{plugin}}/skills/{{name}}/templates/...` {{or "none"}}
+
+**Scope lock adherence:** {{verify each Gate 2 item is reflected; flag any drift}}
+
+**Frontmatter validation:** `standards:` + `verification_spiral:` + `related_skills:` blocks present + parse as valid YAML
+
+**Pyramid structure:** SKILL.md leads with the conclusion ({{yes / no — note location}})
+
+**Linguistic audit (NH-02):** zero prohibited terms ({{yes / no — list terms found}})
+
+**Referenced files verified present:** {{yes / no — if no, list missing}}
+
+---
+
+## Gate 4 — Evaluate (Spiral Verification)
+
+### ACCA (required all tiers)
+
+| Sub-dimension | Threshold | Score | Evidence |
+|---------------|-----------|-------|----------|
+| Accurate | >= 4 | {{1-5}} | {{citations — file:line / quoted text / metrics}} |
+| Clear | >= 4 | {{1-5}} | {{evidence}} |
+| Complete | >= 4 | {{1-5}} | {{evidence}} |
+| Actionable | >= 4 | {{1-5}} | {{evidence}} |
+
+**ACCA minimum:** {{min(sub-scores)}}/5 — {{PASS | BLOCKED}}
+
+### Evidence Grounding (STANDARD + HEAVY)
+
+**Threshold:** >= 4/5 — Score: {{1-5}}
+**Standard reference:** CRITICAL_THINKING_STANDARD.md (BI, SI, AT-01)
+**Evidence:** {{counter-search performed / sources independent / adversarial validation done}}
+
+### Structural Coherence (STANDARD + HEAVY)
+
+**Threshold:** >= 4/5 — Score: {{1-5}}
+**Standard reference:** CRITICAL_THINKING_STANDARD.md (MECE, PP, DF)
+**Evidence:** {{MECE on When-to/When-not / Pyramid lead / SCQA framing}}
+
+### Honest Uncertainty (STANDARD + HEAVY)
+
+**Threshold:** >= 3/5 — Score: {{1-5}}
+**Standard reference:** CRITICAL_THINKING_STANDARD.md (HU, CC)
+**Evidence:** {{gaps surfaced as findings; deferrals documented with rationale}}
+
+### Codebase Referential Integrity (STANDARD + HEAVY)
+
+**Threshold:** >= 4/5 — Score: {{1-5}}
+**Standard reference:** SPIRAL_TEMPLATES.md (derived from platform ADR-164)
+**Evidence (per pre-existing entity named):**
+
+| Entity | Path | Verified exists | Notes |
+|--------|------|-----------------|-------|
+| {{e.g., _lib/tools/semgrep.py}} | `plugins/sulis/_lib/tools/semgrep.py` | YES / NO / NEW (flagged) | |
+
+### Outcome-Specific Rigor (HEAVY only) — three legacy perspectives
+
+#### Sub-perspective 1 — Trigger accuracy
+
+**Verdict:** {{PASS / FAIL / DEFERRED}}
+**Method:** {{description-only test on N scenarios}}
+**Result:** precision {{N}}% (threshold ≥ 85%)
+
+#### Sub-perspective 2 — Gotchas coverage
+
+**Verdict:** {{PASS / FAIL / DEFERRED}}
+**Result:** {{N}} of {{M}} gotchas have concrete prior-failure source; {{K}} removed as speculation
+
+#### Sub-perspective 3 — Functional completeness
+
+**Verdict:** {{PASS / FAIL / DEFERRED}}
+**Scenarios tested:** {{N}}; **passed:** {{M}}; **success rate:** {{X}}% (threshold ≥ 80%)
+**Failure modes captured:** {{list, classify as skill-bug / methodology-gap / scenario-mismatch}}
+
+**Outcome-Specific Rigor aggregate:** {{min(sub-perspectives)}}/5
+
+### Independence Check (HEAVY only)
+
+**Threshold:** >= 3/5 — Score: {{1-5}}
+**Scorer:** Agent (subagent_type=Explore) in fresh context (no access to author reasoning)
+**Sub-agent ID / artifact:** `{{path to INDEPENDENCE_CHECK.md or sub-agent output}}`
+**Evidence:** {{sub-agent's per-dimension score with citations}}
+
+---
+
+## Gate 5 — Adversarial Review (AT / FR)
+
+### Misuse case 1: {{name (MUC-Fx if founder-facing)}}
+
+- **What Claude might do wrong (FR-03 pre-mortem):** {{description}}
+- **Status:** PREVENTED with mechanism / OPEN_RISK with rationale + revisit-trigger
+- **Mitigation or rationale:** {{...}}
+
+### Misuse case 2: {{name}}
+
+- {{same structure}}
+
+### Misuse case 3: {{name}}
+
+- {{same structure}}
+
+{{Add more as identified. Minimum 3; founder-facing: minimum 3 of MUC-F1..F6.}}
+
+---
+
+## Fixes Applied During Spiral
+
+{{List of autonomous fixes made during iterations, or "None"}}
+
+---
+
+## Irreducible Blockers
+
+{{If BLOCKED:}}
+- **Dimension failed:** {{name}}
+- **Why unfixable by current agent / tools:** {{specific reason}}
+- **External action required:** {{concrete next step}}
+- **Scope of blocking issue:** {{bounded estimate}}
+
+{{Or "None" if PASS}}
+
+---
+
+## Open risks accepted at publication
+
+{{Summary of any DEFERRED dimensions, OPEN_RISK misuse cases, or known
+limitations the skill ships with. Each MUST have a structured
+`revisit_by` field:
+  - revisit_by: date | YYYY-MM-DD
+  - revisit_by: event | <description>
+  - revisit_by: trigger | <condition>
+  - revisit_by: never (acknowledged permanent limitation)}}
+
+### Risk 1: {{name}}
+
+- **Description:** {{what could go wrong}}
+- **Why accepted:** {{rationale — usually: low likelihood, low impact, or blocker for a future-version dependency}}
+- **revisit_by:** {{date | event | trigger | never}}: {{detail}}
+- **Workaround for users in the meantime:** {{if any}}
+
+### Risk 2: {{name}}
+
+{{same structure}}
+
+---
+
+## Vocabulary changes (if any)
+
+{{Record any vocabulary revisions made during authoring. Each entry:}}
+
+- **{{term}}** — changed from "{{old}}" to "{{new}}" because {{reason}}.
+  Updated in: {{list of files}}.
+
+---
+
+## Meta-Notes
+
+{{Optional: observations about the spiral execution itself, limitations
+encountered, special considerations for future audits. Patterns reported
+across many VERIFICATION_REPORT.md files inform methodology + standards
+updates.}}
+
+---
+
+## Naming history
+
+- v0.7.0+ (this template): VERIFICATION_REPORT.md (aligned with SPIRAL_TEMPLATES.md)
+- v0.6.x and earlier: COMPLETENESS_REPORT.md (still valid on existing skills; new skills use this template)

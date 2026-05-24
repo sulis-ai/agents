@@ -3,9 +3,48 @@
 This document explains the rationale for each gate in `add-skill`. Read it
 once. The SKILL.md tells you *what* to do; this tells you *why*.
 
-The methodology is grounded in patterns the kinds-and-tools spec validated for
-getting consistent outcomes from agent-driven authoring. See
-`kinds-and-tools-learnings.md` for the raw source patterns.
+## v0.7.0 — Standards-grounded methodology
+
+Since v0.7.0 the methodology cites the five sulis standards (at
+`plugins/sulis/references/standards/`) at each gate. The previous
+ad-hoc methodology is superseded:
+
+- Gate 1 (Find) adopts Balanced Investigation + Source Independence +
+  Confidence Calibration + adds Primitive Discovery sub-step grounded
+  in PG-01..04 + PD-01..06
+- Gate 2 (Scope Lock) adopts STANDARDS_RUBRIC phase classification +
+  Outside-In Reasoning + MECE
+- Gate 3 (Generate) adopts MECE + Pyramid + SCQA + No Hyperbole
+  linguistic audit
+- Gate 4 (Evaluate) adopts SPIRAL_TEMPLATES tier + dimensions +
+  Codebase Referential Integrity + VERIFICATION_REPORT.md on disk
+- Gate 5 (Adversarial Review) adopts Adversarial Testing Posture +
+  Falsifiability
+- Cross-cutting: REFERENTIAL_INTEGRITY for inter-skill relationships
+
+The original methodology grounding (kinds-and-tools spec learnings)
+remains documented for provenance below.
+
+## Skills are deep + thorough, never fast
+
+The "fast pattern scan vs deep audit" framing is rejected as of v0.7.0.
+Every analysis / audit skill uses real tools (Semgrep, Gitleaks, Trivy,
+lizard, jscpd, hadolint, testssl.sh, curl) with Docker → native-binary
+→ NOT_ASSESSED degradation. Pure-regex skills without tool integration
+require explicit justification in VERIFICATION_REPORT — regex is the
+floor, not the ceiling.
+
+Why: the "fast tier with shallow regex" pattern misleads founders. A
+green tier-2 verdict that covers ~5 of 12 SEC+DAT primitives via regex
+encourages shipping when real tools would have caught critical issues.
+The trust cost of false-green outweighs the latency cost of running
+real tools.
+
+## Original grounding (kinds-and-tools spec)
+
+The methodology is also grounded in patterns the kinds-and-tools spec
+validated for getting consistent outcomes from agent-driven authoring.
+See `kinds-and-tools-learnings.md` for the raw source patterns.
 
 ## Why a methodology instead of a checklist
 
@@ -152,7 +191,7 @@ list during Gate 4; finalise + categorise (PREVENTED / OPEN_RISK) at
 Gate 5. This is not a methodology violation; it's the methodology
 working as designed — real evidence beats speculation.
 
-The COMPLETENESS_REPORT.md template has space for "misuse cases
+The VERIFICATION_REPORT.md template has space for "misuse cases
 identified during Gate 4 (then formalised at Gate 5)" — use it.
 
 ### Why DEFERRED is valid but FAIL is not
@@ -234,10 +273,17 @@ reports findings, supports baseline-aware regression detection.
 
 Shared concerns:
 
-- **False-positive philosophy must be locked.** Different audit domains
-  have different FP/FN trade-offs. Security: FPs erode trust; FNs are
-  worse. Readability: FPs are noise; FNs are tolerable. State the lock
-  in Gate 2 (see SKILL.md Gate 2 "False-positive philosophy" item).
+- **Tool stack must be declared (v0.7.0+).** Audit-pattern skills are
+  deep + thorough by default; pure-regex implementations require explicit
+  justification at Gate 2. State the declared tool stack: Semgrep
+  (SEC-01/03/04/05/06 + DAT-03 + INF-04), Gitleaks (SEC-07 + DAT-04 +
+  INF-02), Trivy (SC-01..04 + INF-01 base-image), lizard (CQ-01), jscpd
+  (CQ-03), hadolint (INF-01 Dockerfile), testssl.sh (DAT-02), curl
+  (INF-03), pytest-cov / vitest coverage / jest coverage (CQ-02).
+- **Tool degradation policy.** Each tool wrapper: Docker preferred →
+  native binary → NOT_ASSESSED (never silent regex fallback). Codebase
+  Referential Integrity dimension (Gate 4) catches "skill claims to use
+  Semgrep" without the wrapper present.
 - **Baseline-aware regression.** First-run captures the state; subsequent
   runs report what's NEW since baseline. Use the shared
   `plugins/sulis/_lib/baseline.py` helper (tier-namespaced sub-keys in
@@ -246,17 +292,24 @@ Shared concerns:
   domain vocabulary, conscious accept). Use the shared
   `plugins/sulis/_lib/allowlist.py` helper for per-project + per-skill
   allowlist loading.
-- **Pattern-registry extensibility.** Adding a new pattern shouldn't
-  require rewriting the scanner. Use a registry list of `Pattern` /
-  `Framework` / `Heuristic` entries; document the "adding a new entry"
-  contract in the skill's `references/` doc.
-- **In-loop Gate 4 P3 refinement is the methodology working.** Real-state
+- **Pattern-registry extensibility.** Adding a new pattern (or wiring a
+  new tool) shouldn't require rewriting the scanner. Use a registry list
+  of `Pattern` / `Framework` / `Heuristic` / `ToolWrapper` entries;
+  document the "adding a new entry" contract in the skill's `references/`
+  doc.
+- **Hypothesis output for manual primitives.** Some primitives can't be
+  fully automated (DAT-01 encryption at rest, DAT-05 audit logging,
+  CQ-05 review practices). Emit `Hypothesis` records (separate from
+  findings) with statement + evidence + confidence + verification
+  question. Code-health surfaces hypotheses under "## Things to verify
+  with the team" (founder mode).
+- **In-loop Gate 4 refinement is the methodology working.** Real-state
   testing surfaces false positives that pure-thinking misses. Iterate
-  the heuristic during Gate 4 P3 (running candidate misuse-case list
-  documented in COMPLETENESS_REPORT.md), then formalise at Gate 5.
+  during Gate 4 (running candidate misuse-case list documented in
+  VERIFICATION_REPORT.md), then formalise at Gate 5.
 
-If the skill being authored is an audit, all five concerns should
-become gotchas at Gate 2.
+If the skill being authored is an audit, all six concerns should become
+gotchas at Gate 2.
 
 ### Wrapper-pattern skills
 
@@ -312,6 +365,91 @@ translation at output.
 Free to use technical vocabulary directly; audience preference. The
 conventions doc explicitly does NOT apply.
 
+### Primitive Decomposition pattern (v0.7.0+)
+
+A skill whose scope can be reduced to a set of irreducible primitives
+benefits from explicit decomposition at Gate 1. `check-security`'s scope
+maps to SEC-01..07 + DAT-01..05 + SC-01..04 (16 primitives) at the
+skill-scope level of analysis.
+
+Shared concerns:
+
+- **Declare the level of analysis (PG-03).** The same scope can be
+  primitive at one level and composite at another. "Cover SEC-03
+  injection" is primitive at skill-scope; composite at rule-pack level
+  (SQL injection vs NoSQL vs command injection).
+- **Apply the independence test (PG-02 / PD-03).** Each candidate
+  primitive must be independently changeable, validatable, falsifiable.
+  Two "primitives" that must change together → one primitive or hidden
+  dependency.
+- **Apply termination condition (PG-04 / PD-04).** Stop decomposing when
+  further splitting wouldn't change the next action. Over-decomposition
+  is AP-09.
+- **Type the dependencies (PD-05).** depends-on / enables /
+  conflicts-with. Untyped dependencies forbidden.
+- **Record provenance (PD-06).** extracted / inferred / user-stated.
+- **Scale constraints (PD-02).** Fan-out ≤ 7 per node; depth ≤ 5.
+
+See `plugins/sulis/references/standards/DECOMPOSITION_PROCEDURE.md` for
+the full operational procedure + `CRITICAL_THINKING_STANDARD.md` §11 for
+the analytical grounding.
+
+### Spiral Verification pattern (v0.7.0+)
+
+A skill that needs to prove it works produces a VERIFICATION_REPORT.md
+on disk scored against SPIRAL_TEMPLATES dimensions. Replaces ad-hoc
+"three perspectives" verification (v0.6.x and earlier).
+
+Shared concerns:
+
+- **Tier selection.** LIGHT (mechanical), STANDARD (most audits), HEAVY
+  (methodology + founder-visible verdict). See SPIRAL_TEMPLATES.md
+  tiering rules.
+- **Dimensions per tier.** STANDARD = ACCA + Evidence Grounding +
+  Structural Coherence + Honest Uncertainty + Codebase Referential
+  Integrity. HEAVY adds Outcome-Specific Rigor + Independence Check.
+- **Codebase Referential Integrity.** Every named entity (file path,
+  tool wrapper, helper module) must trace to the codebase with verified
+  path. NEW entities flagged explicitly; unflagged new = hallucination =
+  0/5.
+- **VERIFICATION_REPORT.md on disk.** Single filesystem check
+  (`test -f ... && grep "Verdict:.*PASS"`) determines compliance.
+- **Independence Check (HEAVY only).** Spawn Agent
+  (subagent_type=Explore) in fresh context — no access to author's
+  reasoning. Score the skill against declared dimensions using only the
+  standards.
+- **Max iterations: 3.** Terminate on sufficient, max_iterations, or
+  irreducible blocker with justification.
+
+See `plugins/sulis/references/standards/SPIRAL_TEMPLATES.md` for the
+full rubric.
+
+### Deepening (upsurge) pattern (v0.7.0+)
+
+A skill that needs to extend coverage against the standards without
+losing existing wiring. `check-security` upsurged from ~3 to ~16
+primitives in the v0.7.0 wave; `code-health` orchestrator preserved
+across the change.
+
+Shared concerns:
+
+- **Gate 1 still runs.** BRIEF_PACK + primitive discovery; existing
+  skill counted as prior art; question becomes "what primitives does
+  this skill currently miss?"
+- **Gate 2 locks the delta.** Not a re-scope; what new primitives are in
+  scope this iteration.
+- **Gate 3 extends, doesn't rewrite.** Preserve orchestrator entries,
+  baseline format, allowlist semantics. Existing tier wiring is the
+  bright line.
+- **Gate 4 re-scores the full skill.** Not just the delta. Produces
+  VERIFICATION_REPORT.md at `iterations/{N}/` to preserve history.
+- **Gate 5 sweeps the new primitives + regression-checks the existing.**
+- **Iteration termination.** All dimensions ≥ threshold AND author marks
+  "no productive lines of inquiry remain."
+
+Distinguishes from full re-author: deepening preserves identity (skill
+name, orchestrator entry, baseline namespace); re-author replaces.
+
 ### Cross-skill self-test (validation pattern)
 
 When authoring multiple skills in a batch, run each newly-authored
@@ -363,17 +501,29 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from _lib import baseline, allowlist, scope
 ```
 
-## On the COMPLETENESS_REPORT.md
+## On the VERIFICATION_REPORT.md
 
 The report is committed alongside SKILL.md. It is not metadata; it is part of
-the skill's identity. Three reasons:
+the skill's identity. Per SPIRAL_TEMPLATES it is also the forcing function — a
+single filesystem check (`test -f ... && grep "Verdict:.*PASS"`) determines
+whether the skill is shipped. Four reasons:
 
-1. **Audit trail.** When the skill is later rewritten or deprecated, the
+1. **Forcing function.** Mechanical compliance check on disk; no judgment
+   call about "is it done." If the file is absent or the verdict is BLOCKED,
+   the skill is definitionally incomplete regardless of other artifacts.
+2. **Audit trail.** When the skill is later rewritten or deepened, the
    report tells the next author which decisions were deliberate and which
-   were deferred.
-2. **Trust calibration.** A skill with PASS verdicts across all five gates is
-   different from a skill with three PASSes and two DEFERREDs. Users and
-   future authors should be able to see this at a glance.
-3. **Process learning.** Patterns across many COMPLETENESS_REPORT.md files
+   were deferred. For deepening mode, write to `iterations/{N}/` to
+   preserve the history.
+3. **Trust calibration.** A skill with PASS across all dimensions is
+   different from a skill with one DEFERRED dimension. Users and future
+   authors see this at a glance.
+4. **Process learning.** Patterns across many VERIFICATION_REPORT.md files
    reveal where the methodology itself has gaps (e.g., if every skill defers
-   the same perspective for the same reason, the methodology needs adjustment).
+   the same dimension for the same reason, the methodology or the standards
+   need adjustment).
+
+**Naming note (v0.7.0+):** the artifact was named COMPLETENESS_REPORT.md
+through v0.6.x. The v0.7.0 rename aligns with SPIRAL_TEMPLATES.md.
+Pre-v0.7.0 skills' COMPLETENESS_REPORT.md files remain valid; new skills
+and upsurges use VERIFICATION_REPORT.md.
