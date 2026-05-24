@@ -1,5 +1,103 @@
 # Sulis — Changelog
 
+## v0.16.0 — 2026-05-24
+
+**Phase 2 iteration 1: all 7 check-* skills upsurged to v0.7.0
+methodology.** Frontmatter blocks (`standards:` / `verification_spiral:`
+/ `related_skills:`) added per skill; iterations/1/VERIFICATION_REPORT.md
+produced per skill scoring against SPIRAL_TEMPLATES rubric.
+
+### Per-skill outcomes
+
+| Skill | Tier | Verdict | Primitives declared | NEW wrappers flagged |
+|-------|------|---------|---------------------|---------------------|
+| check-security | HEAVY | APPROVED-WITH-RISK | 17 (SEC-01..07 + DAT-01..05 + SC-01..04 + INF-03) | semgrep / gitleaks / trivy / testssl / curl |
+| check-build | STANDARD | APPROVED-WITH-RISK | 4 (build / manifest / INF-01 / INF-02) | hadolint / trivy / gitleaks |
+| check-tests | STANDARD | APPROVED-WITH-RISK | 2 (regression / CQ-02) | coverage |
+| check-reliability | STANDARD | APPROVED-WITH-RISK | 6 (existing 4 + INF-04 + DAT-05) | semgrep |
+| check-readability | STANDARD | APPROVED-WITH-RISK | 5 (existing 3 + CQ-01 + CQ-03) | lizard / jscpd |
+| check-maintainability | STANDARD | APPROVED-WITH-RISK | 2 (dead-code + CQ-05) | (none — CQ-05 uses git native) |
+| check-polish | STANDARD | APPROVED | 3 (docs / hygiene / CQ-04) | (none — CQ-04 already implemented; canonical ownership declared) |
+
+### What landed (iteration 1)
+
+For each of the 7 skills:
+
+- SKILL.md frontmatter extended with v0.7.0 spec blocks: `standards:`
+  (input / processing / output phase classification), `verification_spiral:`
+  (tier + template_base + custom_dimensions), `related_skills:` (4
+  canonical relationship types per REFERENTIAL_INTEGRITY)
+- description: extended to reflect deepened scope
+- iterations/1/VERIFICATION_REPORT.md created — per-dimension scoring
+  against SPIRAL_TEMPLATES (ACCA + Evidence Grounding + Structural
+  Coherence + Honest Uncertainty + Codebase Referential Integrity +
+  per-skill custom dimensions)
+
+### What's DEFERRED (iteration 2+)
+
+Per-tool wrapper integration is flagged NEW in each skill's
+`related_skills:` block per the Codebase Referential Integrity policy:
+
+- `_lib/tools/semgrep.py` — needed by check-security + check-reliability
+- `_lib/tools/gitleaks.py` — needed by check-security + check-build
+- `_lib/tools/trivy.py` — needed by check-security + check-build
+- `_lib/tools/hadolint.py` — needed by check-build
+- `_lib/tools/lizard.py` — needed by check-readability
+- `_lib/tools/jscpd.py` — needed by check-readability
+- `_lib/tools/coverage.py` — needed by check-tests
+- `_lib/tools/testssl.py` — needed by check-security (when --url)
+- `_lib/tools/curl_probe.py` — needed by check-security (when --url)
+- `_lib/hypothesis.py` — needed by check-reliability (DAT-05) +
+  check-maintainability (CQ-05)
+- git-log analysis function for check-maintainability CQ-05
+
+Each wrapper / function is built in a dedicated iteration-2 follow-up
+commit per the upsurge plan. Until then, the affected primitives carry
+NOT_ASSESSED status — visible to founders via the renderer, never
+silently substituted with a worse regex heuristic.
+
+### Cross-skill self-test
+
+- check-readability: 0 findings (157 files)
+- check-reliability: 0 findings
+- check-security: 0 findings
+- check-maintainability: 0 findings
+- check-polish: 0 findings
+
+The v0.6.0 cross-skill self-test track record (5 prior data points all
+0-finding) extends to 6 — methodology continues producing
+consistent-quality code.
+
+### Why iteration 1 is APPROVED-WITH-RISK rather than BLOCKED
+
+Per SPIRAL_TEMPLATES: dimensions can carry DEFERRED status with
+structured `revisit_by:` triggers. The Primitive Coverage Completeness
+custom dimension is intentionally DEFERRED for 6 of 7 skills pending
+per-tool wrapper integration. This is the methodology working as
+designed — the upsurge is iterative; each iteration narrows the DEFERRED
+set.
+
+The honest NOT_ASSESSED for un-wired primitives is preferable to a
+misleading PASS via silent regex fallback — that's the trust-calibration
+discipline the methodology was built to enforce.
+
+### Plugin metadata
+
+- plugins/sulis/.claude-plugin/plugin.json: 0.15.0 → 0.16.0
+- .claude-plugin/marketplace.json: sulis 0.15.0 → 0.16.0; marketplace
+  1.57.0 → 1.58.0
+
+### What's next (Phase 2 iteration 2 / Phase 3)
+
+- Per-tool wrapper construction (one or more wrappers per follow-up
+  commit; each wrapper's introducing commit re-verifies the consuming
+  skills under iteration 2's VERIFICATION_REPORT.md)
+- Phase 3 tier composition review (apply MECE + PG to tier layout)
+- Phase 4 cross-validation vs codebase-assess
+- Phase 5 codebase-assess deprecation
+
+---
+
 ## v0.15.0 — 2026-05-24
 
 **Phase 2 foundation: `_lib/tools/` shared tool-integration layer.**

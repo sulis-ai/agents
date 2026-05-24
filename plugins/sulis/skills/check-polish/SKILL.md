@@ -1,6 +1,32 @@
 ---
 name: check-polish
-description: Use when the founder wants to know if the project feels professional — checks documentation completeness (README, CHANGELOG), tech-debt markers (TODO/FIXME/HACK density), and basic file hygiene (trailing whitespace, mixed line endings). Read-only; never modifies code.
+description: Use when the founder wants to know if the project feels professional — checks documentation completeness (README, CHANGELOG), tech-debt markers (TODO/FIXME/HACK density — the canonical CQ-04 owner), and basic file hygiene (trailing whitespace, mixed line endings). Read-only; never modifies code.
+standards:
+  input: [REFERENTIAL_INTEGRITY_STANDARD]
+  processing: [CRITICAL_THINKING_STANDARD]
+  output: [CRITICAL_THINKING_STANDARD]
+verification_spiral:
+  tier: standard
+  template_base: STANDARD_TIER_DEFAULT
+  custom_dimensions:
+    - name: "CQ-04 Canonical Ownership"
+      threshold: ">= 4/5"
+      standard_reference: "plugins/sulis-security/skills/codebase-assess/references/primitives.md CQ-04"
+      scorer: generating_agent
+      evidence_required: "Existing TD-001 + TD-002 patterns + this skill is the canonical CQ-04 owner; codebase-assess defers here post-Phase 5"
+related_skills:
+  - relationship: depends_on
+    skill: code-health
+    notes: invoked as wired tier 7 (Polished) in code-health orchestrator
+  - relationship: depends_on
+    skill: _lib/baseline
+  - relationship: depends_on
+    skill: _lib/allowlist
+  - relationship: depends_on
+    skill: _lib/scope
+  - relationship: supersedes
+    skill: plugins/sulis-security/skills/codebase-assess
+    notes: CQ-04 ownership transfers here post-Phase 5
 ---
 
 # Check Polish

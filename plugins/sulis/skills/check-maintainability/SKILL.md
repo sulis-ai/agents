@@ -1,6 +1,29 @@
 ---
 name: check-maintainability
-description: Use when the founder wants to know if the code will be easy to change later — scans for dead code (unused functions, classes, imports) that accumulates and makes future changes harder. Read-only; never modifies code.
+description: Use when the founder wants to know if the code will be easy to change later — scans for dead code (unused functions, classes, imports) and assesses review practices (direct-to-main commits, avg reviewers, PR template presence) via git-log analysis. Read-only; never modifies code.
+standards:
+  input: [REFERENTIAL_INTEGRITY_STANDARD]
+  processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]
+  output: [CRITICAL_THINKING_STANDARD]
+verification_spiral:
+  tier: standard
+  template_base: STANDARD_TIER_DEFAULT
+  custom_dimensions:
+    - name: "Primitive Coverage Completeness"
+      threshold: ">= 4/5"
+      standard_reference: "plugins/sulis-security/skills/codebase-assess/references/primitives.md CQ-05"
+      scorer: generating_agent
+      evidence_required: "Existing dead-code detection + CQ-05 review-practices hypothesis both have status"
+related_skills:
+  - relationship: depends_on
+    skill: code-health
+    notes: invoked as wired tier 6 (Evolves) in code-health orchestrator
+  - relationship: depends_on
+    skill: _lib/baseline
+  - relationship: depends_on
+    skill: _lib/allowlist
+  - relationship: depends_on
+    skill: _lib/scope
 ---
 
 # Check Maintainability

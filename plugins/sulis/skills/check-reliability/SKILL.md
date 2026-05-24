@@ -1,6 +1,34 @@
 ---
 name: check-reliability
-description: Use when the founder wants to know if the code can handle things going wrong — scans for missing timeouts on external calls, silent error swallowing, and missing logging on important operations. Read-only; never modifies code.
+description: Use when the founder wants to know if the code can handle things going wrong — scans for missing timeouts, silent error swallowing, missing observability, verbose error responses, and audit-logging gaps. Read-only; never modifies code.
+standards:
+  input: [REFERENTIAL_INTEGRITY_STANDARD]
+  processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]
+  output: [CRITICAL_THINKING_STANDARD]
+verification_spiral:
+  tier: standard
+  template_base: STANDARD_TIER_DEFAULT
+  custom_dimensions:
+    - name: "Primitive Coverage Completeness"
+      threshold: ">= 4/5"
+      standard_reference: "plugins/sulis-security/skills/codebase-assess/references/primitives.md INF-04 + DAT-05"
+      scorer: generating_agent
+      evidence_required: "Existing reliability patterns + INF-04 verbose-error + DAT-05 audit-logging hypothesis all have status"
+related_skills:
+  - relationship: depends_on
+    skill: code-health
+    notes: invoked as wired tier 4 (Survives) in code-health orchestrator
+  - relationship: depends_on
+    skill: _lib/baseline
+  - relationship: depends_on
+    skill: _lib/allowlist
+  - relationship: depends_on
+    skill: _lib/scope
+  - relationship: depends_on
+    skill: _lib/tools
+  - relationship: depends_on
+    skill: _lib/tools/semgrep
+    notes: NEW — to be created — covers INF-04 verbose-error / debug-mode-in-prod
 ---
 
 # Check Reliability

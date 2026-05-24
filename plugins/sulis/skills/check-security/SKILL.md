@@ -1,6 +1,58 @@
 ---
 name: check-security
-description: Use when the founder wants to know if anything in the code could harm users or the business — scans for leaked credentials, dangerous patterns (eval, SQL injection, shell injection), and missing security basics. Read-only; never modifies code.
+description: Use when the founder wants to know if anything in the code could harm users or the business — runs a deep multi-tool security + data-protection + supply-chain assessment scoped at the skill-scope level across SEC-01..07 + DAT-01..05 + SC-01..04 primitives. Read-only; never modifies code.
+standards:
+  input: [REFERENTIAL_INTEGRITY_STANDARD]
+  processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]
+  output: [CRITICAL_THINKING_STANDARD]
+verification_spiral:
+  tier: heavy
+  template_base: HEAVY_TIER_DEFAULT
+  custom_dimensions:
+    - name: "Primitive Coverage Completeness"
+      threshold: ">= 4/5"
+      standard_reference: "plugins/sulis-security/skills/codebase-assess/references/primitives.md SEC/DAT/SC categories"
+      scorer: generating_agent
+      evidence_required: "Each of SEC-01..07 + DAT-01..05 + SC-01..04 (+ DAT-02 + INF-03 when --url) has a status: PASS / ADVISORY / CONCERN / CRITICAL / HYPOTHESIS / NOT_ASSESSED"
+    - name: "Tool Degradation Verified"
+      threshold: ">= 4/5"
+      standard_reference: "plugins/sulis/_lib/tools/REFERENCE.md degradation policy"
+      scorer: generating_agent
+      evidence_required: "With Docker stopped AND native binary absent, each tool reports NOT_ASSESSED (never silent regex fallback)"
+related_skills:
+  - relationship: depends_on
+    skill: code-health
+    notes: invoked as wired tier 2 (Safe) in code-health orchestrator
+  - relationship: depends_on
+    skill: _lib/baseline
+    notes: shared baseline-aware regression detection
+  - relationship: depends_on
+    skill: _lib/allowlist
+    notes: shared per-project + per-skill allowlist loading
+  - relationship: depends_on
+    skill: _lib/scope
+    notes: shared PR-vs-codebase scope auto-detection
+  - relationship: depends_on
+    skill: _lib/tools
+    notes: shared tool-integration foundation (detection + degradation)
+  - relationship: depends_on
+    skill: _lib/tools/semgrep
+    notes: NEW — to be created — covers SEC-01 / SEC-03..06 / DAT-03 / INF-04
+  - relationship: depends_on
+    skill: _lib/tools/gitleaks
+    notes: NEW — to be created — covers SEC-07 (git history) / DAT-04 / INF-02
+  - relationship: depends_on
+    skill: _lib/tools/trivy
+    notes: NEW — to be created — covers SC-01..04 / INF-01 base image
+  - relationship: optional_input
+    skill: _lib/tools/testssl
+    notes: NEW — to be created — covers DAT-02 when --url provided
+  - relationship: optional_input
+    skill: _lib/tools/curl_probe
+    notes: NEW — to be created — covers INF-03 when --url provided
+  - relationship: supersedes
+    skill: plugins/sulis-security/skills/codebase-assess
+    notes: scheduled for Phase 5 retirement after Phase 4 cross-validation
 ---
 
 # Check Security

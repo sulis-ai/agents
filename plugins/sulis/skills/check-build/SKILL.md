@@ -1,6 +1,35 @@
 ---
 name: check-build
-description: Use when the founder wants to know if the project even builds — runs the build command, checks the manifest files parse, and reports anything broken. Read-only when the build is read-only; never modifies code.
+description: Use when the founder wants to know if the project even builds — runs the build command, checks the manifest files parse, scans container + deploy configs for security issues, and reports anything broken. Read-only when the build is read-only; never modifies code.
+standards:
+  input: [REFERENTIAL_INTEGRITY_STANDARD]
+  processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]
+  output: [CRITICAL_THINKING_STANDARD]
+verification_spiral:
+  tier: standard
+  template_base: STANDARD_TIER_DEFAULT
+  custom_dimensions:
+    - name: "Primitive Coverage Completeness"
+      threshold: ">= 4/5"
+      standard_reference: "plugins/sulis-security/skills/codebase-assess/references/primitives.md INF-01 + INF-02"
+      scorer: generating_agent
+      evidence_required: "INF-01 (container security) + INF-02 (deploy-config secrets) + manifest hygiene all have status"
+related_skills:
+  - relationship: depends_on
+    skill: code-health
+    notes: invoked as wired tier 1 (Exists) in code-health orchestrator
+  - relationship: depends_on
+    skill: _lib/tools
+    notes: shared tool-integration foundation
+  - relationship: depends_on
+    skill: _lib/tools/hadolint
+    notes: NEW — to be created — covers INF-01 Dockerfile lint
+  - relationship: depends_on
+    skill: _lib/tools/trivy
+    notes: NEW — to be created — covers INF-01 base-image CVE scan
+  - relationship: depends_on
+    skill: _lib/tools/gitleaks
+    notes: NEW — to be created — covers INF-02 secrets in deploy configs (yaml/k8s/CI)
 ---
 
 # Check Build

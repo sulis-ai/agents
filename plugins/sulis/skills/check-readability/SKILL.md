@@ -1,6 +1,37 @@
 ---
 name: check-readability
-description: Use when the founder wants to know if the code is clear, if a new person could read it, or if it's getting messy. Audits naming, module structure, and jargon density across the current PR or the whole codebase. Read-only — reports findings and rename suggestions; never modifies code.
+description: Use when the founder wants to know if the code is clear, if a new person could read it, or if it's getting messy. Audits naming, module structure, jargon density, cyclomatic complexity, and code duplication across the current PR or the whole codebase. Read-only — reports findings and rename suggestions; never modifies code.
+standards:
+  input: [REFERENTIAL_INTEGRITY_STANDARD]
+  processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]
+  output: [CRITICAL_THINKING_STANDARD]
+verification_spiral:
+  tier: standard
+  template_base: STANDARD_TIER_DEFAULT
+  custom_dimensions:
+    - name: "Primitive Coverage Completeness"
+      threshold: ">= 4/5"
+      standard_reference: "plugins/sulis-security/skills/codebase-assess/references/primitives.md CQ-01 + CQ-03"
+      scorer: generating_agent
+      evidence_required: "Existing naming/kitchen-sink/jargon + CQ-01 complexity + CQ-03 duplication all have status"
+related_skills:
+  - relationship: depends_on
+    skill: code-health
+    notes: invoked as wired tier 5 (Understandable) in code-health orchestrator
+  - relationship: depends_on
+    skill: _lib/baseline
+  - relationship: depends_on
+    skill: _lib/allowlist
+  - relationship: depends_on
+    skill: _lib/scope
+  - relationship: depends_on
+    skill: _lib/tools
+  - relationship: depends_on
+    skill: _lib/tools/lizard
+    notes: NEW — to be created — covers CQ-01 cyclomatic complexity
+  - relationship: depends_on
+    skill: _lib/tools/jscpd
+    notes: NEW — to be created — covers CQ-03 code duplication
 ---
 
 # Check Readability

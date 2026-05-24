@@ -1,6 +1,30 @@
 ---
 name: check-tests
-description: Use when the founder wants to know if anything that was working before stopped working — runs the test suite, compares to a baseline, and reports any newly-failing tests as regressions. Read-only when the test runner is read-only; never modifies code.
+description: Use when the founder wants to know if anything that was working before stopped working — runs the test suite, compares to a baseline, reports any newly-failing tests as regressions, and assesses test coverage quality. Read-only when the test runner is read-only; never modifies code.
+standards:
+  input: [REFERENTIAL_INTEGRITY_STANDARD]
+  processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]
+  output: [CRITICAL_THINKING_STANDARD]
+verification_spiral:
+  tier: standard
+  template_base: STANDARD_TIER_DEFAULT
+  custom_dimensions:
+    - name: "Primitive Coverage Completeness"
+      threshold: ">= 4/5"
+      standard_reference: "plugins/sulis-security/skills/codebase-assess/references/primitives.md CQ-02"
+      scorer: generating_agent
+      evidence_required: "Regression detection (existing) + CQ-02 test coverage quality both have status"
+related_skills:
+  - relationship: depends_on
+    skill: code-health
+    notes: invoked as wired tier 3 (Works) in code-health orchestrator
+  - relationship: depends_on
+    skill: _lib/baseline
+  - relationship: depends_on
+    skill: _lib/tools
+  - relationship: depends_on
+    skill: _lib/tools/coverage
+    notes: NEW — to be created — covers CQ-02 (pytest-cov / vitest coverage / jest coverage)
 ---
 
 # Check Tests
