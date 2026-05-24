@@ -106,6 +106,118 @@ class ScanReport:
     allowlisted_count: int
     captured_baseline: bool
     errors: list[str]
+    primitive_status: dict = None  # type: ignore[assignment]
+    hypotheses: list = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.primitive_status is None:
+            self.primitive_status = {}
+        if self.hypotheses is None:
+            self.hypotheses = []
+
+
+# ─── CQ-05 review-practices analysis (v0.22.0+) ───────────────────
+
+
+def _run_review_practices_check(repo_root: Path) -> tuple[list, dict[str, str], list[str]]:
+    """Analyse recent git history for review-practice signals.
+
+    Heuristics (per codebase-assess CQ-05 hypothesis):
+    - Direct-to-main commits: count of commits to main/master in the last
+      90 days that DON'T have a merge-commit parent (single-parent commits
+      authored directly without a PR merge).
+    - Average reviewer count: parsed from `Reviewed-by:` trailers in
+      commit messages (last 100 commits).
+    - PR template presence: `.github/pull_request_template.md` or
+      `.github/PULL_REQUEST_TEMPLATE.md`.
+
+    Returns:
+        (hypotheses, primitive_status, errors)
+    """
+    import subprocess
+
+    sys_path_old = sys.path.copy()
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    try:
+        from _lib.hypothesis import Confidence, Hypothesis
+    finally:
+        sys.path[:] = sys_path_old
+
+    hypotheses: list = []
+    primitive_status: dict[str, str] = {}
+    errors: list[str] = []
+
+    # PR template detection (always check)
+    template_paths = [
+        repo_root / ".github" / "pull_request_template.md",
+        repo_root / ".github" / "PULL_REQUEST_TEMPLATE.md",
+        repo_root / ".github" / "PULL_REQUEST_TEMPLATE" / "default.md",
+    ]
+    has_template = any(p.exists() for p in template_paths)
+
+    # Git log analysis
+    try:
+        # Count commits in last 90 days
+        proc = subprocess.run(
+            ["git", "log", "--since=90.days", "--pretty=format:%H %P"],
+            cwd=str(repo_root), capture_output=True, text=True, timeout=30, check=False,
+        )
+        if proc.returncode != 0:
+            errors.append(f"git log failed: {proc.stderr[:200]}")
+            primitive_status["CQ-05"] = "NOT_ASSESSED"
+            return hypotheses, primitive_status, errors
+
+        commits = [line.strip().split(" ", 1) for line in proc.stdout.splitlines() if line.strip()]
+        total = len(commits)
+        merge_commits = sum(1 for c in commits if len(c) > 1 and len(c[1].split()) > 1)
+        direct_commits = total - merge_commits
+        direct_pct = (direct_commits / total * 100) if total else 0
+
+        # Reviewer-trailer scan (last 100 commits)
+        proc2 = subprocess.run(
+            ["git", "log", "-100", "--pretty=format:%b"],
+            cwd=str(repo_root), capture_output=True, text=True, timeout=30, check=False,
+        )
+        body = proc2.stdout if proc2.returncode == 0 else ""
+        reviewer_lines = sum(1 for line in body.splitlines() if line.lower().startswith("reviewed-by:"))
+        reviewer_per_100 = reviewer_lines  # rough proxy
+
+        # Form hypothesis
+        signals = []
+        signals.append(f"{direct_pct:.0f}% direct-to-main commits (last 90 days; {direct_commits} of {total})")
+        signals.append(f"PR template: {'present' if has_template else 'absent'}")
+        signals.append(f"Reviewed-by trailers in last 100 commits: {reviewer_per_100}")
+
+        # Confidence calibration
+        if total < 10:
+            confidence = Confidence.UNVALIDATED
+            statement = "Not enough commit history (last 90 days) to assess review practices"
+        elif direct_pct > 50 and not has_template:
+            confidence = Confidence.SUPPORTED
+            statement = "Review practices likely informal: high direct-to-main ratio + no PR template"
+        elif direct_pct < 10 and has_template and reviewer_per_100 > 20:
+            confidence = Confidence.SUPPORTED
+            statement = "Review practices appear formal: low direct-to-main + PR template + reviewer trailers"
+        elif direct_pct < 30:
+            confidence = Confidence.EMERGING
+            statement = f"Review practices likely moderate: {direct_pct:.0f}% direct-to-main commits"
+        else:
+            confidence = Confidence.EMERGING
+            statement = f"Review practices unclear: {direct_pct:.0f}% direct-to-main commits, template={'yes' if has_template else 'no'}"
+
+        hypotheses.append(Hypothesis(
+            primitive_id="CQ-05",
+            statement=statement,
+            evidence=signals,
+            confidence=confidence,
+            verification_question="Does the team have a documented review process? How are direct-to-main commits authorised?",
+        ))
+        primitive_status["CQ-05"] = "HYPOTHESIS"
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
+        errors.append(f"CQ-05 git log analysis failed: {exc}")
+        primitive_status["CQ-05"] = "NOT_ASSESSED"
+
+    return hypotheses, primitive_status, errors
 
 
 # ─── Symbol extraction ──────────────────────────────────────────────
@@ -362,6 +474,8 @@ def render_json(report: ScanReport) -> str:
         "allowlisted_count": report.allowlisted_count,
         "captured_baseline": report.captured_baseline,
         "errors": report.errors,
+        "primitive_status": report.primitive_status,
+        "hypotheses": [h.to_dict() if hasattr(h, "to_dict") else h for h in report.hypotheses],
     }, indent=2)
 
 
@@ -426,6 +540,8 @@ def main() -> int:
     parser.add_argument("--pr-number", type=int, default=None)
     parser.add_argument("--update-baseline", action="store_true")
     parser.add_argument("--raw", action="store_true")
+    parser.add_argument("--skip-cq05", action="store_true",
+        help="skip CQ-05 review-practices git-log analysis")
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -526,6 +642,19 @@ def main() -> int:
         baseline.save_namespace(repo_root, args.project, "tier_6_findings", sorted(current_sigs))
         captured_baseline = True
 
+    # CQ-05 review-practices hypothesis (v0.22.0+)
+    hypotheses: list = []
+    primitive_status: dict[str, str] = {}
+    if not args.skip_cq05:
+        try:
+            hypotheses, primitive_status, cq05_errors = _run_review_practices_check(repo_root)
+            scope_errors.extend(cq05_errors)
+        except Exception as exc:  # noqa: BLE001
+            scope_errors.append(f"CQ-05 review-practices check failed: {exc}")
+            primitive_status["CQ-05"] = "NOT_ASSESSED"
+    else:
+        primitive_status["CQ-05"] = "NOT_ASSESSED"
+
     report = ScanReport(
         project=args.project,
         scope=resolved_scope,
@@ -538,6 +667,8 @@ def main() -> int:
         allowlisted_count=allowlisted_count,
         captured_baseline=captured_baseline,
         errors=scope_errors,
+        primitive_status=primitive_status,
+        hypotheses=hypotheses,
     )
 
     if args.raw:

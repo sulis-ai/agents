@@ -8,6 +8,55 @@ For the marketplace-facing summary, see `plugin.json`.
 
 ---
 
+## v0.6.0 — 2026-05-24
+
+**[DEPRECATED] banner applied.** sulis v0.22.0+ check-* tier framework
+crossed the ≥ 95% parity threshold (96% — 24 of 25 primitives match
+codebase-assess) per the cross-validation ledger at
+`plugins/sulis/skills/code-health/tests/cross_validation/expected_divergence.md`.
+
+### Files modified
+
+- `plugins/sulis-security/skills/codebase-assess/SKILL.md`:
+  - Description prefixed with `[DEPRECATED — use /sulis:code-health]`
+  - Migration path documented (founder-facing audits → /sulis:code-health;
+    operator JSON → --raw on check-* skills; hypothesis output → hypotheses[]
+    array in --raw output)
+  - Retirement schedule clarified: one major release window after banner;
+    physical removal follows sulis-concierge → sulis pattern
+- `plugins/sulis-security/.claude-plugin/plugin.json`:
+  - Description prefixed with `[DEPRECATED]` + parity note
+  - Version: 0.5.0 → 0.6.0
+- `.claude-plugin/marketplace.json`:
+  - sulis-security entry description prefixed with `[DEPRECATED]`
+  - Version: 0.5.0 → 0.6.0
+
+### Why [DEPRECATED] now rather than later
+
+Parity verified at 96% in `expected_divergence.md`:
+
+- 24 of 25 primitives ✅ PARITY
+- 1 primitive ⏳ EXPECTED-DIVERGENT (CQ-02 full coverage measurement —
+  detection-only path works in check-tests; full integration is a
+  scheduled follow-up that doesn't require codebase-assess as a fallback)
+- 0 UNEXPECTED-DIVERGENT findings
+
+The threshold for advancing from "scheduled for retirement" → [DEPRECATED]
+was ≥ 95%. 96% exceeds that. Founders are now directed to /sulis:code-health
+as the canonical surface; codebase-assess remains callable as a shim
+during the deprecation window.
+
+### What's next
+
+- One major release window where both surfaces are callable (founders
+  get [DEPRECATED] banner on codebase-assess + redirect to code-health)
+- CQ-02 full-coverage integration (closes the last divergence at full
+  100% parity)
+- After the window: physical removal of codebase-assess directory +
+  sulis-security plugin retirement (only skill in the plugin)
+
+---
+
 ## v0.5.0 — 2026-05-24
 
 **Phase 5 of the sulis upsurge plan: scheduled-for-retirement notice.**

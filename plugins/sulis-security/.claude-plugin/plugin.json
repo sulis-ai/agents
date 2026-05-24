@@ -1,7 +1,7 @@
 {
   "name": "sulis-security",
-  "description": "Security & Viability Reviewer — runs a 25-primitive codebase viability assessment (security, data protection, code quality, supply chain, infrastructure) via an OODA-spiral methodology. Produces evidence-backed reports with scores, attack chains, and hypotheses.",
-  "version": "0.5.0",
+  "description": "[DEPRECATED — use /sulis:code-health] Security & Viability Reviewer. Superseded by sulis v0.22.0+ check-* tier framework which covers 24 of 25 primitives at 96% parity. Kept for one major release window as a deprecation shim.",
+  "version": "0.6.0",
   "author": {
     "name": "Iain"
   },

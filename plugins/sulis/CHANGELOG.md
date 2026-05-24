@@ -1,5 +1,107 @@
 # Sulis — Changelog
 
+## v0.22.0 — 2026-05-24
+
+**Phase 4 iteration 3: closes 2 of 3 remaining EXPECTED-DIVERGENT
+primitives. Parity climbs from 88% → 96% — crosses the codebase-assess
+deprecation threshold (≥ 95%).**
+
+### Changes
+
+**SEC-07 default depth (gitleaks full history):**
+
+- `plugins/sulis/skills/check-security/scripts/scanner.py`:
+  - `--scan-git-history` now default `True` (was `False`)
+  - New `--no-scan-git-history` flag for opt-out (HEAD-only fast path)
+  - Closes SEC-07 divergence — code-health now matches codebase-assess's
+    `--unshallow` default.
+
+**CQ-05 review-practices analysis (check-maintainability):**
+
+- `plugins/sulis/skills/check-maintainability/scripts/scanner.py`:
+  - New `_run_review_practices_check()` function — analyses last 90 days
+    of git history for:
+    - Direct-to-main commit ratio (single-parent commits / total)
+    - PR template presence (`.github/pull_request_template.md` +
+      variants)
+    - Reviewed-by trailer count in last 100 commit bodies
+  - Emits `Hypothesis` (via `_lib/hypothesis.py`) with calibrated
+    confidence (VALIDATED / SUPPORTED / EMERGING / UNVALIDATED per
+    CRITICAL_THINKING_STANDARD CC) and verification question for the
+    team
+  - New `--skip-cq05` flag for opt-out
+  - `ScanReport` dataclass gains `primitive_status` + `hypotheses`
+    fields; `render_json` emits them
+  - Live-tested on agents marketplace: surfaced "Review practices likely
+    informal" hypothesis with SUPPORTED confidence (100% direct-to-main
+    in last 90 days; no PR template; 0 Reviewed-by trailers — note: the
+    marketplace uses Co-Authored-By trailers but not the Reviewed-by
+    convention)
+
+**Allowlist additions:**
+
+- `.checkup/agents/check-reliability-allowlist.md`: 2 new entries
+  (boundary-catch in CQ-05 + new main-level catch in check-security)
+
+### Parity trajectory
+
+- v0.19.0 wrappers built: 4% → ready for integration
+- v0.20.0 wrappers wired: 4% → 88%
+- v0.22.0 SEC-07 default + CQ-05: 88% → **96%** ✅ crosses threshold
+
+### Cross-validation expected_divergence.md updated
+
+- SEC-07 now ✅ PARITY
+- CQ-05 now ✅ PARITY (both hypothesis-form)
+- Only CQ-02 remains ⏳ EXPECTED-DIVERGENT (full coverage measurement
+  vs. detection-only)
+
+### codebase-assess [DEPRECATED] — Phase 5 advance
+
+`plugins/sulis-security/`:
+
+- skills/codebase-assess/SKILL.md: description prefixed with
+  `[DEPRECATED — use /sulis:code-health]` + migration path documented
+- .claude-plugin/plugin.json: description prefixed `[DEPRECATED]` +
+  version 0.5.0 → 0.6.0
+- CHANGELOG.md: v0.6.0 entry documenting parity verification at 96% +
+  deprecation rationale + retirement schedule
+
+`.claude-plugin/marketplace.json`:
+
+- sulis-security entry description fully rewritten with [DEPRECATED]
+  + parity note + redirect target
+- sulis-security version: 0.5.0 → 0.6.0
+
+The threshold for [DEPRECATED] was ≥ 95% parity. 96% exceeds it.
+Founders are now directed to /sulis:code-health as the canonical
+surface; codebase-assess remains callable as a shim during the
+deprecation window. Physical removal follows the sulis-concierge → sulis
+pattern: one major release after banner.
+
+### Cross-skill self-test
+
+All 7 skills: 0 findings after allowlist additions. Methodology track
+record extends 7 → 8 data points.
+
+### Plugin metadata
+
+- plugins/sulis/.claude-plugin/plugin.json: 0.21.0 → 0.22.0
+- plugins/sulis-security/.claude-plugin/plugin.json: 0.5.0 → 0.6.0
+- .claude-plugin/marketplace.json: sulis 0.21.0 → 0.22.0;
+  sulis-security 0.5.0 → 0.6.0; marketplace 1.64.0 → 1.65.0
+
+### What's deferred (one remaining divergence)
+
+CQ-02 full coverage measurement: detection-only path works (check-tests
+detects pytest-cov / vitest / jest presence). Full integration —
+running suite with --cov, parsing per-file rates, flagging uncovered
+files — requires per-framework integration with the existing test-runner
+dispatch. Doesn't block the [DEPRECATED] decision (parity is 96% > 95%);
+scheduled as a follow-up commit when needed.
+
+---
+
 ## v0.21.0 — 2026-05-24
 
 **Phase 2 iteration 2 verification: VERIFICATION_REPORT.md iteration 2

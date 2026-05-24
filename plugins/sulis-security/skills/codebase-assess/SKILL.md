@@ -1,23 +1,32 @@
 ---
 name: codebase-assess
 description: >
-  Use when running an evidence-based viability assessment against a codebase
-  (and optionally a deployed URL). Covers 25 primitives across 5 categories —
-  Security, Data Protection, Code Quality, Supply Chain, Infrastructure —
-  using an OODA-spiral methodology. Produces a structured viability report
-  with scores, attack chains, and hypotheses. Use for production-readiness
-  reviews, compliance preparation, or pre-merge security audits.
+  [DEPRECATED — use /sulis:code-health] This skill is superseded by sulis
+  v0.22.0+ /sulis:code-health which covers 24 of 25 codebase-assess
+  primitives at 96% parity (only CQ-02 full coverage measurement remains
+  deferred). The check-* tier framework integrates the same tool stack
+  (Semgrep, Gitleaks, Trivy, hadolint, testssl.sh, curl) plus lizard +
+  jscpd via plugins/sulis/_lib/tools/, with founder-facing
+  output + baseline-aware regression detection + per-project allowlists.
 
-  MIGRATION NOTICE (sulis v0.18.0+ / 2026-05-24): the 25-primitive
-  catalogue is migrating into the sulis plugin's check-* tier framework.
-  See plan at /Users/iain/.claude/plans/eager-crunching-quail.md. This
-  skill remains the canonical depth tool through Phase 4 (cross-validation
-  vs code-health) and the early portion of Phase 5 (parity-based soft
-  deprecation). Founders running production-readiness audits today should
-  continue using /sulis-security:codebase-assess — its tool integration
-  (Semgrep / Gitleaks / Trivy / hadolint / testssl) is established;
-  the equivalent wrappers in plugins/sulis/_lib/tools/ are NEW pending
-  Phase 2 iteration 2.
+  Original description (kept for context): Use when running an
+  evidence-based viability assessment against a codebase (and optionally
+  a deployed URL). Covers 25 primitives across 5 categories — Security,
+  Data Protection, Code Quality, Supply Chain, Infrastructure — using an
+  OODA-spiral methodology. Produces a structured viability report with
+  scores, attack chains, and hypotheses.
+
+  Migration path for callers:
+  - Founder-facing audits: use /sulis:code-health (full tier sweep)
+    or /sulis:check-security (security only with deployed-URL support
+    via --url)
+  - Operator JSON envelope: use --raw flag on /sulis:check-* skills
+  - Hypothesis output (DAT-01 / DAT-05 / CQ-05): hypotheses[] array in
+    --raw output from the appropriate check-* skill
+
+  Retirement schedule: this skill remains callable through one major
+  release window after the [DEPRECATED] banner; physical removal follows
+  per the established sulis-concierge → sulis deprecation pattern.
 ---
 
 # Codebase Viability Assessment

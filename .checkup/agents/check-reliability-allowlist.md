@@ -51,3 +51,5 @@ broad-except::plugins/sulis/skills/check-security/scripts/scanner.py::299: tool-
 broad-except::plugins/sulis/skills/check-security/scripts/scanner.py::314: tool-wrapper boundary catch (testssl)
 broad-except::plugins/sulis/skills/check-security/scripts/scanner.py::326: tool-wrapper boundary catch (curl_probe)
 broad-except::plugins/sulis/skills/check-security/scripts/scanner.py::587: tool-wrapper boundary catch (main-level)
+broad-except::plugins/sulis/skills/check-security/scripts/scanner.py::591: tool-wrapper boundary catch (main-level v0.22.0+)
+broad-except::plugins/sulis/skills/check-maintainability/scripts/scanner.py::652: CQ-05 git-log analysis boundary catch (v0.22.0+)

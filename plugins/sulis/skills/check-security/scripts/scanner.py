@@ -533,8 +533,12 @@ def main() -> int:
         help="deployed URL — triggers testssl (DAT-02) + curl_probe (INF-03)",
     )
     parser.add_argument(
-        "--scan-git-history", action="store_true",
-        help="gitleaks --no-git off; scans full git history (SEC-07)",
+        "--scan-git-history", action="store_true", default=True,
+        help="gitleaks scans full git history (SEC-07 default). Disable with --no-scan-git-history.",
+    )
+    parser.add_argument(
+        "--no-scan-git-history", dest="scan_git_history", action="store_false",
+        help="gitleaks HEAD-only scan (faster; SEC-07 partial only).",
     )
     parser.add_argument(
         "--skip-tools", action="store_true",
