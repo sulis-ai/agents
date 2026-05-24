@@ -463,9 +463,32 @@ def main() -> int:
         symbol_total += len(defs)
 
     # Build reference graph across ALL files (including tests — they
-    # reference production code, which counts)
-    # Pull text from skipped files too for ref purposes
+    # reference production code, which counts).
+    # ALSO include extensionless Python scripts (detected by shebang).
+    # Without this, _wpxlib.py symbols like cli_main / add_common_args /
+    # PlanResult / find_change_branches appear "dead" because they're
+    # used in scripts/wpx-pipeline, scripts/wpx-worktree, scripts/sulis-
+    # change — files with no .py extension that won't match
+    # SCANNABLE_EXTENSIONS. Real bug; surfaced during cleanup-iteration
+    # round 3.
     full_files = scope.list_codebase_files(repo_root, SCANNABLE_EXTENSIONS) if resolved_scope == "codebase" else files
+    # Add extensionless scripts that look Python (shebang-detected)
+    all_tracked = scope.list_codebase_files(repo_root, None)
+    for candidate in all_tracked:
+        if candidate in full_files or is_skipped_path(candidate):
+            continue
+        if Path(candidate).suffix:
+            continue  # has an extension; if not .py, not relevant
+        # Extensionless: check shebang
+        candidate_path = repo_root / candidate
+        if not candidate_path.is_file():
+            continue
+        try:
+            first_line = candidate_path.read_text(encoding="utf-8", errors="ignore")[:200]
+        except OSError:
+            continue
+        if first_line.startswith("#!") and "python" in first_line.split("\n", 1)[0]:
+            full_files.append(candidate)
     for f in full_files:
         if f not in file_texts:
             path = repo_root / f

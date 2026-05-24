@@ -83,7 +83,7 @@ def build_svg(initials: str, primary: str, surface: str, font_sans: str, variant
 """
 
 
-def build(company_name: str, tokens_path: Path, output_path: Path, variant: str = "light") -> int:
+def build_monogram(company_name: str, tokens_path: Path, output_path: Path, variant: str = "light") -> int:
     if not tokens_path.is_file():
         print(f"ERROR: tokens.json not found: {tokens_path}", file=sys.stderr)
         return 1
@@ -117,7 +117,7 @@ def main(argv: list[str]) -> int:
         print(__doc__, file=sys.stderr)
         return 1
 
-    return build(args[0], Path(args[1]), Path(args[2]), variant=variant)
+    return build_monogram(args[0], Path(args[1]), Path(args[2]), variant=variant)
 
 
 if __name__ == "__main__":

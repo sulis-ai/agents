@@ -1,1 +1,10 @@
-{"name":"ts-simple","dependencies":{"express":"^4"},"devDependencies":{"vitest":"^1"}}
+{
+  "name": "ts-simple",
+  "dependencies": {
+    "express": "^4"
+  },
+  "devDependencies": {
+    "vitest": "^1"
+  },
+  "version": "0.0.0"
+}

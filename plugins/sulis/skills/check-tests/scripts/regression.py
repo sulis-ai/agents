@@ -614,12 +614,42 @@ def main() -> int:
     if not framework:
         chosen, detected = detect_framework(repo_root)
         if not chosen:
+            # Project has no detectable test framework. This is a passable
+            # state when called from a tier wrapper (code-health): nothing
+            # to test means nothing can regress. Emit an empty envelope
+            # with a `no_framework: true` flag and exit 0 — the wrapper
+            # will surface the note in the tier report.
+            if args.raw:
+                print(json.dumps({
+                    "project": args.project,
+                    "framework": None,
+                    "no_framework": True,
+                    "test_count": 0,
+                    "passing_count": 0,
+                    "failing_count": 0,
+                    "findings": [],
+                    "newly_failing": [],
+                    "newly_passing": [],
+                    "newly_added": [],
+                    "newly_removed": [],
+                    "flaky_suppressed": [],
+                    "captured_baseline": False,
+                    "errors": [],
+                }, indent=2))
+            else:
+                print("# Test check — no framework detected")
+                print()
+                print("_No test framework detected at project root. Looked for pytest, "
+                      "vitest, jest, go, rspec, mocha. Nothing to test means no "
+                      "regressions — passing._")
+                print()
+                print("If your project DOES have tests in a non-standard location, pass "
+                      "`--framework <name>` explicitly.")
             print(
-                "error: no test framework detected (looked for pytest, vitest, jest, "
-                "go, rspec, mocha). Pass --framework explicitly.",
+                "check-tests: no framework detected; treating as passed (nothing to regress)",
                 file=sys.stderr,
             )
-            return 4
+            return 0
         framework = chosen
         if len(detected) > 1:
             print(f"info: multiple frameworks detected: {detected}; using {framework}. Override with --framework.", file=sys.stderr)

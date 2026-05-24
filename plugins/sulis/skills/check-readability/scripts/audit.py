@@ -43,6 +43,7 @@ from pathlib import Path
 
 # _lib/ shared helpers (canonical pattern per add-skill v0.6.0).
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from _lib import allowlist as _allowlist  # noqa: E402
 from _lib import scope as _scope  # noqa: E402
 
 
@@ -645,7 +646,14 @@ def main() -> int:
         default=".",
         help="Repo root (defaults to cwd).",
     )
+    parser.add_argument(
+        "--project",
+        default=None,
+        help="Project slug for the per-project allowlist (defaults to repo-root basename).",
+    )
     args = parser.parse_args()
+    if args.project is None:
+        args.project = Path(args.repo_root).resolve().name
 
     repo_root = Path(args.repo_root).resolve()
     if not (repo_root / ".git").exists():
@@ -690,6 +698,23 @@ def main() -> int:
             args.kitchen_sink_concerns_threshold,
             args.jargon_threshold,
         ))
+
+    # Apply per-project allowlist. Signature shape:
+    # `{heuristic}::{file}::{line}` — matches the convention used by
+    # other check-* skills' allowlists.
+    allowlist_path = (
+        repo_root / ".checkup" / args.project / "check-readability-allowlist.md"
+    )
+    allow_signatures = _allowlist.load_allowlist(allowlist_path)
+    if allow_signatures:
+        pre = len(findings)
+        findings = [
+            f for f in findings
+            if f"{f.heuristic}::{f.file}::{f.line}" not in allow_signatures
+        ]
+        allowlisted = pre - len(findings)
+        if allowlisted:
+            print(f"audit: allowlisted {allowlisted} finding(s)", file=sys.stderr)
 
     env = AuditEnvelope(
         scope=scope,

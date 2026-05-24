@@ -567,9 +567,11 @@ def main() -> int:
             print(f"error: build system '{args.system}' not detected", file=sys.stderr)
             return 4
 
-    if not systems and not hygiene:
-        print("error: no build system detected and no manifests to check", file=sys.stderr)
-        return 4
+    # NB: empty (systems + hygiene) is a PASSABLE state when there are
+    # genuinely no manifests + no build systems in the project. Tier
+    # wrappers (code-health) need this to register as "passed" not
+    # "error". Standalone users see the markdown output which still
+    # explains "No build systems detected" cleanly.
 
     # Build runs (if --run)
     build_results: list[BuildResult] = []

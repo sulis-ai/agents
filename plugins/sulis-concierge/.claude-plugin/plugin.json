@@ -9,6 +9,7 @@
   "license": "MIT",
   "keywords": [
     "deprecated",
-    "moved-to-sulis"
+    "moved-to-sulis",
+    "redirect-shim"
   ]
 }
