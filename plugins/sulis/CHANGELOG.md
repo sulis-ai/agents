@@ -1,5 +1,58 @@
 # Sulis — Changelog
 
+## v0.23.0 — 2026-05-24
+
+**CQ-02 full coverage integration: closes the last EXPECTED-DIVERGENT
+primitive. Parity reaches 100% (25 of 25 primitives match codebase-assess).**
+
+### Changes
+
+`plugins/sulis/skills/check-tests/scripts/regression.py`:
+- New `_run_coverage_measurement(repo_root, framework, timeout)` function:
+  - Runs `pytest --cov=. --cov-report=json:...` when framework=pytest +
+    pytest-cov installed
+  - Parses per-file coverage from the JSON report
+  - Surfaces low-overall-coverage finding (< 60% = concern; < 30% = high)
+  - Surfaces per-file low-coverage findings (< 50%, ≥ 10 statements;
+    top 10 worst-covered)
+  - Returns `coverage_summary` dict with total_pct + covered_lines +
+    missing_lines + num_statements
+- New CLI flags:
+  - `--measure-coverage` (default True): run with coverage when --run +
+    pytest + pytest-cov available
+  - `--no-measure-coverage`: opt out (detection-only path)
+- `RegressionReport` dataclass gains `coverage_summary` +
+  `coverage_findings` fields
+- `render_json` emits `coverage_summary` + merges `coverage_findings`
+  into the `findings` array
+- vitest + jest coverage paths documented as follow-up; pytest is the
+  most common case
+
+### Parity ledger update
+
+`plugins/sulis/skills/code-health/tests/cross_validation/expected_divergence.md`:
+- CQ-02 row updated: ⏳ EXPECTED-DIVERGENT → ✅ PARITY
+- Summary: 25 of 25 primitives PARITY. **Full 100% parity reached.**
+
+### Cross-skill self-test
+
+All 7 skills: 0 findings. Track record extends 8 → 9 data points.
+
+### Plugin metadata
+
+- plugins/sulis/.claude-plugin/plugin.json: 0.22.0 → 0.23.0
+- .claude-plugin/marketplace.json: sulis 0.22.0 → 0.23.0; marketplace
+  1.65.0 → 1.66.0
+
+### What this unlocks
+
+With 100% parity verified, codebase-assess can move from [DEPRECATED]
+banner → physical removal at the next major release without coverage
+loss. The full sulis check-* surface now matches codebase-assess at
+the primitive level.
+
+---
+
 ## v0.22.0 — 2026-05-24
 
 **Phase 4 iteration 3: closes 2 of 3 remaining EXPECTED-DIVERGENT

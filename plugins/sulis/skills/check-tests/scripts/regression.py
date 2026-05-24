@@ -99,9 +99,11 @@ class RegressionReport:
     errors: list[str]
     captured_baseline: bool  # True if this run captured a new baseline
     primitive_status: dict[str, str] = field(default_factory=dict)
+    coverage_summary: dict = field(default_factory=dict)
+    coverage_findings: list[dict] = field(default_factory=list)
 
 
-# ─── External tool integration (v0.20.0+) — CQ-02 coverage tool detection ─────────────
+# ─── External tool integration (v0.20.0+) — CQ-02 coverage measurement ─────────────
 
 
 def _assess_coverage_tool() -> str:
@@ -110,10 +112,8 @@ def _assess_coverage_tool() -> str:
     Returns one of: "PASS" (tool detected), "NOT_ASSESSED" (no tool found),
     "NOT_APPLICABLE" (no test framework detected at all).
 
-    Lightweight: just detects tool presence; doesn't run the suite. Full
-    coverage measurement is a follow-up — wiring pytest-cov + vitest +
-    jest coverage tools per framework into the existing test runner is
-    more invasive than iteration-2 scope.
+    Lightweight: just detects tool presence. For full coverage measurement
+    (running suite + parsing per-file rates), use _run_coverage_measurement().
     """
     sys_path_old = sys.path.copy()
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
@@ -122,6 +122,126 @@ def _assess_coverage_tool() -> str:
         return "PASS" if coverage.is_available().value != "not_available" else "NOT_ASSESSED"
     finally:
         sys.path[:] = sys_path_old
+
+
+def _run_coverage_measurement(
+    repo_root: Path,
+    framework: str,
+    timeout: int,
+) -> tuple[list[dict], dict, list[str]]:
+    """Run the test suite with coverage and parse the report.
+
+    Currently supports pytest+pytest-cov. vitest / jest follow-up.
+
+    Args:
+        repo_root: absolute repo path
+        framework: detected framework (must be "pytest" for current support)
+        timeout: subprocess timeout
+
+    Returns:
+        (findings, coverage_summary, errors)
+        findings: list of finding dicts (low-coverage files)
+        coverage_summary: dict with total_pct, covered_lines, missing_lines
+        errors: list of error strings
+    """
+    findings: list[dict] = []
+    summary: dict = {}
+    errors: list[str] = []
+
+    if framework != "pytest":
+        return findings, summary, [f"coverage measurement for {framework} not yet implemented; pytest-cov path only"]
+
+    # Verify pytest-cov is importable
+    try:
+        import pytest_cov  # noqa: F401
+    except ImportError:
+        return findings, summary, ["pytest-cov not installed; install with `pip install pytest-cov`"]
+
+    # Run pytest with coverage, JSON output
+    coverage_json_path = repo_root / ".coverage_check_tests.json"
+    cmd = [
+        "pytest", "--quiet", "--no-header",
+        "-p", "no:cacheprovider",
+        "--cov=.",
+        f"--cov-report=json:{coverage_json_path}",
+        "--cov-report=",
+    ]
+    try:
+        proc = subprocess.run(
+            cmd, cwd=str(repo_root), capture_output=True, text=True, timeout=timeout, check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return findings, summary, [f"pytest --cov timed out after {timeout}s"]
+    except FileNotFoundError:
+        return findings, summary, ["pytest not installed"]
+
+    if proc.returncode not in (0, 1, 5):
+        errors.append(f"pytest --cov exited rc={proc.returncode}; stderr: {proc.stderr[:200]}")
+
+    if not coverage_json_path.exists():
+        errors.append(f"coverage JSON not produced at {coverage_json_path}")
+        return findings, summary, errors
+
+    try:
+        data = json.loads(coverage_json_path.read_text())
+    except (json.JSONDecodeError, OSError) as exc:
+        errors.append(f"coverage JSON parse failed: {exc}")
+        return findings, summary, errors
+    finally:
+        try:
+            coverage_json_path.unlink()
+        except OSError:
+            pass
+
+    # Summary
+    totals = data.get("totals", {})
+    total_pct = totals.get("percent_covered", 0)
+    summary["total_pct"] = total_pct
+    summary["covered_lines"] = totals.get("covered_lines", 0)
+    summary["missing_lines"] = totals.get("missing_lines", 0)
+    summary["num_statements"] = totals.get("num_statements", 0)
+
+    # Overall low-coverage finding
+    if total_pct < 60:
+        findings.append({
+            "tool": "pytest-cov",
+            "rule_id": "CQ-02-low-overall-coverage",
+            "file": "<repo-root>",
+            "line": 1,
+            "severity": "concern" if total_pct >= 30 else "high",
+            "message": f"Overall test coverage is {total_pct:.1f}% (target ≥ 60%)",
+            "extras": {
+                "covered_lines": summary["covered_lines"],
+                "missing_lines": summary["missing_lines"],
+            },
+        })
+
+    # Per-file low coverage (top 10 worst-covered files)
+    files = data.get("files", {})
+    per_file = []
+    for file_path, file_data in files.items():
+        file_summary = file_data.get("summary", {})
+        pct = file_summary.get("percent_covered", 100)
+        statements = file_summary.get("num_statements", 0)
+        if pct < 50 and statements >= 10:  # skip tiny files
+            per_file.append((pct, file_path, file_summary))
+    per_file.sort(key=lambda x: x[0])
+    for pct, file_path, file_summary in per_file[:10]:
+        findings.append({
+            "tool": "pytest-cov",
+            "rule_id": "CQ-02-low-file-coverage",
+            "file": file_path,
+            "line": 1,
+            "severity": "advisory",
+            "message": f"File coverage is {pct:.1f}% ({file_summary.get('missing_lines', 0)} missing lines)",
+            "extras": {
+                "covered_lines": file_summary.get("covered_lines", 0),
+                "missing_lines": file_summary.get("missing_lines", 0),
+                "num_statements": file_summary.get("num_statements", 0),
+            },
+        })
+
+    return findings, summary, errors
 
 
 # ─── Framework detection ────────────────────────────────────────────
@@ -477,13 +597,14 @@ def render_json(report: RegressionReport) -> str:
         "newly_removed": report.newly_removed,
         "flaky_suppressed": report.flaky_suppressed,
         "captured_baseline": report.captured_baseline,
-        # Orchestrator-compatible findings shape (only regressions surface here)
-        "findings": findings,
+        # Orchestrator-compatible findings shape (regressions + coverage)
+        "findings": findings + report.coverage_findings,
         "errors": report.errors,
         "primitive_status": report.primitive_status,
         "not_assessed": sorted(
             prim for prim, status in report.primitive_status.items() if status == "NOT_ASSESSED"
         ),
+        "coverage_summary": report.coverage_summary,
     }
     return json.dumps(payload, indent=2)
 
@@ -614,6 +735,11 @@ def main() -> int:
     parser.add_argument("--update-baseline", action="store_true", help="Overwrite baseline with current results (requires confirmation)")
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS)
     parser.add_argument("--raw", action="store_true", help="Output JSON")
+    parser.add_argument("--measure-coverage", action="store_true",
+        help="Run with coverage measurement (CQ-02 full integration). Requires --run, pytest framework, pytest-cov installed.")
+    parser.add_argument("--no-measure-coverage", dest="measure_coverage", action="store_false",
+        help="Skip coverage measurement (CQ-02 detection-only).")
+    parser.set_defaults(measure_coverage=True)
     # Accepted-but-ignored flags for orchestrator compatibility. check-tests
     # doesn't yet do scope-aware test selection (would require per-framework
     # filter paths); accepting the flag means the orchestrator can pass the
@@ -739,12 +865,25 @@ def main() -> int:
             compute_delta(results, baseline, flaky)
         )
 
-    # CQ-02 coverage tool detection (v0.20.0+)
+    # CQ-02 coverage measurement (v0.23.0+) — full integration when --run + pytest + pytest-cov
     primitive_status: dict[str, str] = {}
-    if framework:
-        primitive_status["CQ-02"] = _assess_coverage_tool()
-    else:
+    coverage_summary: dict = {}
+    coverage_findings_dicts: list[dict] = []
+    if not framework:
         primitive_status["CQ-02"] = "NOT_APPLICABLE"
+    elif args.measure_coverage and args.run and framework == "pytest":
+        cov_findings, coverage_summary, cov_errors = _run_coverage_measurement(
+            repo_root, framework, args.timeout,
+        )
+        errors.extend(cov_errors)
+        coverage_findings_dicts = cov_findings
+        if coverage_summary.get("total_pct") is not None:
+            primitive_status["CQ-02"] = "PASS"
+        else:
+            primitive_status["CQ-02"] = _assess_coverage_tool()
+    else:
+        # detection-only fallback (no --run, or non-pytest framework)
+        primitive_status["CQ-02"] = _assess_coverage_tool()
 
     report = RegressionReport(
         project=args.project,
@@ -762,6 +901,8 @@ def main() -> int:
         errors=errors,
         captured_baseline=captured_baseline,
         primitive_status=primitive_status,
+        coverage_summary=coverage_summary,
+        coverage_findings=coverage_findings_dicts,
     )
 
     if args.raw:
