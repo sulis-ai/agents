@@ -7,6 +7,17 @@ description: >
   using an OODA-spiral methodology. Produces a structured viability report
   with scores, attack chains, and hypotheses. Use for production-readiness
   reviews, compliance preparation, or pre-merge security audits.
+
+  MIGRATION NOTICE (sulis v0.18.0+ / 2026-05-24): the 25-primitive
+  catalogue is migrating into the sulis plugin's check-* tier framework.
+  See plan at /Users/iain/.claude/plans/eager-crunching-quail.md. This
+  skill remains the canonical depth tool through Phase 4 (cross-validation
+  vs code-health) and the early portion of Phase 5 (parity-based soft
+  deprecation). Founders running production-readiness audits today should
+  continue using /sulis-security:codebase-assess — its tool integration
+  (Semgrep / Gitleaks / Trivy / hadolint / testssl) is established;
+  the equivalent wrappers in plugins/sulis/_lib/tools/ are NEW pending
+  Phase 2 iteration 2.
 ---
 
 # Codebase Viability Assessment
