@@ -1,5 +1,62 @@
 # Sulis — Changelog
 
+## v0.21.0 — 2026-05-24
+
+**Phase 2 iteration 2 verification: VERIFICATION_REPORT.md iteration 2
+per skill + cross-validation parity ledger updated.**
+
+### Files added — 5 iteration-2 verification reports
+
+- `plugins/sulis/skills/check-security/iterations/2/VERIFICATION_REPORT.md`
+  — 16 of 17 primitives addressed (94% — 12 PASS + 2 PASS-with-url + 2
+  HYPOTHESIS). Live-tested: 3 real security concerns surfaced (XXE,
+  SHA1) on this marketplace. Verdict: PASS. Independence Check
+  DEFERRED with revisit trigger.
+- `plugins/sulis/skills/check-readability/iterations/2/VERIFICATION_REPORT.md`
+  — 5 of 5 primitives PASS (100%). lizard surfaced 20+ real CCN
+  findings on IDC scripts. Verdict: PASS.
+- `plugins/sulis/skills/check-build/iterations/2/VERIFICATION_REPORT.md`
+  — 4 of 4 primitives PASS (100%). Verdict: PASS.
+- `plugins/sulis/skills/check-reliability/iterations/2/VERIFICATION_REPORT.md`
+  — 7 of 7 primitives addressed (6 PASS + 1 HYPOTHESIS). Verdict: PASS.
+- `plugins/sulis/skills/check-tests/iterations/2/VERIFICATION_REPORT.md`
+  — 2 of 2 primitives addressed (CQ-02 detection-only; full coverage
+  run DEFERRED). Verdict: PASS-WITH-DEFERRAL.
+
+### File updated — cross-validation expected_divergence.md
+
+Parity climbs from **4% → 88%** (22 of 25 primitives now match
+codebase-assess). 3 EXPECTED-DIVERGENT primitives remaining:
+
+1. SEC-07 default depth (code-health invokes Gitleaks with `--no-git`;
+   codebase-assess uses `--unshallow` by default)
+2. CQ-02 detection-only (full coverage run DEFERRED)
+3. CQ-05 NOT_ASSESSED (git-log analysis follow-up)
+
+0 UNEXPECTED-DIVERGENT findings. Estimated ~1-2 commits to reach ≥ 95%
+parity (the codebase-assess deprecation threshold).
+
+### Phase 5 (codebase-assess deprecation) — current stance
+
+Current 88% parity warrants **soft-deprecation advance**: SKILL.md
+MIGRATION NOTICE upgrades to "RECOMMENDED FOR DEPRECATION" with revisit
+trigger | parity ≥ 95%. Founders are informed that check-* now covers
+88% of codebase-assess's primitives.
+
+Full [DEPRECATED] banner still requires:
+1. Parity ≥ 95% (need 1-2 more commits)
+2. compare.py implementation against real targets
+3. One run on a real platform-scale codebase confirming no
+   UNEXPECTED-DIVERGENT findings
+
+### Plugin metadata
+
+- plugins/sulis/.claude-plugin/plugin.json: 0.20.0 → 0.21.0
+- .claude-plugin/marketplace.json: sulis 0.20.0 → 0.21.0; marketplace
+  1.63.0 → 1.64.0
+
+---
+
 ## v0.20.0 — 2026-05-24
 
 **Phase 2 iteration 2 (wiring): all 9 tool wrappers integrated into
