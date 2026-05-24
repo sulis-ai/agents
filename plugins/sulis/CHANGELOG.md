@@ -1,5 +1,68 @@
 # Sulis — Changelog
 
+## v0.18.0 — 2026-05-24
+
+**Phase 4 iteration 1: cross-validation framework vs codebase-assess.**
+Methodology + expected-divergence ledger + comparison script skeleton.
+Actual parity measurement deferred to Phase 4 iteration 2 (post-wrapper).
+
+### Files added
+
+- `plugins/sulis/skills/code-health/tests/cross_validation/README.md` —
+  methodology, parity target (≥ 95%), categorisation rules
+  (MATCH / EXPECTED-DIVERGENT / UNEXPECTED-DIVERGENT / NOT_ASSESSED-BOTH)
+- `plugins/sulis/skills/code-health/tests/cross_validation/expected_divergence.md`
+  — live per-primitive ledger of current divergence + revisit triggers.
+  Records the iteration-1 state honestly: 4% parity (1 of 25 primitives
+  match — CQ-04 only); 24 EXPECTED-DIVERGENT pending per-tool wrapper
+  build-out; 0 UNEXPECTED-DIVERGENT.
+- `plugins/sulis/skills/code-health/tests/cross_validation/compare.py` —
+  comparison script skeleton with categorisation algorithm + parser
+  signatures. Full implementation wires up once both tools' outputs have
+  comparable shape (Phase 4 iteration 2).
+
+### Honest current state
+
+**Current parity rate: 4%** (CQ-04 only). The ≥ 95% target is
+post-wrapper-integration. The framework lands; the measurement is
+iterative as wrappers come online.
+
+**Trajectory documented in expected_divergence.md:**
+
+- After semgrep.py wrapper → +6 primitives → parity ~32%
+- After gitleaks.py wrapper → +3 primitives → ~44%
+- After trivy.py wrapper → +5 primitives → ~64%
+- After lizard.py + jscpd.py → +2 primitives → ~72%
+- After coverage.py wrapper → +1 primitive → ~76%
+- After hadolint.py wrapper → ~80%
+- After testssl.py + curl_probe.py + hypothesis.py + git-log analysis →
+  ~100%
+
+### Why this iteration ships the framework not the measurement
+
+Per the SPIRAL_TEMPLATES Honest Uncertainty dimension: shipping an
+empty divergence report would be misleading. Shipping the framework +
+expected-divergence ledger lets future maintainers (and future-me) run
+the comparison as wrappers come online and update the ledger
+incrementally. The 4% honest baseline is preferable to a fabricated
+"we will reach 95%" claim.
+
+### Plugin metadata
+
+- plugins/sulis/.claude-plugin/plugin.json: 0.17.0 → 0.18.0
+- .claude-plugin/marketplace.json: sulis 0.17.0 → 0.18.0; marketplace
+  1.59.0 → 1.60.0
+
+### What's next
+
+- Phase 5 (next): codebase-assess deprecation — soft mark; physical
+  removal deferred to a future major release
+- Phase 4 iteration 2+ (post-wrapper): run compare.py against this
+  marketplace + platform repo; update expected_divergence.md with
+  measured rates; iterate to ≥ 95% parity
+
+---
+
 ## v0.17.0 — 2026-05-24
 
 **Phase 3: tier composition review post-upsurge.** MECE + Primitive
