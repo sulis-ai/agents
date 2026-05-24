@@ -179,12 +179,156 @@ class ScanReport:
     allowlisted_count: int
     captured_baseline: bool
     errors: list[str]
+    primitive_status: dict[str, str] = field(default_factory=dict)
+    deployed_url: str | None = None
 
 
 # ─── Allowlist loading ──────────────────────────────────────────────
 # (Inline implementation removed in v0.11.x — uses _lib/allowlist.
 # Keep this comment as a pointer for future maintainers.)
 # Pre-existing allowlist path: .checkup/{project}/security-allowlist.md
+
+
+# ─── External tool integration (v0.20.0+) ─────────────────────────
+# Wraps semgrep / gitleaks / trivy / testssl / curl_probe via
+# plugins/sulis/_lib/tools/ wrappers. Each wrapper degrades to
+# NOT_ASSESSED if neither Docker nor native binary is present —
+# never silent regex fallback.
+
+
+def _import_tool_wrappers():
+    """Lazy import to avoid sys.path pollution at module load."""
+    import sys as _sys
+    lib_root = str(Path(__file__).resolve().parents[3])
+    if lib_root not in _sys.path:
+        _sys.path.insert(0, lib_root)
+    from _lib.tools import semgrep, gitleaks, trivy, testssl, curl_probe
+    return semgrep, gitleaks, trivy, testssl, curl_probe
+
+
+def _tool_finding_to_finding(tool_finding: dict, category: str) -> Finding:
+    """Map a tool-wrapper finding dict to the scanner's Finding dataclass."""
+    rule_id = tool_finding.get("rule_id", "unknown")
+    file_path = tool_finding.get("file", "")
+    line = tool_finding.get("line", 1)
+    message = tool_finding.get("message", "")
+    severity = tool_finding.get("severity", "advisory")
+    sig = f"{tool_finding.get('tool', 'tool')}::{rule_id}::{file_path}::{line}"
+    return Finding(
+        pattern_name=rule_id,
+        category=category,
+        severity=severity,
+        file=file_path,
+        line=line,
+        matched_text=message[:80],
+        founder_message=message,
+        signature=sig,
+    )
+
+
+def run_external_tools(
+    repo_root: Path,
+    *,
+    url: str | None = None,
+    scan_git_history: bool = False,
+    timeout_per_tool: int = 300,
+) -> tuple[list[Finding], dict[str, str], list[str]]:
+    """Invoke external tool wrappers and merge findings into Finding list.
+
+    Args:
+        repo_root: absolute repo path
+        url: optional deployed URL — triggers testssl + curl_probe
+        scan_git_history: if True, gitleaks scans git history (SEC-07)
+        timeout_per_tool: per-wrapper subprocess timeout
+
+    Returns:
+        (findings, primitive_status, errors) — primitive_status maps
+        primitive_id → PASS / NOT_ASSESSED based on tool availability.
+    """
+    semgrep, gitleaks, trivy, testssl, curl_probe = _import_tool_wrappers()
+    findings: list[Finding] = []
+    primitive_status: dict[str, str] = {}
+    errors: list[str] = []
+    repo_root_str = str(repo_root)
+
+    # Semgrep — SEC-01/03/04/05/06 + DAT-03 + (via reliability) INF-04
+    sg_mode = semgrep.is_available()
+    if sg_mode.value != "not_available":
+        try:
+            result = semgrep.run(repo_root=repo_root_str, timeout=timeout_per_tool)
+            for tf in semgrep.parse_findings(result, repo_root_str):
+                findings.append(_tool_finding_to_finding(tf, "semgrep-security"))
+            primitive_status.update({
+                "SEC-01": "PASS", "SEC-03": "PASS", "SEC-04": "PASS",
+                "SEC-05": "PASS", "SEC-06": "PASS", "DAT-03": "PASS",
+            })
+        except Exception as exc:  # noqa: BLE001 — boundary catch for tool wrapper
+            errors.append(f"semgrep invocation failed: {exc}")
+    else:
+        for prim in ("SEC-01", "SEC-03", "SEC-04", "SEC-05", "SEC-06", "DAT-03"):
+            primitive_status[prim] = "NOT_ASSESSED"
+
+    # Gitleaks — SEC-07 + DAT-04
+    gl_mode = gitleaks.is_available()
+    if gl_mode.value != "not_available":
+        try:
+            result = gitleaks.run(
+                repo_root=repo_root_str,
+                scan_history=scan_git_history,
+                timeout=timeout_per_tool,
+            )
+            for tf in gitleaks.parse_findings(result, repo_root_str):
+                findings.append(_tool_finding_to_finding(tf, "credential"))
+            primitive_status["SEC-07"] = "PASS"
+            primitive_status["DAT-04"] = "PASS"
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"gitleaks invocation failed: {exc}")
+    else:
+        primitive_status["SEC-07"] = "NOT_ASSESSED"
+        primitive_status["DAT-04"] = "NOT_ASSESSED"
+
+    # Trivy — SC-01..04
+    tv_mode = trivy.is_available()
+    if tv_mode.value != "not_available":
+        try:
+            result = trivy.run_fs_scan(repo_root=repo_root_str, timeout=timeout_per_tool * 2)
+            for tf in trivy.parse_findings(result, repo_root_str):
+                findings.append(_tool_finding_to_finding(tf, "supply-chain"))
+            for prim in ("SC-01", "SC-02", "SC-03", "SC-04"):
+                primitive_status[prim] = "PASS"
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"trivy invocation failed: {exc}")
+    else:
+        for prim in ("SC-01", "SC-02", "SC-03", "SC-04"):
+            primitive_status[prim] = "NOT_ASSESSED"
+
+    # Deployed-URL checks: testssl (DAT-02) + curl_probe (INF-03)
+    if url:
+        ts_mode = testssl.is_available()
+        if ts_mode.value != "not_available":
+            try:
+                result = testssl.run(url=url, timeout=timeout_per_tool * 2)
+                for tf in testssl.parse_findings(result):
+                    findings.append(_tool_finding_to_finding(tf, "tls"))
+                primitive_status["DAT-02"] = "PASS"
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"testssl invocation failed: {exc}")
+        else:
+            primitive_status["DAT-02"] = "NOT_ASSESSED"
+
+        cp_mode = curl_probe.is_available()
+        if cp_mode.value != "not_available":
+            try:
+                result = curl_probe.run(url=url, timeout=30)
+                for tf in curl_probe.parse_findings(result, url=url):
+                    findings.append(_tool_finding_to_finding(tf, "http-header"))
+                primitive_status["INF-03"] = "PASS"
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"curl_probe invocation failed: {exc}")
+        else:
+            primitive_status["INF-03"] = "NOT_ASSESSED"
+
+    return findings, primitive_status, errors
 
 
 # ─── Scanner ────────────────────────────────────────────────────────
@@ -266,6 +410,9 @@ def save_baseline_tier2(repo_root: Path, project: str, signatures: set[str]) -> 
 def render_json(report: ScanReport) -> str:
     # Orchestrator-compatible findings array
     findings = []
+    not_assessed = sorted(
+        prim for prim, status in report.primitive_status.items() if status == "NOT_ASSESSED"
+    )
     for f in report.findings:
         findings.append({
             "heuristic": f.category,
@@ -287,6 +434,9 @@ def render_json(report: ScanReport) -> str:
         "allowlisted_count": report.allowlisted_count,
         "captured_baseline": report.captured_baseline,
         "errors": report.errors,
+        "primitive_status": report.primitive_status,
+        "not_assessed": not_assessed,
+        "deployed_url": report.deployed_url,
     }, indent=2)
 
 
@@ -340,9 +490,27 @@ def render_markdown(report: ScanReport) -> str:
             out.append(f"- {e}")
         out.append("")
 
+    # Primitive coverage status — surfaces NOT_ASSESSED honestly per
+    # SPIRAL_TEMPLATES Codebase Referential Integrity policy.
+    if report.primitive_status:
+        passed = sorted(p for p, s in report.primitive_status.items() if s == "PASS")
+        not_assessed_list = sorted(p for p, s in report.primitive_status.items() if s == "NOT_ASSESSED")
+        out.append("## Primitive coverage")
+        out.append("")
+        if passed:
+            out.append(f"**Assessed ({len(passed)}):** {', '.join(passed)}")
+        if not_assessed_list:
+            out.append(f"**⏳ NOT_ASSESSED ({len(not_assessed_list)}):** {', '.join(not_assessed_list)}")
+            out.append("")
+            out.append("> NOT_ASSESSED primitives have a known tool dependency that is")
+            out.append("> not currently available (neither Docker daemon nor native binary).")
+            out.append("> Install the relevant tool (semgrep / gitleaks / trivy / testssl.sh)")
+            out.append("> or start Docker to assess these primitives.")
+        out.append("")
+
     out.append("---")
     out.append("_This skill is read-only. It identifies what's risky; it never modifies code._")
-    out.append("_For deeper analysis (25 primitives, OODA-spiral), use `sulis-security:codebase-assess`._")
+    out.append("_For full 25-primitive depth audit until check-security parity reaches ≥ 95%, use `sulis-security:codebase-assess`._")
     return "\n".join(out)
 
 
@@ -359,6 +527,23 @@ def main() -> int:
     parser.add_argument("--scope", default=None)
     parser.add_argument("--base-branch", default=None)
     parser.add_argument("--pr-number", default=None)
+    # External tool integration (v0.20.0+)
+    parser.add_argument(
+        "--url", default=None,
+        help="deployed URL — triggers testssl (DAT-02) + curl_probe (INF-03)",
+    )
+    parser.add_argument(
+        "--scan-git-history", action="store_true",
+        help="gitleaks --no-git off; scans full git history (SEC-07)",
+    )
+    parser.add_argument(
+        "--skip-tools", action="store_true",
+        help="skip external tool wrappers (regex-only fast path; STRONGLY DISCOURAGED — produces NOT_ASSESSED for most primitives)",
+    )
+    parser.add_argument(
+        "--tool-timeout", type=int, default=300,
+        help="per-tool subprocess timeout in seconds",
+    )
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -383,6 +568,33 @@ def main() -> int:
                 continue
             findings.append(finding)
 
+    # External tool integration — semgrep / gitleaks / trivy / testssl / curl_probe
+    primitive_status: dict[str, str] = {}
+    tool_errors: list[str] = []
+    if not args.skip_tools:
+        try:
+            tool_findings, primitive_status, tool_errors = run_external_tools(
+                repo_root,
+                url=args.url,
+                scan_git_history=args.scan_git_history,
+                timeout_per_tool=args.tool_timeout,
+            )
+            for tf in tool_findings:
+                if tf.signature in allowlist or tf.matched_text in allowlist:
+                    allowlisted_count += 1
+                    continue
+                findings.append(tf)
+        except Exception as exc:  # noqa: BLE001 — boundary catch
+            tool_errors.append(f"external tool integration failed: {exc}")
+    else:
+        # All wrapper-covered primitives marked NOT_ASSESSED
+        for prim in ("SEC-01", "SEC-03", "SEC-04", "SEC-05", "SEC-06", "SEC-07",
+                     "DAT-03", "DAT-04", "SC-01", "SC-02", "SC-03", "SC-04"):
+            primitive_status[prim] = "NOT_ASSESSED"
+        if args.url:
+            primitive_status["DAT-02"] = "NOT_ASSESSED"
+            primitive_status["INF-03"] = "NOT_ASSESSED"
+
     # Baseline + delta
     baseline_sigs = load_baseline_tier2(repo_root, args.project)
     baseline_loaded = bool(baseline_sigs)
@@ -406,7 +618,9 @@ def main() -> int:
         newly_resolved=newly_resolved,
         allowlisted_count=allowlisted_count,
         captured_baseline=captured_baseline,
-        errors=[],
+        errors=tool_errors,
+        primitive_status=primitive_status,
+        deployed_url=args.url,
     )
 
     if args.raw:

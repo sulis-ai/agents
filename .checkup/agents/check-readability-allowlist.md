@@ -17,3 +17,14 @@ naming-clarity::plugins/sea/skills/probe/scripts/probe/render_templates/interact
 # itself; founders' projects see their own findings unfiltered.
 # Revisit if the file grows beyond 4000 LOC.
 kitchen-sink-file::plugins/sulis-execution/scripts/_wpxlib.py::0: HD-008 design choice — revisit at 4000 LOC
+
+# Tool wrapper run() convention. Every _lib/tools/{tool}.py exposes a
+# canonical run() function (mirrors sea:probe runners pattern). Renaming
+# would break the consumer-side wrapper protocol documented in REFERENCE.md.
+naming-clarity::plugins/sulis/_lib/tools/curl_probe.py::39: tool-wrapper run() convention
+naming-clarity::plugins/sulis/_lib/tools/gitleaks.py::25: tool-wrapper run() convention
+naming-clarity::plugins/sulis/_lib/tools/hadolint.py::25: tool-wrapper run() convention
+naming-clarity::plugins/sulis/_lib/tools/jscpd.py::33: tool-wrapper run() convention
+naming-clarity::plugins/sulis/_lib/tools/lizard.py::28: tool-wrapper run() convention
+naming-clarity::plugins/sulis/_lib/tools/semgrep.py::30: tool-wrapper run() convention
+naming-clarity::plugins/sulis/_lib/tools/testssl.py::26: tool-wrapper run() convention

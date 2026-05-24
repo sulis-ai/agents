@@ -78,6 +78,64 @@ class BuilderReport:
     newly_fixed_systems: list[str]
     captured_baseline: bool
     errors: list[str]
+    primitive_status: dict[str, str] = field(default_factory=dict)
+    tool_findings: list[dict] = field(default_factory=list)
+
+
+# ─── External tool integration (v0.20.0+) ─────────────────────────
+
+
+def _run_build_tools(
+    repo_root: Path,
+    *,
+    timeout: int = 300,
+) -> tuple[list[dict], dict[str, str], list[str]]:
+    """Invoke hadolint (INF-01 Dockerfile) + trivy (INF-01 base image) +
+    gitleaks (INF-02 deploy-config secrets) wrappers."""
+    sys_path_old = sys.path.copy()
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    try:
+        from _lib.tools import hadolint, trivy, gitleaks
+    finally:
+        sys.path[:] = sys_path_old
+
+    findings: list[dict] = []
+    primitive_status: dict[str, str] = {}
+    errors: list[str] = []
+
+    # hadolint — INF-01 Dockerfile lint (per Dockerfile found)
+    if hadolint.is_available().value != "not_available":
+        dockerfiles = [str(p.relative_to(repo_root)) for p in repo_root.rglob("Dockerfile*") if "node_modules" not in str(p)]
+        for df in dockerfiles[:10]:  # cap to avoid runaway
+            try:
+                result = hadolint.run(dockerfile_path=df, repo_root=str(repo_root), timeout=60)
+                findings.extend(hadolint.parse_findings(result, str(repo_root)))
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"hadolint on {df} failed: {exc}")
+        primitive_status["INF-01"] = "PASS" if dockerfiles else "NOT_APPLICABLE"
+    else:
+        primitive_status["INF-01"] = "NOT_ASSESSED"
+
+    # trivy — INF-01 base-image scan (re-uses INF-01 status — informational; same primitive)
+    # No additional scan needed at build-tier; check-security covers SC-01..04 already.
+
+    # gitleaks — INF-02 deploy-config secrets (yaml/k8s/CI files)
+    if gitleaks.is_available().value != "not_available":
+        try:
+            result = gitleaks.run(repo_root=str(repo_root), scan_history=False, timeout=timeout)
+            # Filter to yaml / k8s / CI configs only — secrets in source code are
+            # check-security's territory (covered by tier 2 gitleaks run).
+            for tf in gitleaks.parse_findings(result, str(repo_root)):
+                f = tf["file"]
+                if any(f.endswith(ext) for ext in (".yml", ".yaml")) or "/.github/" in f or "/k8s/" in f:
+                    findings.append(tf)
+            primitive_status["INF-02"] = "PASS"
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"gitleaks invocation failed: {exc}")
+    else:
+        primitive_status["INF-02"] = "NOT_ASSESSED"
+
+    return findings, primitive_status, errors
 
 
 # ─── Side-effect blocklist ──────────────────────────────────────────
@@ -447,6 +505,21 @@ def render_json(report: BuilderReport) -> str:
                 "extras": {"rule": h.rule, "raw": h.raw_value},
             })
 
+    # Add tool-wrapper findings (INF-01 hadolint + INF-02 gitleaks deploy-config secrets)
+    for tf in report.tool_findings:
+        findings.append({
+            "heuristic": tf.get("tool", "tool"),
+            "severity": tf.get("severity", "advisory"),
+            "file": tf.get("file", ""),
+            "line": tf.get("line", 0),
+            "identifier": tf.get("rule_id", ""),
+            "message": tf.get("message", ""),
+            "suggestion": "",
+            "extras": tf.get("extras", {}),
+        })
+    not_assessed = sorted(
+        prim for prim, status in report.primitive_status.items() if status == "NOT_ASSESSED"
+    )
     return json.dumps({
         "project": report.project,
         "detected_systems": [asdict(s) for s in report.detected_systems],
@@ -457,6 +530,8 @@ def render_json(report: BuilderReport) -> str:
         "captured_baseline": report.captured_baseline,
         "findings": findings,
         "errors": report.errors,
+        "primitive_status": report.primitive_status,
+        "not_assessed": not_assessed,
     }, indent=2)
 
 
@@ -544,6 +619,10 @@ def main() -> int:
     parser.add_argument("--scope", default=None)
     parser.add_argument("--base-branch", default=None)
     parser.add_argument("--pr-number", default=None)
+    # External tool integration (v0.20.0+)
+    parser.add_argument("--skip-tools", action="store_true",
+        help="skip hadolint + trivy + gitleaks integration; INF-01 + INF-02 will be NOT_ASSESSED")
+    parser.add_argument("--tool-timeout", type=int, default=300)
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -555,6 +634,21 @@ def main() -> int:
         args.project = repo_root.name
 
     errors: list[str] = []
+
+    # External tool integration (v0.20.0+)
+    primitive_status: dict[str, str] = {}
+    tool_findings: list[dict] = []
+    if not args.skip_tools:
+        try:
+            tool_findings, primitive_status, tool_errors = _run_build_tools(
+                repo_root, timeout=args.tool_timeout
+            )
+            errors.extend(tool_errors)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"external tool integration failed: {exc}")
+    else:
+        primitive_status["INF-01"] = "NOT_ASSESSED"
+        primitive_status["INF-02"] = "NOT_ASSESSED"
 
     # Always run hygiene (cheap, no side effects)
     hygiene = check_manifest_hygiene(repo_root)
@@ -604,6 +698,8 @@ def main() -> int:
         newly_fixed_systems=newly_fixed,
         captured_baseline=captured_baseline,
         errors=errors,
+        primitive_status=primitive_status,
+        tool_findings=tool_findings,
     )
 
     if args.raw:

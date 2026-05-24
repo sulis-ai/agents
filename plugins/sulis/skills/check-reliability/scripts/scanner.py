@@ -286,6 +286,64 @@ class ScanReport:
     allowlisted_count: int
     captured_baseline: bool
     errors: list[str]
+    primitive_status: dict[str, str] = field(default_factory=dict)
+
+
+# ─── External tool integration (v0.20.0+) ─────────────────────────
+
+
+def _run_reliability_tools(
+    repo_root: Path,
+    *,
+    timeout: int = 300,
+) -> tuple[list[Finding], dict[str, str], list[str]]:
+    """Invoke semgrep INF-04 rules (verbose-error / debug-mode-in-prod)."""
+    sys_path_old = sys.path.copy()
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    try:
+        from _lib.tools import semgrep
+    finally:
+        sys.path[:] = sys_path_old
+
+    findings: list[Finding] = []
+    primitive_status: dict[str, str] = {}
+    errors: list[str] = []
+
+    if semgrep.is_available().value != "not_available":
+        try:
+            # INF-04: verbose error responses, debug=True in prod
+            result = semgrep.run(
+                repo_root=str(repo_root),
+                configs=["p/python", "p/django", "p/flask"],
+                timeout=timeout,
+            )
+            for tf in semgrep.parse_findings(result, str(repo_root)):
+                rule = tf.get("rule_id", "")
+                # Filter to debug / verbose-error rules
+                if not any(kw in rule.lower() for kw in ("debug", "verbose", "stacktrace", "production")):
+                    continue
+                findings.append(Finding(
+                    pattern_name=rule,
+                    category="verbose-error",
+                    severity=tf.get("severity", "advisory"),
+                    file=tf.get("file", ""),
+                    line=tf.get("line", 1),
+                    excerpt=tf.get("message", "")[:80],
+                    founder_message=tf.get("message", ""),
+                    suggestion="ensure debug mode is disabled in production; sanitise error responses",
+                    signature=f"semgrep::{rule}::{tf.get('file', '')}::{tf.get('line', 1)}",
+                ))
+            primitive_status["INF-04"] = "PASS"
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"semgrep INF-04 invocation failed: {exc}")
+    else:
+        primitive_status["INF-04"] = "NOT_ASSESSED"
+
+    # DAT-05 audit-logging hypothesis — uses the _lib/hypothesis dataclass
+    # (recorded separately in the calling skill, not as a finding)
+    primitive_status["DAT-05"] = "HYPOTHESIS"  # handled via hypothesis-form, not findings
+
+    return findings, primitive_status, errors
 
 
 # ─── Rendering ──────────────────────────────────────────────────────
@@ -305,6 +363,9 @@ def render_json(report: ScanReport) -> str:
         }
         for f in report.findings
     ]
+    not_assessed = sorted(
+        prim for prim, status in report.primitive_status.items() if status == "NOT_ASSESSED"
+    )
     return json.dumps({
         "project": report.project,
         "scope": report.scope,
@@ -316,6 +377,8 @@ def render_json(report: ScanReport) -> str:
         "allowlisted_count": report.allowlisted_count,
         "captured_baseline": report.captured_baseline,
         "errors": report.errors,
+        "primitive_status": report.primitive_status,
+        "not_assessed": not_assessed,
     }, indent=2)
 
 
@@ -391,6 +454,9 @@ def main() -> int:
     parser.add_argument("--pr-number", type=int, default=None)
     parser.add_argument("--update-baseline", action="store_true")
     parser.add_argument("--raw", action="store_true")
+    parser.add_argument("--skip-tools", action="store_true",
+        help="skip semgrep INF-04 integration; INF-04 will be NOT_ASSESSED")
+    parser.add_argument("--tool-timeout", type=int, default=300)
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -413,9 +479,27 @@ def main() -> int:
     )
     allow_signatures = allowlist.load_allowlist(project_allow)
 
+    # External tool integration (v0.20.0+)
+    primitive_status: dict[str, str] = {}
+    tool_findings: list[Finding] = []
+    if not args.skip_tools:
+        try:
+            tool_findings, primitive_status, tool_errors = _run_reliability_tools(
+                repo_root, timeout=args.tool_timeout
+            )
+            scope_errors.extend(tool_errors)
+        except Exception as exc:  # noqa: BLE001
+            scope_errors.append(f"external tool integration failed: {exc}")
+    else:
+        primitive_status["INF-04"] = "NOT_ASSESSED"
+        primitive_status["DAT-05"] = "HYPOTHESIS"
+
     # Scan
-    findings: list[Finding] = []
+    findings: list[Finding] = list(tool_findings)
     allowlisted_count = 0
+    # Apply allowlist to tool findings too
+    findings = [f for f in findings if f.signature not in allow_signatures]
+    allowlisted_count = len(tool_findings) - len(findings)
     for f in files:
         path = repo_root / f
         if not path.is_file():
@@ -463,6 +547,7 @@ def main() -> int:
         allowlisted_count=allowlisted_count,
         captured_baseline=captured_baseline,
         errors=scope_errors,
+        primitive_status=primitive_status,
     )
 
     if args.raw:

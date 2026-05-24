@@ -137,6 +137,68 @@ class AuditEnvelope:
     kitchen_sink_threshold_loc: int
     kitchen_sink_threshold_concerns: int
     errors: list[str]
+    primitive_status: dict[str, str] = field(default_factory=dict)
+
+
+# ─── External tool integration (v0.20.0+) ─────────────────────────
+
+
+def _run_readability_tools(
+    repo_root: Path,
+    *,
+    timeout: int = 300,
+) -> tuple[list[Finding], dict[str, str], list[str]]:
+    """Invoke lizard (CQ-01) + jscpd (CQ-03) wrappers and convert findings."""
+    from _lib.tools import lizard, jscpd
+
+    findings: list[Finding] = []
+    primitive_status: dict[str, str] = {}
+    errors: list[str] = []
+    repo_root_str = str(repo_root)
+
+    # lizard — CQ-01 cyclomatic complexity
+    if lizard.is_available().value != "not_available":
+        try:
+            result = lizard.run(repo_root=repo_root_str, timeout=timeout)
+            for tf in lizard.parse_findings(result, repo_root_str):
+                findings.append(Finding(
+                    heuristic="cyclomatic-complexity",
+                    severity=tf["severity"],
+                    file=tf["file"],
+                    line=tf["line"],
+                    identifier=tf["extras"]["function_name"],
+                    message=tf["message"],
+                    suggestion=f"refactor — extract sub-functions; target CCN ≤ {lizard.DEFAULT_CCN_THRESHOLD}",
+                    extras=tf["extras"],
+                ))
+            primitive_status["CQ-01"] = "PASS"
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"lizard invocation failed: {exc}")
+    else:
+        primitive_status["CQ-01"] = "NOT_ASSESSED"
+
+    # jscpd — CQ-03 code duplication
+    if jscpd.is_available().value != "not_available":
+        try:
+            result = jscpd.run(repo_root=repo_root_str, timeout=timeout)
+            for tf in jscpd.parse_findings(result, repo_root_str):
+                findings.append(Finding(
+                    heuristic="code-duplication",
+                    severity=tf["severity"],
+                    file=tf["file"],
+                    line=tf["line"],
+                    identifier="duplicate-block",
+                    message=tf["message"],
+                    suggestion="extract shared module / function",
+                    extras=tf["extras"],
+                ))
+            primitive_status["CQ-03"] = "PASS"
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"jscpd invocation failed: {exc}")
+    else:
+        primitive_status["CQ-03"] = "NOT_ASSESSED"
+
+    return findings, primitive_status, errors
 
 
 # ─── Scope detection ────────────────────────────────────────────────
@@ -511,6 +573,9 @@ def audit_file(
 
 
 def render_json(env: AuditEnvelope) -> str:
+    not_assessed = sorted(
+        prim for prim, status in env.primitive_status.items() if status == "NOT_ASSESSED"
+    )
     return json.dumps({
         "scope": env.scope,
         "base_branch": env.base_branch,
@@ -523,6 +588,8 @@ def render_json(env: AuditEnvelope) -> str:
             "kitchen_sink_concerns": env.kitchen_sink_threshold_concerns,
         },
         "errors": env.errors,
+        "primitive_status": env.primitive_status,
+        "not_assessed": not_assessed,
     }, indent=2)
 
 
@@ -651,6 +718,15 @@ def main() -> int:
         default=None,
         help="Project slug for the per-project allowlist (defaults to repo-root basename).",
     )
+    # External tool integration
+    parser.add_argument(
+        "--skip-tools", action="store_true",
+        help="skip lizard + jscpd integration; CQ-01 + CQ-03 will be NOT_ASSESSED",
+    )
+    parser.add_argument(
+        "--tool-timeout", type=int, default=300,
+        help="per-tool subprocess timeout in seconds",
+    )
     args = parser.parse_args()
     if args.project is None:
         args.project = Path(args.repo_root).resolve().name
@@ -689,8 +765,21 @@ def main() -> int:
     # Load vocabulary
     vocab, sources = load_vocabulary(repo_root)
 
+    # External tool integration (v0.20.0+): lizard CQ-01 + jscpd CQ-03
+    primitive_status: dict[str, str] = {}
+    tool_findings: list[Finding] = []
+    if not args.skip_tools:
+        tool_findings, primitive_status, tool_errors = _run_readability_tools(
+            repo_root, timeout=args.tool_timeout
+        )
+        errors.extend(tool_errors)
+    else:
+        primitive_status["CQ-01"] = "NOT_ASSESSED"
+        primitive_status["CQ-03"] = "NOT_ASSESSED"
+
     # Run heuristics on each file
     findings: list[Finding] = []
+    findings.extend(tool_findings)
     for f in files:
         findings.extend(audit_file(
             repo_root, f, vocab,
@@ -726,6 +815,7 @@ def main() -> int:
         kitchen_sink_threshold_loc=args.kitchen_sink_threshold,
         kitchen_sink_threshold_concerns=args.kitchen_sink_concerns_threshold,
         errors=errors,
+        primitive_status=primitive_status,
     )
 
     if args.raw:

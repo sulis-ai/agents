@@ -98,6 +98,30 @@ class RegressionReport:
     flaky_suppressed: list[str]
     errors: list[str]
     captured_baseline: bool  # True if this run captured a new baseline
+    primitive_status: dict[str, str] = field(default_factory=dict)
+
+
+# ─── External tool integration (v0.20.0+) — CQ-02 coverage tool detection ─────────────
+
+
+def _assess_coverage_tool() -> str:
+    """Detect whether a coverage tool is wired for the project's test framework.
+
+    Returns one of: "PASS" (tool detected), "NOT_ASSESSED" (no tool found),
+    "NOT_APPLICABLE" (no test framework detected at all).
+
+    Lightweight: just detects tool presence; doesn't run the suite. Full
+    coverage measurement is a follow-up — wiring pytest-cov + vitest +
+    jest coverage tools per framework into the existing test runner is
+    more invasive than iteration-2 scope.
+    """
+    sys_path_old = sys.path.copy()
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    try:
+        from _lib.tools import coverage
+        return "PASS" if coverage.is_available().value != "not_available" else "NOT_ASSESSED"
+    finally:
+        sys.path[:] = sys_path_old
 
 
 # ─── Framework detection ────────────────────────────────────────────
@@ -456,6 +480,10 @@ def render_json(report: RegressionReport) -> str:
         # Orchestrator-compatible findings shape (only regressions surface here)
         "findings": findings,
         "errors": report.errors,
+        "primitive_status": report.primitive_status,
+        "not_assessed": sorted(
+            prim for prim, status in report.primitive_status.items() if status == "NOT_ASSESSED"
+        ),
     }
     return json.dumps(payload, indent=2)
 
@@ -635,6 +663,8 @@ def main() -> int:
                     "flaky_suppressed": [],
                     "captured_baseline": False,
                     "errors": [],
+                    "primitive_status": {"CQ-02": "NOT_APPLICABLE"},
+                    "not_assessed": [],
                 }, indent=2))
             else:
                 print("# Test check — no framework detected")
@@ -709,6 +739,13 @@ def main() -> int:
             compute_delta(results, baseline, flaky)
         )
 
+    # CQ-02 coverage tool detection (v0.20.0+)
+    primitive_status: dict[str, str] = {}
+    if framework:
+        primitive_status["CQ-02"] = _assess_coverage_tool()
+    else:
+        primitive_status["CQ-02"] = "NOT_APPLICABLE"
+
     report = RegressionReport(
         project=args.project,
         repo_root=str(repo_root),
@@ -724,6 +761,7 @@ def main() -> int:
         flaky_suppressed=flaky_suppressed,
         errors=errors,
         captured_baseline=captured_baseline,
+        primitive_status=primitive_status,
     )
 
     if args.raw:

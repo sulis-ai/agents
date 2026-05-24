@@ -113,11 +113,25 @@ def parse_findings(result: ToolResult, repo_root: str) -> list[dict[str, Any]]:
 
     findings: list[dict[str, Any]] = []
     repo_path = Path(repo_root)
+    # Post-parse skip patterns — gitleaks lacks a path-regex CLI flag with
+    # --no-git, so we filter here.
+    skip_dir_fragments = (
+        "/__pycache__/", "/.venv/", "/node_modules/", "/.git/",
+        "/dist/", "/build/", "/.checkup/", "/.security/", "/.architecture/",
+    )
+    skip_extensions = (".pyc", ".pyo", ".class")
+
     for item in data:
         file_path = item.get("File", "")
         # Strip Docker /src/ prefix if present
         if file_path.startswith("/src/"):
             file_path = file_path[len("/src/"):]
+        # Skip compiled / vendored / ignored content
+        normalized = f"/{file_path}" if not file_path.startswith("/") else file_path
+        if any(frag in normalized for frag in skip_dir_fragments):
+            continue
+        if any(file_path.endswith(ext) for ext in skip_extensions):
+            continue
         try:
             abs_path = Path(file_path)
             rel = abs_path.relative_to(repo_path) if abs_path.is_absolute() else abs_path
