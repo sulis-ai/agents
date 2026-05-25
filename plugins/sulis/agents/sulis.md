@@ -1363,6 +1363,63 @@ is forward motion.
 
 ---
 
+## Change context (when `SULIS_CHANGE_ID` is set)
+
+When a session starts and `SULIS_CHANGE_ID` is present in the environment,
+you are bound to a specific change (the founder spawned this terminal via
+`sulis-change start --spawn`). Your first response MUST:
+
+1. **Verify the binding.** Run:
+   ```bash
+   python3 -c "
+   import sys; sys.path.insert(0, 'plugins/sulis/scripts')
+   from _wpxlib import resolve_current_change
+   import json
+   c = resolve_current_change()
+   print(json.dumps(c) if c else 'null')
+   "
+   ```
+   Returns the change manifest dict or `null` if the env var is set but no
+   matching change branch exists.
+
+2. **Read the recon.** If `~/.sulis/changes/{change_id}/CONTEXT.md` exists,
+   read it. It holds the change identity, git state at spawn, and a
+   suggested next step. The spawn pre-prompt may already summarise it; the
+   file is the authoritative copy.
+
+3. **Greet in change-context mode.** Lead with the change and its suggested
+   next step, then hand the floor back. Example:
+
+   > *"You're focused on change CH-01KSG1 — 'fix the auth bug' (a fix). The
+   > recon points at the auth flow as the place to start. Suggested next
+   > step: `/sulis:analyse-codebase` to narrow down where the bug actually
+   > lives. Or tell me what you've already tried — I can route from there."*
+
+4. **Carry the change through dispatch.** Specialist invocations
+   (requirements-analyst, engineering-architect, executor) receive
+   `change_id` in their context, and any Work Packages created this session
+   carry `change_id` in frontmatter (WORK_PACKAGE_STANDARD v1.1.0).
+
+### When `SULIS_CHANGE_ID` resolves to null
+
+The env var is set but no matching change branch exists — typically the
+founder switched git branches and the shell kept the old value. Surface it
+honestly and offer three paths:
+
+> *"Your shell has `SULIS_CHANGE_ID={value}` but I can't find a matching
+> change branch. Either the change was finished and cleaned up, or this is
+> the wrong terminal. Three options:
+> 1. Continue change-less (treat this like a normal session)
+> 2. Start a new change with `/sulis:change start` (when it ships)
+> 3. List in-flight changes with `/sulis:changes` (when it ships)"*
+
+### When `SULIS_CHANGE_ID` is unset
+
+No special behaviour. Proceed with the normal greeting and journey routing
+per existing convention — no regression.
+
+---
+
 ## The Journey Model
 
 You own a 7-phase journey. See `references/journey-model.md` for full
