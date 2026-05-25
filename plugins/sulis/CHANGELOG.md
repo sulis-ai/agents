@@ -1,5 +1,50 @@
 # Sulis — Changelog
 
+## v0.41.0 — 2026-05-25
+
+**Phase 4 of the change-as-primitive build — 4 standards amendments codify what Phase 5 will populate.**
+
+All four amendments are **additive and backwards-compatible**. Existing
+WPs and existing change-less workflows continue to work; the new fields
+and steps activate only via Phase 5's executor implementation.
+
+### Amendments
+
+| # | Standard | Version | Amendment |
+|---|---|---|---|
+| 1 | `WORK_PACKAGE_STANDARD.md` | v1.0.0 → **v1.1.0** | WP-01 Identity gains the `change_id:` field — 26-character Crockford-base32 ULID linking the WP to its parent change. Optional for legacy WPs; required for WPs created post-Phase 5 via `/sulis:change start`. Per-change WP-NNN sequencing now disambiguated by change_id (cross-change collisions OK). |
+| 2 | `change-work-standard.md` | v0.1.0 → **v0.2.0** | CW-04 gains the **Auto back-integration** subsection — merge-not-rebase (preserves SHAs so in-flight WP worktrees stay valid) with two trigger points (post-WP-merge active driver + pre-WP-start safety net) and structured conflict handling (no auto-resolve; founder picks resolve / defer / abort). |
+| 3 | `repository-contract-standard.md` | v0.1.0 → **v0.2.0** | RC-04 clarifies merge-queue source = `change/*` branches (per CW-04 — change branch is the integration point reaching the queue; `feat/wp-*` go through wpx-train into their parent change first). `branch-ci.yml` push trigger extended to fire on both `feat/wp-*` AND `change/*`. |
+| 4 | `lifecycle.md` (2200-LOC executor bible) | (no formal version) | Gains **Step 0** (arrival check before Step 1 — defence in depth) and **Step 12.5** (post-WP back-integration after Step 12 — active driver). Both invoke `git merge --no-edit origin/dev` on the change branch; both fail closed with the CW-04 conflict-handling options. |
+
+### Composition
+
+The four amendments compose into one mechanism:
+
+- `change_id:` field (WP-01) links the WP to its parent change
+- CW-04 auto back-integration codifies the merge-not-rebase mechanism
+- RC-04 ensures the change branch (not individual WP branches) enters the merge queue
+- lifecycle Step 0 + Step 12.5 are the executor's per-step touchpoints
+
+### Commit chain
+
+- `d0fa43f` — Amendment #1 (WORK_PACKAGE_STANDARD change_id)
+- `814a8df` — Amendment #2 (CW-04 auto back-integration)
+- `c6c1f08` — Amendment #3 (RC-04 merge-queue source)
+- (this commit) — Amendment #4 (lifecycle Step 0 + Step 12.5) + sulis v0.41.0 version bump + marketplace.json + this CHANGELOG entry
+
+### Recipe-improvement signal observed
+
+The user's question "Do we need a skill for managing standards?" surfaced during this phase. Answer captured: not yet. Phase 4 was 4 amendments — ad-hoc Edits worked fine. If standards amendments hit ~6-10+ over time, build a dedicated `amend-standard` skill that codifies version-history bumps + citation-manifest sweep + dependent-skill update — same pattern as `consolidate-into-sulis` (ad-hoc → codified after pattern stabilises).
+
+### What's next
+
+**Phase 5 — change-as-primitive infrastructure.** Builds the data + spawn + session-binding infrastructure these amendments codify: ULID + handle + slug allocator (`_change.py`), `~/.sulis/sulis.db` SQLite schema, terminal launcher (ported from `ae_task_executor`), `SULIS_CHANGE_ID` env-var binding + heartbeat updater, auto back-integration mechanic in `wpx-pipeline` Step 0 + new Step 12.5.
+
+See `plugins/sulis/docs/change-as-primitive-design.md` for the full plan; Phases 5-7 remain.
+
+---
+
 ## v0.40.0 — 2026-05-25
 
 **Phase 3 fourth and final consolidation — `sulis-security` folded into `sulis`. Phase 3 complete.**

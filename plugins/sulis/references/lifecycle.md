@@ -1,13 +1,16 @@
 # Executor Lifecycle
 
-The 12-step contract per Work Package — split across two owners as of
-v0.9.0. **Executor owns Steps 1-7; calling session owns Steps 8-12.**
-Each step has input artifacts, a success criterion, a failure-handling
-OODA recipe (per `executor-loop-standard.md`), and an escalation
-trigger.
+The 14-step contract per Work Package — split across two owners as of
+v0.9.0, with Step 0 (arrival check) and Step 12.5 (post-WP
+back-integration) added in v0.11.0+ as part of Phase 4 of the
+change-as-primitive build. **Executor owns Steps 1-7; calling session
+owns Steps 0, 8-12, and 12.5.** Each step has input artifacts, a
+success criterion, a failure-handling OODA recipe (per
+`executor-loop-standard.md`), and an escalation trigger.
 
 | # | Step | Owner |
 |---|---|---|
+| 0 | **Arrival check (v0.11.0+ — change-as-primitive)** | Calling session — runs before Step 1; verifies the change branch is current with `dev` (per CW-04 auto back-integration); merges `origin/dev` into the change branch if behind; pauses + surfaces conflict if `git merge` fails |
 | 1 | Worktree + branch | Executor |
 | 1.5 | Plan generation (v0.10.0+) | Executor |
 | 2 | RED — failing tests | Executor |
@@ -23,6 +26,7 @@ trigger.
 | 10.5 | **Train-batch code-review (IMPLEMENTED v0.21.1+ as post-merge variant; folded into `_verify_phase` boundary at v0.23.0 per HD-007)** | Calling session (`/sulis:code-review` against the batch diff range `<bundle[0].pre_train_sha>..<bundle[-1].merge_sha_on_dev>` after `wpx-train run` returns). Catches cross-WP composition issues (N+1 across siblings, integration regressions). CRITICAL → BLOCKER batch-wide + auto-draft remediation WPs; CONCERN/ADVISORY → SF registered + WP-AUTO-* auto-drafted. **HD-007 (v0.23.0)**: when callers pass `--enable-gate-handoff` to `wpx-train run`, the train stops at the new `verifying_gates` phase with `outcome: awaiting_gates` (exit 0); the calling session dispatches Step 10.5 + Step 11 inside that phase and invokes `wpx-train mark-gates-complete` to finalise. The gates are now part of the train's transaction (in lifecycle terms) — the dispatch mechanism stays in the calling LLM session (a Python CLI can't spawn Agents). Legacy callers (no `--enable-gate-handoff`) continue to dispatch Step 10.5 + Step 11 as post-train follow-on. |
 | 11 | Security review (post-deploy verification) | Calling session (`Agent({subagent_type: "sulis-security:security-reviewer"})` + `wpx-findings register`) — runs **per-WP sequentially after `wpx-train run` returns**. Dispatched by the run-all skill (v0.20.0+), one WP at a time over the batch's `wps_shipped`. CRITICAL → BLOCKER + `step-11-blocked` + Step 12 skipped for that WP; CONCERN/ADVISORY → SF registered + WP-AUTO-* auto-drafted. The loop is **distributed across trains** — terminates when a subsequent train's Step 11 produces zero NEW (non-duplicate) findings. **HD-007 (v0.23.0)**: when `--enable-gate-handoff` was set on `wpx-train run`, Step 11 fires inside the `verifying_gates` phase and the calling session invokes `wpx-train mark-gates-complete --train-id <id>` once both Step 10.5 + Step 11 dispatches complete (or `--critical-found` if any CRITICAL surfaced). |
 | 12 | INDEX flip + acceptance evidence + worktree removal | Calling session (`wpx-step12 wrap`) — flips `step-7-complete` → `done` after train succeeds |
+| 12.5 | **Post-WP back-integration (v0.11.0+ — change-as-primitive)** | Calling session — after the WP merges back to the change branch, runs `git fetch origin dev && git merge --no-edit origin/dev` on the change branch; pushes. Per CW-04 auto back-integration (active driver). Pauses + surfaces conflict if `git merge` fails. Skipped for the trivial-change carve-out (CW-05) where there is no parent change branch. |
 
 > **v0.11.0+ change (ADR-212):** Steps 8-10 are now per-batch via
 > `wpx-train` (the default). Per-WP `wpx-pipeline` shipping remains
@@ -450,6 +454,58 @@ or Step 12.
 
 The full skill prompts for the calling session live in
 `plugins/sulis/skills/run-all/SKILL.md` and `run-wp/SKILL.md`.
+
+---
+
+## Step 0 — Arrival check (v0.11.0+ — change-as-primitive)
+
+**Owner:** Calling session (run-all / run-wp / the founder's main session).
+
+**Input:** Current change branch (if any) + `origin/dev`.
+
+**Purpose:** Per CW-04 auto back-integration, verify the change branch is current with `dev` before the executor builds a WP worktree off it. If the change branch is behind, run the back-integration merge first. This is the defence-in-depth trigger point that catches teammate pushes to `dev` between WPs (the active driver is Step 12.5, which fires after every WP merge).
+
+**Skipped when:**
+
+- The WP is running under the trivial-change carve-out (CW-05) — there's no parent change branch
+- The change branch is already up-to-date with `origin/dev`
+
+### Mechanism
+
+```bash
+# In the change worktree
+git fetch origin dev
+
+if ! git merge-base --is-ancestor origin/dev HEAD; then
+  # Change branch is behind dev — back-integrate
+  git merge --no-edit origin/dev || {
+    # Conflict — surface in founder English and pause
+    echo "Conflict during change-branch back-integration."
+    echo "See CW-04 conflict-handling for the three options:"
+    echo "  1. Resolve interactively"
+    echo "  2. Abandon back-integration for now (continue on stale branch)"
+    echo "  3. Abort this WP"
+    exit 1
+  }
+  git push origin HEAD
+fi
+```
+
+### Success criterion
+
+`git merge-base --is-ancestor origin/dev <change-branch-HEAD>` returns 0 (origin/dev is an ancestor of the change branch tip).
+
+### Failure-handling OODA
+
+| Symptom | Observation | Diagnosis | Decision | Action |
+|---|---|---|---|---|
+| `git fetch` fails | Network error or auth failure | Transient or credential | Retry once with backoff; if still failing, BLOCKER per executor-loop-standard | Pause + surface to founder |
+| `git merge --no-edit` fails | Conflict during back-integration | Concurrent dev push touched same files | Pause; do NOT auto-resolve per CW-04 | Surface conflict + three founder-pick options |
+| Change branch doesn't exist | The WP is running under CW-05 trivial-change carve-out (no parent change) | Expected | Skip Step 0 entirely | Proceed to Step 1 |
+
+### Escalation trigger
+
+If a single Step 0 surfaces ≥3 successive conflicts on the same files, the change branch is structurally drifting from `dev`. Surface to the founder: *"This change branch has hit the same conflict 3 times in a row — `dev` is moving faster than this change can keep up with. Want to abandon and re-cut?"*
 
 ---
 
@@ -2078,6 +2134,73 @@ NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 Then via Edit tool, append to the WP file at
 `.architecture/{project}/work-packages/WP-NNN-<title>.md`:
+
+```markdown
+## Acceptance Evidence
+
+- Branch: `feat/wp-NNN-<slug>` (deleted post-merge)
+```
+
+(Step 12 implementation continues below in the next-but-one section
+"Acceptance Evidence (continued)". This positioning is preserved
+verbatim from the v0.11.0 amendment that inserted Step 12.5; the
+Step 12.5 section follows the inserted truncated marker.)
+
+---
+
+## Step 12.5 — Post-WP back-integration (v0.11.0+ — change-as-primitive)
+
+**Owner:** Calling session (run-all / run-wp / the founder's main session).
+
+**Input:** Just-merged WP commit on the change branch + `origin/dev`.
+
+**Purpose:** Per CW-04 auto back-integration (active driver), keep the change branch current with `dev` after every WP merges in. This is the trigger point that prevents the change branch from accumulating multi-day merge debt — paired with Step 0 (defence in depth before the next WP starts).
+
+**Skipped when:**
+
+- The WP shipped under the trivial-change carve-out (CW-05) — there's no parent change branch
+- The change branch is already at `origin/dev` tip (nothing to merge)
+
+### Mechanism
+
+```bash
+# In the change worktree, AFTER Step 12 wrap-up completes
+git fetch origin dev
+
+if ! git merge-base --is-ancestor origin/dev HEAD; then
+  git merge --no-edit origin/dev || {
+    # Conflict — surface and pause (same as Step 0)
+    echo "Conflict during post-WP back-integration."
+    echo "Three options per CW-04:"
+    echo "  1. Resolve interactively"
+    echo "  2. Defer (continue; surfaces again at next WP's Step 0)"
+    echo "  3. Abort the change (extreme — rolls back all merged WPs)"
+    exit 1
+  }
+  git push origin HEAD
+fi
+```
+
+### Success criterion
+
+After Step 12.5, `git merge-base --is-ancestor origin/dev <change-branch-HEAD>` returns 0.
+
+### Failure-handling OODA
+
+Identical to Step 0's table — same conflict types, same three founder-pick options, same escalation trigger (≥3 successive conflicts on same files → "abandon and re-cut" prompt).
+
+### Why both Step 0 and Step 12.5
+
+- **Step 12.5** is the active driver — fires after every WP merges, keeps the change branch within one WP of `dev`. Without it, the change branch can drift days behind.
+- **Step 0** is the safety net — catches teammate pushes to `dev` that happened *between* WPs (i.e., after Step 12.5 ran but before the next Step 0 fires).
+
+Both are required per CW-04. Skipping Step 12.5 would mean the change branch drifts to multi-day staleness; skipping Step 0 would mean concurrent dev-pushes during between-WP gaps slip through undetected.
+
+---
+
+## Acceptance Evidence (continued from Step 12 — the original section header below was truncated by the Step 12.5 insertion above)
+
+(The original Acceptance Evidence section follows; preserved verbatim.)
 
 ```markdown
 ## Acceptance Evidence
