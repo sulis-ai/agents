@@ -77,13 +77,18 @@ If you have not read the eight standards, read `plugins/sulis/references/standar
 
 ## What's different from `add-skill`
 
-`add-agent` borrows `add-skill`'s scaffolding wholesale. The differences are concentrated in three places:
+`add-agent` borrows `add-skill`'s scaffolding wholesale. The differences are concentrated in five places (three from v0.1.0, two new in v0.2.0):
 
 | Where | What's different |
 |---|---|
-| **Gate 2** | Register declaration (founder + technical mode shapes); dispatch trigger as the load-bearing description; tools declaration; model preference; `user_invocable` flag |
-| **Gate 4** | Two new perspectives for founder-facing agents — **Coaching Delivery** (passes the COACHING_STANDARD seven-question checklist) + **Register Switch Correctness** (correctly switches on intent / `--raw` / `/sulis:jargon`); new **Tone Conformance** perspective (passes the TONE_STANDARD seven-item checklist) |
-| **Gate 5** | New misuse cases — MUC-A1..A4 (founder-facing agent specific) + MUC-R1..R3 (register-aware specific) layered on top of the audience-agnostic + MUC-F1..F6 categories |
+| **Gate 1 (v0.2.0)** | New sub-step 1c **Specialist Boundary Analysis** for coordinator/router agents — produces a binding Specialist Boundary Table mapping every artifact-producing skill to its owning specialist + the dispatch trigger that fires. Becomes the source-of-truth for Gate 2's `delegation:` block. |
+| **Gate 2 (v0.1.0)** | Register declaration (founder + technical mode shapes); dispatch trigger as the load-bearing description; tools declaration; model preference; `user_invocable` flag |
+| **Gate 2 (v0.2.0)** | Three new declarative frontmatter blocks lifted from `studios/.claude/agents/explorer.yaml`: `context_sources:` (startup file loads with `required:` + `purpose:`), `delegation:` (coordinator-only — `artifact_owners` map + `dispatch_via` map + `authorisation` policy; binding on body behaviour), `routes_to:` (specialist routing targets with founder-intent `triggers:`) |
+| **Gate 3 (v0.2.0)** | Tier-aware body-size budget (LIGHT 150 / STANDARD 300 / HEAVY 500 lines target; 1.5× hard ceiling with mandatory `## Why this is big` rationale paragraph); per-section `> Standards:` citation header rule (cite, don't restate — the body's job is to apply the standard in the agent's context, not duplicate the standard's content) |
+| **Gate 4 (v0.1.0)** | Two perspectives for founder-facing agents — **Coaching Delivery** (passes the COACHING_STANDARD seven-question checklist) + **Register Switch Correctness** (correctly switches on intent / `--raw` / `/sulis:jargon`); **Tone Conformance** perspective (passes the TONE_STANDARD seven-item checklist) |
+| **Gate 4 (v0.2.0)** | Two more perspectives — **Delegation Discipline** (coordinator/router only; 4-check scoring whether the agent CAN delegate correctly) + **Body Density Conformance** (all agents; 4-check scoring Gate 3 body-size + citation rules are honoured) |
+| **Gate 5 (v0.1.0)** | Misuse cases — MUC-A1..A4 (founder-facing agent specific) + MUC-R1..R3 (register-aware specific) layered on top of the audience-agnostic + MUC-F1..F6 categories |
+| **Gate 5 (v0.2.0)** | New misuse case **MUC-A5 Specialist-Bypass** — coordinator agent authors specialist-owned artifact directly instead of dispatching. Catches the failure mode that drove v0.2.0 (Sulis authored WP-005..WP-007 inline instead of dispatching back to SEA's plan-work skill). |
 
 Everything else (BRIEF_PACK, Primitive Discovery, SPIRAL_TEMPLATES tier choice, Codebase Referential Integrity, Independence Check, Adversarial Testing Posture, Iteration termination) is identical to `add-skill`.
 
@@ -144,6 +149,36 @@ For agents that orchestrate or specialise (most agents), decompose the agent's s
 
 For pure-router agents (e.g., a stage-classifier that simply picks a depth mode), primitive discovery is shallow — record one paragraph of "this agent owns the classifier function; primitives are the inputs it considers (file count, primitive count, founder-facing flag)" and move on.
 
+#### Sub-step 1c: Specialist Boundary Analysis (NEW in v0.2.0 — coordinator/router agents only)
+
+If the proposed agent is a **coordinator** (dispatches to specialists across multiple phases) or a **router** (chooses between specialists based on input), it MUST declare its delegation boundary explicitly. Skip this sub-step for pure-specialist agents (executor, requirements-analyst) — they're dispatched, not dispatchers.
+
+Heuristic for whether this sub-step applies:
+
+| Signal | Implication |
+|---|---|
+| Agent body contains "What You Are Not" or "specialists are your team" | coordinator → run sub-step |
+| Agent has `kind: primary` or `kind: coordinator` (if marketplace adopts the field) | coordinator → run sub-step |
+| Agent body cites ≥ 3 distinct specialist agents | coordinator → run sub-step |
+| Agent body describes a multi-phase journey owned by it | coordinator → run sub-step |
+| Agent dispatches via Agent tool to ≥ 2 distinct `subagent_type`s | coordinator → run sub-step |
+| None of the above | specialist → skip sub-step |
+
+When the sub-step applies, produce a **Specialist Boundary Table**:
+
+| Specialist (subagent_type) | Owns these artifacts | Dispatch trigger (founder request that fires the dispatch) | Coordinator's role |
+|---|---|---|---|
+| engineering-architect | TDD.md, ADR-NNN.md, WP-NNN.md, INDEX.md, DECOMPOSE_VALIDATION.md | "design the technical blueprint" / "break this into tasks" / "amend the WP set" / "add a new WP" / mid-session detection of incomplete WP coverage | recommend `/sulis:draft-architecture` or `/sulis:plan-work`; read produced artifacts; translate to founder English |
+| requirements-analyst | SRD.md, NFR.md, PRIMITIVE_TREE.jsonld, GLOSSARY.md, MISUSE_CASES.md | "interview me about what this needs to do" / "capture the requirements" | recommend `claude --agent requirements-analyst`; read produced artifacts |
+| executor | implementation code + tests per WP; commits + branches | Phase 5 (WP execution); spawned by run-all skill | spawn via Agent tool; translate progress + blockers |
+| security-reviewer | viability-report-*.md, SF-NNN-*.md | Phase 7 (security review); "audit the codebase" | recommend `/sulis:codebase-assess`; translate findings to business risk |
+
+For each row, the coordinator's role MUST be one of: **dispatch (recommend)**, **dispatch (spawn)**, **read + translate**, or **never** — there's no "and also author this myself" option. If the body has a section like "What You Are Not" naming a specialist, the table must have a corresponding row.
+
+**Specialist coverage check.** Every artifact-producing skill in the marketplace must appear in at least one row's "Owns these artifacts" column, OR be explicitly excluded with a documented reason (e.g., "out of scope for this coordinator's domain"). If a skill exists but isn't claimed by any specialist in the table, the coordinator's delegation policy has a gap — either add a row pointing to whichever specialist now owns it, or escalate to the user before Gate 2.
+
+The table becomes the source-of-truth for the `delegation:` and `routes_to:` frontmatter blocks at Gate 2. If the coordinator later finds itself drafting an artifact whose row says "dispatch (recommend)" or "dispatch (spawn)", that's a Gate-5 MUC-A5 violation.
+
 **Pass criteria for Gate 1:**
 
 - BRIEF_PACK produced and reviewed
@@ -151,6 +186,7 @@ For pure-router agents (e.g., a stage-classifier that simply picks a depth mode)
 - "No existing agent covers this" carries an explicit CC verdict
 - "Could this be a skill instead?" question explicitly answered — record the answer in VERIFICATION_REPORT
 - Primitive decomposition completed; primitives pass PG-02 + PG-04; provenance recorded
+- **For coordinator/router agents:** Specialist Boundary Table produced + specialist-coverage check passes (no orphan artifact-producing skills); table is the source-of-truth for Gate 2's `delegation:` block
 
 ### Gate 2 — Scope Lock (decide phase)
 
@@ -201,13 +237,85 @@ The author commits to:
 
 - **Related skills + agents** — declare per REFERENTIAL_INTEGRITY_STANDARD in `agent.md` frontmatter `related_skills:` block. Include both skills the agent dispatches AND agents it dispatches as sub-agents.
 
+- **Context sources (NEW in v0.2.0)** — declarative frontmatter block listing every file the agent loads at startup. Each entry has `path:`, `required:` (true/false), and `purpose:` (one-line justification). This replaces ad-hoc "read X first" instructions scattered through the body. Pattern lifted from `studios/.claude/agents/explorer.yaml`:
+
+  ```yaml
+  context_sources:
+    - path: .sulis/{project}/JOURNEY.md
+      required: false
+      purpose: "Current phase + decisions + open questions; null on first run"
+    - path: plugins/sulis/references/standards/CRITICAL_THINKING_STANDARD.md
+      required: true
+      purpose: "13 principles applied to every analytical decision"
+    - path: plugins/sulis/references/standards/COACHING_STANDARD.md
+      required: true
+      purpose: "Seven tenets for surfacing findings without triggering defensiveness"
+  ```
+
+  Loaded at startup means the agent's first action (before any user-facing response) is to read every `required: true` source. The `purpose:` annotation makes verification easy: Gate 4 can check that each loaded source is actually referenced in the body for its stated purpose.
+
+- **Delegation policy (NEW in v0.2.0 — coordinator/router agents only)** — declarative frontmatter block binding the agent's delegation behaviour. For coordinator/router agents identified at Gate 1 sub-step 1c, the Specialist Boundary Table from Gate 1 becomes a `delegation:` block:
+
+  ```yaml
+  delegation:
+    artifact_creation: dispatch     # dispatch | direct | mixed
+    direct_threshold: "JOURNEY.md updates; one-line decision-discipline journal entries"
+    artifact_owners:
+      # Maps artifact-class → specialist that owns it
+      TDD.md: engineering-architect
+      ADR-*.md: engineering-architect
+      WP-*.md: engineering-architect
+      INDEX.md: engineering-architect
+      DECOMPOSE_VALIDATION.md: engineering-architect
+      SRD.md: requirements-analyst
+      NFR.md: requirements-analyst
+      PRIMITIVE_TREE.jsonld: requirements-analyst
+      GLOSSARY.md: requirements-analyst
+      MISUSE_CASES.md: requirements-analyst
+      viability-report-*.md: security-reviewer
+      SF-*.md: security-reviewer
+    dispatch_via:
+      engineering-architect: ["recommend /sulis:draft-architecture", "recommend /sulis:plan-work", "Agent tool spawn"]
+      requirements-analyst: ["recommend claude --agent requirements-analyst"]
+      executor: ["Agent tool spawn (via run-all skill)"]
+      security-reviewer: ["recommend /sulis:codebase-assess"]
+    authorisation: silent           # silent | user-approval-required
+  ```
+
+  **The `artifact_owners` map is binding.** When the coordinator finds itself about to author a file whose extension matches a row in this map, it MUST dispatch instead. Direct authoring of a mapped artifact is a Gate-5 MUC-A5 violation (Specialist-Bypass).
+
+  Operator-facing or specialist agents (not coordinators) declare `delegation: null` and skip this block.
+
+- **Routes to (NEW in v0.2.0 — coordinator/router agents only)** — declarative frontmatter block listing the specialists this agent routes to + the founder-intent trigger that fires each route. Pattern lifted from `studios/.claude/agents/explorer.yaml`:
+
+  ```yaml
+  routes_to:
+    - slug: engineering-architect
+      description: "Technical design, architecture decisions, work-package authoring"
+      triggers: ["design", "architect", "break this into tasks", "amend the WP set"]
+    - slug: requirements-analyst
+      description: "Requirements interview, specification capture"
+      triggers: ["capture requirements", "interview me about", "what does this need to do"]
+    - slug: executor
+      description: "Implement a Work Package end-to-end"
+      triggers: ["build it", "Phase 5", "run-all"]
+    - slug: security-reviewer
+      description: "Codebase security viability assessment"
+      triggers: ["security review", "audit the codebase", "Phase 7"]
+  ```
+
+  The `triggers` array gives the parent-agent (or Sulis itself) explicit signals for routing. Verification at Gate 4 includes a "Routing precision" check — fresh-context test of each trigger producing the expected route.
+
+  Specialist-only agents declare `routes_to: []` and skip the routing list.
+
 **Pass criteria for Gate 2:**
 
-- All twelve items written down in `VERIFICATION_REPORT.md`'s "Scope Lock" section
+- All fifteen items written down in `VERIFICATION_REPORT.md`'s "Scope Lock" section
 - No item is "TBD"; if something cannot be locked, return to Gate 1
 - For founder-facing or both: founder-facing-conventions.md Rule 6 has been read; register declaration matches the Rule 6 shape
 - For founder-facing or both: COACHING + TONE standards in `output:` phase classification
 - "Could this be a skill instead?" answered NO with explicit justification (the agent needs its own conversational context, its own tool set, its own role definition that wouldn't fit in a skill)
+- **For coordinator/router agents:** `context_sources:`, `delegation:`, and `routes_to:` frontmatter blocks fully populated from the Gate 1 Specialist Boundary Table
 
 ### Gate 3 — Generate (authoring, LLM-driven)
 
@@ -239,15 +347,57 @@ The `agent.md` must:
 - Pass the linguistic audit (NH-02 + TONE T-05): no prohibited terms ("comprehensive", "robust", "powerful", "revolutionary", "leverage", "magic", "seamless"); preferred vocabulary from TONE Section A used
 - Use progressive disclosure: point to standards/references rather than restating them
 
+#### Body-size budget (NEW in v0.2.0)
+
+Per add-skill's right-sizing discipline (and SPIRAL_TEMPLATES tier limits), agent bodies have tier-aware size targets:
+
+| Tier | Target body length | Hard ceiling (1.5× target — exceed only with rationale) |
+|---|---|---|
+| LIGHT | ≤ 150 lines | 225 lines |
+| STANDARD | ≤ 300 lines | 450 lines |
+| HEAVY | ≤ 500 lines | 750 lines |
+
+If the draft exceeds the target, the author MUST do one of:
+
+1. **Refactor**: move restated standards content out of the body. Cite standards via `> Standards: ...` headers (see citation rule below) and trust the reader to follow the reference.
+2. **Add a `## Why this is big` paragraph** at the top of the body explaining what's load-bearing about the length. Acceptable rationales: "agent embeds a workflow that spans 7 phases each with non-skippable detail" or "agent is the marketplace's single front-door and consolidates 5 specialist roles". Unacceptable rationales: "comprehensive coverage" / "to be safe" / "in case the agent forgets".
+
+If the draft exceeds the hard ceiling AND has no acceptable rationale, Gate 3 BLOCKS — return to refactor.
+
+**Why this matters:** every line in the body costs tokens at every dispatch. A 1800-line body costs ~30K tokens per session start; a 500-line body costs ~8K. The difference compounds across 10+ sessions/day. Beyond cost: density defeats pattern-matching — when the same teaching shows up 5× in different shapes, the agent can't reliably extract the load-bearing rule.
+
+#### Per-section standards-citation header (NEW in v0.2.0)
+
+Every section that operationalises a standard MUST cite that standard at the top of the section as a `> Standards:` blockquote. Pattern lifted from `studios/.claude/agents/explorer.yaml`:
+
+```markdown
+### Facilitation Tone
+> Standards: COACHING_STANDARD.md (seven tenets), TONE_STANDARD.md (T-01, T-02, NH-02)
+
+You are a creative collaborator, not an evaluator. ...
+```
+
+The body's job is to **apply** the standard in the agent's context, not to **restate** it. Three rules:
+
+1. **Cite the standard's canonical path + the specific principles** (e.g., `(EH, HU)` or `(T-01, T-02)`) at section top.
+2. **Worked examples are OK** — they make the standard concrete in the agent's domain (e.g., "for Sulis, structural-not-personal looks like: 'There's a gap in the auth flow' not 'you missed authentication'"). They're cheap signal.
+3. **Restating the principles is NOT OK** — if the body has a numbered list of the seven COACHING tenets identical to the standard's, delete the list and cite.
+
+A body that cites N standards and restates none of them is dense + scannable. A body that restates 5 standards is bloated + brittle (when the standard updates, the body diverges).
+
+**Verification at Gate 4:** Codebase Referential Integrity already checks that cited paths resolve. Gate 4 adds a check that each section with operational content (workflow steps, behaviour rules, output discipline) has a `> Standards:` header citing the standard it implements — OR a documented exception (e.g., "agent-specific behaviour not derived from a published standard").
+
 **Pass criteria for Gate 3:**
 
 - `agent.md` exists at `plugins/<plugin>/agents/<agent-name>.md` and parses (frontmatter is valid YAML)
-- All Gate 2 frontmatter blocks present (`standards:`, `verification_spiral:`, `related_skills:`, optionally `register:` / `model:` / `tools:` / `user_invocable:`)
-- The agent matches the Gate 2 lock (scope, audience, dispatch trigger, register, standards, verification tier, tools, gotchas, related)
+- All Gate 2 frontmatter blocks present (`standards:`, `verification_spiral:`, `related_skills:`, optionally `register:` / `model:` / `tools:` / `user_invocable:` / `context_sources:` / `delegation:` / `routes_to:`)
+- The agent matches the Gate 2 lock (scope, audience, dispatch trigger, register, standards, verification tier, tools, gotchas, related, context sources, delegation policy, routes)
 - No reference file declared in `agent.md` is missing on disk (Codebase Referential Integrity precursor)
 - Pyramid structure verified: first heading or paragraph states the role / what-the-agent-does
 - Linguistic audit passes: zero prohibited terms; preferred vocabulary applied
 - For founder-facing or both: at least one founder-mode example present; at least one technical-mode example present
+- **Body within tier size target OR has documented `## Why this is big` rationale** (NEW in v0.2.0)
+- **Every operational section has `> Standards:` citation header OR documented exception** (NEW in v0.2.0)
 
 ### Gate 4 — Evaluate (verification spiral, scored under SPIRAL_TEMPLATES)
 
@@ -316,6 +466,38 @@ For agents declaring dual register, verify the register-switch mechanics work:
 
 Score: total-passes / 20. Threshold: ≥ 18/20.
 
+#### Delegation Discipline perspective (NEW in v0.2.0 — coordinator/router agents only)
+
+For agents identified at Gate 1 sub-step 1c as coordinator/router, verify the delegation policy is binding (not aspirational):
+
+1. **Declarative block present** — frontmatter contains a `delegation:` block with `artifact_creation`, `artifact_owners`, `dispatch_via`, and `authorisation` fields populated. PASS / FAIL.
+
+2. **What-You-Are-Not coverage** — every specialist named in the body's "What You Are Not" (or equivalent) section has a corresponding row in the `delegation.artifact_owners` map OR is excluded with documented reason. PASS / FAIL.
+
+3. **Unambiguous dispatch triggers** — for every specialist in `routes_to:`, the body has at least one section with an explicit "when you encounter X, dispatch via Y" instruction. No specialist is implicitly invoked only — every specialist has an explicit trigger. PASS / FAIL.
+
+4. **Mid-session amendment trigger present** — body explicitly addresses the case where specialist output is incomplete and the coordinator notices a gap mid-session. The trigger must be "dispatch back to the specialist", not "fill the gap myself". This catches the Phase-5-WP-authoring failure mode that drove v0.2.0. PASS / FAIL.
+
+Score: number-of-PASS / 4. Threshold: ≥ 3/4 (i.e., at most one FAIL with documented mitigation).
+
+The Delegation Discipline perspective is the operational complement to Gate 5's MUC-A5 (Specialist-Bypass). Gate 4 measures whether the agent CAN delegate correctly; Gate 5 documents the residual risk if it doesn't.
+
+For specialist agents (not coordinators), this perspective is skipped — record "N/A — specialist agent, not a coordinator" in VERIFICATION_REPORT.
+
+#### Body Density Conformance perspective (NEW in v0.2.0 — all agents, HEAVY tier weighted)
+
+Verify Gate 3's body-size + standards-citation rules are actually honoured:
+
+1. **Body size within target** — agent body line count ≤ tier target (LIGHT 150 / STANDARD 300 / HEAVY 500); OR ≤ hard ceiling (1.5× target) with `## Why this is big` rationale paragraph present + acceptable. PASS / FAIL.
+
+2. **Per-section standards citations** — every operational section (workflow steps, behaviour rules, output discipline, decision rules) has a `> Standards: ...` blockquote header at the top OR documents an exception. Sample 5 sections at random; threshold 4/5 PASS.
+
+3. **No standard restatement** — for each standard cited in `standards:` frontmatter, the body does NOT contain a numbered list of the standard's principles identical to the standard's. Sample 3 standards; threshold 3/3 (any restatement = FAIL — refactor required at Gate 3).
+
+4. **Citation paths resolve** — every `> Standards:` blockquote cites a file that exists at the cited path (overlaps with Codebase Referential Integrity but specific to the citation headers). PASS / FAIL.
+
+Score: number-of-PASS / 4. Threshold: ≥ 3/4 for STANDARD tier; ≥ 4/4 for HEAVY tier (stricter because HEAVY agents are highest-cost-per-dispatch).
+
 #### Codebase Referential Integrity (all tiers, very high leverage for agents)
 
 Every pre-existing entity the agent names must trace to the codebase with a verified path:
@@ -346,6 +528,8 @@ Per SPIRAL_TEMPLATES: max 3 iterations; terminate on sufficient (all thresholds 
 - File contains "Verdict: PASS"
 - All scored dimensions meet threshold; for HEAVY tier, Independence Check ≥ 3
 - For founder-facing or both: Coaching Delivery ≥ 6/7; Tone Conformance ≥ 6/7; Register Switch Correctness ≥ 18/20
+- **For coordinator/router agents:** Delegation Discipline ≥ 3/4 (NEW in v0.2.0)
+- **For all agents:** Body Density Conformance ≥ 3/4 (STANDARD tier) or ≥ 4/4 (HEAVY tier) (NEW in v0.2.0)
 - Single filesystem check: `test -f ... && grep -q "Verdict:.*PASS" ...` returns 0
 
 ### Gate 5 — Adversarial Review (publish gate)
@@ -377,7 +561,17 @@ Misuse cases sometimes surface during Gate 4 functional-scenario testing. Mainta
 - **MUC-A3: Defensive-triggering phrase in a recommendation** — agent surfaces a finding using language that triggers founder defensiveness (e.g., "Your code has 5 security issues"). Mitigation: COACHING Tenet 1 (structural framing); pre-emission validation against the Pass/Fail checklist.
 - **MUC-A4: Commercial outcome missing when describing a feature/change** — agent reports completion without connecting to user impact (e.g., "Change shipped" not "Change shipped: auth-bug fix is live for the ~500 users affected"). Mitigation: TONE T-03; output-shape template includes "outcome" field.
 
-Founder-facing or both agents MUST address all 4 of MUC-A1..A4.
+- **MUC-A5: Specialist-Bypass (NEW in v0.2.0 — coordinator/router agents only)** — coordinator agent encounters mid-session work that belongs to a declared specialist (artifact authoring, finding triage, design edit, WP amendment) and authors the artifact directly instead of dispatching. Concrete failure pattern: SEA's `/sulis:plan-work` produces 4 WPs covering the mechanism; coordinator notices a gap in Phase-5/6 integration coverage; coordinator authors WP-005, WP-006, WP-007 directly + updates INDEX.md + DECOMPOSE_VALIDATION.md inline instead of dispatching back to SEA. Result: artifact provenance is wrong (specialist didn't produce it), specialist's validation rubric wasn't applied to the additions, and the coordinator silently absorbed the specialist's responsibility.
+
+  Mitigation stack:
+  - **Gate 2 declarative `delegation:` block** with `artifact_owners` map — body cannot author a mapped artifact without violating its own declared policy
+  - **Gate 4 Delegation Discipline perspective check 4** — body explicitly addresses mid-session amendment with dispatch-not-direct trigger
+  - **Body explicit trigger** — section like "When you encounter a gap in specialist output mid-session" naming the specific failure mode + the dispatch as the response
+  - **Pre-emission scan in body** — coordinator's pre-emission gate (the silent check before any artifact write) includes "is this file's extension or path in `delegation.artifact_owners`? If yes, abort write + dispatch instead."
+
+  Coordinator/router agents (any agent with a `delegation:` frontmatter block declaring `artifact_creation: dispatch`) MUST address MUC-A5.
+
+Founder-facing or both agents MUST address all 4 of MUC-A1..A4. Coordinator/router agents (overlapping category) MUST also address MUC-A5.
 
 #### Audience-conditional: dual-register agent misuse cases (NEW in add-agent v0.1.0)
 
@@ -425,6 +619,7 @@ OPEN_RISK without a structured revisit-trigger = automatic Gate 5 BLOCK. The tri
 
 - ≥ 3 misuse cases named in VERIFICATION_REPORT.md's "Adversarial Review" section
 - For founder-facing or both: ALL 4 of MUC-A1..A4 addressed
+- For coordinator/router agents: MUC-A5 addressed (NEW in v0.2.0)
 - For dual-register agents: ALL 3 of MUC-R1..R3 addressed
 - For founder-facing or both: ≥ 3 of MUC-F1..F6 addressed
 - All marked as either PREVENTED (with mechanism) or OPEN_RISK (with documented impact + rationale + revisit-trigger)
@@ -491,10 +686,14 @@ After all five gates pass:
 - **Register** — the language register an agent speaks. Founder-mode (full tone stack) or technical-mode (operator-direct).
 - **Dual register** — an agent that supports both founder-mode (default) and technical-mode (on request) per founder-facing-conventions.md Rule 6.
 - **MUC-A1..A4** — founder-facing agent-specific misuse cases (Prescriptive / Banned-Vocab / Defensive-Trigger / Missing-Outcome).
+- **MUC-A5** (NEW in v0.2.0) — Specialist-Bypass misuse case (coordinator authors specialist-owned artifact directly).
 - **MUC-R1..R3** — dual-register misuse cases (Mode-Leak / Signal-Drop / Switch-Ambiguity).
 - **Coaching Delivery** — Gate 4 perspective scoring founder-mode output against COACHING_STANDARD seven-question checklist.
 - **Tone Conformance** — Gate 4 perspective scoring founder-mode output against TONE_STANDARD seven-item checklist.
 - **Register Switch Correctness** — Gate 4 perspective scoring dual-register mechanics (intent / `--raw` / `/sulis:jargon`).
+- **Delegation Discipline** (NEW in v0.2.0) — Gate 4 perspective scoring whether a coordinator/router agent CAN delegate correctly (declarative block present, what-you-are-not coverage, unambiguous triggers, mid-session amendment trigger).
+- **Body Density Conformance** (NEW in v0.2.0) — Gate 4 perspective scoring whether Gate 3 body-size + standards-citation rules are honoured.
+- **Specialist Boundary Table** (NEW in v0.2.0) — Gate 1 sub-step 1c artifact for coordinator/router agents; maps artifact classes → owning specialists + dispatch mechanism. Source-of-truth for the `delegation:` frontmatter block.
 - **Dispatch trigger precision** — Gate 4 sub-perspective measuring how accurately a parent agent routes based on the description.
 - **VERIFICATION_REPORT.md** — the per-agent audit artifact required on disk by SPIRAL_TEMPLATES. Single filesystem check determines compliance.
 

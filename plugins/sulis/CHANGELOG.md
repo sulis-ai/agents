@@ -1,5 +1,52 @@
 # Sulis — Changelog
 
+## v0.43.0 — 2026-05-25
+
+**add-agent v0.2.0 — five-gate patch driven by a real-session delegation failure.**
+
+Mid-session during Phase 5 #5 (terminal-launcher-port WP authoring),
+Sulis authored WP-005..WP-007 directly + updated INDEX.md +
+DECOMPOSE_VALIDATION.md + TDD.md inline — instead of dispatching back
+to SEA's `plan-work` skill which owns WP authoring. User flagged the
+bypass as a delegation discipline gap. Root cause: agent body's
+"What You Are Not" list is prose, not declarative; no operational
+trigger for "mid-session work that belongs to a specialist — dispatch,
+don't author." add-agent v0.2.0 closes the gap by adding five
+methodology checkpoints that an agent body must pass to ship.
+
+### Five gates patched
+
+| Gate | New v0.2.0 capability |
+|---|---|
+| 1 | **Sub-step 1c Specialist Boundary Analysis** — for coordinator/router agents, produce a binding Specialist Boundary Table mapping every artifact class (TDD.md, ADR-*.md, WP-*.md, SRD.md, ...) to its owning specialist + the dispatch trigger that fires. Skip for specialist agents. |
+| 2 | **Three declarative frontmatter blocks** lifted from `studios/.claude/agents/explorer.yaml` — `context_sources:` (startup file loads with `required:` + `purpose:` annotations), `delegation:` (coordinator-only — `artifact_owners` + `dispatch_via` + `authorisation`; binding on body behaviour), `routes_to:` (specialist routing targets with founder-intent `triggers:`). The `delegation.artifact_owners` map is binding — direct authoring of a mapped artifact is a Gate-5 MUC-A5 violation. |
+| 3 | **Tier-aware body-size budget** (LIGHT 150 / STANDARD 300 / HEAVY 500 lines target; 1.5× hard ceiling with mandatory `## Why this is big` rationale paragraph) + **per-section `> Standards:` citation header rule** (cite, don't restate — the body's job is to apply standards in the agent's context, not duplicate them). |
+| 4 | **Two new perspectives** — **Delegation Discipline** (coordinator/router only; 4-check scoring declarative block present + what-you-are-not coverage + unambiguous triggers + mid-session amendment trigger) + **Body Density Conformance** (all agents; 4-check scoring Gate 3 body-size + citation rules are honoured). HEAVY tier requires 4/4 on Body Density. |
+| 5 | **MUC-A5 Specialist-Bypass** misuse case — coordinator agent authors specialist-owned artifact directly instead of dispatching. Mitigation stack: Gate 2 declarative `delegation:` block + Gate 4 Delegation Discipline perspective + body explicit trigger + pre-emission scan against `artifact_owners`. Catches the exact failure mode that drove v0.2.0. |
+
+### Foundation for next iteration
+
+v0.43.0 ships the patched methodology. Next iteration applies it to
+`plugins/sulis/agents/sulis.md` in deepening mode — closes the 10
+issues surfaced in the self-audit:
+
+1. Delegation policy hidden in prose (no `delegation:` block)
+2. 1827-line body restating 5 standards
+3. Three competing self-checks (Pre-Emission Gate / Brevity / Decision Discipline) — none checks delegation
+4. Identity buried at line 323 (Pyramid violation)
+5. Workflow section duplicates `journey-model.md` (~400 lines)
+6. Stale specialist references (`sulis-context:` / `srd:` / `sea:` / `sulis-execution:` / `sulis-security:`) post-consolidation
+7. Verification spiral has only 2 custom dimensions; declared MUSTs not measured
+8. No `## Required reading` section
+9. No declarative `context_sources:` block
+10. No explicit `delegation:` triggers list
+
+### Files modified
+
+- `plugins/sulis/skills/add-agent/SKILL.md` — five gate updates (~700 lines added across Gate 1c + Gate 2 blocks + Gate 3 size/citation rules + Gate 4 perspectives + Gate 5 MUC-A5)
+- `plugins/sulis/.claude-plugin/plugin.json` — v0.42.0 → v0.43.0
+- `.claude-plugin/marketplace.json` — sulis entry v0.42.0 → v0.43.0; metadata v1.85.0 → v1.86.0
+
 ## v0.42.0 — 2026-05-25
 
 **Phase 5 partial — change-as-primitive executor-side infrastructure.**
