@@ -19,8 +19,9 @@ so artifact directories conflict. Branching by change makes those
 directories disjoint by construction.
 <!-- /summary -->
 
-> **Version:** 0.1.0
+> **Version:** 0.2.0
 > **Status:** Active — Calibration Period (90 days from 2026-05-21)
+> **v0.2.0 amendment** (Phase 4 of change-as-primitive build, 2026-05-25): CW-04 gains the **Auto back-integration** subsection — merge-not-rebase mechanism with two trigger points (post-WP-merge + pre-WP-start) and structured conflict handling. Operationalises what CW-04's two-level worktree hierarchy makes possible: keeping the change branch current with `dev` without breaking in-flight WP worktrees.
 > **Applies to:** Every Sulis-marketplace skill or tool that produces
 > artifacts under `.specifications/`, `.architecture/`, `.security/`,
 > `.pitch/`, or any other project-scoped directory; every executor
@@ -230,6 +231,52 @@ change branch. It batches them, rebases each onto the change branch
 into the change branch. The train is the per-WP integration layer
 within a change; the change merge is the per-change integration layer
 within `dev`.
+
+### Auto back-integration (MUST — added in v1.1.0 Phase 4)
+
+A change branch can sit out for hours or days while WPs ship through
+it. Meanwhile, `dev` moves on (other founders, other changes, hotfix
+deploys). The change branch needs to stay current with `dev` to avoid
+accumulating a multi-day merge debt — but not so eagerly that
+in-flight WP worktrees lose their base commit.
+
+**Mechanism: merge, not rebase.** The change branch is updated from
+`dev` via `git merge --no-edit origin/dev` — preserving commit SHAs so
+any in-flight WP worktrees branched off the change branch's previous
+tip remain valid. Rebase would rewrite SHAs and break those worktrees.
+
+**Two trigger points (both MUST fire):**
+
+| When | What runs | Why |
+|---|---|---|
+| After every WP merges back to the change branch | `git fetch origin dev && git merge --no-edit origin/dev` on the change branch; push | Active driver — keeps change branch within one WP of dev |
+| Before every new WP starts (executor Step 0 arrival check) | Same merge invocation; fast no-op if change branch is already up-to-date | Defence in depth — catches teammate pushes to `dev` that happened between WPs |
+
+Both together. After-merge is the active driver; before-WP is the
+safety net for inter-WP `dev` motion.
+
+**Conflict handling.** If `git merge origin/dev` on the change branch
+fails:
+
+- **Do not auto-resolve.** Pause the WP-in-flight and surface the
+  conflict in founder English: *"Dev moved while you were working —
+  there's a conflict in `src/auth.py` between your change and what was
+  merged 12 minutes ago. Want me to walk you through resolving it?"*
+- **Founder picks** one of three options:
+  1. Resolve interactively (operator walks the conflict files)
+  2. Abandon back-integration for now (continue on stale change
+     branch; the conflict surfaces again next merge attempt)
+  3. Abort this WP (`git reset` the WP branch; the WP is rebuilt
+     after the change branch is current)
+
+**Why this lives in CW-04.** The two-level worktree hierarchy CW-04
+codifies makes back-integration possible (the change branch is the
+integration point; updates flow into it without touching WP worktrees).
+The auto back-integration mechanism is the operational rule that keeps
+the hierarchy current.
+
+See `lifecycle.md` Step 0 (arrival check) and Step 12.5
+(post-WP back-integration) for the executor's per-step touchpoints.
 
 ---
 
@@ -460,3 +507,4 @@ change, and what CW-NN rule(s) it exercised or stressed.
 | Version | Date | Change |
 |---------|------|--------|
 | 0.1.0 | 2026-05-21 | Initial standard. CW-01..CW-08 synthesised from OpenSpec, Conventional Commits, SEA change primitives, GIT-01..GIT-10. Greenfield — no anchor cases yet; 90-day calibration begins. |
+| 0.2.0 | 2026-05-25 | **CW-04 amended (additive).** Auto back-integration subsection added — codifies the merge-not-rebase mechanism with two trigger points (post-WP-merge active driver + pre-WP-start safety net) and structured conflict handling (interactive resolve / defer / abort options). Operationalises what CW-04's two-level worktree hierarchy makes possible. Phase 4 of the change-as-primitive build; pairs with lifecycle.md Step 0 + Step 12.5 amendments. Backwards-compatible — existing change branches without auto back-integration continue to work; the new mechanism activates only via the Phase 5 executor implementation. |
