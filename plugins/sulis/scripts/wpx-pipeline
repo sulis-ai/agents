@@ -45,6 +45,7 @@ from _wpxlib import (  # noqa: E402
     _rebase_on_dev,
     _run_smoke,
     add_common_args,
+    back_integrate_change_branch,
     cli_main,
     emit_internal_error,
     emit_result,
@@ -97,6 +98,47 @@ def cmd_run(args: argparse.Namespace) -> None:
     result["ci_poll_skipped"] = skip_ci_poll
 
     try:
+        # Step 0: arrival check (Phase 5 #3 — change-as-primitive build).
+        # Per lifecycle.md Step 0 + CW-04 auto back-integration: if running
+        # in a change context, ensure the change branch is current with dev
+        # BEFORE the WP rebases onto it. Defence in depth (the active
+        # driver is Step 12.5 after the last WP merged).
+        # Skipped if not in a change context (--change-worktree-path unset,
+        # or --base-branch doesn't start with "change/" — CW-05 trivial
+        # carve-out).
+        if args.change_worktree_path and base_branch.startswith("change/"):
+            _log(f"Step 0: arrival check — back-integrating {base_branch} from origin/dev")
+            arrival = back_integrate_change_branch(
+                Path(args.change_worktree_path),
+                base_branch,
+                dev_ref="origin/dev",
+            )
+            result["step_0_arrival_check"] = arrival["status"]
+            if arrival["status"] == "merge_conflict":
+                files_summary = ", ".join(arrival["files"][:3]) + (
+                    f" (+ {len(arrival['files']) - 3} more)" if len(arrival["files"]) > 3 else ""
+                )
+                result.update(
+                    outcome="blocker",
+                    blocker_reason=(
+                        f"Step 0: change branch back-integration conflict in {files_summary}. "
+                        f"Per CW-04, do not auto-resolve — founder picks resolve / defer / abort."
+                    ),
+                )
+                emit_result(result, exit_code=1)
+            elif arrival["status"] in ("fetch_failed", "internal_error"):
+                result.update(
+                    outcome="blocker",
+                    blocker_reason=f"Step 0 {arrival['status']}: {arrival.get('error', '')}",
+                )
+                emit_result(result, exit_code=1)
+            elif arrival["status"] == "merged_ok":
+                _log(f"Step 0: merged {arrival.get('merged_commits', '?')} commits from origin/dev into {base_branch}")
+            else:
+                _log(f"Step 0: {base_branch} already current with origin/dev (no-op)")
+        else:
+            result["step_0_arrival_check"] = "skipped"
+
         # Step 8a: CI poll
         if skip_ci_poll:
             _log("Step 8a: skipping CI poll (--skip-ci-poll or auto-detected absence)")
@@ -150,6 +192,41 @@ def cmd_run(args: argparse.Namespace) -> None:
             merge_sha = _merge_squash(repo, args.branch, args.wp,
                                       base_branch=base_branch)
         result["merge_sha"] = merge_sha
+
+        # Step 12.5: post-WP back-integration (Phase 5 #3 — change-as-primitive
+        # build). Per lifecycle.md Step 12.5 + CW-04 auto back-integration:
+        # AFTER the WP successfully merges into the change branch, back-
+        # integrate the change branch from dev. This is the ACTIVE DRIVER
+        # — keeps the change branch within one WP of dev.
+        # Conflict here is non-blocking: the WP already merged successfully.
+        # Surface the conflict as a warning and let the founder resolve at
+        # next Step 0 (defence in depth).
+        if args.change_worktree_path and base_branch.startswith("change/") and not result.get("merge_already_complete"):
+            _log(f"Step 12.5: post-WP back-integration of {base_branch} from origin/dev")
+            post_merge = back_integrate_change_branch(
+                Path(args.change_worktree_path),
+                base_branch,
+                dev_ref="origin/dev",
+            )
+            result["step_12_5_back_integration"] = post_merge["status"]
+            if post_merge["status"] == "merge_conflict":
+                files_summary = ", ".join(post_merge["files"][:3]) + (
+                    f" (+ {len(post_merge['files']) - 3} more)" if len(post_merge["files"]) > 3 else ""
+                )
+                _log(
+                    f"WARNING: Step 12.5 conflict in {files_summary}. The WP "
+                    f"merged successfully, but the change branch is now stale. "
+                    f"Founder action needed at next Step 0."
+                )
+                result["step_12_5_conflict_files"] = post_merge["files"]
+            elif post_merge["status"] in ("fetch_failed", "internal_error"):
+                _log(f"WARNING: Step 12.5 {post_merge['status']}: {post_merge.get('error', '')}. Continuing — defence in depth at next Step 0.")
+            elif post_merge["status"] == "merged_ok":
+                _log(f"Step 12.5: merged {post_merge.get('merged_commits', '?')} commits from origin/dev into {base_branch}")
+            else:
+                _log(f"Step 12.5: {base_branch} already current with origin/dev (no-op)")
+        else:
+            result["step_12_5_back_integration"] = "skipped"
 
         # Step 9: deploy poll
         _log(f"Step 9: polling deploy workflow '{args.deploy_workflow}' for {merge_sha[:8]}")
@@ -264,6 +341,19 @@ def build_parser() -> argparse.ArgumentParser:
              "CW-04, when invoked from inside a change worktree, callers "
              "pass the change branch name (e.g. change/feat-payments) so "
              "WPs ship to the change branch, not directly to dev.",
+    )
+    p_run.add_argument(
+        "--change-worktree-path", default=None,
+        help="Path to the parent change worktree (per CW-04 — the worktree "
+             "where the change/* branch lives). When set + --base-branch "
+             "starts with 'change/', the pipeline runs Step 0 (arrival "
+             "check — back-integrate change branch from dev) before the CI "
+             "poll, and Step 12.5 (post-WP back-integration) after the "
+             "merge succeeds. Both are no-ops when the change branch is "
+             "already current. See lifecycle.md Step 0 / Step 12.5 for "
+             "the failure-handling OODA. When unset, both steps are "
+             "skipped (backward-compatible with pre-Phase-5 callers and "
+             "with the CW-05 trivial-change carve-out).",
     )
 
     return parser
