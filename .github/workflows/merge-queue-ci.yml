@@ -1,0 +1,40 @@
+name: merge-queue-ci
+# RC-04 / RC-13: speculative-merge integration test. Fires ONLY on merge_group.
+# Runs against the synthetic merged ref GitHub creates inside the queue.
+# Merge-queue source = change/* branches (per CW-04). Required check before merge to dev.
+# Marketplace profile: full pytest suite + manifest integration check.
+on:
+  merge_group:
+jobs:
+  merge-queue-ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test deps
+        run: pip install pytest
+
+      - name: full unit tests
+        run: pytest plugins/sulis/scripts/tests/ -q
+
+      - name: integration — all plugin manifests resolve against marketplace
+        run: |
+          python3 -c "
+          import json, glob, os, sys
+          mp = json.load(open('.claude-plugin/marketplace.json'))
+          declared = {p['source'].lstrip('./') for p in mp['plugins']}
+          for src in declared:
+              pj = os.path.join(src, '.claude-plugin', 'plugin.json')
+              assert os.path.isfile(pj), f'missing plugin.json for {src}'
+              json.load(open(pj))
+          print(f'{len(declared)} plugin sources integrate cleanly')
+          "
+
+      - name: e2e — (marketplace has no runtime e2e; manifest+test gate is the integration surface)
+        run: echo "marketplace profile: unit + integration is the full gate"

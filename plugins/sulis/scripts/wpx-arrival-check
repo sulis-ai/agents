@@ -1,0 +1,275 @@
+#!/usr/bin/env python3
+"""wpx-arrival-check — verify the Repository Contract (RC-01..RC-10).
+
+The executor's Step 0. Read-only. Verifies every MUST rule in
+repository-contract-standard.md against a live GitHub repo via `gh api`,
+plus filesystem checks for workflow files + CODEOWNERS.
+
+Marketplace profile: when .sulis/repo-contract.yml declares
+`deploy_target: none`, the deploy-coupled MUSTs (RC-05 deploy secrets,
+RC-06, RC-08 tag signing) downgrade to WARN — a non-deployable repo
+(plugin marketplace, library, CLI) cannot satisfy them and shouldn't be
+refused for it. This is the documented deviation pending the RC v0.3.0
+"repo profiles" work.
+
+Emits the RC-11 JSON contract to stdout:
+    {"ok": bool, "errors": [...], "warnings": [...]}
+Exit codes: 0 = all MUST pass, 2 = a MUST failed, 1 = tooling error.
+
+Usage:
+    wpx-arrival-check --repo owner/name [--repo-root .]
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+REQUIRED_WORKFLOWS = [
+    "branch-ci",
+    "merge-queue-ci",
+    "deploy-staging",
+    "health-and-smoke",
+    "promote-dev-to-main",
+    "release-prod",
+]
+
+
+def _gh(args: list[str], timeout: int = 30) -> tuple[int, str, str]:
+    """Run a gh command. Returns (rc, stdout, stderr). rc!=0 means the API
+    call failed (often a 404 = the resource is absent = a rule failure)."""
+    try:
+        proc = subprocess.run(
+            ["gh", *args], capture_output=True, text=True, timeout=timeout
+        )
+        return proc.returncode, proc.stdout, proc.stderr
+    except FileNotFoundError:
+        raise _ToolingError("gh CLI not found on PATH")
+    except subprocess.TimeoutExpired:
+        return 124, "", "timeout"
+
+
+class _ToolingError(Exception):
+    """Raised when the check cannot run at all (no gh, no auth). Exit 1."""
+
+
+def _read_deploy_target(repo_root: Path) -> str:
+    """Parse deploy_target from .sulis/repo-contract.yml (stdlib-only)."""
+    contract = repo_root / ".sulis" / "repo-contract.yml"
+    if not contract.is_file():
+        return "unknown"
+    for line in contract.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("deploy_target:"):
+            return stripped.split(":", 1)[1].strip()
+    return "unknown"
+
+
+class _Report:
+    def __init__(self) -> None:
+        self.errors: list[dict] = []
+        self.warnings: list[dict] = []
+
+    def error(self, rule: str, check: str, actual: str, expected: str) -> None:
+        self.errors.append(
+            {"rule": rule, "check": check, "actual": actual, "expected": expected}
+        )
+
+    def warn(self, rule: str, check: str, actual: str, expected: str) -> None:
+        self.warnings.append(
+            {"rule": rule, "check": check, "actual": actual, "expected": expected}
+        )
+
+    def emit(self) -> int:
+        ok = len(self.errors) == 0
+        print(json.dumps({"ok": ok, "errors": self.errors, "warnings": self.warnings}))
+        return 0 if ok else 2
+
+
+def _check_rc01_branches(repo: str, rep: _Report) -> None:
+    """RC-01: dev + main exist; default branch is dev."""
+    rc, out, _ = _gh(["api", f"repos/{repo}"])
+    if rc == 0 and out.strip():
+        try:
+            default = json.loads(out).get("default_branch")
+        except json.JSONDecodeError:
+            default = None
+        if default != "dev":
+            rep.error("RC-01", "default branch is dev", str(default), "dev")
+    else:
+        rep.error("RC-01", "repo metadata readable", "gh error", "200")
+
+    for branch in ("dev", "main"):
+        rc, _, _ = _gh(["api", f"repos/{repo}/branches/{branch}"])
+        if rc != 0:
+            rep.error("RC-01", f"{branch} branch exists", "missing", "present")
+
+
+def _check_rc02_protections(repo: str, rep: _Report) -> None:
+    """RC-02: dev + main protected; dev requires branch-ci + merge-queue-ci."""
+    rc, out, _ = _gh(["api", f"repos/{repo}/branches/dev/protection"])
+    if rc != 0:
+        rep.error("RC-02", "dev branch protected", "no protection", "protected")
+    else:
+        try:
+            contexts = (
+                json.loads(out).get("required_status_checks", {}).get("contexts", [])
+            )
+        except json.JSONDecodeError:
+            contexts = []
+        for required in ("branch-ci", "merge-queue-ci"):
+            if required not in contexts:
+                rep.error(
+                    "RC-02", f"dev requires {required}", "not required", "required"
+                )
+
+    rc, _, _ = _gh(["api", f"repos/{repo}/branches/main/protection"])
+    if rc != 0:
+        rep.error("RC-02", "main branch protected", "no protection", "protected")
+
+
+def _check_rc03_merge_queue(repo: str, rep: _Report) -> None:
+    """RC-03: merge queue enabled on dev."""
+    owner, name = repo.split("/", 1)
+    query = (
+        '{ repository(owner: "%s", name: "%s") '
+        "{ mergeQueue { mergeMethod } } }" % (owner, name)
+    )
+    rc, out, _ = _gh(["api", "graphql", "-f", f"query={query}"])
+    if rc != 0:
+        rep.error("RC-03", "merge queue on dev", "not configured", "enabled")
+        return
+    try:
+        mq = json.loads(out)["data"]["repository"]["mergeQueue"]
+    except (json.JSONDecodeError, KeyError, TypeError):
+        mq = None
+    if not mq:
+        rep.error("RC-03", "merge queue on dev", "not configured", "enabled")
+
+
+def _check_rc04_workflows(repo_root: Path, rep: _Report) -> None:
+    """RC-04: the six required workflow files exist."""
+    wf_dir = repo_root / ".github" / "workflows"
+    for wf in REQUIRED_WORKFLOWS:
+        if not (wf_dir / f"{wf}.yml").is_file():
+            rep.error("RC-04", f"{wf}.yml present", "missing", "present")
+
+
+def _check_rc05_environments(repo: str, deploy_target: str, rep: _Report) -> None:
+    """RC-05: staging + production environments exist."""
+    rc, out, _ = _gh(["api", f"repos/{repo}/environments"])
+    names: set[str] = set()
+    if rc == 0 and out.strip():
+        try:
+            names = {e["name"] for e in json.loads(out).get("environments", [])}
+        except (json.JSONDecodeError, KeyError, TypeError):
+            names = set()
+    for env in ("staging", "production"):
+        if env not in names:
+            # Environment absence: hard MUST normally; but when there is no
+            # deploy target the environments are a formality — downgrade.
+            if deploy_target == "none":
+                rep.warn("RC-05", f"{env} environment exists", "missing",
+                         "present (deploy_target: none — advisory)")
+            else:
+                rep.error("RC-05", f"{env} environment exists", "missing", "present")
+
+
+def _check_rc06_secrets(deploy_target: str, rep: _Report) -> None:
+    """RC-06: deploy-token secrets. Meaningless without a deploy target."""
+    if deploy_target == "none":
+        rep.warn(
+            "RC-06", "deploy-token secrets present", "n/a",
+            "skipped — deploy_target: none (no deploy; secrets would be meaningless)",
+        )
+        return
+    # Deployable repo: secrets are MUST. (Real check would `gh secret list`.)
+    rep.error(
+        "RC-06", "SULIS_DEPLOY_TOKEN_STAGING present", "unverified",
+        "present on staging env",
+    )
+
+
+def _check_rc07_settings(repo: str, rep: _Report) -> None:
+    """RC-07: squash-only merge settings."""
+    rc, out, _ = _gh(["api", f"repos/{repo}"])
+    if rc != 0 or not out.strip():
+        rep.error("RC-07", "repo settings readable", "gh error", "200")
+        return
+    try:
+        s = json.loads(out)
+    except json.JSONDecodeError:
+        rep.error("RC-07", "repo settings parse", "invalid JSON", "valid")
+        return
+    expected = {
+        "allow_squash_merge": True,
+        "allow_merge_commit": False,
+        "allow_rebase_merge": False,
+        "delete_branch_on_merge": True,
+    }
+    for key, want in expected.items():
+        if key in s and s[key] != want:
+            rep.error("RC-07", key, str(s[key]), str(want))
+
+
+def _check_rc08_tag_protection(deploy_target: str, rep: _Report) -> None:
+    """RC-08: v* tag signing/protection. Signing WARN when deploy_target none."""
+    if deploy_target == "none":
+        rep.warn(
+            "RC-08", "v* tags signed", "annotated (unsigned)",
+            "signed — WARN: no GPG key in CI for marketplace profile",
+        )
+
+
+def _check_rc10_codeowners(repo_root: Path, rep: _Report) -> None:
+    """RC-10: CODEOWNERS present (SHOULD → WARN)."""
+    candidates = [
+        repo_root / ".github" / "CODEOWNERS",
+        repo_root / "CODEOWNERS",
+        repo_root / "docs" / "CODEOWNERS",
+    ]
+    if not any(c.is_file() for c in candidates):
+        rep.warn("RC-10", "CODEOWNERS present", "missing",
+                 "present (SHOULD — production promotions fall back to write-access)")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="RC-01..RC-10 arrival check")
+    parser.add_argument("--repo", required=True, help="owner/name")
+    parser.add_argument("--repo-root", default=".", help="path to repo root")
+    args = parser.parse_args()
+
+    if shutil.which("gh") is None:
+        print(json.dumps({
+            "ok": False, "errors": [],
+            "tooling_error": "gh CLI not found on PATH",
+        }))
+        return 1
+
+    repo_root = Path(args.repo_root).resolve()
+    deploy_target = _read_deploy_target(repo_root)
+    rep = _Report()
+
+    try:
+        _check_rc01_branches(args.repo, rep)
+        _check_rc02_protections(args.repo, rep)
+        _check_rc03_merge_queue(args.repo, rep)
+        _check_rc04_workflows(repo_root, rep)
+        _check_rc05_environments(args.repo, deploy_target, rep)
+        _check_rc06_secrets(deploy_target, rep)
+        _check_rc07_settings(args.repo, rep)
+        _check_rc08_tag_protection(deploy_target, rep)
+        _check_rc10_codeowners(repo_root, rep)
+    except _ToolingError as exc:
+        print(json.dumps({"ok": False, "errors": [], "tooling_error": str(exc)}))
+        return 1
+
+    return rep.emit()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

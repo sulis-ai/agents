@@ -1,0 +1,39 @@
+name: release-prod
+# RC-04 / RC-13: fires on push to main with a v* tag.
+# Marketplace profile: there is no production deploy. A plugin marketplace's
+# "release to production" IS the SemVer tag on main — consumers install from it.
+# This workflow turns the pushed tag into a GitHub Release (the consumer-facing
+# artifact). No deploy token needed (deviation from RC-06 — deploy_target: none).
+on:
+  push:
+    tags: ['v*.*.*']
+concurrency:
+  group: release-prod
+  cancel-in-progress: false
+jobs:
+  release-prod:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: publish GitHub Release from tag (marketplace-profile "deploy")
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          # Derive notes from the sulis CHANGELOG top section if present.
+          NOTES_FILE=$(mktemp)
+          if [ -f plugins/sulis/CHANGELOG.md ]; then
+            awk '/^## /{c++} c==1{print} c==2{exit}' plugins/sulis/CHANGELOG.md > "$NOTES_FILE"
+          else
+            echo "Release $TAG" > "$NOTES_FILE"
+          fi
+          gh release create "$TAG" --title "$TAG" --notes-file "$NOTES_FILE" --verify-tag || \
+            gh release edit "$TAG" --notes-file "$NOTES_FILE"
+          echo "published release $TAG"

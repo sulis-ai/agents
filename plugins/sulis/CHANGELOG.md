@@ -1,5 +1,46 @@
 # Sulis — Changelog
 
+## v0.44.0 — 2026-05-25
+
+**Repository-contract bootstrap for the marketplace repo + the RC-11 arrival check that was never built.**
+
+Triggered by the founder choosing *"make repo conformant first"* when `/sulis:run-all` couldn't run on this repo. The terminal-launcher-port dogfood test surfaced that the marketplace repo can't run its own executor pipeline: no `dev` branch, no deploy/staging/health/smoke workflows, executor refuses at Step 0. And the `wpx-arrival-check` script that Step 0 invokes — specified in RC-11 — was never built.
+
+### The non-deployable-repo reconciliation
+
+A plugin marketplace has no deploy target — no URL to health-check, no staging server. Half the Repository Contract (RC-04..RC-06 deploy/staging/health/smoke) assumes a deployable web product. Rather than fake it or skip conformance, this release adapts:
+
+- **Structure stays strict** — `dev`/`main` (RC-01), protections (RC-02), merge queue (RC-03), the six workflow files with correct triggers (RC-04), squash-only settings (RC-07), CODEOWNERS (RC-10).
+- **Command slots go marketplace-real** — CI runs the actual pytest suite + manifest JSON validation; the "deploy" slot runs marketplace-version-drift detection (marketplace.json vs each plugin.json); the "health/smoke" slot runs plugin-primitive load checks (every skill has SKILL.md, every agent has frontmatter, the sulis front-door agent parses). The dev branch IS the installable surface; a SemVer tag on main IS the release.
+- **Three documented deviations** — RC-05 (env deploy source), RC-06 (deploy-token secrets), RC-08 (signed tags) downgrade to WARN when `.sulis/repo-contract.yml` declares `deploy_target: none`. This is the exact gap the deferred RC v0.3.0 "repo profiles" work will formalise; until then it's a named, contained deviation, not a silent skip.
+
+### Files authored
+
+| File | Purpose |
+|---|---|
+| `.github/workflows/branch-ci.yml` | RC-04 per-WP checks: manifest lint + py_compile + pytest + smoke. Fires on PR→dev + push to `feat/wp-*` / `change/*`. |
+| `.github/workflows/merge-queue-ci.yml` | RC-04 speculative-merge: full pytest + manifest integration. `merge_group` only. |
+| `.github/workflows/deploy-staging.yml` | RC-04 push-to-dev: validate installable marketplace + version-drift check (the marketplace-profile "deploy"). |
+| `.github/workflows/health-and-smoke.yml` | RC-04 post-deploy: plugin-primitive load health + sulis front-door agent smoke. |
+| `.github/workflows/promote-dev-to-main.yml` | RC-04 manual dispatch: ff-merge dev→main + annotated SemVer tag. |
+| `.github/workflows/release-prod.yml` | RC-04 tag push: publish GitHub Release (the marketplace-profile "production deploy"). |
+| `.github/CODEOWNERS` | RC-10 root owner `@iainn`. |
+| `.sulis/repo-contract.yml` | Project-specific command capture + documented deviations + strictly-enforced rule list. |
+| `.sulis/bootstrap-repo-contract.sh` | The admin `gh` script the OWNER runs (branches + protections + merge queue + environments + tag protection). RC-09 forbids the executor token from holding admin — surfaced, not fired by Sulis. |
+| `plugins/sulis/scripts/wpx-arrival-check` | **The RC-11 Step 0 verifier** — specified in the standard, never built until now. Verifies RC-01..RC-10 via `gh api` + filesystem; emits the RC-11 JSON contract (`ok`/`errors`/`warnings`); exit 0/2/1; downgrades deploy-coupled MUSTs to WARN under the marketplace profile. |
+| `plugins/sulis/scripts/tests/unit/test_wpx_arrival_check.py` | 5 mock_gh-driven unit tests (conformant pass / missing-dev RC-01 / missing-workflow RC-04 / deploy_target-none downgrade / CODEOWNERS WARN). |
+
+### Verification
+
+- 5/5 new arrival-check tests pass (TDD: Red confirmed before Green).
+- 343 other tests pass.
+- Live `wpx-arrival-check --repo sulis-ai/agents` against the current (pre-bootstrap) repo produces the honest delta (RC-01 default branch is main not dev, no dev branch, no protections, merge queue not configured, allow_merge_commit true, etc.) — proving the verifier works end-to-end.
+- **1 pre-existing unrelated failure** noted, not fixed: `test_cmd_run_shrunk_after_phase_split` (wpx-train `cmd_run` is 179 LOC, asserts <130 — HD-001 phase-split refactor debt). Confirmed pre-existing by stashing this session's work and re-running on clean HEAD. Out of scope per EP-07 (boy-scout is scoped to files touched; wpx-train wasn't touched).
+
+### What's still gated on the OWNER
+
+`.sulis/bootstrap-repo-contract.sh` mutates the live GitHub repo and needs admin auth. Until it's run: `dev` doesn't exist, protections aren't applied, and the arrival check still returns the delta above. After it runs, Step 0 passes and the executor can operate on this repo.
+
 ## v0.43.1 — 2026-05-25
 
 **Stale dispatch slug sweep — post-consolidation cleanup.**

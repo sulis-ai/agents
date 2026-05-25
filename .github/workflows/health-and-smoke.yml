@@ -1,0 +1,56 @@
+name: health-and-smoke
+# RC-04 / RC-13: fires after deploy-staging succeeds (workflow_run).
+# Marketplace profile: no deployed URL to poll. "Health" = every plugin's
+# declared primitives load (skills have SKILL.md, agents have valid frontmatter);
+# "smoke" = the sulis front-door agent + its journey skills are present and parse.
+on:
+  workflow_run:
+    workflows: [deploy-staging]
+    types: [completed]
+jobs:
+  health-and-smoke:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: health — plugin primitives load
+        run: |
+          python3 -c "
+          import json, glob, os, sys
+          problems = []
+          for pj in glob.glob('plugins/*/.claude-plugin/plugin.json'):
+              root = os.path.dirname(os.path.dirname(pj))
+              meta = json.load(open(pj))
+              # every skill dir must have a SKILL.md
+              for skill_dir in glob.glob(os.path.join(root, 'skills', '*')):
+                  if os.path.isdir(skill_dir) and not os.path.isfile(os.path.join(skill_dir, 'SKILL.md')):
+                      problems.append(f'{skill_dir}: no SKILL.md')
+              # every agent .md must have YAML frontmatter
+              for agent in glob.glob(os.path.join(root, 'agents', '*.md')):
+                  head = open(agent).read(3)
+                  if head != '---':
+                      problems.append(f'{agent}: no frontmatter')
+          if problems:
+              print('\n'.join(problems)); sys.exit(1)
+          print('all plugin primitives load')
+          "
+
+      - name: smoke — sulis front-door agent present + parses
+        run: |
+          python3 -c "
+          import os, sys
+          agent = 'plugins/sulis/agents/sulis.md'
+          assert os.path.isfile(agent), 'sulis front-door agent missing'
+          body = open(agent).read()
+          assert body.startswith('---'), 'sulis agent has no frontmatter'
+          assert 'name: sulis' in body, 'sulis agent name not declared'
+          print('sulis front-door agent smoke OK')
+          "

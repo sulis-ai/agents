@@ -1,0 +1,67 @@
+# Repository Contract — project-specific configuration
+# Read by the RC-13 workflow command slots + wpx-arrival-check.
+# Per RC-13 bootstrap step 7: this file fills the project-specific commands
+# the reference workflow templates leave as placeholders.
+
+repo: sulis-ai/agents
+owner: iainn
+
+# --- Profile -----------------------------------------------------------------
+# This is a Claude Code plugin MARKETPLACE, not a deployable web product.
+# It has no runtime, no URL, no staging/production servers. The dev branch IS
+# the installable surface (consumers point extraKnownMarketplaces at the repo);
+# a SemVer tag on main IS the production release (consumers install from it).
+#
+# Consequence: the deploy / health / smoke half of RC-04..RC-06 has no literal
+# target. The workflows are kept structurally (right triggers, environments
+# exist) but their command slots run marketplace-real work — manifest
+# validation, version-drift detection, plugin-primitive load checks — instead
+# of a deploy + URL poll.
+profile: plugin-marketplace
+deploy_target: none
+
+# --- Project-specific command slots (filled into RC-13 templates) ------------
+commands:
+  lint: |
+    python3 -c "import json,glob; [json.load(open(f)) for f in ['.claude-plugin/marketplace.json', *glob.glob('plugins/*/.claude-plugin/plugin.json')]]"
+    python3 -m compileall -q plugins/sulis/scripts
+  type_check: ""              # no type-checker; stdlib-only tooling per plugin contract
+  unit_tests: pytest plugins/sulis/scripts/tests/ -q
+  smoke: |
+    python3 -c "import json; m=json.load(open('.claude-plugin/marketplace.json')); assert m['plugins']"
+  integration: |
+    python3 -c "import json,os; mp=json.load(open('.claude-plugin/marketplace.json')); [json.load(open(os.path.join(p['source'].lstrip('./'),'.claude-plugin','plugin.json'))) for p in mp['plugins']]"
+  e2e: ""                     # marketplace has no runtime e2e; unit+integration is the full gate
+  deploy_staging: "marketplace-profile: validate installable marketplace (see deploy-staging.yml)"
+  deploy_prod: "marketplace-profile: publish GitHub Release from tag (see release-prod.yml)"
+
+# --- Documented deviations from RC MUST rules --------------------------------
+# These are the single class of MUSTs a non-deployable repo cannot satisfy.
+# The deferred "repo profiles" work (RC v0.3.0 candidate) will formalise this;
+# until then wpx-arrival-check downgrades these to WARN when deploy_target: none.
+deviations:
+  - rule: RC-06
+    must: "SULIS_DEPLOY_TOKEN_STAGING / HEALTH_URL_STAGING / SULIS_DEPLOY_TOKEN_PROD / HEALTH_URL_PROD secrets on environments"
+    why: "No deploy target — these secrets would be meaningless. Workflows need no deploy token."
+    handling: "wpx-arrival-check treats RC-06 deploy-secret checks as WARN (not FAIL) when deploy_target: none"
+  - rule: RC-05
+    must: "staging environment deploys dev; production deploys main, with deploy tokens"
+    why: "Environments exist (so `environment:` resolves in workflows) but carry no deploy secrets; the 'deploy' is manifest validation."
+    handling: "environments created empty; arrival-check verifies existence, not secret presence, when deploy_target: none"
+  - rule: RC-08
+    must: "signed v* tags (git tag -s)"
+    why: "No GPG key provisioned in CI; promote workflow uses annotated tags (-a). github-actions[bot] commits are GitHub-verified."
+    handling: "WARN when deploy_target: none and no signing key configured"
+
+# --- What stays strictly enforced (the half that DOES apply) -----------------
+# RC-01 two-branch model, RC-02 protections, RC-03 merge queue, RC-04 workflow
+# files present with correct triggers, RC-07 repo settings, RC-09 token scopes,
+# RC-10 CODEOWNERS. These have nothing to do with deployability and are MUST.
+enforced_strictly:
+  - RC-01  # dev/main branching
+  - RC-02  # branch protections
+  - RC-03  # merge queue on dev
+  - RC-04  # six workflow files, correct triggers
+  - RC-07  # squash-only repo settings
+  - RC-09  # token scopes
+  - RC-10  # CODEOWNERS

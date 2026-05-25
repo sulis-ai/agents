@@ -1,0 +1,41 @@
+name: deploy-staging
+# RC-04 / RC-13: fires on push to dev (after the queue merges a batch).
+# Marketplace profile: there is no deploy target — the dev branch IS the
+# installable surface (consumers point extraKnownMarketplaces at the repo).
+# "Deploy" maps to validating that the merged batch produces a coherent,
+# installable marketplace. No deploy token needed (deviation from RC-06 deploy
+# secrets — see .sulis/repo-contract.yml deploy_target: none).
+on:
+  push:
+    branches: [dev]
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: validate installable marketplace (marketplace-profile "deploy")
+        run: |
+          python3 -c "
+          import json, os, sys
+          mp = json.load(open('.claude-plugin/marketplace.json'))
+          assert mp.get('name'), 'marketplace.json missing name'
+          assert mp.get('plugins'), 'marketplace.json has no plugins'
+          for p in mp['plugins']:
+              src = p['source'].lstrip('./')
+              pj = os.path.join(src, '.claude-plugin', 'plugin.json')
+              assert os.path.isfile(pj), f'plugin source {src} has no plugin.json'
+              meta = json.load(open(pj))
+              assert meta.get('version') == p.get('version'), f\"version drift: {p['name']} marketplace={p.get('version')} plugin={meta.get('version')}\"
+          print(f\"marketplace installable: {len(mp['plugins'])} plugins, versions aligned\")
+          "

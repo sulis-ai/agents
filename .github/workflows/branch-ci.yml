@@ -1,0 +1,43 @@
+name: branch-ci
+# RC-04 / RC-13: per-WP fast checks. Required status check for merge-queue entry.
+# Marketplace profile: lint = manifest JSON validity + py_compile; tests = pytest;
+# smoke = manifest parse (no network deps). No deploy target — see .sulis/repo-contract.yml.
+on:
+  pull_request:
+    branches: [dev]
+  push:
+    branches:
+      - 'feat/wp-*'
+      - 'change/*'
+concurrency:
+  group: branch-ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  branch-ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test deps
+        run: pip install pytest
+
+      - name: lint — manifest JSON validity + python compile
+        run: |
+          python3 -c "import json,glob,sys; [json.load(open(f)) for f in ['.claude-plugin/marketplace.json', *glob.glob('plugins/*/.claude-plugin/plugin.json')]]; print('manifests OK')"
+          python3 -m compileall -q plugins/sulis/scripts
+
+      - name: type-check — (none configured; stdlib-only tooling per plugin contract)
+        run: echo "no type-checker configured for this repo"
+
+      - name: unit tests
+        run: pytest plugins/sulis/scripts/tests/ -q
+
+      - name: smoke — manifest parse + plugin layout
+        run: |
+          python3 -c "import json; m=json.load(open('.claude-plugin/marketplace.json')); assert m['plugins'], 'no plugins in marketplace'; print(f\"{len(m['plugins'])} plugins resolve\")"
