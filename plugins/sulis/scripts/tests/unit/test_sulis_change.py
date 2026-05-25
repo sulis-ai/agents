@@ -316,3 +316,145 @@ def test_validate_change_ulid_rejects_non_crockford_chars():
     ok, reason = validate_change_ulid(bad)
     assert ok is False
     assert "non-Crockford-base32" in reason
+
+
+# ─── resolve_current_change (Phase 5 #2: SULIS_CHANGE_ID binding) ──────────
+
+
+def test_resolve_current_change_returns_none_when_env_unset(monkeypatch):
+    monkeypatch.delenv("SULIS_CHANGE_ID", raising=False)
+    from _wpxlib import resolve_current_change
+    assert resolve_current_change(repo_root=".") is None
+
+
+def test_resolve_current_change_returns_none_when_no_matching_branch(monkeypatch, tmp_path):
+    """SULIS_CHANGE_ID set but no change branch in repo → None."""
+    monkeypatch.setenv("SULIS_CHANGE_ID", "01HYQC71000000000000000000")
+    from _wpxlib import resolve_current_change
+    # tmp_path is a fresh dir; find_change_branches returns [] (no git here either)
+    result = resolve_current_change(repo_root=tmp_path)
+    assert result is None
+
+
+# ─── back_integrate_change_branch (Phase 5 #2: Step 0 / Step 12.5 mechanic) ─
+
+
+def test_back_integrate_already_current(monkeypatch, tmp_path):
+    """When dev_ref is already ancestor → status=already_current, no merge."""
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, cwd=None, timeout=None, **kwargs):
+        calls.append(list(cmd))
+        if cmd[:2] == ["git", "fetch"]:
+            return (0, "", "")
+        if cmd[:3] == ["git", "merge-base", "--is-ancestor"]:
+            return (0, "", "")  # is ancestor
+        return (1, "", "unexpected command")
+
+    monkeypatch.setattr("_wpxlib._run", fake_run)
+    from _wpxlib import back_integrate_change_branch
+    result = back_integrate_change_branch(tmp_path, "change/create-introduce-payments")
+    assert result["status"] == "already_current"
+    assert result["change_branch"] == "change/create-introduce-payments"
+    # No merge invocation expected
+    merge_calls = [c for c in calls if c[:2] == ["git", "merge"] and "--is-ancestor" not in c]
+    assert merge_calls == []
+
+
+def test_back_integrate_merged_ok(monkeypatch, tmp_path):
+    """When merge succeeds → status=merged_ok with merged_commits count."""
+    def fake_run(cmd, cwd=None, timeout=None, **kwargs):
+        if cmd[:2] == ["git", "fetch"]:
+            return (0, "", "")
+        if cmd[:3] == ["git", "merge-base", "--is-ancestor"]:
+            return (1, "", "")  # NOT ancestor → behind dev
+        if cmd[:3] == ["git", "rev-list", "--count"]:
+            return (0, "3\n", "")
+        if cmd[:2] == ["git", "merge"]:
+            return (0, "", "")
+        return (1, "", "unexpected")
+
+    monkeypatch.setattr("_wpxlib._run", fake_run)
+    from _wpxlib import back_integrate_change_branch
+    result = back_integrate_change_branch(tmp_path, "change/create-introduce-payments")
+    assert result["status"] == "merged_ok"
+    assert result["merged_commits"] == 3
+
+
+def test_back_integrate_merge_conflict(monkeypatch, tmp_path):
+    """When merge fails + diff shows U files → status=merge_conflict."""
+    def fake_run(cmd, cwd=None, timeout=None, **kwargs):
+        if cmd[:2] == ["git", "fetch"]:
+            return (0, "", "")
+        if cmd[:3] == ["git", "merge-base", "--is-ancestor"]:
+            return (1, "", "")
+        if cmd[:3] == ["git", "rev-list", "--count"]:
+            return (0, "5\n", "")
+        if cmd[:2] == ["git", "merge"]:
+            return (1, "", "CONFLICT (content): Merge conflict in src/auth.py")
+        if cmd[:5] == ["git", "diff", "--name-only", "--diff-filter=U"]:
+            return (0, "src/auth.py\nsrc/orders.py\n", "")
+        return (1, "", "unexpected")
+
+    monkeypatch.setattr("_wpxlib._run", fake_run)
+    from _wpxlib import back_integrate_change_branch
+    result = back_integrate_change_branch(tmp_path, "change/create-introduce-payments")
+    assert result["status"] == "merge_conflict"
+    assert result["files"] == ["src/auth.py", "src/orders.py"]
+    assert "CW-04" in result["guidance"]
+    assert "three options" in result["guidance"]
+
+
+def test_back_integrate_fetch_failed(monkeypatch, tmp_path):
+    """When git fetch returns non-zero → status=fetch_failed."""
+    def fake_run(cmd, cwd=None, timeout=None, **kwargs):
+        if cmd[:2] == ["git", "fetch"]:
+            return (128, "", "fatal: unable to access origin")
+        return (0, "", "")
+
+    monkeypatch.setattr("_wpxlib._run", fake_run)
+    from _wpxlib import back_integrate_change_branch
+    result = back_integrate_change_branch(tmp_path, "change/create-introduce-payments")
+    assert result["status"] == "fetch_failed"
+    assert "fatal" in result["error"]
+
+
+def test_back_integrate_internal_error(monkeypatch, tmp_path):
+    """Merge fails but no conflict files → status=internal_error."""
+    def fake_run(cmd, cwd=None, timeout=None, **kwargs):
+        if cmd[:2] == ["git", "fetch"]:
+            return (0, "", "")
+        if cmd[:3] == ["git", "merge-base", "--is-ancestor"]:
+            return (1, "", "")
+        if cmd[:3] == ["git", "rev-list", "--count"]:
+            return (0, "1\n", "")
+        if cmd[:2] == ["git", "merge"]:
+            return (128, "", "fatal: something unexpected")
+        if cmd[:5] == ["git", "diff", "--name-only", "--diff-filter=U"]:
+            return (0, "", "")  # no conflict files
+        return (1, "", "unexpected")
+
+    monkeypatch.setattr("_wpxlib._run", fake_run)
+    from _wpxlib import back_integrate_change_branch
+    result = back_integrate_change_branch(tmp_path, "change/create-introduce-payments")
+    assert result["status"] == "internal_error"
+    assert "fatal" in result["error"]
+
+
+def test_back_integrate_no_fetch_when_disabled(monkeypatch, tmp_path):
+    """fetch_first=False skips the fetch invocation."""
+    fetch_called = []
+
+    def fake_run(cmd, cwd=None, timeout=None, **kwargs):
+        if cmd[:2] == ["git", "fetch"]:
+            fetch_called.append(cmd)
+            return (0, "", "")
+        if cmd[:3] == ["git", "merge-base", "--is-ancestor"]:
+            return (0, "", "")
+        return (1, "", "unexpected")
+
+    monkeypatch.setattr("_wpxlib._run", fake_run)
+    from _wpxlib import back_integrate_change_branch
+    result = back_integrate_change_branch(tmp_path, "change/create-introduce-payments", fetch_first=False)
+    assert result["status"] == "already_current"
+    assert fetch_called == [], "fetch should not have been called"

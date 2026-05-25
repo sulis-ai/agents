@@ -3510,3 +3510,173 @@ def find_change_branches(repo_root: Path) -> list[dict]:
             "current": is_current,
         })
     return result
+
+
+# ─── Phase 5: SULIS_CHANGE_ID env-var binding + back-integration ──────────
+#
+# Per the change-as-primitive design + lifecycle.md Step 0 / Step 12.5
+# amendments. The calling session reads SULIS_CHANGE_ID to know which
+# change context it's operating in, and invokes back_integrate_change_branch
+# at Step 0 (defence in depth, before WP starts) and Step 12.5 (active
+# driver, after WP merges back to change).
+
+SULIS_CHANGE_ID_ENV_VAR = "SULIS_CHANGE_ID"
+
+
+def resolve_current_change(repo_root: Path | None = None) -> dict | None:
+    """Resolve the current change context from the SULIS_CHANGE_ID env var.
+
+    Returns a dict with at minimum {change_id, handle, branch, primitive,
+    slug, worktree_path, ...} if the env var is set AND a matching change
+    branch with metadata exists in this repo. Returns None if:
+
+    - SULIS_CHANGE_ID is unset
+    - SULIS_CHANGE_ID is set but no matching change branch found
+    - The matching branch has no .changes/{primitive}-{slug}.yaml metadata
+
+    The matching strategy: iterate `find_change_branches(repo_root)`, read
+    each metadata file, look for one whose `change_id` matches the env var.
+    """
+    change_id = os.environ.get(SULIS_CHANGE_ID_ENV_VAR)
+    if not change_id:
+        return None
+
+    if repo_root is None:
+        repo_root = Path.cwd().resolve()
+    else:
+        repo_root = Path(repo_root).resolve()
+
+    # Iterate change branches; find the one with matching change_id in metadata.
+    # Note: metadata lives ON the change branch, so we need to read from the
+    # change worktree's .changes/ directory (or git-show from the branch).
+    # For now, simplest: rely on the change worktree existing (sulis-change
+    # start always creates one); look there.
+    for entry in find_change_branches(repo_root):
+        primitive = entry["primitive"]
+        slug = entry["slug"]
+        worktree_dest = change_worktree_path(repo_root, primitive, slug)
+        metadata_path = worktree_dest / ".changes" / f"{primitive}-{slug}.yaml"
+        if not metadata_path.exists():
+            continue
+        metadata = read_change_metadata(metadata_path)
+        if metadata.get("change_id") == change_id:
+            return metadata
+
+    return None
+
+
+def back_integrate_change_branch(
+    repo_root: Path,
+    change_branch: str,
+    dev_ref: str = "origin/dev",
+    *,
+    fetch_first: bool = True,
+) -> dict:
+    """Auto back-integration mechanic per CW-04 + lifecycle Step 0 / Step 12.5.
+
+    Runs `git fetch origin dev` (unless fetch_first=False) + checks whether
+    `dev_ref` is ancestor of the change branch HEAD; if not, runs
+    `git merge --no-edit origin/dev` to bring the change branch current.
+
+    Per CW-04: merge-not-rebase (preserves commit SHAs so in-flight WP
+    worktrees stay valid).
+
+    The function MUST be called from within the change worktree (HEAD ==
+    change branch). Caller is responsible for ensuring this.
+
+    Returns a structured result dict:
+
+    - {"status": "already_current", "change_branch": ...}
+    - {"status": "merged_ok", "change_branch": ..., "merged_commits": N}
+    - {"status": "fetch_failed", "error": "..."}
+    - {"status": "merge_conflict", "files": [...], "guidance": "..."}
+    - {"status": "internal_error", "error": "..."}
+
+    The caller is expected to handle each status:
+    - "already_current" → proceed normally (no-op)
+    - "merged_ok" → push the merged change branch, proceed
+    - "fetch_failed" → retry or surface as BLOCKER
+    - "merge_conflict" → surface to founder per CW-04 three-option dialog
+    - "internal_error" → BLOCKER
+
+    See lifecycle.md Step 0 + Step 12.5 for the full failure-handling OODA.
+    """
+    repo_root = Path(repo_root).resolve()
+
+    # Step 1: fetch dev (unless caller said don't — useful in tests)
+    if fetch_first:
+        rc, _, stderr = _run(
+            ["git", "fetch", "origin", dev_ref.split("/", 1)[-1] if "/" in dev_ref else "dev"],
+            cwd=repo_root,
+            timeout=60,
+        )
+        if rc != 0:
+            return {
+                "status": "fetch_failed",
+                "change_branch": change_branch,
+                "error": stderr.strip() or "git fetch returned non-zero",
+            }
+
+    # Step 2: is dev_ref already an ancestor of HEAD?
+    rc, _, _ = _run(
+        ["git", "merge-base", "--is-ancestor", dev_ref, "HEAD"],
+        cwd=repo_root,
+        timeout=10,
+    )
+    if rc == 0:
+        # Already an ancestor → change branch is at or ahead of dev
+        return {
+            "status": "already_current",
+            "change_branch": change_branch,
+            "dev_ref": dev_ref,
+        }
+
+    # Step 3: count how many commits are coming in (informational)
+    rc_count, count_out, _ = _run(
+        ["git", "rev-list", "--count", f"HEAD..{dev_ref}"],
+        cwd=repo_root,
+        timeout=10,
+    )
+    merged_commits = int(count_out.strip()) if rc_count == 0 and count_out.strip().isdigit() else 0
+
+    # Step 4: merge (no rebase — preserves SHAs for in-flight WP worktrees)
+    rc, _, stderr = _run(
+        ["git", "merge", "--no-edit", dev_ref],
+        cwd=repo_root,
+        timeout=120,
+    )
+    if rc == 0:
+        return {
+            "status": "merged_ok",
+            "change_branch": change_branch,
+            "dev_ref": dev_ref,
+            "merged_commits": merged_commits,
+        }
+
+    # Step 5: merge failed → check for conflict
+    rc_diff, diff_out, _ = _run(
+        ["git", "diff", "--name-only", "--diff-filter=U"],
+        cwd=repo_root,
+        timeout=10,
+    )
+    if rc_diff == 0 and diff_out.strip():
+        conflict_files = [line.strip() for line in diff_out.splitlines() if line.strip()]
+        return {
+            "status": "merge_conflict",
+            "change_branch": change_branch,
+            "dev_ref": dev_ref,
+            "files": conflict_files,
+            "guidance": (
+                "Per CW-04, three options: (1) resolve interactively, (2) "
+                "defer (continue on stale branch; surfaces again next time), "
+                "(3) abort this WP. Do NOT auto-resolve."
+            ),
+        }
+
+    # Step 6: merge failed but not a conflict — internal error
+    return {
+        "status": "internal_error",
+        "change_branch": change_branch,
+        "dev_ref": dev_ref,
+        "error": stderr.strip() or "git merge returned non-zero with no conflict files",
+    }
