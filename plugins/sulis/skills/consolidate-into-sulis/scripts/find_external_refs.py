@@ -66,10 +66,15 @@ def parse_grep_line(line: str) -> tuple[str, int, str] | None:
 def find_path_refs(marketplace_root: Path, source_plugin: str) -> list[tuple[str, int, str]]:
     """Find every external reference to the source plugin.
 
-    Catches two patterns:
+    Catches THREE patterns (v0.1.1 — added slash-command pattern after the
+    sulis-context → sulis consolidation surfaced 13 missed refs):
+
     - Absolute: plugins/{source}/  (cited from CLAUDE.md, root README, etc.)
     - Relative: (../)+{source}/    (cited from related_skills: blocks in other
       plugins' SKILL.md / agent.md, README cross-links, etc.)
+    - Slash command: /{source}:{name}  (cited from agent bodies, skill
+      bodies, references, .architecture/ TDDs — wherever the founder-visible
+      slash-command form is invoked or documented)
 
     Excludes the source plugin's own directory so we don't surface its internal
     self-references.
@@ -87,11 +92,17 @@ def find_path_refs(marketplace_root: Path, source_plugin: str) -> list[tuple[str
     rel_pattern = f"(\\.\\./)+{src_escaped}/"
     rel_lines = run_git_grep(marketplace_root, rel_pattern, exclude)
 
-    # Merge + de-dup by (file, lineno) so a line matching both patterns isn't
-    # reported twice.
+    # Slash-command pattern: /{source}:{name}
+    # ERE doesn't have lookahead; we use [a-zA-Z] as the right boundary
+    # (slash-command names are kebab-case identifiers).
+    slash_pattern = f"/{src_escaped}:[a-zA-Z]"
+    slash_lines = run_git_grep(marketplace_root, slash_pattern, exclude)
+
+    # Merge + de-dup by (file, lineno) so a line matching multiple patterns
+    # isn't reported more than once.
     seen: set[tuple[str, int]] = set()
     results: list[tuple[str, int, str]] = []
-    for line in abs_lines + rel_lines:
+    for line in abs_lines + rel_lines + slash_lines:
         parsed = parse_grep_line(line)
         if parsed is None:
             continue

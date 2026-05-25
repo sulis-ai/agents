@@ -141,6 +141,16 @@ Pattern: fixture files (markdown, YAML, JSON) can hardcode plugin paths.
 git grep "plugins/{source}/" plugins/*/scripts/tests/fixtures/
 ```
 
+### 13. Architecture docs (`.architecture/**/*.md`)
+
+Where: `.architecture/{project}/TDD.md`, `.architecture/{project}/adrs/*.md`, `.architecture/{project}/work-packages/*.md`, etc.
+
+Pattern: technical design docs cite plugin paths AND slash-command surfaces. The sulis-context → sulis consolidation surfaced 4 hits in `.architecture/sulis-checkup/TDD.md` (slash-command references to `/sulis-context:discover`) that the 12-category scan missed. Added in v0.1.1.
+
+```bash
+git grep -nE "(plugins/{source}/|/{source}:[a-zA-Z])" .architecture/
+```
+
 ## The sweep procedure
 
 For each line in `find_external_refs.py` output:

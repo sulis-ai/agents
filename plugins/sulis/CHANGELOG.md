@@ -1,5 +1,66 @@
 # Sulis — Changelog
 
+## v0.36.0 — 2026-05-25
+
+**`consolidate-into-sulis` v0.1.1 — six recipe-improvement patches from the sulis-context run.**
+
+All six signals captured in
+`plugins/sulis/skills/consolidate-into-sulis/runs/sulis-context-2026-05-25/VERIFICATION_REPORT.md`
+ship as concrete fixes before the next Phase 3 consolidations.
+
+### Patches
+
+1. **`scripts/find_external_refs.py`** — added a third regex pattern
+   (`/{source}:[a-zA-Z]`) alongside the existing absolute
+   (`plugins/{source}/`) and relative (`(../)+{source}/`) patterns.
+   Catches founder-visible slash-command references that the v0.1.0
+   script missed. Smoke-tested against srd: surfaces 151 refs across
+   59 files (vs 6 refs across 6 files for sulis-context, which is
+   exclusively a slash-command-rich plugin's signature).
+
+2. **`scripts/compare_baseline.py`** — finding-signature priority chain
+   now includes `identifier` and `extras.rule` alongside
+   `rule` / `rule_id` / `check`. Without this, code-health findings
+   whose only difference is a length value in the `message` field
+   (e.g., manifest description-length checks PH-103) signature-hash
+   differently across runs and produce false NEW + RESOLVED for the
+   same logical finding. Confirmed fix against the sulis-context Gate
+   6 false attribution.
+
+3. **`SKILL.md` Gotchas** — added gotcha *"`git mv` stages renames,
+   but post-rename Edits do NOT auto-stage"* with mitigation: run
+   `git add -A` after the Edit pass, before `git commit`. Grounded in
+   the sulis-context Commit 2 split into `0e5c9ea` (rename) +
+   `584d438` (continuation).
+
+4. **`SKILL.md` Sub-step 0d** — code-health baseline capture now
+   explicitly redirects stderr to `/dev/null`. Without this, the
+   orchestrator's `code-health: tiers_walked=…` progress line
+   (emitted to stderr) pollutes the JSON output via `2>&1`.
+
+5. **`references/external-ref-sweep.md`** — added category 13
+   (`.architecture/**/*.md`). The sulis-context consolidation surfaced
+   4 slash-command hits in `.architecture/sulis-checkup/TDD.md` that
+   the 12-category sweep missed.
+
+6. **`SKILL.md` Commit 1** — added "no-op handling" note: if the
+   source plugin has no scripts/tests/CI workflows, skip Commit 1
+   entirely and resume at Commit 2. Recipe step-numbering preserves
+   the placeholder for chain audit-trail consistency.
+
+### Why ship v0.1.1 before the next consolidation
+
+The next Phase 3 plugin (srd, per founder direction; deviates from
+design-doc ordering to take the largest second after the smallest
+calibration run) has **151 external refs across 59 files** vs
+sulis-context's 6. Without the slash-command pattern, ~120 of those
+would be missed by the helper; manual `git grep` would be needed for
+every commit. The v0.1.1 fix turns a brittle manual sweep into a
+deterministic script-driven one — material risk reduction for the
+larger consolidation.
+
+---
+
 ## v0.35.0 — 2026-05-25
 
 **Phase 3 first consolidation of the change-as-primitive build — `sulis-context` folded into `sulis`.**

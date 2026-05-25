@@ -153,10 +153,16 @@ See `references/external-ref-sweep.md` for the 12-category sweep checklist.
 ### Sub-step 0d — Capture code-health baseline
 
 ```bash
-# /sulis:code-health is invoked from inside a Claude session; capture the --raw JSON
-# (If running this skill from a Claude session, invoke the skill and save its output here)
-# Manual equivalent: /sulis:code-health --raw > "$RUN_DIR/code-health-baseline.json"
+# Subprocess-only deterministic baseline (no Agent dispatch, no token cost).
+# Important: discard stderr so the orchestrator's progress line
+# ("code-health: tiers_walked=…") does not pollute the JSON stream.
+python3 plugins/sulis/skills/code-health/scripts/orchestrator.py \
+  --mode fast --raw --scope codebase --repo-root . \
+  2>/dev/null > "$RUN_DIR/code-health-baseline.json"
 ```
+
+If invoking the code-health skill via the Claude Skill tool instead of the
+orchestrator directly, save its `--raw` output to the same path.
 
 This is the pre-consolidation state. Gate 6 compares against this. See `references/code-health-gating.md` for the comparison rubric.
 
@@ -182,6 +188,8 @@ Using `templates/CONSOLIDATION_PLAN.md.template`, produce a commit-by-commit pla
 ## Commit 1 — Scripts + tests + CI workflow
 
 **Standards:** REFERENTIAL_INTEGRITY (paths cited from scripts must continue to resolve).
+
+> **No-op handling.** If the source plugin has no scripts, tests, or CI workflows (verified by `find plugins/{source}/scripts -type f` returning empty AND `ls .github/workflows/{source}*.yml` returning no match), **skip this commit entirely** and resume at Commit 2. Document the skip in CONSOLIDATION_PLAN.md and VERIFICATION_REPORT.md. The recipe step-numbering preserves Commit 1 as a placeholder for the consolidation chain's audit trail.
 
 ```bash
 # Move scripts (preserves git history)
@@ -383,6 +391,7 @@ After Gate 6 passes:
 - **Subagent_type silent break.** Renaming an agent without updating `subagent_type:` references means Sulis dispatches to a nonexistent agent. Mitigation: `find_external_refs.py` emits every dispatch site; Commit 3 fixes them; manual test by invoking Sulis once afterwards. Grounded in precedent commit `99607e8` which moved executor + orchestrator agents.
 - **Tin-test rename → description-field rewrite.** If a skill name changes from `decompose` to `plan-work`, the `description:` field in its SKILL.md likely also needs rewording — descriptions often cite the skill name and operation. Mitigation: Commit 2 edit pass includes description verification.
 - **`git mv` then forgetting to edit the moved files.** Moving a script preserves history but doesn't update internal paths inside the moved file. Mitigation: every commit has an Edit pass after the `git mv` pass; pass criteria requires paths to resolve.
+- **`git mv` stages renames, but post-rename Edits do NOT auto-stage.** After `git mv` + Edit pass, the moves are staged but the content changes are not. A naive `git commit` will land the rename without the edits, producing a slightly broken intermediate state that needs a follow-up "continuation" commit. Mitigation: run `git add -A` (or explicitly `git add <edited-files>`) **after** the Edit pass and **before** the `git commit`. Grounded in the sulis-context → sulis consolidation (Commit 2 split into `0e5c9ea` + `584d438` from this exact misstep).
 - **Code-health baseline drift.** If the founder ran `/sulis:code-health` weeks ago and saved a baseline somewhere global, Gate 0's fresh baseline supersedes — don't reuse stale baselines for regression detection. Mitigation: Gate 0 captures fresh baseline at consolidation start.
 - **Atomic commits violated under pressure.** Mid-consolidation, an operator might be tempted to batch Commits 2-4 to "save time." Don't — atomic commits preserve reviewability and rollback. Mitigation: skill's pass criteria gate per-commit; do not advance until met.
 

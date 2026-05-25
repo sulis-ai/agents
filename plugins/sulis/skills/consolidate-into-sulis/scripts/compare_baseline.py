@@ -31,10 +31,27 @@ def finding_signature(finding: dict) -> str:
     - file + line + rule (most stable)
     - file + rule
     - hash of stable JSON dump
+
+    v0.1.1: added `identifier` and `extras.rule` to the rule-id priority
+    chain after the sulis-context Gate 6 surfaced a false attribution
+    where PH-103 (a code-health rule) used the `identifier` field, not
+    `rule` / `rule_id` / `check`. Without this, any finding whose
+    message contains a length value or other content that changes (e.g.,
+    "description is 710 chars" → "description is 864 chars") would
+    produce different signatures across runs, causing false NEW +
+    RESOLVED for the same logical finding.
     """
     file = finding.get("file") or finding.get("path") or ""
     line = finding.get("line") or finding.get("lineno") or ""
-    rule = finding.get("rule") or finding.get("rule_id") or finding.get("check") or ""
+    extras = finding.get("extras") or {}
+    rule = (
+        finding.get("rule")
+        or finding.get("rule_id")
+        or finding.get("check")
+        or finding.get("identifier")
+        or (extras.get("rule") if isinstance(extras, dict) else "")
+        or ""
+    )
 
     if file and rule:
         return f"{file}::{line}::{rule}"
