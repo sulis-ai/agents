@@ -1,5 +1,105 @@
 # Sulis — Changelog
 
+## v0.32.0 — 2026-05-25
+
+**Phase 1 of the change-as-primitive build.** Author the `add-agent`
+meta-skill via `add-skill` v0.7.0. Foundation for Phase 2 (Sulis agent
+rewrite — concierge → Sulis, embed COACHING + TONE, apply dual-register
+pattern). Also unblocks Phase 3 consolidations where each consolidated
+agent gets re-authored via add-agent.
+
+See `plugins/sulis/docs/change-as-primitive-design.md` for the full
+8-phase build plan.
+
+### What's new
+
+- **`plugins/sulis/skills/add-agent/`** — new meta-skill mirroring
+  `add-skill` v0.7.0's five-gate methodology, adapted for the agent
+  shape. Files:
+  - `SKILL.md` (~470 LOC) — five gates with explicit standards
+    citations; three modes (Greenfield / Deepening / Standards-grounded
+    re-author); mode-detection heuristic; worked OPEN_RISK example
+  - `references/methodology.md` — why each gate exists; what failure
+    modes it prevents; how add-agent composes with add-skill
+  - `references/agent-shape-conventions.md` — anatomy of an agent.md;
+    frontmatter field reference; body shape conventions; existing
+    agents to study per role-shape
+  - `references/founder-mode-perspectives.md` — Gate 4 evaluation
+    perspectives for founder-facing agents (Coaching Delivery, Tone
+    Conformance, Register Switch Correctness) with measurable
+    thresholds
+  - `templates/agent.md.template` — starter agent file
+  - `templates/VERIFICATION_REPORT.md.template` — extended from
+    add-skill's template with new dimensions (Coaching Delivery, Tone
+    Conformance, Register Switch Correctness) and new misuse cases
+    (MUC-A1..A4, MUC-R1..R3)
+  - `scripts/inventory.py` — BRIEF_PACK generator for agents (walks
+    every plugins/*/agents/*.md; produces name collision check,
+    description overlap analysis, tool overlap analysis, standards
+    inventory, decision prompts)
+  - `VERIFICATION_REPORT.md` — add-agent's own audit trail (Verdict:
+    PASS across all dimensions; Independence Check via Agent
+    subagent_type=Explore confirmed PASS)
+
+### Key differences from add-skill
+
+Differences concentrate at three gates:
+
+- **Gate 2** — register declaration (founder + technical mode shapes);
+  dispatch trigger as the load-bearing description; tools declaration;
+  model preference; `user_invocable` flag
+- **Gate 4** — three new perspectives for founder-facing agents:
+  Coaching Delivery (passes COACHING_STANDARD seven-question
+  checklist), Tone Conformance (passes TONE_STANDARD seven-item
+  checklist), Register Switch Correctness (verifies dual-register
+  mechanics work via 4 sub-tests × 5 scenarios = 18/20 threshold)
+- **Gate 5** — new misuse cases: MUC-A1..A4 (Prescriptive language
+  leak / Banned vocabulary leak / Defensive-triggering phrase /
+  Commercial outcome missing) and MUC-R1..R3 (Technical-mode leak /
+  Founder-mode signal drop / Register-switch ambiguity); MUC-F1..F6
+  inherited from founder-facing skills
+
+Everything else (BRIEF_PACK, Primitive Discovery, SPIRAL_TEMPLATES tier
+choice, Codebase Referential Integrity, Independence Check, AT
+posture, Iteration termination) mirrors add-skill identically.
+
+### Verification
+
+- **Independence Check** dispatched via Agent(subagent_type=Explore)
+  in fresh context with no access to author reasoning. Verdict: PASS.
+  Per-dimension scores: ACCA 5/5, Evidence Grounding 4/5, Structural
+  Coherence 5/5, Honest Uncertainty 4/5, Codebase Referential
+  Integrity 5/5, Outcome-Specific Rigor 4-5/5 across three
+  sub-perspectives, Coaching Delivery 7/7, Tone Conformance 7/7.
+- **Three refinement-grade improvements** identified by the
+  Independence Check and applied before publish:
+  1. `principle_reference:` field added to custom_dimensions in
+     frontmatter (strengthens Evidence Grounding citation)
+  2. Mode-detection heuristic decision table added to SKILL.md Modes
+     section (was only in methodology.md)
+  3. "What an acceptable OPEN_RISK looks like (worked example)"
+     sub-section added to Gate 5 (clarifies the bar)
+- **BRIEF_PACK inventory script** smoke-tested against the marketplace:
+  successfully scanned 13 agents across 11 plugins, produced
+  well-formed Markdown output with collision check, overlap analyses,
+  and decision prompts
+- **Cross-skill self-test** on Phase 1 files: 0 findings on
+  check-readability, check-reliability, check-maintainability,
+  check-polish
+
+### Out of scope (deliberate — separate phases)
+
+- Sulis agent rewrite (concierge → Sulis rename, embed COACHING +
+  TONE, apply dual-register) — Phase 2
+- Specialist plugin consolidations (sulis-context, sulis-security, sea,
+  srd) — Phase 3
+- Standards amendments for change-as-primitive (CW-04, RC-04, WP-01,
+  lifecycle Step 0/12.5) — Phase 4
+- Change-as-primitive infrastructure (ULID, terminal spawn, session
+  binding, auto back-integration) — Phase 5
+- Founder-facing skills (/sulis:change start, /sulis:specify with
+  depth modes, etc.) — Phase 6
+
 ## v0.31.0 — 2026-05-25
 
 **Phase 0 of the change-as-primitive build.** Port COACHING + TONE

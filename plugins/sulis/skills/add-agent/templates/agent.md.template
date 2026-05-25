@@ -1,0 +1,109 @@
+---
+name: {{agent-name-kebab-case}}
+description: {{Dispatch trigger — one or two sentences. The parent agent (Sulis, orchestrator, user-facing CLI) scans this to decide whether to route. Name the role + conditions to dispatch + (optional) hard constraints on scope. Founder-facing or both: use ONLY user-facing vocabulary.}}
+user_invocable: {{true | false — true if founder can invoke via `claude --agent {{agent-name}}`; false default per Claude Code}}
+model: {{haiku | sonnet | opus | omit (inherit) — haiku for routing/classification, sonnet for most specialists, opus for coordinator agents with long-context conversational work}}
+tools: {{[Read, Edit, Bash, Agent] | * (inherit-all)}}  # per principle of least privilege
+standards:
+  input: [REFERENTIAL_INTEGRITY_STANDARD]
+  processing: [CRITICAL_THINKING_STANDARD{{, DECOMPOSITION_PROCEDURE if decomposition-heavy}}]
+  output: [CRITICAL_THINKING_STANDARD{{, TONE_STANDARD, COACHING_STANDARD if founder-facing or both}}]
+verification_spiral:
+  tier: {{light | standard | heavy}}  # heavy for coordinator/founder-facing; light only with justification
+  template_base: {{LIGHT_TIER_DEFAULT | STANDARD_TIER_DEFAULT | HEAVY_TIER_DEFAULT}}
+  custom_dimensions: []  # add domain-specific dimensions here per SPIRAL_TEMPLATES "Declaring a Custom Spiral"
+related_skills:
+  - relationship: depends_on  # depends_on / optional_input / related_to / supersedes per REFERENTIAL_INTEGRITY_STANDARD
+    skill: {{e.g., ../skills/run-wp, ../../sea/agents/engineering-architect}}
+    notes: {{semantic context for this relationship}}
+register:  # required if Audience is founder-facing or both; omit for operator-facing or agent-internal
+  founder_mode: default
+  technical_mode:
+    shape: {{json_envelope | markdown_with_paths | diff | raw_tool_output | structured_summary}}
+    triggers: [intent, --raw, /sulis:jargon]
+---
+
+# {{Agent Name (Title Case)}}
+
+## Role
+
+{{One paragraph: what you are. Lead with the conclusion per PP-01.
+
+Example shape:
+"You are the **{{Role Noun}}**. You {{primary verb}} {{primary
+domain}}. {{What you don't do — sets the boundary.}}"
+
+For founder-facing agents, also state:
+"Default audience is the non-technical founder. AAF v1.11.4 +
+FE-06 + COACHING + TONE applied at every turn. Switch to
+technical-mode on request via natural-language intent, --raw flag,
+or /sulis:jargon on toggle."}}
+
+## Required reading
+
+{{If the agent must consume standards or references on dispatch,
+list them here in priority order. Keep to ≤ 5 items per PD-02
+fan-out. Otherwise delete this section.
+
+1. **{{standard or reference path}}** — {{one-sentence reason}}
+2. ...}}
+
+## Workflow / Main loop / When dispatched
+
+{{Choose ONE heading per agent; delete the others:
+
+- ## Workflow — for procedural agents (executor, requirements-analyst)
+- ## Main loop — for loop-shaped agents (orchestrator)
+- ## When dispatched — for event-driven agents (security-reviewer
+  triggered on commit)
+
+The body: numbered steps, sub-headings, or a fenced code-block
+pseudo-code. Choose what fits the agent's complexity.}}
+
+### Step 1 — {{name}}
+
+{{What to do.}}
+
+### Step 2 — {{name}}
+
+{{What to do.}}
+
+## Output shape
+
+{{What the agent produces. For founder-facing or both agents
+declaring dual register, include separate sub-sections for each
+mode with concrete examples.}}
+
+### Founder-mode output (default)
+
+> {{Example founder-mode string. Apply COACHING + TONE checks before
+> emitting — this becomes a Gate 4 behavioural anchor.}}
+
+### Technical-mode output (--raw / after /sulis:jargon on)
+
+{{Example technical-mode output — JSON envelope, markdown with file
+paths, structured summary, etc. Must match the declared `register.technical_mode.shape`.}}
+
+```json
+{
+  "{{field}}": "{{value}}"
+}
+```
+
+## Gotchas
+
+{{Top 3-5 things the agent must avoid. Each must trace to a concrete
+prior-failure source — either prior art from another agent (cite via
+"see {{plugin}}/{{agent}}.md"), the BRIEF_PACK, or documented author
+experience. Speculation-sourced gotchas fail Gate 4 and get removed.}}
+
+- **{{Pithy name}}** — {{What goes wrong + why + brief mitigation}}.
+- **{{Pithy name}}** — {{What goes wrong + why + brief mitigation}}.
+
+## Vocabulary
+
+{{Include this section only if the agent introduces ≥ 2 domain terms.
+Otherwise delete it.}}
+
+- **{{term}}** — {{definition; if it collides with another agent's use,
+  disambiguate here}}.

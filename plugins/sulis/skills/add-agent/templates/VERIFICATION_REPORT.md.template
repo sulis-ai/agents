@@ -1,0 +1,362 @@
+# VERIFICATION_REPORT.md — {{plugin}}:{{agent-name}}
+
+**Agent:** `plugins/{{plugin}}/agents/{{agent-name}}.md`
+**Iteration:** {{N — 1 for first run; increment per upsurge}}
+**Produced:** {{ISO-8601 timestamp}}
+**Methodology:** `sulis:add-agent` v0.1.0+ (standards-grounded; mirrors `add-skill` v0.7.0)
+
+---
+
+## Spiral Summary
+
+**Tier:** {{light | standard | heavy}}
+**Template base:** {{LIGHT_TIER_DEFAULT | STANDARD_TIER_DEFAULT | HEAVY_TIER_DEFAULT}}
+**Iterations used:** {{1-3}}
+**Termination reason:** {{sufficient | max_iterations | irreducible_blocker}}
+**Verdict:** {{PASS | BLOCKED}}
+
+**Publication decision:** {{APPROVED | APPROVED-WITH-RISK | BLOCKED}}
+
+---
+
+## Gate 1 — Find (BI / SI / CC + Primitive Discovery)
+
+**BRIEF_PACK generated:** `{{path or "regenerated on each run"}}`
+
+**BI counter-search performed:** {{yes / no — list counter-queries}}
+
+**SI verification:** {{N distinct sources / M total references → consolidated to N independent}}
+
+**CC verdict on "no existing agent covers this":** {{VALIDATED | SUPPORTED | EMERGING | UNVALIDATED}}
+
+**"Could this be a skill instead?" answered:** {{NO with justification: ... | YES — use add-skill instead}}
+
+**Collisions flagged + resolved:**
+
+- {{name collision or description-overlap}}: {{rename / scope-disambiguated / waived because …}}
+
+### Primitive Discovery
+
+**Level of analysis:** {{e.g., "stages the agent owns" or "dispatch triggers the agent routes between"}}
+
+**Primitives identified:**
+
+| Primitive | Provenance | Independence test | Termination test |
+|---|---|---|---|
+| {{ID + name}} | extracted / inferred / user-stated | PASS / FAIL with rationale | PASS / FAIL with rationale |
+
+**Dependencies (typed per PD-05):** {{depends-on / enables / conflicts-with edges}}
+
+**Scale check (PD-02):** fan-out = {{N}}, depth = {{M}} (both ≤ 7 / ≤ 5)
+
+---
+
+## Gate 2 — Scope Lock
+
+| Item | Locked value |
+|---|---|
+| Agent name | `{{kebab-case}}` |
+| Plugin home | `{{plugin}}` |
+| Audience | {{founder-facing / operator-facing / both / agent-internal}} |
+| Dispatch trigger | {{verbatim text appearing in `description:` frontmatter}} |
+| Tools needed | {{[Read, Edit, ...] or * with justification}} |
+| Model preference | {{haiku / sonnet / opus / inherit}} with rationale |
+| `user_invocable` | {{true / false}} |
+| Register declaration | {{founder_mode: default + technical_mode.shape: ... + triggers: [...]}} OR {{single register declared}} |
+| Standards-phase classification | input: {{...}} / processing: {{...}} / output: {{...}} |
+| Verification tier | {{LIGHT / STANDARD / HEAVY}} (with justification if LIGHT) |
+| Top-N gotchas | {{list ≤ 7 — each with source: prior-art / BRIEF_PACK / author-experience}} |
+| Related skills + agents | {{depends_on / optional_input / related_to / supersedes declarations}} |
+
+**Vocabulary terms introduced:** {{list with collision resolution from Gate 1}}
+
+---
+
+## Gate 3 — Generate
+
+**File produced:** `plugins/{{plugin}}/agents/{{agent-name}}.md`
+
+**Scope lock adherence:** {{verify each Gate 2 item is reflected; flag any drift}}
+
+**Frontmatter validation:**
+
+- `standards:` block present + parses as valid YAML ({{yes / no}})
+- `verification_spiral:` block present + parses ({{yes / no}})
+- `related_skills:` block present + parses ({{yes / no}})
+- `register:` block present if founder-facing or both ({{yes / no / N/A}})
+- `model:` declared with justification ({{yes / no — model: ___}})
+- `tools:` declared per least-privilege ({{yes / no — tools: ___}})
+- `user_invocable:` declared explicitly ({{yes / no — value: ___}})
+
+**Pyramid structure:** agent.md leads with the Role / what-the-agent-does ({{yes / no — note location}})
+
+**Linguistic audit (NH-02 + TONE T-05 for founder-facing):** zero prohibited terms ({{yes / no — list terms found}})
+
+**Referenced files verified present:** {{yes / no — if no, list missing}}
+
+**For founder-facing or both:**
+
+- At least one founder-mode example present ({{yes / no — count: ___}})
+- At least one technical-mode example present ({{yes / no — count: ___}})
+
+---
+
+## Gate 4 — Evaluate (Spiral Verification)
+
+### ACCA (required all tiers)
+
+| Sub-dimension | Threshold | Score | Evidence |
+|---|---|---|---|
+| Accurate | >= 4 | {{1-5}} | {{citations}} |
+| Clear | >= 4 | {{1-5}} | {{evidence}} |
+| Complete | >= 4 | {{1-5}} | {{evidence}} |
+| Actionable | >= 4 | {{1-5}} | {{evidence}} |
+
+**ACCA minimum:** {{min(sub-scores)}}/5 — {{PASS | BLOCKED}}
+
+### Evidence Grounding (STANDARD + HEAVY)
+
+**Threshold:** >= 4/5 — Score: {{1-5}}
+**Standard reference:** CRITICAL_THINKING_STANDARD.md (BI, SI, AT-01)
+**Evidence:** {{counter-search performed / sources independent / adversarial validation done}}
+
+### Structural Coherence (STANDARD + HEAVY)
+
+**Threshold:** >= 4/5 — Score: {{1-5}}
+**Standard reference:** CRITICAL_THINKING_STANDARD.md (MECE, PP, DF)
+**Evidence:** {{Pyramid lead / SCQA framing / consistent section structure}}
+
+### Honest Uncertainty (STANDARD + HEAVY)
+
+**Threshold:** >= 3/5 — Score: {{1-5}}
+**Standard reference:** CRITICAL_THINKING_STANDARD.md (HU, CC)
+**Evidence:** {{gaps surfaced as findings; deferrals documented with rationale}}
+
+### Codebase Referential Integrity (STANDARD + HEAVY)
+
+**Threshold:** >= 4/5 — Score: {{1-5}}
+**Standard reference:** SPIRAL_TEMPLATES.md (derived from platform ADR-164)
+**Evidence (per pre-existing entity named in agent.md):**
+
+| Entity | Path | Verified exists | Notes |
+|---|---|---|---|
+| {{e.g., COACHING_STANDARD.md}} | `plugins/sulis/references/standards/COACHING_STANDARD.md` | YES / NO / NEW (flagged) | |
+| {{other agent dispatched}} | `plugins/{{plugin}}/agents/{{name}}.md` | YES / NO / NEW (flagged) | |
+
+### Outcome-Specific Rigor (HEAVY only)
+
+#### Sub-perspective 1 — Dispatch trigger precision
+
+**Verdict:** {{PASS / FAIL / DEFERRED}}
+**Method:** Description-only test on {{N}} parent-agent scenarios
+**Result:** precision {{N}}% (threshold ≥ 85%)
+**Notes:** {{which scenarios passed / failed, why}}
+
+#### Sub-perspective 2 — Tool-completeness check
+
+**Verdict:** {{PASS / FAIL / DEFERRED}}
+**Result:** {{N}} tools claimed in agent body / {{M}} declared in `tools:` frontmatter — match: {{yes / no}}
+**Missing tools (if any):** {{list — these are Gate 3 regressions}}
+
+#### Sub-perspective 3 — Output-shape verification
+
+**Verdict:** {{PASS / FAIL / DEFERRED}}
+**Scenarios tested:** {{N}}; **passed:** {{M}}; **success rate:** {{X}}% (threshold ≥ 80%)
+**Founder-mode shape match:** {{yes / no}}
+**Technical-mode shape match (if dual-register):** {{yes / no}}
+**Failure modes captured:** {{list, classify as agent-bug / methodology-gap / scenario-mismatch}}
+
+### Coaching Delivery (founder-facing or both only — MANDATORY)
+
+**Standard reference:** `plugins/sulis/references/standards/COACHING_STANDARD.md`
+**Method:** Seven-question Pass/Fail validation checklist applied to each declared founder-mode example
+**Examples scored:** {{N}}
+
+| Example | Q1 Structural | Q2 Calibration | Q3 Room | Q4 Dignity | Q5 Relationship | Q6 Step-up | Q7 Forward | Score |
+|---|---|---|---|---|---|---|---|---|
+| Example 1 | PASS/FAIL | PASS/FAIL | PASS/FAIL | PASS/FAIL | PASS/FAIL | PASS/FAIL | PASS/FAIL | N/7 |
+| Example 2 | ... | | | | | | | N/7 |
+
+**Aggregate:** all examples ≥ 6/7? {{yes — PASS / no — FAIL}}
+**Red-flag scan (auto-fail triggers):** {{none / list any "You need to..." / "The problem is..." / etc.}}
+
+### Tone Conformance (founder-facing or both only — MANDATORY)
+
+**Standard reference:** `plugins/sulis/references/standards/TONE_STANDARD.md`
+**Method:** Seven-item validation checklist applied to each declared founder-mode example
+**Examples scored:** {{N}}
+
+| Example | T-01 | T-02 | T-03 | T-04 | T-05 | Lexicon | Forbidden | Score |
+|---|---|---|---|---|---|---|---|---|
+| Example 1 | PASS/FAIL | PASS/FAIL | PASS/FAIL | PASS/FAIL | PASS/FAIL | PASS/FAIL | PASS/FAIL | N/7 |
+| Example 2 | ... | | | | | | | N/7 |
+
+**Aggregate:** all examples ≥ 6/7? {{yes — PASS / no — FAIL}}
+**Forbidden-vocabulary scan:** {{none / list any "robust" / "comprehensive" / "powerful" / "magic" / etc.}}
+**Preferred-vocabulary applied:** {{list which TONE Section A terms used}}
+
+### Register Switch Correctness (dual-register agents only — MANDATORY)
+
+**Standard reference:** `plugins/sulis/references/founder-facing-conventions.md` Rule 6
+**Method:** Four sub-tests × 5 scenarios each = 20 total scenarios
+
+#### Sub-test 1: Intent-triggered switch
+{{Score: N/5 — list which scenarios passed}}
+
+#### Sub-test 2: --raw flag handling
+{{Score: N/5 — list which commands tested + which passed; OR N/A if agent not wrapped by --raw commands}}
+
+#### Sub-test 3: Session toggle (SULIS_JARGON env var) integration
+{{Score: N/5 — list scenarios}}
+
+#### Sub-test 4: Default-register correctness
+{{Score: N/5 — list scenarios}}
+
+**Aggregate:** {{total}}/20 (threshold ≥ 18/20) — {{PASS / FAIL}}
+
+### Independence Check (HEAVY only)
+
+**Threshold:** >= 3/5 — Score: {{1-5}}
+**Scorer:** Agent (subagent_type=Explore) in fresh context (no access to author reasoning)
+**Sub-agent ID / artifact:** `{{path to INDEPENDENCE_CHECK.md or sub-agent output}}`
+**Evidence:** {{sub-agent's per-dimension score with citations}}
+
+---
+
+## Gate 5 — Adversarial Review (AT / FR)
+
+### Audience-agnostic misuse cases
+
+#### Misuse case 1: {{name}}
+
+- **What the agent might do wrong (FR-03 pre-mortem):** {{description}}
+- **Status:** PREVENTED with mechanism / OPEN_RISK with rationale + revisit-trigger
+- **Mitigation or rationale:** {{...}}
+
+#### Misuse case 2: {{name}}
+{{same structure}}
+
+#### Misuse case 3: {{name}}
+{{same structure}}
+
+### Founder-facing agent misuse cases (founder-facing or both only — ALL 4 MANDATORY)
+
+#### MUC-A1: Prescriptive language leak
+
+- **What might go wrong:** Agent emits "You need to..." / "You should..." / "The problem is..." despite COACHING citation.
+- **Status:** PREVENTED / OPEN_RISK
+- **Mitigation:** {{Gate 4 Coaching Delivery perspective scoring + pre-emission scan}}
+
+#### MUC-A2: Banned vocabulary leak
+
+- **What might go wrong:** Agent emits "robust" / "comprehensive" / "powerful" / "magic" / "leverage" despite TONE citation.
+- **Status:** PREVENTED / OPEN_RISK
+- **Mitigation:** {{Gate 4 Tone Conformance perspective + pre-emission scan against TONE forbidden list}}
+
+#### MUC-A3: Defensive-triggering phrase in a recommendation
+
+- **What might go wrong:** Agent surfaces a finding using language that triggers founder defensiveness.
+- **Status:** PREVENTED / OPEN_RISK
+- **Mitigation:** {{COACHING Tenet 1 structural framing + pre-emission validation against Pass/Fail checklist}}
+
+#### MUC-A4: Commercial outcome missing when describing a feature/change
+
+- **What might go wrong:** Agent reports completion without connecting to user impact.
+- **Status:** PREVENTED / OPEN_RISK
+- **Mitigation:** {{TONE T-03 + output-shape template includes "outcome" field}}
+
+### Dual-register agent misuse cases (dual-register only — ALL 3 MANDATORY)
+
+#### MUC-R1: Technical-mode leaks into founder-mode default
+
+- **What might go wrong:** Agent emits JSON envelope or IDs-only string when founder expected plain English.
+- **Status:** PREVENTED / OPEN_RISK
+- **Mitigation:** {{register flag checked at emission time + Gate 4 default-register check}}
+
+#### MUC-R2: Founder-mode drops signal the founder needed
+
+- **What might go wrong:** File path or identifier stripped when it was the actionable signal.
+- **Status:** PREVENTED / OPEN_RISK
+- **Mitigation:** {{surface load-bearing identifiers per founder-facing-conventions Rule 2}}
+
+#### MUC-R3: Register-switch ambiguity
+
+- **What might go wrong:** Founder says "more detail" — agent unsure whether to deepen founder-mode or switch to technical-mode.
+- **Status:** PREVENTED / OPEN_RISK
+- **Mitigation:** {{default is "deeper in founder-mode"; ask explicitly if technical-mode seems intended}}
+
+### MUC-F1..F6 (founder-facing only — ≥ 3 MANDATORY)
+
+{{Address at least 3 of MUC-F1..F6 from founder-facing-conventions.md.}}
+
+#### MUC-F1: Operator jargon leak in error string
+- **Status:** PREVENTED / OPEN_RISK
+- **Mitigation:** {{...}}
+
+#### MUC-F2: Shortcut acts on stale state without echoing
+- ...
+
+(etc.)
+
+---
+
+## Fixes Applied During Spiral
+
+{{List of autonomous fixes made during iterations, or "None"}}
+
+---
+
+## Irreducible Blockers
+
+{{If BLOCKED:}}
+- **Dimension failed:** {{name}}
+- **Why unfixable by current agent / tools:** {{specific reason}}
+- **External action required:** {{concrete next step}}
+- **Scope of blocking issue:** {{bounded estimate}}
+
+{{Or "None" if PASS}}
+
+---
+
+## Open risks accepted at publication
+
+### Risk 1: {{name}}
+
+- **Description:** {{what could go wrong}}
+- **Why accepted:** {{rationale — usually: low likelihood, low impact, or blocker for a future-version dependency}}
+- **revisit_by:** {{date | event | trigger | never}}: {{detail}}
+- **Workaround for users in the meantime:** {{if any}}
+
+---
+
+## Vocabulary changes (if any)
+
+{{Record any vocabulary revisions made during authoring. Each entry:}}
+
+- **{{term}}** — changed from "{{old}}" to "{{new}}" because {{reason}}.
+  Updated in: {{list of files}}.
+
+---
+
+## Meta-Notes
+
+{{Optional: observations about the spiral execution itself, limitations
+encountered, special considerations for future audits. Patterns reported
+across many VERIFICATION_REPORT.md files inform methodology + standards
+updates.}}
+
+---
+
+## File location
+
+This report should live at:
+
+- First iteration: `plugins/{{plugin}}/agents/{{agent-name}}.VERIFICATION_REPORT.md` (sibling to the agent file)
+- Deepening iterations: `plugins/{{plugin}}/agents/iterations/{{agent-name}}/{N}/VERIFICATION_REPORT.md` (preserves history)
+
+The single filesystem check that determines compliance:
+
+```bash
+test -f plugins/{{plugin}}/agents/{{agent-name}}.VERIFICATION_REPORT.md \
+  && grep -q "Verdict:.*PASS" plugins/{{plugin}}/agents/{{agent-name}}.VERIFICATION_REPORT.md
+```

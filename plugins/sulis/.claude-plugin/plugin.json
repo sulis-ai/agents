@@ -1,7 +1,7 @@
 {
   "name": "sulis",
-  "description": "Sulis — the canonical front-door plugin for the Sulis AI marketplace. Hosts the founder-facing Sulis agent + journey skills (start/handoff/status); the meta-skill methodology (add-skill) used to author other plugins; the deep-mode code-health framework (check-* tier 1-7); the address-findings bridge (turns findings into Work Packages per WORK_PACKAGE_STANDARD); the executor + train + wpx-* CLI tools (consolidated from sulis-execution at v0.30.0); and 8 cross-cutting standards including COACHING + TONE (ported at v0.31.0 ahead of add-agent). Founders interact via /sulis:* commands — including the full execution surface: /sulis:run-wp, /sulis:run-all, /sulis:retry, /sulis:wp-status, /sulis:backfill-code-review, /sulis:backfill-gates.",
-  "version": "0.31.0",
+  "description": "Sulis — the canonical front-door plugin for the Sulis AI marketplace. Hosts the founder-facing Sulis agent + journey skills (start/handoff/status); two meta-skill methodologies (add-skill v0.7.0 for skills, add-agent v0.1.0 for agents — both five-gate standards-grounded); the deep-mode code-health framework (check-* tier 1-7); the address-findings bridge (turns findings into Work Packages per WORK_PACKAGE_STANDARD); the executor + train + wpx-* CLI tools (consolidated from sulis-execution at v0.30.0); and 8 cross-cutting standards including COACHING + TONE (ported at v0.31.0 ahead of add-agent). Founders interact via /sulis:* commands — including the full execution surface: /sulis:run-wp, /sulis:run-all, /sulis:retry, /sulis:wp-status, /sulis:backfill-code-review, /sulis:backfill-gates.",
+  "version": "0.32.0",
   "author": {
     "name": "Iain"
   },
