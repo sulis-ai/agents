@@ -49,7 +49,13 @@ def _write_workflows(repo_root: Path, names: list[str]) -> None:
 
 def _conformant_gh_responses() -> list[dict]:
     """Mock gh responses for a fully-conformant repo. Specific matches first."""
+    # Ordered most-specific first — the mock matches the first response whose
+    # `match` is a substring of the gh args. `rules/branches/dev` must precede
+    # `branches/dev` (the latter is a substring of the former).
     return [
+        {"match": "rules/branches/dev", "stdout": json.dumps([
+            {"type": "merge_queue", "parameters": {"merge_method": "SQUASH"}},
+        ])},
         {"match": "branches/dev/protection", "stdout": json.dumps({
             "required_status_checks": {"contexts": ["branch-ci", "merge-queue-ci"]},
             "required_linear_history": {"enabled": True},
@@ -62,8 +68,6 @@ def _conformant_gh_responses() -> list[dict]:
         {"match": "/environments", "stdout": json.dumps({
             "environments": [{"name": "staging"}, {"name": "production"}],
         })},
-        {"match": "mergeQueue", "stdout": json.dumps({
-            "data": {"repository": {"mergeQueue": {"mergeMethod": "SQUASH"}}}})},
         # repo settings / default branch — least specific, matched last
         {"match": "repos/sulis-ai/agents", "stdout": json.dumps({
             "default_branch": "dev",

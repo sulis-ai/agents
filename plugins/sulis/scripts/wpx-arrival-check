@@ -133,21 +133,21 @@ def _check_rc02_protections(repo: str, rep: _Report) -> None:
 
 
 def _check_rc03_merge_queue(repo: str, rep: _Report) -> None:
-    """RC-03: merge queue enabled on dev."""
-    owner, name = repo.split("/", 1)
-    query = (
-        '{ repository(owner: "%s", name: "%s") '
-        "{ mergeQueue { mergeMethod } } }" % (owner, name)
-    )
-    rc, out, _ = _gh(["api", "graphql", "-f", f"query={query}"])
+    """RC-03: merge queue enabled on dev.
+
+    Merge queue is enabled via a repository ruleset with a `merge_queue`
+    rule targeting dev (classic branch protection does not expose it).
+    The rules-for-branch endpoint surfaces every active rule on the branch.
+    """
+    rc, out, _ = _gh(["api", f"repos/{repo}/rules/branches/dev"])
     if rc != 0:
-        rep.error("RC-03", "merge queue on dev", "not configured", "enabled")
+        rep.error("RC-03", "merge queue on dev", "rules unreadable", "enabled")
         return
     try:
-        mq = json.loads(out)["data"]["repository"]["mergeQueue"]
-    except (json.JSONDecodeError, KeyError, TypeError):
-        mq = None
-    if not mq:
+        rule_types = {r.get("type") for r in json.loads(out)}
+    except (json.JSONDecodeError, TypeError, AttributeError):
+        rule_types = set()
+    if "merge_queue" not in rule_types:
         rep.error("RC-03", "merge queue on dev", "not configured", "enabled")
 
 
