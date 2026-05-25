@@ -1699,6 +1699,110 @@ def _finalise_awaiting_gates(
     }, exit_code=0)
 
 
+def _step_0_arrival_check(
+    args: argparse.Namespace,
+    paths: WpxPaths,
+    train_id: str,
+    base_branch: str,
+    record: dict,
+) -> None:
+    """Step 0 (Phase 5 #6 — change-as-primitive build): back-integrate the
+    change branch from dev BEFORE the train touches anything.
+
+    Per lifecycle.md Step 0 + CW-04 auto back-integration. Defence in depth
+    — the active driver is Step 12.5 after the batch lands. Skipped when not
+    in a change context (--change-worktree-path unset, or --base-branch is
+    not a change/* branch — CW-05 trivial carve-out OR direct-to-dev).
+
+    On conflict / fetch-fail / internal-error this writes the run record and
+    terminates via emit_result(exit_code=1) (SystemExit), exactly as the
+    pre-extraction inline block did. Returns None on success or skip.
+    """
+    change_worktree_path = getattr(args, "change_worktree_path", None)
+    if not (change_worktree_path and base_branch.startswith("change/")):
+        record["step_0_arrival_check"] = "skipped"
+        return
+
+    _log(f"{train_id}: Step 0 arrival check — back-integrating {base_branch} from origin/dev")
+    arrival = back_integrate_change_branch(
+        Path(change_worktree_path), base_branch, dev_ref="origin/dev",
+    )
+    record["step_0_arrival_check"] = arrival["status"]
+
+    if arrival["status"] == "merge_conflict":
+        files_summary = ", ".join(arrival["files"][:3]) + (
+            f" (+ {len(arrival['files']) - 3} more)" if len(arrival["files"]) > 3 else ""
+        )
+        record.update(
+            outcome="blocker",
+            outcome_reason=(
+                f"Step 0: change branch back-integration conflict in {files_summary}. "
+                f"Per CW-04, do not auto-resolve — founder picks resolve / defer / abort."
+            ),
+            completed_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        )
+        write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
+        emit_result(record, exit_code=1)
+    elif arrival["status"] in ("fetch_failed", "internal_error"):
+        record.update(
+            outcome="blocker",
+            outcome_reason=f"Step 0 {arrival['status']}: {arrival.get('error', '')}",
+            completed_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        )
+        write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
+        emit_result(record, exit_code=1)
+    elif arrival["status"] == "merged_ok":
+        _log(f"{train_id}: Step 0: merged {arrival.get('merged_commits', '?')} commits from origin/dev into {base_branch}")
+    else:
+        _log(f"{train_id}: Step 0: {base_branch} already current with origin/dev")
+
+
+def _step_12_5_back_integration(
+    args: argparse.Namespace,
+    train_id: str,
+    base_branch: str,
+    record: dict,
+) -> None:
+    """Step 12.5 (Phase 5 #6 — change-as-primitive build): after the train
+    merges the batch into the change branch, back-integrate from dev.
+
+    Active driver — keeps the change branch within one batch of dev. Conflict
+    here is NON-blocking: the batch already merged, so we log a warning and
+    let the founder resolve at the next Step 0. Mutates record; never raises
+    or terminates. Skipped when not in a change context.
+    """
+    change_worktree_path = getattr(args, "change_worktree_path", None)
+    if not (change_worktree_path and base_branch.startswith("change/")):
+        record["step_12_5_back_integration"] = "skipped"
+        return
+
+    _log(f"{train_id}: Step 12.5 post-batch back-integration of {base_branch} from origin/dev")
+    post_batch = back_integrate_change_branch(
+        Path(change_worktree_path), base_branch, dev_ref="origin/dev",
+    )
+    record["step_12_5_back_integration"] = post_batch["status"]
+
+    if post_batch["status"] == "merge_conflict":
+        files_summary = ", ".join(post_batch["files"][:3]) + (
+            f" (+ {len(post_batch['files']) - 3} more)" if len(post_batch["files"]) > 3 else ""
+        )
+        _log(
+            f"WARNING: {train_id}: Step 12.5 conflict in {files_summary}. "
+            f"Batch merged successfully but change branch is now stale. "
+            f"Founder action needed at next Step 0."
+        )
+        record["step_12_5_conflict_files"] = post_batch["files"]
+    elif post_batch["status"] in ("fetch_failed", "internal_error"):
+        _log(
+            f"WARNING: {train_id}: Step 12.5 {post_batch['status']}: "
+            f"{post_batch.get('error', '')}. Continuing — defence in depth at next Step 0."
+        )
+    elif post_batch["status"] == "merged_ok":
+        _log(f"{train_id}: Step 12.5: merged {post_batch.get('merged_commits', '?')} commits from origin/dev into {base_branch}")
+    else:
+        _log(f"{train_id}: Step 12.5: {base_branch} already current with origin/dev")
+
+
 def cmd_run(args: argparse.Namespace) -> None:
     """Fire the train — thin orchestrator over plan / commit / verify phases.
 
@@ -1793,51 +1897,10 @@ def cmd_run(args: argparse.Namespace) -> None:
         _log(f"{train_id}: trigger={trigger_reason}; batch_size={len(batch)}; "
              f"WPs={[e.wp for e in batch]}")
 
-        # Step 0: arrival check (Phase 5 #6 — change-as-primitive build).
-        # Per lifecycle.md Step 0 + CW-04 auto back-integration: if running
-        # in a change context, ensure the change branch is current with dev
-        # BEFORE the train begins touching things. Defence in depth — the
-        # active driver is Step 12.5 after the batch lands.
-        # Skipped if not in a change context (--change-worktree-path unset,
-        # or --base-branch doesn't start with "change/" — CW-05 trivial
-        # carve-out OR direct-to-dev shipping).
-        change_worktree_path = getattr(args, "change_worktree_path", None)
-        if change_worktree_path and base_branch.startswith("change/"):
-            _log(f"{train_id}: Step 0 arrival check — back-integrating {base_branch} from origin/dev")
-            arrival = back_integrate_change_branch(
-                Path(change_worktree_path),
-                base_branch,
-                dev_ref="origin/dev",
-            )
-            record["step_0_arrival_check"] = arrival["status"]
-            if arrival["status"] == "merge_conflict":
-                files_summary = ", ".join(arrival["files"][:3]) + (
-                    f" (+ {len(arrival['files']) - 3} more)" if len(arrival["files"]) > 3 else ""
-                )
-                record.update(
-                    outcome="blocker",
-                    outcome_reason=(
-                        f"Step 0: change branch back-integration conflict in {files_summary}. "
-                        f"Per CW-04, do not auto-resolve — founder picks resolve / defer / abort."
-                    ),
-                    completed_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                )
-                write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
-                emit_result(record, exit_code=1)
-            elif arrival["status"] in ("fetch_failed", "internal_error"):
-                record.update(
-                    outcome="blocker",
-                    outcome_reason=f"Step 0 {arrival['status']}: {arrival.get('error', '')}",
-                    completed_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                )
-                write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
-                emit_result(record, exit_code=1)
-            elif arrival["status"] == "merged_ok":
-                _log(f"{train_id}: Step 0: merged {arrival.get('merged_commits', '?')} commits from origin/dev into {base_branch}")
-            else:
-                _log(f"{train_id}: Step 0: {base_branch} already current with origin/dev")
-        else:
-            record["step_0_arrival_check"] = "skipped"
+        # Step 0: arrival check (Phase 5 #6). Back-integrate the change branch
+        # from dev before touching anything. Extracted to _step_0_arrival_check;
+        # terminates via emit_result(exit 1) on conflict/fetch-fail.
+        _step_0_arrival_check(args, paths, train_id, base_branch, record)
 
         plan = _plan_phase(
             args=args, paths=paths, repo=repo, train_id=train_id,
@@ -1863,45 +1926,12 @@ def cmd_run(args: argparse.Namespace) -> None:
                 plan=plan, commit=commit, verify=verify, record=record,
             )
 
-        # Step 12.5: post-batch back-integration (Phase 5 #6 — change-as-
-        # primitive build). After the train successfully merges the batch
-        # into the change branch, back-integrate the change branch from
-        # dev. Active driver — keeps the change branch within one batch
-        # of dev. Conflict here is non-blocking: the batch already merged
-        # successfully; founder resolves at next Step 0.
-        # Note: _finalise_success / _finalise_awaiting_gates do NOT raise
-        # SystemExit on the success path — they update record + return.
-        # cmd_run exits via record propagation, so we run Step 12.5
-        # AFTER the finalise calls but BEFORE the function returns.
-        if change_worktree_path and base_branch.startswith("change/"):
-            _log(f"{train_id}: Step 12.5 post-batch back-integration of {base_branch} from origin/dev")
-            post_batch = back_integrate_change_branch(
-                Path(change_worktree_path),
-                base_branch,
-                dev_ref="origin/dev",
-            )
-            record["step_12_5_back_integration"] = post_batch["status"]
-            if post_batch["status"] == "merge_conflict":
-                files_summary = ", ".join(post_batch["files"][:3]) + (
-                    f" (+ {len(post_batch['files']) - 3} more)" if len(post_batch["files"]) > 3 else ""
-                )
-                _log(
-                    f"WARNING: {train_id}: Step 12.5 conflict in {files_summary}. "
-                    f"Batch merged successfully but change branch is now stale. "
-                    f"Founder action needed at next Step 0."
-                )
-                record["step_12_5_conflict_files"] = post_batch["files"]
-            elif post_batch["status"] in ("fetch_failed", "internal_error"):
-                _log(
-                    f"WARNING: {train_id}: Step 12.5 {post_batch['status']}: "
-                    f"{post_batch.get('error', '')}. Continuing — defence in depth at next Step 0."
-                )
-            elif post_batch["status"] == "merged_ok":
-                _log(f"{train_id}: Step 12.5: merged {post_batch.get('merged_commits', '?')} commits from origin/dev into {base_branch}")
-            else:
-                _log(f"{train_id}: Step 12.5: {base_branch} already current with origin/dev")
-        else:
-            record["step_12_5_back_integration"] = "skipped"
+        # Step 12.5: post-batch back-integration (Phase 5 #6). After the
+        # batch merges into the change branch, back-integrate from dev.
+        # Extracted to _step_12_5_back_integration; non-blocking (logs +
+        # mutates record only). Runs AFTER finalise (which doesn't raise on
+        # the success path) but BEFORE the function returns.
+        _step_12_5_back_integration(args, train_id, base_branch, record)
 
     except RuntimeError as exc:
         record["outcome"] = "error"
