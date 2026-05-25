@@ -1,304 +1,56 @@
-# SEA: Senior Engineering Architect Plugin for Claude Code
+# sea — [DEPRECATED at v0.21.0]
 
-A Claude Code plugin that converts requirements into hardened technical
-designs, audits brownfield code for primitive gaps, and decomposes
-architectures into atomic Work Packages an execution agent can implement
-without drift.
+> **This plugin has been consolidated into [`sulis`](../sulis/) at v0.38.0 (commit chain `714bb23..` on 2026-05-25).**
 
-SEA is the technical counterpart to the requirements analyst (consolidated into [sulis](../sulis/) at v0.37.0; legacy plugin home at `../srd/` is DEPRECATED) — where requirements handles
-**What** and **Why**, SEA handles **How**, **Hardening**, and **Work
-Decomposition**.
+## What moved where
 
----
+### Skills
 
-## Why This Exists
-
-Most AI coding agents act like junior developers: they write code that
-passes the next test. SEA is opinionated in the opposite direction. It
-plays the Staff Engineer role — designing the system before code is
-written, naming the trade-offs explicitly, and breaking work into pieces
-small enough that an execution agent can implement each piece correctly
-without holding the whole design in its head.
-
-The output is "boring code": explicit, type-safe, free of magic and
-hidden state. The kind of code a future maintainer can read top-to-bottom
-and predict.
-
----
-
-## Quick Start
-
-```bash
-# Install the plugin
-/plugin marketplace add sulis-ai/agents
-/plugin install sea@sulis-ai-agents
-
-# Start an architect session
-claude --agent sea:engineering-architect --dangerously-skip-permissions
-```
-
-### Commands
-
-| Command | What It Does |
-|---------|-------------|
-| `claude --agent sea:engineering-architect` | Start the architect as the primary agent |
-| `/sea:blueprint` | Greenfield — synthesise a `TDD.md` and ADRs from an existing SRD |
-| `/sea:codebase-audit` | Brownfield — read source, identify primitive gaps, draft Hardening Deltas |
-| `/sea:harden` | Brownfield — implement accepted Hardening Deltas through the Red-Green-Blue cycle |
-| `/sea:decompose` | Break a TDD into atomic Work Packages with dependency graph and token-cost estimates |
-| `/sea:verify` | Run five-perspective completeness check; produce `COMPLETENESS_REPORT.md` |
-| `/code-review <PR\|branch\|range>` | PR-scoped review implementing the Code Review Standard ([CR-01..CR-09](references/code-review-standard.md)) and applying the PR Hygiene Standard ([PH-01..PH-08](../sulis/references/pr-hygiene-standard.md)). Runs a mandatory mechanical baseline (typecheck + lint) before any lens (CR-01); computes the PR Hygiene signal table — Scope / Size / Safety / Completeness — before lens dispatch (CR-09); dispatches three lenses in parallel above the 200-line / 5-file carve-out (CR-02); reads every changed file >50 lines end-to-end (CR-03); computes verdict with four auto-downgrade rules the agent cannot override including PH-03 high-severity hygiene findings (CR-06); self-attests in the report's Methodology (CR-08). Report is **two-tier**: a plain-English author tier (no internal IDs, action-oriented verdict and severity labels — "Ready to merge" / "Must fix" / "Strongly recommend fixing" / etc., optional "Things to take away" educational notes capped at 3 and tied to specific findings) and a technical tier for engineers and downstream agents (full CR-NN / PH-NN taxonomy intact). Default tier-1 audience is a non-technical founder using AI to generate code. Produces a self-contained per-review bundle at `.architecture/{project}/code-reviews/PR-{number}-{TIMESTAMP}/` with REVIEW.md + hardening-deltas/ subdir + signals.json + tool-outputs/. Advisory only — no PR comments, no status checks, no auto-blocking. |
-| `/sea:suggest-split <PR\|branch\|range>` | Natural follow-on to `/code-review` when PH-01 Scope or PH-02 Size fires high. Reads the diff, categorises changes by type (refactor / migration / schema / infra / docs / feature), proposes a 2-4 way split with dependency ordering, and emits the exact git commands to make each new branch. Read-only — does NOT execute the commands. The founder copies and runs them (or asks a developer to). Output is a two-tier `SPLIT-SUGGESTION.md` inside the originating review bundle. Designed for non-technical founders who don't know what "split the PR" actually involves. |
-
----
-
-## How It Works
-
-### The MECE-3 Architecture Framework
-
-Every component SEA designs or audits goes through three Mutually Exclusive
-and Collectively Exhaustive pillars:
-
-1. **Form — Structural Integrity.** Hexagonal architecture. Dependencies
-   point inward. Modules expose contracts, not implementations.
-
-2. **Armor — Operational Hardening.** Every external call has a timeout,
-   retry, and circuit breaker. Secrets are fetched, never embedded.
-   Inter-service traffic is encrypted and authenticated. Every operation
-   emits a trace, a log, and a metric.
-
-3. **Proof — Verification Protocol.** Every port has a contract test.
-   Integration tests use real adapters (testcontainers, not mocks). Every
-   resiliency primitive has a chaos test.
-
-A design that satisfies one pillar but ignores another is incomplete. SEA
-flags the gap.
-
-### Dual-Mode Operation
-
-| Mode | Trigger | Workflow |
+| Old (in this plugin) | New (in `sulis`) | Notes |
 |---|---|---|
-| **Greenfield** | SRD exists, codebase doesn't | `/sea:blueprint` → `/sea:decompose` → hand off to execution agent |
-| **Brownfield** | Codebase exists, hardening needed | `/sea:codebase-audit` → review deltas → `/sea:harden` → `/sea:verify` |
+| `/sea:blueprint` | `/sulis:draft-architecture` | Tin-test rename (bare verb / abstract noun) |
+| `/sea:decompose` | `/sulis:plan-work` | Tin-test rename (bare verb) |
+| `/sea:harden` | `/sulis:harden-codebase` | Tin-test rename (bare verb) |
+| `/sea:probe` | `/sulis:analyse-codebase` | Tin-test rename (bare verb); brings scripts/ + tests/ subdirs (ast-grep + lizard + scc deterministic orchestrator) |
+| `/sea:verify` | `/sulis:verify-architecture` | Tin-test rename (bare verb) |
+| `/sea:code-review` | `/sulis:code-review` | No rename — already verb-noun |
+| `/sea:codebase-audit` | `/sulis:codebase-audit` | No rename — already verb-noun |
+| `/sea:suggest-split` | `/sulis:suggest-split` | No rename — clear in context |
 
-### Red-Green-Blue
+### Agent
 
-Every Work Package follows a three-stage cycle:
-
-| Stage | What happens |
+| Old | New |
 |---|---|
-| **Red** | Write failing tests — including hardening assertions (timeouts, circuit-breaker behaviour, OpenTelemetry spans, authz checks). Hardening lives in Red, not after Green. |
-| **Green** | Boring code makes the tests pass. Explicit types. No hidden state. No metaprogramming. |
-| **Blue** | Refactor with all tests still green. Extract shared primitives. Remove duplication. Mandatory, not optional. |
+| `engineering-architect` (at `plugins/sea/agents/`) | `engineering-architect` (at `plugins/sulis/agents/`) — invoked via `claude --agent engineering-architect` |
 
-See [`references/red-green-blue.md`](references/red-green-blue.md) for full detail.
+### References (11)
 
----
+Moved from `plugins/sea/references/` to `plugins/sulis/references/`:
 
-## What It Produces
+- `architecture-patterns.md`
+- `boring-code.md`
+- `change-primitives.md` (the 22-primitive vocabulary of code change)
+- `code-intelligence-template.md` (CODE_INTELLIGENCE.html shape)
+- `code-review-standard.md` (CR-01..CR-10)
+- `decompose-validation-rubric.md`
+- `hardening-deltas.md` (HD-NNN format)
+- `mece-3-architecture.md` (Form / Armor / Proof)
+- `performance-procedural-checks.md`
+- `red-green-blue.md` (RGB-TDD)
+- `right-sizing.md`
 
-Per the Change Work Standard (CW-01..CW-08, see
-`plugins/sulis/references/change-work-standard.md`), SEA's artifacts
-live on a **change branch** (`change/{primitive}-{slug}`) when work
-happens inside a change worktree. The artifact directory paths are
-unchanged — `.architecture/{project}/` stays where it is — but the
-branch they live on is the change branch, not `dev` directly. When
-the change is shipped via `sulis-change finish`, the TDD + ADRs +
-Work Packages merge to `dev` in one squash commit alongside the
-implementation code.
+## Why this plugin shell remains
 
-For greenfield work, SEA writes to `.architecture/{project}/` parallel to
-SRD's `.specifications/{project}/`:
+Per the Sulis AI marketplace's consolidation convention (set by `sulis-execution` → `sulis` v0.30.0, `sulis-context` → `sulis` v0.35.0, `srd` → `sulis` v0.37.0, and earlier `sulis-concierge` → `sulis` v0.2.0): consolidated source plugins are marked `[DEPRECATED]` in-place rather than deleted outright. No shim skills get written.
 
-```
-.architecture/{project}/
-├── ARCH.yaml                       # metadata, status, link to source SPEC
-├── TDD.md                          # Technical Design Document (Form/Armor/Proof)
-├── adrs/
-│   ├── ADR-001-{slug}.md           # one decision per file
-│   └── ...
-├── hardening-deltas/               # brownfield only
-│   ├── INDEX.md
-│   └── HD-001-{slug}.md
-├── work-packages/
-│   ├── INDEX.md                    # dependency graph + sequence
-│   └── WP-001-{slug}.md            # atomic Red-Green-Blue WPs
-└── COMPLETENESS_REPORT.md
-```
+This gives:
 
-### Work Package shape
+- Marketplace compatibility (any external listing or link still resolves)
+- Audit trail (the old layout is preserved as historical record)
+- Forward pointer (this README + the deprecation marker in `plugin.json`)
 
-Each WP is atomic — an execution agent can pick one up and implement it
-without reading any other WP. Fields:
+For future development, work directly in `plugins/sulis/`. This shell will be removed only when the marketplace's deprecation window for `sea` (one major release after v0.21.0) closes.
 
-- **Context** — which TDD section / architecture component
-- **Contract** — public interfaces, types, ports
-- **Definition of Done** — three checklists for Red, Green, Blue
-- **Sequence ID** with `dependsOn` graph — prevents merge conflicts
-- **Estimated Token Cost** — `input: ~Nk / output: ~Nk` for orchestrator routing
+## Original README
 
-### Hardening Delta shape
-
-For brownfield work, each delta describes one gap and one fix:
-
-- **Gap type** — which MECE-3 violation (circuit-breaker, secrets, contract-test, etc.)
-- **Context** — file path, line, why this is a gap
-- **Change** — ADDED / MODIFIED / REMOVED (OpenSpec-style)
-- **Verification** — the failing characterisation test that proves the gap exists
-- **Rationale** — why this approach, what alternatives were rejected
-
----
-
-## Where SEA Fits in the Spec-Driven Pipeline
-
-The SEA pipeline composes with the broader Sulis fleet:
-
-```
-sulis-security                 SEA                              SRD
-(security-reviewer)            (engineering-architect)          (requirements-analyst)
-─────────────────              ─────────────────                ─────────────────
-25-primitive viability    ←→   MECE-3 architecture        ←→    What & Why
-.security/{project}/           .architecture/{project}/         .specifications/{project}/
-viability-report.md            TDD + ADRs + WPs + HDs           SRD + NFR + diagrams
-```
-
-- **`sulis-security`** runs the broader audit (5 categories, OODA spiral).
-  Its Critical and Concern findings convert into SEA Hardening Deltas via
-  `/sea:harden`. SEA's `codebase-audit` focuses on Form/Armor/Proof against
-  the design; `sulis-security` covers a wider surface (code quality, supply
-  chain, infrastructure) and runs without a TDD.
-- **`srd`** produces the specification SEA builds the architecture from.
-- **Execution agents** (Claude Code, GSD) implement SEA's Work Packages.
-
-```
-SRD                  SEA                   Execution Agent
-(srd:requirements-   (sea:engineering-     (claude code, gsd, ...)
- analyst)             architect)
-─────────────────    ─────────────────     ──────────────────
-What & Why     →     How & Hardening   →   Implementation
-Functional reqs      Hardened TDD          Code + tests
-NFRs                 ADRs                  Green CI
-Primitive tree       Work Packages         Merged PR
-```
-
-SRD produces the specification. SEA consumes it and produces the
-architecture + Work Packages. An execution agent (Claude Code itself,
-GSD, or a human engineering team) picks up Work Packages one at a time
-and implements them through the Red-Green-Blue cycle.
-
-### Integration with SRD outputs
-
-SEA parses these SRD artifacts directly:
-
-- `SRD.md` → drives the Form pillar (entities, operations, business rules)
-  and per-use-case Negative Requirements
-- `NFR.md` → drives the Armor pillar and pattern selection
-- `MISUSE_CASES.md` (SRD v1.11.0+) → seeds Armor primitives; each MUC's
-  System Response becomes one or more Hardening Deltas or TDD Armor entries.
-  See `references/hardening-deltas.md` for the MUC → delta translation
-  pattern (with worked example).
-- `PRIMITIVE_TREE.jsonld` → component inventory for the TDD
-- `GLOSSARY.md` (SRD v1.11.0+) → locked vocabulary; SEA uses preferred terms
-  exactly in the TDD, ADRs, and Work Packages
-- `diagrams/` → integration design (sequence, process, data-flow)
-- `EXPLORATION_JOURNAL.md` `## Deferred to SEA` section (SRD v1.11.0+) →
-  architecture content SRD parked mid-session; treated as additional user
-  design intent
-- `HANDOFF_TO_SEA.md` (SRD v1.11.0+, only present in Early Handover path) →
-  the sole upstream context when SRD bailed out because the user arrived
-  with predominantly technical input; read first, then ask for any missing
-  business intent before producing artifacts
-
-If `.specifications/{project}/` doesn't exist, SEA blocks and refers the
-user to `srd:requirements-analyst`. It does not invent requirements.
-
----
-
-## Who It's For
-
-**Engineering teams using AI-assisted development.** When you have a
-specification and need a hardened technical design, plus atomic Work
-Packages that won't drift when handed to an execution agent.
-
-**Brownfield audits.** When you have a working codebase that needs to
-become production-grade — timeouts, circuit breakers, observability,
-secrets management, contract tests. SEA produces a delta-driven path
-from where you are to where you need to be, one focused change at a time.
-
-**Spec-driven development practitioners.** SEA slots between SRD (or any
-SRD-equivalent) and execution-layer tools (Claude Code Plan mode, GSD,
-Spec Kit). It bridges "we know what to build" and "we're building it".
-
----
-
-## Installation
-
-### From marketplace
-
-```bash
-/plugin marketplace add sulis-ai/agents
-/plugin install sea@sulis-ai-agents
-```
-
-### From local clone
-
-```bash
-claude --plugin-dir ./plugins/sea
-```
-
----
-
-## Usage
-
-### Starting a session
-
-```bash
-claude --agent sea:engineering-architect --dangerously-skip-permissions
-```
-
-The agent runs as your primary conversational partner — direct
-conversation, full context window. The `--agent` flag is the right
-invocation for the multi-turn design sessions this plugin is built for.
-
-To make it the default for a project, add to `.claude/settings.json`:
-
-```json
-{
-  "agent": "sea:engineering-architect"
-}
-```
-
-### Standalone skill invocation
-
-Each skill can be run independently outside of an architect session:
-
-```bash
-/sea:blueprint .specifications/payments-service
-/sea:codebase-audit
-/sea:decompose
-/sea:harden HD-003
-/sea:verify
-```
-
----
-
-## References
-
-The plugin loads these standards. They are authoritative for the decisions
-SEA makes.
-
-| File | Purpose |
-|---|---|
-| [`references/mece-3-architecture.md`](references/mece-3-architecture.md) | The three pillars — Form, Armor, Proof |
-| [`references/red-green-blue.md`](references/red-green-blue.md) | The Work Package execution cycle |
-| [`references/boring-code.md`](references/boring-code.md) | The Green-stage code standard |
-| [`references/hardening-deltas.md`](references/hardening-deltas.md) | The brownfield delta format (OpenSpec-style) |
-| [`references/architecture-patterns.md`](references/architecture-patterns.md) | Catalogue of vetted architecture patterns |
-| [`references/code-review-standard.md`](references/code-review-standard.md) | The Code Review Standard (CR-01..CR-09) — mechanical baseline, parallel dispatch, full-file reads, evidence discipline, severity rubric, computed verdict with auto-downgrade, lens completion criteria, self-attestation, PR Hygiene application |
-| `plugins/sulis/references/pr-hygiene-standard.md` | The PR Hygiene Standard (PH-01..PH-08) — Scope / Size / Safety / Completeness primitives for change-artifact shape; consumed by `/code-review` via CR-09 |
-
----
-
-## License
-
-MIT
+(For the full historical README content, see git history at commit `714bb23^` and earlier.)

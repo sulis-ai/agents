@@ -1,7 +1,8 @@
 {
   "name": "sea",
-  "description": "Senior Engineering Architect — designs hardened architectures from SRDs, audits brownfield codebases, decomposes designs into atomic Work Packages with Red-Green-Blue verification. Publishes the Code Review Standard (CR-01..CR-10) and the decompose validation rubric. See CHANGELOG.md for version history.",
-  "version": "0.20.0",
+  "description": "[DEPRECATED at v0.21.0 — consolidated into sulis at v0.38.0] Senior Engineering Architect skills + agent + references now in plugins/sulis/. See plugins/sulis/CHANGELOG.md v0.38.0 + plugins/sea/README.md for what-moved-where. Shell remains for marketplace compatibility; no new development.",
+  "version": "0.21.0",
+  "deprecated": true,
   "author": {
     "name": "Iain"
   },

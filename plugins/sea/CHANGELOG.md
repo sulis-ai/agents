@@ -4,6 +4,33 @@ This file holds the cumulative version history that previously lived in
 `plugin.json`'s `description` field. The description is now a one-sentence
 summary (per HD-004, v0.21.3+); historical detail lives here.
 
+## v0.21.0 — 2026-05-25 — [DEPRECATED]
+
+**This plugin is consolidated into `sulis` at v0.38.0 as the third Phase 3
+consolidation of the change-as-primitive build.**
+
+Authored via `consolidate-into-sulis` v0.1.1. Commit chain:
+
+- `714bb23` — steps 2-4/5 combined — 8 skills moved (5 tin-test renamed:
+  `blueprint` → `draft-architecture`, `decompose` → `plan-work`, `harden`
+  → `harden-codebase`, `probe` → `analyse-codebase`, `verify` →
+  `verify-architecture`; `code-review`, `codebase-audit`, `suggest-split`
+  retained their names); 1 agent moved (`engineering-architect`); 11
+  references moved (architecture-patterns, boring-code, change-primitives,
+  code-intelligence-template, code-review-standard, decompose-validation-
+  rubric, hardening-deltas, mece-3-architecture, performance-procedural-
+  checks, red-green-blue, right-sizing). External ref sweep via
+  `sea_sweep.py` ad-hoc bulk python rewrite: 327 substitutions across 70
+  files. The `probe` skill brought its scripts/ and tests/ subdirs (the
+  ast-grep + lizard + scc deterministic orchestrator).
+- (this commit) — step 5/5 — wrap-up: this plugin marked DEPRECATED;
+  sulis bumped to v0.38.0; marketplace.json updated; consolidation run's
+  VERIFICATION_REPORT.md captured under
+  `plugins/sulis/skills/consolidate-into-sulis/runs/sea-2026-05-25/`.
+
+No shim skills written. Plugin shell stays in-place for marketplace
+compatibility.
+
 For the marketplace-facing summary, see `plugin.json`.
 
 ---

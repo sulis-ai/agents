@@ -1,5 +1,41 @@
 # Sulis — Changelog
 
+## v0.38.0 — 2026-05-25
+
+**Phase 3 third consolidation — `sea` folded into `sulis`.**
+
+### What moved
+
+| Category | Count | Items |
+|---|---|---|
+| Skills (with tin-test rename) | 8 | `blueprint` → `draft-architecture`, `decompose` → `plan-work`, `harden` → `harden-codebase`, `probe` → `analyse-codebase`, `verify` → `verify-architecture`; `code-review`, `codebase-audit`, `suggest-split` kept their names |
+| Agents | 1 | `engineering-architect` |
+| References | 11 | `architecture-patterns`, `boring-code`, `change-primitives` (the 22-primitive code-change vocabulary), `code-intelligence-template`, `code-review-standard` (CR-01..CR-10), `decompose-validation-rubric`, `hardening-deltas`, `mece-3-architecture` (Form / Armor / Proof), `performance-procedural-checks`, `red-green-blue` (RGB-TDD), `right-sizing` |
+| Scripts brought with `probe` (now `analyse-codebase`) | 1 deterministic orchestrator | `scripts/probe.py` + `scripts/probe/` package (ast-grep + lizard + scc + jscpd + vulture + ts-prune + detect-secrets); tests/ with fixtures |
+| Docs | 0 | (sea had none) |
+
+### Commit chain
+
+- `714bb23` — steps 2-4/5 (combined) — 8 skills + 1 agent + 11 references moved; `sea_sweep.py` ad-hoc bulk python rewrite landed 327 substitutions across 70 files; manual edit in suggest-split for narrative future-skill reference
+- (this commit) — step 5/5 — wrap-up: sea marked DEPRECATED; sulis bumps; marketplace.json updated
+
+### Recipe-improvement signal recurring
+
+The bulk-rewrite pattern (now used in both srd and sea runs) is unmistakably
+the right tool for runs with 100+ refs. v0.1.2 should package it as a
+first-class `consolidate-into-sulis` helper rather than an ad-hoc tmp script.
+
+### Code-health (Gate 6 verdict)
+
+Captured at `runs/sea-2026-05-25/VERIFICATION_REPORT.md` after Gate 6 runs.
+
+### What's next
+
+One Phase 3 consolidation remains: sulis-security → sulis (trivial — only 1
+already-DEPRECATED skill). Phase 3 essentially done after that.
+
+---
+
 ## v0.37.0 — 2026-05-25
 
 **Phase 3 second consolidation — `srd` folded into `sulis`.**
