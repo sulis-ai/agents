@@ -1,5 +1,121 @@
 # Sulis — Changelog
 
+## v0.33.0 — 2026-05-25
+
+**Phase 2 of the change-as-primitive build — the Sulis agent rewrite.**
+Renames concierge → Sulis. Embeds COACHING + TONE standards alongside
+the existing AAF + FE + Founder-Facing Conventions. Applies the
+dual-register pattern (Rule 6) with `/sulis:jargon on|off` toggle.
+Adds the **Coach + Invoker + Partner** role articulation across the
+six-stage journey. Authored via the v0.32.0 add-agent meta-skill.
+
+**Restart your Claude session with `claude --agent sulis` to feel the
+new tone stack + dual-register behaviour.**
+
+See `plugins/sulis/docs/change-as-primitive-design.md` for the full
+8-phase build plan.
+
+### What's new in the Sulis agent
+
+- **Persona renamed:** Concierge → Sulis. Agent file at
+  `plugins/sulis/agents/sulis.md` (git mv preserves history from
+  `concierge.md`). Body's "You are the Concierge" → "You are Sulis"
+  throughout. The "VP of Engineering" identity framing preserved.
+
+- **Standards-grounded frontmatter** — Sulis is the first agent
+  authored via add-agent v0.1.0 with full frontmatter compliance:
+  - `standards:` (input / processing / output phase classification —
+    includes COACHING + TONE in output for founder-facing voice)
+  - `verification_spiral:` (HEAVY tier with two custom dimensions:
+    Coach + Invoker + Partner Role Coherence, Specialist Dispatch
+    Accuracy)
+  - `related_skills:` (22 declarations — depends_on for standards +
+    core skills, optional_input for dispatched specialists)
+  - `register:` (founder_mode default + technical_mode structured
+    summary on intent / `--raw` / `/sulis:jargon`)
+  - `model: opus` (long-context conversational coordinator work)
+  - `tools: "*"` (coordinator agent dispatching many things)
+
+- **Coach + Invoker + Partner role section** — three operating modes
+  picked by signal each turn. Coach when surfacing findings (apply
+  COACHING tenets). Invoker when routing to specialists (echo before
+  dispatch). Partner when working alongside on a change (brief
+  check-ins, forward-motion, closure discipline).
+
+- **Dual Register section** — new section codifying the
+  founder-facing-conventions.md Rule 6 mechanics. Three trigger
+  mechanisms (natural language intent, `--raw` flag, `/sulis:jargon
+  on|off` toggle). Founder-mode-vs-technical-mode worked example.
+  Translation-not-filter discipline. Safety checks still apply.
+
+- **Coaching Delivery section** — COACHING_STANDARD's seven tenets
+  applied to Sulis's voice with concrete examples. Red-flag phrase
+  list (auto-fail before posting). Directness-when-necessary criteria
+  (safety violations, repeated patterns, urgent business risk,
+  explicit request, established session trust).
+
+- **Tone Discipline section** — TONE_STANDARD's five directives
+  inlined for quick reference. Preferred vocabulary table (Section A).
+  Forbidden vocabulary scan list (19 banned terms). Preserved
+  vocabulary list (do NOT replace MVP / PR / guardrails with novel
+  terms).
+
+### Cross-plugin operational reference updates
+
+- `.concierge/` → `.sulis/` everywhere in operational paths (15 files
+  affected; CHANGELOG entries preserve `.concierge/` references as
+  historical record)
+- `.concierge-state.md` → `.sulis-state.md`
+- `/sulis-execution:` → `/sulis:` everywhere (the consolidation at
+  v0.30.0 made these commands native; operational references in
+  skills + agents now use the canonical form)
+- `subagent_type: "sulis-execution:orchestrator"` → `"orchestrator"`
+- `subagent_type: "sulis-execution:executor"` → `"executor"`
+- `subagent_type: "sea:engineering-architect"` → `"engineering-architect"`
+- `Skill(sulis-execution:run-all)` → `Skill(sulis:run-all)`
+- `plugins/sulis-execution/skills/...` → `plugins/sulis/skills/...`
+- `--agent concierge` → `--agent sulis` (operational invocations)
+
+### Removed
+
+- **`plugins/sulis-concierge/` plugin shell deleted.** It was a
+  deprecation shim from the v0.2.0 sulis-concierge → sulis migration;
+  the deprecation period ran 30 versions and is now closed. Marketplace
+  entry removed too. Anyone still running `claude --agent
+  sulis-concierge` will need to update to `claude --agent sulis`.
+
+### Files touched
+
+| File | Change |
+|---|---|
+| `plugins/sulis/agents/sulis.md` | Rewrite — persona, frontmatter, new sections (~1830 LOC, was 1526) |
+| `plugins/sulis/agents/concierge.md` | git mv → sulis.md |
+| `plugins/sulis-concierge/` (entire dir) | Deleted (deprecation shim) |
+| `plugins/sulis/.claude-plugin/plugin.json` | Version bump + description rewrite |
+| `plugins/sulis/CHANGELOG.md` | This entry |
+| `.claude-plugin/marketplace.json` | sulis 0.32.0 → 0.33.0; sulis-concierge entry removed; marketplace 1.75.0 → 1.76.0 |
+| `plugins/sulis/{README.md, docs/, references/, skills/}` | Operational reference updates per the bulk-rename sed |
+
+### Verification
+
+- **Frontmatter parses** as valid YAML (22 related_skills declarations;
+  custom dimensions present; register block well-formed; model: opus)
+- **Cross-skill self-test** — verified post-edits
+- **Independence Check** — deferred to first real founder session
+  (the user restarts `claude --agent sulis` to validate; v0.34.0 will
+  capture observed quality data)
+
+### What's NOT in this version (deliberate — separate phases)
+
+- Phase 3 — specialist plugin consolidations (sulis-context,
+  sulis-security, sea, srd) using `add-agent` for each
+- Phase 4 — standards amendments (CW-04 back-integration, RC-04 merge
+  queue source, WP-01 change_id field, lifecycle Step 0/12.5)
+- Phase 5 — change-as-primitive infrastructure (ULID, terminal spawn,
+  session binding, auto back-integration)
+- Phase 6 — founder-facing skills (/sulis:change start, /sulis:specify
+  with depth modes, /sulis:jargon, etc.)
+
 ## v0.32.0 — 2026-05-25
 
 **Phase 1 of the change-as-primitive build.** Author the `add-agent`

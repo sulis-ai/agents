@@ -26,7 +26,7 @@ trigger.
 
 > **v0.11.0+ change (ADR-212):** Steps 8-10 are now per-batch via
 > `wpx-train` (the default). Per-WP `wpx-pipeline` shipping remains
-> available via `/sulis-execution:run-wp WP-X --force-single` for
+> available via `/sulis:run-wp WP-X --force-single` for
 > hotfixes. Step 11 stays per-WP in parallel (each WP's security
 > review verdict is distinct; the train doesn't collapse this).
 > See ADR-212 (`platform/.architecture/kinds-and-tools/adrs/`) for
@@ -2046,7 +2046,7 @@ calling session:
    - Halts the run-all loop.
    - Surfaces a clear plain-English status line: *"WP-NNN: executor
      returned before Step 11 completed. Likely parked late in
-     lifecycle. Re-dispatch via /sulis-execution:run-wp WP-NNN to
+     lifecycle. Re-dispatch via /sulis:run-wp WP-NNN to
      resume from journal."*
 
 4. **If Step 11 complete with CRITICAL finding** → executor wrote a

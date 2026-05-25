@@ -184,7 +184,7 @@ deploys.
 
 **Run:**
 ```
-/sulis-execution:retry WP-003
+/sulis:retry WP-003
 ```
 
 **Expected outcome:**
@@ -285,7 +285,7 @@ critical_findings:
     in-scope: use SQLAlchemy's parameterised query (already used
     elsewhere in the codebase)."*
   - `## Suggested next step` — *"Fix the SQL injection in
-    src/api/subscriptions.py:42; re-run /sulis-execution:retry
+    src/api/subscriptions.py:42; re-run /sulis:retry
     WP-NNN."*
 
 **Pass criteria:**

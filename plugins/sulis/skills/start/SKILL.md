@@ -1,7 +1,7 @@
 ---
 name: start
 description: >
-  Re-enter an existing concierge journey. Reads .concierge/{project}/JOURNEY.md
+  Re-enter an existing concierge journey. Reads .sulis/{project}/JOURNEY.md
   and routes to the current phase. Use when returning to a project after a
   break or to resume after a specialist invocation completed.
 user_invocable: true
@@ -9,12 +9,12 @@ user_invocable: true
 
 # /sulis:start — Resume Journey
 
-When invoked, read `.concierge/{project}/JOURNEY.md` and resume from the
+When invoked, read `.sulis/{project}/JOURNEY.md` and resume from the
 current phase.
 
 ## Workflow
 
-1. **Look for journey state.** Check for `.concierge/{project}/JOURNEY.md`
+1. **Look for journey state.** Check for `.sulis/{project}/JOURNEY.md`
    in the current project directory.
 2. **If no journey exists:** the founder is starting fresh. Route to the
    concierge agent's Phase 1 (Greet) directly: respond with the canonical
@@ -57,7 +57,7 @@ current phase.
 
 ## Composition
 
-- Updates `.concierge/{project}/JOURNEY.md` `## Phase History` and
+- Updates `.sulis/{project}/JOURNEY.md` `## Phase History` and
   `## Triage Trace` sections as it works.
 - Respects AAF-01..AAF-09; never asks permission-theater questions during
   resume.

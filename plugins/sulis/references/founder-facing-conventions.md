@@ -292,7 +292,7 @@ dual-register MUST additionally address at least 2 of MUC-R1..R3.
 
 - **Founder-facing, good:** `"I'm checking on your project's status —
   this'll take a few seconds."`
-- **Founder-facing, bad:** `"Invoking /sulis-execution:status against
+- **Founder-facing, bad:** `"Invoking /sulis:status against
   .architecture/{project}/work-packages/INDEX.md..."`
 
 ### Confirmation prompt

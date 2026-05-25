@@ -12,7 +12,7 @@ user_invocable: true
 
 When invoked, the concierge is about to hand off to a specialist agent
 (via a recommended slash command). This skill writes the handoff context
-note to `.concierge/{project}/JOURNEY.md` and to a dedicated handoff
+note to `.sulis/{project}/JOURNEY.md` and to a dedicated handoff
 file the specialist can read.
 
 ## Workflow
@@ -21,7 +21,7 @@ file the specialist can read.
    command being recommended (e.g. `/srd:start`, `/sea:blueprint`,
    `/sulis-security:codebase-assess`).
 2. **Write a handoff context file** at
-   `.concierge/{project}/handoffs/HANDOFF-{NN}-to-{specialist}.md` with:
+   `.sulis/{project}/handoffs/HANDOFF-{NN}-to-{specialist}.md` with:
 
    ```markdown
    # Handoff #{NN} — Concierge → {specialist}
@@ -79,7 +79,7 @@ file the specialist can read.
 ## Composition
 
 - Handoff context files persist across sessions; specialists can read
-  them via the standard "look for `.concierge/{project}/handoffs/` if it
+  them via the standard "look for `.sulis/{project}/handoffs/` if it
   exists" pattern.
 - Specialists that have been updated (post-v1.12.0) check for handoff
   context files at session start and apply the audience score they find.

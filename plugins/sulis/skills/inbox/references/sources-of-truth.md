@@ -26,7 +26,7 @@ All paths are project-scoped under `{repo_root}/.architecture/{project}/`
 | Security root | `.security/{project}/` |
 | Findings directory | `.security/{project}/findings/` |
 | Findings register | `.security/{project}/findings-register.md` |
-| Concierge journey | `.concierge/{project}/JOURNEY.md` |
+| Concierge journey | `.sulis/{project}/JOURNEY.md` |
 
 ## Category sources
 
@@ -110,7 +110,7 @@ decisions awaiting input" — this is part of the planned founder-UX
 evolution.
 
 **v2 candidate sources** (when the concierge writes decisions explicitly):
-- `.concierge/{project}/decisions-pending.md` — proposed format
+- `.sulis/{project}/decisions-pending.md` — proposed format
 - JOURNEY.md fields with `decision_pending: true`
 
 For v1, this category is always empty. Document the placeholder so the

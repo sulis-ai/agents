@@ -34,7 +34,7 @@ next phase?"*.
 right path.
 
 **Entry criteria:** founder runs `claude --agent sulis` in an
-empty session OR no `.concierge/{project}/JOURNEY.md` exists.
+empty session OR no `.sulis/{project}/JOURNEY.md` exists.
 
 **Activities:**
 - Open with the canonical greeting.
@@ -46,7 +46,7 @@ empty session OR no `.concierge/{project}/JOURNEY.md` exists.
 **Exit criteria:** JOURNEY.md exists with `## Goal` populated; current
 phase set to 2 (or to non-build branch).
 
-**Produces:** `.concierge/{project}/JOURNEY.md`.
+**Produces:** `.sulis/{project}/JOURNEY.md`.
 
 **Auto-progress to:** Phase 2 (Discover) if the goal is "build a
 product"; otherwise hand off to the correct specialist plugin and end
@@ -143,7 +143,7 @@ running the Red-Green-Blue cycle per WP.
 **Entry criteria:** Phase 4 complete; WP INDEX exists.
 
 **Activities (v0.1.0):**
-- Recommend `/sulis-execution:run-all` to the founder.
+- Recommend `/sulis:run-all` to the founder.
 - Executor processes WPs in topological order.
 - When founder returns (or when executor surfaces a blocker), read WP
   status in INDEX.md.

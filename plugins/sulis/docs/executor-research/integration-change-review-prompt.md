@@ -298,7 +298,7 @@ To illustrate, here's a hypothetical run for a change to `wpx-pipeline`:
 **Walkthrough condensed:**
 
 Step 1 (OI — enumerate integrations):
-- Callers: `/sulis-execution:run-wp` skill; `/sulis-execution:run-all` skill;
+- Callers: `/sulis:run-wp` skill; `/sulis:run-all` skill;
   `sulis-concierge` (indirect via run-wp / run-all)
 - Consumers: `wpx-step12 wrap` (reads pipeline result JSON)
 - Shared state: INDEX.md (`step-7-complete` / `done` transitions)
@@ -357,8 +357,8 @@ Step 8 (Recommendations — abbreviated):
 
 | Integration | Recommendation | Confidence |
 |---|---|---|
-| `/sulis-execution:run-wp` | Step 0 detects change context, passes `--base-branch` | SUPPORTED |
-| `/sulis-execution:run-all` | Same detection, passes through to `wpx-train run` | SUPPORTED |
+| `/sulis:run-wp` | Step 0 detects change context, passes `--base-branch` | SUPPORTED |
+| `/sulis:run-all` | Same detection, passes through to `wpx-train run` | SUPPORTED |
 | `wpx-train run` | Mirror `--base-branch` parameter (already done in v0.11.0) | VALIDATED |
 | `wpx-step12 wrap` | No change needed — reads result JSON, not base-branch | VALIDATED |
 | `lifecycle.md` | New "Where a WP sits — inside a change (CW-04)" section | SUPPORTED |

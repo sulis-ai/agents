@@ -97,7 +97,7 @@ green or about-to-be-green.
 Callers that explicitly relied on the strict CI gate add the
 `--strict-ci` flag. No other changes required.
 
-For the marketplace's own callers (`/sulis-execution:run-all`):
+For the marketplace's own callers (`/sulis:run-all`):
 no change needed. The skill invokes `wpx-train run` without
 `--strict-ci`; it gets the new default (optimistic). This is the
 intended behaviour for the founder workflow.

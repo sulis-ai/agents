@@ -204,7 +204,7 @@ this way.
 ### The batch unit
 
 **Use SEA's existing topological-level structure.** No new primitive needed
-in SEA. The `/sulis-execution:run-all` orchestrator already walks the INDEX
+in SEA. The `/sulis:run-all` orchestrator already walks the INDEX
 DAG and identifies the unblocked-WP set per level — that set **is** the
 batch.
 
@@ -270,7 +270,7 @@ Adopt Shopify's pattern verbatim:
 
 - **`sea:decompose`** — emit `batch_hint` field per WP (1-line config change
   in the WP template)
-- **`/sulis-execution:run-all` orchestrator** — already walks the DAG; adds
+- **`/sulis:run-all` orchestrator** — already walks the DAG; adds
   a "pack into batches respecting batch_hint" step before dispatching to
   executors
 - **`wpx-pipeline`** — split Step 8 into 8a (branch CI per-WP) and 8b

@@ -12,7 +12,7 @@ concierge inside sulis spawns at the right time.
 | Surface | Purpose |
 |---|---|
 | `concierge` agent | The single entry point for founders. Owns the journey from idea → requirements → design → implementation → verification → security in plain English. Spawns specialist agents and translates their outputs back into Founder English. |
-| `start` skill | Re-enter an existing concierge journey from `.concierge/{project}/JOURNEY.md`. |
+| `start` skill | Re-enter an existing concierge journey from `.sulis/{project}/JOURNEY.md`. |
 | `handoff` skill | Capture state in JOURNEY.md when handing the founder over to a specialist. |
 | `status` skill | Read-only plain-English summary of the current journey state. |
 | `add-skill` skill | Five-gate methodology for authoring new skills in the marketplace. Used by skill authors (not founders). Grounded in the kinds-and-tools spec's learnings on consistent agent outcomes. |
@@ -25,7 +25,7 @@ More founder-facing skills will land here as the canonical experience builds out
 claude --agent sulis
 ```
 
-The concierge greets the founder, picks up `.concierge/{project}/JOURNEY.md`
+The concierge greets the founder, picks up `.sulis/{project}/JOURNEY.md`
 (or starts a new journey), and routes the conversation through whatever phase
 they're in.
 

@@ -59,7 +59,7 @@ Just announce:
 | sea:blueprint | `/sea:blueprint` | recommend | recommend (always; long conversation) |
 | sea:decompose | `/sea:decompose` | recommend | spawn (short, autonomous) |
 | sea:verify | `/sea:verify` | recommend | spawn (short, returns COMPLETENESS_REPORT) |
-| sulis-execution:executor | `/sulis-execution:run-all` | recommend (this WP-execution plugin ships in same v1.12.0 release) | spawn (long but autonomous) |
+| sulis-execution:executor | `/sulis:run-all` | recommend (this WP-execution plugin ships in same v1.12.0 release) | spawn (long but autonomous) |
 | sulis-security:codebase-assess | `/sulis-security:codebase-assess` | recommend | spawn (short-to-medium, returns report) |
 
 ---

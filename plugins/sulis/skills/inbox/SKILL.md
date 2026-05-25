@@ -18,7 +18,7 @@ each attention-item category to the underlying file paths.
 ## When invoked
 
 1. **Resolve project + repo root.** If the user is in a project directory,
-   read `.concierge/{project}/JOURNEY.md` to confirm the project slug. If
+   read `.sulis/{project}/JOURNEY.md` to confirm the project slug. If
    ambiguous, ask: *"Which project — {list of projects with concierge state}?"*
 
 2. **Run the aggregator script:**

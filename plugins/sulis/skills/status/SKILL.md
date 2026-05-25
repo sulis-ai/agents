@@ -14,7 +14,7 @@ journey state. Read-only.
 
 ## Workflow
 
-1. **Read `.concierge/{project}/JOURNEY.md`.** If it doesn't exist, tell
+1. **Read `.sulis/{project}/JOURNEY.md`.** If it doesn't exist, tell
    the founder: *"No journey started yet for this project. Run `claude
    --agent sulis` to begin."*
 2. **Read produced artifacts** to verify what's actually on disk matches
