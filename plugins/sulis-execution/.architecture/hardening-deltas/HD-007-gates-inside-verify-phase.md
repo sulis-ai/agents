@@ -18,7 +18,7 @@ After `wpx-train run` returns `outcome: success`, the calling LLM session
 code-review)" and "Step 11 (per-batch security review)" dispatches) runs
 two more verification primitives over the batch that just shipped:
 
-1. **Step 10.5** — `/sea:code-review` against the batch diff range,
+1. **Step 10.5** — `/sulis:code-review` against the batch diff range,
    surfacing cross-WP composition issues that only appear when sibling
    WPs compose (N+1 across siblings, contract drift between
    interdependent WPs).

@@ -53,7 +53,7 @@ def test_step_trace_accepts_half_step_six_point_five(tmp_project, run_tool):
     """v0.20.1+: --step 6.5 is accepted (used by the executor's Step 6.5
     code-review gate). Pre-v0.20.1 the script rejected 6.5 because --step
     was type=int — which may have driven executors to substitute inline
-    judgement rather than invoke /sea:code-review at all.
+    judgement rather than invoke /sulis:code-review at all.
 
     The half-step renders as "6.5" in the trace (not "6.5.0" or "6").
     """

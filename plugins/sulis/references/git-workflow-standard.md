@@ -424,7 +424,7 @@ either a comment-on-commit flow or a manual `dev → main` ratification):
 2. **`dev → main` promotion** (per GIT-06) — founder authorisation
    required.
 3. **Standards changes** — modifications to anything under
-   `plugins/sulis/references/` or `plugins/sea/references/` follow the
+   `plugins/sulis/references/` or `plugins/sulis/references/` follow the
    standards governance process (CONTRIBUTING.md), which does include
    review.
 

@@ -284,8 +284,8 @@ codebases via Hardening Deltas. Your role is upstream of that:
   Deltas under `.architecture/{project}/hardening-deltas/` and implements them
   via the Red-Green-Blue cycle.
 
-When your report is produced, recommend `/sea:codebase-audit` and then
-`/sea:harden` for any project that also wants a structural hardening pass on
+When your report is produced, recommend `/sulis:codebase-audit` and then
+`/sulis:harden-codebase` for any project that also wants a structural hardening pass on
 top of the security assessment. If `.architecture/{project}/` already exists,
 cross-reference any existing hardening deltas and note overlaps in the report.
 

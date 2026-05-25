@@ -65,7 +65,7 @@ Before doing any work on a WP, read these in this order:
    `--no-verify`.
 9. **`plugins/sulis/references/executor-loop-standard.md`** — EL-01..08:
    OODA + Five Whys + scope guard + budget + BLOCKER format.
-10. **`plugins/sea/references/red-green-blue.md`** — RGB-01..03: the
+10. **`plugins/sulis/references/red-green-blue.md`** — RGB-01..03: the
     test cycle's MUST rules. **Blue is non-negotiable.**
 11. **`plugins/sulis/references/engineering-principles.md`** — EP-02
     (Quality Paramount), EP-03 (Reuse First), EP-07 (SOLID + Boy

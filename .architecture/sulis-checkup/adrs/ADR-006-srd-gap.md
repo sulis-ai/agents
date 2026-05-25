@@ -8,7 +8,7 @@ deciders: [iain, sea-architect-agent]
 
 ## Context
 
-`/sea:blueprint`'s standard gotcha is "No SRD, no TDD". The skill should
+`/sulis:draft-architecture`'s standard gotcha is "No SRD, no TDD". The skill should
 refer the user back to `requirements-analyst` when no
 `.specifications/{project}/` exists.
 
@@ -32,7 +32,7 @@ This ADR is that recording.
 **Proceed with TDD authorship despite the absent SRD, recording the gap
 here.** The TDD serves as the investigation + design output the brief
 asked for. An SRD should be authored after TDD review, before any
-`/sea:decompose` step, using the TDD's Part 9 (gap list) and Part 10
+`/sulis:plan-work` step, using the TDD's Part 9 (gap list) and Part 10
 (open questions) as the FR/NFR/MUC seed.
 
 ## Why this is acceptable for this case
@@ -61,7 +61,7 @@ license. The pattern's contract is:
 
 1. The TDD is produced honestly (no requirement invention).
 2. The absent SRD is recorded explicitly (this ADR).
-3. An SRD is authored before any `/sea:decompose` step, using the TDD
+3. An SRD is authored before any `/sulis:plan-work` step, using the TDD
    as seed input.
 4. The SRD passes its own `requirements-validation` before WPs are
    decomposed.
@@ -86,7 +86,7 @@ sequence is:
      runaway, etc.)
 4. **Run `/sulis:requirements-validation`** for the five-perspective
    completeness check.
-5. **Then run `/sea:decompose`** against this TDD + the new SRD.
+5. **Then run `/sulis:plan-work`** against this TDD + the new SRD.
 
 ## Options Considered
 
@@ -116,9 +116,9 @@ Sets up the SRD path explicitly.
 **Pros:** ships both at once. No follow-up step.
 
 **Cons:**
-- Skill scope creep. `/sea:blueprint` is not `requirements-analyst`.
+- Skill scope creep. `/sulis:draft-architecture` is not `requirements-analyst`.
 - The SRD facilitation flow is interactive (it prompts the founder for
-  clarifications); doing it inside `/sea:blueprint` would have blocked
+  clarifications); doing it inside `/sulis:draft-architecture` would have blocked
   on questions outside the blueprint skill's design.
 
 ## Consequences

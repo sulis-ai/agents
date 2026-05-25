@@ -1,0 +1,42 @@
+{
+  "agents": [
+    "engineering-architect.md"
+  ],
+  "ci_workflows": [],
+  "docs": [],
+  "manifest_files": [
+    ".claude-plugin/plugin.json"
+  ],
+  "marketplace_root": "/Users/iain/Documents/repos/agents",
+  "metadata_files": [
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "plugin_dir": "plugins/sea",
+  "references": [
+    "references/architecture-patterns.md",
+    "references/boring-code.md",
+    "references/change-primitives.md",
+    "references/code-intelligence-template.md",
+    "references/code-review-standard.md",
+    "references/decompose-validation-rubric.md",
+    "references/hardening-deltas.md",
+    "references/mece-3-architecture.md",
+    "references/performance-procedural-checks.md",
+    "references/red-green-blue.md",
+    "references/right-sizing.md"
+  ],
+  "script_tests": [],
+  "scripts": [],
+  "skills": [
+    "blueprint",
+    "code-review",
+    "codebase-audit",
+    "decompose",
+    "harden",
+    "probe",
+    "suggest-split",
+    "verify"
+  ],
+  "source_plugin": "sea"
+}

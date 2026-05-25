@@ -71,7 +71,7 @@ This is the most common confusion (thanks Sib for surfacing it). If `/sulis-exec
 **Why it happens.** The executor only ships work that has a complete spec chain behind it. It needs:
 
 - `.specifications/{project}/SRD.md` — produced by `claude --agent requirements-analyst`
-- `.architecture/{project}/TDD.md` + Work Packages — produced by `/sea:blueprint`
+- `.architecture/{project}/TDD.md` + Work Packages — produced by `/sulis:draft-architecture`
 
 If any of those are missing, the executor refuses to fabricate them. That's a feature: building without specs is how you get expensive rewrites.
 
@@ -88,7 +88,7 @@ If you'd prefer to skip the concierge and run the phases manually, in order:
 ```bash
 /sulis:discover-context <project-slug>
 claude --agent requirements-analyst <project-slug>
-/sea:blueprint <project-slug>
+/sulis:draft-architecture <project-slug>
 /sulis-execution:run-all
 ```
 

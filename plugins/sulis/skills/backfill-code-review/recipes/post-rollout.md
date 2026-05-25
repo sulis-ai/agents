@@ -3,7 +3,7 @@
 **Use when:** WPs shipped via train BEFORE `v0.20.1` (which added
 the Step 6.5 bundle-path verification). Those WPs may have shown
 "Step 6.5 inline review: 0 findings" in journals without actually
-invoking `/sea:code-review` — no bundle on disk; no audit trail.
+invoking `/sulis:code-review` — no bundle on disk; no audit trail.
 
 **The specific case:** the 2026-05-22 slice-2 audit found 9 of 12
 WPs had no bundle. Inline self-attestation pattern. This recipe
@@ -59,7 +59,7 @@ Expected output: 9 WPs (the slice-2 self-attestation cohort).
 This will:
 
 1. Auto-scan train-runs YAMLs for shipped WPs without bundles
-2. For each (default: all 9): invoke `/sea:code-review <parent>..<merge_sha> agent-applications`
+2. For each (default: all 9): invoke `/sulis:code-review <parent>..<merge_sha> agent-applications`
 3. Parse the resulting `signals.json` per bundle
 4. Register findings (signature-hash dedup)
 5. For NEW findings: auto-draft remediation WPs (up to 10 total)

@@ -11,12 +11,12 @@ deciders: [iain, sea-architect-agent]
 Every finding needs a healing path. The brief named six candidates drawn from
 existing marketplace patterns:
 
-1. **Auto-fix** (`/sea:harden`)
+1. **Auto-fix** (`/sulis:harden-codebase`)
 2. **Auto-draft remediation WP** (`/sulis-execution:backfill-*`)
 3. **Founder shortcut** (`/sulis:inbox` `[1] resume`)
 4. **Adversarial human-in-the-loop** (`/idc:adversarial-review`)
 5. **Escalate to SRD** (`requirements-analyst`)
-6. **Defer / accept-as-known** (`/sea:verify` OPEN_RISK)
+6. **Defer / accept-as-known** (`/sulis:verify-architecture` OPEN_RISK)
 
 The brief asks for a healing strategy *per tier*. The implicit assumption
 is that each tier has one healing prototype. That assumption is wrong —
@@ -27,7 +27,7 @@ the right granularity is **per finding shape**, not per tier.
 Adopt all six healing prototypes. Each tier's primitives **classify findings
 into prototypes** based on the finding's shape, NOT based on tier identity.
 Tier identity informs the *primary* prototype (e.g. tier 4 leans
-auto-fix-heavy because `/sea:harden` is tier-4-shaped) but every tier can
+auto-fix-heavy because `/sulis:harden-codebase` is tier-4-shaped) but every tier can
 produce findings of any prototype.
 
 The classification rule (decided per finding by the source primitive):
@@ -61,7 +61,7 @@ about *what shape the fix takes*. Conflating them destroys the model.
 WPs through the executor.
 
 **Cons:**
-- Loses the auto-fix wins at tier 4 (`/sea:harden`'s reason for existing).
+- Loses the auto-fix wins at tier 4 (`/sulis:harden-codebase`'s reason for existing).
 - Annoying for trivial fixes ("write me a WP to add a timeout to this
   function" is comically over-process for a one-line change).
 - The marketplace already has six healing patterns in use; converging
@@ -97,14 +97,14 @@ The TDD's per-tier table captures this in detail. Summary:
 | 1 | Auto-draft WP (build errors → fix-this WP) | Founder shortcut (open at error) |
 | 2 | Auto-fix (secret rotation, header add) | Adversarial (access control); Escalate (CVE coord) |
 | 3 | Auto-draft WP (test failures → per-test WP) | Escalate to SRD (spec ambiguity); shortcut (re-run test) |
-| 4 | Auto-fix via `/sea:harden` (timeouts, OTel) | Auto-draft WP (per-call-site judgement) |
+| 4 | Auto-fix via `/sulis:harden-codebase` (timeouts, OTel) | Auto-draft WP (per-call-site judgement) |
 | 5 | Auto-draft WP (naming changes) | Adversarial (module splits); defer (legitimate jargon) |
 | 6 | Auto-draft WP (dead-code removal) | Adversarial (migration state); defer (low-value tests) |
 | 7 | Defer (whole tier deferred for v1) | — |
 
 ## How classification information travels
 
-Each source primitive (e.g. `/sea:codebase-audit`) tags each finding with
+Each source primitive (e.g. `/sulis:codebase-audit`) tags each finding with
 its prototype in the finding's metadata. The checkup aggregator reads the
 tag and routes accordingly. Schema (cross-reference TDD §7):
 
@@ -151,8 +151,8 @@ For SRD-author reference. Each prototype must satisfy:
 
 | Prototype | Contract |
 |---|---|
-| `auto_fix` | Target HD-NNN-{slug}.md drafted at `status: accepted` (skips proposed → accepted promotion). Runs `/sea:harden HD-NNN` immediately. Failing characterisation test MUST exist or auto-fix is downgraded to draft_wp. |
-| `draft_wp` | HD-NNN-{slug}.md drafted at `status: proposed`. Promotion to `accepted` is a founder action. Then `/sea:harden` picks it up. |
+| `auto_fix` | Target HD-NNN-{slug}.md drafted at `status: accepted` (skips proposed → accepted promotion). Runs `/sulis:harden-codebase HD-NNN` immediately. Failing characterisation test MUST exist or auto-fix is downgraded to draft_wp. |
+| `draft_wp` | HD-NNN-{slug}.md drafted at `status: proposed`. Promotion to `accepted` is a founder action. Then `/sulis:harden-codebase` picks it up. |
 | `shortcut` | A numbered action in the CHECKUP.md report's "What to do" section. Echo-before-act per founder-facing-conventions Rule 3. |
 | `adversarial` | A perspective document drafted at `.checkup/{project}/perspectives/{finding-id}.md` containing the finding context, the proposed approaches, and the trade-offs. Surfaced as a shortcut "review perspective" in the report. |
 | `escalate_srd` | A short note at `.checkup/{project}/escalations/{finding-id}.md` naming the spec question + the recommended SRD action. Surfaced as a shortcut "open SRD facilitation" in the report. |

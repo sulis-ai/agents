@@ -1,11 +1,11 @@
 ---
 name: backfill-code-review
 description: >
-  Retroactive /sea:code-review for WPs that shipped without bundles
+  Retroactive /sulis:code-review for WPs that shipped without bundles
   (executor self-attestation gap closed forward at v0.20.1 but
   historical WPs unaffected). For each WP missing a bundle, derives
   the squash-merge SHA from the train state YAML, computes its parent,
-  invokes /sea:code-review with the commit range, registers findings
+  invokes /sulis:code-review with the commit range, registers findings
   via wpx-findings, auto-drafts remediation WPs. Human-in-the-loop:
   founder reviews drafted WPs; ships them; re-invokes the skill to
   close the loop. Terminates when an iteration produces zero NEW
@@ -19,7 +19,7 @@ description: >
 Retroactive code-review for WPs that shipped before the Step 6.5
 bundle-path verification landed (`v0.20.1`). Those WPs may have
 self-attested ("inline review; 0 findings") without actually
-invoking `/sea:code-review` — no bundle file on disk; no audit
+invoking `/sulis:code-review` — no bundle file on disk; no audit
 trail; no remediation WPs for findings that may have been missed.
 
 ## When to invoke
@@ -43,7 +43,7 @@ Each iteration:
 3. For each missing WP:
    - Read the squash-merge SHA from the train state YAML.
    - Compute the parent SHA: `git rev-parse <merge_sha>^`.
-   - Invoke `/sea:code-review <parent>..<merge_sha> <project>`.
+   - Invoke `/sulis:code-review <parent>..<merge_sha> <project>`.
 4. For each finding in each newly-produced bundle:
    - `wpx-findings register` (signature-hash dedup).
    - If new: `wpx-findings auto-draft-wp` + `wpx-index add-wp`.
@@ -148,7 +148,7 @@ for WP_ENTRY in <missing WPs from Step 2>; do
     continue
   fi
 
-  # Invoke /sea:code-review against the historical range
+  # Invoke /sulis:code-review against the historical range
   # The skill resolves the commit range locally; no checkout needed.
   # Output lands at .architecture/<project>/code-reviews/PR-<rangeID>-<TS>/
   /code-review "${PARENT_SHA}..${MERGE_SHA}" <project>
@@ -170,7 +170,7 @@ done
 ### Step 4: Register findings + auto-draft remediation WPs
 
 For each bundle produced in Step 3, parse `signals.json` for findings.
-Findings in /sea:code-review's PH-06 signal table have severity
+Findings in /sulis:code-review's PH-06 signal table have severity
 (high / medium / low — roughly equivalent to CRITICAL / CONCERN /
 ADVISORY).
 
@@ -305,7 +305,7 @@ Summary report: .architecture/<project>/backfill-code-review-<TIMESTAMP>/SUMMARY
 ## Why this is a skill, not a wpx-* CLI tool
 
 Same reasoning as `backfill-gates`: orchestration involves multiple
-top-level skill invocations (`/sea:code-review`), parsing free-form
+top-level skill invocations (`/sulis:code-review`), parsing free-form
 markdown + JSON, agent judgement about how to map findings to change
 primitives. That's the calling session's job; the CLI tools handle
 the state-changing operations.
@@ -327,7 +327,7 @@ the state-changing operations.
 
 - `plugins/sulis/skills/backfill-gates/SKILL.md` — sibling
   skill for security backfill (uses `/sulis-security:codebase-assess`)
-- `plugins/sea/skills/code-review/SKILL.md` — the skill this
+- `plugins/sulis/skills/code-review/SKILL.md` — the skill this
   orchestrates
 - `plugins/sulis/agents/executor.md` — Step 6.5 (the
   forward gate this skill complements)

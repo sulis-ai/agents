@@ -54,7 +54,7 @@ Conditional on state:
 
 - If `Stale`: recommend `/sulis:refresh-context`
 - If known gaps exist and SRD/SEA hasn't run yet: recommend
-  `requirements-analyst` or `/sea:blueprint` to fill them
+  `requirements-analyst` or `/sulis:draft-architecture` to fill them
 - If neither: no recommendation, exit cleanly
 
 ---

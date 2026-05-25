@@ -1,0 +1,1265 @@
+{
+  "scope": "codebase",
+  "base_branch": null,
+  "pr_number": null,
+  "gating_applied": false,
+  "gating_reason": null,
+  "tiers": [
+    {
+      "tier": 1,
+      "name": "Exists",
+      "status": "needs_attention",
+      "finding_count": 6,
+      "findings": [
+        {
+          "heuristic": "manifest-hygiene",
+          "severity": "concern",
+          "file": "plugins/sulis/.claude-plugin/plugin.json",
+          "line": 0,
+          "identifier": "PH-103",
+          "message": "description is 864 chars (recommended max 500 per HD-004 \u2014 move cumulative history to CHANGELOG.md)",
+          "suggestion": "",
+          "extras": {
+            "rule": "PH-103",
+            "raw": "len=864"
+          }
+        },
+        {
+          "heuristic": "manifest-hygiene",
+          "severity": "concern",
+          "file": "plugins/sulis-execution/.claude-plugin/plugin.json",
+          "line": 0,
+          "identifier": "PH-103",
+          "message": "description is 533 chars (recommended max 500 per HD-004 \u2014 move cumulative history to CHANGELOG.md)",
+          "suggestion": "",
+          "extras": {
+            "rule": "PH-103",
+            "raw": "len=533"
+          }
+        },
+        {
+          "heuristic": "manifest-hygiene",
+          "severity": "concern",
+          "file": ".claude-plugin/marketplace.json",
+          "line": 0,
+          "identifier": "MM-104",
+          "message": "plugin[0] (`srd`) description is 679 chars (recommended max 500)",
+          "suggestion": "",
+          "extras": {
+            "rule": "MM-104",
+            "raw": "len=679"
+          }
+        },
+        {
+          "heuristic": "manifest-hygiene",
+          "severity": "concern",
+          "file": ".claude-plugin/marketplace.json",
+          "line": 0,
+          "identifier": "MM-104",
+          "message": "plugin[9] (`sulis-security`) description is 514 chars (recommended max 500)",
+          "suggestion": "",
+          "extras": {
+            "rule": "MM-104",
+            "raw": "len=514"
+          }
+        },
+        {
+          "heuristic": "manifest-hygiene",
+          "severity": "concern",
+          "file": ".claude-plugin/marketplace.json",
+          "line": 0,
+          "identifier": "MM-104",
+          "message": "plugin[11] (`sulis-execution`) description is 663 chars (recommended max 500)",
+          "suggestion": "",
+          "extras": {
+            "rule": "MM-104",
+            "raw": "len=663"
+          }
+        },
+        {
+          "heuristic": "manifest-hygiene",
+          "severity": "concern",
+          "file": ".claude-plugin/marketplace.json",
+          "line": 0,
+          "identifier": "MM-104",
+          "message": "plugin[12] (`sulis`) description is 834 chars (recommended max 500)",
+          "suggestion": "",
+          "extras": {
+            "rule": "MM-104",
+            "raw": "len=834"
+          }
+        }
+      ],
+      "wired_in": "0.7.0",
+      "error_message": null,
+      "severity_summary": {
+        "concern": 6
+      }
+    },
+    {
+      "tier": 2,
+      "name": "Safe",
+      "status": "failed",
+      "finding_count": 2,
+      "findings": [
+        {
+          "heuristic": "semgrep-security",
+          "severity": "high",
+          "file": "plugins/sulis/scripts/wpx-findings",
+          "line": 40,
+          "identifier": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
+          "message": "Detected SHA1 hash algorithm which is considered insecure. SHA1 is not collision resistant and is therefore not suitable as a cryptographic signature. Use SHA256 or SHA3 instead.",
+          "suggestion": "review and replace with a safer pattern",
+          "extras": {
+            "matched_text": "Detected SHA1 hash algorithm which is considered insecure. SHA1 is not collision",
+            "signature": "semgrep::python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1::plugins/sulis/scripts/wpx-findings::40"
+          }
+        },
+        {
+          "heuristic": "semgrep-security",
+          "severity": "high",
+          "file": "plugins/sulis/skills/consolidate-into-sulis/scripts/compare_baseline.py",
+          "line": 61,
+          "identifier": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
+          "message": "Detected SHA1 hash algorithm which is considered insecure. SHA1 is not collision resistant and is therefore not suitable as a cryptographic signature. Use SHA256 or SHA3 instead.",
+          "suggestion": "review and replace with a safer pattern",
+          "extras": {
+            "matched_text": "Detected SHA1 hash algorithm which is considered insecure. SHA1 is not collision",
+            "signature": "semgrep::python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1::plugins/sulis/skills/consolidate-into-sulis/scripts/compare_baseline.py::61"
+          }
+        }
+      ],
+      "wired_in": "0.8.0",
+      "error_message": null,
+      "severity_summary": {
+        "high": 2
+      }
+    },
+    {
+      "tier": 3,
+      "name": "Works",
+      "status": "passed",
+      "finding_count": 0,
+      "findings": [],
+      "wired_in": "0.6.0",
+      "error_message": null,
+      "severity_summary": {}
+    },
+    {
+      "tier": 4,
+      "name": "Survives",
+      "status": "failed",
+      "finding_count": 14,
+      "findings": [
+        {
+          "heuristic": "broad-except",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe.py",
+          "line": 179,
+          "identifier": "broad-except",
+          "message": "this catches all exceptions and doesn't re-raise \u2014 hides bugs",
+          "suggestion": "catch only the specific exception types you can handle, or re-raise",
+          "extras": {
+            "excerpt": "except Exception as exc:",
+            "signature": "broad-except::plugins/sulis/skills/analyse-codebase/scripts/probe.py::179"
+          }
+        },
+        {
+          "heuristic": "broad-except",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/architecture_runner.py",
+          "line": 101,
+          "identifier": "broad-except",
+          "message": "this catches all exceptions and doesn't re-raise \u2014 hides bugs",
+          "suggestion": "catch only the specific exception types you can handle, or re-raise",
+          "extras": {
+            "excerpt": "except Exception:",
+            "signature": "broad-except::plugins/sulis/skills/analyse-codebase/scripts/probe/runners/architecture_runner.py::101"
+          }
+        },
+        {
+          "heuristic": "broad-except",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/architecture_runner.py",
+          "line": 136,
+          "identifier": "broad-except",
+          "message": "this catches all exceptions and doesn't re-raise \u2014 hides bugs",
+          "suggestion": "catch only the specific exception types you can handle, or re-raise",
+          "extras": {
+            "excerpt": "except Exception:",
+            "signature": "broad-except::plugins/sulis/skills/analyse-codebase/scripts/probe/runners/architecture_runner.py::136"
+          }
+        },
+        {
+          "heuristic": "broad-except",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/deadcode_runner.py",
+          "line": 72,
+          "identifier": "broad-except",
+          "message": "this catches all exceptions and doesn't re-raise \u2014 hides bugs",
+          "suggestion": "catch only the specific exception types you can handle, or re-raise",
+          "extras": {
+            "excerpt": "except Exception:",
+            "signature": "broad-except::plugins/sulis/skills/analyse-codebase/scripts/probe/runners/deadcode_runner.py::72"
+          }
+        },
+        {
+          "heuristic": "broad-except",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/deadcode_runner.py",
+          "line": 82,
+          "identifier": "broad-except",
+          "message": "this catches all exceptions and doesn't re-raise \u2014 hides bugs",
+          "suggestion": "catch only the specific exception types you can handle, or re-raise",
+          "extras": {
+            "excerpt": "except Exception:",
+            "signature": "broad-except::plugins/sulis/skills/analyse-codebase/scripts/probe/runners/deadcode_runner.py::82"
+          }
+        },
+        {
+          "heuristic": "broad-except",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/deadcode_runner.py",
+          "line": 91,
+          "identifier": "broad-except",
+          "message": "this catches all exceptions and doesn't re-raise \u2014 hides bugs",
+          "suggestion": "catch only the specific exception types you can handle, or re-raise",
+          "extras": {
+            "excerpt": "except Exception:",
+            "signature": "broad-except::plugins/sulis/skills/analyse-codebase/scripts/probe/runners/deadcode_runner.py::91"
+          }
+        },
+        {
+          "heuristic": "broad-except",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/deployment_runner.py",
+          "line": 337,
+          "identifier": "broad-except",
+          "message": "this catches all exceptions and doesn't re-raise \u2014 hides bugs",
+          "suggestion": "catch only the specific exception types you can handle, or re-raise",
+          "extras": {
+            "excerpt": "except Exception:",
+            "signature": "broad-except::plugins/sulis/skills/analyse-codebase/scripts/probe/runners/deployment_runner.py::337"
+          }
+        },
+        {
+          "heuristic": "broad-except",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/duplication_runner.py",
+          "line": 55,
+          "identifier": "broad-except",
+          "message": "this catches all exceptions and doesn't re-raise \u2014 hides bugs",
+          "suggestion": "catch only the specific exception types you can handle, or re-raise",
+          "extras": {
+            "excerpt": "except Exception as exc:",
+            "signature": "broad-except::plugins/sulis/skills/analyse-codebase/scripts/probe/runners/duplication_runner.py::55"
+          }
+        },
+        {
+          "heuristic": "broad-except",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/lint_runner.py",
+          "line": 112,
+          "identifier": "broad-except",
+          "message": "this catches all exceptions and doesn't re-raise \u2014 hides bugs",
+          "suggestion": "catch only the specific exception types you can handle, or re-raise",
+          "extras": {
+            "excerpt": "except Exception:",
+            "signature": "broad-except::plugins/sulis/skills/analyse-codebase/scripts/probe/runners/lint_runner.py::112"
+          }
+        },
+        {
+          "heuristic": "broad-except",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/test_runner.py",
+          "line": 158,
+          "identifier": "broad-except",
+          "message": "this catches all exceptions and doesn't re-raise \u2014 hides bugs",
+          "suggestion": "catch only the specific exception types you can handle, or re-raise",
+          "extras": {
+            "excerpt": "except Exception as exc:",
+            "signature": "broad-except::plugins/sulis/skills/analyse-codebase/scripts/probe/runners/test_runner.py::158"
+          }
+        },
+        {
+          "heuristic": "broad-except",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/test_runner.py",
+          "line": 211,
+          "identifier": "broad-except",
+          "message": "this catches all exceptions and doesn't re-raise \u2014 hides bugs",
+          "suggestion": "catch only the specific exception types you can handle, or re-raise",
+          "extras": {
+            "excerpt": "except Exception:",
+            "signature": "broad-except::plugins/sulis/skills/analyse-codebase/scripts/probe/runners/test_runner.py::211"
+          }
+        },
+        {
+          "heuristic": "broad-except",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/workspace.py",
+          "line": 137,
+          "identifier": "broad-except",
+          "message": "this catches all exceptions and doesn't re-raise \u2014 hides bugs",
+          "suggestion": "catch only the specific exception types you can handle, or re-raise",
+          "extras": {
+            "excerpt": "except Exception:",
+            "signature": "broad-except::plugins/sulis/skills/analyse-codebase/scripts/probe/workspace.py::137"
+          }
+        },
+        {
+          "heuristic": "missing-timeout",
+          "severity": "high",
+          "file": "plugins/sulis/skills/consolidate-into-sulis/scripts/find_external_refs.py",
+          "line": 29,
+          "identifier": "Python subprocess call",
+          "message": "this subprocess has no time limit \u2014 could hang indefinitely",
+          "suggestion": "add `timeout=N` (note: Popen needs special handling \u2014 use `.wait(timeout=N)`)",
+          "extras": {
+            "excerpt": "proc = subprocess.run(",
+            "signature": "missing-timeout::plugins/sulis/skills/consolidate-into-sulis/scripts/find_external_refs.py::29::Python subprocess call"
+          }
+        },
+        {
+          "heuristic": "missing-timeout",
+          "severity": "high",
+          "file": "plugins/sulis/skills/consolidate-into-sulis/scripts/find_external_refs.py",
+          "line": 45,
+          "identifier": "Python subprocess call",
+          "message": "this subprocess has no time limit \u2014 could hang indefinitely",
+          "suggestion": "add `timeout=N` (note: Popen needs special handling \u2014 use `.wait(timeout=N)`)",
+          "extras": {
+            "excerpt": "proc = subprocess.run(",
+            "signature": "missing-timeout::plugins/sulis/skills/consolidate-into-sulis/scripts/find_external_refs.py::45::Python subprocess call"
+          }
+        }
+      ],
+      "wired_in": "0.10.0",
+      "error_message": null,
+      "severity_summary": {
+        "concern": 12,
+        "high": 2
+      }
+    },
+    {
+      "tier": 5,
+      "name": "Understandable",
+      "status": "failed",
+      "finding_count": 59,
+      "findings": [
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/idc/scripts/build_review_html.py",
+          "line": 59,
+          "identifier": "render_markdown",
+          "message": "Function render_markdown has cyclomatic complexity 23 (threshold 15; NLOC=92)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "render_markdown",
+            "ccn": 23,
+            "nloc": 92,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "high",
+          "file": "plugins/idc/scripts/build_finance_html.py",
+          "line": 63,
+          "identifier": "build_html",
+          "message": "Function build_html has cyclomatic complexity 29 (threshold 15; NLOC=125)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "build_html",
+            "ccn": 29,
+            "nloc": 125,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/idc/scripts/build_web_pitch.py",
+          "line": 123,
+          "identifier": "render_hero",
+          "message": "Function render_hero has cyclomatic complexity 21 (threshold 15; NLOC=33)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "render_hero",
+            "ccn": 21,
+            "nloc": 33,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "high",
+          "file": "plugins/idc/scripts/build_pptx.py",
+          "line": 206,
+          "identifier": "render_slide",
+          "message": "Function render_slide has cyclomatic complexity 28 (threshold 15; NLOC=139)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "render_slide",
+            "ccn": 28,
+            "nloc": 139,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "high",
+          "file": "plugins/idc/scripts/build_investor_financials.py",
+          "line": 73,
+          "identifier": "build_html",
+          "message": "Function build_html has cyclomatic complexity 38 (threshold 15; NLOC=170)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "build_html",
+            "ccn": 38,
+            "nloc": 170,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/_lib/wp_index.py",
+          "line": 107,
+          "identifier": "_parse_minimal",
+          "message": "Function _parse_minimal has cyclomatic complexity 20 (threshold 15; NLOC=50)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "_parse_minimal",
+            "ccn": 20,
+            "nloc": 50,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/add-skill/scripts/inventory.py",
+          "line": 297,
+          "identifier": "render_brief_pack",
+          "message": "Function render_brief_pack has cyclomatic complexity 21 (threshold 15; NLOC=128)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "render_brief_pack",
+            "ccn": 21,
+            "nloc": 128,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/check-build/scripts/builder.py",
+          "line": 88,
+          "identifier": "_run_build_tools",
+          "message": "Function _run_build_tools has cyclomatic complexity 15 (threshold 15; NLOC=38)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "_run_build_tools",
+            "ccn": 15,
+            "nloc": 38,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/check-build/scripts/builder.py",
+          "line": 158,
+          "identifier": "detect_systems",
+          "message": "Function detect_systems has cyclomatic complexity 21 (threshold 15; NLOC=40)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "detect_systems",
+            "ccn": 21,
+            "nloc": 40,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/check-build/scripts/builder.py",
+          "line": 538,
+          "identifier": "render_markdown",
+          "message": "Function render_markdown has cyclomatic complexity 21 (threshold 15; NLOC=52)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "render_markdown",
+            "ccn": 21,
+            "nloc": 52,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/check-build/scripts/builder.py",
+          "line": 607,
+          "identifier": "main",
+          "message": "Function main has cyclomatic complexity 23 (threshold 15; NLOC=83)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "main",
+            "ccn": 23,
+            "nloc": 83,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/consolidate-into-sulis/scripts/compare_baseline.py",
+          "line": 64,
+          "identifier": "extract_findings",
+          "message": "Function extract_findings has cyclomatic complexity 16 (threshold 15; NLOC=20)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "extract_findings",
+            "ccn": 16,
+            "nloc": 20,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/consolidate-into-sulis/scripts/detect_collisions.py",
+          "line": 114,
+          "identifier": "emit_markdown",
+          "message": "Function emit_markdown has cyclomatic complexity 22 (threshold 15; NLOC=71)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "emit_markdown",
+            "ccn": 22,
+            "nloc": 71,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/consolidate-into-sulis/scripts/inventory.py",
+          "line": 22,
+          "identifier": "collect",
+          "message": "Function collect has cyclomatic complexity 18 (threshold 15; NLOC=59)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "collect",
+            "ccn": 18,
+            "nloc": 59,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/tests/fixtures/ts_simple/src/PaymentProcessor.ts",
+          "line": 2,
+          "identifier": "process",
+          "message": "Function process has cyclomatic complexity 16 (threshold 15; NLOC=21)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "process",
+            "ccn": 16,
+            "nloc": 21,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/credential_runner.py",
+          "line": 137,
+          "identifier": "run_repo",
+          "message": "Function run_repo has cyclomatic complexity 17 (threshold 15; NLOC=121)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "run_repo",
+            "ccn": 17,
+            "nloc": 121,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "high",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/lint_runner.py",
+          "line": 118,
+          "identifier": "_parse_lint_output",
+          "message": "Function _parse_lint_output has cyclomatic complexity 35 (threshold 15; NLOC=77)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "_parse_lint_output",
+            "ccn": 35,
+            "nloc": 77,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/architecture_runner.py",
+          "line": 26,
+          "identifier": "run",
+          "message": "Function run has cyclomatic complexity 18 (threshold 15; NLOC=59)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "run",
+            "ccn": 18,
+            "nloc": 59,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/astgrep_capability.py",
+          "line": 120,
+          "identifier": "_parse_astgrep_stream",
+          "message": "Function _parse_astgrep_stream has cyclomatic complexity 17 (threshold 15; NLOC=44)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "_parse_astgrep_stream",
+            "ccn": 17,
+            "nloc": 44,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/reuse_runner.py",
+          "line": 66,
+          "identifier": "run",
+          "message": "Function run has cyclomatic complexity 16 (threshold 15; NLOC=57)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "run",
+            "ccn": 16,
+            "nloc": 57,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/wrapper_runner.py",
+          "line": 32,
+          "identifier": "run",
+          "message": "Function run has cyclomatic complexity 20 (threshold 15; NLOC=80)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "run",
+            "ccn": 20,
+            "nloc": 80,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/astgrep_extension.py",
+          "line": 27,
+          "identifier": "run",
+          "message": "Function run has cyclomatic complexity 23 (threshold 15; NLOC=76)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "run",
+            "ccn": 23,
+            "nloc": 76,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/test_runner.py",
+          "line": 167,
+          "identifier": "_parse_enum_output",
+          "message": "Function _parse_enum_output has cyclomatic complexity 16 (threshold 15; NLOC=17)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "_parse_enum_output",
+            "ccn": 16,
+            "nloc": 17,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "high",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/deployment_runner.py",
+          "line": 205,
+          "identifier": "_classify",
+          "message": "Function _classify has cyclomatic complexity 26 (threshold 15; NLOC=44)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "_classify",
+            "ccn": 26,
+            "nloc": 44,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "high",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/deployment_runner.py",
+          "line": 330,
+          "identifier": "_parse_yaml_docs",
+          "message": "Function _parse_yaml_docs has cyclomatic complexity 25 (threshold 15; NLOC=50)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "_parse_yaml_docs",
+            "ccn": 25,
+            "nloc": 50,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "high",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/deployment_runner.py",
+          "line": 436,
+          "identifier": "run_repo",
+          "message": "Function run_repo has cyclomatic complexity 36 (threshold 15; NLOC=127)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "run_repo",
+            "ccn": 36,
+            "nloc": 127,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/runners/coupling_runner.py",
+          "line": 35,
+          "identifier": "run",
+          "message": "Function run has cyclomatic complexity 18 (threshold 15; NLOC=59)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "run",
+            "ccn": 18,
+            "nloc": 59,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/detection.py",
+          "line": 113,
+          "identifier": "detect_tools",
+          "message": "Function detect_tools has cyclomatic complexity 16 (threshold 15; NLOC=51)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "detect_tools",
+            "ccn": 16,
+            "nloc": 51,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/render.py",
+          "line": 211,
+          "identifier": "render_markdown",
+          "message": "Function render_markdown has cyclomatic complexity 17 (threshold 15; NLOC=56)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "render_markdown",
+            "ccn": 17,
+            "nloc": 56,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/render.py",
+          "line": 536,
+          "identifier": "_md_deployment",
+          "message": "Function _md_deployment has cyclomatic complexity 22 (threshold 15; NLOC=60)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "_md_deployment",
+            "ccn": 22,
+            "nloc": 60,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "high",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/render.py",
+          "line": 657,
+          "identifier": "render_html_doc",
+          "message": "Function render_html_doc has cyclomatic complexity 29 (threshold 15; NLOC=78)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "render_html_doc",
+            "ccn": 29,
+            "nloc": 78,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "high",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/render.py",
+          "line": 830,
+          "identifier": "_html_deployment",
+          "message": "Function _html_deployment has cyclomatic complexity 31 (threshold 15; NLOC=64)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "_html_deployment",
+            "ccn": 31,
+            "nloc": 64,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "high",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe/filesystem.py",
+          "line": 107,
+          "identifier": "walk_files",
+          "message": "Function walk_files has cyclomatic complexity 28 (threshold 15; NLOC=46)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "walk_files",
+            "ccn": 28,
+            "nloc": 46,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/analyse-codebase/scripts/probe.py",
+          "line": 113,
+          "identifier": "main",
+          "message": "Function main has cyclomatic complexity 23 (threshold 15; NLOC=81)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "main",
+            "ccn": 23,
+            "nloc": 81,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/check-tests/scripts/regression.py",
+          "line": 127,
+          "identifier": "_run_coverage_measurement",
+          "message": "Function _run_coverage_measurement has cyclomatic complexity 16 (threshold 15; NLOC=88)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "_run_coverage_measurement",
+            "ccn": 16,
+            "nloc": 88,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/check-tests/scripts/regression.py",
+          "line": 250,
+          "identifier": "detect_framework",
+          "message": "Function detect_framework has cyclomatic complexity 22 (threshold 15; NLOC=36)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "detect_framework",
+            "ccn": 22,
+            "nloc": 36,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/check-tests/scripts/regression.py",
+          "line": 529,
+          "identifier": "compute_delta",
+          "message": "Function compute_delta has cyclomatic complexity 16 (threshold 15; NLOC=24)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "compute_delta",
+            "ccn": 16,
+            "nloc": 24,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "high",
+          "file": "plugins/sulis/skills/check-tests/scripts/regression.py",
+          "line": 612,
+          "identifier": "render_markdown",
+          "message": "Function render_markdown has cyclomatic complexity 27 (threshold 15; NLOC=86)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "render_markdown",
+            "ccn": 27,
+            "nloc": 86,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "high",
+          "file": "plugins/sulis/skills/check-tests/scripts/regression.py",
+          "line": 728,
+          "identifier": "main",
+          "message": "Function main has cyclomatic complexity 27 (threshold 15; NLOC=156)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "main",
+            "ccn": 27,
+            "nloc": 156,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/check-maintainability/scripts/scanner.py",
+          "line": 122,
+          "identifier": "_run_review_practices_check",
+          "message": "Function _run_review_practices_check has cyclomatic complexity 21 (threshold 15; NLOC=69)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "_run_review_practices_check",
+            "ccn": 21,
+            "nloc": 69,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "high",
+          "file": "plugins/sulis/skills/check-maintainability/scripts/scanner.py",
+          "line": 226,
+          "identifier": "extract_definitions",
+          "message": "Function extract_definitions has cyclomatic complexity 30 (threshold 15; NLOC=72)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "extract_definitions",
+            "ccn": 30,
+            "nloc": 72,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/check-maintainability/scripts/scanner.py",
+          "line": 325,
+          "identifier": "build_reference_index",
+          "message": "Function build_reference_index has cyclomatic complexity 16 (threshold 15; NLOC=37)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "build_reference_index",
+            "ccn": 16,
+            "nloc": 37,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "high",
+          "file": "plugins/sulis/skills/check-maintainability/scripts/scanner.py",
+          "line": 534,
+          "identifier": "main",
+          "message": "Function main has cyclomatic complexity 33 (threshold 15; NLOC=118)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "main",
+            "ccn": 33,
+            "nloc": 118,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/check-security/scripts/scanner.py",
+          "line": 229,
+          "identifier": "run_external_tools",
+          "message": "Function run_external_tools has cyclomatic complexity 20 (threshold 15; NLOC=82)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "run_external_tools",
+            "ccn": 20,
+            "nloc": 82,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/check-security/scripts/scanner.py",
+          "line": 446,
+          "identifier": "render_markdown",
+          "message": "Function render_markdown has cyclomatic complexity 23 (threshold 15; NLOC=61)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "render_markdown",
+            "ccn": 23,
+            "nloc": 61,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/check-security/scripts/scanner.py",
+          "line": 523,
+          "identifier": "main",
+          "message": "Function main has cyclomatic complexity 21 (threshold 15; NLOC=105)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "main",
+            "ccn": 21,
+            "nloc": 105,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/code-health/scripts/aggregator.py",
+          "line": 77,
+          "identifier": "parse_tier_response",
+          "message": "Function parse_tier_response has cyclomatic complexity 16 (threshold 15; NLOC=26)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "parse_tier_response",
+            "ccn": 16,
+            "nloc": 26,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/code-health/scripts/aggregator.py",
+          "line": 114,
+          "identifier": "parse_independence_check",
+          "message": "Function parse_independence_check has cyclomatic complexity 19 (threshold 15; NLOC=34)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "parse_independence_check",
+            "ccn": 19,
+            "nloc": 34,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "high",
+          "file": "plugins/sulis/skills/code-health/scripts/aggregator.py",
+          "line": 192,
+          "identifier": "render_founder_markdown",
+          "message": "Function render_founder_markdown has cyclomatic complexity 28 (threshold 15; NLOC=77)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "render_founder_markdown",
+            "ccn": 28,
+            "nloc": 77,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/code-health/scripts/orchestrator.py",
+          "line": 313,
+          "identifier": "render_markdown",
+          "message": "Function render_markdown has cyclomatic complexity 22 (threshold 15; NLOC=61)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "render_markdown",
+            "ccn": 22,
+            "nloc": 61,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/code-health/scripts/orchestrator.py",
+          "line": 472,
+          "identifier": "main",
+          "message": "Function main has cyclomatic complexity 22 (threshold 15; NLOC=79)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "main",
+            "ccn": 22,
+            "nloc": 79,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "high",
+          "file": "plugins/sulis/skills/check-reliability/scripts/scanner.py",
+          "line": 168,
+          "identifier": "scan_file_python",
+          "message": "Function scan_file_python has cyclomatic complexity 26 (threshold 15; NLOC=81)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "scan_file_python",
+            "ccn": 26,
+            "nloc": 81,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/check-reliability/scripts/scanner.py",
+          "line": 448,
+          "identifier": "main",
+          "message": "Function main has cyclomatic complexity 22 (threshold 15; NLOC=97)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "main",
+            "ccn": 22,
+            "nloc": 97,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/check-polish/scripts/scanner.py",
+          "line": 97,
+          "identifier": "check_plugin_docs",
+          "message": "Function check_plugin_docs has cyclomatic complexity 19 (threshold 15; NLOC=67)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "check_plugin_docs",
+            "ccn": 19,
+            "nloc": 67,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/check-polish/scripts/scanner.py",
+          "line": 356,
+          "identifier": "main",
+          "message": "Function main has cyclomatic complexity 21 (threshold 15; NLOC=74)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "main",
+            "ccn": 21,
+            "nloc": 74,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/check-readability/scripts/audit.py",
+          "line": 466,
+          "identifier": "audit_file",
+          "message": "Function audit_file has cyclomatic complexity 19 (threshold 15; NLOC=88)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "audit_file",
+            "ccn": 19,
+            "nloc": 88,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis/skills/check-readability/scripts/audit.py",
+          "line": 669,
+          "identifier": "main",
+          "message": "Function main has cyclomatic complexity 17 (threshold 15; NLOC=144)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "main",
+            "ccn": 17,
+            "nloc": 144,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "concern",
+          "file": "plugins/sulis-execution/sdk/typescript/dist/transport.js",
+          "line": 75,
+          "identifier": "parseEnvelope",
+          "message": "Function parseEnvelope has cyclomatic complexity 19 (threshold 15; NLOC=45)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "parseEnvelope",
+            "ccn": 19,
+            "nloc": 45,
+            "tool_mode": "native"
+          }
+        },
+        {
+          "heuristic": "cyclomatic-complexity",
+          "severity": "high",
+          "file": "plugins/sulis-execution/sdk/typescript/src/transport.ts",
+          "line": 32,
+          "identifier": "resolveBinary",
+          "message": "Function resolveBinary has cyclomatic complexity 30 (threshold 15; NLOC=112)",
+          "suggestion": "refactor \u2014 extract sub-functions; target CCN \u2264 15",
+          "extras": {
+            "function_name": "resolveBinary",
+            "ccn": 30,
+            "nloc": 112,
+            "tool_mode": "native"
+          }
+        }
+      ],
+      "wired_in": "0.5.0",
+      "error_message": null,
+      "severity_summary": {
+        "concern": 42,
+        "high": 17
+      }
+    },
+    {
+      "tier": 6,
+      "name": "Evolves",
+      "status": "passed",
+      "finding_count": 0,
+      "findings": [],
+      "wired_in": "0.11.0",
+      "error_message": null,
+      "severity_summary": {}
+    },
+    {
+      "tier": 7,
+      "name": "Polished",
+      "status": "passed",
+      "finding_count": 0,
+      "findings": [],
+      "wired_in": "0.11.0",
+      "error_message": null,
+      "severity_summary": {}
+    }
+  ],
+  "errors": []
+}

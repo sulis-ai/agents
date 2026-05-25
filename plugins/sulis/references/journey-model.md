@@ -115,9 +115,9 @@ an ordered Work Package backlog ready for implementation.
 **Entry criteria:** Phase 3 complete; SRD PASS.
 
 **Activities (v0.1.0):**
-- Recommend `/sea:blueprint` (produces TDD + ADRs).
+- Recommend `/sulis:draft-architecture` (produces TDD + ADRs).
 - When founder returns, read TDD + ADRs.
-- Recommend `/sea:decompose` (produces Work Packages with INDEX).
+- Recommend `/sulis:plan-work` (produces Work Packages with INDEX).
 - When founder returns, read Work Package INDEX.
 - Translate: "[N] components, [M] technical decisions recorded, [K]
   tasks to build (organised so [a, b] can happen in parallel)."
@@ -170,7 +170,7 @@ contract tests, chaos tests, referential integrity.
 **Entry criteria:** Phase 5 complete; all WPs `done`.
 
 **Activities:**
-- Recommend `/sea:verify` to the founder.
+- Recommend `/sulis:verify-architecture` to the founder.
 - When founder returns, read `.architecture/{project}/COMPLETENESS_REPORT.md`.
 - If PASS: auto-progress to Phase 7.
 - If GAPS_FOUND: translate gaps; apply AAF triage. Step-1/2-silent
@@ -243,7 +243,7 @@ Each phase advances **automatically** when its exit criteria are met
 ask the founder *"want me to move to the next phase?"*. Instead:
 
 > *"Requirements done. Starting design — recommending you run
-> `/sea:blueprint` next."*
+> `/sulis:draft-architecture` next."*
 
 The single exception is the AAF-05 revoke signal — a founder who has
 said *"slow down"* or *"check with me on each phase"* opts into per-

@@ -44,7 +44,7 @@ Never use forbidden permission-theater shapes:
 - *"Should I recommend something?"* ✗
 
 Just announce:
-- *"Run `/sea:blueprint` next."* ✓
+- *"Run `/sulis:draft-architecture` next."* ✓
 
 ---
 
@@ -56,9 +56,9 @@ Just announce:
 | sulis-context (refresh) | `/sulis:refresh-context` | recommend | spawn (short) |
 | srd:requirements-analyst | `claude --agent requirements-analyst` | recommend | recommend (always; long conversation) |
 | srd:requirements-validation | `/sulis:requirements-validation` | recommend | spawn (short, returns COMPLETENESS_REPORT.md) |
-| sea:blueprint | `/sea:blueprint` | recommend | recommend (always; long conversation) |
-| sea:decompose | `/sea:decompose` | recommend | spawn (short, autonomous) |
-| sea:verify | `/sea:verify` | recommend | spawn (short, returns COMPLETENESS_REPORT) |
+| sea:blueprint | `/sulis:draft-architecture` | recommend | recommend (always; long conversation) |
+| sea:decompose | `/sulis:plan-work` | recommend | spawn (short, autonomous) |
+| sea:verify | `/sulis:verify-architecture` | recommend | spawn (short, returns COMPLETENESS_REPORT) |
 | sulis-execution:executor | `/sulis:run-all` | recommend (this WP-execution plugin ships in same v1.12.0 release) | spawn (long but autonomous) |
 | sulis-security:codebase-assess | `/sulis-security:codebase-assess` | recommend | spawn (short-to-medium, returns report) |
 

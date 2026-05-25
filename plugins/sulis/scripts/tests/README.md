@@ -1,7 +1,7 @@
 # sulis-execution test suite
 
 Pytest-based integration tests for the wpx-* CLI tools. Mirrors the
-established pattern at `plugins/sea/skills/probe/tests/`.
+established pattern at `plugins/sulis/skills/analyse-codebase/tests/`.
 
 ## Layout
 

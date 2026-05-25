@@ -134,7 +134,7 @@ def test_train_run_awaiting_gates(make_fake_binary, client):
                     "diff_range": "0000000..abc1234",
                     "wps": ["WP-001", "WP-002"],
                     "next_action": (
-                        "Dispatch /sea:code-review against diff_range; "
+                        "Dispatch /sulis:code-review against diff_range; "
                         "then per-WP security review."
                     ),
                 },

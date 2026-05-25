@@ -36,7 +36,7 @@ This standard synthesises four established conventions.
 |---|---|---|
 | **OpenSpec** (Fission AI) | 2025 | The `openspec/changes/{proposal-id}/` directory pattern — a change is a first-class object with its own state, separate from the canonical spec. SEA's Hardening Deltas already inherit this shape; CW extends it to the whole change lifecycle. |
 | **Conventional Commits 1.0.0** | 2017 | Verb-prefixed change types (`feat`, `fix`, `refactor`, `chore`, etc.). CW maps these onto the existing 22-primitive vocabulary. |
-| **SEA Change Primitives** (`plugins/sea/references/change-primitives.md`) | This marketplace | The 22-primitive catalogue — EXPAND (Create, Extend, Reuse, Compose, Generate), REORGANISE (Move, Refactor, Inline, Merge, Decompose, Abstract), SUBSTITUTE (Replace, Strangle, Wrap), CONTRACT (Deprecate, Delete), REINFORCE (Test, Instrument, Secure, Harden, Gate, Document). Branch naming inherits this. |
+| **SEA Change Primitives** (`plugins/sulis/references/change-primitives.md`) | This marketplace | The 22-primitive catalogue — EXPAND (Create, Extend, Reuse, Compose, Generate), REORGANISE (Move, Refactor, Inline, Merge, Decompose, Abstract), SUBSTITUTE (Replace, Strangle, Wrap), CONTRACT (Deprecate, Delete), REINFORCE (Test, Instrument, Secure, Harden, Gate, Document). Branch naming inherits this. |
 | **GIT-01..GIT-10** (Git Workflow Standard) | This marketplace | The two-branch dev/main model. CW slots between dev and the executor's per-WP branches — `change/...` branches live above WP branches and below dev. |
 
 The synthesis itself is a Sulis-marketplace contribution. No prior
@@ -140,7 +140,7 @@ branch merges, the change is over.
 The branch convention is `change/{primitive}-{slug}` where:
 
 - `primitive` is one of the 22 change primitives from
-  `plugins/sea/references/change-primitives.md`, lowercased: `create`,
+  `plugins/sulis/references/change-primitives.md`, lowercased: `create`,
   `extend`, `reuse`, `compose`, `generate`, `move`, `refactor`,
   `inline`, `merge`, `decompose`, `abstract`, `replace`, `strangle`,
   `wrap`, `deprecate`, `delete`, `test`, `instrument`, `secure`,
@@ -352,7 +352,7 @@ RC-04 (branch protections), RC-05 (merge queue config on `dev`), RC-06
 (required Actions workflows) apply unchanged. The merge queue on `dev`
 batches change-branch merges the same way it batches WP merges today.
 
-### With change primitives (`plugins/sea/references/change-primitives.md`)
+### With change primitives (`plugins/sulis/references/change-primitives.md`)
 
 The 22-primitive vocabulary becomes load-bearing — it's the
 `{primitive}` part of the branch name. Changes to the primitive

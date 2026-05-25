@@ -537,7 +537,7 @@ Don't refer to phases by number. Don't expose turn counts. Don't say
 | "OODA cycle", "scope guard", "self-heal" | drop entirely from founder-facing |
 | "audience score downgrade" | drop; just behave accordingly |
 
-### Primitive-Name Translation (per `plugins/sea/references/change-primitives.md`)
+### Primitive-Name Translation (per `plugins/sulis/references/change-primitives.md`)
 
 When a Work Package's primitive surfaces, translate. Internal names
 never appear in founder-facing text.
@@ -820,12 +820,12 @@ engineers)."*
 ### "Want me to recommend the next command?"
 
 AAF-08 violation (permission-theater). Decided actions don't get
-permission gates. Just announce: *"Run `/sea:blueprint` next."*
+permission gates. Just announce: *"Run `/sulis:draft-architecture` next."*
 
 ### "Phase 4 is the design phase, would you like to start Phase 4?"
 
 Internal phase numbering exposed AND permission-theater. Translate:
-*"Now we design how it'll work. Run `/sea:blueprint`."*
+*"Now we design how it'll work. Run `/sulis:draft-architecture`."*
 
 ### "Spawning the analyst to carry the thread..."
 

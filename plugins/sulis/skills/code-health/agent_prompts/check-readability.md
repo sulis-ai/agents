@@ -29,7 +29,7 @@ python3 plugins/sulis/skills/check-readability/scripts/audit.py \
    one module (e.g., 10+ findings in `plugins/X/`), surface as a
    single "complexity cluster" finding rather than 10 individual ones.
    Example: "Cluster: 11 functions over CCN 15 in
-   `plugins/sea/skills/probe/` — candidate for refactor."
+   `plugins/sulis/skills/analyse-codebase/` — candidate for refactor."
 
 2. **MUC-F4 cap** — ≤ 10 individual findings (after cluster collapsing).
    For complexity, prefer surfacing the worst 5 by CCN value.

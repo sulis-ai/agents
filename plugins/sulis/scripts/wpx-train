@@ -148,7 +148,7 @@ def cmd_queue_list(args: argparse.Namespace) -> None:
     if not paths.index_md.exists():
         emit_error(
             f"INDEX.md not found at {paths.index_md}",
-            context={"hint": "Has /sea:decompose been run for this project?"},
+            context={"hint": "Has /sulis:plan-work been run for this project?"},
         )
 
     wps = parse_index_md(paths.index_md)
@@ -1659,7 +1659,7 @@ def _finalise_awaiting_gates(
         train_state_path(paths.train_runs_dir, train_id), "verifying_gates",
         pause_reason="Step 10.5 + Step 11 pending (gate handoff to calling session)",
         recovery_hint=(
-            "Calling session: dispatch /sea:code-review against the diff "
+            "Calling session: dispatch /sulis:code-review against the diff "
             "range in `gate_handoff.diff_range`, then per-WP security "
             "review for every WP in `gate_handoff.wps`. When both gates "
             f"complete clean, run `wpx-train mark-gates-complete --train-id "

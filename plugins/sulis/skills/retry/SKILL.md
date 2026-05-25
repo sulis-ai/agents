@@ -119,7 +119,7 @@ Return ONLY on step-10 success or new BLOCKER written.
   Re-decompose the WP first; do not retry blindly.
 - **`permanently_blocked` WPs.** The orchestrator marks a WP
   permanently blocked after multiple retry-then-block cycles. Use
-  `/sea:decompose` to re-classify.
+  `/sulis:plan-work` to re-classify.
 - **`done` WPs.** No-op.
 
 ## See also

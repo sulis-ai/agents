@@ -18,13 +18,13 @@ engineers + downstream agents (technical). Three viable formats:
 3. **Two reports — `CHECKUP_FOUNDER.md` and `CHECKUP_ENGINEER.md`** — same
    findings, two writeups.
 4. **Two tiers in one file** — founder-facing first, technical below a
-   `## Technical detail` heading. The pattern `/sea:code-review` validated.
+   `## Technical detail` heading. The pattern `/sulis:code-review` validated.
 
 ## Decision
 
-**Adopt the two-tiers-in-one-file pattern from `/sea:code-review`.** Founder
+**Adopt the two-tiers-in-one-file pattern from `/sulis:code-review`.** Founder
 tier reads top-down; technical tier sits below the `## Technical detail`
-heading; downstream agents (`/sea:harden`, future `/code-review` re-runs)
+heading; downstream agents (`/sulis:harden-codebase`, future `/code-review` re-runs)
 read the technical tier verbatim.
 
 ## Options Considered
@@ -34,7 +34,7 @@ read the technical tier verbatim.
 **Pros:** simple. One file.
 
 **Cons:**
-- Engineers lose the precise taxonomy they need to act (e.g. `/sea:harden`
+- Engineers lose the precise taxonomy they need to act (e.g. `/sulis:harden-codebase`
   needs to read the HD-NNN delta IDs; founder tier shouldn't carry them).
 - Founder-tier translations of technical findings lose information
   (e.g. "circuit breaker missing" → "no backup plan when X is slow" loses
@@ -61,7 +61,7 @@ founder uses it.
 - Founder navigates to wrong file, reads jargon, gets frustrated.
 - Authors maintain two file generators in the checkup code.
 
-**Rejected because:** the `/sea:code-review` decision document explicitly
+**Rejected because:** the `/sulis:code-review` decision document explicitly
 called this out — two-tier-one-file is the calibrated form.
 
 ### Option 4 — Two tiers in one file (chosen)
@@ -72,12 +72,12 @@ called this out — two-tier-one-file is the calibrated form.
 - Same evidence; two writeups; one file; no drift risk.
 - Downstream agents parse the technical tier deterministically (it
   carries the IDs they need).
-- Calibrated pattern in `/sea:code-review`'s `SKILL.md` — already proven
+- Calibrated pattern in `/sulis:code-review`'s `SKILL.md` — already proven
   to work on real PRs.
 
 **Cons:**
 - Authors writing report templates need to know both writing styles.
-  Mitigated by the existing `/sea:code-review` pattern serving as the
+  Mitigated by the existing `/sulis:code-review` pattern serving as the
   template.
 
 **Accepted because:** the pattern is already in production for code-review;
@@ -120,7 +120,7 @@ adopting it for checkup is the consistent move.
  result.]
 ```
 
-## Translation table (mirrors /sea:code-review)
+## Translation table (mirrors /sulis:code-review)
 
 | Internal | Founder tier |
 |---|---|
@@ -150,7 +150,7 @@ adopting it for checkup is the consistent move.
 - One file, two audiences, no drift.
 - Founder stops reading naturally when their need is met.
 - Engineers and downstream agents have full taxonomy below the fold.
-- Pattern reuses an already-validated convention from `/sea:code-review`.
+- Pattern reuses an already-validated convention from `/sulis:code-review`.
 
 **Negative:**
 - Long file when there are many findings. Mitigated by passing-tier
@@ -158,4 +158,4 @@ adopting it for checkup is the consistent move.
 
 **Neutral:**
 - Authors writing report templates have to maintain both registers.
-  The `/sea:code-review` SKILL.md is the canonical example to imitate.
+  The `/sulis:code-review` SKILL.md is the canonical example to imitate.

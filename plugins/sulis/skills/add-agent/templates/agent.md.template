@@ -14,7 +14,7 @@ verification_spiral:
   custom_dimensions: []  # add domain-specific dimensions here per SPIRAL_TEMPLATES "Declaring a Custom Spiral"
 related_skills:
   - relationship: depends_on  # depends_on / optional_input / related_to / supersedes per REFERENTIAL_INTEGRITY_STANDARD
-    skill: {{e.g., ../skills/run-wp, ../../sea/agents/engineering-architect}}
+    skill: {{e.g., ../skills/run-wp, ../../sulis/agents/engineering-architect}}
     notes: {{semantic context for this relationship}}
 register:  # required if Audience is founder-facing or both; omit for operator-facing or agent-internal
   founder_mode: default

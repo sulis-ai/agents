@@ -7,9 +7,9 @@ Lines starting with `#` are comments.
 # run() that's the conventional entry-point for sea:probe's orchestration.
 # interactivity.js's update() and init() are the corresponding JS
 # conventions. Renaming would break the long-standing pattern.
-naming-clarity::plugins/sea/skills/probe/scripts/probe/orchestrator.py::334: probe orchestrator entry-point convention
-naming-clarity::plugins/sea/skills/probe/scripts/probe/render_templates/interactivity.js::85: interactivity.js JS entry convention
-naming-clarity::plugins/sea/skills/probe/scripts/probe/render_templates/interactivity.js::107: interactivity.js JS entry convention
+naming-clarity::plugins/sulis/skills/analyse-codebase/scripts/probe/orchestrator.py::334: probe orchestrator entry-point convention
+naming-clarity::plugins/sulis/skills/analyse-codebase/scripts/probe/render_templates/interactivity.js::85: interactivity.js JS entry convention
+naming-clarity::plugins/sulis/skills/analyse-codebase/scripts/probe/render_templates/interactivity.js::107: interactivity.js JS entry convention
 
 # _wpxlib.py kitchen-sink: documented in sulis-execution's HD-008.
 # Per-HD architectural analysis concluded the structural alternative

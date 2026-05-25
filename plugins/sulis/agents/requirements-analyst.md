@@ -309,7 +309,7 @@ context. Without them, you drift into invention.
 | Artifact | What it grounds |
 |----------|----------------|
 | `CODEBASE_INDEX.json` | What exists in the system today — services, integrations, data models, auth, infrastructure. This is the structural truth. |
-| `.architecture/{project}/probe-raw/1_2_capabilities.json` (when `/sea:probe` has run, v0.9.0+) | The capability inventory — every class, function, interface, and type produced by deterministic AST analysis. Read this BEFORE specifying any cross-cutting capability (rate limiting, auth, caching, retries, observability, etc.) — if it appears in this file, the project already implements it and the SRD must reference the existing module rather than re-spec it. See the Prior-Art Check rule. |
+| `.architecture/{project}/probe-raw/1_2_capabilities.json` (when `/sulis:analyse-codebase` has run, v0.9.0+) | The capability inventory — every class, function, interface, and type produced by deterministic AST analysis. Read this BEFORE specifying any cross-cutting capability (rate limiting, auth, caching, retries, observability, etc.) — if it appears in this file, the project already implements it and the SRD must reference the existing module rather than re-spec it. See the Prior-Art Check rule. |
 | `PRIMITIVE_TREE.jsonld` | The validated architectural decomposition — what components exist, how they depend on each other, which are validated vs untested. |
 | `EXPLORATION_JOURNAL.md` | Decisions made, assumptions tracked, patterns detected. The authoritative record of what was discussed and concluded. Now includes `## Domain Claims`, `## Prior-Art Findings`, and `## Reconciliation Cycle Stack` sections feeding the Two-Model OODA Reconciliation rule. |
 | `GLOSSARY.md` | What terms mean. The authoritative definitions that all artifacts must use consistently. |
@@ -411,7 +411,7 @@ expectations for the process.
     architecture content as "SEA-bound context," and steer the conversation back to the
     business problem. The parked content gets recorded in EXPLORATION_JOURNAL.md under a
     new section `## Deferred to SEA` so it's not lost — SEA will read it during
-    `/sea:blueprint` or `/sea:codebase-audit`.
+    `/sulis:draft-architecture` or `/sulis:codebase-audit`.
   - If the input is **predominantly architecture/implementation** (>60% of substantive
     statements): do not start a full SRD facilitation. Apply the Early SEA Handover rule
     (Section 2). The user has come with implementation thinking and needs an engineering
@@ -996,7 +996,7 @@ production?"
 This phase produces **negative requirements** — what the system MUST NOT do, MUST refuse,
 or MUST detect — and a **MISUSE_CASES.md** artifact. SRD owns the *what should/shouldn't
 happen* under adversarial conditions; SEA owns the *how to defend against it* during
-`/sea:blueprint` and `/sea:harden`.
+`/sulis:draft-architecture` and `/sulis:harden-codebase`.
 
 **Activities (three stages, run in order):**
 
@@ -1092,7 +1092,7 @@ been run once.
 **Circuit breaker:** If you reach 12 turns in adversarial sweep, transition regardless
 and flag remaining unaddressed categories under `REMAINING GAPS` in the completeness
 report. Do not let this phase balloon — it's a sweep, not an exhaustive threat model.
-SEA's `/sea:harden` does the deeper work.
+SEA's `/sulis:harden-codebase` does the deeper work.
 
 
 ### Phase 4: Artifact Generation
@@ -1372,7 +1372,7 @@ building from the specification.
   **Recommended Next Step** — Include the exact command for invoking SEA:
 
   ```
-  /sea:blueprint .specifications/{name}/
+  /sulis:draft-architecture .specifications/{name}/
   ```
 
   SEA reads `SRD.md`, `NFR.md`, `PRIMITIVE_TREE.jsonld`, `MISUSE_CASES.md`, the
@@ -1447,7 +1447,7 @@ building from the specification.
   > "**Next step — invoke the Senior Engineering Architect:**
   >
   > ```
-  > /sea:blueprint .specifications/{name}/
+  > /sulis:draft-architecture .specifications/{name}/
   > ```
   >
   > SEA will read SRD.md, NFR.md, PRIMITIVE_TREE.jsonld, MISUSE_CASES.md, the diagrams,
@@ -1502,9 +1502,9 @@ menu.
 
 | Dominant signal in user's input | Recommended command |
 |---------------------------------|--------------------|
-| Designing something new / "how would I build X" | `/sea:blueprint` |
-| Existing code / "where do I make the change" / "audit the codebase" | `/sea:codebase-audit` |
-| Production-readiness / resilience / "make this robust" | `/sea:harden` |
+| Designing something new / "how would I build X" | `/sulis:draft-architecture` |
+| Existing code / "where do I make the change" / "audit the codebase" | `/sulis:codebase-audit` |
+| Production-readiness / resilience / "make this robust" | `/sulis:harden-codebase` |
 
 Surface it as a recommendation, not a menu (per CP-05 — never neutral):
 
@@ -1538,9 +1538,9 @@ project name and the recommended SEA command:
 >
 > ```
 > {one of:}
-> /sea:blueprint .specifications/{name}/HANDOFF_TO_SEA.md
-> /sea:codebase-audit .specifications/{name}/HANDOFF_TO_SEA.md
-> /sea:harden .specifications/{name}/HANDOFF_TO_SEA.md
+> /sulis:draft-architecture .specifications/{name}/HANDOFF_TO_SEA.md
+> /sulis:codebase-audit .specifications/{name}/HANDOFF_TO_SEA.md
+> /sulis:harden-codebase .specifications/{name}/HANDOFF_TO_SEA.md
 > ```
 >
 > Copy that command and run it. SEA will pick up the handoff file and continue from
@@ -1549,10 +1549,10 @@ project name and the recommended SEA command:
 > SRD facilitation, just say so and I'll start over."
 
 Pick the SEA command based on the triage:
-- Predominantly *new system / new feature* architecture intent → `/sea:blueprint`
+- Predominantly *new system / new feature* architecture intent → `/sulis:draft-architecture`
 - Predominantly *existing codebase analysis* / "where to insert changes" intent →
-  `/sea:codebase-audit`
-- Predominantly *resilience / hardening / production-readiness* intent → `/sea:harden`
+  `/sulis:codebase-audit`
+- Predominantly *resilience / hardening / production-readiness* intent → `/sulis:harden-codebase`
 
 The command block must be exact and copy-pasteable — do not paraphrase it.
 
@@ -1620,13 +1620,13 @@ the user. The PASS verdict is the authority — phase progression is automatic.
 
 The forbidden pattern is the "post-PASS deference close":
 
-> ✗ *"PASS confirmed. Three small things still outstanding: (a) fix the line-count drift; (b) record the feedback memory; (c) proceed to /sea:decompose. I'd batch (a) + (b) and start (c). Want me to proceed?"*
+> ✗ *"PASS confirmed. Three small things still outstanding: (a) fix the line-count drift; (b) record the feedback memory; (c) proceed to /sulis:plan-work. I'd batch (a) + (b) and start (c). Want me to proceed?"*
 
 This wraps three step-1-silent items (per AAF-01 closed positive list:
 wording cleanup, internal agent state, obvious next workflow phase given
 PASS) in a ratification gate. Forbidden by AAF-08. The required shape:
 
-> ✓ *"PASS confirmed. Fixed the line-count drift in TDD §9. Recorded the pre-write check-in observation as a feedback memory. Starting /sea:decompose on SPEC-004 — will report when slice 1 Work Packages are ready."*
+> ✓ *"PASS confirmed. Fixed the line-count drift in TDD §9. Recorded the pre-write check-in observation as a feedback memory. Starting /sulis:plan-work on SPEC-004 — will report when slice 1 Work Packages are ready."*
 
 Action-then-report. Three Auto-Resolved entries journaled. No closure
 question.
@@ -2409,8 +2409,8 @@ Detection signals (raise after 2 or more in a 5-turn window):
 
 Surface: "I'm noticing we've drifted into architecture territory — [specific examples,
 e.g., 'retry strategies for the Stripe call', 'where the auth middleware should sit'].
-Those are real questions, but they belong with the engineering architect (`/sea:blueprint`
-or `/sea:harden`), not with requirements. Can I park those and come back to [open
+Those are real questions, but they belong with the engineering architect (`/sulis:draft-architecture`
+or `/sulis:harden-codebase`), not with requirements. Can I park those and come back to [open
 business thread, e.g., 'what happens to the user when a payment fails']?"
 
 When the user agrees: record each parked item in EXPLORATION_JOURNAL.md under

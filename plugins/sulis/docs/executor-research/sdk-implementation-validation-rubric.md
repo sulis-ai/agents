@@ -590,7 +590,7 @@ This rubric is in calibration. Falsification criteria (FR):
 
 ### Related marketplace standards
 - [`plugins/sulis/references/convention-preference-standard.md`](../../../sulis/references/convention-preference-standard.md) — CP-01
-- [`plugins/sea/references/code-review-standard.md`](../../../sea/references/code-review-standard.md) — CR-01..CR-09 (related: per-PR review; this rubric is per-SDK retrospective)
+- [`plugins/sulis/references/code-review-standard.md`](../../../sulis/references/code-review-standard.md) — CR-01..CR-09 (related: per-PR review; this rubric is per-SDK retrospective)
 
 ---
 

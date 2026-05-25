@@ -63,7 +63,7 @@ clearer" advisories can stay at "mostly clear."
 The audit respects the project's established vocabulary. If found, the
 following terms are NOT flagged as jargon:
 
-- Terms in `plugins/sea/references/boring-code.md`
+- Terms in `plugins/sulis/references/boring-code.md`
 - Terms in any project-level `GLOSSARY.md` (top-level or `.specifications/{project}/`)
 - Terms in `plugins/sulis/references/founder-english.md`'s glossary section
   (if present)

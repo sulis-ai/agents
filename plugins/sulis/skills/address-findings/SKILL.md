@@ -253,7 +253,7 @@ Run /sulis:execute to start, or /sulis:status to see the full picture.
 
 - Founder ran `/sulis:code-health` (any mode) and asks "now what?"
 - Founder ran any individual `/sulis:check-*` skill and wants to act on the findings
-- A `/sea:code-review` run produced draft Hardening Deltas the founder wants to operationalise
+- A `/sulis:code-review` run produced draft Hardening Deltas the founder wants to operationalise
 - Founder is preparing a hardening sprint and wants the queue scoped + sequenced
 
 ## When NOT to invoke this skill

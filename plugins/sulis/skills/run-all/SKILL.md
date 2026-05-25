@@ -33,7 +33,7 @@ executor dispatch and train-based integration:
   + bundled-tip CI + sequential merge + deploy + health + smoke.
 - **Per-batch (Step 10.5, in the calling session, v0.21.1+):** after
   `wpx-train run` returns `outcome: success`, the calling session
-  dispatches `/sea:code-review` against the BATCH DIFF RANGE
+  dispatches `/sulis:code-review` against the BATCH DIFF RANGE
   (`<first WP's pre_train_sha>..<last WP's merge_sha_on_dev>`).
   Catches cross-WP composition issues — N+1 across sibling WPs,
   integration regressions, contract drift between interdependent
@@ -400,7 +400,7 @@ loop:
        for cross-WP composition issues.**
 
        After `wpx-train run` returns, but BEFORE Step 11, review the
-       composition of all WPs in the batch via `/sea:code-review` against
+       composition of all WPs in the batch via `/sulis:code-review` against
        the batch's diff range on the base branch. This catches issues
        only visible when WPs compose: N+1 queries across sibling WPs,
        integration regressions, contract drift between interdependent
@@ -431,7 +431,7 @@ loop:
            # "after the last squash-merge lands".
            # Equivalent: <BATCH_START_SHA>..<BATCH_END_SHA> on the base branch.
 
-       Invoke `/sea:code-review` against the range:
+       Invoke `/sulis:code-review` against the range:
 
            /code-review "${BATCH_START_SHA}..${BATCH_END_SHA}" <project>
 
@@ -459,7 +459,7 @@ loop:
                --step "Step 10.5 (bundled-tip code-review)" \
                --trigger "step-10.5-critical" \
                --observation "<finding summary>" \
-               --root-cause "Cross-WP composition issue surfaced by /sea:code-review against batch diff <range>" \
+               --root-cause "Cross-WP composition issue surfaced by /sulis:code-review against batch diff <range>" \
                --scope in-scope \
                --suggested-next "Founder review; auto-drafted remediation WPs ship in next train cycle"
 
@@ -926,7 +926,7 @@ ready set. Transitively-dependent descendants of blocked WPs get
 
 - The skill expects a non-empty
   `.architecture/{project}/work-packages/INDEX.md`. If empty,
-  surface: *"INDEX is empty. Run `/sea:decompose` first."*
+  surface: *"INDEX is empty. Run `/sulis:plan-work` first."*
 - `max_parallel: 1` in INDEX header is a valid configuration —
   forces sequential dispatch. Useful when staging capacity is
   constrained or the founder wants one-at-a-time observability.

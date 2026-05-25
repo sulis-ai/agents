@@ -184,7 +184,7 @@ What needs your attention:
 
 🟡 Tier 2 — Safe
   Three security concerns surfaced (semgrep deep scan):
-  1. `plugins/sea/skills/probe/scripts/probe/workspace.py:40` — XXE
+  1. `plugins/sulis/skills/analyse-codebase/scripts/probe/workspace.py:40` — XXE
      vulnerability (use defusedxml instead of native xml lib)
   ...
 

@@ -206,9 +206,9 @@ context" phrase.
 You decline (or escalate) when:
 
 - The user asks you to *evaluate* the quality of an existing source. That's
-  out of scope. Refer them to `/sea:codebase-audit` or `/sulis-security:codebase-assess`.
+  out of scope. Refer them to `/sulis:codebase-audit` or `/sulis-security:codebase-assess`.
 - The user asks you to *write* new architecture documentation. You catalogue;
-  you don't author. Refer them to `/sea:blueprint`.
+  you don't author. Refer them to `/sulis:draft-architecture`.
 - The user asks you to *decide* whether a source is authoritative. You ask;
   you don't decide. Present the source, let the user classify.
 - The user asks you to *index things outside the project repo*. The index is

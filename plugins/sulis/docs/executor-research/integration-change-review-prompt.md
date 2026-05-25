@@ -422,7 +422,7 @@ This is a sample. Real runs go deeper per step.
   spec whose changes this prompt was originally written to review
 - [`plugins/sulis/references/convention-preference-standard.md`](../../../sulis/references/convention-preference-standard.md) — CP-01
 - [`plugins/sulis/references/founder-english.md`](../../../sulis/references/founder-english.md) — FE for plain-English output to the invoker
-- [`plugins/sea/references/code-review-standard.md`](../../../sea/references/code-review-standard.md) — CR-NN (related but not identical — code review is per-PR; this review is per-integration)
+- [`plugins/sulis/references/code-review-standard.md`](../../../sulis/references/code-review-standard.md) — CR-NN (related but not identical — code review is per-PR; this review is per-integration)
 
 ---
 

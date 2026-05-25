@@ -306,9 +306,9 @@ Two semgrep findings on `probe/workspace.py` (`use-defused-xml`, line 40 + `use-
 
 ## What changes
 
-- `plugins/sea/skills/probe/scripts/probe/workspace.py` line 40 (import)
-- `plugins/sea/skills/probe/scripts/probe/workspace.py` line 269 (parse call site)
-- `plugins/sea/skills/probe/requirements.txt` — add `defusedxml>=0.7.1`
+- `plugins/sulis/skills/analyse-codebase/scripts/probe/workspace.py` line 40 (import)
+- `plugins/sulis/skills/analyse-codebase/scripts/probe/workspace.py` line 269 (parse call site)
+- `plugins/sulis/skills/analyse-codebase/requirements.txt` — add `defusedxml>=0.7.1`
 
 ## How
 

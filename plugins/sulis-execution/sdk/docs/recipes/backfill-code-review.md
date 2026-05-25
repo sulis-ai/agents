@@ -4,7 +4,7 @@
 
 **When to use:** WPs shipped via `wpx-train run` BEFORE `v0.20.1`
 may have substituted inline self-attestation for actual
-`/sea:code-review` invocation. The historical record shows
+`/sulis:code-review` invocation. The historical record shows
 "Step 6.5: 0 findings" in journals but no `.architecture/.../
 code-reviews/PR-*/REVIEW.md` bundle on disk.
 
@@ -63,7 +63,7 @@ The skill:
 3. For each missing WP:
    - Reads the squash-merge SHA from the train state YAML
    - Computes the parent SHA: `git rev-parse <merge_sha>^`
-   - Invokes `/sea:code-review <parent>..<merge_sha> <slug>`
+   - Invokes `/sulis:code-review <parent>..<merge_sha> <slug>`
 4. For each finding in each newly-produced bundle:
    - `wpx-findings register` (signature-hash dedup)
    - If new: `wpx-findings auto-draft-wp` + `wpx-index add-wp`
@@ -142,7 +142,7 @@ parent_sha = subprocess.check_output(
     ["git", "rev-parse", f"{merge_sha}^"], text=True
 ).strip()
 
-# /sea:code-review is a top-level skill (not an SDK operation);
+# /sulis:code-review is a top-level skill (not an SDK operation);
 # invoke via Bash from your orchestrator script:
 subprocess.run(
     ["claude", "skill", "/code-review",
@@ -185,6 +185,6 @@ for finding in signals.get("findings", []):
   — narrative recipe for the slice-2 9-WP case
 - `plugins/sulis-execution/skills/backfill-gates/SKILL.md` — sibling
   skill for security backfill
-- `plugins/sea/skills/code-review/SKILL.md` — the skill this
+- `plugins/sulis/skills/code-review/SKILL.md` — the skill this
   orchestrates
 - `plugins/sulis-execution/agents/executor.md` — Step 6.5 forward gate

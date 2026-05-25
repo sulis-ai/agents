@@ -1165,7 +1165,7 @@ components:
           type: [string, 'null']
           description: |
             Convenience: `<batch_start_sha>..<batch_end_sha>`, suitable
-            for `git diff` / `gh pr diff` / `/sea:code-review`.
+            for `git diff` / `gh pr diff` / `/sulis:code-review`.
         wps:
           type: array
           items: { type: string }

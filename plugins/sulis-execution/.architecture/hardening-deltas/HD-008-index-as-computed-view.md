@@ -338,7 +338,7 @@ two commits have distinct review profiles:
   blast radius is larger; review focuses on whether the migrated
   callers still behave correctly under every existing test.
 
-Splitting lets `/sea:code-review` run twice with focused diffs each
+Splitting lets `/sulis:code-review` run twice with focused diffs each
 time, instead of one 800-line diff that's hard to review thoroughly.
 This matches the operational pattern PH-02 (PR Hygiene Size) was
 calibrated against in batches 4 and 5.

@@ -38,7 +38,7 @@
 
 **Existing references to wrap (not restate):**
 
-- `plugins/sea/references/boring-code.md` (8K) — Boring Code Standard. Defines simple-over-clever; directly relevant to readability heuristics.
+- `plugins/sulis/references/boring-code.md` (8K) — Boring Code Standard. Defines simple-over-clever; directly relevant to readability heuristics.
 - `plugins/sulis/references/founder-english.md` (36K) — FE-01..FE-11. Required for the founder-vocab translation in audience=both mode.
 
 **Existing skills considered for reuse:**

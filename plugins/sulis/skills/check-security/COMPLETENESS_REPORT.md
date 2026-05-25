@@ -79,7 +79,7 @@
 All 5 sourced.
 
 ### P3 Functional completeness: PASS
-- Real-state test against marketplace: ran scanner; **caught the test-fixture AWS key in `plugins/sea/skills/probe/tests/fixtures/polyglot_monorepo/apps/api/src/leaked_key.py`** correctly identified AND correctly allowlisted (fixture path)
+- Real-state test against marketplace: ran scanner; **caught the test-fixture AWS key in `plugins/sulis/skills/analyse-codebase/tests/fixtures/polyglot_monorepo/apps/api/src/leaked_key.py`** correctly identified AND correctly allowlisted (fixture path)
 - Synthetic fixture with planted real-looking credential: caught with high severity
 - Synthetic fixture with `eval(user_input)`: caught
 - **Cross-skill:** check-readability run on scanner.py = 0 findings (clean code)

@@ -57,9 +57,9 @@ the established CI/CD convention say?
 
 ## Part 1 — SEA produces a DAG, not a hierarchy
 
-I read `plugins/sea/agents/engineering-architect.md`,
-`plugins/sea/skills/decompose/SKILL.md`, and
-`plugins/sea/references/change-primitives.md` end-to-end.
+I read `plugins/sulis/agents/engineering-architect.md`,
+`plugins/sulis/skills/plan-work/SKILL.md`, and
+`plugins/sulis/references/change-primitives.md` end-to-end.
 
 **Finding 1 — There is no "slice" or "phase" concept above WP.** SEA's
 decompose output is a flat list of Work Packages with `dependsOn` / `blocks`
@@ -327,10 +327,10 @@ level, not N.
 ## Sources
 
 **Codebase reads:**
-- `plugins/sea/agents/engineering-architect.md`
-- `plugins/sea/skills/decompose/SKILL.md` (lines 206-288 INDEX.md structure;
+- `plugins/sulis/agents/engineering-architect.md`
+- `plugins/sulis/skills/plan-work/SKILL.md` (lines 206-288 INDEX.md structure;
   lines 284-286 topological order example)
-- `plugins/sea/references/change-primitives.md` (22 primitives, 5 groups)
+- `plugins/sulis/references/change-primitives.md` (22 primitives, 5 groups)
 - `plugins/sulis/references/lifecycle.md`
 - `plugins/sulis/agents/executor.md`
 

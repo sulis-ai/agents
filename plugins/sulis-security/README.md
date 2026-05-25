@@ -154,7 +154,7 @@ srd:requirements-analyst   →   sulis-security   →   sea:engineering-architec
   reads it and flags **specification drift** (findings that contradict
   documented NFRs). Bridges what was promised with what was built.
 - **With SEA** — Critical and Concern findings can be converted to SEA
-  Hardening Deltas via `/sea:harden`. The report cross-references existing
+  Hardening Deltas via `/sulis:harden-codebase`. The report cross-references existing
   deltas to avoid double-counting.
 - **Standalone** — the assessment runs without either plugin, on any
   codebase that has no prior specification or architecture.

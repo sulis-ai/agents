@@ -66,7 +66,7 @@ convention that meets the requirements. The priority order is precise:
    Discover internal prior art via:
    - `.context/{project}/INDEX.md` authoritative sources
    - `.architecture/{project}/probe-raw/1_2_capabilities.json` capability
-     inventory (produced by `/sea:probe`)
+     inventory (produced by `/sulis:analyse-codebase`)
    - Direct codebase grep for cross-cutting concern names (rate limiting,
      auth, caching, retries, secrets management, observability, feature
      flags, audit, idempotency — see the Prior-Art Check rule in the SRD

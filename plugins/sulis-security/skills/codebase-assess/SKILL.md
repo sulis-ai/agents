@@ -301,7 +301,7 @@ Before writing the report, check for sibling-plugin artifacts:
 - For each Critical/Concern finding in the assessment, check if a Hardening
   Delta already covers it.
 - Report's "Recommendations" section: for findings without an existing
-  delta, recommend `/sea:harden` to convert them into deltas; for findings
+  delta, recommend `/sulis:harden-codebase` to convert them into deltas; for findings
   with an existing delta, note its status (proposed/accepted/implemented).
 
 This avoids double-counting between security review and architectural hardening.
@@ -395,7 +395,7 @@ TIMESTAMP=$(date -u +%Y-%m-%dT%H%M%SZ)
 ## Recommendations
 
 ### Immediate (production-blocking)
-{Critical and high-severity items. If SEA is installed, recommend `/sea:harden` to convert to Hardening Deltas.}
+{Critical and high-severity items. If SEA is installed, recommend `/sulis:harden-codebase` to convert to Hardening Deltas.}
 
 ### Near-term (before next major release)
 {Medium-severity items. Group by category. Estimate effort.}
@@ -427,7 +427,7 @@ After the report is written:
 4. Move hypotheses to `.security/{project}/hypotheses.md`.
 5. Remove the temp directory: `rm -rf "$ASSESS_DIR"`.
 6. Summarise top findings to the user in conversation.
-7. If applicable, suggest `/sea:harden` as the next step.
+7. If applicable, suggest `/sulis:harden-codebase` as the next step.
 
 ---
 

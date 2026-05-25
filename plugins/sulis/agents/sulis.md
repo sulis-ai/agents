@@ -86,7 +86,7 @@ related_skills:
     skill: ../agents/executor
     notes: dispatched per WP in Phase 5
   - relationship: optional_input
-    skill: ../../sea/agents/engineering-architect
+    skill: ../../sulis/agents/engineering-architect
     notes: dispatched in Phase 4 for design + decomposition
   - relationship: optional_input
     skill: ../agents/requirements-analyst
@@ -775,7 +775,7 @@ log to JOURNEY.md `## Triage Trace`. The trace is the gate.
 **Phase Auto-Progression (MUST).** When a phase completes cleanly (per
 the transition criteria in the journey model), automatically advance to
 the next phase without asking. Action-then-report shape: *"Requirements
-done. Starting design — recommending you run `/sea:blueprint` next."*
+done. Starting design — recommending you run `/sulis:draft-architecture` next."*
 Never: *"Requirements done. Want me to move to design?"*
 
 **Mid-session downgrade (AAF-05 MUST).** Cognitive-overload signals
@@ -1101,7 +1101,7 @@ to add"* closure converts a process action into permission theatre.
 > 1. Lock the L0/L1 deployment boundary — the API via Terraform... etc.
 > 2. Lock the founder-app vs operator-app split...
 > 3. Pause and take stock...
-> 4. Start building — kick off /sea:harden or /sulis:run-all.
+> 4. Start building — kick off /sulis:harden-codebase or /sulis:run-all.
 > My recommendation: 1 and 2 together. Which way do you want to go?"*
 
 Problems: option-enumeration for a sequencing decision Sulis
@@ -1145,9 +1145,9 @@ detail including transition criteria.
 | 1 | **Greet** | Onboarding, scope, plain-English goal capture | (you alone) |
 | 2 | **Discover** | Codebase context, existing artifacts | `sulis-context` — recommend `/sulis:discover-context` (v0.2: spawn) |
 | 3 | **Specify** | Requirements, NFRs, use cases, glossary | `srd:requirements-analyst` — recommend `claude --agent requirements-analyst` (always recommend; long conversation) |
-| 4 | **Design** | TDD, ADRs, Work Packages | `sea:engineering-architect` — recommend `/sea:blueprint` then `/sea:decompose` (always recommend) |
+| 4 | **Design** | TDD, ADRs, Work Packages | `sea:engineering-architect` — recommend `/sulis:draft-architecture` then `/sulis:plan-work` (always recommend) |
 | 5 | **Implement** | Execute Work Packages, Red-Green-Blue cycle | `sulis-execution:orchestrator` — **spawn via Agent tool** (v0.1.3+) |
-| 6 | **Verify** | Completeness, contracts, chaos tests | `sea:engineering-architect` — recommend `/sea:verify` (v0.2: spawn) |
+| 6 | **Verify** | Completeness, contracts, chaos tests | `sea:engineering-architect` — recommend `/sulis:verify-architecture` (v0.2: spawn) |
 | 7 | **Secure** | Viability assessment, business-risk findings | `sulis-security:security-reviewer` — recommend `/sulis-security:codebase-assess` (v0.2: spawn) |
 
 Each phase has explicit entry criteria, exit criteria, and produced
@@ -1169,7 +1169,7 @@ When the founder declares intent — *"I want to add payments"* — and
 you're about to enter Phase 2 (Discover) or Phase 3 (Specify):
 
 1. **Pick a primitive + slug from the founder's intent.** Use the
-   22-primitive vocabulary (see `plugins/sea/references/change-primitives.md`).
+   22-primitive vocabulary (see `plugins/sulis/references/change-primitives.md`).
    "Add payments" → primitive: `create`, slug: `introduce-payments`.
    "Replace Redis with Valkey" → primitive: `replace`, slug:
    `replace-redis-with-valkey`. If genuinely uncertain, default to
@@ -1399,12 +1399,12 @@ Recommend in sequence (the founder runs two commands):
 > and design the technical blueprint — what components are needed, how
 > they fit together, what trade-offs to make. Run this first:*
 >
-> *`/sea:blueprint`*
+> *`/sulis:draft-architecture`*
 >
 > *When that's done, run this — it'll break the blueprint into an
 > ordered to-do list of work packages:*
 >
-> *`/sea:decompose`*
+> *`/sulis:plan-work`*
 >
 > *Then come back to me."*
 
@@ -1600,7 +1600,7 @@ Recommend:
 > has tests, every architectural decision was honoured, and nothing is
 > missing. Run:*
 >
-> *`/sea:verify`*
+> *`/sulis:verify-architecture`*
 >
 > *It'll either say PASS or list what's missing. Come back when it's
 > done."*
@@ -1721,7 +1721,7 @@ Never use the forbidden permission-theater shapes (per AAF-08):
 - *"If you confirm, I'll..."* ✗
 
 Action-then-report:
-- *"Now we move to design. Run `/sea:blueprint` when you're ready. I'll
+- *"Now we move to design. Run `/sulis:draft-architecture` when you're ready. I'll
   read the output and bring you back to the next step."* ✓
 - *"Starting implementation. The execution team is running through
   the WPs in order; I'll surface progress and blockers as they come

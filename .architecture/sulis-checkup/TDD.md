@@ -6,8 +6,8 @@
 > hierarchy for code: each tier checked, failures at low tiers short-circuit work
 > at high tiers, one tiered report.
 > **Sized:** tier L (multi-skill aggregator + new graph engine), addressable scope
-> mostly net-new; partial coverage of `/sea:probe`, `/sea:codebase-audit`,
-> `/sea:verify`, `/sulis-security:codebase-assess`, `/sea:code-review`.
+> mostly net-new; partial coverage of `/sulis:analyse-codebase`, `/sulis:codebase-audit`,
+> `/sulis:verify-architecture`, `/sulis-security:codebase-assess`, `/sulis:code-review`.
 > **Note on note-to-author:** the agent worked in greenfield mode (no SRD; no existing
 > `.context/sulis-checkup`). The first ADR records this as the SRD gap.
 > **ADRs produced:** 6 (graph engine; tier semantics; healing taxonomy; OODA per
@@ -75,8 +75,8 @@ One file. `CHECKUP.md`. Front page is the seven-tier traffic light.
 Below that, deep-dive expansions only for the tiers that failed,
 with the most-load-bearing fix at the top. Numbered shortcuts at
 the bottom: `[1] fix the build`, `[2] rotate the leaked key`, etc.,
-each of which fires the right downstream skill (`/sea:harden`,
-`/sea:suggest-split`, manual escalation).
+each of which fires the right downstream skill (`/sulis:harden-codebase`,
+`/sulis:suggest-split`, manual escalation).
 
 ### What changes after this lands
 
@@ -97,18 +97,18 @@ primitives and which are addressed by composing what we have.
 | `plugins/sulis/references/founder-facing-conventions.md` | Rules 1–5 govern every founder-facing surface this skill produces. Audience lock = founder-facing or both. |
 | `plugins/sulis/skills/add-skill/SKILL.md` | The five-gate methodology this design will be authored under when we move to implementation. |
 | `plugins/sulis-security/skills/codebase-assess/references/primitives.md` | The 25-primitive catalogue; rows 5–8 of the coverage matrix; tier-2/tier-5/tier-6 candidates. |
-| `plugins/sea/references/mece-3-architecture.md` | Form/Armor/Proof pillars; MEA-01..10. Tier-4 (Survives) and tier-6 (Evolves) map to MEA primitives. |
-| `plugins/sea/references/boring-code.md` | The Green-stage standard. Any code that lands as part of `sulis-checkup` follows BC-01..BC-NN. |
-| `plugins/sea/references/change-primitives.md` (inferred from agent.md citations) | Cross-group decision priority; informs the tier-5/6 healing strategy (refactor vs wrap). |
+| `plugins/sulis/references/mece-3-architecture.md` | Form/Armor/Proof pillars; MEA-01..10. Tier-4 (Survives) and tier-6 (Evolves) map to MEA primitives. |
+| `plugins/sulis/references/boring-code.md` | The Green-stage standard. Any code that lands as part of `sulis-checkup` follows BC-01..BC-NN. |
+| `plugins/sulis/references/change-primitives.md` (inferred from agent.md citations) | Cross-group decision priority; informs the tier-5/6 healing strategy (refactor vs wrap). |
 | `/Users/iain/Documents/repos/platform/apps/api/sulis/shared/workflows/` | The platform's graph-driven workflow service. **Study reference, not target.** Informs the engine choice ADR. |
 | `/Users/iain/Documents/repos/platform/.specifications/kinds-and-tools/SUMMARY.md` + `KIND_LIFECYCLE.md` | The four-stage Kind lifecycle (find/generate/evaluate/decide). Already OODA-shaped; informs per-tier sub-graph design. |
 | LangGraph documentation (StateGraph, conditional_edges, Send, checkpointer, interrupt/resume) | Informs the graph engine ADR. |
 
 **No SRD exists** at `.specifications/sulis-checkup/`. **No context index exists**
-at `.context/sulis-checkup/`. The agent ran `/sea:blueprint` in early-handoff /
+at `.context/sulis-checkup/`. The agent ran `/sulis:draft-architecture` in early-handoff /
 greenfield mode with the user's brief as the sole upstream spec. The first ADR
 records the absent SRD as an explicit gap, with the recommendation that
-`srd:requirements-analyst` is run before any `/sea:decompose` step.
+`srd:requirements-analyst` is run before any `/sulis:plan-work` step.
 
 ---
 
@@ -121,12 +121,12 @@ the gap column names what's missing for the tier to be fully covered.
 
 | # | Founder question | What gets checked | Existing skills + primitives | Gaps (recommended owner) | Refinement note |
 |---|---|---|---|---|---|
-| **1** | **Exists** — does it run? | Builds without error. Typecheck passes (mechanical baseline). Container image / deploy artefact produces. **Tests are discovered (the runner can find them)** — but tests *passing* is tier 3, not tier 1. | `/sea:probe` Phase 1.1 (stack), 1.9 (test discovery), 1.10 (lint dry-run). `/sea:code-review` CR-01 mechanical baseline (`tsc --noEmit`, `eslint`, `mypy`, `cargo check`, `go build`). | Build/deploy-artefact verification per language (a "does the Dockerfile build?" probe). Currently inferred from Phase 1.16 deployment topology + 1.10 lint signal — not directly executed. **Recommended:** extend `/sea:probe` Phase 1.9 with a `--build-artefact` opt-in. | Brief draft had `sea:probe` only. Adding CR-01 covers the typecheck/lint mechanical floor that distinguishes "compiles" from "ships". The brief asked about tier 1 vs 3 for tests: **tests passing is tier 3**, but tests *being runnable* (discovery) is tier 1, because a project that can't even find its tests is broken at the existence layer. |
-| **2** | **Safe** — could anyone be harmed? | Hardcoded secrets in source/history. SQL/command/SSRF injection. Broken access control. Sensitive-data exposure. PII in logs. Supply-chain CVEs. Outdated EOL dependencies. Containers running as root. Plaintext secrets in deploy config. Verbose error messages leaking internals. | `/sulis-security:codebase-assess` covers SEC-01..07, DAT-01..05, SC-01..04, INF-01..04. `/sea:probe` Phase 1.17 credential scanning (hash-only, baseline-aware). `/sea:code-review` CR-09 PH-03 Safety primitive (migrations / secret patterns). | **Comprehensive coverage already exists.** Gap is *integration* — these primitives run in separate skills with separate report formats. The checkup graph re-uses them; no new primitives needed. | Brief draft was correct. Note tier-2 splits into two severity tracks: **critical** (leaked secret in production code → blocks everything) vs **advisory** (CVE on a transitive dep with no exploit path → recorded, doesn't gate). |
-| **3** | **Works** — does it do what it should? | Tests pass. Functional spec met (if a spec exists). Smoke tests green against deploy. CR-10 performance procedural checks pass (no N+1 etc.). | `/sea:verify` perspectives P1–P6 (pillar coverage, WP completion, contract tests, chaos coverage, referential integrity, change-primitive discipline). `/sea:code-review` CR-10 performance checks + quality lens. `/sea:probe` Phase 1.9 (optional test execution). `/sulis-execution:status` for shipped-WP signal. | **`/sea:verify` requires an SRD + TDD + WPs to verify against** — only applicable to projects with prior spec work. For projects without a spec, "works" reduces to "tests pass + smoke green" — currently no skill owns the spec-less verification. **Recommended:** extend `/sea:probe` with a test-execution mode (`--run-tests`) that reports pass/fail without requiring an SRD. | Brief draft had `sea:verify` + test runners. Confirmed: test *execution* lives here, not at tier 1. |
-| **4** | **Survives** — does it handle failure? | Every external call has timeout + retry + circuit breaker (MEA-04). Secrets fetched not embedded (MEA-05). Inter-service mTLS (MEA-06). Operations emit trace+log+metric (MEA-07). No data-loss paths on failure. Chaos tests exist (MEA-10). | `/sea:codebase-audit` Armor pillar — scans for unbounded HTTP/DB clients, missing timeouts, missing CBs, missing OTel. `/sea:harden` implements accepted deltas. `/sea:code-review` architecture lens within a PR. | **Per-operation Failure Mode and Effects Analysis (FMEA) is missing.** Coverage matrix row #16. The audit is one-shot ("scan everything once"); there is no per-module ongoing skill that asks "for each call site, what can fail and where does the failure go?" **Recommended:** new `sea:failure-mode-audit` (per coverage matrix row #16 + recommended new work #2). Owns module-level FMEA tables; consumes audit findings and adds the diagnosability layer (coverage matrix row #17). | Brief draft had `sea:codebase-audit` (Armor). Confirmed. Adding FMEA is the gap. |
-| **5** | **Understandable** — can a new person read this? | Names are descriptive (no `wpx/wp/lib` jargon-density problem). Modules are cohesive (single concept, not kitchen-sink). Docs match code (no doc-drift). Cross-surface contracts (CLI ↔ SDK ↔ MCP) named consistently. | `/sea:probe` Phase 1.5 (coupling), 1.6 (CCN hotspots), 1.7 (wrapper-rot), 1.8 (conventions). `/sulis-security:CQ-01..05` (complexity, coverage, duplication, debt markers, review practices). `/sea:code-review` quality lens. `/sulis:discover-context` doc inventory. | **Stranger-reader naming/legibility/cohesion skill is missing.** Coverage matrix row #15. Coverage matrix row #18 (cross-surface contract drift) and #19 (doc-drift validation) are partial. **Recommended:** three skills — `sea:code-hygiene` (#15), `sea:surface-parity-audit` (#18), `sulis-context:validate` (#19, extends sulis-context). | Brief draft had a single new `sea:code-hygiene`. Coverage analysis shows tier 5 is actually **three sub-concerns** — naming/cohesion, surface parity, and doc drift. Bundling them into one skill loses the stranger-reader lens. Recommended split per coverage matrix. |
-| **6** | **Evolves cleanly** — can we change it without breaking it? | Test coverage is real (not just count — coverage matrix row #22 says we count but don't judge). No dead code, no orphan exports, no stranded migrations. Surface contracts (port→adapter, schema→migration) intact. Migrations are N/M complete (no half-finished moves). | `/sea:probe` Phase 1.13 (dead code via ts-prune/vulture). `/sea:verify` P3 (contract test coverage) + P4 (chaos coverage). `/sea:code-review` CR-09 PH-04 Completeness primitive. `/sulis-security:CQ-02` test ratio signal. | **Three missing primitives.** Coverage matrix #20 (dead code), #21 (migration completion), #22 (test quality beyond coverage). **Recommended:** new `sea:dead-code-audit` (covers #20+#21 — they share infrastructure), new `sea:test-audit` (#22). Surface-parity-audit (from tier 5) also reads here. | Brief draft had three new skills. Refined per coverage matrix: the three concerns fold into **two** new skills (dead-code-audit covers both #20 and #21 because both are "is the cumulative state of the codebase coherent?" questions), plus test-audit. |
+| **1** | **Exists** — does it run? | Builds without error. Typecheck passes (mechanical baseline). Container image / deploy artefact produces. **Tests are discovered (the runner can find them)** — but tests *passing* is tier 3, not tier 1. | `/sulis:analyse-codebase` Phase 1.1 (stack), 1.9 (test discovery), 1.10 (lint dry-run). `/sulis:code-review` CR-01 mechanical baseline (`tsc --noEmit`, `eslint`, `mypy`, `cargo check`, `go build`). | Build/deploy-artefact verification per language (a "does the Dockerfile build?" probe). Currently inferred from Phase 1.16 deployment topology + 1.10 lint signal — not directly executed. **Recommended:** extend `/sulis:analyse-codebase` Phase 1.9 with a `--build-artefact` opt-in. | Brief draft had `sea:probe` only. Adding CR-01 covers the typecheck/lint mechanical floor that distinguishes "compiles" from "ships". The brief asked about tier 1 vs 3 for tests: **tests passing is tier 3**, but tests *being runnable* (discovery) is tier 1, because a project that can't even find its tests is broken at the existence layer. |
+| **2** | **Safe** — could anyone be harmed? | Hardcoded secrets in source/history. SQL/command/SSRF injection. Broken access control. Sensitive-data exposure. PII in logs. Supply-chain CVEs. Outdated EOL dependencies. Containers running as root. Plaintext secrets in deploy config. Verbose error messages leaking internals. | `/sulis-security:codebase-assess` covers SEC-01..07, DAT-01..05, SC-01..04, INF-01..04. `/sulis:analyse-codebase` Phase 1.17 credential scanning (hash-only, baseline-aware). `/sulis:code-review` CR-09 PH-03 Safety primitive (migrations / secret patterns). | **Comprehensive coverage already exists.** Gap is *integration* — these primitives run in separate skills with separate report formats. The checkup graph re-uses them; no new primitives needed. | Brief draft was correct. Note tier-2 splits into two severity tracks: **critical** (leaked secret in production code → blocks everything) vs **advisory** (CVE on a transitive dep with no exploit path → recorded, doesn't gate). |
+| **3** | **Works** — does it do what it should? | Tests pass. Functional spec met (if a spec exists). Smoke tests green against deploy. CR-10 performance procedural checks pass (no N+1 etc.). | `/sulis:verify-architecture` perspectives P1–P6 (pillar coverage, WP completion, contract tests, chaos coverage, referential integrity, change-primitive discipline). `/sulis:code-review` CR-10 performance checks + quality lens. `/sulis:analyse-codebase` Phase 1.9 (optional test execution). `/sulis-execution:status` for shipped-WP signal. | **`/sulis:verify-architecture` requires an SRD + TDD + WPs to verify against** — only applicable to projects with prior spec work. For projects without a spec, "works" reduces to "tests pass + smoke green" — currently no skill owns the spec-less verification. **Recommended:** extend `/sulis:analyse-codebase` with a test-execution mode (`--run-tests`) that reports pass/fail without requiring an SRD. | Brief draft had `sea:verify` + test runners. Confirmed: test *execution* lives here, not at tier 1. |
+| **4** | **Survives** — does it handle failure? | Every external call has timeout + retry + circuit breaker (MEA-04). Secrets fetched not embedded (MEA-05). Inter-service mTLS (MEA-06). Operations emit trace+log+metric (MEA-07). No data-loss paths on failure. Chaos tests exist (MEA-10). | `/sulis:codebase-audit` Armor pillar — scans for unbounded HTTP/DB clients, missing timeouts, missing CBs, missing OTel. `/sulis:harden-codebase` implements accepted deltas. `/sulis:code-review` architecture lens within a PR. | **Per-operation Failure Mode and Effects Analysis (FMEA) is missing.** Coverage matrix row #16. The audit is one-shot ("scan everything once"); there is no per-module ongoing skill that asks "for each call site, what can fail and where does the failure go?" **Recommended:** new `sea:failure-mode-audit` (per coverage matrix row #16 + recommended new work #2). Owns module-level FMEA tables; consumes audit findings and adds the diagnosability layer (coverage matrix row #17). | Brief draft had `sea:codebase-audit` (Armor). Confirmed. Adding FMEA is the gap. |
+| **5** | **Understandable** — can a new person read this? | Names are descriptive (no `wpx/wp/lib` jargon-density problem). Modules are cohesive (single concept, not kitchen-sink). Docs match code (no doc-drift). Cross-surface contracts (CLI ↔ SDK ↔ MCP) named consistently. | `/sulis:analyse-codebase` Phase 1.5 (coupling), 1.6 (CCN hotspots), 1.7 (wrapper-rot), 1.8 (conventions). `/sulis-security:CQ-01..05` (complexity, coverage, duplication, debt markers, review practices). `/sulis:code-review` quality lens. `/sulis:discover-context` doc inventory. | **Stranger-reader naming/legibility/cohesion skill is missing.** Coverage matrix row #15. Coverage matrix row #18 (cross-surface contract drift) and #19 (doc-drift validation) are partial. **Recommended:** three skills — `sea:code-hygiene` (#15), `sea:surface-parity-audit` (#18), `sulis-context:validate` (#19, extends sulis-context). | Brief draft had a single new `sea:code-hygiene`. Coverage analysis shows tier 5 is actually **three sub-concerns** — naming/cohesion, surface parity, and doc drift. Bundling them into one skill loses the stranger-reader lens. Recommended split per coverage matrix. |
+| **6** | **Evolves cleanly** — can we change it without breaking it? | Test coverage is real (not just count — coverage matrix row #22 says we count but don't judge). No dead code, no orphan exports, no stranded migrations. Surface contracts (port→adapter, schema→migration) intact. Migrations are N/M complete (no half-finished moves). | `/sulis:analyse-codebase` Phase 1.13 (dead code via ts-prune/vulture). `/sulis:verify-architecture` P3 (contract test coverage) + P4 (chaos coverage). `/sulis:code-review` CR-09 PH-04 Completeness primitive. `/sulis-security:CQ-02` test ratio signal. | **Three missing primitives.** Coverage matrix #20 (dead code), #21 (migration completion), #22 (test quality beyond coverage). **Recommended:** new `sea:dead-code-audit` (covers #20+#21 — they share infrastructure), new `sea:test-audit` (#22). Surface-parity-audit (from tier 5) also reads here. | Brief draft had three new skills. Refined per coverage matrix: the three concerns fold into **two** new skills (dead-code-audit covers both #20 and #21 because both are "is the cumulative state of the codebase coherent?" questions), plus test-audit. |
 | **7** | **Polished** — is it delightful? | Performance (sub-tier-3 perf checks aside — CR-10 catches procedural N+1 already; tier 7 is empirical perf budgets). Accessibility. UX. Founder ergonomics (clear CLI, helpful error messages, sensible defaults). | None today. Coverage matrix row #23 (founder ergonomics) has no owner. Performance budgets typically tracked outside the marketplace. | **Whole tier is deferred.** Coverage matrix's second-wave gap. **Recommended:** new `sulis-concierge:ergonomics-audit` for founder UX (#23) when prioritised. Performance budgets best owned by deploy/observability tooling outside this marketplace. | Brief had tier 7 deferred. Confirmed defer. Checkup graph stubs tier 7 with a "not applicable for this run" terminal — it doesn't fail, it just doesn't gate. |
 
 ### Boundary decisions called out
@@ -169,11 +169,11 @@ don't fit are flagged.
 
 | Matrix row | Concern | Tier | Note |
 |---|---|---|---|
-| 1 | Per-change correctness | 3 (Works) | `/sea:code-review` already lives at the PR layer; checkup runs it on a branch or last-N-commits in a project-level pass. |
-| 2 | PR hygiene + sizing | 3 (Works) | Same — composes from `/sea:code-review` + `/sea:suggest-split` outputs. |
-| 3 | Architecture primitive gaps | 4 (Survives) | `/sea:codebase-audit` is the tier-4 backbone. |
-| 4 | Post-WP completeness | 6 (Evolves) | `/sea:verify` is tier-6 because it asks "is the architecture coherent enough to change?". Sub-result feeds tier 3 (works) via P2 WP-completion. |
-| 5 | Cyclomatic complexity | 5 (Understandable) | Coverage overlap between `/sea:probe` and `sulis-security:CQ-01` resolved by checkup: probe is canonical (deeper), CQ-01 reads probe output. ADR not needed yet — flag as an existing consolidation opportunity to address out-of-band. |
+| 1 | Per-change correctness | 3 (Works) | `/sulis:code-review` already lives at the PR layer; checkup runs it on a branch or last-N-commits in a project-level pass. |
+| 2 | PR hygiene + sizing | 3 (Works) | Same — composes from `/sulis:code-review` + `/sulis:suggest-split` outputs. |
+| 3 | Architecture primitive gaps | 4 (Survives) | `/sulis:codebase-audit` is the tier-4 backbone. |
+| 4 | Post-WP completeness | 6 (Evolves) | `/sulis:verify-architecture` is tier-6 because it asks "is the architecture coherent enough to change?". Sub-result feeds tier 3 (works) via P2 WP-completion. |
+| 5 | Cyclomatic complexity | 5 (Understandable) | Coverage overlap between `/sulis:analyse-codebase` and `sulis-security:CQ-01` resolved by checkup: probe is canonical (deeper), CQ-01 reads probe output. ADR not needed yet — flag as an existing consolidation opportunity to address out-of-band. |
 | 6 | Test coverage ratio | 6 (Evolves) | `sulis-security:CQ-02`. Cross-feeds tier 3 if coverage is so low it suggests "works" is unverified. |
 | 7 | Code duplication | 5 (Understandable) | `sulis-security:CQ-03`. |
 | 8 | Tech-debt markers | 5 (Understandable) | `sulis-security:CQ-04`. |
@@ -192,7 +192,7 @@ don't fit are flagged.
 | 21 | Migration completion | 6 (Evolves) | **PARTIAL** — same skill as #20. |
 | 22 | Test quality beyond coverage | 6 (Evolves) | **PARTIAL** — new `sea:test-audit` needed. |
 | 23 | CLI / founder ergonomics | 7 (Polished) | **GAP** — deferred per tier-7 decision. |
-| 24 | Manifest hygiene | 1 (Exists) — for parseability; 3 (Works) — for semantic correctness | **PARTIAL** — extend `/sea:code-review` checklist + checkup runs YAML/JSON parser as part of the tier-1 mechanical floor. |
+| 24 | Manifest hygiene | 1 (Exists) — for parseability; 3 (Works) — for semantic correctness | **PARTIAL** — extend `/sulis:code-review` checklist + checkup runs YAML/JSON parser as part of the tier-1 mechanical floor. |
 
 **No row failed to fit a tier.** Two rows (13, 24) cross-tier — a single primitive
 contributing to two tiers. ADR-003 covers the "primitive contributes to multiple
@@ -209,21 +209,21 @@ table assigns one or more healing prototypes per tier with rationale.
 
 | Prototype | Pattern source | When it works |
 |---|---|---|
-| **Auto-fix** | `/sea:harden` | When the fix is well-bounded and the failing characterisation test can be constructed deterministically. Example: add a timeout to an unwrapped `fetch()` call. |
+| **Auto-fix** | `/sulis:harden-codebase` | When the fix is well-bounded and the failing characterisation test can be constructed deterministically. Example: add a timeout to an unwrapped `fetch()` call. |
 | **Auto-draft remediation WP** | `/sulis-execution:backfill-gates`, `backfill-code-review` | When the fix needs deliberation but the gap is concrete. The skill drafts a WP at `status: proposed`; the founder ships it through the existing executor pipeline. |
 | **Founder shortcut** | `/sulis:inbox` `[1] resume` pattern | When the action is low-stakes and routine. Echo-before-act per founder-facing-conventions Rule 3. |
 | **Adversarial human-in-the-loop** | `/idc:adversarial-review` pattern | When the fix is a design decision. Skill produces a perspective; founder accepts/rejects/modifies. |
 | **Escalate to SRD** | `requirements-analyst` referral | When the gap is a missing requirement, not missing code. Example: tier 3 fails because there's no spec for the feature — the answer isn't to add tests, it's to clarify the spec. |
-| **Defer / accept-as-known** | `/sea:verify` OPEN_RISK pattern | When the risk is acknowledged but not fixed now. Recorded in the checkup state so re-runs don't re-surface it. |
+| **Defer / accept-as-known** | `/sulis:verify-architecture` OPEN_RISK pattern | When the risk is acknowledged but not fixed now. Recorded in the checkup state so re-runs don't re-surface it. |
 
 ### Per-tier healing assignment
 
 | Tier | Primary healing | Secondary | Rationale |
 |---|---|---|---|
 | **1 — Exists** | **Auto-draft remediation WP** for build failures (with the failing typecheck/lint output embedded). | Founder shortcut: `[1] open the failing file at the first error`. | Build failures usually have one root cause and one or two fix sites. The WP is short; the founder ships it. Auto-fix is too risky because the agent might "fix" the build by deleting symbols rather than understanding the missing import. |
-| **2 — Safe** | **Auto-fix** for known-shape findings (secret in source → replace with vault lookup; missing CSP header → add). | **Adversarial** for security-design findings (access-control gap → human reads the threat model). **Escalate** for unpatched supply-chain CVEs requiring vendor coordination. | Tier 2 splits by finding type. Bounded fixes (secret replacement) are exactly `/sea:harden`'s wheelhouse — the failing test is "secret appears in HEAD"; the green test is "secret has been rotated AND removed from history". Design gaps need human judgment. |
+| **2 — Safe** | **Auto-fix** for known-shape findings (secret in source → replace with vault lookup; missing CSP header → add). | **Adversarial** for security-design findings (access-control gap → human reads the threat model). **Escalate** for unpatched supply-chain CVEs requiring vendor coordination. | Tier 2 splits by finding type. Bounded fixes (secret replacement) are exactly `/sulis:harden-codebase`'s wheelhouse — the failing test is "secret appears in HEAD"; the green test is "secret has been rotated AND removed from history". Design gaps need human judgment. |
 | **3 — Works** | **Auto-draft remediation WP** for failing tests (per-test). | **Escalate to SRD** if a test failure exposes a spec ambiguity. Founder shortcut: `[1] re-run failing test in isolation`. | Failing tests usually have a known cause (recent diff broke something). The WP carries the test name + most-recently-modified file in the test's call graph. SRD escalation only when the test author and the production code can't be reconciled without a spec decision. |
-| **4 — Survives** | **Auto-fix** via `/sea:harden` for HD-NNN deltas with `subject_ownership: external` (timeouts on HTTP clients, retries on DB calls, OTel instrumentation). | **Auto-draft remediation WP** for findings requiring per-call-site judgment (which dependencies are critical-path vs advisory; which need bulkheads). | Tier 4 is the most mature healing path — `/sea:harden` and `/sea:codebase-audit` are already designed exactly for this. The checkup graph reuses them as-is. |
+| **4 — Survives** | **Auto-fix** via `/sulis:harden-codebase` for HD-NNN deltas with `subject_ownership: external` (timeouts on HTTP clients, retries on DB calls, OTel instrumentation). | **Auto-draft remediation WP** for findings requiring per-call-site judgment (which dependencies are critical-path vs advisory; which need bulkheads). | Tier 4 is the most mature healing path — `/sulis:harden-codebase` and `/sulis:codebase-audit` are already designed exactly for this. The checkup graph reuses them as-is. |
 | **5 — Understandable** | **Auto-draft remediation WP** for naming/cohesion findings, with the recommended new name + rationale embedded. | **Adversarial** for "should this module be split?" decisions. **Defer / accept-as-known** for legitimate-jargon decisions (e.g. domain terms that look like jargon to a stranger but are correct). | Renaming and module-splitting are design decisions, not mechanical fixes. The skill proposes; the founder chooses. Auto-fix here would produce a name-change PR that the founder hates and the team rejects. |
 | **6 — Evolves** | **Auto-draft remediation WP** for dead-code removal (one WP per orphan symbol or symbol group). | **Adversarial** for migration-completion decisions (is this migration legitimately stalled or actively in-progress?). **Defer** for low-value test-quality findings. | Dead-code removal is locally bounded but globally risky (the symbol might be referenced via reflection / dynamic dispatch). The WP carries the static-analysis evidence and the burden of proof falls to the executor agent in the Red stage. |
 | **7 — Polished** | **Defer / accept-as-known** for the v1 of checkup. | (future: adversarial for UX, escalate for perf budget conversations) | Tier 7 is stubbed. The checkup reports "not assessed in this run" and moves on. When the tier graduates to active, founder ergonomics findings naturally route to adversarial (it's a taste decision). |
@@ -521,7 +521,7 @@ ideas, not as code.
 Alternatives considered:
 - `/sulis:health` — too vague (what kind of health? auth? db?). Rejected.
 - `/sulis:audit` — overloaded already (codebase-audit, security audit). Rejected.
-- `/sulis:review` — collides with `/sea:code-review` mental model. Rejected.
+- `/sulis:review` — collides with `/sulis:code-review` mental model. Rejected.
 - `/sulis:status` — exists; reads INDEX state inline; conceptually orthogonal.
 
 **Recommendation: `/sulis:checkup`.** Plain English. Implies "scheduled or
@@ -541,7 +541,7 @@ diagnose-then-treat shape.
 
 ### Report format — CHECKUP.md
 
-**Two tiers per the `/sea:code-review` pattern.** Founder tier on top, technical
+**Two tiers per the `/sulis:code-review` pattern.** Founder tier on top, technical
 tier below the `## Technical detail` heading.
 
 ```markdown
@@ -626,8 +626,8 @@ sequenceDiagram
     participant Founder
     participant Checkup as /sulis:checkup
     participant Tier4 as Tier 4 OODA
-    participant Audit as /sea:codebase-audit
-    participant Harden as /sea:harden
+    participant Audit as /sulis:codebase-audit
+    participant Harden as /sulis:harden-codebase
     participant Report as CHECKUP.md
 
     Founder->>Checkup: invoke
@@ -668,10 +668,10 @@ it now (that's `sulis:add-skill`'s job).
 | 5 | `sea:test-audit` | 6 | Coverage matrix #22 — test-quality-beyond-coverage. We count, we don't judge. | `sea` plugin |
 | 6 | `sulis-context:validate` | 5 | Coverage matrix #19 — doc-drift validation. Extends `sulis-context` (close to the inventory already there). | `sulis-context` plugin |
 | 7 | `sulis-concierge:ergonomics-audit` | 7 | Coverage matrix #23 — founder ergonomics. Deferred for v1 of checkup. | `sulis` plugin (concierge ergonomics) — long-term |
-| 8 | Build/deploy-artefact verification | 1 | Tier-1 gap surfaced in Part 3 — "does the Dockerfile build?" not directly executed. | Extend `/sea:probe` Phase 1.9 with `--build-artefact` opt-in (incremental, not new skill) |
-| 9 | Spec-less test-execution mode | 3 | Tier-3 only fully covered by `/sea:verify` which requires SRD+TDD+WPs. Need a spec-less "tests pass + smoke green" mode. | Extend `/sea:probe` Phase 1.9 with `--run-tests` mode reporting pass/fail (already partially supported per probe SKILL.md) |
-| 10 | Observability/diagnosability per-PR check | 3-4 | Coverage matrix #17 — extend `/sea:code-review` quality lens with diagnosability check. Incremental, not new skill. | Extend `/sea:code-review` CR-NN checklist |
-| 11 | Manifest hygiene check | 1 | Coverage matrix #24 — `plugin.json`, `marketplace.json` semantic correctness beyond JSON-parseability. | Extend `/sea:code-review` PR-hygiene checklist OR extend `/sea:probe` Phase 1.16 |
+| 8 | Build/deploy-artefact verification | 1 | Tier-1 gap surfaced in Part 3 — "does the Dockerfile build?" not directly executed. | Extend `/sulis:analyse-codebase` Phase 1.9 with `--build-artefact` opt-in (incremental, not new skill) |
+| 9 | Spec-less test-execution mode | 3 | Tier-3 only fully covered by `/sulis:verify-architecture` which requires SRD+TDD+WPs. Need a spec-less "tests pass + smoke green" mode. | Extend `/sulis:analyse-codebase` Phase 1.9 with `--run-tests` mode reporting pass/fail (already partially supported per probe SKILL.md) |
+| 10 | Observability/diagnosability per-PR check | 3-4 | Coverage matrix #17 — extend `/sulis:code-review` quality lens with diagnosability check. Incremental, not new skill. | Extend `/sulis:code-review` CR-NN checklist |
+| 11 | Manifest hygiene check | 1 | Coverage matrix #24 — `plugin.json`, `marketplace.json` semantic correctness beyond JSON-parseability. | Extend `/sulis:code-review` PR-hygiene checklist OR extend `/sulis:analyse-codebase` Phase 1.16 |
 
 **Eight new skills, three extensions.** This is the maximum scope. Checkup v1
 ships with the four highest-priority new skills (#1–#4) plus the extensions
@@ -681,12 +681,12 @@ that fall into other skills naturally. Items #5–#7 + #11 are second-wave.
 
 ## Part 10 — Open questions
 
-These need a founder/maintainer decision before `/sea:decompose` runs. Each
+These need a founder/maintainer decision before `/sulis:plan-work` runs. Each
 is genuinely open — not a question I could answer by reading more docs.
 
 ### Q1 — How aggressive should auto-fix be at tier 2?
 
-`/sea:harden` currently auto-fixes hardcoded-secret findings by replacing the
+`/sulis:harden-codebase` currently auto-fixes hardcoded-secret findings by replacing the
 literal with a vault lookup. The vault is configured at the project level. If
 the project has no vault configured, what should checkup do?
 
@@ -714,7 +714,7 @@ Recommendation: **B for the founder tier, A for the technical tier**. Founder se
 
 ### Q4 — What "passing tier 3" means without a spec
 
-If the project has no SRD/TDD/WPs, `/sea:verify` doesn't apply. Tier 3 then reduces to "tests pass + smoke green". But a project with no spec and no tests passes tier 3 trivially. Is that right?
+If the project has no SRD/TDD/WPs, `/sulis:verify-architecture` doesn't apply. Tier 3 then reduces to "tests pass + smoke green". But a project with no spec and no tests passes tier 3 trivially. Is that right?
 
 Recommendation: **no.** A project with no tests should produce a tier 3 verdict of `partial` with the finding "no tests detected — tier 3 cannot be fully assessed". The tier 6 test-audit primitive will then drive the founder toward adding tests.
 
@@ -763,7 +763,7 @@ Recommendation: **auto-invoke only in non-interactive form** (write the index wi
 | Sections that referenced rather than restated | Founder-facing-conventions (referenced, not restated); MECE-3 (referenced for tier 4 mapping, not restated); kinds-and-tools lifecycle (referenced as pattern source, not copied) |
 | Circuit breakers triggered | None |
 | Reserved-Vocabulary Sweep | Skipped — greenfield, no probe synthesis with `reserved_vocabulary_hint` available. Vocabulary check done informally: `Checkup`, `Tier`, `OODA cycle`, `Finding`, `HealingAction`, `Verdict` checked against marketplace; `Verdict` matches kinds-and-tools usage (intentional borrow); no collisions. |
-| Reserved-Vocabulary Sweep formal | DEFERRED — to be run when probe v0.9.1+ output exists for the marketplace and during `/sea:decompose`. |
+| Reserved-Vocabulary Sweep formal | DEFERRED — to be run when probe v0.9.1+ output exists for the marketplace and during `/sulis:plan-work`. |
 
 ---
 
@@ -774,5 +774,5 @@ Recommendation: **auto-invoke only in non-interactive form** (write the index wi
 | Founder reviewing this design | Part 1 (executive summary). Stop at Part 3. |
 | Maintainer deciding whether to commit to the design | Parts 1, 3, 5, 7, 10. |
 | Future SRD author writing `.specifications/sulis-checkup/SRD.md` | Parts 3, 4, 9, 10. Treat Part 9's gap list and Part 10's open questions as the source for the SRD's FR/NFR set. |
-| Future SEA author running `/sea:decompose` after SRD lands | Parts 3, 7, 8 + all ADRs. |
+| Future SEA author running `/sulis:plan-work` after SRD lands | Parts 3, 7, 8 + all ADRs. |
 | Future `sulis:add-skill` author for new primitives | Part 9 (gap list), plus the ADRs once the SRD is in place. |

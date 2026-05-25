@@ -67,7 +67,7 @@ it just means the naming finding is more urgent to fix.
 
 **Cons:**
 - Tier 4-7 results are noise if the project doesn't build (tier 1).
-  Running `/sea:codebase-audit` against a non-compiling codebase
+  Running `/sulis:codebase-audit` against a non-compiling codebase
   produces meaningless output.
 
 **Accepted with the exception:** if tier 1 fails critically, the
