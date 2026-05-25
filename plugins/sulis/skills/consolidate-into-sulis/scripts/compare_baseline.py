@@ -56,9 +56,11 @@ def finding_signature(finding: dict) -> str:
     if file and rule:
         return f"{file}::{line}::{rule}"
 
-    # Fall back to a hash of stable JSON
+    # Fall back to a hash of stable JSON. SHA256 (not SHA1) — this is a
+    # non-cryptographic content fingerprint, but SHA256 avoids the semgrep
+    # `insecure-hash-algorithm-sha1` flag without changing semantics.
     blob = json.dumps(finding, sort_keys=True, default=str)
-    return "hash::" + hashlib.sha1(blob.encode()).hexdigest()[:12]
+    return "hash::" + hashlib.sha256(blob.encode()).hexdigest()[:12]
 
 
 def extract_findings(report: dict) -> list[dict]:
