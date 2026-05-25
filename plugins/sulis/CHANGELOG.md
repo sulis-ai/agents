@@ -1,5 +1,120 @@
 # Sulis — Changelog
 
+## v0.29.0 — 2026-05-25
+
+**`/sulis:address-findings` — the bridge skill between detection and
+execution.** First skill authored against the v0.7.0 add-skill
+methodology with the new local standards (Critical Thinking /
+Decomposition / Spiral / Standards Rubric / Referential Integrity /
+WORK_PACKAGE_STANDARD).
+
+### What the skill does
+
+Takes scanner findings (deep-mode CHECKUP.md OR any check-* --raw JSON)
+and turns them into a queue of actionable Work Packages the founder
+can execute one by one. Reads input, dispatches sea:engineering-architect
+via Agent to characterise (root cause + fix shape + effort + risk +
+recurrence pattern), writes one WP file per atomic unit of work per
+WORK_PACKAGE_STANDARD, and refreshes INDEX.md.
+
+### The three differentiators (vs "just write some WPs")
+
+1. **Recurrence heuristic.** If a fix shape recurs ≥ 3 times AND is
+   mechanically identical, proposes extracting a skill via
+   /sulis:add-skill instead of writing N one-off WPs. Pattern lifted
+   from the user's transcript where SEA organically recognised "4 of
+   6 kitchen-sink findings have identical mechanics."
+2. **Lineage chain.** Every WP carries PROV-O-aligned pointers back to
+   the finding signatures it addresses. Loop closes when next scan
+   confirms signatures are gone.
+3. **Founder-mode summary.** 3 sentences (what was found / what's
+   proposed / sequencing); cap-applied per MUC-F4; full list in
+   INDEX.md.
+
+### Files added
+
+- `plugins/sulis/skills/address-findings/SKILL.md` — 282 lines;
+  Pyramid-led; v0.7.0 frontmatter (standards / verification_spiral /
+  related_skills); 8-step workflow; 7 gotchas
+- `plugins/sulis/skills/address-findings/references/characterisation-prompt.md`
+  — 134 lines; SEA Agent dispatch template with strict YAML response
+  contract; explicit prohibitions (mechanical identity required for
+  skill proposals; atomic scope required; destructive intent declared)
+- `plugins/sulis/skills/address-findings/scripts/findings_loader.py`
+  — 290 lines; input validation + staleness check + signature-based
+  dedup against existing WPs; supports CHECKUP.md + check-* --raw +
+  multi-input merge. Smoke-tested with synthetic fixture (2 findings,
+  1 pre-existing WP → correctly surfaced 1 new + 1 duplicate).
+- `plugins/sulis/skills/address-findings/iterations/1/VERIFICATION_REPORT.md`
+  — full 5-gate documentation. Verdict: APPROVED-WITH-RISK
+  (functional-completeness + Independence Check both DEFERRED with
+  revisit triggers per HU; all 7 misuse cases PREVENTED).
+
+### Five-gate verdict summary
+
+- **Gate 1 Find:** PASS — BRIEF_PACK reviewed (88 skills × 64 refs);
+  5 nearest-neighbour skills all complementary; 2 vocab collisions
+  waived with reason; CC verdict on "no existing skill covers this"
+  = SUPPORTED. Primitive Discovery surfaced 9 primitives → 4 clusters.
+- **Gate 2 Scope Lock:** PASS — all 11 lock items written; tier=HEAVY;
+  4 of 7 gotchas are MUC-F1..F6 (meets founder-facing requirement)
+- **Gate 3 Generate:** PASS — 4 files produced; Pyramid structure;
+  linguistic audit clean; 8 of 9 cross-references verified
+- **Gate 4 Evaluate:** PASS (with 2 DEFERRED dimensions carrying
+  revisit triggers): ACCA 4/5, Evidence 4/5, Structural 4/5, Honest
+  Uncertainty 5/5, Codebase Referential Integrity 4/5, Outcome-
+  Specific Rigor 2-of-3-PASS (Functional-Completeness DEFERRED until
+  first founder run), Independence Check DEFERRED to follow-up commit
+- **Gate 5 Adversarial:** PASS — 7 misuse cases named, all PREVENTED
+  with mechanism (MUC-F4 / F3 / F1 / F5 from the founder-conditional
+  set + 3 audience-agnostic)
+
+### Why the methodology held up
+
+This was the first real test of the v0.7.0 add-skill standards-grounded
+methodology with all 6 local standards (5 from v0.13.0 + WORK_PACKAGE
+from v0.27.0). Key observations:
+
+- Primitive Discovery sub-step (v0.7.0 new) usefully forced the
+  9-primitive enumeration → 4 cluster collapse BEFORE drafting; would
+  have produced a bloated SKILL.md otherwise
+- DEFERRED-with-revisit pattern (Functional Completeness +
+  Independence Check both deferred rather than blocking publish) is
+  exactly what v0.7.0 was designed for; authoring vs first-real-use
+  are different evidence points
+- Gate 5 produced 7 misuse cases naturally because the 8 workflow
+  steps each had failure-mode pairings (Step 1 → MUC-F5 staleness,
+  Step 4 → MUC-F3 destructive, etc.)
+
+### Cross-skill self-test
+
+All 5 skills 0 findings. Track record: 13 → 14 data points.
+
+### Plugin metadata
+
+- plugins/sulis/.claude-plugin/plugin.json: 0.28.0 → 0.29.0
+- .claude-plugin/marketplace.json: sulis 0.28.0 → 0.29.0;
+  marketplace 1.71.0 → 1.72.0
+
+### What's next (per WORK_PACKAGE_STANDARD build order)
+
+1. ✅ wp_index.py — DONE (v0.28.0)
+2. ✅ /sulis:address-findings — DONE (this commit)
+3. **/sulis:execute** — founder-facing wrapper around
+   sulis-execution:executor for backend WPs (first executor migration
+   step toward bringing execution into sulis)
+4. **WP_BACKEND_STANDARD.md** — codifies what executor already does
+5. **Per-kind standards + executors** (frontend / async / docs / infra)
+   as each kind has real work to validate against
+6. **Loop-close mechanism** — `wp_loop_close.py` post-deploy re-runs
+   the originating scanner + updates `invalidated_by` on the WP file
+
+The smallest functional loop ships after #3: founder runs
+/sulis:code-health → /sulis:address-findings → sees INDEX.md →
+/sulis:execute → loop closed (after #6).
+
+---
+
 ## v0.28.0 — 2026-05-25
 
 **INDEX.md generator (`wp_index.py`).** First implementation against
