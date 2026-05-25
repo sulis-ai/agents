@@ -1,5 +1,79 @@
 # Sulis — Changelog
 
+## v0.30.0 — 2026-05-25
+
+**sulis-execution consolidated into sulis.** The executor + train + wpx-*
+CLI tools moved from the sulis-execution plugin into the canonical sulis
+plugin. The longer-term direction is sulis as the only plugin shipped;
+this consolidation mirrors the sulis-concierge → sulis migration at
+v0.2.0. Every piece of functionality preserved.
+
+### What founders see
+
+A new family of /sulis:* commands replaces the /sulis-execution:*
+namespace:
+
+| Was | Now |
+|-----|-----|
+| `/sulis-execution:run-wp WP-NNN` | `/sulis:run-wp WP-NNN` |
+| `/sulis-execution:run-all` | `/sulis:run-all` |
+| `/sulis-execution:retry WP-NNN` | `/sulis:retry WP-NNN` |
+| `/sulis-execution:status` | `/sulis:wp-status` (renamed; `/sulis:status` was already the concierge journey status) |
+| `/sulis-execution:backfill-code-review` | `/sulis:backfill-code-review` |
+| `/sulis-execution:backfill-gates` | `/sulis:backfill-gates` |
+
+No deprecation shim skills — same pattern as the sulis-concierge
+deprecation. The old plugin's description is the [DEPRECATED] redirect.
+
+### Migration: 5 commits, 8 steps, 50 files moved
+
+| Step | Commit | What moved |
+|------|--------|------------|
+| 1 — Scripts | `02c1e77` | `_wpxlib.py` (3429 LOC), 11 wpx-* CLIs + sulis-change, 37 test files (249 tests), `.github/workflows/sulis-execution-tests.yml` → `sulis-executor-tests.yml` (path triggers + pytest targets updated), allowlist updates in `.checkup/agents/check-readability-allowlist.md` + `check-reliability-allowlist.md` |
+| 2 — Skills | `6621e5b` | 6 skills moved + ~70 line-level ref updates per SKILL.md across 12 categories (cache path, dev fallback, plugin install, subagent_type, etc.); `status` renamed to `wp-status` |
+| 3 — Agents | `99607e8` | `executor.md` + `orchestrator.md` moved; 17 line-level edits (including the multi-line subagent_type in orchestrator.md:52-53) |
+| 4 — References | `5278a85` | `lifecycle.md` (2292 LOC), `primitive-scaffolds.md`, `self-heal-budget.md` moved; 4 cross-plugin docs updated (`plugins/srd/references/executor-loop-standard.md` + 3 SDK docs at `plugins/sulis-execution/sdk/docs/`); 12 line edits including a line-wrapped path in srd/references that sed missed and Edit fixed |
+| 5+6+7 — Wrap-up | this commit | `docs/executor-research/` (8 files) + `docs/executor-e2e-test.md` moved; sulis-execution plugin.json, CLAUDE.md, README.md, CHANGELOG.md rewritten as [DEPRECATED] redirects; sulis plugin.json + this CHANGELOG + marketplace.json + this commit's metadata updated |
+| 8 — Self-test | this commit | Cross-skill self-test run on the migrated tree (check-readability + check-reliability + check-maintainability + check-polish): 0 findings sustained. 6 pre-existing cyclomatic-complexity findings in `_wpxlib.py` + `tests/integration/testbed.py` allowlisted with explicit HD-008 justification (`.checkup/agents/check-readability-allowlist.md`) — downstream of the kitchen-sink design choice; will be revisited during the v2 _wpxlib.py refactor |
+
+### What stays at plugins/sulis-execution/
+
+Only the SDK packages — they keep their stable published names because
+external consumers depend on them:
+
+- `sdk/python/` — `sulis-execution` on PyPI
+- `sdk/typescript/` — `@sulis-ai/execution` on npm
+- `sdk/mcp-server/` — `sulis-execution-mcp` on PyPI
+
+A future commit will move them to a dedicated `sulis-ai/sulis-execution-sdk`
+repository; renaming them in place would be SemVer-breaking. The plugin
+shell is retained as a [DEPRECATED] SDK distribution wrapper until then.
+
+### Design decisions
+
+- **No shim skills.** Tried at first; rejected after checking the
+  sulis-concierge precedent (no shims, just a [DEPRECATED] description).
+  Shim skills add maintenance burden + would shadow the canonical
+  /sulis:* names in command-search.
+- **`lifecycle.md` not promoted to `references/standards/`.** Standards
+  there are cross-cutting (Critical Thinking, Decomposition Procedure,
+  Spiral Templates, Standards Rubric, Referential Integrity). The
+  executor lifecycle is executor-specific, not cross-cutting.
+- **One flaky test** (`test_train_lock_second_acquisition_raises`)
+  failed once on first re-run after Step 1; passed on isolated re-run
+  + on full re-run. Pre-existing flakiness, not migration-caused.
+- **Dead constant removed.** `_FINDING_FIELDS` in `findings_loader.py`
+  was scaffolding never wired in; check-maintainability surfaced it
+  after the move exposed the unused symbol; removed.
+
+### Verification
+
+- 249 executor tests passing
+- Cross-skill self-test 0 findings on the migrated tree
+- CI workflow renamed + path triggers updated; next pull_request will
+  exercise it
+- All cross-plugin references (srd + SDK docs) follow the moves
+
 ## v0.29.0 — 2026-05-25
 
 **`/sulis:address-findings` — the bridge skill between detection and

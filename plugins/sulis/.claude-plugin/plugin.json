@@ -1,7 +1,7 @@
 {
   "name": "sulis",
-  "description": "Sulis — the canonical front-door plugin for the Sulis AI marketplace. Hosts the founder-facing concierge agent + journey skills (start/handoff/status) and the meta-skill methodology (add-skill) used to author other plugins. Founders interact via /sulis:* commands; specialist domain plugins (srd/sea/sulis-execution/sulis-security/etc) remain operator-facing internals.",
-  "version": "0.29.0",
+  "description": "Sulis — the canonical front-door plugin for the Sulis AI marketplace. Hosts the founder-facing concierge agent + journey skills (start/handoff/status); the meta-skill methodology (add-skill) used to author other plugins; the deep-mode code-health framework (check-* tier 1-7); the address-findings bridge (turns findings into Work Packages per WORK_PACKAGE_STANDARD); and the executor + train + wpx-* CLI tools (consolidated from sulis-execution at v0.30.0). Founders interact via /sulis:* commands — including the full execution surface: /sulis:run-wp, /sulis:run-all, /sulis:retry, /sulis:wp-status, /sulis:backfill-code-review, /sulis:backfill-gates.",
+  "version": "0.30.0",
   "author": {
     "name": "Iain"
   },

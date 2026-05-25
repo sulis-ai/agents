@@ -1,5 +1,57 @@
 # Changelog — sulis-execution
 
+## v0.25.0 — 2026-05-25 — DEPRECATED (consolidated into sulis)
+
+**Final sulis-execution release. All executor surfaces moved to the
+`sulis` plugin (v0.30.0).** This shell remains for the SDK packages
+(`sdk/python/`, `sdk/typescript/`, `sdk/mcp-server/`) which retain
+their published names and will move to a dedicated repo separately.
+
+See `plugins/sulis/CHANGELOG.md` v0.30.0 for the consolidated
+migration entry covering all 8 steps. See `plugins/sulis-execution/
+CLAUDE.md` for the full file-by-file mapping table.
+
+**What moved:**
+- 6 skills (run-wp / run-all / retry / backfill-code-review /
+  backfill-gates / status→wp-status) → `plugins/sulis/skills/`
+- 2 agents (executor / orchestrator) → `plugins/sulis/agents/`
+- 12 wpx-* CLI tools + sulis-change + `_wpxlib.py` (3429 LOC) →
+  `plugins/sulis/scripts/`
+- 3 reference docs (lifecycle.md / primitive-scaffolds.md /
+  self-heal-budget.md) → `plugins/sulis/references/`
+- 249 tests → `plugins/sulis/scripts/tests/` (all green at the new
+  location)
+- 8 research docs + E2E_TEST.md → `plugins/sulis/docs/`
+
+**What stayed:**
+- `sdk/python/` (PyPI package `sulis-execution`)
+- `sdk/typescript/` (npm package `@sulis-ai/execution`)
+- `sdk/mcp-server/` (PyPI package `sulis-execution-mcp`)
+- This CHANGELOG.md (sealed at v0.25.0 — historical record)
+- README.md + CLAUDE.md (updated to redirect to sulis)
+
+**Command renames** (founders must update):
+
+| Was | Now |
+|-----|-----|
+| `/sulis-execution:run-wp WP-NNN` | `/sulis:run-wp WP-NNN` |
+| `/sulis-execution:run-all` | `/sulis:run-all` |
+| `/sulis-execution:retry WP-NNN` | `/sulis:retry WP-NNN` |
+| `/sulis-execution:status` | `/sulis:wp-status` (renamed) |
+| `/sulis-execution:backfill-code-review` | `/sulis:backfill-code-review` |
+| `/sulis-execution:backfill-gates` | `/sulis:backfill-gates` |
+
+**CI workflow** moved: `.github/workflows/sulis-execution-tests.yml`
+→ `.github/workflows/sulis-executor-tests.yml`; trigger paths updated
+to `plugins/sulis/scripts/**`.
+
+**No deprecation shim skills** added (matches `sulis-concierge`
+deprecation pattern); old command names stop working at next plugin
+reload. The plugin description in `.claude-plugin/plugin.json`
+documents the rename so founders see the redirect when listing plugins.
+
+---
+
 This file holds the cumulative version history that previously lived in
 `plugin.json`'s `description` field. The description is now a one-sentence
 summary (per HD-004, v0.21.3+); historical detail lives here.
