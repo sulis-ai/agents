@@ -1,24 +1,28 @@
-# Repository Contract — project-specific configuration
-# Read by the RC-13 workflow command slots + wpx-arrival-check.
-# Per RC-13 bootstrap step 7: this file fills the project-specific commands
-# the reference workflow templates leave as placeholders.
+# Repository Contract — project-specific configuration (RC v0.3.0 profile model)
+# Read by wpx-arrival-check + the bootstrap script + the RC-13 workflow command slots.
 
 repo: sulis-ai/agents
 owner: iainn
 
-# --- Profile -----------------------------------------------------------------
-# This is a Claude Code plugin MARKETPLACE, not a deployable web product.
-# It has no runtime, no URL, no staging/production servers. The dev branch IS
-# the installable surface (consumers point extraKnownMarketplaces at the repo);
-# a SemVer tag on main IS the production release (consumers install from it).
+# --- Profile + contribution model (RC v0.3.0) --------------------------------
+# This is a Claude Code plugin MARKETPLACE — a published artifact, not a
+# deployable web product. The dev branch IS the installable surface (consumers
+# point extraKnownMarketplaces at the repo); a SemVer tag on main IS the
+# release (consumers install from it). No runtime, no URL, no servers.
 #
-# Consequence: the deploy / health / smoke half of RC-04..RC-06 has no literal
-# target. The workflows are kept structurally (right triggers, environments
-# exist) but their command slots run marketplace-real work — manifest
-# validation, version-drift detection, plugin-primitive load checks — instead
-# of a deploy + URL poll.
-profile: plugin-marketplace
-deploy_target: none
+# profile: published-artifact  → RC-05 environments are a formality (WARN),
+#   RC-06 deploy-token secrets are N/A, RC-08 tag signing is SHOULD. The
+#   deploy/health/release workflows are kept structurally but their command
+#   slots run manifest validation + version-drift + plugin-load checks.
+# contribution_model: solo     → no merge queue (RC-03 MUST-NOT); changes
+#   merge directly to dev on branch-ci green per GIT-05.
+#
+# This replaces the v0.2.0 `deploy_target: none` deviation hack — the three
+# relaxations (RC-05/06/08) are now defined behaviour of the published-artifact
+# profile, not exceptions. deploy_target retained below as a back-compat alias.
+profile: published-artifact
+contribution_model: solo
+deploy_target: none           # back-compat alias; `profile` is authoritative
 
 # --- Project-specific command slots (filled into RC-13 templates) ------------
 commands:
@@ -26,42 +30,21 @@ commands:
     python3 -c "import json,glob; [json.load(open(f)) for f in ['.claude-plugin/marketplace.json', *glob.glob('plugins/*/.claude-plugin/plugin.json')]]"
     python3 -m compileall -q plugins/sulis/scripts
   type_check: ""              # no type-checker; stdlib-only tooling per plugin contract
-  unit_tests: pytest plugins/sulis/scripts/tests/ -q
+  unit_tests: pytest plugins/sulis/scripts/tests/unit/ -q
   smoke: |
     python3 -c "import json; m=json.load(open('.claude-plugin/marketplace.json')); assert m['plugins']"
   integration: |
     python3 -c "import json,os; mp=json.load(open('.claude-plugin/marketplace.json')); [json.load(open(os.path.join(p['source'].lstrip('./'),'.claude-plugin','plugin.json'))) for p in mp['plugins']]"
   e2e: ""                     # marketplace has no runtime e2e; unit+integration is the full gate
-  deploy_staging: "marketplace-profile: validate installable marketplace (see deploy-staging.yml)"
-  deploy_prod: "marketplace-profile: publish GitHub Release from tag (see release-prod.yml)"
+  deploy_staging: "published-artifact: validate installable marketplace + version-drift (see deploy-staging.yml)"
+  deploy_prod: "published-artifact: publish GitHub Release from tag (see release-prod.yml)"
 
-# --- Documented deviations from RC MUST rules --------------------------------
-# These are the single class of MUSTs a non-deployable repo cannot satisfy.
-# The deferred "repo profiles" work (RC v0.3.0 candidate) will formalise this;
-# until then wpx-arrival-check downgrades these to WARN when deploy_target: none.
-deviations:
-  - rule: RC-06
-    must: "SULIS_DEPLOY_TOKEN_STAGING / HEALTH_URL_STAGING / SULIS_DEPLOY_TOKEN_PROD / HEALTH_URL_PROD secrets on environments"
-    why: "No deploy target — these secrets would be meaningless. Workflows need no deploy token."
-    handling: "wpx-arrival-check treats RC-06 deploy-secret checks as WARN (not FAIL) when deploy_target: none"
-  - rule: RC-05
-    must: "staging environment deploys dev; production deploys main, with deploy tokens"
-    why: "Environments exist (so `environment:` resolves in workflows) but carry no deploy secrets; the 'deploy' is manifest validation."
-    handling: "environments created empty; arrival-check verifies existence, not secret presence, when deploy_target: none"
-  - rule: RC-08
-    must: "signed v* tags (git tag -s)"
-    why: "No GPG key provisioned in CI; promote workflow uses annotated tags (-a). github-actions[bot] commits are GitHub-verified."
-    handling: "WARN when deploy_target: none and no signing key configured"
-
-# --- What stays strictly enforced (the half that DOES apply) -----------------
-# RC-01 two-branch model, RC-02 protections, RC-03 merge queue, RC-04 workflow
-# files present with correct triggers, RC-07 repo settings, RC-09 token scopes,
-# RC-10 CODEOWNERS. These have nothing to do with deployability and are MUST.
-enforced_strictly:
-  - RC-01  # dev/main branching
-  - RC-02  # branch protections
-  - RC-03  # merge queue on dev
-  - RC-04  # six workflow files, correct triggers
-  - RC-07  # squash-only repo settings
-  - RC-09  # token scopes
-  - RC-10  # CODEOWNERS
+# --- Rules enforced by the profile -------------------------------------------
+# Profile-invariant MUSTs (all profiles): RC-01 dev/main, RC-02 protections
+# (branch-ci-only required check per the v0.3.0 deadlock fix), RC-07 squash
+# settings, RC-09 token scopes, RC-11 arrival check, RC-12 refusal.
+# RC-10 CODEOWNERS: SHOULD.
+# Volume (solo): RC-03 merge queue MUST-NOT.
+# Profile-specific (published-artifact): RC-04 branch-ci + promote + repurposed
+#   deploy/health/release; RC-05 WARN; RC-06 N/A; RC-08 SHOULD.
+# See plugins/sulis/references/repository-contract-standard.md for the matrix.

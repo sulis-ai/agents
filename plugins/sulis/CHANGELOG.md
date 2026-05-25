@@ -1,5 +1,41 @@
 # Sulis — Changelog
 
+## v0.45.0 — 2026-05-25
+
+**RC v0.3.0 — the repo-profiles model. Implements the design the founder approved.**
+
+The Repository Contract assumed every target was a deployable web product with a URL. Two pieces bit a non-deployable, single-maintainer repo (this marketplace): the deploy/health/release half (RC-04/05/06/08) and the merge queue (RC-03). The fix is additive profiles — NOT a softening of the strict contract.
+
+### The model (rewrites `repository-contract-standard.md`, 734 → 1405 lines)
+
+- **Three profiles** on one MECE test ("what does a release look like?"):
+  - `deployable-web-app` — running service at a URL. **Byte-for-byte the v0.2.0 strict contract.**
+  - `published-artifact` — a package consumers install (library, CLI, this marketplace). Validates instead of deploying.
+  - `internal-tool` — no published artifact; the repo is the deliverable.
+- **Multi-artifact composition (first-class)** — a repo declares an `artifacts:` list (each entry a `name` + a `type` reusing the three profiles). Rules compose by **union**: a rule applies at the strongest severity any artifact demands; a deployable artifact keeps its full strict set and a co-located library can never subtract from it (union, not intersection). Per-artifact namespaced workflows (`deploy-<name>-staging.yml`, `publish-<name>.yml`); shared repo-wide `branch-ci`/`merge-queue-ci`/`promote`.
+- **Orthogonal `contribution_model` axis** — `team` → merge queue MUST; `solo` → MUST-NOT (direct merge on `branch-ci` green per GIT-05). Volume, not deployability, drives the queue (ADR-002).
+- **Non-weakening guarantee** — the `deployable-web-app` column is identical to v0.2.0 in every row; relaxations apply only where a rule is physically meaningless for the profile, never to deployable.
+- **Fixed versioning** — one tag, many outputs. Independent per-artifact versioning deferred (breaks the one-`dev`/one-`main`/one-promotion invariant).
+- **Backward-compat** — no `profile:` + no `contribution_model:` → `deployable-web-app` + `team` = unchanged strict v0.2.0.
+
+### RC-02 deadlock fix (profile-invariant; shipped in standard text + tooling)
+
+Classic required checks on `dev` = **`branch-ci` only**. `merge-queue-ci` is the merge queue's internal `merge_group` gate (present only under `team`), **never** a classic required status check — listing it deadlocked queue entry (can't enter until it passes; can't run until entered). Found live during the inaugural pipeline dogfood; benefits every repo including deployable ones (ADR-003).
+
+### Tooling
+
+- **`wpx-arrival-check` rewritten** — replaces the scattered `deploy_target == "none"` hacks with a single profile-applicability matrix + multi-artifact union step; RC-02 fix (branch-ci-only); RC-03 keyed on `contribution_model`; `profile` XOR `artifacts` validation. 13 mock_gh-driven unit tests; live `ok:true` against this repo.
+- **`.sulis/repo-contract.yml` migrated** — `profile: published-artifact` + `contribution_model: solo`; the `deviations:` block retired (the three relaxations are now defined profile behaviour, not exceptions).
+- **`.sulis/bootstrap-repo-contract.sh`** — RC-02 dev-protection contexts → `branch-ci` only; RC-03/RC-05 steps annotated profile/volume-conditional.
+- **Removed `merge-queue-ci.yml`** — vestigial for this solo repo. The `dev-merge-queue` ruleset was deleted live.
+
+### Design records
+
+`DESIGN.md` + `ADR-001..004` live under `.architecture/repo-profiles/` (gitignored design scratch, like other `.architecture` content). The rewritten standard is the committed authoritative artifact. (If we want the ADRs durable later, add a gitignore exception as `sulis-checkup` has — deferred.)
+
+### Versions
+sulis 0.44.0 → 0.45.0; marketplace metadata 1.87.0 → 1.88.0. Landed via PR → `branch-ci` → `dev` (solo direct-merge path).
+
 ## v0.44.0 — 2026-05-25
 
 **Repository-contract bootstrap for the marketplace repo + the RC-11 arrival check that was never built.**
