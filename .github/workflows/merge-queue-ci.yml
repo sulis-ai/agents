@@ -20,7 +20,14 @@ jobs:
       - name: Install test deps
         run: pip install pytest
 
-      - name: full unit tests
+      - name: Configure git identity
+        # The integration testbed performs real git rebase/merge operations;
+        # GitHub runners have no default committer identity.
+        run: |
+          git config --global user.email "ci@sulis-ai.invalid"
+          git config --global user.name "sulis-ci"
+
+      - name: full test suite (unit + integration testbed)
         run: pytest plugins/sulis/scripts/tests/ -q
 
       - name: integration — all plugin manifests resolve against marketplace
