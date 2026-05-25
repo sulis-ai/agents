@@ -1,10 +1,10 @@
 ---
-name: show
+name: show-context
 description: >
-  Read-only display of the current `.context/{project}/INDEX.md`. Does
-  not modify anything. Useful when a user wants to know what SRD/SEA
-  will read on their next invocation without running discovery or
-  refresh.
+  Use to view the current project context index in plain text without
+  running any scans or modifications. Useful for checking what the
+  downstream tools (requirements, design, security review) will read
+  on their next invocation. Read-only.
 user_invocable: true
 ---
 
@@ -21,7 +21,7 @@ ask.
 If no `.context/{project}/INDEX.md` exists, stop with:
 
 > "No context index found at `.context/{project}/INDEX.md`. Run
-> `/sulis-context:discover` to create one."
+> `/sulis:discover-context` to create one."
 
 ---
 
@@ -46,13 +46,13 @@ After printing, append a single status line:
 
 The freshness threshold:
 - `Current` — `Last validated` within 90 days
-- `Stale` — older than 90 days; recommend `/sulis-context:refresh`
+- `Stale` — older than 90 days; recommend `/sulis:refresh-context`
 
 ### Step 4 — Suggest next actions
 
 Conditional on state:
 
-- If `Stale`: recommend `/sulis-context:refresh`
+- If `Stale`: recommend `/sulis:refresh-context`
 - If known gaps exist and SRD/SEA hasn't run yet: recommend
   `/srd:requirements-analyst` or `/sea:blueprint` to fill them
 - If neither: no recommendation, exit cleanly
@@ -63,7 +63,7 @@ Conditional on state:
 
 - **Read-only means read-only.** This skill never writes. If the user
   asks to "fix" something in the index, redirect them to
-  `/sulis-context:refresh`.
+  `/sulis:refresh-context`.
 - **Do not summarise the index content.** The user is asking to see the
   index; show it verbatim. Summarising defeats the purpose.
 - **Do not load referenced files.** Show the index — paths only. Loading the
@@ -73,6 +73,6 @@ Conditional on state:
 
 ## See Also
 
-- `skills/discover/SKILL.md` — create a new context index
-- `skills/refresh/SKILL.md` — update an existing context index
+- `../discover-context/SKILL.md` — create a new context index
+- `../refresh-context/SKILL.md` — update an existing context index
 - `references/context-index-template.md` — the index file schema

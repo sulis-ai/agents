@@ -1,12 +1,11 @@
 ---
-name: refresh
+name: refresh-context
 description: >
-  Re-validate an existing `.context/{project}/INDEX.md`. Checks that
-  every indexed source still exists, flags files modified since the
-  last validation, surfaces newly-matched files that didn't exist at
-  the last scan, and asks the user only about deltas. Sticky
-  classifications — does not re-ask about already-classified sources
-  unless they have changed.
+  Use to re-validate an existing project context index after the
+  codebase has changed. Checks every indexed source still exists,
+  flags files modified since last validation, and surfaces new files
+  that have appeared. Asks the founder only about deltas — does not
+  re-run the full discovery conversation. Sticky classifications.
 user_invocable: true
 ---
 
@@ -21,7 +20,7 @@ from `.context/{project}/INDEX.md` (if exactly one project's index exists) or
 ask the user.
 
 If no `.context/{project}/INDEX.md` exists, stop and recommend
-`/sulis-context:discover` instead.
+`/sulis:discover-context` instead.
 
 ---
 
@@ -48,7 +47,7 @@ Capture:
 
 ### Step 2 — Re-scan
 
-Run the same scan as `/sulis-context:discover` (per
+Run the same scan as `/sulis:discover-context` (per
 `references/discovery-protocol.md`). Build a fresh candidate list.
 
 ### Step 3 — Diff against the index
@@ -68,7 +67,7 @@ Produce three lists:
 - If not, add to additions list
 
 If all three lists are empty, the refresh is a no-op. Update only the
-`Last validated` date and `Validated by: /sulis-context:refresh`, write the
+`Last validated` date and `Validated by: /sulis:refresh-context`, write the
 index, and exit with: *"No changes since {date}. Index timestamp updated."*
 
 ### Step 4 — Present deltas
@@ -127,7 +126,7 @@ Add/remove gaps per the answer.
 
 Re-generate `.context/{project}/INDEX.md` with:
 - `Last validated: {today}`
-- `Validated by: /sulis-context:refresh`
+- `Validated by: /sulis:refresh-context`
 - All classification updates applied
 - ADR registry updated
 - Known gaps updated
@@ -197,8 +196,8 @@ genuine deltas.
 
 ## See Also
 
-- `skills/discover/SKILL.md` — first-time discovery
-- `skills/show/SKILL.md` — read-only view of the current index
+- `../discover-context/SKILL.md` — first-time discovery
+- `../show-context/SKILL.md` — read-only view of the current index
 - `references/discovery-protocol.md` — what to scan for and where
 - `references/classification-taxonomy.md` — the four buckets explained
 - `references/context-index-template.md` — the index file schema

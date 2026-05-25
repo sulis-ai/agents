@@ -1,13 +1,14 @@
 ---
-name: discover
+name: discover-context
 description: >
-  First-time context discovery for a project. Scans for architecture
-  documentation, ADRs, conventions, standards, patterns, domain models,
-  and existing specs using the folder-structure-agnostic discovery
-  protocol. Presents findings to the user grouped by purpose; the user
-  classifies each as authoritative / informational / superseded /
-  out-of-scope. Writes `.context/{project}/INDEX.md` for downstream
-  plugins (SRD, SEA, sulis-security) to consume.
+  Use when starting on an existing codebase to capture what's already
+  there — architecture docs, decisions, conventions, standards, prior
+  specs. Scans the project, presents findings grouped by purpose, and
+  asks the founder to classify each as authoritative, informational,
+  superseded, or out-of-scope. Produces a project context index at
+  `.context/{project}/INDEX.md` that downstream tools (requirements,
+  design, security review) read first so they respect prior decisions
+  instead of restating them.
 user_invocable: true
 ---
 
@@ -22,7 +23,7 @@ slug from an existing `.specifications/{name}/` or `.architecture/{name}/` if
 one exists.
 
 If `.context/{project}/INDEX.md` already exists, stop and recommend
-`/sulis-context:refresh` instead.
+`/sulis:refresh-context` instead.
 
 ---
 
@@ -56,7 +57,7 @@ If none of these yield a sensible slug, ask the user.
 
 Verify the project does not already have a context index:
 
-- If `.context/{project}/INDEX.md` exists → recommend `/sulis-context:refresh`
+- If `.context/{project}/INDEX.md` exists → recommend `/sulis:refresh-context`
   and exit.
 - If `.context/{project}/` exists but no INDEX.md → proceed and overwrite.
 
@@ -169,8 +170,8 @@ downstream commands will now use it:
 
 > "Written to `.context/{project}/INDEX.md`. SRD, SEA, and sulis-security will
 > read this first on their next invocation and apply Respect-Don't-Restate.
-> Run `/sulis-context:show` any time to view this index, or
-> `/sulis-context:refresh` after the project changes."
+> Run `/sulis:show-context` any time to view this index, or
+> `/sulis:refresh-context` after the project changes."
 
 ---
 
@@ -210,5 +211,5 @@ downstream commands will now use it:
 - `references/discovery-protocol.md` — what to scan for and where
 - `references/classification-taxonomy.md` — the four buckets explained
 - `references/context-index-template.md` — the index file schema
-- `skills/refresh/SKILL.md` — running discovery on a project that's already been mapped
-- `skills/show/SKILL.md` — read-only view of the current index
+- `../refresh-context/SKILL.md` — running discovery on a project that's already been mapped
+- `../show-context/SKILL.md` — read-only view of the current index
