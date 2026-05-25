@@ -1,5 +1,33 @@
 # Sulis — Changelog
 
+## v0.46.0 — 2026-05-26
+
+**Phase 5 #5 of the change-as-primitive build — the terminal-launcher port.**
+
+Ports the cross-platform terminal-spawning capability from `ae_task_executor/terminal_launcher.py` (504 LOC) into the sulis plugin, enabling `sulis-change start --spawn` to open a new terminal in the change worktree with `SULIS_CHANGE_ID` exported and a focused `claude --agent sulis` session inside it. Shipped TDD-first across the seven Work Packages of `.architecture/terminal-launcher-port/` (WP-001..007).
+
+### Launcher mechanism (WP-001/002/003/006)
+
+- **`plugins/sulis/scripts/_terminal_launcher.py`** (~280 LOC, stdlib only per NFR-5):
+  - Input validators — `validate_entry_command` (whitelist), `validate_extra_env_key` (POSIX name), `validate_worktree_path` (existing-dir), `_validate_pre_prompt` (heredoc-tag collision + 50 KB cap). MUC-1 shell-injection guard before any string concatenation.
+  - `_build_launch_script` — env-scrub preamble (`compgen`-based whitelist; MUC-2 env-leak prevention), `SULIS_CHANGE_ID` export, `shlex.quote`-d `extra_env`, `cd`-then-`exec` order.
+  - Platform dispatchers — `_launch_macos` (osascript `do script`), `_launch_linux` (gnome-terminal → konsole → xterm via `shutil.which`, **NFR-4 honest failure — no silent headless fallback**), `_launch_headless`.
+  - `launch_change_terminal` entry-point — validates, persists `launch.sh` (0o755) + `session.json` under `~/.sulis/changes/{change_id}/`, dispatches by `platform.system()` + `visible`.
+  - **Pre-prompt delivery via quoted HERE-DOC** (ADR-003) — single-quoted `<<'SULIS_PROMPT_EOF'` tag disables bash parameter expansion; `$HOME`, backticks, `$(...)` pass through verbatim. Byte-identical to the no-pre-prompt baseline when `pre_prompt=None`.
+
+### Session integration (WP-005/007 + WP-004 composition)
+
+- **`plugins/sulis/scripts/_change_context.py`** — `write_change_context` writes the pre-spawn recon `CONTEXT.md` (change identity + git state at spawn + per-primitive suggested next step). `_PRIMITIVE_NEXT_STEP_HINTS` covers all 22 change primitives + 3 Conventional Commits fallbacks; defensive default for anything else. Pure-read — never modifies the repo.
+- **`plugins/sulis/scripts/sulis-change start`** — new `--spawn` and `--intent` flags. Composes the recon (unconditional) + the pre-prompt build (`_build_change_pre_prompt`) + `launch_change_terminal`. Spawn failure is **non-fatal**: the branch, worktree, metadata, and recon all survive; `spawn_result.status` surfaces the failure so the founder can fall back to `cd worktree && claude --agent sulis`.
+- **`plugins/sulis/agents/sulis.md`** — new "Change context (when `SULIS_CHANGE_ID` is set)" section codifying session-start behaviour (verify via `resolve_current_change`, read `CONTEXT.md`, greet in change-context mode; stale-env three-option honesty; unset = no-op).
+- **`_wpxlib.write_change_metadata`** — whitelist extended to persist `change_id` / `handle` / `intent` (also fixes the latent `change_id` drop that `resolve_current_change` depended on).
+
+### Tests
+
+68 new unit tests (50 launcher + 10 recon + 8 spawn-composition; subprocess + `platform` mocked throughout — no real terminal spawns). 5 manual smoke procedures under `plugins/sulis/scripts/tests/manual/` (CI has no desktop). Full unit suite green; `compileall` clean (3.11-compatible — no backslashes in f-string expression parts).
+
+ADRs: ADR-001 (port shape), ADR-002 (module placement), ADR-003 (pre-prompt delivery).
+
 ## v0.45.0 — 2026-05-25
 
 **RC v0.3.0 — the repo-profiles model. Implements the design the founder approved.**

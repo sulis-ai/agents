@@ -3229,8 +3229,9 @@ def write_change_metadata(metadata_path: Path, data: dict) -> None:
     """
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
     lines: list[str] = []
-    for k in ("slug", "primitive", "branch", "worktree_path", "base_branch",
-              "base_sha", "started_at", "adopted_from_sha", "adopt_mode"):
+    for k in ("change_id", "handle", "slug", "primitive", "intent", "branch",
+              "worktree_path", "base_branch", "base_sha", "started_at",
+              "adopted_from_sha", "adopt_mode"):
         if k not in data:
             continue
         v = data[k]
