@@ -97,17 +97,29 @@
 
 ---
 
-## Gate 6 — Code-health verification (pending)
+## Gate 6 — Code-health verification
 
-To run after this commit lands. Expected: 0 NEW findings (consolidation is small + scoped; description deliberately kept under 500 chars — 416 chars).
+**Verdict: PASS (first try, 0 NEW findings).**
+
+- NEW: 0
+- PRE-EXISTING: 10
+- RESOLVED: 0
+
+The cleanest Gate 6 of all four Phase 3 consolidations:
+- sulis-context: 1 NEW (false attribution) → PASS after rubric
+- srd: 1 NEW (PH-103 desc-too-long) → PASS after 1 fix-forward
+- sea: 5 NEW (false attribution) → PASS after rubric
+- sulis-security: 0 NEW → **PASS, no rubric application needed**
+
+The v0.1.2 + v0.1.1 patches (signature improvements + ordering discipline + bulk_rewrite.py) compounded into a clean run.
 
 ---
 
-## Verdict (final, pending Gate 6)
+## Verdict (final)
 
-**Steps 2-5:** PASS (0 fix-forward commits — v0.1.2 discipline validated)
-**Gate 6:** TBD
-**Overall:** **Phase 3 complete** — all four specialist plugins consolidated into sulis.
+**Steps 2-5:** PASS (0 fix-forward commits)
+**Gate 6:** PASS (0 NEW findings, first try)
+**Overall:** **Phase 3 complete** — all four specialist plugins consolidated into sulis. Clean run; recipe v1.0-ready.
 
 ---
 
