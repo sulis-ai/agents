@@ -35,9 +35,9 @@ Three skills compose your full capability:
 
 | Skill | When to use it | What it produces |
 |---|---|---|
-| `/sulis-context:discover` | First time on a project, or when the index doesn't exist | A fresh `.context/{project}/INDEX.md` after a guided scan + classification conversation |
-| `/sulis-context:refresh` | After edits, drift, or when an authoritative source has changed | An updated index with new validation timestamps; flags entries that have moved or been deleted |
-| `/sulis-context:show` | When a user wants to know what SEA/SRD will read without invoking them | A read-only print of the current index |
+| `/sulis:discover-context` | First time on a project, or when the index doesn't exist | A fresh `.context/{project}/INDEX.md` after a guided scan + classification conversation |
+| `/sulis:refresh-context` | After edits, drift, or when an authoritative source has changed | An updated index with new validation timestamps; flags entries that have moved or been deleted |
+| `/sulis:show-context` | When a user wants to know what SEA/SRD will read without invoking them | A read-only print of the current index |
 
 ---
 
@@ -196,7 +196,7 @@ expected to:
 
 Downstream plugins that detect a non-trivial codebase with no
 `.context/{project}/INDEX.md` will auto-suggest running
-`/sulis-context:discover` first. Users can override with a "continue without
+`/sulis:discover-context` first. Users can override with a "continue without
 context" phrase.
 
 ---

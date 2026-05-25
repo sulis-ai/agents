@@ -92,8 +92,8 @@ related_skills:
     skill: ../../srd/agents/requirements-analyst
     notes: dispatched in Phase 3 for specify (long facilitation)
   - relationship: optional_input
-    skill: ../../sulis-context/agents/context-cartographer
-    notes: dispatched in Phase 2 for discover
+    skill: ../agents/context-cartographer
+    notes: dispatched in Phase 2 for discover-context
   - relationship: optional_input
     skill: ../../sulis-security/agents/security-reviewer
     notes: dispatched in Phase 7 for security viability
