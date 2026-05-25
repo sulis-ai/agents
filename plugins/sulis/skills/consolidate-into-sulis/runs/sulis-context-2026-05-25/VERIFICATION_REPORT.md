@@ -21,7 +21,7 @@
 **Files moved:** 7 (3 skills, 1 agent, 3 references)
 **Tin-test renames applied:** 3 (`discover`, `refresh`, `show` → `*-context`)
 **External refs updated:** 17 across 9 files (path + slash-command refs)
-**Verdict:** PASS (pending Gate 6 final verification — placeholder TBD)
+**Verdict:** PASS (Gate 6 confirmed — 1 false-attribution finding documented, net NEW = 0)
 
 ---
 
@@ -130,25 +130,51 @@ The recipe accommodates this implicitly (find returns empty so Commit 1 has noth
 
 ## Gate 6 — Code-health verification
 
-**TBD** — pending post-Commit-5 run.
+**Verdict: PASS (with one documented false attribution).**
 
-Expected procedure:
+Captured at:
+- `code-health-final.json` (7,777 bytes — same shape as baseline)
+- `code-health-comparison.md` (compare_baseline.py output)
 
-```bash
-RUN_DIR=plugins/sulis/skills/consolidate-into-sulis/runs/sulis-context-2026-05-25
-python3 plugins/sulis/skills/code-health/scripts/orchestrator.py \
-  --mode fast --raw --scope codebase --repo-root . \
-  2>/dev/null > "$RUN_DIR/code-health-final.json"
+### Counts
 
-python3 plugins/sulis/skills/consolidate-into-sulis/scripts/compare_baseline.py \
-  --baseline "$RUN_DIR/code-health-baseline.json" \
-  --final    "$RUN_DIR/code-health-final.json" \
-  > "$RUN_DIR/code-health-comparison.md"
+| Category | Count |
+|---|---|
+| NEW (consolidation-attributed by signature) | 1 |
+| PRE-EXISTING (carried over) | 8 |
+| RESOLVED (gone vs baseline) | 1 |
+
+### The "NEW" finding — false attribution
+
+`plugins/sulis/.claude-plugin/plugin.json` PH-103 (manifest-hygiene; description over 500 chars). The finding appears as **NEW** in compare_baseline.py's report and the **same logical finding** appears as **RESOLVED**. Both are the same PH-103 rule on the same file at line 0; the only difference is the `message` field:
+
+- Baseline: `"description is 710 chars (...)"`
+- Final: `"description is 864 chars (...)"`
+
+The signature function in `compare_baseline.py` looks for `rule` / `rule_id` / `check` fields but the code-health JSON uses `identifier` (with `extras.rule` as a secondary location). So the signature falls through to the hash-of-stable-JSON path, which hashes the `message` field's "710" vs "864" content → different signatures → false NEW + false RESOLVED for one finding.
+
+**Per `references/code-health-gating.md`'s rubric, this is "pre-existing in disguise" — false attribution, do not gate on it.** The consolidation legitimately made the description longer (added mention of context cartographer surface); PH-103 was already present in baseline; it's still present in final; counted exactly once in reality.
+
+### Net regression: 0
+
+After classifying the one false attribution: NEW = 0. **Gate 6 PASSES.**
+
+### Sixth recipe-improvement signal for v0.1.1
+
+Add `identifier` (and `extras.rule`) to compare_baseline.py's signature-priority chain:
+
+```python
+rule = (
+    finding.get("rule")
+    or finding.get("rule_id")
+    or finding.get("check")
+    or finding.get("identifier")
+    or (finding.get("extras") or {}).get("rule")
+    or ""
+)
 ```
 
-Expected outcome: NEW findings = 0 (consolidation only moves files + edits paths; no behaviour change; no new tests, no new code). If NEW > 0, fix-forward in Commit 6.
-
-**Verdict update:** to be filled after Gate 6 runs.
+Without this fix, every consolidation that changes a manifest description (which Commit 5 always does) will surface a false-attribution PH-103. Six runs ahead (sulis-security, sea, srd, plus future), this would compound.
 
 ---
 
@@ -221,9 +247,9 @@ All five fixes land in `consolidate-into-sulis` v0.1.1 before the next consolida
 ## Verdict (final)
 
 **Commits 1-5:** PASS
-**Gate 6:** TBD — pending post-Commit-5 code-health final run.
+**Gate 6:** PASS (1 false-attribution finding documented; net NEW = 0 after the rubric in `references/code-health-gating.md` is applied)
 
-This file will be updated with the Gate 6 verdict after the final run lands.
+**Overall consolidation:** PASS — sulis-context successfully folded into sulis. 7 files moved, 17 external refs updated (paths + slash-commands), source plugin marked DEPRECATED, sulis bumped to v0.35.0, marketplace bumped to v1.78.0.
 
 ---
 
@@ -233,3 +259,16 @@ This file will be updated with the Gate 6 verdict after the final run lands.
 - Smallest of the four Phase 3 plugins — the easy practice run produced 5 v0.1.1 signals which is exactly the kind of calibration the change-as-primitive plan expected
 - Next: sulis-security → sulis (also small; the only skill is already [DEPRECATED] so the rename pass is trivial)
 - The slash-command pattern gap in `find_external_refs.py` is the single highest-leverage v0.1.1 patch — for the next 3 consolidations (sea, srd in particular), slash-command refs are much more numerous than path refs
+
+---
+
+## Recipe-improvement signals — full list for v0.1.1 (6 total)
+
+1. **`find_external_refs.py` slash-command pattern** — add `/{source}:` scan alongside path patterns (caught 75% of refs manually)
+2. **SKILL.md gotcha: stage edits before commit** — `git mv` + Edit-after-mv split into two commits
+3. **Sub-step 0d: separate stderr from stdout** — orchestrator stderr line polluted JSON
+4. **`external-ref-sweep.md`: add `.architecture/**/*.md` category** — 4 hits in sulis-checkup TDD not in 12-category checklist
+5. **SKILL.md: document Commit 1 no-op handling** — when source plugin has no scripts/tests/CI
+6. **`compare_baseline.py` signature function: prefer `identifier` field** — Gate 6 false attribution on manifest description length change
+
+All six land in `consolidate-into-sulis` v0.1.1 before the next consolidation (sulis-security → sulis).
