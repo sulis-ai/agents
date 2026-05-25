@@ -147,8 +147,8 @@ keep them in working context throughout:
 | `references/cognitive-load.md` (CL-) | Per-slide chunk limits, audience-appropriate density |
 | `references/content-quality.md` (CQ-) | Prose rigor — summaries, identifiers, readability |
 | `references/critical-thinking-standard.md` | Three-phase analytical framework applied throughout |
-| `plugins/srd/references/convention-preference-standard.md` (CP-) | Always recommend the established convention (Sequoia framework, dominant TAM/SAM/SOM methodology, RFC-grade investor patterns) over the bespoke approach |
-| `plugins/srd/references/audience-adapted-framing-standard.md` (AAF-) | Non-technical founder is the default audience. Three-step pre-question triage decides whether to ask, decide silently, or translate to lived-experience scenarios |
+| `plugins/sulis/references/convention-preference-standard.md` (CP-) | Always recommend the established convention (Sequoia framework, dominant TAM/SAM/SOM methodology, RFC-grade investor patterns) over the bespoke approach |
+| `plugins/sulis/references/audience-adapted-framing-standard.md` (AAF-) | Non-technical founder is the default audience. Three-step pre-question triage decides whether to ask, decide silently, or translate to lived-experience scenarios |
 
 When you cite a rule to the founder, cite the ID (e.g., "FN-04 says every TAM
 figure needs top-down + bottom-up triangulation"). The IDs are load-bearing.
@@ -530,7 +530,7 @@ Agents pattern-match. Recommending the canonical answer makes downstream
 turns (and human readers of the deck) load less context, run faster, and
 fail in well-understood ways.
 
-See `plugins/srd/references/convention-preference-standard.md` for
+See `plugins/sulis/references/convention-preference-standard.md` for
 CP-01..CP-05, worked examples, and anti-patterns.
 
 ---
@@ -544,7 +544,7 @@ artifact**, run the FE-06 five-point check:
    `FR-`, `WP-`, `SF-`, `ADR-`, `MUC-`, `Turn N`, `Phase N`).
 2. **Filename scan.** Translate marketplace artifact filenames per
    the FE-08 table at
-   `plugins/srd/references/founder-english.md`
+   `plugins/sulis/references/founder-english.md`
    (`PRIMITIVE_TREE.jsonld` → "the building-block map", `SRD.md`
    → "the requirements document", `TDD.md` → "the technical
    blueprint", `JOURNEY.md` → "your project's journey", etc.).
@@ -571,7 +571,7 @@ Track calibration state in private agent state (dot-prefixed files),
 never in JOURNEY.md, SRD.md, status reports, or any other artifact
 the founder will read.
 
-See `plugins/srd/references/founder-english.md` for FE-01..FE-10 +
+See `plugins/sulis/references/founder-english.md` for FE-01..FE-10 +
 worked anchor cases from production failures that drove this rule.
 
 
@@ -597,7 +597,7 @@ Never relay a specialist's "open questions" verbatim. Triage each
 through AAF-01; step-1-silent items get decided silently; at most
 ONE genuinely founder-owned question per turn reaches them.
 
-See `plugins/srd/references/founder-english.md` (FE-11 + Anchor
+See `plugins/sulis/references/founder-english.md` (FE-11 + Anchor
 Case 3) for the full standard and worked failure example.
 
 ## 4. Audience-Adapted Question Framing (always on, MUST)
@@ -623,7 +623,7 @@ pre-question triage**:
 Never expose pitch-framework acronyms (`SCQA`, `Pyramid`, `BLUF`),
 financial-modelling jargon (`bottom-up TAM`, `cohort retention curve`),
 or template-field names in question text. Consult the lexicon at
-`plugins/srd/references/audience-adapted-framing-standard.md` AAF-03 and
+`plugins/sulis/references/audience-adapted-framing-standard.md` AAF-03 and
 substitute plain-English equivalents.
 
 **IDC-specific worked example.** When you would otherwise ask:
@@ -683,7 +683,7 @@ re-triage under the now-current rules. Auto-resolve any that the new
 rules classify as step-1/step-2-silent; only genuine founder-facing
 strategic questions stay open.
 
-See `plugins/srd/references/audience-adapted-framing-standard.md` for the
+See `plugins/sulis/references/audience-adapted-framing-standard.md` for the
 full standard (AAF-01..AAF-09), the closed positive list of consequences,
 the translation lexicon, and composition rules.
 

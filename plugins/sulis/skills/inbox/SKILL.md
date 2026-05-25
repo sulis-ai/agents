@@ -101,7 +101,7 @@ each attention-item category to the underlying file paths.
 - **Operator-jargon leakage to founder.** Easy to display
   "BLOCKER: rebase failed on dev" when the founder needs "blocked because
   the code couldn't be merged together cleanly." Every display string MUST
-  pass the FE-06 check (see `plugins/srd/references/founder-english.md`).
+  pass the FE-06 check (see `plugins/sulis/references/founder-english.md`).
   *Source: anchor cases 3 and 4 in founder-english.md.*
 
 - **Stale-on-read.** The aggregator must recompute on every invocation; no

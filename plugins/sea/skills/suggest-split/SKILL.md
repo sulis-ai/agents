@@ -312,7 +312,7 @@ touching it before any `feat:` commit."}
 
 - [`../code-review/SKILL.md`](../code-review/SKILL.md) — flags the
   hygiene issues that motivate splitting
-- `plugins/srd/references/pr-hygiene-standard.md` — PH-01 Scope and
+- `plugins/sulis/references/pr-hygiene-standard.md` — PH-01 Scope and
   PH-02 Size primitives this skill helps the author address
 - [`../../references/hardening-deltas.md`](../../references/hardening-deltas.md)
   — file-layout context (this skill writes alongside review bundles)

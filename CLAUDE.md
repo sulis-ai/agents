@@ -38,7 +38,7 @@ Before creating or modifying any skill, read `docs/skill-authoring-guide.md` and
 
 ## Adding a New Skill
 
-1. Create a directory under `plugins/srd/skills/` named after the skill.
+1. Create a directory under `plugins/sulis/skills/` named after the skill.
 2. Add a `SKILL.md` file inside that directory. This is the skill's prompt entrypoint.
 3. Include `references/`, `scripts/`, or `examples/` subdirectories as needed.
 4. Test locally by running the skill from a project that has the plugin installed.
@@ -58,7 +58,7 @@ To test a plugin skill without publishing:
    ```bash
    claude --plugin-dir ./plugins/srd
    ```
-3. Run the skill via its slash command (e.g. `/srd:critical-thinking`).
+3. Run the skill via its slash command (e.g. `/sulis:critical-thinking`).
 
 ---
 
@@ -142,19 +142,19 @@ Seven rules. If a plan would violate any of these, the plan is wrong.
    boss who doesn't know the jargon; the expert's job is to translate.
    (FE-01..FE-10)
 
-For full detail on these principles, see `plugins/srd/references/engineering-principles.md`,
-`plugins/srd/references/security-standard.md`,
-`plugins/srd/references/convention-preference-standard.md`,
-`plugins/srd/references/audience-adapted-framing-standard.md`,
-`plugins/srd/references/git-workflow-standard.md` (GIT-01..GIT-10 —
+For full detail on these principles, see `plugins/sulis/references/engineering-principles.md`,
+`plugins/sulis/references/security-standard.md`,
+`plugins/sulis/references/convention-preference-standard.md`,
+`plugins/sulis/references/audience-adapted-framing-standard.md`,
+`plugins/sulis/references/git-workflow-standard.md` (GIT-01..GIT-10 —
 two-branch dev/main model, Conventional Commits, direct merge to dev on
 CI green with no PR ceremony, dev→main promotion ceremony, SemVer
 release tags), and
-`plugins/srd/references/executor-loop-standard.md` (EL-01..EL-08 —
+`plugins/sulis/references/executor-loop-standard.md` (EL-01..EL-08 —
 OODA loop on every fallible step, verbatim failure observation, Five
 Whys diagnosis bounded at 5, minimum-change Decide, scope guard,
 per-failure-type self-heal budget, structured BLOCKER record format),
-and `plugins/srd/references/founder-english.md` (FE-01..FE-10 —
+and `plugins/sulis/references/founder-english.md` (FE-01..FE-10 —
 voice, vocabulary, pre-emission five-point check, no mechanism
 narration, applies to every founder-facing chat message AND
 founder-readable artifact write).

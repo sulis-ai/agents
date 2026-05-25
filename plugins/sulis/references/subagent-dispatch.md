@@ -54,8 +54,8 @@ Just announce:
 |---|---|---|---|
 | sulis-context (discover) | `/sulis:discover-context` | recommend | spawn (short, returns INDEX.md) |
 | sulis-context (refresh) | `/sulis:refresh-context` | recommend | spawn (short) |
-| srd:requirements-analyst | `/srd:start` | recommend | recommend (always; long conversation) |
-| srd:requirements-validation | `/srd:requirements-validation` | recommend | spawn (short, returns COMPLETENESS_REPORT.md) |
+| srd:requirements-analyst | `claude --agent requirements-analyst` | recommend | recommend (always; long conversation) |
+| srd:requirements-validation | `/sulis:requirements-validation` | recommend | spawn (short, returns COMPLETENESS_REPORT.md) |
 | sea:blueprint | `/sea:blueprint` | recommend | recommend (always; long conversation) |
 | sea:decompose | `/sea:decompose` | recommend | spawn (short, autonomous) |
 | sea:verify | `/sea:verify` | recommend | spawn (short, returns COMPLETENESS_REPORT) |

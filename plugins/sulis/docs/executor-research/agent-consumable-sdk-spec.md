@@ -1033,7 +1033,7 @@ Before shipping a generated SDK from this spec, verify:
 ### Cross-cutting / methodology
 - [OpenTelemetry](https://opentelemetry.io/) — observability standard
 - [The Sulis Critical Thinking Standard](../../../platform/methodology/standards/CRITICAL_THINKING_STANDARD.md)
-- [Sulis Convention Preference Standard (CP-01)](../../../srd/references/convention-preference-standard.md)
+- [Sulis Convention Preference Standard (CP-01)](../../../sulis/references/convention-preference-standard.md)
 
 ---
 

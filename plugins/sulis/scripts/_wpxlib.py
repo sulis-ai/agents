@@ -3036,7 +3036,7 @@ def restore_branch_with_guard(
 # sulis-change helpers (CW-01..CW-08)
 # ─────────────────────────────────────────────────────────────────────────
 #
-# The Change Work Standard at plugins/srd/references/change-work-standard.md
+# The Change Work Standard at plugins/sulis/references/change-work-standard.md
 # defines a change as the unit of work — every piece of work that evolves
 # the system is bounded by a change/{primitive}-{slug} branch with a
 # dedicated git worktree. The helpers below support the sulis-change CLI.

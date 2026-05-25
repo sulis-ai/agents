@@ -135,7 +135,7 @@ This is distinct from the tool-directory resolution above: tool-directory tells 
 
 The full v0.9.0+ executor lifecycle assumes your project runs CI on
 push to feature branches (Step 8 polls the branch's CI before merging
-to dev). Per `plugins/srd/references/git-workflow-standard.md`
+to dev). Per `plugins/sulis/references/git-workflow-standard.md`
 GIT-04 v0.1.3+, branch CI is the canonical safety net before squash-
 merge: if your only CI runs on push-to-dev, every WP's first run on
 dev is also its first CI run, and a broken WP can land before tests

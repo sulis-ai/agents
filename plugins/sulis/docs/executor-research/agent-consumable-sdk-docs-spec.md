@@ -610,8 +610,8 @@ Before shipping a generated SDK's docs from this spec, verify:
 
 ### Sulis marketplace standards referenced
 - [`agent-consumable-sdk-spec.md`](agent-consumable-sdk-spec.md) — the SDK spec this complements
-- [`plugins/srd/references/founder-english.md`](../../../srd/references/founder-english.md) — FE-04 (scannable in 30 seconds)
-- [`plugins/srd/references/convention-preference-standard.md`](../../../srd/references/convention-preference-standard.md) — CP-01
+- [`plugins/sulis/references/founder-english.md`](../../../sulis/references/founder-english.md) — FE-04 (scannable in 30 seconds)
+- [`plugins/sulis/references/convention-preference-standard.md`](../../../sulis/references/convention-preference-standard.md) — CP-01
 
 ---
 

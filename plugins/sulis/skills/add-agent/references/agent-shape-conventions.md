@@ -243,7 +243,7 @@ When authoring a new agent, read the existing agents whose role most closely mat
 | Coordinator / front-door | `plugins/sulis/agents/concierge.md` (1526 LOC — the canonical coordinator) |
 | Specialist procedural | `plugins/sulis/agents/executor.md` |
 | Specialist loop | `plugins/sulis/agents/orchestrator.md` |
-| Specialist facilitator | `plugins/srd/agents/requirements-analyst.md` |
+| Specialist facilitator | `plugins/sulis/agents/requirements-analyst.md` |
 | Specialist analytical | `plugins/sea/agents/engineering-architect.md` |
 | Specialist auditor | `plugins/sulis-security/agents/security-reviewer.md` |
 

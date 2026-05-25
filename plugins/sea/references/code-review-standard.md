@@ -256,7 +256,7 @@ The reviewing agent **cannot** override these:
    Minimum verdict: `Request changes`. A high-severity Safety signal
    (4+ migrations, plaintext secret in diff, etc.) requires explicit
    reviewer attention before merge. (Per CR-09; see
-   `plugins/srd/references/pr-hygiene-standard.md`.)
+   `plugins/sulis/references/pr-hygiene-standard.md`.)
 
 ### Advisory only
 
@@ -354,7 +354,7 @@ without a one-line reason is malformed.
 ## CR-09: PR Hygiene Application (MUST)
 
 The reviewing agent applies the **PR Hygiene Standard** at
-`plugins/srd/references/pr-hygiene-standard.md` (PH-01..PH-08) alongside
+`plugins/sulis/references/pr-hygiene-standard.md` (PH-01..PH-08) alongside
 the three lenses. Hygiene checks run **before** lens dispatch — they
 inform how cautious the lens work needs to be (a 6,000-line / 53-file PR
 with 5 migrations warrants more conservative lens severity scoring than

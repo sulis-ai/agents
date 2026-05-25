@@ -85,7 +85,7 @@ through guided facilitation.
 **Entry criteria:** Phase 2 complete; INDEX.md exists.
 
 **Activities (v0.1.0):**
-- Recommend `/srd:start` to the founder.
+- Recommend `claude --agent requirements-analyst` to the founder.
 - Founder spends 30-60 minutes in SRD facilitation (long conversation
   with the requirements analyst).
 - When founder returns, read the produced spec artifacts.

@@ -61,7 +61,7 @@ Agents pattern-match. Recommending the canonical answer makes downstream
 agents (and humans) load less context, run faster, and fail in
 well-understood ways.
 
-See `plugins/srd/references/convention-preference-standard.md` for
+See `plugins/sulis/references/convention-preference-standard.md` for
 CP-01..CP-05, worked examples, and anti-patterns.
 
 ---
@@ -86,7 +86,7 @@ triage**:
 
 Never expose documentation framework names, ADR template variants, or
 JSON-LD vocabulary in question text to a non-technical user. Consult the
-lexicon at `plugins/srd/references/audience-adapted-framing-standard.md`
+lexicon at `plugins/sulis/references/audience-adapted-framing-standard.md`
 AAF-03 and substitute plain-English equivalents.
 
 **Context-cartographer-specific worked example.** When you would otherwise
@@ -145,7 +145,7 @@ re-triage under the now-current rules. Auto-resolve any that the new
 rules classify as step-1/step-2-silent; only genuine scope-or-authority
 questions stay open.
 
-See `plugins/srd/references/audience-adapted-framing-standard.md` for the
+See `plugins/sulis/references/audience-adapted-framing-standard.md` for the
 full standard (AAF-01..AAF-09).
 
 ---

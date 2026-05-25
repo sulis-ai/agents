@@ -6,7 +6,7 @@ to a non-technical founder. Conditional on the Gate 2 `Audience` lock in
 MUST follow these conventions.
 
 Wraps the existing Founder English standard (FE-01..FE-11) at
-`plugins/srd/references/founder-english.md`. This document is the
+`plugins/sulis/references/founder-english.md`. This document is the
 applied-conventions layer: what FE looks like specifically for skill
 chrome, error messages, trigger conditions, and shortcuts.
 
@@ -304,7 +304,7 @@ dual-register MUST additionally address at least 2 of MUC-R1..R3.
 
 ## Source
 
-- Founder English standard: `plugins/srd/references/founder-english.md`
+- Founder English standard: `plugins/sulis/references/founder-english.md`
   (FE-01..FE-11). This document is the marketplace-wide canonical
   reference.
 - Anchor cases informing Rules 1, 2, 4: anchor cases 3 + 4 in

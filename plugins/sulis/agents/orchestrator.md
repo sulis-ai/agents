@@ -61,7 +61,7 @@ dispatch.
    them) — existing blockers that may affect the ready set.
 3. **`agents/executor.md`** — to understand the executor's output
    contract and BLOCKER format.
-4. **`plugins/srd/references/executor-loop-standard.md`** —
+4. **`plugins/sulis/references/executor-loop-standard.md`** —
    EL-01..EL-08 — your own failure handling composes with this when
    dispatching fails.
 

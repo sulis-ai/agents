@@ -65,7 +65,7 @@ following terms are NOT flagged as jargon:
 
 - Terms in `plugins/sea/references/boring-code.md`
 - Terms in any project-level `GLOSSARY.md` (top-level or `.specifications/{project}/`)
-- Terms in `plugins/srd/references/founder-english.md`'s glossary section
+- Terms in `plugins/sulis/references/founder-english.md`'s glossary section
   (if present)
 - Per-project vocabulary in `references/check-readability-vocabulary.md`
   (per-project allow-list — author this if the audit flags too many

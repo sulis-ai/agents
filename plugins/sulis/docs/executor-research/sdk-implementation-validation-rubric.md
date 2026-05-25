@@ -589,7 +589,7 @@ This rubric is in calibration. Falsification criteria (FR):
   — all 13 principles + AP-01..AP-09 anti-patterns
 
 ### Related marketplace standards
-- [`plugins/srd/references/convention-preference-standard.md`](../../../srd/references/convention-preference-standard.md) — CP-01
+- [`plugins/sulis/references/convention-preference-standard.md`](../../../sulis/references/convention-preference-standard.md) — CP-01
 - [`plugins/sea/references/code-review-standard.md`](../../../sea/references/code-review-standard.md) — CR-01..CR-09 (related: per-PR review; this rubric is per-SDK retrospective)
 
 ---

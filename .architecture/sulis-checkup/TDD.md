@@ -213,7 +213,7 @@ table assigns one or more healing prototypes per tier with rationale.
 | **Auto-draft remediation WP** | `/sulis-execution:backfill-gates`, `backfill-code-review` | When the fix needs deliberation but the gap is concrete. The skill drafts a WP at `status: proposed`; the founder ships it through the existing executor pipeline. |
 | **Founder shortcut** | `/sulis:inbox` `[1] resume` pattern | When the action is low-stakes and routine. Echo-before-act per founder-facing-conventions Rule 3. |
 | **Adversarial human-in-the-loop** | `/idc:adversarial-review` pattern | When the fix is a design decision. Skill produces a perspective; founder accepts/rejects/modifies. |
-| **Escalate to SRD** | `/srd:requirements-analyst` referral | When the gap is a missing requirement, not missing code. Example: tier 3 fails because there's no spec for the feature — the answer isn't to add tests, it's to clarify the spec. |
+| **Escalate to SRD** | `requirements-analyst` referral | When the gap is a missing requirement, not missing code. Example: tier 3 fails because there's no spec for the feature — the answer isn't to add tests, it's to clarify the spec. |
 | **Defer / accept-as-known** | `/sea:verify` OPEN_RISK pattern | When the risk is acknowledged but not fixed now. Recorded in the checkup state so re-runs don't re-surface it. |
 
 ### Per-tier healing assignment

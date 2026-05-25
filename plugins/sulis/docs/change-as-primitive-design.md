@@ -85,7 +85,7 @@ feat/wp-101-schema   feat/wp-102-handler   feat/wp-103-tests
 
 The **change branch is the integration point**. One PR per change reaches `dev` — not one PR per WP. Reviewers see the cohesive change; CI runs on the cohesive unit. Today's WP-level executor flow stays unchanged.
 
-The branch architecture is already specified by `CW-04` in the Change Work Standard (`plugins/srd/references/change-work-standard.md`). Today's executor (in `plugins/sulis/scripts/_wpxlib.py`) already branches WP off the change branch via `_branch_name() → feat/wp-{id-lower}-{slug}`. The gap is the founder-facing surface — not the data model.
+The branch architecture is already specified by `CW-04` in the Change Work Standard (`plugins/sulis/references/change-work-standard.md`). Today's executor (in `plugins/sulis/scripts/_wpxlib.py`) already branches WP off the change branch via `_branch_name() → feat/wp-{id-lower}-{slug}`. The gap is the founder-facing surface — not the data model.
 
 ---
 
@@ -118,7 +118,7 @@ Two paragraph-sized additions to `plugins/sulis/references/lifecycle.md` (the 22
 - Step 0 (arrival check) gains: "is the change branch behind dev? If yes, run back-integration before creating WP worktree"
 - New Step 12.5: after WP merges back to change, run back-integration on change branch + push
 
-Plus one clarifying amendment to `plugins/srd/references/repository-contract-standard.md` (`RC-04`): merge-queue source is `change/*` branches, not `feat/*` directly.
+Plus one clarifying amendment to `plugins/sulis/references/repository-contract-standard.md` (`RC-04`): merge-queue source is `change/*` branches, not `feat/*` directly.
 
 ---
 
@@ -215,8 +215,8 @@ The founder talks to Sulis. Sulis dispatches the right specialist at the right s
 
 | Layer | Standard | What it asks |
 |---|---|---|
-| Audience detection | **AAF** (existing — `plugins/srd/references/audience-adapted-framing-standard.md`) | Who am I talking to, what depth? |
-| Vocabulary translation | **FE** (existing — `plugins/srd/references/founder-english.md`) | Have I stripped jargon, translated identifiers? |
+| Audience detection | **AAF** (existing — `plugins/sulis/references/audience-adapted-framing-standard.md`) | Who am I talking to, what depth? |
+| Vocabulary translation | **FE** (existing — `plugins/sulis/references/founder-english.md`) | Have I stripped jargon, translated identifiers? |
 | Voice and lexicon | **TONE** (new — port from `platform/methodology/standards/TONE_STANDARD.md`) | Am I in operator voice using preferred vocabulary? |
 | Insight delivery | **COACHING** (new — port from `platform/methodology/standards/COACHING_WITHOUT_CONFLICT.md`) | Does this land without triggering defensiveness? |
 | Sulis-layer apply | **Founder-Facing Conventions** (existing) | Are echo-before-act + prompt-before-destroy honoured? Dual-register pattern applied? |

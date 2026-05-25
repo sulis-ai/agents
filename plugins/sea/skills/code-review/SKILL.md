@@ -4,7 +4,7 @@ description: >
   Use when reviewing a pull request, branch, or commit range. Implements the
   Code Review Standard (CR-01..CR-10) at
   `../../references/code-review-standard.md` and applies the PR Hygiene
-  Standard (PH-01..PH-08) at `plugins/srd/references/pr-hygiene-standard.md`.
+  Standard (PH-01..PH-08) at `plugins/sulis/references/pr-hygiene-standard.md`.
   Runs a mandatory mechanical baseline (typecheck + lint) before any lens
   (CR-01); computes the PR Hygiene signal table — Scope / Size / Safety /
   Completeness — before lens dispatch (CR-09); dispatches three lenses in
@@ -172,7 +172,7 @@ verdict cannot be `PASS`.
 ### 3. PR Hygiene check (CR-09 MUST — before lens dispatch)
 
 Apply the **PR Hygiene Standard** at
-`plugins/srd/references/pr-hygiene-standard.md` (PH-01..PH-08). Compute
+`plugins/sulis/references/pr-hygiene-standard.md` (PH-01..PH-08). Compute
 the PH-06 signal table from the diff:
 
 ```bash
@@ -890,7 +890,7 @@ When writing the author-facing tier:
 ## See Also
 
 - [`../../references/code-review-standard.md`](../../references/code-review-standard.md) — **the standard this skill implements** (CR-01..CR-09, anchor cases, calibration)
-- `plugins/srd/references/pr-hygiene-standard.md` — **PR Hygiene Standard** (PH-01..PH-08) applied via CR-09; Scope / Size / Safety / Completeness primitives + computed signal table
+- `plugins/sulis/references/pr-hygiene-standard.md` — **PR Hygiene Standard** (PH-01..PH-08) applied via CR-09; Scope / Size / Safety / Completeness primitives + computed signal table
 - [`../codebase-audit/SKILL.md`](../codebase-audit/SKILL.md) — full-repo architectural audit (same gap types, broader scope)
 - [`../harden/SKILL.md`](../harden/SKILL.md) — implementing accepted fixes
 - [`../../references/hardening-deltas.md`](../../references/hardening-deltas.md) — fix file format and `source:` field schema

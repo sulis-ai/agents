@@ -18,7 +18,7 @@ file the specialist can read.
 ## Workflow
 
 1. **Identify the specialist being invoked.** Required input: the slash
-   command being recommended (e.g. `/srd:start`, `/sea:blueprint`,
+   command being recommended (e.g. `claude --agent requirements-analyst`, `/sea:blueprint`,
    `/sulis-security:codebase-assess`).
 2. **Write a handoff context file** at
    `.sulis/{project}/handoffs/HANDOFF-{NN}-to-{specialist}.md` with:

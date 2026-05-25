@@ -420,8 +420,8 @@ This is a sample. Real runs go deeper per step.
 ### Sulis marketplace standards used
 - [`agent-consumable-sdk-spec.md`](agent-consumable-sdk-spec.md) — the SDK
   spec whose changes this prompt was originally written to review
-- [`plugins/srd/references/convention-preference-standard.md`](../../../srd/references/convention-preference-standard.md) — CP-01
-- [`plugins/srd/references/founder-english.md`](../../../srd/references/founder-english.md) — FE for plain-English output to the invoker
+- [`plugins/sulis/references/convention-preference-standard.md`](../../../sulis/references/convention-preference-standard.md) — CP-01
+- [`plugins/sulis/references/founder-english.md`](../../../sulis/references/founder-english.md) — FE for plain-English output to the invoker
 - [`plugins/sea/references/code-review-standard.md`](../../../sea/references/code-review-standard.md) — CR-NN (related but not identical — code review is per-PR; this review is per-integration)
 
 ---

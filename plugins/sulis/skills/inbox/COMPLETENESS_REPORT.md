@@ -61,7 +61,7 @@ here will feed back into add-skill v0.2.0 (the planned methodology update).
    *Source: prior-art* — HD-008 found INDEX semantics had drifted; same drift class applies to any cross-source aggregator. Mitigation: deterministic source-discovery via a registry, not hard-coded paths; doctor check.
 
 2. **Operator-jargon leakage to founder** — easy to ship inbox display strings like "BLOCKER" or "WP-AUTO-001" when the founder needs "blocked task" or "user signup flow".
-   *Source: prior-art* — `plugins/srd/references/founder-english.md` anchor cases 3 + 4. Mitigation: every display string passes the FE-06 check; translation table for operator → founder vocab; gate at output time.
+   *Source: prior-art* — `plugins/sulis/references/founder-english.md` anchor cases 3 + 4. Mitigation: every display string passes the FE-06 check; translation table for operator → founder vocab; gate at output time.
 
 3. **Stale-on-read** — aggregator reads from disk; if it caches results, the founder sees state from an earlier moment.
    *Source: prior-art* — HD-008 fixed this exact pattern for INDEX (move to compute-on-read). Mitigation: no caching; recompute on every invocation; flag if state-source is mid-write.
@@ -102,7 +102,7 @@ Why it matters for inbox: the trigger condition, every display string, every sho
 
 **Scope lock adherence:** Verified. Skill name (`inbox`), plugin home (`sulis`), category (Business Process), trigger condition (founder-vocab — no operator jargon), top-5 gotchas (each with source citation), depth modes (none for v1) — all reflected as locked.
 
-**Referenced files verified present:** Yes. SKILL.md references `references/sources-of-truth.md` (present), `plugins/srd/references/founder-english.md` (present in srd; verified earlier in session), `plugins/sulis-execution/scripts/_wpxlib.py` (present; HD-008 work). No declared reference is missing.
+**Referenced files verified present:** Yes. SKILL.md references `references/sources-of-truth.md` (present), `plugins/sulis/references/founder-english.md` (present in srd; verified earlier in session), `plugins/sulis-execution/scripts/_wpxlib.py` (present; HD-008 work). No declared reference is missing.
 
 ---
 

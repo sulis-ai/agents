@@ -6,7 +6,7 @@ Before you start, read the **[Skill Authoring Guide](docs/skill-authoring-guide.
 
 1. **Create a skill directory** under the relevant plugin:
    ```
-   plugins/srd/skills/your-skill-name/
+   plugins/sulis/skills/your-skill-name/
    ```
 
 2. **Write `SKILL.md`** — this is the skill's prompt entrypoint. A skill is a folder, not just a markdown file — include `references/`, `scripts/`, `assets/`, or `examples/` subdirectories as needed.
@@ -19,7 +19,7 @@ Before you start, read the **[Skill Authoring Guide](docs/skill-authoring-guide.
 
 ## Adding a New Reference Standard
 
-Reference standards live in `plugins/srd/references/` and define governing rules
+Reference standards live in `plugins/sulis/references/` and define governing rules
 that skills and agents load and apply. Unlike skills, reference standards are not
 directly user-invocable — they are loaded by skills (e.g. `critical-thinking` loads
 `references/critical-thinking-standard.md`) or referenced in agent prompts.
@@ -56,9 +56,9 @@ Adding a new reference standard is a **minor** version bump for the containing p
 
 ### Steps
 
-1. Create the file at `plugins/srd/references/your-standard.md`.
+1. Create the file at `plugins/sulis/references/your-standard.md`.
 2. Follow the required structure above.
-3. Update `plugins/srd/.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` with the
+3. Update `plugins/sulis/.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` with the
    new minor version.
 4. If a skill will load this standard, update that skill's `SKILL.md` to reference it.
 5. Open a PR with a description of the standard's scope and the evidence base for its

@@ -120,4 +120,4 @@ try {
 
 - [Operations catalogue](../reference/operations.md)
 - The Change Work Standard (CW-01..CW-08) at
-  `../../../../srd/references/change-work-standard.md`
+  `../../../../sulis/references/change-work-standard.md`

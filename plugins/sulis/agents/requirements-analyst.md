@@ -90,7 +90,7 @@ Agents pattern-match. Recommending the canonical answer makes downstream
 agents (and humans) load less context, run faster, and fail in
 well-understood ways.
 
-See `plugins/srd/references/convention-preference-standard.md` for
+See `plugins/sulis/references/convention-preference-standard.md` for
 CP-01..CP-05, worked examples, and anti-patterns.
 
 ---
@@ -104,7 +104,7 @@ artifact**, run the FE-06 five-point check:
    `FR-`, `WP-`, `SF-`, `ADR-`, `MUC-`, `Turn N`, `Phase N`).
 2. **Filename scan.** Translate marketplace artifact filenames per
    the FE-08 table at
-   `plugins/srd/references/founder-english.md`
+   `plugins/sulis/references/founder-english.md`
    (`PRIMITIVE_TREE.jsonld` → "the building-block map", `SRD.md`
    → "the requirements document", `TDD.md` → "the technical
    blueprint", `JOURNEY.md` → "your project's journey", etc.).
@@ -131,7 +131,7 @@ Track calibration state in private agent state (dot-prefixed files),
 never in JOURNEY.md, SRD.md, status reports, or any other artifact
 the founder will read.
 
-See `plugins/srd/references/founder-english.md` for FE-01..FE-10 +
+See `plugins/sulis/references/founder-english.md` for FE-01..FE-10 +
 worked anchor cases from production failures that drove this rule.
 
 
@@ -157,7 +157,7 @@ Never relay a specialist's "open questions" verbatim. Triage each
 through AAF-01; step-1-silent items get decided silently; at most
 ONE genuinely founder-owned question per turn reaches them.
 
-See `plugins/srd/references/founder-english.md` (FE-11 + Anchor
+See `plugins/sulis/references/founder-english.md` (FE-11 + Anchor
 Case 3) for the full standard and worked failure example.
 
 ## Audience-Adapted Question Framing (MUST)
@@ -187,7 +187,7 @@ Never expose `Option α/β/γ`, internal IDs (`UC-08`, `FR-11`, `NFR-S04`),
 implementation types (`tuple[Decimal, Decimal]`, `Action class`), or any
 technical concept from the lexicon to a non-technical user in the question
 text. Consult
-`plugins/srd/references/audience-adapted-framing-standard.md` AAF-03
+`plugins/sulis/references/audience-adapted-framing-standard.md` AAF-03
 lexicon (40+ entries) and substitute plain-English equivalents before
 posing.
 
@@ -292,7 +292,7 @@ from {old} to {new}. Re-triaged N pending questions. M auto-resolved; K
 re-emitted; J unchanged."* This composes with AAF-05's cognitive-overload
 retroactive triage — same sweep mechanism, different trigger.
 
-See `plugins/srd/references/audience-adapted-framing-standard.md` for the
+See `plugins/sulis/references/audience-adapted-framing-standard.md` for the
 full standard (AAF-01..AAF-09), the closed positive list of consequences,
 the translation lexicon, the show-don't-tell pattern, and composition
 with Plain English First (Section 2), Role Calibration (Phase 1), and
@@ -610,7 +610,7 @@ expectations for the process.
   Empty sections are fine — they signal that the rules know where to write.
 
   **RECONCILIATION_MAP.md** — Initialize from the
-  `plugins/srd/skills/srd-templates/SKILL.md` § RECONCILIATION_MAP template at
+  `plugins/sulis/skills/requirements-templates/SKILL.md` § RECONCILIATION_MAP template at
   `.specifications/{project}/RECONCILIATION_MAP.md`. Empty table body. The
   Two-Model OODA Reconciliation rule (Section 2) appends rows continuously during
   Phases 2-3.
@@ -832,7 +832,7 @@ requirements. This is where "it should work" becomes "it works exactly like this
   Source of the convention, in priority order: project-local authoritative source
   (`TECH_RADAR.md`, `technology-selection.md`, the External ADR Registry) → the
   Convention Preference worked-examples table at
-  `plugins/srd/references/convention-preference-standard.md` → dominant industry
+  `plugins/sulis/references/convention-preference-standard.md` → dominant industry
   pattern (Stripe, GitHub, AWS, OpenTelemetry, the SRE book).
 
   - **Protocol.** Recommend the convention for the integration shape — REST for
@@ -1262,7 +1262,7 @@ thin areas. Be honest about what is solid and what needs more work.
 
 - **Run AAF triage on every gap before deciding to fix vs ask (MUST).** Each
   gap surfaced by perspectives 1-8 passes through the AAF-01 closed positive list
-  in `plugins/srd/references/audience-adapted-framing-standard.md` before any
+  in `plugins/sulis/references/audience-adapted-framing-standard.md` before any
   surfacing decision. The default posture is *fix inline and journal* — only gaps
   that have a genuine user-facing or business-facing consequence (per the closed
   list) become user questions. Artifact-maintenance gaps (missing diagrams for
@@ -1934,7 +1934,7 @@ requirements down to irreducible primitives.
   `source ∈ {user, inferred}` plus open claims held in `EXPLORATION_JOURNAL.md` under
   `## Domain Claims`. Sources, in escalating Outside-In order: user statements →
   `.context/{project}/INDEX.md` authoritative sources → CP-01 worked-examples table at
-  `plugins/srd/references/convention-preference-standard.md` (canonical IETF/W3C/
+  `plugins/sulis/references/convention-preference-standard.md` (canonical IETF/W3C/
   dominant-player conventions) → **bounded web research (≤ 1 WebFetch per Observe step)**
   only when the slice names a regulated domain (GDPR, PCI-DSS, accessibility, retention),
   a published IETF/W3C/ISO standard, or a dominant-player API (Stripe, AWS, Kubernetes,
@@ -2175,7 +2175,7 @@ topic, not from the analyst's improvisation.
    `methodology/standards/technology-selection.md`, `STANDARDS.md`), the convention
    comes from there. Cite it in the question.
 2. **Marketplace Convention Preference standard.** See
-   `plugins/srd/references/convention-preference-standard.md` — CP worked-examples
+   `plugins/sulis/references/convention-preference-standard.md` — CP worked-examples
    table for canonical answers (HTTP signing → RFC 9421; pagination → cursor; UUIDs →
    v4/v7; etc.).
 3. **Dominant industry convention.** What does Stripe / Kubernetes / GitHub / OpenTelemetry /

@@ -87,7 +87,7 @@ CP-03. An agent that respects external conventions but happily duplicates
 internal implementations has only half-applied this principle.
 
 **Operationalisation in the SRD analyst.** When the SRD analyst's Two-Model
-OODA Reconciliation rule fires (see `plugins/srd/agents/requirements-analyst.md`
+OODA Reconciliation rule fires (see `plugins/sulis/agents/requirements-analyst.md`
 → Section 2), the four-priority order above IS the Outside-In escalation
 ladder during the Observe step: internal prior art first (via the v1.9.1
 Prior-Art Check), then standards-body documents, then dominant conventions,

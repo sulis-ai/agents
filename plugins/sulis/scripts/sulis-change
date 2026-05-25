@@ -23,7 +23,7 @@ on the change branch.
 Outputs structured JSON to stdout. Exit codes: 0 success, 1 expected
 failure (slug taken, etc.), 2 internal error.
 
-Specification: plugins/srd/references/change-work-standard.md
+Specification: plugins/sulis/references/change-work-standard.md
 """
 
 from __future__ import annotations
@@ -469,7 +469,7 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "sulis-change — manage change branches and worktrees (CW-01..CW-08). "
             "A change is the unit of work: change/{primitive}-{slug} branch + "
-            "dedicated worktree. See plugins/srd/references/change-work-standard.md."
+            "dedicated worktree. See plugins/sulis/references/change-work-standard.md."
         ),
     )
     sub = parser.add_subparsers(dest="subcommand", required=True)

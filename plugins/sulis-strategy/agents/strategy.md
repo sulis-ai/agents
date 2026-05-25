@@ -51,7 +51,7 @@ Agents pattern-match. Recommending the canonical answer makes downstream
 agents (and humans) load less context, run faster, and fail in
 well-understood ways.
 
-See `plugins/srd/references/convention-preference-standard.md` for
+See `plugins/sulis/references/convention-preference-standard.md` for
 CP-01..CP-05, worked examples, and anti-patterns.
 
 ---
@@ -65,7 +65,7 @@ artifact**, run the FE-06 five-point check:
    `FR-`, `WP-`, `SF-`, `ADR-`, `MUC-`, `Turn N`, `Phase N`).
 2. **Filename scan.** Translate marketplace artifact filenames per
    the FE-08 table at
-   `plugins/srd/references/founder-english.md`
+   `plugins/sulis/references/founder-english.md`
    (`PRIMITIVE_TREE.jsonld` → "the building-block map", `SRD.md`
    → "the requirements document", `TDD.md` → "the technical
    blueprint", `JOURNEY.md` → "your project's journey", etc.).
@@ -92,7 +92,7 @@ Track calibration state in private agent state (dot-prefixed files),
 never in JOURNEY.md, SRD.md, status reports, or any other artifact
 the founder will read.
 
-See `plugins/srd/references/founder-english.md` for FE-01..FE-10 +
+See `plugins/sulis/references/founder-english.md` for FE-01..FE-10 +
 worked anchor cases from production failures that drove this rule.
 
 
@@ -118,7 +118,7 @@ Never relay a specialist's "open questions" verbatim. Triage each
 through AAF-01; step-1-silent items get decided silently; at most
 ONE genuinely founder-owned question per turn reaches them.
 
-See `plugins/srd/references/founder-english.md` (FE-11 + Anchor
+See `plugins/sulis/references/founder-english.md` (FE-11 + Anchor
 Case 3) for the full standard and worked failure example.
 
 ## Audience-Adapted Question Framing (MUST)
@@ -143,7 +143,7 @@ triage**:
 Never expose framework names (`BMC vs Lean Canvas`), TAM methodology
 acronyms, or adoption-segment jargon (`innovators vs early adopters`) in
 question text to a non-technical user. Consult the lexicon at
-`plugins/srd/references/audience-adapted-framing-standard.md` AAF-03 and
+`plugins/sulis/references/audience-adapted-framing-standard.md` AAF-03 and
 substitute plain-English equivalents.
 
 **Strategy-specific worked example.** When you would otherwise ask:
@@ -205,7 +205,7 @@ re-triage under the now-current rules. Auto-resolve any that the new
 rules classify as step-1/step-2-silent; only genuine step-3 survivors
 stay open.
 
-See `plugins/srd/references/audience-adapted-framing-standard.md` for the
+See `plugins/sulis/references/audience-adapted-framing-standard.md` for the
 full standard (AAF-01..AAF-09).
 
 ---

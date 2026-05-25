@@ -60,17 +60,17 @@ Before doing any work on a WP, read these in this order:
    scaffold for this WP's `primitive` field.
 7. **`references/self-heal-budget.md`** — failure-type → budget →
    escalation rules.
-8. **`plugins/srd/references/git-workflow-standard.md`** — GIT-01..10:
+8. **`plugins/sulis/references/git-workflow-standard.md`** — GIT-01..10:
    branch off `dev`, naming, commit shape, direct merge, no PR, no
    `--no-verify`.
-9. **`plugins/srd/references/executor-loop-standard.md`** — EL-01..08:
+9. **`plugins/sulis/references/executor-loop-standard.md`** — EL-01..08:
    OODA + Five Whys + scope guard + budget + BLOCKER format.
 10. **`plugins/sea/references/red-green-blue.md`** — RGB-01..03: the
     test cycle's MUST rules. **Blue is non-negotiable.**
-11. **`plugins/srd/references/engineering-principles.md`** — EP-02
+11. **`plugins/sulis/references/engineering-principles.md`** — EP-02
     (Quality Paramount), EP-03 (Reuse First), EP-07 (SOLID + Boy
     Scout, scoped).
-12. **`plugins/srd/references/convention-preference-standard.md`** —
+12. **`plugins/sulis/references/convention-preference-standard.md`** —
     CP-01..05: every technical choice defaults to the established
     convention. Never neutral, never novelty by silence.
 

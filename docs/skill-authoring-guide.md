@@ -23,7 +23,7 @@ Before writing a skill, identify which category it falls into:
 `SKILL.md` is the entrypoint, but the skill directory can contain scripts, assets, reference docs, templates, and data. Think of the entire file system as context engineering.
 
 ```
-plugins/srd/skills/your-skill/
+plugins/sulis/skills/your-skill/
 ├── SKILL.md              # Entrypoint — the prompt
 ├── references/           # API docs, standards, usage examples
 │   └── standard.md

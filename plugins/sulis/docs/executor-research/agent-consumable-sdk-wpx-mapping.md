@@ -911,9 +911,9 @@ wpx-specific sources:
 
 **Related marketplace standards:**
 
-- [`plugins/srd/references/convention-preference-standard.md`](../../../srd/references/convention-preference-standard.md)
+- [`plugins/sulis/references/convention-preference-standard.md`](../../../sulis/references/convention-preference-standard.md)
   — CP-01 (recommend established conventions)
-- [`plugins/srd/references/change-work-standard.md`](../../../srd/references/change-work-standard.md)
+- [`plugins/sulis/references/change-work-standard.md`](../../../sulis/references/change-work-standard.md)
   — CW-01..CW-08 (the change-bounded workflow that wpx now supports)
 - [`plugins/sulis/references/lifecycle.md`](../../references/lifecycle.md)
   — the Step 1-12 executor lifecycle (Steps 8-10 ship via wpx-pipeline

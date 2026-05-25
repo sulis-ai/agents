@@ -46,7 +46,7 @@ which the harness's cross-turn notification contract doesn't support.
 ## Where a WP sits — inside a change (CW-04, v0.12.0+)
 
 Per the Change Work Standard at
-`plugins/srd/references/change-work-standard.md`, every WP exists
+`plugins/sulis/references/change-work-standard.md`, every WP exists
 inside a **change** — a dedicated git branch with its own worktree.
 The worktree hierarchy is **two levels**:
 

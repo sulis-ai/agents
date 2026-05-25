@@ -5,7 +5,7 @@ designs, audits brownfield code for primitive gaps, and decomposes
 architectures into atomic Work Packages an execution agent can implement
 without drift.
 
-SEA is the technical counterpart to [SRD](../srd/) — where SRD handles
+SEA is the technical counterpart to the requirements analyst (consolidated into [sulis](../sulis/) at v0.37.0; legacy plugin home at `../srd/` is DEPRECATED) — where requirements handles
 **What** and **Why**, SEA handles **How**, **Hardening**, and **Work
 Decomposition**.
 
@@ -47,7 +47,7 @@ claude --agent sea:engineering-architect --dangerously-skip-permissions
 | `/sea:harden` | Brownfield — implement accepted Hardening Deltas through the Red-Green-Blue cycle |
 | `/sea:decompose` | Break a TDD into atomic Work Packages with dependency graph and token-cost estimates |
 | `/sea:verify` | Run five-perspective completeness check; produce `COMPLETENESS_REPORT.md` |
-| `/code-review <PR\|branch\|range>` | PR-scoped review implementing the Code Review Standard ([CR-01..CR-09](references/code-review-standard.md)) and applying the PR Hygiene Standard ([PH-01..PH-08](../srd/references/pr-hygiene-standard.md)). Runs a mandatory mechanical baseline (typecheck + lint) before any lens (CR-01); computes the PR Hygiene signal table — Scope / Size / Safety / Completeness — before lens dispatch (CR-09); dispatches three lenses in parallel above the 200-line / 5-file carve-out (CR-02); reads every changed file >50 lines end-to-end (CR-03); computes verdict with four auto-downgrade rules the agent cannot override including PH-03 high-severity hygiene findings (CR-06); self-attests in the report's Methodology (CR-08). Report is **two-tier**: a plain-English author tier (no internal IDs, action-oriented verdict and severity labels — "Ready to merge" / "Must fix" / "Strongly recommend fixing" / etc., optional "Things to take away" educational notes capped at 3 and tied to specific findings) and a technical tier for engineers and downstream agents (full CR-NN / PH-NN taxonomy intact). Default tier-1 audience is a non-technical founder using AI to generate code. Produces a self-contained per-review bundle at `.architecture/{project}/code-reviews/PR-{number}-{TIMESTAMP}/` with REVIEW.md + hardening-deltas/ subdir + signals.json + tool-outputs/. Advisory only — no PR comments, no status checks, no auto-blocking. |
+| `/code-review <PR\|branch\|range>` | PR-scoped review implementing the Code Review Standard ([CR-01..CR-09](references/code-review-standard.md)) and applying the PR Hygiene Standard ([PH-01..PH-08](../sulis/references/pr-hygiene-standard.md)). Runs a mandatory mechanical baseline (typecheck + lint) before any lens (CR-01); computes the PR Hygiene signal table — Scope / Size / Safety / Completeness — before lens dispatch (CR-09); dispatches three lenses in parallel above the 200-line / 5-file carve-out (CR-02); reads every changed file >50 lines end-to-end (CR-03); computes verdict with four auto-downgrade rules the agent cannot override including PH-03 high-severity hygiene findings (CR-06); self-attests in the report's Methodology (CR-08). Report is **two-tier**: a plain-English author tier (no internal IDs, action-oriented verdict and severity labels — "Ready to merge" / "Must fix" / "Strongly recommend fixing" / etc., optional "Things to take away" educational notes capped at 3 and tied to specific findings) and a technical tier for engineers and downstream agents (full CR-NN / PH-NN taxonomy intact). Default tier-1 audience is a non-technical founder using AI to generate code. Produces a self-contained per-review bundle at `.architecture/{project}/code-reviews/PR-{number}-{TIMESTAMP}/` with REVIEW.md + hardening-deltas/ subdir + signals.json + tool-outputs/. Advisory only — no PR comments, no status checks, no auto-blocking. |
 | `/sea:suggest-split <PR\|branch\|range>` | Natural follow-on to `/code-review` when PH-01 Scope or PH-02 Size fires high. Reads the diff, categorises changes by type (refactor / migration / schema / infra / docs / feature), proposes a 2-4 way split with dependency ordering, and emits the exact git commands to make each new branch. Read-only — does NOT execute the commands. The founder copies and runs them (or asks a developer to). Output is a two-tier `SPLIT-SUGGESTION.md` inside the originating review bundle. Designed for non-technical founders who don't know what "split the PR" actually involves. |
 
 ---
@@ -98,7 +98,7 @@ See [`references/red-green-blue.md`](references/red-green-blue.md) for full deta
 ## What It Produces
 
 Per the Change Work Standard (CW-01..CW-08, see
-`plugins/srd/references/change-work-standard.md`), SEA's artifacts
+`plugins/sulis/references/change-work-standard.md`), SEA's artifacts
 live on a **change branch** (`change/{primitive}-{slug}`) when work
 happens inside a change worktree. The artifact directory paths are
 unchanged — `.architecture/{project}/` stays where it is — but the
@@ -295,7 +295,7 @@ SEA makes.
 | [`references/hardening-deltas.md`](references/hardening-deltas.md) | The brownfield delta format (OpenSpec-style) |
 | [`references/architecture-patterns.md`](references/architecture-patterns.md) | Catalogue of vetted architecture patterns |
 | [`references/code-review-standard.md`](references/code-review-standard.md) | The Code Review Standard (CR-01..CR-09) — mechanical baseline, parallel dispatch, full-file reads, evidence discipline, severity rubric, computed verdict with auto-downgrade, lens completion criteria, self-attestation, PR Hygiene application |
-| `plugins/srd/references/pr-hygiene-standard.md` | The PR Hygiene Standard (PH-01..PH-08) — Scope / Size / Safety / Completeness primitives for change-artifact shape; consumed by `/code-review` via CR-09 |
+| `plugins/sulis/references/pr-hygiene-standard.md` | The PR Hygiene Standard (PH-01..PH-08) — Scope / Size / Safety / Completeness primitives for change-artifact shape; consumed by `/code-review` via CR-09 |
 
 ---
 

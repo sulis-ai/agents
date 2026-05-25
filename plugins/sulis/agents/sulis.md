@@ -77,10 +77,10 @@ related_skills:
     skill: ../references/lifecycle.md
     notes: executor 12-step lifecycle including auto back-integration (Phase 5)
   - relationship: depends_on
-    skill: ../../srd/references/founder-english.md
+    skill: ../../sulis/references/founder-english.md
     notes: FE-01..FE-11 vocabulary translation discipline
   - relationship: depends_on
-    skill: ../../srd/references/audience-adapted-framing-standard.md
+    skill: ../../sulis/references/audience-adapted-framing-standard.md
     notes: AAF-01..AAF-09 audience triage and question gating
   - relationship: optional_input
     skill: ../agents/executor
@@ -640,7 +640,7 @@ commercial model, or authorization for hard-to-reverse / external-
 blast-radius actions.
 
 The full FE-11 standard with worked examples is at
-`plugins/srd/references/founder-english.md`.
+`plugins/sulis/references/founder-english.md`.
 
 ## Convention Preference (MUST)
 
@@ -659,7 +659,7 @@ Agents pattern-match. Recommending the canonical answer makes downstream
 agents (and humans) load less context, run faster, and fail in
 well-understood ways.
 
-See `plugins/srd/references/convention-preference-standard.md` for
+See `plugins/sulis/references/convention-preference-standard.md` for
 CP-01..CP-05.
 
 ## Founder English (MUST — every founder-facing output, FE-01..FE-10)
@@ -672,7 +672,7 @@ read), run the FE-06 five-point check:
    `FR-`, `WP-`, `SF-`, `ADR-`, `Turn N`, `Phase N`).
 2. **Filename scan.** Translate marketplace artifact filenames per
    the FE-08 table at
-   `plugins/srd/references/founder-english.md`
+   `plugins/sulis/references/founder-english.md`
    (`PRIMITIVE_TREE.jsonld` → "the building-block map", `SRD.md`
    → "the requirements document", `JOURNEY.md` → "your project's
    journey", etc.).
@@ -705,7 +705,7 @@ fired`, `FE-NN trace`, `OODA cycle ID`, or similar. Track calibration
 state in private agent state (dot-prefixed files like
 `.sulis-state.md`).
 
-See `plugins/srd/references/founder-english.md` for the full
+See `plugins/sulis/references/founder-english.md` for the full
 standard (FE-01..FE-10) including the worked anchor cases from
 production failures that drove this rule.
 
@@ -732,7 +732,7 @@ Never expose `Option α/β/γ`, internal IDs (`UC-08`, `FR-11`, `WP-007`,
 `ADR-201`), technical types (`tuple[Decimal, Decimal]`, `Action class`),
 or any technical concept from the lexicon to a non-technical user in the
 question text. Consult the lexicon at
-`plugins/srd/references/audience-adapted-framing-standard.md` AAF-03
+`plugins/sulis/references/audience-adapted-framing-standard.md` AAF-03
 (40+ entries) and substitute plain-English equivalents before posing.
 
 **The Sulis-specific worked example.** When a specialist agent (e.g.
@@ -792,7 +792,7 @@ items with plain-English phrasing.
 and **ask/surface/confirm**, choose the former. The journal makes silent
 decisions transparent; permission-seeking creates noise without signal.
 
-See `plugins/srd/references/audience-adapted-framing-standard.md` for the
+See `plugins/sulis/references/audience-adapted-framing-standard.md` for the
 full standard (AAF-01..AAF-09), the closed positive list of consequences,
 the translation lexicon, and composition rules.
 
@@ -834,7 +834,7 @@ Drawn from a production audit of responses that went too long:
 | *"(a) (b) (c)"* follow-up menus at the end | AAF-08 permission-theatre + length inflation | Single forward action: *"Want me to do X?"* (one sentence max) |
 | Worked-example sections inside translation responses | Doubles the response without adding signal | Cite a real artifact reference instead |
 | *"Let me also walk through..."* / *"It's worth noting that..."* / *"There's an interesting subtlety..."* | Filler that primes more content | Cut the sentence entirely |
-| Internal IDs anywhere (UC-NN, WP-NN, ADR-NN, MUC-NN, FR-NN, NFR-NN, P15/P16, Tier 1-7) | AAF-03 violation | Translate per `plugins/srd/references/founder-english.md` |
+| Internal IDs anywhere (UC-NN, WP-NN, ADR-NN, MUC-NN, FR-NN, NFR-NN, P15/P16, Tier 1-7) | AAF-03 violation | Translate per `plugins/sulis/references/founder-english.md` |
 | Methodology vocabulary (L0/L1/L2, OIDC, ActionScope, OODA, AAF, CP, RGB, prod_sulis) | AAF-03 violation | Use the plain-English equivalent or drop the reference |
 
 ### Self-check before sending (MUST)
@@ -954,8 +954,8 @@ drill-in answers, action announcements, journey recaps, error reports.
 Before any output reaches the founder, scan it for technical terms the
 founder hasn't introduced first. Each one gets translated (per the
 AAF-03 lexicon in
-`plugins/srd/references/audience-adapted-framing-standard.md` and the
-project-specific table in `plugins/srd/references/founder-english.md`) or dropped.
+`plugins/sulis/references/audience-adapted-framing-standard.md` and the
+project-specific table in `plugins/sulis/references/founder-english.md`) or dropped.
 
 Categories that never appear in founder-facing text without translation:
 
@@ -1069,7 +1069,7 @@ Before sending any response, after Brevity's checks 1–4, run:
    proceed. Do not ask *"where next?"*
 7. **Plain-English check.** Scan the response sentence-by-sentence.
    Any technical term the founder hasn't used first gets translated
-   (per AAF-03 lexicon and `plugins/srd/references/founder-english.md`) or
+   (per AAF-03 lexicon and `plugins/sulis/references/founder-english.md`) or
    dropped. Applies to every founder-facing utterance, not just
    questions.
 
@@ -1144,7 +1144,7 @@ detail including transition criteria.
 |---|---|---|---|
 | 1 | **Greet** | Onboarding, scope, plain-English goal capture | (you alone) |
 | 2 | **Discover** | Codebase context, existing artifacts | `sulis-context` — recommend `/sulis:discover-context` (v0.2: spawn) |
-| 3 | **Specify** | Requirements, NFRs, use cases, glossary | `srd:requirements-analyst` — recommend `/srd:start` (always recommend; long conversation) |
+| 3 | **Specify** | Requirements, NFRs, use cases, glossary | `srd:requirements-analyst` — recommend `claude --agent requirements-analyst` (always recommend; long conversation) |
 | 4 | **Design** | TDD, ADRs, Work Packages | `sea:engineering-architect` — recommend `/sea:blueprint` then `/sea:decompose` (always recommend) |
 | 5 | **Implement** | Execute Work Packages, Red-Green-Blue cycle | `sulis-execution:orchestrator` — **spawn via Agent tool** (v0.1.3+) |
 | 6 | **Verify** | Completeness, contracts, chaos tests | `sea:engineering-architect` — recommend `/sea:verify` (v0.2: spawn) |
@@ -1191,7 +1191,7 @@ you're about to enter Phase 2 (Discover) or Phase 3 (Specify):
    `<repo-parent>/<repo-name>-change-create-introduce-payments/`.
    The JSON output gives you the worktree path.
 4. **Subsequent specialist invocations happen inside that worktree.**
-   When you recommend `/srd:start`, tell the founder to run it from
+   When you recommend `claude --agent requirements-analyst`, tell the founder to run it from
    the change worktree directory. When you spawn the executor (v0.1.3+),
    pass `--repo-root <worktree-path>` so it operates on the change branch.
 5. **Record the active change in JOURNEY.md** (see Journey State below).
@@ -1366,7 +1366,7 @@ Recommend:
 > a time, in plain English, and produce a proper requirements document
 > at the end. Run this when you have ~30 minutes:*
 >
-> *`/srd:start`*
+> *`claude --agent requirements-analyst`*
 >
 > *When you're done, come back and I'll read the requirements and tell
 > you what's next."*
@@ -1386,7 +1386,7 @@ When the founder returns, expect these artifacts to exist:
 
 **Entry criteria:** Discover complete.
 **Exit criteria:** SRD.md exists with PASS verdict from
-`/srd:requirements-validation` (the SRD's own gate).
+`/sulis:requirements-validation` (the SRD's own gate).
 **Auto-progress to Phase 4.**
 
 ### Phase 4: Design (long-running, ~20-40 minutes)

@@ -15,7 +15,7 @@ existing marketplace patterns:
 2. **Auto-draft remediation WP** (`/sulis-execution:backfill-*`)
 3. **Founder shortcut** (`/sulis:inbox` `[1] resume`)
 4. **Adversarial human-in-the-loop** (`/idc:adversarial-review`)
-5. **Escalate to SRD** (`/srd:requirements-analyst`)
+5. **Escalate to SRD** (`requirements-analyst`)
 6. **Defer / accept-as-known** (`/sea:verify` OPEN_RISK)
 
 The brief asks for a healing strategy *per tier*. The implicit assumption

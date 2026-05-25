@@ -9,7 +9,7 @@ deciders: [iain, sea-architect-agent]
 ## Context
 
 `/sea:blueprint`'s standard gotcha is "No SRD, no TDD". The skill should
-refer the user back to `/srd:requirements-analyst` when no
+refer the user back to `requirements-analyst` when no
 `.specifications/{project}/` exists.
 
 For `sulis-checkup`, no SRD exists at `.specifications/sulis-checkup/`.
@@ -71,7 +71,7 @@ license. The pattern's contract is:
 When the founder accepts (or modifies) this TDD, the SRD-authoring
 sequence is:
 
-1. **Run `/srd:requirements-analyst`** at `.specifications/sulis-checkup/`.
+1. **Run `requirements-analyst`** at `.specifications/sulis-checkup/`.
 2. **Feed it the TDD as input** (it's already designed to read TDD
    excerpts; the Part 9 gap list and Part 10 open questions are the
    highest-value seed material).
@@ -84,7 +84,7 @@ sequence is:
    - Misuse cases (MUC-01 founder runs against wrong project,
      MUC-02 secret-finding logged in report itself, MUC-03 OODA loop
      runaway, etc.)
-4. **Run `/srd:requirements-validation`** for the five-perspective
+4. **Run `/sulis:requirements-validation`** for the five-perspective
    completeness check.
 5. **Then run `/sea:decompose`** against this TDD + the new SRD.
 
@@ -116,7 +116,7 @@ Sets up the SRD path explicitly.
 **Pros:** ships both at once. No follow-up step.
 
 **Cons:**
-- Skill scope creep. `/sea:blueprint` is not `/srd:requirements-analyst`.
+- Skill scope creep. `/sea:blueprint` is not `requirements-analyst`.
 - The SRD facilitation flow is interactive (it prompts the founder for
   clarifications); doing it inside `/sea:blueprint` would have blocked
   on questions outside the blueprint skill's design.

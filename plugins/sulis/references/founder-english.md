@@ -793,7 +793,7 @@ Anchor case 1's original output, rewritten through FE-01..FE-09:
 > *This one matters because it shapes how customers register their
 > stuff with you, and how the agent sees what's available to use.*
 >
-> *When you're ready to answer, run `/srd:start`. I'll pick up
+> *When you're ready to answer, run `claude --agent requirements-analyst`. I'll pick up
 > after the analyst finishes.*
 
 Same content, three times shorter, zero internal vocabulary, every
@@ -844,4 +844,4 @@ state, not in JOURNEY.md. Either drop or translate.
 | Version | Date | Change | Author |
 |---|---|---|---|
 | 0.1.0 | 2026-05-16 | Initial founder-english translation guide at `plugins/sulis-concierge/references/founder-english.md`. Defers to AAF-03 lexicon; adds concierge-specific patterns for marketplace artifacts, phase numbers, primitive names, severity labels. | Standards team |
-| 1.0.0 | 2026-05-19 | Promoted to marketplace-wide standard at `plugins/srd/references/founder-english.md`. Numbered as FE-01..FE-10. Added voice principles (FE-01 outcomes-first, FE-02 concrete-over-abstract, FE-03 confident-without-jargon, FE-04 scannable, FE-05 read-aloud test). Added FE-06 pre-emission five-point check (applies to chat messages AND founder-readable artifact writes). Added FE-09 no-mechanism-narration rule with worked anchor cases from production concierge failures. FE-10 documents composition with AAF and CP. Cited by every user-facing agent's prompt with inline MUST instructions (not just reference). | Standards team |
+| 1.0.0 | 2026-05-19 | Promoted to marketplace-wide standard at `plugins/sulis/references/founder-english.md`. Numbered as FE-01..FE-10. Added voice principles (FE-01 outcomes-first, FE-02 concrete-over-abstract, FE-03 confident-without-jargon, FE-04 scannable, FE-05 read-aloud test). Added FE-06 pre-emission five-point check (applies to chat messages AND founder-readable artifact writes). Added FE-09 no-mechanism-narration rule with worked anchor cases from production concierge failures. FE-10 documents composition with AAF and CP. Cited by every user-facing agent's prompt with inline MUST instructions (not just reference). | Standards team |
