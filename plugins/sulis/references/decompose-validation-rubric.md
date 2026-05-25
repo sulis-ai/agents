@@ -1,7 +1,7 @@
 # Decompose Validation Rubric
 
 <!-- summary -->
-This rubric validates SEA's `/sea:decompose` output — the set of WPs
+This rubric validates SEA's `/sulis:plan-work` output — the set of WPs
 and their INDEX — before the decompose skill declares done. It catches
 breakdown-stage defects that compound downstream: peer-branch
 collisions, atomicity violations, hidden cyclic dependencies, missing
@@ -12,7 +12,7 @@ verdict computation, output report alongside `INDEX.md`.
 
 > **Version:** 0.1.0
 > **Status:** Active — Calibration Period (90 days from 2026-05-22)
-> **Applies to:** `/sea:decompose` (SEA v0.19.0+). Designed to be invoked
+> **Applies to:** `/sulis:plan-work` (SEA v0.19.0+). Designed to be invoked
 > automatically by the decompose skill at the end of its workflow.
 > **Audience:** Agents (or humans) validating a decomposed WP set after
 > SEA has produced it.
@@ -21,7 +21,7 @@ verdict computation, output report alongside `INDEX.md`.
 
 ## Purpose
 
-`/sea:decompose` produces WP files + INDEX.md from a TDD. The
+`/sulis:plan-work` produces WP files + INDEX.md from a TDD. The
 breakdown is where many downstream pains start:
 
 - **Peer-branch collisions** — two parallel WPs both `Create` the
@@ -43,7 +43,7 @@ algorithms), judgement where necessary (naming quality, single-
 responsibility test). The reviewer agent records each check's verdict
 + evidence in the report.
 
-The rubric exists because /sea:decompose today relies on author
+The rubric exists because /sulis:plan-work today relies on author
 attention. Mechanical checks make the breakdown's quality observable
 rather than assumed.
 
@@ -305,7 +305,7 @@ where two parallel WPs both created `apps/api/sulis/shared/workflows/loader/__in
   gaps sections pass FE-06; the rubric body itself is internal
   taxonomy and lives below an `## At a glance` section in the
   output.
-- **Change Work Standard CW-01..CW-08** — when /sea:decompose runs
+- **Change Work Standard CW-01..CW-08** — when /sulis:plan-work runs
   inside a change worktree, the validation report lives alongside
   the change's INDEX.md.
 - **Critical Thinking Standard** — this rubric is the result of

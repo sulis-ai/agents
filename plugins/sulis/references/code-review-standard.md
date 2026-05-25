@@ -36,7 +36,7 @@ skill's SKILL.md made mechanical checks optional, parallel dispatch
 permissive, and the quality lens vibes-based with no procedural definition
 or coverage gate).
 
-The four edits in `plugins/sea/skills/code-review/BUG_REPORT.md` patched
+The four edits in `plugins/sulis/skills/code-review/BUG_REPORT.md` patched
 the specific failure. This standard generalises the lesson: agent judgement
 is unreliable on the cheapest defects; mechanical tooling is the floor;
 the skill must demonstrably catch *more* than the cheap tool, not less.

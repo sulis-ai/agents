@@ -1,7 +1,7 @@
 # Hardening Delta Format Standard
 
 <!-- summary -->
-A Hardening Delta (HD) is the artifact `/sea:harden` produces when auditing
+A Hardening Delta (HD) is the artifact `/sulis:harden-codebase` produces when auditing
 brownfield code. Each delta describes one concrete change to existing code
 that closes a gap against the [[mece-3-architecture]] pillars. The format is
 adapted from the OpenSpec delta convention (ADDED / MODIFIED / REMOVED) and
@@ -61,7 +61,7 @@ NFR, and other non-review sources:
   HD-019-declare-hasMore.md
 ```
 
-Both locations are valid. `/sea:harden` discovers deltas recursively
+Both locations are valid. `/sulis:harden-codebase` discovers deltas recursively
 under `.architecture/{project}/` (matches `HD-*.md` anywhere in the
 tree). The `status:` field in each delta's frontmatter still gates
 whether harden implements it — only `accepted` runs; `proposed`,
@@ -100,7 +100,7 @@ The optional **`source`** field records where the delta came from. Recognised fo
 
 | Source value | Meaning |
 |--------------|---------|
-| (omitted) | Delta originated from a `/sea:codebase-audit` finding with no upstream spec |
+| (omitted) | Delta originated from a `/sulis:codebase-audit` finding with no upstream spec |
 | `srd:misuse-case-MUC-NN` | Delta implements the System Response required by an SRD misuse case (SRD v1.11.0+) |
 | `srd:negative-requirement-NR-NN` | Delta implements a per-use-case negative requirement from SRD.md |
 | `sulis-security:viability-report-{timestamp}#SEC-NN` | Delta closes a finding from a sulis-security viability report. `timestamp` is the ISO 8601 UTC stamp embedded in the report filename (e.g., `2026-05-21T143052Z`). |
@@ -288,7 +288,7 @@ intervention.
 
 ---
 
-## How `/sea:harden` Uses This Format
+## How `/sulis:harden-codebase` Uses This Format
 
 1. Scans the source tree for gaps in each MEA pillar.
 2. Groups gaps by file and gap-type.
@@ -382,7 +382,7 @@ NFR-09 sets the dedup window at 24 hours. Stripe's signature freshness window of
 `blocks: HD-012` (payment audit log, which assumes only-non-replayed webhooks reach it).
 ```
 
-### What `/sea:codebase-audit` does with MUCs
+### What `/sulis:codebase-audit` does with MUCs
 
 When auditing a brownfield codebase that has a `MISUSE_CASES.md`:
 
@@ -393,7 +393,7 @@ When auditing a brownfield codebase that has a `MISUSE_CASES.md`:
    in the code OR as a draft delta. MUCs that appear in neither are a process gap —
    surface them to the user.
 
-### What `/sea:blueprint` does with MUCs
+### What `/sulis:draft-architecture` does with MUCs
 
 For greenfield work, MUCs are baked directly into the TDD's Armor section rather
 than emerging as deltas (deltas are a brownfield concept). The MUC-to-primitive

@@ -650,7 +650,7 @@ prior wrappers on the same subject. If found, escalate to the user:
 > Refactor `OrderService` directly, or Replace with a new implementation and
 > Delete the existing wrappers. Proceed with Wrap anyway? (Y/N)"
 
-Wrapper rot detection is a requirement for `/sea:probe` (v0.7.0).
+Wrapper rot detection is a requirement for `/sulis:analyse-codebase` (v0.7.0).
 
 ### Premature Abstraction
 
@@ -779,23 +779,23 @@ If a change genuinely doesn't fit, it is a composite. Record the recipe.
 
 ## How Other Skills Use This Standard
 
-**`/sea:blueprint`** — computes a primitive distribution for the proposed
+**`/sulis:draft-architecture`** — computes a primitive distribution for the proposed
 TDD's components; surfaces wrap audit in the pre-write announcement.
 
-**`/sea:codebase-audit`** — uses primitive vocabulary in audit findings
+**`/sulis:codebase-audit`** — uses primitive vocabulary in audit findings
 ("Module X is a candidate for REORGANISE-Decompose; severity high").
 
-**`/sea:decompose`** — assigns a primitive to every WP; produces the WP
+**`/sulis:plan-work`** — assigns a primitive to every WP; produces the WP
 INDEX with primitive distribution summary; runs the wrap audit.
 
-**`/sea:harden`** — implements REINFORCE-Harden primarily; may compose with
+**`/sulis:harden-codebase`** — implements REINFORCE-Harden primarily; may compose with
 other primitives per delta.
 
-**`/sea:verify`** — enforces the MUST rules: No Band-Aid Wrappers,
+**`/sulis:verify-architecture`** — enforces the MUST rules: No Band-Aid Wrappers,
 Characterisation Tests Before Refactor, Strangle Removal Plan, Deprecate
 Before Delete.
 
-**`/sea:probe`** (v0.7.0) — code intelligence supports primitive selection:
+**`/sulis:analyse-codebase`** (v0.7.0) — code intelligence supports primitive selection:
 extension points, reusable abstractions, wrapper rot, coupling/hotspot map.
 
 ---

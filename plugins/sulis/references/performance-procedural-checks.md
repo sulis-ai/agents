@@ -13,7 +13,7 @@ is the reviewer's judgement work, scoped by the Quality lens (CR-07).
 
 > **Version:** 0.1.0
 > **Status:** Active — Calibration Period (90 days from 2026-05-22)
-> **Applies to:** CR-10 in `plugins/sea/references/code-review-standard.md`
+> **Applies to:** CR-10 in `plugins/sulis/references/code-review-standard.md`
 > **Audience:** `/code-review` skill author + reviewing agent + future skill authors
 
 ---

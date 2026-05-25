@@ -227,11 +227,11 @@ and asserts the primitive behaves as designed.
 
 ## How SEA Applies This Standard
 
-- **`/sea:blueprint`** validates that the proposed TDD addresses all three pillars before writing it.
-- **`/sea:codebase-audit`** scans existing code for primitive gaps in each pillar.
-- **`/sea:harden`** generates Hardening Deltas that close Armor gaps.
-- **`/sea:decompose`** ensures each Work Package's Definition of Done includes Proof from the Verification Pillar.
-- **`/sea:verify`** runs the COMPLETENESS_REPORT against this standard.
+- **`/sulis:draft-architecture`** validates that the proposed TDD addresses all three pillars before writing it.
+- **`/sulis:codebase-audit`** scans existing code for primitive gaps in each pillar.
+- **`/sulis:harden-codebase`** generates Hardening Deltas that close Armor gaps.
+- **`/sulis:plan-work`** ensures each Work Package's Definition of Done includes Proof from the Verification Pillar.
+- **`/sulis:verify-architecture`** runs the COMPLETENESS_REPORT against this standard.
 
 ---
 

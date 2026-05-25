@@ -133,8 +133,8 @@ a clear purpose (testability boundary, swap point, polymorphic dispatch).
 
 ## Anti-Patterns SEA Rejects
 
-A non-exhaustive list of patterns SEA flags during `/sea:blueprint` review and
-`/sea:codebase-audit`:
+A non-exhaustive list of patterns SEA flags during `/sulis:draft-architecture` review and
+`/sulis:codebase-audit`:
 
 | Pattern | Why it's rejected |
 |---|---|

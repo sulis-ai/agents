@@ -402,18 +402,18 @@ The override is recorded in SIZING.md under `Tier (confirmed by user)`.
 
 ## How Other Skills Use This Standard
 
-**`/sea:blueprint`** — computes SIZING.md on first run; adapts TDD shape per
+**`/sulis:draft-architecture`** — computes SIZING.md on first run; adapts TDD shape per
 the tables above; appends a Sizing Report to TDD.md cross-referencing
 SIZING.md.
 
-**`/sea:codebase-audit`** — computes SIZING.md from codebase scan when no
+**`/sulis:codebase-audit`** — computes SIZING.md from codebase scan when no
 SRD exists; adapts audit-report depth.
 
-**`/sea:harden`** — reads SIZING.md; tier informs delta batch size.
+**`/sulis:harden-codebase`** — reads SIZING.md; tier informs delta batch size.
 
-**`/sea:decompose`** — reads SIZING.md; tier informs WP granularity.
+**`/sulis:plan-work`** — reads SIZING.md; tier informs WP granularity.
 
-**`/sea:verify`** — reads SIZING.md; tier informs perspective sweep depth.
+**`/sulis:verify-architecture`** — reads SIZING.md; tier informs perspective sweep depth.
 
 ---
 
