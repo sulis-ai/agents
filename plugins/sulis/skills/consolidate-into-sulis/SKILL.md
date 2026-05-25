@@ -275,13 +275,46 @@ git commit -m "chore(sulis): step 3/5 — move {source} agents into sulis"
 
 **This is the highest-risk commit** because cross-plugin references can be cited from anywhere — CLAUDE.md at the repo root, other plugins' references, the Sulis agent itself.
 
+> **Move-then-sweep ordering (v0.1.2 — non-negotiable).** Move ALL source-plugin content (skills + agent + references + docs) **before** running the bulk sweep. If the sweep runs while content is still in the source plugin's directory, that directory is excluded from the sweep, and any self-references inside the about-to-move content survive untouched into the new location — requiring fix-forward commits. The sea consolidation surfaced this bug twice (engineering-architect.md had 24 unswept `/sea:*` refs; 5 references had 24 collective unswept refs) before this discipline was encoded.
+>
+> The right sequence:
+>
+> 1. Move ALL content (Commits 1, 2, 3 + the reference moves in Commit 4) — source plugin directory empty of active content
+> 2. THEN run `bulk_rewrite.py` (see below)
+> 3. THEN apply manual edits for non-deterministic patterns
+> 4. THEN `git add -A` + commit
+
 ```bash
 # Move reference files
 git mv plugins/{source}/references/{ref-file}.md plugins/sulis/references/{ref-file}.md
 
-# Apply external ref sweep — use find_external_refs.py output
-# Every line in the report needs editing:
-#   plugins/{source}/references/{ref-file}.md → plugins/sulis/references/{ref-file}.md
+# After Commit 1 + 2 + 3 + the reference moves above, ALL source-plugin
+# content is in plugins/sulis/. The source plugin directory is empty of
+# active content (only plugin.json + CHANGELOG + README + settings remain).
+# NOW run the bulk sweep — it can scan everything without the
+# excluded-source-plugin escape hatch protecting unswept self-references.
+
+# Write the replacement table — one [old, new] pair per line in JSON
+cat > /tmp/{source}-replacements.json <<'JSON'
+[
+  ["/{source}:{old-skill-name}", "/sulis:{new-skill-name}"],
+  ["plugins/{source}/skills/{old-name}", "plugins/sulis/skills/{new-name}"],
+  ["plugins/{source}/agents/", "plugins/sulis/agents/"],
+  ["plugins/{source}/references/", "plugins/sulis/references/"],
+  ...
+]
+JSON
+
+# Run the bulk rewrite
+python3 plugins/sulis/skills/consolidate-into-sulis/scripts/bulk_rewrite.py \
+  --source-plugin {source} \
+  --replacements-json /tmp/{source}-replacements.json
+
+# Verify (no live source-plugin refs remain outside historical files)
+git grep -nE "(plugins/{source}/|/{source}:[a-zA-Z])" -- \
+  ':!plugins/{source}/' ':!**/CHANGELOG.md' ':!**/VERIFICATION_REPORT.md' \
+  ':!plugins/sulis/skills/consolidate-into-sulis/' \
+  ':!**/sulis.VERIFICATION_REPORT.md'
 ```
 
 Categories of refs to expect (see `references/external-ref-sweep.md` for the full 12-category checklist):
@@ -392,6 +425,7 @@ After Gate 6 passes:
 - **Tin-test rename → description-field rewrite.** If a skill name changes from `decompose` to `plan-work`, the `description:` field in its SKILL.md likely also needs rewording — descriptions often cite the skill name and operation. Mitigation: Commit 2 edit pass includes description verification.
 - **`git mv` then forgetting to edit the moved files.** Moving a script preserves history but doesn't update internal paths inside the moved file. Mitigation: every commit has an Edit pass after the `git mv` pass; pass criteria requires paths to resolve.
 - **`git mv` stages renames, but post-rename Edits do NOT auto-stage.** After `git mv` + Edit pass, the moves are staged but the content changes are not. A naive `git commit` will land the rename without the edits, producing a slightly broken intermediate state that needs a follow-up "continuation" commit. Mitigation: run `git add -A` (or explicitly `git add <edited-files>`) **after** the Edit pass and **before** the `git commit`. Grounded in the sulis-context → sulis consolidation (Commit 2 split into `0e5c9ea` + `584d438` from this exact misstep).
+- **Sweep ordering matters: move BEFORE sweep, not the reverse.** If `bulk_rewrite.py` runs while source-plugin content (agent, references) is still in the source directory, that directory is excluded from the sweep — and any self-references inside the about-to-move content survive untouched into the new location. The sea consolidation surfaced this bug twice (engineering-architect.md had 24 unswept `/sea:*` refs; 5 references had 24 collective unswept refs). Mitigation: move ALL source content (skills + agent + references + docs) before invoking `bulk_rewrite.py`. The script's source-plugin exclusion then becomes a no-op (the directory is empty of active content).
 - **Code-health baseline drift.** If the founder ran `/sulis:code-health` weeks ago and saved a baseline somewhere global, Gate 0's fresh baseline supersedes — don't reuse stale baselines for regression detection. Mitigation: Gate 0 captures fresh baseline at consolidation start.
 - **Atomic commits violated under pressure.** Mid-consolidation, an operator might be tempted to batch Commits 2-4 to "save time." Don't — atomic commits preserve reviewability and rollback. Mitigation: skill's pass criteria gate per-commit; do not advance until met.
 

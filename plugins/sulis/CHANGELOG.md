@@ -1,5 +1,59 @@
 # Sulis — Changelog
 
+## v0.39.0 — 2026-05-25
+
+**`consolidate-into-sulis` v0.1.2 — two highest-leverage patches from the sea run.**
+
+### Patches
+
+1. **`scripts/bulk_rewrite.py`** — new packaged helper. The ad-hoc
+   `/tmp/srd_sweep.py` and `/tmp/sea_sweep.py` scripts used in the srd
+   and sea consolidations are now a first-class helper with:
+   - JSON-driven replacement table (one `[old, new]` pair per line)
+   - Same exclusion semantics (source plugin + historical files +
+     recipe pedagogical examples)
+   - `--dry-run` mode for preview
+   - CLI smoke-tested against sulis-context (excluded correctly, 0 hits
+     after the already-shipped consolidation)
+   - Documented in module docstring: ordering note (move-then-sweep)
+
+2. **Move-then-sweep ordering encoded in SKILL.md** — the sea
+   consolidation surfaced this bug twice (engineering-architect.md
+   had 24 unswept `/sea:*` refs; 5 references had 24 collective
+   unswept refs). Root cause: bulk sweep ran while source-plugin
+   content was still in `plugins/sea/agents/` and
+   `plugins/sea/references/` — those directories were excluded from
+   the sweep, so the self-references inside survived. Fix:
+   - SKILL.md Commit 4 section gains a non-negotiable ordering block:
+     move ALL content first, THEN sweep, THEN manual edits, THEN
+     commit
+   - Gotchas section gains a new gotcha calling out the sweep-
+     ordering bug with the sea-consolidation precedent
+
+### 4 lower-leverage signals deferred
+
+3. `compare_baseline.py` tier-gating asymmetry (skipped-tier findings
+   appear as RESOLVED) — annotation needed; not urgent
+4. Scanner-reported path stability across moves (gitleaks sometimes
+   reports OLD git-tracked paths after file moves) — annotation in
+   compare_baseline.py signature; not urgent
+5. Atomic-per-step combined-commit guidance — write up when/why
+   combined commits are acceptable; not urgent
+6. `detect_collisions.py` tin-test heuristic refinements (abstract-
+   noun-only names, abbreviation-suffix names) — sea caught 5/5
+   cleanly so the heuristic is currently sufficient; defer
+
+These four ship in a future v0.1.3 if usage signal warrants.
+
+### Why ship v0.1.2 before sulis-security
+
+sulis-security is the last Phase 3 consolidation. Trivial in scope
+(1 already-DEPRECATED skill, 1 reference) but it should benefit from
+the move-then-sweep ordering fix even at small scale — establishes
+the discipline for the v1.0 recipe before Phase 3 closes.
+
+---
+
 ## v0.38.0 — 2026-05-25
 
 **Phase 3 third consolidation — `sea` folded into `sulis`.**
