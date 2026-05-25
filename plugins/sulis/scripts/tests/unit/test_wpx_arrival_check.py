@@ -43,8 +43,10 @@ def _write_workflows(repo_root: Path, names: list[str]) -> None:
         "promote-dev-to-main": "on:\n  workflow_dispatch:\n",
         "release-prod": "on:\n  push:\n    tags: ['v*.*.*']\n",
     }
+    default_trigger = "on: push\n"
     for n in names:
-        (wf / f"{n}.yml").write_text(f"name: {n}\n{triggers.get(n, 'on: push\n')}")
+        body = triggers.get(n, default_trigger)
+        (wf / f"{n}.yml").write_text(f"name: {n}\n{body}")
 
 
 def _conformant_gh_responses() -> list[dict]:
