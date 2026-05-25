@@ -449,7 +449,7 @@ instead writes a BLOCKER and stops — it does NOT proceed to Step 11
 or Step 12.
 
 The full skill prompts for the calling session live in
-`plugins/sulis-execution/skills/run-all/SKILL.md` and `run-wp/SKILL.md`.
+`plugins/sulis/skills/run-all/SKILL.md` and `run-wp/SKILL.md`.
 
 ---
 

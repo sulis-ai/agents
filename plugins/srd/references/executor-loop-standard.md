@@ -65,7 +65,7 @@ agent runs when a step fails**. It does NOT govern:
 
 - **Which steps an agent runs** — that is the agent's lifecycle, defined
   by its own contract (e.g. the WP executor's 10-step lifecycle from
-  `git-workflow-standard.md` and `sulis-execution/references/lifecycle.md`).
+  `git-workflow-standard.md` and `sulis/references/lifecycle.md`).
 - **The success path** — when steps succeed, the agent simply advances
   to the next step. The loop fires only on failure.
 - **Diagnosis of root causes outside the agent's contract** — those
@@ -328,8 +328,8 @@ that converges asymptotically on a fix but never quite gets there).
 ### Default budgets
 
 The marketplace defines default budgets per common failure type. The
-WP executor's budgets are in `sulis-execution/references/self-heal-
-budget.md`. The pattern is:
+WP executor's budgets are in `sulis/references/self-heal-budget.md`.
+The pattern is:
 
 | Failure type | Default budget |
 |---|---|

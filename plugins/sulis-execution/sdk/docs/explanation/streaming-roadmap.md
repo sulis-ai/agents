@@ -136,9 +136,9 @@ notifications.
 
 ### Phase E — Skills migrate long-running ops to MCP
 
-**Files:** `plugins/sulis-execution/skills/run-all/SKILL.md`,
-`plugins/sulis-execution/skills/run-wp/SKILL.md`,
-`plugins/sulis-execution/references/lifecycle.md`.
+**Files:** `plugins/sulis/skills/run-all/SKILL.md`,
+`plugins/sulis/skills/run-wp/SKILL.md`,
+`plugins/sulis/references/lifecycle.md`.
 
 Replace the `Bash(... wpx-train run ... run_in_background: true)`
 patterns with MCP tool calls. The agent sees progress notifications

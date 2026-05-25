@@ -102,8 +102,8 @@ Delete WPs are best run as singletons.
 
 ## Part 2 — Per-WP step inventory
 
-From `plugins/sulis-execution/references/lifecycle.md` and
-`plugins/sulis-execution/agents/executor.md`. Each step labelled LOCAL (in
+From `plugins/sulis/references/lifecycle.md` and
+`plugins/sulis/agents/executor.md`. Each step labelled LOCAL (in
 the worktree, no external infra) or GLOBAL (polls external CI / deploy /
 health), with qualitative cost estimate.
 
@@ -331,8 +331,8 @@ level, not N.
 - `plugins/sea/skills/decompose/SKILL.md` (lines 206-288 INDEX.md structure;
   lines 284-286 topological order example)
 - `plugins/sea/references/change-primitives.md` (22 primitives, 5 groups)
-- `plugins/sulis-execution/references/lifecycle.md`
-- `plugins/sulis-execution/agents/executor.md`
+- `plugins/sulis/references/lifecycle.md`
+- `plugins/sulis/agents/executor.md`
 
 **Web research:**
 - [Shopify Engineering — Successfully Merging the Work of 1000+ Developers](https://shopify.engineering/successfully-merging-work-1000-developers)

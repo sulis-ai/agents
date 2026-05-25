@@ -915,7 +915,7 @@ wpx-specific sources:
   — CP-01 (recommend established conventions)
 - [`plugins/srd/references/change-work-standard.md`](../../../srd/references/change-work-standard.md)
   — CW-01..CW-08 (the change-bounded workflow that wpx now supports)
-- [`plugins/sulis-execution/references/lifecycle.md`](../../references/lifecycle.md)
+- [`plugins/sulis/references/lifecycle.md`](../../references/lifecycle.md)
   — the Step 1-12 executor lifecycle (Steps 8-10 ship via wpx-pipeline
   or wpx-train depending on path)
 
