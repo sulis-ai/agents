@@ -45,13 +45,17 @@ gh api -X PATCH "repos/$REPO" \
 echo "  repo settings applied"
 
 # --- RC-02: branch protection on dev -----------------------------------------
-echo "RC-02: dev protection (branch-ci + merge-queue-ci required)"
+# RC v0.3.0 DEADLOCK FIX (ADR-003): classic required checks = branch-ci ONLY.
+# merge-queue-ci is the merge queue's internal merge_group gate (present only
+# when contribution_model: team) — listing it as a classic required check
+# deadlocks queue entry (can't enter until it passes; can't run until entered).
+echo "RC-02: dev protection (branch-ci required check ONLY — deadlock fix)"
 gh api -X PUT "repos/$REPO/branches/dev/protection" \
   --input - <<'JSON' >/dev/null
 {
   "required_status_checks": {
     "strict": true,
-    "contexts": ["branch-ci", "merge-queue-ci"]
+    "contexts": ["branch-ci"]
   },
   "enforce_admins": false,
   "required_pull_request_reviews": {
@@ -64,7 +68,7 @@ gh api -X PUT "repos/$REPO/branches/dev/protection" \
   "allow_deletions": false
 }
 JSON
-echo "  dev protected"
+echo "  dev protected (branch-ci only)"
 
 # --- RC-02: branch protection on main ----------------------------------------
 echo "RC-02: main protection (production marker; no PR, linear, no force)"
@@ -82,19 +86,21 @@ gh api -X PUT "repos/$REPO/branches/main/protection" \
 JSON
 echo "  main protected"
 
-# --- RC-03: merge queue on dev -----------------------------------------------
-# NOTE: GitHub's merge-queue enable is via the repo ruleset / branch settings UI
-# or the GraphQL API. The REST protection call above sets required checks; the
-# queue itself is enabled here. If this GraphQL mutation is unavailable on the
-# plan, enable "Merge queue" on dev in Settings > Branches manually.
-echo "RC-03: merge queue on dev (group size 5, concurrency 3, squash)"
-echo "  NOTE: if the API call below fails, enable Merge Queue on dev manually"
-echo "        in Settings > Branches > dev > Require merge queue."
+# --- RC-03: merge queue on dev (VOLUME-CONDITIONAL) --------------------------
+# Per ADR-002, the merge queue keys on contribution_model, NOT the profile:
+#   team → enable the queue (ruleset with a merge_queue rule on dev)
+#   solo → DO NOT enable a queue; changes merge directly on branch-ci green
+# This repo is contribution_model: solo (single maintainer) → NO merge queue.
+# (A prior bootstrap created a dev-merge-queue ruleset; it was deleted when
+# this repo was reclassified solo. For a team repo, create the ruleset here.)
+echo "RC-03: contribution_model: solo → NO merge queue (direct merge per GIT-05)"
+echo "  (team repos: create a dev ruleset with a merge_queue rule instead)"
 
-# --- RC-05: environments -----------------------------------------------------
-# Marketplace profile: environments exist so workflows' `environment:` resolves,
-# but carry NO deploy secrets (deploy_target: none). See repo-contract.yml.
-echo "RC-05: environments (staging, production) — empty, no deploy secrets"
+# --- RC-05: environments (PROFILE-CONDITIONAL) -------------------------------
+# published-artifact profile: environments are a formality so workflows'
+# `environment:` resolves; they carry NO deploy secrets (no deploy target).
+# deployable-web-app: real targets + deploy secrets (RC-06). internal-tool: skip.
+echo "RC-05: environments (staging, production) — formality (published-artifact)"
 gh api -X PUT "repos/$REPO/environments/staging" >/dev/null
 gh api -X PUT "repos/$REPO/environments/production" \
   --input - <<'JSON' >/dev/null

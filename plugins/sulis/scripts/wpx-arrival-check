@@ -1,16 +1,30 @@
 #!/usr/bin/env python3
-"""wpx-arrival-check — verify the Repository Contract (RC-01..RC-10).
+"""wpx-arrival-check — verify the Repository Contract (RC-01..RC-12, v0.3.0).
 
-The executor's Step 0. Read-only. Verifies every MUST rule in
-repository-contract-standard.md against a live GitHub repo via `gh api`,
-plus filesystem checks for workflow files + CODEOWNERS.
+The executor's Step 0. Read-only. Verifies the contract against a live
+GitHub repo via `gh api` + filesystem, applying the v0.3.0 profile model
+(repository-contract-standard.md).
 
-Marketplace profile: when .sulis/repo-contract.yml declares
-`deploy_target: none`, the deploy-coupled MUSTs (RC-05 deploy secrets,
-RC-06, RC-08 tag signing) downgrade to WARN — a non-deployable repo
-(plugin marketplace, library, CLI) cannot satisfy them and shouldn't be
-refused for it. This is the documented deviation pending the RC v0.3.0
-"repo profiles" work.
+A repo declares EITHER a single `profile:` (deployable-web-app |
+published-artifact | internal-tool) OR an `artifacts:` list (multi-artifact),
+plus an orthogonal `contribution_model:` (team | solo). The applicability
+matrix decides, per rule, whether an absent/wrong resource is an error, a
+warning, or skipped:
+
+- Invariant (all profiles, MUST): RC-01, RC-02, RC-07, RC-09, RC-11, RC-12.
+- RC-02 deadlock fix: classic required checks on dev = `branch-ci` ONLY;
+  `merge-queue-ci` is the queue's internal merge_group gate, NEVER a classic
+  required check.
+- RC-03 (volume): team → merge queue MUST exist; solo → MUST be absent.
+- RC-04 workflows: branch-ci + promote always; merge-queue-ci iff team;
+  deploy/health/release per deployable/published artifact (namespaced in
+  multi-artifact); none for internal-tool.
+- RC-05/06/08: profile-specific (deployable strict; published relaxed;
+  internal N/A) — composed by UNION across artifacts.
+- RC-10: SHOULD (warn) everywhere.
+
+Defaults (backward-compat = strict v0.2.0): no profile + no artifacts →
+deployable-web-app; no contribution_model → team.
 
 Emits the RC-11 JSON contract to stdout:
     {"ok": bool, "errors": [...], "warnings": [...]}
@@ -29,19 +43,15 @@ import subprocess
 import sys
 from pathlib import Path
 
-REQUIRED_WORKFLOWS = [
-    "branch-ci",
-    "merge-queue-ci",
-    "deploy-staging",
-    "health-and-smoke",
-    "promote-dev-to-main",
-    "release-prod",
-]
+VALID_PROFILES = {"deployable-web-app", "published-artifact", "internal-tool"}
+VALID_MODELS = {"team", "solo"}
+
+
+class _ToolingError(Exception):
+    """Raised when the check cannot run at all (no gh, no auth). Exit 1."""
 
 
 def _gh(args: list[str], timeout: int = 30) -> tuple[int, str, str]:
-    """Run a gh command. Returns (rc, stdout, stderr). rc!=0 means the API
-    call failed (often a 404 = the resource is absent = a rule failure)."""
     try:
         proc = subprocess.run(
             ["gh", *args], capture_output=True, text=True, timeout=timeout
@@ -53,20 +63,70 @@ def _gh(args: list[str], timeout: int = 30) -> tuple[int, str, str]:
         return 124, "", "timeout"
 
 
-class _ToolingError(Exception):
-    """Raised when the check cannot run at all (no gh, no auth). Exit 1."""
+def _strip_value(raw: str) -> str:
+    """Strip an inline `# comment` and surrounding whitespace from a value."""
+    return raw.split(" #", 1)[0].strip()
 
 
-def _read_deploy_target(repo_root: Path) -> str:
-    """Parse deploy_target from .sulis/repo-contract.yml (stdlib-only)."""
+def _read_contract(repo_root: Path) -> dict:
+    """Parse profile / contribution_model / artifacts from repo-contract.yml.
+
+    Stdlib-only, indentation-aware enough for the well-formed contract shape.
+    Returns {profile, contribution_model, artifacts: [{name, type}], deploy_target}.
+    """
+    result: dict = {
+        "profile": None, "contribution_model": None,
+        "artifacts": [], "deploy_target": None,
+    }
     contract = repo_root / ".sulis" / "repo-contract.yml"
     if not contract.is_file():
-        return "unknown"
+        return result
+
+    in_artifacts = False
+    cur: dict | None = None
     for line in contract.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
-        if stripped.startswith("deploy_target:"):
-            return stripped.split(":", 1)[1].strip()
-    return "unknown"
+        if not stripped or stripped.startswith("#"):
+            continue
+        top_level = not line[:1].isspace()
+        if top_level:
+            in_artifacts = False
+            if stripped.startswith("profile:"):
+                result["profile"] = _strip_value(stripped.split(":", 1)[1]) or None
+            elif stripped.startswith("contribution_model:"):
+                result["contribution_model"] = _strip_value(stripped.split(":", 1)[1]) or None
+            elif stripped.startswith("deploy_target:"):
+                result["deploy_target"] = _strip_value(stripped.split(":", 1)[1]) or None
+            elif stripped.startswith("artifacts:"):
+                in_artifacts = True
+            continue
+        if in_artifacts:
+            if stripped.startswith("- name:"):
+                if cur:
+                    result["artifacts"].append(cur)
+                cur = {"name": _strip_value(stripped.split(":", 1)[1]), "type": None}
+            elif stripped.startswith("name:"):
+                if cur:
+                    result["artifacts"].append(cur)
+                cur = {"name": _strip_value(stripped.split(":", 1)[1]), "type": None}
+            elif stripped.startswith("type:") and cur is not None:
+                cur["type"] = _strip_value(stripped.split(":", 1)[1])
+    if cur:
+        result["artifacts"].append(cur)
+    return result
+
+
+def _artifacts(contract: dict) -> list[dict]:
+    """Resolve the effective artifact list: explicit artifacts, else the
+    single profile as one unnamed artifact, else the deployable default."""
+    if contract["artifacts"]:
+        return contract["artifacts"]
+    profile = contract["profile"] or "deployable-web-app"
+    return [{"name": None, "type": profile}]
+
+
+def _model(contract: dict) -> str:
+    return contract["contribution_model"] or "team"
 
 
 class _Report:
@@ -75,23 +135,21 @@ class _Report:
         self.warnings: list[dict] = []
 
     def error(self, rule: str, check: str, actual: str, expected: str) -> None:
-        self.errors.append(
-            {"rule": rule, "check": check, "actual": actual, "expected": expected}
-        )
+        self.errors.append({"rule": rule, "check": check, "actual": actual, "expected": expected})
 
     def warn(self, rule: str, check: str, actual: str, expected: str) -> None:
-        self.warnings.append(
-            {"rule": rule, "check": check, "actual": actual, "expected": expected}
-        )
+        self.warnings.append({"rule": rule, "check": check, "actual": actual, "expected": expected})
 
     def emit(self) -> int:
-        ok = len(self.errors) == 0
+        ok = not self.errors
         print(json.dumps({"ok": ok, "errors": self.errors, "warnings": self.warnings}))
         return 0 if ok else 2
 
 
+# ─── invariant checks ───────────────────────────────────────────────────────
+
+
 def _check_rc01_branches(repo: str, rep: _Report) -> None:
-    """RC-01: dev + main exist; default branch is dev."""
     rc, out, _ = _gh(["api", f"repos/{repo}"])
     if rc == 0 and out.strip():
         try:
@@ -102,7 +160,6 @@ def _check_rc01_branches(repo: str, rep: _Report) -> None:
             rep.error("RC-01", "default branch is dev", str(default), "dev")
     else:
         rep.error("RC-01", "repo metadata readable", "gh error", "200")
-
     for branch in ("dev", "main"):
         rc, _, _ = _gh(["api", f"repos/{repo}/branches/{branch}"])
         if rc != 0:
@@ -110,92 +167,31 @@ def _check_rc01_branches(repo: str, rep: _Report) -> None:
 
 
 def _check_rc02_protections(repo: str, rep: _Report) -> None:
-    """RC-02: dev + main protected; dev requires branch-ci + merge-queue-ci."""
+    """RC-02 (v0.3.0 deadlock fix): dev classic required checks = branch-ci
+    ONLY. merge-queue-ci present as a classic check is an ERROR — it is the
+    queue's internal merge_group gate, never a classic required check."""
     rc, out, _ = _gh(["api", f"repos/{repo}/branches/dev/protection"])
     if rc != 0:
         rep.error("RC-02", "dev branch protected", "no protection", "protected")
     else:
         try:
-            contexts = (
-                json.loads(out).get("required_status_checks", {}).get("contexts", [])
-            )
+            contexts = json.loads(out).get("required_status_checks", {}).get("contexts", [])
         except json.JSONDecodeError:
             contexts = []
-        for required in ("branch-ci", "merge-queue-ci"):
-            if required not in contexts:
-                rep.error(
-                    "RC-02", f"dev requires {required}", "not required", "required"
-                )
-
+        if "branch-ci" not in contexts:
+            rep.error("RC-02", "dev requires branch-ci", "not required", "required")
+        if "merge-queue-ci" in contexts:
+            rep.error(
+                "RC-02", "merge-queue-ci is NOT a classic required check",
+                "present in classic checks (re-introduces the deadlock)",
+                "absent — it is the queue's merge_group gate (ADR-003)",
+            )
     rc, _, _ = _gh(["api", f"repos/{repo}/branches/main/protection"])
     if rc != 0:
         rep.error("RC-02", "main branch protected", "no protection", "protected")
 
 
-def _check_rc03_merge_queue(repo: str, rep: _Report) -> None:
-    """RC-03: merge queue enabled on dev.
-
-    Merge queue is enabled via a repository ruleset with a `merge_queue`
-    rule targeting dev (classic branch protection does not expose it).
-    The rules-for-branch endpoint surfaces every active rule on the branch.
-    """
-    rc, out, _ = _gh(["api", f"repos/{repo}/rules/branches/dev"])
-    if rc != 0:
-        rep.error("RC-03", "merge queue on dev", "rules unreadable", "enabled")
-        return
-    try:
-        rule_types = {r.get("type") for r in json.loads(out)}
-    except (json.JSONDecodeError, TypeError, AttributeError):
-        rule_types = set()
-    if "merge_queue" not in rule_types:
-        rep.error("RC-03", "merge queue on dev", "not configured", "enabled")
-
-
-def _check_rc04_workflows(repo_root: Path, rep: _Report) -> None:
-    """RC-04: the six required workflow files exist."""
-    wf_dir = repo_root / ".github" / "workflows"
-    for wf in REQUIRED_WORKFLOWS:
-        if not (wf_dir / f"{wf}.yml").is_file():
-            rep.error("RC-04", f"{wf}.yml present", "missing", "present")
-
-
-def _check_rc05_environments(repo: str, deploy_target: str, rep: _Report) -> None:
-    """RC-05: staging + production environments exist."""
-    rc, out, _ = _gh(["api", f"repos/{repo}/environments"])
-    names: set[str] = set()
-    if rc == 0 and out.strip():
-        try:
-            names = {e["name"] for e in json.loads(out).get("environments", [])}
-        except (json.JSONDecodeError, KeyError, TypeError):
-            names = set()
-    for env in ("staging", "production"):
-        if env not in names:
-            # Environment absence: hard MUST normally; but when there is no
-            # deploy target the environments are a formality — downgrade.
-            if deploy_target == "none":
-                rep.warn("RC-05", f"{env} environment exists", "missing",
-                         "present (deploy_target: none — advisory)")
-            else:
-                rep.error("RC-05", f"{env} environment exists", "missing", "present")
-
-
-def _check_rc06_secrets(deploy_target: str, rep: _Report) -> None:
-    """RC-06: deploy-token secrets. Meaningless without a deploy target."""
-    if deploy_target == "none":
-        rep.warn(
-            "RC-06", "deploy-token secrets present", "n/a",
-            "skipped — deploy_target: none (no deploy; secrets would be meaningless)",
-        )
-        return
-    # Deployable repo: secrets are MUST. (Real check would `gh secret list`.)
-    rep.error(
-        "RC-06", "SULIS_DEPLOY_TOKEN_STAGING present", "unverified",
-        "present on staging env",
-    )
-
-
 def _check_rc07_settings(repo: str, rep: _Report) -> None:
-    """RC-07: squash-only merge settings."""
     rc, out, _ = _gh(["api", f"repos/{repo}"])
     if rc != 0 or not out.strip():
         rep.error("RC-07", "repo settings readable", "gh error", "200")
@@ -205,64 +201,175 @@ def _check_rc07_settings(repo: str, rep: _Report) -> None:
     except json.JSONDecodeError:
         rep.error("RC-07", "repo settings parse", "invalid JSON", "valid")
         return
-    expected = {
-        "allow_squash_merge": True,
-        "allow_merge_commit": False,
-        "allow_rebase_merge": False,
-        "delete_branch_on_merge": True,
-    }
-    for key, want in expected.items():
+    for key, want in {
+        "allow_squash_merge": True, "allow_merge_commit": False,
+        "allow_rebase_merge": False, "delete_branch_on_merge": True,
+    }.items():
         if key in s and s[key] != want:
             rep.error("RC-07", key, str(s[key]), str(want))
 
 
-def _check_rc08_tag_protection(deploy_target: str, rep: _Report) -> None:
-    """RC-08: v* tag signing/protection. Signing WARN when deploy_target none."""
-    if deploy_target == "none":
-        rep.warn(
-            "RC-08", "v* tags signed", "annotated (unsigned)",
-            "signed — WARN: no GPG key in CI for marketplace profile",
-        )
-
-
 def _check_rc10_codeowners(repo_root: Path, rep: _Report) -> None:
-    """RC-10: CODEOWNERS present (SHOULD → WARN)."""
-    candidates = [
-        repo_root / ".github" / "CODEOWNERS",
-        repo_root / "CODEOWNERS",
-        repo_root / "docs" / "CODEOWNERS",
-    ]
+    candidates = [repo_root / ".github" / "CODEOWNERS", repo_root / "CODEOWNERS",
+                  repo_root / "docs" / "CODEOWNERS"]
     if not any(c.is_file() for c in candidates):
         rep.warn("RC-10", "CODEOWNERS present", "missing",
                  "present (SHOULD — production promotions fall back to write-access)")
 
 
+# ─── volume-specific (RC-03) ─────────────────────────────────────────────────
+
+
+def _check_rc03_merge_queue(repo: str, model: str, rep: _Report) -> None:
+    """team → merge queue MUST exist on dev; solo → MUST be absent (ADR-002)."""
+    rc, out, _ = _gh(["api", f"repos/{repo}/rules/branches/dev"])
+    if rc != 0:
+        if model == "team":
+            rep.error("RC-03", "merge queue on dev (team)", "rules unreadable", "enabled")
+        return
+    try:
+        rule_types = {r.get("type") for r in json.loads(out)}
+    except (json.JSONDecodeError, TypeError, AttributeError):
+        rule_types = set()
+    queue_present = "merge_queue" in rule_types
+    if model == "team" and not queue_present:
+        rep.error("RC-03", "merge queue on dev", "not configured", "enabled (contribution_model: team)")
+    elif model == "solo" and queue_present:
+        rep.error("RC-03", "merge queue on dev", "enabled",
+                  "absent (contribution_model: solo — direct merge per GIT-05)")
+
+
+# ─── profile-specific (RC-04 / RC-05 / RC-06 / RC-08) ────────────────────────
+
+
+def _required_workflows(artifacts: list[dict], model: str) -> set[str]:
+    """The set of workflow files this repo must contain, per the matrix."""
+    required = {"branch-ci", "promote-dev-to-main"}
+    if model == "team":
+        required.add("merge-queue-ci")
+    multi = len(artifacts) > 1 or (artifacts and artifacts[0]["name"])
+    for art in artifacts:
+        atype, name = art["type"], art["name"]
+        if multi and name:
+            if atype == "deployable-web-app":
+                required.update({f"deploy-{name}-staging", f"health-{name}-staging", f"release-{name}-prod"})
+            elif atype == "published-artifact":
+                required.add(f"publish-{name}")
+            # internal-tool: no deploy/publish workflow
+        else:
+            if atype in ("deployable-web-app", "published-artifact"):
+                required.update({"deploy-staging", "health-and-smoke", "release-prod"})
+            # internal-tool: none
+    return required
+
+
+def _check_rc04_workflows(repo_root: Path, artifacts: list[dict], model: str, rep: _Report) -> None:
+    wf_dir = repo_root / ".github" / "workflows"
+    for wf in sorted(_required_workflows(artifacts, model)):
+        if not (wf_dir / f"{wf}.yml").is_file():
+            rep.error("RC-04", f"{wf}.yml present", "missing", "present")
+
+
+def _check_rc05_environments(repo: str, artifacts: list[dict], rep: _Report) -> None:
+    """Union: each deployable artifact requires its envs (error); published →
+    formality (warn); internal → none."""
+    rc, out, _ = _gh(["api", f"repos/{repo}/environments"])
+    names: set[str] = set()
+    if rc == 0 and out.strip():
+        try:
+            names = {e["name"] for e in json.loads(out).get("environments", [])}
+        except (json.JSONDecodeError, KeyError, TypeError):
+            names = set()
+    multi = len(artifacts) > 1 or (artifacts and artifacts[0]["name"])
+    for art in artifacts:
+        atype, aname = art["type"], art["name"]
+        prefix = f"{aname}-" if (multi and aname) else ""
+        wanted = [f"{prefix}staging", f"{prefix}production"]
+        for env in wanted:
+            if env in names:
+                continue
+            if atype == "deployable-web-app":
+                rep.error("RC-05", f"{env} environment exists", "missing", "present (real deploy target)")
+            elif atype == "published-artifact":
+                rep.warn("RC-05", f"{env} environment exists", "missing",
+                         "present (published-artifact — formality so `environment:` resolves)")
+            # internal-tool: no env requirement
+
+
+def _check_rc06_secrets(repo: str, artifacts: list[dict], rep: _Report) -> None:
+    """Deploy-token secrets are MUST iff an artifact is deployable. Namespaced
+    per deployable artifact in multi-artifact. Non-deployable → N/A (skip)."""
+    multi = len(artifacts) > 1 or (artifacts and artifacts[0]["name"])
+    deployable = [a for a in artifacts if a["type"] == "deployable-web-app"]
+    if not deployable:
+        rep.warn("RC-06", "deploy-token secrets", "n/a",
+                 "skipped — no deployable artifact (no deploy; secrets meaningless)")
+        return
+    rc, out, _ = _gh(["api", "--method", "GET", f"repos/{repo}/actions/secrets"])
+    have: set[str] = set()
+    if rc == 0 and out.strip():
+        try:
+            have = {s["name"] for s in json.loads(out).get("secrets", [])}
+        except (json.JSONDecodeError, KeyError, TypeError):
+            have = set()
+    for art in deployable:
+        aname = art["name"]
+        token = (f"SULIS_DEPLOY_TOKEN_{aname.upper()}_STAGING"
+                 if (multi and aname) else "SULIS_DEPLOY_TOKEN_STAGING")
+        if token not in have:
+            rep.error("RC-06", f"{token} present", "missing", "present on staging env")
+
+
+def _check_rc08_tags(artifacts: list[dict], rep: _Report) -> None:
+    """Strongest-wins: if any artifact is deployable, signed tags are MUST
+    (advisory here — signature verification is out of scope for the at-rest
+    check); otherwise SHOULD. Surfaced as a warning either way."""
+    any_deployable = any(a["type"] == "deployable-web-app" for a in artifacts)
+    sev = "MUST (any deployable artifact)" if any_deployable else "SHOULD"
+    rep.warn("RC-08", "v* tags signed", "not verified at rest",
+             f"signed — {sev}; verify a GPG key is provisioned in CI")
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="RC-01..RC-10 arrival check")
+    parser = argparse.ArgumentParser(description="RC-01..RC-12 arrival check (v0.3.0)")
     parser.add_argument("--repo", required=True, help="owner/name")
     parser.add_argument("--repo-root", default=".", help="path to repo root")
     args = parser.parse_args()
 
     if shutil.which("gh") is None:
-        print(json.dumps({
-            "ok": False, "errors": [],
-            "tooling_error": "gh CLI not found on PATH",
-        }))
+        print(json.dumps({"ok": False, "errors": [], "tooling_error": "gh CLI not found on PATH"}))
         return 1
 
     repo_root = Path(args.repo_root).resolve()
-    deploy_target = _read_deploy_target(repo_root)
+    contract = _read_contract(repo_root)
     rep = _Report()
+
+    # Contract validation: profile XOR artifacts; valid enum values.
+    if contract["profile"] and contract["artifacts"]:
+        rep.error("contract", "profile XOR artifacts",
+                  "both present", "declare a single profile OR an artifacts list, not both")
+    if contract["profile"] and contract["profile"] not in VALID_PROFILES:
+        rep.error("contract", "valid profile", contract["profile"],
+                  " | ".join(sorted(VALID_PROFILES)))
+    model = _model(contract)
+    if model not in VALID_MODELS:
+        rep.error("contract", "valid contribution_model", model, " | ".join(sorted(VALID_MODELS)))
+
+    artifacts = _artifacts(contract)
+    for art in artifacts:
+        if art["type"] not in VALID_PROFILES:
+            rep.error("contract", "valid artifact type", str(art.get("type")),
+                      " | ".join(sorted(VALID_PROFILES)))
 
     try:
         _check_rc01_branches(args.repo, rep)
         _check_rc02_protections(args.repo, rep)
-        _check_rc03_merge_queue(args.repo, rep)
-        _check_rc04_workflows(repo_root, rep)
-        _check_rc05_environments(args.repo, deploy_target, rep)
-        _check_rc06_secrets(deploy_target, rep)
+        _check_rc03_merge_queue(args.repo, model, rep)
+        _check_rc04_workflows(repo_root, artifacts, model, rep)
+        _check_rc05_environments(args.repo, artifacts, rep)
+        _check_rc06_secrets(args.repo, artifacts, rep)
         _check_rc07_settings(args.repo, rep)
-        _check_rc08_tag_protection(deploy_target, rep)
+        _check_rc08_tags(artifacts, rep)
         _check_rc10_codeowners(repo_root, rep)
     except _ToolingError as exc:
         print(json.dumps({"ok": False, "errors": [], "tooling_error": str(exc)}))

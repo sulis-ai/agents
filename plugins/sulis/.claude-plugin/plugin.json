@@ -1,7 +1,7 @@
 {
   "name": "sulis",
   "description": "Sulis — the canonical front-door plugin for the Sulis AI marketplace. Hosts the founder-facing Sulis agent, the journey skills, three meta-skills (add-skill / add-agent / consolidate-into-sulis), the requirements / design / execution / review surfaces consolidated from the four specialist plugins, the deep-mode code-health framework, and 8 cross-cutting standards. Founders interact via /sulis:* commands. See CHANGELOG.md for version history.",
-  "version": "0.44.0",
+  "version": "0.45.0",
   "author": {
     "name": "Iain"
   },
