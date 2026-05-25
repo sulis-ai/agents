@@ -1,6 +1,6 @@
 {
   "name": "srd",
-  "description": "[DEPRECATED at v1.23.0 — consolidated into the sulis plugin at v0.37.0] Requirements Analyst functionality now lives at /sulis:codebase-mapping, /sulis:critical-thinking, /sulis:requirements-validation, /sulis:index-specifications, /sulis:requirements-templates, /sulis:map-architecture with the requirements-analyst agent in plugins/sulis/agents/. Marketplace-wide standards (Founder English, Repository Contract, PR Hygiene, Change Work, Convention Preference, etc.) now live at plugins/sulis/references/. This plugin shell remains for marketplace compatibility; no new development. See plugins/sulis/CHANGELOG.md v0.37.0 for the consolidation narrative.",
+  "description": "[DEPRECATED at v1.23.0 — consolidated into sulis at v0.37.0] Requirements Analyst skills + agent + marketplace-wide standards now live in plugins/sulis/. See plugins/sulis/CHANGELOG.md v0.37.0 + plugins/srd/README.md for the what-moved-where mapping. Shell remains for marketplace compatibility; no new development.",
   "version": "1.23.0",
   "deprecated": true,
   "author": {

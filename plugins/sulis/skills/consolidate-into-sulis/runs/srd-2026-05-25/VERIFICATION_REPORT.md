@@ -131,11 +131,34 @@
 
 ---
 
-## Gate 6 — Code-health verification (pending)
+## Gate 6 — Code-health verification
 
-To run after this commit lands. With v0.1.1's signature improvement (now prefers `identifier` field), the false-attribution case observed in the sulis-context Gate 6 should NOT recur for the manifest-description-length finding. Expected outcome: net NEW = 0 after rubric.
+**Verdict: PASS** (after one fix-forward commit).
 
-The Gate 6 verdict will be appended to this VERIFICATION_REPORT.md once captured.
+### First run (pre-fix-forward)
+
+- 1 NEW finding: `plugins/srd/.claude-plugin/plugin.json` PH-103 — description 656 chars (over 500 max)
+- 7 PRE-EXISTING, 0 RESOLVED
+- Root cause: Commit 5's DEPRECATED prefix + the enumerated skill list pushed the srd plugin description over the recommended max
+- Classification: **legitimate regression** (real new finding caused by the consolidation; not false attribution)
+
+### v0.1.1 signature improvement worked
+
+The PH-103 finding type was the exact case that motivated the v0.1.1 patch to `compare_baseline.py` (preferring `identifier` over hash-of-full-finding). This time the signature correctly identified the finding's uniqueness; no false NEW + RESOLVED pair like sulis-context's run.
+
+### Fix-forward
+
+Shortened the srd DEPRECATED description from 656 → 315 chars (still informative; points the founder at sulis CHANGELOG + the srd README which has the full what-moved-where table).
+
+### Second run (post-fix-forward)
+
+- 0 NEW findings
+- 7 PRE-EXISTING, 0 RESOLVED
+- **Verdict: PASS**
+
+Captured at:
+- `code-health-final.json` (post-fix-forward state)
+- `code-health-comparison.md` (clean PASS report)
 
 ---
 
@@ -205,12 +228,12 @@ All three are smaller-impact than v0.1.0 → v0.1.1 patches. May or may not warr
 
 ---
 
-## Verdict (final, pending Gate 6)
+## Verdict (final)
 
 **Commits 1-5:** PASS
-**Gate 6:** TBD — pending post-Commit-5 code-health final run.
+**Gate 6:** PASS (after 1 fix-forward commit — shortened DEPRECATED description from 656 → 315 chars; second Gate 6 run clean)
 
-This file will be updated with the Gate 6 verdict after the final run lands.
+**Overall consolidation:** PASS — srd successfully folded into sulis. 45 files moved (6 skills, 1 agent, 13 references, 25 docs), 149 external-ref substitutions across 60 files, 0 manual git-grep recoveries needed (v0.1.1 helper scripts caught everything), 1 fix-forward for PH-103 manifest-hygiene.
 
 ---
 
