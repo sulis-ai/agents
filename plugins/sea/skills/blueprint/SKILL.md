@@ -173,7 +173,7 @@ If extending or superseding, reference the existing ADR by path.}
    Patterns Library, Known Gaps. Hold these in working memory — every subsequent
    step respects what you found. If the index is missing and the codebase has
    signals of existing architecture material, stop and recommend
-   `/sulis-context:discover` (the agent's Phase 0 check should have done this
+   `/sulis:discover-context` (the agent's Phase 0 check should have done this
    already — if you got here without an index on a non-trivial codebase, surface
    that).
 1. **Discover** — locate the spec folder; read all inputs in the table above; report what's missing. If `HANDOFF_TO_SEA.md` is present and `SRD.md` is absent, read the handoff file first and ask the user for any business intent it doesn't capture before proceeding.

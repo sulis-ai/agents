@@ -470,7 +470,7 @@ expectations for the process.
 
   > "Before I start facilitating, I want to check what context already exists in this
   > project. I see signals that there's existing architecture documentation
-  > ({list paths you detected}). Run `/sulis-context:discover` first — it'll
+  > ({list paths you detected}). Run `/sulis:discover-context` first — it'll
   > scan and let you classify existing material, so I don't ask questions you've
   > already answered or contradict decisions you've already made.
   >

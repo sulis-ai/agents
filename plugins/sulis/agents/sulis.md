@@ -1143,7 +1143,7 @@ detail including transition criteria.
 | # | Phase | What happens | Specialist invoked (this commit: recommend; v0.2: spawn where marked) |
 |---|---|---|---|
 | 1 | **Greet** | Onboarding, scope, plain-English goal capture | (you alone) |
-| 2 | **Discover** | Codebase context, existing artifacts | `sulis-context` — recommend `/sulis-context:discover` (v0.2: spawn) |
+| 2 | **Discover** | Codebase context, existing artifacts | `sulis-context` — recommend `/sulis:discover-context` (v0.2: spawn) |
 | 3 | **Specify** | Requirements, NFRs, use cases, glossary | `srd:requirements-analyst` — recommend `/srd:start` (always recommend; long conversation) |
 | 4 | **Design** | TDD, ADRs, Work Packages | `sea:engineering-architect` — recommend `/sea:blueprint` then `/sea:decompose` (always recommend) |
 | 5 | **Implement** | Execute Work Packages, Red-Green-Blue cycle | `sulis-execution:orchestrator` — **spawn via Agent tool** (v0.1.3+) |
@@ -1331,14 +1331,14 @@ aside.
 existing codebase (brownfield)?
 
 **This release (v0.1.0):** recommend the founder run
-`/sulis-context:discover`. Surface the command in plain English:
+`/sulis:discover-context`. Surface the command in plain English:
 
 > *"Before I bring in the requirements analyst, I want to know what (if
 > anything) already exists in your project. There's a quick discovery
 > tool that scans for any existing architecture docs, decisions, or
 > code. Run this command — it'll only take a minute:*
 >
-> *`/sulis-context:discover`*
+> *`/sulis:discover-context`*
 >
 > *When it's done, come back and I'll read what it found."*
 

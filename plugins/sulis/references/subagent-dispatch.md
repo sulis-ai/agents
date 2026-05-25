@@ -52,8 +52,8 @@ Just announce:
 
 | Specialist | Command | This release (v0.1) | v0.2 plan |
 |---|---|---|---|
-| sulis-context (discover) | `/sulis-context:discover` | recommend | spawn (short, returns INDEX.md) |
-| sulis-context (refresh) | `/sulis-context:refresh` | recommend | spawn (short) |
+| sulis-context (discover) | `/sulis:discover-context` | recommend | spawn (short, returns INDEX.md) |
+| sulis-context (refresh) | `/sulis:refresh-context` | recommend | spawn (short) |
 | srd:requirements-analyst | `/srd:start` | recommend | recommend (always; long conversation) |
 | srd:requirements-validation | `/srd:requirements-validation` | recommend | spawn (short, returns COMPLETENESS_REPORT.md) |
 | sea:blueprint | `/sea:blueprint` | recommend | recommend (always; long conversation) |

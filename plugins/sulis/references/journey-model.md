@@ -63,7 +63,7 @@ brownfield (existing codebase with prior work).
 product".
 
 **Activities (v0.1.0):**
-- Recommend `/sulis-context:discover` to the founder.
+- Recommend `/sulis:discover-context` to the founder.
 - When founder returns, read `.context/{project}/INDEX.md`.
 - Translate findings in plain English (no jargon — say "files" not
   "modules"; "documentation" not "ADRs").
@@ -232,7 +232,7 @@ routes correctly:
 | pitch / fundraise / make a deck | Recommend `/idc:start`; end concierge session |
 | design / branding / visual identity | Recommend `/sulis-design:start`; end concierge session |
 | business strategy / GTM / pricing | Recommend `/sulis-strategy:start`; end concierge session |
-| explore an existing codebase | Recommend `/sulis-context:discover`; offer to continue with SEA codebase-audit afterwards |
+| explore an existing codebase | Recommend `/sulis:discover-context`; offer to continue with SEA codebase-audit afterwards |
 
 ---
 

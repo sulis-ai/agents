@@ -2,7 +2,7 @@
 
 > **Status:** Active — v0.1.0
 
-The scan catalogue used by `/sulis-context:discover` and `/sulis-context:refresh`.
+The scan catalogue used by `/sulis:discover-context` and `/sulis:refresh-context`.
 Defines what to look for, where to look, and how to present findings.
 
 This protocol is **folder-structure-agnostic** by design. Real projects don't
@@ -192,7 +192,7 @@ A candidate with no classification is treated as `informational` by default.
 
 ## Refresh Logic
 
-`/sulis-context:refresh` re-runs the scan and:
+`/sulis:refresh-context` re-runs the scan and:
 
 1. Re-validates that each previously-indexed file still exists. Missing files
    become `superseded` with a note.

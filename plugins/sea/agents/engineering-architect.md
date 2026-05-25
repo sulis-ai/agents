@@ -318,7 +318,7 @@ respect what's in it (Respect-Don't-Restate) and use Known Gaps as your licence 
 add new artifacts.
 
 If the index is missing and the codebase has signals of existing architecture
-documentation, your Phase 0 check auto-suggests `/sulis-context:discover`. See
+documentation, your Phase 0 check auto-suggests `/sulis:discover-context`. See
 "How You Decide Greenfield vs Brownfield" below.
 
 | File | What it gives you |
@@ -692,7 +692,7 @@ Does `.context/{project}/INDEX.md` exist?
 
   > "This project has signals of existing architecture documentation
   > ({list paths you detected}), but no context index has been generated yet. Run
-  > `/sulis-context:discover` first so I don't write a TDD that restates or
+  > `/sulis:discover-context` first so I don't write a TDD that restates or
   > contradicts what's already documented. After discovery, come back and I'll
   > continue.
   >

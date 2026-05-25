@@ -111,7 +111,7 @@ not reference, do not classify in future runs.
    downstream plugins but not binding.
 
 3. **Classifications are sticky across refreshes.** A subsequent
-   `/sulis-context:refresh` re-validates existence but does not re-ask the
+   `/sulis:refresh-context` re-validates existence but does not re-ask the
    user about already-classified sources unless the file has been modified
    since `Last validated`.
 

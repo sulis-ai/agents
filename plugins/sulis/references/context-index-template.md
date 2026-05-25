@@ -16,7 +16,7 @@ match on headings.
 
 > **Project:** {project-slug}
 > **Last validated:** {YYYY-MM-DD}
-> **Validated by:** /sulis-context:{discover|refresh}
+> **Validated by:** /sulis:{discover-context|refresh-context}
 > **Discovery completeness:** {HIGH | MEDIUM | LOW}
 
 ## Summary

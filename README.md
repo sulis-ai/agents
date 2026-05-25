@@ -86,7 +86,7 @@ Tell it: "I started in the executor and got blocked on missing files; help me ba
 If you'd prefer to skip the concierge and run the phases manually, in order:
 
 ```bash
-/sulis-context:discover <project-slug>
+/sulis:discover-context <project-slug>
 /srd:start <project-slug>
 /sea:blueprint <project-slug>
 /sulis-execution:run-all

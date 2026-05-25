@@ -45,7 +45,7 @@ hallucination risk.
 | `package.json` / `pyproject.toml` / `Cargo.toml` / `go.mod` / `pom.xml` / `build.gradle*` | Language + framework inference |
 
 If `.context/{project}/INDEX.md` does not exist on a non-trivial codebase,
-recommend `/sulis-context:discover` first (same auto-suggest gate as the
+recommend `/sulis:discover-context` first (same auto-suggest gate as the
 other SEA skills).
 
 ---
