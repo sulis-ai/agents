@@ -10,7 +10,7 @@ Wraps the existing Founder English standard (FE-01..FE-11) at
 applied-conventions layer: what FE looks like specifically for skill
 chrome, error messages, trigger conditions, and shortcuts.
 
-## The five rules
+## The six rules
 
 ### Rule 1 — Apply FE-06 to every founder-visible string
 
@@ -97,6 +97,95 @@ propose the next step.
 
 Even better: provide a shortcut to the resolution path where possible.
 
+### Rule 6 — Dual register: default founder, on-request technical
+
+Every founder-facing agent and skill is **dual-register** — defaults to
+founder-mode (full tone stack applied: AAF + FE + COACHING + TONE +
+Rules 1-5 above), switches to technical-mode on request.
+
+Founder-mode is a **translation, not a filter**. Same substance,
+different shape. No information hidden in founder-mode that surfaces
+only in technical — that would erode trust. If a file path or
+identifier is signal the founder needs to act on, surface it in
+founder-mode too (using Rule 2 — readable name with ID in parens).
+
+#### The three trigger mechanisms
+
+| Trigger | Scope | Example |
+|---|---|---|
+| **Natural language intent** | This response only | "show me the technical version" / "what's the raw output?" / "give it to me straight" → agent detects intent and switches |
+| **`--raw` flag on command** | This invocation only | `/sulis:wp-status WP-101 --raw` returns JSON envelope, no translation |
+| **Session toggle** | Until toggled back | `/sulis:jargon on` switches the session to technical-mode; `/sulis:jargon off` reverts to founder-mode default |
+
+Intent detection is the primary mechanism — it requires no command
+memorisation. Flags and toggles are explicit overrides for power users
+(or for when intent detection misfires).
+
+#### Mode declaration requirement
+
+Every founder-facing or both-audience skill / agent MUST declare its
+technical-mode output shape in its SKILL.md or agent.md frontmatter:
+
+```yaml
+register:
+  founder_mode: default
+  technical_mode:
+    shape: json_envelope | markdown_with_paths | diff | raw_tool_output
+    triggers: [intent, --raw, /sulis:jargon]
+```
+
+Operator-facing skills declare `register: { technical_mode: default }`
+and skip the founder-mode shape entirely.
+
+#### What the agent does on register switch
+
+1. **Intent-triggered switch:** Agent confirms the switch in one
+   sentence ("Switching to technical-mode for this response."), then
+   produces the technical-mode output. Returns to founder-mode default
+   on the next interaction unless the founder explicitly persists it
+   ("keep it technical").
+2. **`--raw` flag:** No confirmation needed; the flag is the explicit
+   request. Emit the declared technical-mode shape directly.
+3. **`/sulis:jargon on` toggle:** Confirms ("Switched to technical-mode
+   for the rest of this session — `/sulis:jargon off` reverts."), then
+   all subsequent responses are technical-mode until toggled back or
+   the session ends.
+
+#### What technical-mode does NOT do
+
+- It does NOT skip safety checks (Rule 3's prompt-before-destroy
+  still applies — though the prompt is operator-direct: "Force-push
+  to dev. Confirm? (y/N)")
+- It does NOT skip the standards stack — CRITICAL_THINKING, SPIRAL
+  verification, REFERENTIAL_INTEGRITY all still apply
+- It does NOT enable destructive shortcuts that founder-mode would
+  prompt on — the prompt is just shorter
+
+#### Examples
+
+**Founder-mode (default):**
+> *"WP-102 (handler) failed at Step 6 (test). The assertion on `auth.py:42` expected a `dict` but got a `list`. Worktree preserved at `~/repo-wp-102-handler/`. Want me to look at it or do you want first crack?"*
+
+**Technical-mode (same situation, `--raw` or after `/sulis:jargon on`):**
+```json
+{
+  "wp_id": "WP-102",
+  "stage": "step-6-test",
+  "status": "failed",
+  "error": {
+    "file": "auth.py",
+    "line": 42,
+    "type": "AssertionError",
+    "message": "expected dict, got list"
+  },
+  "worktree": "~/repo-wp-102-handler/",
+  "next_actions": ["resume", "abandon", "retry-with-fix"]
+}
+```
+
+Same substance. Different shape. Founder-mode does the translation
+work; technical-mode trusts the operator with the structured raw.
+
 ## What this means for skill authoring
 
 When the Gate 2 `Audience` lock = `founder-facing`:
@@ -167,8 +256,27 @@ For founder-facing skills, the Gate 5 misuse-case catalogue extends to:
   out-of-band resolution. Mitigation: dismissal write-back AND/OR
   source-of-truth doctor checks.
 
+For agents and skills declaring a dual-register pattern (Rule 6), the
+catalogue extends to register-specific misuse cases:
+
+- **MUC-R1: Technical-mode leaks into founder-mode default.** Agent
+  emits a JSON envelope or IDs-only string when the founder expected
+  plain English. Mitigation: register flag checked at emission time;
+  default-register-check in Gate 4 verification.
+- **MUC-R2: Founder-mode jargon-stripping drops information the
+  founder needed.** File path stripped from an error message, but the
+  founder asked "what file?" — the file path was signal, not jargon.
+  Mitigation: surface load-bearing identifiers in founder-mode too
+  (per Rule 2: readable name with ID in parens).
+- **MUC-R3: Register-switch ambiguity.** Founder says "more detail"
+  — does that mean more depth in founder-mode or switch to
+  technical-mode? Mitigation: default is "more depth in founder-mode";
+  ask explicitly if the founder seems to want the technical version
+  ("Want the technical version, or more detail in plain English?").
+
 Each founder-facing skill MUST address at least 3 of MUC-F1..F5 in its
-COMPLETENESS_REPORT.md adversarial-review section.
+COMPLETENESS_REPORT.md adversarial-review section. Skills declaring
+dual-register MUST additionally address at least 2 of MUC-R1..R3.
 
 ## Concrete examples
 

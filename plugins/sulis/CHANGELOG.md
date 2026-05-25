@@ -1,5 +1,64 @@
 # Sulis — Changelog
 
+## v0.31.0 — 2026-05-25
+
+**Phase 0 of the change-as-primitive build.** Port COACHING + TONE
+standards from the platform; add dual-register pattern to
+Founder-Facing Conventions. Foundation for the `add-agent` skill
+authoring (Phase 1) and the Sulis agent rewrite (Phase 2).
+
+See `plugins/sulis/docs/change-as-primitive-design.md` for the full
+8-phase build plan.
+
+### What's new
+
+- **`plugins/sulis/references/standards/COACHING_STANDARD.md`** —
+  ported from platform `COACHING_WITHOUT_CONFLICT.md` (2026-01-30).
+  Seven tenets verbatim (structural over personal, diagnostic over
+  prescriptive, questions over statements, modelling over telling,
+  hypotheses over conclusions, sequence for relationship capital,
+  room to step up). Seven-question Pass/Fail validation checklist +
+  red-flag / green-light phrase tables. New "Application in Sulis"
+  section maps each tenet onto Sulis agent behaviour at each of the
+  six journey stages.
+
+- **`plugins/sulis/references/standards/TONE_STANDARD.md`** —
+  ported from platform `TONE_STANDARD.md` v2.0.0 (2026-03-05). Five
+  directives verbatim (T-01 Pragmatic Authority, T-02 Radical
+  Clarity, T-03 Build + Market Reality, T-04 Governance Over
+  Mystification, T-05 Vocabulary Governance). Systemic lexicon +
+  forbidden vocabulary list ported. Applicability table rewritten
+  from "OFM artifacts" to "founder-facing sulis surfaces" — applies
+  to Sulis agent responses, specialist agents' founder-mode output,
+  `/sulis:*` command output, skill chrome, error messages, dashboard
+  view. Three sulis-specific Category C terms added to the lexicon
+  ("change", "patch set", "Sulis").
+
+- **`plugins/sulis/references/founder-facing-conventions.md`** — new
+  Rule 6 (Dual register: default founder, on-request technical).
+  Mechanics: three trigger mechanisms (natural language intent,
+  `--raw` flag, `/sulis:jargon on|off` toggle); register declaration
+  requirement in SKILL.md / agent.md frontmatter; what register
+  switch does + does NOT do; founder-mode-vs-technical-mode example.
+  Adversarial catalogue extended with MUC-R1..R3 (technical-mode
+  leak, founder-mode dropped signal, register-switch ambiguity).
+
+- **`plugins/sulis/references/standards/README.md`** — updated to
+  reflect 8 cross-cutting standards (was 6). New tier organisation:
+  methodology tier (1-6, applies everywhere) + founder-communication
+  tier (7-8, applies to founder-facing only).
+
+### Design context
+
+The two new standards are pre-requisites for the `add-agent` skill
+(Phase 1) which must cite them for founder-facing agents. They're
+also pre-requisites for the Sulis agent rewrite (Phase 2) which
+embeds COACHING + TONE at the right phases.
+
+The dual-register pattern (Rule 6) is the applied-conventions layer
+for `/sulis:jargon on|off` which lets the founder switch between
+founder-mode (default) and technical-mode at any time.
+
 ## v0.30.0 — 2026-05-25
 
 **sulis-execution consolidated into sulis.** The executor + train + wpx-*
