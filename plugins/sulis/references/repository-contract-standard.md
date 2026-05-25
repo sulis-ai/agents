@@ -12,8 +12,9 @@ agents refuse to operate and surface a delta list. No support for repos
 that maintain their own process.
 <!-- /summary -->
 
-> **Version:** 0.1.0
+> **Version:** 0.2.0
 > **Status:** Active — Calibration Period (90 days from 2026-05-19)
+> **v0.2.0 amendment** (Phase 4 of change-as-primitive build, 2026-05-25): RC-04 clarified to make the merge-queue source explicit — `change/*` branches, not `feat/wp-*` directly. The `branch-ci.yml` push trigger extended to fire on both `feat/wp-*` AND `change/*` branches so the change branch itself gets CI signal before merging to `dev`. Composes with CW-04's two-level worktree hierarchy and CW-05's trivial-change carve-out.
 > **Applies to:** All Sulis marketplace agents that operate on a GitHub
 > repository (`sulis-execution`, `sulis` (concierge) when dispatching the
 > executor, `sea` when proposing infrastructure work).
@@ -197,8 +198,8 @@ fixed (the executor reads them by name in the arrival check); the
 
 | Workflow path | Trigger events | Purpose |
 |---|---|---|
-| `.github/workflows/branch-ci.yml` | `pull_request` (any branch → `dev`), `push` (on `feat/wp-*`) | Per-WP fast checks: lint + type-check + unit tests + smoke. ≤15 min target. Required check for queue entry. |
-| `.github/workflows/merge-queue-ci.yml` | `merge_group` | Speculative-merge integration test. Runs full integration + e2e suite on the synthetic merged ref. Required check before merge to `dev`. |
+| `.github/workflows/branch-ci.yml` | `pull_request` (any branch → `dev`), `push` (on `feat/wp-*` and `change/*`) | Per-WP fast checks: lint + type-check + unit tests + smoke. ≤15 min target. Required check for queue entry. Per CW-04, `feat/wp-*` branches live INSIDE a `change/*` branch worktree; the `push` trigger fires on both layers so per-WP CI runs whether the WP is being shipped per-change or directly to `dev` via the trivial-change carve-out. |
+| `.github/workflows/merge-queue-ci.yml` | `merge_group` | Speculative-merge integration test. Runs full integration + e2e suite on the synthetic merged ref. Required check before merge to `dev`. **Merge-queue source = `change/*` branches** (per CW-04 — the change branch is the integration point that reaches the queue; individual `feat/wp-*` branches DO NOT enter the queue directly, they merge into their parent change branch first via wpx-train). The trivial-change carve-out (CW-05) is the only case where `feat/*` may target `dev` directly; even then the per-change merge model is preferred. |
 | `.github/workflows/deploy-staging.yml` | `push` on `dev` | Deploys the merged batch to the `staging` environment. Triggers health-check + smoke downstream. |
 | `.github/workflows/health-and-smoke.yml` | `workflow_run` (after `deploy-staging` success) | Polls `/health` until ready; runs smoke test command. Reports status check `staging-health`. |
 | `.github/workflows/promote-dev-to-main.yml` | `workflow_dispatch` (manual) | The dev→main promotion ceremony per GIT-06. Cuts a release tag (SemVer) and pushes to `main`. |
@@ -207,11 +208,17 @@ fixed (the executor reads them by name in the arrival check); the
 **Workflow event details:**
 
 - `branch-ci` must fire on `pull_request` events whose `base_ref` is `dev`
-  AND on `push` events to `feat/wp-*` branches. The first gives PR-level
-  signal; the second lets the executor short-circuit before opening a PR.
+  AND on `push` events to `feat/wp-*` AND `change/*` branches. The first
+  gives PR-level signal; the second lets the executor short-circuit before
+  opening a PR; the `change/*` trigger gives the change branch CI signal
+  before the change merges to `dev` (per CW-04).
 - `merge-queue-ci` must fire ONLY on `merge_group` (not `pull_request` or
   `push`). It runs against the speculative merge ref GitHub creates inside
-  the queue.
+  the queue. **The merge group's source MUST be `change/*` branches**
+  (PRs from change branches → `dev`); `feat/wp-*` branches do not enter
+  the queue directly per CW-04. The only exception is the trivial-change
+  carve-out (CW-05) where a `feat/*` may merge directly without a parent
+  change branch.
 - `deploy-staging` must NOT fire on `pull_request` — only on `push` to
   `dev` (i.e., after the queue has merged a batch).
 - `release-prod` must NOT fire on `push` to `dev` — only on `push` to
@@ -712,3 +719,15 @@ That is the v1 contract.
   workflow specified but not yet implemented (companion scripts
   `wpx-arrival-check` and `wpx-bootstrap-repo` are scheduled for the
   next sulis-execution release).
+- **v0.2.0** (2026-05-25) — **RC-04 amended (additive).** Merge-queue
+  source explicitly named as `change/*` branches (per CW-04 — change
+  branch is the integration point reaching the queue; individual
+  `feat/wp-*` branches go through `wpx-train` into their parent change
+  first, not directly into the queue). The `branch-ci.yml` push trigger
+  extended to fire on both `feat/wp-*` AND `change/*` so the change
+  branch itself gets CI signal before merging to `dev`. Composes with
+  CW-04's two-level worktree hierarchy + CW-05's trivial-change
+  carve-out (the only exception to the per-change merge model). Phase
+  4 of the change-as-primitive build; pairs with WORK_PACKAGE_STANDARD
+  v1.1.0 `change_id:` field + change-work-standard v0.2.0 CW-04 auto
+  back-integration + lifecycle.md Step 0 + Step 12.5.
