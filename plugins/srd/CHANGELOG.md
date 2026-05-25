@@ -4,6 +4,45 @@ This file holds the cumulative version history that previously lived in
 `plugin.json`'s `description` field. The description is now a one-sentence
 summary (per HD-004, v0.21.3+); historical detail lives here.
 
+## v1.23.0 — 2026-05-25 — [DEPRECATED]
+
+**This plugin is consolidated into `sulis` at v0.37.0 as the second Phase 3
+consolidation of the change-as-primitive build.**
+
+Authored via `consolidate-into-sulis` v0.1.1 (post-sulis-context patches).
+Commit chain:
+
+- `6ed9e9b` — step 2/5 — 6 srd skills moved into sulis with 3 tin-test
+  renames: `spec-index` → `index-specifications`, `srd-templates` →
+  `requirements-templates`, `tree-synthesis` → `map-architecture`.
+  `codebase-mapping`, `critical-thinking`, `requirements-validation`
+  retained their names (already verb-noun or operator-only).
+- `f99482b` — step 3/5 — `requirements-analyst` agent moved into sulis;
+  Sulis agent's `related_skills:` block updated.
+- `cd7e2e9` — step 4/5 — 13 references moved into sulis (the marketplace-
+  wide cross-cutting standards: AAF, FE, change-work, convention-preference,
+  engineering-principles, executor-loop, founder-english, git-workflow,
+  pr-hygiene, repository-contract, security, cognitive-load, content-quality,
+  coaching-without-conflict). External ref sweep across 60 files with 149
+  substitutions including 8 hits in CLAUDE.md, 16 in plugins/sulis/agents/sulis.md,
+  6 in 6 cross-plugin specialist agents.
+- (this commit) — step 5/5 — wrap-up: this plugin marked DEPRECATED;
+  25 docs/specifications/ files moved to plugins/sulis/docs/srd-specifications/;
+  sulis bumped to v0.37.0; marketplace.json updated; consolidation run's
+  VERIFICATION_REPORT.md captured under
+  `plugins/sulis/skills/consolidate-into-sulis/runs/srd-2026-05-25/`.
+
+No shim skills written (mirrors the sulis-context, sulis-execution, and
+sulis-concierge consolidation precedents). The plugin shell stays in-place
+for marketplace compatibility.
+
+**Hooks deferred.** `plugins/srd/.claude-plugin/hooks/codebase-mapping.sh`
+and `tree-synthesis.sh` remain in the DEPRECATED shell as experimental hooks
+tied to the `srd:requirements-analyst` SubagentStart matcher. If these
+hooks are wanted active under sulis, they need re-authoring with the new
+matcher (`requirements-analyst` without the `srd:` prefix) — out of scope
+for this consolidation.
+
 For the marketplace-facing summary, see `plugin.json`.
 
 ---

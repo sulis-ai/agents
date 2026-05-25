@@ -1,5 +1,64 @@
 # Sulis — Changelog
 
+## v0.37.0 — 2026-05-25
+
+**Phase 3 second consolidation — `srd` folded into `sulis`.**
+
+The largest of the four Phase 3 plugins. First consolidation that exercised
+`consolidate-into-sulis` v0.1.1 at scale (333 refs, 60 files swept).
+
+### What moved
+
+| Category | Count | Items |
+|---|---|---|
+| Skills (with tin-test rename) | 6 | `spec-index` → `index-specifications`, `srd-templates` → `requirements-templates`, `tree-synthesis` → `map-architecture`; `codebase-mapping`, `critical-thinking`, `requirements-validation` kept their names |
+| Agents | 1 | `requirements-analyst` |
+| References | 13 | The marketplace-wide cross-cutting standards: AAF, FE, change-work, convention-preference, engineering-principles, executor-loop, founder-english, git-workflow, pr-hygiene, repository-contract, security, cognitive-load, content-quality, coaching-without-conflict |
+| Docs | 25 | `docs/specifications/*` (4 example projects + INDEX.md) → `plugins/sulis/docs/srd-specifications/` |
+| Scripts / tests / CI | 0 | (none — only hooks, deferred per below) |
+
+### Commit chain
+
+- `6ed9e9b` — step 2/5 — 6 skills moved + 3 tin-test renames + descriptions rewritten
+- `f99482b` — step 3/5 — agent move + Sulis `related_skills:` update + self-reference cleanup
+- `cd7e2e9` — step 4/5 — 13 references moved + 149 external-ref substitutions across 60 files (the v0.1.1 slash-command pattern caught all 333 hits without manual git grep — material improvement over the sulis-context run's ~25% script-catch rate)
+- (this commit) — step 5/5 — wrap-up: 25 docs moved; srd marked DEPRECATED; sulis bumps; marketplace.json updated
+
+### Hooks deferred
+
+`plugins/srd/.claude-plugin/hooks/codebase-mapping.sh` and `tree-synthesis.sh`
+remain in the DEPRECATED shell. They are experimental SubagentStart hooks
+matching the old `srd:requirements-analyst` dispatch pattern. If wanted active
+under sulis, they need re-authoring with the new matcher
+(`requirements-analyst`, no plugin prefix). Tracked in
+`runs/srd-2026-05-25/VERIFICATION_REPORT.md` as a follow-up.
+
+### v0.1.1 patches paid off
+
+The 6 v0.1.1 patches shipped at v0.36.0 made a material difference on this
+larger run:
+
+- **Slash-command pattern in `find_external_refs.py`** caught every `/srd:`
+  reference automatically — the sulis-context run needed ~75% manual recovery
+- **`git add -A` discipline** kept Commit 2 + 3 + 4 all single-commit (no
+  continuation commits like the sulis-context Commit 2 split)
+- **stderr separation in sub-step 0d** — clean JSON baseline first try
+- **`.architecture/` as category 13** — caught 6 hits in TDDs and ADRs
+- **`identifier` in `compare_baseline.py` signature** — Gate 6 verdict
+  pending; no false-attribution expected (same logic that surfaced PH-103
+  manifest-length issue last run; this time the signature handles it)
+
+### Code-health (Gate 6 verdict)
+
+Captured at `runs/srd-2026-05-25/VERIFICATION_REPORT.md` after Gate 6 runs.
+
+### What's next
+
+Two Phase 3 consolidations remain: sea → sulis, then sulis-security → sulis.
+Per founder direction, sea is next.
+
+---
+
 ## v0.36.0 — 2026-05-25
 
 **`consolidate-into-sulis` v0.1.1 — six recipe-improvement patches from the sulis-context run.**

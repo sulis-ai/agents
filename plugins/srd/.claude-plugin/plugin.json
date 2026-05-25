@@ -1,7 +1,8 @@
 {
   "name": "srd",
-  "description": "Requirements Analyst — facilitates building Software Requirements Documents through guided conversation with UML artifacts. Marketplace home of cross-plugin standards (Founder English, Repository Contract, PR Hygiene, Change Work, Critical Thinking). See CHANGELOG.md for version history.",
-  "version": "1.22.0",
+  "description": "[DEPRECATED at v1.23.0 — consolidated into the sulis plugin at v0.37.0] Requirements Analyst functionality now lives at /sulis:codebase-mapping, /sulis:critical-thinking, /sulis:requirements-validation, /sulis:index-specifications, /sulis:requirements-templates, /sulis:map-architecture with the requirements-analyst agent in plugins/sulis/agents/. Marketplace-wide standards (Founder English, Repository Contract, PR Hygiene, Change Work, Convention Preference, etc.) now live at plugins/sulis/references/. This plugin shell remains for marketplace compatibility; no new development. See plugins/sulis/CHANGELOG.md v0.37.0 for the consolidation narrative.",
+  "version": "1.23.0",
+  "deprecated": true,
   "author": {
     "name": "Iain"
   },
