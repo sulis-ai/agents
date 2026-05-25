@@ -8,11 +8,11 @@ description: >
   For hotfix or solo-ship cases, pass `--force-single` to use
   wpx-pipeline directly (per-WP CI poll + merge + deploy + health +
   smoke + security review + Step 12 bookkeeping, as before). Usage:
-  /sulis-execution:run-wp WP-NNN [--force-single]. Sulis-execution
+  /sulis:run-wp WP-NNN [--force-single]. Sulis-execution
   v0.11.0+ (ADR-212).
 ---
 
-# /sulis-execution:run-wp
+# /sulis:run-wp
 
 This skill **dispatches the executor agent** for one Work Package's
 Steps 1-7. What happens after Step 7 depends on the flag:
@@ -42,16 +42,16 @@ wpx-* tool directory ONCE and capture it as `$WPX_DIR`:
 WPX_DIR=$(
   find ~/.claude/plugins/cache \
     -name wpx-journal -type f \
-    -path '*/sulis-execution/*/scripts/*' \
+    -path '*/sulis/*/scripts/*' \
     2>/dev/null \
   | sort -r | head -1 | xargs -I{} dirname {} 2>/dev/null
 )
 # Dev fallback: marketplace repo cwd
-if [ -z "$WPX_DIR" ] && [ -f "plugins/sulis-execution/scripts/wpx-journal" ]; then
-  WPX_DIR="$(pwd)/plugins/sulis-execution/scripts"
+if [ -z "$WPX_DIR" ] && [ -f "plugins/sulis/scripts/wpx-journal" ]; then
+  WPX_DIR="$(pwd)/plugins/sulis/scripts"
 fi
 if [ -z "$WPX_DIR" ]; then
-  echo "ERROR: cannot locate wpx-* scripts. Run: claude plugin install sulis-execution@sulis-ai-agents" >&2
+  echo "ERROR: cannot locate wpx-* scripts. Run: claude plugin install sulis@sulis-ai-agents" >&2
   exit 1
 fi
 echo "WPX_DIR=$WPX_DIR"
@@ -91,7 +91,7 @@ session tells it.
 
 ### Step 0a — Dispatch the executor (Steps 1-7)
 
-Given the user invokes `/sulis-execution:run-wp WP-NNN`:
+Given the user invokes `/sulis:run-wp WP-NNN`:
 
 1. Parse the WP-NNN argument from the user's invocation.
 2. Verify the WP file exists at the expected path; if not, surface a
@@ -103,7 +103,7 @@ Given the user invokes `/sulis-execution:run-wp WP-NNN`:
 
 ```
 Agent({
-  subagent_type: "sulis-execution:executor",
+  subagent_type: "executor",
   description: "Ship WP-NNN Steps 1-7",
   model: <executor_model from WP frontmatter, if present>,
   prompt: """
@@ -149,7 +149,7 @@ NOT do Steps 8-12.
 
 Replace `{project}` and `<title>` based on the actual project path
 and WP title. The `subagent_type` value is **exactly**
-`sulis-execution:executor`.
+`executor`.
 
 ### Step 1 — Classify the executor's outcome
 
@@ -197,7 +197,7 @@ Do NOT proceed to Step 2 (the v0.9.0 Steps 8-12 pipeline).
 After the executor returns success and the WP file is on disk with the
 feature branch pushed, **flip the INDEX status to `step-7-complete`**
 and report back. The next `wpx-train run` invocation (typically fired
-by `/sulis-execution:run-all` at the end of its parallel batch) picks
+by `/sulis:run-all` at the end of its parallel batch) picks
 this WP up along with any other ready WPs.
 
 Use the MCP tool `mcp__sulis-execution-mcp__index_flip_status` with
@@ -215,7 +215,7 @@ Use the MCP tool `mcp__sulis-execution-mcp__index_flip_status` with
 Then report to the calling session in plain English:
 
 > WP-NNN queued for the next train. Train fires when 3 WPs are ready
-> or after 4 hours staleness. Run `/sulis-execution:status` to see
+> or after 4 hours staleness. Run `/sulis:status` to see
 > the queue.
 
 Do NOT proceed to Step 2b (wpx-pipeline). Steps 8-11 (CI, merge,
@@ -369,10 +369,10 @@ founder review).
 
 - **Single-WP execution** — when you want to ship one specific WP
   rather than walking the whole INDEX. The orchestrator's
-  `/sulis-execution:run-all` is the normal multi-WP path; this is
+  `/sulis:run-all` is the normal multi-WP path; this is
   the single-shot.
 - **Re-running a blocked WP** after fixing an external blocker. The
-  semantically-clearer alternative is `/sulis-execution:retry WP-NNN`,
+  semantically-clearer alternative is `/sulis:retry WP-NNN`,
   which archives the prior BLOCKER and dispatches a fresh executor.
 
 ## Gotchas
@@ -401,7 +401,7 @@ founder review).
   the calling session's responsibility per v0.9.0.
 - `references/self-heal-budget.md` — per-failure-type budgets
   (executor side).
-- `/sulis-execution:run-all` — multi-WP orchestrator path with
+- `/sulis:run-all` — multi-WP orchestrator path with
   parallel dispatch.
-- `/sulis-execution:status` — read-only INDEX summary.
-- `/sulis-execution:retry` — re-run a blocked WP with archive.
+- `/sulis:status` — read-only INDEX summary.
+- `/sulis:retry` — re-run a blocked WP with archive.

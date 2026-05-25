@@ -2,11 +2,11 @@
 name: status
 description: >
   Read-only INDEX summary in plain English. Usage:
-  /sulis-execution:status. Shows what's done, what's in-flight, what's
+  /sulis:status. Shows what's done, what's in-flight, what's
   blocked, what's pending. **Inline-only — does not spawn any agent.**
 ---
 
-# /sulis-execution:status
+# /sulis:status
 
 Read-only view of the Work Package INDEX state. **This skill runs
 inline in the invoking session — it does NOT spawn the executor or
@@ -16,7 +16,7 @@ the INDEX and renders.
 ## Usage
 
 ```
-/sulis-execution:status
+/sulis:status
 ```
 
 No arguments. Reads `.architecture/{project}/work-packages/INDEX.md`
@@ -119,8 +119,8 @@ or concierge can read the status without opening files.
 
 ## What it doesn't do
 
-- It doesn't dispatch executors. Use `/sulis-execution:run-wp` or
-  `/sulis-execution:run-all` for execution.
+- It doesn't dispatch executors. Use `/sulis:run-wp` or
+  `/sulis:run-all` for execution.
 - It doesn't modify INDEX or any other file. Pure read.
 - It doesn't follow dependsOn — it just shows declared status.
 

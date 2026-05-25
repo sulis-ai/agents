@@ -50,7 +50,7 @@ Expected output: 9 WPs (the slice-2 self-attestation cohort).
 ### 2. Run iteration 1
 
 ```
-/sulis-execution:backfill-code-review \
+/sulis:backfill-code-review \
   --project agent-applications \
   --repo sulis-ai/platform \
   --max-remediation 10
@@ -119,7 +119,7 @@ regression they introduce together is caught immediately.
 After the train completes:
 
 ```
-/sulis-execution:backfill-code-review \
+/sulis:backfill-code-review \
   --project agent-applications \
   --repo sulis-ai/platform
 ```

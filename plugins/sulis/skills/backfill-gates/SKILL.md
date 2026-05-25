@@ -10,11 +10,11 @@ description: >
   see if findings were resolved. Terminates when an iteration
   produces zero NEW (non-duplicate) findings, OR when the
   --max-remediation cap is reached. Usage:
-  /sulis-execution:backfill-gates --project <slug> --repo <org/repo>
+  /sulis:backfill-gates --project <slug> --repo <org/repo>
   [--deployed-url <url>] [--max-remediation 10]
 ---
 
-# /sulis-execution:backfill-gates
+# /sulis:backfill-gates
 
 Retroactive security gate for WPs that shipped before the Step 11
 per-batch flow was wired up.
@@ -49,7 +49,7 @@ Each iteration:
 4. Stop here. Print a summary. The founder reviews the drafted
    WPs, promotes them from `auto-draft` to `pending`, fires
    `wpx-train run` to ship them.
-5. Once the train ships, re-invoke `/sulis-execution:backfill-gates`
+5. Once the train ships, re-invoke `/sulis:backfill-gates`
    to start the next iteration — assesses again, finds fewer new
    findings, drafts fewer remediation WPs.
 6. Loop terminates when an iteration finds zero NEW findings — the
@@ -72,7 +72,7 @@ session — because each finding's remediation needs to be SHIPPED
 ## How to invoke
 
 ```
-/sulis-execution:backfill-gates --project <slug> --repo <org/repo> [--deployed-url <url>] [--max-remediation 10]
+/sulis:backfill-gates --project <slug> --repo <org/repo> [--deployed-url <url>] [--max-remediation 10]
 ```
 
 The skill is a procedure document — the calling session executes
@@ -85,7 +85,7 @@ walks you through one iteration.
 
 ```bash
 # v0.10.1+ — resolve the wpx-* tool paths up front
-WPX_DIR=$(ls -td ~/.claude/plugins/cache/sulis-ai-agents/sulis-execution/*/scripts/ | head -1)
+WPX_DIR=$(ls -td ~/.claude/plugins/cache/sulis-ai-agents/sulis/*/scripts/ | head -1)
 test -d "$WPX_DIR" || { echo "FATAL: wpx-* tools not found"; exit 1; }
 ```
 
@@ -257,7 +257,7 @@ To continue the loop:
   4. After the train completes (Step 11 reviews each remediation WP
      individually per v0.20.0), re-invoke this skill to start the
      next iteration:
-       /sulis-execution:backfill-gates --project <project> --repo <repo>
+       /sulis:backfill-gates --project <project> --repo <repo>
 
 The loop terminates when an iteration produces ZERO new findings.
 
@@ -294,13 +294,13 @@ provide signature-hash dedup so iterations converge.
 
 ## Related
 
-- `plugins/sulis-execution/skills/run-all/SKILL.md` — Step 11
+- `plugins/sulis/skills/run-all/SKILL.md` — Step 11
   per-batch dispatch (forward gate; this skill is the retrofit)
 - `plugins/sulis-security/skills/codebase-assess/SKILL.md` — the
   scan invocation this skill orchestrates
-- `plugins/sulis-execution/scripts/wpx-findings` — signature-hash
+- `plugins/sulis/scripts/wpx-findings` — signature-hash
   dedup + auto-draft mechanics
-- `plugins/sulis-execution/skills/backfill-gates/recipes/post-rollout.md`
+- `plugins/sulis/skills/backfill-gates/recipes/post-rollout.md`
   — step-by-step recipe for the slice-2 12-WP case
 - `plugins/sulis-execution/sdk/docs/recipes/backfill-security-review.md`
   — operator-facing recipe (same content, SDK-style)

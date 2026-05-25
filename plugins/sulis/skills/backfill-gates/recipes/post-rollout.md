@@ -31,7 +31,7 @@ the gap.
 ### 2. Run iteration 1
 
 ```bash
-/sulis-execution:backfill-gates \
+/sulis:backfill-gates \
   --project agent-applications \
   --repo sulis-ai/platform \
   --deployed-url https://dev.example.com \
@@ -87,7 +87,7 @@ the local loop for any new issues the remediation might introduce.
 After the train completes:
 
 ```bash
-/sulis-execution:backfill-gates \
+/sulis:backfill-gates \
   --project agent-applications \
   --repo sulis-ai/platform \
   --deployed-url https://dev.example.com

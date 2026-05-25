@@ -10,11 +10,11 @@ description: >
   founder reviews drafted WPs; ships them; re-invokes the skill to
   close the loop. Terminates when an iteration produces zero NEW
   (non-duplicate) findings, OR when --max-remediation cap is reached.
-  Usage: /sulis-execution:backfill-code-review --project <slug>
+  Usage: /sulis:backfill-code-review --project <slug>
   --repo <org/repo> [--wps WP-A,WP-B,...] [--max-remediation 10]
 ---
 
-# /sulis-execution:backfill-code-review
+# /sulis:backfill-code-review
 
 Retroactive code-review for WPs that shipped before the Step 6.5
 bundle-path verification landed (`v0.20.1`). Those WPs may have
@@ -70,7 +70,7 @@ fixes themselves change the codebase shape).
 ## How to invoke
 
 ```
-/sulis-execution:backfill-code-review --project <slug> --repo <org/repo>
+/sulis:backfill-code-review --project <slug> --repo <org/repo>
 ```
 
 The skill is a procedure document — the calling session executes
@@ -81,7 +81,7 @@ the steps below.
 ### Step 1: Resolve tool paths
 
 ```bash
-WPX_DIR=$(ls -td ~/.claude/plugins/cache/sulis-ai-agents/sulis-execution/*/scripts/ | head -1)
+WPX_DIR=$(ls -td ~/.claude/plugins/cache/sulis-ai-agents/sulis/*/scripts/ | head -1)
 test -d "$WPX_DIR" || { echo "FATAL: wpx-* tools not found"; exit 1; }
 ```
 
@@ -294,7 +294,7 @@ To continue the loop:
   3. Ship via train:
        wpx-train run --project <project> --deploy-workflow <workflow>
   4. After the train completes, re-invoke this skill to continue:
-       /sulis-execution:backfill-code-review --project <project> --repo <repo>
+       /sulis:backfill-code-review --project <project> --repo <repo>
 
 The loop terminates when an iteration produces ZERO new findings
 AND zero SKIPPED_BY_CAP.
@@ -325,13 +325,13 @@ the state-changing operations.
 
 ## Related
 
-- `plugins/sulis-execution/skills/backfill-gates/SKILL.md` — sibling
+- `plugins/sulis/skills/backfill-gates/SKILL.md` — sibling
   skill for security backfill (uses `/sulis-security:codebase-assess`)
 - `plugins/sea/skills/code-review/SKILL.md` — the skill this
   orchestrates
-- `plugins/sulis-execution/agents/executor.md` — Step 6.5 (the
+- `plugins/sulis/agents/executor.md` — Step 6.5 (the
   forward gate this skill complements)
-- `plugins/sulis-execution/skills/backfill-code-review/recipes/post-rollout.md`
+- `plugins/sulis/skills/backfill-code-review/recipes/post-rollout.md`
   — step-by-step recipe for the slice-2 9-WP case
 - `plugins/sulis-execution/sdk/docs/recipes/backfill-code-review.md`
   — operator-facing recipe

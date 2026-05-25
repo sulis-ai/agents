@@ -12,14 +12,14 @@ description: >
   (security-reviewer Agent) over the batch's wps_shipped, drafting
   remediation WPs for any findings — the distributed loop closes when
   a subsequent train's Step 11 produces zero NEW findings (v0.20.0+).
-  Per-WP wpx-pipeline shipping remains available via `/sulis-execution:run-wp
-  WP-X --force-single` for hotfixes. Usage: /sulis-execution:run-all.
+  Per-WP wpx-pipeline shipping remains available via `/sulis:run-wp
+  WP-X --force-single` for hotfixes. Usage: /sulis:run-all.
   The loop runs inline in the calling session — not via a separate
   orchestrator subagent — because agent-tree-depth limits prevent
   subagents from reliably spawning further subagents.
 ---
 
-# /sulis-execution:run-all
+# /sulis:run-all
 
 Walk the Work Package INDEX and ship every ready WP, with parallel
 executor dispatch and train-based integration:
@@ -59,7 +59,7 @@ executor dispatch and train-based integration:
 
 When this skill loads, **YOU (the calling session) run the dispatch
 loop directly**. Do NOT call `Agent({subagent_type:
-"sulis-execution:orchestrator", ...})` first. The orchestrator agent
+"orchestrator", ...})` first. The orchestrator agent
 file is architectural-intent reference only — Claude Code's runtime
 treats spawned subagents as leaves of the agent tree, so an
 orchestrator subagent could not dispatch executor subagents
@@ -76,9 +76,9 @@ depth limits.
 ### Resolving wpx-* tool paths (MUST — first action, v0.10.1+)
 
 The wpx-* CLI tools (journal, pipeline, blocker, step12, …) live
-inside the sulis-execution plugin. When the plugin is installed in
+inside the sulis plugin. When the plugin is installed in
 a downstream project, the scripts are at
-`~/.claude/plugins/cache/sulis-ai-agents/sulis-execution/<version>/scripts/`,
+`~/.claude/plugins/cache/sulis-ai-agents/sulis/<version>/scripts/`,
 NOT at a project-relative path. You MUST resolve the tool directory
 ONCE at the start of every dispatch session, before reading the
 INDEX or doing anything else, and capture the result as
@@ -88,16 +88,16 @@ INDEX or doing anything else, and capture the result as
 WPX_DIR=$(
   find ~/.claude/plugins/cache \
     -name wpx-journal -type f \
-    -path '*/sulis-execution/*/scripts/*' \
+    -path '*/sulis/*/scripts/*' \
     2>/dev/null \
   | sort -r | head -1 | xargs -I{} dirname {} 2>/dev/null
 )
 # Dev fallback: marketplace repo cwd
-if [ -z "$WPX_DIR" ] && [ -f "plugins/sulis-execution/scripts/wpx-journal" ]; then
-  WPX_DIR="$(pwd)/plugins/sulis-execution/scripts"
+if [ -z "$WPX_DIR" ] && [ -f "plugins/sulis/scripts/wpx-journal" ]; then
+  WPX_DIR="$(pwd)/plugins/sulis/scripts"
 fi
 if [ -z "$WPX_DIR" ]; then
-  echo "ERROR: cannot locate wpx-* scripts. Run: claude plugin install sulis-execution@sulis-ai-agents" >&2
+  echo "ERROR: cannot locate wpx-* scripts. Run: claude plugin install sulis@sulis-ai-agents" >&2
   exit 1
 fi
 echo "WPX_DIR=$WPX_DIR"
@@ -196,19 +196,19 @@ loop:
        concurrently:
 
        Agent({
-         subagent_type: "sulis-execution:executor",
+         subagent_type: "executor",
          description: "Ship WP-007 end-to-end",
          model: <executor_model from WP frontmatter, if present>,
          prompt: """<executor brief per below>""",
        })
        Agent({
-         subagent_type: "sulis-execution:executor",
+         subagent_type: "executor",
          description: "Ship WP-008 end-to-end",
          model: <executor_model from WP frontmatter, if present>,
          prompt: """<executor brief per below>""",
        })
        Agent({
-         subagent_type: "sulis-execution:executor",
+         subagent_type: "executor",
          description: "Ship WP-009 end-to-end",
          model: <executor_model from WP frontmatter, if present>,
          prompt: """<executor brief per below>""",
@@ -319,7 +319,7 @@ loop:
                "WP-NNN: executor returned before Step 7 completed
                 and no BLOCKER was written. Plan: <N items, M done>.
                 Likely parked at <step inferred from in-progress
-                item>. Re-dispatch via /sulis-execution:run-wp WP-NNN
+                item>. Re-dispatch via /sulis:run-wp WP-NNN
                 to resume from journal."
 
            The plan in the journal makes the parked-state diagnosis
@@ -388,7 +388,7 @@ loop:
        `wpx-train run --force`).
 
        For backwards-compatibility / hotfix shipping of a single WP,
-       see `/sulis-execution:run-wp WP-X --force-single` which preserves
+       see `/sulis:run-wp WP-X --force-single` which preserves
        the wpx-pipeline per-WP path.
 
        The remainder of this section (the historical Steps 8-12
@@ -643,7 +643,7 @@ loop:
 
        For an explicit, retroactive sweep over WPs that shipped
        before v0.20.0 (i.e., slice-1 and slice-2's 12 WPs that
-       missed Step 11), invoke `/sulis-execution:backfill-gates`
+       missed Step 11), invoke `/sulis:backfill-gates`
        (v0.20.2+).
 
    14.5. **HD-007 gate completion (v0.23.0+, only when `--enable-gate-handoff`
@@ -881,7 +881,7 @@ that WP's Agent call:
 
 ```
 Agent({
-  subagent_type: "sulis-execution:executor",
+  subagent_type: "executor",
   model: "haiku",
   ...
 })
@@ -916,10 +916,10 @@ ready set. Transitively-dependent descendants of blocked WPs get
 
 ## When NOT to use
 
-- **One specific WP.** Use `/sulis-execution:run-wp WP-NNN` — single-
+- **One specific WP.** Use `/sulis:run-wp WP-NNN` — single-
   WP dispatch (also runs Agent in the calling session; no parallel
   logic needed).
-- **Retry a blocked WP.** Use `/sulis-execution:retry WP-NNN` after
+- **Retry a blocked WP.** Use `/sulis:retry WP-NNN` after
   the external blocker is resolved.
 
 ## Gotchas
@@ -952,6 +952,6 @@ ready set. Transitively-dependent descendants of blocked WPs get
 - `agents/orchestrator.md` — architectural-intent reference for the
   dispatch logic (not actively invoked).
 - `references/lifecycle.md` — the 12-step contract per WP.
-- `/sulis-execution:run-wp WP-NNN` — single-WP dispatch.
-- `/sulis-execution:status` — read-only INDEX summary.
-- `/sulis-execution:retry WP-NNN` — re-run a blocked WP.
+- `/sulis:run-wp WP-NNN` — single-WP dispatch.
+- `/sulis:status` — read-only INDEX summary.
+- `/sulis:retry WP-NNN` — re-run a blocked WP.

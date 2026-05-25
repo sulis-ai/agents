@@ -3,11 +3,11 @@ name: retry
 description: >
   Archive a Work Package's prior BLOCKER + journal, reset its status,
   then spawn the executor agent fresh. Usage:
-  /sulis-execution:retry WP-NNN. Use after the external blocker
+  /sulis:retry WP-NNN. Use after the external blocker
   documented in BLOCKER-WP-NNN.md has been resolved.
 ---
 
-# /sulis-execution:retry
+# /sulis:retry
 
 This skill **archives prior failure evidence** and **spawns a fresh
 executor agent** for a WP that was previously blocked.
@@ -24,7 +24,7 @@ Do not run the executor's work inline.
 
 ### The two-step dispatch
 
-Given `/sulis-execution:retry WP-NNN`:
+Given `/sulis:retry WP-NNN`:
 
 **Step 1 — archive prior evidence:**
 
@@ -33,7 +33,7 @@ Given `/sulis-execution:retry WP-NNN`:
 STATUS=$(awk -v wp="WP-NNN" '...parse INDEX status for WP...' \
          .architecture/{project}/work-packages/INDEX.md)
 if [ "$STATUS" != "blocked" ]; then
-  echo "WP-NNN is not blocked (status=$STATUS). Use /sulis-execution:run-wp instead."
+  echo "WP-NNN is not blocked (status=$STATUS). Use /sulis:run-wp instead."
   exit 1
 fi
 
@@ -62,7 +62,7 @@ fi
 
 ```
 Agent({
-  subagent_type: "sulis-execution:executor",
+  subagent_type: "executor",
   description: "Retry WP-NNN after external blocker resolved",
   prompt: """
 You are dispatched to retry WP-NNN. The prior BLOCKER and journal
@@ -126,4 +126,4 @@ Return ONLY on step-10 success or new BLOCKER written.
 
 - `agents/executor.md` — the agent this skill spawns.
 - The `executor-loop-standard.md` BLOCKER record format (EL-08).
-- `/sulis-execution:run-wp WP-NNN` — equivalent for non-blocked WPs.
+- `/sulis:run-wp WP-NNN` — equivalent for non-blocked WPs.
