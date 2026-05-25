@@ -13,10 +13,13 @@ from _wpxlib import (
     ALLOWED_CHANGE_PRIMITIVES,
     change_worktree_path,
     compose_change_branch,
+    generate_change_ulid,
     parse_change_branch,
     read_change_metadata,
+    ulid_handle,
     validate_change_primitive,
     validate_change_slug,
+    validate_change_ulid,
     write_change_metadata,
 )
 
@@ -216,3 +219,100 @@ def test_adopt_state_dict_shape():
     }
     # Documented contract; integration test exercises actual state detection.
     assert expected_keys  # Sanity assertion; the integration tests do the real work.
+
+
+# ─── generate_change_ulid (Phase 5 of change-as-primitive build) ──────────
+
+
+def test_generate_change_ulid_returns_26_chars():
+    u = generate_change_ulid()
+    assert len(u) == 26, f"expected 26 chars, got {len(u)}: {u!r}"
+
+
+def test_generate_change_ulid_uses_crockford_alphabet():
+    u = generate_change_ulid()
+    allowed = set("0123456789ABCDEFGHJKMNPQRSTVWXYZ")
+    for i, ch in enumerate(u):
+        assert ch in allowed, f"char {ch!r} at position {i} not in Crockford-base32"
+
+
+def test_generate_change_ulid_unique_across_calls():
+    """1000 ULIDs should all be unique (random portion guarantees this)."""
+    ulids = {generate_change_ulid() for _ in range(1000)}
+    assert len(ulids) == 1000, f"got {len(ulids)} unique ULIDs out of 1000"
+
+
+def test_generate_change_ulid_sortable_by_timestamp():
+    """Two ULIDs generated in sequence — the second should sort >= the first."""
+    u1 = generate_change_ulid(_now_ms=1000, _random_bytes=b"\x00" * 10)
+    u2 = generate_change_ulid(_now_ms=1001, _random_bytes=b"\x00" * 10)
+    assert u1 < u2, f"expected {u1} < {u2}"
+
+
+def test_generate_change_ulid_deterministic_with_injection():
+    u = generate_change_ulid(_now_ms=1716624000000, _random_bytes=b"\x00" * 10)
+    # Re-run with same inputs — must produce the same output
+    u2 = generate_change_ulid(_now_ms=1716624000000, _random_bytes=b"\x00" * 10)
+    assert u == u2
+
+
+def test_generate_change_ulid_rejects_oversized_timestamp():
+    """Timestamp >48 bits should raise."""
+    with pytest.raises(ValueError, match="timestamp exceeds 48 bits"):
+        generate_change_ulid(_now_ms=2**48 + 1, _random_bytes=b"\x00" * 10)
+
+
+def test_generate_change_ulid_rejects_wrong_random_length():
+    """Randomness must be exactly 10 bytes."""
+    with pytest.raises(ValueError, match="exactly 10 bytes"):
+        generate_change_ulid(_random_bytes=b"\x00" * 9)
+    with pytest.raises(ValueError, match="exactly 10 bytes"):
+        generate_change_ulid(_random_bytes=b"\x00" * 11)
+
+
+# ─── ulid_handle ──────────────────────────────────────────────────────────
+
+
+def test_ulid_handle_returns_ch_prefix_plus_six():
+    u = generate_change_ulid()
+    h = ulid_handle(u)
+    assert h.startswith("CH-")
+    assert len(h) == 9, f"expected 9-char handle (CH- + 6), got {h!r}"
+    assert h[3:] == u[:6]
+
+
+def test_ulid_handle_rejects_wrong_length():
+    with pytest.raises(ValueError, match="must be 26 characters"):
+        ulid_handle("01HYQC")
+    with pytest.raises(ValueError, match="must be 26 characters"):
+        ulid_handle("01HYQC71000000000000000000X")  # 27 chars
+
+
+# ─── validate_change_ulid ─────────────────────────────────────────────────
+
+
+def test_validate_change_ulid_accepts_valid_ulid():
+    u = generate_change_ulid()
+    ok, reason = validate_change_ulid(u)
+    assert ok is True
+    assert reason == ""
+
+
+def test_validate_change_ulid_rejects_empty():
+    ok, reason = validate_change_ulid("")
+    assert ok is False
+    assert "empty" in reason
+
+
+def test_validate_change_ulid_rejects_wrong_length():
+    ok, reason = validate_change_ulid("01HYQC")
+    assert ok is False
+    assert "26 characters" in reason
+
+
+def test_validate_change_ulid_rejects_non_crockford_chars():
+    # Crockford-base32 excludes I, L, O, U (and lower case)
+    bad = "01HYQC710000000000000000IL"  # I + L are excluded
+    ok, reason = validate_change_ulid(bad)
+    assert ok is False
+    assert "non-Crockford-base32" in reason

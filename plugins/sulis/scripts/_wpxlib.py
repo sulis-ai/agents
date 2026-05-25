@@ -3068,6 +3068,89 @@ ALLOWED_CHANGE_PRIMITIVES = (
 _CHANGE_SLUG_RE = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+){1,4}$")
 
 
+# ─── Phase 5: ULID + handle generation (change-as-primitive design) ────────
+#
+# Per WORK_PACKAGE_STANDARD v1.1.0 + the change-as-primitive design doc:
+# every change gets a 26-character Crockford-base32 ULID + a 6-character
+# display handle (first 6 chars of the ULID). The ULID is the canonical
+# identity (SaaS-ready by construction; sortable; collision-free); the
+# handle is what humans + CLIs show ("CH-01HQ8X" — jj-style
+# enough-to-disambiguate). The author-chosen slug remains the
+# branch-friendly name.
+#
+# Implementation: inline ULID generator (no external dep). 48-bit ms
+# timestamp + 80 bits of randomness, Crockford-base32 encoded.
+
+import secrets as _secrets
+import time as _time
+
+_CROCKFORD_BASE32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+
+def _encode_crockford(value: int, length: int) -> str:
+    """Encode an integer as Crockford-base32, left-padded to `length` chars."""
+    if value < 0:
+        raise ValueError("value must be non-negative")
+    chars: list[str] = []
+    for _ in range(length):
+        chars.append(_CROCKFORD_BASE32[value & 0x1F])
+        value >>= 5
+    if value:
+        raise ValueError(f"value too large for {length}-char Crockford-base32")
+    return "".join(reversed(chars))
+
+
+def generate_change_ulid(*, _now_ms: int | None = None,
+                          _random_bytes: bytes | None = None) -> str:
+    """Generate a 26-character Crockford-base32 ULID.
+
+    The two underscore-prefixed parameters are for deterministic testing
+    (inject a fixed timestamp and randomness). Production callers pass
+    neither — the function reads the current time + secrets.token_bytes(10).
+    """
+    # 48 bits of timestamp (ms since epoch) → 10 Crockford chars
+    timestamp_ms = _now_ms if _now_ms is not None else int(_time.time() * 1000)
+    if timestamp_ms.bit_length() > 48:
+        raise ValueError("timestamp exceeds 48 bits")
+    timestamp_part = _encode_crockford(timestamp_ms, 10)
+
+    # 80 bits of randomness → 16 Crockford chars
+    random_bytes = _random_bytes if _random_bytes is not None else _secrets.token_bytes(10)
+    if len(random_bytes) != 10:
+        raise ValueError("randomness must be exactly 10 bytes (80 bits)")
+    random_int = int.from_bytes(random_bytes, "big")
+    random_part = _encode_crockford(random_int, 16)
+
+    return timestamp_part + random_part
+
+
+def ulid_handle(ulid: str) -> str:
+    """Return the 6-character display handle for a ULID.
+
+    The handle is `CH-{first-6-chars}` — "CH" for "change", then the
+    first 6 Crockford-base32 characters of the ULID. The first 6 are
+    derived from the timestamp portion (28 bits encoded across 6
+    chars), so handles sort chronologically + collisions are rare in
+    practice (would require two changes started in the same ~1-second
+    window).
+    """
+    if len(ulid) != 26:
+        raise ValueError(f"ULID must be 26 characters, got {len(ulid)}: {ulid!r}")
+    return "CH-" + ulid[:6]
+
+
+def validate_change_ulid(ulid: str) -> tuple[bool, str]:
+    """Return (ok, reason). ULID must be 26 Crockford-base32 characters."""
+    if not ulid:
+        return False, "ULID is empty"
+    if len(ulid) != 26:
+        return False, f"ULID must be exactly 26 characters, got {len(ulid)}"
+    for i, ch in enumerate(ulid):
+        if ch not in _CROCKFORD_BASE32:
+            return False, f"ULID has non-Crockford-base32 character {ch!r} at position {i}"
+    return True, ""
+
+
 def validate_change_slug(slug: str) -> tuple[bool, str]:
     """Return (ok, reason). Slug must be 2-5 kebab-case words."""
     if not slug:

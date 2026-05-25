@@ -51,10 +51,12 @@ from _wpxlib import (  # noqa: E402
     emit_internal_error,
     emit_ok,
     find_change_branches,
+    generate_change_ulid,
     git_worktree_add,
     git_worktree_remove,
     parse_change_branch,
     read_change_metadata,
+    ulid_handle,
     validate_change_primitive,
     validate_change_slug,
     write_change_metadata,
@@ -122,8 +124,15 @@ def cmd_start(args: argparse.Namespace) -> None:
                                cwd=repo_root, timeout=10)
     base_sha = base_sha_out.strip() if rc == 0 else ""
 
+    # Generate ULID + handle (Phase 5 of change-as-primitive build —
+    # WORK_PACKAGE_STANDARD v1.1.0 `change_id:` field).
+    change_id = generate_change_ulid()
+    handle = ulid_handle(change_id)
+
     # Write metadata into the worktree (it lives on the change branch)
     metadata = {
+        "change_id": change_id,
+        "handle": handle,
         "slug": slug,
         "primitive": primitive,
         "branch": branch,
@@ -135,8 +144,10 @@ def cmd_start(args: argparse.Namespace) -> None:
     write_change_metadata(_metadata_path(worktree_dest, primitive, slug),
                           metadata)
 
-    _log(f"Change started: {branch} at {worktree_dest}")
+    _log(f"Change started: {branch} ({handle}) at {worktree_dest}")
     emit_ok(data={
+        "change_id": change_id,
+        "handle": handle,
         "branch": branch,
         "primitive": primitive,
         "slug": slug,
