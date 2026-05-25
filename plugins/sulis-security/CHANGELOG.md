@@ -4,6 +4,40 @@ This file holds the cumulative version history that previously lived in
 `plugin.json`'s `description` field. The description is now a one-sentence
 summary (per HD-004); historical detail lives here.
 
+## v0.7.0 — 2026-05-25 — [DEPRECATED]
+
+**This plugin is consolidated into `sulis` at v0.40.0 as the fourth and
+final Phase 3 consolidation of the change-as-primitive build.**
+
+Authored via `consolidate-into-sulis` v0.1.2 (with the move-then-sweep
+ordering fix). Single combined commit:
+
+- `bdea2e8` — steps 2-4/5 combined — 1 skill moved (codebase-assess —
+  already-DEPRECATED, kept name); 1 agent moved (security-reviewer);
+  1 reference moved (viability-framework.md). bulk_rewrite.py applied
+  52 substitutions across 32 files. 3 manual edits for narrative
+  primitive-ID shorthand and the README [DEPRECATED] listing. **No
+  fix-forward commits needed** — the v0.1.2 move-then-sweep ordering
+  discipline prevented the bug that bit twice during the sea run.
+- (this commit) — step 5/5 — wrap-up: this plugin marked DEPRECATED;
+  sulis bumped to v0.40.0; marketplace.json updated.
+
+Plugin shell preserved for marketplace compatibility. No shim skills
+written. The `/sulis:codebase-assess` skill is itself DEPRECATED
+(superseded by `/sulis:code-health`) but remains callable through its
+deprecation window per its original retirement schedule.
+
+### Phase 3 complete
+
+This is the fourth and final Phase 3 plugin consolidation:
+
+- sulis-context → sulis (v0.35.0) ✅
+- srd → sulis (v0.37.0) ✅
+- sea → sulis (v0.38.0) ✅
+- sulis-security → sulis (v0.40.0) ✅ ← HERE
+
+Phases 4-7 of the change-as-primitive build remain.
+
 For the marketplace-facing summary, see `plugin.json`.
 
 ---

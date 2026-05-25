@@ -1,5 +1,44 @@
 # Sulis — Changelog
 
+## v0.40.0 — 2026-05-25
+
+**Phase 3 fourth and final consolidation — `sulis-security` folded into `sulis`. Phase 3 complete.**
+
+### What moved
+
+| Category | Count | Items |
+|---|---|---|
+| Skills | 1 | `codebase-assess` (no rename — already-DEPRECATED, kept name through its existing deprecation window) |
+| Agents | 1 | `security-reviewer` |
+| References | 1 | `viability-framework.md` |
+| Scripts / tests / CI / docs | 0 | (none) |
+
+### Commit chain
+
+- `bdea2e8` — steps 2-4/5 (combined) — moves + bulk sweep + manual edits. **First run benefiting from v0.1.2 move-then-sweep ordering** — no fix-forward commits needed (compare to sea which needed 2 fix-forwards for the same bug now prevented).
+- (this commit) — step 5/5 — wrap-up: sulis-security DEPRECATED; sulis bumps; marketplace.json updated.
+
+### v0.1.2 discipline validated
+
+The sea run surfaced the move-then-sweep ordering bug; v0.1.2 encoded the fix. This run is the validation: applied the discipline (move ALL content first, then bulk_rewrite.py), got zero un-swept self-references, single combined commit. The v0.1.2 patch was worth the iteration.
+
+### Phase 3 complete
+
+| # | Plugin | Sulis version | Date |
+|---|---|---|---|
+| 1 | sulis-context | v0.35.0 | 2026-05-25 |
+| 2 | srd | v0.37.0 | 2026-05-25 |
+| 3 | sea | v0.38.0 | 2026-05-25 |
+| 4 | sulis-security | **v0.40.0** | 2026-05-25 |
+
+All four specialist plugins folded into the canonical `sulis` plugin. Marketplace surface reduced to one front-door plugin per the change-as-primitive design.
+
+### What's next
+
+Phases 4-7 of the change-as-primitive build remain (standards amendments, change-as-primitive infrastructure, founder-facing skills, end-to-end test). See `plugins/sulis/docs/change-as-primitive-design.md`.
+
+---
+
 ## v0.39.0 — 2026-05-25
 
 **`consolidate-into-sulis` v0.1.2 — two highest-leverage patches from the sea run.**

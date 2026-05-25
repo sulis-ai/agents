@@ -1,7 +1,8 @@
 {
   "name": "sulis-security",
-  "description": "[DEPRECATED — use /sulis:code-health] Security & Viability Reviewer. Superseded by sulis v0.22.0+ check-* tier framework which covers 24 of 25 primitives at 96% parity. Kept for one major release window as a deprecation shim.",
-  "version": "0.6.0",
+  "description": "[DEPRECATED at v0.7.0 — consolidated into sulis at v0.40.0; was already-DEPRECATED in favour of /sulis:code-health since v0.22.0] Security-reviewer agent + viability-framework reference now in plugins/sulis/. codebase-assess skill preserved at /sulis:codebase-assess through its deprecation window. Shell remains for marketplace compatibility.",
+  "version": "0.7.0",
+  "deprecated": true,
   "author": {
     "name": "Iain"
   },
