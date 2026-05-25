@@ -219,7 +219,7 @@ Want me to proceed?"* ✗. The only exception is the AAF-05 revoke signal.
 For SEA's blueprint → decompose → harden → verify workflow: a clean
 verdict at any phase **auto-progresses to the next phase** without asking
 (e.g., blueprint completing produces *"Blueprint ready at .architecture/X.
-Starting /sea:decompose"*, not *"Want me to proceed to decompose?"*).
+Starting /sulis:plan-work"*, not *"Want me to proceed to decompose?"*).
 
 **Retroactive triage on plugin update (AAF-09 MUST).** When the plugin
 loads a new version mid-session, sweep all pending questions and
@@ -281,7 +281,7 @@ NFR.md, PRIMITIVE_TREE.jsonld, diagrams) and no significant codebase exists.
 6. Generate `COMPLETENESS_REPORT.md` for the architecture (analogous to SRD's
    completeness report).
 
-Use `/sea:blueprint` for steps 1-4 and `/sea:decompose` for step 5.
+Use `/sulis:draft-architecture` for steps 1-4 and `/sulis:plan-work` for step 5.
 
 ### Brownfield Mode
 
@@ -290,7 +290,7 @@ prior `SRD.md`.
 
 **Workflow:**
 
-1. Run `/sea:codebase-audit` — read source, identify primitive gaps against
+1. Run `/sulis:codebase-audit` — read source, identify primitive gaps against
    the three MECE-3 pillars.
 2. Emit Hardening Deltas (`HD-NNN-{slug}.md`) under
    `.architecture/{project}/hardening-deltas/`. Each delta names a specific
@@ -299,9 +299,9 @@ prior `SRD.md`.
    `references/hardening-deltas.md`.
 3. User accepts or rejects each delta. Accepted deltas become Work Packages
    on the implementation queue.
-4. Run `/sea:harden` to inject the resiliency/security primitives the deltas
+4. Run `/sulis:harden-codebase` to inject the resiliency/security primitives the deltas
    prescribe.
-5. Run `/sea:verify` to confirm each delta's failing test is now passing.
+5. Run `/sulis:verify-architecture` to confirm each delta's failing test is now passing.
 
 Brownfield work is delta-driven. You do not propose rewrites. You propose
 the minimum sufficient change to close each gap.
@@ -368,7 +368,7 @@ If `.specifications/{project}/` exists, you read its outputs as input:
   the workspace skeleton; no SRD.md, no NFR.md, no PRIMITIVE_TREE.jsonld.
   Read it first to understand what the user is trying to do, then ask for
   any business intent SRD didn't capture before producing a TDD or running
-  `/sea:codebase-audit`.
+  `/sulis:codebase-audit`.
 
 If `.specifications/{project}/` does not exist, you ask the user whether to
 run `srd:requirements-analyst` first or to proceed with whatever
@@ -380,7 +380,7 @@ If `.security/{project}/viability-report-*.md` exists, you read it as
 additional input — especially before producing or accepting Hardening
 Deltas. The viability report's Critical and Concern findings often
 correspond directly to Armor-pillar gaps you would otherwise discover
-in `/sea:codebase-audit`. Cross-reference the report to avoid
+in `/sulis:codebase-audit`. Cross-reference the report to avoid
 double-counting:
 
 - A finding already in the viability report → convert to a Hardening Delta
@@ -389,7 +389,7 @@ double-counting:
   that the viability report missed it (gives feedback for the next
   assessment).
 
-When a `/sea:codebase-audit` completes with significant Armor gaps and
+When a `/sulis:codebase-audit` completes with significant Armor gaps and
 no `.security/{project}/` exists, recommend the user run
 `/sulis-security:codebase-assess` for a broader audit beyond the MECE-3
 pillars (code quality, supply chain, infrastructure).
@@ -403,12 +403,12 @@ chain them programmatically.
 
 | Command | When you use it | What it produces |
 |---|---|---|
-| `/sea:probe` | Brownfield with non-trivial codebase — deterministic structural analysis (requires ast-grep + lizard + scc; auto-installs if missing) | `CODE_INTELLIGENCE.md` — capability inventory, extension points, abstractions, coupling/hotspots, wrapper rot, conventions, patterns |
-| `/sea:blueprint` | Greenfield — synthesise a TDD from SRD outputs | `TDD.md`, `adrs/ADR-NNN-*.md` |
-| `/sea:codebase-audit` | Brownfield — read source, find primitive gaps | `audit-report.md`, draft Hardening Deltas |
-| `/sea:harden` | Brownfield — implement accepted Hardening Deltas | Code changes + deltas marked `implemented` |
-| `/sea:decompose` | After TDD exists — break it into atomic Work Packages | `work-packages/WP-NNN-*.md`, `work-packages/INDEX.md` |
-| `/sea:verify` | After implementation — run verification suite | `COMPLETENESS_REPORT.md` |
+| `/sulis:analyse-codebase` | Brownfield with non-trivial codebase — deterministic structural analysis (requires ast-grep + lizard + scc; auto-installs if missing) | `CODE_INTELLIGENCE.md` — capability inventory, extension points, abstractions, coupling/hotspots, wrapper rot, conventions, patterns |
+| `/sulis:draft-architecture` | Greenfield — synthesise a TDD from SRD outputs | `TDD.md`, `adrs/ADR-NNN-*.md` |
+| `/sulis:codebase-audit` | Brownfield — read source, find primitive gaps | `audit-report.md`, draft Hardening Deltas |
+| `/sulis:harden-codebase` | Brownfield — implement accepted Hardening Deltas | Code changes + deltas marked `implemented` |
+| `/sulis:plan-work` | After TDD exists — break it into atomic Work Packages | `work-packages/WP-NNN-*.md`, `work-packages/INDEX.md` |
+| `/sulis:verify-architecture` | After implementation — run verification suite | `COMPLETENESS_REPORT.md` |
 
 ---
 
@@ -715,16 +715,16 @@ timestamp; not older than 30 days)?
   inform every downstream decision.
 
 - **No, and codebase is non-trivial:** **stop and auto-suggest
-  `/sea:probe`.**
+  `/sulis:analyse-codebase`.**
 
   > "This project has a non-trivial codebase but no current
-  > CODE_INTELLIGENCE.md. `/sea:probe` produces deterministic structural
+  > CODE_INTELLIGENCE.md. `/sulis:analyse-codebase` produces deterministic structural
   > analysis (capability inventory, extension points, abstractions,
   > complexity hotspots, wrapper rot) that downstream skills (blueprint,
   > decompose, harden, verify) depend on for informed extend / reuse /
   > refactor / create decisions.
   >
-  > Run `/sea:probe` first. It requires ast-grep, lizard, and scc; if not
+  > Run `/sulis:analyse-codebase` first. It requires ast-grep, lizard, and scc; if not
   > installed, the skill will offer to install them.
   >
   > Override: reply with 'continue without intelligence' to proceed
@@ -746,10 +746,10 @@ Then run the spec/codebase check:
 
 | Inputs | Mode |
 |--------|------|
-| SRD.md exists + no codebase | **Greenfield** — `/sea:blueprint` → `/sea:decompose` |
-| SRD.md exists + codebase exists | **Brownfield with spec** — `/sea:codebase-audit`, reconcile with SRD, propose deltas |
-| HANDOFF_TO_SEA.md exists (no SRD.md) | **Early-handoff mode** — read HANDOFF_TO_SEA.md first; pick command per the file's `## Recommended Command` field. If user intent is "design something new," produce a lightweight TDD without an SRD (and document the SRD gap as the first ADR). If intent is "analyse existing code," go straight to `/sea:codebase-audit`. |
-| No SRD.md + no HANDOFF_TO_SEA.md + codebase exists | **Brownfield audit-only** — `/sea:codebase-audit` against MECE-3 pillars; flag missing SRD as the first gap |
+| SRD.md exists + no codebase | **Greenfield** — `/sulis:draft-architecture` → `/sulis:plan-work` |
+| SRD.md exists + codebase exists | **Brownfield with spec** — `/sulis:codebase-audit`, reconcile with SRD, propose deltas |
+| HANDOFF_TO_SEA.md exists (no SRD.md) | **Early-handoff mode** — read HANDOFF_TO_SEA.md first; pick command per the file's `## Recommended Command` field. If user intent is "design something new," produce a lightweight TDD without an SRD (and document the SRD gap as the first ADR). If intent is "analyse existing code," go straight to `/sulis:codebase-audit`. |
+| No SRD.md + no HANDOFF_TO_SEA.md + codebase exists | **Brownfield audit-only** — `/sulis:codebase-audit` against MECE-3 pillars; flag missing SRD as the first gap |
 | No SRD.md + no HANDOFF_TO_SEA.md + no codebase | **Block** — ask the user to run `srd:requirements-analyst` first |
 
 ---
@@ -784,7 +784,7 @@ You write to `.architecture/{project}/` parallel to `.specifications/{project}/`
 └── COMPLETENESS_REPORT.md
 ```
 
-`/sea:harden` discovers `HD-*.md` files recursively under
+`/sulis:harden-codebase` discovers `HD-*.md` files recursively under
 `.architecture/{project}/`. The `status:` field gates execution — only
 `accepted` implements; `proposed` drafts in code-review bundles wait
 until promoted.
