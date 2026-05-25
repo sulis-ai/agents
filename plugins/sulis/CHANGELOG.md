@@ -1,5 +1,82 @@
 # Sulis — Changelog
 
+## v0.28.0 — 2026-05-25
+
+**INDEX.md generator (`wp_index.py`).** First implementation against
+the WORK_PACKAGE_STANDARD — produces the founder-readable WP queue
+per WP-10. Smallest unit that makes the queue real.
+
+### Files added
+
+- `plugins/sulis/_lib/wp_index.py` (~340 lines)
+  - Scans `.architecture/{project}/work-packages/WP-*.md`
+  - Parses YAML frontmatter (prefers pyyaml; minimal scalar+list+nested-dict
+    fallback when unavailable — keeps the script dependency-free)
+  - Buckets WPs by status per WP-07 (todo / in_progress / blocked /
+    sleeping / done / closed / regressed / abandoned)
+  - Renders INDEX.md per the WP-10 spec — bucket headings, per-WP
+    summary line with kind + estimate + finding-count suffix,
+    optional context subline (claimed_by / blocker / sleeping_note /
+    depends_on / closed_at), kind distribution footer
+  - Three modes: `--stdout` (preview), default file-write to
+    `.architecture/{project}/work-packages/INDEX.md`, `--output PATH`
+    override
+  - Library entry: `generate_index(repo_root, project) -> str` for
+    programmatic use by future characterisation / executor skills
+
+### Smoke test (synthetic 6-WP fixture)
+
+```
+## ▶ Ready to start (2)
+- WP-001 — Replace xml.etree with defusedxml in probe  (backend, 2h) — addresses 2 findings
+- WP-006 — Wire frontend rate-limit indicator  (frontend, 4h)
+
+## 🔄 In progress (1)
+- WP-002 — Add CHANGELOG.md to sulis-platform-sdk plugin  (docs, 30min)
+       └─ claimed by Iain, started 2026-05-25T14:00Z
+
+## ⏸ Blocked (1)
+- WP-003 — Split compute_router.py into per-resource modules  (backend, 8h)
+       └─ waiting on WP-001
+
+## 💤 Sleeping — needs a decision (1)
+- WP-004 — Distributed rate-limit / Redis  (backend, 6h)
+       └─ awaiting Memorystore spend approval (~$200-400/mo)
+
+## 🔒 Closed (loop-verified) (1)
+- WP-005 — Add HSTS header on Cloud Run  (backend, 1h) — addresses 1 finding
+       └─ closed 2026-05-24
+
+**Kind distribution:** backend=4, docs=1, frontend=1
+```
+
+All three rendering paths verified: empty-state (no .architecture
+directory), --stdout preview, file-write to canonical path.
+
+### Cross-skill self-test
+
+All 5 skills 0 findings. Track record: 12 → 13 data points.
+
+### Plugin metadata
+
+- plugins/sulis/.claude-plugin/plugin.json: 0.27.0 → 0.28.0
+- .claude-plugin/marketplace.json: sulis 0.27.0 → 0.28.0;
+  marketplace 1.70.0 → 1.71.0
+
+### What's next (per the build order from WORK_PACKAGE_STANDARD)
+
+1. ✅ wp_index.py — DONE (this commit)
+2. **/sulis:address-findings** — characterisation skill that turns
+   code-health findings into WP files matching the standard; calls
+   wp_index.generate_index() after writing to refresh INDEX.md
+3. **/sulis:execute** — founder-facing wrapper around
+   sulis-execution:executor for backend WPs
+4. **WP_BACKEND_STANDARD.md** — codifies what the executor already does
+5. **Per-kind standards + executors** (frontend / async / docs / infra)
+   as each kind has real work to validate against
+
+---
+
 ## v0.27.0 — 2026-05-24
 
 **6th sulis-local standard: WORK_PACKAGE_STANDARD.md.** Codifies the
