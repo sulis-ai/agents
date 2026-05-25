@@ -1,0 +1,29 @@
+{
+  "agents": [
+    "context-cartographer.md"
+  ],
+  "ci_workflows": [],
+  "docs": [],
+  "manifest_files": [
+    ".claude-plugin/plugin.json"
+  ],
+  "marketplace_root": "/Users/iain/Documents/repos/agents",
+  "metadata_files": [
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "plugin_dir": "plugins/sulis-context",
+  "references": [
+    "references/classification-taxonomy.md",
+    "references/context-index-template.md",
+    "references/discovery-protocol.md"
+  ],
+  "script_tests": [],
+  "scripts": [],
+  "skills": [
+    "discover",
+    "refresh",
+    "show"
+  ],
+  "source_plugin": "sulis-context"
+}

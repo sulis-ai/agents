@@ -1,7 +1,8 @@
 {
   "name": "sulis-context",
-  "description": "Context Cartographer — discovers existing architecture documentation, ADRs, conventions, and standards in a project; produces .context/{project}/INDEX.md so downstream plugins (SRD, SEA, sulis-security) respect prior decisions instead of restating them.",
-  "version": "0.3.1",
+  "description": "[DEPRECATED at v0.4.0 — consolidated into the sulis plugin] Context Cartographer functionality now lives at /sulis:discover-context, /sulis:refresh-context, /sulis:show-context with the context-cartographer agent in plugins/sulis/agents/. This plugin shell remains for marketplace compatibility; no new development. See plugins/sulis/CHANGELOG.md v0.35.0 for the consolidation narrative.",
+  "version": "0.4.0",
+  "deprecated": true,
   "author": {
     "name": "Iain"
   },

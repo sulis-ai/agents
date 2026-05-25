@@ -1,0 +1,209 @@
+{
+  "scope": "codebase",
+  "base_branch": null,
+  "pr_number": null,
+  "gating_applied": true,
+  "gating_reason": "hard-stop at tier 2 (Safe) due to critical finding",
+  "tiers": [
+    {
+      "tier": 1,
+      "name": "Exists",
+      "status": "needs_attention",
+      "finding_count": 5,
+      "findings": [
+        {
+          "heuristic": "manifest-hygiene",
+          "severity": "concern",
+          "file": "plugins/sulis/.claude-plugin/plugin.json",
+          "line": 0,
+          "identifier": "PH-103",
+          "message": "description is 710 chars (recommended max 500 per HD-004 \u2014 move cumulative history to CHANGELOG.md)",
+          "suggestion": "",
+          "extras": {
+            "rule": "PH-103",
+            "raw": "len=710"
+          }
+        },
+        {
+          "heuristic": "manifest-hygiene",
+          "severity": "concern",
+          "file": "plugins/sulis-execution/.claude-plugin/plugin.json",
+          "line": 0,
+          "identifier": "PH-103",
+          "message": "description is 533 chars (recommended max 500 per HD-004 \u2014 move cumulative history to CHANGELOG.md)",
+          "suggestion": "",
+          "extras": {
+            "rule": "PH-103",
+            "raw": "len=533"
+          }
+        },
+        {
+          "heuristic": "manifest-hygiene",
+          "severity": "concern",
+          "file": ".claude-plugin/marketplace.json",
+          "line": 0,
+          "identifier": "MM-104",
+          "message": "plugin[9] (`sulis-security`) description is 514 chars (recommended max 500)",
+          "suggestion": "",
+          "extras": {
+            "rule": "MM-104",
+            "raw": "len=514"
+          }
+        },
+        {
+          "heuristic": "manifest-hygiene",
+          "severity": "concern",
+          "file": ".claude-plugin/marketplace.json",
+          "line": 0,
+          "identifier": "MM-104",
+          "message": "plugin[11] (`sulis-execution`) description is 663 chars (recommended max 500)",
+          "suggestion": "",
+          "extras": {
+            "rule": "MM-104",
+            "raw": "len=663"
+          }
+        },
+        {
+          "heuristic": "manifest-hygiene",
+          "severity": "concern",
+          "file": ".claude-plugin/marketplace.json",
+          "line": 0,
+          "identifier": "MM-104",
+          "message": "plugin[12] (`sulis`) description is 834 chars (recommended max 500)",
+          "suggestion": "",
+          "extras": {
+            "rule": "MM-104",
+            "raw": "len=834"
+          }
+        }
+      ],
+      "wired_in": "0.7.0",
+      "error_message": null,
+      "severity_summary": {
+        "concern": 5
+      }
+    },
+    {
+      "tier": 2,
+      "name": "Safe",
+      "status": "failed",
+      "finding_count": 4,
+      "findings": [
+        {
+          "heuristic": "semgrep-security",
+          "severity": "critical",
+          "file": "plugins/sea/skills/probe/scripts/probe/workspace.py",
+          "line": 40,
+          "identifier": "python.lang.security.use-defused-xml.use-defused-xml",
+          "message": "The Python documentation recommends using `defusedxml` instead of `xml` because the native Python `xml` library is vulnerable to XML External Entity (XXE) attacks. These attacks can leak confidential data and \"XML bombs\" can cause denial of service.",
+          "suggestion": "review and replace with a safer pattern",
+          "extras": {
+            "matched_text": "The Python documentation recommends using `defusedxml` instead of `xml` because ",
+            "signature": "semgrep::python.lang.security.use-defused-xml.use-defused-xml::plugins/sea/skills/probe/scripts/probe/workspace.py::40"
+          }
+        },
+        {
+          "heuristic": "semgrep-security",
+          "severity": "critical",
+          "file": "plugins/sea/skills/probe/scripts/probe/workspace.py",
+          "line": 269,
+          "identifier": "python.lang.security.use-defused-xml-parse.use-defused-xml-parse",
+          "message": "The native Python `xml` library is vulnerable to XML External Entity (XXE) attacks.  These attacks can leak confidential data and \"XML bombs\" can cause denial of service. Do not use this library to parse untrusted input. Instead  the Python documentation recommends using `defusedxml`.",
+          "suggestion": "review and replace with a safer pattern",
+          "extras": {
+            "matched_text": "The native Python `xml` library is vulnerable to XML External Entity (XXE) attac",
+            "signature": "semgrep::python.lang.security.use-defused-xml-parse.use-defused-xml-parse::plugins/sea/skills/probe/scripts/probe/workspace.py::269"
+          }
+        },
+        {
+          "heuristic": "semgrep-security",
+          "severity": "high",
+          "file": "plugins/sulis/scripts/wpx-findings",
+          "line": 40,
+          "identifier": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
+          "message": "Detected SHA1 hash algorithm which is considered insecure. SHA1 is not collision resistant and is therefore not suitable as a cryptographic signature. Use SHA256 or SHA3 instead.",
+          "suggestion": "review and replace with a safer pattern",
+          "extras": {
+            "matched_text": "Detected SHA1 hash algorithm which is considered insecure. SHA1 is not collision",
+            "signature": "semgrep::python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1::plugins/sulis/scripts/wpx-findings::40"
+          }
+        },
+        {
+          "heuristic": "semgrep-security",
+          "severity": "high",
+          "file": "plugins/sulis/skills/consolidate-into-sulis/scripts/compare_baseline.py",
+          "line": 44,
+          "identifier": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
+          "message": "Detected SHA1 hash algorithm which is considered insecure. SHA1 is not collision resistant and is therefore not suitable as a cryptographic signature. Use SHA256 or SHA3 instead.",
+          "suggestion": "review and replace with a safer pattern",
+          "extras": {
+            "matched_text": "Detected SHA1 hash algorithm which is considered insecure. SHA1 is not collision",
+            "signature": "semgrep::python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1::plugins/sulis/skills/consolidate-into-sulis/scripts/compare_baseline.py::44"
+          }
+        }
+      ],
+      "wired_in": "0.8.0",
+      "error_message": null,
+      "severity_summary": {
+        "critical": 2,
+        "high": 2
+      }
+    },
+    {
+      "tier": 3,
+      "name": "Works",
+      "status": "skipped_by_gating",
+      "finding_count": 0,
+      "findings": [],
+      "wired_in": "0.6.0",
+      "error_message": null,
+      "severity_summary": {}
+    },
+    {
+      "tier": 4,
+      "name": "Survives",
+      "status": "skipped_by_gating",
+      "finding_count": 2,
+      "findings": [],
+      "wired_in": "0.10.0",
+      "error_message": null,
+      "severity_summary": {
+        "high": 2
+      }
+    },
+    {
+      "tier": 5,
+      "name": "Understandable",
+      "status": "skipped_by_gating",
+      "finding_count": 59,
+      "findings": [],
+      "wired_in": "0.5.0",
+      "error_message": null,
+      "severity_summary": {
+        "concern": 42,
+        "high": 17
+      }
+    },
+    {
+      "tier": 6,
+      "name": "Evolves",
+      "status": "skipped_by_gating",
+      "finding_count": 0,
+      "findings": [],
+      "wired_in": "0.11.0",
+      "error_message": null,
+      "severity_summary": {}
+    },
+    {
+      "tier": 7,
+      "name": "Polished",
+      "status": "skipped_by_gating",
+      "finding_count": 0,
+      "findings": [],
+      "wired_in": "0.11.0",
+      "error_message": null,
+      "severity_summary": {}
+    }
+  ],
+  "errors": []
+}

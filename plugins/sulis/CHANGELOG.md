@@ -1,5 +1,94 @@
 # Sulis — Changelog
 
+## v0.35.0 — 2026-05-25
+
+**Phase 3 first consolidation of the change-as-primitive build — `sulis-context` folded into `sulis`.**
+
+First real exercise of the `consolidate-into-sulis` v0.1.0 meta-skill
+introduced at v0.34.0. The smallest of the four Phase 3 plugins
+(sulis-context → sulis-security → sea → srd, smallest first as practice).
+
+### What moved
+
+| Category | Count | Items |
+|---|---|---|
+| Skills (with tin-test rename) | 3 | `discover` → `discover-context`, `refresh` → `refresh-context`, `show` → `show-context` |
+| Agents | 1 | `context-cartographer` |
+| References | 3 | `classification-taxonomy.md`, `context-index-template.md`, `discovery-protocol.md` |
+| Scripts / tests / CI | 0 | (sulis-context had none) |
+| Docs | 0 | (none) |
+
+### Commit chain
+
+- `0e5c9ea` — step 2/5 — skill moves + tin-test renames
+- `584d438` — step 2/5 (cont'd) — founder-friendly description rewrites + slash-command sweep in moved skills
+- `2348bc5` — step 3/5 — agent move + Sulis agent `related_skills:` update + agent-body slash-command sweep
+- `c4f6358` — step 4/5 — 3 reference moves + external ref sweep across 9 marketplace files (paths + slash-commands)
+- (this commit) — step 5/5 — wrap-up: sulis-context marked DEPRECATED; sulis bumps; marketplace.json bumps; consolidation run artifacts committed; this CHANGELOG entry
+
+### Slash-command surface change
+
+| Old | New |
+|---|---|
+| `/sulis-context:discover` | `/sulis:discover-context` |
+| `/sulis-context:refresh` | `/sulis:refresh-context` |
+| `/sulis-context:show` | `/sulis:show-context` |
+
+Verb-noun shape passes the tin-test rubric — founder reading the name in
+autocomplete or a status message can decode what each skill operates on.
+Original bare verbs (`discover`, `refresh`, `show`) all failed the rubric.
+
+### Code-health baseline (Gate 0 → Gate 6)
+
+Captured pre-consolidation: 70 findings; tier-2 hard-stop on a critical
+security finding. Gate 6 comparison verdict captured in the run's
+VERIFICATION_REPORT.md (see below).
+
+### Recipe-improvement signals captured for v0.1.1
+
+The consolidation surfaced two gaps in the `consolidate-into-sulis`
+v0.1.0 helper scripts:
+
+1. **`find_external_refs.py` only scans path patterns** (`plugins/{source}/`,
+   `(../)+{source}/`). It missed all 13 slash-command refs (`/{source}:`
+   pattern). 13 of the 17 fixes in Commit 4 were caught via manual
+   `git grep`. v0.1.1 patch: add slash-command pattern.
+
+2. **`git mv` + edit-after-mv split into two commits.** The recipe
+   expects one commit per step; my Commit 2 split into `0e5c9ea` (the
+   rename) and `584d438` (the edits) because edits landed after staging.
+   v0.1.1 patch: SKILL.md gotchas section should call out
+   "stage edits *before* `git commit`; `git add -A` after edit pass."
+
+Both flagged in `runs/sulis-context-2026-05-25/VERIFICATION_REPORT.md`
+under "patterns to feed back into the recipe."
+
+### Consolidation run artifacts
+
+Full audit trail at
+`plugins/sulis/skills/consolidate-into-sulis/runs/sulis-context-2026-05-25/`:
+
+- `inventory.json` — Gate 0 source-plugin inventory
+- `collisions.md` — Gate 0 collision + tin-test report
+- `external-refs.md` — Gate 0 external ref report (paths only — the
+  slash-command gap above)
+- `code-health-baseline.json` — Gate 0 pre-state
+- `code-health-final.json` — Gate 6 post-state
+- `code-health-comparison.md` — Gate 6 regression report
+- `CONSOLIDATION_PLAN.md` — Gate 0 commit-by-commit plan
+- `VERIFICATION_REPORT.md` — run's own audit report (PASS / BLOCKED verdict)
+
+### What's next
+
+Three more Phase 3 consolidations remain: sulis-security → sea → srd.
+Each will reuse the same recipe, with v0.1.1 patches applied between
+runs if signal warrants.
+
+See `plugins/sulis/docs/change-as-primitive-design.md` for the full
+8-phase plan; Phases 3-7 remain.
+
+---
+
 ## v0.34.0 — 2026-05-25
 
 **Phase 3 prep of the change-as-primitive build — the `consolidate-into-sulis` meta-skill.**

@@ -1,7 +1,7 @@
 {
   "name": "sulis",
-  "description": "Sulis — the canonical front-door plugin for the Sulis AI marketplace. Hosts the founder-facing **Sulis agent** (rewritten v0.33.0 via add-agent v0.1.0; concierge → Sulis rename; COACHING + TONE embedded; dual-register pattern with /sulis:jargon on|off toggle; coach + invoker + partner role); journey skills (start/handoff/status); three meta-skills (add-skill v0.7.0 for skills, add-agent v0.1.0 for agents, consolidate-into-sulis v0.1.0 for plugin consolidations); the deep-mode code-health framework (check-* tier 1-7); the address-findings bridge; the executor + train + wpx-* CLI tools (consolidated from sulis-execution at v0.30.0); and 8 cross-cutting standards. Founders interact via /sulis:* commands.",
-  "version": "0.34.0",
+  "description": "Sulis — the canonical front-door plugin for the Sulis AI marketplace. Hosts the founder-facing **Sulis agent** (rewritten v0.33.0 via add-agent v0.1.0; concierge → Sulis rename; COACHING + TONE embedded; dual-register pattern with /sulis:jargon on|off toggle; coach + invoker + partner role); journey skills (start/handoff/status); three meta-skills (add-skill v0.7.0 for skills, add-agent v0.1.0 for agents, consolidate-into-sulis v0.1.0 for plugin consolidations); the context cartographer (discover-context/refresh-context/show-context skills + context-cartographer agent, consolidated from sulis-context at v0.35.0); the deep-mode code-health framework (check-* tier 1-7); the address-findings bridge; the executor + train + wpx-* CLI tools (consolidated from sulis-execution at v0.30.0); and 8 cross-cutting standards. Founders interact via /sulis:* commands.",
+  "version": "0.35.0",
   "author": {
     "name": "Iain"
   },

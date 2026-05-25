@@ -49,7 +49,7 @@ The concierge knows which to invoke when. You shouldn't normally need to choose 
 
 | Plugin | What it does |
 |---|---|
-| **[sulis-context](plugins/sulis-context/)** | Discovers existing architecture, ADRs, conventions in a brownfield codebase before any new design lands |
+| **[sulis-context](plugins/sulis-context/) [DEPRECATED]** | Consolidated into `sulis` at v0.35.0. Discovery now lives at `/sulis:discover-context`; refresh at `/sulis:refresh-context`; show at `/sulis:show-context`. Plugin shell preserved for marketplace compatibility |
 | **[srd](plugins/srd/)** | Facilitates building the Software Requirements Document; also home of marketplace-wide standards |
 | **[sea](plugins/sea/)** | Senior Engineering Architect — designs hardened architectures and decomposes them into atomic Work Packages |
 | **[sulis-execution](plugins/sulis-execution/)** | Work Package Executor + Train — ships code from Work Packages: RGB → commit → CI → merge → deploy → review |

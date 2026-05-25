@@ -1,5 +1,33 @@
 # sulis-context — Changelog
 
+## v0.4.0 — 2026-05-25 — [DEPRECATED]
+
+**This plugin is consolidated into `sulis` at v0.35.0 as the first Phase 3
+consolidation of the change-as-primitive build.**
+
+Authored via `consolidate-into-sulis` v0.1.0 (the methodology meta-skill
+introduced in the v1.77.0 marketplace release). Commit chain:
+
+- `0e5c9ea` — step 2/5 — 3 sulis-context skills moved into sulis with
+  tin-test renames: `discover` → `discover-context`, `refresh` →
+  `refresh-context`, `show` → `show-context`
+- `584d438` — step 2/5 (continuation) — founder-friendly description
+  rewrites + `/sulis-context:*` → `/sulis:*-context` slash-command sweep
+- `2348bc5` — step 3/5 — context-cartographer agent moved into sulis;
+  Sulis agent's `related_skills:` block updated to point at the new
+  co-located path
+- `c4f6358` — step 4/5 — 3 references (classification-taxonomy,
+  context-index-template, discovery-protocol) moved into sulis;
+  external ref sweep across 9 marketplace files (paths + slash-commands)
+- (this commit) — step 5/5 — wrap-up: this plugin marked DEPRECATED;
+  sulis bumped to v0.35.0; marketplace.json updated; consolidation run's
+  VERIFICATION_REPORT.md captured under
+  `plugins/sulis/skills/consolidate-into-sulis/runs/sulis-context-2026-05-25/`
+
+No shim skills written (mirrors the sulis-concierge → sulis precedent at
+v0.2.0 and the sulis-execution → sulis precedent at v0.30.0). The plugin
+shell stays in-place for marketplace compatibility.
+
 ## v0.3.1 — 2026-05-XX
 
 Minor refinements to discovery protocol.
