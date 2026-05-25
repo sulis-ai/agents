@@ -119,9 +119,6 @@ def check_staleness(mtime: float, max_age_hours: int) -> tuple[bool, Optional[st
 # ─── Finding extraction ──────────────────────────────────────────────
 
 
-_FINDING_FIELDS = ("file", "line", "severity", "message")
-
-
 def extract_findings_from_json(path: Path) -> tuple[list[Finding], list[str]]:
     """Parse a check-* --raw envelope; extract findings."""
     errors: list[str] = []

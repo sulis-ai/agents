@@ -16,7 +16,7 @@ naming-clarity::plugins/sea/skills/probe/scripts/probe/render_templates/interact
 # wasn't worth the cost at current scale. Allowlist for the marketplace
 # itself; founders' projects see their own findings unfiltered.
 # Revisit if the file grows beyond 4000 LOC.
-kitchen-sink-file::plugins/sulis-execution/scripts/_wpxlib.py::0: HD-008 design choice — revisit at 4000 LOC
+kitchen-sink-file::plugins/sulis/scripts/_wpxlib.py::0: HD-008 design choice — revisit at 4000 LOC
 
 # Tool wrapper run() convention. Every _lib/tools/{tool}.py exposes a
 # canonical run() function (mirrors sea:probe runners pattern). Renaming

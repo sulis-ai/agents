@@ -1,16 +1,16 @@
-name: sulis-execution tests
+name: sulis executor tests
 
 on:
   push:
     branches: [main, dev]
     paths:
-      - 'plugins/sulis-execution/scripts/**'
-      - '.github/workflows/sulis-execution-tests.yml'
+      - 'plugins/sulis/scripts/**'
+      - '.github/workflows/sulis-executor-tests.yml'
   pull_request:
     branches: [main, dev]
     paths:
-      - 'plugins/sulis-execution/scripts/**'
-      - '.github/workflows/sulis-execution-tests.yml'
+      - 'plugins/sulis/scripts/**'
+      - '.github/workflows/sulis-executor-tests.yml'
 
 jobs:
   test:
@@ -26,7 +26,10 @@ jobs:
       - name: Install pytest
         # pytest is the only dev dependency; the wpx-* tools themselves
         # are stdlib-only per the plugin contract.
+        # (Scripts + tests + _wpxlib moved from plugins/sulis-execution/
+        # to plugins/sulis/ in v0.30.0 consolidation; workflow paths
+        # updated to match.)
         run: pip install pytest
 
       - name: Run wpx-* tests
-        run: pytest plugins/sulis-execution/scripts/tests/ -v
+        run: pytest plugins/sulis/scripts/tests/ -v

@@ -28,8 +28,8 @@ broad-except::plugins/idc/scripts/build_pptx.py::407: CLI top-level entry; clean
 # _wpxlib.py: 2 cases of broad-except that need per-case review.
 # Not bulk-allowlisting — these may be real findings. Mark for
 # sulis-execution maintainer follow-up.
-broad-except::plugins/sulis-execution/scripts/_wpxlib.py::177: needs sulis-execution maintainer review
-broad-except::plugins/sulis-execution/scripts/_wpxlib.py::2139: needs sulis-execution maintainer review
+broad-except::plugins/sulis/scripts/_wpxlib.py::177: needs sulis-execution maintainer review
+broad-except::plugins/sulis/scripts/_wpxlib.py::2139: needs sulis-execution maintainer review
 
 # v0.20.0+ tool-wrapper integration: each check-* scanner wraps external
 # tool invocations (semgrep / gitleaks / trivy / hadolint / lizard / jscpd /
