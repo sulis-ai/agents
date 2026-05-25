@@ -1,5 +1,67 @@
 # Sulis — Changelog
 
+## v0.42.0 — 2026-05-25
+
+**Phase 5 partial — change-as-primitive executor-side infrastructure.**
+
+The Phase 4 standards amendments are now operational code. Four atoms
+shipped across four feat commits — covers both the per-WP `--force-
+single` hotfix path (`wpx-pipeline`) and the default per-batch path
+(`wpx-train`). SQLite schema + terminal launcher deferred to Phase 5.x.
+
+### Atoms
+
+| # | Commit | What |
+|---|---|---|
+| 1 | `95452af` | ULID + 6-char handle generator in `_wpxlib.py` (Crockford-base32, inline, zero deps). `sulis-change start` now populates `change_id` + `handle` in `.changes/{primitive}-{slug}.yaml`. |
+| 2 | `3aa52fb` | `SULIS_CHANGE_ID` env-var binding + `resolve_current_change()` + `back_integrate_change_branch()` helpers in `_wpxlib.py`. Merge-not-rebase per CW-04 with 5 structured statuses. |
+| 3 | `d6ac0d4` | `wpx-pipeline` `--change-worktree-path` flag wires Step 0 (before CI poll) + Step 12.5 (after merge) for the per-WP `--force-single` path. |
+| 4 | (this commit) | `wpx-train` `--change-worktree-path` flag wires Step 0 (before plan phase) + Step 12.5 (after finalise) for the default per-batch path. |
+
+### Mechanism end-to-end
+
+```
+sulis-change start    →  manifest with change_id: 01KSG1TD2C…
+                                       handle: CH-01KSG1
+                            ↓
+SULIS_CHANGE_ID=...    →  resolve_current_change() → manifest dict
+                            ↓
+wpx-train run \             →  Step 0 (before plan):     back-integrate
+  --change-worktree-path …      Batch merges WPs to change branch
+  --base-branch change/…        Step 12.5 (after finalise): back-integrate
+   (OR --force-single via wpx-pipeline)
+                            ↓
+                          dev stays current with the change branch
+                          without breaking in-flight WP worktrees
+```
+
+### Backward-compatibility
+
+When `--change-worktree-path` is unset OR `--base-branch` doesn't start
+with `change/`, both Step 0 and Step 12.5 are no-ops (status: `skipped`).
+Pre-Phase-5 callers and the CW-05 trivial-change carve-out continue to
+work unchanged.
+
+### Tests
+
+- 13 new unit tests for ULID generation + handle + validation (test_sulis_change.py)
+- 8 new unit tests for back_integrate_change_branch covering all 5 statuses (test_sulis_change.py)
+- 109/109 passing in the relevant subsets (test_sulis_change.py + test_wpx_train_state_machine.py + test_wpx_train_eligibility.py + test_wpx_train_run.py)
+- The 1 pre-existing test-ordering flake in `test_train_lock_second_acquisition_raises` (passes in isolation; only fails when alphabetical-order full suite leaks lock state from prior tests) is unrelated to Phase 5 — confirmed via stash-and-rerun before this commit
+
+### Phase 5 deferred to Phase 5.x patches
+
+- **#4 — SQLite schema + heartbeat** (`~/.sulis/sulis.db` for dashboard backend). Operator-experience layer; doesn't gate executor correctness.
+- **#5 — Terminal launcher** (port from `ae_task_executor` — osascript on macOS, gnome-terminal/konsole/xterm on Linux). Operator UX; doesn't gate executor correctness.
+
+Both ship in Phase 5.1 / 5.2 if appetite for the multi-terminal dashboard UX emerges. The contract itself is operational without them.
+
+### What's next
+
+Phase 6 — founder-facing skills (`/sulis:change start | focus | ship | rebase`, `/sulis:specify`, `/sulis:design`, `/sulis:audit`, `/sulis:review`, `/sulis:jargon`). These are the founder-visible CLI surface that the Phase 4 + 5 infrastructure makes possible.
+
+---
+
 ## v0.41.0 — 2026-05-25
 
 **Phase 4 of the change-as-primitive build — 4 standards amendments codify what Phase 5 will populate.**
