@@ -1,5 +1,101 @@
 # Sulis — Changelog
 
+## v0.34.0 — 2026-05-25
+
+**Phase 3 prep of the change-as-primitive build — the `consolidate-into-sulis` meta-skill.**
+
+Codifies the proven sulis-execution → sulis migration recipe (precedent
+commits `02c1e77` → `fa882b1`, 5 commits, ~50 files moved, 0-finding
+self-test sustained) as a runbook-pattern skill so the four upcoming
+consolidations (sulis-context → sulis-security → sea → srd) follow the
+same shape without reinvention. Authored via add-skill v0.7.0; mirrors
+the methodology that produced add-agent v0.1.0 in Phase 1.
+
+Tier: HEAVY (methodology skill with founder-visible verdict implications).
+Independence Check via `Agent(subagent_type=Explore)` in fresh context
+returned **Verdict: PASS** across all 8 dimensions (ACCA 5/5/5/5,
+Evidence Grounding 4/5, Structural Coherence 5/5, Honest Uncertainty 4/5,
+Codebase Referential Integrity 5/5, Outcome-Specific Rigor 4/5, Recipe
+Self-Consistency 5/5, Code-Health Gate Effectiveness 5/5) with 5
+advisory refinements — all applied in v0.1.0.
+
+### The recipe — 5 commits + 2 verification gates
+
+- **Gate 0** — Inventory + Plan + code-health baseline (no commit)
+- **Commit 1** — scripts + tests + CI workflow (with `sulis-{qualifier}-tests.yml` rename)
+- **Commit 2** — skills (with **tin-test rename pass** on incoming founder-visible names)
+- **Commit 3** — agents (with repo-wide `subagent_type` sweep)
+- **Commit 4** — references + external ref sweep (12-category checklist; absolute + relative paths)
+- **Commit 5** — wrap-up: docs moved, source plugin `[DEPRECATED]`, sulis bumps, marketplace.json bump
+- **Gate 6** — `/sulis:code-health` verification; compare to baseline; rollback-vs-fix-forward threshold at > 3 fix-forward commits
+
+### What ships in `plugins/sulis/skills/consolidate-into-sulis/`
+
+- `SKILL.md` (~470 LOC) — the 7-gate runbook with copy-paste-ready commands
+- `references/methodology.md` — why each gate exists
+- `references/conflict-resolution.md` — tin-test rubric + worked rename table for all 4 Phase 3 plugins (including `decompose` → `plan-work`)
+- `references/external-ref-sweep.md` — 12-category checklist
+- `references/code-health-gating.md` — Gate 0 baseline + Gate 6 verification rubric with regression classification
+- `templates/CONSOLIDATION_PLAN.md.template`
+- `templates/VERIFICATION_REPORT.md.template`
+- `scripts/inventory.py` — JSON inventory of source plugin
+- `scripts/detect_collisions.py` — Markdown: direct collisions + tin-test failures + CI workflow renames
+- `scripts/find_external_refs.py` — Markdown: repo-wide ref sweep (catches both `plugins/{source}/` absolute and `(../)+{source}/` relative paths)
+- `scripts/compare_baseline.py` — Markdown: code-health regression report classifying NEW / PRE-EXISTING / RESOLVED findings
+- `VERIFICATION_REPORT.md` — skill's own audit trail (PASS verdict)
+
+### Tin-test rubric (Commit 2 rename pass)
+
+Bare verbs (`decompose`, `harden`, `probe`, `verify`, `blueprint`,
+`refresh`, `show`, `discover`) and internal-jargon acronyms (`srd-*`,
+`spec-*`) fail. Renamed to verb-noun shape (`plan-work`,
+`harden-codebase`, `analyse-codebase`, `verify-architecture`,
+`draft-architecture`, `refresh-context`, `show-context`,
+`discover-context`, `requirements-templates`, `index-specifications`).
+Operator-only carve-outs (`critical-thinking` — methodology utility,
+never founder-visible) explicitly justified in CONSOLIDATION_PLAN.md.
+
+Existing sulis plugin names (`retry`, `handoff`, `start`, `status`) are
+out of scope for this skill's rename pass — addressed separately if
+needed.
+
+### Smoke-tested against sulis-context (first Phase 3 target)
+
+All four helper scripts smoke-tested:
+
+- `inventory.py` produced clean JSON (3 skills, 1 agent, 3 references)
+- `detect_collisions.py` found 0 direct collisions, 3 tin-test failures (`discover`/`refresh`/`show`)
+- `find_external_refs.py` found 5 refs across 5 files (initial 4 + one relative-path ref caught after in-flight bug fix)
+- `compare_baseline.py` — full exercise deferred to first real consolidation run
+
+In-flight bug fix during smoke testing: `find_external_refs.py` initially
+missed `../../{source}/` relative-path refs in `related_skills:` blocks.
+Pattern extended to catch both absolute and relative; re-run confirmed.
+
+### What this is NOT
+
+- Not a one-off migration script — each consolidation is reviewable as 5 commits
+- Not a deprecation-shim creator — source plugins marked DEPRECATED outright (no shim skills)
+- Not a rename-existing-sulis-skills pass — incoming names only
+- Not a multi-plugin batch tool — one source plugin per run
+
+### What's next
+
+Phase 3 proper — run `consolidate-into-sulis` four times in sequence:
+
+1. sulis-context (smallest; practice run)
+2. sulis-security (`codebase-assess` already [DEPRECATED] — just move the files)
+3. sea (8 skills; medium-large; underwrites future `/sulis:design`, `/sulis:audit`, `/sulis:review` wrappers)
+4. srd (largest; cross-cutting standards live here — highest external-ref sweep volume)
+
+Plus the deferred Phase 6 founder-facing wrappers (`/sulis:specify`,
+`/sulis:design`, `/sulis:audit`, `/sulis:review`) per the design doc.
+
+See `plugins/sulis/docs/change-as-primitive-design.md` for the full
+8-phase plan; Phases 3-7 remain.
+
+---
+
 ## v0.33.0 — 2026-05-25
 
 **Phase 2 of the change-as-primitive build — the Sulis agent rewrite.**

@@ -1,0 +1,187 @@
+<!-- Template syntax: manual substitution of {{variable}} blocks. No templating engine required. -->
+
+# VERIFICATION_REPORT.md — consolidate-into-sulis run: {{source-plugin}} → sulis
+
+**Skill:** `plugins/sulis/skills/consolidate-into-sulis`
+**Run:** `runs/{{source-plugin}}-{{YYYY-MM-DD}}/`
+**Operator:** {{name or "Sulis agent"}}
+**Produced:** {{ISO-8601 timestamp}}
+**Methodology:** `sulis:consolidate-into-sulis` v{{version}}
+
+---
+
+## Run Summary
+
+**Source plugin:** `plugins/{{source-plugin}}/`
+**Target plugin:** `plugins/sulis/`
+**Commit chain:** {{SHA1}} → {{SHA2}} → {{SHA3}} → {{SHA4}} → {{SHA5}}{{ → SHA6 if fix-forward}}
+**Sulis version bump:** v{{old}} → v{{new}}
+**Files moved:** {{count}}
+**Tin-test renames applied:** {{count}}
+**External refs updated:** {{count}}
+**Verdict:** {{PASS | BLOCKED}}
+
+---
+
+## Gate 0 — Inventory + Plan + Baseline
+
+- Inventory JSON: `runs/{{source-plugin}}-{{date}}/inventory.json` — {{file count}} items catalogued
+- Collisions Markdown: `runs/{{source-plugin}}-{{date}}/collisions.md` — {{N}} direct collisions, {{M}} tin-test failures
+- External refs Markdown: `runs/{{source-plugin}}-{{date}}/external-refs.md` — {{K}} references found across {{L}} files
+- Code-health baseline: `runs/{{source-plugin}}-{{date}}/code-health-baseline.json` — {{total}} pre-existing findings across {{7}} tiers
+- CONSOLIDATION_PLAN.md: complete, no TBDs
+
+**Pass:** {{yes | no — what was missing}}
+
+---
+
+## Commit 1 — Scripts + tests + CI
+
+- **SHA:** {{SHA1}}
+- **Files moved:** {{count}} — {{categories}}
+- **Edit pass categories applied:** {{list}}
+- **CI workflow renamed:** `{{old}}.yml` → `sulis-{{qualifier}}-tests.yml`
+- **Local test invocation result:** {{pass | fail with rationale}}
+
+**Pass:** {{yes | no}}
+
+---
+
+## Commit 2 — Skills (with tin-test rename pass)
+
+- **SHA:** {{SHA2}}
+- **Skills moved:** {{count}}
+- **Renames applied:**
+  | Old | New | Description rewritten? |
+  |---|---|---|
+  | `{{old}}` | `{{new}}` | yes / no |
+- **Operator-only carve-outs:** {{list with justification}}
+- **`/{{source-plugin}}:` references in moved skills:** 0 remaining
+- **Re-run of `detect_collisions.py` after Commit 2:** {{0 tin-test failures | N still failing — why}}
+
+**Pass:** {{yes | no}}
+
+---
+
+## Commit 3 — Agents
+
+- **SHA:** {{SHA3}}
+- **Agents moved:** {{count}}
+- **Subagent_type references updated:** {{count}} across {{N}} files
+- **Manual smoke test:** {{which agent invoked, result}}
+
+**Pass:** {{yes | no}}
+
+---
+
+## Commit 4 — References + external ref sweep
+
+- **SHA:** {{SHA4}}
+- **References moved:** {{count}}
+- **References renamed on collision:** {{list}}
+- **External ref sweep categories addressed:** {{list with hit counts}}
+- **`git grep "plugins/{{source-plugin}}/" .` after Commit 4:** {{zero hits | hits remaining and why}}
+
+**Pass:** {{yes | no}}
+
+---
+
+## Commit 5 — Wrap-up
+
+- **SHA:** {{SHA5}}
+- **Source plugin DEPRECATED markers set in:** plugin.json, CHANGELOG.md, README.md, CLAUDE.md ({{yes/no for each}})
+- **Sulis plugin.json version:** v{{old}} → v{{new}}
+- **Sulis CHANGELOG.md entry:** present, describes the consolidation
+- **marketplace.json updated:** {{yes / no}}
+- **Checkup allowlists updated:** {{N affected}}
+
+**Pass:** {{yes | no}}
+
+---
+
+## Gate 6 — Code-health verification
+
+- **Final code-health JSON:** `runs/{{source-plugin}}-{{date}}/code-health-final.json`
+- **Comparison report:** `runs/{{source-plugin}}-{{date}}/code-health-comparison.md`
+- **NEW findings:** {{count}}
+- **PRE-EXISTING findings:** {{count}}
+- **RESOLVED findings:** {{count}}
+
+### NEW findings detail
+
+For each NEW finding, classify and act:
+
+| Finding | Category | Disposition |
+|---|---|---|
+| {{file:line — rule}} | regression-grade / acceptable / pre-existing-in-disguise | fix-forward Commit 6 / documented |
+
+### Fix-forward commits
+
+- {{SHA6}} — {{message}} — addresses {{N}} regressions
+- {{SHA7}} — {{message}} (if needed)
+
+### Final verdict
+
+**Gate 6:** {{PASS | BLOCKED}}
+
+---
+
+## Spiral Summary
+
+**Tier:** standard (operator-facing; meta-skill quality but no founder-visible verdict)
+**Iterations used:** {{1-3}} (1 if no fix-forward; 2 if one fix-forward round; 3 if two)
+**Termination reason:** sufficient / max_iterations / irreducible_blocker
+
+---
+
+## Adversarial Review (Gate 5 of add-skill applied to this consolidation run)
+
+### Misuse case 1: External ref left behind
+
+- **What might have gone wrong:** A reference cited from CLAUDE.md or another plugin's reference doc was missed during the sweep
+- **Mitigation applied:** `find_external_refs.py` enumerated every line; Commit 4 grep verified zero hits after the sweep
+- **Status:** PREVENTED / OPEN_RISK (with revisit-trigger if any operator-noticed misses surface later)
+
+### Misuse case 2: Subagent_type silent break
+
+- **What might have gone wrong:** Renaming an agent in Commit 3 without sweeping every dispatch site means Sulis dispatches to a nonexistent agent at runtime
+- **Mitigation applied:** find_external_refs.py emitted every subagent_type site; Commit 3 verified zero unhandled; manual smoke test of dispatch
+- **Status:** PREVENTED
+
+### Misuse case 3: Tin-test name leaks through
+
+- **What might have gone wrong:** A renamed skill's `description:` field still uses the old name's vocabulary
+- **Mitigation applied:** Commit 2 edit pass included description rewrites per CONSOLIDATION_PLAN.md
+- **Status:** PREVENTED / OPEN_RISK (mark which descriptions are most at risk for future review)
+
+(Add more cases if surfaced during the run.)
+
+---
+
+## Open risks accepted
+
+### Risk 1: {{name}}
+
+- **Description:** {{what could still go wrong}}
+- **Why accepted:** {{rationale}}
+- **revisit_by:** {{date / event / trigger / never}}: {{detail}}
+
+(Or "None" if everything PREVENTED.)
+
+---
+
+## Patterns to feed back into the recipe
+
+(For future calibration of `consolidate-into-sulis` itself.)
+
+- {{recurring fix-forward pattern observed this run}}
+- {{recipe step that could be tightened}}
+- {{tool or helper that would help next time}}
+
+---
+
+## Meta-Notes
+
+(Anything else worth recording about this run.)
+
+- {{note}}

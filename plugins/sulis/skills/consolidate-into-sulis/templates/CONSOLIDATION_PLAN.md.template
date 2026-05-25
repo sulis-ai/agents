@@ -1,0 +1,166 @@
+<!-- Template syntax: manual substitution of {{variable}} blocks. No templating engine required. -->
+
+# CONSOLIDATION_PLAN.md — {{source-plugin}} → sulis
+
+**Run directory:** `plugins/sulis/skills/consolidate-into-sulis/runs/{{source-plugin}}-{{YYYY-MM-DD}}/`
+**Source plugin:** `plugins/{{source-plugin}}/`
+**Target plugin:** `plugins/sulis/`
+**Started:** {{ISO-8601 timestamp}}
+**Operator:** {{name or "Sulis agent"}}
+
+---
+
+## 1. Inventory summary
+
+(From `inventory.json`)
+
+| Category | Count | Items |
+|---|---|---|
+| Skills | {{N}} | {{list comma-separated}} |
+| Agents | {{N}} | {{list}} |
+| References | {{N}} | {{list}} |
+| Scripts | {{N}} | {{list or "see inventory.json"}} |
+| Docs | {{N}} | {{list}} |
+| CI workflows | {{N}} | {{list of yml filenames}} |
+| Manifest files | {{N}} | `.claude-plugin/plugin.json` etc. |
+| Metadata files | {{N}} | README, CHANGELOG, CLAUDE.md, settings.json |
+
+---
+
+## 2. Direct collisions
+
+(From `collisions.md`)
+
+| Type | Source name | Collides with | Resolution |
+|---|---|---|---|
+| Skill | `{{name}}` | `plugins/sulis/skills/{{name}}/` | Rename to `{{qualifier}}-{{name}}` |
+| Agent | `{{name}}.md` | `plugins/sulis/agents/{{name}}.md` | Rename to `{{qualifier}}-{{name}}.md` |
+| Reference | `{{file}}` | `plugins/sulis/references/{{file}}` | Rename to `{{qualifier}}-{{file}}` |
+| CI workflow | `{{file}}.yml` | (no direct collision) | Rename to `sulis-{{qualifier}}-tests.yml` |
+
+(Delete rows that don't apply.)
+
+---
+
+## 3. Tin-test failures + rename mappings
+
+(From `collisions.md` tin-test section + `conflict-resolution.md` rubric)
+
+| Old name | Tin-test failure | New name | Description rewrite needed? |
+|---|---|---|---|
+| `{{old}}` | bare verb / acronym / abstract noun | `{{new}}` | yes / no |
+
+**Operator-only carve-outs** (skills that fail tin test but stay because not founder-visible):
+
+| Name | Justification |
+|---|---|
+| `{{name}}` | not listed in any founder chrome (autocomplete / status / journey docs) |
+
+---
+
+## 4. External ref sweep checklist
+
+(From `external-refs.md` — every line needs editing)
+
+Categories present in this consolidation (tick when complete):
+
+- [ ] 1. Skill `description:` fields ({{N}} hits)
+- [ ] 2. Agent body cross-references ({{N}} hits)
+- [ ] 3. Reference docs citing other reference docs ({{N}} hits)
+- [ ] 4. SKILL.md `related_skills:` blocks ({{N}} hits)
+- [ ] 5. CLAUDE.md (root + per-plugin) ({{N}} hits)
+- [ ] 6. README.md ({{N}} hits)
+- [ ] 7. CHANGELOG.md historical narration — LEAVE ALONE
+- [ ] 8. Cache path patterns in scripts ({{N}} hits)
+- [ ] 9. Workflow YAML ({{N}} hits)
+- [ ] 10. Settings JSON ({{N}} hits)
+- [ ] 11. Template files ({{N}} hits)
+- [ ] 12. Test fixtures ({{N}} hits)
+
+Subagent_type sweep for {{N}} agent(s):
+
+- [ ] `subagent_type: {{agent-name}}` → all dispatch sites updated ({{N}} hits)
+
+---
+
+## 5. Code-health baseline
+
+Captured at: `code-health-baseline.json`
+Captured at timestamp: {{ISO-8601}}
+
+| Tier | Verdict | Findings | Notes |
+|---|---|---|---|
+| Tier 1 — Exists | {{Pass/Concerns/Fails}} | {{N}} | |
+| Tier 2 — Safe | {{}} | {{N}} | |
+| Tier 3 — Works | {{}} | {{N}} | |
+| Tier 4 — Tests | {{}} | {{N}} | |
+| Tier 5 — Readable | {{}} | {{N}} | |
+| Tier 6 — Maintainable | {{}} | {{N}} | |
+| Tier 7 — Polished | {{}} | {{N}} | |
+
+Pre-existing finding count to beat at Gate 6: **{{total}}**
+
+---
+
+## 6. Per-commit checklist
+
+### Commit 1 — Scripts + tests + CI
+
+- [ ] `git mv` source `scripts/` into `plugins/sulis/scripts/`
+- [ ] Move tests subtree
+- [ ] Rename CI workflow to `sulis-{{qualifier}}-tests.yml`
+- [ ] Edit workflow YAML to point at new paths
+- [ ] Edit pass: shebangs, `sys.path.insert`, cache paths, dev fallbacks
+- [ ] Verify `find plugins/{{source-plugin}}/scripts -type f` returns empty
+- [ ] Commit: `chore(sulis): step 1/5 — move {{source}} scripts + tests + CI into sulis`
+
+### Commit 2 — Skills (with tin-test rename pass)
+
+- [ ] For each skill, `git mv` to new location (with rename per Section 3)
+- [ ] For each renamed skill, rewrite `description:` field
+- [ ] Update SKILL.md `related_skills:` paths
+- [ ] Update internal cross-skill references (`/{{source}}:` → `/sulis:`)
+- [ ] Verify `find plugins/{{source-plugin}}/skills -mindepth 1 -type d` returns empty
+- [ ] Re-run `detect_collisions.py` → no remaining tin-test failures
+- [ ] Commit: `chore(sulis): step 2/5 — move {{N}} {{source}} skills into sulis (with {{M}} tin-test renames)`
+
+### Commit 3 — Agents
+
+- [ ] `git mv` each agent file to `plugins/sulis/agents/`
+- [ ] Repo-wide sweep for `subagent_type:` references; edit each cited file
+- [ ] Verify `find plugins/{{source-plugin}}/agents -name "*.md"` returns empty
+- [ ] Manual smoke test: dispatch the agent once from a Claude session
+- [ ] Commit: `chore(sulis): step 3/5 — move {{source}} agents into sulis`
+
+### Commit 4 — References + external ref sweep
+
+- [ ] `git mv` each reference file to `plugins/sulis/references/` (with rename if collision)
+- [ ] Apply external ref sweep — work through every category in Section 4
+- [ ] Verify `git grep "plugins/{{source-plugin}}/" .` returns no non-historical hits
+- [ ] Commit: `chore(sulis): step 4/5 — move {{source}} references into sulis + external ref sweep`
+
+### Commit 5 — Wrap-up
+
+- [ ] Move `docs/` if present (with rename if collision)
+- [ ] Mark source plugin `[DEPRECATED]` in: plugin.json, CHANGELOG.md, README.md, CLAUDE.md
+- [ ] Bump `plugins/sulis/.claude-plugin/plugin.json` version
+- [ ] Add `plugins/sulis/CHANGELOG.md` entry describing the consolidation
+- [ ] Bump `.claude-plugin/marketplace.json` sulis version (and marketplace version)
+- [ ] Update checkup allowlists if affected
+- [ ] Commit: `feat(sulis): v{{new-version}} — {{source}} consolidated into sulis (step 5/5 — wrap-up)`
+
+### Gate 6 — Code-health verification
+
+- [ ] Re-run `/sulis:code-health --raw` → save as `code-health-final.json`
+- [ ] Run `compare_baseline.py` → produce `code-health-comparison.md`
+- [ ] NEW findings = 0, OR fix-forward in Commit 6 → re-run Gate 6
+- [ ] Update `VERIFICATION_REPORT.md` with Gate 6 verdict
+
+---
+
+## 7. Notes + open questions
+
+(Anything the operator wants to surface for review or future calibration.)
+
+- {{note}}
+- {{open question}}
