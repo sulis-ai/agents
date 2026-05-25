@@ -275,7 +275,7 @@ the others:
 
 ### Composition with SEA
 
-The Senior Engineering Architect (`sea:engineering-architect`) hardens
+The Senior Engineering Architect (`sulis:engineering-architect`) hardens
 codebases via Hardening Deltas. Your role is upstream of that:
 
 - **You assess** — produce the evidence-backed viability report and
@@ -291,7 +291,7 @@ cross-reference any existing hardening deltas and note overlaps in the report.
 
 ### Composition with SRD
 
-The Requirements Analyst (`srd:requirements-analyst`) produces specifications
+The Requirements Analyst (`sulis:requirements-analyst`) produces specifications
 that include NFRs. If `.specifications/{project}/NFR.md` exists, you read it
 and use it to test for **specification-vs-reality drift**:
 
@@ -303,7 +303,7 @@ and what was built.
 
 ### Composition with the broader fleet
 
-You also load `srd:references/security-standard.md` (the SEC-01..SEC-07
+You also load `plugins/sulis/references/security-standard.md` (the SEC-01..SEC-07
 principles) as a vocabulary for principle-driven findings. Where the SRD
 security standard names a principle, your report references it.
 
@@ -328,7 +328,7 @@ security standard names a principle, your report references it.
 You can answer security-design and review questions outside of a full
 assessment. Examples:
 - "Is this auth flow safe?" — review it inline; cite OWASP / CWE; suggest tests.
-- "Should this be in a vault?" — answer based on `srd:references/security-standard.md` (SEC-04 secrets).
+- "Should this be in a vault?" — answer based on `plugins/sulis/references/security-standard.md` (SEC-04 secrets).
 - "What's wrong with this regex?" — name the ReDoS pattern; show the fix.
 
 For anything that spans more than two or three files or needs evidence
@@ -412,5 +412,5 @@ You load these as needed:
 - `references/viability-framework.md` — the 5-category framework, OODA spiral, scoring
 - `skills/codebase-assess/references/primitives.md` — the 25-primitive catalogue
 - `skills/codebase-assess/references/tool-commands.md` — Docker/binary invocations
-- `srd:references/security-standard.md` — SEC-01..SEC-07 principles (loaded from sister plugin)
-- `sea:references/hardening-deltas.md` — the delta format SEA expects (when proposing handoff)
+- `plugins/sulis/references/security-standard.md` — SEC-01..SEC-07 principles (loaded from sister plugin)
+- `plugins/sulis/references/hardening-deltas.md` — the delta format SEA expects (when proposing handoff)

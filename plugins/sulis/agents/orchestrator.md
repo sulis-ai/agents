@@ -49,7 +49,7 @@ This agent file remains as:
 
 When working in Claude Code, **invoke `/sulis:run-all`**,
 which runs this logic inline in the calling session. Do not invoke
-this agent directly via `Agent({subagent_type: "orchestrator"})`
+this agent directly via `Agent({subagent_type: "sulis:orchestrator"})`
 — it would run but fail at the first executor
 dispatch.
 

@@ -62,7 +62,7 @@ fi
 
 ```
 Agent({
-  subagent_type: "executor",
+  subagent_type: "sulis:executor",
   description: "Retry WP-NNN after external blocker resolved",
   prompt: """
 You are dispatched to retry WP-NNN. The prior BLOCKER and journal

@@ -1,5 +1,48 @@
 # Sulis — Changelog
 
+## v0.43.1 — 2026-05-25
+
+**Stale dispatch slug sweep — post-consolidation cleanup.**
+
+Surfaced when the Sulis session attempted to dispatch SEA for the MUC-A5 remediation via `subagent_type: "sea:engineering-architect"` and got `Agent type 'sea:engineering-architect' not found`. The marketplace had a runtime-broken dispatch surface in 10 files across the consolidated agents + the run-all/run-wp/retry skill flows — every dispatch using the old per-plugin prefixes (`sea:` / `srd:` / `sulis-context:` / `sulis-execution:` / `sulis-security:`) or a bare slug (post-v0.30.0 intent that didn't fully land) would fail at runtime.
+
+### Fixed dispatch slugs (24 references across 10 files)
+
+**Stale-prefix → `sulis:` (12 references):**
+- `plugins/sulis/agents/engineering-architect.md` — 7 refs to `srd:requirements-analyst` → `sulis:requirements-analyst`; 1 ref to `sulis-security:viability-report-...` → `sulis:viability-report-...` (synthetic identifier scheme)
+- `plugins/sulis/agents/security-reviewer.md` — 2 refs to `sea:engineering-architect` → `sulis:engineering-architect`; 2 refs to `srd:requirements-analyst` → `sulis:requirements-analyst`; 2 path refs to `srd:references/security-standard.md` + `sea:references/hardening-deltas.md` → `plugins/sulis/references/...`
+- `plugins/sulis/agents/executor.md` — 1 ref to `sulis-security:security-reviewer` → `sulis:security-reviewer`
+- `plugins/sulis/agents/requirements-analyst.md` — 3 skill refs: `srd:codebase-mapping` / `srd:tree-synthesis` → `sulis:codebase-mapping` / `sulis:map-architecture`
+- `plugins/sulis/agents/sulis.md` — 2 BAD-example chrome lines showing `sulis-execution:executor` → `sulis:executor` (post-consolidation pattern in the rendered Agent-tool chrome)
+- `plugins/sulis/references/lifecycle.md` — 3 refs (Step 11 dispatch examples) `sulis-security:security-reviewer` → `sulis:security-reviewer`
+
+**Bare slug → `sulis:` prefix (12 references):**
+- `plugins/sulis/skills/run-all/SKILL.md` — 4 `subagent_type: "executor"` → `"sulis:executor"`; 2 `subagent_type: "sulis-security:security-reviewer"` → `"sulis:security-reviewer"`
+- `plugins/sulis/skills/run-wp/SKILL.md` — 1 `"executor"` + 1 `"sulis-security:security-reviewer"` (both `sulis:`-prefixed)
+- `plugins/sulis/skills/retry/SKILL.md` — 1 `"executor"` → `"sulis:executor"`
+- `plugins/sulis/agents/sulis.md` — 3 Agent-tool examples in body: `"engineering-architect"` x2 + `"orchestrator"` x1 → `sulis:`-prefixed; 1 frontmatter `subagent_type=engineering-architect` in dispatch_via block also prefixed
+- `plugins/sulis/agents/orchestrator.md` — 1 self-reference example `Agent({subagent_type: "orchestrator"})` → `sulis:orchestrator`
+
+### Why this was hidden
+
+The CHANGELOG at v0.30.0 documented the consolidation intent as: `subagent_type: "sulis-execution:executor"` → `"executor"` (bare). But the actual runtime resolves dispatches via the available-agents registry, which lists all agents as `sulis:*`-prefixed. Bare slugs may have worked via fallback resolution OR may have been silently broken — either way, prefixing matches the registry format explicitly and is forward-compatible.
+
+### Why this matters
+
+Without this fix:
+- SEA dispatch attempts fail at runtime → coordinator agents (Sulis) can't dispatch for amendments
+- run-all + run-wp + retry skills attempt executor dispatch with bare slug → WP shipping flow is at risk of silent breakage
+- Step 11 security review dispatches use `sulis-security:security-reviewer` (definitely broken — plugin doesn't exist) → security gate is bypassed silently
+
+The MUC-A5 prevention machinery from v0.43.0 only works if the dispatch actually succeeds. v0.43.1 makes the dispatches succeed.
+
+### Verification
+
+- 0 stale-prefix dispatches remain (audit-grep returns 0)
+- 0 bare-slug dispatches remain (audit-grep returns 0)
+- 16 `sulis:*`-prefixed dispatches across the marketplace (all functional sites)
+- VERIFICATION_REPORT files + CHANGELOG (historical records) intentionally untouched
+
 ## v0.43.0 — 2026-05-25
 
 **add-agent v0.2.0 — five-gate patch driven by a real-session delegation failure.**

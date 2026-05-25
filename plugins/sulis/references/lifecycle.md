@@ -24,7 +24,7 @@ success criterion, a failure-handling OODA recipe (per
 | 9 | Deploy poll | **v0.11.0+:** `wpx-train` (per-batch — ONE deploy per train). **--force-single:** `wpx-pipeline`. |
 | 10 | Health + smoke | **v0.11.0+:** `wpx-train` (per-batch — ONE health+smoke per train). **--force-single:** `wpx-pipeline`. |
 | 10.5 | **Train-batch code-review (IMPLEMENTED v0.21.1+ as post-merge variant; folded into `_verify_phase` boundary at v0.23.0 per HD-007)** | Calling session (`/sulis:code-review` against the batch diff range `<bundle[0].pre_train_sha>..<bundle[-1].merge_sha_on_dev>` after `wpx-train run` returns). Catches cross-WP composition issues (N+1 across siblings, integration regressions). CRITICAL → BLOCKER batch-wide + auto-draft remediation WPs; CONCERN/ADVISORY → SF registered + WP-AUTO-* auto-drafted. **HD-007 (v0.23.0)**: when callers pass `--enable-gate-handoff` to `wpx-train run`, the train stops at the new `verifying_gates` phase with `outcome: awaiting_gates` (exit 0); the calling session dispatches Step 10.5 + Step 11 inside that phase and invokes `wpx-train mark-gates-complete` to finalise. The gates are now part of the train's transaction (in lifecycle terms) — the dispatch mechanism stays in the calling LLM session (a Python CLI can't spawn Agents). Legacy callers (no `--enable-gate-handoff`) continue to dispatch Step 10.5 + Step 11 as post-train follow-on. |
-| 11 | Security review (post-deploy verification) | Calling session (`Agent({subagent_type: "sulis-security:security-reviewer"})` + `wpx-findings register`) — runs **per-WP sequentially after `wpx-train run` returns**. Dispatched by the run-all skill (v0.20.0+), one WP at a time over the batch's `wps_shipped`. CRITICAL → BLOCKER + `step-11-blocked` + Step 12 skipped for that WP; CONCERN/ADVISORY → SF registered + WP-AUTO-* auto-drafted. The loop is **distributed across trains** — terminates when a subsequent train's Step 11 produces zero NEW (non-duplicate) findings. **HD-007 (v0.23.0)**: when `--enable-gate-handoff` was set on `wpx-train run`, Step 11 fires inside the `verifying_gates` phase and the calling session invokes `wpx-train mark-gates-complete --train-id <id>` once both Step 10.5 + Step 11 dispatches complete (or `--critical-found` if any CRITICAL surfaced). |
+| 11 | Security review (post-deploy verification) | Calling session (`Agent({subagent_type: "sulis:security-reviewer"})` + `wpx-findings register`) — runs **per-WP sequentially after `wpx-train run` returns**. Dispatched by the run-all skill (v0.20.0+), one WP at a time over the batch's `wps_shipped`. CRITICAL → BLOCKER + `step-11-blocked` + Step 12 skipped for that WP; CONCERN/ADVISORY → SF registered + WP-AUTO-* auto-drafted. The loop is **distributed across trains** — terminates when a subsequent train's Step 11 produces zero NEW (non-duplicate) findings. **HD-007 (v0.23.0)**: when `--enable-gate-handoff` was set on `wpx-train run`, Step 11 fires inside the `verifying_gates` phase and the calling session invokes `wpx-train mark-gates-complete --train-id <id>` once both Step 10.5 + Step 11 dispatches complete (or `--critical-found` if any CRITICAL surfaced). |
 | 12 | INDEX flip + acceptance evidence + worktree removal | Calling session (`wpx-step12 wrap`) — flips `step-7-complete` → `done` after train succeeds |
 | 12.5 | **Post-WP back-integration (v0.11.0+ — change-as-primitive)** | Calling session — after the WP merges back to the change branch, runs `git fetch origin dev && git merge --no-edit origin/dev` on the change branch; pushes. Per CW-04 auto back-integration (active driver). Pauses + surfaces conflict if `git merge` fails. Skipped for the trivial-change carve-out (CW-05) where there is no parent change branch. |
 
@@ -390,7 +390,7 @@ continues:
 # Spawn the security-reviewer agent via Agent tool (synchronous):
 
 Agent({
-  subagent_type: "sulis-security:security-reviewer",
+  subagent_type: "sulis:security-reviewer",
   description: "Step 11 post-deploy verification for WP-NNN",
   prompt: """
     Review the squash-merge at <merge_sha> on dev (deployed to
@@ -1807,7 +1807,7 @@ deciding whether to dial the default down to opt-in.
 
    ```
    Agent({
-     subagent_type: "sulis-security:security-reviewer",
+     subagent_type: "sulis:security-reviewer",
      description: "Post-deploy security assessment for WP-NNN",
      model: <security_model from WP frontmatter, if present>,
      prompt: """

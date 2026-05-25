@@ -196,19 +196,19 @@ loop:
        concurrently:
 
        Agent({
-         subagent_type: "executor",
+         subagent_type: "sulis:executor",
          description: "Ship WP-007 end-to-end",
          model: <executor_model from WP frontmatter, if present>,
          prompt: """<executor brief per below>""",
        })
        Agent({
-         subagent_type: "executor",
+         subagent_type: "sulis:executor",
          description: "Ship WP-008 end-to-end",
          model: <executor_model from WP frontmatter, if present>,
          prompt: """<executor brief per below>""",
        })
        Agent({
-         subagent_type: "executor",
+         subagent_type: "sulis:executor",
          description: "Ship WP-009 end-to-end",
          model: <executor_model from WP frontmatter, if present>,
          prompt: """<executor brief per below>""",
@@ -539,7 +539,7 @@ loop:
 
            # For each wp_id in wps_shipped:
            Agent({
-             subagent_type: "sulis-security:security-reviewer",
+             subagent_type: "sulis:security-reviewer",
              description: "Step 11 post-batch verification for <wp_id>",
              model: <security_model from frontmatter, if present>,
              prompt: """
@@ -750,7 +750,7 @@ loop:
        Agent call; ~5-15 min wall time.
 
            Agent({
-             subagent_type: "sulis-security:security-reviewer",
+             subagent_type: "sulis:security-reviewer",
              description: "Step 11 post-deploy verification for WP-NNN",
              model: <security_model from frontmatter, if present>,
              prompt: """
@@ -881,7 +881,7 @@ that WP's Agent call:
 
 ```
 Agent({
-  subagent_type: "executor",
+  subagent_type: "sulis:executor",
   model: "haiku",
   ...
 })

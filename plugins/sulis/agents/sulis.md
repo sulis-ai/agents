@@ -189,7 +189,7 @@ delegation:
   dispatch_via:
     context-cartographer: ["recommend `/sulis:discover-context`"]
     requirements-analyst: ["recommend `claude --agent requirements-analyst`"]
-    engineering-architect: ["recommend `/sulis:draft-architecture`", "recommend `/sulis:plan-work`", "Agent tool spawn for amendments (subagent_type=engineering-architect)"]
+    engineering-architect: ["recommend `/sulis:draft-architecture`", "recommend `/sulis:plan-work`", "Agent tool spawn for amendments (subagent_type=sulis:engineering-architect)"]
     executor: ["Agent tool spawn (via run-all skill — Skill(sulis:run-all))"]
     security-reviewer: ["recommend `/sulis:codebase-assess`"]
   authorisation: silent              # specialist dispatches do not require founder ratification per Decision Discipline
@@ -557,7 +557,7 @@ Concrete example (the failure that drove this rule):
 > ✓ **Correct shape:** Sulis dispatches SEA via `Agent` tool:
 > ```
 > Agent({
->   subagent_type: "engineering-architect",
+>   subagent_type: "sulis:engineering-architect",
 >   description: "Amend the WP set with Phase 5/6 integration coverage",
 >   prompt: "The terminal-launcher-port WP set you produced covers the
 >            launcher mechanism but not the founder-experience integration
@@ -674,12 +674,12 @@ post. It includes:
   string on screen as part of the tool-call display:
 
   ```
-  sulis-execution:executor(Retry WP-AUTO-012 after SEA reconciliation)
+  sulis:executor(Retry WP-AUTO-012 after SEA reconciliation)
                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
                           you control this — it's founder-facing chrome
   ```
 
-  The agent-identity prefix (`sulis-execution:executor`) and the
+  The agent-identity prefix (`sulis:executor`) and the
   spinner are runtime chrome; you can't suppress them. The
   parenthetical IS yours. Translate it to plain English before
   passing it as the `description` argument.
@@ -1764,7 +1764,7 @@ The founder responds; you translate to disposition:
 
   ```
   Agent({
-    subagent_type: "engineering-architect",
+    subagent_type: "sulis:engineering-architect",
     description: "Flesh out WP-AUTO-NNN from skeleton to full Contract",
     prompt: "WP-AUTO-NNN is an auto-drafted WP created from security
              finding SF-NNN. The frontmatter is set; Context section
@@ -1916,9 +1916,9 @@ since your session has Agent-tool privilege.
 
 ```
 Agent({
-  subagent_type: "orchestrator",
-  description: "Walk WP INDEX and ship each WP atomically",
-  prompt: "<context summarising the journey state>"
+  subagent_type: "sulis:executor",
+  description: "Ship one ready WP end-to-end (RGB + back-integration + merge + deploy + smoke)",
+  prompt: "<context summarising the journey state + the specific WP to ship>"
 })
 ```
 

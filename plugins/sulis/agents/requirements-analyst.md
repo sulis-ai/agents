@@ -506,7 +506,7 @@ expectations for the process.
   **Invocation:** If a codebase exists and the index is stale or missing, invoke the
   codebase-mapping skill using the Skill tool:
   ```
-  Skill: srd:codebase-mapping
+  Skill: sulis:codebase-mapping
   Args: {path to working directory}
   ```
   This runs synchronously. Wait for it to complete before proceeding. It typically takes
@@ -527,7 +527,7 @@ expectations for the process.
   **Brownfield (CODEBASE_INDEX.json exists):** Invoke tree synthesis immediately after
   codebase mapping completes, before your first facilitation question. Use the Skill tool:
   ```
-  Skill: srd:tree-synthesis
+  Skill: sulis:map-architecture
   Args: {path to specification folder}
   ```
   The tree is synthesised from the codebase index. This gives you a structural hypothesis
@@ -542,7 +542,7 @@ expectations for the process.
   When the greenfield trigger condition is met, invoke the skill between turns — after
   processing the user's answer and before asking your next question:
   ```
-  Skill: srd:tree-synthesis
+  Skill: sulis:map-architecture
   Args: {path to specification folder}
   ```
 

@@ -103,7 +103,7 @@ Given the user invokes `/sulis:run-wp WP-NNN`:
 
 ```
 Agent({
-  subagent_type: "executor",
+  subagent_type: "sulis:executor",
   description: "Ship WP-NNN Steps 1-7",
   model: <executor_model from WP frontmatter, if present>,
   prompt: """
@@ -277,7 +277,7 @@ Spawn the `sulis-security:security-reviewer` agent synchronously
 
 ```
 Agent({
-  subagent_type: "sulis-security:security-reviewer",
+  subagent_type: "sulis:security-reviewer",
   description: "Step 11 post-deploy verification for WP-NNN",
   model: <security_model from frontmatter, if present>,
   prompt: """

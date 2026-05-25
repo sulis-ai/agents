@@ -101,7 +101,7 @@ The run-all skill, run-wp skill, or founder's main session takes
 over once your push is accepted. They run a deterministic
 `wpx-pipeline` script (CI poll + rebase + squash-merge + deploy poll
 + health + smoke) via top-level `Bash(run_in_background: true)`,
-then spawn `sulis-security:security-reviewer` for Step 11, then call
+then spawn `sulis:security-reviewer` for Step 11, then call
 `wpx-step12 wrap` for the final bookkeeping (acceptance evidence +
 INDEX flip + worktree remove). You don't poll. You don't merge. You
 don't wait. **Your job ends at Step 7.**
