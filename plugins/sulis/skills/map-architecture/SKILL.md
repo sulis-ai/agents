@@ -1,11 +1,11 @@
 ---
-name: tree-synthesis
+name: map-architecture
 description: >
-  Synthesise a PRIMITIVE_TREE.jsonld from a codebase index (brownfield) or user
-  description (greenfield). Produces a directed acyclic graph of domain-specific
-  architectural building blocks with typed nodes, dependency edges, health statuses,
-  and facilitation phases. Used by the requirements-analyst agent to drive gap-targeted
-  facilitation via an OODA spiral.
+  Map the architecture of an existing codebase (brownfield) or a planned
+  product (greenfield) into a directed graph of building blocks — what
+  each component is, how it depends on others, what state it's in. Used
+  by the requirements-analyst to focus the facilitation conversation on
+  gaps that actually matter for the project's stage.
 ---
 
 # Tree Synthesis

@@ -5,8 +5,8 @@ Uses the [Critical Thinking Standard](critical-thinking-standard.md) as the
 reasoning framework.
 
 **Fetch the standard directly:**
-- GitHub: https://github.com/sulis-ai/agents/blob/main/plugins/srd/skills/critical-thinking/references/critical-thinking-standard.md
-- Raw (for AI tools): https://raw.githubusercontent.com/sulis-ai/agents/main/plugins/srd/skills/critical-thinking/references/critical-thinking-standard.md
+- GitHub: https://github.com/sulis-ai/agents/blob/main/plugins/sulis/skills/critical-thinking/references/critical-thinking-standard.md
+- Raw (for AI tools): https://raw.githubusercontent.com/sulis-ai/agents/main/plugins/sulis/skills/critical-thinking/references/critical-thinking-standard.md
 
 ---
 
@@ -31,7 +31,7 @@ First, read these files completely before responding:
 
 - Critical Thinking Standard — 13 analytical principles organised by phase
   (input/processing/output) and 9 anti-patterns. This governs how you reason.
-  Fetch from: https://raw.githubusercontent.com/sulis-ai/agents/main/plugins/srd/skills/critical-thinking/references/critical-thinking-standard.md
+  Fetch from: https://raw.githubusercontent.com/sulis-ai/agents/main/plugins/sulis/skills/critical-thinking/references/critical-thinking-standard.md
 - [YOUR DOMAIN FILE] — [what it contains and why it matters]
 - [YOUR DATA/EVIDENCE FILE] — [what it contains and why it matters]
 

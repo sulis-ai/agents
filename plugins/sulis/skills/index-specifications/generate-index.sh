@@ -32,7 +32,7 @@ cat > "$INDEX_FILE" << 'HEADER'
 # Specification Index
 
 > **Generated file.** Do not edit directly — regenerate with `./scripts/generate-index.sh`
-> or `/srd:spec-index`. Source of truth is each folder's `SPEC.yaml`.
+> or `/sulis:index-specifications`. Source of truth is each folder's `SPEC.yaml`.
 
 | Status | Meaning |
 |--------|---------|

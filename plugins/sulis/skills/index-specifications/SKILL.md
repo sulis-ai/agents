@@ -1,9 +1,11 @@
 ---
-name: spec-index
+name: index-specifications
 description: >
-  Generate or regenerate the specification index from SPEC.yaml metadata files.
-  Scans .specifications/*/SPEC.yaml and produces INDEX.md with status tracking,
-  artifact completeness matrix, and next-ID counter.
+  Use to rebuild the index of all specifications in this project. Scans
+  every `.specifications/*/SPEC.yaml` file and produces an `INDEX.md`
+  with status tracking, artifact completeness matrix, and the next-ID
+  counter. Run this when you've added or renamed a specification and
+  want the index to reflect the new state.
 ---
 
 # Specification Index Generator
@@ -138,7 +140,7 @@ Next specification ID and generation timestamp.
 Write to `.specifications/INDEX.md` with a header noting it is generated:
 
 ```markdown
-> **Generated file.** Do not edit directly — regenerate with `/srd:spec-index`.
+> **Generated file.** Do not edit directly — regenerate with `/sulis:index-specifications`.
 > Source of truth is each folder's `SPEC.yaml`.
 ```
 
@@ -149,7 +151,7 @@ Write to `.specifications/INDEX.md` with a header noting it is generated:
 ```markdown
 # Specification Index
 
-> **Generated file.** Do not edit directly — regenerate with `/srd:spec-index`.
+> **Generated file.** Do not edit directly — regenerate with `/sulis:index-specifications`.
 > Source of truth is each folder's `SPEC.yaml`.
 
 | Status | Meaning |

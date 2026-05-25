@@ -1,9 +1,11 @@
 ---
-name: srd-templates
+name: requirements-templates
 description: >
-  Artifact templates for Software Requirements Documents. Contains templates for
-  the SRD itself, use cases, sequence diagrams, process flows, state diagrams,
-  data flows, NFRs, and glossary. Preloaded into the requirements-analyst agent.
+  Artifact templates for requirements documents. Contains templates for
+  the requirements document itself, use cases, sequence diagrams, process
+  flows, state diagrams, data flows, non-functional requirements, and
+  glossary. Preloaded into the requirements-analyst agent — not
+  founder-invoked directly.
 user-invocable: false
 ---
 
@@ -612,7 +614,7 @@ remains in the repo unspecified.)
 ## EXPLORATION_JOURNAL.md Triage Trace section (AAF-07)
 
 Every question emitted to the user MUST first be logged here per AAF-07 in
-`plugins/srd/references/audience-adapted-framing-standard.md`. The trace is the
+`plugins/sulis/references/audience-adapted-framing-standard.md`. The trace is the
 gate, not the documentation — questions without a trace row are not emitted.
 
 ```markdown

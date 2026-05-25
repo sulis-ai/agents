@@ -23,7 +23,7 @@ requirements conversation.
 The codebase mapper runs synchronously at the start of the facilitation session.
 
 - Triggered by the requirements-analyst agent at session start (brownfield projects
-  only), or manually via `/srd:codebase-mapping`
+  only), or manually via `/sulis:codebase-mapping`
 - The agent waits for mapping to complete before asking its first facilitation question,
   because the index informs question selection and grounding
 - After mapping, the agent briefly acknowledges what it found before proceeding

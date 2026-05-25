@@ -1,0 +1,69 @@
+{
+  "agents": [
+    "requirements-analyst.md"
+  ],
+  "ci_workflows": [],
+  "docs": [
+    "docs/specifications/INDEX.md",
+    "docs/specifications/adaptive-coaching-annotations/GLOSSARY.md",
+    "docs/specifications/adaptive-coaching-annotations/HANDOVER.md",
+    "docs/specifications/adaptive-coaching-annotations/NFR.md",
+    "docs/specifications/adaptive-coaching-annotations/SRD.md",
+    "docs/specifications/adaptive-coaching-annotations/diagrams/process-flows.md",
+    "docs/specifications/adaptive-coaching-annotations/diagrams/state-diagrams.md",
+    "docs/specifications/auto-codebase-mapping/GLOSSARY.md",
+    "docs/specifications/auto-codebase-mapping/HANDOVER.md",
+    "docs/specifications/auto-codebase-mapping/NFR.md",
+    "docs/specifications/auto-codebase-mapping/SRD.md",
+    "docs/specifications/auto-codebase-mapping/diagrams/process-flows.md",
+    "docs/specifications/auto-codebase-mapping/diagrams/state-diagrams.md",
+    "docs/specifications/facilitation-pedagogy/EXPLORATION_JOURNAL.md",
+    "docs/specifications/primitive-tree-architecture/COMPLETENESS_REPORT.md",
+    "docs/specifications/primitive-tree-architecture/EXPLORATION_JOURNAL.md",
+    "docs/specifications/primitive-tree-architecture/GLOSSARY.md",
+    "docs/specifications/primitive-tree-architecture/HANDOVER.md",
+    "docs/specifications/primitive-tree-architecture/NFR.md",
+    "docs/specifications/primitive-tree-architecture/SRD.md",
+    "docs/specifications/primitive-tree-architecture/diagrams/data-flows.md",
+    "docs/specifications/primitive-tree-architecture/diagrams/process-flows.md",
+    "docs/specifications/primitive-tree-architecture/diagrams/sequence-diagrams.md",
+    "docs/specifications/primitive-tree-architecture/diagrams/state-diagrams.md",
+    "docs/specifications/primitive-tree-architecture/diagrams/use-cases.md"
+  ],
+  "manifest_files": [
+    ".claude-plugin/plugin.json"
+  ],
+  "marketplace_root": "/Users/iain/Documents/repos/agents",
+  "metadata_files": [
+    "README.md",
+    "CHANGELOG.md",
+    "settings.json"
+  ],
+  "plugin_dir": "plugins/srd",
+  "references": [
+    "references/audience-adapted-framing-standard.md",
+    "references/change-work-standard.md",
+    "references/coaching-without-conflict.md",
+    "references/cognitive-load.md",
+    "references/content-quality.md",
+    "references/convention-preference-standard.md",
+    "references/engineering-principles.md",
+    "references/executor-loop-standard.md",
+    "references/founder-english.md",
+    "references/git-workflow-standard.md",
+    "references/pr-hygiene-standard.md",
+    "references/repository-contract-standard.md",
+    "references/security-standard.md"
+  ],
+  "script_tests": [],
+  "scripts": [],
+  "skills": [
+    "codebase-mapping",
+    "critical-thinking",
+    "requirements-validation",
+    "spec-index",
+    "srd-templates",
+    "tree-synthesis"
+  ],
+  "source_plugin": "srd"
+}

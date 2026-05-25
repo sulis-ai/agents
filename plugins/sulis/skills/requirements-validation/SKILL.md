@@ -34,7 +34,7 @@ The completeness assessment uses a spiral approach rather than a single-pass che
 7. Adversarial Coverage — Does every security-sensitive use case have a corresponding misuse case (or explicit "no plausible adversary" note), and does every misuse case have a defined system response?
 
 **Fix-as-you-go via AAF triage (MUST).** Every gap found by every perspective passes
-through the AAF-01 triage from `plugins/srd/references/audience-adapted-framing-standard.md`
+through the AAF-01 triage from `plugins/sulis/references/audience-adapted-framing-standard.md`
 before becoming a user question. The default posture is *fix inline and journal-record*;
 only gaps that survive AAF-01 step 1 + step 2 + step 3 become user-facing questions.
 
@@ -82,7 +82,7 @@ shape**:
 
 This is an AAF-08 violation. The validation skill does not surface a "proceed?"
 question after PASS. Auto-progression is the analyst's responsibility (see
-`plugins/srd/agents/requirements-analyst.md` → Phase Auto-Progression rule); the
+`plugins/sulis/agents/requirements-analyst.md` → Phase Auto-Progression rule); the
 validation skill simply reports the verdict and identifies the cleanup items as
 Auto-Resolved entries.
 
@@ -498,7 +498,7 @@ primitive.
 ## Perspective 8: Two-Model Reconciliation
 
 This perspective enforces that the Two-Model OODA Reconciliation rule (in
-`plugins/srd/agents/requirements-analyst.md` → Section 2) has run to closure. The rule
+`plugins/sulis/agents/requirements-analyst.md` → Section 2) has run to closure. The rule
 recursively decomposes every requirement until it terminates at an irreducible-leaf
 category, reconciles the Domain Model (what's needed) against the Code Model (what
 exists), and produces `.specifications/{project}/RECONCILIATION_MAP.md` plus the
