@@ -89,7 +89,7 @@ related_skills:
     skill: ../../sea/agents/engineering-architect
     notes: dispatched in Phase 4 for design + decomposition
   - relationship: optional_input
-    skill: ../../srd/agents/requirements-analyst
+    skill: ../agents/requirements-analyst
     notes: dispatched in Phase 3 for specify (long facilitation)
   - relationship: optional_input
     skill: ../agents/context-cartographer

@@ -1561,8 +1561,9 @@ recommendation declined under `## Intent Triage` in EXPLORATION_JOURNAL.md so it
 visible at handover.
 
 **When NOT to apply this rule:**
-- The user explicitly invoked `/srd:requirements-analyst` because they want a
-  specification, not architecture — proceed with SRD.
+- The user explicitly invoked `claude --agent requirements-analyst` (or
+  Sulis dispatched here) because they want a specification, not
+  architecture — proceed with requirements facilitation.
 - The technical content is shallow context-setting ("we're a Rails app") rather than
   load-bearing design intent — proceed with SRD.
 - The user is a novice (Level 1 in SA&D calibration) — the technical language is
