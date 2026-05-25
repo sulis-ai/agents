@@ -287,7 +287,7 @@ findings, the lens emits:
 ### Security lens
 
 Must produce a list of findings against the 25 primitives at
-`plugins/sulis-security/skills/codebase-assess/references/primitives.md`,
+`plugins/sulis/skills/codebase-assess/references/primitives.md`,
 filtered to those applicable to the diff. Empty findings → explicit
 "nothing surfaced" entry with the primitives that were applicable and the
 scanners that ran.

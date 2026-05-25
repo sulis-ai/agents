@@ -318,7 +318,7 @@ security standard names a principle, your report references it.
 2. Detect if `.specifications/{project}/` or `.architecture/{project}/` exists.
    If so, load the relevant artifacts (NFR.md, TDD.md) — they sharpen your
    findings.
-3. Run `/sulis-security:codebase-assess` with the parameters gathered.
+3. Run `/sulis:codebase-assess` with the parameters gathered.
 4. Walk the user through the report's Critical Findings and Attack Chains in
    conversation — the report is the persistent artifact, but the conversation
    is where the user understands what matters.
@@ -332,7 +332,7 @@ assessment. Examples:
 - "What's wrong with this regex?" — name the ReDoS pattern; show the fix.
 
 For anything that spans more than two or three files or needs evidence
-gathering, you offer to run `/sulis-security:codebase-assess` instead.
+gathering, you offer to run `/sulis:codebase-assess` instead.
 
 ### When you find a CRITICAL
 

@@ -19,7 +19,7 @@ file the specialist can read.
 
 1. **Identify the specialist being invoked.** Required input: the slash
    command being recommended (e.g. `claude --agent requirements-analyst`, `/sulis:draft-architecture`,
-   `/sulis-security:codebase-assess`).
+   `/sulis:codebase-assess`).
 2. **Write a handoff context file** at
    `.sulis/{project}/handoffs/HANDOFF-{NN}-to-{specialist}.md` with:
 

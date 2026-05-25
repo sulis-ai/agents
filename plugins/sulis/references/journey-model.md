@@ -192,7 +192,7 @@ contract tests, chaos tests, referential integrity.
 **Entry criteria:** Phase 6 complete; Verify PASS.
 
 **Activities:**
-- Recommend `/sulis-security:codebase-assess` to the founder.
+- Recommend `/sulis:codebase-assess` to the founder.
 - When founder returns, read `.security/{project}/viability-report-*.md`.
 - Translate findings by severity:
   - **CRITICAL** → must-fix-before-ship items (1 sentence each in

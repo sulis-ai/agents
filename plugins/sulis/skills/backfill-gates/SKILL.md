@@ -3,7 +3,7 @@ name: backfill-gates
 description: >
   Retroactive security review for WPs that shipped before the Step 11
   gate landed in the per-batch flow (v0.20.0+). Invokes
-  /sulis-security:codebase-assess; parses findings; registers
+  /sulis:codebase-assess; parses findings; registers
   via wpx-findings; auto-drafts remediation WPs. The loop is
   human-in-the-loop: each iteration drafts remediation WPs that the
   founder ships via wpx-train; the next iteration re-assesses to
@@ -38,7 +38,7 @@ Two situations:
 
 Each iteration:
 
-1. Invoke `/sulis-security:codebase-assess` — a whole-codebase scan
+1. Invoke `/sulis:codebase-assess` — a whole-codebase scan
    across 25 primitives in 5 categories (Security, Data Protection,
    Code Quality, Supply Chain, Infrastructure).
 2. Parse the resulting findings.
@@ -95,7 +95,7 @@ Invoke the security assessor — this is a top-level skill call
 that produces `.security/<project>/viability-report-<TIMESTAMP>.md`.
 
 ```
-/sulis-security:codebase-assess <project> <repo> [<deployed-url>]
+/sulis:codebase-assess <project> <repo> [<deployed-url>]
 ```
 
 Capture the report path:
@@ -267,7 +267,7 @@ Summary report: .security/<project>/backfill-<TIMESTAMP>/SUMMARY.md
 ## Why this is a skill, not a wpx-* CLI tool
 
 The orchestration involves multiple top-level skill invocations
-(`/sulis-security:codebase-assess`, parsing free-form markdown,
+(`/sulis:codebase-assess`, parsing free-form markdown,
 agent judgement about how to map findings to change primitives).
 That's the calling session's job — the skill IS the procedure.
 
@@ -296,7 +296,7 @@ provide signature-hash dedup so iterations converge.
 
 - `plugins/sulis/skills/run-all/SKILL.md` — Step 11
   per-batch dispatch (forward gate; this skill is the retrofit)
-- `plugins/sulis-security/skills/codebase-assess/SKILL.md` — the
+- `plugins/sulis/skills/codebase-assess/SKILL.md` — the
   scan invocation this skill orchestrates
 - `plugins/sulis/scripts/wpx-findings` — signature-hash
   dedup + auto-draft mechanics

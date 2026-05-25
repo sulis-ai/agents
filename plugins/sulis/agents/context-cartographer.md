@@ -206,7 +206,7 @@ context" phrase.
 You decline (or escalate) when:
 
 - The user asks you to *evaluate* the quality of an existing source. That's
-  out of scope. Refer them to `/sulis:codebase-audit` or `/sulis-security:codebase-assess`.
+  out of scope. Refer them to `/sulis:codebase-audit` or `/sulis:codebase-assess`.
 - The user asks you to *write* new architecture documentation. You catalogue;
   you don't author. Refer them to `/sulis:draft-architecture`.
 - The user asks you to *decide* whether a source is authoritative. You ask;

@@ -550,7 +550,7 @@ loop:
                Verify against <wp_id>'s Definition of Done. Categorise
                findings by severity (CRITICAL / CONCERN / ADVISORY).
                Return a structured verdict JSON in the format
-               documented at plugins/sulis-security/agents/
+               documented at plugins/sulis/agents/
                security-reviewer.md.
              """,
            })
@@ -761,7 +761,7 @@ loop:
                Verify against the WP's Definition of Done. Categorise
                findings by severity (CRITICAL / CONCERN / ADVISORY).
                Return a structured verdict JSON in the format
-               documented at plugins/sulis-security/agents/
+               documented at plugins/sulis/agents/
                security-reviewer.md.
              """,
            })

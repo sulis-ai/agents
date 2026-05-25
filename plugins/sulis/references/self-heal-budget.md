@@ -104,7 +104,7 @@ The "Suggested next step" varies by failure category:
   installed, missing system tools (Trivy, Semgrep, Gitleaks), or
   staging URL unreachable from the assessor's environment. Step 11
   could not run; recommend assessing manually via
-  `/sulis-security:codebase-assess <project> <repo> <staging-url>`
+  `/sulis:codebase-assess <project> <repo> <staging-url>`
   before marking the WP done."
 - **Step 11 CRITICAL finding** (not a budget exhaustion; halt-and-
   escalate directly) — "The security-reviewer surfaced a CRITICAL

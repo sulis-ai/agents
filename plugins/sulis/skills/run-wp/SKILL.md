@@ -286,7 +286,7 @@ Agent({
 
     Verify against WP-NNN's Definition of Done. Categorise findings
     by severity (CRITICAL / CONCERN / ADVISORY). Return a structured
-    verdict JSON per plugins/sulis-security/agents/security-reviewer.md.
+    verdict JSON per plugins/sulis/agents/security-reviewer.md.
   """,
 })
 ```

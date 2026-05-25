@@ -11,7 +11,7 @@ verification_spiral:
   custom_dimensions:
     - name: "Primitive Coverage Completeness"
       threshold: ">= 4/5"
-      standard_reference: "plugins/sulis-security/skills/codebase-assess/references/primitives.md CQ-02"
+      standard_reference: "plugins/sulis/skills/codebase-assess/references/primitives.md CQ-02"
       scorer: generating_agent
       evidence_required: "Regression detection (existing) + CQ-02 test coverage quality both have status"
 related_skills:

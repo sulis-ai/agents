@@ -10,7 +10,7 @@ For each target project:
 
 1. Run `/sulis:code-health --project NAME` → captures CHECKUP.md + per-tier
    raw envelopes
-2. Run `/sulis-security:codebase-assess acme NAME` → captures
+2. Run `/sulis:codebase-assess acme NAME` → captures
    `.security/{NAME}/viability-report-{TIMESTAMP}.md`
 3. Diff the two outputs at the primitive level:
    - For each codebase-assess primitive (SEC-01..07 + DAT-01..05 + CQ-01..05

@@ -56,9 +56,9 @@ Accept three arguments:
 **Example invocations:**
 
 ```
-/sulis-security:codebase-assess acme acme-corp/platform
-/sulis-security:codebase-assess acme acme-corp/platform https://staging.acme.com
-/sulis-security:codebase-assess acme https://github.com/acme-corp/platform.git
+/sulis:codebase-assess acme acme-corp/platform
+/sulis:codebase-assess acme acme-corp/platform https://staging.acme.com
+/sulis:codebase-assess acme https://github.com/acme-corp/platform.git
 ```
 
 If arguments are missing, ask the user — do not invent.

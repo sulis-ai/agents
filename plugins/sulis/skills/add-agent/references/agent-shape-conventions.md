@@ -245,7 +245,7 @@ When authoring a new agent, read the existing agents whose role most closely mat
 | Specialist loop | `plugins/sulis/agents/orchestrator.md` |
 | Specialist facilitator | `plugins/sulis/agents/requirements-analyst.md` |
 | Specialist analytical | `plugins/sulis/agents/engineering-architect.md` |
-| Specialist auditor | `plugins/sulis-security/agents/security-reviewer.md` |
+| Specialist auditor | `plugins/sulis/agents/security-reviewer.md` |
 
 ## Conventions for naming the verification report
 

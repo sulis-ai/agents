@@ -11,7 +11,7 @@ verification_spiral:
   custom_dimensions:
     - name: "Primitive Coverage Completeness"
       threshold: ">= 4/5"
-      standard_reference: "plugins/sulis-security/skills/codebase-assess/references/primitives.md SEC/DAT/SC categories"
+      standard_reference: "plugins/sulis/skills/codebase-assess/references/primitives.md SEC/DAT/SC categories"
       scorer: generating_agent
       evidence_required: "Each of SEC-01..07 + DAT-01..05 + SC-01..04 (+ DAT-02 + INF-03 when --url) has a status: PASS / ADVISORY / CONCERN / CRITICAL / HYPOTHESIS / NOT_ASSESSED"
     - name: "Tool Degradation Verified"
@@ -51,7 +51,7 @@ related_skills:
     skill: _lib/tools/curl_probe
     notes: NEW — to be created — covers INF-03 when --url provided
   - relationship: supersedes
-    skill: plugins/sulis-security/skills/codebase-assess
+    skill: plugins/sulis/skills/codebase-assess
     notes: scheduled for Phase 5 retirement after Phase 4 cross-validation
 ---
 

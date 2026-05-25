@@ -11,7 +11,7 @@ verification_spiral:
   custom_dimensions:
     - name: "Primitive Coverage Completeness"
       threshold: ">= 4/5"
-      standard_reference: "plugins/sulis-security/skills/codebase-assess/references/primitives.md INF-04 + DAT-05"
+      standard_reference: "plugins/sulis/skills/codebase-assess/references/primitives.md INF-04 + DAT-05"
       scorer: generating_agent
       evidence_required: "Existing reliability patterns + INF-04 verbose-error + DAT-05 audit-logging hypothesis all have status"
 related_skills:

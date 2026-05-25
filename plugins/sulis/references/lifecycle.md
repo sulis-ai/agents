@@ -395,7 +395,7 @@ Agent({
     Verify against the WP's Definition of Done. Categorise findings
     by severity (CRITICAL / CONCERN / ADVISORY). Return a structured
     verdict JSON in the format documented at
-    plugins/sulis-security/agents/security-reviewer.md.
+    plugins/sulis/agents/security-reviewer.md.
   """,
 })
 
@@ -1755,7 +1755,7 @@ deciding whether to dial the default down to opt-in.
      description: "Post-deploy security assessment for WP-NNN",
      model: <security_model from WP frontmatter, if present>,
      prompt: """
-   Run /sulis-security:codebase-assess <project> <repo> <staging-url>
+   Run /sulis:codebase-assess <project> <repo> <staging-url>
    against the dev branch at merge SHA <sha>, with the live staging
    URL <staging-url> for passive deployed-surface checks.
 

@@ -59,7 +59,7 @@ def parse_codebase_assess_output(path: Path) -> dict[str, str]:
     """Parse viability-report-{TIMESTAMP}.md and extract primitive → verdict mapping.
 
     NOT YET IMPLEMENTED — codebase-assess output structure documented in
-    plugins/sulis-security/skills/codebase-assess/SKILL.md §"Output format".
+    plugins/sulis/skills/codebase-assess/SKILL.md §"Output format".
     Look for the per-primitive table under "## Findings" section.
     """
     raise NotImplementedError(

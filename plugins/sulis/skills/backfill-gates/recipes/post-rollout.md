@@ -40,7 +40,7 @@ the gap.
 
 This will:
 
-1. Invoke `/sulis-security:codebase-assess`
+1. Invoke `/sulis:codebase-assess`
 2. Parse findings from the produced viability report
 3. Register findings; auto-draft remediation WPs for novel ones
 4. Stop after 10 remediation WPs (or sooner if fewer exist)

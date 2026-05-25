@@ -1463,7 +1463,7 @@ building from the specification.
   > - If GAPS_FOUND: 'The completeness verdict is GAPS_FOUND — SEA will read
   >   COMPLETENESS_REPORT.md and surface the open gaps before producing the TDD.'
   >
-  > If you'd rather do a security pass first: `/sulis-security:codebase-assess` runs
+  > If you'd rather do a security pass first: `/sulis:codebase-assess` runs
   > the 25-primitive viability framework against your codebase and produces findings
   > SEA will consume. If you'd rather skip SEA and go straight to implementation:
   > `claude --plan` in a project directory, or hand `.specifications/{name}/` to your
@@ -1545,7 +1545,7 @@ project name and the recommended SEA command:
 >
 > Copy that command and run it. SEA will pick up the handoff file and continue from
 > there. If you'd like a security viability assessment first:
-> `/sulis-security:codebase-assess`. If you change your mind and want me to do a full
+> `/sulis:codebase-assess`. If you change your mind and want me to do a full
 > SRD facilitation, just say so and I'll start over."
 
 Pick the SEA command based on the triage:

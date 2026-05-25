@@ -11,7 +11,7 @@ verification_spiral:
   custom_dimensions:
     - name: "Primitive Coverage Completeness"
       threshold: ">= 4/5"
-      standard_reference: "plugins/sulis-security/skills/codebase-assess/references/primitives.md INF-01 + INF-02"
+      standard_reference: "plugins/sulis/skills/codebase-assess/references/primitives.md INF-01 + INF-02"
       scorer: generating_agent
       evidence_required: "INF-01 (container security) + INF-02 (deploy-config secrets) + manifest hygiene all have status"
 related_skills:

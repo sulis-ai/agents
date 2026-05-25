@@ -326,7 +326,7 @@ the state-changing operations.
 ## Related
 
 - `plugins/sulis/skills/backfill-gates/SKILL.md` — sibling
-  skill for security backfill (uses `/sulis-security:codebase-assess`)
+  skill for security backfill (uses `/sulis:codebase-assess`)
 - `plugins/sulis/skills/code-review/SKILL.md` — the skill this
   orchestrates
 - `plugins/sulis/agents/executor.md` — Step 6.5 (the

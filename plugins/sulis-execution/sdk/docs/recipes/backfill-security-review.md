@@ -63,7 +63,7 @@ In a Claude Code session with `sulis-execution v0.20.2+` installed:
 
 What happens:
 
-1. The skill invokes `/sulis-security:codebase-assess` over the
+1. The skill invokes `/sulis:codebase-assess` over the
    project's current `dev` state.
 2. The assessor produces `.security/<slug>/viability-report-<TS>.md`
    with findings categorised by primitive (Security / Data Protection
@@ -194,5 +194,5 @@ operations, not Agent dispatch.
   — same recipe, more narrative
 - `plugins/sulis-execution/skills/run-all/SKILL.md` — per-batch Step 11
   (forward gate this skill complements)
-- `plugins/sulis-security/skills/codebase-assess/SKILL.md` — the
+- `plugins/sulis/skills/codebase-assess/SKILL.md` — the
   whole-codebase assessor this skill orchestrates

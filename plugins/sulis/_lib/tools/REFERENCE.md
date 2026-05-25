@@ -1,6 +1,6 @@
 # `_lib/tools/` — tool-integration reference
 
-> **Adapted from** `plugins/sulis-security/skills/codebase-assess/references/tool-commands.md`
+> **Adapted from** `plugins/sulis/skills/codebase-assess/references/tool-commands.md`
 > — the platform's tool-command catalogue. This document is the sulis-local
 > equivalent: invocation contracts per tool, degradation behaviour, version
 > pinning.

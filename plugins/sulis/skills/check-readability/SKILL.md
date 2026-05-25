@@ -11,7 +11,7 @@ verification_spiral:
   custom_dimensions:
     - name: "Primitive Coverage Completeness"
       threshold: ">= 4/5"
-      standard_reference: "plugins/sulis-security/skills/codebase-assess/references/primitives.md CQ-01 + CQ-03"
+      standard_reference: "plugins/sulis/skills/codebase-assess/references/primitives.md CQ-01 + CQ-03"
       scorer: generating_agent
       evidence_required: "Existing naming/kitchen-sink/jargon + CQ-01 complexity + CQ-03 duplication all have status"
 related_skills:

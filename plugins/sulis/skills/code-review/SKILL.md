@@ -294,9 +294,9 @@ explicit *"Architecture lens: nothing surfaced. Checks run: …"*.
 
 #### Security lens (CR-07 — must produce structured output)
 
-Invoke `/sulis-security:codebase-assess` in "Quick" mode — Cycle 1 + Cycle 2
+Invoke `/sulis:codebase-assess` in "Quick" mode — Cycle 1 + Cycle 2
 only, scoped to the diff plus neighbour ring. Findings against the 25
-primitives at `plugins/sulis-security/skills/codebase-assess/references/primitives.md`,
+primitives at `plugins/sulis/skills/codebase-assess/references/primitives.md`,
 filtered to those applicable.
 
 Focus categories: **SEC** (access control, auth, injection, validation, XSS,
@@ -824,7 +824,7 @@ When writing the author-facing tier:
   findings inform lens severity scoring and feed the CR-06 verdict
   auto-downgrade for PH-03 high findings. When PH thresholds calibrate
   (per PH-07), this skill picks them up by reference.
-- **With `/sulis-security:codebase-assess`** — invoked in Quick mode internally
+- **With `/sulis:codebase-assess`** — invoked in Quick mode internally
   for the security lens. If a full security audit already exists in
   `.security/{project}/`, cite it instead of re-running.
 - **With `/sulis:harden-codebase`** — draft fixes produced here are handed to
@@ -896,4 +896,4 @@ When writing the author-facing tier:
 - [`../../references/hardening-deltas.md`](../../references/hardening-deltas.md) — fix file format and `source:` field schema
 - [`../../references/mece-3-architecture.md`](../../references/mece-3-architecture.md) — the three architectural lenses
 - [`../../references/red-green-blue.md`](../../references/red-green-blue.md) — characterisation-test discipline
-- `plugins/sulis-security/skills/codebase-assess/SKILL.md` — the security lens this skill invokes
+- `plugins/sulis/skills/codebase-assess/SKILL.md` — the security lens this skill invokes

@@ -95,7 +95,7 @@ related_skills:
     skill: ../agents/context-cartographer
     notes: dispatched in Phase 2 for discover-context
   - relationship: optional_input
-    skill: ../../sulis-security/agents/security-reviewer
+    skill: ../../sulis/agents/security-reviewer
     notes: dispatched in Phase 7 for security viability
 register:
   founder_mode: default
@@ -1148,7 +1148,7 @@ detail including transition criteria.
 | 4 | **Design** | TDD, ADRs, Work Packages | `sea:engineering-architect` — recommend `/sulis:draft-architecture` then `/sulis:plan-work` (always recommend) |
 | 5 | **Implement** | Execute Work Packages, Red-Green-Blue cycle | `sulis-execution:orchestrator` — **spawn via Agent tool** (v0.1.3+) |
 | 6 | **Verify** | Completeness, contracts, chaos tests | `sea:engineering-architect` — recommend `/sulis:verify-architecture` (v0.2: spawn) |
-| 7 | **Secure** | Viability assessment, business-risk findings | `sulis-security:security-reviewer` — recommend `/sulis-security:codebase-assess` (v0.2: spawn) |
+| 7 | **Secure** | Viability assessment, business-risk findings | `sulis-security:security-reviewer` — recommend `/sulis:codebase-assess` (v0.2: spawn) |
 
 Each phase has explicit entry criteria, exit criteria, and produced
 artifacts documented in `references/journey-model.md`.
@@ -1628,7 +1628,7 @@ Recommend:
 > things like exposed credentials, missing encryption, or known
 > vulnerable libraries. Run:*
 >
-> *`/sulis-security:codebase-assess`*
+> *`/sulis:codebase-assess`*
 >
 > *Then come back and I'll tell you what (if anything) needs fixing."*
 

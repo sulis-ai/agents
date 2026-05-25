@@ -391,7 +391,7 @@ double-counting:
 
 When a `/sulis:codebase-audit` completes with significant Armor gaps and
 no `.security/{project}/` exists, recommend the user run
-`/sulis-security:codebase-assess` for a broader audit beyond the MECE-3
+`/sulis:codebase-assess` for a broader audit beyond the MECE-3
 pillars (code quality, supply chain, infrastructure).
 
 ---

@@ -1,0 +1,25 @@
+{
+  "agents": [
+    "security-reviewer.md"
+  ],
+  "ci_workflows": [],
+  "docs": [],
+  "manifest_files": [
+    ".claude-plugin/plugin.json"
+  ],
+  "marketplace_root": "/Users/iain/Documents/repos/agents",
+  "metadata_files": [
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "plugin_dir": "plugins/sulis-security",
+  "references": [
+    "references/viability-framework.md"
+  ],
+  "script_tests": [],
+  "scripts": [],
+  "skills": [
+    "codebase-assess"
+  ],
+  "source_plugin": "sulis-security"
+}

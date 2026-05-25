@@ -11,7 +11,7 @@ verification_spiral:
   custom_dimensions:
     - name: "CQ-04 Canonical Ownership"
       threshold: ">= 4/5"
-      standard_reference: "plugins/sulis-security/skills/codebase-assess/references/primitives.md CQ-04"
+      standard_reference: "plugins/sulis/skills/codebase-assess/references/primitives.md CQ-04"
       scorer: generating_agent
       evidence_required: "Existing TD-001 + TD-002 patterns + this skill is the canonical CQ-04 owner; codebase-assess defers here post-Phase 5"
 related_skills:
@@ -25,7 +25,7 @@ related_skills:
   - relationship: depends_on
     skill: _lib/scope
   - relationship: supersedes
-    skill: plugins/sulis-security/skills/codebase-assess
+    skill: plugins/sulis/skills/codebase-assess
     notes: CQ-04 ownership transfers here post-Phase 5
 ---
 
