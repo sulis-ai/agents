@@ -134,9 +134,9 @@ a calling-session reference for what happens at Steps 8-12.
 ## Resolving wpx-* tool paths (MUST — first action, v0.10.1+)
 
 The wpx-* CLI tools (journal, blocker, worktree, …) live inside the
-sulis-execution plugin. When the plugin is installed in a downstream
+sulis plugin. When the plugin is installed in a downstream
 project, the scripts are at
-`~/.claude/plugins/cache/sulis-ai-agents/sulis-execution/<version>/scripts/`,
+`~/.claude/plugins/cache/sulis-ai-agents/sulis/<version>/scripts/`,
 NOT at the project's working directory. You MUST resolve the tool
 directory ONCE at the start of every session, before any bookkeeping
 operation.
@@ -148,16 +148,16 @@ before initialising any worktree, before doing anything else:
 WPX_DIR=$(
   find ~/.claude/plugins/cache \
     -name wpx-journal -type f \
-    -path '*/sulis-execution/*/scripts/*' \
+    -path '*/sulis/*/scripts/*' \
     2>/dev/null \
   | sort -r | head -1 | xargs -I{} dirname {} 2>/dev/null
 )
 # Dev fallback: marketplace repo cwd
-if [ -z "$WPX_DIR" ] && [ -f "plugins/sulis-execution/scripts/wpx-journal" ]; then
-  WPX_DIR="$(pwd)/plugins/sulis-execution/scripts"
+if [ -z "$WPX_DIR" ] && [ -f "plugins/sulis/scripts/wpx-journal" ]; then
+  WPX_DIR="$(pwd)/plugins/sulis/scripts"
 fi
 if [ -z "$WPX_DIR" ]; then
-  echo "ERROR: cannot locate wpx-* scripts. Run: claude plugin install sulis-execution@sulis-ai-agents" >&2
+  echo "ERROR: cannot locate wpx-* scripts. Run: claude plugin install sulis@sulis-ai-agents" >&2
   exit 1
 fi
 echo "WPX_DIR=$WPX_DIR"
@@ -511,7 +511,7 @@ The executor MUST NOT:
 `wpx-*` CLI tool, not direct file edits or raw git commands.** Two
 invocation paths are available:
 
-### MCP path (preferred, sulis-execution v0.15.0+)
+### MCP path (preferred — MCP support added in sulis-execution v0.15.0; preserved through consolidation into sulis)
 
 If the sulis-execution-mcp server is loaded in your session (run
 `/mcp` to verify — it should be there if the plugin is enabled), call
@@ -674,7 +674,7 @@ JSON
   --scope out-of-scope \
   --scope-reason "TDD content is upstream artifact; not in this WP's Contract" \
   --plain-english "The WP's test contract points at a file that doesn't have the function it expects. The function moved to a different module during decomposition. SEA needs to reconcile the TDD §5.4 path before this WP can proceed." \
-  --suggested-next "SEA path-reconciliation pass: update TDD §5.4 + WP-CHAR-01 Contract + WP-MIG-1 Contract to reference tasks/cli/node_executor/dispatch.py instead of tasks/tools.py, then re-dispatch via /sulis-execution:retry WP-CHAR-01."
+  --suggested-next "SEA path-reconciliation pass: update TDD §5.4 + WP-CHAR-01 Contract + WP-MIG-1 Contract to reference tasks/cli/node_executor/dispatch.py instead of tasks/tools.py, then re-dispatch via /sulis:retry WP-CHAR-01."
 ```
 
 ### What this is not
@@ -769,7 +769,7 @@ the outcome as `error` and halts.
 If your session terminates ungracefully mid-lifecycle (rare — RGB
 cycles for a single WP typically complete in 5-15 min total), the
 journal is the safety net. On re-dispatch
-(`/sulis-execution:run-wp WP-NNN` or orchestrator re-pick), your
+(`/sulis:run-wp WP-NNN` or orchestrator re-pick), your
 first action is to read the journal via `wpx-journal read --field
 step-trace` and find the last step with no `Completed` timestamp.
 That is the resume point. Continue from there, not from Step 1.
@@ -795,7 +795,7 @@ The calling session classifies your exit into three outcomes:
   entirely — silent advance past a half-finished WP is the failure
   mode this discipline exists to prevent.
 
-For single-WP dispatch via `/sulis-execution:run-wp`, the invoking
+For single-WP dispatch via `/sulis:run-wp`, the invoking
 session sees the journal's incomplete tail and re-invokes; you read
 the journal and resume from the parked step. Production failures
 observed at every prior boundary (Step 7→8, Step 11→12, Step 9
@@ -997,7 +997,7 @@ orchestrator (which reads the journal, not the task list).
   ceremony, surfaced via the concierge.
 - **You do not talk to the founder directly.** That is the
   concierge's role. Your output goes to the orchestrator (or the
-  invoking session if run standalone via `/sulis-execution:run-wp`).
+  invoking session if run standalone via `/sulis:run-wp`).
 - **You do not exceed the WP's Contract.** Boy Scout improvements
   (EP-07) are scoped to files you are *already* modifying for this
   WP. Cross-cutting cleanups become their own WP.

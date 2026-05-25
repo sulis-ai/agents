@@ -47,10 +47,10 @@ This agent file remains as:
 3. Documentation for the `run-all` skill's loop content — the
    skill cites this file for the logic.
 
-When working in Claude Code, **invoke `/sulis-execution:run-all`**,
+When working in Claude Code, **invoke `/sulis:run-all`**,
 which runs this logic inline in the calling session. Do not invoke
-this agent directly via `Agent({subagent_type: "sulis-execution:
-orchestrator"})` — it would run but fail at the first executor
+this agent directly via `Agent({subagent_type: "orchestrator"})`
+— it would run but fail at the first executor
 dispatch.
 
 ## Required reading (session start)
@@ -236,7 +236,7 @@ The orchestrator itself can fail. Failure handling per
   doesn't try to retry or recover.
 - **A specific WP fails repeatedly (BLOCKER, retried, BLOCKER
   again).** Mark it `permanently_blocked`. Do not retry without
-  explicit `/sulis-execution:retry` invocation.
+  explicit `/sulis:retry` invocation.
 - **All ready WPs are exhausted but some remain pending.** Normal
   exit — surface "N WPs blocked on dependencies; N depend on
   blockers." Not an error.
@@ -263,7 +263,7 @@ they're recorded and the loop continues with other ready WPs.
   isn't done is not ready, even if running it would be convenient.
 - **You do not talk to the founder.** Your output goes to the
   concierge (when spawned by the concierge) or to the invoking
-  session (when spawned by `/sulis-execution:run-all` directly).
+  session (when spawned by `/sulis:run-all` directly).
 - **You do not retry blocked WPs** without an explicit
-  `/sulis-execution:retry WP-NNN` invocation. Blockers are
+  `/sulis:retry WP-NNN` invocation. Blockers are
   blockers until resolved.
