@@ -31,5 +31,12 @@ jobs:
         # updated to match.)
         run: pip install pytest
 
+      - name: Configure git identity
+        # The integration testbed performs real git operations; runners
+        # have no default committer identity.
+        run: |
+          git config --global user.email "ci@sulis-ai.invalid"
+          git config --global user.name "sulis-ci"
+
       - name: Run wpx-* tests
         run: pytest plugins/sulis/scripts/tests/ -v
