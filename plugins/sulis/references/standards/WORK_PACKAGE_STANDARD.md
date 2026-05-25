@@ -1,8 +1,10 @@
 # Work Package Standard
 
-> **Sulis-local v1.0.0 (2026-05-24).** No platform precedent — this codifies what `sulis-execution` already does informally, plus the per-kind execution shapes (backend / frontend / async / docs / infra / composite) the methodology needs going forward.
+> **Sulis-local v1.1.0 (2026-05-25).** No platform precedent — this codifies what `sulis-execution` already does informally, plus the per-kind execution shapes (backend / frontend / async / docs / infra / composite) the methodology needs going forward.
+>
+> **v1.1.0 amendment** (Phase 4 of change-as-primitive build): adds the `change_id:` field to WP-01 Identity, linking every WP to its parent change. Backwards-compatible — `change_id:` is optional for legacy WPs created before the change primitive landed.
 
-> **Version:** 1.0.0
+> **Version:** 1.1.0
 > **Status:** Active
 > **Purpose:** Define the canonical unit of execution work in sulis. Every actionable thing that flows from a code-health finding to a shipped commit is a Work Package (WP). This standard documents the primitive: file format, identity, lineage, status lifecycle, executor dispatch contract, and the rules for composing WPs into larger arcs.
 
@@ -42,10 +44,11 @@ Every WP MUST have:
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `id` | yes | Globally unique within the project. Format: `WP-NNN` (sequential) or `WP-{SOURCE}-{NNN}` (e.g., `WP-HD-AA-001`). Conventional, not enforced — IDs in the same project just have to be unique. |
+| `id` | yes | Globally unique within the project. Format: `WP-NNN` (sequential within a change) or `WP-{SOURCE}-{NNN}` (e.g., `WP-HD-AA-001`). Conventional, not enforced — IDs in the same project just have to be unique. With `change_id:` populated, WP-NNN sequencing is per-change; cross-change collisions don't matter because the change_id disambiguates. |
 | `title` | yes | One-line plain-English summary. Founder-readable. |
 | `kind` | yes | One of: `backend` / `frontend` / `async` / `docs` / `infra` / `composite`. Determines which executor + which verification gates apply. |
 | `source` | yes | Where this WP came from: `hardening` / `feature` / `migration` / `refactor` / `observability` / `bug` / `manual`. Determines where the WP file lives within `.architecture/{project}/`. |
+| `change_id` | optional (required for WPs created after Phase 5 of the change-as-primitive build) | ULID of the parent change this WP belongs to. Format: 26-character Crockford-base32 ULID (e.g., `01HQ8XQM8G5KZGZQXPZD8H6PJ7`). Every WP created via `/sulis:change start` automatically gets the parent change's ULID. Legacy WPs (created before the change primitive) omit this field; they execute against `dev` directly without a change branch. See `change-work-standard.md` CW-04 for the change-branch + WP-branch hierarchy this field enables. |
 | `parent_phase` | optional | Groups related WPs (e.g., `HD-AA` for the hardening bundle in the transcript). Used by the INDEX.md generator to show grouped progress. |
 
 ### WP-02: Atomic scope
@@ -406,3 +409,4 @@ The chain is the empirical proof. No human attestation needed at any step — th
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-05-24 | Initial sulis-local definition. 11 requirements (WP-01..WP-11). Codifies the WP primitive that `sulis-execution` uses informally; documents the kind-based executor dispatch contract; introduces lineage (PROV-O-aligned vocabulary, no JSON-LD machinery), loop-closed verification, INDEX.md derivation, and composite/multi-kind composition rules. Per-kind execution details deferred to companion standards (WP_BACKEND_STANDARD, WP_FRONTEND_STANDARD, WP_ASYNC_STANDARD, WP_DOCS_STANDARD, WP_INFRA_STANDARD) — authored as each kind's executor is built. |
+| 1.1.0 | 2026-05-25 | Added the `change_id:` field to WP-01 Identity as part of Phase 4 of the change-as-primitive build (sulis v0.41.0). Optional for backwards-compat with legacy WPs; required for WPs created via `/sulis:change start` post-Phase 5. Field is a 26-character Crockford-base32 ULID linking the WP to its parent change. Per-change WP-NNN sequencing now disambiguated by change_id (cross-change collisions OK). |
