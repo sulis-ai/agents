@@ -1,5 +1,29 @@
 # Sulis — Changelog
 
+## v0.54.0 — 2026-05-26
+
+**Standards groundwork for the cockpit build — four design-time standards + an optional Mobbin MCP.**
+
+The standards work that turns the cockpit (and all future cross-kind work) into something *designed* rather than improvised. Four standards landed across the last week, here consolidated and cross-referenced as one coherent set.
+
+(1) **WP_BACKEND_STANDARD v0.1.0** — 12 opinionated patterns (WPB-01..12) consolidated from five practitioner docs: ports & adapters, repository, in-memory adapter first, handler-as-single-source-of-truth, auth-at-handler, typed Result, composition root/DI, outside-in double-loop TDD, done-means-wired, structured logging, conventional API surface, clean-code/boy-scout. Language-agnostic; platform couplings (Firestore/GCP/SDK/`@operation`/ontology/IVS) deliberately stripped. Used across design · implementation · review.
+
+(2) **WP_FRONTEND_STANDARD v0.1.0** — 13 patterns (WPF-01..13) **mirroring the backend spine** so the two read as siblings, layering the frontend-only patterns: component tiers, typed-client-not-fetch, mock-first (the contract mock), single state source, loading/error/empty states, WCAG-AA-gated automatically (jest-axe per component, Playwright-axe per page), design tokens, error boundaries, composition root, outside-in TDD, done-means-wired-and-accessible-and-reachable, agentic-interface UX, clean-code. Two profiles (production React / prototype Alpine). Authorization-divergence note: frontend show/hide only; real gate is backend.
+
+(3) **CONTRACT_FIRST_STANDARD v0.1.0** — the **data-contract seam** between backend and frontend, built on the **two-axis model** (schema *is* the contract, transport is the binding) + the **three-category error model** (Protocol / Expected / Internal) from the plugin-builder Agent-Consumable SDK Specification v0.2.0. 9 requirements (CF-01..09): contract before implementation, contract = schema layer, errors are part of the contract, stubs include error/empty cases, parallel-not-sequential decomposition (both sides depend only on the contract WP — the two-speed build pattern), consumer-conforms (EP-11), integration = swap mock→real + conformance check, conventional transport binding, structured streaming contracts. Two tiers (lightweight internal seam vs full published SDK); single-kind + `--prototype` changes exempt. The `wpx-*`/`sulis-change` tools noted as the in-repo subprocess-binding reference implementation.
+
+(4) **UX_VISUAL_DESIGN_STANDARD v0.2.0** — the **contract WITH THE USER** (the human-facing sibling of contract-first). Just as the API contract is agreed before the build, the design is agreed before the frontend is built. 15 requirements (UXD-01..15) across four layers — **Identity** (Golden Circle order; competitor substitution test; 3–7 distinctive assets), **Visual** (brand traits → measurable visual parameters; three-tier W3C DTCG design tokens as single source of visual truth; systematic visual-identity evaluation by Rand criteria, not subjective judgement; HIG with variants/states/focus/three-UI-states/structural profile), **Experience** (WCAG 2.1 AA decided at design time not retrofitted; ISO 9241-210 human-centred design; EAST ethical evidence-based behavioural design — never dark patterns; the seven agentic-interface principles for AI surfaces; UI voice & tone), and **Governance** (cross-artifact coherence; tri-track AI provenance AI-generated → human-reviewed → production-approved; design-before-build).
+
+**UXD-15 — Optional Mobbin inspiration.** When connected, the design flow may probe the founder's own Mobbin account for structural / compositional / interaction patterns from real shipped apps, with the firm guardrail that **inspiration informs *patterns*, never *identity*** (importing a referenced app's visual identity would violate UXD-02 distinctiveness). Wired as an optional plugin MCP server at `plugins/sulis/.mcp.json` (`https://api.mobbin.com/mcp`) — graceful when unauthenticated; the founder connects per their account.
+
+Brand and identity **values** (the palette, type, logo, look-and-feel) are deliberately carved out as founder-owned, produced via the design flow (`design-system` / `sulis-design` tooling) — the standard sets the discipline ("semantic tokens with AA contrast"); the founder sets the identity ("the primary colour is X"). Sulis's own `VISUAL_PRINCIPLES.md` (Bath/Minerva heritage, Deep Wisdom navy, warm neutrals, Satoshi/Inter, 70:30 geometric-to-organic, measurable parameters throughout) cited as the worked exemplar.
+
+Plus a light **cross-ref pass on WP_BACKEND_STANDARD** so the four read as one coherent set: WPB-06's three error categories *are* CF-03's contract error model; WPB-11's API conventions live *inside* a CF contract; WPB-09's "done means wired" is completed by CF-07's conformance check at the seam.
+
+**Honest status.** All four are v0.1.0/v0.2.0 — written, not exercised. The marketplace's own rule is standards calibrate after 3+ executions, so wiring them into design/executor/review is **follow-on**. The **cockpit MVP is the first real exercise** that tells us where they're wrong.
+
+No code change beyond the new `.mcp.json` and version bumps.
+
 ## v0.53.0 — 2026-05-26
 
 **Change-dashboard (slice B) — the founder-facing `/sulis:dashboard` + the machinery that keeps it current.**
