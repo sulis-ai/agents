@@ -1,4 +1,4 @@
-// WP-004 / WP-006 — typed errors for the cockpit server's lib layer.
+// WP-004 / WP-006 / WP-007 — typed errors for the cockpit server's lib layer.
 //
 // Errors live here (not co-located with the functions that throw them)
 // so route handlers can catch by class without importing the lib
@@ -39,10 +39,13 @@ export class NotADirectoryError extends Error {
 }
 
 /**
- * Thrown by `readWorktreeTree` (and other future lib functions that
- * need to surface a missing path distinctly from a path-outside-worktree
- * error) when the resolved path doesn't exist on disk. Route handlers
- * translate this into a 404.
+ * Thrown by `readWorktreeTree`, `readFileContents`, and other filesystem-
+ * reading helpers when the resolved path does not exist on disk. Route
+ * handlers translate this into a 404. We define our own class rather
+ * than re-throwing the underlying `NodeJS.ErrnoException` so the route
+ * doesn't have to inspect `err.code === "ENOENT"` and so the class
+ * stays available even when a future implementation switches to a
+ * non-fs source (e.g. an in-memory test double).
  */
 export class NotFoundError extends Error {
   readonly code = "NOT_FOUND";
@@ -50,5 +53,20 @@ export class NotFoundError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "NotFoundError";
+  }
+}
+
+/**
+ * Thrown by `readFileContents` (WP-007) when the resolved path is a
+ * directory rather than a regular file. The route layer maps this to
+ * `400 is a directory` — distinct from `404 not found` because the
+ * path *does* exist; it is just not a thing the file endpoint can serve.
+ */
+export class IsADirectoryError extends Error {
+  readonly code = "IS_A_DIRECTORY";
+
+  constructor(message: string) {
+    super(message);
+    this.name = "IsADirectoryError";
   }
 }
