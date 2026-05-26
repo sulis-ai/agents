@@ -37,6 +37,11 @@ jobs:
           python3 -c "import json,glob,sys; [json.load(open(f)) for f in ['.claude-plugin/marketplace.json', *glob.glob('plugins/*/.claude-plugin/plugin.json')]]; print('manifests OK')"
           python3 -m compileall -q plugins/sulis/scripts
 
+      - name: routing coverage gate
+        # Fails the build if any skill is neither routed nor excluded (orphan),
+        # or two routes share an invocation (duplicate). Stdlib only, no network.
+        run: python3 plugins/sulis/scripts/sulis-route check --repo-root .
+
       - name: type-check — (none configured; stdlib-only tooling per plugin contract)
         run: echo "no type-checker configured for this repo"
 
