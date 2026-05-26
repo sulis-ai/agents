@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+"""sulis-list-changes wrapper — delegates to ``sulis_list_changes.main``.
+
+Two-file split (wrapper + module) per WP-002 contract: the wrapper is the
+executable entry-point shell users invoke; the module is what the WP-003
+adapter and tests import and exercise. The wrapper is intentionally
+trivial — all behaviour lives in the module.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from sulis_list_changes import main  # noqa: E402
+
+if __name__ == "__main__":
+    sys.exit(main())
