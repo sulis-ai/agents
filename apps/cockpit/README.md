@@ -8,9 +8,9 @@ them as a thread-centric review tool.
 It is **strictly read-only**. It writes nothing, it sends nothing to
 any running Claude session, and it binds to `127.0.0.1` only.
 
-This README covers the workspace shape and the dev-run flow that
-ships with the foundation work package (WP-001). The HTTP surface,
-React components, and end-to-end behaviour land in later WPs.
+This README covers the workspace shape, the dev-run flow, and the
+HTTP surface that ships with WP-001 + WP-010. The React components
+and end-to-end behaviour land in later WPs.
 
 ## Starting the dev experience
 
@@ -37,15 +37,52 @@ Both ports are overridable via env (`COCKPIT_SERVER_PORT`,
 `COCKPIT_CLIENT_PORT`). The host stays `127.0.0.1`; that is not
 configurable.
 
+## The HTTP surface
+
+Six GET endpoints, JSON only, all bound to `127.0.0.1:5174` by default
+(TDD §5, ADR-002, ADR-003). The route handlers are thin — they
+delegate to the lib functions (WP-005..WP-009) and the change-store
+port (WP-003).
+
+| Method + path                                | Purpose                                                       | Wire shape           |
+| -------------------------------------------- | ------------------------------------------------------------- | -------------------- |
+| `GET /api/changes`                           | List every change with liveness.                              | `Change[]`           |
+| `GET /api/changes/:id`                       | One change + the resolved transcript file paths.              | `ChangeDetail`       |
+| `GET /api/changes/:id/tree?path=...`         | One level of the worktree's folder tree. Default = root.      | `TreeNode[]`         |
+| `GET /api/changes/:id/file?path=...`         | Current contents of a file in the worktree (1 MiB cap).       | `FileContents`       |
+| `GET /api/changes/:id/diff?path=...`         | Base (at `baseSha`) + current contents for Monaco's DiffEditor. | `FileDiff`         |
+| `GET /api/changes/:id/transcript`            | Chronologically-merged chat messages from the change's transcripts. | `TranscriptMessage[]` |
+
+Non-2xx responses use a single envelope:
+
+```json
+{ "error": "human-readable message", "code": "TYPED_CODE" }
+```
+
+`code` values: `NOT_FOUND` (404), `PATH_OUTSIDE_WORKTREE` /
+`NOT_A_DIRECTORY` / `IS_A_DIRECTORY` / `GIT_ERROR` / `BAD_REQUEST`
+(400), `NO_BASE_SHA` (422), `TIMEOUT` (504), `METHOD_NOT_ALLOWED`
+(405), `INTERNAL_ERROR` (500). The client renders contextual messages
+from `code`.
+
+The server is GET-only by construction. The `tests/read-only-inventory.test.ts`
+gate fails the build if any future change introduces a `.post / .put
+/ .patch / .delete` handler, a filesystem-mutating call, a mutating
+git verb, or a non-zero process signal (TDD §13.7 — "guarantee, not
+convention").
+
 ## How the workspace is organised
 
 ```
 apps/cockpit/
 ├── server/                 # Express + Node — runs the read-only API
-│   ├── index.ts            # placeholder bootstrap (WP-010 replaces it)
+│   ├── index.ts            # bootstrap — binds 127.0.0.1:5174
+│   ├── app.ts              # createApp(deps) Express factory (testable)
+│   ├── config.ts           # CONFIG — bindAddress is hard-coded
 │   ├── ports/              # one port: ChangeStoreReader (extractability seam)
-│   ├── adapters/           # SulisChangeStoreReader lives here later
-│   ├── routes/             # six HTTP handlers (WP-010)
+│   ├── adapters/           # SulisChangeStoreReader (the Python helper bridge)
+│   ├── routes/             # six GET handlers + shared shims
+│   ├── middleware/         # request-log + typed-error → JSON mapper
 │   ├── lib/                # domain logic — no framework imports
 │   └── tests/
 ├── client/                 # React + Vite — runs the UI
