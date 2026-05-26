@@ -198,3 +198,22 @@ def route_set(
     from the inventory minus the explicitly-excluded names, never hand-listed.
     """
     return [e for e in entries if e.name not in exclusions]
+
+
+def lookup(entries: list[InventoryEntry], invocation: str) -> InventoryEntry | None:
+    """The explicit-invocation deterministic fast-path (TDD §4.2, R6).
+
+    Exact-match ``invocation`` against ``InventoryEntry.invocation`` and return
+    the single matching entry, or ``None`` when nothing matches. Pure,
+    deterministic, **never a guess**: matching is exact-string only — no
+    normalisation, no substring/prefix, no fuzzy fallback. Fuzzy candidate
+    scoring is ``match``'s job (WP-006); a partial match here would defeat the
+    determinism contract (Armor §9 / WP Notes).
+
+    Invocations are unique in a gate-passing inventory (RT-02, no-duplicate),
+    so the first exact hit is the only hit; returning it is well-defined.
+    """
+    for entry in entries:
+        if entry.invocation == invocation:
+            return entry
+    return None
