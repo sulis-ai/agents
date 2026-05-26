@@ -1,5 +1,5 @@
 ---
-name: status
+name: wp-status
 description: >
   Read-only INDEX summary in plain English. Usage:
   /sulis:status. Shows what's done, what's in-flight, what's
