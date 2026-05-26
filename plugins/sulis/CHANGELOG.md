@@ -1,5 +1,42 @@
 # Sulis — Changelog
 
+## v0.50.1 — 2026-05-26
+
+**Fix terminal-launcher spawn — a live dogfood surfaced that `sulis-change start --spawn` opened a window but never started the bound `claude` session.**
+
+A real `sulis-change start --spawn` opened a macOS Terminal window that printed:
+
+```
+launch.sh: line 4: unset: EUID: cannot unset: readonly variable
+launch.sh: line 4: unset: PPID: cannot unset: readonly variable
+launch.sh: line 4: unset: SHELLOPTS: cannot unset: readonly variable
+launch.sh: line 4: unset: UID: cannot unset: readonly variable
+```
+
+…then dropped to a bare shell. `claude` never started.
+
+### Bug 1 (CRITICAL) — the env-scrub aborted the launch under `set -e`
+
+The MUC-2 env-scrub line (`unset $(compgen -v | grep -Ev '^(PATH|HOME|USER|TERM|LANG|LC_.*)$')`) ran `unset` over **every** var `compgen -v` lists — including bash readonly vars (`EUID`, `UID`, `PPID`, `SHELLOPTS`, `BASHOPTS`, `BASH_VERSINFO`, …). `unset` on a readonly var returns non-zero, and the script runs under `set -euo pipefail`, so it aborted at line 4 **before `exec claude`** — every spawn silently failed to a bare shell.
+
+Fixed two complementary ways: (1) the grep `-Ev` pattern now also excludes the known bash readonly + shell-internal vars (`EUID|UID|GID|PPID|SHELLOPTS|BASHOPTS|BASH_VERSINFO|BASH_.*|IFS|PWD|OLDPWD|SHLVL|_`); (2) the unset is now non-fatal — `unset -v $(...) 2>/dev/null || true` silences the per-var error spam and the trailing `|| true` guarantees the line can't abort the script under `-e`. The scrub intent is preserved: every non-carry-over env var is still scrubbed so the spawned session can't inherit the parent's secrets; `PATH/HOME/USER/TERM/LANG/LC_*` are still carried over.
+
+### Bug 2 — session.json recorded a known-dead pid
+
+`session.json` recorded the osascript helper pid, which exits within ~1s — so `focus`'s `kill -0 <pid>` liveness check was always false. The macOS launcher now runs osascript synchronously and reads back the spawned tab's `tty` (`tty of newTab`), recording it as the liveness handle (`pid_kind: "session"`, `pid: null`). When the tty can't be parsed it degrades honestly (`pid_kind: "launcher"`, `tty: null`) rather than recording a misleading dead pid. `session.json` and the spawn-result dict gain `pid_kind` + `tty` fields; Linux/headless dispatchers set `pid_kind` honestly too (`launcher` for the emulator pid, `session` for the headless shell).
+
+### Bug 3 — the window opened in the background
+
+The macOS osascript now `activate`s Terminal before `do script`, so the spawned window comes to the foreground instead of opening behind the founder's current app. Linux emulators foreground themselves on launch, so no change there.
+
+### Bug 4 — agent invocation form (flagged for live re-verify)
+
+`entry_command` defaults to `claude --agent sulis`; the running plugin agent is `sulis:sulis` (plugin-qualified). The scrubbed script aborted before `exec`, so whether bare `sulis` resolves to the plugin agent was never confirmed live. `entry_command` is already configurable; the calling session should confirm the agent name resolves on the next live spawn (and switch the default to `sulis:sulis` if bare `sulis` does not resolve).
+
+### Test gap closed
+
+The existing tests MOCKED subprocess and only string-matched the generated script, so the `set -e` abort was invisible. A new regression test **actually executes the generated script under bash** (entry_command swapped for the harmless marker `printf reached-exec`) and asserts it exits 0, reaches the exec line, and emits no readonly-var spam. It fails on the old code and passes on the fix. 382 unit tests green (two runs).
+
 ## v0.50.0 — 2026-05-26
 
 **Phase 6c — the final slice of Phase 6 of the change-as-primitive build. Phase 6 COMPLETE: the full founder-facing CLI surface is live.**

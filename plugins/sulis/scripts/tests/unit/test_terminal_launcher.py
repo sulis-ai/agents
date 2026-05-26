@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import stat
+import subprocess
 from pathlib import Path
 from unittest import mock
 
@@ -105,7 +106,14 @@ def test_validate_worktree_path_rejects_file_not_dir(tmp_path):
 
 def test_build_launch_script_includes_env_scrub(tmp_path):
     script = tl._build_launch_script(_GOOD_ULID, tmp_path)
-    assert "unset $(compgen -v | grep -Ev '^(PATH|HOME|USER|TERM|LANG|LC_.*)$')" in script
+    # compgen-based scrub that carries over the whitelist...
+    assert "compgen -v | grep -Ev" in script
+    assert "PATH|HOME|USER|TERM|LANG|LC_.*" in script
+    # ...and is hardened against the `set -e` readonly-var abort (the dogfood
+    # bug): readonly bash vars excluded + stderr silenced + non-fatal.
+    assert "EUID" in script
+    assert "SHELLOPTS" in script
+    assert "2>/dev/null || true" in script
 
 
 def test_build_launch_script_exports_sulis_change_id(tmp_path):
@@ -127,15 +135,87 @@ def test_build_launch_script_cd_then_exec_order(tmp_path):
     assert cd_idx < exec_idx
 
 
+# ─── Regression: execute the generated script under bash ───────────────────
+# The mocked content-assertion tests above never *ran* the script, so the
+# `set -euo pipefail` abort on bash readonly vars (EUID/UID/PPID/SHELLOPTS/...)
+# in the env-scrub line was invisible — a real spawn dropped to a bare shell
+# and `claude` never started. This test actually executes the generated
+# script under bash with the entry_command swapped for a harmless marker,
+# proving the env-scrub does NOT abort and the final exec line is reached.
+
+
+def test_generated_script_runs_to_exec_under_bash(tmp_path):
+    """The generated launch script must run to its exec line under bash.
+
+    Regression guard for the env-scrub `set -e` abort: bash readonly vars
+    (EUID, UID, PPID, SHELLOPTS, BASH_VERSINFO, ...) are present in this very
+    process, so a non-resilient `unset` of them aborts the script before the
+    exec line. We swap entry_command for a harmless lowercase marker the
+    validator accepts (`printf reached-exec`) and assert the marker is printed
+    AND the script exits 0.
+    """
+    script = tl._build_launch_script(
+        _GOOD_ULID, tmp_path, entry_command="printf reached-exec",
+    )
+    script_path = tmp_path / "launch.sh"
+    script_path.write_text(script)
+    result = subprocess.run(
+        ["bash", str(script_path)],
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+    )
+    assert result.returncode == 0, (
+        f"script aborted (exit {result.returncode}); "
+        f"stderr={result.stderr!r}"
+    )
+    assert "reached-exec" in result.stdout, (
+        f"exec line not reached; stdout={result.stdout!r} "
+        f"stderr={result.stderr!r}"
+    )
+
+
+def test_generated_script_scrub_does_not_spam_readonly_errors(tmp_path):
+    """The env-scrub must not print `cannot unset ... readonly variable` spam.
+
+    Even with `|| true` guarding the exit code, an unguarded stderr stream
+    floods the founder's terminal with one error line per bash readonly var.
+    Routing stderr to /dev/null keeps the spawned window clean.
+    """
+    script = tl._build_launch_script(
+        _GOOD_ULID, tmp_path, entry_command="printf reached-exec",
+    )
+    script_path = tmp_path / "launch.sh"
+    script_path.write_text(script)
+    result = subprocess.run(
+        ["bash", str(script_path)],
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+    )
+    assert "readonly variable" not in result.stderr, (
+        f"env-scrub spammed readonly-var errors: stderr={result.stderr!r}"
+    )
+    assert "cannot unset" not in result.stderr
+
+
 # ─── WP-002: _launch_macos ────────────────────────────────────────────────
+
+
+def _fake_osascript(stdout: str):
+    """Build a fake subprocess.run CompletedProcess-like object."""
+    fake = mock.Mock()
+    fake.stdout = stdout
+    fake.stderr = ""
+    fake.returncode = 0
+    return fake
 
 
 def test_launch_macos_invokes_osascript(tmp_path):
     script_path = tmp_path / "launch.sh"
     script_path.write_text("#!/usr/bin/env bash\n")
-    fake_proc = mock.Mock()
-    fake_proc.pid = 4321
-    with mock.patch.object(tl.subprocess, "Popen", return_value=fake_proc) as p:
+    with mock.patch.object(tl.subprocess, "run",
+                           return_value=_fake_osascript("/dev/ttys003\n")) as p:
         tl._launch_macos(script_path, _GOOD_ULID, visible=True)
     args = p.call_args[0][0]
     assert "osascript" in args
@@ -143,16 +223,54 @@ def test_launch_macos_invokes_osascript(tmp_path):
     assert "tell" in joined and "Terminal" in joined and "do script" in joined
 
 
-def test_launch_macos_returns_spawned_dict(tmp_path):
+def test_launch_macos_activates_terminal_to_foreground(tmp_path):
+    """Bug 3: the AppleScript must `activate` Terminal so the window comes to
+    the foreground rather than opening behind the founder's current app."""
     script_path = tmp_path / "launch.sh"
     script_path.write_text("#!/usr/bin/env bash\n")
-    fake_proc = mock.Mock()
-    fake_proc.pid = 4321
-    with mock.patch.object(tl.subprocess, "Popen", return_value=fake_proc):
+    with mock.patch.object(tl.subprocess, "run",
+                           return_value=_fake_osascript("/dev/ttys003\n")) as p:
+        tl._launch_macos(script_path, _GOOD_ULID, visible=True)
+    joined = " ".join(p.call_args[0][0])
+    assert "activate" in joined
+
+
+def test_launch_macos_captures_tty_as_session_handle(tmp_path):
+    """Bug 2: when the tab's tty is read back, record it with
+    pid_kind="session" (a real liveness handle) instead of a dead pid."""
+    script_path = tmp_path / "launch.sh"
+    script_path.write_text("#!/usr/bin/env bash\n")
+    with mock.patch.object(tl.subprocess, "run",
+                           return_value=_fake_osascript("/dev/ttys007\n")):
         result = tl._launch_macos(script_path, _GOOD_ULID, visible=True)
     assert result["status"] == "spawned"
     assert result["terminal_app_used"] == "Terminal.app"
-    assert isinstance(result["pid"], int)
+    assert result["tty"] == "/dev/ttys007"
+    assert result["pid_kind"] == "session"
+    assert result["error"] is None
+
+
+def test_launch_macos_degrades_honestly_when_no_tty(tmp_path):
+    """Bug 2 honest-degrade: if the tty can't be parsed, flag
+    pid_kind="launcher" (don't record a misleading handle)."""
+    script_path = tmp_path / "launch.sh"
+    script_path.write_text("#!/usr/bin/env bash\n")
+    with mock.patch.object(tl.subprocess, "run",
+                           return_value=_fake_osascript("garbage not-a-tty\n")):
+        result = tl._launch_macos(script_path, _GOOD_ULID, visible=True)
+    assert result["status"] == "spawned"
+    assert result["tty"] is None
+    assert result["pid_kind"] == "launcher"
+
+
+def test_launch_macos_returns_spawned_dict(tmp_path):
+    script_path = tmp_path / "launch.sh"
+    script_path.write_text("#!/usr/bin/env bash\n")
+    with mock.patch.object(tl.subprocess, "run",
+                           return_value=_fake_osascript("/dev/ttys003\n")):
+        result = tl._launch_macos(script_path, _GOOD_ULID, visible=True)
+    assert result["status"] == "spawned"
+    assert result["terminal_app_used"] == "Terminal.app"
     assert result["error"] is None
 
 
@@ -242,7 +360,9 @@ def test_launch_headless_returns_spawned_dict(tmp_path):
 def _spawned_dict(script_path: Path) -> dict:
     return {
         "status": "spawned",
-        "pid": 1234,
+        "pid": None,
+        "pid_kind": "session",
+        "tty": "/dev/ttys009",
         "terminal_app_used": "Terminal.app",
         "script_path": str(script_path),
         "error": None,
@@ -286,6 +406,10 @@ def test_launch_change_terminal_writes_session_json_on_spawn(tmp_path, monkeypat
     assert payload["change_id"] == _GOOD_ULID
     assert payload["terminal_app_used"] == "Terminal.app"
     assert "spawned_at" in payload
+    # Bug 2: session.json records pid_kind + tty so focus's liveness check
+    # has a real handle and never trusts a known-dead launcher pid.
+    assert payload["pid_kind"] == "session"
+    assert payload["tty"] == "/dev/ttys009"
 
 
 def test_launch_change_terminal_does_not_write_session_json_on_failure(tmp_path, monkeypatch):
