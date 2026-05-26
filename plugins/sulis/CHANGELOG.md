@@ -1,5 +1,25 @@
 # Sulis — Changelog
 
+## v0.47.0 — 2026-05-26
+
+**Phase 6a of the change-as-primitive build — the founder-facing `/sulis:change` lifecycle command.**
+
+Authors `plugins/sulis/skills/change/SKILL.md` via add-skill v0.7.0 (STANDARD tier, founder-facing, dual-register). One command, five subcommands, all of which orchestrate the already-built Phase 5 infrastructure — no new Python; the underlying machinery (`sulis-change`, `_terminal_launcher.py`, `_wpxlib.py`) already exists and is wired in the skill body.
+
+### Subcommands
+
+- **`start <slug-or-intent> [--primitive P] [--intent "..."]`** — picks the change primitive from the founder's intent if not given (22-primitive vocab in `references/change-primitives.md`; default `feat`), echoes the plan in plain English, then runs `sulis-change start --slug --primitive --spawn --intent`. That creates the `change/{primitive}-{slug}` branch + worktree, writes the recon `CONTEXT.md`, and opens a focused terminal running `claude --agent sulis` bound via `SULIS_CHANGE_ID`. Reports the `CH-XXXXXX` handle + that a new terminal opened; on spawn failure surfaces the manual `cd worktree && claude --agent sulis` fallback (branch/worktree/recon all survive).
+- **`list`** — **file-based, no SQLite.** Merges `.changes/*.yaml` manifests + `~/.sulis/changes/*/session.json` + `git branch --list 'change/*'` into one scannable founder-English list (≤10 most-recent + "+N more"; primitive translated to a plain noun; handle, not raw ULID, as the reference). A `session.json` is checked for liveness via `kill -0 <pid>`.
+- **`focus <CH-handle>`** — reattaches. Live session → point at the existing terminal (no second spawn). Dead/absent session → re-spawn via `launch_change_terminal` with the same change context.
+- **`ship <CH-handle>`** — the SOLO landing flow (this repo is `contribution_model: solo`). Push branch → `gh pr create --base dev` → wait for `branch-ci` → `gh pr merge --squash --delete-branch` → sync `dev`. Echo-before-act + prompt-before-destroy on the merge (Rule 3); STOP-no-merge on a red check (surfaces the PR URL + next step); lands on **`dev` ONLY** — promotion to `main` is a separate, deliberate founder act.
+- **`rebase <CH-handle>`** — runs `back_integrate_change_branch` (merge-not-rebase per CW-04, preserving SHAs for in-flight WP worktrees). Reports `already_current` / `merged_ok` / `merge_conflict` / `fetch_failed` in plain English; never auto-resolves a conflict.
+
+### Verification
+
+`VERIFICATION_REPORT.md` co-located: **Verdict PASS** across all STANDARD dimensions. Codebase Referential Integrity 5/5 — every named tool, helper, manifest path, and workflow verified on disk. 9 adversarial misuse cases, all PREVENTED with a named mechanism: MUC-F3 (ship triggered by ambiguous phrasing — the headline destructive case), MUC-F1 (operator-vocab leak), MUC-F2/F5 (acting on a stale `session.json` pid), MUC-F4 (list overwhelm), MUC-R1/R2 (technical-mode leak / stripping a load-bearing identifier), plus never-merge-on-red and ship-never-reaches-main.
+
+Founder tone stack applied: AAF + FE (FE-09 no mechanism narration) + Founder-Facing Conventions Rules 1-6 (echo-before-act, prompt-before-destroy, plain-English translation at the seam, dual-register default-founder). Docs/skill change only — no Python touched.
+
 ## v0.46.1 — 2026-05-26
 
 **Harden terminal-launcher file-I/O — unguarded writes now return structured errors.**
