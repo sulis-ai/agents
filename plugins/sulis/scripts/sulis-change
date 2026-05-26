@@ -106,7 +106,7 @@ def _build_change_pre_prompt(
     slug: str,
     intent: str,
     primitive: str,
-    context_md_path: Path,
+    context_md_path: Path | None,
 ) -> str:
     """Assemble the HERE-DOC body briefing Sulis on the change.
 
@@ -115,13 +115,26 @@ def _build_change_pre_prompt(
     secrets, never the heredoc tag (the launcher's _validate_pre_prompt
     rejects bodies containing it). Reading the recon file is the spawned
     Claude's job.
+
+    ``context_md_path`` may be None when recon could not be written (best-
+    effort); in that case the brief omits the recon-file reference.
     """
+    if context_md_path is not None:
+        recon_line = (
+            f"Pre-spawn recon is at {context_md_path} — read it for git state "
+            f"and the suggested next step, then greet me in change-context mode."
+        )
+    else:
+        recon_line = (
+            "Pre-spawn recon was unavailable (the recon file could not be "
+            "written); greet me in change-context mode and run `/sulis:status` "
+            "to orient."
+        )
     body = (
         f"You are Sulis, focused on change {handle}: \"{intent}\".\n"
         f"This is a '{primitive}' change (slug: {slug}, id: {change_id}).\n"
         f"Your working directory is the change worktree.\n"
-        f"Pre-spawn recon is at {context_md_path} — read it for git state "
-        f"and the suggested next step, then greet me in change-context mode."
+        f"{recon_line}"
     )
     # Defence in depth: never let the reserved tag into the body.
     if _PRE_PROMPT_HEREDOC_TAG in body:
@@ -183,11 +196,17 @@ def cmd_start(args: argparse.Namespace) -> None:
 
     # Pre-spawn recon — unconditional (cheap, useful artefact; nothing
     # downstream is harmed). Produces ~/.sulis/changes/{change_id}/CONTEXT.md.
+    # Best-effort: write_change_context returns None if the path is unwritable
+    # (permission / read-only FS / disk full). A recon-write failure degrades
+    # gracefully — the spawn proceeds without CONTEXT.md rather than crashing.
     context_path = write_change_context(
         change_id=change_id,
         metadata=metadata,
         repo_root=repo_root,
     )
+    if context_path is None:
+        _log("Pre-spawn recon could not be written (path unwritable); "
+             "continuing without CONTEXT.md")
 
     # Optional terminal spawn (WP-004). Spawn failure does NOT unwind the
     # change-creation work — the JSON surfaces spawn_result.status so the
@@ -220,7 +239,7 @@ def cmd_start(args: argparse.Namespace) -> None:
         "base_branch": base_ref,
         "base_sha": base_sha,
         "metadata_path": str(_metadata_path(worktree_dest, primitive, slug)),
-        "context_md_path": str(context_path),
+        "context_md_path": str(context_path) if context_path is not None else None,
         "spawn_result": spawn_result,
     })
 

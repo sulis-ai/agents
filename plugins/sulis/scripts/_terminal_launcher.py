@@ -369,10 +369,23 @@ def launch_change_terminal(
         extra_env=extra_env, pre_prompt=pre_prompt,
     )
 
-    change_dir = _change_dir(change_id)
-    script_path = change_dir / "launch.sh"
-    script_path.write_text(script_body)
-    script_path.chmod(0o755)
+    # File-I/O hardening: an unwritable change dir / launch.sh (permission
+    # denied, read-only FS, disk full) must surface the module's structured
+    # _failed(...) dict — never an unhandled OSError traceback to the founder.
+    try:
+        change_dir = _change_dir(change_id)
+        script_path = change_dir / "launch.sh"
+        script_path.write_text(script_body)
+        script_path.chmod(0o755)
+    except OSError as exc:
+        target = Path.home() / ".sulis" / "changes" / change_id / "launch.sh"
+        result = _failed(
+            f"could not write launch script at {target}: {exc.strerror or exc} "
+            f"(check the path is writable and the disk is not full)",
+            target,
+        )
+        result["session_json_path"] = ""
+        return result
 
     dispatcher = _dispatch_for_platform(visible, platform.system())
     if dispatcher is None:
@@ -390,11 +403,21 @@ def launch_change_terminal(
         result = dispatcher(script_path, change_id, visible)
 
     if result["status"] == "spawned":
-        session_path = _write_session_json(
-            change_dir, change_id, result["pid"],
-            result["terminal_app_used"], script_path,
-        )
-        result["session_json_path"] = str(session_path)
+        # session.json is best-effort reattach bookkeeping (Phase 6 deferred);
+        # a write failure must not unwind an already-spawned terminal. Degrade
+        # to an empty session_json_path and log, rather than raise.
+        try:
+            session_path = _write_session_json(
+                change_dir, change_id, result["pid"],
+                result["terminal_app_used"], script_path,
+            )
+            result["session_json_path"] = str(session_path)
+        except OSError as exc:
+            logger.warning(
+                "could not write session.json for change %s: %s",
+                change_id, exc,
+            )
+            result["session_json_path"] = ""
     else:
         result["session_json_path"] = ""
     return result

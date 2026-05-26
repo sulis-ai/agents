@@ -339,6 +339,65 @@ def test_launch_change_terminal_uses_headless_on_unknown_platform_invisible(tmp_
     assert m.call_count == 1
 
 
+# ─── Hardening: file-I/O guards (OSError → structured _failed) ────────────
+
+
+def test_launch_change_terminal_returns_failed_when_write_text_raises(tmp_path, monkeypatch):
+    """An unwritable launch.sh path must surface a structured failure, not raise."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl.Path, "write_text",
+                              side_effect=PermissionError(13, "Permission denied")), \
+            mock.patch.object(tl.subprocess, "Popen") as p:
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path)
+    assert result["status"] == "failed"
+    assert result["pid"] is None
+    assert result["error"]
+    assert "launch.sh" in result["error"]
+    assert "session_json_path" in result
+    assert result["session_json_path"] == ""
+    assert p.call_count == 0  # never reached the spawn
+
+
+def test_launch_change_terminal_returns_failed_when_chmod_raises(tmp_path, monkeypatch):
+    """A chmod failure on the launch script must degrade to a structured failure."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl.Path, "chmod",
+                              side_effect=OSError(30, "Read-only file system")), \
+            mock.patch.object(tl.subprocess, "Popen") as p:
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path)
+    assert result["status"] == "failed"
+    assert result["error"]
+    assert p.call_count == 0
+
+
+def test_launch_change_terminal_returns_failed_when_mkdir_raises(tmp_path, monkeypatch):
+    """An unwritable ~/.sulis/changes dir must surface a structured failure."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl.Path, "mkdir",
+                              side_effect=PermissionError(13, "Permission denied")), \
+            mock.patch.object(tl.subprocess, "Popen") as p:
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path)
+    assert result["status"] == "failed"
+    assert result["error"]
+    # The change_id should appear in the error so the founder can locate the path.
+    assert _GOOD_ULID in result["error"] or ".sulis" in result["error"]
+    assert p.call_count == 0
+
+
+def test_launch_change_terminal_failure_error_names_the_os_error(tmp_path, monkeypatch):
+    """The structured error message must include the underlying OS error text."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl.Path, "write_text",
+                              side_effect=OSError(28, "No space left on device")):
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path)
+    assert result["status"] == "failed"
+    assert "No space left on device" in result["error"]
+
+
 # ─── WP-006: _validate_pre_prompt ─────────────────────────────────────────
 
 
