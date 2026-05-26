@@ -39,6 +39,12 @@ This standard adds the **backend-specific execution shape** only. It does
   "is there a port already?" precedes any new adapter).
 - `WORK_PACKAGE_STANDARD.md` — the WP shape; this is its `kind: backend`
   execution detail.
+- `CONTRACT_FIRST_STANDARD.md` — the **seam** to the consumer. When a backend
+  WP sits across a producer/consumer boundary, the *contract* is owned there
+  (CF-02); this standard governs what the backend does *behind* it. The three
+  error categories WPB-06 emits **are** the contract's error model (CF-03);
+  WPB-11's API conventions live *inside* a CF contract; WPB-09's "done means
+  wired" is completed by CF-07's conformance check at the seam.
 
 ---
 
@@ -202,7 +208,9 @@ When a backend WP exposes HTTP, default to the established conventions
 (per `convention-preference-standard.md`): **OpenAPI-first**, conventional
 status codes (201 create, 204 delete, 400/404/409), **cursor pagination**,
 explicit **versioning** (`/v{n}`), consistent error envelopes. Mobile-/SDK-
-specific optimisations are **out of scope** unless the WP requires them.
+specific optimisations are **out of scope** unless the WP requires them. When
+this surface is consumed across a seam, the OpenAPI spec **is** the contract —
+see `CONTRACT_FIRST_STANDARD.md` (CF-02/CF-08).
 
 > **Anti-pattern:** bespoke status-code schemes; offset pagination by
 > default; unversioned breaking changes; inventing an error format per
