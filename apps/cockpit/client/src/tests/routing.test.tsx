@@ -7,21 +7,48 @@
 //
 // Pages are rendered inside <Shell />, so the sidebar testid is also
 // present in every case (the layout wraps every route).
+//
+// WP-012 made the Sidebar a TanStack-Query consumer and turned the
+// Dashboard into a query-driven page; this test wraps in a
+// QueryClientProvider and mocks fetch.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppRoutes } from "../App";
+
+function freshClient() {
+  return new QueryClient({
+    defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+  });
+}
+
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
 
 function renderAt(path: string) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <AppRoutes />
-    </MemoryRouter>,
+    <QueryClientProvider client={freshClient()}>
+      <MemoryRouter initialEntries={[path]}>
+        <AppRoutes />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
 describe("App routes", () => {
+  beforeEach(() => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, []));
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("renders Dashboard at /", () => {
     renderAt("/");
     expect(screen.getByTestId("page-dashboard")).toBeInTheDocument();

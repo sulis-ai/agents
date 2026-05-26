@@ -1,0 +1,30 @@
+/* WP-012 — EmptyState styles. */
+
+.wrap {
+  text-align: center;
+  padding: 64px 24px;
+  color: #586069;
+}
+
+.headline {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 12px;
+  color: #24292e;
+}
+
+.body {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.command {
+  background: #f6f8fa;
+  border: 1px solid #e1e4e8;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  color: #24292e;
+}
