@@ -32,6 +32,9 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 function renderAt(path: string) {
+  // Since WP-013, the ThreadView route calls useChange/useTranscript;
+  // wrap routes in a QueryClientProvider so any route is renderable.
+  // freshClient() gives test-friendly defaults (retry off, focus-refetch off).
   return render(
     <QueryClientProvider client={freshClient()}>
       <MemoryRouter initialEntries={[path]}>
