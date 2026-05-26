@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import multiprocessing
 import sys
-import time
 from pathlib import Path
 
 import pytest
@@ -229,14 +228,22 @@ def test_train_lock_releases_on_exception(tmp_path):
         pass
 
 
-def _acquire_and_hold(lock_path_str: str, hold_seconds: float) -> None:
-    """Helper for the concurrency test — runs in a subprocess."""
+def _acquire_and_hold(lock_path_str, acquired, release) -> None:
+    """Helper for the concurrency test — runs in a subprocess.
+
+    Acquires the flock, writes its PID, *then* signals `acquired` so the
+    parent knows the lock is held before it attempts its own acquisition.
+    Holds until the parent signals `release` (bounded by a timeout so a
+    crashed parent can never orphan this process).
+    """
     import fcntl
     fh = open(lock_path_str, "w", encoding="utf-8")
     fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
-    fh.write(f"{multiprocessing.current_process().pid}\n")
+    pid = multiprocessing.current_process().pid
+    fh.write(f"{pid}\n")
     fh.flush()
-    time.sleep(hold_seconds)
+    acquired.set()  # lock is held + PID written — parent may now proceed
+    release.wait(timeout=10.0)  # hold until told to release (bounded)
     fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
     fh.close()
 
@@ -244,16 +251,23 @@ def _acquire_and_hold(lock_path_str: str, hold_seconds: float) -> None:
 def test_train_lock_second_acquisition_raises(tmp_path):
     """Concurrent acquisition raises RuntimeError naming the existing holder's PID."""
     lock_path = tmp_path / "train-1.lock"
-    # Hold the lock from a subprocess for 1 second
-    proc = multiprocessing.Process(target=_acquire_and_hold, args=(str(lock_path), 1.0))
+    acquired = multiprocessing.Event()
+    release = multiprocessing.Event()
+    # Hold the lock from a subprocess until we signal release.
+    proc = multiprocessing.Process(
+        target=_acquire_and_hold, args=(str(lock_path), acquired, release)
+    )
     proc.start()
-    time.sleep(0.2)  # let the subprocess grab the lock
     try:
+        # Deterministic sync: wait for the subprocess to actually hold the
+        # lock (no timing window) before attempting our own acquisition.
+        assert acquired.wait(timeout=5.0), "subprocess never acquired the lock"
         with pytest.raises(RuntimeError, match="being acted on by PID"):
             with TrainLock(tmp_path, "train-1"):
                 pass
     finally:
-        proc.join(timeout=2.0)
+        release.set()  # let the subprocess release + exit cleanly
+        proc.join(timeout=5.0)
 
 
 # ─── cleanup_train_state ────────────────────────────────────────────────
