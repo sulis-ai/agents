@@ -42,10 +42,44 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
 logger = logging.getLogger("sulis.change_state")
+
+
+# ─── State-base resolver (single source of truth for ~/.sulis) ─────────────
+
+
+def sulis_state_base() -> Path:
+    """Resolve the Sulis local-state base dir.
+
+    Returns ``Path(os.environ["SULIS_STATE_DIR"])`` when that env var is set
+    (used by tests + by any caller that wants an isolated store), else the
+    production default ``~/.sulis``.
+
+    This is the ONE place the base is computed. Every reader/writer of the
+    local store (``_change_state``, ``_change_context``, ``sulis-change``'s
+    start/list/nuke, the global-index reader) routes through here — no module
+    should hard-code ``Path.home() / ".sulis"``. Honouring SULIS_STATE_DIR is
+    what lets subprocess-based tests point at a tmp dir and stop polluting the
+    real home (and, by extension, the dashboard's global view).
+    """
+    override = os.environ.get("SULIS_STATE_DIR")
+    if override:
+        return Path(override)
+    return Path.home() / ".sulis"
+
+
+def changes_base() -> Path:
+    """The dir holding per-change local state: ``{state_base}/changes/``."""
+    return sulis_state_base() / "changes"
+
+
+def change_dir(change_id: str) -> Path:
+    """The per-change local dir: ``{state_base}/changes/{change_id}/``."""
+    return changes_base() / change_id
 
 
 # Canonical ordered workflow stages. Order is meaningful (recon is first,
@@ -74,8 +108,13 @@ def _now_iso() -> str:
 
 
 def _state_path(change_id: str) -> Path:
-    """Absolute path to a change's state.json under ~/.sulis/changes/."""
-    return Path.home() / ".sulis" / "changes" / change_id / "state.json"
+    """Absolute path to a change's state.json under {state_base}/changes/."""
+    return change_dir(change_id) / "state.json"
+
+
+def _change_record_path(change_id: str) -> Path:
+    """Absolute path to a change's change.json under {state_base}/changes/."""
+    return change_dir(change_id) / "change.json"
 
 
 def _emit_warning(message: str) -> None:
@@ -162,3 +201,108 @@ def read_change_stage(change_id: str) -> str | None:
         return None
     stage = state.get("stage")
     return stage if isinstance(stage, str) else None
+
+
+# ─── Global change record (the branch-independent index entry) ─────────────
+
+
+# The fields the global-index record carries. The record is the cross-change
+# source of truth for a change's IDENTITY (everything except the live workflow
+# position). The live ``stage`` cursor stays in state.json (it carries history
+# and is appended on every advance); ``list_all_changes`` overlays the live
+# stage onto each record so there is ONE authoritative live stage (state.json)
+# and change.json's ``stage`` is only the seed written at start. This is the
+# deliberate "don't duplicate stage in two files that can drift" resolution.
+_CHANGE_RECORD_FIELDS: tuple[str, ...] = (
+    "change_id",
+    "handle",
+    "slug",
+    "primitive",
+    "branch",
+    "worktree_path",
+    "intent",
+    "base_branch",
+    "created_at",
+    "stage",
+)
+
+
+def write_change_record(change_id: str, record: dict) -> Path | None:
+    """Write the full per-change record to ``{change_dir}/change.json``.
+
+    ``record`` supplies the _CHANGE_RECORD_FIELDS; missing keys are written as
+    "" (str) except ``stage`` which defaults to "recon". This is the branch-
+    independent global-index entry the dashboard + ``sulis-change list`` read
+    (git is per-branch, so a committed manifest on the change branch can't be
+    enumerated from dev — this record can).
+
+    Best-effort, mirroring write_change_stage: an unwritable path degrades to
+    ``None`` + a logged warning rather than raising — ``sulis-change start``
+    must never abort because the local store is unwritable.
+    """
+    payload = {field: record.get(field, "") for field in _CHANGE_RECORD_FIELDS}
+    payload["change_id"] = change_id
+    if not payload.get("stage"):
+        payload["stage"] = "recon"
+
+    record_path = _change_record_path(change_id)
+    try:
+        record_path.parent.mkdir(parents=True, exist_ok=True)
+        record_path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        _emit_warning(
+            f"could not write change record at {record_path}: {exc} "
+            f"(the global-index record is best-effort; continuing without it)"
+        )
+        return None
+    return record_path.resolve()
+
+
+def read_change_record(change_id: str) -> dict | None:
+    """Read + parse ``change.json``. Returns the dict, or None if missing/corrupt."""
+    record_path = _change_record_path(change_id)
+    if not record_path.exists():
+        return None
+    try:
+        return json.loads(record_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        _emit_warning(f"could not read change record at {record_path}: {exc}")
+        return None
+
+
+def list_all_changes() -> list[dict]:
+    """Enumerate every change.json under ``{state_base}/changes/*/``.
+
+    Returns the full records, branch-independent (no git needed), sorted
+    most-recent-first by ``created_at`` (records without a parseable
+    ``created_at`` sort last). The live ``stage`` from each change's state.json
+    is overlaid onto the record so the returned ``stage`` reflects the current
+    workflow position (the single source of truth), not just the seed value.
+
+    Dirs without a readable change.json (legacy/partial changes that predate
+    this record, or a corrupt file) are skipped — the record is the index, and
+    a change without one isn't in the global view until it's re-recorded.
+
+    Best-effort: an unreadable changes base yields ``[]``.
+    """
+    base = changes_base()
+    try:
+        candidates = [d for d in base.iterdir() if d.is_dir()]
+    except OSError:
+        return []
+
+    records: list[dict] = []
+    for d in candidates:
+        record = read_change_record(d.name)
+        if record is None:
+            continue
+        live_stage = read_change_stage(d.name)
+        if live_stage is not None:
+            record["stage"] = live_stage
+        records.append(record)
+
+    records.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+    return records

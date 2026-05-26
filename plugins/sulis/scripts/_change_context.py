@@ -21,6 +21,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+from _change_state import change_dir  # noqa: E402
 from _wpxlib import _run  # noqa: E402
 
 logger = logging.getLogger("sulis.change_context")
@@ -163,10 +164,10 @@ def write_change_context(
 
     body = _render_context_md(change_id, metadata, git_state)
 
-    change_dir = Path.home() / ".sulis" / "changes" / change_id
-    context_path = change_dir / "CONTEXT.md"
+    dest_dir = change_dir(change_id)
+    context_path = dest_dir / "CONTEXT.md"
     try:
-        change_dir.mkdir(parents=True, exist_ok=True)
+        dest_dir.mkdir(parents=True, exist_ok=True)
         context_path.write_text(body, encoding="utf-8")
     except OSError as exc:
         logger.warning(
