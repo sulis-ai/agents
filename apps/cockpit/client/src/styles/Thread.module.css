@@ -1,0 +1,152 @@
+/* WP-013 — Thread page + header + tab styles. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.status {
+  padding: 32px 16px;
+  color: #586069;
+  font-size: 14px;
+  text-align: center;
+}
+
+.goneOrMoved {
+  padding: 32px 16px;
+  background: #fff5f5;
+  border: 1px solid #ffd6d6;
+  border-radius: 8px;
+  color: #86181d;
+}
+
+.goneOrMovedDetail {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #86181d;
+  opacity: 0.85;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid #e1e4e8;
+}
+
+.left {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.handle {
+  font-weight: 600;
+  font-size: 16px;
+  color: #24292e;
+}
+
+.slug {
+  font-size: 13px;
+  color: #6a737d;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.stage {
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 4px;
+  background: #f1f8ff;
+  color: #0366d6;
+  border: 1px solid #c8e1ff;
+}
+
+.liveness {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #d1d5da;
+}
+.liveness[data-status="running"] {
+  background: #28a745;
+  box-shadow: 0 0 0 2px #d4f4dd;
+}
+.liveness[data-status="not-running"] {
+  background: #d1d5da;
+}
+.liveness[data-status="unknown"] {
+  background: #ffd33d;
+}
+
+.right {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.intent {
+  font-size: 13px;
+  color: #586069;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.tabBar {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #e1e4e8;
+}
+
+.tab,
+.tabActive {
+  padding: 8px 16px;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-size: 14px;
+  color: #586069;
+}
+
+.tabActive {
+  color: #24292e;
+  font-weight: 600;
+  border-bottom-color: #0366d6;
+}
+
+.tab:hover {
+  color: #24292e;
+}
+
+.panel {
+  padding-top: 4px;
+}
+
+.filesPlaceholder {
+  padding: 48px 16px;
+  text-align: center;
+  color: #6a737d;
+  font-style: italic;
+}

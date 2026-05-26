@@ -1,0 +1,113 @@
+name: cockpit-e2e
+
+# WP-016 — the cockpit's test + read-only-guarantee gate.
+#
+# Three things run here, in order of how load-bearing they are:
+#   1. The read-only inventory gate (check-read-only.sh) — the static proof
+#      the cockpit never writes (TDD §13.7, ADR-003). Cheap; runs first.
+#   2. The combined Vitest suite (`npm test` → `vitest run`) — server +
+#      client together. WP-016 made this deterministic (see vitest.config.ts
+#      + app.integration.test.ts). This is the suite CI must run combined,
+#      because the combined run is what proves the two surfaces compose.
+#   3. The Playwright end-to-end smoke — the founder walkthrough. Browsers
+#      are downloaded in CI; if the download is unavailable the e2e job is
+#      skipped (its `continue-on-error` guard) rather than failing the whole
+#      gate — the read-only gate + combined Vitest suite still block merge.
+
+on:
+  push:
+    paths:
+      - "apps/cockpit/**"
+      - ".github/workflows/cockpit-e2e.yml"
+  pull_request:
+    paths:
+      - "apps/cockpit/**"
+      - ".github/workflows/cockpit-e2e.yml"
+
+concurrency:
+  group: cockpit-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  read-only-and-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/cockpit
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Set up Python (for the change-store helper the server shells out to)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install workspace deps
+        run: npm install
+
+      # 1. Read-only guarantee — the load-bearing gate. Runs first, fails fast.
+      - name: Read-only inventory gate
+        run: bash scripts/check-read-only.sh
+
+      # 2. Combined Vitest suite (server + client together).
+      - name: Combined unit + integration tests
+        run: npm test
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: read-only-and-tests
+    defaults:
+      run:
+        working-directory: apps/cockpit
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Configure git identity (the e2e fixture inits a temp git repo)
+        run: |
+          git config --global user.email "ci@sulis-ai.invalid"
+          git config --global user.name "sulis-ci"
+
+      - name: Install workspace deps
+        run: npm install
+
+      # The browser download can fail on restricted runners; if it does we
+      # skip the e2e run (the read-only gate + combined Vitest suite in the
+      # required job above already gate the merge). We record the outcome so
+      # the step is visibly skipped rather than silently green.
+      - name: Install Playwright browser (chromium)
+        id: browsers
+        continue-on-error: true
+        run: npx playwright install --with-deps chromium
+
+      - name: Playwright end-to-end smoke
+        if: steps.browsers.outcome == 'success'
+        run: npm run test:e2e
+
+      - name: Note skipped e2e (browser unavailable)
+        if: steps.browsers.outcome != 'success'
+        run: echo "::warning::Playwright browser download failed — e2e smoke skipped. Read-only gate + combined Vitest suite still gated this change."
+
+      - name: Upload Playwright report on failure
+        if: failure() && steps.browsers.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/cockpit/playwright-report/
+          retention-days: 7

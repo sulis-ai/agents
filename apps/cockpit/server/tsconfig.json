@@ -1,0 +1,20 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "types": ["node", "vitest/globals"],
+    "outDir": "./dist",
+    "rootDir": ".."
+  },
+  "include": [
+    "index.ts",
+    "ports/**/*.ts",
+    "adapters/**/*.ts",
+    "routes/**/*.ts",
+    "lib/**/*.ts",
+    "tests/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
+}

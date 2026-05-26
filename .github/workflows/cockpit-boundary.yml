@@ -1,0 +1,43 @@
+name: cockpit-boundary
+
+# WP-001 — enforces the apps/cockpit/ extractability boundary (TDD §9,
+# ADR-008). This grep gate is a deliberate duplication of the ESLint
+# `no-restricted-paths` rule: ESLint only covers TS/JS files, this
+# regex catches any other file type that references a path outside the
+# workspace.
+
+on:
+  push:
+    paths:
+      - "apps/cockpit/**"
+      - ".github/workflows/cockpit-boundary.yml"
+  pull_request:
+    paths:
+      - "apps/cockpit/**"
+      - ".github/workflows/cockpit-boundary.yml"
+
+jobs:
+  boundary-grep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify the boundary gate itself (self-test)
+        shell: bash
+        run: python3 apps/cockpit/scripts/check-boundary.py --self-test
+
+      - name: Reject cross-boundary imports
+        shell: bash
+        # Resolves each relative import against its file location and fails
+        # only when the target escapes apps/cockpit/. Intra-cockpit imports
+        # (client/server → shared) are legitimate even at three-up depth,
+        # because the cockpit tree is itself three levels deep. The earlier
+        # grep gate could not resolve paths and produced false positives on
+        # every `client/src/** → ../../../shared` import. See the script
+        # docstring + ADR-008.
+        run: python3 apps/cockpit/scripts/check-boundary.py --root apps/cockpit

@@ -1,0 +1,62 @@
+/* WP-012 — Dashboard page styles. */
+
+.page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+  color: #24292e;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.skeleton {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.skeletonCard {
+  height: 120px;
+  background: linear-gradient(90deg, #f6f8fa 0%, #eef0f3 50%, #f6f8fa 100%);
+  background-size: 200% 100%;
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
+}
+
+.errorBox {
+  border: 1px solid #fdb8c0;
+  background: #ffeef0;
+  color: #86181d;
+  padding: 16px;
+  border-radius: 6px;
+}
+
+.errorHeading {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.errorMessage {
+  font-size: 13px;
+  margin: 0 0 12px;
+  color: #2f1419;
+}

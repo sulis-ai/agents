@@ -285,3 +285,10 @@ touching `plugins/sulis-execution/scripts/**`.
 - `../references/lifecycle.md` — 12-step lifecycle with tool-invocation patterns.
 - `../skills/run-all/SKILL.md` — calling-session orchestration; describes which tools the skill invokes.
 - `tests/README.md` — pytest suite walkthrough (v0.10.5+).
+
+## Cockpit helpers
+
+- `sulis-list-changes` — read-only CLI that prints the change-store
+  contents as JSON for the cockpit's `SulisChangeStoreReader` adapter
+  (WP-003, ADR-008). Wraps `_change_state.list_all_changes`,
+  `read_change_record`, `read_change_stage` — the canonical source.
