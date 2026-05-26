@@ -79,7 +79,10 @@ _PRE_PROMPT_MAX_BYTES = 50_000
 
 
 def validate_entry_command(cmd: str) -> tuple[bool, str]:
-    """Whitelist: ``^[a-z][a-z0-9 \\-]+$`` (default ``claude --agent sulis``).
+    """Whitelist: ``^[a-z][a-z0-9 \\-]+$`` (default
+    ``claude --dangerously-skip-permissions --agent sulis`` — the spawned
+    focused session runs unattended, so it skips interactive permission
+    prompts, matching how the founder runs Claude Code).
 
     Rejects shell metacharacters (``;``, ``&``, ``$``, backticks, ``|``,
     newlines) that would enable injection at script-generation time.
@@ -160,7 +163,7 @@ def _render_heredoc(tag: str, body: str) -> str:
 def _build_launch_script(
     change_id: str,
     worktree_path: Path,
-    entry_command: str = "claude --agent sulis",
+    entry_command: str = "claude --dangerously-skip-permissions --agent sulis",
     extra_env: dict[str, str] | None = None,
     pre_prompt: str | None = None,
 ) -> str:
@@ -432,7 +435,7 @@ def launch_change_terminal(
     worktree_path: Path | str,
     *,
     visible: bool = True,
-    entry_command: str = "claude --agent sulis",
+    entry_command: str = "claude --dangerously-skip-permissions --agent sulis",
     extra_env: dict[str, str] | None = None,
     pre_prompt: str | None = None,
 ) -> dict:
