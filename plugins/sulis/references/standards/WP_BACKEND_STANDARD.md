@@ -13,9 +13,10 @@ opinionated shape: a **hexagonal core** (pure domain behind ports), a
 **handler** as the single source of truth, **adapters** behind those ports
 with an **in-memory adapter first**, **authorization at the handler**,
 **typed Results** at the boundary, **outside-in TDD**, and a definition of
-done that means **wired, not just written**. This standard is the contract
-the executor follows for backend WPs and the rubric the reviewer scores
-against.
+done that means **wired, not just written**. This standard is the **shared
+contract across the loop**: it shapes backend WPs at **design** time, is the
+contract the executor follows at **implementation** time, and is the rubric
+the reviewer scores against at **review** time.
 <!-- detail -->
 
 ## Severity convention
@@ -38,6 +39,27 @@ This standard adds the **backend-specific execution shape** only. It does
   "is there a port already?" precedes any new adapter).
 - `WORK_PACKAGE_STANDARD.md` — the WP shape; this is its `kind: backend`
   execution detail.
+
+---
+
+## How this standard is used (design · implementation · review)
+
+A per-kind standard is the **single contract shared by every phase** that
+touches backend code:
+
+| Phase | Who | How this standard applies |
+|-------|-----|---------------------------|
+| **Design** | `draft-architecture` / `plan-work` (engineering-architect) | A `kind: backend` WP's Contract + Definition of Done are written to *target* these patterns — ports named, repository identified, handler + entry points listed, integration tests specified. The design **prescribes** the shape. |
+| **Implementation** | the executor | The executor **follows** the patterns building the WP, and its RED→GREEN→BLUE loop runs the outside-in discipline (WPB-08) against in-memory adapters (WPB-03). |
+| **Review** | `code-review` / `review` (security + quality lenses) | The reviewer **scores** the backend diff against WPB-01..12 as the rubric, and the verification gates below as the mechanical baseline. |
+
+> **Honest status (v0.1.0):** the doctrine is written, but the **wiring** that
+> makes design / executor / review *load this automatically for
+> `kind: backend`* is not built yet — that is the same per-kind dispatch gap
+> noted for the `kind` enum (the enum is declared; the dispatch that selects
+> the right per-kind standard is the next step). Today it is a standard
+> humans and agents cite explicitly; making it apply automatically across the
+> three phases is follow-on work.
 
 ---
 
@@ -186,6 +208,31 @@ specific optimisations are **out of scope** unless the WP requires them.
 > default; unversioned breaking changes; inventing an error format per
 > endpoint.
 
+### WPB-12 — Clean code + leave-it-better (boy scout) · MUST
+
+Every backend WP applies SOLID + clean code (`engineering-principles.md`
+EP-07) and `boring-code.md` — clear descriptive names, small focused
+functions, no duplication, explicit types, comments for "why" not "what".
+It **leaves every file it touches better than it found it** (the boy scout
+rule), **bounded to the WP's scope**: in-scope cleanups happen now;
+improvements that span other files are captured as separate work, never an
+unbounded side-quest inside this WP. **Structural** changes to existing
+code (extracting functions, splitting classes, changing an interface)
+follow the **characterisation-test-first** discipline — pin current
+behaviour with a test, confirm it passes, refactor, confirm it still passes.
+
+> **In practice:** adding a method to a handler, you tidy *that* handler;
+> you don't refactor three unrelated modules in the same WP.
+> **Anti-pattern:** god handlers; vague names (`data`, `manager`,
+> `helper`); an unbounded refactor sprawling across the codebase inside one
+> WP; a structural change with no characterisation test to prove behaviour
+> was preserved.
+
+> This pattern **points to** EP-07 + `boring-code.md` rather than restating
+> them — the canonical definitions live there; this entry makes the
+> expectation visible in the doctrine and adds the backend-execution nuance
+> (bounded boy-scout, characterisation-test-first for structural change).
+
 ---
 
 ## Verification gates (per `kind: backend`)
@@ -239,4 +286,4 @@ the language and framework are the implementer's choice.
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 0.1.0 | 2026-05-26 | Initial sulis-local definition. 11 patterns (WPB-01..WPB-11) consolidated from five practitioner docs into one opinionated, language-agnostic backend implementation doctrine. Companion to WORK_PACKAGE_STANDARD's `kind: backend`. SHOULD-tier patterns (WPB-06/10/11) carry 90-day calibration; promote to MUST on evidence from 3+ backend WP executions. |
+| 0.1.0 | 2026-05-26 | Initial sulis-local definition. 12 patterns (WPB-01..WPB-12) consolidated from five practitioner docs into one opinionated, language-agnostic backend implementation doctrine. Companion to WORK_PACKAGE_STANDARD's `kind: backend`. Used across design · implementation · review (wiring is follow-on per the per-kind dispatch gap). WPB-12 surfaces clean-code + boy-scout (pointer to EP-07/boring-code, with bounded-scope + characterisation-test-first nuance). SHOULD-tier patterns (WPB-06/10/11) carry 90-day calibration; promote to MUST on evidence from 3+ backend WP executions. |
