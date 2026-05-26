@@ -1,0 +1,165 @@
+/* WP-013 — Chat panel styles. CSS module (no Tailwind).
+ *
+ * The colours mirror the Shell + Sidebar palette (greys + GitHub-ish
+ * blue) so the thread surface feels continuous with the rest of the
+ * cockpit. Bubbles are intentionally soft (no hard borders) so the
+ * page reads as a conversation rather than a form.
+ */
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 0;
+}
+
+.status {
+  padding: 32px 16px;
+  color: #586069;
+  font-size: 14px;
+  text-align: center;
+}
+
+.retryButton {
+  margin-top: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  border: 1px solid #d1d5da;
+  background: #f6f8fa;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.retryButton:hover {
+  background: #e1e4e8;
+}
+
+.bubble {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border-radius: 8px;
+  max-width: 80%;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.bubbleUser {
+  align-self: flex-end;
+  background: #ddf4ff;
+  color: #0550ae;
+}
+
+.bubbleAssistant {
+  align-self: flex-start;
+  background: #f6f8fa;
+  color: #24292e;
+}
+
+.bubbleTime {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #6a737d;
+}
+
+.userText {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  background: transparent;
+}
+
+.textBlock {
+  margin: 4px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.collapsedBlock {
+  margin: 4px 0;
+  border: 1px solid #d1d5da;
+  border-radius: 6px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.collapsedHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  background: #f6f8fa;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+  color: #24292e;
+}
+.collapsedHeader:hover {
+  background: #e1e4e8;
+}
+
+.collapsedChevron {
+  font-size: 10px;
+  color: #586069;
+}
+
+.collapsedBody {
+  padding: 8px 10px;
+  border-top: 1px solid #d1d5da;
+  background: #fff;
+}
+
+.collapsedJson {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.systemChip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #fff8c5;
+  border: 1px solid #f0d77a;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #735c0f;
+  align-self: stretch;
+}
+
+.systemSubtype {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+}
+
+.systemText {
+  flex: 1 1 auto;
+  word-break: break-word;
+}
+
+.systemTime {
+  font-size: 11px;
+  color: #735c0f;
+  opacity: 0.7;
+}
+
+.empty {
+  padding: 48px 16px;
+  text-align: center;
+  color: #586069;
+}
+
+.emptyText {
+  margin: 0;
+  font-size: 14px;
+  font-style: italic;
+}

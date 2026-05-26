@@ -11,13 +11,22 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppRoutes } from "../App";
 
 function renderAt(path: string) {
+  // Since WP-013, the ThreadView route calls useChange/useTranscript;
+  // wrap routes in a QueryClientProvider so any route is renderable.
+  // Retry off, focus-refetch off — test-friendly defaults.
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+  });
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <AppRoutes />
-    </MemoryRouter>,
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[path]}>
+        <AppRoutes />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
