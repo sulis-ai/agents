@@ -22,36 +22,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify the boundary gate itself (self-test)
+        shell: bash
+        run: python3 apps/cockpit/scripts/check-boundary.py --self-test
+
       - name: Reject cross-boundary imports
         shell: bash
-        run: |
-          # Look for any source file under apps/cockpit/ whose relative
-          # imports escape the workspace (../../ or deeper). We allow:
-          #   - ./X            (same dir)
-          #   - ../X           (one level up — still within apps/cockpit)
-          # We forbid:
-          #   - ../../X        (escapes apps/cockpit/<sub>/ into apps/cockpit/)
-          #                    which still might be fine, but two-up from
-          #                    the deepest legal entry (apps/cockpit/<sub>/<sub>/)
-          #                    is suspicious; the ESLint rule covers the nuance.
-          # The grep here only fires on the unambiguous escape case:
-          # `from '../../../...'` (three-or-more up) from any file under
-          # apps/cockpit/, which provably escapes the workspace.
-          set -euo pipefail
-
-          violations=$(
-            grep -RInE "from ['\"](\.\./){3,}" apps/cockpit/ \
-              --include='*.ts' --include='*.tsx' \
-              --include='*.js' --include='*.jsx' \
-              --include='*.json' --include='*.html' \
-              --include='*.css' --include='*.md' \
-              || true
-          )
-
-          if [ -n "$violations" ]; then
-            echo "::error::cross-boundary imports detected"
-            echo "$violations"
-            exit 1
-          fi
-
-          echo "OK — no cross-boundary imports under apps/cockpit/"
+        # Resolves each relative import against its file location and fails
+        # only when the target escapes apps/cockpit/. Intra-cockpit imports
+        # (client/server → shared) are legitimate even at three-up depth,
+        # because the cockpit tree is itself three levels deep. The earlier
+        # grep gate could not resolve paths and produced false positives on
+        # every `client/src/** → ../../../shared` import. See the script
+        # docstring + ADR-008.
+        run: python3 apps/cockpit/scripts/check-boundary.py --root apps/cockpit
