@@ -1,4 +1,4 @@
-// WP-004 — typed errors for the cockpit server's lib layer.
+// WP-004 / WP-006 — typed errors for the cockpit server's lib layer.
 //
 // Errors live here (not co-located with the functions that throw them)
 // so route handlers can catch by class without importing the lib
@@ -20,5 +20,35 @@ export class PathOutsideWorktreeError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "PathOutsideWorktreeError";
+  }
+}
+
+/**
+ * Thrown by `readWorktreeTree` (WP-006) when the caller asks to list
+ * the children of a path that exists but is not a directory — e.g. a
+ * regular file. Route handlers translate this into a 400 so the client
+ * can correct its request shape.
+ */
+export class NotADirectoryError extends Error {
+  readonly code = "NOT_A_DIRECTORY";
+
+  constructor(message: string) {
+    super(message);
+    this.name = "NotADirectoryError";
+  }
+}
+
+/**
+ * Thrown by `readWorktreeTree` (and other future lib functions that
+ * need to surface a missing path distinctly from a path-outside-worktree
+ * error) when the resolved path doesn't exist on disk. Route handlers
+ * translate this into a 404.
+ */
+export class NotFoundError extends Error {
+  readonly code = "NOT_FOUND";
+
+  constructor(message: string) {
+    super(message);
+    this.name = "NotFoundError";
   }
 }
