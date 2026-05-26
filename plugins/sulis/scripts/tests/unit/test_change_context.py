@@ -138,6 +138,34 @@ def test_write_change_context_creates_parent_dir_if_absent(tmp_path, monkeypatch
     assert path.parent.exists()
 
 
+# ─── Hardening: file-I/O guards (best-effort recon degrades to None) ──────
+
+
+def test_write_change_context_returns_none_when_write_text_raises(tmp_path, monkeypatch):
+    """An unwritable CONTEXT.md must degrade to None, not propagate a traceback.
+
+    Recon is best-effort; a write failure must not crash `sulis-change start`.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path))
+    p_head, p_base, p_ab = _patch_git()
+    with p_head, p_base, p_ab, \
+            mock.patch.object(cc.Path, "write_text",
+                              side_effect=PermissionError(13, "Permission denied")):
+        result = cc.write_change_context(_GOOD_ULID, _metadata(), tmp_path)
+    assert result is None
+
+
+def test_write_change_context_returns_none_when_mkdir_raises(tmp_path, monkeypatch):
+    """An unwritable ~/.sulis/changes dir must degrade to None, not raise."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    p_head, p_base, p_ab = _patch_git()
+    with p_head, p_base, p_ab, \
+            mock.patch.object(cc.Path, "mkdir",
+                              side_effect=OSError(30, "Read-only file system")):
+        result = cc.write_change_context(_GOOD_ULID, _metadata(), tmp_path)
+    assert result is None
+
+
 def test_primitive_hints_cover_all_change_primitives():
     """Hint table covers all 22 primitives + 3 CC fallbacks."""
     from _wpxlib import ALLOWED_CHANGE_PRIMITIVES

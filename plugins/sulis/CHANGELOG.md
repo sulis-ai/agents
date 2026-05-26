@@ -1,5 +1,17 @@
 # Sulis — Changelog
 
+## v0.46.1 — 2026-05-26
+
+**Harden terminal-launcher file-I/O — unguarded writes now return structured errors.**
+
+A Tier-4 code-health review flagged unguarded file/dir writes in the terminal-launcher feature: an unwritable path (`PermissionError` / `OSError` / disk full) propagated an unhandled traceback to the founder instead of a clean, structured error.
+
+- **`plugins/sulis/scripts/_terminal_launcher.py`** — `launch_change_terminal` now wraps the change-dir `mkdir`, `launch.sh` `write_text`, and `chmod` in a `try/except OSError` that returns the module's existing structured `_failed(...)` dict (same shape as "no terminal app found" / "unsupported platform"), naming the path + the OS error so the founder can act on it. `session.json` (best-effort reattach bookkeeping, Phase 6 deferred) degrades to an empty `session_json_path` with a logged warning rather than unwinding an already-spawned terminal.
+- **`plugins/sulis/scripts/_change_context.py`** — `write_change_context` now returns `Path | None`: on `OSError` it logs a warning and returns `None` (recon is best-effort). `sulis-change start` tolerates the `None` — the spawn proceeds without `CONTEXT.md`, and the pre-prompt omits the recon-file reference rather than crashing.
+- The intentional fire-and-forget `subprocess.Popen` terminal spawns are left untouched — they are never `.wait()`/`.communicate()`-ed, so the "could hang" finding there was a false positive.
+
+6 new unit tests (4 launcher OSError-guard + 2 recon best-effort-degrade; `Path.write_text` / `chmod` / `mkdir` mocked to raise). Full unit suite green; `compileall` clean (3.11-compatible).
+
 ## v0.46.0 — 2026-05-26
 
 **Phase 5 #5 of the change-as-primitive build — the terminal-launcher port.**

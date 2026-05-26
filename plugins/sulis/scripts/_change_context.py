@@ -16,11 +16,14 @@ Stdlib only; git access via _wpxlib._run (subprocess wrapper).
 
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _wpxlib import _run  # noqa: E402
+
+logger = logging.getLogger("sulis.change_context")
 
 
 # Opinionated next-step hint per primitive. Covers all 22 change primitives
@@ -134,7 +137,7 @@ def write_change_context(
     change_id: str,
     metadata: dict,
     repo_root: Path,
-) -> Path:
+) -> Path | None:
     """Gather pre-spawn context and write ~/.sulis/changes/{change_id}/CONTEXT.md.
 
     Sections: change identity, git state at spawn, suggested next step
@@ -142,6 +145,11 @@ def write_change_context(
 
     Pure-read: never modifies the repo. Subprocess calls are git-rev-parse
     and git-rev-list only. Returns the absolute path to the written file.
+
+    Recon is best-effort: if the change dir / CONTEXT.md cannot be written
+    (permission denied, read-only FS, disk full), this returns ``None`` and
+    logs a warning rather than raising — a recon-write failure must not crash
+    the caller's ``sulis-change start`` spawn path.
     """
     base_ref = metadata.get("base_branch") or "dev"
     git_state = {
@@ -156,7 +164,15 @@ def write_change_context(
     body = _render_context_md(change_id, metadata, git_state)
 
     change_dir = Path.home() / ".sulis" / "changes" / change_id
-    change_dir.mkdir(parents=True, exist_ok=True)
     context_path = change_dir / "CONTEXT.md"
-    context_path.write_text(body, encoding="utf-8")
+    try:
+        change_dir.mkdir(parents=True, exist_ok=True)
+        context_path.write_text(body, encoding="utf-8")
+    except OSError as exc:
+        logger.warning(
+            "could not write recon CONTEXT.md at %s: %s (recon is best-effort; "
+            "spawn proceeds without it)",
+            context_path, exc,
+        )
+        return None
     return context_path.resolve()
