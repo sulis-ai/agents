@@ -1,5 +1,24 @@
 # Sulis — Changelog
 
+## v0.49.0 — 2026-05-26
+
+**Phase 6b-ii of the change-as-primitive build — four founder-facing stage-wrapper skills.**
+
+Authors `plugins/sulis/skills/{recon,design,audit,review}/SKILL.md` via add-skill (STANDARD tier, founder-facing, dual-register). These are **thin orchestration wrappers**: each runs inside a change (`resolve_current_change()` reads `SULIS_CHANGE_ID`; `null` routes to `/sulis:change start`) and routes to an EXISTING skill/agent rather than reimplementing any capability. No new Python.
+
+### The four stages
+
+- **`recon` (Stage 0)** — the first look around. Folds the read-only arrival check (`wpx-arrival-check`) + context map (`/sulis:discover-context` via `context-cartographer`) + code shape (`/sulis:analyse-codebase`), then writes/refreshes the change's `CONTEXT.md` via `_change_context.write_change_context()` (best-effort — returns `None` and never crashes on an unwritable path). Reports "what's already here"; degrades gracefully on an empty/new repo (no remote slug, no docs, little code is a valid state, not three failures). Skips the heavy passes for trivial changes.
+- **`design` (Stage 2, greenfield)** — turns the "what" into a "how". Reads the change's `SPEC.md` and routes to `/sulis:draft-architecture` (blueprint + decision records) → `/sulis:plan-work` (decompose to a to-do list), dispatching `engineering-architect`. Detects a lite spec and **offers** the single-WP shortcut (the founder decides). **STOPs and routes to `/sulis:specify`** when there is no spec — never designs against a guess.
+- **`audit` (Stage 2, brownfield)** — design's twin for `refactor` / `harden` / `fix` / `replace` changes. Pairs `/sulis:analyse-codebase` (structural baseline) with `/sulis:codebase-audit` (gap audit + draft hardening deltas) via `engineering-architect`. Checks the change primitive first and routes greenfield (`feat`/`create`) work to `/sulis:design`. Hardening deltas are draft fixes, not applied changes (read-only).
+- **`review` (Stage 4)** — folds `/sulis:code-health` (the 7-tier check, which dispatches its own per-tier agents — review **calls and interprets, never duplicates the tier logic**) with the security pass (`/sulis:check-security`, or the deeper `/sulis:codebase-assess`) via `security-reviewer` into **one founder verdict** (good to ship / needs attention first). Caps surfaced findings to the handful that matter (MUC-F4 overwhelm guard) and offers `/sulis:address-findings`. Both passes read-only; findings deliver structurally (COACHING_STANDARD).
+
+### Verification
+
+One shared `plugins/sulis/skills/VERIFICATION_REPORT_stage_wrappers.md` co-located: **Verdict PASS** across all four skills, all five gates. Codebase Referential Integrity 5/5 — every cited skill (`draft-architecture` / `plan-work` / `codebase-audit` / `analyse-codebase` / `code-health` / `codebase-assess` / `check-security` / `discover-context` / `refresh-context` / `address-findings`), agent (`engineering-architect` / `security-reviewer` / `context-cartographer`), and script (`wpx-arrival-check` / `_change_context.py` / `_wpxlib.py`) verified on disk. 8 adversarial cases all PREVENTED, including the three named founder-facing ones: **recon on an empty repo** (degrades, doesn't fail loudly), **review-findings overwhelm (MUC-F4)** (cap + count + next step), **design dispatched without a SPEC** (STOP → `/sulis:specify`); plus audit-wrong-stage, MUC-F1 operator-vocab leak, MUC-F5 no-current-change, the read-only contract, and MUC-R1 technical-leak-into-founder-default.
+
+Founder tone stack applied: AAF + FE (FE-09 no mechanism narration) + COACHING + TONE + Founder-Facing Conventions Rules 1-6 (echo-before-act, plain-English translation at the seam, dual-register default-founder). Docs/skill change only — no Python touched.
+
 ## v0.48.0 — 2026-05-26
 
 **Phase 6b of the change-as-primitive build — the founder-facing `/sulis:specify` stage skill.**
