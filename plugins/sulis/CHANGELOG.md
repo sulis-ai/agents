@@ -1,5 +1,21 @@
 # Sulis — Changelog
 
+## v0.53.0 — 2026-05-26
+
+**Change-dashboard (slice B) — the founder-facing `/sulis:dashboard` + the machinery that keeps it current.**
+
+Slice A/A.5 built the branch-independent global change store; this slice surfaces it to the founder and makes its workflow-stage data real.
+
+(1) **`/sulis:dashboard` — the by-change map.** New STANDARD-tier founder-facing skill (`plugins/sulis/skills/dashboard/SKILL.md`). Reads `_change_state.list_all_changes()` (branch-independent — works from any branch) and renders every change in flight with: readable name + `CH-XXXXXX` handle, the kind of work (primitive → plain noun), the stage it has reached (stage → position in the six: recon → specify → design → implement → review → ship), and whether its workspace is open. Crucially it does NOT trust the store for liveness/git state — it cross-checks ground truth: `kill -0` on the recorded session `pid` (a `session.json` is not proof of a live terminal), `git branch --list` (a change whose branch is gone has shipped/been nuked), and `worktree_path.exists()`. It flags which changes need attention (at-review, or stalled-with-no-live-workspace) and routes to `/sulis:inbox` for the item-level detail — dashboard *highlights*, inbox *drills in*. Read-only; never starts/ships/deletes. Empty store is a valid common state, not an error. Adversarial coverage incl. MUC-F1 (operator-vocab leak), MUC-F4 (overwhelm cap → ~10 + "+N more"), MUC-F5 (shipped change shown as in-flight stale belief).
+
+(2) **`sulis-change` gains `stage` + `nuke` is now a documented founder verb.** New `stage <name>` subcommand: resolves the change from `--change-id` or the `SULIS_CHANGE_ID` env var, validates against `WORKFLOW_STAGES`, writes branch-independent local state via `write_change_stage` (best-effort; honest error on an unwritable store or a missing change-id). It's machinery, not a founder verb. `nuke` (the CLI landed in v0.51.0) is now wired into the `/sulis:change` skill as a founder-facing subcommand with the full destructive contract: dry-run first → echo the exact footprint (and any unmerged commits that would be lost) → require an explicit yes → `--force` (prompt-before-destroy per MUC-F3; never act on vague phrasing). 6 new unit tests for `stage`.
+
+(3) **Stage-stamping wired into all five stage skills.** `recon` → `recon`, `specify` → `specify`, `design` → `design`, `run-all` → `implement`, `review` → `review`: each stamps its stage on completion via `sulis-change stage`, best-effort, never blocking the stage, never narrated to the founder (FE-09). The four change-aware skills reuse their resolved `$SCRIPTS_DIR`; `run-all` (which doesn't resolve it) gets a compact inline resolver. This makes the dashboard's "where is each change?" real rather than a static `recon` seed.
+
+(4) **Test-isolation hardening.** The `SULIS_STATE_DIR` autouse fixture moved from the integration-only conftest to the repo-wide root conftest (`tests/conftest.py`), so *unit* tests can no longer leak a change record into the real `~/.sulis` store (one test-fixture ULID had leaked through the gap). A full 508-test unit+integration run now leaves `~/.sulis/changes` empty. The three modules that deliberately assert the `~/.sulis` HOME-fallback path (`test_change_state`, `test_change_context`, `test_sulis_change_nuke`) opt out via a module-local fixture that clears `SULIS_STATE_DIR` and isolates via a tmp `HOME` instead.
+
+Next: SQLite (`~/.sulis/sulis.db`) as the queryable backing for the global store — the dashboard re-points its read seam, nothing else changes. Stdlib only; Python 3.11-safe; 508 unit+integration tests green.
+
 ## v0.52.0 — 2026-05-26
 
 **Change-dashboard foundation (slice A.5) — the local store as the branch-independent global change index.**

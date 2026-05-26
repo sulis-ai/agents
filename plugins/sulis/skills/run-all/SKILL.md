@@ -946,9 +946,34 @@ ready set. Transitively-dependent descendants of blocked WPs get
   (Step 11). All Agent calls one level deep from the concierge.
   Same shape one level shallower from a top-level user session.
 
+## Stamp the workflow stage (when the run reaches implementation)
+
+When the loop has started shipping WPs and you're inside a change (the
+`SULIS_CHANGE_ID` env var is set — every change-bound session has it), record
+that the change has reached the **implement** stage so `/sulis:dashboard`
+reflects it. Resolve the tool path, then stamp:
+
+```bash
+SCRIPTS_DIR=$(
+  find ~/.claude/plugins/cache -name sulis-change -type f \
+    -path '*/sulis/*/scripts/*' 2>/dev/null | sort -r | head -1 \
+  | xargs -I{} dirname {} 2>/dev/null
+)
+[ -z "$SCRIPTS_DIR" ] && [ -f "plugins/sulis/scripts/sulis-change" ] \
+  && SCRIPTS_DIR="$(pwd)/plugins/sulis/scripts"
+[ -n "$SCRIPTS_DIR" ] && [ -n "$SULIS_CHANGE_ID" ] \
+  && "$SCRIPTS_DIR/sulis-change" stage implement
+```
+
+Branch-independent, best-effort; it never blocks the run. If
+`SULIS_CHANGE_ID` is unset (a run outside a change), skip it. Don't narrate
+this to the founder; the dashboard simply stays current (FE-09).
+
 ## See also
 
 - `agents/executor.md` — what the loop spawns per WP.
+- `../../scripts/sulis-change` — `stage` stamps the workflow position read by
+  `/sulis:dashboard`.
 - `agents/orchestrator.md` — architectural-intent reference for the
   dispatch logic (not actively invoked).
 - `references/lifecycle.md` — the 12-step contract per WP.

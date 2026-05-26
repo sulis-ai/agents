@@ -38,8 +38,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from _change_context import write_change_context  # noqa: E402
 from _change_state import (  # noqa: E402
+    WORKFLOW_STAGES,
     change_dir,
     changes_base,
+    is_valid_stage,
     list_all_changes,
     read_change_record,
     write_change_record,
@@ -615,6 +617,54 @@ def cmd_status(args: argparse.Namespace) -> None:
     })
 
 
+# ─── Subcommand: stage ────────────────────────────────────────────────────
+
+def cmd_stage(args: argparse.Namespace) -> None:
+    """Stamp the workflow stage a change has reached.
+
+    Each stage skill (recon / specify / design / run-all / review) calls this
+    on completion so the dashboard reflects where the change is in the
+    six-stage workflow. The stage is written to the branch-independent local
+    store (`{state_base}/changes/{change_id}/state.json`), so it survives
+    branch switches and is visible to the global cross-change view.
+
+    Resolves the change_id from `--change-id` if given, else from the
+    `SULIS_CHANGE_ID` environment variable (set in every change-bound
+    session). Validates the stage against WORKFLOW_STAGES before writing.
+    """
+    stage = args.stage
+    if not is_valid_stage(stage):
+        emit_error(
+            f"Unknown workflow stage: {stage!r}. "
+            f"Valid stages: {', '.join(WORKFLOW_STAGES)}.",
+            context={"given_stage": stage, "valid_stages": list(WORKFLOW_STAGES)},
+        )
+
+    change_id = args.change_id or os.environ.get("SULIS_CHANGE_ID")
+    if not change_id:
+        emit_error(
+            "No change to stamp: pass --change-id, or run inside a "
+            "change-bound session (SULIS_CHANGE_ID is unset).",
+            context={"stage": stage},
+        )
+
+    state_path = write_change_stage(change_id, stage)
+    if state_path is None:
+        # Best-effort write failed (unwritable state dir) — surface honestly
+        # rather than claiming success.
+        emit_error(
+            f"Couldn't record the {stage!r} stage for {change_id} "
+            f"(state store not writable).",
+            context={"change_id": change_id, "stage": stage},
+        )
+
+    emit_ok(data={
+        "change_id": change_id,
+        "stage": stage,
+        "state_path": str(state_path),
+    })
+
+
 # ─── Subcommand: nuke ─────────────────────────────────────────────────────
 
 def _local_state_base() -> Path:
@@ -997,6 +1047,21 @@ def build_parser() -> argparse.ArgumentParser:
     p_status = sub.add_parser("status", help="Show one change's state")
     _common(p_status)
 
+    p_stage = sub.add_parser(
+        "stage",
+        help="Stamp the workflow stage a change has reached "
+             "(recon/specify/design/implement/review/ship)",
+    )
+    p_stage.add_argument(
+        "stage",
+        help="The workflow stage now reached: "
+             + " / ".join(WORKFLOW_STAGES),
+    )
+    p_stage.add_argument(
+        "--change-id", default=None,
+        help="Change ULID to stamp (default: the SULIS_CHANGE_ID env var)",
+    )
+
     p_nuke = sub.add_parser(
         "nuke",
         help="Abandon + delete a change and its full footprint "
@@ -1025,6 +1090,7 @@ HANDLERS = {
     "finish": cmd_finish,
     "list": cmd_list,
     "status": cmd_status,
+    "stage": cmd_stage,
     "nuke": cmd_nuke,
 }
 

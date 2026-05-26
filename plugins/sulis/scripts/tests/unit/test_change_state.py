@@ -19,10 +19,23 @@ from __future__ import annotations
 import json
 from unittest import mock
 
+import pytest
+
 import _change_state as cs
 
 
 _GOOD_ULID = "01HYQC71000000000000000000"
+
+
+@pytest.fixture(autouse=True)
+def _home_base_isolation(tmp_path_factory, monkeypatch):
+    """This module exercises the ~/.sulis HOME-fallback path explicitly, so it
+    opts out of the repo-wide SULIS_STATE_DIR isolation (root conftest) and
+    isolates via HOME instead. Tests that set their own HOME override the
+    default set here, so existing path assertions hold; tests that don't are
+    still kept out of the real home."""
+    monkeypatch.delenv("SULIS_STATE_DIR", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))
 
 
 # ─── Canonical stages + validator ─────────────────────────────────────────

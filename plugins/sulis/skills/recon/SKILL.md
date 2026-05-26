@@ -306,10 +306,28 @@ real finding under a clean-bill-of-health summary.
 - **CONTEXT.md** — the short "what's already here" summary recon writes; the
   first thing every later stage reads.
 
+## Stamp the workflow stage (on completion)
+
+When the recon work is done and you're inside a change (the `SULIS_CHANGE_ID`
+env var is set — every change-bound session has it), record that the change
+has reached the **recon** stage so `/sulis:dashboard` reflects it. Use the
+`$SCRIPTS_DIR` you resolved earlier:
+
+```bash
+"$SCRIPTS_DIR/sulis-change" stage recon
+```
+
+Branch-independent, best-effort; it never blocks the stage from completing.
+If `SULIS_CHANGE_ID` is unset (work outside a change), skip it — there's
+nothing to stamp. Don't narrate this to the founder; the dashboard simply
+stays current (FE-09).
+
 ## See also
 
 - `../../scripts/_wpxlib.py` — `resolve_current_change()` (SULIS_CHANGE_ID →
   manifest).
+- `../../scripts/sulis-change` — `stage` stamps the workflow position read by
+  `/sulis:dashboard`.
 - `../../scripts/_change_context.py` — `write_change_context()` (writes the
   change's CONTEXT.md; best-effort).
 - `../../scripts/wpx-arrival-check` — the read-only Repository-Contract

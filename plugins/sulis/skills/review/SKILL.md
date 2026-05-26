@@ -278,10 +278,26 @@ ship without triggering defensiveness.
 - **Blocking finding** — something that should be addressed before shipping;
   the few of these are what review leads with.
 
+## Stamp the workflow stage (on completion)
+
+When the review is done and you're inside a change (the `SULIS_CHANGE_ID` env
+var is set), record that the change has reached the **review** stage so
+`/sulis:dashboard` reflects it. Use the `$SCRIPTS_DIR` you resolved earlier:
+
+```bash
+"$SCRIPTS_DIR/sulis-change" stage review
+```
+
+Branch-independent, best-effort; it never blocks the stage from completing.
+If `SULIS_CHANGE_ID` is unset (work outside a change), skip it. Don't narrate
+this to the founder; the dashboard simply stays current (FE-09).
+
 ## See also
 
 - `../../scripts/_wpxlib.py` — `resolve_current_change()` (SULIS_CHANGE_ID →
   manifest).
+- `../../scripts/sulis-change` — `stage` stamps the workflow position read by
+  `/sulis:dashboard`.
 - `../code-health/SKILL.md` — the seven-tier health check (dispatches its own
   tier agents) this skill folds in.
 - `../check-security/SKILL.md` — the security / data-protection /
