@@ -1,6 +1,6 @@
 {
   "name": "sulis",
-  "description": "Sulis — the canonical front-door plugin for the Sulis AI marketplace. Hosts the founder-facing Sulis agent, the journey skills, three meta-skills (add-skill / add-agent / consolidate-into-sulis), the requirements / design / execution / review surfaces consolidated from the four specialist plugins, the deep-mode code-health framework, and 8 cross-cutting standards. Founders interact via /sulis:* commands. See CHANGELOG.md for version history.",
+  "description": "Your AI engineering team in a plugin. Talk through what you want to build, and Sulis takes it end-to-end — gathering requirements, designing the architecture, writing and reviewing the code, and shipping it. Start with `claude --agent sulis`.",
   "version": "0.55.0",
   "author": {
     "name": "Iain"
@@ -8,13 +8,13 @@
   "repository": "https://github.com/sulis-ai/agents",
   "license": "MIT",
   "keywords": [
-    "canonical",
-    "founder-facing",
-    "concierge",
-    "meta-skill",
-    "skill-authoring",
-    "methodology",
-    "marketplace",
-    "front-door"
+    "founder",
+    "non-technical",
+    "autonomous-engineering",
+    "build-software",
+    "ai-engineering-team",
+    "specification",
+    "architecture",
+    "ship"
   ]
 }
