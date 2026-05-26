@@ -1,0 +1,12 @@
+# WP-016 — cockpit-local ignores (Playwright + Vite build artefacts).
+# node_modules/ is already covered by the repo-root .gitignore.
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/e2e/.cache/
+
+# Vite build output (out of MVP scope — TDD §11 — but ignore if produced)
+/client/dist/
+/dist/

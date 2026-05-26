@@ -9,15 +9,27 @@
 //   - A real git repo init'd inside the worktree with a base commit so
 //     `git show <base_sha>:<path>` is reachable.
 //
-// Then boots the app on a random free port (the kernel chooses), hits
-// each endpoint with `fetch`, and asserts the wire-shape contracts.
+// Then drives each endpoint through supertest IN-PROCESS (no real socket
+// bind) and asserts the wire-shape contracts.
+//
+// WP-016 note — combined-run stability:
+//   This suite previously called `app.listen(0, "127.0.0.1")` and hit the
+//   ephemeral port with `fetch`. That was the ONLY server test binding a
+//   real socket. Under the combined `npx vitest run` (server node-env +
+//   client jsdom/Monaco env in parallel) the real socket intermittently
+//   produced "socket hang up" on the transcript route under load. Switching
+//   to in-process `supertest(app)` (the pattern every routes.*.test.ts
+//   already uses) removes the socket entirely and makes the combined run
+//   deterministic. The bind-address invariant (127.0.0.1, never 0.0.0.0)
+//   is fully covered by bind-address.test.ts, so no coverage is lost.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import type { Server } from "node:http";
+import request from "supertest";
+import type { Application } from "express";
 
 import { createApp } from "../app";
 import { FakeChangeStoreReader } from "../adapters/FakeChangeStoreReader";
@@ -39,8 +51,7 @@ describe("end-to-end integration smoke (TDD §14.6)", () => {
   let projectsDir: string;
   let worktree: string;
   let baseSha: string;
-  let server: Server;
-  let baseUrl: string;
+  let app: Application;
   const changeId = "01SMOKE";
 
   beforeAll(async () => {
@@ -132,40 +143,23 @@ describe("end-to-end integration smoke (TDD §14.6)", () => {
     };
     const reader = new FakeChangeStoreReader([record]);
 
-    const app = createApp({
+    app = createApp({
       changeStore: reader,
       sulisStateDir: stateDir,
       claudeProjectsDir: projectsDir,
     });
-    // Bind to 127.0.0.1, kernel-assigned port (0).
-    server = await new Promise<Server>((resolve, reject) => {
-      const s = app.listen(0, "127.0.0.1", () => resolve(s));
-      s.on("error", reject);
-    });
-    const addr = server.address();
-    if (addr === null || typeof addr === "string") {
-      throw new Error("server.address() returned unexpected shape");
-    }
-    baseUrl = `http://127.0.0.1:${addr.port}`;
   }, 30_000);
 
   afterAll(async () => {
-    if (server) {
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-    }
     await rm(stateDir, { recursive: true, force: true });
     await rm(projectsDir, { recursive: true, force: true });
     await rm(worktree, { recursive: true, force: true });
   });
 
-  it("server is bound to 127.0.0.1 (assertion via the resolved baseUrl)", () => {
-    expect(baseUrl.startsWith("http://127.0.0.1:")).toBe(true);
-  });
-
   it("GET /api/changes returns one change with liveness", async () => {
-    const res = await fetch(`${baseUrl}/api/changes`);
+    const res = await request(app).get("/api/changes");
     expect(res.status).toBe(200);
-    const body = (await res.json()) as Array<{
+    const body = res.body as Array<{
       changeId: string;
       liveness: { status: string };
     }>;
@@ -177,9 +171,9 @@ describe("end-to-end integration smoke (TDD §14.6)", () => {
   });
 
   it("GET /api/changes/:id returns the detail + transcriptPaths", async () => {
-    const res = await fetch(`${baseUrl}/api/changes/${changeId}`);
+    const res = await request(app).get(`/api/changes/${changeId}`);
     expect(res.status).toBe(200);
-    const body = (await res.json()) as {
+    const body = res.body as {
       changeId: string;
       transcriptPaths: string[];
     };
@@ -189,9 +183,9 @@ describe("end-to-end integration smoke (TDD §14.6)", () => {
   });
 
   it("GET /api/changes/:id/tree returns the worktree root without node_modules", async () => {
-    const res = await fetch(`${baseUrl}/api/changes/${changeId}/tree`);
+    const res = await request(app).get(`/api/changes/${changeId}/tree`);
     expect(res.status).toBe(200);
-    const body = (await res.json()) as Array<{ name: string; kind: string }>;
+    const body = res.body as Array<{ name: string; kind: string }>;
     const names = body.map((n) => n.name);
     expect(names).toContain("src");
     expect(names).toContain("README.md");
@@ -199,11 +193,11 @@ describe("end-to-end integration smoke (TDD §14.6)", () => {
   });
 
   it("GET /api/changes/:id/file returns the file with a language hint", async () => {
-    const res = await fetch(
-      `${baseUrl}/api/changes/${changeId}/file?path=${encodeURIComponent("src/index.ts")}`,
-    );
+    const res = await request(app)
+      .get(`/api/changes/${changeId}/file`)
+      .query({ path: "src/index.ts" });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as {
+    const body = res.body as {
       content: string;
       language: string;
       binary: boolean;
@@ -214,11 +208,11 @@ describe("end-to-end integration smoke (TDD §14.6)", () => {
   });
 
   it("GET /api/changes/:id/diff returns base + current", async () => {
-    const res = await fetch(
-      `${baseUrl}/api/changes/${changeId}/diff?path=${encodeURIComponent("src/index.ts")}`,
-    );
+    const res = await request(app)
+      .get(`/api/changes/${changeId}/diff`)
+      .query({ path: "src/index.ts" });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as {
+    const body = res.body as {
       base: string | null;
       current: string | null;
     };
@@ -227,9 +221,9 @@ describe("end-to-end integration smoke (TDD §14.6)", () => {
   });
 
   it("GET /api/changes/:id/transcript returns the projected messages", async () => {
-    const res = await fetch(`${baseUrl}/api/changes/${changeId}/transcript`);
+    const res = await request(app).get(`/api/changes/${changeId}/transcript`);
     expect(res.status).toBe(200);
-    const body = (await res.json()) as Array<{
+    const body = res.body as Array<{
       kind: string;
       timestamp: string;
     }>;
@@ -242,15 +236,15 @@ describe("end-to-end integration smoke (TDD §14.6)", () => {
   });
 
   it("returns a JSON error envelope for an unknown change id", async () => {
-    const res = await fetch(`${baseUrl}/api/changes/does-not-exist`);
+    const res = await request(app).get("/api/changes/does-not-exist");
     expect(res.status).toBe(404);
-    const body = (await res.json()) as { error: string; code: string };
+    const body = res.body as { error: string; code: string };
     expect(body.code).toBe("NOT_FOUND");
     expect(typeof body.error).toBe("string");
   });
 
   it("rejects non-GET methods with 405", async () => {
-    const res = await fetch(`${baseUrl}/api/changes`, { method: "POST" });
+    const res = await request(app).post("/api/changes");
     expect(res.status).toBe(405);
   });
 });

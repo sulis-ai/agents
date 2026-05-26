@@ -10,7 +10,9 @@
     "dev:client": "vite",
     "typecheck": "tsc --noEmit -p server && tsc --noEmit -p client",
     "lint": "eslint --ext .ts,.tsx .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check:read-only": "bash scripts/check-read-only.sh",
+    "test:e2e": "playwright test --config e2e/playwright.config.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -22,6 +24,7 @@
     "react-router-dom": "^7.15.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/cors": "^2.8.19",

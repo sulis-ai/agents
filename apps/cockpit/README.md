@@ -71,6 +71,55 @@ gate fails the build if any future change introduces a `.post / .put
 git verb, or a non-zero process signal (TDD §13.7 — "guarantee, not
 convention").
 
+## Testing
+
+```bash
+npm test            # combined unit + integration suite (server + client)
+npm run check:read-only   # the workspace-wide read-only guarantee gate
+npm run test:e2e    # Playwright end-to-end smoke (browser required)
+```
+
+### Combined test run
+
+`npm test` runs `vitest run`, which executes **both** Vitest projects —
+the Node-environment server tests and the jsdom/Monaco client tests — in
+one pass. The config pins the `forks` pool so the two environments run in
+isolated child processes and cannot contend (this is also what CI runs).
+Run a single surface with `npx vitest run server` or `npx vitest run
+client`.
+
+### Read-only guarantee gate
+
+`apps/cockpit/scripts/check-read-only.sh` statically proves the cockpit
+never writes: it greps the active source tree for filesystem-write APIs,
+`git` spawns outside the read-only `git show`, mutating git verbs,
+non-zero process signals, HTTP mutation verbs, and non-loopback binds
+(TDD §13.7, ADR-002, ADR-003). It is the load-bearing read-only proof for
+the whole MVP and runs in CI on every change. Run it locally with
+`npm run check:read-only`; explain every rule with:
+
+```bash
+bash apps/cockpit/scripts/check-read-only.sh --explain
+```
+
+### End-to-end smoke (Playwright)
+
+The end-to-end smoke under `apps/cockpit/e2e/` boots both halves of the
+cockpit against a seeded fixture and drives a real browser through the
+founder walkthrough (dashboard → chat → files → file viewer → copy path →
+diff toggle), plus the empty-state. It needs a browser the first time:
+
+```bash
+npx playwright install chromium   # one-time, downloads the browser
+npm run test:e2e
+```
+
+In CI the browser is installed automatically; if the download is
+unavailable on a restricted runner the e2e job is skipped (the read-only
+gate + the combined Vitest suite still gate the merge). Visual-regression
+comparison is off by default — set `PWTEST_SCREENSHOTS=1` to capture
+screenshots on failure locally.
+
 ## How the workspace is organised
 
 ```
