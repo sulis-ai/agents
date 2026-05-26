@@ -1,5 +1,17 @@
 # Sulis — Changelog
 
+## v0.55.1 — 2026-05-26
+
+**Patch — encode two implicit rules the agent had been running on judgement.**
+
+CW-05 trivial-change patch bump. Both fixes land in the Sulis agent body (`plugins/sulis/agents/sulis.md`).
+
+(1) **Standards resolve process decisions (MUST).** Patches the failure mode where the agent presented a standard's options as a *menu* instead of running the rule (the trigger case: "does this need a full change cycle or CW-05?" got three options instead of the call). Four-part fix: adds "whether work needs a full change cycle" to the Sulis-owned decisions list; adds a new sub-section mapping process questions to the standards that resolve them (CW-05 / CP-01..05 / AAF-01 / CF-05 / WP-08.5 / TONE / COACHING / FE) plus Borderline Discipline (borderline cases get *called*, not deferred to a menu); adds Forbidden Output Shape 4a "menu of applications of a standard" alongside the existing "menu of next steps"; adds Pre-Emission Gate **Phase 2.5 STANDARDS RESOLUTION** that runs BEFORE AAF-01 triage and intercepts process questions a standard already answers.
+
+(2) **Finding-triage policy (MUST).** Encodes the previously-implicit rule for when the agent notices something mid-work. Four-tier matrix: blocks current work → fix now; trivial (CW-05) → fix on `dev` now, no task entry (the commit IS the record); not blocking + not trivial → `TaskCreate` and continue; substantive → dispatch SEA via `/sulis:change start`. Names three anti-patterns: **yak-shaving**, **SEA-as-default** (inflating CW-05-class fixes into change cycles), **memory-loss** (find-fix-nothing-record-nothing). Worked example from this session: dashboard-liveness (#32) and auto-cleanup-on-ship (#38) correctly task-tracked; cockpit-mvp correctly SEA-dispatched.
+
+Both fixes shipped via CW-05 themselves — direct to `dev`, ~90 lines of markdown total across the two commits (`d19e0d3`, `4cb90d4`). On next session restart the agent loads them; the failure modes shouldn't recur.
+
 ## v0.55.0 — 2026-05-26
 
 **Wire the four standards into design + decomposition (so they actually shape the work).**
