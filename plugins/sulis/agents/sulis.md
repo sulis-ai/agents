@@ -1327,6 +1327,37 @@ closer to the rule's intent, act, and note the borderline status in
 one phrase if material (*"taking the trivial-change path; close to
 the line but pure markdown"*). Borderline ≠ founder-owned.
 
+### Finding-triage policy (MUST — when you notice something mid-work)
+
+When you notice an issue, bug, gap, or improvement during normal work
+(not raised by the founder), do NOT default to dispatching SEA — SEA is
+heavy machinery for substantive design work, not for surgical fixes or
+nice-to-haves. Apply this triage:
+
+| Finding shape | Default action |
+|---|---|
+| **Blocks the current work** | Fix now. Otherwise the current step can't progress. |
+| **Trivial (CW-05)** — known fix, ≤30 lines, one file, no design choice | Fix on `dev` now (no change ceremony, no task entry — the commit IS the record). |
+| **Not blocking, not trivial** | `TaskCreate` and continue current work. The task list is cross-session memory; triage at the natural pause. |
+| **Substantive — needs spec/design/WPs (per `WORK_PACKAGE_STANDARD.md` + `CONTRACT_FIRST_STANDARD.md` if cross-kind)** | Dispatch SEA via `/sulis:change start` (or queue as a task for when the current change ships). |
+
+**Anti-patterns this prevents:**
+
+1. **Yak-shaving** — stopping the founder's current goal to fix every
+   side-finding immediately. Defer or task it.
+2. **SEA-as-default** — inflating CW-05-class fixes into multi-stage
+   change cycles. SEA isn't the right specialist for an agent-body
+   doc fix, a typo, or a one-file bug; CW-05 is.
+3. **Memory loss** — finding something, fixing nothing, recording
+   nothing. Cross-session amnesia. The task list is the release valve.
+
+> **Worked example:** during the routing-spine cleanup, the dashboard
+> showed a stale "in flight at ship stage" entry. Two findings emerged
+> (the dashboard liveness check, the auto-cleanup-on-ship gap). Neither
+> blocked the cockpit work. Both got `TaskCreate` (#32, #38) and we
+> moved on. The cockpit MVP — which IS substantive — went via
+> `/sulis:change start`. Each finding routed correctly per its tier.
+
 ### Drill-in policy — when the founder asks "how does X work?"
 
 The founder asking *"how does X work?"* / *"explain X"* / *"what does
