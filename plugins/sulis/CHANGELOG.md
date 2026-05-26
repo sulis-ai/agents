@@ -1,5 +1,29 @@
 # Sulis — Changelog
 
+## v0.48.0 — 2026-05-26
+
+**Phase 6b of the change-as-primitive build — the founder-facing `/sulis:specify` stage skill.**
+
+Authors `plugins/sulis/skills/specify/SKILL.md` via add-skill v0.7.0 (STANDARD tier, founder-facing, dual-register). Stage 1 (Specify) of a change: produce a `SPEC.md` at one of three depths, matched to the work.
+
+### The deterministic depth classifier
+
+`plugins/sulis/scripts/_specify_classifier.py` (new, pure — no I/O) proposes **lite / standard / deep** from three signals: the change's **file count**, its **primitive** (from the manifest), and a **founder-facing flag** (`paths_touch_founder_surface()` heuristic over the touched paths — UI / pages / routes / templates / emails). On uncertainty it **defaults to standard**. The classifier only *proposes*; the skill echoes the proposal in plain English (`proposal_sentence()`) and the founder confirms or overrides — a mode is never run silently off the classifier. TDD'd: 20 unit tests at `plugins/sulis/scripts/tests/unit/test_specify_classifier.py`.
+
+### The three depth modes
+
+- **Lite** — three-field `SPEC.md` (intent / acceptance / what-to-avoid), ~30 seconds. For typos, one-file mechanical fixes. After a lite spec, design is optional — the skill offers the single-WP shortcut (per the design doc).
+- **Standard** (default) — a 5–10 question facilitated conversation (~3 min) → `SPEC.md` with intent / scope / non-goals / acceptance / constraints. COACHING + TONE applied through the conversation.
+- **Deep** — **dispatches the `requirements-analyst` agent** (`claude --agent requirements-analyst` / `subagent_type: sulis:requirements-analyst`) for a full SRD + Mermaid use-case / sequence / state diagrams. Does NOT reimplement SRD facilitation — it hands off and lands a short front-door `SPEC.md` that links to the specialist's `.specifications/{name}/` folder.
+
+### Output + resolution
+
+`SPEC.md` lands at `{worktree_path}/.changes/{primitive}-{slug}.SPEC.md`, alongside the change manifest written by `sulis-change start` — committed, so it travels with the change branch and is reviewable in the one PR per change (the design's hybrid-storage model). `resolve_current_change()` resolves `SULIS_CHANGE_ID` → manifest; if there is no current change, the skill routes to `/sulis:change start` rather than orphaning a spec in the cwd.
+
+### Verification
+
+`VERIFICATION_REPORT.md` co-located: **Verdict PASS** across all STANDARD dimensions. Codebase Referential Integrity 5/5 (all 9 named entities verified on disk). 6 adversarial misuse cases — 5 PREVENTED including the founder-facing **MUC-F3** (classifier proposes the wrong depth → the mandatory confirm step is the safety net), **MUC-F1** (operator-vocab leak — `proposal_sentence()` is founder-English by construction, unit-asserted), **MUC-F5** (writing a spec with no change); 1 low OPEN_RISK (trigger over-match, with revisit trigger). `compileall` clean (3.11-safe — no backslash in f-string expressions). Pre-existing flaky lock test in the deprecated `sulis-execution` mirror noted, not caused by this change (the new module is pure).
+
 ## v0.47.0 — 2026-05-26
 
 **Phase 6a of the change-as-primitive build — the founder-facing `/sulis:change` lifecycle command.**
