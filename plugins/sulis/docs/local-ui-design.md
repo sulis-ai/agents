@@ -144,17 +144,26 @@ Gates applied:
    worktree file browser + read-only Monaco file/diff viewer + copy-link.
    This is the founder's whole "view, navigate, review" ask, all read-only,
    all over data we already have.
-4. **Live terminal + live chat (C2) as a later phase, prototype-first** —
-   de-risk the session-bridge with a disposable prototype change before
-   building it for real.
+4. **Live chat + terminal (C2) as a later phase, prototype-first.** Drive
+   the chat from Claude Code's **headless streaming interface** — `claude
+   --print --output-format=stream-json --include-partial-messages`, or the
+   **Claude Agent SDK** — **not** by pty-driving the interactive TUI. (See
+   Prior art: pty-scraping the full-screen TUI is exactly where the earlier
+   attempt got mixed results.) A pty / xterm.js view is fine for showing a
+   *raw terminal*, but the *chat* should consume structured stream-json
+   events (assistant text deltas, tool-use, results), never text scraped
+   from a TUI. De-risk with a disposable `--prototype` change that validates
+   stream-json / SDK consumption + rendering.
 
 **Suggested sequencing (each its own change):**
 
 1. Read-only cockpit MVP (thread list + chat history + file browser + diff
    viewer + copy-link). *Reuses the dashboard data layer entirely.*
-2. *(Prototype)* spike the live-session bridge (xterm.js ↔ a running Sulis
-   session) — throwaway, to prove feasibility + pick the transport.
-3. Live terminal + live chat + live-thread switching, built on what the
+2. *(Prototype)* spike the live-session bridge — throwaway — to validate
+   consuming `claude` **stream-json** (or the Agent SDK) and rendering it as
+   chat (the exact part the earlier attempt churned on). Reuse a
+   socket.io / WebSocket transport; do **not** re-litigate pty-TUI scraping.
+3. Live chat + terminal + live-thread switching, built on what the
    prototype proved.
 
 ---
@@ -170,6 +179,45 @@ Gates applied:
 
 The cockpit invents almost no new state — it reads the global store, the
 worktrees, and the session transcripts.
+
+---
+
+## Prior art — the earlier `claude-code-chat-ui` attempt
+
+A previous prototype lives at `~/Documents/repos/ae/prototypes/
+claude-code-chat-ui` (Sept 2025). It targeted the same goal — a web chat UI
+that submits prompts to Claude Code and streams results back — and got
+**mixed results**. The lessons are load-bearing for the live bridge:
+
+**Stack:** Express + `node-pty` + socket.io + a React client. Sound
+transport; the React + socket.io layer is reusable.
+
+**Two approaches, visible in the repo:**
+
+1. **pty-drive the interactive TUI** (the README's main architecture). Got a
+   generic terminal streaming over WebSocket, but *real Claude integration
+   stayed unfinished* (README roadmap: "Phase 2 — Actual Claude Code CLI
+   integration — [ ]"). The file graveyard tells the story —
+   `initialization-aware-server.js`, `fixed-extraction.js`,
+   `investigate-claude-thinking.js`, `claude-diagnostic.js`, ~15 server
+   variants — all fighting ANSI / control codes and trying to scrape
+   "thinking" text out of a full-screen TUI.
+2. **Headless `stream-json`** (`test-claude-streaming-modes.js`). The pivot,
+   and the right instinct: testing `claude --print
+   --output-format=stream-json --include-partial-messages` over plain
+   stdin/stdout pipes — the *designed* machine interface.
+
+**The lesson (drives recommendation 4):** the chat must consume the
+**structured headless stream** (`stream-json` or the Agent SDK), not be
+scraped from the interactive TUI. The pty-TUI path is where the mixed
+results came from. Keep the socket.io + React transport; replace the
+Claude-integration layer. Two needs were conflated and should be separated:
+a *raw terminal view* (pty/xterm.js is fine) vs *the chat* (structured
+stream — never TUI-scraped).
+
+> Action: salvage the React client + socket.io transport as a starting
+> point; discard the pty-TUI integration path. The `--prototype` spike's
+> job is narrowly to prove stream-json / SDK consumption + rendering.
 
 ---
 
@@ -190,6 +238,16 @@ worktrees, and the session transcripts.
 5. **Is this `sulis`-plugin-hosted or a separate local app/repo?** A local
    UI is a different artifact class from skills/agents — may warrant its own
    home with the marketplace as its data source.
+6. **Chat transport: CLI `stream-json` vs the Agent SDK.** The CLI headless
+   mode is zero-install; the Agent SDK is the supported programmatic
+   interface (session resume, structured events). Confirm the exact current
+   flags / SDK surface at prototype time (route the question through the
+   claude-code-guide). Either way: structured stream, never TUI scrape.
+7. **One live session per change, or attach to the already-spawned
+   terminal?** A change already spawns a `claude --agent sulis` session in a
+   real tty. Does the cockpit start its *own* headless session per thread,
+   or attach to / mirror the existing spawned one? (Affects whether the
+   terminal the founder sees and the cockpit chat are the same session.)
 
 ---
 
