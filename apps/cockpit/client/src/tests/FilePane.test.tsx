@@ -144,7 +144,7 @@ describe("<FilePane />", () => {
     expect(screen.queryByTestId("monaco-editor-mock")).not.toBeInTheDocument();
   });
 
-  it("renders the toolbar with a disabled diff toggle stub", async () => {
+  it("renders the toolbar with an enabled diff toggle (WP-015 made it live)", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       jsonResponse(200, makeFile()),
     );
@@ -154,6 +154,6 @@ describe("<FilePane />", () => {
       expect(screen.getByTestId("monaco-editor-mock")).toBeInTheDocument(),
     );
     const diffButton = screen.getByRole("button", { name: /show diff/i });
-    expect(diffButton).toBeDisabled();
+    expect(diffButton).toBeEnabled();
   });
 });
