@@ -1,12 +1,47 @@
 # Sulis — Changelog
 
+## v0.50.0 — 2026-05-26
+
+**Phase 6c — the final slice of Phase 6 of the change-as-primitive build. Phase 6 COMPLETE: the full founder-facing CLI surface is live.**
+
+Two deliverables wire the six stage skills (recon / specify / design / audit / review / change) into one journey the founder walks through Sulis, and give the founder a session-level handle on how Sulis talks to them. Docs/skill change only — no new Python.
+
+### Deliverable 1 — `/sulis:jargon` toggle skill
+
+`plugins/sulis/skills/jargon/SKILL.md` (LIGHT tier, founder-facing, dual-register) — the session-wide switch for the dual-register default:
+
+- `/sulis:jargon on` → technical-mode is the default for the rest of the session.
+- `/sulis:jargon off` → back to plain English (founder-mode).
+- `/sulis:jargon` (no argument) → reports the current default.
+
+**Mechanism: session state, not a permanent setting.** A skill can't set an env var in the parent shell, so the toggle writes `on`/`off` to a dot-prefixed private-state file (`.sulis/.session/jargon`) the Sulis agent reads each turn. Precedence (highest first): a per-response "plain English please" intent → the `SULIS_JARGON` env var → the session-state file → founder-mode default. The toggle sets the *default*, never a lock — a one-off plain-English request always wins. Confirms in one sentence; does NOT restate the dual-register pattern (the agent body owns it).
+
+`VERIFICATION_REPORT.md` co-located: **PASS** across all five gates at LIGHT tier. Codebase Referential Integrity **3/3** (agent body / founder-facing-conventions / change skill all verified on disk). Founder-readability 100%. 6 adversarial cases — 5 PREVENTED (MUC-F1 operator-vocab leak; MUC-R1 technical-mode-leaks-into-founder-default — prevented by session-scoping the toggle; MUC-R3 toggle-without-persistence — prevented by the explicit one-off-vs-session precedence ladder; MUC-F3 destructive-via-jargon — technical-mode never skips the destroy-prompt; no-argument edge), 1 N/A justified (MUC-R2 — this skill does no translation of its own).
+
+### Deliverable 2 — stage auto-routing in the Sulis agent body
+
+`plugins/sulis/agents/sulis.md` gains a **Stage auto-routing** subsection inside the existing Change-context section. When a session is bound to a change (`SULIS_CHANGE_ID` set → `resolve_current_change()` → manifest), Sulis reads where the change is in the six-stage journey and routes to the right stage skill:
+
+| Stage | Route to |
+|---|---|
+| 0 — Recon | `/sulis:recon` |
+| 1 — Specify | `/sulis:specify` |
+| 2 — Design | `/sulis:design` (greenfield `create`/`feat`) or `/sulis:audit` (brownfield `refactor`/`harden`/`fix`/`replace`) |
+| 3 — Implement | `/sulis:run-all` |
+| 4 — Review | `/sulis:review` |
+| 5 — Ship | `/sulis:change ship` |
+
+The manifest does not store a `stage` field, so stage is **inferred** from the change primitive + which stage artifacts already exist on the branch (no `CONTEXT.md` → Recon; `CONTEXT.md` but no `SPEC.md` → Specify; `SPEC.md` but no Work Packages → Design; etc.), tie-broken by the recon `CONTEXT.md` suggested-next-step. Sulis proposes the next stage's skill in plain English ("You're in change CH-X at the Specify stage — ready to run `/sulis:specify`?") and advances on founder confirmation, matching the existing **Phase Auto-Progression** (action-then-report on a clean stage; never permission-theater) + **Decision Discipline** rules. When the stage is genuinely ambiguous, it surfaces the two likeliest stages rather than guessing.
+
+All seven stage skills (recon / specify / design / audit / review / change / run-all) plus the new jargon toggle are declared in the agent's `related_skills` and verified on disk. The existing dual-register + change-context sections are preserved byte-for-byte; only the routing subsection + the related-skills entries were added.
+
+Founder tone stack applied throughout (AAF + FE + COACHING + TONE + Founder-Facing Conventions Rules 1-6).
+
 ## v0.49.1 — 2026-05-26
 
 **Fix flaky `test_train_lock_second_acquisition_raises` — replace timing-window race with Event synchronization; was intermittently breaking branch-ci.**
 
-`plugins/sulis/scripts/tests/unit/test_wpx_train_state_machine.py::test_train_lock_second_acquisition_raises` spawned a subprocess to hold the train flock, then used `time.sleep(0.2)` to "let the subprocess grab the lock" before the main process attempted its own `TrainLock` acquisition (expecting a `RuntimeError` naming the holder's PID). Under full-suite load — process-spawn overhead, especially with the `spawn` start method — the subprocess often hadn't acquired the lock within that 0.2s window, so the main acquisition *succeeded* and `pytest.raises` failed. The test passed in isolation and failed ~50% under the full unit suite; because it lives in `unit/`, that flake broke the `branch-ci` gate (`pytest plugins/sulis/scripts/tests/unit/ -q`) roughly half the time.
-
-**Fix (deterministic):** the helper `_acquire_and_hold` now takes two `multiprocessing.Event`s. The subprocess acquires the flock, writes its PID, then `acquired.set()`; the parent `acquired.wait(timeout=5.0)` (asserted) *before* attempting its own acquisition — guaranteeing the lock is held when the parent tries, with no timing window. A `release` event (bounded `wait(timeout=10.0)`) lets the subprocess release + exit cleanly so no orphaned process or leaked lock file survives between tests. The assertion under test (`pytest.raises(RuntimeError, match="being acted on by PID")`) and the PID-naming behaviour are unchanged — only the synchronization was fixed. The now-unused `time` import was removed. The helper remains a module-level picklable function, so it works under both `fork` and `spawn`. Test-only change — no production code touched. Verified: the exact gate command ran 5× consecutively, 377 passed each time.
+`plugins/sulis/scripts/tests/unit/test_wpx_train_state_machine.py::test_train_lock_second_acquisition_raises` spawned a subprocess to hold the train flock, then used `time.sleep(0.2)` before the main process attempted its own `TrainLock` acquisition. Under full-suite load (process-spawn overhead, esp. `spawn` start method) the subprocess often hadn't acquired the lock within that window, so the main acquisition succeeded and `pytest.raises` failed — ~50% under the full unit suite, breaking the `branch-ci` gate roughly half the time. Fix: `_acquire_and_hold` now takes two `multiprocessing.Event`s — the subprocess acquires the flock + writes its PID + `acquired.set()`; the parent `acquired.wait()` (asserted) before its own acquisition (race eliminated); a `release` event lets the subprocess exit cleanly (no orphan / leaked lock). Assertion + PID-naming behaviour unchanged; test-only. Verified 5× consecutive gate runs green.
 
 ## v0.49.0 — 2026-05-26
 
