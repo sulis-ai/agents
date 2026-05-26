@@ -32,8 +32,8 @@
       {
         "patterns": [
           {
-            "group": ["../../*", "../../../*", "../../../../*"],
-            "message": "Cross-import boundary violation — apps/cockpit/ must not import from outside its own tree (TDD §9, ADR-008)."
+            "group": ["../../../../*", "../../../../../*", "../../../../../../*"],
+            "message": "Cross-import boundary violation — relative imports of 4+ levels up escape apps/cockpit/ (the deepest in-tree source is client/src/api/, three levels up from which is apps/cockpit/ itself). See TDD §9, ADR-008."
           }
         ]
       }

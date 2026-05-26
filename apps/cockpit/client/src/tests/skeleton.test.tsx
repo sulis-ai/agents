@@ -1,17 +1,30 @@
-// WP-001 — skeleton test for the placeholder client root.
+// WP-011 — smoke test for <App />.
 //
-// Per the WP Contract's Red checklist: <App /> must render without
-// throwing. We don't assert any visible content beyond a single anchor
-// string ("cockpit booting") because pages + components are the work of
-// later WPs (WP-011 onwards).
+// Replaces WP-001's "cockpit booting" placeholder assertion now that
+// WP-011 has landed the real Router + Shell + TanStack Query wiring.
+// We assert <App /> mounts without throwing AND the dashboard route
+// renders inside the persistent Shell. Detailed route + layout
+// behaviour lives in routing.test.tsx + Shell.test.tsx.
 
 import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
-import { App } from "../App";
+import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
+import { AppRoutes } from "../App";
 
-describe("client App (placeholder)", () => {
-  it("renders without throwing", () => {
-    const { container } = render(<App />);
-    expect(container.textContent ?? "").toMatch(/cockpit booting/i);
+describe("App smoke", () => {
+  it("mounts AppRoutes with a router + query client without throwing", () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={["/"]}>
+          <AppRoutes />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(screen.getByTestId("page-dashboard")).toBeInTheDocument();
+    expect(screen.getByTestId("shell-sidebar")).toBeInTheDocument();
   });
 });

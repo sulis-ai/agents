@@ -1,0 +1,26 @@
+/* WP-011 — Sidebar styles. CSS module per WP Contract (no Tailwind). */
+
+.sidebar {
+  width: 280px;
+  flex: 0 0 280px;
+  border-right: 1px solid #e1e4e8;
+  padding: 16px;
+  overflow-y: auto;
+  background: #fafbfc;
+}
+
+.heading {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #586069;
+  margin: 0 0 12px;
+}
+
+.placeholder {
+  font-size: 13px;
+  color: #6a737d;
+  font-style: italic;
+  margin: 0;
+}

@@ -1,13 +1,14 @@
-// WP-001 — placeholder client entry point.
+// WP-011 — client entry point.
 //
-// Mounts <App /> into the #root element from index.html. WP-011 will
-// wrap this with QueryClientProvider + BrowserRouter; for the
-// skeleton, a bare React.StrictMode + render is enough to validate the
-// Vite + React + TS toolchain.
+// Mounts <App /> wrapped in QueryClientProvider (TanStack Query)
+// inside React.StrictMode. The BrowserRouter wrap lives inside <App />
+// itself so tests can swap in MemoryRouter via <AppRoutes />.
 
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { App } from "./App";
+import { queryClient } from "./queryClient";
 
 const rootEl = document.getElementById("root");
 if (!rootEl) {
@@ -16,6 +17,8 @@ if (!rootEl) {
 
 ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
-    <App />
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
   </React.StrictMode>,
 );
