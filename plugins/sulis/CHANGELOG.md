@@ -1,5 +1,13 @@
 # Sulis — Changelog
 
+## v0.49.1 — 2026-05-26
+
+**Fix flaky `test_train_lock_second_acquisition_raises` — replace timing-window race with Event synchronization; was intermittently breaking branch-ci.**
+
+`plugins/sulis/scripts/tests/unit/test_wpx_train_state_machine.py::test_train_lock_second_acquisition_raises` spawned a subprocess to hold the train flock, then used `time.sleep(0.2)` to "let the subprocess grab the lock" before the main process attempted its own `TrainLock` acquisition (expecting a `RuntimeError` naming the holder's PID). Under full-suite load — process-spawn overhead, especially with the `spawn` start method — the subprocess often hadn't acquired the lock within that 0.2s window, so the main acquisition *succeeded* and `pytest.raises` failed. The test passed in isolation and failed ~50% under the full unit suite; because it lives in `unit/`, that flake broke the `branch-ci` gate (`pytest plugins/sulis/scripts/tests/unit/ -q`) roughly half the time.
+
+**Fix (deterministic):** the helper `_acquire_and_hold` now takes two `multiprocessing.Event`s. The subprocess acquires the flock, writes its PID, then `acquired.set()`; the parent `acquired.wait(timeout=5.0)` (asserted) *before* attempting its own acquisition — guaranteeing the lock is held when the parent tries, with no timing window. A `release` event (bounded `wait(timeout=10.0)`) lets the subprocess release + exit cleanly so no orphaned process or leaked lock file survives between tests. The assertion under test (`pytest.raises(RuntimeError, match="being acted on by PID")`) and the PID-naming behaviour are unchanged — only the synchronization was fixed. The now-unused `time` import was removed. The helper remains a module-level picklable function, so it works under both `fork` and `spawn`. Test-only change — no production code touched. Verified: the exact gate command ran 5× consecutively, 377 passed each time.
+
 ## v0.49.0 — 2026-05-26
 
 **Phase 6b-ii of the change-as-primitive build — four founder-facing stage-wrapper skills.**
