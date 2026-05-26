@@ -1,16 +1,22 @@
-// WP-014 — <FileToolbar />.
+// WP-014 → WP-015 — <FileToolbar />.
 //
 // The toolbar above the file viewer: the filename (truncated, full path
-// in a tooltip), the copy-path button, and a diff-toggle button that is
-// DISABLED in this WP. WP-015 enables the diff toggle — leaving the
-// control present (but disabled) keeps the toolbar layout stable so
-// WP-015 is a one-line wiring change rather than a layout shift.
+// in a tooltip), the copy-path button, and the diff toggle.
 //
-// References: WP-014 Contract (<FileToolbar>, diff toggle stub), ADR-006
-// (diff surface is WP-015).
+// WP-014 shipped the diff toggle as a disabled stub. WP-015 makes it
+// live: the toggle flips the `?diff=1` search param on/off, and its
+// label + pressed state derive from that param — so the URL fully
+// describes the view (TDD §6.1) and the back button works. The label
+// strings live in a single constant (diffToolbarCopy) per the WP-015
+// Blue requirement.
+//
+// References: WP-014 Contract (<FileToolbar>), WP-015 Contract
+// (<FileToolbar> change), ADR-006.
 
+import { useSearchParams } from "react-router-dom";
 import styles from "../styles/FilesPanel.module.css";
 import { CopyPathButton } from "./CopyPathButton";
+import { DIFF_TOGGLE_LABELS } from "./diffToolbarCopy";
 
 interface Props {
   /** Worktree-relative path (shown as the filename label). */
@@ -20,6 +26,19 @@ interface Props {
 }
 
 export function FileToolbar({ relativePath, absolutePath }: Props) {
+  const [params, setParams] = useSearchParams();
+  const diffOn = params.get("diff") === "1";
+
+  function toggleDiff() {
+    const next = new URLSearchParams(params);
+    if (diffOn) {
+      next.delete("diff");
+    } else {
+      next.set("diff", "1");
+    }
+    setParams(next, { replace: false });
+  }
+
   return (
     <div className={styles.toolbar} data-testid="file-toolbar">
       <span className={styles.filename} title={relativePath}>
@@ -30,11 +49,11 @@ export function FileToolbar({ relativePath, absolutePath }: Props) {
         <button
           type="button"
           className={styles.diffToggle}
-          disabled
-          title="Diff toggle lands in WP-015"
-          data-testid="diff-toggle-stub"
+          aria-pressed={diffOn}
+          onClick={toggleDiff}
+          data-testid="diff-toggle"
         >
-          Show diff
+          {diffOn ? DIFF_TOGGLE_LABELS.showCurrent : DIFF_TOGGLE_LABELS.showDiff}
         </button>
       </div>
     </div>
