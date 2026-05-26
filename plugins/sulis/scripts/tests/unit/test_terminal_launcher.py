@@ -35,7 +35,9 @@ _GOOD_ULID = "01HYQC71000000000000000000"
 
 
 def test_validate_entry_command_accepts_default():
-    ok, reason = tl.validate_entry_command("claude --agent sulis")
+    ok, reason = tl.validate_entry_command(
+        "claude --dangerously-skip-permissions --agent sulis"
+    )
     assert ok is True
     assert reason == ""
 

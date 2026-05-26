@@ -1,5 +1,11 @@
 # Sulis — Changelog
 
+## v0.50.2 — 2026-05-26
+
+**Spawned focused session now runs unattended — `--dangerously-skip-permissions` in the launcher entry command.**
+
+Live-dogfood follow-up to v0.50.1: with the spawn now actually starting `claude`, the focused session blocked on an interactive permission prompt on its first tool use — useless for an unattended change workspace. Change the launcher's default `entry_command` from `claude --agent sulis` to `claude --dangerously-skip-permissions --agent sulis` (both default sites in `_terminal_launcher.py`; `sulis-change` relies on the default). The flag is all lowercase + dashes, so it passes the existing `validate_entry_command` injection whitelist unchanged. Bare `--agent sulis` confirmed to resolve to the plugin agent in the live re-spawn (v0.50.1 Bug 4 closed). Test updated to assert the new default validates.
+
 ## v0.50.1 — 2026-05-26
 
 **Fix terminal-launcher spawn — a live dogfood surfaced that `sulis-change start --spawn` opened a window but never started the bound `claude` session.**
