@@ -219,6 +219,17 @@ stream — never TUI-scraped).
 > point; discard the pty-TUI integration path. The `--prototype` spike's
 > job is narrowly to prove stream-json / SDK consumption + rendering.
 
+**Spike result (validated 2026-05-26).** A throwaway spike confirmed the
+bridge: `claude -p "<prompt>" --output-format stream-json --verbose
+--dangerously-skip-permissions` returns clean newline-delimited JSON events
+(`system/init` → `assistant` → `result/success`), exit 0, no TUI/ANSI.
+Adding `--include-partial-messages` yields incremental `stream_event` token
+deltas (49 on a short prompt) for a live "typing" feel. The structured
+stream is the path; the old pty-TUI wall is avoided. Remaining unknowns are
+multi-turn *chat* (session resume via `--resume`/`--continue` or the Agent
+SDK) and live pipe latency (read `Popen.stdout` line-by-line, not a blocking
+capture) — both for the real bridge build, not the feasibility question.
+
 ---
 
 ## Open questions (resolve before / within the changes)
