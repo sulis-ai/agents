@@ -28,6 +28,28 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 
+# ─── Global state isolation (repo-wide) ───────────────────────────────────
+
+
+@pytest.fixture(autouse=True)
+def _isolate_sulis_state(tmp_path_factory, monkeypatch):
+    """Point SULIS_STATE_DIR at a per-test tmp dir for EVERY test (unit +
+    integration).
+
+    `_change_state.sulis_state_base()` resolves SULIS_STATE_DIR first, falling
+    back to ~/.sulis. Both in-process writes (unit tests calling
+    write_change_stage / write_change_record directly) and subprocess writes
+    (integration tests invoking `sulis-change start` via run_tool, which
+    inherits the env) must land in tmp — otherwise they pollute the
+    developer's (and CI runner's) real ~/.sulis/changes/*, junking the
+    dashboard's global cross-change view. Living at the root conftest, this
+    covers unit tests too (the integration-only fixture left that gap, which
+    leaked a test-fixture ULID into the real store).
+    """
+    state_dir = tmp_path_factory.mktemp("sulis-state")
+    monkeypatch.setenv("SULIS_STATE_DIR", str(state_dir))
+
+
 # ─── Project path helpers ─────────────────────────────────────────────────
 
 

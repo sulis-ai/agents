@@ -43,6 +43,17 @@ sc = _load_sulis_change()
 _GOOD_ULID = "01HYQC71000000000000000000"
 
 
+@pytest.fixture(autouse=True)
+def _home_base_isolation(tmp_path_factory, monkeypatch):
+    """nuke tests build their footprint under a HOME-based ~/.sulis and assert
+    it's removed, so this module opts out of the repo-wide SULIS_STATE_DIR
+    isolation (root conftest) and isolates via HOME instead. Each test sets its
+    own HOME (overriding the default here); the default keeps any that don't
+    out of the real home."""
+    monkeypatch.delenv("SULIS_STATE_DIR", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))
+
+
 # ─── emit capture harness ─────────────────────────────────────────────────
 
 

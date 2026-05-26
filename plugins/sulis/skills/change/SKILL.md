@@ -3,11 +3,12 @@ name: change
 description: >
   Use when the founder wants to start a new piece of work, see everything
   they have in flight, jump back into one, ship one when it's ready, or
-  pull in the latest from the rest of the team. The change-lifecycle
-  command. Subcommands: start / list / focus / ship / rebase.
+  pull in the latest from the rest of the team, or throw a change away.
+  The change-lifecycle command. Subcommands: start / list / focus / ship /
+  rebase / nuke.
   Usage: /sulis:change start "fix the login bug", /sulis:change list,
   /sulis:change focus CH-01HQ8X, /sulis:change ship CH-01HQ8X,
-  /sulis:change rebase CH-01HQ8X.
+  /sulis:change rebase CH-01HQ8X, /sulis:change nuke CH-01HQ8X.
 user_invocable: true
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]
@@ -50,6 +51,7 @@ You give it a subcommand and it does the right thing:
 | `/sulis:change focus CH-01HQ8X` | Jumps you back into a piece of work you started earlier. |
 | `/sulis:change ship CH-01HQ8X` | Lands the finished work into the shared `dev` line (after the safety checks pass). |
 | `/sulis:change rebase CH-01HQ8X` | Pulls in everyone else's latest work so yours stays current. |
+| `/sulis:change nuke CH-01HQ8X` | Throws a change away — deletes its branch, workspace, and local state. Asks first; can't be undone. |
 
 This skill is an **orchestrator** — it tells the Sulis session which
 existing tool to run for each subcommand. It does not run any new code of
@@ -369,6 +371,75 @@ print(json.dumps(r))
 - `internal_error` → surface plainly + suggest re-running; if it persists,
   it's a tooling issue to raise.
 
+### `nuke <CH-handle>` — throw a change away
+
+Delete a change and its full footprint: the git **branch**, the
+**workspace** (worktree), the **local state**, and the committed
+**manifest**. **Destructive + irreversible** — prompt-before-destroy
+applies (Rule 3). Use it for abandoned experiments, dead-ends, and
+orphaned changes the founder no longer wants.
+
+**1. Resolve the change** (same as `focus`); get its branch + slug +
+worktree. If the handle doesn't match, say so and offer `list`.
+
+**2. Dry-run FIRST — always.** `nuke` without `--force` deletes nothing;
+it lists exactly what *would* be removed. Run it and show the founder the
+footprint before touching anything:
+
+```bash
+"$SCRIPTS_DIR/sulis-change" nuke --handle CH-01HQ8X
+```
+
+(Use `--slug <slug>` instead of `--handle` when you resolved the change by
+slug — the tool accepts either.)
+
+**3. Echo the footprint + the irreversible step, and require an explicit
+yes** (MUC-F3 — never act on vague phrasing like "get rid of this"):
+
+> *"This will permanently delete **fix the login bug** (`CH-01HQ8X`) — its
+> branch, its workspace, and its saved state. {If the dry-run reported
+> unmerged commits:} It has {N} commit(s) that aren't merged anywhere else,
+> so that work would be lost for good. This can't be undone. Go ahead?
+> (yes / no)"*
+
+Do not proceed without an affirmative. If the founder is currently *in* the
+change's workspace, the tool refuses (you can't nuke the change you're on) —
+relay that and tell them to switch away first (`git checkout dev`).
+
+**4. Delete (only after an explicit yes):**
+
+```bash
+"$SCRIPTS_DIR/sulis-change" nuke --handle CH-01HQ8X --force
+```
+
+`--force` is the confirm switch — it's also what's required to discard a
+branch with unmerged commits.
+
+**5. Report (Rule 1):** parse the JSON; lead with the outcome:
+
+> *"Done — **fix the login bug** (`CH-01HQ8X`) is gone: branch, workspace,
+> and saved state all removed."*
+
+If the tool reports it couldn't fully resolve the change (e.g. the manifest
+lives on a branch you're not on), relay what it *did* and didn't remove in
+plain English — never claim a clean delete the tool didn't confirm.
+
+### `stage <name>` — internal: stamp the workflow stage
+
+Not a founder command. The stage skills (recon / specify / design / run-all
+/ review) call this on completion so the dashboard reflects where each change
+sits in the six-stage workflow. It resolves the change from the
+`SULIS_CHANGE_ID` env var and records the stage in the branch-independent
+local store:
+
+```bash
+"$SCRIPTS_DIR/sulis-change" stage design   # recon|specify|design|implement|review|ship
+```
+
+If a founder types it directly, treat it as a no-op-with-explanation: tell
+them the dashboard updates on its own as work progresses, and point them at
+`/sulis:dashboard` to see it.
+
 ---
 
 ## When to invoke this skill
@@ -419,6 +490,15 @@ print(json.dumps(r))
 - **`rebase` uses merge, not rebase** (the name is the founder's word for
   "catch up", not the git operation). Merge preserves SHAs so in-flight WP
   worktrees stay valid (CW-04). Do not "fix" this to a real git rebase.
+- **`nuke` is irreversible — dry-run, echo, confirm, then `--force`.** Never
+  pass `--force` on the first call. Run the dry-run, show the founder the
+  exact footprint (and call out any unmerged commits that would be lost),
+  require an explicit yes, *then* re-run with `--force`. Never treat vague
+  phrasing ("clear it", "get rid of this", "delete that") as a nuke — ask
+  what they mean. (MUC-F3)
+- **`stage` is machinery, not a founder verb.** It's called by the stage
+  skills to keep the dashboard current; don't surface it in founder-facing
+  menus or suggest the founder type it.
 - **Don't narrate the machinery.** The founder doesn't need to hear about
   `launch_change_terminal`, `back_integrate_change_branch`, or
   `SULIS_CHANGE_ID`. Surface what is now true and what they should do next
@@ -443,6 +523,13 @@ print(json.dumps(r))
   implemented as a merge, not a git rebase (CW-04).
 - **Workspace / focused terminal** — the new terminal `start` opens, with
   Sulis already briefed on the change via the recon `CONTEXT.md`.
+- **Nuke** — throw a change away: delete its branch, worktree, local state,
+  and manifest. Irreversible; dry-runs by default, deletes only with
+  `--force` after explicit founder confirmation.
+- **Stage** — the change's position in the six-stage workflow (recon →
+  specify → design → implement → review → ship), recorded in the branch-
+  independent local store. The `stage` subcommand stamps it; `/sulis:dashboard`
+  reads it. Internal machinery, not a founder verb.
 
 ## See also
 

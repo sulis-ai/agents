@@ -12,10 +12,22 @@ import subprocess
 from pathlib import Path
 from unittest import mock
 
+import pytest
+
 import _change_context as cc
 
 
 _GOOD_ULID = "01HYQC71000000000000000000"
+
+
+@pytest.fixture(autouse=True)
+def _home_base_isolation(tmp_path_factory, monkeypatch):
+    """This module asserts the ~/.sulis HOME-fallback CONTEXT.md path, so it
+    opts out of the repo-wide SULIS_STATE_DIR isolation (root conftest) and
+    isolates via HOME instead. Tests that set their own HOME override the
+    default set here."""
+    monkeypatch.delenv("SULIS_STATE_DIR", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))
 
 
 def _metadata(primitive: str = "create") -> dict:
