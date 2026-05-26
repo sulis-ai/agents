@@ -190,6 +190,26 @@ def test_cmd_start_with_spawn_failure_still_emits_ok(tmp_path):
     assert data["spawn_result"]["status"] == "failed"
 
 
+def test_cmd_start_stamps_initial_recon_stage(tmp_path):
+    """cmd_start writes the initial 'recon' stage into state.json."""
+    repo_root = tmp_path
+    worktree = tmp_path / "wt"
+    worktree.mkdir()
+    captured, patches = _patch_cmd_start_internals(repo_root, worktree)
+    wcc = mock.patch.object(sc, "write_change_context", return_value=tmp_path / "C.md")
+    stamped: dict = {}
+
+    def _stamp(change_id, stage):
+        stamped["change_id"] = change_id
+        stamped["stage"] = stage
+        return tmp_path / "state.json"
+
+    wcs = mock.patch.object(sc, "write_change_stage", side_effect=_stamp)
+    _run_cmd_start(_args(spawn=False, repo_root=repo_root), captured, patches, [wcc, wcs])
+    assert stamped["change_id"] == _GOOD_ULID
+    assert stamped["stage"] == "recon"
+
+
 def test_build_change_pre_prompt_includes_handle_and_intent():
     body = sc._build_change_pre_prompt(
         change_id=_GOOD_ULID, handle="CH-01HYQC", slug="introduce-payments",

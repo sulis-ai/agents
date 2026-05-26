@@ -30,12 +30,14 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _change_context import write_change_context  # noqa: E402
+from _change_state import write_change_stage  # noqa: E402
 from _terminal_launcher import launch_change_terminal  # noqa: E402
 from _wpxlib import (  # noqa: E402
     ALLOWED_CHANGE_PRIMITIVES,
@@ -207,6 +209,15 @@ def cmd_start(args: argparse.Namespace) -> None:
     if context_path is None:
         _log("Pre-spawn recon could not be written (path unwritable); "
              "continuing without CONTEXT.md")
+
+    # Stamp the initial workflow stage (recon) into the per-change local
+    # state.json. The stage skills advance it later (slice B); here we just
+    # seed the starting position. Best-effort like recon: an unwritable path
+    # degrades inside write_change_stage (returns None) without crashing.
+    stage_path = write_change_stage(change_id, "recon")
+    if stage_path is None:
+        _log("Initial stage (recon) could not be written (path unwritable); "
+             "continuing without state.json")
 
     # Optional terminal spawn (WP-004). Spawn failure does NOT unwind the
     # change-creation work — the JSON surfaces spawn_result.status so the
@@ -559,6 +570,191 @@ def cmd_status(args: argparse.Namespace) -> None:
     })
 
 
+# ─── Subcommand: nuke ─────────────────────────────────────────────────────
+
+def _resolve_nuke_target(repo_root: Path, args: argparse.Namespace) -> dict:
+    """Resolve --slug or --handle to a change-branch descriptor.
+
+    Reuses find_change_branches (the same enumeration list/status use). When
+    --handle is given, matches it against each change's manifest change_id
+    (CH-<first-6-of-ULID>). When --slug is given, matches the branch slug.
+
+    Returns a dict {branch, primitive, slug, current, change_id, worktree_path,
+    manifest_path}. Calls emit_error (exits) when no selector is given or no
+    matching change is found.
+    """
+    slug = getattr(args, "slug", None)
+    handle = getattr(args, "handle", None)
+    if not slug and not handle:
+        emit_error(
+            "Pass a selector: --slug SLUG or --handle CH-XXXXXX.",
+            context={"hint": "Run `sulis-change list` to see active changes."},
+        )
+
+    candidates = find_change_branches(repo_root)
+    for c in candidates:
+        dest = change_worktree_path(repo_root, c["primitive"], c["slug"])
+        manifest = _metadata_path(repo_root, c["primitive"], c["slug"])
+        meta = read_change_metadata(manifest)
+        change_id = meta.get("change_id", "")
+        change_handle = ulid_handle(change_id) if len(change_id) == 26 else ""
+
+        matched = False
+        if slug and c["slug"] == slug.lower():
+            matched = True
+        if handle and change_handle and change_handle == handle:
+            matched = True
+        if matched:
+            return {
+                "branch": c["branch"],
+                "primitive": c["primitive"],
+                "slug": c["slug"],
+                "current": c["current"],
+                "change_id": change_id,
+                "worktree_path": dest,
+                "manifest_path": manifest,
+            }
+
+    selector = f"--slug {slug}" if slug else f"--handle {handle}"
+    emit_error(
+        f"No active change matches {selector}.",
+        context={"hint": "Run `sulis-change list` to see active changes."},
+    )
+
+
+def _branch_has_unmerged_commits(repo_root: Path, branch: str,
+                                  base_ref: str = "dev") -> int:
+    """Return the count of commits on `branch` not yet on `base_ref`.
+
+    0 means fully merged (or branch/base unresolvable — treated as nothing
+    to lose). Best-effort: a git failure returns 0 rather than blocking nuke.
+    """
+    rc, out, _ = _run(
+        ["git", "rev-list", "--count", f"{base_ref}..{branch}"],
+        cwd=repo_root, timeout=10,
+    )
+    if rc == 0 and out.strip().isdigit():
+        return int(out.strip())
+    return 0
+
+
+def cmd_nuke(args: argparse.Namespace) -> None:
+    repo_root = _resolve_repo_root(args)
+    target = _resolve_nuke_target(repo_root, args)
+    branch = target["branch"]
+    worktree_dest = target["worktree_path"]
+    manifest = target["manifest_path"]
+    change_id = target["change_id"]
+
+    # Safety 1: never nuke the change you're currently on. Check the current
+    # branch of the repo_root we were pointed at (which, when run from inside
+    # the change worktree, IS the change branch).
+    rc, cur_out, _ = _run(["git", "branch", "--show-current"],
+                          cwd=repo_root, timeout=10)
+    current_branch = cur_out.strip() if rc == 0 else ""
+    if current_branch == branch:
+        emit_error(
+            f"Can't nuke the change you're currently on ({branch}) — "
+            f"switch to dev first (`git checkout dev`), then re-run.",
+            context={"current_branch": current_branch},
+        )
+
+    state_dir = (Path.home() / ".sulis" / "changes" / change_id
+                 if change_id else None)
+
+    # Safety 2: refuse to nuke a branch with unmerged commits unless --force.
+    # (--force is also the mechanical delete switch; without it we dry-run.)
+    unmerged = _branch_has_unmerged_commits(repo_root, branch)
+
+    footprint = {
+        "worktree": str(worktree_dest),
+        "branch": branch,
+        "state_dir": str(state_dir) if state_dir else None,
+        "manifest": str(manifest),
+    }
+
+    if not args.force:
+        # Dry-run: list what WOULD be removed; delete nothing; exit 0.
+        warnings = []
+        if unmerged:
+            warnings.append(
+                f"branch {branch} has {unmerged} unmerged commit(s) — "
+                f"these would be LOST. Re-run with --force to confirm."
+            )
+        emit_ok(data={
+            "dry_run": True,
+            "branch": branch,
+            "primitive": target["primitive"],
+            "slug": target["slug"],
+            "change_id": change_id or None,
+            "would_remove": footprint,
+            "unmerged_commits": unmerged,
+        }, warnings=warnings or None)
+        return
+
+    # --force path: tear down the full footprint. Each step is idempotent —
+    # a half-cleaned change (worktree already gone, no state dir, etc.) must
+    # not crash; report truthfully what was actually removed this run.
+    removed: dict = {}
+
+    # 1. Worktree (force — untracked manifest lives inside; work is abandoned).
+    ok, detail = git_worktree_remove(repo_root, worktree_dest, force=True)
+    removed["worktree"] = ok
+    removed["worktree_detail"] = detail
+    # Prune stale refs before deleting the branch.
+    _run(["git", "worktree", "prune"], cwd=repo_root, timeout=10)
+
+    # 2. Branch (-D: forced, since the work is being abandoned).
+    rc, _, err = _run(["git", "rev-parse", "--verify", f"refs/heads/{branch}"],
+                      cwd=repo_root, timeout=10)
+    if rc == 0:
+        rc, out, err = _run(["git", "branch", "-D", branch],
+                            cwd=repo_root, timeout=10)
+        removed["branch"] = rc == 0
+        if rc != 0:
+            removed["branch_detail"] = (err or out or "branch delete failed").strip()
+    else:
+        removed["branch"] = False
+        removed["branch_detail"] = "branch already absent"
+
+    # 3. Local state dir (~/.sulis/changes/{change_id}/).
+    if state_dir is not None and state_dir.exists():
+        try:
+            shutil.rmtree(state_dir)
+            removed["state_dir"] = True
+        except OSError as exc:
+            removed["state_dir"] = False
+            removed["state_dir_detail"] = str(exc)
+    else:
+        removed["state_dir"] = False
+        removed["state_dir_detail"] = "state dir already absent"
+
+    # 4. Committed manifest (.changes/{primitive}-{slug}.yaml). Removing it is
+    # a working-tree change the founder commits separately (or, on dev, just a
+    # file removal). nuke only removes the file; it never commits.
+    if manifest.exists():
+        try:
+            manifest.unlink()
+            removed["manifest"] = True
+        except OSError as exc:
+            removed["manifest"] = False
+            removed["manifest_detail"] = str(exc)
+    else:
+        removed["manifest"] = False
+        removed["manifest_detail"] = "manifest already absent"
+
+    _log(f"Change nuked: {branch} ({change_id or 'no-id'})")
+    emit_ok(data={
+        "dry_run": False,
+        "branch": branch,
+        "primitive": target["primitive"],
+        "slug": target["slug"],
+        "change_id": change_id or None,
+        "removed": removed,
+        "unmerged_commits_discarded": unmerged,
+    })
+
+
 # ─── argparse ────────────────────────────────────────────────────────────
 
 def build_parser() -> argparse.ArgumentParser:
@@ -629,6 +825,25 @@ def build_parser() -> argparse.ArgumentParser:
     p_status = sub.add_parser("status", help="Show one change's state")
     _common(p_status)
 
+    p_nuke = sub.add_parser(
+        "nuke",
+        help="Abandon + delete a change and its full footprint "
+             "(worktree, branch, local state, manifest)",
+    )
+    p_nuke.add_argument("--repo-root", default=os.getcwd(),
+                        help="Path to the repo root (default: cwd)")
+    p_nuke.add_argument("--slug", default=None,
+                        help="Change slug to nuke (e.g. introduce-payments)")
+    p_nuke.add_argument("--handle", default=None,
+                        help="Change handle to nuke (e.g. CH-01HYQC)")
+    p_nuke.add_argument(
+        "--force", action="store_true",
+        help="Actually delete. Without --force, nuke dry-runs: it lists the "
+             "footprint that WOULD be removed and exits without deleting. "
+             "--force is also required to discard a branch with unmerged "
+             "commits.",
+    )
+
     return parser
 
 
@@ -638,6 +853,7 @@ HANDLERS = {
     "finish": cmd_finish,
     "list": cmd_list,
     "status": cmd_status,
+    "nuke": cmd_nuke,
 }
 
 

@@ -1,5 +1,17 @@
 # Sulis — Changelog
 
+## v0.51.0 — 2026-05-26
+
+**Change-dashboard foundation (slice A) — per-change workflow-stage persistence + `sulis-change nuke`.**
+
+Two deliverables that lay the groundwork for the change dashboard (slice B wires them into a `/sulis:dashboard` skill + `/sulis:change nuke` subcommand).
+
+(1) **Per-change stage persistence.** A change moves through the six-stage workflow `recon → specify → design → implement → review → ship`. The current stage is now persisted as lightweight per-change *local* state at `~/.sulis/changes/{change_id}/state.json` (alongside the existing `CONTEXT.md` / `session.json` / `launch.sh`) — deliberately NOT the committed `.changes/{primitive}-{slug}.yaml` manifest, because stage is a local workflow *position*, not shared/committed state. New `plugins/sulis/scripts/_change_state.py` (separate-concern module mirroring `_change_context.py`): `WORKFLOW_STAGES` canonical ordered tuple + `is_valid_stage` validator; `write_change_stage(change_id, stage)` (creates the dir, stamps `{change_id, stage, updated_at (ISO-8601 Z), stage_history[]}`, appends a `{stage, at}` history row each write for the dashboard timeline — best-effort like `write_change_context`, degrades to `None` + a logged warning on an unwritable path, never crashes the caller; rejects unknown stages); `read_change_stage(change_id)` (current stage, `None` on missing/corrupt/absent-key). `sulis-change start` now stamps the initial `recon` stage right after it writes the recon `CONTEXT.md`.
+
+(2) **`sulis-change nuke`.** There was no way to abandon/delete a change (only start/adopt/finish/list/status), so orphaned changes (failed spawns, abandoned work) accumulated. New `cmd_nuke` + subparser tears down a change's full footprint: the git worktree (`git worktree remove --force`), the change branch (`git branch -D`), the local state dir (`~/.sulis/changes/{change_id}/`), and the committed manifest (`.changes/{primitive}-{slug}.yaml`). Selector: `--slug SLUG` or `--handle CH-XXXXXX` (resolved via the same `find_change_branches` enumeration list/status use). Safety: the CLI requires `--force` to actually delete — without it, nuke dry-runs (lists the footprint that WOULD be removed, deletes nothing, exits 0); it refuses to nuke the change branch you're currently on ("switch to dev first"); and it warns when a branch has unmerged commits that would be lost (requiring `--force`). Idempotent — nuking a half-cleaned change (worktree already gone, no state dir) reports truthfully what was actually removed and never crashes. Emits structured JSON so the slice-B skill can report in founder English. (The founder-facing confirm-gate lives in the slice-B skill; the `--force` flag is the mechanical safety.)
+
+26 new unit tests (15 stage persistence + 10 nuke + 1 cmd_start-stamps-recon). Stdlib only; Python 3.11-safe; full unit suite green.
+
 ## v0.50.2 — 2026-05-26
 
 **Spawned focused session now runs unattended — `--dangerously-skip-permissions` in the launcher entry command.**
