@@ -572,16 +572,117 @@ def cmd_status(args: argparse.Namespace) -> None:
 
 # ─── Subcommand: nuke ─────────────────────────────────────────────────────
 
+def _local_state_base() -> Path:
+    """The base dir holding per-change local state: ~/.sulis/changes/.
+
+    Mirrors _change_state._state_path's parent so a monkeypatched HOME in
+    tests (and a real ~/.sulis in production) resolve identically.
+    """
+    return Path.home() / ".sulis" / "changes"
+
+
+def _scan_state_dir_by_prefix(prefix: str) -> tuple[str, str | None]:
+    """Resolve a change_id by scanning ~/.sulis/changes/* for a dir whose name
+    starts with the 6-char handle prefix.
+
+    `prefix` is the first 6 chars of the ULID (the part after "CH-"). The
+    local state dir is named with the full ULID, so a unique prefix match
+    yields the change_id. Returns (resolution_note, change_id_or_None):
+
+      - exactly one match  → (matched-via-prefix, <change_id>)
+      - zero matches       → (no-prefix-match, None)
+      - >1 match           → ("AMBIGUOUS:...", None)  (caller surfaces error)
+
+    Best-effort: an unreadable base dir yields (no-prefix-match, None).
+    """
+    base = _local_state_base()
+    try:
+        candidates = [d for d in base.iterdir()
+                      if d.is_dir() and d.name.startswith(prefix)]
+    except OSError:
+        return "no-prefix-match", None
+    if len(candidates) == 1:
+        return "matched-via-prefix", candidates[0].name
+    if len(candidates) > 1:
+        names = ", ".join(sorted(d.name for d in candidates))
+        return f"AMBIGUOUS:{names}", None
+    return "no-prefix-match", None
+
+
+def _resolve_change_id(repo_root: Path, primitive: str, slug: str,
+                       worktree_dest: Path,
+                       handle: str | None) -> tuple[str, str]:
+    """Resolve a change's change_id via the fallback chain (stop at first hit).
+
+    1. --handle CH-XXXXXX given → scan ~/.sulis/changes/* for a dir whose name
+       starts with the 6-char prefix. Unique in practice; >1 match is an error
+       the caller surfaces (returned as a "AMBIGUOUS:" resolution note).
+    2. Worktree manifest → read {worktree}/.changes/{primitive}-{slug}.yaml
+       (the manifest is committed on the change branch, so it lives in the
+       WORKTREE, not the dev checkout where nuke runs).
+    3. Dev-checkout manifest → read <repo-root>/.changes/{primitive}-{slug}.yaml
+       (rare — only if a copy happens to exist locally, e.g. on dev).
+    4. Honest-degrade → "" (state_dir stays null; the caller reports it
+       truthfully and removes branch + worktree + manifest only).
+
+    Returns (change_id_or_empty, resolution_note). resolution_note records
+    which rung of the chain hit, for the JSON + the ambiguity error path.
+    """
+    # 1. Handle-prefix scan of local state dirs.
+    if handle and handle.startswith("CH-") and len(handle) == 9:
+        prefix = handle[len("CH-"):]
+        note, change_id = _scan_state_dir_by_prefix(prefix)
+        if change_id:
+            return change_id, note
+        if note.startswith("AMBIGUOUS:"):
+            matches = note[len("AMBIGUOUS:"):]
+            emit_error(
+                f"Handle {handle} matches more than one local change state "
+                f"dir under ~/.sulis/changes/ ({matches}). Disambiguate with "
+                f"--slug, or remove the stale dir(s) by hand.",
+                context={"handle": handle, "matches": matches},
+            )
+        # else: no prefix match — fall through to the manifest rungs.
+
+    # 2. Worktree manifest (the common case — manifest committed on the branch).
+    wt_manifest = _metadata_path(worktree_dest, primitive, slug)
+    meta = read_change_metadata(wt_manifest)
+    change_id = meta.get("change_id", "") or ""
+    if len(change_id) == 26:
+        return change_id, "matched-via-worktree-manifest"
+
+    # 3. Dev-checkout manifest (rare local copy).
+    dev_manifest = _metadata_path(repo_root, primitive, slug)
+    if dev_manifest != wt_manifest:
+        meta = read_change_metadata(dev_manifest)
+        change_id = meta.get("change_id", "") or ""
+        if len(change_id) == 26:
+            return change_id, "matched-via-dev-manifest"
+
+    # 4. Honest-degrade: unresolved. state_dir stays null downstream.
+    return "", "unresolved"
+
+
 def _resolve_nuke_target(repo_root: Path, args: argparse.Namespace) -> dict:
     """Resolve --slug or --handle to a change-branch descriptor.
 
-    Reuses find_change_branches (the same enumeration list/status use). When
-    --handle is given, matches it against each change's manifest change_id
-    (CH-<first-6-of-ULID>). When --slug is given, matches the branch slug.
+    Reuses find_change_branches (the same enumeration list/status use) to find
+    the branch + worktree. The change_id (hence the local state dir) is then
+    resolved via the _resolve_change_id fallback chain — robust to the manifest
+    living only in the worktree (the production case) rather than the dev
+    checkout where nuke runs.
 
-    Returns a dict {branch, primitive, slug, current, change_id, worktree_path,
-    manifest_path}. Calls emit_error (exits) when no selector is given or no
-    matching change is found.
+    Matching:
+      --slug  → match the branch slug.
+      --handle → match a change whose change_id (resolved via the fallback
+                 chain) has handle CH-<first-6-of-ULID> == the given handle.
+                 The handle-prefix scan of local state dirs is the primary
+                 resolver; for branches whose state dir is gone we still match
+                 on the handle prefix against the branch's resolved change_id.
+
+    Returns a dict {branch, primitive, slug, current, change_id,
+    change_id_resolution, worktree_path, manifest_path}. Calls emit_error
+    (exits) when no selector is given or no matching change is found.
     """
     slug = getattr(args, "slug", None)
     handle = getattr(args, "handle", None)
@@ -594,9 +695,9 @@ def _resolve_nuke_target(repo_root: Path, args: argparse.Namespace) -> dict:
     candidates = find_change_branches(repo_root)
     for c in candidates:
         dest = change_worktree_path(repo_root, c["primitive"], c["slug"])
-        manifest = _metadata_path(repo_root, c["primitive"], c["slug"])
-        meta = read_change_metadata(manifest)
-        change_id = meta.get("change_id", "")
+        change_id, resolution = _resolve_change_id(
+            repo_root, c["primitive"], c["slug"], dest, handle,
+        )
         change_handle = ulid_handle(change_id) if len(change_id) == 26 else ""
 
         matched = False
@@ -611,8 +712,12 @@ def _resolve_nuke_target(repo_root: Path, args: argparse.Namespace) -> dict:
                 "slug": c["slug"],
                 "current": c["current"],
                 "change_id": change_id,
+                "change_id_resolution": resolution,
+                # The state dir lives under ~/.sulis/changes/, NOT in the
+                # worktree; nuke removes the dev-side manifest copy if present.
                 "worktree_path": dest,
-                "manifest_path": manifest,
+                "manifest_path": _metadata_path(repo_root, c["primitive"],
+                                                c["slug"]),
             }
 
     selector = f"--slug {slug}" if slug else f"--handle {handle}"
@@ -681,12 +786,18 @@ def cmd_nuke(args: argparse.Namespace) -> None:
                 f"branch {branch} has {unmerged} unmerged commit(s) — "
                 f"these would be LOST. Re-run with --force to confirm."
             )
+        if state_dir is None:
+            warnings.append(
+                "couldn't locate local state for this change; removing "
+                "branch + worktree + manifest only (no ~/.sulis/changes/ dir)."
+            )
         emit_ok(data={
             "dry_run": True,
             "branch": branch,
             "primitive": target["primitive"],
             "slug": target["slug"],
             "change_id": change_id or None,
+            "change_id_resolution": target.get("change_id_resolution"),
             "would_remove": footprint,
             "unmerged_commits": unmerged,
         }, warnings=warnings or None)
@@ -744,15 +855,22 @@ def cmd_nuke(args: argparse.Namespace) -> None:
         removed["manifest_detail"] = "manifest already absent"
 
     _log(f"Change nuked: {branch} ({change_id or 'no-id'})")
+    nuke_warnings = []
+    if state_dir is None:
+        nuke_warnings.append(
+            "couldn't locate local state for this change; removed "
+            "branch + worktree + manifest only (no ~/.sulis/changes/ dir)."
+        )
     emit_ok(data={
         "dry_run": False,
         "branch": branch,
         "primitive": target["primitive"],
         "slug": target["slug"],
         "change_id": change_id or None,
+        "change_id_resolution": target.get("change_id_resolution"),
         "removed": removed,
         "unmerged_commits_discarded": unmerged,
-    })
+    }, warnings=nuke_warnings or None)
 
 
 # ─── argparse ────────────────────────────────────────────────────────────

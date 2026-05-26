@@ -334,3 +334,120 @@ def test_nuke_unknown_change_errors(local_git_repo, tmp_path, monkeypatch):
     _run_nuke(_nuke_args(local_git_repo, slug="never-existed", force=True),
               captured, patches)
     assert captured["ok"] is False
+
+
+# ─── change_id resolution fallback chain (the real-world case) ──────────────
+#
+# In production the change manifest (.changes/{primitive}-{slug}.yaml, which
+# carries change_id) lives in the WORKTREE — it's committed on the change
+# branch — NOT in the dev checkout where nuke runs. A nuke that only reads
+# <repo-root>/.changes/ therefore resolves change_id=null → state_dir=null →
+# leaves ~/.sulis/changes/{change_id}/ behind. These tests pin the fallback
+# chain that resolves change_id robustly: handle-prefix scan, worktree
+# manifest, honest-degrade.
+
+
+def _make_change_branch_manifest_in_worktree(
+    repo: Path, primitive: str, slug: str, change_id: str = _GOOD_ULID,
+) -> dict:
+    """Real-world fixture: manifest lives in the WORKTREE, not in dev's .changes/.
+
+    This mirrors production — the manifest is committed on the change branch,
+    so the dev checkout (where nuke runs) has no copy. The worktree's own
+    working tree carries it.
+    """
+    branch = f"change/{primitive}-{slug}"
+    worktree = repo.parent / f"{repo.name}-change-{primitive}-{slug}"
+    subprocess.run(
+        ["git", "worktree", "add", "-b", branch, str(worktree), "dev"],
+        cwd=repo, check=True, capture_output=True,
+    )
+    manifest = worktree / ".changes" / f"{primitive}-{slug}.yaml"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(
+        f'change_id: "{change_id}"\nslug: "{slug}"\nprimitive: "{primitive}"\n'
+        f'branch: "{branch}"\nworktree_path: "{worktree}"\n',
+        encoding="utf-8",
+    )
+    # Deliberately do NOT write any .changes/ file into the dev checkout.
+    return {
+        "change_id": change_id,
+        "branch": branch,
+        "primitive": primitive,
+        "slug": slug,
+        "worktree_path": worktree,
+        "worktree_manifest": manifest,
+    }
+
+
+def test_nuke_resolves_state_dir_via_worktree_manifest(local_git_repo, tmp_path, monkeypatch):
+    """Manifest is only in the worktree; nuke must still resolve change_id +
+    the local state dir, list it in would_remove, and remove it under --force."""
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    home = tmp_path / "home"
+    home.mkdir()
+    meta = _make_change_branch_manifest_in_worktree(
+        local_git_repo, "create", "wt-manifest")
+    state = _state_dir(home, meta["change_id"])
+
+    # Dry-run first: would_remove.state_dir must be the real state dir.
+    captured, patches = _capture_emit()
+    _run_nuke(_nuke_args(local_git_repo, slug="wt-manifest", force=False),
+              captured, patches)
+    assert captured["ok"] is True
+    data = captured["data"]
+    assert data["change_id"] == meta["change_id"]
+    assert data["would_remove"]["state_dir"] == str(state)
+    assert state.exists()  # dry-run removed nothing
+
+    # --force: the state dir is actually removed.
+    captured2, patches2 = _capture_emit()
+    _run_nuke(_nuke_args(local_git_repo, slug="wt-manifest", force=True),
+              captured2, patches2)
+    assert captured2["ok"] is True
+    assert captured2["data"]["removed"]["state_dir"] is True
+    assert not state.exists()
+
+
+def test_nuke_handle_resolves_state_dir_via_prefix_scan(local_git_repo, tmp_path, monkeypatch):
+    """--handle CH-XXXXXX resolves the state dir by scanning ~/.sulis/changes/*
+    for a dir whose name starts with the 6-char ULID prefix — even when no
+    manifest is reachable from the dev checkout."""
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    home = tmp_path / "home"
+    home.mkdir()
+    meta = _make_change_branch_manifest_in_worktree(
+        local_git_repo, "create", "handle-prefix")
+    state = _state_dir(home, meta["change_id"])
+    handle = sc.ulid_handle(meta["change_id"])  # CH-01HYQC
+
+    captured, patches = _capture_emit()
+    _run_nuke(_nuke_args(local_git_repo, handle=handle, force=False),
+              captured, patches)
+    assert captured["ok"] is True
+    data = captured["data"]
+    assert data["change_id"] == meta["change_id"]
+    assert data["would_remove"]["state_dir"] == str(state)
+
+
+def test_nuke_state_dir_already_gone_is_truthful_and_idempotent(local_git_repo, tmp_path, monkeypatch):
+    """change_id resolves (via worktree manifest) but the local state dir was
+    never created → no crash, removal reported truthfully (already absent)."""
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    home = tmp_path / "home"
+    home.mkdir()
+    meta = _make_change_branch_manifest_in_worktree(
+        local_git_repo, "create", "state-absent")
+    # No _state_dir() call — the local state dir does not exist.
+
+    captured, patches = _capture_emit()
+    _run_nuke(_nuke_args(local_git_repo, slug="state-absent", force=True),
+              captured, patches)
+    assert captured["ok"] is True
+    data = captured["data"]
+    # change_id was resolved (proving the fallback chain fired), so the
+    # state_dir path is known even though the dir is absent.
+    assert data["change_id"] == meta["change_id"]
+    removed = data["removed"]
+    assert removed["state_dir"] is False
+    assert "already absent" in removed.get("state_dir_detail", "")
