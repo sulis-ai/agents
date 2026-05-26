@@ -23,6 +23,29 @@ If no SRD specification exists, stop and tell the user — refer them to
 
 ---
 
+## Required Reading (load before drafting)
+
+These standards shape the TDD + the new contract artifacts (step 3.5):
+
+- `../../references/standards/CONTRACT_FIRST_STANDARD.md` — the **data
+  contract** seam discipline (two-axis model, three-category error model,
+  stubs include error/empty cases, transport binding).
+- `../../references/standards/UX_VISUAL_DESIGN_STANDARD.md` — the **visual
+  contract** (Identity/Visual/Experience/Governance layers + the agentic-
+  interface principles for AI surfaces); produced as a design-time artifact
+  per UXD-14.
+- `../../references/standards/WP_BACKEND_STANDARD.md` — backend patterns
+  the TDD's backend components implement (ports & adapters, repository,
+  handler, in-memory adapter first, etc.).
+- `../../references/standards/WP_FRONTEND_STANDARD.md` — frontend patterns
+  the TDD's user-facing components implement (component tiers, typed client,
+  loading/error/empty, design tokens, agentic UX).
+- `../../references/standards/WORK_PACKAGE_STANDARD.md` — the `kind:` enum
+  (incl. `kind: contract`) and the cross-kind decomposition WP-08.5 that
+  `plan-work` will apply to the TDD this skill produces.
+
+---
+
 ## Inputs You Read
 
 **Read in this order. Context index first — it constrains everything else.**
@@ -213,6 +236,59 @@ If extending or superseding, reference the existing ADR by path.}
    Wait for the user response. Record their choice (computed tier accepted,
    or overridden to X). Write `.architecture/{project}/SIZING.md` per the
    schema in `references/right-sizing.md`.
+3.5. **Define the contracts (MUST when cross-kind or user-facing).** Before
+   pillar design, identify the **producer/consumer seams** in the proposed
+   architecture and the **user-facing surfaces**. For each, produce a
+   contract artifact as a design-time deliverable — the same way the TDD is.
+
+   **(a) Data contracts** — per
+   [`CONTRACT_FIRST_STANDARD.md`](../../references/standards/CONTRACT_FIRST_STANDARD.md).
+   For every backend↔frontend seam (or tool↔caller seam) in the TDD, produce
+   a schema sketch:
+   - **operations** (named units the seam exposes)
+   - **input + output types** (named, reusable; not inline-per-endpoint)
+   - **the three error categories** (Protocol / Expected / Internal per CF-03)
+     mapped to the chosen transport (HTTP statuses / NDJSON event types /
+     subprocess exit codes / library exceptions)
+   - **example stubs** covering **happy + error + empty** cases (CF-04)
+   - **the transport binding** (HTTP/REST + OpenAPI 3.1 for web seams;
+     JSON-RPC/MCP for agent tools; subprocess+NDJSON for streaming local
+     pipes; library for in-process)
+
+   Write the contract sketch to `.architecture/{project}/contracts/{seam}.md`
+   (or `.yaml`/`.json` if you can already commit to OpenAPI/JSON Schema at
+   this stage). `plan-work` will emit a `kind: contract` WP from it (WP-08.5)
+   so the build conforms.
+
+   **(b) Visual contract** — per
+   [`UX_VISUAL_DESIGN_STANDARD.md`](../../references/standards/UX_VISUAL_DESIGN_STANDARD.md).
+   If the TDD has any user-facing surface, produce a visual-contract sketch
+   covering the four layers' essentials:
+   - **Identity** (referenced — not re-articulated here) — point at the
+     project's identity artifacts; flag if missing.
+   - **Visual** — the token tiers the surface will consume (semantic +
+     component tokens, not raw values); brand traits → measurable visual
+     parameters; the structural profile (navigation / layout / density /
+     elevation).
+   - **Experience** — the HIG sections needed (the surface's components +
+     their variants/states/focus + the three UI states loading/empty/error);
+     accessibility decisions taken at design time (AA contrast on the
+     chosen token pairs; keyboard model; colour-independence check); if
+     the surface is AI-facing, the agentic-interface principles in play
+     (UXD-10: outcome-oriented, human-in-the-loop gates, transparency).
+   - **Governance** — provenance label on the artifact.
+
+   Write the visual contract to
+   `.architecture/{project}/contracts/visual.md` (or co-located with the
+   data contract for the same seam). `plan-work`'s `kind: frontend` WPs
+   `dependsOn` this artifact (UXD-14). Identity/brand *values* (palette,
+   type, look-and-feel) remain founder-owned — if absent, surface as the
+   first Open Question and route to the design flow rather than inventing
+   them.
+
+   **(c) Single-kind work + `--prototype` changes are exempt** from this
+   step.
+
 4. **Select patterns** — for each NFR, pick patterns from `references/architecture-patterns.md`. Surface trade-offs explicitly. Skip pattern selection for any pillar marked "fully covered" in the sizing announcement; reference the authoritative source instead.
 5. **Translate misuse cases** — for each MUC in `MISUSE_CASES.md`, translate its `System Response (REQUIRED)` into one or more Armor-pillar primitives in the TDD. Cross-reference: every MUC ID must appear in the TDD's Armor section. See `references/hardening-deltas.md` for the MUC → delta/primitive translation pattern (the same translation applies to greenfield TDD entries).
 6. **Cover all three pillars at tier-appropriate depth.** For every component, ensure Form, Armor, and Proof are addressed. Per the sizing decision:

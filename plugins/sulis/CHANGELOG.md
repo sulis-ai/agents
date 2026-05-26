@@ -1,5 +1,67 @@
 # Sulis — Changelog
 
+## v0.55.1 — 2026-05-26
+
+**Patch — encode two implicit rules the agent had been running on judgement.**
+
+CW-05 trivial-change patch bump. Both fixes land in the Sulis agent body (`plugins/sulis/agents/sulis.md`).
+
+(1) **Standards resolve process decisions (MUST).** Patches the failure mode where the agent presented a standard's options as a *menu* instead of running the rule (the trigger case: "does this need a full change cycle or CW-05?" got three options instead of the call). Four-part fix: adds "whether work needs a full change cycle" to the Sulis-owned decisions list; adds a new sub-section mapping process questions to the standards that resolve them (CW-05 / CP-01..05 / AAF-01 / CF-05 / WP-08.5 / TONE / COACHING / FE) plus Borderline Discipline (borderline cases get *called*, not deferred to a menu); adds Forbidden Output Shape 4a "menu of applications of a standard" alongside the existing "menu of next steps"; adds Pre-Emission Gate **Phase 2.5 STANDARDS RESOLUTION** that runs BEFORE AAF-01 triage and intercepts process questions a standard already answers.
+
+(2) **Finding-triage policy (MUST).** Encodes the previously-implicit rule for when the agent notices something mid-work. Four-tier matrix: blocks current work → fix now; trivial (CW-05) → fix on `dev` now, no task entry (the commit IS the record); not blocking + not trivial → `TaskCreate` and continue; substantive → dispatch SEA via `/sulis:change start`. Names three anti-patterns: **yak-shaving**, **SEA-as-default** (inflating CW-05-class fixes into change cycles), **memory-loss** (find-fix-nothing-record-nothing). Worked example from this session: dashboard-liveness (#32) and auto-cleanup-on-ship (#38) correctly task-tracked; cockpit-mvp correctly SEA-dispatched.
+
+Both fixes shipped via CW-05 themselves — direct to `dev`, ~90 lines of markdown total across the two commits (`d19e0d3`, `4cb90d4`). On next session restart the agent loads them; the failure modes shouldn't recur.
+
+## v0.55.0 — 2026-05-26
+
+**Wire the four standards into design + decomposition (so they actually shape the work).**
+
+v0.54.0 wrote the doctrine; this release makes it *bind*. The shape of the work — the TDD, the WP set, the dependency graph — now changes when the standards apply. Required Reading is added as the anchor, but the substantive amendments are in the *methods*:
+
+(1) **`WORK_PACKAGE_STANDARD` v1.2.0** — added `kind: contract` to the kind enum + its WP-05 gates row (schema lints; examples cover happy + **error + empty** stubs; ≥1 consumer mock). New section **WP-08.5 — contract-first cross-kind decomposition**: any composite spanning a producer/consumer seam MUST emit a `kind: contract` child first; the kind-specific children `dependsOn` the contract WP **and not each other** (parallel-not-sequential, per CF-05); an integration child closes the graph with the conformance check (CF-07). User-facing seams pair the data contract with the visual contract (a design-time artifact per UXD-14, not its own WP). Single-kind + `--prototype` exempt.
+
+(2) **`plan-work`** — three structural amendments to the workflow, plus Required Reading:
+- **Step 4a — Assign `kind:` (MUST).** Every WP carries `kind:` (backend / frontend / async / docs / infra / contract / composite); dispatches the executor + the verification gates + the per-kind doctrine.
+- **Step 4b — Cross-kind detection + contract-first decomposition (MUST when cross-kind).** Apply WP-08.5: contract WP first, per-kind WPs depend on it (parallel), integration WP last. User-facing surfaces reference the visual contract.
+- **Step 7a — Per-kind gate audit.** Every WP's DoD/test plan must match its `kind:`'s gates per WP-05; misclassified WPs get fixed or split.
+- **Step 7b — Cross-kind shape audit.** Verify the contract-first shape was applied; a failed shape audit is FAIL at validation, re-decompose.
+- Step 5 dependency-graph note: cross-kind graph is **contract → {parallel per-kind} → integration**.
+
+(3) **`draft-architecture`** — new **Step 3.5 — Define the contracts (MUST when cross-kind or user-facing)**, sitting between sizing and pillar design:
+- **(a) Data contracts** for every producer/consumer seam, per CONTRACT_FIRST. Operations + named types + the three error categories mapped to the chosen transport + example stubs (happy / error / empty) + the binding (HTTP+OpenAPI / MCP+JSON-Schema / subprocess+NDJSON / library). Written to `.architecture/{project}/contracts/{seam}.md`. `plan-work` will emit a `kind: contract` WP from it.
+- **(b) Visual contract** for any user-facing surface, per UX_VISUAL_DESIGN. Token tiers consumed; brand traits → measurable visual parameters; HIG sections + variants/states/focus + the three UI states; design-time WCAG AA decisions; agentic-interface principles in play for AI surfaces. Written to `.architecture/{project}/contracts/visual.md`. Identity/brand *values* remain founder-owned — surfaced as Open Questions if absent.
+- Single-kind + `--prototype` exempt.
+
+(4) **Required Reading anchors** added to `design`, `audit`, `run-all`, `review`, `code-review`, plus already-wired `draft-architecture` + `plan-work`. Each cites only what it needs: design/audit read the contract + per-kind standards before producing; `run-all` passes the relevant per-kind standard to the executor brief as the rubric (not background); `review` / `code-review` use the standards as the **rubric** for scoring the diff per `kind:`.
+
+**The cockpit is now the first real exercise.** When SEA enters its design phase, the four standards bind — the TDD will emit data + visual contracts, the WP set will be kind-tagged and contract-first decomposed, the executor briefs will carry the per-kind doctrine, and the review will score against them. What we learn there calibrates everything; the v0.1.0 carve-outs noted in each standard get re-visited after.
+
+No code change beyond the skill/standard markdown + version bumps.
+
+## v0.54.0 — 2026-05-26
+
+**Standards groundwork for the cockpit build — four design-time standards + an optional Mobbin MCP.**
+
+The standards work that turns the cockpit (and all future cross-kind work) into something *designed* rather than improvised. Four standards landed across the last week, here consolidated and cross-referenced as one coherent set.
+
+(1) **WP_BACKEND_STANDARD v0.1.0** — 12 opinionated patterns (WPB-01..12) consolidated from five practitioner docs: ports & adapters, repository, in-memory adapter first, handler-as-single-source-of-truth, auth-at-handler, typed Result, composition root/DI, outside-in double-loop TDD, done-means-wired, structured logging, conventional API surface, clean-code/boy-scout. Language-agnostic; platform couplings (Firestore/GCP/SDK/`@operation`/ontology/IVS) deliberately stripped. Used across design · implementation · review.
+
+(2) **WP_FRONTEND_STANDARD v0.1.0** — 13 patterns (WPF-01..13) **mirroring the backend spine** so the two read as siblings, layering the frontend-only patterns: component tiers, typed-client-not-fetch, mock-first (the contract mock), single state source, loading/error/empty states, WCAG-AA-gated automatically (jest-axe per component, Playwright-axe per page), design tokens, error boundaries, composition root, outside-in TDD, done-means-wired-and-accessible-and-reachable, agentic-interface UX, clean-code. Two profiles (production React / prototype Alpine). Authorization-divergence note: frontend show/hide only; real gate is backend.
+
+(3) **CONTRACT_FIRST_STANDARD v0.1.0** — the **data-contract seam** between backend and frontend, built on the **two-axis model** (schema *is* the contract, transport is the binding) + the **three-category error model** (Protocol / Expected / Internal) from the plugin-builder Agent-Consumable SDK Specification v0.2.0. 9 requirements (CF-01..09): contract before implementation, contract = schema layer, errors are part of the contract, stubs include error/empty cases, parallel-not-sequential decomposition (both sides depend only on the contract WP — the two-speed build pattern), consumer-conforms (EP-11), integration = swap mock→real + conformance check, conventional transport binding, structured streaming contracts. Two tiers (lightweight internal seam vs full published SDK); single-kind + `--prototype` changes exempt. The `wpx-*`/`sulis-change` tools noted as the in-repo subprocess-binding reference implementation.
+
+(4) **UX_VISUAL_DESIGN_STANDARD v0.2.0** — the **contract WITH THE USER** (the human-facing sibling of contract-first). Just as the API contract is agreed before the build, the design is agreed before the frontend is built. 15 requirements (UXD-01..15) across four layers — **Identity** (Golden Circle order; competitor substitution test; 3–7 distinctive assets), **Visual** (brand traits → measurable visual parameters; three-tier W3C DTCG design tokens as single source of visual truth; systematic visual-identity evaluation by Rand criteria, not subjective judgement; HIG with variants/states/focus/three-UI-states/structural profile), **Experience** (WCAG 2.1 AA decided at design time not retrofitted; ISO 9241-210 human-centred design; EAST ethical evidence-based behavioural design — never dark patterns; the seven agentic-interface principles for AI surfaces; UI voice & tone), and **Governance** (cross-artifact coherence; tri-track AI provenance AI-generated → human-reviewed → production-approved; design-before-build).
+
+**UXD-15 — Optional Mobbin inspiration.** When connected, the design flow may probe the founder's own Mobbin account for structural / compositional / interaction patterns from real shipped apps, with the firm guardrail that **inspiration informs *patterns*, never *identity*** (importing a referenced app's visual identity would violate UXD-02 distinctiveness). Wired as an optional plugin MCP server at `plugins/sulis/.mcp.json` (`https://api.mobbin.com/mcp`) — graceful when unauthenticated; the founder connects per their account.
+
+Brand and identity **values** (the palette, type, logo, look-and-feel) are deliberately carved out as founder-owned, produced via the design flow (`design-system` / `sulis-design` tooling) — the standard sets the discipline ("semantic tokens with AA contrast"); the founder sets the identity ("the primary colour is X"). Sulis's own `VISUAL_PRINCIPLES.md` (Bath/Minerva heritage, Deep Wisdom navy, warm neutrals, Satoshi/Inter, 70:30 geometric-to-organic, measurable parameters throughout) cited as the worked exemplar.
+
+Plus a light **cross-ref pass on WP_BACKEND_STANDARD** so the four read as one coherent set: WPB-06's three error categories *are* CF-03's contract error model; WPB-11's API conventions live *inside* a CF contract; WPB-09's "done means wired" is completed by CF-07's conformance check at the seam.
+
+**Honest status.** All four are v0.1.0/v0.2.0 — written, not exercised. The marketplace's own rule is standards calibrate after 3+ executions, so wiring them into design/executor/review is **follow-on**. The **cockpit MVP is the first real exercise** that tells us where they're wrong.
+
+No code change beyond the new `.mcp.json` and version bumps.
+
 ## v0.53.0 — 2026-05-26
 
 **Change-dashboard (slice B) — the founder-facing `/sulis:dashboard` + the machinery that keeps it current.**

@@ -46,7 +46,7 @@ Every WP MUST have:
 |-------|----------|-------|
 | `id` | yes | Globally unique within the project. Format: `WP-NNN` (sequential within a change) or `WP-{SOURCE}-{NNN}` (e.g., `WP-HD-AA-001`). Conventional, not enforced — IDs in the same project just have to be unique. With `change_id:` populated, WP-NNN sequencing is per-change; cross-change collisions don't matter because the change_id disambiguates. |
 | `title` | yes | One-line plain-English summary. Founder-readable. |
-| `kind` | yes | One of: `backend` / `frontend` / `async` / `docs` / `infra` / `composite`. Determines which executor + which verification gates apply. |
+| `kind` | yes | One of: `backend` / `frontend` / `async` / `docs` / `infra` / `contract` / `composite`. Determines which executor + which verification gates apply. (`contract` is the producer/consumer seam — see WP-08.5.) |
 | `source` | yes | Where this WP came from: `hardening` / `feature` / `migration` / `refactor` / `observability` / `bug` / `manual`. Determines where the WP file lives within `.architecture/{project}/`. |
 | `change_id` | optional (required for WPs created after Phase 5 of the change-as-primitive build) | ULID of the parent change this WP belongs to. Format: 26-character Crockford-base32 ULID (e.g., `01HQ8XQM8G5KZGZQXPZD8H6PJ7`). Every WP created via `/sulis:change start` automatically gets the parent change's ULID. Legacy WPs (created before the change primitive) omit this field; they execute against `dev` directly without a change branch. See `change-work-standard.md` CW-04 for the change-branch + WP-branch hierarchy this field enables. |
 | `parent_phase` | optional | Groups related WPs (e.g., `HD-AA` for the hardening bundle in the transcript). Used by the INDEX.md generator to show grouped progress. |
@@ -96,6 +96,7 @@ Every WP cites which verification gates apply, determined by `kind:`. The comple
 | `async` | unit tests + integration tests (full enqueue/dequeue) + chaos test + idempotency proof |
 | `docs` | link-integrity check + a11y for rendered output |
 | `infra` | Terraform plan + drift detection + staging destroy-test |
+| `contract` | schema validates (OpenAPI / JSON Schema lint) + examples cover happy + error + empty cases (CF-03/CF-04) + at least one consumer mock generated from it (CF-05) |
 | `composite` | union of child WP gates; parent merges only when all children merge |
 
 The executor reads `kind:` and refuses to mark a WP done until its gates pass.
@@ -174,6 +175,50 @@ title: "Add tenant_id column + propagate through message envelope"
 ```
 
 Default to composite. Only use multi-kind when atomic shipping is genuinely required.
+
+### WP-08.5: Contract-first cross-kind decomposition (MUST when cross-kind)
+
+When a composite spans a **producer/consumer seam** (backend + frontend, or
+tool + caller) the children MUST be decomposed contract-first per
+`CONTRACT_FIRST_STANDARD.md`:
+
+1. **A `kind: contract` child WP comes first.** It defines the schema layer
+   (operations + types + the three error categories + LLM-/dev-facing
+   descriptions) and the example stubs (happy + **error** + **empty**). Its
+   gates are the contract-kind gates above.
+2. **The kind-specific child WPs (backend, frontend, …) `dependsOn` the
+   contract WP — and not each other** (CF-05 parallel-not-sequential). The
+   frontend WP `dependsOn: [WP-contract]`; it does *not* `dependsOn` the
+   backend WP. Both build at once, the consumer against the contract mock.
+3. **An integration child WP comes last** — `kind: composite` or `kind: docs`
+   with `produces: integration-check` — that swaps the mock for the real
+   producer and runs the conformance check (CF-07). The parent composite's
+   merge gate is this integration's pass.
+
+Worked shape:
+
+```yaml
+# Parent
+id: WP-100
+kind: composite
+title: "Add orders API + UI"
+child_wps:
+  - WP-100a    # kind: contract  — orders API schema + stubs (FIRST)
+  - WP-100b    # kind: backend   — implement endpoints   (dependsOn: WP-100a)
+  - WP-100c    # kind: frontend  — orders view           (dependsOn: WP-100a)
+  - WP-100d    # kind: composite — integration: mock→real + conformance check
+                #                  dependsOn: [WP-100b, WP-100c]
+```
+
+> **User-facing seams need TWO contracts.** When the consumer is a UI, a
+> `kind: contract` WP for the **data** contract is paired with the **visual**
+> contract being produced as a design artifact (per
+> `UX_VISUAL_DESIGN_STANDARD.md` UXD-14: tokens + HIG + UX patterns), which
+> the frontend WP also `dependsOn`. The visual contract isn't its own WP —
+> it's a design-time artifact, the same way the data contract is.
+
+> **Exemption.** Single-kind work and `--prototype` changes are exempt from
+> contract-first decomposition (`CONTRACT_FIRST_STANDARD.md` tier carve-out).
 
 ### WP-09: Loop-closed verification
 
@@ -410,3 +455,4 @@ The chain is the empirical proof. No human attestation needed at any step — th
 |---------|------|---------|
 | 1.0.0 | 2026-05-24 | Initial sulis-local definition. 11 requirements (WP-01..WP-11). Codifies the WP primitive that `sulis-execution` uses informally; documents the kind-based executor dispatch contract; introduces lineage (PROV-O-aligned vocabulary, no JSON-LD machinery), loop-closed verification, INDEX.md derivation, and composite/multi-kind composition rules. Per-kind execution details deferred to companion standards (WP_BACKEND_STANDARD, WP_FRONTEND_STANDARD, WP_ASYNC_STANDARD, WP_DOCS_STANDARD, WP_INFRA_STANDARD) — authored as each kind's executor is built. |
 | 1.1.0 | 2026-05-25 | Added the `change_id:` field to WP-01 Identity as part of Phase 4 of the change-as-primitive build (sulis v0.41.0). Optional for backwards-compat with legacy WPs; required for WPs created via `/sulis:change start` post-Phase 5. Field is a 26-character Crockford-base32 ULID linking the WP to its parent change. Per-change WP-NNN sequencing now disambiguated by change_id (cross-change collisions OK). |
+| 1.2.0 | 2026-05-26 | Wired CONTRACT_FIRST_STANDARD into decomposition. Added `contract` to the `kind:` enum + its WP-05 gates row (schema lints, examples cover happy/error/empty, ≥1 consumer mock). Added WP-08.5 — contract-first cross-kind decomposition: cross-kind composites MUST emit a `kind: contract` child first, kind-specific children depend on it (parallel, not sequential), integration child closes with the conformance check. User-facing seams pair the data contract with the visual contract (design artifact per UX_VISUAL_DESIGN_STANDARD UXD-14). Single-kind + `--prototype` exempt. |

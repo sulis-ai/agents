@@ -1,0 +1,244 @@
+#!/usr/bin/env python3
+"""sulis-route — the deterministic routing spine CLI (WP-007 / TDD §4).
+
+A sibling CLI to `sulis-change`: it shares the same shared-library conventions
+(`_wpxlib` JSON envelope, `cli_main` subcommand dispatch, the 0/1/2 exit-code
+contract) and lives in the same directory. Where `sulis-change` owns the change
+*lifecycle*, `sulis-route` owns *routing* — the orthogonal "what should I
+invoke" concern (TDD §2.1). It is the composition root that wires the routing
+domain together: it is the ONLY place that touches the filesystem, calls
+``print``, and calls ``sys.exit``; the domain modules (`_route_inventory`,
+`_route_match`, `_route_gate`) stay pure and never import the CLI (TDD §2.2).
+
+Four subcommands, all emitting the `_wpxlib` envelope
+(`{"ok": true, "data": …}` / `{"ok": false, "error": …}`):
+
+  inventory   --repo-root            full inventory + derived route_set + excluded   (exit 0)
+  lookup      <invocation>           the single matching entry, or not-found         (exit 0 / 1)
+  match       <intent> [--top-n N]   ranked candidates with matched-signal evidence  (exit 0)
+  check       --repo-root            GateResult: pass/fail + orphans/duplicates/...   (exit 0 / 1)
+
+`check` sets exit code **1** when the gate fails — the CI-blocking contract
+WP-008 wires into `branch-ci.yml`. A gate that printed failure but exited 0
+would silently pass the build (WP Notes).
+
+Stdlib only, Python 3.11-safe. Specification: `.architecture/routing-spine/`
+TDD §4 / §7; ADR-001 (auto-discovery), ADR-002 (rules matching), ADR-004
+(orphan-vs-exclusion), ADR-005 (CI gate).
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+from dataclasses import asdict
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _route_gate import GateResult, check  # noqa: E402
+from _route_inventory import (  # noqa: E402
+    InventoryEntry,
+    build_inventory,
+    discover,
+    lookup,
+    route_set,
+)
+from _route_match import Candidate, match  # noqa: E402
+from _route_rubric import RubricData, load  # noqa: E402
+from _wpxlib import cli_main, emit_error, emit_ok  # noqa: E402
+
+
+# ─── Serialisation (domain value objects → JSON-safe dicts) ────────────────
+
+
+def _entry_dict(entry: InventoryEntry) -> dict:
+    """Serialise an InventoryEntry to a JSON-safe dict (routes flattened).
+
+    `asdict` recurses through the frozen `Route` dataclasses and turns their
+    `triggers` tuples into lists, so the result is JSON-serialisable as-is.
+    """
+    return asdict(entry)
+
+
+def _candidate_dict(candidate: Candidate) -> dict:
+    """Serialise a match Candidate: its entry, score, and matched-signal why."""
+    return {
+        "entry": _entry_dict(candidate.entry),
+        "score": candidate.score,
+        "matched_signals": list(candidate.matched_signals),
+    }
+
+
+def _gate_dict(result: GateResult) -> dict:
+    """Serialise a GateResult: tuples → lists for a stable JSON shape."""
+    return {
+        "passed": result.passed,
+        "orphans": list(result.orphans),
+        "duplicates": [list(d) for d in result.duplicates],
+        "parse_failures": [list(f) for f in result.parse_failures],
+    }
+
+
+# ─── Shared adapter: build the inventory + rubric from a repo root ─────────
+
+
+def _resolve_repo_root(args: argparse.Namespace) -> Path:
+    """Resolve --repo-root with `.resolve()` (path safety, Armor §9)."""
+    return Path(getattr(args, "repo_root", None) or os.getcwd()).resolve()
+
+
+def _load_world(
+    repo_root: Path,
+) -> tuple[list[InventoryEntry], list[tuple[str, str]], RubricData]:
+    """The composition step: read the filesystem once, derive the world.
+
+    Returns ``(entries, parse_failures, rubric)`` — the three inputs every
+    subcommand needs. This is the single place file I/O happens (TDD §2.2):
+    WP-002's ``discover`` + ``build_inventory`` for the inventory, WP-003's
+    ``load`` for the authored rubric layer.
+    """
+    entries, parse_failures = build_inventory(*discover(repo_root))
+    rubric = load(repo_root)
+    return entries, parse_failures, rubric
+
+
+# ─── Handlers ───────────────────────────────────────────────────────────────
+
+
+def cmd_inventory(args: argparse.Namespace) -> None:
+    """Full inventory + the derived route-set + the excluded names (EO)."""
+    repo_root = _resolve_repo_root(args)
+    entries, parse_failures, rubric = _load_world(repo_root)
+    routed = route_set(entries, rubric.exclusions)
+    excluded = sorted(
+        {e.name for e in entries} & rubric.exclusions
+    )
+
+    emit_ok(
+        data={
+            "inventory": [_entry_dict(e) for e in entries],
+            "route_set": [_entry_dict(e) for e in routed],
+            "excluded": excluded,
+            "parse_failures": [list(f) for f in parse_failures],
+        }
+    )
+
+
+def cmd_lookup(args: argparse.Namespace) -> None:
+    """Exact-match the invocation token → the single entry, or not-found (EQ).
+
+    Deterministic fast-path (TDD §4.2): exact match only, never a guess. A miss
+    is an expected failure (`ok:false`, exit 1), not an internal error.
+    """
+    repo_root = _resolve_repo_root(args)
+    entries, _parse_failures, _rubric = _load_world(repo_root)
+    entry = lookup(entries, args.invocation)
+    if entry is None:
+        emit_error(
+            f"No entry with invocation {args.invocation!r}",
+            context={"invocation": args.invocation},
+        )
+        return  # unreachable: emit_error exits 1
+    emit_ok(data={"entry": _entry_dict(entry)})
+
+
+def cmd_match(args: argparse.Namespace) -> None:
+    """Rank the route-set against the intent string → candidates + why (EO)."""
+    repo_root = _resolve_repo_root(args)
+    entries, _parse_failures, rubric = _load_world(repo_root)
+    routed = route_set(entries, rubric.exclusions)
+    candidates = match(args.intent, routed, rubric, top_n=args.top_n)
+    emit_ok(
+        data={"candidates": [_candidate_dict(c) for c in candidates]}
+    )
+
+
+def cmd_check(args: argparse.Namespace) -> None:
+    """The coverage gate (EO). Exits 1 when the gate fails — the CI contract.
+
+    ``passed = no orphans AND no duplicates AND no parse_failures`` (TDD §7).
+    The `route_set_names` are derived inside `check` from
+    ``inventory − exclusions`` (the §3.4 invariant); we don't pre-compute them
+    here so the gate stays the single authority on the derivation.
+    """
+    repo_root = _resolve_repo_root(args)
+    entries, parse_failures, rubric = _load_world(repo_root)
+    result = check(entries, parse_failures, rubric)
+    # emit_ok with exit_code=1 on failure: a structured result is still emitted
+    # (the founder/CI can read WHY it failed) but the non-zero exit blocks the
+    # build (WP-008). This mirrors wpx-pipeline's structured-blocker pattern.
+    emit_ok(data=_gate_dict(result), exit_code=0 if result.passed else 1)
+
+
+# ─── Parser + dispatch ──────────────────────────────────────────────────────
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=(
+            "sulis-route — the deterministic routing spine. Auto-discovers the "
+            "skill/agent inventory, looks up explicit invocations, scores "
+            "founder intent against the route-set, and runs the coverage gate. "
+            "See .architecture/routing-spine/TDD.md §4 / §7."
+        ),
+    )
+    sub = parser.add_subparsers(dest="subcommand", required=True)
+
+    def _repo_root(p: argparse.ArgumentParser) -> None:
+        p.add_argument(
+            "--repo-root", default=os.getcwd(),
+            help="Repo root the discovery globs are scoped under (default: cwd).",
+        )
+
+    p_inventory = sub.add_parser(
+        "inventory",
+        help="Full inventory + derived route-set + excluded names.",
+    )
+    _repo_root(p_inventory)
+
+    p_lookup = sub.add_parser(
+        "lookup",
+        help="Exact-match an invocation token (e.g. /sulis:specify).",
+    )
+    p_lookup.add_argument(
+        "invocation",
+        help="The explicit invocation token to look up (e.g. /sulis:specify "
+             "for a skill, or a bare agent name).",
+    )
+    _repo_root(p_lookup)
+
+    p_match = sub.add_parser(
+        "match",
+        help="Rank the route-set against a plain-language intent string.",
+    )
+    p_match.add_argument(
+        "intent",
+        help="The plain-language intent to score against the route-set.",
+    )
+    p_match.add_argument(
+        "--top-n", type=int, default=5,
+        help="Maximum number of ranked candidates to return (default: 5).",
+    )
+    _repo_root(p_match)
+
+    p_check = sub.add_parser(
+        "check",
+        help="Run the coverage gate (no-orphan / no-duplicate / "
+             "no-parse-failure). Exits 1 on failure — the CI-blocking contract.",
+    )
+    _repo_root(p_check)
+
+    return parser
+
+
+HANDLERS = {
+    "inventory": cmd_inventory,
+    "lookup": cmd_lookup,
+    "match": cmd_match,
+    "check": cmd_check,
+}
+
+
+if __name__ == "__main__":
+    cli_main(build_parser(), HANDLERS)

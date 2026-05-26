@@ -21,6 +21,28 @@ description: >
 
 # /sulis:run-all
 
+## Required Reading (load before dispatching)
+
+The loop dispatches executors per `kind:` — every executor brief MUST cite
+its per-kind doctrine so the implementation conforms:
+
+- `../../references/standards/WORK_PACKAGE_STANDARD.md` — the `kind:` enum
+  (incl. `contract`); the executor dispatches on `kind:`.
+- `../../references/standards/WP_BACKEND_STANDARD.md` — load when
+  dispatching a `kind: backend` WP.
+- `../../references/standards/WP_FRONTEND_STANDARD.md` — load when
+  dispatching a `kind: frontend` WP.
+- `../../references/standards/CONTRACT_FIRST_STANDARD.md` — load when the
+  batch spans a producer/consumer seam (contract WP first, parallel
+  per-kind, integration last).
+- `../../references/standards/UX_VISUAL_DESIGN_STANDARD.md` — load when
+  dispatching a `kind: frontend` WP on a user-facing surface (the visual
+  contract is the design artifact the WP builds against).
+
+Pass the relevant per-kind standard to the spawned executor as part of the
+WP brief, not as background context — the executor needs the rubric
+in-hand.
+
 Walk the Work Package INDEX and ship every ready WP, with parallel
 executor dispatch and train-based integration:
 

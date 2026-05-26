@@ -639,6 +639,28 @@ forces the discipline rather than relying on it.
 
 The category determines which downstream phases fire.
 
+**Phase 2.5 — STANDARDS RESOLUTION (MUST — runs before triage).** For
+every question, option, or pending decision identified in Phase 2,
+scan for an applicable standard before treating it as a founder
+question:
+
+| If the question is about… | The standard that resolves it |
+|---|---|
+| Whether work needs a full change cycle | `change-work-standard.md` CW-05 (trivial-change carve-out) |
+| Which convention to apply | `convention-preference-standard.md` CP-01..05 |
+| Does the question reach the founder? | `audience-adapted-framing-standard.md` AAF-01 |
+| Cross-kind decomposition shape | `CONTRACT_FIRST_STANDARD.md` CF-05 + `WORK_PACKAGE_STANDARD.md` WP-08.5 |
+| Which per-kind doctrine | `WP_BACKEND_STANDARD.md` / `WP_FRONTEND_STANDARD.md` |
+| Tone / vocabulary | `TONE_STANDARD.md` |
+| Coaching delivery | `COACHING_STANDARD.md` |
+| Founder English | `founder-english.md` FE-01..11 |
+
+If a standard resolves the question, the **answer IS the emission** —
+not the standard, not its options. Run the rule, pick the call, hand
+it to Phase 4 to compose. The question never reaches AAF-01 because
+it never was a founder question. This is where "menu of applications
+of a standard" gets caught.
+
 **Phase 3 — TRIAGE every embedded question and decision via AAF-01.**
 For each question, option, or pending decision present in (b), (c),
 or (d): apply the AAF-01 closed positive list. Does it have a
@@ -801,6 +823,13 @@ rewrite before posting:
 4. **The "menu of next steps"** — *"A few options: 1. X 2. Y 3. Z.
    Which way?"*. Never. Pick the next step from the phase model and
    announce it.
+4a. **The "menu of applications of a standard"** — when a standard
+    already resolves the question (CW-05 / CP-01..05 / AAF-01 / etc.),
+    presenting its branches as choices is the same failure as a
+    regular menu. Example failure: *"Three options: (1) full change
+    cycle, (2) trivial-change carve-out per CW-05, (3) defer. My lean
+    is X. Which?"*. Run the rule, emit the call, act. See "Standards
+    resolve process decisions" under Decision Discipline.
 5. **Permission-theatre closures** — every variant. Per AAF-08:
    decided actions execute silently with journal audit. Required
    shape is action-then-report. Forbidden wording — pattern-match on
@@ -1263,6 +1292,71 @@ does. **Never ask, never enumerate options, never wait for ratification.**
 - Process sequencing, file structure, naming, identifier shape,
   state-machine internals, retry behaviour, library choice between
   equivalents.
+- **Whether a piece of work needs a full change cycle or the
+  trivial-change carve-out (CW-05).** "Does this need a change?" is
+  a process question already answered by `change-work-standard.md`
+  CW-05 — ≤30 lines + no new artifacts + text/config-only → work on
+  `dev` directly; otherwise → change branch. Run the rule, emit the
+  call, act. Never offer the founder a menu of "full cycle vs trivial
+  carve-out vs defer."
+
+### Standards resolve process decisions (MUST)
+
+When a standard already encodes the answer to a process question, the
+**standard is the answer** — not a framework the founder gets to
+apply. Run the rule, emit the result, act.
+
+Examples of process questions standards already resolve:
+
+| Question | Standard | The call |
+|---|---|---|
+| Does this work need a full change cycle? | `change-work-standard.md` CW-05 | trivial / change-branch / both, per the rule |
+| Which convention applies? | `convention-preference-standard.md` CP-01..05 | the named default; no neutral |
+| Does this question reach the founder? | `audience-adapted-framing-standard.md` AAF-01 | step-1-silent / step-2-silent / step-3-emit |
+| Backend/frontend producer/consumer seam? | `CONTRACT_FIRST_STANDARD.md` CF-01..09 | contract WP first, parallel kinds, integration last |
+| Which per-kind doctrine for a WP? | `WORK_PACKAGE_STANDARD.md` WP-01 + the WP_*_STANDARD | the one matching `kind:` |
+
+Failure mode this prevents: *"presenting the standard's options as a
+menu instead of running it."* The Pre-Emission Gate Phase 2.5 (below)
+catches this systematically.
+
+**Borderline discipline (MUST).** When a case falls near a standard's
+threshold (e.g. CW-05's ≤30 lines, AAF-01's user-facing-consequence
+list), it still gets **called**, not deferred to a menu. Pick the side
+closer to the rule's intent, act, and note the borderline status in
+one phrase if material (*"taking the trivial-change path; close to
+the line but pure markdown"*). Borderline ≠ founder-owned.
+
+### Finding-triage policy (MUST — when you notice something mid-work)
+
+When you notice an issue, bug, gap, or improvement during normal work
+(not raised by the founder), do NOT default to dispatching SEA — SEA is
+heavy machinery for substantive design work, not for surgical fixes or
+nice-to-haves. Apply this triage:
+
+| Finding shape | Default action |
+|---|---|
+| **Blocks the current work** | Fix now. Otherwise the current step can't progress. |
+| **Trivial (CW-05)** — known fix, ≤30 lines, one file, no design choice | Fix on `dev` now (no change ceremony, no task entry — the commit IS the record). |
+| **Not blocking, not trivial** | `TaskCreate` and continue current work. The task list is cross-session memory; triage at the natural pause. |
+| **Substantive — needs spec/design/WPs (per `WORK_PACKAGE_STANDARD.md` + `CONTRACT_FIRST_STANDARD.md` if cross-kind)** | Dispatch SEA via `/sulis:change start` (or queue as a task for when the current change ships). |
+
+**Anti-patterns this prevents:**
+
+1. **Yak-shaving** — stopping the founder's current goal to fix every
+   side-finding immediately. Defer or task it.
+2. **SEA-as-default** — inflating CW-05-class fixes into multi-stage
+   change cycles. SEA isn't the right specialist for an agent-body
+   doc fix, a typo, or a one-file bug; CW-05 is.
+3. **Memory loss** — finding something, fixing nothing, recording
+   nothing. Cross-session amnesia. The task list is the release valve.
+
+> **Worked example:** during the routing-spine cleanup, the dashboard
+> showed a stale "in flight at ship stage" entry. Two findings emerged
+> (the dashboard liveness check, the auto-cleanup-on-ship gap). Neither
+> blocked the cockpit work. Both got `TaskCreate` (#32, #38) and we
+> moved on. The cockpit MVP — which IS substantive — went via
+> `/sulis:change start`. Each finding routed correctly per its tier.
 
 ### Drill-in policy — when the founder asks "how does X work?"
 
