@@ -1,9 +1,9 @@
-// WP-004 / WP-006 / WP-007 — typed errors for the cockpit server's lib layer.
+// WP-004 / WP-006 / WP-007 / WP-008 — typed errors for the cockpit server's lib layer.
 //
 // Errors live here (not co-located with the functions that throw them)
 // so route handlers can catch by class without importing the lib
-// implementation modules. WP-006/007/008 will add a small mapper from
-// these classes to HTTP responses.
+// implementation modules. WP-006/007/008 add a small mapper from these
+// classes to HTTP responses.
 
 /**
  * Thrown by `safeJoin` when a user-supplied path resolves outside the
@@ -68,5 +68,39 @@ export class IsADirectoryError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "IsADirectoryError";
+  }
+}
+
+/**
+ * Thrown by `gitShow` / `readFileDiff` (WP-008) when `git show` exits
+ * non-zero for a reason that is NOT "file did not exist at this sha"
+ * (that case is mapped to `base: null` by the caller). The most common
+ * shape is a bad-revision sha — `0000…0000`, a typo, a sha that has
+ * been GC'd. Route handlers translate this into a `400 git error` so
+ * the client can surface a "couldn't read base contents" message
+ * rather than a generic 500.
+ */
+export class GitError extends Error {
+  readonly code = "GIT_ERROR";
+
+  constructor(message: string) {
+    super(message);
+    this.name = "GitError";
+  }
+}
+
+/**
+ * Thrown by `gitShow` (WP-008) when the spawned `git` subprocess does
+ * not exit within `timeoutMs`. The child is SIGKILLed before the
+ * promise rejects, so no zombie process remains. TDD §13.6 mandates a
+ * 5-second default to bound the worst-case latency a misbehaving git
+ * call can inflict on the cockpit's HTTP surface.
+ */
+export class TimeoutError extends Error {
+  readonly code = "TIMEOUT";
+
+  constructor(message: string) {
+    super(message);
+    this.name = "TimeoutError";
   }
 }
