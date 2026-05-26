@@ -46,6 +46,23 @@ related_skills:
 
 # /sulis:design — turn the "what" into a "how"
 
+## Required Reading (load before designing)
+
+This skill wraps `draft-architecture` + `plan-work`; both load the per-kind
++ contract-first standards. Surface them here so the design conversation
+operates with them in working memory:
+
+- `../../references/standards/CONTRACT_FIRST_STANDARD.md` — produce a data
+  contract for any producer/consumer seam (step 3.5 of `draft-architecture`).
+- `../../references/standards/UX_VISUAL_DESIGN_STANDARD.md` — produce a
+  visual contract for any user-facing surface (UXD-14).
+- `../../references/standards/WP_BACKEND_STANDARD.md` /
+  `../../references/standards/WP_FRONTEND_STANDARD.md` — per-kind
+  implementation doctrine the TDD must target.
+- `../../references/standards/WORK_PACKAGE_STANDARD.md` — `kind:` enum
+  (incl. `contract`) + WP-08.5 cross-kind decomposition that `plan-work`
+  will apply.
+
 ## Conclusion (lead with the answer)
 
 `/sulis:design` is Stage 2 for new work (the greenfield path). It reads the

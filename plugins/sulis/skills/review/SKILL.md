@@ -46,6 +46,22 @@ related_skills:
 
 # /sulis:review — is it safe and sound before shipping?
 
+## Required Reading (load as the rubric)
+
+The review scores the diff against the per-kind + contract-first + visual
+standards — they're not background context, they're the **rubric**:
+
+- `../../references/standards/WP_BACKEND_STANDARD.md` — score backend diff
+  against WPB-01..12.
+- `../../references/standards/WP_FRONTEND_STANDARD.md` — score frontend
+  diff against WPF-01..13 (a11y is a gate, not a nice-to-have).
+- `../../references/standards/CONTRACT_FIRST_STANDARD.md` — for cross-kind
+  changes, verify the contract conformance check passed (CF-07).
+- `../../references/standards/UX_VISUAL_DESIGN_STANDARD.md` — for
+  user-facing changes, verify the visual contract was honoured (semantic
+  tokens not hex; design-time WCAG AA; agentic-UX principles for AI
+  surfaces).
+
 ## Conclusion (lead with the answer)
 
 `/sulis:review` is Stage 4: the check on built work before it ships. It folds

@@ -46,6 +46,24 @@ related_skills:
 
 # /sulis:audit — understand existing code before you change it
 
+## Required Reading (load before auditing)
+
+`audit` is the brownfield twin of `design` — when it produces hardening
+deltas / WP candidates, the same per-kind + contract-first discipline
+applies. Load:
+
+- `../../references/standards/WP_BACKEND_STANDARD.md` /
+  `../../references/standards/WP_FRONTEND_STANDARD.md` — per-kind doctrine
+  the proposed fixes must target.
+- `../../references/standards/CONTRACT_FIRST_STANDARD.md` — when a finding
+  touches a producer/consumer seam, the fix may need a contract artifact
+  before the per-kind WPs.
+- `../../references/standards/UX_VISUAL_DESIGN_STANDARD.md` — when a
+  finding is on a user-facing surface, the fix conforms to the visual
+  contract.
+- `../../references/standards/WORK_PACKAGE_STANDARD.md` — `kind:` enum +
+  WP-08.5 cross-kind decomposition.
+
 ## Conclusion (lead with the answer)
 
 `/sulis:audit` is Stage 2 for work against code that already exists (the

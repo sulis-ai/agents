@@ -1,5 +1,31 @@
 # Sulis — Changelog
 
+## v0.55.0 — 2026-05-26
+
+**Wire the four standards into design + decomposition (so they actually shape the work).**
+
+v0.54.0 wrote the doctrine; this release makes it *bind*. The shape of the work — the TDD, the WP set, the dependency graph — now changes when the standards apply. Required Reading is added as the anchor, but the substantive amendments are in the *methods*:
+
+(1) **`WORK_PACKAGE_STANDARD` v1.2.0** — added `kind: contract` to the kind enum + its WP-05 gates row (schema lints; examples cover happy + **error + empty** stubs; ≥1 consumer mock). New section **WP-08.5 — contract-first cross-kind decomposition**: any composite spanning a producer/consumer seam MUST emit a `kind: contract` child first; the kind-specific children `dependsOn` the contract WP **and not each other** (parallel-not-sequential, per CF-05); an integration child closes the graph with the conformance check (CF-07). User-facing seams pair the data contract with the visual contract (a design-time artifact per UXD-14, not its own WP). Single-kind + `--prototype` exempt.
+
+(2) **`plan-work`** — three structural amendments to the workflow, plus Required Reading:
+- **Step 4a — Assign `kind:` (MUST).** Every WP carries `kind:` (backend / frontend / async / docs / infra / contract / composite); dispatches the executor + the verification gates + the per-kind doctrine.
+- **Step 4b — Cross-kind detection + contract-first decomposition (MUST when cross-kind).** Apply WP-08.5: contract WP first, per-kind WPs depend on it (parallel), integration WP last. User-facing surfaces reference the visual contract.
+- **Step 7a — Per-kind gate audit.** Every WP's DoD/test plan must match its `kind:`'s gates per WP-05; misclassified WPs get fixed or split.
+- **Step 7b — Cross-kind shape audit.** Verify the contract-first shape was applied; a failed shape audit is FAIL at validation, re-decompose.
+- Step 5 dependency-graph note: cross-kind graph is **contract → {parallel per-kind} → integration**.
+
+(3) **`draft-architecture`** — new **Step 3.5 — Define the contracts (MUST when cross-kind or user-facing)**, sitting between sizing and pillar design:
+- **(a) Data contracts** for every producer/consumer seam, per CONTRACT_FIRST. Operations + named types + the three error categories mapped to the chosen transport + example stubs (happy / error / empty) + the binding (HTTP+OpenAPI / MCP+JSON-Schema / subprocess+NDJSON / library). Written to `.architecture/{project}/contracts/{seam}.md`. `plan-work` will emit a `kind: contract` WP from it.
+- **(b) Visual contract** for any user-facing surface, per UX_VISUAL_DESIGN. Token tiers consumed; brand traits → measurable visual parameters; HIG sections + variants/states/focus + the three UI states; design-time WCAG AA decisions; agentic-interface principles in play for AI surfaces. Written to `.architecture/{project}/contracts/visual.md`. Identity/brand *values* remain founder-owned — surfaced as Open Questions if absent.
+- Single-kind + `--prototype` exempt.
+
+(4) **Required Reading anchors** added to `design`, `audit`, `run-all`, `review`, `code-review`, plus already-wired `draft-architecture` + `plan-work`. Each cites only what it needs: design/audit read the contract + per-kind standards before producing; `run-all` passes the relevant per-kind standard to the executor brief as the rubric (not background); `review` / `code-review` use the standards as the **rubric** for scoring the diff per `kind:`.
+
+**The cockpit is now the first real exercise.** When SEA enters its design phase, the four standards bind — the TDD will emit data + visual contracts, the WP set will be kind-tagged and contract-first decomposed, the executor briefs will carry the per-kind doctrine, and the review will score against them. What we learn there calibrates everything; the v0.1.0 carve-outs noted in each standard get re-visited after.
+
+No code change beyond the skill/standard markdown + version bumps.
+
 ## v0.54.0 — 2026-05-26
 
 **Standards groundwork for the cockpit build — four design-time standards + an optional Mobbin MCP.**

@@ -4,7 +4,7 @@
     "name": "Iain"
   },
   "metadata": {
-    "version": "1.97.0",
+    "version": "1.98.0",
     "description": "Sulis AI plugin marketplace — methodology studios, requirements analysis, facilitation, context cartography, right-sized architecture, disciplined change primitives, deterministic code intelligence, founder coordination, and autonomous Work Package execution end-to-end. See plugins/sulis/CHANGELOG.md for release detail."
   },
   "plugins": [
@@ -83,7 +83,7 @@
     {
       "name": "sulis",
       "source": "./plugins/sulis",
-      "version": "0.54.0",
+      "version": "0.55.0",
       "description": "Sulis — the canonical front-door plugin for the Sulis AI marketplace. Hosts the founder-facing Sulis agent, journey skills, three meta-skills, eight cross-cutting standards, the deep-mode code-health framework, the address-findings bridge, and the executor + train + wpx-* CLI tools. Founders interact via /sulis:* commands. Longer-term direction is sulis as the only plugin shipped — see plugins/sulis/docs/change-as-primitive-design.md. See CHANGELOG.md for version history."
     }
   ]

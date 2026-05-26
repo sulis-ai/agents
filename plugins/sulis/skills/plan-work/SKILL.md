@@ -125,11 +125,36 @@ State invariants the contract must preserve:
 
 ---
 
+## Required Reading (load before decomposing)
+
+These standards shape the WP set's *shape*, not just the content:
+
+- `../../references/standards/WORK_PACKAGE_STANDARD.md` — WP shape; the
+  `kind:` enum (step 4a); cross-kind decomposition rules (WP-08.5).
+- `../../references/standards/CONTRACT_FIRST_STANDARD.md` — when the WP set
+  spans a producer/consumer seam, decompose contract-first (step 4b).
+- `../../references/standards/WP_BACKEND_STANDARD.md` — per-kind execution
+  doctrine for `kind: backend` WPs (the gates step 11 validates).
+- `../../references/standards/WP_FRONTEND_STANDARD.md` — per-kind execution
+  doctrine for `kind: frontend` WPs.
+- `../../references/standards/UX_VISUAL_DESIGN_STANDARD.md` — UXD-14:
+  frontend WPs `dependsOn` the visual contract (a design-time artifact,
+  not its own WP).
+- `../../references/change-primitives.md` — the change-primitive vocabulary
+  step 3 still applies orthogonally to `kind`.
+
+---
+
 ## Workflow
 
 1. **Read inputs** — `TDD.md`, `PRIMITIVE_TREE.jsonld`, `SIZING.md`,
    `.context/{project}/INDEX.md`, any existing `HANDOVER.md` from SRD, any
-   prior WPs.
+   prior WPs. Plus the contract artifacts the design phase produced (the
+   **data contract** for any seam, and the **visual contract** for any
+   user-facing surface — see `draft-architecture`'s "Define the contracts"
+   step). If a cross-kind TDD has no contract artifacts, **stop and route
+   back to `draft-architecture`** to produce them (don't manufacture
+   contracts during decomposition).
 2. **Inventory** — list every component, port, adapter, and resilience
    primitive mentioned in the TDD. Each becomes a candidate WP.
 3. **Assign primitive (MUST).** Per `references/change-primitives.md`,
@@ -170,10 +195,58 @@ State invariants the contract must preserve:
    - One application service / use case = 1 WP
    - One observability primitive (e.g. "wire up OpenTelemetry") = 1 WP
    - One resilience policy (timeout + retry + CB for one dependency) = 1 WP
+
+4a. **Assign `kind` (MUST).** Per
+    `references/standards/WORK_PACKAGE_STANDARD.md` WP-01, every WP carries
+    `kind:` ∈ `backend / frontend / async / docs / infra / contract /
+    composite`. The kind dispatches the executor + the verification gates
+    (WP-05) + the per-kind doctrine (`WP_BACKEND_STANDARD.md` /
+    `WP_FRONTEND_STANDARD.md` / …). Decide kind by what the WP *touches*:
+    - HTTP handlers, application services, ports, repository adapters,
+      domain logic → `backend`
+    - React/Vue/Alpine components, pages, layouts, state, frontend tests →
+      `frontend`
+    - Queue consumers/producers, scheduled jobs, message envelopes →
+      `async`
+    - Terraform, Dockerfiles, CI workflows, deploy config → `infra`
+    - Docs/README/CHANGELOG/spec text only → `docs`
+    - API/SDK schema artifacts (operations + types + errors + stubs) →
+      `contract` (see step 4b)
+    - Spans multiple kinds atomically (rare) → `composite` with child WPs
+    Record in WP frontmatter (`kind:`).
+
+4b. **Cross-kind detection + contract-first decomposition (MUST when
+    cross-kind).** If the WP set spans a **producer/consumer seam**
+    (backend + frontend, or tool + caller — i.e. ≥ 2 of {backend, frontend,
+    async} touch the same operation surface), apply
+    `references/standards/CONTRACT_FIRST_STANDARD.md` + `WORK_PACKAGE_STANDARD.md`
+    WP-08.5:
+
+    - **Emit a `kind: contract` WP first.** Its scope is the schema layer
+      for the seam: operations + input/output types + the three error
+      categories (Protocol / Expected / Internal per CF-03) + LLM-/dev-
+      facing descriptions + **example stubs covering happy AND error AND
+      empty cases** (CF-04). Gates per WP-05's contract row.
+    - **Producer + consumer WPs `dependsOn` the contract WP — never each
+      other.** Frontend `dependsOn: [WP-contract]`; it does **NOT**
+      `dependsOn` the backend WP. Both build in parallel (CF-05 parallel-
+      not-sequential) — the consumer against a mock generated from the
+      contract.
+    - **Emit an integration WP last.** `kind: composite` (or `kind: docs`
+      with `produces: integration-check`) that `dependsOn` all the per-kind
+      siblings and runs the conformance check (CF-07) — swap mock for real
+      producer, validate against schema.
+    - **User-facing seams pair the data contract with the visual contract.**
+      The visual contract (tokens + HIG + UX patterns) is a **design-time
+      artifact** produced by `draft-architecture`, not its own WP; frontend
+      WPs `dependsOn` it the same way (UXD-14).
+    - **Exempt:** single-kind WP sets and `--prototype` changes.
+
 5. **Build the dependency graph** — for each WP, identify what must exist
    first (`dependsOn`) and what it unlocks (`blocks`). Note: REINFORCE-Test
    WPs are dependencies of any REORGANISE WPs that operate on the same
-   subject (characterisation tests must exist first).
+   subject (characterisation tests must exist first). For cross-kind work
+   (step 4b), the graph is contract → {parallel per-kind} → integration.
 6. **Estimate token cost** — rough. Input ≈ WP itself + dependency WPs +
    relevant TDD section. Output ≈ implementation files + tests. Round to
    nearest 1k. This is for orchestrator routing, not billing.
@@ -192,6 +265,33 @@ State invariants the contract must preserve:
      > Recommendation: Refactor `{subject}` directly (REORGANISE-Refactor),
      > or Replace with a new implementation and Delete existing wrappers.
      > Proceed with Wrap anyway? (Y/N)"
+7a. **Per-kind gate audit (MUST).** For each WP, confirm its `kind:` matches
+    its planned DoD/test plan:
+    - `kind: backend` → DoD names unit + integration + smoke per WP-05;
+      `WP_BACKEND_STANDARD` patterns (ports & adapters / repository / in-
+      memory adapter first / handler / Result / auth) appear in the
+      Context/Contract sections where they apply.
+    - `kind: frontend` → DoD names component + integration + **a11y (axe)**
+      + (page-level) E2E per WP-05; `WP_FRONTEND_STANDARD` patterns
+      (component tier / typed client / mock-first / loading/error/empty /
+      tokens-not-hex / error boundary) appear where they apply; the WP
+      declares which design-tokens it consumes.
+    - `kind: contract` → DoD names schema lint + happy/error/empty stub
+      coverage + ≥1 consumer mock generated from it.
+    A WP whose DoD doesn't match its `kind`'s gates is a misclassified WP —
+    fix the kind, fix the DoD, or split.
+7b. **Cross-kind shape audit (MUST when the WP set spans kinds).** Verify
+    step 4b's shape was applied:
+    - ≥1 `kind: contract` WP exists (or single-kind / `--prototype` exempt
+      noted).
+    - The non-contract per-kind WPs `dependsOn` the contract WP, **not each
+      other** (no `frontend dependsOn backend`).
+    - ≥1 integration WP closes the graph (`dependsOn` all per-kind
+      siblings; runs the conformance check per CF-07).
+    - For user-facing surfaces, the visual contract is referenced in every
+      `kind: frontend` WP (UXD-14).
+    A failed cross-kind shape audit is **FAIL** at step 11 — re-decompose,
+    don't paper over.
 8. **Write WPs** — one file per WP, using the template above.
 9. **Write `INDEX.md`** — list all WPs, their statuses, primitive
    distribution, the dependency graph (as a markdown table and a Mermaid

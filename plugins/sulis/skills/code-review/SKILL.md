@@ -29,6 +29,26 @@ description: >
 
 # Code Review — Three Lenses, Mechanical Floor, One Report
 
+## Required Reading (load as the rubric per `kind:`)
+
+In addition to the Code Review Standard cited below, load the per-kind +
+contract-first + visual standards — they are the **rubric** for scoring the
+diff, not background:
+
+- `../../references/standards/WP_BACKEND_STANDARD.md` — for backend changes,
+  score against WPB-01..12.
+- `../../references/standards/WP_FRONTEND_STANDARD.md` — for frontend
+  changes, score against WPF-01..13 (a11y gates incl. jest-axe / Playwright-
+  axe).
+- `../../references/standards/CONTRACT_FIRST_STANDARD.md` — for cross-kind
+  diffs, verify CF-07 conformance check was run.
+- `../../references/standards/UX_VISUAL_DESIGN_STANDARD.md` — for
+  user-facing diffs, verify token consumption + design-time WCAG AA + (for
+  AI surfaces) the agentic-interface principles.
+
+Dispatch the lens that matches the WP's `kind:` (backend / frontend); for
+cross-kind diffs, dispatch both.
+
 This skill is the implementation of the **Code Review Standard** at
 [`../../references/code-review-standard.md`](../../references/code-review-standard.md).
 Every workflow step below traces to one or more CR-01..CR-10 rules. Read the
