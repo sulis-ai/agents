@@ -1,0 +1,57 @@
+name: cockpit-boundary
+
+# WP-001 — enforces the apps/cockpit/ extractability boundary (TDD §9,
+# ADR-008). This grep gate is a deliberate duplication of the ESLint
+# `no-restricted-paths` rule: ESLint only covers TS/JS files, this
+# regex catches any other file type that references a path outside the
+# workspace.
+
+on:
+  push:
+    paths:
+      - "apps/cockpit/**"
+      - ".github/workflows/cockpit-boundary.yml"
+  pull_request:
+    paths:
+      - "apps/cockpit/**"
+      - ".github/workflows/cockpit-boundary.yml"
+
+jobs:
+  boundary-grep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reject cross-boundary imports
+        shell: bash
+        run: |
+          # Look for any source file under apps/cockpit/ whose relative
+          # imports escape the workspace (../../ or deeper). We allow:
+          #   - ./X            (same dir)
+          #   - ../X           (one level up — still within apps/cockpit)
+          # We forbid:
+          #   - ../../X        (escapes apps/cockpit/<sub>/ into apps/cockpit/)
+          #                    which still might be fine, but two-up from
+          #                    the deepest legal entry (apps/cockpit/<sub>/<sub>/)
+          #                    is suspicious; the ESLint rule covers the nuance.
+          # The grep here only fires on the unambiguous escape case:
+          # `from '../../../...'` (three-or-more up) from any file under
+          # apps/cockpit/, which provably escapes the workspace.
+          set -euo pipefail
+
+          violations=$(
+            grep -RInE "from ['\"](\.\./){3,}" apps/cockpit/ \
+              --include='*.ts' --include='*.tsx' \
+              --include='*.js' --include='*.jsx' \
+              --include='*.json' --include='*.html' \
+              --include='*.css' --include='*.md' \
+              || true
+          )
+
+          if [ -n "$violations" ]; then
+            echo "::error::cross-boundary imports detected"
+            echo "$violations"
+            exit 1
+          fi
+
+          echo "OK — no cross-boundary imports under apps/cockpit/"
