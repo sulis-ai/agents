@@ -13,6 +13,8 @@ existing wpx-pipeline / wpx-train test pattern).
 
 from __future__ import annotations
 
+import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -260,3 +262,119 @@ def test_finish_requires_merge_or_pr(local_git_repo, run_tool):
                       "--slug", "nomode-test", "--primitive", "feat")
     assert result.returncode == 1
     assert "--merge" in result.json["error"] or "--pr" in result.json["error"]
+
+
+# ─── global change store (slice A.5) ──────────────────────────────────────
+
+
+def _state_changes_dir() -> Path:
+    """The changes/ dir under the isolated SULIS_STATE_DIR (set autouse)."""
+    return Path(os.environ["SULIS_STATE_DIR"]) / "changes"
+
+
+def test_start_writes_change_record(local_git_repo, run_tool):
+    """`start` writes a full change.json record under the local store."""
+    result = run_tool("sulis-change", "start",
+                      "--repo-root", str(local_git_repo),
+                      "--slug", "record-test", "--primitive", "create",
+                      "--intent", "build the thing")
+    assert result.ok, f"start failed: stderr={result.stderr}"
+    change_id = result.data["change_id"]
+
+    record_path = _state_changes_dir() / change_id / "change.json"
+    assert record_path.exists(), "change.json was not written"
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    assert record["change_id"] == change_id
+    assert record["slug"] == "record-test"
+    assert record["primitive"] == "create"
+    assert record["branch"] == "change/create-record-test"
+    assert record["intent"] == "build the thing"
+    assert record["base_branch"] == "dev"
+    assert record["stage"] == "recon"
+    assert record["created_at"].endswith("Z")
+
+
+def test_list_reads_the_records(local_git_repo, run_tool):
+    """`list` enumerates from the local records (branch-independent index)."""
+    run_tool("sulis-change", "start",
+             "--repo-root", str(local_git_repo),
+             "--slug", "rec-a", "--primitive", "create")
+    run_tool("sulis-change", "start",
+             "--repo-root", str(local_git_repo),
+             "--slug", "rec-b", "--primitive", "refactor")
+
+    result = run_tool("sulis-change", "list",
+                      "--repo-root", str(local_git_repo))
+    assert result.ok
+    assert result.data["active_count"] == 2
+    slugs = sorted(c["slug"] for c in result.data["changes"])
+    assert slugs == ["rec-a", "rec-b"]
+    # Each entry carries the record fields + the cross-referenced branch flag.
+    for c in result.data["changes"]:
+        assert c["branch_present"] is True
+        assert c["worktree_present"] is True
+        assert "change_id" in c
+        assert c["stage"] == "recon"
+
+
+def test_list_flags_record_whose_branch_is_gone(local_git_repo, run_tool):
+    """A record whose branch was deleted is listed but branch_present=False."""
+    run_tool("sulis-change", "start",
+             "--repo-root", str(local_git_repo),
+             "--slug", "gone-branch", "--primitive", "feat")
+    # Delete the branch + worktree out from under the record (simulating a
+    # merged/pruned change whose local record still lingers).
+    worktree = local_git_repo.parent / f"{local_git_repo.name}-change-feat-gone-branch"
+    subprocess.run(["git", "worktree", "remove", str(worktree), "--force"],
+                   cwd=local_git_repo, check=True, capture_output=True)
+    subprocess.run(["git", "branch", "-D", "change/feat-gone-branch"],
+                   cwd=local_git_repo, check=True, capture_output=True)
+
+    result = run_tool("sulis-change", "list",
+                      "--repo-root", str(local_git_repo))
+    assert result.ok
+    assert result.data["active_count"] == 1
+    item = result.data["changes"][0]
+    assert item["slug"] == "gone-branch"
+    assert item["branch_present"] is False
+    assert item["worktree_present"] is False
+
+
+def test_nuke_resolves_change_id_from_record(local_git_repo, run_tool):
+    """nuke resolves the change_id via the local record (no manifest needed)."""
+    start = run_tool("sulis-change", "start",
+                     "--repo-root", str(local_git_repo),
+                     "--slug", "nuke-rec", "--primitive", "feat")
+    change_id = start.data["change_id"]
+
+    result = run_tool("sulis-change", "nuke",
+                      "--repo-root", str(local_git_repo),
+                      "--slug", "nuke-rec")  # dry-run (no --force)
+    assert result.ok
+    assert result.data["change_id"] == change_id
+    assert result.data["change_id_resolution"] == "matched-via-record"
+
+
+def test_start_does_not_pollute_real_home(local_git_repo, run_tool, monkeypatch):
+    """With SULIS_STATE_DIR set, `start` writes ONLY under it — never real HOME.
+
+    Pollution guard: prior to the configurable base, subprocess `start` calls
+    inherited the real home and wrote ~20 junk ~/.sulis/changes/* dirs.
+    """
+    # Point HOME at a sentinel tmp that must stay empty (SULIS_STATE_DIR, set
+    # by the autouse fixture, takes precedence in the resolver).
+    fake_home = local_git_repo.parent / "_sentinel_home"
+    fake_home.mkdir()
+    monkeypatch.setenv("HOME", str(fake_home))
+
+    result = run_tool("sulis-change", "start",
+                      "--repo-root", str(local_git_repo),
+                      "--slug", "no-pollute", "--primitive", "feat")
+    assert result.ok, f"start failed: stderr={result.stderr}"
+    change_id = result.data["change_id"]
+
+    # The record landed under SULIS_STATE_DIR ...
+    assert (_state_changes_dir() / change_id / "change.json").exists()
+    # ... and NOTHING was written under the (fake) real home's ~/.sulis.
+    assert not (fake_home / ".sulis").exists(), \
+        "start polluted the real home's ~/.sulis despite SULIS_STATE_DIR"

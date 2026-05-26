@@ -1,5 +1,21 @@
 # Sulis — Changelog
 
+## v0.52.0 — 2026-05-26
+
+**Change-dashboard foundation (slice A.5) — the local store as the branch-independent global change index.**
+
+A change's committed manifest lives ON its change branch (in the worktree), so from `dev` you can't enumerate all changes — git is per-branch. The global view (every change + its workflow stage, regardless of branch) must come from a store OUTSIDE git: the local `~/.sulis/` store. This slice makes that store the authoritative cross-change index that the dashboard (slice B), `sulis-change list`, and `nuke` read.
+
+Three deliverables.
+
+(1) **Configurable state base.** The local-state base was hardcoded `Path.home() / ".sulis"` in three modules, so subprocess-based tests (which invoke `sulis-change start` via a real subprocess) inherited the developer's REAL home and wrote ~20 junk `~/.sulis/changes/*` dirs into it on every run — pollution that would also junk the dashboard's global view. New single resolver `_change_state.sulis_state_base() -> Path` returns `Path(os.environ["SULIS_STATE_DIR"])` when set, else `~/.sulis`; companion `changes_base()` + `change_dir(change_id)`. Every base computation now routes through it — `_change_state` (`_state_path`, the new `_change_record_path`), `_change_context.write_change_context`, and `sulis-change`'s `_local_state_base` + `cmd_nuke`'s `state_dir`. No module hard-codes the base any more. An autouse fixture in the integration conftest points `SULIS_STATE_DIR` at a per-test tmp dir, so NO test (unit or subprocess) writes the real home — verified by a pollution-guard test that runs `start` via subprocess with a sentinel HOME and asserts nothing lands under it.
+
+(2) **Full per-change record (`change.json`).** `sulis-change start` now writes a full record to `{state_base}/changes/{change_id}/change.json` — `{change_id, handle, slug, primitive, branch, worktree_path, intent, base_branch, created_at, stage}`. This is the branch-independent global-index entry. To avoid two files' stage drifting, the live workflow position stays in `state.json` (it carries `stage_history`); `change.json.stage` is only the seed written at start, and the reader overlays the live `state.json` stage so there is one authoritative live value. Best-effort like recon/stage — an unwritable path degrades to `None` + a warning, never crashes `start`.
+
+(3) **Global-index reader + repointed list/nuke.** New `_change_state.list_all_changes() -> list[dict]` enumerates `{state_base}/changes/*/change.json`, skips record-less (legacy/partial) dirs, overlays each change's live stage, and returns the records sorted most-recent-first. `sulis-change list` now reads the records as its primary source (branch-independent, no git enumeration needed) and cross-references `git branch --list 'change/*'` to flag records whose branch is gone (`branch_present`). `nuke`'s `change_id` resolution gains a preferred rung-0: scan the local records by slug (`matched-via-record`) — simpler + branch-independent than the worktree-manifest fallback chain, which is kept for legacy changes without a record.
+
+15 new unit tests (resolver + record round-trip + `list_all_changes` ordering/skip/stage-overlay) + 5 new integration tests (record-at-start, list-reads-records, branch-gone flag, nuke-via-record, pollution-guard). Stdlib only; Python 3.11-safe; full unit suite green ×2; `compileall` clean.
+
 ## v0.51.0 — 2026-05-26
 
 **Change-dashboard foundation (slice A) — per-change workflow-stage persistence + `sulis-change nuke`.**
