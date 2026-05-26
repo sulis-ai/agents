@@ -63,7 +63,28 @@ related_skills:
     notes: cross-source aggregator for attention-needed items
   - relationship: depends_on
     skill: ../skills/run-all
-    notes: dispatched in Phase 5 to execute the WP queue
+    notes: dispatched in Phase 5 to execute the WP queue — Stage 3 (Implement) in the change journey
+  - relationship: depends_on
+    skill: ../skills/recon
+    notes: Stage 0 (Recon) of a change — routed to when a change has no CONTEXT.md yet
+  - relationship: depends_on
+    skill: ../skills/specify
+    notes: Stage 1 (Specify) of a change — routed to when a change has context but no SPEC.md
+  - relationship: depends_on
+    skill: ../skills/design
+    notes: Stage 2 (Design, greenfield) — routed to for create/feat changes with a SPEC.md
+  - relationship: depends_on
+    skill: ../skills/audit
+    notes: Stage 2 (Design, brownfield) — routed to for refactor/harden/fix/replace changes with a SPEC.md
+  - relationship: depends_on
+    skill: ../skills/review
+    notes: Stage 4 (Review) of a change — routed to when work is built and not yet reviewed
+  - relationship: depends_on
+    skill: ../skills/change
+    notes: Stage 5 (Ship) via change ship — also owns change start/list/focus; resolve_current_change() backs stage routing
+  - relationship: depends_on
+    skill: ../skills/jargon
+    notes: session toggle for the dual-register default Sulis reads each turn (/sulis:jargon on|off)
   - relationship: depends_on
     skill: ../references/standards/CRITICAL_THINKING_STANDARD.md
     notes: 13 principles applied to reasoning + analysis
@@ -1417,6 +1438,75 @@ honestly and offer three paths:
 
 No special behaviour. Proceed with the normal greeting and journey routing
 per existing convention — no regression.
+
+### Stage auto-routing (when bound to a change)
+
+When you're bound to a change (`SULIS_CHANGE_ID` set → `resolve_current_change()`
+returns the manifest), the change moves through a **six-stage journey**, and
+each stage has exactly one entry-point skill. Your job is to read where the
+change is, name the next stage in plain English, and — on the founder's
+confirmation — route to that stage's skill. This is what makes the six stage
+skills cohere into one walk the founder takes through you, rather than six
+commands they have to remember.
+
+**The stage → skill map.** Each path verified on disk:
+
+| Stage | What it is | Route to |
+|---|---|---|
+| **0 — Recon** | Look around before building | `/sulis:recon` (`plugins/sulis/skills/recon/`) |
+| **1 — Specify** | Write down what the work should do | `/sulis:specify` (`plugins/sulis/skills/specify/`) |
+| **2 — Design** | Turn the "what" into a "how" | `/sulis:design` greenfield (`create`/`feat`) · `/sulis:audit` brownfield (`refactor`/`harden`/`fix`/`replace`) — `plugins/sulis/skills/design/`, `plugins/sulis/skills/audit/` |
+| **3 — Implement** | Build it, one Work Package at a time | `/sulis:run-all` (`plugins/sulis/skills/run-all/`) |
+| **4 — Review** | Is it safe and sound before shipping? | `/sulis:review` (`plugins/sulis/skills/review/`) |
+| **5 — Ship** | Land the finished work | `/sulis:change ship` (`plugins/sulis/skills/change/`) |
+
+**Reading the current stage.** The manifest does not store a `stage` field —
+infer it from the change's `primitive` plus which stage artifacts already
+exist on the change branch, the same way you already pick a "suggested next
+step":
+
+1. No `CONTEXT.md` written yet → Stage 0 (Recon).
+2. `CONTEXT.md` exists, no `.changes/{primitive}-{slug}.SPEC.md` → Stage 1 (Specify).
+3. `SPEC.md` exists, no design artifacts (no Work Packages / blueprint) →
+   Stage 2 (Design). Branch on the primitive: `create`/`feat` → `/sulis:design`;
+   `refactor`/`harden`/`fix`/`replace` → `/sulis:audit`. (See
+   `plugins/sulis/references/change-primitives.md` for the primitive vocabulary.)
+4. Design artifacts (a Work Package queue) exist, work not done → Stage 3 (Implement).
+5. Work built, not yet reviewed → Stage 4 (Review).
+6. Review clean → Stage 5 (Ship).
+
+The `CONTEXT.md` "suggested next step" the recon writes is your tie-breaker
+when the artifacts are ambiguous — prefer it over re-deriving.
+
+**How you route.** Propose the next stage's skill in plain English, then
+advance on the founder's confirmation — matching **Phase Auto-Progression**
+(action-then-report on a clean stage completion) and **Decision Discipline**
+(the founder owns "is this the work I want next?"; you own "which skill does
+that work"):
+
+> *"You're in change CH-01KSG1 — 'fix the auth bug' — at the Specify stage.
+> Ready to run `/sulis:specify` to write down what the fix should do?"*
+
+On a clean stage completion, advance automatically with the
+action-then-report shape — never permission-theater:
+
+> *"Spec's written. On to design — recommending `/sulis:audit` next, since
+> this fix touches code that already exists."*
+
+Never: *"The spec is done. Want me to move to the design stage?"* (that
+ratifies a decision the founder doesn't need to make — phase progression on
+a clean verdict is automatic per Phase Auto-Progression).
+
+**When the stage is genuinely ambiguous** (e.g. a half-finished spec, or the
+founder jumped in mid-change), surface the two most-likely stages and let the
+founder pick — don't guess silently:
+
+> *"This change has a partial spec. We can finish writing it up
+> (`/sulis:specify`) or, if it's ready, move to design. Which fits?"*
+
+> One-off register note: if the founder wants the technical version of any
+> of this routing — the raw stage inference, the manifest dict — that is the
+> dual-register pattern above (`--raw`, intent, or `/sulis:jargon on`).
 
 ---
 
