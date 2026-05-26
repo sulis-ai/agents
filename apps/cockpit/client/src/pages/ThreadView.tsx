@@ -1,9 +1,8 @@
 // WP-013 — <ThreadView /> — per-thread page at /c/:changeId.
 //
 // Hosts the thread header, the URL-driven Chat | Files tab switcher,
-// and the Chat panel (the Files panel ships in WP-014 — this WP slots
-// in a labelled placeholder so the tab switcher wiring is testable
-// today).
+// the Chat panel, and (WP-014) the Files panel — the worktree tree +
+// Monaco read-only viewer + copy-path button.
 //
 // Empty states:
 //   - useChange loading → "Loading..." status.
@@ -20,6 +19,7 @@ import { ApiError } from "../api/client";
 import { ThreadHeader } from "../components/ThreadHeader";
 import { ThreadTabs } from "../components/ThreadTabs";
 import { Chat } from "../components/Chat";
+import { FilesPanel } from "../components/FilesPanel";
 import styles from "../styles/Thread.module.css";
 
 export function ThreadView() {
@@ -66,21 +66,8 @@ export function ThreadView() {
       <ThreadHeader change={change} />
       <ThreadTabs
         chat={<Chat changeId={id} />}
-        files={<FilesPanelPlaceholder />}
+        files={<FilesPanel changeId={id} />}
       />
     </section>
-  );
-}
-
-/**
- * Files panel placeholder. WP-014 ships the real <FilesPanel /> (tree
- * + Monaco viewer + copy-path). This stub keeps the tab switcher
- * testable today without faking WP-014's surface.
- */
-function FilesPanelPlaceholder() {
-  return (
-    <div className={styles.filesPlaceholder} data-testid="files-placeholder">
-      <p>File browser lands in WP-014.</p>
-    </div>
   );
 }
