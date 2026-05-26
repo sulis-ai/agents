@@ -1,0 +1,25 @@
+/* WP-012 — RefreshButton styles. Extracted now per WP risks/notes so
+   WP-013 and WP-014 can reuse without duplication. */
+
+.button {
+  background: #ffffff;
+  border: 1px solid #d1d5da;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 13px;
+  color: #24292e;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.button:hover:not(:disabled) {
+  background: #f6f8fa;
+  border-color: #c8d1d9;
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}

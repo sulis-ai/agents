@@ -1,0 +1,30 @@
+/* WP-012 — LivenessDot styles. Four states, colour-coded per WP. */
+
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  vertical-align: middle;
+  border: 1px solid transparent;
+}
+
+.running {
+  background: #28a745;
+  border-color: #1e7e34;
+}
+
+.terminal {
+  background: #f0a020;
+  border-color: #c97f00;
+}
+
+.notRunning {
+  background: #d1d5da;
+  border-color: #a3a8af;
+}
+
+.unknown {
+  background: #f6f8fa;
+  border-color: #d1d5da;
+}

@@ -5,27 +5,54 @@
 //   - <Outlet /> region on the right (testid "shell-outlet"), into
 //     which the active route's element is rendered.
 //
-// The Sidebar's body content is a placeholder owned by WP-011 (WP-012
-// fleshes it out); we only assert the structural skeleton here.
+// WP-012 made the Sidebar a TanStack-Query consumer (useChangesWithLiveness),
+// so this test now needs a QueryClientProvider wrapper. The fetch mock
+// keeps the network out of the test.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Shell } from "../layouts/Shell";
 
-function renderShellWith(children: React.ReactNode, path = "/") {
+function freshClient() {
+  return new QueryClient({
+    defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+  });
+}
+
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function renderShellWith(_children: React.ReactNode, path = "/") {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route element={<Shell />}>
-          <Route path="/" element={<div data-testid="route-marker">child</div>} />
-        </Route>
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={freshClient()}>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route element={<Shell />}>
+            <Route
+              path="/"
+              element={<div data-testid="route-marker">child</div>}
+            />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
 describe("<Shell />", () => {
+  beforeEach(() => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, []));
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("renders sidebar and outlet regions", () => {
     renderShellWith(null);
     expect(screen.getByTestId("shell-sidebar")).toBeInTheDocument();

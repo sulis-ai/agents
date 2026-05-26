@@ -1,0 +1,44 @@
+/* WP-012 — SidebarItem styles. */
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  text-decoration: none;
+  color: #24292e;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.item:hover {
+  background: #eef1f4;
+}
+
+.item[data-active="true"] {
+  background: #dbedff;
+  color: #0366d6;
+  font-weight: 600;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.handle {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.slug {
+  font-size: 11px;
+  color: #6a737d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
