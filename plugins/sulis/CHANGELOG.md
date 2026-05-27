@@ -1,5 +1,25 @@
 # Sulis — Changelog
 
+## v0.63.0 — 2026-05-27
+
+**Minor — harden the spawned Sulis's change-context greeting discipline (closes #27 + #28).**
+
+The "Change context (when SULIS_CHANGE_ID is set)" section of the Sulis agent body contradicted the agent's own Decision Discipline / Forbidden Output Shapes rules elsewhere in the file — so the spawned Sulis skipped Stage 0 (`/sulis:recon`) on every greeting (#27) and surfaced menus-of-options instead of acting (#28). Three targeted edits resolve the contradiction:
+
+1. **Step 3 "Greet in change-context mode"** — replaced menu-shape example with action-then-report, plus an explicit "Forbidden shape" call-out showing what NOT to write.
+2. **Stage-inference rule 1** — was *"No CONTEXT.md written yet → Stage 0"*, which never fired (the pre-spawn stub is always written). Now keys off a sentinel marker file `{worktree}/.changes/{primitive}-{slug}.RECON.md` that `/sulis:recon` writes after its existing `write_change_context()` call. The pre-spawn writer never touches the marker; its existence is the load-bearing "Stage 0 done" signal.
+3. **"How you route"** block — replaced *"Ready to run X?"* (permission-theatre) with **MUST: act, don't ask** + an explicit forbidden-shapes list for the routing step.
+
+The ambiguous-stage exception is preserved as the **one** legitimate case for surfacing two options.
+
+**`/sulis:recon` Step 4 also amended** to write the sentinel marker after its existing CONTEXT.md update — required for Edit 2 to work (the spec originally scoped this out; pre-merge review on PR #33 caught the gap, scope widened in-flight). The marker file is documentation-only content; the load-bearing signal is its existence. Best-effort failure handling preserved.
+
+**The new step 4.5 review gate (#30) earned its place on its very next change** — caught the broken Stage-0 heuristic before merge, scope widened in-flight, re-reviewed clean. Two reviewer passes verified the bundle.
+
+Prose-only — no Python touched; 608 unit tests unchanged (green); lint clean.
+
+A follow-on lesson from the merge — the PR body's "Closes #N and #M" syntax only auto-closes the first issue (GitHub needs "Closes #N, closes #M") — captured durably as #34 for a follow-up fix to the change-skill PR body template.
+
 ## v0.62.0 — 2026-05-27
 
 **Minor — `/sulis:change ship` now gates structurally on `/sulis:review` before merging (closes #30).**
