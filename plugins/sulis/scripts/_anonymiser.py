@@ -256,9 +256,37 @@ def _is_allowlisted_domain(host: str) -> bool:
     return any(h.endswith("." + d) for d in PUBLIC_DOMAIN_ALLOWLIST)
 
 
+def _url_has_userinfo(url: str) -> bool:
+    """RFC 3986 userinfo detection: returns True iff the URL has
+    ``userinfo@`` between the scheme and the host (#39).
+
+    Userinfo carries credentials (e.g. ``user:password@host``); per
+    the privacy contract these are always sensitive, regardless of
+    whether the host is on the allowlist. ``_replace_url`` consults
+    this predicate FIRST to short-circuit to ``<url>`` redaction
+    before any allowlist evaluation.
+
+    Distinguishes userinfo `@` (between scheme and host) from `@` in
+    paths, queries, or fragments: the userinfo position is bounded
+    by the next ``/``, ``?``, or ``#``, so an `@` after any of those
+    is not userinfo.
+    """
+    # Match `scheme://[userinfo]@[host…]` where userinfo is anything
+    # before the first `@` AND that `@` appears before the first `/`,
+    # `?`, or `#` (which would mark the end of the authority section).
+    return bool(re.match(
+        r"^[a-zA-Z][a-zA-Z0-9+.\-]*://[^/?#\s@]+@",
+        url or "",
+    ))
+
+
 def _extract_host_from_url(url: str) -> str:
     """Pull the hostname out of an ``https://host/...`` URL. Returns
-    lowercased; empty on parse failure (degrades to "not allowlisted")."""
+    lowercased; empty on parse failure (degrades to "not allowlisted").
+
+    Callers should check :func:`_url_has_userinfo` FIRST — this function
+    does not strip ``userinfo@`` and would yield the userinfo's local
+    part as the "host" otherwise."""
     # Strip scheme:
     rest = re.sub(r"^https?://", "", url, flags=re.IGNORECASE)
     # Hostname is everything up to the next `/`, `:`, `?`, `#`, whitespace.
@@ -270,6 +298,13 @@ def _replace_url(match: re.Match, keep: set[str]) -> str:
     url = match.group(0)
     if _is_kept(url, keep):
         return url
+    # Userinfo present → credentials are sensitive; redact the WHOLE
+    # URL unconditionally. Skip the allowlist evaluation entirely so a
+    # naive future "extract the host after stripping userinfo" change
+    # can't accidentally route a credential-bearing URL to the
+    # preserved-allowlisted-host branch (#39).
+    if _url_has_userinfo(url):
+        return "<url>"
     host = _extract_host_from_url(url)
     if _is_allowlisted_domain(host):
         # Allowlisted host → preserve the WHOLE URL (path + query). Add
