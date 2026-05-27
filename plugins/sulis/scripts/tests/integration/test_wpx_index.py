@@ -218,3 +218,81 @@ def test_sync_auto_drafts_idempotent(tmp_project, seed_index, seed_wp, run_tool)
     assert r2.ok
     assert r2.data["added"] == []
     assert "WP-AUTO-012" in r2.data["skipped"]
+
+
+# ─── #45 / UXD-14: visual-contract write-time gate ────────────────────────
+
+
+def _write_wp(wp_dir, wp_id, slug, frontmatter_lines):
+    """Write a minimal WP file with the given frontmatter lines."""
+    wp_dir.mkdir(parents=True, exist_ok=True)
+    body = "---\n" + "\n".join(frontmatter_lines) + "\n---\n\n# " + wp_id + "\n"
+    (wp_dir / f"{wp_id}-{slug}.md").write_text(body, encoding="utf-8")
+
+
+def test_add_frontend_wp_without_visual_contract_is_refused(
+    tmp_project, seed_index, run_tool,
+):
+    """A kind: frontend WP with no visual_contract must be refused loudly at
+    add-wp (the #45 write-time gate) — not silently admitted to the INDEX."""
+    seed_index("INDEX-minimal.md")
+    _write_wp(tmp_project.wp_dir, "WP-050", "cancel-ui", [
+        "id: WP-050",
+        "title: Cancel-flow UI",
+        "kind: frontend",
+        "primitive: create",
+        "status: pending",
+        "dependsOn: [WP-001]",
+    ])
+    result = run_tool(
+        "wpx-index", "add-wp", "--wp", "WP-050", "--from-wp-file",
+        *_common(tmp_project),
+    )
+    assert not result.ok, "frontend WP without a visual contract must be refused"
+    assert "visual_contract" in (result.error or "")
+    assert "WP-050" not in tmp_project.index_md.read_text()
+
+
+def test_add_frontend_wp_with_visual_contract_succeeds(
+    tmp_project, seed_index, run_tool,
+):
+    """A kind: frontend WP that declares + dependsOn its visual-contract WP is
+    admitted."""
+    seed_index("INDEX-minimal.md")
+    _write_wp(tmp_project.wp_dir, "WP-051", "cancel-ui", [
+        "id: WP-051",
+        "title: Cancel-flow UI",
+        "kind: frontend",
+        "primitive: create",
+        "status: pending",
+        "visual_contract: WP-049",
+        "dependsOn: [WP-049]",
+    ])
+    result = run_tool(
+        "wpx-index", "add-wp", "--wp", "WP-051", "--from-wp-file",
+        *_common(tmp_project),
+    )
+    assert result.ok, f"add-wp failed: {result.error}"
+    assert "WP-051" in tmp_project.index_md.read_text()
+
+
+def test_add_frontend_wp_with_logged_exemption_succeeds(
+    tmp_project, seed_index, run_tool,
+):
+    """The only bypass: an explicit, logged exemption."""
+    seed_index("INDEX-minimal.md")
+    _write_wp(tmp_project.wp_dir, "WP-052", "data-only", [
+        "id: WP-052",
+        "title: Non-visual frontend wiring",
+        "kind: frontend",
+        "primitive: create",
+        "status: pending",
+        "visual_contract: exempt — config-only change, no rendered delta",
+        "dependsOn: [WP-001]",
+    ])
+    result = run_tool(
+        "wpx-index", "add-wp", "--wp", "WP-052", "--from-wp-file",
+        *_common(tmp_project),
+    )
+    assert result.ok, f"exempt frontend WP should be admitted: {result.error}"
+    assert "WP-052" in tmp_project.index_md.read_text()

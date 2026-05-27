@@ -30,6 +30,7 @@ from _wpxlib import (  # noqa: E402
     parse_md_table,
     paths_from_args,
     resolve_wp_columns,
+    validate_frontend_wp_visual_contract,
     validate_wp_status,
 )
 
@@ -318,6 +319,12 @@ def _cells_from_frontmatter(fm: dict, wp_id: str) -> list[str]:
     status_error = validate_wp_status(str(status))
     if status_error is not None:
         raise ValueError(f"{wp_id}: {status_error}")
+    # #45 / UXD-14 write-time gate — a kind: frontend WP cannot enter the INDEX
+    # unless it declares (and dependsOn) its visual-contract WP. Same loud-
+    # refusal chokepoint as the status guard above.
+    vc_error = validate_frontend_wp_visual_contract(fm)
+    if vc_error is not None:
+        raise ValueError(f"{wp_id}: {vc_error}")
     depends = _list_cell(fm.get("dependsOn"))
     blocks = _list_cell(fm.get("blocks"))
     # token estimate may be a scalar string ("1k", "?") or a dict (input/output Nk)

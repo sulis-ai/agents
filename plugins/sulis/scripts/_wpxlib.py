@@ -389,6 +389,75 @@ def validate_wp_status(status: str) -> str | None:
     )
 
 
+# ─── Visual-contract gate (#45 / UXD-14) ────────────────────────────────
+#
+# A user-facing surface MUST be built against a signed-off visual contract
+# (a real-token mockup), or the "still looks the same" failure recurs (L-13:
+# tokens matched the mockup but the founder saw no brand — fonts unloaded).
+# The gate has two halves:
+#   * write-time (validate_frontend_wp_visual_contract, below) — a
+#     `kind: frontend` WP cannot enter the INDEX unless it declares the
+#     visual-contract WP it depends on. Fires at the single chokepoint every WP
+#     passes through (`_cells_from_frontmatter` in wpx-index), exactly like
+#     validate_wp_status. Because the declared contract WP is in `dependsOn`,
+#     list-ready's done-oracle won't dispatch the frontend WP until that
+#     contract WP is `done`.
+#   * runtime sign-off (the contract WP only reaches `done` once its mockup
+#     record is signed off) — Phase 2, wired at the done-transition.
+#
+# The only bypass is an explicit, logged exemption (`visual_contract:
+# exempt — <reason>`) or a `prototype` WP — rare, never silent.
+
+
+def _as_str_list(value) -> list[str]:
+    """Normalise a dependsOn/blocks value (list, comma-string, or scalar) to a
+    list of trimmed strings."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [v.strip() for v in value.split(",") if v.strip()]
+    if isinstance(value, list):
+        return [str(v).strip() for v in value if str(v).strip()]
+    return [str(value).strip()] if str(value).strip() else []
+
+
+def validate_frontend_wp_visual_contract(fm: dict) -> str | None:
+    """Return None if a frontend WP correctly declares its visual contract,
+    else an error message (the write-time half of the #45 / UXD-14 gate).
+
+    A ``kind: frontend`` WP MUST carry a ``visual_contract:`` field that is
+    either (a) the id of the visual-contract WP it depends on — which MUST also
+    appear in ``dependsOn`` so list-ready won't dispatch it before that WP is
+    signed off (done) — or (b) an explicit logged exemption
+    (``visual_contract: exempt — <reason>``) or a ``prototype: true`` WP.
+    Non-frontend WPs are never gated.
+    """
+    kind = str(fm.get("kind", "")).strip().lower()
+    if kind != "frontend":
+        return None
+    if fm.get("prototype") is True:
+        return None
+    vc = str(fm.get("visual_contract", "") or "").strip()
+    if vc.lower().startswith("exempt"):
+        return None
+    if not vc:
+        return (
+            "kind: frontend requires a `visual_contract:` field naming the "
+            "signed-off visual-contract WP it depends on (or "
+            "`visual_contract: exempt — <reason>` for a logged, genuinely "
+            "non-visual exception). The visual contract is mandatory for "
+            "user-facing surfaces (UXD-14)."
+        )
+    deps = _as_str_list(fm.get("dependsOn"))
+    if vc not in deps:
+        return (
+            f"`visual_contract: {vc}` must also appear in dependsOn so "
+            f"list-ready won't dispatch this frontend WP before the "
+            f"visual-contract WP {vc} is signed off (done)."
+        )
+    return None
+
+
 # ─── Repository contract (RC v0.3.0 profile model) — L-05 ───────────────
 #
 # Promoted from wpx-arrival-check._read_contract so the pipeline, the train,
