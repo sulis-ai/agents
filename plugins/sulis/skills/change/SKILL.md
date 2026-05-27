@@ -281,10 +281,34 @@ what they mean.
 git push -u origin change/fix-login-bug
 gh pr create --base dev --head change/fix-login-bug \
   --title "fix: fix the login bug" \
-  --body "Change CH-01HQ8X · primitive: fix"
+  --body "Change CH-01HQ8X · primitive: fix · Closes #42"
 ```
 
 Capture the PR URL from stdout.
+
+**PR-body close-trailer rules (MUST when the change addresses GitHub
+issues, #34).** Scan the change's intent for `#NN` tokens. For every
+issue the change addresses, the PR body MUST include a `Closes`-form
+keyword PER issue — GitHub's auto-close-on-merge only acts on the issue
+adjacent to the keyword. Accepted forms:
+
+| Form | Example | Result |
+|---|---|---|
+| Comma-separated, keyword repeated | `Closes #27, closes #28` | Both auto-close ✅ |
+| One sentence per issue | `Closes #27. Closes #28.` | Both auto-close ✅ |
+| One trailer per line | `Closes #27`<br>`Closes #28` | Both auto-close ✅ |
+
+**Forbidden** — only the first issue auto-closes:
+
+| Form | Example | Result |
+|---|---|---|
+| Chained with "and" | `Closes #27 and #28` | Only #27 closes ✗ |
+| Comma-separated, keyword once | `Closes #27, #28` | Only #27 closes ✗ |
+
+Bit PR #33 (the #27 + #28 bundle); captured as #34. The rule applies
+to richer PR-body templates too — when composing a longer Summary /
+Test plan / Notes body, place a `Closes #N` trailer per addressed
+issue near the bottom, separated per rule above.
 
 **4. Wait for `branch-ci` to pass.** This repo's PR-time check is
 `branch-ci` (`.github/workflows/branch-ci.yml`). Poll its conclusion:
