@@ -1,13 +1,6 @@
 ---
 name: orchestrator
-description: >
-  **ARCHITECTURAL-INTENT REFERENCE — NOT ACTIVELY INVOKED IN CLAUDE
-  CODE (v0.7.1+).** Walks the Work Package INDEX, picks the next
-  ready WP, dispatches the executor. The same dispatch logic is
-  encoded in the `run-all` skill, which runs in the calling session
-  (where the Agent tool is available) rather than as a separate
-  subagent. This agent file is kept as the canonical specification of
-  the dispatch logic for documentation and future runtime portability.
+description: "Reference spec for the task-dispatch loop, kept for documentation and not run directly."
 user_invocable: true
 ---
 

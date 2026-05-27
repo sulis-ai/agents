@@ -1,6 +1,6 @@
 ---
 name: check-security
-description: Use when the founder wants to know if anything in the code could harm users or the business — runs a deep multi-tool security + data-protection + supply-chain assessment scoped at the skill-scope level across SEC-01..07 + DAT-01..05 + SC-01..04 primitives. Read-only; never modifies code.
+description: "Checks whether anything in the code could harm users or the business."
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]
   processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]

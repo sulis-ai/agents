@@ -1,13 +1,6 @@
 ---
 name: security-reviewer
-description: >
-  Security & Viability Reviewer — runs evidence-based assessments of arbitrary
-  codebases against 25 primitives across 5 categories (Security, Data
-  Protection, Code Quality, Supply Chain, Infrastructure). Uses an OODA-spiral
-  methodology to adapt scanning depth and chain findings across primitives.
-  Produces an evidence-backed viability report with scores, attack chains,
-  hypotheses for manual primitives, and recommendations. Use when auditing
-  any codebase for production readiness or compliance preparation.
+description: "Audits a codebase for security and viability risks and reports what to fix before shipping."
 model: inherit
 memory: project
 skills:

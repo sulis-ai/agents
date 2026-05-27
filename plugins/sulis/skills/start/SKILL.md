@@ -1,9 +1,6 @@
 ---
 name: start
-description: >
-  Re-enter an existing concierge journey. Reads .sulis/{project}/JOURNEY.md
-  and routes to the current phase. Use when returning to a project after a
-  break or to resume after a specialist invocation completed.
+description: "Resumes an existing journey where you left off."
 user_invocable: true
 ---
 

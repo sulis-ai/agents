@@ -43,6 +43,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+from _wpxlib import read_repo_contract  # noqa: E402
+
 VALID_PROFILES = {"deployable-web-app", "published-artifact", "internal-tool"}
 VALID_MODELS = {"team", "solo"}
 
@@ -63,57 +66,13 @@ def _gh(args: list[str], timeout: int = 30) -> tuple[int, str, str]:
         return 124, "", "timeout"
 
 
-def _strip_value(raw: str) -> str:
-    """Strip an inline `# comment` and surrounding whitespace from a value."""
-    return raw.split(" #", 1)[0].strip()
-
-
 def _read_contract(repo_root: Path) -> dict:
     """Parse profile / contribution_model / artifacts from repo-contract.yml.
 
-    Stdlib-only, indentation-aware enough for the well-formed contract shape.
-    Returns {profile, contribution_model, artifacts: [{name, type}], deploy_target}.
+    Thin wrapper over `_wpxlib.read_repo_contract` (L-05) — one parser shared
+    by the pipeline, the train, and this check so they can never drift apart.
     """
-    result: dict = {
-        "profile": None, "contribution_model": None,
-        "artifacts": [], "deploy_target": None,
-    }
-    contract = repo_root / ".sulis" / "repo-contract.yml"
-    if not contract.is_file():
-        return result
-
-    in_artifacts = False
-    cur: dict | None = None
-    for line in contract.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        top_level = not line[:1].isspace()
-        if top_level:
-            in_artifacts = False
-            if stripped.startswith("profile:"):
-                result["profile"] = _strip_value(stripped.split(":", 1)[1]) or None
-            elif stripped.startswith("contribution_model:"):
-                result["contribution_model"] = _strip_value(stripped.split(":", 1)[1]) or None
-            elif stripped.startswith("deploy_target:"):
-                result["deploy_target"] = _strip_value(stripped.split(":", 1)[1]) or None
-            elif stripped.startswith("artifacts:"):
-                in_artifacts = True
-            continue
-        if in_artifacts:
-            if stripped.startswith("- name:"):
-                if cur:
-                    result["artifacts"].append(cur)
-                cur = {"name": _strip_value(stripped.split(":", 1)[1]), "type": None}
-            elif stripped.startswith("name:"):
-                if cur:
-                    result["artifacts"].append(cur)
-                cur = {"name": _strip_value(stripped.split(":", 1)[1]), "type": None}
-            elif stripped.startswith("type:") and cur is not None:
-                cur["type"] = _strip_value(stripped.split(":", 1)[1])
-    if cur:
-        result["artifacts"].append(cur)
-    return result
+    return read_repo_contract(repo_root)
 
 
 def _artifacts(contract: dict) -> list[dict]:

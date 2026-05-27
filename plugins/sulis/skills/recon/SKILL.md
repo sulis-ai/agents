@@ -1,12 +1,6 @@
 ---
 name: recon
-description: >
-  Use at the very start of a change to find out what's already here before
-  you build anything — Stage 0 (Recon) of a change. Checks the repo is set
-  up the way the tools expect, maps what already exists (the docs,
-  decisions, and conventions), looks at how the code is put together, and
-  writes a short "here's what's already here" summary the rest of the
-  journey reads first. Usage: /sulis:recon (run inside a change).
+description: "Finds out what's already in the repo at the start of a change."
 user_invocable: true
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]

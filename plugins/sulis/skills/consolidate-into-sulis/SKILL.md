@@ -1,6 +1,6 @@
 ---
 name: consolidate-into-sulis
-description: Use when folding a specialist plugin into the sulis plugin — runs the proven 5-commit recipe (scripts+CI / skills / agents / references / wrap-up) with code-health gating, deterministic helpers for inventory and collision detection, and a tin-test rename pass on incoming founder-visible skill names.
+description: "Folds a separate plugin into the Sulis plugin using the proven recipe."
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]
   processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]

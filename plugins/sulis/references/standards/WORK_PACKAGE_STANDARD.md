@@ -134,7 +134,7 @@ Every WP carries a status field. The lifecycle:
 
 | Status | Meaning | Set by |
 |--------|---------|--------|
-| `todo` | Ready to start, all dependencies met | Default on file creation |
+| `pending` | Ready to start, all dependencies met | Default on file creation |
 | `in_progress` | Claimed by an executor or human; branch is open | Executor on claim |
 | `blocked` | Started but waiting on a sibling WP or external decision | Executor on detection of a blocker |
 | `sleeping` | Paused intentionally — needs a decision before resuming (cost approval, scope clarification) | Human or executor |
@@ -144,6 +144,15 @@ Every WP carries a status field. The lifecycle:
 | `abandoned` | Scope no longer relevant; will not ship | Human |
 
 The INDEX.md generator buckets WPs by status (see WP-10).
+
+> **Canonical status word (L-03):** `pending` is the one word for "ready to
+> start" across the whole toolchain (`wpx-index list-ready`, the train, the
+> orchestrator, the `plan-work` template). The legacy spellings `todo` and
+> `ready` are tolerated only on the read path — the INDEX generator still
+> buckets them as ready so old files surface — but a WP being added or
+> decomposed MUST use `pending`. `wpx-index add-wp` / `sync-auto-drafts`
+> reject any other spelling loudly rather than let a drifted-status WP vanish
+> from the ready set.
 
 ### WP-08: Composite WPs
 

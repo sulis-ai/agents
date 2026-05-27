@@ -285,6 +285,199 @@ def parse_md_table(table_text: str) -> MdTable:
     return MdTable(headers=headers, alignments=alignments, rows=rows)
 
 
+# ─── WP INDEX column resolution (shared by wpx-index + parse_index_md) ──────
+#
+# Two parsers historically disagreed on the "depends" column header —
+# wpx-index keyed on "depends", parse_index_md keyed on "depends on" — so a
+# correctly-generated INDEX (canonical header "Depends On") was silently
+# rejected by one of them (L-02). This is the SINGLE source of truth both now
+# call: a canonical column key → the set of accepted (lowercased) header
+# spellings. Adding a spelling here fixes both parsers at once.
+WP_COLUMN_ALIASES: dict[str, frozenset[str]] = {
+    "id": frozenset({"id", "wp", "wp id"}),
+    "title": frozenset({"title", "name"}),
+    "primitive": frozenset({"primitive", "kind"}),
+    "status": frozenset({"status"}),
+    "depends": frozenset(
+        {"depends", "depends on", "dependson", "depends_on", "depends-on"}
+    ),
+    "blocks": frozenset({"blocks", "blocked by", "unblocks"}),
+}
+
+
+def _normalise_header(header: str) -> str:
+    """Lowercase + strip a header to its comparable form (drops a trailing
+    footnote marker like ' *')."""
+    return header.strip().lower().rstrip(" *")
+
+
+def resolve_wp_columns(headers: list[str]) -> dict[str, int]:
+    """Map a WP table's headers to canonical column keys → column index.
+
+    Both wpx-index and parse_index_md call this so they resolve the same
+    table identically. Header spelling variants (``Depends On`` / ``Depends``
+    / ``depends_on``) all collapse to the canonical key ``"depends"``.
+    Unknown headers are ignored (callers read them as extras). First match
+    wins if a spelling somehow maps twice.
+    """
+    resolved: dict[str, int] = {}
+    for i, raw in enumerate(headers):
+        norm = _normalise_header(raw)
+        for canonical, spellings in WP_COLUMN_ALIASES.items():
+            if norm in spellings and canonical not in resolved:
+                resolved[canonical] = i
+                break
+    return resolved
+
+
+# ─── Canonical WP status vocabulary (L-03) ──────────────────────────────
+#
+# `pending` is the canonical "ready to start" word — it aligns wpx-index,
+# parse_index_md, the orchestrator, and the plan-work template. Before L-03
+# there were four spellings (WP-07 said `todo`; _lib.wp_index defaulted
+# `todo` and bucketed any UNKNOWN status as "ready"), so a WP with a drifted
+# status (`ready`) looked fine in the INDEX but was invisible to `list-ready`,
+# which counts only `pending`.
+#
+# Two sets, two jobs:
+#   * WRITE path (this set, strict) — a WP being added/decomposed MUST use one
+#     of these. `todo`/`ready` are deliberately absent: new WPs use `pending`,
+#     so drift fails loudly at add time (validate_wp_status) instead of
+#     vanishing silently.
+#   * READ path (lenient) — `_lib.wp_index.STATUS_BUCKETS` separately tolerates
+#     `pending`/`todo`/`ready` so any pre-existing legacy file still surfaces.
+
+WP_STATUS_READY = "pending"
+
+CANONICAL_WP_STATUSES: frozenset[str] = frozenset(
+    {
+        "pending",              # ready to start (canonical)
+        "in_progress",
+        "blocked",
+        "dependency_blocked",   # transitional, set by propagate-blocked
+        "sleeping",             # paused, needs a decision (WP-07)
+        "step-7-complete",      # train lifecycle: coded, awaiting steps 8-11
+        "step-7-held",
+        "step-7-blocked",
+        "done",
+        "closed",               # loop-verified (WP-07)
+        "regressed",            # WP-07
+        "abandoned",            # WP-07
+        "cancelled",            # auto-draft dispositioned out
+        "auto-draft",           # security finding awaiting disposition
+    }
+)
+
+
+def validate_wp_status(status: str) -> str | None:
+    """Return None if ``status`` is a canonical WP status, else an error string.
+
+    Comparison is whitespace-trimmed + case-insensitive; the canonical set is
+    lowercase. An unrecognised non-empty status is the L-03 bug class (a WP that
+    silently never appears in ``list-ready``); callers MUST surface the returned
+    message loudly (emit_error for a single WP, a per-WP error for a batch)
+    rather than write the row.
+    """
+    norm = (status or "").strip().lower()
+    if norm in CANONICAL_WP_STATUSES:
+        return None
+    valid = ", ".join(sorted(CANONICAL_WP_STATUSES))
+    return (
+        f"unrecognised WP status {status!r} — must be one of: {valid}. "
+        f"Use {WP_STATUS_READY!r} for a ready-to-start WP "
+        f"('todo'/'ready' are tolerated only for display, not for new WPs)."
+    )
+
+
+# ─── Repository contract (RC v0.3.0 profile model) — L-05 ───────────────
+#
+# Promoted from wpx-arrival-check._read_contract so the pipeline, the train,
+# AND the arrival check all read the contract through ONE parser. A duplicated
+# parser drifting from its twin is exactly the bug class that produced L-02 —
+# arrival-check now delegates here. Stdlib-only, indentation-aware enough for
+# the well-formed contract shape.
+
+_RC_DEPLOYABLE_ARTIFACT_TYPE = "deployable-web-app"
+
+
+def _rc_strip_value(raw: str) -> str:
+    """Strip an inline `# comment` and surrounding whitespace from a value."""
+    return raw.split(" #", 1)[0].strip()
+
+
+def read_repo_contract(repo_root: Path) -> dict:
+    """Parse `.sulis/repo-contract.yml` into a normalised dict.
+
+    Returns {profile, contribution_model, artifacts: [{name, type}],
+    deploy_target}. A missing file returns the all-None/empty shape (callers
+    treat that as the strict deployable default).
+    """
+    result: dict = {
+        "profile": None, "contribution_model": None,
+        "artifacts": [], "deploy_target": None,
+    }
+    contract = Path(repo_root) / ".sulis" / "repo-contract.yml"
+    if not contract.is_file():
+        return result
+
+    in_artifacts = False
+    cur: dict | None = None
+    for line in contract.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        top_level = not line[:1].isspace()
+        if top_level:
+            in_artifacts = False
+            if stripped.startswith("profile:"):
+                result["profile"] = _rc_strip_value(stripped.split(":", 1)[1]) or None
+            elif stripped.startswith("contribution_model:"):
+                result["contribution_model"] = _rc_strip_value(stripped.split(":", 1)[1]) or None
+            elif stripped.startswith("deploy_target:"):
+                result["deploy_target"] = _rc_strip_value(stripped.split(":", 1)[1]) or None
+            elif stripped.startswith("artifacts:"):
+                in_artifacts = True
+            continue
+        if in_artifacts:
+            if stripped.startswith("- name:"):
+                if cur:
+                    result["artifacts"].append(cur)
+                cur = {"name": _rc_strip_value(stripped.split(":", 1)[1]), "type": None}
+            elif stripped.startswith("name:"):
+                if cur:
+                    result["artifacts"].append(cur)
+                cur = {"name": _rc_strip_value(stripped.split(":", 1)[1]), "type": None}
+            elif stripped.startswith("type:") and cur is not None:
+                cur["type"] = _rc_strip_value(stripped.split(":", 1)[1])
+    if cur:
+        result["artifacts"].append(cur)
+    return result
+
+
+def deploy_is_applicable(contract: dict) -> bool:
+    """True iff a deploy → health → smoke phase applies to this repo (L-05).
+
+    Only a ``deployable-web-app`` runs a staging deploy poll + health check.
+    A ``published-artifact`` (this marketplace) or ``internal-tool`` ships
+    without one; ``deploy_target: none`` is the explicit opt-out. An unset
+    profile defaults to deployable (strict — matches arrival-check's
+    backward-compat default). Multi-artifact → True iff ANY artifact is
+    deployable.
+    """
+    if (contract.get("deploy_target") or "").strip().lower() == "none":
+        return False
+    artifacts = contract.get("artifacts") or []
+    if artifacts:
+        return any(
+            (a.get("type") or "") == _RC_DEPLOYABLE_ARTIFACT_TYPE
+            for a in artifacts
+        )
+    profile = (contract.get("profile") or "").strip()
+    if not profile:
+        return True  # strict default = deployable-web-app
+    return profile == _RC_DEPLOYABLE_ARTIFACT_TYPE
+
+
 def find_section(text: str, heading: str) -> tuple[int, int]:
     """Find the byte range of a Markdown section by heading.
 
@@ -1130,15 +1323,14 @@ def parse_index_md(
         if not table.headers:
             continue
 
-        # Map column names to indices (case-insensitive, strip whitespace)
-        col_index: dict[str, int] = {}
-        for i, h in enumerate(table.headers):
-            key = h.strip().lower().replace("on", "on").rstrip(" *")
-            col_index[key] = i
+        # Resolve columns once via the shared resolver (L-02): canonical key
+        # → index. wpx-index uses the same resolver, so header spelling
+        # variants ("Depends On" / "Depends") resolve identically across both.
+        col_index = resolve_wp_columns(table.headers)
+        resolved_indices = set(col_index.values())
 
         def get(row: list[str], name: str, default: str = "") -> str:
-            key = name.lower()
-            i = col_index.get(key)
+            i = col_index.get(name)
             if i is None or i >= len(row):
                 return default
             return row[i].strip()
@@ -1152,11 +1344,8 @@ def parse_index_md(
                 continue
 
             extras: dict[str, str] = {}
-            standard_keys = {"id", "title", "primitive", "status",
-                             "depends on", "blocks"}
             for i, h in enumerate(table.headers):
-                key = h.strip().lower()
-                if key in standard_keys or i >= len(row):
+                if i in resolved_indices or i >= len(row):
                     continue
                 extras[h.strip()] = row[i].strip()
 
@@ -1165,7 +1354,7 @@ def parse_index_md(
                 title=get(row, "title"),
                 primitive=get(row, "primitive"),
                 status=get(row, "status"),
-                depends_on=_split_csv_or_dash(get(row, "depends on")),
+                depends_on=_split_csv_or_dash(get(row, "depends")),
                 blocks=_split_csv_or_dash(get(row, "blocks")),
                 extras=extras,
             ))
@@ -3490,6 +3679,7 @@ def find_change_branches(repo_root: Path) -> list[dict]:
         return []
 
     result: list[dict] = []
+    seen: set[str] = set()
     for raw in out.splitlines():
         line = raw.rstrip()
         if not line:
@@ -3504,12 +3694,43 @@ def find_change_branches(repo_root: Path) -> list[dict]:
         if parsed is None:
             continue
         primitive, slug = parsed
+        seen.add(branch)
         result.append({
             "branch": branch,
             "primitive": primitive,
             "slug": slug,
             "current": is_current,
         })
+
+    # Also surface origin-only change branches (a teammate's change pulled but
+    # not checked out locally). Strip the `origin/` prefix to the logical
+    # branch name; skip any already listed as a local branch. (L-01)
+    rrc, rout, _ = _run(
+        ["git", "branch", "--list", "--remotes", "origin/change/*"],
+        cwd=repo_root, timeout=10,
+    )
+    if rrc == 0:
+        for raw in rout.splitlines():
+            line = raw.strip()
+            if not line or "->" in line:  # skip "origin/HEAD -> origin/dev"
+                continue
+            if line.startswith("origin/"):
+                branch = line[len("origin/"):]
+            else:
+                continue
+            if branch in seen:
+                continue
+            parsed = parse_change_branch(branch)
+            if parsed is None:
+                continue
+            primitive, slug = parsed
+            seen.add(branch)
+            result.append({
+                "branch": branch,
+                "primitive": primitive,
+                "slug": slug,
+                "current": False,
+            })
     return result
 
 
@@ -3527,16 +3748,28 @@ SULIS_CHANGE_ID_ENV_VAR = "SULIS_CHANGE_ID"
 def resolve_current_change(repo_root: Path | None = None) -> dict | None:
     """Resolve the current change context from the SULIS_CHANGE_ID env var.
 
-    Returns a dict with at minimum {change_id, handle, branch, primitive,
-    slug, worktree_path, ...} if the env var is set AND a matching change
-    branch with metadata exists in this repo. Returns None if:
+    Returns the change metadata dict ({change_id, handle, branch, primitive,
+    slug, worktree_path, ...}) when the env var is set AND a matching change's
+    metadata is found. Returns None when the env var is unset, or set but no
+    match.
 
-    - SULIS_CHANGE_ID is unset
-    - SULIS_CHANGE_ID is set but no matching change branch found
-    - The matching branch has no .changes/{primitive}-{slug}.yaml metadata
+    Resolution order (L-01 — cwd-first, then fall back):
 
-    The matching strategy: iterate `find_change_branches(repo_root)`, read
-    each metadata file, look for one whose `change_id` matches the env var.
+      1. **Self** — the common case where this is invoked from INSIDE the
+         change worktree (cwd == the worktree). Metadata travels ON the
+         change branch, so it's already at `repo_root/.changes/`. Read the
+         current branch directly and the committed metadata beside it. The
+         pre-L-01 code only computed a SIBLING worktree path and so returned
+         None here even with the env var set and a valid manifest.
+      2. **`.changes/` scan** — scan `repo_root/.changes/*.yaml` for any whose
+         change_id matches (covers a detached HEAD / odd branch name but
+         committed metadata).
+      3. **Sibling worktree iteration** — the original path: driving from the
+         MAIN repo, the metadata lives in the sibling change worktree. Now
+         also covers origin-only change branches via find_change_branches.
+
+    When the env var is set but nothing matches, a breadcrumb of the paths
+    checked is written to stderr (debugging aid; never pollutes stdout JSON).
     """
     change_id = os.environ.get(SULIS_CHANGE_ID_ENV_VAR)
     if not change_id:
@@ -3547,22 +3780,52 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
     else:
         repo_root = Path(repo_root).resolve()
 
-    # Iterate change branches; find the one with matching change_id in metadata.
-    # Note: metadata lives ON the change branch, so we need to read from the
-    # change worktree's .changes/ directory (or git-show from the branch).
-    # For now, simplest: rely on the change worktree existing (sulis-change
-    # start always creates one); look there.
+    checked: list[str] = []
+
+    # 1. Self: current branch + metadata committed at repo_root/.changes/.
+    rc, branch_out, _ = _run(
+        ["git", "branch", "--show-current"], cwd=repo_root, timeout=10,
+    )
+    if rc == 0:
+        parsed = parse_change_branch(branch_out.strip())
+        if parsed is not None:
+            primitive, slug = parsed
+            self_meta = repo_root / ".changes" / f"{primitive}-{slug}.yaml"
+            checked.append(str(self_meta))
+            if self_meta.exists():
+                metadata = read_change_metadata(self_meta)
+                if metadata.get("change_id") == change_id:
+                    return metadata
+
+    # 2. Scan repo_root/.changes/ for any manifest matching this change_id.
+    changes_dir = repo_root / ".changes"
+    if changes_dir.is_dir():
+        for meta_file in sorted(changes_dir.glob("*.yaml")):
+            checked.append(str(meta_file))
+            metadata = read_change_metadata(meta_file)
+            if metadata.get("change_id") == change_id:
+                return metadata
+
+    # 3. Sibling worktree iteration (driving from the main repo; includes
+    #    origin-only change branches via find_change_branches).
     for entry in find_change_branches(repo_root):
         primitive = entry["primitive"]
         slug = entry["slug"]
         worktree_dest = change_worktree_path(repo_root, primitive, slug)
         metadata_path = worktree_dest / ".changes" / f"{primitive}-{slug}.yaml"
+        checked.append(str(metadata_path))
         if not metadata_path.exists():
             continue
         metadata = read_change_metadata(metadata_path)
         if metadata.get("change_id") == change_id:
             return metadata
 
+    # Env var set but nothing matched — leave a breadcrumb for debugging.
+    print(
+        f"resolve_current_change: SULIS_CHANGE_ID={change_id} set but no "
+        f"matching metadata found. Checked: {checked or '(no candidates)'}",
+        file=sys.stderr,
+    )
     return None
 
 

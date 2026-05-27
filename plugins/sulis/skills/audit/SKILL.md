@@ -1,12 +1,6 @@
 ---
 name: audit
-description: >
-  Use when a piece of work changes code that already exists and you need to
-  understand it before touching it — Stage 2 (Design), the brownfield path.
-  For refactors, hardening, fixes, and replacements: looks at how the
-  existing code is built, finds the gaps against the architecture pillars,
-  and drafts the set of fixes that close them. Pairs the structural baseline
-  with the gap audit. Usage: /sulis:audit (run inside a change).
+description: "Reviews existing code before you change it and drafts the fixes to close the gaps."
 user_invocable: true
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]

@@ -1,12 +1,6 @@
 ---
 name: plan-work
-description: >
-  Use after the technical blueprint is done and you need a to-do list of
-  independent tasks that can ship one at a time without conflicting with
-  each other. Reads the design document and produces a Work Package
-  index — one task per file with explicit context, contract, definition
-  of done, and dependency graph. Ordered so an executor can ship the
-  ready ones in parallel.
+description: "Turns a blueprint into a to-do list of independent, shippable tasks."
 ---
 
 # Decompose — TDD to Atomic Work Packages
@@ -46,7 +40,7 @@ working on parallel WPs simultaneously.
 ---
 id: WP-007
 title: Implement Postgres OrderRepository adapter
-status: pending                  # pending | in_progress | done | blocked
+status: pending                  # MUST be `pending` for a new WP (L-03 canonical "ready to start"); add-wp rejects `todo`/`ready`. Later: in_progress | done | blocked
 sequence_id: WP-007
 dependsOn: [WP-001, WP-003]      # the domain entity and the port must exist first
 blocks: [WP-012]                 # the application service uses this adapter

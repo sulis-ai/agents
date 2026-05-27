@@ -1,6 +1,6 @@
 ---
 name: check-maintainability
-description: Use when the founder wants to know if the code will be easy to change later — scans for dead code (unused functions, classes, imports) and assesses review practices (direct-to-main commits, avg reviewers, PR template presence) via git-log analysis. Read-only; never modifies code.
+description: "Checks whether the code will be easy to change later."
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]
   processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]

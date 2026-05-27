@@ -1,12 +1,6 @@
 ---
 name: draft-architecture
-description: >
-  Use when you have a requirements document and need a hardened technical
-  blueprint that names the components, their interactions, the trade-offs,
-  and the design decisions — ready for the work-planner to break into a
-  to-do list. Reads the requirements + non-functional needs + building-block
-  map and produces a Technical Design Document plus one Architecture
-  Decision Record per non-trivial decision.
+description: "Turns a requirements document into a technical blueprint."
 ---
 
 # Blueprint — Greenfield Technical Design

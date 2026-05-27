@@ -1,30 +1,6 @@
 ---
 name: code-review
-description: >
-  Use when reviewing a pull request, branch, or commit range. Implements the
-  Code Review Standard (CR-01..CR-10) at
-  `../../references/code-review-standard.md` and applies the PR Hygiene
-  Standard (PH-01..PH-08) at `plugins/sulis/references/pr-hygiene-standard.md`.
-  Runs a mandatory mechanical baseline (typecheck + lint) before any lens
-  (CR-01); computes the PR Hygiene signal table — Scope / Size / Safety /
-  Completeness — before lens dispatch (CR-09); dispatches three lenses in
-  parallel — architectural (Form / Armor / Proof gaps), security
-  (diff-scoped viability assessment), and general code quality with
-  procedural checks (CR-02, CR-07). Reads every changed file >50 lines
-  end-to-end (CR-03). Findings cite file:line + quoted text (CR-04). Severity
-  is rubric-driven (CR-05); verdict is computed with four auto-downgrade
-  rules including PH-03 high findings (CR-06). Self-attestation in the
-  report's Methodology section (CR-08). Outputs a single merged report at
-  `.architecture/{project}/code-reviews/` plus draft Hardening Deltas (lens
-  findings only — hygiene findings are author recommendations). The report
-  is **two-tier**: a plain-English author tier first (no internal IDs, no
-  jargon, action-oriented severity labels, optional "Things to take away"
-  for educational notes tied to specific findings) and a technical tier
-  below for engineers and downstream agents (full CR-NN / PH-NN taxonomy,
-  signal tables, self-attestation). Default audience for tier 1 is a
-  non-technical founder using AI to generate code; tier 2 is unchanged.
-  Advisory only — never posts to the PR, never sets status checks, never
-  blocks merge.
+description: "Reviews a pull request or branch and reports what to fix before merging."
 ---
 
 # Code Review — Three Lenses, Mechanical Floor, One Report

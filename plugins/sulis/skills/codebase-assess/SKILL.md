@@ -1,32 +1,6 @@
 ---
 name: codebase-assess
-description: >
-  [DEPRECATED — use /sulis:code-health] This skill is superseded by sulis
-  v0.22.0+ /sulis:code-health which covers 24 of 25 codebase-assess
-  primitives at 96% parity (only CQ-02 full coverage measurement remains
-  deferred). The check-* tier framework integrates the same tool stack
-  (Semgrep, Gitleaks, Trivy, hadolint, testssl.sh, curl) plus lizard +
-  jscpd via plugins/sulis/_lib/tools/, with founder-facing
-  output + baseline-aware regression detection + per-project allowlists.
-
-  Original description (kept for context): Use when running an
-  evidence-based viability assessment against a codebase (and optionally
-  a deployed URL). Covers 25 primitives across 5 categories — Security,
-  Data Protection, Code Quality, Supply Chain, Infrastructure — using an
-  OODA-spiral methodology. Produces a structured viability report with
-  scores, attack chains, and hypotheses.
-
-  Migration path for callers:
-  - Founder-facing audits: use /sulis:code-health (full tier sweep)
-    or /sulis:check-security (security only with deployed-URL support
-    via --url)
-  - Operator JSON envelope: use --raw flag on /sulis:check-* skills
-  - Hypothesis output (DAT-01 / DAT-05 / CQ-05): hypotheses[] array in
-    --raw output from the appropriate check-* skill
-
-  Retirement schedule: this skill remains callable through one major
-  release window after the [DEPRECATED] banner; physical removal follows
-  per the established sulis-concierge → sulis deprecation pattern.
+description: "Deprecated — use /sulis:code-health instead."
 ---
 
 # Codebase Viability Assessment

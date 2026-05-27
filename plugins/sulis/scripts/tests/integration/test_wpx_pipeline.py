@@ -487,3 +487,72 @@ jobs:
     )
     # Auto-skip must engage because the workflow excludes feat/ branches
     assert "no branch-CI" in result.stderr or "auto-detected absence" in result.stderr
+
+
+# ─── L-05: published-artifact / no-deploy fit ─────────────────────────────
+
+
+def _write_contract(repo_root, body):
+    sulis = repo_root / ".sulis"
+    sulis.mkdir(parents=True, exist_ok=True)
+    (sulis / "repo-contract.yml").write_text(body, encoding="utf-8")
+
+
+def _no_deploy_args(tmp_project, local_git_repo, dev_sha="abc123"):
+    """Pipeline args WITHOUT --deploy-workflow / --staging-url / --smoke-cmd —
+    the published-artifact shape the cockpit run needed but couldn't express."""
+    return [
+        "--project", tmp_project.project,
+        "--repo-root", str(tmp_project.repo_root),
+        "--wp", "WP-001",
+        "--branch", "feat/test",
+        "--worktree-path", str(local_git_repo),
+        "--dev-sha-at-creation", dev_sha,
+        "--repo", "test-org/test-repo",
+    ]
+
+
+def test_published_artifact_skips_deploy_and_succeeds(
+    tmp_project, local_git_repo, run_tool, mock_gh,
+):
+    """A published-artifact repo with no --deploy-workflow must reach
+    outcome=success with the deploy phase reported as skipped — the merge IS
+    the ship. No deploy 'run list' is mocked: if the pipeline tried to poll a
+    deploy it would hang/blocker, so success proves the poll was skipped."""
+    _write_contract(
+        tmp_project.repo_root,
+        "profile: published-artifact\ncontribution_model: solo\ndeploy_target: none\n",
+    )
+    mock_gh([
+        {"match": "git/refs/heads/dev", "stdout": json.dumps({"object": {"sha": "abc123"}})},
+        {"match": "compare", "stdout": json.dumps({"status": "identical"})},
+        # Deliberately NO "run list" mock — a deploy poll here would fail.
+    ])
+    result = run_tool(
+        "wpx-pipeline", "run", *_no_deploy_args(tmp_project, local_git_repo),
+    )
+    assert result.json is not None, f"crashed: {result.stderr[-800:]!r}"
+    assert "Traceback" not in result.stderr
+    res = result.data["result"]
+    assert res.get("outcome") == "success", f"got {res.get('outcome')}: {res.get('blocker_reason')}"
+    assert str(res.get("deploy_status", "")).startswith("skipped"), res.get("deploy_status")
+
+
+def test_deployable_without_deploy_workflow_is_a_blocker(
+    tmp_project, local_git_repo, run_tool, mock_gh,
+):
+    """A deployable repo (no contract → strict default) with no
+    --deploy-workflow must fail with a clear config blocker, not silently
+    skip deploy — the contract preserved for repos that DO deploy."""
+    # No .sulis/repo-contract.yml → strict deployable default.
+    mock_gh([
+        {"match": "git/refs/heads/dev", "stdout": json.dumps({"object": {"sha": "abc123"}})},
+        {"match": "compare", "stdout": json.dumps({"status": "identical"})},
+    ])
+    result = run_tool(
+        "wpx-pipeline", "run", *_no_deploy_args(tmp_project, local_git_repo),
+    )
+    assert result.json is not None, f"crashed: {result.stderr[-800:]!r}"
+    res = result.data["result"]
+    assert res.get("outcome") == "blocker", f"expected blocker, got {res.get('outcome')}"
+    assert "deploy" in str(res.get("blocker_reason", "")).lower()

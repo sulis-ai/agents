@@ -1,10 +1,6 @@
 ---
 name: show-context
-description: >
-  Use to view the current project context index in plain text without
-  running any scans or modifications. Useful for checking what the
-  downstream tools (requirements, design, security review) will read
-  on their next invocation. Read-only.
+description: "Shows the current project context index without changing anything."
 user_invocable: true
 ---
 

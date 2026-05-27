@@ -1,9 +1,6 @@
 ---
 name: critical-thinking
-description: >
-  Apply the Critical Thinking Standard to the current task. Loads the three-phase
-  reasoning framework (input/processing/output), identifies which principles matter
-  most, and structures the work accordingly. Use when analytical rigour is needed.
+description: "Applies the Critical Thinking Standard to the task at hand."
 user_invocable: true
 ---
 

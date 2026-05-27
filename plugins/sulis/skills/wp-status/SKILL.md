@@ -1,9 +1,6 @@
 ---
 name: wp-status
-description: >
-  Read-only INDEX summary in plain English. Usage:
-  /sulis:status. Shows what's done, what's in-flight, what's
-  blocked, what's pending. **Inline-only — does not spawn any agent.**
+description: "Shows what's done, in-flight, blocked, and pending for a change."
 ---
 
 # /sulis:status

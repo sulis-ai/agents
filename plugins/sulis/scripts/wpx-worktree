@@ -33,39 +33,64 @@ def _run(cmd: list[str], cwd: Path | None = None) -> tuple[int, str, str]:
 def cmd_create(args: argparse.Namespace) -> None:
     paths = paths_from_args(args)
     worktree_path = Path(args.worktree_path).resolve()
+    base_branch = getattr(args, "base_branch", None) or "dev"
 
     if worktree_path.exists():
         emit_error(f"Worktree path already exists: {worktree_path}")
 
-    # Fetch latest origin/dev
-    rc, _, err = _run(["git", "fetch", "origin", "dev"], cwd=paths.repo_root)
-    if rc != 0:
-        emit_error(f"git fetch failed: {err}")
+    # Resolve the base ref (L-04, CW-04). Prefer the freshest shared state:
+    # fetch origin/<base> and branch off it — this keeps the default `dev`
+    # behaviour identical to pre-L-04 (always the latest integration line).
+    # A CW-04 change branch (`change/{primitive}-{slug}`) usually lives only
+    # locally (origin doesn't have it yet), so the fetch fails to find the
+    # remote ref; we then fall back to the LOCAL branch with no further fetch.
+    fetch_rc, _, fetch_err = _run(
+        ["git", "fetch", "origin", base_branch], cwd=paths.repo_root,
+    )
+    if fetch_rc == 0:
+        base_ref = f"origin/{base_branch}"
+    else:
+        # origin has no such branch (or fetch failed) — try the local ref.
+        local_rc, _, _ = _run(
+            ["git", "rev-parse", "--verify", "--quiet", f"refs/heads/{base_branch}"],
+            cwd=paths.repo_root,
+        )
+        if local_rc != 0:
+            emit_error(
+                f"base branch {base_branch!r} not found on origin "
+                f"(fetch: {fetch_err.strip()}) or locally"
+            )
+        base_ref = base_branch
 
-    # Capture current origin/dev SHA
-    rc, dev_sha, err = _run(["git", "rev-parse", "origin/dev"], cwd=paths.repo_root)
+    # Capture the base SHA at creation (drift baseline for Step 8b rebase)
+    rc, base_sha, err = _run(["git", "rev-parse", base_ref], cwd=paths.repo_root)
     if rc != 0:
-        emit_error(f"git rev-parse origin/dev failed: {err}")
-    dev_sha = dev_sha.strip()
+        emit_error(f"git rev-parse {base_ref} failed: {err}")
+    base_sha = base_sha.strip()
 
-    # Create worktree
+    # Create worktree off the resolved base ref
     rc, _, err = _run(
-        ["git", "worktree", "add", str(worktree_path), "-b", args.branch, "origin/dev"],
+        ["git", "worktree", "add", str(worktree_path), "-b", args.branch, base_ref],
         cwd=paths.repo_root,
     )
     if rc != 0:
         emit_error(f"git worktree add failed: {err}")
 
-    # Record dev SHA in a sidecar file (the journal complement)
+    # Record the base SHA in a sidecar file (the journal complement).
+    # NOTE: the filename keeps the historical `-dev-sha` suffix for back-compat
+    # — cmd_remove and wpx-pipeline read it by exact name. It is the base SHA
+    # regardless of which base branch was used (see `base_branch` field below).
     sidecar = paths.wp_dir / f".executor-{args.wp}-dev-sha"
     sidecar.parent.mkdir(parents=True, exist_ok=True)
-    sidecar.write_text(dev_sha + "\n", encoding="utf-8")
+    sidecar.write_text(base_sha + "\n", encoding="utf-8")
 
     emit_ok(data={
         "wp": args.wp,
         "worktree_path": str(worktree_path),
         "branch": args.branch,
-        "dev_sha_at_creation": dev_sha,
+        "base_branch": base_branch,
+        "base_ref": base_ref,
+        "dev_sha_at_creation": base_sha,  # kept key name for back-compat
         "sidecar": str(sidecar),
     })
 
@@ -103,6 +128,12 @@ def build_parser() -> argparse.ArgumentParser:
                           help="Branch name (e.g. feat/wp-007-cancel-flow)")
     p_create.add_argument("--worktree-path", required=True,
                           help="Path for the worktree (e.g. ../wp-007-worktree)")
+    p_create.add_argument(
+        "--base-branch", default="dev",
+        help="Branch to create the worktree from (default: dev). A local "
+             "`change/*` branch is used directly with no fetch (CW-04); any "
+             "other base is taken from origin/<base> after a fetch.",
+    )
 
     p_remove = sub.add_parser("remove", help="Remove a worktree")
     add_common_args(p_remove)

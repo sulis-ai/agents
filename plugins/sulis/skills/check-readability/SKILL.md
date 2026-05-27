@@ -1,6 +1,6 @@
 ---
 name: check-readability
-description: Use when the founder wants to know if the code is clear, if a new person could read it, or if it's getting messy. Audits naming, module structure, jargon density, cyclomatic complexity, and code duplication across the current PR or the whole codebase. Read-only — reports findings and rename suggestions; never modifies code.
+description: "Checks whether the code is clear and easy to read."
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]
   processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]

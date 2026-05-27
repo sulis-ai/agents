@@ -1,13 +1,6 @@
 ---
 name: executor
-description: >
-  Work Package Executor — takes one WP, writes failing tests, makes
-  them pass with minimum code, refactors, updates docs, lints, commits,
-  pushes. Returns when the branch is on remote. Steps 8-12 (CI poll,
-  merge to dev, deploy, health, smoke, security review, bookkeeping)
-  are the calling session's responsibility per v0.9.0. Self-heals
-  in-scope failures via OODA + Five Whys per executor-loop-standard.md;
-  escalates out-of-scope failures via BLOCKER records.
+description: "Builds one task end to end — tests first, then code, then commit and push."
 user_invocable: true
 ---
 
@@ -577,7 +570,7 @@ to Bash.
 
 | Lifecycle operation | Tool invocation |
 |---|---|
-| Step 1: create worktree off `dev` + record dev SHA | `wpx-worktree create --wp WP-NNN --project <slug> --branch feat/wp-NNN-<slug> --worktree-path ../wp-NNN-worktree` |
+| Step 1: create worktree off the base branch + record base SHA | `wpx-worktree create --wp WP-NNN --project <slug> --branch feat/wp-NNN-<slug> --worktree-path ../wp-NNN-worktree [--base-branch <base>]` |
 | Step 1: initialise journal | `wpx-journal init --wp WP-NNN --project <slug>` |
 | Step 1: record each pre-flight tooling check | `wpx-journal record-preflight --wp WP-NNN --project <slug> --tool <name> --status present\|absent --fallback "<note>"` |
 | Step 1.5: seed the plan | `wpx-journal seed-plan --wp WP-NNN --project <slug> --approach "<2-3 sentence summary>" --plan-json @/tmp/plan.json` |

@@ -1,6 +1,6 @@
 ---
 name: address-findings
-description: Use when the founder has run code-health (or any check-* scanner) and wants to turn the findings into a queue of actionable work items the team can execute one by one. Reads the findings, dispatches the engineering architect to characterise them (root cause + fix shape + effort + risk + recurrence pattern), writes one Work Package per atomic unit of work, and updates the to-do list (INDEX.md) so the founder sees what's next.
+description: "Turns code-health findings into an ordered to-do list of fixes."
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]
   processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE, WORK_PACKAGE_STANDARD]

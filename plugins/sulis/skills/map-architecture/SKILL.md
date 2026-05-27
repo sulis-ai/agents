@@ -1,11 +1,6 @@
 ---
 name: map-architecture
-description: >
-  Map the architecture of an existing codebase (brownfield) or a planned
-  product (greenfield) into a directed graph of building blocks — what
-  each component is, how it depends on others, what state it's in. Used
-  by the requirements-analyst to focus the facilitation conversation on
-  gaps that actually matter for the project's stage.
+description: "Maps a product's building blocks and how they depend on each other."
 ---
 
 # Tree Synthesis

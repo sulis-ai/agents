@@ -47,9 +47,11 @@ from _wpxlib import (  # noqa: E402
     add_common_args,
     back_integrate_change_branch,
     cli_main,
+    deploy_is_applicable,
     emit_internal_error,
     emit_result,
     paths_from_args,
+    read_repo_contract,
 )
 
 
@@ -228,18 +230,42 @@ def cmd_run(args: argparse.Namespace) -> None:
         else:
             result["step_12_5_back_integration"] = "skipped"
 
-        # Step 9: deploy poll
-        _log(f"Step 9: polling deploy workflow '{args.deploy_workflow}' for {merge_sha[:8]}")
-        deploy_verdict, deploy_url = _poll_deploy(
-            repo, args.deploy_workflow, merge_sha,
-            deploy_interval, deploy_cap,
-        )
-        result["deploy_url"] = deploy_url
-        if deploy_verdict != "green":
-            result.update(outcome="blocker", blocker_reason=f"Deploy {deploy_verdict}")
+        # Step 9: deploy poll — gated on the repo contract (L-05).
+        # A published-artifact / internal-tool repo (or deploy_target: none)
+        # has no staging deploy to poll; the merge IS the ship. A deployable
+        # repo with no --deploy-workflow is a config error, not a skip.
+        contract = read_repo_contract(paths.repo_root)
+        deploy_applies = deploy_is_applicable(contract)
+        if not deploy_applies:
+            profile = contract.get("profile") or "non-deployable"
+            _log(f"Step 9: deploy skipped — {profile} profile (no staging deploy)")
+            result["deploy_status"] = f"skipped ({profile} profile)"
+            result["deploy_url"] = None
+        elif not args.deploy_workflow:
+            result.update(
+                outcome="blocker",
+                blocker_reason=(
+                    "Repo is deployable (per .sulis/repo-contract.yml) but no "
+                    "--deploy-workflow was given. Pass --deploy-workflow, or "
+                    "set profile: published-artifact / deploy_target: none if "
+                    "this repo has no staging deploy."
+                ),
+            )
             emit_result(result, exit_code=1)
+        else:
+            _log(f"Step 9: polling deploy workflow '{args.deploy_workflow}' for {merge_sha[:8]}")
+            deploy_verdict, deploy_url = _poll_deploy(
+                repo, args.deploy_workflow, merge_sha,
+                deploy_interval, deploy_cap,
+            )
+            result["deploy_url"] = deploy_url
+            if deploy_verdict != "green":
+                result.update(outcome="blocker", blocker_reason=f"Deploy {deploy_verdict}")
+                emit_result(result, exit_code=1)
 
-        # Step 10a: health check
+        # Step 10a: health check (runs only if a staging URL was supplied —
+        # independent of the deploy gate, so a published-artifact repo can
+        # still health-check a URL if one is passed).
         if args.staging_url:
             # Resolve health path (v0.10.7+):
             #   1. --health-path explicit flag wins
@@ -304,8 +330,12 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Path to worktree (defaults to repo root)")
     p_run.add_argument("--dev-sha-at-creation", required=True,
                        help="origin/dev SHA when worktree was created (from sidecar)")
-    p_run.add_argument("--deploy-workflow", required=True,
-                       help="Deploy workflow name (e.g. 'Deploy to Dev Environment')")
+    p_run.add_argument("--deploy-workflow", default=None,
+                       help="Deploy workflow name (e.g. 'Deploy to Dev "
+                            "Environment'). Required for a deployable-web-app "
+                            "repo; omitted for a published-artifact / "
+                            "internal-tool repo (L-05 — the deploy phase is "
+                            "skipped per the repo contract).")
     p_run.add_argument("--staging-url", default=None,
                        help="Staging URL for health check (optional)")
     p_run.add_argument(

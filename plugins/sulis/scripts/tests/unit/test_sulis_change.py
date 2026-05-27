@@ -336,6 +336,122 @@ def test_resolve_current_change_returns_none_when_no_matching_branch(monkeypatch
     assert result is None
 
 
+# ─── L-01: resolve from INSIDE the change worktree (the cockpit failure) ────
+
+
+_CHANGE_ID = "01HYQC71ABCDEFGHJKMNPQRSTV"
+
+
+def _seed_change_metadata(repo_root, *, primitive="create", slug="foo-bar"):
+    from _wpxlib import write_change_metadata
+    branch = f"change/{primitive}-{slug}"
+    write_change_metadata(
+        repo_root / ".changes" / f"{primitive}-{slug}.yaml",
+        {
+            "change_id": _CHANGE_ID,
+            "handle": "CH-01HYQC",
+            "slug": slug,
+            "primitive": primitive,
+            "branch": branch,
+            "worktree_path": str(repo_root),
+            "base_branch": "dev",
+            "started_at": "2026-05-27T00:00:00Z",
+        },
+    )
+    return branch
+
+
+def test_resolve_from_inside_worktree_via_self_branch(monkeypatch, tmp_path):
+    """The L-01 bug: invoked from INSIDE the change worktree (cwd == worktree),
+    metadata is committed at repo_root/.changes/. Pre-L-01 only computed a
+    sibling path and returned None. Now: read the current branch + the
+    committed manifest beside it."""
+    monkeypatch.setenv("SULIS_CHANGE_ID", _CHANGE_ID)
+    branch = _seed_change_metadata(tmp_path)
+
+    def fake_run(cmd, cwd=None, timeout=None, **kwargs):
+        if cmd[:3] == ["git", "branch", "--show-current"]:
+            return (0, branch + "\n", "")
+        return (1, "", "unexpected")
+
+    monkeypatch.setattr("_wpxlib._run", fake_run)
+    from _wpxlib import resolve_current_change
+    result = resolve_current_change(repo_root=tmp_path)
+    assert result is not None
+    assert result["change_id"] == _CHANGE_ID
+    assert result["branch"] == branch
+
+
+def test_resolve_via_changes_scan_when_branch_unhelpful(monkeypatch, tmp_path):
+    """Detached HEAD / odd branch name, but committed metadata is present →
+    the .changes/ scan finds it by change_id."""
+    monkeypatch.setenv("SULIS_CHANGE_ID", _CHANGE_ID)
+    _seed_change_metadata(tmp_path)
+
+    def fake_run(cmd, cwd=None, timeout=None, **kwargs):
+        if cmd[:3] == ["git", "branch", "--show-current"]:
+            return (0, "\n", "")  # detached / empty → step 1 can't parse
+        if cmd[:4] == ["git", "branch", "--list", "change/*"]:
+            return (0, "", "")
+        return (1, "", "unexpected")
+
+    monkeypatch.setattr("_wpxlib._run", fake_run)
+    from _wpxlib import resolve_current_change
+    result = resolve_current_change(repo_root=tmp_path)
+    assert result is not None
+    assert result["change_id"] == _CHANGE_ID
+
+
+def test_resolve_sibling_worktree_fallback(monkeypatch, tmp_path):
+    """Driving from the MAIN repo: no committed metadata at repo_root, but the
+    sibling change worktree has it. Pins the original fallback path."""
+    monkeypatch.setenv("SULIS_CHANGE_ID", _CHANGE_ID)
+    repo_root = tmp_path / "agents"
+    repo_root.mkdir()
+    # Sibling worktree per change_worktree_path convention.
+    sibling = tmp_path / "agents-change-create-foo-bar"
+    _seed_change_metadata(sibling)
+
+    def fake_run(cmd, cwd=None, timeout=None, **kwargs):
+        if cmd[:3] == ["git", "branch", "--show-current"]:
+            return (0, "dev\n", "")  # on dev in the main repo → not a change
+        if cmd[:4] == ["git", "branch", "--list", "change/*"]:
+            return (0, "  change/create-foo-bar\n", "")
+        if cmd[:5] == ["git", "branch", "--list", "--remotes", "origin/change/*"]:
+            return (0, "", "")
+        return (1, "", "unexpected")
+
+    monkeypatch.setattr("_wpxlib._run", fake_run)
+    from _wpxlib import resolve_current_change
+    result = resolve_current_change(repo_root=repo_root)
+    assert result is not None
+    assert result["change_id"] == _CHANGE_ID
+
+
+def test_find_change_branches_includes_origin_only(monkeypatch, tmp_path):
+    """L-01 step 4: a teammate's change branch present only on origin must be
+    surfaced (current=False), de-duped against local branches."""
+    def fake_run(cmd, cwd=None, timeout=None, **kwargs):
+        if cmd[:4] == ["git", "branch", "--list", "change/*"]:
+            return (0, "  change/fix-local-one\n", "")
+        if cmd[:5] == ["git", "branch", "--list", "--remotes", "origin/change/*"]:
+            return (0,
+                    "  origin/HEAD -> origin/dev\n"
+                    "  origin/change/fix-local-one\n"      # dup of local → skip
+                    "  origin/change/feat-remote-two\n", "")
+        return (1, "", "unexpected")
+
+    monkeypatch.setattr("_wpxlib._run", fake_run)
+    from _wpxlib import find_change_branches
+    branches = {b["branch"]: b for b in find_change_branches(tmp_path)}
+    assert "change/fix-local-one" in branches
+    assert "change/feat-remote-two" in branches
+    assert branches["change/feat-remote-two"]["current"] is False
+    # de-duped: only one entry for the local branch
+    assert sum(1 for b in find_change_branches(tmp_path)
+               if b["branch"] == "change/fix-local-one") == 1
+
+
 # ─── back_integrate_change_branch (Phase 5 #2: Step 0 / Step 12.5 mechanic) ─
 
 

@@ -1,9 +1,6 @@
 ---
 name: codebase-mapping
-description: >
-  Map an existing codebase to build a context index for requirements facilitation.
-  Produces CODEBASE_INDEX.json with technology stack, services, integrations, and
-  data models so the requirements analyst can ground questions in existing code.
+description: "Maps an existing codebase so requirements work can build on what's there."
 ---
 
 # Codebase Mapping

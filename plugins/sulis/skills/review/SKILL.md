@@ -1,12 +1,6 @@
 ---
 name: review
-description: >
-  Use when the work on a change is built and the founder wants to know if
-  it's safe and sound before shipping — Stage 4 (Review) of a change. Runs
-  the full code-health check across all seven tiers and folds in a security
-  assessment, then gives one plain-English verdict — good to ship, or here's
-  what needs attention first. Read-only; never changes code. Usage:
-  /sulis:review (run inside a change, after the work is built).
+description: "Checks whether a finished change is safe and sound before shipping."
 user_invocable: true
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]

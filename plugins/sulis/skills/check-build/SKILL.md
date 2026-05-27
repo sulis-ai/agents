@@ -1,6 +1,6 @@
 ---
 name: check-build
-description: Use when the founder wants to know if the project even builds — runs the build command, checks the manifest files parse, scans container + deploy configs for security issues, and reports anything broken. Read-only when the build is read-only; never modifies code.
+description: "Checks whether your project builds and flags anything broken."
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]
   processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]

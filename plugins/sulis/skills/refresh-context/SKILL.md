@@ -1,11 +1,6 @@
 ---
 name: refresh-context
-description: >
-  Use to re-validate an existing project context index after the
-  codebase has changed. Checks every indexed source still exists,
-  flags files modified since last validation, and surfaces new files
-  that have appeared. Asks the founder only about deltas — does not
-  re-run the full discovery conversation. Sticky classifications.
+description: "Re-checks the project context index after the codebase has changed."
 user_invocable: true
 ---
 

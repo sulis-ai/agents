@@ -18,6 +18,16 @@ Each lesson carries a disposition per the finding-triage policy
 
 ## Genuine tooling bugs
 
+> **RESOLVED 2026-05-27** — Cluster A (L-01..L-05) fixed on
+> `change/refactor-executor-contract-fit` (commits addc90d, bb6a82d, 8753e34,
+> f3a5ec7, 8b66560). One shared INDEX column resolver (L-02); single status
+> vocabulary with a loud write-time guard (L-03); `wpx-worktree create
+> --base-branch` (L-04); published-artifact no-deploy fit on pipeline + train
+> + shared contract reader (L-05, also closes #39); cwd-first
+> `resolve_current_change` (L-01). 623 tests green; end-to-end `list-ready`
+> on a canonical `Depends On` + `pending` INDEX now passes (the cockpit
+> failure shape).
+
 ### L-01 — `resolve_current_change()` returns null at startup · SEA
 Returned `null` despite `SULIS_CHANGE_ID` set + a valid change branch +
 manifest existing. The bound session fell back to reading

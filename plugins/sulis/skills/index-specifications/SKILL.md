@@ -1,11 +1,6 @@
 ---
 name: index-specifications
-description: >
-  Use to rebuild the index of all specifications in this project. Scans
-  every `.specifications/*/SPEC.yaml` file and produces an `INDEX.md`
-  with status tracking, artifact completeness matrix, and the next-ID
-  counter. Run this when you've added or renamed a specification and
-  want the index to reflect the new state.
+description: "Rebuilds the index of all specifications in the project."
 ---
 
 # Specification Index Generator

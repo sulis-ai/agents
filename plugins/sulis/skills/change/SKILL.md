@@ -1,14 +1,6 @@
 ---
 name: change
-description: >
-  Use when the founder wants to start a new piece of work, see everything
-  they have in flight, jump back into one, ship one when it's ready, or
-  pull in the latest from the rest of the team, or throw a change away.
-  The change-lifecycle command. Subcommands: start / list / focus / ship /
-  rebase / nuke.
-  Usage: /sulis:change start "fix the login bug", /sulis:change list,
-  /sulis:change focus CH-01HQ8X, /sulis:change ship CH-01HQ8X,
-  /sulis:change rebase CH-01HQ8X, /sulis:change nuke CH-01HQ8X.
+description: "Starts, lists, resumes, ships, or discards a piece of work."
 user_invocable: true
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]

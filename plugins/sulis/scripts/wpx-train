@@ -84,10 +84,12 @@ from _wpxlib import (  # noqa: E402
     cli_main,
     clone_repo_to_temp,
     compute_culprit_heuristic,
+    deploy_is_applicable,
     emit_error,
     emit_internal_error,
     emit_ok,
     emit_result,
+    read_repo_contract,
     find_eligible_branches,
     find_wp_merge_sha,
     is_sha_on_branch,
@@ -853,8 +855,12 @@ def cmd_resume(args: argparse.Namespace) -> None:
     for key, value in saved_args.items():
         if not hasattr(fresh_args, key) or getattr(fresh_args, key) is None:
             setattr(fresh_args, key, value)
-    # Ensure required args are populated (deploy_workflow especially)
-    if not getattr(fresh_args, "deploy_workflow", None):
+    # deploy_workflow is required on resume ONLY for a deployable repo (L-05).
+    # A published-artifact / internal-tool repo skips the deploy poll, so its
+    # absence is expected — don't block the resume on it.
+    if not getattr(fresh_args, "deploy_workflow", None) and deploy_is_applicable(
+        read_repo_contract(paths.repo_root)
+    ):
         emit_error(
             f"Cannot resume: deploy_workflow missing from train state "
             f"and not provided on CLI. Pass --deploy-workflow explicitly."
@@ -1521,6 +1527,24 @@ def _verify_phase(
         train_state_path(paths.train_runs_dir, train_id), "deploying",
     )
 
+    # Deploy poll — gated on the repo contract (L-05). A published-artifact /
+    # internal-tool repo (or deploy_target: none) has no staging deploy to
+    # poll: the merge to the base branch IS the ship, so we skip straight to
+    # health/smoke (themselves optional) and the gate-handoff / terminal path.
+    contract = read_repo_contract(paths.repo_root)
+    if not deploy_is_applicable(contract):
+        profile = contract.get("profile") or "non-deployable"
+        _log(f"Deploy skipped — {profile} profile (no staging deploy to poll)")
+        deploy_verdict = f"skipped ({profile} profile)"
+        deploy_url = None
+        record["deploy_url"] = None
+        record["deploy_status"] = deploy_verdict
+        return _verify_phase_health_smoke(
+            args=args, paths=paths, repo=repo, train_id=train_id, plan=plan,
+            commit=commit, record=record, clone_dir=clone_dir,
+            deploy_verdict=deploy_verdict, deploy_url=deploy_url,
+        )
+
     deploy_interval = args.deploy_poll_interval or DEPLOY_DEFAULT_INTERVAL
     deploy_cap = args.deploy_cap or DEPLOY_DEFAULT_CAP
     _log(
@@ -1558,6 +1582,33 @@ def _verify_phase(
             failure_text=f"Deploy workflow result: {deploy_verdict}",
         )
 
+    return _verify_phase_health_smoke(
+        args=args, paths=paths, repo=repo, train_id=train_id, plan=plan,
+        commit=commit, record=record, clone_dir=clone_dir,
+        deploy_verdict=deploy_verdict, deploy_url=deploy_url,
+    )
+
+
+def _verify_phase_health_smoke(
+    *,
+    args: argparse.Namespace,
+    paths,
+    repo: str,
+    train_id: str,
+    plan: PlanResult,
+    commit: CommitResult,
+    record: dict,
+    clone_dir: Path,
+    deploy_verdict: str,
+    deploy_url,
+) -> VerifyResult:
+    """Health + smoke + terminal VerifyResult — the tail of the verify phase.
+
+    Shared by both paths (L-05): the deployable path reaches here after a
+    green deploy poll; the non-deployable path (published-artifact /
+    deploy_target: none) jumps here directly with a `skipped` deploy verdict.
+    Both run health/smoke only when their flags are passed.
+    """
     update_train_phase(
         train_state_path(paths.train_runs_dir, train_id), "verifying",
     )
@@ -2190,8 +2241,12 @@ def build_parser() -> argparse.ArgumentParser:
              "Strict mode preserves the v0.11.0 behaviour for callers that want "
              "pre-batch confidence on individual branches.",
     )
-    p_run.add_argument("--deploy-workflow", required=True,
-                       help="Deploy workflow name (e.g. 'Deploy to Dev Environment')")
+    p_run.add_argument("--deploy-workflow", default=None,
+                       help="Deploy workflow name (e.g. 'Deploy to Dev "
+                            "Environment'). Required for a deployable-web-app "
+                            "repo; omitted for a published-artifact / "
+                            "internal-tool repo (L-05 — the deploy poll is "
+                            "skipped per .sulis/repo-contract.yml).")
     p_run.add_argument("--staging-url", default=None,
                        help="Staging URL for health check (optional)")
     p_run.add_argument(
