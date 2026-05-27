@@ -1,0 +1,218 @@
+#!/usr/bin/env python3
+"""sulis-issues — capture items as durable GitHub issues (#20 generalisation).
+
+Generalises the v0.43.0 `sulis-lessons` script by parameterising the
+type-specific bits (prefix, dispositions, labels, body format) into a
+*descriptor* (see `_issue_descriptors.py`). One CLI handles every capture
+type; new types add a descriptor entry, not a new tool.
+
+Reads a structured items JSON, deduplicates against the open issues already
+on the repo (using the descriptor's base label as the search filter), and
+raises one issue per new actionable item. Non-actionable items are skipped
+(the commit is the record, or it's digest-only). Degrades cleanly to
+"no issues created" when `gh` is unavailable or the remote isn't GitHub —
+the calling skill still writes whatever narrative artefact it produces.
+
+Subcommand:
+  capture --descriptor <name> --items-file <path.json>
+          [--repo owner/name] [--dry-run]
+
+Where ``<name>`` is one of the registered descriptors
+(``lesson``, ``feedback``, ...). The deterministic triage/dedup lives in
+``_issues.py``; this script is the gh glue. Exit codes: 0 success,
+1 user/data error, 2 internal error.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _issue_descriptors import (  # noqa: E402
+    available_descriptors,
+    get_descriptor,
+)
+from _issues import (  # noqa: E402
+    IssueTypeDescriptor,
+    issue_body,
+    issue_labels,
+    issue_title,
+    partition_items,
+)
+from _wpxlib import cli_main, emit_error, emit_ok  # noqa: E402
+
+
+def _run(cmd: list[str], cwd: Path | None = None) -> tuple[int, str, str]:
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)  # noqa: S603
+    except FileNotFoundError:
+        return 127, "", f"{cmd[0]} not found on PATH"
+    return proc.returncode, proc.stdout, proc.stderr
+
+
+def _gh_available() -> bool:
+    rc, _, _ = _run(["gh", "auth", "status"])
+    return rc == 0
+
+
+def _existing_issue_titles(descriptor: IssueTypeDescriptor,
+                           repo: str | None) -> list[str]:
+    """List existing open issue titles carrying the descriptor's base label.
+
+    Uses ``--search`` (GraphQL backend, immediate) rather than ``--label``
+    (REST filter index, eventually-consistent). The label filter could miss
+    issues created seconds earlier, causing the dedup scan to fail silently
+    and re-create the same issue. The search expression
+    ``label:<base> is:open`` covers both filters in one query (#23).
+    """
+    base = descriptor.base_labels[0] if descriptor.base_labels else descriptor.name
+    cmd = ["gh", "issue", "list", "--search", f"label:{base} is:open",
+           "--limit", "200", "--json", "title"]
+    if repo:
+        cmd += ["--repo", repo]
+    rc, out, _ = _run(cmd)
+    if rc != 0:
+        return []
+    try:
+        return [row.get("title", "") for row in json.loads(out)]
+    except (json.JSONDecodeError, AttributeError):
+        return []
+
+
+def _ensure_labels(descriptor: IssueTypeDescriptor, repo: str | None) -> None:
+    """Ensure every label the descriptor might apply exists. Idempotent via
+    ``--force``; failures are best-effort (the issue create will warn if a
+    label is missing, but the create still succeeds)."""
+    candidates: set[str] = set(descriptor.base_labels)
+    for extras in descriptor.extra_labels_for_disposition.values():
+        candidates.update(extras)
+    for label in sorted(candidates):
+        cmd = ["gh", "label", "create", label, "--color", "fbca04",
+               "--description", f"Captured by /sulis:{descriptor.name}",
+               "--force"]
+        if repo:
+            cmd += ["--repo", repo]
+        _run(cmd)
+
+
+def _create_issue(item: dict, descriptor: IssueTypeDescriptor,
+                  repo: str | None) -> tuple[bool, str]:
+    cmd = ["gh", "issue", "create",
+           "--title", issue_title(item, descriptor),
+           "--body", issue_body(item, descriptor)]
+    for label in issue_labels(item, descriptor):
+        cmd += ["--label", label]
+    if repo:
+        cmd += ["--repo", repo]
+    rc, out, err = _run(cmd)
+    if rc != 0:
+        return False, (err or out).strip()
+    return True, out.strip()  # gh prints the new issue URL
+
+
+def _load_items(path: Path) -> list[dict]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, list):
+        raise ValueError("items file must be a JSON array of objects")
+    return data
+
+
+def cmd_capture(args: argparse.Namespace) -> None:
+    try:
+        descriptor = get_descriptor(args.descriptor)
+    except KeyError as exc:
+        emit_error(str(exc))
+        return  # for type checker
+
+    items_file = Path(args.items_file)
+    if not items_file.exists():
+        emit_error(f"items file not found: {items_file}")
+    try:
+        items = _load_items(items_file)
+    except (json.JSONDecodeError, ValueError) as exc:
+        emit_error(f"could not parse items file: {exc}")
+        return  # for type checker
+
+    # Degrade cleanly when we can't reach GitHub — the skill still writes its
+    # narrative artefact; we just create no issues.
+    if not _gh_available():
+        partition = partition_items(items, existing_issue_titles=[],
+                                    descriptor=descriptor)
+        emit_ok(data={
+            "degraded": True,
+            "reason": "gh unavailable or not authenticated",
+            "descriptor": descriptor.name,
+            "created": [],
+            "would_create": [i["title"] for i in partition["to_create"]],
+            "duplicates": [i["title"] for i in partition["duplicates"]],
+            "skipped": [i["title"] for i in partition["skipped"]],
+        })
+        return
+
+    existing = _existing_issue_titles(descriptor, args.repo)
+    partition = partition_items(items, existing_issue_titles=existing,
+                                descriptor=descriptor)
+
+    if args.dry_run:
+        emit_ok(data={
+            "dry_run": True,
+            "descriptor": descriptor.name,
+            "would_create": [i["title"] for i in partition["to_create"]],
+            "duplicates": [i["title"] for i in partition["duplicates"]],
+            "skipped": [i["title"] for i in partition["skipped"]],
+        })
+        return
+
+    if partition["to_create"]:
+        _ensure_labels(descriptor, args.repo)
+
+    created: list[dict] = []
+    errors: list[dict] = []
+    for item in partition["to_create"]:
+        ok, result = _create_issue(item, descriptor, args.repo)
+        if ok:
+            created.append({"title": item["title"], "url": result})
+        else:
+            errors.append({"title": item["title"], "error": result})
+
+    emit_ok(data={
+        "degraded": False,
+        "descriptor": descriptor.name,
+        "created": created,
+        "errors": errors,
+        "duplicates": [i["title"] for i in partition["duplicates"]],
+        "skipped": [i["title"] for i in partition["skipped"]],
+    })
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Capture items as durable GitHub issues (lessons, "
+                    "feedback, ...).")
+    sub = parser.add_subparsers(dest="subcommand", required=True)
+    p_cap = sub.add_parser("capture", help="Raise GitHub issues for "
+                                            "actionable items")
+    p_cap.add_argument(
+        "--descriptor", required=True,
+        help=f"Issue type. One of: {', '.join(available_descriptors())}",
+    )
+    p_cap.add_argument("--items-file", required=True,
+                       help="Path to a JSON array of items "
+                            "{id,title,body,disposition}")
+    p_cap.add_argument("--repo", default=None,
+                       help="GitHub OWNER/REPO (defaults to the current "
+                            "remote)")
+    p_cap.add_argument("--dry-run", action="store_true",
+                       help="Compute the partition; create no issues")
+    return parser
+
+
+HANDLERS = {"capture": cmd_capture}
+
+
+if __name__ == "__main__":
+    cli_main(build_parser(), HANDLERS)

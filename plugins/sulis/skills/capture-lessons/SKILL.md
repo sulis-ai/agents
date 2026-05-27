@@ -17,7 +17,7 @@ and records the **narrative** in a digest in the repo.
 
 It is an **orchestrator**: the deterministic triage/dedup lives in
 `../../scripts/_lessons.py` and the gh issue creation in
-`../../scripts/sulis-lessons`. The skill gathers the lessons, lets the founder
+`../../scripts/sulis-issues`. The skill gathers the lessons, lets the founder
 confirm, and writes the digest.
 
 ## What counts as a lesson + where it goes
@@ -42,14 +42,14 @@ closes.
 
 ```bash
 SCRIPTS_DIR=$(
-  find ~/.claude/plugins/cache -name sulis-lessons -type f \
+  find ~/.claude/plugins/cache -name sulis-issues -type f \
     -path '*/sulis/*/scripts/*' 2>/dev/null | sort -r | head -1 \
   | xargs -I{} dirname {} 2>/dev/null
 )
-if [ -z "$SCRIPTS_DIR" ] && [ -f "plugins/sulis/scripts/sulis-lessons" ]; then
+if [ -z "$SCRIPTS_DIR" ] && [ -f "plugins/sulis/scripts/sulis-issues" ]; then
   SCRIPTS_DIR="$(pwd)/plugins/sulis/scripts"
 fi
-[ -z "$SCRIPTS_DIR" ] && { echo "ERROR: cannot find sulis-lessons" >&2; exit 1; }
+[ -z "$SCRIPTS_DIR" ] && { echo "ERROR: cannot find sulis-issues" >&2; exit 1; }
 ```
 
 ## When invoked
@@ -73,8 +73,8 @@ and specific — the title is the issue title and the dedup key.
 **2. Dry-run to see the partition** (creates nothing):
 
 ```bash
-python3 "$SCRIPTS_DIR/sulis-lessons" capture \
-  --lessons-file /tmp/lessons-<change>.json --dry-run [--repo OWNER/REPO]
+python3 "$SCRIPTS_DIR/sulis-issues" capture --descriptor lesson \
+  --items-file /tmp/lessons-<change>.json --dry-run [--repo OWNER/REPO]
 ```
 
 Returns `would_create` / `duplicates` / `skipped`. (`--repo` defaults to the
@@ -90,8 +90,8 @@ NOT silently create issues:
 **4. Create the issues** (on confirmation):
 
 ```bash
-python3 "$SCRIPTS_DIR/sulis-lessons" capture \
-  --lessons-file /tmp/lessons-<change>.json [--repo OWNER/REPO]
+python3 "$SCRIPTS_DIR/sulis-issues" capture --descriptor lesson \
+  --items-file /tmp/lessons-<change>.json [--repo OWNER/REPO]
 ```
 
 Returns `created` (title + issue URL), `duplicates`, `skipped`. If `degraded:
@@ -140,6 +140,6 @@ discoverable on the branch.
 ## See also
 
 - `../../scripts/_lessons.py` — the pure triage/dedup core.
-- `../../scripts/sulis-lessons` — the gh-backed CLI this skill drives.
+- `../../scripts/sulis-issues` — the gh-backed CLI this skill drives.
 - `../../references/founder-facing-conventions.md` — AAF-06 batch shape,
   echo-before-act.
