@@ -1,5 +1,21 @@
 # Sulis — Changelog
 
+## v0.66.0 — 2026-05-27
+
+**Minor — `sulis-change nuke` no longer fails open on a corrupt change record (closes #22).**
+
+The original integration-test target from the 2026-05-27 compounding-improvements session: the SEA-grade follow-up the very first code-health run (PR #24) had surfaced as an emerging-confidence reliability hypothesis on the #38 archive-on-ship work.
+
+**The bug.** `read_change_record(change_id)` in `plugins/sulis/scripts/_change_state.py` returned `None` for **two distinct states** — file absent (benign; the common case immediately after `start` before anything writes `change.json`) AND file present-but-unreadable (corrupt JSON, truncated write, OS error). `cmd_nuke`'s #38 shipped-protection guard reads `if record and record.get("stage") == "shipped"`, which short-circuited to False for both cases and silently let the nuke proceed — destroying the worktree + branch + manifest, which IS the audit trail #38 was designed to preserve.
+
+**The fix.** A new pure-predicate `change_record_is_unreadable(change_id) -> bool` in `_change_state.py` returns True iff the file exists on disk AND `read_change_record` returns None. Wired into `cmd_nuke` as Safety 1.4, ordered BEFORE the existing Safety 1.5 (#38 shipped check) — the unreadable case is caught first and refused with a distinct error message: *"Refusing to nuke {branch}: the change record exists but can't be read (corrupt or unreadable). I can't verify this isn't a shipped change, so I won't risk destroying its audit trail."* `--force` still overrides — same refusal-by-default semantics as Safety 1.5.
+
+**Design judgement** (validated by the pre-merge reliability tier-4 review): only `cmd_nuke` needs the strict distinction. The four other callers of `read_change_record` (`mark_change_shipped`, `list_all_changes`, `sulis_list_changes.py`'s `--change-id` lookup, and the post-`mark-shipped` re-read in `sulis-change`) are best-effort / informational; they correctly degrade on a corrupt record.
+
+6 new tests: 4 pure-predicate (`change_record_is_unreadable`: absent → False, OK → False, corrupt-JSON → True, empty-file → True) + 2 integration (corrupt `change.json` + nuke without `--force` → refused with worktree/branch/manifest preserved; with `--force` → completes). The killer load-bearing assertion (`assert True is False` before the fix) proves the silent fail-open empirically. 625/625 unit tests green; zero regression on the existing #38 shipped-protection tests.
+
+Closes the structural antipattern at the call site #38 introduced — the same class R2 fixed at a different layer (a best-effort read silently swallowing a failure load-bearing for a safety check).
+
 ## v0.65.0 — 2026-05-27
 
 **Minor — recon code-area pointers now surface subjects, not mentioners (closes #31).**
