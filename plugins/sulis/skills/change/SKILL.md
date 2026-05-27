@@ -293,13 +293,64 @@ Capture the PR URL from stdout.
 gh pr checks change/fix-login-bug --watch
 ```
 
-- **Checks pass** → proceed to step 5.
+- **Checks pass** → proceed to step 4.5.
 - **Checks fail** → STOP. Do NOT merge. Surface the failure in plain
   English with the next step (Rule 5):
 
   > *"The automated checks didn't pass on **fix the login bug**, so I
   > haven't merged anything. The failing check is `branch-ci` — open
   > {pr_url} to see what broke, fix it on the change branch, and run
+  > `/sulis:change ship CH-01HQ8X` again."*
+
+**4.5. Review gate — run `/sulis:review` and respect its verdict
+(MUST, #30).** `branch-ci` proves the tests + lint pass; it does NOT
+audit the seven tiers (security, reliability, maintainability, …) or
+the architectural / hygiene lenses a code-review applies. `/sulis:review`
+composes `/sulis:code-health` + a security assessment + folds the result
+into a single verdict. Run it **before** the squash-merge so any
+critical findings block the merge rather than land on `dev`.
+
+*CW-05 size carve-out — skip review when the change is genuinely
+trivial:* before invoking the review, parse the diff size against
+`origin/dev`:
+
+```bash
+git fetch origin dev -q
+SHORTSTAT=$(git diff --shortstat origin/dev...HEAD)
+# e.g. " 1 file changed, 5 insertions(+), 0 deletions(-)"
+FILES=$(echo "$SHORTSTAT" | grep -oE '[0-9]+ files? changed' | grep -oE '[0-9]+')
+INS=$(echo "$SHORTSTAT" | grep -oE '[0-9]+ insertions?\(\+\)' | grep -oE '[0-9]+')
+DEL=$(echo "$SHORTSTAT" | grep -oE '[0-9]+ deletions?\(-\)' | grep -oE '[0-9]+')
+TOTAL=$(( ${INS:-0} + ${DEL:-0} ))
+```
+
+If `FILES ≤ 1 AND TOTAL ≤ 30 AND no new files added (the diff has no
+`new file mode` lines)` → log the skip in founder English ("The change
+is small enough to skip the full review — 5 lines changed in 1 file.")
+and proceed to step 5. **Otherwise**, dispatch `/sulis:review` (or
+invoke the skill via the Skill tool) scoped to the PR diff:
+
+> *"Running the review gate now — code-health across seven tiers + a
+> security check. I'll come back with a verdict."*
+
+The skill returns one of **PASS** / **CONCERN** / **CRITICAL**:
+
+- **PASS** → log it ("Review verdict: clear. Proceeding to merge.")
+  and continue to step 5.
+- **CONCERN** → surface the findings to the founder in plain English
+  and require explicit yes/no before continuing (mirrors the step 2
+  confirm pattern). Don't auto-proceed — the founder owns the
+  acceptable-risk call.
+
+  > *"Review verdict: needs your eye. Three medium findings: {list}.
+  > None block shipping, but worth seeing before the merge lands.
+  > Proceed with the merge anyway? (yes / no)"*
+
+- **CRITICAL** → STOP. Do NOT merge. Surface findings + the next step
+  (mirrors the branch-ci-fail path):
+
+  > *"Review found a critical issue I won't ship over: {finding +
+  > file:line}. I haven't merged. Fix on the change branch, then run
   > `/sulis:change ship CH-01HQ8X` again."*
 
 **5. Squash-merge** (only after green + confirmation):
