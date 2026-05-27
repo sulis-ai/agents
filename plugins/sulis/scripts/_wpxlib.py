@@ -495,6 +495,82 @@ def visual_contract_signed_off(fm: dict) -> str | None:
     return None
 
 
+# ─── Data-contract structural check (#48 / CF-05 / WP-08.5) ──────────────
+#
+# The symmetric partner to the visual-contract gate, but GRAPH-level: whether a
+# change is a producer/consumer seam is a property of the whole WP set, not a
+# single WP (so it can't live at the per-WP _cells_from_frontmatter chokepoint
+# the way the visual gate does). The data contract's *conformance* is already
+# test-enforced (CF-07 integration WP); this closes the structural-wiring half
+# — the same "aspirational MUST" weakness #45 fixed for visual.
+
+_IMPL_KINDS: frozenset[str] = frozenset({"backend", "frontend", "async"})
+
+
+def validate_cross_kind_contract_wiring(wps: list[dict]) -> list[str]:
+    """Return a list of data-contract wiring violations for a WP set (empty =
+    pass). Pure; operates on WP frontmatter dicts ({id, kind, contract_type,
+    dependsOn, prototype}).
+
+    Applied only when the set spans a producer/consumer seam (≥2 distinct
+    implementation kinds among backend/frontend/async, excluding prototypes):
+      1. A data-contract WP must exist (``kind: contract`` with
+         ``contract_type`` != ``visual``). A visual contract does not satisfy
+         a data seam.
+      2. No direct dependency edge between two different implementation kinds —
+         cross-kind deps MUST route through the contract WP (CF-05 parallel-
+         not-sequential). ``frontend dependsOn backend`` is the canonical
+         violation.
+    Single-kind sets and prototype-only seams are not checked.
+    """
+    by_id: dict[str, dict] = {}
+    kinds_present: set[str] = set()
+    for wp in wps:
+        wid = str(wp.get("id", "")).strip()
+        if not wid:
+            continue
+        by_id[wid] = wp
+        kind = str(wp.get("kind", "")).strip().lower()
+        if kind in _IMPL_KINDS and wp.get("prototype") is not True:
+            kinds_present.add(kind)
+
+    if len(kinds_present) < 2:
+        return []  # not a cross-kind seam
+
+    violations: list[str] = []
+
+    # Rule 1 — a data-contract WP exists.
+    has_data_contract = any(
+        str(w.get("kind", "")).strip().lower() == "contract"
+        and str(w.get("contract_type", "") or "").strip().lower() != "visual"
+        for w in wps
+    )
+    if not has_data_contract:
+        violations.append(
+            f"cross-kind WP set (kinds: {', '.join(sorted(kinds_present))}) has "
+            f"no data-contract WP. Per CONTRACT_FIRST CF-01 / WP-08.5, emit a "
+            f"`kind: contract` WP first; producer + consumer WPs dependsOn it."
+        )
+
+    # Rule 2 — no direct edge between two different implementation kinds.
+    for wid, wp in by_id.items():
+        kind = str(wp.get("kind", "")).strip().lower()
+        if kind not in _IMPL_KINDS or wp.get("prototype") is True:
+            continue
+        for dep in _as_str_list(wp.get("dependsOn")):
+            dep_wp = by_id.get(dep)
+            if dep_wp is None:
+                continue
+            dep_kind = str(dep_wp.get("kind", "")).strip().lower()
+            if dep_kind in _IMPL_KINDS and dep_kind != kind:
+                violations.append(
+                    f"{wid} (kind: {kind}) dependsOn {dep} (kind: {dep_kind}) "
+                    f"directly — cross-kind deps MUST route through the data "
+                    f"contract WP, not the other implementation (CF-05)."
+                )
+    return violations
+
+
 # ─── Repository contract (RC v0.3.0 profile model) — L-05 ───────────────
 #
 # Promoted from wpx-arrival-check._read_contract so the pipeline, the train,

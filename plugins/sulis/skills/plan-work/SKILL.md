@@ -319,7 +319,12 @@ These standards shape the WP set's *shape*, not just the content:
     - **P3 Module naming + clean code** — no jargon prefixes, no
       single-letter abbreviations, descriptive kebab-case slugs
     - **P4 Dependency graph correctness** — no cycles, all targets
-      exist, transitive depth ≤ 8, valid topological order
+      exist, transitive depth ≤ 8, valid topological order. **Includes the
+      data-contract wiring check (#48): run `wpx-index audit-contracts` —
+      a cross-kind seam (≥2 of backend/frontend/async) MUST have a
+      `kind: contract` (data) WP, and cross-kind deps MUST route through it,
+      not directly between implementations (CF-05). A non-empty violation
+      list is a MUST failure.**
     - **P5 Performance + non-functional reqs** — endpoint/handler WPs
       have a `## Performance` section with measurable bounds
     - **P6 Peer-collision risk** — no two WPs `Create` the same file

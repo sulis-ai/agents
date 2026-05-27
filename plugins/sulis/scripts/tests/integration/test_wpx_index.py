@@ -355,3 +355,58 @@ def test_non_contract_wp_done_flip_is_unaffected(
         *_common(tmp_project),
     )
     assert result.ok, f"ordinary WP done-flip must be unaffected: {result.error}"
+
+
+# ─── #48: audit-contracts (graph-level data-contract wiring) ──────────────
+
+
+def test_audit_contracts_passes_clean_cross_kind_set(
+    tmp_project, seed_index, run_tool,
+):
+    """A cross-kind set with a data contract + clean wiring passes."""
+    seed_index("INDEX-minimal.md")
+    _write_wp(tmp_project.wp_dir, "WP-100", "contract", [
+        "id: WP-100", "title: API contract", "kind: contract",
+        "contract_type: data", "primitive: create", "status: pending",
+    ])
+    _write_wp(tmp_project.wp_dir, "WP-101", "api", [
+        "id: WP-101", "title: Backend", "kind: backend",
+        "primitive: create", "status: pending", "dependsOn: [WP-100]",
+    ])
+    _write_wp(tmp_project.wp_dir, "WP-102", "ui", [
+        "id: WP-102", "title: Frontend", "kind: frontend",
+        "primitive: create", "status: pending",
+        "visual_contract: WP-100", "dependsOn: [WP-100]",
+    ])
+    result = run_tool("wpx-index", "audit-contracts", *_common(tmp_project))
+    assert result.ok, f"clean cross-kind set should pass: {result.error}"
+    assert result.data["violations"] == []
+
+
+def test_audit_contracts_flags_missing_data_contract(
+    tmp_project, seed_index, run_tool,
+):
+    """A backend+frontend seam with no data-contract WP is flagged."""
+    seed_index("INDEX-minimal.md")
+    _write_wp(tmp_project.wp_dir, "WP-101", "api", [
+        "id: WP-101", "title: Backend", "kind: backend",
+        "primitive: create", "status: pending",
+    ])
+    _write_wp(tmp_project.wp_dir, "WP-102", "ui", [
+        "id: WP-102", "title: Frontend", "kind: frontend",
+        "primitive: create", "status: pending",
+        "visual_contract: exempt — test", "dependsOn: [WP-101]",
+    ])
+    result = run_tool("wpx-index", "audit-contracts", *_common(tmp_project))
+    assert not result.ok, "missing data contract must fail the audit"
+    assert "data-contract" in (result.error or "")
+
+
+def test_audit_contracts_noop_for_single_kind(
+    tmp_project, seed_index, run_tool,
+):
+    """A single-kind set (the INDEX-minimal default — no WP files) is not a
+    seam, so the audit passes trivially."""
+    seed_index("INDEX-minimal.md")
+    result = run_tool("wpx-index", "audit-contracts", *_common(tmp_project))
+    assert result.ok, f"single-kind set should pass: {result.error}"
