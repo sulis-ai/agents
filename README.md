@@ -7,17 +7,33 @@ Two focused plugins, one engineering team and one pitch coach.
 ## Start Here
 
 ```bash
-# 1. Add the marketplace
+# 1. (Optional) Install the tools sulis uses across its skills
+#    (clone first, then run — safer than curl|bash)
+git clone https://github.com/sulis-ai/agents.git /tmp/sulis-agents
+bash /tmp/sulis-agents/plugins/sulis/scripts/install-sulis.sh --check
+bash /tmp/sulis-agents/plugins/sulis/scripts/install-sulis.sh
+#   Flags:
+#     --check               audit what's installed; no changes
+#     --core-only           just git, gh, python3, pipx
+#     --with-code-health    everything, including the 7-tier scanners
+#                           (hadolint, trivy, gitleaks, semgrep, …)
+
+# 2. Add the marketplace
 /plugin marketplace add sulis-ai/agents
 
-# 2. Install whichever plugin matches what you're trying to do
+# 3. Install whichever plugin matches what you're trying to do
 /plugin install sulis@sulis-ai-agents             # build your product
 /plugin install investor-coach@sulis-ai-agents    # prepare your pitch deck
 
-# 3. Launch
+# 4. Launch
 claude --agent sulis              # AI engineering team
 claude --agent investor-coach     # Sequoia-style pitch coach
 ```
+
+**Tool install is optional.** The sulis plugin gracefully degrades — each
+code-health tier checks if its tool is on `PATH` and emits `NOT_ASSESSED`
+if missing. So you can install the plugin first, then run `install-sulis.sh`
+only when you want to enable the tiers it covers.
 
 ## The two plugins
 
