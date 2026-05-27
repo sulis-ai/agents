@@ -199,3 +199,22 @@ the #45 v0.1 system must handle:
 (index.css) + 73 core-chrome replacements. **Second pass:** the 46 status/
 stage hues (map liveness→positive/warning, errors→destructive, decide on
 stage-badge hues vs an instance stage-colour scale).
+
+### L-13 — static OODA passed but the founder saw NO change · #45 (visual OODA is not optional)
+After the core-chrome retheme, static OODA confirmed "cockpit palette ==
+mockup palette" — GREEN. But the founder saw no visible change, for two
+reasons static OODA is blind to: (a) the Sulis warm-neutrals are near-
+identical to the GitHub greys they replaced (#e1e4e8→#e5e5e5, white→#fafafa
+— imperceptible), and (b) the brand FONTS weren't loaded — `--font-sans:
+'Inter'` fell back to system-ui, so typography (the dominant visible-brand
+lever) didn't move. The mockup gets its Sulis character mostly from Inter +
+JetBrains Mono, which it loads via Google Fonts; the cockpit loaded neither.
+**Lesson:** "tokens match the instance" ≠ "looks like the brand." Static
+OODA verifies token VALUES; it cannot see font-loading or perceptual delta.
+The founder's "still looks the same" is precisely the signal visual OODA
+(screenshot vs mockup) catches — the screenshot would NOT match (wrong
+font) despite the palette matching. So for #45 v0.1: either include visual
+OODA, or have static OODA additionally assert (i) webfonts referenced by
+font tokens are actually loaded, (ii) a meaningful-delta check, not just
+value-equality. Fix applied: load Inter + JetBrains Mono in index.html
+(matching the mockup).
