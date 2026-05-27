@@ -1,10 +1,6 @@
 ---
 name: requirements-validation
-description: >
-  Run completeness verification on a specification folder. Five perspectives
-  (traceability, integration completeness, NFR coverage, tree completeness,
-  referential integrity), up to 3 passes, fix-as-you-go. Produces
-  COMPLETENESS_REPORT.md with PASS or GAPS_FOUND verdict.
+description: "Checks a specification for completeness and reports gaps."
 ---
 
 # Requirements Validation

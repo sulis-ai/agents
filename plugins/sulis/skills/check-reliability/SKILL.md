@@ -1,6 +1,6 @@
 ---
 name: check-reliability
-description: Use when the founder wants to know if the code can handle things going wrong — scans for missing timeouts, silent error swallowing, missing observability, verbose error responses, and audit-logging gaps. Read-only; never modifies code.
+description: "Checks whether the code handles failure gracefully."
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]
   processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]

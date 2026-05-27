@@ -1,12 +1,6 @@
 ---
 name: specify
-description: >
-  Use when the founder is ready to write down what a piece of work should
-  do — Stage 1 (Specify) of a change. Produces a SPEC.md at the right depth:
-  a quick three-line note for a small fix, a short facilitated spec for most
-  work, or a full requirements document with flows for a new feature. The
-  skill proposes a depth, the founder confirms or overrides, then it runs
-  that mode. Usage: /sulis:specify (run inside a change).
+description: "Writes down what a piece of work should do, at the right depth."
 user_invocable: true
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]

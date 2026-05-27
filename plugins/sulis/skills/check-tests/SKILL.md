@@ -1,6 +1,6 @@
 ---
 name: check-tests
-description: Use when the founder wants to know if anything that was working before stopped working — runs the test suite, compares to a baseline, reports any newly-failing tests as regressions, and assesses test coverage quality. Read-only when the test runner is read-only; never modifies code.
+description: "Runs the tests and flags anything that used to work but now doesn't."
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]
   processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]

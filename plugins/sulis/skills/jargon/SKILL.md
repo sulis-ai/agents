@@ -1,11 +1,6 @@
 ---
 name: jargon
-description: >
-  Use when the founder wants Sulis to talk to them like an engineer for the
-  rest of this session — the raw, technical version by default — or wants to
-  switch that back off and return to plain English. The session-level toggle
-  for dual-register output. Usage: /sulis:jargon on (technical-mode default)
-  or /sulis:jargon off (founder-mode default).
+description: "Switches Sulis between plain-English and technical replies for the session."
 user_invocable: true
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]

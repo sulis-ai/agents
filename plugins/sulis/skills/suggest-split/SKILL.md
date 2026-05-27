@@ -1,16 +1,6 @@
 ---
 name: suggest-split
-description: >
-  Use when a pull request is too large or covers too many concerns to
-  review safely and the author wants help splitting it into smaller PRs.
-  Reads the diff, categorises the changes by type (refactor, migration,
-  feature, tests, infrastructure, documentation), proposes a 2-4 way
-  split with dependency ordering, and emits the exact git commands to
-  make each new branch. Read-only — does NOT execute the commands. The
-  founder copies the commands, runs them (or asks a developer to), and
-  opens one PR per piece. Designed for non-technical founders who get a
-  high-severity PR Hygiene finding from `/code-review` (PH-01 Scope or
-  PH-02 Size) and don't know what "split the PR" actually involves.
+description: "Splits a too-large pull request into smaller ones and gives you the commands."
 ---
 
 # Suggest Split — Help an author divide a large PR into smaller ones

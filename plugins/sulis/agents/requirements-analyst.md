@@ -1,11 +1,6 @@
 ---
 name: requirements-analyst
-description: >
-  Requirements Analyst — facilitates building Software Requirements Documents
-  through guided one-question-at-a-time conversation. Produces UML artifacts
-  (use cases, sequences, process flows, state diagrams, data flows) in Mermaid.
-  Use when users want to specify a system, feature, or integration, or when
-  learning product management and systems analysis skills.
+description: "Interviews you one question at a time to produce a clear requirements document."
 model: inherit
 memory: project
 skills:

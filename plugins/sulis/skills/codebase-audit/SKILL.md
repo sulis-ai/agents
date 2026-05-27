@@ -1,12 +1,6 @@
 ---
 name: codebase-audit
-description: >
-  Use when auditing an existing (brownfield) codebase for primitive gaps
-  against the MECE-3 architecture pillars. Reads source code, identifies
-  missing timeouts, hardcoded secrets, missing observability, unwrapped
-  external calls, mocked integration tests, and other Armor/Form/Proof
-  gaps. Produces an audit report and a draft set of Hardening Deltas
-  (HD-NNN-*.md) the user can review and accept.
+description: "Audits existing code for gaps and drafts the fixes to close them."
 ---
 
 # Codebase Audit — Brownfield Gap Analysis

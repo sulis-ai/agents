@@ -1,6 +1,6 @@
 ---
 name: add-skill
-description: Use when the user wants to author a new skill in the Claude Code marketplace, formalise an existing repeatable workflow as a published skill, deepen an existing skill ("upsurge"), or get methodology-driven quality consistency rather than ad-hoc SKILL.md authoring. Walks a five-gate flow grounded in the five sulis standards (Critical Thinking / Decomposition Procedure / Spiral Templates / Standards Rubric / Referential Integrity).
+description: "Authors a new Sulis skill through a guided, standards-backed flow."
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]
   processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]

@@ -1,22 +1,6 @@
 ---
 name: run-all
-description: >
-  Walk the Work Package INDEX in the calling session with parallel
-  dispatch (up to max_parallel concurrent executors per batch, gated
-  by dependency-graph eligibility). After each executor batch returns,
-  the loop polls wpx-train for eligibility and fires `wpx-train run`
-  when the train trigger is met (size ≥3 OR ≥1 WP older than 4h OR
-  --force). The train handles Steps 8-10 (rebase / bundled-tip CI /
-  sequential merge / deploy / health / smoke); after the train returns
-  outcome=success, the calling session dispatches Step 11 per-WP
-  (security-reviewer Agent) over the batch's wps_shipped, drafting
-  remediation WPs for any findings — the distributed loop closes when
-  a subsequent train's Step 11 produces zero NEW findings (v0.20.0+).
-  Per-WP wpx-pipeline shipping remains available via `/sulis:run-wp
-  WP-X --force-single` for hotfixes. Usage: /sulis:run-all.
-  The loop runs inline in the calling session — not via a separate
-  orchestrator subagent — because agent-tree-depth limits prevent
-  subagents from reliably spawning further subagents.
+description: "Builds and ships every ready task in the to-do list."
 ---
 
 # /sulis:run-all

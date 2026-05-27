@@ -1,6 +1,6 @@
 ---
 name: add-agent
-description: Use when the user wants to author a new Claude Code agent in the Sulis marketplace, formalise an existing dispatch pattern as a published agent, deepen an existing agent ("upsurge"), or get methodology-driven quality consistency rather than ad-hoc agent.md authoring. Walks a five-gate flow grounded in the eight sulis standards (six methodology + two founder-communication for founder-facing agents).
+description: "Authors a new Sulis agent through a guided, standards-backed flow."
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]
   processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]

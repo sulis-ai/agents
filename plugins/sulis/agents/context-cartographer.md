@@ -1,12 +1,6 @@
 ---
 name: context-cartographer
-description: >
-  Context Cartographer — discovers existing architecture documentation, ADRs,
-  conventions, standards, and domain models in a project. Produces a
-  classified index at .context/{project}/INDEX.md that downstream plugins
-  (SRD, SEA, sulis-security) read first so they respect prior decisions
-  instead of restating or contradicting them. Folder-structure-agnostic;
-  works on any project shape.
+description: "Maps the docs, decisions, and conventions already in a project so later tools build on them."
 model: inherit
 memory: project
 skills:

@@ -1,11 +1,6 @@
 ---
 name: verify-architecture
-description: >
-  Use after the work-packages have been shipped to verify the architecture
-  is complete, hardened, and proven against the design. Runs five
-  perspectives — pillar coverage, work-package completion, contract test
-  coverage, chaos test coverage, and referential integrity between design
-  and code. Produces a completeness report with a PASS or GAPS_FOUND verdict.
+description: "Checks that shipped work matches the design and reports gaps."
 ---
 
 # Verify — Architecture Completeness Check

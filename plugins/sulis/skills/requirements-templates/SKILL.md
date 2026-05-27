@@ -1,11 +1,6 @@
 ---
 name: requirements-templates
-description: >
-  Artifact templates for requirements documents. Contains templates for
-  the requirements document itself, use cases, sequence diagrams, process
-  flows, state diagrams, data flows, non-functional requirements, and
-  glossary. Preloaded into the requirements-analyst agent — not
-  founder-invoked directly.
+description: "Templates used by the requirements analyst, not run directly."
 user-invocable: false
 ---
 

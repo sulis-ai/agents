@@ -1,6 +1,6 @@
 ---
 name: check-polish
-description: Use when the founder wants to know if the project feels professional — checks documentation completeness (README, CHANGELOG), tech-debt markers (TODO/FIXME/HACK density — the canonical CQ-04 owner), and basic file hygiene (trailing whitespace, mixed line endings). Read-only; never modifies code.
+description: "Checks whether the project feels finished and professional."
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]
   processing: [CRITICAL_THINKING_STANDARD]

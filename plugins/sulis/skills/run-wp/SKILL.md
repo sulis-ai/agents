@@ -1,15 +1,6 @@
 ---
 name: run-wp
-description: >
-  Ship a single Work Package. Dispatches the executor agent for Steps
-  1-7 (worktree, RGB, docs, lint, commit, push). After Step 7 lands,
-  the WP is queued for the next train (the default; wpx-train batches
-  multiple ready WPs into one merge / deploy / health / smoke pass).
-  For hotfix or solo-ship cases, pass `--force-single` to use
-  wpx-pipeline directly (per-WP CI poll + merge + deploy + health +
-  smoke + security review + Step 12 bookkeeping, as before). Usage:
-  /sulis:run-wp WP-NNN [--force-single]. Sulis-execution
-  v0.11.0+ (ADR-212).
+description: "Builds and ships a single task."
 ---
 
 # /sulis:run-wp

@@ -1,13 +1,6 @@
 ---
 name: dashboard
-description: >
-  Use when the founder asks "what am I working on?", "show me my changes",
-  "what's in flight?", or wants a one-screen map of every piece of work and
-  where each one sits in the workflow. The by-change overview: all changes,
-  the stage each has reached (recon → specify → design → implement → review →
-  ship), and whether its workspace is open. Flags which need attention and
-  routes to /sulis:inbox for the item-level detail.
-  Usage: /sulis:dashboard.
+description: "Shows every piece of work you have in flight and how far along each is."
 user_invocable: true
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]

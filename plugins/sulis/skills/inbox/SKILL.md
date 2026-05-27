@@ -1,6 +1,6 @@
 ---
 name: inbox
-description: Use when the founder asks "what's waiting for me?", "what needs my attention?", or wants a one-screen view of all attention-needed items across their project. Aggregator that combines paused work, things to review, blocked tasks, and decisions waiting on the founder into one founder-readable list with one-keystroke shortcuts to act on each.
+description: "Shows everything waiting on you, in one list."
 ---
 
 # Inbox

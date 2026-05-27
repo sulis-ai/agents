@@ -1,10 +1,6 @@
 ---
 name: retry
-description: >
-  Archive a Work Package's prior BLOCKER + journal, reset its status,
-  then spawn the executor agent fresh. Usage:
-  /sulis:retry WP-NNN. Use after the external blocker
-  documented in BLOCKER-WP-NNN.md has been resolved.
+description: "Resets a blocked task and runs it again from scratch."
 ---
 
 # /sulis:retry

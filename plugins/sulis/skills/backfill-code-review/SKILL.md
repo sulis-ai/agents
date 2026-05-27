@@ -1,17 +1,6 @@
 ---
 name: backfill-code-review
-description: >
-  Retroactive /sulis:code-review for WPs that shipped without bundles
-  (executor self-attestation gap closed forward at v0.20.1 but
-  historical WPs unaffected). For each WP missing a bundle, derives
-  the squash-merge SHA from the train state YAML, computes its parent,
-  invokes /sulis:code-review with the commit range, registers findings
-  via wpx-findings, auto-drafts remediation WPs. Human-in-the-loop:
-  founder reviews drafted WPs; ships them; re-invokes the skill to
-  close the loop. Terminates when an iteration produces zero NEW
-  (non-duplicate) findings, OR when --max-remediation cap is reached.
-  Usage: /sulis:backfill-code-review --project <slug>
-  --repo <org/repo> [--wps WP-A,WP-B,...] [--max-remediation 10]
+description: "Runs code review retroactively on work that shipped without it."
 ---
 
 # /sulis:backfill-code-review

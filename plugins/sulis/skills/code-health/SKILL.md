@@ -1,6 +1,6 @@
 ---
 name: code-health
-description: Use when the founder wants to know if everything is OK — runs a comprehensive code-health check across all 7 tiers (Exists / Safe / Works / Survives / Understandable / Evolves / Polished) and produces one prioritised report covering 25 primitives across security / data protection / code quality / supply chain / infrastructure. Default mode is "deep" — dispatches 7 parallel agents for LLM-mediated per-tier interpretation (NOT_APPLICABLE framing, finding re-routing, contextual judgment). Use --mode fast for CI / cron (subprocess-only, zero tokens). Use --mode audited for production-readiness reviews (deep + Independence Check). Read-only; never modifies code.
+description: "Runs a full health check across your code and reports what needs attention."
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]
   processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]

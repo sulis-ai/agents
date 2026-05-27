@@ -1,12 +1,6 @@
 ---
 name: design
-description: >
-  Use when a piece of work is specified and the founder is ready to turn the
-  "what" into a "how" — Stage 2 (Design), the greenfield path. Drafts the
-  technical blueprint (the design document + the decisions behind it) from
-  the change's spec, then breaks it into a to-do list of independent tasks.
-  For a small change it offers to skip straight to a single task instead.
-  Usage: /sulis:design (run inside a change, after /sulis:specify).
+description: "Turns a spec into a technical blueprint and a to-do list of tasks."
 user_invocable: true
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]

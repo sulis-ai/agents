@@ -1,17 +1,6 @@
 ---
 name: backfill-gates
-description: >
-  Retroactive security review for WPs that shipped before the Step 11
-  gate landed in the per-batch flow (v0.20.0+). Invokes
-  /sulis:codebase-assess; parses findings; registers
-  via wpx-findings; auto-drafts remediation WPs. The loop is
-  human-in-the-loop: each iteration drafts remediation WPs that the
-  founder ships via wpx-train; the next iteration re-assesses to
-  see if findings were resolved. Terminates when an iteration
-  produces zero NEW (non-duplicate) findings, OR when the
-  --max-remediation cap is reached. Usage:
-  /sulis:backfill-gates --project <slug> --repo <org/repo>
-  [--deployed-url <url>] [--max-remediation 10]
+description: "Runs security review retroactively on work that shipped before the gate existed."
 ---
 
 # /sulis:backfill-gates

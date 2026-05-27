@@ -1,10 +1,6 @@
 ---
 name: handoff
-description: >
-  Capture state in JOURNEY.md when transitioning the founder to a
-  specialist agent. Writes the handoff context note so the specialist
-  knows the founder is non-technical, what the goal is, and what
-  artifacts already exist.
+description: "Records the hand-off note when passing you to a specialist."
 user_invocable: true
 ---
 

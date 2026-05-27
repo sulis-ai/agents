@@ -1,12 +1,6 @@
 ---
 name: harden-codebase
-description: >
-  Use after a codebase audit has produced a list of hardening fixes the
-  founder has accepted. Implements each fix — wraps unbounded calls in
-  resilience policies, injects timeouts and circuit breakers, replaces
-  hardcoded secrets with vault lookups, adds observability instrumentation.
-  Writes a failing characterisation test alongside each fix; marks the
-  delta as implemented when the test turns green.
+description: "Implements the accepted hardening fixes, each backed by a test."
 ---
 
 # Harden — Implement Accepted Hardening Deltas

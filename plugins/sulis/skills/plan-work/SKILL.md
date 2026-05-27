@@ -1,12 +1,6 @@
 ---
 name: plan-work
-description: >
-  Use after the technical blueprint is done and you need a to-do list of
-  independent tasks that can ship one at a time without conflicting with
-  each other. Reads the design document and produces a Work Package
-  index — one task per file with explicit context, contract, definition
-  of done, and dependency graph. Ordered so an executor can ship the
-  ready ones in parallel.
+description: "Turns a blueprint into a to-do list of independent, shippable tasks."
 ---
 
 # Decompose — TDD to Atomic Work Packages

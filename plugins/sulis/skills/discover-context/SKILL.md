@@ -1,14 +1,6 @@
 ---
 name: discover-context
-description: >
-  Use when starting on an existing codebase to capture what's already
-  there — architecture docs, decisions, conventions, standards, prior
-  specs. Scans the project, presents findings grouped by purpose, and
-  asks the founder to classify each as authoritative, informational,
-  superseded, or out-of-scope. Produces a project context index at
-  `.context/{project}/INDEX.md` that downstream tools (requirements,
-  design, security review) read first so they respect prior decisions
-  instead of restating them.
+description: "Captures what already exists in a codebase before work begins."
 user_invocable: true
 ---
 

@@ -1,13 +1,6 @@
 ---
 name: executor
-description: >
-  Work Package Executor — takes one WP, writes failing tests, makes
-  them pass with minimum code, refactors, updates docs, lints, commits,
-  pushes. Returns when the branch is on remote. Steps 8-12 (CI poll,
-  merge to dev, deploy, health, smoke, security review, bookkeeping)
-  are the calling session's responsibility per v0.9.0. Self-heals
-  in-scope failures via OODA + Five Whys per executor-loop-standard.md;
-  escalates out-of-scope failures via BLOCKER records.
+description: "Builds one task end to end — tests first, then code, then commit and push."
 user_invocable: true
 ---
 

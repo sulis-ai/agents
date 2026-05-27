@@ -1,9 +1,6 @@
 ---
 name: status
-description: >
-  Show the current journey state in plain English — what phase, what's
-  been done, what's blocked, what's next. Read-only; does not modify the
-  journey.
+description: "Shows the current journey state in plain English."
 user_invocable: true
 ---
 

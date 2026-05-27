@@ -1,11 +1,6 @@
 ---
 name: analyse-codebase
-description: >
-  Use to run a deterministic structural analysis on an existing codebase —
-  what's there, how complex it is, where the hotspots are, what credentials
-  might be exposed, how the deployment topology looks. Produces a navigable
-  HTML report and a structured JSON output. Required reading before
-  architecture audits or design work on existing code.
+description: "Scans an existing codebase and reports its structure, complexity, and risks."
 user_invocable: true
 ---
 
