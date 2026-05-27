@@ -222,6 +222,7 @@ _CHANGE_RECORD_FIELDS: tuple[str, ...] = (
     "worktree_path",
     "intent",
     "base_branch",
+    "base_sha",
     "created_at",
     "stage",
 )

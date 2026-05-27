@@ -34,6 +34,7 @@ def _record(change_id: str, **overrides) -> dict:
         "worktree_path": "/tmp/wt",
         "intent": "add subscription billing",
         "base_branch": "dev",
+        "base_sha": "abc1234def5678",
         "created_at": "2026-05-26T11:00:00Z",
         "stage": "recon",
     }
@@ -98,6 +99,9 @@ def test_change_record_round_trips(tmp_path, monkeypatch):
     assert record["branch"] == "change/create-introduce-payments"
     assert record["intent"] == "add subscription billing"
     assert record["base_branch"] == "dev"
+    # L-11 / #44: base_sha must persist — the cockpit diff route needs it as
+    # the git ref to diff the worktree against. Dropping it left diffs dead.
+    assert record["base_sha"] == "abc1234def5678"
     assert record["stage"] == "recon"
 
 

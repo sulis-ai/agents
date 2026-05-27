@@ -242,6 +242,9 @@ def cmd_start(args: argparse.Namespace) -> None:
         "worktree_path": str(worktree_dest),
         "intent": metadata.get("intent", ""),
         "base_branch": base_ref,
+        # base_sha is the git ref the cockpit diffs the worktree against
+        # (L-11 / #44 — its absence left diffs dead for every change).
+        "base_sha": base_sha,
         "created_at": metadata["started_at"],
         "stage": "recon",
     })
