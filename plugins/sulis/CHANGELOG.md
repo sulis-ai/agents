@@ -1,5 +1,24 @@
 # Sulis — Changelog
 
+## v0.57.0 — 2026-05-27
+
+**Minor — both contracts become deterministic gates; change records travel; cockpit diffs work.**
+
+(1) **#45 — the visual contract is now a mandatory, toolchain-enforced gate.** Previously doctrine (UXD-14 prose); now unskippable so the L-13 "still looks the same" failure can't recur.
+- **Write-time gate** — a `kind: frontend` WP cannot enter the INDEX unless it declares `visual_contract: <id>` and `dependsOn` that visual-contract WP (`_wpxlib.validate_frontend_wp_visual_contract`, fired at the `_cells_from_frontmatter` chokepoint).
+- **Runtime gate** — the visual-contract WP (`kind: contract`, `contract_type: visual`) can't flip to `done` until its rendered mockup is signed off (`signed_off_at` + `provenance: production-approved`). Because frontend WPs depend on it, no frontend work is dispatchable until the founder signs off.
+- **Producer skills** — `draft-architecture` emits the real-token mockup (fonts loaded, perceptual delta noted — L-13) + the contract WP; `plan-work` wires every frontend WP to it; `design` runs the sign-off step; `specify` records `founder_facing`.
+- **Standards** — UXD-14 (→ MUST-as-WP + visual-not-token sign-off), WORK_PACKAGE WP-08.5 (the visual contract IS its own WP now), WPF-11, and `review` (post-build "matches the mockup" check).
+- Bypass: a logged `visual_contract: exempt — <reason>` or a `prototype` WP — never silent.
+
+(2) **#48 — symmetric data-contract structural check.** `wpx-index audit-contracts` (backed by `_wpxlib.validate_cross_kind_contract_wiring`): a cross-kind seam (≥2 of backend/frontend/async) MUST have a `kind: contract` (data) WP, and cross-kind deps MUST route through it, not directly between implementations (CF-05). Wired into `plan-work`'s decompose validation (rubric P4, checks 4.08-4.09). The data contract's *conformance* was already test-enforced (CF-07); this closes the structural-wiring half.
+
+(3) **#42 — change records are durable + discoverable.** `.specifications/`, `.architecture/`, `.changes/`, `.context/`, and `.security/` now travel with the change branch (were gitignored) so review, the next session, and the founder can read WHY the code is the way it is. Per-worktree scratch (`.wpx-*` / `.executor-*-dev-sha` sidecars) stays ignored.
+
+(4) **#44 — cockpit diffs work.** `base_sha` is now persisted in the global change record (it was absent from `_CHANGE_RECORD_FIELDS`, so the cockpit threw "no base_sha" for every change). Also closes #39 (the L-05 no-deploy executor path) as part of the v1.99.0 line shipped earlier.
+
+662 tests green (+~48 across the release).
+
 ## v0.56.0 — 2026-05-27
 
 **Minor — executor change-branch + published-artifact fit (Cluster A), and one pithy CLI description per skill/agent.**
