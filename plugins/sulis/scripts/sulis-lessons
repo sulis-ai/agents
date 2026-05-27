@@ -47,7 +47,12 @@ def _gh_available() -> bool:
 
 
 def _existing_lesson_titles(repo: str | None) -> list[str]:
-    cmd = ["gh", "issue", "list", "--label", "lesson", "--state", "open",
+    # Use `--search` (GraphQL backend, immediate) rather than `--label` (REST
+    # filter index, eventually-consistent). The label filter could miss
+    # issues created seconds earlier, causing the dedup scan to fail silently
+    # and re-create the same issue. The search expression `label:lesson
+    # is:open` covers both filters in one query (#23).
+    cmd = ["gh", "issue", "list", "--search", "label:lesson is:open",
            "--limit", "200", "--json", "title"]
     if repo:
         cmd += ["--repo", repo]

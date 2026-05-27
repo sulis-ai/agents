@@ -86,3 +86,48 @@ def test_capture_missing_lessons_file_errors(tmp_path, run_tool, mock_gh):
                       "--lessons-file", str(tmp_path / "nope.json"))
     assert not result.ok
     assert "not found" in (result.error or "")
+
+
+# ─── #23: gh issue list dedup query uses --search (immediate), not --label ──
+
+
+def test_capture_dedup_uses_search_query_not_label_filter(
+    tmp_path, run_tool, mock_gh,
+):
+    """gh's `--label` filter uses the eventually-consistent REST API search
+    index; `--search` uses the GraphQL backend that's immediate. The dedup
+    scan after creating an issue in another tab/process must see the issue,
+    not miss it for ~minutes (#23).
+
+    Strategy: the stub responds ONLY to `--search`. If sulis-lessons still
+    uses `--label`, that argv won't include `--search`, the stub falls
+    through, the dedup query returns nothing, and the test sees the lesson
+    as NOT a duplicate. After the fix, the stub matches `--search`, returns
+    the existing-lesson stub, and dedup correctly flags the duplicate.
+    """
+    lessons = [{"id": "L-01", "title": "already raised", "body": "x",
+                "disposition": "SEA"}]
+    f = _write_lessons(tmp_path, lessons)
+    mock_gh([
+        {"match": "auth status", "stdout": "Logged in"},
+        # Only matches the new --search form — not the legacy --label filter:
+        {"match": "--search",
+         "stdout": json.dumps([{"title": "lesson: already raised"}])},
+        # Bare 'issue create' fallback so a regression doesn't silently create:
+        {"match": "issue create",
+         "stdout": "https://github.com/o/r/issues/42\n"},
+    ])
+    result = run_tool("sulis-lessons", "capture",
+                      "--lessons-file", str(f), "--repo", "o/r")
+    assert result.ok, f"capture failed: {result.error}"
+    # If the --search query was used → dedup found the existing issue →
+    # to_create is empty + duplicates has 'already raised'.
+    assert result.data["created"] == [], (
+        f"expected dedup to flag the issue as a duplicate via --search, "
+        f"but {len(result.data['created'])} issue(s) were created — the "
+        f"CLI is probably still using --label (the legacy eventually-"
+        f"consistent form). created={result.data['created']}"
+    )
+    assert result.data["duplicates"] == ["already raised"]
+
+
