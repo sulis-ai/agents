@@ -1,0 +1,20 @@
+/* Global full-height anchor for the app-shell layout.
+ *
+ * Without html/body/#root at height:100%, the height:100% chain down to
+ * the Monaco editor has no viewport anchor and collapses — the editor
+ * renders only partially and content regions don't fill the window.
+ * (Cockpit post-ship fix, 2026-05-27: bugs 1 + 3 — the visual contract
+ * that would have specified the app-shell layout was never produced.)
+ */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}

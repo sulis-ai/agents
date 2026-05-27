@@ -15,11 +15,40 @@ const STAGE_CLASS: Record<WorkflowStage, string> = {
   ship: styles.ship!,
 };
 
+// The six-stage workflow, in order. Used to render a stage as its
+// position in the journey ("Review · 5/6") so it reads as a recognisable
+// step rather than a bare enum the reader might think is invalid.
+const STAGE_ORDER: WorkflowStage[] = [
+  "recon",
+  "specify",
+  "design",
+  "implement",
+  "review",
+  "ship",
+];
+
+const STAGE_NAME: Record<WorkflowStage, string> = {
+  recon: "Recon",
+  specify: "Specify",
+  design: "Design",
+  implement: "Implement",
+  review: "Review",
+  ship: "Ship",
+};
+
+/** "Review · 5/6" — title-cased stage name + its position in the six-stage
+ *  workflow. Shared so the badge and the thread header read identically. */
+export function stageLabel(stage: WorkflowStage): string {
+  const i = STAGE_ORDER.indexOf(stage);
+  const name = STAGE_NAME[stage] ?? stage;
+  return i >= 0 ? `${name} · ${i + 1}/6` : name;
+}
+
 export interface StageBadgeProps {
   stage: WorkflowStage;
 }
 
 export function StageBadge({ stage }: StageBadgeProps) {
   const cls = STAGE_CLASS[stage] ?? styles.unknown;
-  return <span className={`${styles.badge} ${cls}`}>{stage}</span>;
+  return <span className={`${styles.badge} ${cls}`}>{stageLabel(stage)}</span>;
 }

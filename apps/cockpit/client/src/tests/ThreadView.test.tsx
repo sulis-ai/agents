@@ -85,7 +85,9 @@ describe("<ThreadView />", () => {
     );
     const header = screen.getByTestId("thread-header");
     expect(header.textContent).toContain("CH-01ABC");
-    expect(header.textContent).toContain("implement");
+    // Stage renders as its position in the six-stage journey, not the raw
+    // enum (so it reads as a recognisable step): "Implement · 4/6".
+    expect(header.textContent).toContain("Implement · 4/6");
     expect(header.textContent).toContain("ship the thing");
   });
 

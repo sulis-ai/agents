@@ -1,9 +1,11 @@
 /* WP-013 — Thread page + header + tab styles. */
 
 .page {
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  padding: 0 24px;
 }
 
 .status {
@@ -29,11 +31,13 @@
 }
 
 .header {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 12px 0;
   border-bottom: 1px solid #e1e4e8;
+  background: #fff;
 }
 
 .left {
@@ -108,12 +112,15 @@
 }
 
 .tabs {
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 0;
 }
 
 .tabBar {
+  flex: 0 0 auto;
   display: flex;
   gap: 4px;
   border-bottom: 1px solid #e1e4e8;
@@ -141,6 +148,9 @@
 }
 
 .panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
   padding-top: 4px;
 }
 

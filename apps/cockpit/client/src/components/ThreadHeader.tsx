@@ -8,6 +8,7 @@
 
 import type { Change } from "../../../shared/api-types";
 import styles from "../styles/Thread.module.css";
+import { stageLabel } from "./StageBadge";
 
 interface Props {
   change: Change;
@@ -22,7 +23,7 @@ export function ThreadHeader({ change }: Props) {
       </div>
       <div className={styles.center}>
         <span className={styles.stage} data-stage={change.stage}>
-          {change.stage}
+          {stageLabel(change.stage)}
         </span>
         <span
           className={styles.liveness}
