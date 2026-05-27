@@ -191,6 +191,59 @@ def test_read_change_record_corrupt_returns_none(tmp_path, monkeypatch):
         assert cs.read_change_record(_GOOD_ULID) is None
 
 
+# ─── change_record_is_unreadable (#22 safety-check predicate) ──────────────
+#
+# `read_change_record` collapses two distinct states to None: "file absent"
+# (benign) and "file exists but is unreadable" (load-bearing for safety
+# checks). `change_record_is_unreadable` is the predicate that
+# distinguishes the second case — used by `sulis-change nuke` so the #38
+# shipped-protection guard can't silently fail open on a corrupt record.
+
+
+def test_change_record_is_unreadable_returns_false_when_record_absent(
+    tmp_path, monkeypatch,
+):
+    """File doesn't exist on disk → not unreadable, just absent (benign)."""
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
+    assert cs.change_record_is_unreadable(_GOOD_ULID) is False
+
+
+def test_change_record_is_unreadable_returns_false_when_record_ok(
+    tmp_path, monkeypatch,
+):
+    """File exists and parses cleanly → not unreadable."""
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
+    cs.write_change_record(_GOOD_ULID, _record(_GOOD_ULID))
+    assert cs.change_record_is_unreadable(_GOOD_ULID) is False
+
+
+def test_change_record_is_unreadable_returns_true_on_corrupt_json(
+    tmp_path, monkeypatch,
+):
+    """File exists but JSON is malformed → unreadable. This is the case the
+    #22 fix exists to surface — the shipped-protection check at the nuke
+    call site keys off this to refuse loudly instead of failing open."""
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
+    d = tmp_path / "changes" / _GOOD_ULID
+    d.mkdir(parents=True)
+    (d / "change.json").write_text("{not valid json", encoding="utf-8")
+    with mock_warning(cs):
+        assert cs.change_record_is_unreadable(_GOOD_ULID) is True
+
+
+def test_change_record_is_unreadable_returns_true_on_empty_file(
+    tmp_path, monkeypatch,
+):
+    """An empty file exists but parses to nothing → unreadable. Catches the
+    truncated-write failure mode (e.g. process killed mid-write)."""
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
+    d = tmp_path / "changes" / _GOOD_ULID
+    d.mkdir(parents=True)
+    (d / "change.json").write_text("", encoding="utf-8")
+    with mock_warning(cs):
+        assert cs.change_record_is_unreadable(_GOOD_ULID) is True
+
+
 # ─── list_all_changes ──────────────────────────────────────────────────────
 
 

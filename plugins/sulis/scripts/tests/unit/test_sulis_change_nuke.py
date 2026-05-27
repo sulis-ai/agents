@@ -526,3 +526,76 @@ def test_nuke_force_overrides_shipped_protection(
     # --force completes the nuke; the shipped check is bypassed.
     assert captured["ok"] is True
     assert not meta["worktree_path"].exists()
+
+
+# ─── #22: nuke refuses on an unreadable change record (silent fail-open) ───
+
+
+def _seed_corrupt_record(home: Path, change_id: str) -> Path:
+    """Seed a corrupt change.json so cmd_nuke's #22 unreadable-guard fires.
+
+    Mirrors the #38 fixture (`_seed_shipped_record`) but writes invalid JSON
+    so `read_change_record` returns None — the very case that, before #22,
+    let the shipped-protection guard silently pass and destroy the audit
+    trail.
+    """
+    d = home / ".sulis" / "changes" / change_id
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "state.json").write_text('{"stage": "implement"}', encoding="utf-8")
+    (d / "change.json").write_text("{not valid json at all", encoding="utf-8")
+    return d
+
+
+def test_nuke_refuses_unreadable_change_record_without_force(
+    local_git_repo, tmp_path, monkeypatch,
+):
+    """A corrupt change.json (#22) MUST refuse the nuke loudly. Before the
+    fix, `read_change_record` returned None for both 'absent' and
+    'unreadable', so the #38 shipped-protection check silently passed —
+    the nuke proceeded and destroyed the archive."""
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path / "home" / ".sulis"))
+    home = tmp_path / "home"
+    home.mkdir()
+    meta = _make_change_branch(local_git_repo, "feat", "corrupt-record")
+    _seed_corrupt_record(home, meta["change_id"])
+
+    captured, patches = _capture_emit()
+    _run_nuke(_nuke_args(local_git_repo, slug="corrupt-record", force=False),
+              captured, patches)
+
+    assert captured["ok"] is False
+    # Distinct error wording — "unreadable" or "can't be read" so the
+    # founder can distinguish this from the shipped-protection refusal.
+    err = captured["error"].lower()
+    assert ("unreadable" in err) or ("can't be read" in err) or ("corrupt" in err)
+    # Footprint preserved — worktree, branch, and manifest all survive.
+    assert meta["worktree_path"].exists()
+    branches = subprocess.run(
+        ["git", "branch", "--list", meta["branch"]],
+        cwd=local_git_repo, capture_output=True, text=True,
+    ).stdout
+    assert meta["branch"] in branches
+    assert meta["manifest"].exists()
+
+
+def test_nuke_force_overrides_unreadable_record_protection(
+    local_git_repo, tmp_path, monkeypatch,
+):
+    """The #22 guard is a refusal-by-default, not a hard block — same
+    semantics as the #38 shipped-protection guard. --force is the
+    documented escape hatch for genuine cleanup of a broken-record change."""
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path / "home" / ".sulis"))
+    home = tmp_path / "home"
+    home.mkdir()
+    meta = _make_change_branch(local_git_repo, "feat", "corrupt-force")
+    _seed_corrupt_record(home, meta["change_id"])
+
+    captured, patches = _capture_emit()
+    _run_nuke(_nuke_args(local_git_repo, slug="corrupt-force", force=True),
+              captured, patches)
+
+    # --force completes the nuke; the unreadable check is bypassed.
+    assert captured["ok"] is True
+    assert not meta["worktree_path"].exists()
