@@ -135,3 +135,33 @@ re-shipping, (b) only clean up after a confirmed-successful merge. Folds into
 A demo change record (CH-DEMO01, pointing at the repo root) was seeded into
 the local store for the visual test; it is not a real change and should be
 removed after the browser walkthrough.
+
+### L-11 — diff feature dead for ALL changes: base_sha not in the store schema · SEA (factory)
+The cockpit reads `base_sha` from the change-store record
+(`SulisChangeStoreReader` → `raw.base_sha`) to render diffs. But the store
+writer `_change_state.write_change_record` filters to `_CHANGE_RECORD_FIELDS`,
+which does NOT include `base_sha`. So every real change's record has no
+base_sha → `baseSha: null` → the diff route returns NO_BASE_SHA for every
+file. **The diff view never works for a real change**, not just the demo.
+This is a cockpit(consumer)↔store(producer) CONTRACT_FIRST gap: the consumer
+assumed a field the producer doesn't record. Fix: add `base_sha` to
+`_CHANGE_RECORD_FIELDS` + have `sulis-change start` capture + write it (it
+already computes base_sha at start — saw it in the start JSON).
+*Disposition: SEA (store schema + start) — task #44.*
+
+### L-12 — cockpit server tests read the real store as a fallback · note
+Several server tests create tmp fixtures but the code-under-test falls back
+to the real `~/.sulis` / `~/.claude/projects` when the isolation env var
+isn't set in that test — so a developer with changes in flight (or a stray
+seed) makes them flake. Mirrors the SULIS_STATE_DIR-isolation fix the
+PLUGIN's own tests already adopted. Minor (green with a clean store; CI
+clean), but a real isolation gap. *Disposition: cockpit test-robustness
+backlog (not urgent).*
+
+### Note — process slips (mine, this session)
+- Committed a fix (1a4c82c) before gating the commit on a green test run.
+  Quality gate: verify green BEFORE commit, not after. (The code was sound;
+  the red was my demo-seed pollution + a too-tight timeout.)
+- Seeded a demo change into the REAL ~/.sulis for the visual test, which
+  polluted unisolated server tests. A demo/dev store should be isolated
+  (set SULIS_STATE_DIR for the dev server), never the real one.
