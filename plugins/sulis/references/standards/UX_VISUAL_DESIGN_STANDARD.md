@@ -200,15 +200,36 @@ Design artifacts produced with AI carry a provenance label: **AI-generated →
 human-reviewed → production-approved**, advancing only through review (not
 time). The founder approves before an artifact is consumed by the build.
 
-### UXD-14 — The visual contract precedes the build · MUST
+### UXD-14 — The visual contract precedes the build · MUST (a hard gate)
 
 Like contract-first for data: the visual/UX contract (identity → tokens → spec
-→ experience patterns) is a **design-time artifact** the frontend WPs depend
-on. For cross-kind work, it is defined alongside the data contract; frontend
-WPs `dependsOn` it.
+→ experience patterns) precedes the build. It is a **`kind: contract` WP**
+(`contract_type: visual`) carrying a real-token mockup; every `kind: frontend`
+WP MUST declare `visual_contract: <its id>` and `dependsOn` it. This is
+**enforced by the toolchain**, not just doctrine (#45):
+
+- `wpx-index` refuses a `kind: frontend` WP that doesn't declare + depend on a
+  visual-contract WP (write-time gate).
+- The visual-contract WP reaches `done` only when its mockup is **signed off**
+  — `signed_off_at` set + `provenance: production-approved` — refused at
+  `flip-status` otherwise (runtime gate).
+- Because frontend WPs depend on it, list-ready won't dispatch any frontend
+  work until the founder has signed off.
+
+**Sign-off is visual, not value-equality (L-13).** The mockup MUST load the
+webfonts its type tokens reference and be approved *rendered* — a real
+production failure passed "tokens match" while the founder saw no brand
+because the fonts never loaded. "Looks like the brand" is the founder's
+judgement at sign-off; token-value matching is necessary but not sufficient.
+
+**The only bypass** is a logged exemption (`visual_contract: exempt —
+<reason>` on the frontend WP) or a `prototype: true` WP — rare, explicit,
+never silent.
 
 > **Anti-pattern:** building components first and "extracting a design system
-> later"; design and build drifting because neither is the source of truth.
+> later"; design and build drifting because neither is the source of truth;
+> declaring a mockup "matched" on token values without the founder seeing it
+> rendered.
 
 ---
 

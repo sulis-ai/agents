@@ -281,6 +281,18 @@ For **deep** specs, the requirements-analyst's full `.specifications/{name}/`
 folder is also committed (its native home); the change's `SPEC.md` is the
 short readable front door that links to it.
 
+**Record the founder-facing flag (MUST).** Every SPEC.md opens with a tiny
+frontmatter block carrying the `founder_facing` value already computed in
+Step 1 (the `paths_touch_founder_surface()` result), so `design` inherits the
+signal instead of re-deriving it — and so the #45 visual-contract gate knows a
+user-facing surface is in scope:
+
+```yaml
+---
+founder_facing: true   # or false — from the Step 1 classifier
+---
+```
+
 ### SPEC.md shapes
 
 **Lite** (~10 lines):

@@ -198,6 +198,34 @@ Read back the result and tell the founder the shape of the decision in their
 words — not the document verbatim. Lead with the one or two choices that
 actually shape the work.
 
+## Step 3.5 — visual-contract sign-off gate (MUST for a user-facing surface)
+
+If this change touches a **user-facing surface** (the SPEC's `founder_facing`
+flag, or the blueprint produced any `kind: frontend` component), the visual
+contract is mandatory before the to-do list (#45 / UXD-14). The architect's
+blueprint pass produces a **real-token mockup** + a visual-contract WP; this
+step is where the founder actually signs it off.
+
+Show the founder the rendered mockup and get an explicit sign-off (echo-
+before-act, Rule 3) — they are approving how it will *look*, not a token
+table (L-13: a mockup whose fonts didn't load once passed "tokens match"
+while the founder saw no change). On sign-off, set the visual-contract WP's
+`signed_off_at` + `provenance: production-approved`.
+
+Do **not** route to plan-work for the frontend work until the contract is
+signed off — the toolchain enforces this anyway (a `kind: frontend` WP can't
+enter the to-do list without depending on the contract WP, and the contract
+WP can't reach `done` unsigned), but surface it in plain English here rather
+than letting the founder hit a refusal later:
+
+> *"Before I break the screens into tasks, take a look at this mockup — it's
+> how the {surface} will actually look, using your real colours and fonts.
+> Happy with it, or want changes first?"*
+
+A genuinely non-visual change misdetected as user-facing → the founder
+overrides, logged as `visual_contract: exempt — <reason>` on the WP. Rare,
+explicit, never silent. `--prototype` changes skip this step.
+
 ## Step 4 — break it into a to-do list (route to plan-work)
 
 A blueprint isn't yet a thing you can ship one piece at a time. `/sulis:plan-work`

@@ -52,9 +52,12 @@ standards — they're not background context, they're the **rubric**:
 - `../../references/standards/CONTRACT_FIRST_STANDARD.md` — for cross-kind
   changes, verify the contract conformance check passed (CF-07).
 - `../../references/standards/UX_VISUAL_DESIGN_STANDARD.md` — for
-  user-facing changes, verify the visual contract was honoured (semantic
-  tokens not hex; design-time WCAG AA; agentic-UX principles for AI
-  surfaces).
+  user-facing changes, verify the visual contract was honoured: a signed-off
+  visual-contract WP existed (`signed_off_at` + `provenance:
+  production-approved`), and the shipped surface **matches its rendered
+  mockup** — the post-build visual check (look at it, don't just diff tokens;
+  L-13). Plus semantic tokens not hex; design-time WCAG AA; agentic-UX
+  principles for AI surfaces.
 
 ## Conclusion (lead with the answer)
 

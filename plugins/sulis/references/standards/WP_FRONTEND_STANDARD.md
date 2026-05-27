@@ -166,6 +166,13 @@ has its **loading/error/empty** states, **passes a11y audits**, and is
 **reachable in the running app**. The frontend equivalent of a 404 is an
 orphaned component never imported into a route.
 
+A `kind: frontend` WP is also **not dispatchable** until its visual contract is
+signed off: it MUST declare `visual_contract: <id>` + `dependsOn` that
+`contract_type: visual` WP, which reaches `done` only on founder sign-off
+(UXD-14 / WORK_PACKAGE WP-08.5; enforced by `wpx-index`). Building a surface
+against an unsigned mockup is the L-13 failure (built, looked nothing like the
+brand).
+
 > **Anti-pattern:** a component reachable only from a test; a page built but
 > never added to the router; "states later."
 
