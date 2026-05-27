@@ -2,17 +2,17 @@
 
 .card {
   display: block;
-  border: 1px solid #e1e4e8;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 16px;
-  background: #ffffff;
+  background: var(--card);
   text-decoration: none;
   color: inherit;
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .card:hover {
-  border-color: #0366d6;
+  border-color: var(--primary);
   box-shadow: 0 1px 4px rgba(3, 102, 214, 0.12);
 }
 
@@ -28,17 +28,17 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 13px;
   font-weight: 600;
-  color: #0366d6;
+  color: var(--primary);
 }
 
 .slug {
   font-size: 12px;
-  color: #6a737d;
+  color: var(--muted-foreground);
 }
 
 .intent {
   font-size: 14px;
-  color: #24292e;
+  color: var(--foreground);
   margin: 0 0 12px;
   line-height: 1.4;
 }
@@ -49,7 +49,7 @@
   justify-content: space-between;
   gap: 8px;
   font-size: 12px;
-  color: #586069;
+  color: var(--muted-foreground);
 }
 
 .livenessGroup {

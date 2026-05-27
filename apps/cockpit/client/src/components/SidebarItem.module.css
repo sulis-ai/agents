@@ -8,18 +8,18 @@
   padding: 8px 10px;
   border-radius: 4px;
   text-decoration: none;
-  color: #24292e;
+  color: var(--foreground);
   font-size: 13px;
   margin-bottom: 2px;
 }
 
 .item:hover {
-  background: #eef1f4;
+  background: var(--muted);
 }
 
 .item[data-active="true"] {
   background: #dbedff;
-  color: #0366d6;
+  color: var(--primary);
   font-weight: 600;
 }
 
@@ -37,7 +37,7 @@
 
 .slug {
   font-size: 11px;
-  color: #6a737d;
+  color: var(--muted-foreground);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

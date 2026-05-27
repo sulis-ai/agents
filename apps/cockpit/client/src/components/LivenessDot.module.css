@@ -20,11 +20,11 @@
 }
 
 .notRunning {
-  background: #d1d5da;
-  border-color: #a3a8af;
+  background: var(--border);
+  border-color: var(--muted-foreground);
 }
 
 .unknown {
-  background: #f6f8fa;
-  border-color: #d1d5da;
+  background: var(--muted);
+  border-color: var(--border);
 }

@@ -3,10 +3,10 @@
 .sidebar {
   width: 280px;
   flex: 0 0 280px;
-  border-right: 1px solid #e1e4e8;
+  border-right: 1px solid var(--border);
   padding: 16px;
   overflow-y: auto;
-  background: #fafbfc;
+  background: var(--muted);
 }
 
 .heading {
@@ -14,13 +14,13 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #586069;
+  color: var(--muted-foreground);
   margin: 0 0 12px;
 }
 
 .placeholder {
   font-size: 13px;
-  color: #6a737d;
+  color: var(--muted-foreground);
   font-style: italic;
   margin: 0;
 }

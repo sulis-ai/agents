@@ -165,3 +165,37 @@ backlog (not urgent).*
 - Seeded a demo change into the REAL ~/.sulis for the visual test, which
   polluted unisolated server tests. A demo/dev store should be isolated
   (set SULIS_STATE_DIR for the dev server), never the real one.
+
+---
+
+## v0.1 flow dry-run learnings (re-grounding the cockpit in the Sulis instance → #45)
+
+Walking the build-ui-style flow by hand on the cockpit surfaced exactly what
+the #45 v0.1 system must handle:
+
+- **Token resolution is the hard step.** The instance's semantic tokens
+  either hold a `$value` or REFERENCE a primitive (`{primitives.colors.
+  semantic.blue.600}`). v0.1's token-export step needs a resolver that walks
+  refs → literal. (Prototyped: a ~30-line Python resolver → flat tokens.css.)
+- **Token substitution needs complete-hex-token boundaries.** A naive
+  `#fff → var(...)` replace corrupted `#fff5f5` → `var(--card)5f5`. Any
+  write-time enforcement / migration tooling MUST match whole hex tokens
+  (negative lookahead on hex digits), not prefixes. Real gotcha.
+- **Retheme splits into core-chrome (mechanical) + status/stage tail
+  (judgment).** 73 of 119 hex were unambiguous greys/primary → tokens
+  (mechanical); 46 were status/stage hues (liveness green, error red, per-
+  stage badge colours) needing a token decision. v0.1's enforcement should
+  distinguish "tokenise now" from "needs a token mapping decision."
+- **The sign-off baseline can be an EXISTING mockup.** `reference/web-app-
+  mockup.html` IS the visual contract — v0.1's mockup step can reference the
+  instance's existing mockups, not always generate fresh.
+- **Static OODA is cheap and real.** Diffing the rethemed cockpit's resolved
+  palette (#fafafa/#171717/#2563EB/#e5e5e5) against the mockup's palette
+  confirmed the retheme lands on the instance — no Playwright needed.
+- **Demo/dev data MUST use an isolated SULIS_STATE_DIR** (the dev server
+  pointed at a tmp store), never the real ~/.sulis (re-confirms L-12).
+
+**Done in this pass:** token resolver + tokens.css + app-wide grounding
+(index.css) + 73 core-chrome replacements. **Second pass:** the 46 status/
+stage hues (map liveness→positive/warning, errors→destructive, decide on
+stage-badge hues vs an instance stage-colour scale).

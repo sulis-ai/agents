@@ -15,7 +15,7 @@
 
 .status {
   padding: 32px 16px;
-  color: #586069;
+  color: var(--muted-foreground);
   font-size: 14px;
   text-align: center;
 }
@@ -24,13 +24,13 @@
   margin-top: 8px;
   padding: 6px 12px;
   font-size: 13px;
-  border: 1px solid #d1d5da;
-  background: #f6f8fa;
+  border: 1px solid var(--border);
+  background: var(--muted);
   border-radius: 6px;
   cursor: pointer;
 }
 .retryButton:hover {
-  background: #e1e4e8;
+  background: var(--border);
 }
 
 .bubble {
@@ -46,19 +46,19 @@
 .bubbleUser {
   align-self: flex-end;
   background: #ddf4ff;
-  color: #0550ae;
+  color: var(--primary);
 }
 
 .bubbleAssistant {
   align-self: flex-start;
-  background: #f6f8fa;
-  color: #24292e;
+  background: var(--muted);
+  color: var(--foreground);
 }
 
 .bubbleTime {
   margin-top: 6px;
   font-size: 11px;
-  color: #6a737d;
+  color: var(--muted-foreground);
 }
 
 .userText {
@@ -78,9 +78,9 @@
 
 .collapsedBlock {
   margin: 4px 0;
-  border: 1px solid #d1d5da;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--card);
   overflow: hidden;
 }
 
@@ -91,24 +91,24 @@
   width: 100%;
   padding: 6px 10px;
   border: 0;
-  background: #f6f8fa;
+  background: var(--muted);
   cursor: pointer;
   text-align: left;
   font-size: 13px;
-  color: #24292e;
+  color: var(--foreground);
 }
 .collapsedHeader:hover {
-  background: #e1e4e8;
+  background: var(--border);
 }
 
 .collapsedChevron {
   font-size: 10px;
-  color: #586069;
+  color: var(--muted-foreground);
 }
 
 .collapsedBody {
   padding: 8px 10px;
-  border-top: 1px solid #d1d5da;
+  border-top: 1px solid var(--border);
   background: #fff;
 }
 
@@ -155,7 +155,7 @@
 .empty {
   padding: 48px 16px;
   text-align: center;
-  color: #586069;
+  color: var(--muted-foreground);
 }
 
 .emptyText {

@@ -3,14 +3,14 @@
 .wrap {
   text-align: center;
   padding: 64px 24px;
-  color: #586069;
+  color: var(--muted-foreground);
 }
 
 .headline {
   font-size: 18px;
   font-weight: 600;
   margin: 0 0 12px;
-  color: #24292e;
+  color: var(--foreground);
 }
 
 .body {
@@ -20,11 +20,11 @@
 }
 
 .command {
-  background: #f6f8fa;
-  border: 1px solid #e1e4e8;
+  background: var(--muted);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 2px 6px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 13px;
-  color: #24292e;
+  color: var(--foreground);
 }

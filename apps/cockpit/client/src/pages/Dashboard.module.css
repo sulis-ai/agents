@@ -22,7 +22,7 @@
   font-size: 20px;
   font-weight: 600;
   margin: 0;
-  color: #24292e;
+  color: var(--foreground);
 }
 
 .grid {
@@ -39,9 +39,9 @@
 
 .skeletonCard {
   height: 120px;
-  background: linear-gradient(90deg, #f6f8fa 0%, #eef0f3 50%, #f6f8fa 100%);
+  background: linear-gradient(90deg, var(--muted) 0%, var(--muted) 50%, var(--muted) 100%);
   background-size: 200% 100%;
-  border: 1px solid #e1e4e8;
+  border: 1px solid var(--border);
   border-radius: 6px;
 }
 

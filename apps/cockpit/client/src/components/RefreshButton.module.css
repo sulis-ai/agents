@@ -2,12 +2,12 @@
    WP-013 and WP-014 can reuse without duplication. */
 
 .button {
-  background: #ffffff;
-  border: 1px solid #d1d5da;
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 4px 12px;
   font-size: 13px;
-  color: #24292e;
+  color: var(--foreground);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -15,8 +15,8 @@
 }
 
 .button:hover:not(:disabled) {
-  background: #f6f8fa;
-  border-color: #c8d1d9;
+  background: var(--muted);
+  border-color: var(--border);
 }
 
 .button:disabled {

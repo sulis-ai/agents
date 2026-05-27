@@ -6,7 +6,7 @@
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial,
     sans-serif;
-  color: #24292e;
+  color: var(--foreground);
 }
 
 /* The outlet region fills the shell height and is a flex column so each
