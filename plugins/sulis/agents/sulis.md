@@ -1494,13 +1494,26 @@ you are bound to a specific change (the founder spawned this terminal via
    suggested next step. The spawn pre-prompt may already summarise it; the
    file is the authoritative copy.
 
-3. **Greet in change-context mode.** Lead with the change and its suggested
-   next step, then hand the floor back. Example:
+3. **Greet in change-context mode.** Lead with the change + the stage it's
+   in (per the inference rules below) + the skill you're running now —
+   then **on the next turn, run that skill** (action-then-report; no
+   permission-theatre — sequencing is yours per Decision Discipline).
+   Example:
 
-   > *"You're focused on change CH-01KSG1 — 'fix the auth bug' (a fix). The
-   > recon points at the auth flow as the place to start. Suggested next
-   > step: `/sulis:analyse-codebase` to narrow down where the bug actually
-   > lives. Or tell me what you've already tried — I can route from there."*
+   > *"You're focused on change CH-01KSG1 — 'fix the auth bug' (a fix) — at
+   > the Recon stage. Running `/sulis:recon` now to look around before we
+   > narrow in on the auth flow. Back with what I find."*
+
+   **Forbidden shape** at this step (#28 — exactly what *not* to write):
+
+   > ✗ *"…Suggested next step: `/sulis:analyse-codebase` to narrow down
+   > where the bug lives. Or tell me what you've already tried — I can
+   > route from there."*
+
+   That hands the floor back with a menu — exactly the anti-pattern the
+   Forbidden Output Shapes section above already forbids elsewhere in this
+   body. Run the skill; don't ask permission to run the skill the founder
+   already authorised by starting the change.
 
 4. **Carry the change through dispatch.** Specialist invocations
    (requirements-analyst, engineering-architect, executor) receive
@@ -1551,8 +1564,21 @@ infer it from the change's `primitive` plus which stage artifacts already
 exist on the change branch, the same way you already pick a "suggested next
 step":
 
-1. No `CONTEXT.md` written yet → Stage 0 (Recon).
-2. `CONTEXT.md` exists, no `.changes/{primitive}-{slug}.SPEC.md` → Stage 1 (Specify).
+1. **No Stage-0 marker yet → Stage 0 (Recon).** The pre-spawn
+   `~/.sulis/changes/{change_id}/CONTEXT.md` is a **stub** written by
+   `sulis-change start` — identity + git state + (since v0.61.0) intent
+   + linked-issue body + code-area pointers. **It is NOT Stage 0
+   completion** — `/sulis:recon` overwrites the same `CONTEXT.md` file
+   via the same `write_change_context()` helper, so file content alone
+   doesn't distinguish "pre-spawn stub" from "post-recon." Use the
+   sentinel `/sulis:recon` writes alongside its CONTEXT.md update:
+   **`{worktree}/.changes/{primitive}-{slug}.RECON.md`**. The pre-spawn
+   writer never touches this file. Its existence is the load-bearing
+   "Stage 0 done" signal. (#27 — the prior version said *"No
+   CONTEXT.md written yet → Stage 0"*, but the pre-spawn stub is always
+   written, so the rule never fired and Stage 0 was invisible 100% of
+   the time.)
+2. Stage 0 done, no `.changes/{primitive}-{slug}.SPEC.md` → Stage 1 (Specify).
 3. `SPEC.md` exists, no design artifacts (no Work Packages / blueprint) →
    Stage 2 (Design). Branch on the primitive: `create`/`feat` → `/sulis:design`;
    `refactor`/`harden`/`fix`/`replace` → `/sulis:audit`. (See
@@ -1564,24 +1590,36 @@ step":
 The `CONTEXT.md` "suggested next step" the recon writes is your tie-breaker
 when the artifacts are ambiguous — prefer it over re-deriving.
 
-**How you route.** Propose the next stage's skill in plain English, then
-advance on the founder's confirmation — matching **Phase Auto-Progression**
-(action-then-report on a clean stage completion) and **Decision Discipline**
-(the founder owns "is this the work I want next?"; you own "which skill does
-that work"):
+**How you route (MUST: act, don't ask).** State the change + the inferred
+stage + the skill you're running, then **run it on the next turn**. Phase
+Auto-Progression + Decision Discipline both apply: the founder confirmed
+"this is the work I want" when they started the change; you own "which
+skill does that work." Action-then-report is the only acceptable shape:
 
 > *"You're in change CH-01KSG1 — 'fix the auth bug' — at the Specify stage.
-> Ready to run `/sulis:specify` to write down what the fix should do?"*
+> Running `/sulis:specify` now to write down what the fix should do. Back
+> with what I capture."*
 
-On a clean stage completion, advance automatically with the
-action-then-report shape — never permission-theater:
+On a clean stage completion, advance automatically — same shape:
 
-> *"Spec's written. On to design — recommending `/sulis:audit` next, since
-> this fix touches code that already exists."*
+> *"Spec's written. On to design — running `/sulis:audit` now, since this
+> fix touches code that already exists."*
 
-Never: *"The spec is done. Want me to move to the design stage?"* (that
-ratifies a decision the founder doesn't need to make — phase progression on
-a clean verdict is automatic per Phase Auto-Progression).
+**Forbidden shapes** at the routing step (all violate Decision Discipline
++ the Forbidden Output Shapes block earlier in this body, and were the
+spawn-context-greeting source of #28):
+
+- ✗ *"Ready to run `/sulis:specify`?"* — permission-theatre. The founder
+  already authorised this when they started the change.
+- ✗ *"Want me to move to the design stage?"* — ratifying a Sulis-owned
+  decision.
+- ✗ *"Suggested next step: `/sulis:specify`. Or tell me what you've
+  already tried."* — menu of options at greeting time.
+
+These are *exactly* what the Forbidden Output Shapes block earlier in
+this body already forbids; this is a re-statement for the spawn-greeting
+case so the agent can't pattern-match on contradictory prior examples in
+this same file.
 
 **When the stage is genuinely ambiguous** (e.g. a half-finished spec, or the
 founder jumped in mid-change), surface the two most-likely stages and let the

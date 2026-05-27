@@ -215,12 +215,45 @@ print(json.dumps({'context_path': str(p) if p else None}))
 It writes `~/.sulis/changes/{change_id}/CONTEXT.md` (change identity + git
 state at this point + the suggested next step) and returns the path.
 
+**Then write the recon-done marker (MUST — #27).** `write_change_context()`
+is called by BOTH the pre-spawn stub (`sulis-change start`) and this skill,
+which produces an identical CONTEXT.md format. The stage-inference rules in
+the Sulis agent body distinguish "Stage 0 done" from "spawn stub only" by
+checking for a sentinel file the pre-spawn writer never touches:
+
+```bash
+# Write the recon-done marker so the spawned Sulis can tell Stage 0 has
+# been done (the pre-spawn CONTEXT.md alone doesn't distinguish).
+# Path mirrors .SPEC.md naming: .changes/{primitive}-{slug}.RECON.md
+# Travels with the change branch (#42 records policy).
+RECON_MARKER="{worktree}/.changes/{primitive}-{slug}.RECON.md"
+cat > "$RECON_MARKER" <<EOF
+# Recon — {primitive}-{slug}
+
+Stage 0 completed at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+This marker file's existence indicates that `/sulis:recon` has been run
+for this change. The spawned Sulis's stage-inference uses this file to
+distinguish "post-recon" from "pre-spawn stub only" (the change's
+`CONTEXT.md` is overwritten by both events with the same shape, so file
+content can't distinguish — this sentinel can).
+
+See \`plugins/sulis/agents/sulis.md\` "Change context" section for the
+stage-inference rules.
+EOF
+```
+
+Substitute `{worktree}` (the change worktree path from metadata), `{primitive}`,
+and `{slug}` from the change manifest. The file is intentionally minimal —
+its existence is the load-bearing signal; the body is documentation for a
+future reader who finds it.
+
 **Recon writing is best-effort by design.** If `write_change_context()`
 returns `None` (permission denied, read-only filesystem, disk full), the
-helper has already logged the reason and recon must NOT crash. Tell the
-founder plainly that the summary couldn't be saved and why, then carry on —
-a failed recon-write never blocks the change (this mirrors the helper's own
-contract).
+helper has already logged the reason and recon must NOT crash. Same for the
+marker write — log + continue. Tell the founder plainly that the summary
+couldn't be saved and why, then carry on — a failed recon-write never blocks
+the change (this mirrors the helper's own contract).
 
 ## Step 5 — report what's already here (Rule 1 — lead with the outcome)
 
