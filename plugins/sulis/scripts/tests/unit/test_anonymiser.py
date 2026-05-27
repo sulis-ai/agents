@@ -18,6 +18,7 @@ from _anonymiser import (
     PUBLIC_DOMAIN_ALLOWLIST,
     AnonymisationContext,
     Redaction,
+    _url_has_userinfo,
     anonymise,
 )
 
@@ -156,6 +157,127 @@ def test_subdomain_of_allowlisted_is_preserved():
     text = "the docs at docs.python.org/3/library/re.html"
     r = anonymise(text)
     assert "python.org" in r.redacted_text
+
+
+# ─── URL userinfo handling (#39) ─────────────────────────────────────────────
+#
+# When a URL has embedded credentials (RFC 3986 `userinfo@host`), the WHOLE
+# URL must be redacted to `<url>` — regardless of whether the host is on
+# the allowlist. Credentials are always sensitive; the allowlist check is
+# skipped entirely. Pinned because a naive "extract the host" fix would
+# leak credentials in allowlisted-host URLs otherwise.
+
+
+def test_url_with_basic_auth_is_fully_redacted_even_on_allowlisted_host():
+    """https://user:pass@github.com/... — host is allowlisted, BUT
+    credentials are present → redact the whole URL anyway. The lesson
+    body's load-bearing assertion."""
+    text = "see https://user:pass@github.com/sulis-ai/agents"
+    r = anonymise(text)
+    assert "<url>" in r.redacted_text
+    # Critically: the password must not appear in the output.
+    assert "pass" not in r.redacted_text
+    assert "user:pass" not in r.redacted_text
+    # The allowlisted host is also gone (whole URL replaced).
+    assert "user:pass@github.com" not in r.redacted_text
+
+
+def test_url_with_user_only_is_fully_redacted():
+    """user@host form (no password) is still userinfo per RFC 3986 —
+    redact the whole URL."""
+    text = "fetch https://iain@github.com/private-repo.git"
+    r = anonymise(text)
+    assert "<url>" in r.redacted_text
+    assert "iain@github.com" not in r.redacted_text
+
+
+def test_url_with_credentials_on_non_allowlisted_host_is_redacted():
+    """Regression pin: a non-allowlisted host with credentials behaves
+    the same as today (redacted). The fix must not break this path."""
+    text = "see http://admin:secret@my-startup.com/api"
+    r = anonymise(text)
+    assert "<url>" in r.redacted_text
+    assert "secret" not in r.redacted_text
+
+
+def test_url_without_credentials_on_allowlisted_host_still_preserved():
+    """Regression pin: plain allowlisted-host URLs still pass through.
+    The fix must NOT over-redact normal URLs."""
+    text = "see https://github.com/sulis-ai/agents/issues/22"
+    r = anonymise(text)
+    assert "https://github.com/sulis-ai/agents/issues/22" in r.redacted_text
+
+
+def test_url_without_credentials_on_non_allowlisted_host_redacted():
+    """Regression pin: non-allowlisted hosts still redact (unchanged)."""
+    text = "the failing call to https://internal-api.acme.com/foo"
+    r = anonymise(text)
+    assert "<url>" in r.redacted_text
+
+
+# ─── _url_has_userinfo predicate (direct unit tests) ─────────────────────────
+#
+# Direct helper tests distinguish "deliberately correct" from the
+# pre-existing "lucky-safe" accident. The full-anonymise tests above
+# verify the OUTPUT is correct; these tests verify the LOGIC reaches
+# that output by the right code path.
+
+
+def test_url_has_userinfo_basic_auth_form():
+    assert _url_has_userinfo("https://user:pass@host.com/path") is True
+
+
+def test_url_has_userinfo_user_only_form():
+    assert _url_has_userinfo("https://iain@host.com/path") is True
+
+
+def test_url_has_userinfo_with_special_chars_in_password():
+    """RFC 3986 allows percent-encoded chars in userinfo (e.g.
+    `user:p%40ss@host`). Most common shapes are unreserved + percent-
+    encoded; we conservatively recognise these as userinfo."""
+    assert _url_has_userinfo("https://user:p%40ss@host.com/path") is True
+
+
+def test_url_has_userinfo_plain_url():
+    assert _url_has_userinfo("https://github.com/sulis-ai/agents") is False
+
+
+def test_url_has_userinfo_at_in_path_not_userinfo():
+    """An `@` in the path (after the host) is not userinfo."""
+    assert _url_has_userinfo("https://github.com/foo/@bar") is False
+
+
+def test_url_has_userinfo_at_in_query_not_userinfo():
+    """An `@` in the query string is not userinfo."""
+    assert _url_has_userinfo("https://api.com/search?q=user@host") is False
+
+
+def test_url_has_userinfo_at_in_fragment_not_userinfo():
+    assert _url_has_userinfo("https://docs.com/page#@mention") is False
+
+
+def test_url_has_userinfo_no_scheme_returns_false():
+    """Schemeless input is not a URL — predicate returns False rather
+    than misclassifying. The URL regex won't match schemeless input
+    anyway, so this is belt-and-braces."""
+    assert _url_has_userinfo("user@host.com") is False
+
+
+def test_url_has_userinfo_empty_string_returns_false():
+    assert _url_has_userinfo("") is False
+
+
+def test_url_with_at_sign_in_path_not_misclassified_as_userinfo():
+    """An `@` in the URL PATH (not before the host) is not userinfo.
+    e.g. https://github.com/orgs/foo/@bar — the `@bar` is a path
+    segment, not credentials. The URL should be preserved (allowlisted
+    host, no userinfo)."""
+    text = "see https://github.com/sulis-ai/agents/pull/42#@user-mention"
+    r = anonymise(text)
+    # github.com is allowlisted; no userinfo (the @ is after the path
+    # separator). The URL should survive.
+    assert "github.com" in r.redacted_text
+    assert "<url>" not in r.redacted_text
 
 
 def test_non_allowlisted_domain_is_redacted():
