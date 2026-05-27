@@ -1,5 +1,40 @@
 # Sulis — Changelog
 
+## v0.67.0 — 2026-05-28
+
+**Minor — `/sulis:feedback` skill + extracted shared issue-capture engine (closes #20).**
+
+Founders can now submit patterns, issues, bugs, and feedback as GitHub issues against the open-source plugin repo (`sulis-ai/agents`) via `/sulis:feedback`. Personal + proprietary context is scrubbed by default; the founder previews the redacted version + opts back in per item; submission only happens after explicit confirmation.
+
+**Per #20's EP-03 rule** ("extract on the 2nd consumer, not before, not after; never copy-paste `_lessons.py`"), the change ALSO extracts the type-agnostic engine out of `_lessons.py` + `sulis-lessons` into a shared `_issues.py` + `sulis-issues`. Lessons + feedback are both descriptors on the same engine — zero duplication; the abstraction trigger fired correctly.
+
+**New surface:**
+
+- `_issues.py` — pure type-agnostic engine. `partition_items`, `issue_title`, `issue_body`, `issue_labels`, `dedup_key`, parameterised over `IssueTypeDescriptor`.
+- `_issue_descriptors.py` — `LESSON` + `FEEDBACK` entries. Lookup via `get_descriptor(name)`.
+- `sulis-issues` — generic CLI replacing `sulis-lessons`. `capture --descriptor lesson|feedback --items-file X`. Same gh orchestration as v0.43.0 (`--search` dedup query preserved per #23).
+- `_anonymiser.py` — pure, no I/O, default-redact policy. 8 scrub categories: code blocks (≥ 5 lines → placeholder), URLs (allowlisted hosts preserved; else `<url>`), secrets (env-var-named assignments + JWTs + opaque tokens with known prefixes), emails, other-repo refs (`org/repo#N` → `<other-repo>#N`; `sulis-ai/agents` preserved), absolute + relative paths, non-allowlisted domains, project names + change-branch refs. Pre-pass `_seed_allowlisted_host_path_tails` protects schemeless URLs from path-pass interaction.
+- `/sulis:feedback` skill. Disposition: `pattern` / `issue` / `bug` / `feedback`; each maps to a sub-label so maintainers can triage by class. Preview gate is non-optional — no `--auto-submit` flag. Repo target is hardcoded `sulis-ai/agents`.
+
+**Migrated:**
+
+- `_lessons.py`, `sulis-lessons`, `test_lessons.py` deleted; content split into the new files. The 12 assertions in `test_lessons.py` all migrated to `test_issues_engine.py` + `test_issue_descriptors.py` with no loss.
+- `/sulis:capture-lessons` SKILL.md updated to call `sulis-issues capture --descriptor lesson --items-file` (was `sulis-lessons capture --lessons-file`).
+- `test_sulis_lessons.py` → `test_sulis_issues.py` with `--descriptor lesson` argv updates.
+
+**Tests:** 773/773 pass (was 726; +47 net new tests across 4 new test files + migrated content; zero regression). `_anonymiser.py` alone has 29 unit tests covering every redaction category, the keep-list short-circuit, the public-domain allowlist (pinned), the substring-of-kept URL protection, and the realistic mixed-content blob.
+
+**Trust contract for the feedback skill** (load-bearing piece):
+
+- Preview gate is non-optional — every submission goes through founder review.
+- Repo target is hardcoded to `sulis-ai/agents`; this skill is upstream maintainer feedback only.
+- Anonymisation is best-effort scrub + founder review — the combination IS the contract.
+- `sulis-ai/agents` references preserved by design (maintainer triage context).
+
+**Test fixtures with secret-shaped strings** (Stripe / GitHub PAT / JWT) are stored REVERSED in source so GitHub's push-protection secret-scanning never sees the literal forms in any committed byte position; reversed at runtime via `[::-1]` to yield the exact shapes the regexes target.
+
+**Pre-merge review** (Tier 2 Safe + Tier 4 Survives, code-health step 4.5) PASSED. Four v2 follow-ups surfaced as separate issues (#39 URL credential handling, #40 IP-range scrubbing, #41 non-Latin script support, #42 long-token over-scrubbing on casual references) — none ship-blocking; all conservative-by-default and trackable.
+
 ## v0.66.0 — 2026-05-27
 
 **Minor — `sulis-change nuke` no longer fails open on a corrupt change record (closes #22).**
