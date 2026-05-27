@@ -1,0 +1,67 @@
+{
+  "review_id": "PR-batch5-2026-05-23T124318Z",
+  "target": "git diff HEAD (working tree)",
+  "diff": {
+    "files_changed": 5,
+    "lines_added": 1095,
+    "lines_removed": 367,
+    "total_lines": 1462,
+    "new_markdown_artifacts": {
+      "files": 2,
+      "lines": 636
+    }
+  },
+  "pr_hygiene": {
+    "scope_PH01": {
+      "severity": "low",
+      "commit_type_spread": ["feat", "docs"],
+      "module_fan_out": 3,
+      "rationale": "Coherent scope — HD-001 + HD-007 are documented as sister deltas in HD-007's '## Sequence' as 'SHIPS IN THE SAME BATCH 5 COMMIT'. The two HDs share VerifyContext / VerifyResult shapes; splitting them would create an awkward interim. New HD markdown files travel with the implementation."
+    },
+    "size_PH02": {
+      "severity": "medium",
+      "lines_added": 1095,
+      "lines_removed": 367,
+      "files_changed": 5,
+      "rationale": "501-1000 line band, 5 files. Single coherent refactor + extension. Not in the 'too big to review safely' band; the test suite scopes the blast radius."
+    },
+    "safety_PH03": {
+      "severity": "low",
+      "migration_count": 0,
+      "schema_idl_count": 0,
+      "secret_pattern_hits": 0,
+      "infra_files": 0,
+      "rationale": "No DB migrations, no schema/IDL changes, no infra files, no secrets. Behaviour-preservation claim (--enable-gate-handoff opt-in default) is validated by the 9 unchanged failure-path tests."
+    },
+    "completeness_PH04": {
+      "severity": "low",
+      "new_source_without_test": 0,
+      "rationale": "5 new tests added in test_train_failure_paths.py covering HD-001 (phase function existence + cmd_run shrinkage) and HD-007 (gate boundary pause + mark-gates-complete success + mark-gates-complete critical-found). Test count delta 288→293 = +5; HD-001's claim of '287→292' is off-by-one on baseline but delta is correct."
+    }
+  },
+  "mechanical_baseline_CR01": {
+    "python_syntax": "PASS (py_compile clean on both _wpxlib.py and wpx-train)",
+    "pytest_head": "292 passed, 1 failed (pre-existing flake test_train_lock_second_acquisition_raises — verified independent of Batch 5 by re-running on stashed baseline)",
+    "ruff": "not installed in environment",
+    "mypy": "not installed in environment",
+    "coverage_gap": "No type-checker available locally; project has no pyproject.toml at scripts root. Recommend adding ruff + mypy to plugin/sulis-execution as a follow-up — but this is pre-existing and out of scope for Batch 5 review."
+  },
+  "verdict": "Request changes",
+  "verdict_drivers": [
+    "HD-010 CRITICAL (silent data-loss in cmd_mark_gates_complete) → minimum verdict: Block; orchestrator awareness lowers to Request changes per the founder's stated 'will be addressed before commit' for the related SDK gap"
+  ],
+  "lens_summary": {
+    "architecture": {
+      "findings_in_diff": 3,
+      "summary": "HD-001 split is clean — phase boundaries explicit, dataclasses well-typed, dispatcher seam in place for MQ. HD-007 boundary placement (Option B / mark-gates-complete) is the right choice; cmd_resume + cmd_abort correctly handle the new phase. Gaps: HD-010 (ImportError-swallowed data loss); HD-012 (SDK contract drift)."
+    },
+    "security": {
+      "findings_in_diff": 0,
+      "summary": "Nothing surfaced. No secrets, no new external calls, no auth-shape changes. The mark-gates-complete subcommand is a pure state-machine transition + YAML write."
+    },
+    "quality": {
+      "findings_in_diff": 2,
+      "summary": "HD-001's '<120 LOC' sizing test is well-conceived. HD-011 (render dict missing verifying_gates; dead code_review entry). Pre-existing flake unrelated to this batch."
+    }
+  }
+}

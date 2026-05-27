@@ -1,0 +1,15 @@
+ plugins/sulis-execution/references/lifecycle.md    |   95 +-
+ plugins/sulis-execution/scripts/_wpxlib.py         |  184 +++-
+ .../tests/integration/test_train_failure_paths.py  |  295 ++++++
+ .../scripts/tests/unit/test_wpx_train_inspect.py   |   58 ++
+ plugins/sulis-execution/scripts/wpx-train          | 1027 +++++++++++++-------
+ .../sdk/mcp-server/tests/test_server.py            |    7 +-
+ .../sdk/python/sulis_execution/resources/train.py  |   66 ++
+ .../sdk/python/sulis_execution/types.py            |   35 +-
+ .../sdk/python/tests/test_resources_smoke.py       |  133 +++
+ .../sdk/sulis-execution.openapi.yaml               |  151 ++-
+ .../sdk/typescript/src/resources/train.ts          |   77 ++
+ .../sulis-execution/sdk/typescript/src/types.ts    |   39 +-
+ plugins/sulis-execution/skills/run-all/SKILL.md    |   90 +-
+ 13 files changed, 1877 insertions(+), 380 deletions(-)
+ 13 files changed, 1877 insertions(+), 380 deletions(-)

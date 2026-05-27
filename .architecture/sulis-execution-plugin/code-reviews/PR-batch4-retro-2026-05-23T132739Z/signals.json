@@ -1,0 +1,39 @@
+{
+  "ph_01_scope": {
+    "commit_count": 1,
+    "commit_type_spread": ["feat"],
+    "module_fan_out": 2,
+    "top_dirs": [".claude-plugin", "plugins/sulis-execution"],
+    "severity": "note",
+    "rationale": "Single feat commit. Two HDs (HD-005 + HD-002) bundled but coupled by depends_on: HD-002 depends on HD-005's protocol seam. Documented in HD-002 frontmatter. The bundling is justified — HD-002 cannot be written before HD-005 lands."
+  },
+  "ph_02_size": {
+    "lines_added": 1885,
+    "lines_removed": 89,
+    "lines_total": 1974,
+    "files_changed": 9,
+    "lines_band": "1001-3000",
+    "files_band": "<=15",
+    "severity": "medium",
+    "rationale": "1974 line change is in the 1001-3000 medium band. File count (9) well within threshold. Substantive split breakdown: HD-005 ~342 lines in _wpxlib.py (net) + 192 line unit-test = ~534 lines for HD-005. HD-002 = ~778 testbed + 274 test + 23 conftest = ~1075. Marketplace + plugin bumps + HD docs = ~365. Split into two PRs would have been ~534 (HD-005, including its unit tests) and ~1075 (HD-002, which depends on HD-005 landing first). Splitting would have created a stronger gate between protocol introduction and consumption — but the trade-off is real and the deltas' depends_on chain makes the bundling defensible."
+  },
+  "ph_03_safety": {
+    "migration_count": 0,
+    "schema_idl_count": 0,
+    "infra_files": 0,
+    "secret_pattern_hits": 0,
+    "lock_files": 0,
+    "severity": "note",
+    "rationale": "Pure source + test changes. No migrations, schemas, infra, or secrets."
+  },
+  "ph_04_completeness": {
+    "new_source_without_test": 0,
+    "new_test_files": 3,
+    "new_test_count": 21,
+    "api_change_without_schema": false,
+    "severity": "note",
+    "rationale": "HD-005 added a Protocol + adapter with 11 dedicated unit tests; HD-002 IS test infrastructure with 9 integration tests exercising it. Completeness is exceptional for this PR."
+  },
+  "ph_overall_severity": "medium",
+  "auto_downgrade_trigger": "none — PH-03 severity note, not high"
+}

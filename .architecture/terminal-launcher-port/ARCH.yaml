@@ -1,0 +1,21 @@
+id: ARCH-001
+title: Terminal Launcher Port (ae_task_executor → sulis)
+status: decomposed
+sourced_from: ../../.specifications/terminal-launcher-port/HANDOFF_TO_SEA.md
+created: 2026-05-25
+linked_phase: phase-5-step-5-change-as-primitive
+pillars:
+  form: gap-filled
+  armor: gap-filled
+  proof: gap-filled
+sizing:
+  tier: S
+  sfpc: 2
+  asr: 6
+  tdd_target_lines: "100-200"
+  adr_target_count: "1-2"
+  actual_tdd_lines: 315
+  actual_adr_count: 3
+  circuit_breakers_triggered:
+    - "tdd_length_1.5x — rationale in TDD Sizing Report (two cohesive concerns ship together)"
+    - "adr_count_1.5x — rationale in TDD Sizing Report (ADR-003 crosses two systems)"

@@ -1,0 +1,118 @@
+{
+  "review_id": "PR-batch5-2026-05-23T131405Z",
+  "target": "git diff HEAD (working tree)",
+  "supersedes": "PR-batch5-2026-05-23T124318Z",
+  "diff": {
+    "files_changed": 13,
+    "lines_added": 1877,
+    "lines_removed": 380,
+    "total_lines": 2257,
+    "remediation_overlay": {
+      "description": "Additive remediation on top of the prior Batch 5 working tree: HD-010 (cmd_mark_gates_complete data-loss fix) + HD-011 (phase_descriptions cleanup) + HD-012 (SDK + OpenAPI + MCP additions). The prior 5-file/1462-line Batch 5 surface is unchanged in shape; this diff adds 8 SDK-and-spec files plus the remediation tests.",
+      "new_files": 0,
+      "modified_files_added": [
+        "scripts/_wpxlib.py (read_train_run_record + writer schema extension)",
+        "scripts/wpx-train (cmd_mark_gates_complete refactor)",
+        "scripts/tests/integration/test_train_failure_paths.py (HD-010 RED + tightened existing)",
+        "scripts/tests/unit/test_wpx_train_inspect.py (HD-011 RED)",
+        "sdk/sulis-execution.openapi.yaml (trainMarkGatesComplete + enable_gate_handoff + outcome enum)",
+        "sdk/python/sulis_execution/types.py (TrainGateHandoff + TrainMarkGatesCompleteResult + Literal extension)",
+        "sdk/python/sulis_execution/resources/train.py (enable_gate_handoff kwarg + mark_gates_complete on sync + async)",
+        "sdk/python/tests/test_resources_smoke.py (6 new HD-012 RED tests)",
+        "sdk/typescript/src/types.ts (TrainGateHandoff + TrainMarkGatesCompleteResult + union extension)",
+        "sdk/typescript/src/resources/train.ts (enable_gate_handoff + markGatesComplete on sync + async)",
+        "sdk/mcp-server/tests/test_server.py (tool count 43 → 44 + train_mark_gates_complete sanity check)"
+      ]
+    }
+  },
+  "pr_hygiene": {
+    "scope_PH01": {
+      "severity": "low",
+      "commit_type_spread": ["feat", "fix", "test"],
+      "module_fan_out": 4,
+      "rationale": "Coherent scope — HD-010/011/012 are sibling remediations all rooted in the same source review (PR-batch5-2026-05-23T124318Z). The SDK additions are forced by the CLI surface that the prior diff introduced; co-shipping is correct per the 'CLI-and-SDK contract co-evolution' principle. Module fan-out reflects layered architecture (scripts + sdk python + sdk typescript + sdk mcp + spec), not unrelated changes."
+    },
+    "size_PH02": {
+      "severity": "medium",
+      "lines_added": 1877,
+      "lines_removed": 380,
+      "files_changed": 13,
+      "rationale": "1001-2500 line band, 11-30 file band — both medium. The diff includes the original Batch 5 surface (1462 lines / 5 files) + remediation (795 lines / 8 files). Splitting the remediation OUT of the original diff is the founder's call; per the prompt context, the entire bundle is intended to ship as v0.23.0 (single semantic version cut) so the review treats them as one PR. If they were to split, the natural cut would be: Commit 1 = original HD-001 + HD-007; Commit 2 = HD-010/011/012 remediation. Both commits would be in the medium band individually."
+    },
+    "safety_PH03": {
+      "severity": "low",
+      "migration_count": 0,
+      "schema_idl_count": 1,
+      "secret_pattern_hits": 0,
+      "infra_files": 0,
+      "rationale": "Schema/IDL change: sdk/sulis-execution.openapi.yaml gains 2 new schemas (TrainMarkGatesCompleteRequest/Result, TrainGateHandoff), 1 new operation (trainMarkGatesComplete), 1 enum extension (TrainRunResult.outcome adds awaiting_gates + paused; TrainStateSnapshot.phase adds verifying_gates). All additive — no breaking changes. Pydantic forward-compat (extra=allow) on the SDK side means existing consumers keep validating. No secrets, no infra, no migrations."
+    },
+    "completeness_PH04": {
+      "severity": "low",
+      "new_source_without_test": 0,
+      "rationale": "Every new code path has a test. HD-010: 1 new RED test (test_mark_gates_complete_preserves_bundle_and_deploy_fields) + 2 tightened existing tests (now assert bundle/started_at/batch_size/gate_findings_path survive). HD-011: 2 new tests (covers + dead-keys). HD-012: 6 new SDK tests (awaiting_gates outcome, mark_gates_complete success + critical_found, kwarg presence, method presence, Literal validation) + 1 MCP test bump. Test count delta: scripts +3 (293 → 296 collected; 295 pass); Python SDK +6 (25 → 31); MCP +1 (19 → 20). TypeScript no new tests but the types are exercised by the existing pilot tests via Vitest and confirmed by `tsc --noEmit`."
+    }
+  },
+  "mechanical_baseline_CR01": {
+    "python_syntax": "PASS (py_compile clean on all modified Python files)",
+    "pytest_scripts_head": "295 passed, 1 failed (test_train_lock_second_acquisition_raises — pre-existing flake; verified in prior review against stashed baseline; unchanged by this diff)",
+    "pytest_sdk_python_head": "31 passed (was 25)",
+    "pytest_sdk_mcp_head": "20 passed (was 19; +1 for train_mark_gates_complete sanity check)",
+    "npm_test_typescript_head": "9 passed (unchanged)",
+    "tsc_noEmit": "PASS (TypeScript types compile cleanly with new TrainGateHandoff, TrainMarkGatesCompleteResult, extended TrainRunResult union)",
+    "ruff": "not installed in environment",
+    "mypy": "not installed in environment",
+    "coverage_gap": "No ruff/mypy locally. py_compile + pytest cover syntax and behaviour. TS tsc --noEmit covers the TS side. SDK + MCP test counts confirm the surface."
+  },
+  "verdict": "PASS",
+  "verdict_drivers": [
+    "All three findings from the prior review (HD-010 CRITICAL, HD-011 medium, HD-012 high) are addressed at file:line with characterisation tests. The HD-010 RED test was confirmed RED on the pre-fix code (git stash check) and GREEN on the fix.",
+    "No new critical/high findings surfaced in the lens sweep. The fixes are minimal, surgical, and additive.",
+    "Build verification empty (py_compile + tsc + pytest all clean except 1 pre-existing flake).",
+    "PR Hygiene primitives: Scope/Safety/Completeness all low. Size medium (1001-2500 band) but justified by additive remediation + SDK contract co-evolution; no PH-03 high → no CR-06 auto-downgrade.",
+    "Self-attestation complete (CR-08): all CR-01..CR-09 boxes checked with reasons."
+  ],
+  "lens_summary": {
+    "architecture": {
+      "findings_in_diff": 0,
+      "summary": "HD-010 fix follows the Convention Preference principle: writer/reader symmetry as a pair (CP-01 priority 0 — established convention in this codebase, mirroring write_train_run_record's bespoke YAML emitter). The bare-except was removed; ImportError-via-bare-except was the root cause, and the new code lifts the import to the module top so any failure is loud at startup, not at runtime. HD-012 closes the CLI-SDK contract drift — adds the missing surface symmetrically (Python sync + async, TypeScript sync + async, OpenAPI spec, MCP auto-registration). No new gaps surfaced."
+    },
+    "security": {
+      "findings_in_diff": 0,
+      "summary": "Nothing surfaced. The new read_train_run_record reads from a project-local path derived from validated args (no path traversal). YAML-lite parser is pure Python (no eval, no exec, no shell-out). No new external calls, no auth changes, no new secrets. mark-gates-complete is still a pure state-machine transition + YAML write. The new SDK methods are thin transport wrappers — no new attack surface."
+    },
+    "quality": {
+      "findings_in_diff": 0,
+      "summary": "HD-010 fix removed a bare-except (anti-pattern); replaced with a real reader + module-top import. HD-011 fix is the 4-line dict edit + 2 RED tests catching future drift. HD-012 additions are uniformly typed (Literal extensions, new dataclasses/Pydantic models, JSDoc comments cross-referencing HD-007). Test contracts on the mark-gates-complete path are now tight (assert bundle/started_at/batch_size/gate_findings_path survival, not just outcome). One advisory: the `_TRAIN_RECORD_SCALAR_KEYS` tuple is now load-bearing — if a future field is added to the writer's schema, it must be added to this tuple OR it'll be silently dropped from the historical archive. The HD-010 test would catch most cases (asserts specific fields) but not a brand-new field. Noted as a watch-list item — not a blocking finding."
+    }
+  },
+  "tests_added_or_tightened": {
+    "scripts/tests/integration/test_train_failure_paths.py": [
+      "test_mark_gates_complete_finalises_train_to_success (TIGHTENED — now asserts started_at + batch_size + bundle + completed_at survive)",
+      "test_mark_gates_complete_preserves_bundle_and_deploy_fields (NEW — HD-010 RED)",
+      "test_mark_gates_complete_with_critical_marks_gate_blocker (TIGHTENED — asserts started_at + bundle + gate_findings_path survive)"
+    ],
+    "scripts/tests/unit/test_wpx_train_inspect.py": [
+      "test_phase_descriptions_covers_every_non_terminal_phase (NEW — HD-011 RED for missing verifying_gates)",
+      "test_phase_descriptions_has_no_dead_keys_outside_phases (NEW — HD-011 RED for dead code_review key)"
+    ],
+    "sdk/python/tests/test_resources_smoke.py": [
+      "test_train_run_awaiting_gates (NEW — HD-012 RED for outcome Literal + gate_handoff parsing)",
+      "test_train_mark_gates_complete_success (NEW — HD-012 RED for sync method)",
+      "test_train_mark_gates_complete_critical_found (NEW — HD-012 RED for gate_blocker outcome)",
+      "test_train_resource_run_accepts_enable_gate_handoff (NEW — HD-012 static signature contract)",
+      "test_train_resource_has_mark_gates_complete (NEW — HD-012 method-presence contract)",
+      "test_train_run_result_outcome_literal_includes_awaiting_gates (NEW — HD-012 Pydantic Literal contract)"
+    ],
+    "sdk/mcp-server/tests/test_server.py": [
+      "test_tool_registry_covers_all_operations (TIGHTENED — bumped expected count 43 → 44; added train_mark_gates_complete sanity assertion)"
+    ]
+  },
+  "ports_and_adapters_check": {
+    "primitive": "EXPAND-Extend + REINFORCE-Test",
+    "rationale": "HD-010 is REINFORCE-Test (RED test surfacing data loss) + REORGANISE-Refactor (extract read function, remove bare-except). HD-011 is EXPAND-Extend (add dict entry; remove dead key). HD-012 is EXPAND-Extend on a domain-owned port (OpenAPI spec) with co-evolved adapters (Python SDK + TypeScript SDK + MCP server). None of the new code is a Wrap-over-internal — the SDK adapters implement a domain-owned port (the SDK contract). Per the Ports & Adapters check, this is Create, not Wrap.",
+    "no_band_aid_wrappers": "PASS",
+    "wrap_subjects": [],
+    "characterisation_tests_before_refactor": "PASS (HD-010 has the RED test in place before/with the refactor)"
+  }
+}
