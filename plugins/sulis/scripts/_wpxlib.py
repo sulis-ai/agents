@@ -285,6 +285,51 @@ def parse_md_table(table_text: str) -> MdTable:
     return MdTable(headers=headers, alignments=alignments, rows=rows)
 
 
+# ─── WP INDEX column resolution (shared by wpx-index + parse_index_md) ──────
+#
+# Two parsers historically disagreed on the "depends" column header —
+# wpx-index keyed on "depends", parse_index_md keyed on "depends on" — so a
+# correctly-generated INDEX (canonical header "Depends On") was silently
+# rejected by one of them (L-02). This is the SINGLE source of truth both now
+# call: a canonical column key → the set of accepted (lowercased) header
+# spellings. Adding a spelling here fixes both parsers at once.
+WP_COLUMN_ALIASES: dict[str, frozenset[str]] = {
+    "id": frozenset({"id", "wp", "wp id"}),
+    "title": frozenset({"title", "name"}),
+    "primitive": frozenset({"primitive", "kind"}),
+    "status": frozenset({"status"}),
+    "depends": frozenset(
+        {"depends", "depends on", "dependson", "depends_on", "depends-on"}
+    ),
+    "blocks": frozenset({"blocks", "blocked by", "unblocks"}),
+}
+
+
+def _normalise_header(header: str) -> str:
+    """Lowercase + strip a header to its comparable form (drops a trailing
+    footnote marker like ' *')."""
+    return header.strip().lower().rstrip(" *")
+
+
+def resolve_wp_columns(headers: list[str]) -> dict[str, int]:
+    """Map a WP table's headers to canonical column keys → column index.
+
+    Both wpx-index and parse_index_md call this so they resolve the same
+    table identically. Header spelling variants (``Depends On`` / ``Depends``
+    / ``depends_on``) all collapse to the canonical key ``"depends"``.
+    Unknown headers are ignored (callers read them as extras). First match
+    wins if a spelling somehow maps twice.
+    """
+    resolved: dict[str, int] = {}
+    for i, raw in enumerate(headers):
+        norm = _normalise_header(raw)
+        for canonical, spellings in WP_COLUMN_ALIASES.items():
+            if norm in spellings and canonical not in resolved:
+                resolved[canonical] = i
+                break
+    return resolved
+
+
 def find_section(text: str, heading: str) -> tuple[int, int]:
     """Find the byte range of a Markdown section by heading.
 
@@ -1130,15 +1175,14 @@ def parse_index_md(
         if not table.headers:
             continue
 
-        # Map column names to indices (case-insensitive, strip whitespace)
-        col_index: dict[str, int] = {}
-        for i, h in enumerate(table.headers):
-            key = h.strip().lower().replace("on", "on").rstrip(" *")
-            col_index[key] = i
+        # Resolve columns once via the shared resolver (L-02): canonical key
+        # → index. wpx-index uses the same resolver, so header spelling
+        # variants ("Depends On" / "Depends") resolve identically across both.
+        col_index = resolve_wp_columns(table.headers)
+        resolved_indices = set(col_index.values())
 
         def get(row: list[str], name: str, default: str = "") -> str:
-            key = name.lower()
-            i = col_index.get(key)
+            i = col_index.get(name)
             if i is None or i >= len(row):
                 return default
             return row[i].strip()
@@ -1152,11 +1196,8 @@ def parse_index_md(
                 continue
 
             extras: dict[str, str] = {}
-            standard_keys = {"id", "title", "primitive", "status",
-                             "depends on", "blocks"}
             for i, h in enumerate(table.headers):
-                key = h.strip().lower()
-                if key in standard_keys or i >= len(row):
+                if i in resolved_indices or i >= len(row):
                     continue
                 extras[h.strip()] = row[i].strip()
 
@@ -1165,7 +1206,7 @@ def parse_index_md(
                 title=get(row, "title"),
                 primitive=get(row, "primitive"),
                 status=get(row, "status"),
-                depends_on=_split_csv_or_dash(get(row, "depends on")),
+                depends_on=_split_csv_or_dash(get(row, "depends")),
                 blocks=_split_csv_or_dash(get(row, "blocks")),
                 extras=extras,
             ))

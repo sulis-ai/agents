@@ -28,6 +28,7 @@ from _wpxlib import (  # noqa: E402
     parse_index_md,
     parse_md_table,
     paths_from_args,
+    resolve_wp_columns,
 )
 
 
@@ -186,7 +187,7 @@ def cmd_list_ready(args: argparse.Namespace) -> None:
     text = _read_index(args)
     start, end, table_text = _find_wp_table(text)
     table = parse_md_table(table_text)
-    cols = {h.lower(): i for i, h in enumerate(table.headers)}
+    cols = resolve_wp_columns(table.headers)  # shared resolver (L-02)
     required = {"id", "status", "depends"}
     if not required <= cols.keys():
         emit_error(
@@ -239,7 +240,7 @@ def cmd_propagate_blocked(args: argparse.Namespace) -> None:
     text = _read_index(args)
     start, end, table_text = _find_wp_table(text)
     table = parse_md_table(table_text)
-    cols = {h.lower(): i for i, h in enumerate(table.headers)}
+    cols = resolve_wp_columns(table.headers)  # shared resolver (L-02)
 
     # Build transitive descendants
     depends_map: dict[str, list[str]] = {}
