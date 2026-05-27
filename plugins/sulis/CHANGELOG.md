@@ -1,5 +1,21 @@
 # Sulis — Changelog
 
+## v0.59.0 — 2026-05-27
+
+**Minor — archive on ship: preserve the audit trail, refuse to nuke it.**
+
+(1) **#38 — change-lifecycle hygiene with audit-trail preservation.** Inverts the original "auto-cleanup on ship" framing: a shipped change's worktree, local branch, change record, and in-repo records ALL stay so the cockpit + future sessions can retrace what happened. The default actively REFUSES to destroy archived audit trail.
+
+- **Terminal stages.** `_change_state.py` introduces `TERMINAL_STAGES = ("shipped",)` past the six-stage workflow + `shipped_at` field. `mark_change_shipped()` flips stage on both state.json and change.json (idempotent — preserves the first ship time).
+- **`sulis-change finish`** replaces destructive cleanup with `mark_change_shipped`. `--no-cleanup` flag preserved as a back-compat no-op.
+- **`sulis-change mark-shipped`** (new subcommand) — for the gh-PR ship-skill flow.
+- **`sulis-change nuke`** refuses on `stage='shipped'` unless `--force`. The loud explanatory error cites the audit-trail rule.
+- **Cockpit.** `WorkflowStage` union extended with `'shipped'`; Sidebar splits into Active + Shipped sections (Shipped collapsed by default with toggle); `StageBadge` renders "Shipped" as a muted terminal-stage badge.
+
+Tests: 9 new Python (helper, CLI, nuke-refuses-shipped + force-override, archive-on-ship integration) + 3 new Sidebar (no Shipped section when none shipped; collapsed-by-default with count; expand on click). Code-health deep mode (PR scope): no critical or high findings. Two follow-on lesson issues raised durably via /sulis:capture-lessons during the audit (#22 silent-corrupt-record edge in nuke protection; #23 dedup index-lag in lessons-capture itself).
+
+967 tests green (686 python + 281 cockpit).
+
 ## v0.58.0 — 2026-05-27
 
 **Minor — lessons-capture: post-ship lessons become durable GitHub issues.**
