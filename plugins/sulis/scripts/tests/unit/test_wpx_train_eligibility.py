@@ -398,3 +398,30 @@ def test_optimistic_and_strict_agree_when_all_ci_green(tmp_project, monkeypatch)
     )
     assert [r.eligible for r in optimistic] == [r.eligible for r in strict]
     assert all(r.eligible for r in optimistic)
+
+
+# ─── L-03: the status-vocab unification must NOT move the train words ───────
+
+
+def test_train_status_constants_unchanged_by_l03():
+    """L-03 unified the 'ready to start' word on `pending`. The train's own
+    lifecycle words (`step-7-complete`, `done`) are a different axis and MUST
+    be untouched — eligibility/done logic keys on these exact strings."""
+    assert _wpxlib.TRAIN_ELIGIBLE_STATUS == "step-7-complete"
+    assert _wpxlib.TRAIN_HELD_STATUS == "step-7-held"
+    assert _wpxlib.TRAIN_BLOCKED_STATUS == "step-7-blocked"
+    assert _wpxlib.TRAIN_DONE_STATUS == "done"
+
+
+def test_train_statuses_are_in_the_canonical_set():
+    """The train words must be recognised by the L-03 write-time validator,
+    so a WP the executor parks at step-7-complete can be re-added to an INDEX
+    without tripping the new status guard."""
+    for status in (
+        _wpxlib.TRAIN_ELIGIBLE_STATUS,
+        _wpxlib.TRAIN_HELD_STATUS,
+        _wpxlib.TRAIN_BLOCKED_STATUS,
+        _wpxlib.TRAIN_DONE_STATUS,
+    ):
+        assert status in _wpxlib.CANONICAL_WP_STATUSES
+        assert _wpxlib.validate_wp_status(status) is None

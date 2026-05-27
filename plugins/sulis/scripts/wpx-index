@@ -20,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _wpxlib import (  # noqa: E402
+    CANONICAL_WP_STATUSES,
     add_common_args,
     cli_main,
     compute_wp_status,
@@ -29,7 +30,12 @@ from _wpxlib import (  # noqa: E402
     parse_md_table,
     paths_from_args,
     resolve_wp_columns,
+    validate_wp_status,
 )
+
+# Argparse choice lists for status flags derive from the one canonical set
+# (L-03) so flip-status / add-wp can never drift from the validator again.
+_STATUS_CHOICES = sorted(CANONICAL_WP_STATUSES)
 
 
 # INDEX.md structure (simplified):
@@ -306,6 +312,12 @@ def _cells_from_frontmatter(fm: dict, wp_id: str) -> list[str]:
     title = fm.get("title", "")
     primitive = fm.get("primitive", "")
     status = fm.get("status", "auto-draft")
+    # L-03 loud write-time validator — reject a drifted status (`ready`/`todo`/
+    # a typo) here, at the single chokepoint both add-wp and sync-auto-drafts
+    # flow through, instead of letting it vanish silently from list-ready.
+    status_error = validate_wp_status(str(status))
+    if status_error is not None:
+        raise ValueError(f"{wp_id}: {status_error}")
     depends = _list_cell(fm.get("dependsOn"))
     blocks = _list_cell(fm.get("blocks"))
     # token estimate may be a scalar string ("1k", "?") or a dict (input/output Nk)
@@ -384,7 +396,11 @@ def cmd_add_wp(args: argparse.Namespace) -> None:
                 f"--from-wp-file: frontmatter id={fm.get('id')!r} "
                 f"does not match --wp={args.wp}"
             )
-        cells = _cells_from_frontmatter(fm, args.wp)
+        try:
+            cells = _cells_from_frontmatter(fm, args.wp)
+        except ValueError as e:
+            emit_error(str(e))
+            return  # for type checker
     else:
         # Explicit-fields mode
         if not args.title or not args.primitive:
@@ -402,7 +418,11 @@ def cmd_add_wp(args: argparse.Namespace) -> None:
         }
         if args.tdd:
             fm["tdd_section"] = args.tdd
-        cells = _cells_from_frontmatter(fm, args.wp)
+        try:
+            cells = _cells_from_frontmatter(fm, args.wp)
+        except ValueError as e:
+            emit_error(str(e))
+            return  # for type checker
 
     new_text = _append_wp_row(text, cells)
     _write_index(args, new_text)
@@ -599,10 +619,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_flip = sub.add_parser("flip-status", help="Change a WP's status (with check)")
     add_common_args(p_flip)
     p_flip.add_argument("--wp", required=True)
-    p_flip.add_argument("--to", required=True,
-                        choices=["pending", "in_progress", "done", "blocked",
-                                 "dependency_blocked", "auto-draft", "cancelled",
-                                 "step-7-complete", "step-7-held", "step-7-blocked"])
+    p_flip.add_argument("--to", required=True, choices=_STATUS_CHOICES)
     p_flip.add_argument("--expected", default=None,
                         help="Expected current status (atomic check)")
 
@@ -637,9 +654,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_add.add_argument("--primitive", default=None,
                        help="Change primitive (required if --from-wp-file is not set)")
     p_add.add_argument(
-        "--status", default="auto-draft",
-        choices=["pending", "in_progress", "done", "blocked",
-                 "dependency_blocked", "auto-draft", "cancelled"],
+        "--status", default="auto-draft", choices=_STATUS_CHOICES,
         help="Initial status (default: auto-draft)",
     )
     p_add.add_argument("--depends-on", default="",

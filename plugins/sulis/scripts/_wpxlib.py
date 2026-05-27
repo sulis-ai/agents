@@ -330,6 +330,65 @@ def resolve_wp_columns(headers: list[str]) -> dict[str, int]:
     return resolved
 
 
+# ─── Canonical WP status vocabulary (L-03) ──────────────────────────────
+#
+# `pending` is the canonical "ready to start" word — it aligns wpx-index,
+# parse_index_md, the orchestrator, and the plan-work template. Before L-03
+# there were four spellings (WP-07 said `todo`; _lib.wp_index defaulted
+# `todo` and bucketed any UNKNOWN status as "ready"), so a WP with a drifted
+# status (`ready`) looked fine in the INDEX but was invisible to `list-ready`,
+# which counts only `pending`.
+#
+# Two sets, two jobs:
+#   * WRITE path (this set, strict) — a WP being added/decomposed MUST use one
+#     of these. `todo`/`ready` are deliberately absent: new WPs use `pending`,
+#     so drift fails loudly at add time (validate_wp_status) instead of
+#     vanishing silently.
+#   * READ path (lenient) — `_lib.wp_index.STATUS_BUCKETS` separately tolerates
+#     `pending`/`todo`/`ready` so any pre-existing legacy file still surfaces.
+
+WP_STATUS_READY = "pending"
+
+CANONICAL_WP_STATUSES: frozenset[str] = frozenset(
+    {
+        "pending",              # ready to start (canonical)
+        "in_progress",
+        "blocked",
+        "dependency_blocked",   # transitional, set by propagate-blocked
+        "sleeping",             # paused, needs a decision (WP-07)
+        "step-7-complete",      # train lifecycle: coded, awaiting steps 8-11
+        "step-7-held",
+        "step-7-blocked",
+        "done",
+        "closed",               # loop-verified (WP-07)
+        "regressed",            # WP-07
+        "abandoned",            # WP-07
+        "cancelled",            # auto-draft dispositioned out
+        "auto-draft",           # security finding awaiting disposition
+    }
+)
+
+
+def validate_wp_status(status: str) -> str | None:
+    """Return None if ``status`` is a canonical WP status, else an error string.
+
+    Comparison is whitespace-trimmed + case-insensitive; the canonical set is
+    lowercase. An unrecognised non-empty status is the L-03 bug class (a WP that
+    silently never appears in ``list-ready``); callers MUST surface the returned
+    message loudly (emit_error for a single WP, a per-WP error for a batch)
+    rather than write the row.
+    """
+    norm = (status or "").strip().lower()
+    if norm in CANONICAL_WP_STATUSES:
+        return None
+    valid = ", ".join(sorted(CANONICAL_WP_STATUSES))
+    return (
+        f"unrecognised WP status {status!r} — must be one of: {valid}. "
+        f"Use {WP_STATUS_READY!r} for a ready-to-start WP "
+        f"('todo'/'ready' are tolerated only for display, not for new WPs)."
+    )
+
+
 def find_section(text: str, heading: str) -> tuple[int, int]:
     """Find the byte range of a Markdown section by heading.
 

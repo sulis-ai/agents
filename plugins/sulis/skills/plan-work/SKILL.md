@@ -46,7 +46,7 @@ working on parallel WPs simultaneously.
 ---
 id: WP-007
 title: Implement Postgres OrderRepository adapter
-status: pending                  # pending | in_progress | done | blocked
+status: pending                  # MUST be `pending` for a new WP (L-03 canonical "ready to start"); add-wp rejects `todo`/`ready`. Later: in_progress | done | blocked
 sequence_id: WP-007
 dependsOn: [WP-001, WP-003]      # the domain entity and the port must exist first
 blocks: [WP-012]                 # the application service uses this adapter

@@ -42,8 +42,13 @@ except ImportError:
 # ─── Status buckets (WP-07) ──────────────────────────────────────────
 
 
+# L-03 READ-path leniency: the ready bucket tolerates all three spellings of
+# "ready to start" so a pre-existing legacy file (`todo`/`ready`) still
+# surfaces by MATCH rather than via the silent UNKNOWN→ready fallback below.
+# The canonical word is `pending` (see `_wpxlib.WP_STATUS_READY`); the WRITE
+# path (`_wpxlib.validate_wp_status`) rejects `todo`/`ready` for new WPs.
 STATUS_BUCKETS = [
-    ("ready",       "▶ Ready to start",                       ["todo"]),
+    ("ready",       "▶ Ready to start",                       ["pending", "todo", "ready"]),
     ("in_progress", "🔄 In progress",                         ["in_progress"]),
     ("blocked",     "⏸ Blocked",                              ["blocked"]),
     ("sleeping",    "💤 Sleeping — needs a decision",         ["sleeping"]),
@@ -216,7 +221,7 @@ def summarise_wp(path: Path) -> Optional[WPSummary]:
         title=str(fm.get("title", "")),
         kind=str(fm.get("kind", "unknown")),
         source=str(fm.get("source", "manual")),
-        status=str(fm.get("status", "todo")),
+        status=str(fm.get("status", "pending")),  # L-03 canonical default
         estimate=str(fm.get("estimate", "")),
         depends_on=[str(d) for d in depends_on],
         parent_phase=str(fm.get("parent_phase", "")),
