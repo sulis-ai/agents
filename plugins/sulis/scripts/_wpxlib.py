@@ -3679,6 +3679,7 @@ def find_change_branches(repo_root: Path) -> list[dict]:
         return []
 
     result: list[dict] = []
+    seen: set[str] = set()
     for raw in out.splitlines():
         line = raw.rstrip()
         if not line:
@@ -3693,12 +3694,43 @@ def find_change_branches(repo_root: Path) -> list[dict]:
         if parsed is None:
             continue
         primitive, slug = parsed
+        seen.add(branch)
         result.append({
             "branch": branch,
             "primitive": primitive,
             "slug": slug,
             "current": is_current,
         })
+
+    # Also surface origin-only change branches (a teammate's change pulled but
+    # not checked out locally). Strip the `origin/` prefix to the logical
+    # branch name; skip any already listed as a local branch. (L-01)
+    rrc, rout, _ = _run(
+        ["git", "branch", "--list", "--remotes", "origin/change/*"],
+        cwd=repo_root, timeout=10,
+    )
+    if rrc == 0:
+        for raw in rout.splitlines():
+            line = raw.strip()
+            if not line or "->" in line:  # skip "origin/HEAD -> origin/dev"
+                continue
+            if line.startswith("origin/"):
+                branch = line[len("origin/"):]
+            else:
+                continue
+            if branch in seen:
+                continue
+            parsed = parse_change_branch(branch)
+            if parsed is None:
+                continue
+            primitive, slug = parsed
+            seen.add(branch)
+            result.append({
+                "branch": branch,
+                "primitive": primitive,
+                "slug": slug,
+                "current": False,
+            })
     return result
 
 
@@ -3716,16 +3748,28 @@ SULIS_CHANGE_ID_ENV_VAR = "SULIS_CHANGE_ID"
 def resolve_current_change(repo_root: Path | None = None) -> dict | None:
     """Resolve the current change context from the SULIS_CHANGE_ID env var.
 
-    Returns a dict with at minimum {change_id, handle, branch, primitive,
-    slug, worktree_path, ...} if the env var is set AND a matching change
-    branch with metadata exists in this repo. Returns None if:
+    Returns the change metadata dict ({change_id, handle, branch, primitive,
+    slug, worktree_path, ...}) when the env var is set AND a matching change's
+    metadata is found. Returns None when the env var is unset, or set but no
+    match.
 
-    - SULIS_CHANGE_ID is unset
-    - SULIS_CHANGE_ID is set but no matching change branch found
-    - The matching branch has no .changes/{primitive}-{slug}.yaml metadata
+    Resolution order (L-01 — cwd-first, then fall back):
 
-    The matching strategy: iterate `find_change_branches(repo_root)`, read
-    each metadata file, look for one whose `change_id` matches the env var.
+      1. **Self** — the common case where this is invoked from INSIDE the
+         change worktree (cwd == the worktree). Metadata travels ON the
+         change branch, so it's already at `repo_root/.changes/`. Read the
+         current branch directly and the committed metadata beside it. The
+         pre-L-01 code only computed a SIBLING worktree path and so returned
+         None here even with the env var set and a valid manifest.
+      2. **`.changes/` scan** — scan `repo_root/.changes/*.yaml` for any whose
+         change_id matches (covers a detached HEAD / odd branch name but
+         committed metadata).
+      3. **Sibling worktree iteration** — the original path: driving from the
+         MAIN repo, the metadata lives in the sibling change worktree. Now
+         also covers origin-only change branches via find_change_branches.
+
+    When the env var is set but nothing matches, a breadcrumb of the paths
+    checked is written to stderr (debugging aid; never pollutes stdout JSON).
     """
     change_id = os.environ.get(SULIS_CHANGE_ID_ENV_VAR)
     if not change_id:
@@ -3736,22 +3780,52 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
     else:
         repo_root = Path(repo_root).resolve()
 
-    # Iterate change branches; find the one with matching change_id in metadata.
-    # Note: metadata lives ON the change branch, so we need to read from the
-    # change worktree's .changes/ directory (or git-show from the branch).
-    # For now, simplest: rely on the change worktree existing (sulis-change
-    # start always creates one); look there.
+    checked: list[str] = []
+
+    # 1. Self: current branch + metadata committed at repo_root/.changes/.
+    rc, branch_out, _ = _run(
+        ["git", "branch", "--show-current"], cwd=repo_root, timeout=10,
+    )
+    if rc == 0:
+        parsed = parse_change_branch(branch_out.strip())
+        if parsed is not None:
+            primitive, slug = parsed
+            self_meta = repo_root / ".changes" / f"{primitive}-{slug}.yaml"
+            checked.append(str(self_meta))
+            if self_meta.exists():
+                metadata = read_change_metadata(self_meta)
+                if metadata.get("change_id") == change_id:
+                    return metadata
+
+    # 2. Scan repo_root/.changes/ for any manifest matching this change_id.
+    changes_dir = repo_root / ".changes"
+    if changes_dir.is_dir():
+        for meta_file in sorted(changes_dir.glob("*.yaml")):
+            checked.append(str(meta_file))
+            metadata = read_change_metadata(meta_file)
+            if metadata.get("change_id") == change_id:
+                return metadata
+
+    # 3. Sibling worktree iteration (driving from the main repo; includes
+    #    origin-only change branches via find_change_branches).
     for entry in find_change_branches(repo_root):
         primitive = entry["primitive"]
         slug = entry["slug"]
         worktree_dest = change_worktree_path(repo_root, primitive, slug)
         metadata_path = worktree_dest / ".changes" / f"{primitive}-{slug}.yaml"
+        checked.append(str(metadata_path))
         if not metadata_path.exists():
             continue
         metadata = read_change_metadata(metadata_path)
         if metadata.get("change_id") == change_id:
             return metadata
 
+    # Env var set but nothing matched — leave a breadcrumb for debugging.
+    print(
+        f"resolve_current_change: SULIS_CHANGE_ID={change_id} set but no "
+        f"matching metadata found. Checked: {checked or '(no candidates)'}",
+        file=sys.stderr,
+    )
     return None
 
 
