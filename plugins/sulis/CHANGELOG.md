@@ -1,5 +1,13 @@
 # Sulis — Changelog
 
+## v0.68.0 — 2026-05-28
+
+**Patch — anonymiser URL pass redacts credential-bearing URLs unconditionally (closes #39).**
+
+PR #38's review surfaced that `_extract_host_from_url` splits on `:` so a URL like `https://user:pass@github.com/...` extracts `user` as the "host" and falls through to `<url>` by accident. Output is right today but only by luck — a naive "extract the real host" change would route credential-bearing allowlisted-host URLs to the preserved branch and leak credentials.
+
+New `_url_has_userinfo(url)` predicate. `_replace_url` checks it FIRST and short-circuits to `<url>` if userinfo is present; allowlist evaluation skipped entirely. 15 new tests (9 helper-direct + 6 anonymise()-level). 788/788 pass.
+
 ## v0.67.0 — 2026-05-28
 
 **Minor — `/sulis:feedback` skill + extracted shared issue-capture engine (closes #20).**
