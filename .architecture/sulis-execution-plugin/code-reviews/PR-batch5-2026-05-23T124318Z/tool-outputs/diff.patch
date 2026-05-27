@@ -1,0 +1,1660 @@
+diff --git a/plugins/sulis-execution/references/lifecycle.md b/plugins/sulis-execution/references/lifecycle.md
+index 97fdfe7..be50d68 100644
+--- a/plugins/sulis-execution/references/lifecycle.md
++++ b/plugins/sulis-execution/references/lifecycle.md
+@@ -20,8 +20,8 @@ trigger.
+ | 8 | CI poll + rebase + squash-merge | **v0.11.0+:** `wpx-train` (per-batch). **--force-single / hotfix:** `wpx-pipeline` (per-WP). |
+ | 9 | Deploy poll | **v0.11.0+:** `wpx-train` (per-batch — ONE deploy per train). **--force-single:** `wpx-pipeline`. |
+ | 10 | Health + smoke | **v0.11.0+:** `wpx-train` (per-batch — ONE health+smoke per train). **--force-single:** `wpx-pipeline`. |
+-| 10.5 | **Train-batch code-review (IMPLEMENTED v0.21.1+ as post-merge variant)** | Calling session (`/sea:code-review` against the batch diff range `<bundle[0].pre_train_sha>..<bundle[-1].merge_sha_on_dev>` after `wpx-train run` returns success). Catches cross-WP composition issues (N+1 across siblings, integration regressions). CRITICAL → BLOCKER batch-wide + auto-draft remediation WPs; CONCERN/ADVISORY → SF registered + WP-AUTO-* auto-drafted. The TRUE pre-merge gate (cmd_run pause/resume) is still deferred — see "Step 10.5 (post-merge variant)" below. |
+-| 11 | Security review (post-deploy verification) | Calling session (`Agent({subagent_type: "sulis-security:security-reviewer"})` + `wpx-findings register`) — runs **per-WP sequentially after `wpx-train run` returns outcome=success**. Dispatched by the run-all skill (v0.20.0+), one WP at a time over the batch's `wps_shipped`. CRITICAL → BLOCKER + `step-11-blocked` + Step 12 skipped for that WP; CONCERN/ADVISORY → SF registered + WP-AUTO-* auto-drafted. The loop is **distributed across trains** — terminates when a subsequent train's Step 11 produces zero NEW (non-duplicate) findings. |
++| 10.5 | **Train-batch code-review (IMPLEMENTED v0.21.1+ as post-merge variant; folded into `_verify_phase` boundary at v0.23.0 per HD-007)** | Calling session (`/sea:code-review` against the batch diff range `<bundle[0].pre_train_sha>..<bundle[-1].merge_sha_on_dev>` after `wpx-train run` returns). Catches cross-WP composition issues (N+1 across siblings, integration regressions). CRITICAL → BLOCKER batch-wide + auto-draft remediation WPs; CONCERN/ADVISORY → SF registered + WP-AUTO-* auto-drafted. **HD-007 (v0.23.0)**: when callers pass `--enable-gate-handoff` to `wpx-train run`, the train stops at the new `verifying_gates` phase with `outcome: awaiting_gates` (exit 0); the calling session dispatches Step 10.5 + Step 11 inside that phase and invokes `wpx-train mark-gates-complete` to finalise. The gates are now part of the train's transaction (in lifecycle terms) — the dispatch mechanism stays in the calling LLM session (a Python CLI can't spawn Agents). Legacy callers (no `--enable-gate-handoff`) continue to dispatch Step 10.5 + Step 11 as post-train follow-on. |
++| 11 | Security review (post-deploy verification) | Calling session (`Agent({subagent_type: "sulis-security:security-reviewer"})` + `wpx-findings register`) — runs **per-WP sequentially after `wpx-train run` returns**. Dispatched by the run-all skill (v0.20.0+), one WP at a time over the batch's `wps_shipped`. CRITICAL → BLOCKER + `step-11-blocked` + Step 12 skipped for that WP; CONCERN/ADVISORY → SF registered + WP-AUTO-* auto-drafted. The loop is **distributed across trains** — terminates when a subsequent train's Step 11 produces zero NEW (non-duplicate) findings. **HD-007 (v0.23.0)**: when `--enable-gate-handoff` was set on `wpx-train run`, Step 11 fires inside the `verifying_gates` phase and the calling session invokes `wpx-train mark-gates-complete --train-id <id>` once both Step 10.5 + Step 11 dispatches complete (or `--critical-found` if any CRITICAL surfaced). |
+ | 12 | INDEX flip + acceptance evidence + worktree removal | Calling session (`wpx-step12 wrap`) — flips `step-7-complete` → `done` after train succeeds |
+ 
+ > **v0.11.0+ change (ADR-212):** Steps 8-10 are now per-batch via
+@@ -150,6 +150,97 @@ worktree removal (Step 12) bracket the per-executor isolation.
+ 
+ ---
+ 
++## Train phases and `_verify_phase`'s gate-handoff boundary (v0.23.0, HD-001 + HD-007)
++
++`wpx-train`'s `cmd_run` is split into three phase functions with explicit
++transaction boundaries (HD-001):
++
++| Phase function | Mutates base branch? | Returns |
++|---|---|---|
++| `_plan_phase` | **No** (force-pushes rebased *feature* branches; never touches the base branch) | `PlanResult(bundle, base_branch, bundle_tip_branch, ci_verdict, rebase_failures)` |
++| `_commit_phase` | **Yes** — only phase that mutates the base branch (squash-merge). Strategy dispatcher: today `_commit_via_rebase_loop` is the only strategy; merge-queue strategy lands in a follow-up delta per the spike's PARTIAL recommendation | `CommitResult(merge_shas, final_merge_sha)` |
++| `_verify_phase` | No (read-only — deploy poll + health + smoke) | `VerifyResult(deploy_url, deploy_verdict, health_status, smoke_verdict, ready_for_gates)` |
++
++cmd_run reduces to: discovery → batch packing → train-state init → three
++phase-function calls → finalise → exception handler. Each phase either
++returns its dataclass result or terminates the process via the existing
++failure handlers (`_pause_train_state` for pre-merge non-fatal pauses;
++`_handle_post_merge_failure` for post-merge ADR-212 revert).
++
++### State-machine phases
++
++```
++pending → rebasing → ci_running → merging → deploying → verifying
++                                                            ↓
++                                  ┌─────────────────────────┤
++                                  ↓                         ↓
++                             (handoff off)             (handoff on)
++                                  ↓                         ↓
++                              success ←───── verifying_gates ──→  (CRITICAL)
++                                              │                        ↓
++                                              └─→ mark-gates-complete  failed
++                                                  (--critical-found)   (gate_blocker)
++                                                  ↓
++                                                  success
++```
++
++`verifying_gates` is the HD-007 addition: deploy/health/smoke completed
++green; Step 10.5 + Step 11 dispatch pending. Reached only when callers
++pass `--enable-gate-handoff` to `wpx-train run`. Without the flag,
++`_verify_phase` returns `ready_for_gates=False` and cmd_run transitions
++directly to terminal `success` (the legacy path).
++
++### `mark-gates-complete` — finalising a gate-handoff train
++
++The calling LLM session (typically `skills/run-all/SKILL.md`) dispatches
++Step 10.5 + Step 11 while the train sits at `verifying_gates`, then
++signals completion:
++
++```
++wpx-train mark-gates-complete --train-id <id> \
++  [--gate-findings <path-to-bundle-or-findings-json>] \
++  [--critical-found]
++```
++
++Behaviour:
++
++- **No `--critical-found`** (clean gates) → transitions to terminal `success`;
++  writes `outcome: success` to the train YAML; cleans up the state file;
++  exits 0.
++- **`--critical-found`** → transitions to terminal `failed` with
++  `outcome: gate_blocker`; records the findings path. **No ADR-212 revert
++  runs** — the gate dispatchers (Step 10.5 / Step 11) already wrote
++  per-WP BLOCKERs and drafted remediation WPs; production stays live;
++  the founder owns the remediation cycle. Exits 1.
++
++The subcommand is intentionally tiny: state-machine transition + YAML
++write, no git operations, no shell-outs.
++
++### Why the boundary lives where it does
++
++A Python CLI can't directly spawn LLM Agents (the Step 10.5 + Step 11
++dispatch). Two architectures could resolve this:
++
++- **(a) Pause-then-resume.** `_verify_phase` writes a structured "needs
++  gate" pause record; cmd_run exits paused; calling session dispatches
++  gates; cmd_run re-invoked via `wpx-train resume <id>` continues from
++  where it left off. Reuses resume machinery but adds a new branch to
++  cmd_resume's pre-merge-vs-post-merge logic.
++- **(b) Stop-at-boundary with explicit gate-complete signal.** cmd_run
++  reaches the gate boundary, transitions to `verifying_gates`, emits
++  `outcome: awaiting_gates`. Calling session dispatches gates inline,
++  invokes `mark-gates-complete` to finalise. Adds one tiny subcommand;
++  cmd_resume unchanged.
++
++We chose **(b)**. The dispatch boundary stays in the calling LLM
++session (which is where Agent calls have to live anyway); the new
++subcommand is single-purpose and easy to reason about; `cmd_resume`'s
++existing pre-merge-vs-post-merge logic does not gain a third case.
++`--enable-gate-handoff` is opt-in (default off) so the 9 integration
++tests + every legacy caller see no behavioural change.
++
++---
++
+ ## Bookkeeping: MCP tools (default, v0.15.0+) vs Bash CLI (fallback)
+ 
+ The sulis-execution plugin (v0.15.0+) auto-loads an MCP server
+diff --git a/plugins/sulis-execution/scripts/_wpxlib.py b/plugins/sulis-execution/scripts/_wpxlib.py
+index 2ac56f6..5abd619 100644
+--- a/plugins/sulis-execution/scripts/_wpxlib.py
++++ b/plugins/sulis-execution/scripts/_wpxlib.py
+@@ -1780,21 +1780,74 @@ def rebase_branch_in_clone(
+ 
+ 
+ PHASES = (
+-    "pending",       # train_id assigned; bundle selected; no work yet
+-    "rebasing",      # cloning + sequential rebases in temp clone
+-    "ci_running",    # bundled-tip CI polling
+-    "merging",       # sequential squash-merges to base branch
+-    "deploying",     # deploy workflow polling
+-    "verifying",     # health + smoke
+-    "success",       # terminal success
+-    "failed",        # terminal failure (ADR-212 revert completed)
+-    "paused",        # needs attention; resume possible
+-    "aborted",       # founder-initiated abort completed
++    "pending",          # train_id assigned; bundle selected; no work yet
++    "rebasing",         # cloning + sequential rebases in temp clone
++    "ci_running",       # bundled-tip CI polling
++    "merging",          # sequential squash-merges to base branch
++    "deploying",        # deploy workflow polling
++    "verifying",        # health + smoke
++    "verifying_gates",  # HD-007 — deploy/health/smoke done; Step 10.5 + Step 11 pending
++    "success",          # terminal success
++    "failed",           # terminal failure (ADR-212 revert completed)
++    "paused",           # needs attention; resume possible
++    "aborted",          # founder-initiated abort completed
+ )
+ 
+ TERMINAL_PHASES = frozenset({"success", "failed", "aborted"})
+ 
+ 
++# ─────────────────────────────────────────────────────────────────────────
++# HD-001 — Phase-result dataclasses for cmd_run's plan / commit / verify split.
++#
++# Each phase function in scripts/wpx-train returns one of these (or raises;
++# failure handlers terminate the process via emit_result, so the dataclasses
++# are populated only on success). They flow forward between phases so the
++# orchestration in cmd_run reduces to four function calls + a finaliser.
++# ─────────────────────────────────────────────────────────────────────────
++
++
++@dataclass
++class PlanResult:
++    """Output of _plan_phase. Read-only-against-base-branch work complete:
++    bundle assembled, sequential rebases done, bundled-tip CI green.
++
++    The base branch itself has not been mutated yet — that happens in
++    _commit_phase. Feature branches in the bundle HAVE been force-pushed
++    with their rebased tips (this is mutating, but only to branches the
++    train owns)."""
++    bundle: list[dict]
++    base_branch: str
++    bundle_tip_branch: str
++    ci_verdict: str
++    rebase_failures: list[dict]
++
++
++@dataclass
++class CommitResult:
++    """Output of _commit_phase. Squash-merges have landed on the base
++    branch; bundle entries are updated in-place with merge_sha_on_dev."""
++    merge_shas: dict[str, str]
++    final_merge_sha: str
++
++
++@dataclass
++class VerifyResult:
++    """Output of _verify_phase. Deploy + health + smoke have all returned
++    green verdicts (failure paths terminate the process via the existing
++    _handle_post_merge_failure / _pause_train_state helpers).
++
++    ``ready_for_gates`` is HD-007's signal: when the caller passed
++    --enable-gate-handoff, this flag is True and cmd_run transitions to
++    the verifying_gates phase instead of going directly to terminal
++    success. The calling LLM session then dispatches Step 10.5 + Step 11
++    and invokes ``wpx-train mark-gates-complete`` to finalise."""
++    deploy_url: str | None
++    deploy_verdict: str
++    health_status: str
++    smoke_verdict: str
++    ready_for_gates: bool = False
++
++
+ def train_state_path(train_runs_dir: Path, train_id: str) -> Path:
+     """Path to a train's in-flight state JSON."""
+     return train_runs_dir / f"{train_id}.state.json"
+diff --git a/plugins/sulis-execution/scripts/tests/integration/test_train_failure_paths.py b/plugins/sulis-execution/scripts/tests/integration/test_train_failure_paths.py
+index 0802838..0c90974 100644
+--- a/plugins/sulis-execution/scripts/tests/integration/test_train_failure_paths.py
++++ b/plugins/sulis-execution/scripts/tests/integration/test_train_failure_paths.py
+@@ -19,12 +19,30 @@ These tests close the gap noted in the SEA audit report 2026-05-23:
+ per-helper monkeypatch tests. With the TrainTestbed they're covered
+ end-to-end through a single orchestrator entry point — the prerequisite
+ for HD-001 to safely refactor cmd_run into plan/commit/verify phases.
++
++HD-001 + HD-007 additions (v0.23.0):
++  - `test_phase_functions_exist` — RED proving the split happened.
++  - `test_cmd_run_shrunk_after_phase_split` — RED proving cmd_run is no
++    longer a 400+ LOC monolith.
++  - `test_verify_phase_pauses_at_gate_boundary_when_handoff_enabled` —
++    RED proving the HD-007 gate-handoff boundary fires.
++  - `test_mark_gates_complete_finalises_train_to_success` — RED proving
++    the new subcommand promotes verifying_gates → success.
++  - `test_mark_gates_complete_with_critical_marks_gate_blocker` —
++    RED proving --critical-found records gate_blocker without revert.
+ """
+ 
+ from __future__ import annotations
+ 
++from types import SimpleNamespace
++
+ import pytest  # noqa: F401 (used implicitly via parametrize, etc.)
+ 
++# Import the testbed module-loader helper for the HD-007 tests that
++# directly invoke cmd_mark_gates_complete (no test wrapper for that
++# subcommand on the testbed; tests construct args + call directly).
++from testbed import _load_wpx_train_module
++
+ # The `train_testbed` fixture is re-exported from
+ # scripts/tests/integration/conftest.py; pytest discovers it
+ # automatically. No explicit import here.
+@@ -272,3 +290,153 @@ def test_smoke_fail_triggers_revert_path(train_testbed):
+     for wp in ("WP-001", "WP-002", "WP-003"):
+         train_testbed.assert_index_flip(wp, "step-7-blocked")
+     assert record.get("outcome") == "blocker"
++
++
++# ─── HD-001 RED tests — prove the cmd_run split happened ────────────
++
++
++def test_phase_functions_exist():
++    """HD-001 RED — _plan_phase / _commit_phase / _verify_phase exist
++    as importable module-level functions on wpx-train.
++
++    Before HD-001 these don't exist; cmd_run is a single ~415 LOC monolith.
++    After HD-001 they're the testable unit-of-work boundaries the merge-
++    queue spike's PARTIAL recommendation needs as the strategy-dispatcher
++    seam.
++    """
++    wpx = _load_wpx_train_module()
++    for name in ("_plan_phase", "_commit_phase", "_verify_phase",
++                 "_commit_via_rebase_loop", "_finalise_success",
++                 "_finalise_awaiting_gates"):
++        assert hasattr(wpx, name), (
++            f"HD-001: expected wpx-train.{name} after phase-split refactor; "
++            f"missing means the decomposition didn't ship."
++        )
++        assert callable(getattr(wpx, name)), (
++            f"HD-001: wpx-train.{name} exists but isn't callable"
++        )
++
++
++def test_cmd_run_shrunk_after_phase_split():
++    """HD-001 RED — cmd_run is a thin orchestrator post-refactor.
++
++    Pre-HD-001 cmd_run body is ~415 LOC. Post-HD-001 it shrinks to
++    ~100 LOC of orchestration: discovery, batch packing, train-state
++    init, three phase-function calls, finalise, exception handler.
++    Anything substantially larger means the decomposition leaked.
++    """
++    import inspect
++    wpx = _load_wpx_train_module()
++    src = inspect.getsource(wpx.cmd_run)
++    loc = sum(
++        1 for ln in src.splitlines()
++        if ln.strip() and not ln.strip().startswith("#")
++    )
++    assert loc < 130, (
++        f"cmd_run is {loc} non-blank non-comment LOC; expected <130 "
++        f"post-HD-001. The phase-split refactor should have moved most "
++        f"of the body into _plan_phase / _commit_phase / _verify_phase."
++    )
++
++
++# ─── HD-007 RED tests — gate-handoff boundary semantics ─────────────
++
++
++def test_verify_phase_pauses_at_gate_boundary_when_handoff_enabled(train_testbed):
++    """HD-007 RED — with --enable-gate-handoff, the train stops at
++    phase=verifying_gates after deploy/health/smoke green, emitting
++    outcome=awaiting_gates instead of going directly to terminal success.
++
++    Calling LLM session reads the gate_handoff envelope, dispatches
++    Step 10.5 + Step 11, then invokes `mark-gates-complete` to finalise.
++    """
++    _seed_three_wp_bundle(train_testbed)
++    args = train_testbed.make_args(enable_gate_handoff=True)
++    record, exit_code = train_testbed.run_train(args)
++    assert exit_code == 0, (
++        f"Gate handoff is success-pending (exit 0), not failure. "
++        f"Got exit={exit_code}; record={record}"
++    )
++    assert record.get("outcome") == "awaiting_gates", (
++        f"Expected outcome=awaiting_gates with --enable-gate-handoff; "
++        f"got {record.get('outcome')}. Record: {record}"
++    )
++    # All merges should have landed — the gate boundary is post-merge.
++    train_testbed.assert_merged_on_dev("WP-001")
++    train_testbed.assert_merged_on_dev("WP-002")
++    train_testbed.assert_merged_on_dev("WP-003")
++
++
++def test_mark_gates_complete_finalises_train_to_success(train_testbed):
++    """HD-007 RED — `wpx-train mark-gates-complete` promotes a train
++    paused at verifying_gates to terminal phase=success."""
++    _seed_three_wp_bundle(train_testbed)
++    args = train_testbed.make_args(enable_gate_handoff=True)
++    record, exit_code = train_testbed.run_train(args)
++    assert record.get("outcome") == "awaiting_gates"
++    train_id = record.get("train_id")
++    assert train_id, f"Train ID missing from record: {record}"
++
++    wpx = _load_wpx_train_module()
++    mark_args = SimpleNamespace(
++        project=train_testbed.project,
++        repo_root=str(train_testbed.workspace),
++        repo="acme/test-repo",
++        train_id=train_id,
++        gate_findings=None,
++        critical_found=False,
++    )
++    try:
++        wpx.cmd_mark_gates_complete(mark_args)
++        mgc_exit = 0
++    except SystemExit as exc:
++        mgc_exit = int(exc.code or 0)
++    assert mgc_exit == 0, (
++        f"mark-gates-complete should exit 0 on clean gates; got {mgc_exit}"
++    )
++    final = train_testbed.read_latest_train_record()
++    assert final.get("outcome") == "success", (
++        f"Expected outcome=success after mark-gates-complete; got "
++        f"{final.get('outcome')}. Record: {final}"
++    )
++
++
++def test_mark_gates_complete_with_critical_marks_gate_blocker(train_testbed):
++    """HD-007 RED — --critical-found records gate_blocker (phase=failed)
++    without invoking ADR-212 revert. The gate dispatchers already wrote
++    BLOCKERs + drafted remediation WPs; the train just records the
++    outcome.
++    """
++    _seed_three_wp_bundle(train_testbed)
++    args = train_testbed.make_args(enable_gate_handoff=True)
++    record, exit_code = train_testbed.run_train(args)
++    train_id = record.get("train_id")
++
++    wpx = _load_wpx_train_module()
++    mark_args = SimpleNamespace(
++        project=train_testbed.project,
++        repo_root=str(train_testbed.workspace),
++        repo="acme/test-repo",
++        train_id=train_id,
++        gate_findings="/tmp/findings.json",
++        critical_found=True,
++    )
++    try:
++        wpx.cmd_mark_gates_complete(mark_args)
++        mgc_exit = 0
++    except SystemExit as exc:
++        mgc_exit = int(exc.code or 0)
++    assert mgc_exit == 1, (
++        f"mark-gates-complete --critical-found should exit 1; got {mgc_exit}"
++    )
++    final = train_testbed.read_latest_train_record()
++    assert final.get("outcome") == "gate_blocker", (
++        f"Expected outcome=gate_blocker on --critical-found; got "
++        f"{final.get('outcome')}. Record: {final}"
++    )
++    # Critically: no ADR-212 revert ran. Production stays live; founder
++    # owns the remediation cycle.
++    assert not train_testbed.revert_calls, (
++        f"--critical-found must NOT invoke ADR-212 revert. Got revert "
++        f"calls: {train_testbed.revert_calls}"
++    )
+diff --git a/plugins/sulis-execution/scripts/wpx-train b/plugins/sulis-execution/scripts/wpx-train
+index 9998caf..10e7ecd 100755
+--- a/plugins/sulis-execution/scripts/wpx-train
++++ b/plugins/sulis-execution/scripts/wpx-train
+@@ -62,8 +62,12 @@ from _wpxlib import (  # noqa: E402
+     HEALTH_DEFAULT_CAP,
+     TRAIN_BLOCKED_STATUS,
+     TRAIN_DONE_STATUS,
++    TRAIN_ELIGIBLE_STATUS,
++    CommitResult,
+     EligibilityResult,
++    PlanResult,
+     TrainOverrides,
++    VerifyResult,
+     WPRow,
+     _gh_branch_sha,
+     _gh_ref_sha,
+@@ -750,16 +754,25 @@ def cmd_resume(args: argparse.Namespace) -> None:
+         )
+         return
+ 
+-    if phase in ("merging", "deploying", "verifying"):
++    if phase in ("merging", "deploying", "verifying", "verifying_gates"):
++        gate_hint = (
++            f"  • If you're here because the train paused at the gate "
++            f"boundary (phase=verifying_gates from HD-007 --enable-gate-"
++            f"handoff): run `wpx-train mark-gates-complete --train-id "
++            f"{args.train_id}` after Step 10.5 + Step 11 dispatch "
++            f"completes (use --critical-found if a CRITICAL surfaced).\n"
++            if phase == "verifying_gates" else ""
++        )
+         emit_error(
+             f"Train {args.train_id!r} is paused at phase {phase!r}, "
+             f"AFTER merges landed on dev. Post-merge resume isn't "
+-            f"available in v0.19.0a. Options:\n"
++            f"available. Options:\n"
++            f"{gate_hint}"
+             f"  • If production is healthy (deploy completed, smoke green): "
+             f"manually flip the merged WPs to done via `wpx-index "
+             f"flip-status --to done --expected step-7-complete`.\n"
+             f"  • If production is broken: `wpx-train abort {args.train_id}` "
+-            f"(when Phase 3.2 ships) to invoke ADR-212 revert.\n"
++            f"to invoke ADR-212 revert.\n"
+             f"  • Inspect via `wpx-train inspect {args.train_id}` to see "
+             f"the recovery_hint for this specific failure."
+         )
+@@ -1166,13 +1179,513 @@ def _handle_post_merge_failure(
+     emit_result(record, exit_code=1)
+ 
+ 
+-def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestration)
+-    """Fire the train. Picks up eligible WPs, packs into batches, rebases,
+-    runs bundled-tip CI, sequential-merges to dev, one deploy/health/smoke.
++def _plan_phase(
++    *,
++    args: argparse.Namespace,
++    paths,
++    repo: str,
++    train_id: str,
++    batch: list,
++    base_branch: str,
++    clone_dir: Path,
++    record: dict,
++) -> PlanResult:
++    """HD-001 plan phase — read-only against the base branch.
++
++    Clone the repo, sequential-rebase every batch branch onto the previous
++    rebased tip, run bundled-tip CI. No squash-merges to the base branch
++    happen here — that's the commit phase.
++
++    Force-pushes to feature branches (the rebased tips) DO happen here.
++    Those branches are train-owned; the base branch is untouched.
+ 
+-    Happy path only (Phase 2). Failure handling (rebase conflicts,
+-    bundled-tip CI red, post-merge deploy/smoke fail with revert + branch
+-    restoration) is implemented in Phase 3.
++    Returns PlanResult on success. On non-fatal failures (rebase conflicts
++    that drop some-but-not-all branches, bundled-tip CI red/timeout) the
++    function calls _pause_train_state or emits a blocker — both terminate
++    the process via emit_result, so the caller never sees a None return.
++    """
++    update_train_phase(
++        train_state_path(paths.train_runs_dir, train_id), "rebasing",
++    )
++    clone_repo_to_temp(repo, clone_dir)
++
++    bundle: list[dict] = []
++    rebase_failures: list[dict] = []
++    onto_sha = _gh_ref_sha(repo, base_branch)
++    for e in batch:
++        try:
++            pre_train_sha = _gh_branch_sha(repo, e.branch)
++        except RuntimeError as exc:
++            _log(f"WARN: could not fetch pre_train_sha for {e.branch}: {exc}")
++            rebase_failures.append({"wp": e.wp, "branch": e.branch,
++                                     "reason": str(exc)})
++            continue
++        _log(f"Rebasing {e.branch} onto {onto_sha[:8]} (pre={pre_train_sha[:8]})")
++        try:
++            rebased_sha = rebase_branch_in_clone(
++                clone_dir, e.branch, onto_sha, base_branch=base_branch,
++            )
++        except PatchesAlreadyAppliedError as exc:
++            # v0.15.3 — branch's patches already in base history (typically
++            # post-revert). Emit a specific BLOCKER with the manual git
++            # revert command so the founder can recover deterministically.
++            _log(f"PATCHES ALREADY APPLIED: {e.branch} → {exc}")
++            flip_ok, _ = flip_index_status_via_cli(
++                _SCRIPTS_DIR, paths, e.wp, TRAIN_BLOCKED_STATUS,
++            )
++            applied_short = ", ".join(s[:8] for s in exc.applied_shas)
++            write_wp_blocker_via_cli(
++                _SCRIPTS_DIR, paths, e.wp,
++                title=f"Patches already in {exc.base_branch} during {train_id}",
++                observation=(
++                    f"git cherry shows {len(exc.applied_shas)} of this "
++                    f"WP's commits are already present in "
++                    f"origin/{exc.base_branch}: {applied_short}. "
++                    f"git rebase would silently drop them; GitHub's merge "
++                    f"endpoint would then return 204 No Content."
++                ),
++                root_cause=(
++                    "An earlier train likely shipped this WP, then "
++                    "reverted (via _handle_post_merge_failure or a manual "
++                    "revert commit). The revert neutralised the content "
++                    "but the original squash-merge commits remain in "
++                    f"{exc.base_branch}'s graph. Re-shipping the branch "
++                    "as-is is impossible without first restoring the "
++                    "content."
++                ),
++                plain_english=(
++                    "This work's changes are already in the codebase's "
++                    "history — likely from an earlier shipment that was "
++                    "reverted. Trying to ship it again now would silently "
++                    "skip it. To recover, find the revert commit on "
++                    f"{exc.base_branch} and revert THAT (which brings the "
++                    "content back); then mark this WP done directly."
++                ),
++                suggested_next=(
++                    f"On {exc.base_branch}: identify the revert commit "
++                    f"(e.g. `git log --oneline {exc.base_branch} | grep "
++                    f"-i Revert`); run `git revert -m 1 <revert_sha>` "
++                    "to restore the content; push; then flip this WP "
++                    "to done via `wpx-index flip-status --to done "
++                    "--expected step-7-complete`."
++                ),
++            )
++            rebase_failures.append({
++                "wp": e.wp,
++                "branch": e.branch,
++                "reason": "patches_already_applied",
++                "applied_shas": exc.applied_shas,
++                "index_flipped": flip_ok,
++            })
++            continue
++        except RuntimeError as exc:
++            _log(f"REBASE CONFLICT: {e.branch} → {exc}")
++            flip_ok, _ = flip_index_status_via_cli(
++                _SCRIPTS_DIR, paths, e.wp, TRAIN_BLOCKED_STATUS,
++            )
++            blocker_ok, _ = write_wp_blocker_via_cli(
++                _SCRIPTS_DIR, paths, e.wp,
++                title=f"Rebase conflict during {train_id}",
++                observation=str(exc),
++                root_cause=(
++                    "git rebase failed when stacking onto the previous "
++                    "rebased branch in the train. Likely a merge "
++                    "conflict against a sibling WP's changes."
++                ),
++                plain_english=(
++                    f"This WP's branch couldn't be cleanly rebased on "
++                    f"top of the other WPs in the train (their changes "
++                    f"conflict). The other WPs are continuing. Resolve "
++                    f"the conflict locally, push, then flip this WP "
++                    f"back to step-7-complete."
++                ),
++                suggested_next=(
++                    "Pull origin/dev, rebase this branch, resolve "
++                    "conflicts, push. Then re-flip INDEX status."
++                ),
++            )
++            rebase_failures.append({
++                "wp": e.wp,
++                "branch": e.branch,
++                "reason": str(exc),
++                "index_flipped": flip_ok,
++                "blocker_written": blocker_ok,
++            })
++            continue
++        bundle.append({
++            "wp": e.wp,
++            "branch": e.branch,
++            "pre_train_sha": pre_train_sha,
++            "rebased_to_sha": rebased_sha,
++            "merge_sha_on_dev": None,
++        })
++        onto_sha = rebased_sha
++
++    # If every branch failed to rebase, the train can't continue
++    if not bundle:
++        record["outcome"] = "blocker"
++        record["outcome_reason"] = (
++            f"all {len(batch)} branches failed to rebase; see per-WP BLOCKERs"
++        )
++        record["rebase_failures"] = rebase_failures
++        write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
++        emit_result(record, exit_code=1)
++
++    record["bundle"] = bundle
++    record["rebase_failures"] = rebase_failures
++    bundle_tip_branch = bundle[-1]["branch"]
++
++    update_train_phase(
++        train_state_path(paths.train_runs_dir, train_id), "ci_running",
++    )
++
++    ci_interval = args.ci_poll_interval or CI_DEFAULT_INTERVAL
++    _log(f"Bundled-tip CI: polling {bundle_tip_branch}")
++    ci_verdict = _poll_ci(repo, bundle_tip_branch, ci_interval, CI_DEFAULT_CAP)
++    if ci_verdict != "green":
++        # v0.18.0+ — bundled-tip CI red/timeout is a NON-FATAL pre-merge
++        # failure. Route to paused. _pause_train_state terminates via
++        # emit_result; the caller never sees this code path return.
++        culprit = compute_culprit_heuristic(bundle, clone_dir,
++                                           f"bundled-tip CI {ci_verdict}")
++        reason = f"bundled-tip CI {ci_verdict} on {bundle_tip_branch}"
++        hint = (
++            f"Bundled-tip CI is {ci_verdict}. Likely culprit "
++            f"(file-overlap heuristic): {culprit or '<no signal>'}. "
++            f"Inspect via `wpx-train inspect {train_id}`. "
++            f"Once you've identified + fixed the failing branch, run "
++            f"`wpx-train resume {train_id}`. "
++            f"To unwind the rebases + free the WPs back to step-7-complete, "
++            f"`wpx-train abort {train_id}`."
++        )
++        record["bundle"] = bundle
++        record["suspected_culprit"] = culprit
++        _pause_train_state(
++            paths=paths, train_id=train_id, record=record,
++            pause_reason=reason, recovery_hint=hint, bundle=bundle,
++        )
++
++    return PlanResult(
++        bundle=bundle,
++        base_branch=base_branch,
++        bundle_tip_branch=bundle_tip_branch,
++        ci_verdict=ci_verdict,
++        rebase_failures=rebase_failures,
++    )
++
++
++def _commit_via_rebase_loop(
++    *,
++    args: argparse.Namespace,
++    paths,
++    repo: str,
++    train_id: str,
++    plan: PlanResult,
++    record: dict,
++    clone_dir: Path,
++) -> CommitResult:
++    """Legacy commit strategy — today's sequential squash-merge loop.
++
++    HD-003: each per-entry merge is wrapped in try/except so a failure on
++    entry N — after entries 1..N-1 landed on the base branch — routes
++    through the ADR-212 revert path with the partial bundle. The outer
++    handler writes outcome=error and exits without reverting, which would
++    leave the base in a half-state. _handle_post_merge_failure already
++    filters the bundle to merged entries (those with a populated
++    merge_sha_on_dev), so passing the partial bundle here is correct.
++    """
++    merge_shas: dict[str, str] = {}
++    final_merge_sha = None
++    for entry in plan.bundle:
++        _log(f"Squash-merging {entry['wp']} ({entry['branch']}) to {plan.base_branch}")
++        try:
++            sha = _merge_squash(repo, entry["branch"], entry["wp"],
++                                base_branch=plan.base_branch)
++        except Exception as exc:  # noqa: BLE001
++            _log(
++                f"MERGE FAILURE: {entry['wp']} ({entry['branch']}) "
++                f"failed mid-batch: {exc}"
++            )
++            record["bundle"] = plan.bundle
++            _handle_post_merge_failure(
++                record=record, bundle=plan.bundle,
++                reason=f"merge of {entry['wp']} failed: {exc}",
++                clone_dir=clone_dir, repo=repo, paths=paths,
++                train_id=train_id,
++                failure_text=(
++                    f"_merge_squash raised on {entry['wp']} "
++                    f"({entry['branch']}): {exc}"
++                ),
++            )
++        entry["merge_sha_on_dev"] = sha
++        merge_shas[entry["wp"]] = sha
++        final_merge_sha = sha
++
++    return CommitResult(
++        merge_shas=merge_shas,
++        final_merge_sha=final_merge_sha,
++    )
++
++
++def _commit_phase(
++    *,
++    args: argparse.Namespace,
++    paths,
++    repo: str,
++    train_id: str,
++    plan: PlanResult,
++    record: dict,
++    clone_dir: Path,
++) -> CommitResult:
++    """HD-001 commit phase — only phase that mutates the base branch.
++
++    Strategy dispatcher: the merge-queue spike's PARTIAL recommendation
++    introduces a second strategy `_commit_via_merge_queue` in a follow-up
++    delta. Today there is only `legacy` (the sequential squash-merge loop).
++    The dispatcher's RuntimeError on unknown strategy is the explicit
++    extension seam.
++    """
++    update_train_phase(
++        train_state_path(paths.train_runs_dir, train_id), "merging",
++    )
++
++    strategy = getattr(args, "commit_strategy", None) or "legacy"
++    if strategy == "legacy":
++        result = _commit_via_rebase_loop(
++            args=args, paths=paths, repo=repo, train_id=train_id,
++            plan=plan, record=record, clone_dir=clone_dir,
++        )
++    else:
++        raise RuntimeError(
++            f"Unknown commit strategy {strategy!r}; expected 'legacy' "
++            f"(follow-up delta adds 'mq')."
++        )
++
++    record["bundle"] = plan.bundle  # refresh with merge_sha_on_dev populated
++    return result
++
++
++def _verify_phase(
++    *,
++    args: argparse.Namespace,
++    paths,
++    repo: str,
++    train_id: str,
++    plan: PlanResult,
++    commit: CommitResult,
++    record: dict,
++    clone_dir: Path,
++) -> VerifyResult:
++    """HD-001 verify phase — deploy poll + health + smoke.
++
++    HD-007: when args.enable_gate_handoff is set, this phase reports the
++    `ready_for_gates=True` boundary on success. cmd_run then transitions
++    state to the new `verifying_gates` phase and emits outcome=awaiting_gates
++    instead of terminal success. The calling LLM session dispatches
++    Step 10.5 + Step 11 and invokes `wpx-train mark-gates-complete` to
++    finalise.
++
++    When --enable-gate-handoff is NOT set, behaviour is unchanged — the
++    function returns ready_for_gates=False and cmd_run goes to terminal
++    success.
++    """
++    update_train_phase(
++        train_state_path(paths.train_runs_dir, train_id), "deploying",
++    )
++
++    deploy_interval = args.deploy_poll_interval or DEPLOY_DEFAULT_INTERVAL
++    deploy_cap = args.deploy_cap or DEPLOY_DEFAULT_CAP
++    _log(
++        f"Polling deploy '{args.deploy_workflow}' for "
++        f"{commit.final_merge_sha[:8]} "
++        f"(interval={deploy_interval}s, cap={deploy_cap}s)"
++    )
++    deploy_verdict, deploy_url = _poll_deploy(
++        repo, args.deploy_workflow, commit.final_merge_sha,
++        deploy_interval, deploy_cap,
++    )
++    record["deploy_url"] = deploy_url
++    if deploy_verdict == "timeout":
++        hint = (
++            f"Deploy poll timed out after {deploy_cap}s. The deploy may "
++            f"still be in progress. Check {deploy_url} for the current "
++            f"status. If completed: `wpx-train resume {train_id}` "
++            f"will continue to verify. If it failed: `wpx-train abort "
++            f"{train_id}` to run the ADR-212 revert. Or raise --deploy-cap "
++            f"and re-run via the manual `wpx-train run --strict-ci` "
++            f"escape hatch."
++        )
++        record["bundle"] = plan.bundle
++        _pause_train_state(
++            paths=paths, train_id=train_id, record=record,
++            pause_reason=f"deploy poll timeout after {deploy_cap}s",
++            recovery_hint=hint, bundle=plan.bundle,
++        )
++    if deploy_verdict != "green":
++        _handle_post_merge_failure(
++            record=record, bundle=plan.bundle,
++            reason=f"deploy {deploy_verdict}",
++            clone_dir=clone_dir, repo=repo, paths=paths,
++            train_id=train_id,
++            failure_text=f"Deploy workflow result: {deploy_verdict}",
++        )
++
++    update_train_phase(
++        train_state_path(paths.train_runs_dir, train_id), "verifying",
++    )
++
++    # Health check (optional)
++    if args.staging_url:
++        health_path = args.health_path or "/"
++        health_url = _join_health_url(args.staging_url, health_path)
++        _log(f"Health check: {health_url}")
++        health = _poll_health(health_url, HEALTH_DEFAULT_CAP)
++        record["health_status"] = health
++        if health != "healthy":
++            _handle_post_merge_failure(
++                record=record, bundle=plan.bundle,
++                reason=f"health check failed at {health_url}",
++                clone_dir=clone_dir, repo=repo, paths=paths,
++                train_id=train_id,
++                failure_text=f"Health check: {health} at {health_url}",
++            )
++    else:
++        health = "skipped (no --staging-url)"
++        record["health_status"] = health
++
++    # Smoke (optional)
++    if args.smoke_cmd:
++        _log("Running smoke test")
++        smoke_verdict, smoke_out = _run_smoke(args.smoke_cmd, clone_dir)
++        record["smoke_verdict"] = smoke_verdict
++        if not smoke_verdict.startswith("PASS"):
++            _handle_post_merge_failure(
++                record=record, bundle=plan.bundle,
++                reason=f"smoke {smoke_verdict}",
++                clone_dir=clone_dir, repo=repo, paths=paths,
++                train_id=train_id,
++                failure_text=f"Smoke output:\n{smoke_out}",
++            )
++    else:
++        smoke_verdict = "skipped (no --smoke-cmd)"
++        record["smoke_verdict"] = smoke_verdict
++
++    return VerifyResult(
++        deploy_url=deploy_url,
++        deploy_verdict=deploy_verdict,
++        health_status=health,
++        smoke_verdict=smoke_verdict,
++        ready_for_gates=bool(getattr(args, "enable_gate_handoff", False)),
++    )
++
++
++def _finalise_success(
++    *,
++    paths,
++    train_id: str,
++    batch: list,
++    plan: PlanResult,
++    commit: CommitResult,
++    verify: VerifyResult,
++    record: dict,
++) -> None:
++    """Terminal success path — write the YAML record, clean up the state
++    file, emit the success envelope.
++
++    Exits the process via emit_result (raises SystemExit). Does not return.
++    """
++    update_train_phase(
++        train_state_path(paths.train_runs_dir, train_id), "success",
++    )
++    record["outcome"] = "success"
++    record["completed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
++    write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
++    cleanup_train_state(paths.train_runs_dir, train_id)
++    emit_result({
++        "train_id": train_id,
++        "outcome": "success",
++        "wps_shipped": [e.wp for e in batch],
++        "deploy_url": verify.deploy_url,
++        "final_merge_sha": commit.final_merge_sha,
++        "record_path": str(paths.train_runs_dir / f"{train_id}.yaml"),
++    }, exit_code=0)
++
++
++def _finalise_awaiting_gates(
++    *,
++    paths,
++    train_id: str,
++    batch: list,
++    plan: PlanResult,
++    commit: CommitResult,
++    verify: VerifyResult,
++    record: dict,
++) -> None:
++    """HD-007 gate-handoff path — verify phase complete; Step 10.5 + 11
++    pending. Transitions to phase=verifying_gates and emits a clear
++    handoff envelope so the calling LLM session knows what to dispatch.
++
++    Exit code 0 — this is success-pending-gates, not failure.
++    """
++    bundle_start_sha = plan.bundle[0].get("pre_train_sha") if plan.bundle else None
++    update_train_phase(
++        train_state_path(paths.train_runs_dir, train_id), "verifying_gates",
++        pause_reason="Step 10.5 + Step 11 pending (gate handoff to calling session)",
++        recovery_hint=(
++            "Calling session: dispatch /sea:code-review against the diff "
++            "range in `gate_handoff.diff_range`, then per-WP security "
++            "review for every WP in `gate_handoff.wps`. When both gates "
++            f"complete clean, run `wpx-train mark-gates-complete --train-id "
++            f"{train_id}` to finalise the train to success. If a CRITICAL "
++            f"finding surfaces, pass `--critical-found` to mark the train "
++            f"as gate-blocked (BLOCKERs are written by the gate dispatchers; "
++            f"mark-gates-complete just records the train outcome)."
++        ),
++    )
++    record["outcome"] = "awaiting_gates"
++    record["awaiting_gates_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
++    write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
++    emit_result({
++        "train_id": train_id,
++        "outcome": "awaiting_gates",
++        "phase": "verifying_gates",
++        "wps_shipped": [e.wp for e in batch],
++        "deploy_url": verify.deploy_url,
++        "final_merge_sha": commit.final_merge_sha,
++        "record_path": str(paths.train_runs_dir / f"{train_id}.yaml"),
++        "gate_handoff": {
++            "batch_start_sha": bundle_start_sha,
++            "batch_end_sha": commit.final_merge_sha,
++            "diff_range": (
++                f"{bundle_start_sha}..{commit.final_merge_sha}"
++                if bundle_start_sha else commit.final_merge_sha
++            ),
++            "wps": [e.wp for e in batch],
++            "next_action": (
++                "Calling session: dispatch Step 10.5 (sea:code-review against "
++                "diff_range) + Step 11 (per-WP security review for each WP); "
++                f"then `wpx-train mark-gates-complete --train-id {train_id}` "
++                "to finalise."
++            ),
++        },
++    }, exit_code=0)
++
++
++def cmd_run(args: argparse.Namespace) -> None:
++    """Fire the train — thin orchestrator over plan / commit / verify phases.
++
++    HD-001 split the previous monolithic body into _plan_phase (read-only
++    against the base branch), _commit_phase (the only phase that mutates
++    the base — strategy dispatcher: today legacy sequential rebase loop;
++    follow-up adds merge-queue strategy), and _verify_phase (deploy +
++    health + smoke + HD-007 gate-handoff boundary).
++
++    Each phase function either returns its dataclass result or terminates
++    the process via the existing failure handlers (_pause_train_state for
++    non-fatal pauses; _handle_post_merge_failure for ADR-212 revert).
++    cmd_run never sees a None return — control either flows through all
++    three phases to _finalise_success / _finalise_awaiting_gates, or
++    SystemExit propagates from a failure handler.
+     """
+     paths = paths_from_args(args)
+     repo = _resolve_repo(args)
+@@ -1180,7 +1693,7 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
+     if not paths.index_md.exists():
+         emit_error(f"INDEX.md not found at {paths.index_md}")
+ 
+-    # Discovery (re-uses Phase 1 algorithm)
++    # Discovery
+     wps = parse_index_md(paths.index_md)
+     overrides = read_overrides(paths.train_overrides)
+     results = find_eligible_branches(
+@@ -1189,7 +1702,6 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
+     )
+     eligible = [r for r in results if r.eligible]
+ 
+-    # Trigger check
+     should_fire, trigger_reason = check_train_trigger(eligible, force=args.force)
+     if not should_fire:
+         emit_ok(data={
+@@ -1199,13 +1711,11 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
+             "eligible_wps": [r.wp for r in eligible],
+         })
+ 
+-    # Pack batches (Phase 2: ship the first batch; later trains pick up rest)
+     batches = pack_batches(eligible, max_per_batch=args.max_batch_size)
+     if not batches:
+         emit_ok(data={"outcome": "nothing_to_pack", "eligible_count": 0})
+     batch = batches[0]
+ 
+-    # Train metadata
+     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
+     train_id = f"train-{timestamp}"
+     started_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+@@ -1222,18 +1732,10 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
+         "smoke_verdict": None,
+     }
+ 
+-    # Base for rebase chain: per CW-04, when inside a change worktree,
+-    # the caller passes --base-branch to ship WPs to the change branch
+-    # rather than directly to dev. Resolved here (before args_repr below)
+-    # because v0.18.0+ writes the initial train-state YAML using these
+-    # args; the v0.18.0 commit moved init_train_state ABOVE this
+-    # assignment by mistake, causing an UnboundLocalError on `base_branch`
+-    # at any wpx-train run invocation. Fixed by hoisting the assignment.
++    # Per CW-04: callers inside a change worktree pass --base-branch to
++    # ship to the change branch rather than directly to dev.
+     base_branch = args.base_branch or "dev"
+ 
+-    # v0.18.0+ — write initial state YAML (phase=pending) for inspect /
+-    # resume / abort to read. cmd_run drives phase transitions inline;
+-    # full per-phase factoring (so cmd_resume can re-enter) is Phase 3.1.
+     args_repr = {
+         "project": args.project,
+         "repo_root": str(paths.repo_root),
+@@ -1244,6 +1746,7 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
+         "base_branch": base_branch,
+         "force": getattr(args, "force", False),
+         "strict_ci": getattr(args, "strict_ci", False),
++        "enable_gate_handoff": getattr(args, "enable_gate_handoff", False),
+     }
+     initial_bundle = [
+         {"wp": e.wp, "branch": e.branch, "pre_train_sha": None}
+@@ -1251,338 +1754,34 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
+     ]
+     init_train_state(paths.train_runs_dir, train_id, initial_bundle, args_repr)
+ 
+-    # Sandbox clone — reused across all rebases in this train
+     clone_dir = Path(tempfile.mkdtemp(prefix=f"wpx-train-{train_id}-"))
+ 
+     try:
+         _log(f"{train_id}: trigger={trigger_reason}; batch_size={len(batch)}; "
+              f"WPs={[e.wp for e in batch]}")
+-        # Phase transition: pending → rebasing
+-        update_train_phase(
+-            train_state_path(paths.train_runs_dir, train_id), "rebasing",
+-        )
+-        clone_repo_to_temp(repo, clone_dir)
+-
+-        # Step: rebase chain. Each branch is rebased onto the previous
+-        # rebased branch's HEAD (sequential rebase). If a branch's rebase
+-        # conflicts, remove it from the batch, flip its status to
+-        # step-7-blocked, write a per-WP BLOCKER, and continue with the
+-        # remaining branches (Phase 3 D7-rebase-conflict failure mode).
+-        bundle: list[dict] = []
+-        rebase_failures: list[dict] = []
+-        # base_branch was resolved above (pre-init_train_state); reuse it here
+-        onto_sha = _gh_ref_sha(repo, base_branch)
+-        for e in batch:
+-            try:
+-                pre_train_sha = _gh_branch_sha(repo, e.branch)
+-            except RuntimeError as exc:
+-                _log(f"WARN: could not fetch pre_train_sha for {e.branch}: {exc}")
+-                rebase_failures.append({"wp": e.wp, "branch": e.branch,
+-                                         "reason": str(exc)})
+-                continue
+-            _log(f"Rebasing {e.branch} onto {onto_sha[:8]} (pre={pre_train_sha[:8]})")
+-            try:
+-                rebased_sha = rebase_branch_in_clone(
+-                    clone_dir, e.branch, onto_sha, base_branch=base_branch,
+-                )
+-            except PatchesAlreadyAppliedError as exc:
+-                # v0.15.3 — branch's patches already in base history (typically
+-                # post-revert). Emit a specific BLOCKER with the manual git
+-                # revert command so the founder can recover deterministically.
+-                _log(f"PATCHES ALREADY APPLIED: {e.branch} → {exc}")
+-                flip_ok, flip_err = flip_index_status_via_cli(
+-                    _SCRIPTS_DIR, paths, e.wp, TRAIN_BLOCKED_STATUS,
+-                )
+-                applied_short = ", ".join(s[:8] for s in exc.applied_shas)
+-                blocker_ok, blocker_err = write_wp_blocker_via_cli(
+-                    _SCRIPTS_DIR, paths, e.wp,
+-                    title=f"Patches already in {exc.base_branch} during {train_id}",
+-                    observation=(
+-                        f"git cherry shows {len(exc.applied_shas)} of this "
+-                        f"WP's commits are already present in "
+-                        f"origin/{exc.base_branch}: {applied_short}. "
+-                        f"git rebase would silently drop them; GitHub's merge "
+-                        f"endpoint would then return 204 No Content."
+-                    ),
+-                    root_cause=(
+-                        "An earlier train likely shipped this WP, then "
+-                        "reverted (via _handle_post_merge_failure or a manual "
+-                        "revert commit). The revert neutralised the content "
+-                        "but the original squash-merge commits remain in "
+-                        f"{exc.base_branch}'s graph. Re-shipping the branch "
+-                        "as-is is impossible without first restoring the "
+-                        "content."
+-                    ),
+-                    plain_english=(
+-                        "This work's changes are already in the codebase's "
+-                        "history — likely from an earlier shipment that was "
+-                        "reverted. Trying to ship it again now would silently "
+-                        "skip it. To recover, find the revert commit on "
+-                        f"{exc.base_branch} and revert THAT (which brings the "
+-                        "content back); then mark this WP done directly."
+-                    ),
+-                    suggested_next=(
+-                        f"On {exc.base_branch}: identify the revert commit "
+-                        f"(e.g. `git log --oneline {exc.base_branch} | grep "
+-                        f"-i Revert`); run `git revert -m 1 <revert_sha>` "
+-                        "to restore the content; push; then flip this WP "
+-                        "to done via `wpx-index flip-status --to done "
+-                        "--expected step-7-complete`."
+-                    ),
+-                )
+-                rebase_failures.append({
+-                    "wp": e.wp,
+-                    "branch": e.branch,
+-                    "reason": "patches_already_applied",
+-                    "applied_shas": exc.applied_shas,
+-                    "index_flipped": flip_ok,
+-                })
+-                continue
+-            except RuntimeError as exc:
+-                _log(f"REBASE CONFLICT: {e.branch} → {exc}")
+-                # Flip INDEX status; write per-WP BLOCKER; continue
+-                flip_ok, flip_err = flip_index_status_via_cli(
+-                    _SCRIPTS_DIR, paths, e.wp, TRAIN_BLOCKED_STATUS,
+-                )
+-                blocker_ok, blocker_err = write_wp_blocker_via_cli(
+-                    _SCRIPTS_DIR, paths, e.wp,
+-                    title=f"Rebase conflict during {train_id}",
+-                    observation=str(exc),
+-                    root_cause=(
+-                        "git rebase failed when stacking onto the previous "
+-                        "rebased branch in the train. Likely a merge "
+-                        "conflict against a sibling WP's changes."
+-                    ),
+-                    plain_english=(
+-                        f"This WP's branch couldn't be cleanly rebased on "
+-                        f"top of the other WPs in the train (their changes "
+-                        f"conflict). The other WPs are continuing. Resolve "
+-                        f"the conflict locally, push, then flip this WP "
+-                        f"back to step-7-complete."
+-                    ),
+-                    suggested_next=(
+-                        "Pull origin/dev, rebase this branch, resolve "
+-                        "conflicts, push. Then re-flip INDEX status."
+-                    ),
+-                )
+-                rebase_failures.append({
+-                    "wp": e.wp,
+-                    "branch": e.branch,
+-                    "reason": str(exc),
+-                    "index_flipped": flip_ok,
+-                    "blocker_written": blocker_ok,
+-                })
+-                continue
+-            bundle.append({
+-                "wp": e.wp,
+-                "branch": e.branch,
+-                "pre_train_sha": pre_train_sha,
+-                "rebased_to_sha": rebased_sha,
+-                "merge_sha_on_dev": None,
+-            })
+-            onto_sha = rebased_sha
+-
+-        # If every branch failed to rebase, the train can't continue
+-        if not bundle:
+-            record["outcome"] = "blocker"
+-            record["outcome_reason"] = (
+-                f"all {len(batch)} branches failed to rebase; see per-WP BLOCKERs"
+-            )
+-            record["rebase_failures"] = rebase_failures
+-            write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
+-            emit_result(record, exit_code=1)
+-
+-        record["bundle"] = bundle
+-        record["rebase_failures"] = rebase_failures
+-        bundle_tip_branch = bundle[-1]["branch"]
+-
+-        # Phase transition: rebasing → ci_running
+-        update_train_phase(
+-            train_state_path(paths.train_runs_dir, train_id), "ci_running",
++        plan = _plan_phase(
++            args=args, paths=paths, repo=repo, train_id=train_id,
++            batch=batch, base_branch=base_branch, clone_dir=clone_dir,
++            record=record,
+         )
+-
+-        # Step: bundled-tip CI
+-        ci_interval = args.ci_poll_interval or CI_DEFAULT_INTERVAL
+-        _log(f"Bundled-tip CI: polling {bundle_tip_branch}")
+-        ci_verdict = _poll_ci(repo, bundle_tip_branch, ci_interval, CI_DEFAULT_CAP)
+-        if ci_verdict != "green":
+-            # v0.18.0+ — bundled-tip CI red/timeout is a NON-FATAL pre-merge
+-            # failure. No merges have happened. Route to paused so the
+-            # founder can inspect, fix the underlying CI failure, and
+-            # resume (Phase 3.1) — OR abort (Phase 3.2) to flip WPs to
+-            # step-7-blocked and write the train BLOCKER.
+-            culprit = compute_culprit_heuristic(bundle, clone_dir,
+-                                               f"bundled-tip CI {ci_verdict}")
+-            reason = f"bundled-tip CI {ci_verdict} on {bundle_tip_branch}"
+-            hint = (
+-                f"Bundled-tip CI is {ci_verdict}. Likely culprit "
+-                f"(file-overlap heuristic): {culprit or '<no signal>'}. "
+-                f"Inspect via `wpx-train inspect {train_id}`. "
+-                f"Once you've identified + fixed the failing branch, run "
+-                f"`wpx-train resume {train_id}` (Phase 3.1, ships v0.19.0). "
+-                f"To unwind the rebases + free the WPs back to step-7-complete, "
+-                f"`wpx-train abort {train_id}` (Phase 3.2). Until v0.19.0, "
+-                f"manual recovery: flip affected WPs back to step-7-complete "
+-                f"after fixing CI; re-run wpx-train run."
+-            )
+-            record["bundle"] = bundle
+-            record["suspected_culprit"] = culprit
+-            _pause_train_state(
+-                paths=paths, train_id=train_id, record=record,
+-                pause_reason=reason, recovery_hint=hint, bundle=bundle,
+-            )
+-
+-        # Phase transition: ci_running → merging
+-        update_train_phase(
+-            train_state_path(paths.train_runs_dir, train_id), "merging",
++        commit = _commit_phase(
++            args=args, paths=paths, repo=repo, train_id=train_id,
++            plan=plan, record=record, clone_dir=clone_dir,
+         )
+-
+-        # Step: sequential squash-merge
+-        #
+-        # HD-003: each per-entry merge is wrapped in try/except so that a
+-        # failure on entry N — after entries 1..N-1 have already landed
+-        # on dev — routes through the existing ADR-212 revert path rather
+-        # than propagating up to the outer `except RuntimeError`. The
+-        # outer handler writes outcome=error and exits without reverting,
+-        # which would leave dev in a half-state. _handle_post_merge_failure
+-        # already filters the bundle to merged entries (those with a
+-        # populated merge_sha_on_dev), so passing the partial bundle here
+-        # is correct: only the merges that actually landed get reverted,
+-        # and only their branches get restored.
+-        final_merge_sha = None
+-        for entry in bundle:
+-            _log(f"Squash-merging {entry['wp']} ({entry['branch']}) to dev")
+-            try:
+-                sha = _merge_squash(repo, entry["branch"], entry["wp"],
+-                                    base_branch=base_branch)
+-            except Exception as exc:  # noqa: BLE001
+-                # Per-merge failure mid-loop. Capture partial progress on
+-                # the record so the post-mortem yaml reflects which merges
+-                # landed, then hand off to the existing revert path.
+-                _log(
+-                    f"MERGE FAILURE: {entry['wp']} ({entry['branch']}) "
+-                    f"failed mid-batch: {exc}"
+-                )
+-                record["bundle"] = bundle
+-                _handle_post_merge_failure(
+-                    record=record, bundle=bundle,
+-                    reason=f"merge of {entry['wp']} failed: {exc}",
+-                    clone_dir=clone_dir, repo=repo, paths=paths,
+-                    train_id=train_id,
+-                    failure_text=(
+-                        f"_merge_squash raised on {entry['wp']} "
+-                        f"({entry['branch']}): {exc}"
+-                    ),
+-                )
+-            entry["merge_sha_on_dev"] = sha
+-            final_merge_sha = sha
+-        record["bundle"] = bundle  # refresh with merge_sha_on_dev populated
+-
+-        # Phase transition: merging → deploying
+-        update_train_phase(
+-            train_state_path(paths.train_runs_dir, train_id), "deploying",
++        verify = _verify_phase(
++            args=args, paths=paths, repo=repo, train_id=train_id,
++            plan=plan, commit=commit, record=record, clone_dir=clone_dir,
+         )
+-
+-        # Step: deploy poll
+-        deploy_interval = args.deploy_poll_interval or DEPLOY_DEFAULT_INTERVAL
+-        deploy_cap = args.deploy_cap or DEPLOY_DEFAULT_CAP
+-        _log(f"Polling deploy '{args.deploy_workflow}' for {final_merge_sha[:8]} "
+-             f"(interval={deploy_interval}s, cap={deploy_cap}s)")
+-        deploy_verdict, deploy_url = _poll_deploy(
+-            repo, args.deploy_workflow, final_merge_sha,
+-            deploy_interval, deploy_cap,
+-        )
+-        record["deploy_url"] = deploy_url
+-        if deploy_verdict == "timeout":
+-            # v0.18.0+ — deploy timeout is ambiguous (the deploy may still
+-            # complete after our cap). Route to paused rather than running
+-            # the revert; the founder can check the deploy URL + resume
+-            # if it completed, or abort if it genuinely failed.
+-            hint = (
+-                f"Deploy poll timed out after {deploy_cap}s. The deploy may "
+-                f"still be in progress. Check {deploy_url} for the current "
+-                f"status. If completed: `wpx-train resume {train_id}` (v0.19.0+) "
+-                f"will continue to verify. If it failed: `wpx-train abort "
+-                f"{train_id}` to run the ADR-212 revert. Or raise --deploy-cap "
+-                f"and re-run via the manual `wpx-train run --strict-ci` "
+-                f"escape hatch."
++        if verify.ready_for_gates:
++            _finalise_awaiting_gates(
++                paths=paths, train_id=train_id, batch=batch,
++                plan=plan, commit=commit, verify=verify, record=record,
+             )
+-            record["bundle"] = bundle
+-            _pause_train_state(
+-                paths=paths, train_id=train_id, record=record,
+-                pause_reason=f"deploy poll timeout after {deploy_cap}s",
+-                recovery_hint=hint, bundle=bundle,
+-            )
+-        if deploy_verdict != "green":
+-            # Explicit deploy failure (workflow conclusion = failure /
+-            # cancelled / etc.) — production verdict is bad; run the
+-            # existing ADR-212 revert path.
+-            _handle_post_merge_failure(
+-                record=record, bundle=bundle,
+-                reason=f"deploy {deploy_verdict}",
+-                clone_dir=clone_dir, repo=repo, paths=paths,
+-                train_id=train_id,
+-                failure_text=f"Deploy workflow result: {deploy_verdict}",
+-            )
+-
+-        # Phase transition: deploying → verifying
+-        update_train_phase(
+-            train_state_path(paths.train_runs_dir, train_id), "verifying",
+-        )
+-
+-        # Step: health check (optional — only if staging URL provided)
+-        if args.staging_url:
+-            health_path = args.health_path or "/"
+-            health_url = _join_health_url(args.staging_url, health_path)
+-            _log(f"Health check: {health_url}")
+-            health = _poll_health(health_url, HEALTH_DEFAULT_CAP)
+-            record["health_status"] = health
+-            if health != "healthy":
+-                _handle_post_merge_failure(
+-                    record=record, bundle=bundle,
+-                    reason=f"health check failed at {health_url}",
+-                    clone_dir=clone_dir, repo=repo, paths=paths,
+-                    train_id=train_id,
+-                    failure_text=f"Health check: {health} at {health_url}",
+-                )
+-        else:
+-            record["health_status"] = "skipped (no --staging-url)"
+-
+-        # Step: smoke test (optional — only if smoke cmd provided)
+-        if args.smoke_cmd:
+-            _log("Running smoke test")
+-            smoke_verdict, smoke_out = _run_smoke(args.smoke_cmd, clone_dir)
+-            record["smoke_verdict"] = smoke_verdict
+-            if not smoke_verdict.startswith("PASS"):
+-                _handle_post_merge_failure(
+-                    record=record, bundle=bundle,
+-                    reason=f"smoke {smoke_verdict}",
+-                    clone_dir=clone_dir, repo=repo, paths=paths,
+-                    train_id=train_id,
+-                    failure_text=f"Smoke output:\n{smoke_out}",
+-                )
+         else:
+-            record["smoke_verdict"] = "skipped (no --smoke-cmd)"
+-
+-        # Phase transition: verifying → success (terminal)
+-        update_train_phase(
+-            train_state_path(paths.train_runs_dir, train_id), "success",
+-        )
+-
+-        # Train complete — write record + cleanup state file + emit success
+-        record["outcome"] = "success"
+-        record["completed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+-        write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
+-        cleanup_train_state(paths.train_runs_dir, train_id)
+-        emit_result({
+-            "train_id": train_id,
+-            "outcome": "success",
+-            "wps_shipped": [e.wp for e in batch],
+-            "deploy_url": deploy_url,
+-            "final_merge_sha": final_merge_sha,
+-            "record_path": str(paths.train_runs_dir / f"{train_id}.yaml"),
+-        }, exit_code=0)
+-
++            _finalise_success(
++                paths=paths, train_id=train_id, batch=batch,
++                plan=plan, commit=commit, verify=verify, record=record,
++            )
+     except RuntimeError as exc:
+         record["outcome"] = "error"
+         record["outcome_reason"] = f"internal: {exc}"
+@@ -1600,6 +1799,120 @@ def cmd_run(args: argparse.Namespace) -> None:  # noqa: C901 (clear orchestratio
+         shutil.rmtree(clone_dir, ignore_errors=True)
+ 
+ 
++def cmd_mark_gates_complete(args: argparse.Namespace) -> None:
++    """HD-007 — signal that Step 10.5 + Step 11 have completed for a train
++    in phase=verifying_gates. Transitions to terminal success (or failed,
++    when --critical-found is set).
++
++    This is the calling LLM session's complement to cmd_run's gate handoff:
++    cmd_run pauses at the gate boundary; the session dispatches Step 10.5
++    + Step 11; the session invokes this subcommand to finalise. No git
++    operations, no shell-outs, no agent dispatch — just a state-machine
++    transition + record write.
++    """
++    paths = paths_from_args(args)
++    state_path = train_state_path(paths.train_runs_dir, args.train_id)
++
++    if not state_path.exists():
++        emit_error(
++            f"Train {args.train_id!r} has no in-flight state file at "
++            f"{state_path}. Either it never started, it already completed, "
++            f"or its state file was cleaned up. Run `wpx-train inspect "
++            f"{args.train_id}` to see the historical record."
++        )
++        return
++
++    try:
++        state = read_train_state(state_path)
++    except RuntimeError as exc:
++        emit_error(str(exc))
++        return
++
++    phase = state.get("phase")
++    if phase != "verifying_gates":
++        emit_error(
++            f"Train {args.train_id!r} is in phase {phase!r}; expected "
++            f"verifying_gates. mark-gates-complete only finalises trains "
++            f"that paused at the gate handoff boundary (via cmd_run with "
++            f"--enable-gate-handoff). Inspect via `wpx-train inspect "
++            f"{args.train_id}`."
++        )
++        return
++
++    record_path = paths.train_runs_dir / f"{args.train_id}.yaml"
++    record: dict = {}
++    if record_path.exists():
++        # Re-read the YAML record stub written by _finalise_awaiting_gates
++        # so we preserve bundle + deploy_url + final_merge_sha fields.
++        try:
++            from _wpxlib import read_train_run_record  # type: ignore[attr-defined]
++            record = read_train_run_record(record_path) or {}
++        except Exception:  # noqa: BLE001
++            # Reader may not exist; harmless — we overwrite minimal fields.
++            pass
++
++    completed_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
++
++    if args.critical_found:
++        # Calling session dispatched gates; one or more CRITICAL findings
++        # surfaced. The gate dispatchers already wrote BLOCKERs for the
++        # affected WPs (their existing CRITICAL-handling code paths).
++        # The train's job here is just to record the gate-failure outcome
++        # and transition to phase=failed.
++        reason = "Gate found CRITICAL finding(s)"
++        if args.gate_findings:
++            reason = f"{reason}; see {args.gate_findings}"
++        update_train_phase(
++            state_path, "failed",
++            pause_reason=reason,
++            recovery_hint=(
++                "Step 10.5 or Step 11 surfaced one or more CRITICAL findings. "
++                "The gate dispatchers already wrote per-WP BLOCKERs and "
++                "drafted remediation WPs. The train is recorded as failed; "
++                "no ADR-212 revert was run because production is live and "
++                "the founder owns the remediation cycle (next train picks "
++                "up the remediation WPs)."
++            ),
++        )
++        record["outcome"] = "gate_blocker"
++        record["outcome_reason"] = reason
++        record["completed_at"] = completed_at
++        if args.gate_findings:
++            record["gate_findings_path"] = args.gate_findings
++        try:
++            from _wpxlib import write_train_run_record as _writer
++            _writer(record_path, record)
++        except Exception:  # noqa: BLE001
++            pass
++        cleanup_train_state(paths.train_runs_dir, args.train_id)
++        emit_result({
++            "train_id": args.train_id,
++            "outcome": "gate_blocker",
++            "phase": "failed",
++            "record_path": str(record_path),
++        }, exit_code=1)
++        return
++
++    # Clean gate verdict: transition to terminal success.
++    update_train_phase(state_path, "success")
++    record["outcome"] = "success"
++    record["completed_at"] = completed_at
++    if args.gate_findings:
++        record["gate_findings_path"] = args.gate_findings
++    try:
++        from _wpxlib import write_train_run_record as _writer
++        _writer(record_path, record)
++    except Exception:  # noqa: BLE001
++        pass
++    cleanup_train_state(paths.train_runs_dir, args.train_id)
++    emit_result({
++        "train_id": args.train_id,
++        "outcome": "success",
++        "phase": "success",
++        "record_path": str(record_path),
++    }, exit_code=0)
++
++
+ # --- argparse -----------------------------------------------------------
+ 
+ def build_parser() -> argparse.ArgumentParser:
+@@ -1761,6 +2074,38 @@ def build_parser() -> argparse.ArgumentParser:
+                             "Per CW-04, when run inside a change worktree, "
+                             "callers pass the change branch name so WPs ship "
+                             "to the change branch rather than directly to dev.")
++    p_run.add_argument(
++        "--enable-gate-handoff", action="store_true",
++        help="HD-007: stop at the verifying_gates phase boundary after "
++             "deploy/health/smoke complete green. Emits outcome=awaiting_gates "
++             "(exit 0) with a gate_handoff envelope describing the batch diff "
++             "range + wps_shipped for Step 10.5 + Step 11. Calling session "
++             "dispatches the gates and then invokes `wpx-train mark-gates-"
++             "complete --train-id <id>` to finalise. Default: off (legacy "
++             "path — goes directly to terminal success after smoke).",
++    )
++
++    p_mgc = sub.add_parser(
++        "mark-gates-complete",
++        help=("HD-007: finalise a train paused at verifying_gates. "
++              "Calling session invokes after Step 10.5 + Step 11 dispatch "
++              "completes."),
++    )
++    _common(p_mgc)
++    p_mgc.add_argument("--train-id", required=True,
++                       help="Train ID to finalise (must be in phase=verifying_gates)")
++    p_mgc.add_argument(
++        "--gate-findings", default=None,
++        help="Optional path to gate findings artifact (e.g. code-review bundle). "
++             "Recorded in the train YAML for posterity.",
++    )
++    p_mgc.add_argument(
++        "--critical-found", action="store_true",
++        help="A CRITICAL finding surfaced in Step 10.5 or Step 11. Records "
++             "the train as gate_blocker (phase=failed) without running the "
++             "ADR-212 revert; the gate dispatcher already wrote BLOCKERs "
++             "and drafted remediation WPs.",
++    )
+ 
+     return parser
+ 
+@@ -1777,6 +2122,7 @@ HANDLERS = {
+     "retry-wp": cmd_retry_wp,
+     "doctor": cmd_doctor,
+     "run": cmd_run,
++    "mark-gates-complete": cmd_mark_gates_complete,
+ }
+ 
+ 
+diff --git a/plugins/sulis-execution/skills/run-all/SKILL.md b/plugins/sulis-execution/skills/run-all/SKILL.md
+index b8a9a1e..4fd7d6d 100644
+--- a/plugins/sulis-execution/skills/run-all/SKILL.md
++++ b/plugins/sulis-execution/skills/run-all/SKILL.md
+@@ -344,9 +344,28 @@ loop:
+          --staging-url "<staging-url>" \
+          --smoke-cmd "<smoke command>" \
+          --health-path "<health-path>" \
++         --enable-gate-handoff \
+          # Add --force to bypass size/staleness trigger
+        ```
+ 
++       **v0.23.0 (HD-007): pass `--enable-gate-handoff`** so the train
++       stops at the new `verifying_gates` phase after deploy/health/smoke
++       complete green, instead of going directly to terminal success.
++       The train emits `outcome: awaiting_gates` (exit 0) with a
++       `gate_handoff` envelope describing the batch diff range +
++       wps_shipped. The calling session (this skill) then dispatches
++       Step 10.5 + Step 11 inside that phase and invokes
++       `wpx-train mark-gates-complete --train-id <id>` to finalise (see
++       Step 14.5 below). The gates are now part of the train's
++       transaction in lifecycle terms — the dispatch mechanism stays
++       here because a Python CLI can't spawn Agents.
++
++       **Legacy fallback:** if `--enable-gate-handoff` is omitted, the
++       train returns `outcome: success` directly (today's pre-v0.23.0
++       behaviour) and Steps 13-14 below run as post-train follow-on.
++       Both shapes are supported during the deprecation cycle; new
++       projects SHOULD pass the flag.
++
+        If the train trigger isn't met (e.g. only 1 WP eligible and no
+        force), `wpx-train run` exits cleanly with `outcome:
+        not_triggered`. The eligible WPs wait for the next invocation
+@@ -365,16 +384,26 @@ loop:
+    13. **Step 10.5 (per-batch, v0.21.1+): bundled-tip code-review
+        for cross-WP composition issues.**
+ 
+-       After `wpx-train run` returns `outcome: success`, but BEFORE
+-       Step 11, review the composition of all WPs in the batch via
+-       `/sea:code-review` against the batch's diff range on the base
+-       branch. This catches issues only visible when WPs compose:
+-       N+1 queries across sibling WPs, integration regressions,
+-       contract drift between interdependent WPs.
+-
+-       Dispatch ONLY when `outcome: "success"`. If `outcome` is
+-       `not_triggered`, `paused`, `failed`, or `blocker`, **skip Step 10.5**
+-       — the train's own recovery flow owns those states.
++       After `wpx-train run` returns, but BEFORE Step 11, review the
++       composition of all WPs in the batch via `/sea:code-review` against
++       the batch's diff range on the base branch. This catches issues
++       only visible when WPs compose: N+1 queries across sibling WPs,
++       integration regressions, contract drift between interdependent
++       WPs.
++
++       **Trigger outcome (v0.23.0, HD-007):**
++
++       - When `--enable-gate-handoff` was passed (recommended), the
++         train returns `outcome: awaiting_gates` (exit 0) and the train
++         state is in phase=`verifying_gates`. Dispatch Step 10.5 + 11
++         INSIDE this phase. The `gate_handoff` envelope on the result
++         JSON carries the diff range + wps_shipped — use those instead
++         of reading the train state YAML.
++       - When `--enable-gate-handoff` was omitted (legacy), dispatch
++         ONLY when `outcome: "success"` per pre-v0.23.0 semantics.
++       - In either case: if `outcome` is `not_triggered`, `paused`,
++         `failed`, or `blocker`, **skip Step 10.5** — the train's own
++         recovery flow owns those states.
+ 
+        Capture the batch diff range from the train state YAML:
+ 
+@@ -602,6 +631,47 @@ loop:
+        missed Step 11), invoke `/sulis-execution:backfill-gates`
+        (v0.20.2+).
+ 
++   14.5. **HD-007 gate completion (v0.23.0+, only when `--enable-gate-handoff`
++        was passed at Step 12).**
++
++        After Step 10.5 + Step 11 have both completed for every WP in
++        the batch, finalise the train by invoking the new
++        `mark-gates-complete` subcommand:
++
++            # Clean verdict — no CRITICAL found in Step 10.5 OR Step 11:
++            "$WPX_DIR/wpx-train" mark-gates-complete \
++              --project <slug> \
++              --train-id <train_id from train-result.json> \
++              --gate-findings "$BUNDLE_DIR/REVIEW.md"
++
++            # CRITICAL verdict — at least one Step 10.5 or Step 11 CRITICAL
++            # finding fired (and the dispatcher above already wrote BLOCKERs +
++            # drafted remediation WPs):
++            "$WPX_DIR/wpx-train" mark-gates-complete \
++              --project <slug> \
++              --train-id <train_id> \
++              --gate-findings "$BUNDLE_DIR/REVIEW.md" \
++              --critical-found
++
++        Behaviour:
++
++        - **Clean** → train transitions to terminal `success`; YAML
++          record's `outcome` becomes `success`; state file cleaned up.
++          Exits 0.
++        - **`--critical-found`** → transitions to terminal `failed`;
++          YAML record's `outcome` becomes `gate_blocker`. **No ADR-212
++          revert runs** — the gate dispatchers above (Steps 13-14)
++          already wrote per-WP BLOCKERs + drafted remediation WPs.
++          Production stays live; the founder owns the remediation
++          cycle (the next train ships the remediation WPs and that
++          train's Step 10.5 + 11 re-evaluate). Exits 1.
++
++        **Skip this step when `--enable-gate-handoff` was NOT passed at
++        Step 12** — the train already transitioned to terminal `success`
++        on its own, and `mark-gates-complete` will reject the call with
++        "expected phase=verifying_gates" since the state file no longer
++        exists.
++
+        ---
+ 
+        **(v0.10.7 fallback — preserved for reference)**
