@@ -67,65 +67,78 @@ export function FilePane({ changeId }: Props) {
     return message("Pick a file from the tree to view it.");
   }
 
-  if (query.isLoading) {
-    // No toolbar until data arrives: the absolute path (for copy-path)
-    // only comes back with the payload, and the diff toggle is reachable
-    // again the instant the load resolves. Matches WP-014's loading state.
-    return message(diffMode ? "Loading diff..." : "Loading file...");
-  }
+  // The toolbar — and crucially the diff toggle — renders ABOVE the body
+  // in EVERY state (loading / error / no-base-sha / success). This is the
+  // documented contract: the founder must always be able to flip the diff
+  // toggle back, even when diff mode errors (e.g. NO_BASE_SHA). Earlier the
+  // error branches returned without the toolbar, stranding the user in diff
+  // mode with no way back. The filename comes from the selected path
+  // (always known); the absolute path (for copy) only fills once data
+  // arrives — CopyPathButton disables itself until then.
+  const absolutePath =
+    query.data && "absolutePath" in query.data ? query.data.absolutePath : "";
 
-  if (query.isError) {
-    if (
-      diffMode &&
-      query.error instanceof ApiError &&
-      query.error.code === "NO_BASE_SHA"
-    ) {
-      return pane(<NoBaseShaState />);
+  function body(): ReactNode {
+    if (query.isLoading) {
+      return (
+        <p className={styles.fileMessage}>
+          {diffMode ? "Loading diff..." : "Loading file..."}
+        </p>
+      );
     }
-    const reason =
-      query.error instanceof ApiError ? query.error.message : "unknown error";
-    return message(
-      `Could not load ${diffMode ? "diff" : "file"}: ${reason}`,
-    );
-  }
 
-  if (diffMode) {
-    const diff = diffQuery.data!;
-    return pane(
-      <>
-        <FileToolbar relativePath={diff.path} absolutePath={diff.absolutePath} />
-        {diff.binary || diff.truncated ? (
-          <DiffUnavailableState absolutePath={diff.absolutePath} />
-        ) : (
-          <Suspense
-            fallback={<p className={styles.fileMessage}>Loading viewer...</p>}
-          >
-            <MonacoDiff
-              base={diff.base}
-              current={diff.current}
-              language={diff.language}
-            />
-          </Suspense>
-        )}
-      </>,
-    );
-  }
+    if (query.isError) {
+      if (
+        diffMode &&
+        query.error instanceof ApiError &&
+        query.error.code === "NO_BASE_SHA"
+      ) {
+        return <NoBaseShaState />;
+      }
+      const reason =
+        query.error instanceof ApiError ? query.error.message : "unknown error";
+      return (
+        <p className={styles.fileMessage}>
+          Could not load {diffMode ? "diff" : "file"}: {reason}
+        </p>
+      );
+    }
 
-  const file = fileQuery.data!;
-  return pane(
-    <>
-      <FileToolbar relativePath={file.path} absolutePath={file.absolutePath} />
-      {file.binary ? (
-        <FileBinaryState absolutePath={file.absolutePath} />
-      ) : file.truncated ? (
-        <FileTruncatedState absolutePath={file.absolutePath} />
+    if (diffMode) {
+      const diff = diffQuery.data!;
+      return diff.binary || diff.truncated ? (
+        <DiffUnavailableState absolutePath={diff.absolutePath} />
       ) : (
         <Suspense
           fallback={<p className={styles.fileMessage}>Loading viewer...</p>}
         >
-          <MonacoFile content={file.content ?? ""} language={file.language} />
+          <MonacoDiff
+            base={diff.base}
+            current={diff.current}
+            language={diff.language}
+          />
         </Suspense>
-      )}
+      );
+    }
+
+    const file = fileQuery.data!;
+    return file.binary ? (
+      <FileBinaryState absolutePath={file.absolutePath} />
+    ) : file.truncated ? (
+      <FileTruncatedState absolutePath={file.absolutePath} />
+    ) : (
+      <Suspense
+        fallback={<p className={styles.fileMessage}>Loading viewer...</p>}
+      >
+        <MonacoFile content={file.content ?? ""} language={file.language} />
+      </Suspense>
+    );
+  }
+
+  return pane(
+    <>
+      <FileToolbar relativePath={selected} absolutePath={absolutePath} />
+      {body()}
     </>,
   );
 }

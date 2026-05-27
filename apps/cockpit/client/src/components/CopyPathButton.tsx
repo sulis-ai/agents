@@ -51,11 +51,16 @@ export function CopyPathButton({ absolutePath }: Props) {
     }
   }
 
+  // Before the file's data arrives (loading / error states), there is no
+  // absolute path to copy — disable rather than copy an empty string.
+  const ready = absolutePath.length > 0;
+
   return (
     <button
       type="button"
       className={styles.copyPathButton}
       onClick={handleCopy}
+      disabled={!ready}
       title={absolutePath}
       data-testid="copy-path-button"
     >
