@@ -1,10 +1,33 @@
-# Changelog — idc
+# Changelog — investor-coach
 
 This file holds the cumulative version history that previously lived in
 `plugin.json`'s `description` field. The description is now a one-sentence
 summary (per HD-004); historical detail lives here.
 
 For the marketplace-facing summary, see `plugin.json`.
+
+---
+
+## v0.6.0 — 2026-05-28
+
+**Renamed `idc` → `investor-coach`.** Slug change only — no behavioural
+difference. All 85 `/idc:` command references inside the plugin
+rewritten to `/investor-coach:` (skills, agent, references, scripts,
+templates, README). Plugin folder moved to `plugins/investor-coach/`
+via `git mv` (history preserved).
+
+Companion marketplace cleanup pruned 11 other plugins; the registry
+now lists exactly two: `sulis` (build) + `investor-coach` (pitch).
+
+**Heads-up if you had `idc` installed:** Claude Code will reinstall
+under the new `investor-coach/` cache path on the next plugin reload.
+Your `.pitch/{project}/` artefacts are unaffected — they never
+contained the plugin slug. If `idc` appears in your `enabledPlugins`
+settings, replace it with `investor-coach`.
+
+Entries before this point still say "idc" because that IS what the
+plugin was called when those entries were written. The historical
+record is intentionally preserved.
 
 ---
 
