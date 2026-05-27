@@ -355,3 +355,153 @@ def test_extract_code_tokens_ignores_short_tokens():
     assert "ab" not in tokens
     assert "abc" in tokens
     assert "cmd_nuke" in tokens
+
+
+# ─── #31: harden code-area pointers (path-token recognition + doc exclusion) ──
+
+
+def test_looks_like_path_recognises_path_with_slash():
+    assert cc._looks_like_path("plugins/sulis/scripts/_change_context.py")
+    assert cc._looks_like_path("apps/cockpit/client/src/main.tsx")
+    assert cc._looks_like_path("foo/bar")  # has slash; not yet asserting existence
+
+
+def test_looks_like_path_recognises_extension_without_slash():
+    assert cc._looks_like_path("_change_context.py")
+    assert cc._looks_like_path("settings.yaml")
+    assert cc._looks_like_path("README.md")
+    assert cc._looks_like_path("config.toml")
+
+
+def test_looks_like_path_rejects_bare_symbols():
+    assert not cc._looks_like_path("cmd_finish")
+    assert not cc._looks_like_path("mark_change_shipped")
+    assert not cc._looks_like_path("MyClass")
+
+
+def test_looks_like_path_rejects_short_alpha_tokens():
+    assert not cc._looks_like_path("abc")
+    assert not cc._looks_like_path("foo")
+
+
+def test_is_doc_file_recognises_doc_extensions():
+    assert cc._is_doc_file("README.md")
+    assert cc._is_doc_file("plugins/sulis/CHANGELOG.md")
+    assert cc._is_doc_file("notes.txt")
+    assert cc._is_doc_file("design/intro.rst")
+
+
+def test_is_doc_file_rejects_code_extensions():
+    assert not cc._is_doc_file("plugins/sulis/scripts/_change_context.py")
+    assert not cc._is_doc_file("apps/cockpit/client/src/main.tsx")
+    assert not cc._is_doc_file("scripts/sulis-change")
+
+
+# ─── _locate_code_areas — integration: path-recognition first, docs excluded ──
+
+
+def test_locate_code_areas_returns_path_token_when_file_exists(tmp_path, monkeypatch):
+    """A backticked path-like token that resolves to a real file in the
+    worktree must be listed in pointers FIRST as a direct reference, ahead
+    of any grep results."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    target = repo / "plugins" / "sulis" / "scripts" / "_change_context.py"
+    target.parent.mkdir(parents=True)
+    target.write_text("# stub\n")
+    # No grep results — path resolution alone provides the pointer.
+    monkeypatch.setattr(cc, "_run", lambda *a, **kw: (1, "", ""))
+    pointers = cc._locate_code_areas(
+        "fix the recon's `plugins/sulis/scripts/_change_context.py` helper",
+        repo,
+    )
+    assert "plugins/sulis/scripts/_change_context.py" in pointers
+    # And it's first (direct paths beat grep results in ordering)
+    assert pointers[0] == "plugins/sulis/scripts/_change_context.py"
+
+
+def test_locate_code_areas_path_token_with_no_matching_file_falls_back_to_grep(
+    tmp_path, monkeypatch,
+):
+    """If a token looks path-like but doesn't actually exist, fall back to
+    the grep (don't silently drop the token)."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    # The grep finds 'nonexistent.py' mentioned in some-real.py
+    monkeypatch.setattr(
+        cc, "_run",
+        lambda *a, **kw: (0, "some-real.py\n", ""),
+    )
+    pointers = cc._locate_code_areas(
+        "fix `nonexistent.py`",  # path-like but no such file in repo
+        repo,
+    )
+    assert pointers == ["some-real.py"]
+
+
+def test_locate_code_areas_excludes_doc_files_from_symbol_grep(
+    tmp_path, monkeypatch,
+):
+    """When the grep returns mixed code + doc files for a symbol token,
+    the doc files (.md / .txt / .rst) must be filtered out — they're
+    almost always mentioners, not the subject."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    # Mock git grep returning a mix: docs + the real source file
+    monkeypatch.setattr(
+        cc, "_run",
+        lambda *a, **kw: (
+            0,
+            "plugins/sulis/CHANGELOG.md\n"
+            "docs/notes.md\n"
+            "plugins/sulis/scripts/sulis-change\n"
+            "plugins/sulis/scripts/_change_state.py\n",
+            "",
+        ),
+    )
+    pointers = cc._locate_code_areas(
+        "fix `cmd_finish`",  # symbol token, not path-like
+        repo,
+    )
+    # Docs filtered; only code-y matches remain
+    assert "plugins/sulis/CHANGELOG.md" not in pointers
+    assert "docs/notes.md" not in pointers
+    assert "plugins/sulis/scripts/sulis-change" in pointers
+    assert "plugins/sulis/scripts/_change_state.py" in pointers
+
+
+def test_locate_code_areas_combines_paths_first_then_grep(tmp_path, monkeypatch):
+    """Mixed intent (one path token + one symbol token): the path-token
+    match appears first, then the symbol-grep matches."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    # Create the path-token's file
+    target = repo / "plugins" / "sulis" / "scripts" / "sulis-change"
+    target.parent.mkdir(parents=True)
+    target.write_text("# stub\n")
+    # Grep returns matches for the symbol token (cmd_nuke)
+    monkeypatch.setattr(
+        cc, "_run",
+        lambda *a, **kw: (0, "plugins/sulis/scripts/_change_state.py\n", ""),
+    )
+    pointers = cc._locate_code_areas(
+        "fix `plugins/sulis/scripts/sulis-change` and `cmd_nuke`",
+        repo,
+    )
+    # Path-token first, then symbol-grep result
+    assert pointers[0] == "plugins/sulis/scripts/sulis-change"
+    assert "plugins/sulis/scripts/_change_state.py" in pointers
+
+
+def test_locate_code_areas_caps_at_five_across_paths_and_grep(tmp_path, monkeypatch):
+    """The total cap of 5 entries (paths + grep) is preserved post-fix."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    # 7 grep results — cap should kick in at 5
+    monkeypatch.setattr(
+        cc, "_run",
+        lambda *a, **kw: (0,
+            "a.py\nb.py\nc.py\nd.py\ne.py\nf.py\ng.py\n", ""),
+    )
+    pointers = cc._locate_code_areas("fix `cmd_finish`", repo)
+    assert len(pointers) == 5

@@ -184,16 +184,82 @@ def _resolve_linked_issues(intent: str, repo_root: Path) -> list[dict]:
     return out
 
 
+# Path-token heuristic (#31). Recognises a backticked token as a file-path
+# reference when it either contains a directory separator or ends in a known
+# code/doc/config extension. The list covers the common file types in this
+# marketplace and downstream Sulis-built apps; bare extensions are caught
+# even without a slash (e.g. `_change_context.py` triggers).
+_PATH_EXTENSIONS: tuple[str, ...] = (
+    ".py", ".md", ".ts", ".tsx", ".js", ".jsx", ".json",
+    ".yaml", ".yml", ".sh", ".html", ".css", ".toml", ".rst",
+)
+
+# Doc-file extensions excluded from symbol-grep results (#31). When the
+# intent backticks a symbol like `cmd_finish`, matches in `.md` / `.txt` /
+# `.rst` are almost always mentioners (CHANGELOGs, design docs) rather than
+# subjects (the file where the symbol lives). The path-token heuristic still
+# returns these files DIRECTLY when the token IS the filename — only the
+# symbol-grep fallback applies this filter.
+_DOC_EXTENSIONS: tuple[str, ...] = (".md", ".txt", ".rst")
+
+
+def _looks_like_path(token: str) -> bool:
+    """True if a backticked token looks like a file-path reference: has a
+    directory separator OR ends in a known code/doc/config extension."""
+    if "/" in token or "\\" in token:
+        return True
+    return token.endswith(_PATH_EXTENSIONS)
+
+
+def _is_doc_file(path: str) -> bool:
+    """True if ``path`` ends in a doc extension (``.md`` / ``.txt`` /
+    ``.rst``). Used to filter mentioners out of symbol-grep results."""
+    return path.endswith(_DOC_EXTENSIONS)
+
+
 def _locate_code_areas(intent: str, repo_root: Path) -> list[str]:
-    """For each backtick-quoted token of length >= 3 in ``intent``, run
-    `git grep -l -- <token>` and collect up to 5 unique matching files.
-    Empty list on any failure. Best-effort; ordered by first-seen token."""
+    """For each backtick-quoted token of length >= 3 in ``intent``, find the
+    files it refers to. Returns up to 5 unique paths total.
+
+    Two heuristics (#31 — recon code-pointer accuracy):
+      1. **Path-token recognition.** If the token looks like a path
+         (`_looks_like_path`) AND the corresponding file exists in the repo,
+         add it directly to the pointers list FIRST as a high-signal
+         reference. Skip the grep for that token — direct path resolution
+         beats any grep match.
+      2. **Symbol-grep with doc filter.** For non-path tokens, run the
+         existing `git grep -l -F -- <token>` and add matches, but filter
+         out doc files (`.md` / `.txt` / `.rst`) — they're almost always
+         mentioners (CHANGELOGs, design docs) rather than subjects.
+
+    Direct paths come first because they're strictly higher signal. Empty
+    list on any failure. Best-effort; ordered by first-seen token.
+    """
     tokens = _extract_code_tokens(intent)
     if not tokens:
         return []
     seen: set[str] = set()
-    out: list[str] = []
+    direct: list[str] = []
+    grep_hits: list[str] = []
     for tok in tokens:
+        # 1. Path-token check: if the token resolves to a file in the repo,
+        # use that directly and skip the grep.
+        if _looks_like_path(tok):
+            candidate = Path(repo_root) / tok
+            try:
+                if candidate.is_file():
+                    rel = str(candidate.resolve().relative_to(
+                        Path(repo_root).resolve()
+                    ))
+                    if rel not in seen:
+                        seen.add(rel)
+                        direct.append(rel)
+                    continue
+            except (OSError, ValueError):
+                # `relative_to` raises ValueError if candidate resolves
+                # outside repo_root (e.g. `../foo`). Fall through to grep.
+                pass
+        # 2. Symbol-grep with doc filter.
         rc, stdout, _ = _run(
             # `-l` lists files only; `-F` treats the pattern as a fixed string
             # so `.` etc. are not regex metacharacters. `--` separates the
@@ -207,11 +273,13 @@ def _locate_code_areas(intent: str, repo_root: Path) -> list[str]:
             path = path.strip()
             if not path or path in seen:
                 continue
+            if _is_doc_file(path):
+                # Mentioners (CHANGELOG, design docs) — skip; bias toward code.
+                continue
             seen.add(path)
-            out.append(path)
-            if len(out) >= 5:
-                return out
-    return out
+            grep_hits.append(path)
+    # Direct path matches first (higher signal), then grep matches. Cap at 5.
+    return (direct + grep_hits)[:5]
 
 
 # ─── Rendering ─────────────────────────────────────────────────────────────
