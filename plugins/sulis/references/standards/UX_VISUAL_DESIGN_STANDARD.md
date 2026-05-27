@@ -235,27 +235,41 @@ never silent.
 
 ## Optional inspiration inputs (Mobbin MCP)
 
-### UXD-15 — Inspiration informs patterns, never identity · MUST (when used)
+### UXD-15 — Inspiration informs patterns, never identity · MUST when MCP connected, MAY otherwise
 
-The design flow MAY draw inspiration from real-world shipped apps. When an
-optional **Mobbin MCP** is connected (the founder's own Mobbin account —
-`https://api.mobbin.com/mcp`), the design phase may probe it for
-**structural, compositional, and interaction patterns** — how comparable
-products lay out a dashboard, sequence an onboarding, handle an empty state.
+When the visual-contract producer runs (`draft-architecture` step 3.5(b) — see
+UXD-14), it **MUST probe the Mobbin MCP if connected** and persist the
+results as a **referenceable doc** the mockup is built against and `review`
+later verifies against. When the MCP is not connected the probe is skipped
+cleanly (no fabrication); the design flow proceeds without external
+references.
 
-The guardrail is firm: **inspiration informs *patterns*, never *identity*.**
+**The guardrail is firm: inspiration informs *patterns*, never *identity*.**
 The product's own identity, tokens, voice, and distinctive assets
 (UXD-01/02/03/04) remain **authoritative**. Mobbin shows *how others
 structured a problem*; it never sets *what this product looks like*. Borrowing
 a competitor's visual identity would directly violate UXD-02 (distinctiveness).
 
-- **Optional.** The design flow works fully without it; it's an enhancement,
-  not a dependency.
+- **MCP-gated.** Connected → probe MUST run; disconnected → skipped cleanly.
+  No fallback fabrication.
 - **Account-bound.** Inspiration comes from the founder's connected Mobbin
-  account, on their request.
-- **Provenance.** Patterns drawn from Mobbin are recorded (what was borrowed,
-  from where) per UXD-13, and pass back through UXD-02 + UXD-05 so a borrowed
-  structure is never allowed to dilute distinctiveness.
+  account; the MCP runs under their credentials.
+- **Persisted referenceable artifact (MUST).** The probe writes
+  `.architecture/{project}/contracts/visual/_mobbin-context.md` — per-reference
+  (app name, URL, structural observations marked *transferable* and visual
+  observations marked *NOT transferable*) plus a 2–4 line synthesis. The
+  visual-contract WP's `inspiration:` frontmatter cites the path. Because
+  `.architecture/` travels with the change branch (#42), the research is
+  durable; `review` reads it post-build to verify the shipped surface honoured
+  the cited structural patterns (the loop closes).
+- **Scope hard-bound.** *Structural* patterns (section ordering, density,
+  spacing rhythm, micro-interactions) are transferable. *Visual* choices
+  (palette, type stack, mark) are NOT — they stay bound to the design
+  instance. The mockup never embeds Mobbin screenshots; the produced surface
+  never adopts a referenced app's identity.
+- **Worked-example carve-out.** If the project's design instance already
+  covers the surface tightly via `reference/` or `examples/`, log the skip
+  and proceed without the probe.
 
 > **In practice:** "show me how shipped apps structure a multi-change
 > workspace" → Mobbin returns layout/interaction patterns → they inform the

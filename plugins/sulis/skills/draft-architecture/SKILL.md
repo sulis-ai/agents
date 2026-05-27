@@ -275,19 +275,58 @@ If extending or superseding, reference the existing ADR by path.}
      (UXD-10: outcome-oriented, human-in-the-loop gates, transparency).
    - **Governance** — provenance label on the artifact.
 
-   Produce a **real-token HTML mockup** at
+   **Run the Mobbin inspiration probe FIRST (UXD-15 — gated on MCP
+   availability).** Before producing the mockup, search Mobbin for real-world
+   patterns matching this surface so the mockup is grounded in what's been
+   shipped, not invented in isolation. Strict scope: **structural patterns
+   are transferable; visual choices are NOT** — our tokens, type stack, and
+   identity stay authoritative (UXD-15).
+
+   1. **Detect availability.** Probe the Mobbin MCP (e.g.
+      `mcp__plugin_honest_mobbin__search_screens` if connected via the honest
+      plugin, or a sulis-native equivalent). If unavailable or unauthenticated:
+      log one line ("Mobbin: MCP unavailable, skipping inspiration probe —
+      mockup will proceed without external references."), set
+      `inspiration: none` on the visual-contract WP, and continue. **Never
+      fabricate references** — no MCP = no `_mobbin-context.md`.
+   2. **Query.** Compose a search from the surface description (e.g.
+      "settings screen with org switcher") + the change intent. Cap results
+      to ~6; keep 2–3 most relevant.
+   3. **Capture per reference.** App name, Mobbin URL, 2–4 *structural*
+      observations (transferable — section ordering, density, spacing rhythm,
+      micro-interaction beats) and the *visual* observations explicitly marked
+      NOT transferable (our tokens authoritative).
+   4. **Synthesise.** Write a 2–4 line paragraph extracting the cross-cutting
+      structural patterns the mockup should consider folding in.
+   5. **Worked-example carve-out.** If the project's own design-instance
+      `reference/` or `examples/` already covers this surface tightly, log
+      "Worked example covers this surface; skipping Mobbin probe" and skip.
+   6. **Persist** the probe output to
+      `.architecture/{project}/contracts/visual/_mobbin-context.md`. Because
+      `.architecture/` travels with the change branch (#42), the research is
+      durable and discoverable — `review` can later verify the shipped surface
+      honoured the inspiration cited here. The visual-contract WP's
+      `inspiration:` frontmatter field cites the relative path so the link
+      is explicit.
+
+   **(b.ii) Produce the real-token HTML mockup** at
    `.architecture/{project}/contracts/visual/<surface>.html` — composed
    page(s), the product's actual design-instance tokens (never invented hex),
    and **the webfonts its type tokens reference actually loaded** (L-13: a
    mockup whose fonts don't load passed "tokens match" while the founder saw
-   no brand — sign-off is *visual*, not value-equality). Note the
-   perceptual delta vs the current surface so the founder can see what changes.
+   no brand — sign-off is *visual*, not value-equality). The mockup's
+   **structure** may reflect the Mobbin synthesis (section ordering, density,
+   spacing rhythm); the mockup's **visual identity** stays bound to the
+   design instance — never embed Mobbin screenshots and never adopt their
+   palettes/type stacks. Note the perceptual delta vs the current surface so
+   the founder can see what changes.
 
-   **(ii) The visual-contract WP.** Emit a WP with frontmatter:
+   **(b.iii) The visual-contract WP.** Emit a WP with frontmatter:
    ```yaml
    kind: contract
    contract_type: visual          # marks it as the visual-contract WP
    mockup: contracts/visual/<surface>.html
+   inspiration: contracts/visual/_mobbin-context.md   # or "none" if MCP unavailable
    signed_off_at:                 # EMPTY until the founder signs off
    provenance: draft              # → production-approved on sign-off
    ```

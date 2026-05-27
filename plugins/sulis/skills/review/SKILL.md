@@ -56,6 +56,10 @@ standards — they're not background context, they're the **rubric**:
   visual-contract WP existed (`signed_off_at` + `provenance:
   production-approved`), and the shipped surface **matches its rendered
   mockup** — the post-build visual check (look at it, don't just diff tokens;
+  AND, when the contract WP's `inspiration:` cites a `_mobbin-context.md`,
+  verify the shipped surface honoured the **structural patterns** that
+  document called out — section ordering, density, micro-interactions — while
+  staying within the design instance's tokens (UXD-15 scope rule).
   L-13). Plus semantic tokens not hex; design-time WCAG AA; agentic-UX
   principles for AI surfaces.
 
