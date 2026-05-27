@@ -1,5 +1,21 @@
 # Sulis — Changelog
 
+## v0.61.0 — 2026-05-27
+
+**Minor — pre-spawn recon CONTEXT.md is now grounded: intent + linked issue + code-area pointers (closes #26).**
+
+Surfaced by the first end-to-end integration test of the change-as-primitive flow on 2026-05-27. The pre-spawn recon stub previously included identity + git-state only — the spawned Sulis greeted the founder blind on what the change is FOR.
+
+`plugins/sulis/scripts/_change_context.py`'s CONTEXT.md writer now produces three additional sections:
+
+1. **`## Intent`** — the founder's intent text from the change manifest (already persisted but not piped through). Omitted when absent.
+2. **`## Linked issue`** — when the intent contains `#NN`, shells out `gh issue view N --json title,labels,body,state,url` and inlines per issue. Best-effort with silent omit on any failure (no `gh`, no remote, network error, malformed JSON). Capped at 5 issues.
+3. **`## Code-area pointers`** — extracts backtick-quoted tokens of length >= 3 from the intent and runs `git grep -l -F -- <token>`; surfaces up to 5 unique matching files. Omitted when zero matches.
+
+Section order is pinned by test (`identity → git state → intent → linked issue → code areas → suggested next step`) so the spawned Sulis can keep relying on "last section is the actionable hint." Both new shell-outs use `argv` lists with explicit timeouts; `git grep -F` treats user-supplied tokens as fixed strings (defends against regex-metacharacter injection from the intent).
+
+13 new unit tests (699 total green); 12 existing change-context tests unperturbed. Post-merge code-health and code-review both PASS — surfaced one further lesson (#30 — ship flow doesn't structurally force review) captured durably for follow-up.
+
 ## v0.60.0 — 2026-05-27
 
 **Minor — Mobbin inspiration probe wired into the visual contract producer.**
