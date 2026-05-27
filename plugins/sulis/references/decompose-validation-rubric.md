@@ -226,6 +226,8 @@ consistent, and free of orphans.
 | **4.05** | SHOULD | No orphan WPs (no incoming or outgoing edges) UNLESS the WP is explicitly a foundation WP | Find isolated nodes; cross-check against `foundation:` flag in frontmatter | Graph + frontmatter |
 | **4.06** | MAY | At least one parallelisable batch (multiple WPs at the same DAG level, no shared dependencies) exists | Compute topological levels; assert ≥1 level has ≥2 WPs | Graph algorithm |
 | **4.07** | MUST | INDEX.md's Recommended Implementation Order is a valid topological sort | Verify the order respects all `dependsOn` relations | Order check |
+| **4.08** | MUST | Cross-kind seam has a data-contract WP (#48 / CF-01 / WP-08.5) | If the set spans ≥2 of backend/frontend/async, a `kind: contract` (data; `contract_type` ≠ visual) WP exists | `wpx-index audit-contracts` |
+| **4.09** | MUST | No direct cross-kind dependency edge (#48 / CF-05) | No WP `dependsOn` a WP of a *different* implementation kind — cross-kind deps route through the contract WP (parallel-not-sequential) | `wpx-index audit-contracts` |
 
 ---
 

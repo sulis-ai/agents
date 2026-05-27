@@ -220,11 +220,19 @@ child_wps:
 ```
 
 > **User-facing seams need TWO contracts.** When the consumer is a UI, a
-> `kind: contract` WP for the **data** contract is paired with the **visual**
-> contract being produced as a design artifact (per
-> `UX_VISUAL_DESIGN_STANDARD.md` UXD-14: tokens + HIG + UX patterns), which
-> the frontend WP also `dependsOn`. The visual contract isn't its own WP —
-> it's a design-time artifact, the same way the data contract is.
+> `kind: contract` WP for the **data** contract is paired with a **visual**
+> contract — itself a `kind: contract` WP with `contract_type: visual` (tokens
+> + HIG + UX patterns + a real-token mockup, per `UX_VISUAL_DESIGN_STANDARD.md`
+> UXD-14). The frontend WP MUST declare `visual_contract: <that WP id>` and
+> `dependsOn` it. The visual-contract WP reaches `done` only when the founder
+> signs off the rendered mockup (`signed_off_at` + `provenance:
+> production-approved`). This is enforced by `wpx-index` at write-time (a
+> frontend WP without the dependency is refused) and at the done-transition (an
+> unsigned visual contract can't be marked done) — #45.
+>
+> (Earlier this standard said the visual contract "isn't its own WP"; #45
+> makes it a WP so the dependency is enforceable via the existing done-oracle
+> rather than aspirational prose.)
 
 > **Exemption.** Single-kind work and `--prototype` changes are exempt from
 > contract-first decomposition (`CONTRACT_FIRST_STANDARD.md` tier carve-out).

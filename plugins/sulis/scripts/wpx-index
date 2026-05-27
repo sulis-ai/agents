@@ -26,11 +26,16 @@ from _wpxlib import (  # noqa: E402
     compute_wp_status,
     emit_error,
     emit_ok,
+    is_visual_contract_wp,
     parse_index_md,
     parse_md_table,
     paths_from_args,
+    read_frontmatter,
     resolve_wp_columns,
+    validate_cross_kind_contract_wiring,
+    validate_frontend_wp_visual_contract,
     validate_wp_status,
+    visual_contract_signed_off,
 )
 
 # Argparse choice lists for status flags derive from the one canonical set
@@ -152,7 +157,31 @@ def _find_wp_table(text: str) -> tuple[int, int, str]:
     raise ValueError("Could not find WP table in INDEX.md (no | ID | header)")
 
 
+def _enforce_visual_contract_signoff_on_done(args: argparse.Namespace) -> None:
+    """#45 / UXD-14 runtime gate — a visual-contract WP cannot be flipped to
+    `done` until its mockup is signed off. No-op for any other WP / status.
+
+    Because frontend WPs `dependsOn` the contract WP (Phase 1 write-time gate)
+    and list-ready only releases deps that are `done`, refusing this flip keeps
+    the frontend work undispatchable until the founder has signed off.
+    """
+    if args.to != "done":
+        return
+    paths = paths_from_args(args)
+    try:
+        wp_path = paths.wp_file(args.wp)
+    except (FileNotFoundError, ValueError):
+        return  # no WP file → not a checkable visual-contract WP
+    fm = read_frontmatter(wp_path)
+    if not is_visual_contract_wp(fm):
+        return
+    err = visual_contract_signed_off(fm)
+    if err is not None:
+        emit_error(f"{args.wp}: {err}")
+
+
 def cmd_flip_status(args: argparse.Namespace) -> None:
+    _enforce_visual_contract_signoff_on_done(args)
     text = _read_index(args)
     start, end, table_text = _find_wp_table(text)
     table = parse_md_table(table_text)
@@ -318,6 +347,12 @@ def _cells_from_frontmatter(fm: dict, wp_id: str) -> list[str]:
     status_error = validate_wp_status(str(status))
     if status_error is not None:
         raise ValueError(f"{wp_id}: {status_error}")
+    # #45 / UXD-14 write-time gate — a kind: frontend WP cannot enter the INDEX
+    # unless it declares (and dependsOn) its visual-contract WP. Same loud-
+    # refusal chokepoint as the status guard above.
+    vc_error = validate_frontend_wp_visual_contract(fm)
+    if vc_error is not None:
+        raise ValueError(f"{wp_id}: {vc_error}")
     depends = _list_cell(fm.get("dependsOn"))
     blocks = _list_cell(fm.get("blocks"))
     # token estimate may be a scalar string ("1k", "?") or a dict (input/output Nk)
@@ -484,6 +519,39 @@ def cmd_sync_auto_drafts(args: argparse.Namespace) -> None:
         "errors": errors,
         "total_found": total_found,
     })
+
+
+def cmd_audit_contracts(args: argparse.Namespace) -> None:
+    """#48 — graph-level data-contract structural check over the WP set.
+
+    Reads every WP file's frontmatter (kind / contract_type / dependsOn),
+    runs `validate_cross_kind_contract_wiring`, and fails loudly on any
+    violation (so plan-work's decompose validation + CI can gate on it). The
+    symmetric partner to the per-WP visual-contract gate.
+    """
+    paths = paths_from_args(args)
+    candidates = sorted(paths.wp_dir.glob("WP-*.md"))
+    candidates = [
+        p for p in candidates
+        if not p.name.startswith(".") and not p.name.startswith("BLOCKER-")
+    ]
+    wps: list[dict] = []
+    for wp_path in candidates:
+        try:
+            fm = read_frontmatter(wp_path)
+        except Exception:  # noqa: BLE001 — a malformed WP is a different check's job
+            continue
+        if fm.get("id"):
+            wps.append(fm)
+
+    violations = validate_cross_kind_contract_wiring(wps)
+    if violations:
+        emit_error(
+            "data-contract wiring violations (#48 / CF-05):\n  - "
+            + "\n  - ".join(violations),
+            context={"violations": violations, "wp_count": len(wps)},
+        )
+    emit_ok(data={"violations": [], "wp_count": len(wps)})
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -673,6 +741,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_common_args(p_sync)
 
+    p_audit = sub.add_parser(
+        "audit-contracts",
+        help="Graph-level data-contract wiring check (#48 / CF-05): a "
+             "cross-kind WP set must have a data-contract WP and route "
+             "cross-kind deps through it. Fails on violation.",
+    )
+    add_common_args(p_audit)
+
     # HD-008 — read-only computed-status view.
     p_status = sub.add_parser(
         "status",
@@ -720,6 +796,7 @@ HANDLERS = {
     "propagate-blocked": cmd_propagate_blocked,
     "add-wp": cmd_add_wp,
     "sync-auto-drafts": cmd_sync_auto_drafts,
+    "audit-contracts": cmd_audit_contracts,
     "status": cmd_status,
 }
 

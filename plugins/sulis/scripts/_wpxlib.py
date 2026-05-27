@@ -389,6 +389,188 @@ def validate_wp_status(status: str) -> str | None:
     )
 
 
+# ─── Visual-contract gate (#45 / UXD-14) ────────────────────────────────
+#
+# A user-facing surface MUST be built against a signed-off visual contract
+# (a real-token mockup), or the "still looks the same" failure recurs (L-13:
+# tokens matched the mockup but the founder saw no brand — fonts unloaded).
+# The gate has two halves:
+#   * write-time (validate_frontend_wp_visual_contract, below) — a
+#     `kind: frontend` WP cannot enter the INDEX unless it declares the
+#     visual-contract WP it depends on. Fires at the single chokepoint every WP
+#     passes through (`_cells_from_frontmatter` in wpx-index), exactly like
+#     validate_wp_status. Because the declared contract WP is in `dependsOn`,
+#     list-ready's done-oracle won't dispatch the frontend WP until that
+#     contract WP is `done`.
+#   * runtime sign-off (the contract WP only reaches `done` once its mockup
+#     record is signed off) — Phase 2, wired at the done-transition.
+#
+# The only bypass is an explicit, logged exemption (`visual_contract:
+# exempt — <reason>`) or a `prototype` WP — rare, never silent.
+
+
+def _as_str_list(value) -> list[str]:
+    """Normalise a dependsOn/blocks value (list, comma-string, or scalar) to a
+    list of trimmed strings."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [v.strip() for v in value.split(",") if v.strip()]
+    if isinstance(value, list):
+        return [str(v).strip() for v in value if str(v).strip()]
+    return [str(value).strip()] if str(value).strip() else []
+
+
+def validate_frontend_wp_visual_contract(fm: dict) -> str | None:
+    """Return None if a frontend WP correctly declares its visual contract,
+    else an error message (the write-time half of the #45 / UXD-14 gate).
+
+    A ``kind: frontend`` WP MUST carry a ``visual_contract:`` field that is
+    either (a) the id of the visual-contract WP it depends on — which MUST also
+    appear in ``dependsOn`` so list-ready won't dispatch it before that WP is
+    signed off (done) — or (b) an explicit logged exemption
+    (``visual_contract: exempt — <reason>``) or a ``prototype: true`` WP.
+    Non-frontend WPs are never gated.
+    """
+    kind = str(fm.get("kind", "")).strip().lower()
+    if kind != "frontend":
+        return None
+    if fm.get("prototype") is True:
+        return None
+    vc = str(fm.get("visual_contract", "") or "").strip()
+    if vc.lower().startswith("exempt"):
+        return None
+    if not vc:
+        return (
+            "kind: frontend requires a `visual_contract:` field naming the "
+            "signed-off visual-contract WP it depends on (or "
+            "`visual_contract: exempt — <reason>` for a logged, genuinely "
+            "non-visual exception). The visual contract is mandatory for "
+            "user-facing surfaces (UXD-14)."
+        )
+    deps = _as_str_list(fm.get("dependsOn"))
+    if vc not in deps:
+        return (
+            f"`visual_contract: {vc}` must also appear in dependsOn so "
+            f"list-ready won't dispatch this frontend WP before the "
+            f"visual-contract WP {vc} is signed off (done)."
+        )
+    return None
+
+
+def is_visual_contract_wp(fm: dict) -> bool:
+    """True if a WP's frontmatter marks it as the visual-contract WP
+    (``kind: contract`` + ``contract_type: visual``)."""
+    return (
+        str(fm.get("kind", "")).strip().lower() == "contract"
+        and str(fm.get("contract_type", "")).strip().lower() == "visual"
+    )
+
+
+def visual_contract_signed_off(fm: dict) -> str | None:
+    """Return None if a visual-contract WP's frontmatter shows founder
+    sign-off, else an error message (the runtime half of the #45 / UXD-14
+    gate, wired at the visual-contract WP's done-transition).
+
+    Signed off = a non-empty ``signed_off_at`` timestamp AND
+    ``provenance: production-approved`` (UXD-13's strongest track — the founder
+    has seen the real-token mockup *rendered*, per L-13, not merely matched
+    token values). Until then the contract WP cannot reach ``done``, so the
+    frontend WPs that ``dependsOn`` it stay undispatchable.
+    """
+    signed_at = str(fm.get("signed_off_at", "") or "").strip()
+    provenance = str(fm.get("provenance", "") or "").strip().lower()
+    if not signed_at:
+        return (
+            "visual contract not signed off — `signed_off_at` is empty. The "
+            "founder must sign off the rendered real-token mockup before this "
+            "contract WP can reach `done` (UXD-14)."
+        )
+    if provenance != "production-approved":
+        return (
+            f"visual contract provenance is {provenance!r}, not "
+            f"'production-approved' — sign-off means the founder approved the "
+            f"rendered mockup, not just that token values matched (UXD-13/L-13)."
+        )
+    return None
+
+
+# ─── Data-contract structural check (#48 / CF-05 / WP-08.5) ──────────────
+#
+# The symmetric partner to the visual-contract gate, but GRAPH-level: whether a
+# change is a producer/consumer seam is a property of the whole WP set, not a
+# single WP (so it can't live at the per-WP _cells_from_frontmatter chokepoint
+# the way the visual gate does). The data contract's *conformance* is already
+# test-enforced (CF-07 integration WP); this closes the structural-wiring half
+# — the same "aspirational MUST" weakness #45 fixed for visual.
+
+_IMPL_KINDS: frozenset[str] = frozenset({"backend", "frontend", "async"})
+
+
+def validate_cross_kind_contract_wiring(wps: list[dict]) -> list[str]:
+    """Return a list of data-contract wiring violations for a WP set (empty =
+    pass). Pure; operates on WP frontmatter dicts ({id, kind, contract_type,
+    dependsOn, prototype}).
+
+    Applied only when the set spans a producer/consumer seam (≥2 distinct
+    implementation kinds among backend/frontend/async, excluding prototypes):
+      1. A data-contract WP must exist (``kind: contract`` with
+         ``contract_type`` != ``visual``). A visual contract does not satisfy
+         a data seam.
+      2. No direct dependency edge between two different implementation kinds —
+         cross-kind deps MUST route through the contract WP (CF-05 parallel-
+         not-sequential). ``frontend dependsOn backend`` is the canonical
+         violation.
+    Single-kind sets and prototype-only seams are not checked.
+    """
+    by_id: dict[str, dict] = {}
+    kinds_present: set[str] = set()
+    for wp in wps:
+        wid = str(wp.get("id", "")).strip()
+        if not wid:
+            continue
+        by_id[wid] = wp
+        kind = str(wp.get("kind", "")).strip().lower()
+        if kind in _IMPL_KINDS and wp.get("prototype") is not True:
+            kinds_present.add(kind)
+
+    if len(kinds_present) < 2:
+        return []  # not a cross-kind seam
+
+    violations: list[str] = []
+
+    # Rule 1 — a data-contract WP exists.
+    has_data_contract = any(
+        str(w.get("kind", "")).strip().lower() == "contract"
+        and str(w.get("contract_type", "") or "").strip().lower() != "visual"
+        for w in wps
+    )
+    if not has_data_contract:
+        violations.append(
+            f"cross-kind WP set (kinds: {', '.join(sorted(kinds_present))}) has "
+            f"no data-contract WP. Per CONTRACT_FIRST CF-01 / WP-08.5, emit a "
+            f"`kind: contract` WP first; producer + consumer WPs dependsOn it."
+        )
+
+    # Rule 2 — no direct edge between two different implementation kinds.
+    for wid, wp in by_id.items():
+        kind = str(wp.get("kind", "")).strip().lower()
+        if kind not in _IMPL_KINDS or wp.get("prototype") is True:
+            continue
+        for dep in _as_str_list(wp.get("dependsOn")):
+            dep_wp = by_id.get(dep)
+            if dep_wp is None:
+                continue
+            dep_kind = str(dep_wp.get("kind", "")).strip().lower()
+            if dep_kind in _IMPL_KINDS and dep_kind != kind:
+                violations.append(
+                    f"{wid} (kind: {kind}) dependsOn {dep} (kind: {dep_kind}) "
+                    f"directly — cross-kind deps MUST route through the data "
+                    f"contract WP, not the other implementation (CF-05)."
+                )
+    return violations
+
+
 # ─── Repository contract (RC v0.3.0 profile model) — L-05 ───────────────
 #
 # Promoted from wpx-arrival-check._read_contract so the pipeline, the train,

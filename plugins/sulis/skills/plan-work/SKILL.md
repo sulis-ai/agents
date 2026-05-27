@@ -230,11 +230,17 @@ These standards shape the WP set's *shape*, not just the content:
       with `produces: integration-check`) that `dependsOn` all the per-kind
       siblings and runs the conformance check (CF-07) — swap mock for real
       producer, validate against schema.
-    - **User-facing seams pair the data contract with the visual contract.**
-      The visual contract (tokens + HIG + UX patterns) is a **design-time
-      artifact** produced by `draft-architecture`, not its own WP; frontend
-      WPs `dependsOn` it the same way (UXD-14).
-    - **Exempt:** single-kind WP sets and `--prototype` changes.
+    - **User-facing surfaces require the visual-contract WP (MUST, #45).**
+      `draft-architecture` emits a visual-contract WP (`kind: contract`,
+      `contract_type: visual`, with `mockup:` + empty `signed_off_at`). Every
+      `kind: frontend` WP MUST carry `visual_contract: <that WP id>` AND list
+      it in `dependsOn` — so list-ready won't dispatch the frontend WP until
+      the contract WP is `done`, and the contract WP only reaches `done` once
+      the founder signs off the rendered mockup. This is enforced at the
+      toolchain (`wpx-index` refuses a frontend WP without it, and refuses to
+      flip an unsigned contract WP to `done`) — not just convention.
+    - **Exempt:** single-kind non-visual WP sets, `--prototype` changes, and a
+      frontend WP with a logged `visual_contract: exempt — <reason>`.
 
 5. **Build the dependency graph** — for each WP, identify what must exist
    first (`dependsOn`) and what it unlocks (`blocks`). Note: REINFORCE-Test
@@ -282,8 +288,12 @@ These standards shape the WP set's *shape*, not just the content:
       other** (no `frontend dependsOn backend`).
     - ≥1 integration WP closes the graph (`dependsOn` all per-kind
       siblings; runs the conformance check per CF-07).
-    - For user-facing surfaces, the visual contract is referenced in every
-      `kind: frontend` WP (UXD-14).
+    - For user-facing surfaces (#45): a visual-contract WP (`kind: contract`,
+      `contract_type: visual`) exists, and every `kind: frontend` WP carries
+      `visual_contract: <its id>` AND lists it in `dependsOn`. (`wpx-index
+      add-wp` already refuses a frontend WP that doesn't — this audit is the
+      belt to that braces; a failure here means a WP would be rejected at
+      INDEX time.)
     A failed cross-kind shape audit is **FAIL** at step 11 — re-decompose,
     don't paper over.
 8. **Write WPs** — one file per WP, using the template above.
@@ -309,7 +319,12 @@ These standards shape the WP set's *shape*, not just the content:
     - **P3 Module naming + clean code** — no jargon prefixes, no
       single-letter abbreviations, descriptive kebab-case slugs
     - **P4 Dependency graph correctness** — no cycles, all targets
-      exist, transitive depth ≤ 8, valid topological order
+      exist, transitive depth ≤ 8, valid topological order. **Includes the
+      data-contract wiring check (#48): run `wpx-index audit-contracts` —
+      a cross-kind seam (≥2 of backend/frontend/async) MUST have a
+      `kind: contract` (data) WP, and cross-kind deps MUST route through it,
+      not directly between implementations (CF-05). A non-empty violation
+      list is a MUST failure.**
     - **P5 Performance + non-functional reqs** — endpoint/handler WPs
       have a `## Performance` section with measurable bounds
     - **P6 Peer-collision risk** — no two WPs `Create` the same file

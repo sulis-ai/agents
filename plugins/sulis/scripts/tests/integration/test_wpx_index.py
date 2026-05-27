@@ -218,3 +218,195 @@ def test_sync_auto_drafts_idempotent(tmp_project, seed_index, seed_wp, run_tool)
     assert r2.ok
     assert r2.data["added"] == []
     assert "WP-AUTO-012" in r2.data["skipped"]
+
+
+# ─── #45 / UXD-14: visual-contract write-time gate ────────────────────────
+
+
+def _write_wp(wp_dir, wp_id, slug, frontmatter_lines):
+    """Write a minimal WP file with the given frontmatter lines."""
+    wp_dir.mkdir(parents=True, exist_ok=True)
+    body = "---\n" + "\n".join(frontmatter_lines) + "\n---\n\n# " + wp_id + "\n"
+    (wp_dir / f"{wp_id}-{slug}.md").write_text(body, encoding="utf-8")
+
+
+def test_add_frontend_wp_without_visual_contract_is_refused(
+    tmp_project, seed_index, run_tool,
+):
+    """A kind: frontend WP with no visual_contract must be refused loudly at
+    add-wp (the #45 write-time gate) — not silently admitted to the INDEX."""
+    seed_index("INDEX-minimal.md")
+    _write_wp(tmp_project.wp_dir, "WP-050", "cancel-ui", [
+        "id: WP-050",
+        "title: Cancel-flow UI",
+        "kind: frontend",
+        "primitive: create",
+        "status: pending",
+        "dependsOn: [WP-001]",
+    ])
+    result = run_tool(
+        "wpx-index", "add-wp", "--wp", "WP-050", "--from-wp-file",
+        *_common(tmp_project),
+    )
+    assert not result.ok, "frontend WP without a visual contract must be refused"
+    assert "visual_contract" in (result.error or "")
+    assert "WP-050" not in tmp_project.index_md.read_text()
+
+
+def test_add_frontend_wp_with_visual_contract_succeeds(
+    tmp_project, seed_index, run_tool,
+):
+    """A kind: frontend WP that declares + dependsOn its visual-contract WP is
+    admitted."""
+    seed_index("INDEX-minimal.md")
+    _write_wp(tmp_project.wp_dir, "WP-051", "cancel-ui", [
+        "id: WP-051",
+        "title: Cancel-flow UI",
+        "kind: frontend",
+        "primitive: create",
+        "status: pending",
+        "visual_contract: WP-049",
+        "dependsOn: [WP-049]",
+    ])
+    result = run_tool(
+        "wpx-index", "add-wp", "--wp", "WP-051", "--from-wp-file",
+        *_common(tmp_project),
+    )
+    assert result.ok, f"add-wp failed: {result.error}"
+    assert "WP-051" in tmp_project.index_md.read_text()
+
+
+def test_add_frontend_wp_with_logged_exemption_succeeds(
+    tmp_project, seed_index, run_tool,
+):
+    """The only bypass: an explicit, logged exemption."""
+    seed_index("INDEX-minimal.md")
+    _write_wp(tmp_project.wp_dir, "WP-052", "data-only", [
+        "id: WP-052",
+        "title: Non-visual frontend wiring",
+        "kind: frontend",
+        "primitive: create",
+        "status: pending",
+        "visual_contract: exempt — config-only change, no rendered delta",
+        "dependsOn: [WP-001]",
+    ])
+    result = run_tool(
+        "wpx-index", "add-wp", "--wp", "WP-052", "--from-wp-file",
+        *_common(tmp_project),
+    )
+    assert result.ok, f"exempt frontend WP should be admitted: {result.error}"
+    assert "WP-052" in tmp_project.index_md.read_text()
+
+
+def test_visual_contract_wp_cannot_go_done_unsigned(
+    tmp_project, seed_index, run_tool,
+):
+    """#45 runtime gate: a visual-contract WP whose mockup isn't signed off
+    must be refused at flip-status --to done (so the frontend WPs depending on
+    it stay undispatchable)."""
+    seed_index("INDEX-minimal.md")
+    # WP-001 exists in INDEX-minimal; make it the (unsigned) visual contract.
+    _write_wp(tmp_project.wp_dir, "WP-001", "visual", [
+        "id: WP-001",
+        "title: Visual contract — dashboard",
+        "kind: contract",
+        "contract_type: visual",
+        "mockup: contracts/visual/dashboard.html",
+        "signed_off_at:",          # not signed off
+        "provenance: draft",
+    ])
+    result = run_tool(
+        "wpx-index", "flip-status", "--wp", "WP-001", "--to", "done",
+        *_common(tmp_project),
+    )
+    assert not result.ok, "unsigned visual contract must not reach done"
+    assert "signed off" in (result.error or "").lower()
+
+
+def test_visual_contract_wp_goes_done_when_signed_off(
+    tmp_project, seed_index, run_tool,
+):
+    """Once signed off, the visual-contract WP flips to done normally."""
+    seed_index("INDEX-minimal.md")
+    _write_wp(tmp_project.wp_dir, "WP-001", "visual", [
+        "id: WP-001",
+        "title: Visual contract — dashboard",
+        "kind: contract",
+        "contract_type: visual",
+        "mockup: contracts/visual/dashboard.html",
+        "signed_off_at: 2026-05-27T14:00:00Z",
+        "provenance: production-approved",
+    ])
+    result = run_tool(
+        "wpx-index", "flip-status", "--wp", "WP-001", "--to", "done",
+        *_common(tmp_project),
+    )
+    assert result.ok, f"signed-off contract should flip to done: {result.error}"
+
+
+def test_non_contract_wp_done_flip_is_unaffected(
+    tmp_project, seed_index, run_tool,
+):
+    """A normal WP with no WP file (or non-contract) flips to done untouched —
+    the gate is a no-op for anything that isn't a visual-contract WP."""
+    seed_index("INDEX-minimal.md")
+    result = run_tool(
+        "wpx-index", "flip-status", "--wp", "WP-002", "--to", "done",
+        *_common(tmp_project),
+    )
+    assert result.ok, f"ordinary WP done-flip must be unaffected: {result.error}"
+
+
+# ─── #48: audit-contracts (graph-level data-contract wiring) ──────────────
+
+
+def test_audit_contracts_passes_clean_cross_kind_set(
+    tmp_project, seed_index, run_tool,
+):
+    """A cross-kind set with a data contract + clean wiring passes."""
+    seed_index("INDEX-minimal.md")
+    _write_wp(tmp_project.wp_dir, "WP-100", "contract", [
+        "id: WP-100", "title: API contract", "kind: contract",
+        "contract_type: data", "primitive: create", "status: pending",
+    ])
+    _write_wp(tmp_project.wp_dir, "WP-101", "api", [
+        "id: WP-101", "title: Backend", "kind: backend",
+        "primitive: create", "status: pending", "dependsOn: [WP-100]",
+    ])
+    _write_wp(tmp_project.wp_dir, "WP-102", "ui", [
+        "id: WP-102", "title: Frontend", "kind: frontend",
+        "primitive: create", "status: pending",
+        "visual_contract: WP-100", "dependsOn: [WP-100]",
+    ])
+    result = run_tool("wpx-index", "audit-contracts", *_common(tmp_project))
+    assert result.ok, f"clean cross-kind set should pass: {result.error}"
+    assert result.data["violations"] == []
+
+
+def test_audit_contracts_flags_missing_data_contract(
+    tmp_project, seed_index, run_tool,
+):
+    """A backend+frontend seam with no data-contract WP is flagged."""
+    seed_index("INDEX-minimal.md")
+    _write_wp(tmp_project.wp_dir, "WP-101", "api", [
+        "id: WP-101", "title: Backend", "kind: backend",
+        "primitive: create", "status: pending",
+    ])
+    _write_wp(tmp_project.wp_dir, "WP-102", "ui", [
+        "id: WP-102", "title: Frontend", "kind: frontend",
+        "primitive: create", "status: pending",
+        "visual_contract: exempt — test", "dependsOn: [WP-101]",
+    ])
+    result = run_tool("wpx-index", "audit-contracts", *_common(tmp_project))
+    assert not result.ok, "missing data contract must fail the audit"
+    assert "data-contract" in (result.error or "")
+
+
+def test_audit_contracts_noop_for_single_kind(
+    tmp_project, seed_index, run_tool,
+):
+    """A single-kind set (the INDEX-minimal default — no WP files) is not a
+    seam, so the audit passes trivially."""
+    seed_index("INDEX-minimal.md")
+    result = run_tool("wpx-index", "audit-contracts", *_common(tmp_project))
+    assert result.ok, f"single-kind set should pass: {result.error}"

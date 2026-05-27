@@ -254,10 +254,13 @@ If extending or superseding, reference the existing ADR by path.}
    this stage). `plan-work` will emit a `kind: contract` WP from it (WP-08.5)
    so the build conforms.
 
-   **(b) Visual contract** — per
+   **(b) Visual contract (MUST for any user-facing surface)** — per
    [`UX_VISUAL_DESIGN_STANDARD.md`](../../references/standards/UX_VISUAL_DESIGN_STANDARD.md).
-   If the TDD has any user-facing surface, produce a visual-contract sketch
-   covering the four layers' essentials:
+   This is a **hard gate** (#45): if the TDD has any user-facing surface, the
+   visual contract is mandatory and `plan-work` cannot emit frontend WPs
+   without it (the toolchain enforces this — see below). Produce two things:
+
+   **(i) The contract record + mockup.** Cover the four layers' essentials:
    - **Identity** (referenced — not re-articulated here) — point at the
      project's identity artifacts; flag if missing.
    - **Visual** — the token tiers the surface will consume (semantic +
@@ -272,16 +275,35 @@ If extending or superseding, reference the existing ADR by path.}
      (UXD-10: outcome-oriented, human-in-the-loop gates, transparency).
    - **Governance** — provenance label on the artifact.
 
-   Write the visual contract to
-   `.architecture/{project}/contracts/visual.md` (or co-located with the
-   data contract for the same seam). `plan-work`'s `kind: frontend` WPs
-   `dependsOn` this artifact (UXD-14). Identity/brand *values* (palette,
-   type, look-and-feel) remain founder-owned — if absent, surface as the
-   first Open Question and route to the design flow rather than inventing
-   them.
+   Produce a **real-token HTML mockup** at
+   `.architecture/{project}/contracts/visual/<surface>.html` — composed
+   page(s), the product's actual design-instance tokens (never invented hex),
+   and **the webfonts its type tokens reference actually loaded** (L-13: a
+   mockup whose fonts don't load passed "tokens match" while the founder saw
+   no brand — sign-off is *visual*, not value-equality). Note the
+   perceptual delta vs the current surface so the founder can see what changes.
 
-   **(c) Single-kind work + `--prototype` changes are exempt** from this
-   step.
+   **(ii) The visual-contract WP.** Emit a WP with frontmatter:
+   ```yaml
+   kind: contract
+   contract_type: visual          # marks it as the visual-contract WP
+   mockup: contracts/visual/<surface>.html
+   signed_off_at:                 # EMPTY until the founder signs off
+   provenance: draft              # → production-approved on sign-off
+   ```
+   `plan-work` makes every `kind: frontend` WP carry `visual_contract: <this
+   WP id>` and `dependsOn` it; the WP only reaches `done` once `signed_off_at`
+   is set + `provenance: production-approved` (enforced at `wpx-index
+   flip-status`). So no frontend WP is dispatchable until the founder has
+   signed off the rendered mockup.
+
+   Identity/brand *values* (palette, type, look-and-feel) remain
+   founder-owned — if absent, STOP, surface as the first Open Question, and
+   route to the design flow rather than inventing them.
+
+   **(c) Single-kind non-visual work + `--prototype` changes are exempt** from
+   this step (the gate honours a `prototype: true` WP and a logged
+   `visual_contract: exempt — <reason>`).
 
 4. **Select patterns** — for each NFR, pick patterns from `references/architecture-patterns.md`. Surface trade-offs explicitly. Skip pattern selection for any pillar marked "fully covered" in the sizing announcement; reference the authoritative source instead.
 5. **Translate misuse cases** — for each MUC in `MISUSE_CASES.md`, translate its `System Response (REQUIRED)` into one or more Armor-pillar primitives in the TDD. Cross-reference: every MUC ID must appear in the TDD's Armor section. See `references/hardening-deltas.md` for the MUC → delta/primitive translation pattern (the same translation applies to greenfield TDD entries).
