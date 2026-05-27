@@ -183,3 +183,175 @@ def test_primitive_hints_cover_all_change_primitives():
     from _wpxlib import ALLOWED_CHANGE_PRIMITIVES
     for p in ALLOWED_CHANGE_PRIMITIVES:
         assert p in cc._PRIMITIVE_NEXT_STEP_HINTS, f"missing hint for {p}"
+
+
+# ─── #26: enrich CONTEXT.md with intent + linked issue + code-area pointers ──
+
+
+def test_intent_section_renders_when_metadata_has_intent(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    meta = _metadata("fix")
+    meta["intent"] = "fix the silent-corrupt-record nuke bypass (closes #22)"
+    with mock.patch.object(cc, "_resolve_linked_issues", return_value=[]), \
+         mock.patch.object(cc, "_locate_code_areas", return_value=[]), \
+         _patch_git()[0], _patch_git()[1], _patch_git()[2]:
+        cc.write_change_context(_GOOD_ULID, meta, repo_root=tmp_path / "repo")
+    body = (tmp_path / ".sulis" / "changes" / _GOOD_ULID / "CONTEXT.md").read_text()
+    assert "## Intent" in body
+    assert "fix the silent-corrupt-record nuke bypass" in body
+
+
+def test_intent_section_omitted_when_metadata_lacks_intent(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    meta = _metadata("fix")  # no intent key
+    with mock.patch.object(cc, "_resolve_linked_issues", return_value=[]), \
+         mock.patch.object(cc, "_locate_code_areas", return_value=[]), \
+         _patch_git()[0], _patch_git()[1], _patch_git()[2]:
+        cc.write_change_context(_GOOD_ULID, meta, repo_root=tmp_path / "repo")
+    body = (tmp_path / ".sulis" / "changes" / _GOOD_ULID / "CONTEXT.md").read_text()
+    assert "## Intent" not in body
+
+
+def test_linked_issue_section_renders_when_gh_resolves(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    meta = _metadata("fix")
+    meta["intent"] = "fix the silent-corrupt-record nuke bypass (closes #22)"
+    issue = {
+        "number": 22,
+        "title": "nuke shipped-protection silently bypasses if change.json is unreadable",
+        "labels": ["enhancement", "lesson"],
+        "body": "Surfaced by Tier 4 of code-health…",
+        "url": "https://github.com/sulis-ai/agents/issues/22",
+    }
+    with mock.patch.object(cc, "_resolve_linked_issues", return_value=[issue]), \
+         mock.patch.object(cc, "_locate_code_areas", return_value=[]), \
+         _patch_git()[0], _patch_git()[1], _patch_git()[2]:
+        cc.write_change_context(_GOOD_ULID, meta, repo_root=tmp_path / "repo")
+    body = (tmp_path / ".sulis" / "changes" / _GOOD_ULID / "CONTEXT.md").read_text()
+    assert "## Linked issue" in body
+    assert "#22" in body
+    assert "nuke shipped-protection silently bypasses" in body
+    assert "Surfaced by Tier 4" in body
+    # Labels surfaced too — useful signal for the spawned Sulis
+    assert "enhancement" in body or "lesson" in body
+
+
+def test_linked_issue_section_handles_multiple_refs(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    meta = _metadata("fix")
+    meta["intent"] = "fix both #22 and #23 in one go"
+    issues = [
+        {"number": 22, "title": "twenty-two", "labels": [], "body": "b22", "url": ""},
+        {"number": 23, "title": "twenty-three", "labels": [], "body": "b23", "url": ""},
+    ]
+    with mock.patch.object(cc, "_resolve_linked_issues", return_value=issues), \
+         mock.patch.object(cc, "_locate_code_areas", return_value=[]), \
+         _patch_git()[0], _patch_git()[1], _patch_git()[2]:
+        cc.write_change_context(_GOOD_ULID, meta, repo_root=tmp_path / "repo")
+    body = (tmp_path / ".sulis" / "changes" / _GOOD_ULID / "CONTEXT.md").read_text()
+    assert "#22" in body
+    assert "#23" in body
+    assert "twenty-two" in body
+    assert "twenty-three" in body
+
+
+def test_linked_issue_section_omitted_when_resolution_fails(tmp_path, monkeypatch):
+    """gh unavailable / unauthenticated / network error → resolver returns []."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    meta = _metadata("fix")
+    meta["intent"] = "fix #22"
+    with mock.patch.object(cc, "_resolve_linked_issues", return_value=[]), \
+         mock.patch.object(cc, "_locate_code_areas", return_value=[]), \
+         _patch_git()[0], _patch_git()[1], _patch_git()[2]:
+        cc.write_change_context(_GOOD_ULID, meta, repo_root=tmp_path / "repo")
+    body = (tmp_path / ".sulis" / "changes" / _GOOD_ULID / "CONTEXT.md").read_text()
+    assert "## Linked issue" not in body
+
+
+def test_code_area_pointers_render_when_grep_finds_files(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    meta = _metadata("fix")
+    meta["intent"] = "fix `cmd_nuke` and `read_change_record` in `_change_state.py`"
+    pointers = [
+        "plugins/sulis/scripts/sulis-change",
+        "plugins/sulis/scripts/_change_state.py",
+    ]
+    with mock.patch.object(cc, "_resolve_linked_issues", return_value=[]), \
+         mock.patch.object(cc, "_locate_code_areas", return_value=pointers), \
+         _patch_git()[0], _patch_git()[1], _patch_git()[2]:
+        cc.write_change_context(_GOOD_ULID, meta, repo_root=tmp_path / "repo")
+    body = (tmp_path / ".sulis" / "changes" / _GOOD_ULID / "CONTEXT.md").read_text()
+    assert "## Code-area pointers" in body
+    assert "plugins/sulis/scripts/sulis-change" in body
+    assert "plugins/sulis/scripts/_change_state.py" in body
+
+
+def test_code_area_pointers_section_omitted_when_no_matches(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    meta = _metadata("fix")
+    meta["intent"] = "fix something somewhere"
+    with mock.patch.object(cc, "_resolve_linked_issues", return_value=[]), \
+         mock.patch.object(cc, "_locate_code_areas", return_value=[]), \
+         _patch_git()[0], _patch_git()[1], _patch_git()[2]:
+        cc.write_change_context(_GOOD_ULID, meta, repo_root=tmp_path / "repo")
+    body = (tmp_path / ".sulis" / "changes" / _GOOD_ULID / "CONTEXT.md").read_text()
+    assert "## Code-area pointers" not in body
+
+
+def test_section_order_intent_then_issue_then_pointers_then_hint(tmp_path, monkeypatch):
+    """The spec mandates a fixed render order — Intent → Linked issue →
+    Pointers → Suggested next step — so the spawned Sulis can rely on
+    'last section is the hint' to read the actionable thing last."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    meta = _metadata("fix")
+    meta["intent"] = "fix `cmd_nuke` per #22"
+    issue = {"number": 22, "title": "t", "labels": [], "body": "b", "url": ""}
+    with mock.patch.object(cc, "_resolve_linked_issues", return_value=[issue]), \
+         mock.patch.object(cc, "_locate_code_areas",
+                            return_value=["plugins/sulis/scripts/sulis-change"]), \
+         _patch_git()[0], _patch_git()[1], _patch_git()[2]:
+        cc.write_change_context(_GOOD_ULID, meta, repo_root=tmp_path / "repo")
+    body = (tmp_path / ".sulis" / "changes" / _GOOD_ULID / "CONTEXT.md").read_text()
+    intent_at = body.find("## Intent")
+    issue_at = body.find("## Linked issue")
+    pointers_at = body.find("## Code-area pointers")
+    hint_at = body.find("## Suggested next step")
+    assert -1 < intent_at < issue_at < pointers_at < hint_at, (
+        f"order wrong: intent={intent_at} issue={issue_at} "
+        f"pointers={pointers_at} hint={hint_at}"
+    )
+
+
+# ─── helper-level tests for the pure parts ─────────────────────────────────
+
+
+def test_extract_issue_refs_finds_all_NN_tokens():
+    refs = cc._extract_issue_refs("fix #22 and also #23, but not #notanumber")
+    assert refs == [22, 23]
+
+
+def test_extract_issue_refs_dedupes_and_preserves_order():
+    refs = cc._extract_issue_refs("first #5 then #5 again then #1")
+    assert refs == [5, 1]
+
+
+def test_extract_issue_refs_empty_when_no_hashes():
+    assert cc._extract_issue_refs("plain text with no hash refs") == []
+
+
+def test_extract_code_tokens_picks_backtick_quoted_strings():
+    tokens = cc._extract_code_tokens(
+        "fix `cmd_nuke` and `read_change_record` in `_change_state.py`"
+    )
+    # Order preserved; deduped
+    assert tokens == ["cmd_nuke", "read_change_record", "_change_state.py"]
+
+
+def test_extract_code_tokens_ignores_short_tokens():
+    """Single-char or two-char backticked tokens are likely noise."""
+    tokens = cc._extract_code_tokens("see `a` and `ab` and `abc` and `cmd_nuke`")
+    # Threshold: drop tokens shorter than 3 chars (config / domain heuristic)
+    assert "a" not in tokens
+    assert "ab" not in tokens
+    assert "abc" in tokens
+    assert "cmd_nuke" in tokens
