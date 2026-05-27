@@ -13,11 +13,9 @@
 # Concierge journey state — per-project session state, not a change record.
 .concierge/
 
-# Context discovery output — per-project
-.context/
-
-# Security review output — per-project
-.security/
+# Note: `.context/` (the context index) and `.security/` (viability reports)
+# are ALSO durable change records (#42) and travel with the change branch —
+# they are intentionally NOT ignored.
 
 # Worktrees (defensive — should never be inside the repo)
 wp-*-worktree/
