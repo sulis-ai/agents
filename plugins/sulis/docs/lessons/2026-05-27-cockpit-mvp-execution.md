@@ -106,3 +106,32 @@ upstream WP before parallel siblings).* → **Cluster C**
 
 Priority order from the bound session: **L-03 + L-02** (block runs), then
 **L-04 + L-05** (change-branch execution model), then **L-01**.
+
+---
+
+## Post-ship test findings (2026-05-27, during "ship it and test it")
+
+### L-09 — `npm run dev` ran `vite` from the wrong root; client never served · FIXED
+The `dev`/`dev:client` scripts ran bare `vite` from the package root, but
+`index.html` + `client/vite.config.ts` live in `client/`. Vite booted ("ready")
+but 404'd on every path — the documented dev-run never served the UI. **CI's
+E2E passed** because Playwright's webServer points Vite at the right root,
+masking the broken dev-run. Lesson: a green E2E gate doesn't prove the
+*documented* dev-run works — they're different invocations. Fix: `vite` →
+`vite client` (positional root) in both scripts. Verified end-to-end:
+`npm run dev` → client 200 + `<title>Sulis cockpit</title>`, server 200.
+*Disposition: fixed in this commit (CW-05).*
+
+### L-10 — ship-flow chained cleanup to an unconfirmed merge · covered by #38
+The cockpit had already squash-merged to dev at 00:12 (3711658), but the
+change store still showed it "ready to ship" (the #38 auto-cleanup gap) — so
+a re-ship was attempted, and the command chain ran `nuke` before confirming
+the (rejected, redundant) merge succeeded. No harm (work was safe on dev +
+remote), but the ship flow MUST: (a) detect already-merged changes before
+re-shipping, (b) only clean up after a confirmed-successful merge. Folds into
+#38.
+
+### Note — demo seed
+A demo change record (CH-DEMO01, pointing at the repo root) was seeded into
+the local store for the visual test; it is not a real change and should be
+removed after the browser walkthrough.

@@ -5,9 +5,9 @@
   "description": "Sulis local cockpit — read-only localhost web app over the change store + worktrees + Claude Code transcripts (TDD §1).",
   "type": "module",
   "scripts": {
-    "dev": "concurrently --names server,client --prefix-colors blue,green 'tsx watch server/index.ts' 'vite'",
+    "dev": "concurrently --names server,client --prefix-colors blue,green 'tsx watch server/index.ts' 'vite client'",
     "dev:server": "tsx watch server/index.ts",
-    "dev:client": "vite",
+    "dev:client": "vite client",
     "typecheck": "tsc --noEmit -p server && tsc --noEmit -p client",
     "lint": "eslint --ext .ts,.tsx .",
     "test": "vitest run",
