@@ -222,12 +222,19 @@ def test_status_reports_sha_and_ahead_behind(local_git_repo, run_tool):
 # ─── finish ─────────────────────────────────────────────────────────────
 
 
-def test_finish_merge_cleans_up_worktree_and_branch(local_git_repo, run_tool):
-    """`finish --merge` squash-merges to dev and removes the worktree."""
+def test_finish_merge_archives_and_preserves_worktree(local_git_repo, run_tool):
+    """`finish --merge` squash-merges to dev and ARCHIVES (no deletion) — #38.
+
+    Reverses the old delete-on-ship behaviour: the worktree, the local branch,
+    and the change record all stay so the cockpit + future sessions can
+    retrace what happened. The change record's stage flips to 'shipped' and
+    `shipped_at` is set.
+    """
     # Start a change
-    run_tool("sulis-change", "start",
-             "--repo-root", str(local_git_repo),
-             "--slug", "merge-test", "--primitive", "feat")
+    start_result = run_tool("sulis-change", "start",
+                            "--repo-root", str(local_git_repo),
+                            "--slug", "merge-test", "--primitive", "feat")
+    change_id = start_result.data["change_id"]
 
     # Add a commit on the change branch
     worktree_dest = local_git_repo.parent / f"{local_git_repo.name}-change-feat-merge-test"
@@ -242,11 +249,19 @@ def test_finish_merge_cleans_up_worktree_and_branch(local_git_repo, run_tool):
                       "--merge")
     assert result.ok, f"finish failed: stderr={result.stderr}"
     assert result.data["outcome"]["mode"] == "merge"
-    assert result.data["cleanup"]["branch_deleted"] is True, \
-        f"cleanup detail: {result.data['cleanup']}"
 
-    # The worktree is gone
-    assert not worktree_dest.exists()
+    # Archived (NOT deleted): the new contract.
+    assert result.data["archived"]["archived"] is True
+    assert result.data["archived"]["stage"] == "shipped"
+    assert result.data["archived"]["change_id"] == change_id
+
+    # Worktree + local branch BOTH remain — the audit trail is preserved.
+    assert worktree_dest.exists(), "worktree must remain after archive-on-ship"
+    proc = _run(
+        ["git", "branch", "--list", "change/feat-merge-test"], cwd=local_git_repo,
+    )
+    assert "change/feat-merge-test" in proc.stdout, \
+        "local change branch must remain after archive-on-ship"
 
     # The work is on dev
     assert (local_git_repo / "merged.txt").exists()
@@ -378,3 +393,38 @@ def test_start_does_not_pollute_real_home(local_git_repo, run_tool, monkeypatch)
     # ... and NOTHING was written under the (fake) real home's ~/.sulis.
     assert not (fake_home / ".sulis").exists(), \
         "start polluted the real home's ~/.sulis despite SULIS_STATE_DIR"
+
+
+# ─── #38: mark-shipped subcommand (the gh-PR ship-skill seam) ──────────────
+
+
+def test_mark_shipped_via_handle_flips_stage(local_git_repo, run_tool):
+    """The mark-shipped subcommand is what the change skill calls AFTER
+    `gh pr merge` succeeds. It must resolve the change via --handle, flip
+    stage='shipped', and persist shipped_at on the change record so the
+    cockpit's 'Shipped' section can read it AND cmd_nuke's protection
+    fires."""
+    start = run_tool("sulis-change", "start",
+                     "--repo-root", str(local_git_repo),
+                     "--slug", "mark-shipped-test", "--primitive", "feat")
+    assert start.ok
+    handle = start.data["handle"]
+
+    result = run_tool("sulis-change", "mark-shipped",
+                      "--handle", handle,
+                      "--repo-root", str(local_git_repo))
+    assert result.ok, f"mark-shipped failed: {result.error}; stderr={result.stderr}"
+    assert result.data["stage"] == "shipped"
+    assert result.data["shipped_at"]  # non-empty ISO timestamp
+
+
+def test_mark_shipped_requires_an_identifier(local_git_repo, run_tool):
+    """Without --change-id / --handle / SULIS_CHANGE_ID, mark-shipped errors
+    cleanly (no destructive default)."""
+    result = run_tool(
+        "sulis-change", "mark-shipped",
+        "--repo-root", str(local_git_repo),
+        env={"PATH": os.environ.get("PATH", "")},  # no SULIS_CHANGE_ID
+    )
+    assert not result.ok
+    assert "change-id" in (result.error or "") or "handle" in (result.error or "")

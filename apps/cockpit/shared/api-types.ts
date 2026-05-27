@@ -16,7 +16,11 @@ export type WorkflowStage =
   | "design"
   | "implement"
   | "review"
-  | "ship";
+  | "ship"
+  // Terminal stages — past the six-stage workflow. A 'shipped' change is
+  // archived: worktree + branch + record all preserved as the audit trail,
+  // surfaced in the Sidebar's collapsed "Shipped" section (#38).
+  | "shipped";
 
 export type Liveness =
   | { status: "running"; pid: number }

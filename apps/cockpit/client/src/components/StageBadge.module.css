@@ -17,4 +17,7 @@
 .implement   { background: #e1ffe1; color: #22863a; border: 1px solid #c0e6c0; }
 .review      { background: #fff0e6; color: #c04a00; border: 1px solid #ffd0b0; }
 .ship        { background: #d4edda; color: #155724; border: 1px solid #a5d6a7; }
+/* #38: terminal stage — muted on purpose. Shipped changes are the audit
+ * trail; the badge signals "archived", not "active step". */
+.shipped     { background: var(--muted); color: var(--muted-foreground); border: 1px solid var(--border); }
 .unknown     { background: var(--muted); color: var(--muted-foreground); border: 1px solid var(--border); }

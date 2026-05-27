@@ -266,9 +266,10 @@ exact branch and the irreversible step BEFORE doing it, and require an
 explicit yes:
 
 > *"This will merge **fix the login bug** (`change/fix-login-bug`) into the
-> shared `dev` line and delete the change branch afterwards. The merge
-> itself can't be casually undone. I'll only do it once the automated
-> checks pass. Go ahead? (yes / no)"*
+> shared `dev` line. The merge itself can't be casually undone. Your
+> workspace + branch stay intact afterwards (as an audit trail you can
+> retrace in the cockpit) — they're marked as shipped, not deleted. I'll
+> only merge once the automated checks pass. Go ahead? (yes / no)"*
 
 Do not proceed without an affirmative. If the founder's phrasing was
 ambiguous ("get rid of this", "clear it"), do NOT treat it as ship — ask
@@ -301,11 +302,15 @@ gh pr checks change/fix-login-bug --watch
   > {pr_url} to see what broke, fix it on the change branch, and run
   > `/sulis:change ship CH-01HQ8X` again."*
 
-**5. Squash-merge and clean up** (only after green + confirmation):
+**5. Squash-merge** (only after green + confirmation):
 
 ```bash
 gh pr merge change/fix-login-bug --squash --delete-branch
 ```
+
+`--delete-branch` deletes only the **remote** branch (the merge artefact gh
+no longer needs). The local branch + worktree stay intact — they are the
+audit trail.
 
 Then sync local `dev`:
 
@@ -313,11 +318,21 @@ Then sync local `dev`:
 git checkout dev && git pull origin dev
 ```
 
-**6. Report:**
+**6. Mark the change as shipped (#38).** Flips `stage='shipped'` + records
+`shipped_at` on the change. The cockpit reads this to show the change in its
+"Shipped" section; `nuke` reads it to refuse destroying the archive by
+default:
 
-> *"Shipped **fix the login bug** (`CH-01HQ8X`) into `dev`. The change
-> branch is cleaned up. When you're ready to release everything on `dev`
-> to production, that's a separate, deliberate step — just ask."*
+```bash
+"$SCRIPTS_DIR/sulis-change" mark-shipped --handle CH-01HQ8X
+```
+
+**7. Report:**
+
+> *"Shipped **fix the login bug** (`CH-01HQ8X`) into `dev`. The workspace +
+> branch are preserved as an audit trail you can retrace in the cockpit
+> (under 'Shipped'). When you're ready to release everything on `dev` to
+> production, that's a separate, deliberate step — just ask."*
 
 ### `rebase <CH-handle>` — pull in the latest
 

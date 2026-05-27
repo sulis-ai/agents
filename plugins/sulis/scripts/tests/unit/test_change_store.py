@@ -113,6 +113,60 @@ def test_change_record_has_all_canonical_fields(tmp_path, monkeypatch):
         assert field in data, f"missing field {field!r}"
 
 
+# ─── #38: shipped terminal stage + shipped_at + mark_change_shipped ─────────
+
+
+def test_shipped_is_a_valid_terminal_stage():
+    assert cs.is_valid_stage("shipped")
+    # And it's distinct from the 6 workflow stages
+    assert "shipped" not in cs.WORKFLOW_STAGES
+
+
+def test_shipped_at_round_trips_in_record(tmp_path, monkeypatch):
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
+    cs.write_change_record(_GOOD_ULID,
+                           _record(_GOOD_ULID, shipped_at="2026-05-27T16:00:00Z"))
+    record = cs.read_change_record(_GOOD_ULID)
+    assert record["shipped_at"] == "2026-05-27T16:00:00Z"
+
+
+def test_mark_change_shipped_sets_stage_and_timestamp(tmp_path, monkeypatch):
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
+    cs.write_change_record(_GOOD_ULID, _record(_GOOD_ULID))
+    cs.write_change_stage(_GOOD_ULID, "ship")  # active in ship stage
+
+    result = cs.mark_change_shipped(_GOOD_ULID, now="2026-05-27T16:00:00Z")
+    assert result is not None
+    # The PERSISTED record must carry the shipped stage (not just the overlay)
+    # — direct readers like `cmd_nuke` use read_change_record without the
+    # overlay, and they must see 'shipped' to enforce the audit-trail guard.
+    record = cs.read_change_record(_GOOD_ULID)
+    assert record["shipped_at"] == "2026-05-27T16:00:00Z"
+    assert record["stage"] == "shipped"
+    # The overlay store agrees (list_all_changes reads state.json over the record)
+    rows = cs.list_all_changes()
+    assert rows[0]["stage"] == "shipped"
+
+
+def test_mark_change_shipped_is_idempotent_preserves_first_timestamp(
+    tmp_path, monkeypatch,
+):
+    """A second mark-shipped (e.g. re-running the ship flow) MUST NOT
+    overwrite the original shipped_at — the audit trail is the first event."""
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
+    cs.write_change_record(_GOOD_ULID, _record(_GOOD_ULID))
+    cs.mark_change_shipped(_GOOD_ULID, now="2026-05-27T16:00:00Z")
+    cs.mark_change_shipped(_GOOD_ULID, now="2026-05-27T17:00:00Z")  # later
+    record = cs.read_change_record(_GOOD_ULID)
+    assert record["shipped_at"] == "2026-05-27T16:00:00Z"
+
+
+def test_mark_change_shipped_returns_none_for_missing_record(tmp_path, monkeypatch):
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
+    assert cs.mark_change_shipped("01HYQC79000000000000000000",
+                                  now="2026-05-27T16:00:00Z") is None
+
+
 def test_write_change_record_defaults_missing_fields(tmp_path, monkeypatch):
     """Missing keys default to "" (str); stage defaults to recon."""
     monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
