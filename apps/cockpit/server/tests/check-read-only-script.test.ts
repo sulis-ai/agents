@@ -30,11 +30,15 @@ function runGate(cwdRoot: string) {
 }
 
 describe("read-only inventory gate script (TDD §13.7, ADR-003)", () => {
+  // The script scans the whole cockpit source (~80+ files) and takes ~7-8s
+  // locally; the default 5s test timeout is too tight for the real runtime,
+  // so allow 30s. The gate itself passes — this only stops a slow scan from
+  // being misreported as a failure.
   it("exits 0 against the actual committed cockpit source", () => {
     const res = spawnSync("bash", [script], { encoding: "utf8" });
     expect(res.status, res.stdout + res.stderr).toBe(0);
     expect(res.stdout).toMatch(/Read-only inventory clean/);
-  });
+  }, 30000);
 
   it("--explain prints the rule catalogue and exits 0", () => {
     const res = spawnSync("bash", [script, "--explain"], { encoding: "utf8" });
