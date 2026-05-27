@@ -42,6 +42,12 @@ venv/
 # Node (for marketplace tooling)
 node_modules/
 
+# Executor sidecar files — per-worktree scratch, must never travel onto dev
+# (L-07: .wpx-base-sha nearly leaked onto dev via a worktree commit)
+.wpx-base-sha
+.executor-*-dev-sha
+.wpx-*
+
 # Logs / scratch
 *.log
 .scratch/
