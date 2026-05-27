@@ -1,0 +1,176 @@
+# Completeness Report — {{COMPANY_NAME}}
+
+**Stage:** {{STAGE}}
+**Generated:** {{YYYY-MM-DD}}
+**Pass number:** {{1 | 2 | 3}}
+**Verdict:** {{PASS | GAPS_FOUND}}
+
+Multi-perspective verification of the pitch. Each perspective applies a
+specific reference standard. Up to three fix-as-you-go passes are
+permitted before manual escalation.
+
+---
+
+## Perspectives evaluated
+
+| Perspective | Reference | Verdict |
+|---|---|---|
+| Sequoia spine coverage | sequoia-pitch-framework.md (SQ-) | {{PASS | GAPS}} |
+| Financial rigor | financial-rigor-standard.md (FN-) | {{PASS | GAPS}} |
+| Narrative composition | deck-narrative-standard.md (ND-) | {{PASS | GAPS}} |
+| Visual layout | visual-design-standard.md (VD-) | {{PASS | GAPS}} |
+| Adversarial rebuttal coverage | investor-objection-catalogue.md (IO-) | {{PASS | GAPS}} |
+| Claim-to-proof traceability | FN-06, ND-05 | {{PASS | GAPS}} |
+| Term consistency | GLOSSARY.md + CL-06 | {{PASS | GAPS}} |
+| Brand application | brand-standard.md + visual-design-standard.md | {{PASS | GAPS}} |
+
+---
+
+## Sequoia spine coverage (SQ-)
+
+| Required slide | Present? | Notes |
+|---|---|---|
+| SQ-01 What's Changed? | {{yes / no}} | |
+| SQ-02 What You Do | {{yes / no}} | |
+| SQ-03 Fast Facts | {{yes / no}} | |
+| SQ-04 Agenda (+ pause prompt) | {{yes / no}} | |
+| SQ-05 Pain | {{yes / no}} | |
+| SQ-06 Solution | {{yes / no}} | |
+| SQ-07 Market Size (TAM/SAM/SOM with triangulation) | {{yes / no}} | |
+| SQ-08 Competition | {{yes / no}} | |
+| SQ-09 Team | {{yes / no}} | |
+| SQ-10 Financials | {{yes / no}} | |
+
+Stage variant ({{SQ-V1 | V2 | V3 | V4}}) applied: {{yes / no}}
+
+Slide count: {{N}} (must be 10–15)
+
+---
+
+## Financial rigor (FN-)
+
+| Check | Status | Notes |
+|---|---|---|
+| Stage matches horizon (FN-01) | {{✓ / ✗}} | |
+| Required metrics for stage present (FN-02) | {{✓ / ✗}} | |
+| Cohort definitions consistent (FN-03) | {{✓ / ✗}} | |
+| TAM/SAM/SOM triangulated top-down + bottom-up (FN-04) | {{✓ / ✗}} | |
+| All sources tiered (FN-05) | {{✓ / ✗}} | |
+| Every number traces to proof-point (FN-06) | {{✓ / ✗}} | |
+| Confidence levels assigned (FN-07) | {{✓ / ✗}} | |
+| No false precision in deck (FN-08) | {{✓ / ✗}} | |
+| Assumptions documented (FN-09) | {{✓ / ✗}} | |
+| Pre-mortem present (FN-10) | {{✓ / ✗}} | |
+| Stop/pivot triggers stated (FN-11) | {{✓ / ✗}} | |
+| No vanity metrics on financials slide (FN-12) | {{✓ / ✗}} | |
+| Burn/runway definitions in glossary (FN-13) | {{✓ / ✗}} | |
+| Sensitivity analysis present (FN-14, A+) | {{✓ / ✗ / N/A}} | |
+| Use of funds milestone-tied (FN-15) | {{✓ / ✗}} | |
+| Round size justified (FN-16) | {{✓ / ✗}} | |
+
+---
+
+## Narrative composition (ND-)
+
+| Check | Status | Notes |
+|---|---|---|
+| Every slide has one investor question (ND-01) | {{✓ / ✗}} | |
+| Every title is a conclusion, not a label (ND-02, ND-04) | {{✓ / ✗}} | |
+| Argument slides use SCQA (ND-03) | {{✓ / ✗}} | |
+| Every numerical claim links to a proof-point (ND-05) | {{✓ / ✗}} | |
+| No slide exceeds 5 chunks (ND-06) | {{✓ / ✗}} | |
+| Verbal transitions in speaker notes (ND-08) | {{✓ / ✗}} | |
+| Term consistency per GLOSSARY (ND-09) | {{✓ / ✗}} | |
+| No prohibited PL words (ND-10) | {{✓ / ✗}} | |
+| Speaker notes ≤ 80 words, bulleted (ND-11) | {{✓ / ✗}} | |
+
+---
+
+## Visual layout (VD-)
+
+| Check | Status | Notes |
+|---|---|---|
+| One idea per slide (VD-01) | {{✓ / ✗}} | |
+| Chunk limit ≤5 enforced visually (VD-02) | {{✓ / ✗}} | |
+| Whitespace floor 25% (VD-03) | {{✓ / ✗}} | |
+| ≤3 typographic levels per slide (VD-04) | {{✓ / ✗}} | |
+| All typography from brand-assets (VD-05) | {{✓ / ✗}} | |
+| Line length / leading in range (VD-06) | {{✓ / ✗}} | |
+| Tabular figures on numerals (VD-07) | {{✓ / ✗}} | |
+| All colour from tokens.css (VD-08) | {{✓ / ✗}} | |
+| WCAG AA contrast on every pair (VD-09) | {{✓ / ✗}} | |
+| No colour-only encoding (VD-10) | {{✓ / ✗}} | |
+| Data-ink ratio respected (VD-11) | {{✓ / ✗}} | |
+| Y-axes start at zero or annotated (VD-12) | {{✓ / ✗}} | |
+| No decorative imagery (VD-13) | {{✓ / ✗}} | |
+
+---
+
+## Adversarial rebuttal coverage (IO-)
+
+- Total objections scored in ADVERSARIAL_REVIEW.md: {{N}}
+- Weak / None rebuttals remaining: {{N}}
+- Founder-acknowledged residual risks: {{N}}
+
+| Objection | Rebuttal strength | Resolution |
+|---|---|---|
+| {{IO-NN}} | {{strength}} | {{addressed in slide NN / accepted residual risk / pending}} |
+
+---
+
+## Claim-to-proof traceability
+
+| Slide | Claim | Proof-point | Source | Status |
+|---|---|---|---|---|
+| {{NN}} | {{claim}} | pp-{{NNN}} | src-{{NNN}} (T{{tier}}) | {{✓ / ✗ orphan claim}} |
+
+Orphan claims (no proof-point): {{N}}
+Orphan proof-points (no claim using them): {{N}}
+
+---
+
+## Brand application
+
+| Check | Status | Notes |
+|---|---|---|
+| BRAND.md page-build-ready (BR / BP) | {{✓ / ✗}} | |
+| tokens.css and tokens.json present | {{✓ / ✗}} | |
+| Logo or monogram present | {{✓ / ✗}} | |
+| Deck applies brand consistently | {{✓ / ✗}} | |
+| Financial dashboard applies brand consistently | {{✓ / ✗}} | |
+
+---
+
+## Findings (sorted by severity)
+
+### CRITICAL — must address before delivery
+
+- {{FINDING}} (perspective, rule ID, location)
+
+### SIGNIFICANT — should address
+
+- {{FINDING}}
+
+### MINOR — note for future revision
+
+- {{FINDING}}
+
+---
+
+## Verdict
+
+{{PASS | GAPS_FOUND}}
+
+If PASS: the pitch is stage-conformant and ready for delivery. Optional
+next step: schedule rehearsal if not already complete.
+
+If GAPS_FOUND: address CRITICAL items and re-run `/investor-coach:validate`. After
+three failed passes, manual review required.
+
+---
+
+## Pass history
+
+| Pass | Date | Findings count (C / S / M) | Verdict |
+|---|---|---|---|
+| 1 | {{YYYY-MM-DD}} | {{N / N / N}} | {{PASS / GAPS}} |

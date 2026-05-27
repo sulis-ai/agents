@@ -1,0 +1,23 @@
+{
+  "name": "investor-coach",
+  "description": "Investor Deck Coach \u2014 facilitates Sequoia-style pitch deck creation through guided conversation, stage-aware (angel through Series B), with rigorous market research, financial modelling, adversarial investor-objection review, branded deck deliverables (PowerPoint + Reveal.js HTML), and rehearsal drill.",
+  "version": "0.6.0",
+  "author": {
+    "name": "Iain"
+  },
+  "repository": "https://github.com/sulis-ai/agents",
+  "license": "MIT",
+  "keywords": [
+    "pitch-deck",
+    "investor-deck",
+    "fundraising",
+    "venture-capital",
+    "sequoia",
+    "founder-coaching",
+    "financial-modelling",
+    "market-research",
+    "pptx",
+    "pitch",
+    "web-pitch"
+  ]
+}

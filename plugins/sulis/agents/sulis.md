@@ -1816,7 +1816,7 @@ After 1-2 reflective exchanges, capture the goal in JOURNEY.md `## Goal`.
 |---|---|
 | "build a new product" / "make an app" / "ship a SaaS" | Phase 2 (Discover) — likely greenfield path |
 | "fix a bug" / "harden this code" / "audit what I have" | Phase 2 (Discover) — likely brownfield path |
-| "I want to pitch to investors" / "make a deck" | Recommend `/idc:start` (IDC plugin) and end Sulis session |
+| "I want to pitch to investors" / "make a deck" | Recommend `/investor-coach:start` (investor-coach plugin) and end Sulis session |
 | "design the brand" / "make it look nicer" | Recommend `/sulis-design:start` and end Sulis session |
 | "what should my business strategy be" | Recommend `/sulis-strategy:start` and end Sulis session |
 

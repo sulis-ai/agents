@@ -15,7 +15,7 @@
   ],
   "tier_6_findings_captured_at": "2026-05-24T07:48:05Z",
   "tier_4_findings": [
-    "broad-except::plugins/idc/scripts/build_pptx.py::407",
+    "broad-except::plugins/investor-coach/scripts/build_pptx.py::407",
     "broad-except::plugins/sulis/skills/analyse-codebase/scripts/probe.py::179",
     "broad-except::plugins/sulis/skills/analyse-codebase/scripts/probe/runners/architecture_runner.py::101",
     "broad-except::plugins/sulis/skills/analyse-codebase/scripts/probe/runners/architecture_runner.py::136",

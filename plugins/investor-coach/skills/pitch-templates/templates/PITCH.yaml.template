@@ -1,0 +1,56 @@
+# PITCH.yaml — Investor Deck Coach project metadata
+# Generated and maintained by the investor-deck-coach agent.
+
+id: PITCH-{{NNN}}
+name: "{{COMPANY_NAME}}"
+slug: "{{company-slug}}"
+created: "{{YYYY-MM-DD}}"
+updated: "{{YYYY-MM-DD}}"
+status: in_progress  # in_progress | review | complete | archived
+
+# Stage — drives every threshold downstream (FN-01, SQ-V1..V4, IO- variants)
+stage: "{{angel | pre-seed | seed | series-a | series-b}}"
+
+# The ask
+round:
+  target_size_usd: {{ROUND_SIZE}}
+  use_of_funds_summary: "{{ONE_SENTENCE_SUMMARY}}"
+  runway_target_months: {{RUNWAY_MONTHS}}
+  next_milestone: "{{NEXT_ROUND_POSITIONING}}"
+
+# Target audience for this pitch
+audience:
+  type: "{{vc-partner | angel | strategic | demo-day | other}}"
+  specific_targets: []   # named funds, partners, angels (optional)
+
+# Founder(s)
+founders:
+  - name: "{{FOUNDER_NAME}}"
+    role: "{{ROLE}}"
+    relevant_edge: "{{ONE_SENTENCE_REASON_RIGHT_FOR_THIS_PROBLEM}}"
+
+# Company context
+company:
+  founded: "{{YYYY-MM}}"
+  headcount: {{N}}
+  development_stage: "{{pre-product | private-beta | ga | scaling}}"
+  one_line: "{{ONE_SENTENCE_WHAT_YOU_DO}}"
+
+# Cross-references — populated as work progresses
+artifacts:
+  discovery: ".pitch/{{slug}}/DISCOVERY.md"
+  brand: ".pitch/{{slug}}/BRAND.md"
+  market_research: ".pitch/{{slug}}/MARKET_RESEARCH.md"
+  financial_model: ".pitch/{{slug}}/03-financials/MODEL.yaml"
+  narrative: ".pitch/{{slug}}/NARRATIVE.md"
+  adversarial_review: ".pitch/{{slug}}/05-adversarial/ADVERSARIAL_REVIEW.md"
+  deck_pptx: ".pitch/{{slug}}/04-narrative/DECK.pptx"
+  deck_html: ".pitch/{{slug}}/04-narrative/DECK.html"
+  web_pitch: ".pitch/{{slug}}/PITCH.html"
+  investor_financials: ".pitch/{{slug}}/FINANCIALS.html"
+  investor_review: ".pitch/{{slug}}/REVIEW.html"
+
+# Optional links to upstream specs (investor-coach is self-contained, but may read context)
+upstream:
+  srd_spec: null     # path to .specifications/{name}/ if exists
+  strategy: null     # path to sulis-strategy outputs if exists
