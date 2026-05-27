@@ -1,5 +1,19 @@
 # Sulis — Changelog
 
+## v0.58.0 — 2026-05-27
+
+**Minor — lessons-capture: post-ship lessons become durable GitHub issues.**
+
+(1) **#43 — lessons-capture mechanism.** Closes the "in-session findings evaporate at session end" gap. After a piece of work ships, actionable lessons (disposition `SEA` / `TASK`) are promoted into `lesson`-labelled GitHub issues — durable, discoverable, closeable via the next PR's `Closes #N`. `FIX-NOW` / `FIXED` get no issue (the commit IS the record); `note` is digest-only.
+
+- `_lessons.py` — pure triage/dedup core (no I/O). Stable prefixed issue titles (`lesson: …`) as the dedup key; case-insensitive matching against open `lesson` issues.
+- `sulis-lessons capture` — gh glue: lists open `lesson` issues, partitions into create/dup/skip, creates the new actionable ones (auto-creates the `lesson` label), `--dry-run` to preview, **degrades cleanly to digest-only** when gh is unavailable / the remote isn't GitHub.
+- `/sulis:capture-lessons` skill — gather → dry-run → batch-confirm (AAF-06, no silent issue spam) → create → write digest → report in founder English.
+
+Architecture review (engineering-architect, 2026-05-27): kept lessons-specific rather than generalised to a "capture-issue" engine. With one consumer today, the reusable plumbing (partition + the gh layer) is already cleanly separated, so generalising would delete zero duplicate code and only add a parameterisation layer (premature abstraction, EP-03). The trigger to extract a shared `_issues.py` engine is recorded as the very first real lesson issue (#20) so it can't be forgotten when a 2nd capture type (bugs / enhancements) is requested.
+
+Real-path dogfooded: created the repo's first-ever GitHub issue (#20) with correct prefix + labels, dedup verified by re-run. 677 tests green (+15: 11 unit + 4 integration via the mock_gh fake-binary fixture).
+
 ## v0.57.0 — 2026-05-27
 
 **Minor — both contracts become deterministic gates; change records travel; cockpit diffs work.**
