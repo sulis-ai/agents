@@ -1,5 +1,26 @@
 # Sulis — Changelog
 
+## v0.62.0 — 2026-05-27
+
+**Minor — `/sulis:change ship` now gates structurally on `/sulis:review` before merging (closes #30).**
+
+`branch-ci` runs the tests + lint — necessary, not sufficient. `/sulis:code-health` is the 7-tier audit (security, reliability, maintainability, …); it's what surfaced issue #22 on PR #24. Until now, both code-health and code-review were separate skills the founder/agent had to remember to run; the ship flow went branch-ci-green → squash-merge with nothing in between.
+
+`plugins/sulis/skills/change/SKILL.md` ship subcommand has a new **step 4.5** between branch-ci (4) and squash-merge (5):
+
+- Invoke `/sulis:review` (which already composes `/sulis:code-health` + a security check + folds into one PASS / CONCERN / CRITICAL verdict — no amendment to the review skill needed).
+- **PASS** → log + proceed to merge.
+- **CONCERN** → surface findings + require explicit founder yes/no (mirrors the existing step-2 confirm shape).
+- **CRITICAL** → STOP. Do NOT merge. Surface findings + next step (mirrors the existing branch-ci-fail path).
+
+**CW-05 size carve-out** so typo/comment-only changes don't trigger the full review stack: when the diff vs `origin/dev` is ≤1 file AND ≤30 total lines AND no new files added, log the skip and proceed direct to merge. Inline bash parses `git diff --shortstat` — no new helper needed.
+
+The change shipped through its own new gate (bootstrap discipline) — `/sulis:review` fired live on PR #32 with verdict PASS before the squash-merge landed. The reviewer pressure-tested the bash regex against three edge cases (singular forms, missing INS / DEL) — all clean — and verified self-consistency (CW-05 carve-out prevents circular invocation on future small edits to the skill itself).
+
+A follow-on lesson surfaced while live-testing the v1.104.0 enriched recon during this work — the `## Code-area pointers` section in CONTEXT.md returns files that mention the intent's backticked tokens rather than files those tokens refer to. Captured durably as #31.
+
+Prose-only — no Python touched; 608 unit tests unchanged (green).
+
 ## v0.61.0 — 2026-05-27
 
 **Minor — pre-spawn recon CONTEXT.md is now grounded: intent + linked issue + code-area pointers (closes #26).**
