@@ -14,7 +14,7 @@ existing marketplace patterns:
 1. **Auto-fix** (`/sulis:harden-codebase`)
 2. **Auto-draft remediation WP** (`/sulis-execution:backfill-*`)
 3. **Founder shortcut** (`/sulis:inbox` `[1] resume`)
-4. **Adversarial human-in-the-loop** (`/idc:adversarial-review`)
+4. **Adversarial human-in-the-loop** (`/investor-coach:adversarial-review`)
 5. **Escalate to SRD** (`requirements-analyst`)
 6. **Defer / accept-as-known** (`/sulis:verify-architecture` OPEN_RISK)
 

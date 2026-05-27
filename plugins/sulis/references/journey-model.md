@@ -229,7 +229,7 @@ routes correctly:
 |---|---|
 | build / make / ship / create a product / app / SaaS | Phases 2-7 (concierge primary path) |
 | fix bugs / harden / audit my code | Phases 2, 6, 7 (skip Specify + Design + Implement; route to harden-style workflow if relevant) |
-| pitch / fundraise / make a deck | Recommend `/idc:start`; end concierge session |
+| pitch / fundraise / make a deck | Recommend `/investor-coach:start`; end concierge session |
 | design / branding / visual identity | Recommend `/sulis-design:start`; end concierge session |
 | business strategy / GTM / pricing | Recommend `/sulis-strategy:start`; end concierge session |
 | explore an existing codebase | Recommend `/sulis:discover-context`; offer to continue with SEA codebase-audit afterwards |

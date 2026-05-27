@@ -23,7 +23,7 @@ broad-except::plugins/sulis/skills/analyse-codebase/scripts/probe/workspace.py::
 # idc CLI entry pattern. build_pptx.py is a CLI script; broad-except at
 # the top-level entry catches all errors and emits a clean message rather
 # than a stack trace to a non-technical founder.
-broad-except::plugins/idc/scripts/build_pptx.py::407: CLI top-level entry; clean error reporting to founder
+broad-except::plugins/investor-coach/scripts/build_pptx.py::407: CLI top-level entry; clean error reporting to founder
 
 # _wpxlib.py: 2 cases of broad-except that need per-case review.
 # Not bulk-allowlisting — these may be real findings. Mark for

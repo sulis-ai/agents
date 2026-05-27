@@ -9,82 +9,16 @@
   },
   "plugins": [
     {
-      "name": "srd",
-      "source": "./plugins/srd",
-      "version": "1.23.0",
-      "description": "[DEPRECATED at v1.23.0 — consolidated into sulis at v0.37.0] Requirements Analyst functionality now lives at /sulis:codebase-mapping, /sulis:critical-thinking, /sulis:requirements-validation, /sulis:index-specifications, /sulis:requirements-templates, /sulis:map-architecture with the requirements-analyst agent at plugins/sulis/agents/. Marketplace-wide standards (AAF, FE, repository-contract, pr-hygiene, change-work, convention-preference, engineering-principles, executor-loop, git-workflow, security, cognitive-load, content-quality, coaching-without-conflict) moved to plugins/sulis/references/. This plugin shell remains for marketplace compatibility; no new development."
-    },
-    {
-      "name": "sulis-context",
-      "source": "./plugins/sulis-context",
-      "version": "0.4.0",
-      "description": "[DEPRECATED at v0.4.0 — consolidated into sulis at v0.35.0] Context Cartographer functionality now lives at /sulis:discover-context, /sulis:refresh-context, /sulis:show-context with the context-cartographer agent in plugins/sulis/agents/. This plugin shell remains for marketplace compatibility; no new development."
-    },
-    {
-      "name": "sulis-strategy",
-      "source": "./plugins/sulis-strategy",
-      "version": "1.3.3",
-      "description": "Business strategy studio for the Outcome-First Methodology. Provides vision, strategy, principles, commercial, gtm-planning, roadmap, identity, brand-research, company-research, competitive-research, anti-goals, and win-loss-analysis skills."
-    },
-    {
-      "name": "sulis-business-strategy",
-      "source": "./plugins/sulis-business-strategy",
-      "version": "0.1.0",
-      "description": "Business Strategy studio (Kind-schema variant). Drives business-context intake, identity, brand positioning, voice, principles, and strategic foundation work through four-stage Kind workflows (find / generate / evaluate / decide)."
-    },
-    {
-      "name": "sulis-product-development",
-      "source": "./plugins/sulis-product-development",
-      "version": "1.3.0",
-      "description": "Product development studio for the Outcome-First Methodology. Provides design, plan, implement, and complete skills for the full product delivery lifecycle. Includes test-scenarios, task-decomposition, backend/frontend development guidance, and IVS-authoring."
-    },
-    {
-      "name": "sulis-builder",
-      "source": "./plugins/sulis-builder",
-      "version": "1.2.3",
-      "description": "Self-service studio creation for the Outcome-First Methodology. Creates new domain expertise packages (7-file studio bundles) using the studio-creation sequence; outcome-definition + platform integration + tail outcomes."
-    },
-    {
-      "name": "sulis-design",
-      "source": "./plugins/sulis-design",
-      "version": "1.3.3",
-      "description": "Design studio for the Outcome-First Methodology. Provides design foundation, visual identity, customer experience, design coherence, design compliance, identity articulation, and implementation system skills for translating brand into a design system."
-    },
-    {
-      "name": "sulis-platform-sdk",
-      "source": "./plugins/sulis-platform-sdk",
-      "version": "0.1.0",
-      "description": "Build production-ready, business-critical applications with AI-native infrastructure. Deploy scalable SaaS backends with built-in auth, billing, multi-tenancy, and observability."
-    },
-    {
-      "name": "sea",
-      "source": "./plugins/sea",
-      "version": "0.21.0",
-      "description": "[DEPRECATED at v0.21.0 — consolidated into sulis at v0.38.0] Architect skills (draft-architecture, plan-work, harden-codebase, analyse-codebase, verify-architecture, code-review, codebase-audit, suggest-split) + engineering-architect agent + 11 references (boring-code, change-primitives, code-review-standard, mece-3-architecture, red-green-blue, etc.) now in plugins/sulis/. Shell preserved for compatibility."
-    },
-    {
-      "name": "sulis-security",
-      "source": "./plugins/sulis-security",
-      "version": "0.7.0",
-      "description": "[DEPRECATED at v0.7.0 — consolidated into sulis at v0.40.0] Security-reviewer agent + viability-framework reference now in plugins/sulis/. codebase-assess skill preserved at /sulis:codebase-assess through its existing deprecation window (skill was already DEPRECATED in favour of /sulis:code-health since v0.22.0). Shell preserved for compatibility."
-    },
-    {
-      "name": "idc",
-      "source": "./plugins/idc",
-      "version": "0.5.0",
-      "description": "Investor Deck Coach — facilitates Sequoia-style pitch deck creation through guided conversation, stage-aware (angel through Series B), with rigorous market research, financial modelling, adversarial investor-objection review, branded deck deliverables (PowerPoint + Reveal.js HTML), and rehearsal drill."
-    },
-    {
-      "name": "sulis-execution",
-      "source": "./plugins/sulis-execution",
-      "version": "0.25.0",
-      "description": "[DEPRECATED — see /sulis:*] Executor + train + wpx-* CLI tools moved into the sulis plugin at v0.30.0 (2026-05-25). Use /sulis:run-wp WP-NNN, /sulis:run-all, /sulis:retry WP-NNN, /sulis:wp-status (renamed from status to avoid sulis:status conflict with the concierge journey status), /sulis:backfill-code-review, /sulis:backfill-gates. This plugin shell retained for the SDK packages only: sdk/python (sulis-execution on PyPI), sdk/typescript (@sulis-ai/execution on npm), sdk/mcp-server (sulis-execution-mcp on PyPI). SDK packages keep stable names because external consumers depend on them; will move to a dedicated sulis-ai/sulis-execution-sdk repo separately."
+      "name": "investor-coach",
+      "source": "./plugins/investor-coach",
+      "version": "0.6.0",
+      "description": "Investor Deck Coach \u2014 facilitates Sequoia-style pitch deck creation through guided conversation, stage-aware (angel through Series B), with rigorous market research, financial modelling, adversarial investor-objection review, branded deck deliverables (PowerPoint + Reveal.js HTML), and rehearsal drill."
     },
     {
       "name": "sulis",
       "source": "./plugins/sulis",
       "version": "0.55.1",
-      "description": "Your AI engineering team in a plugin. Talk through what you want to build, and Sulis takes it end-to-end — gathering requirements, designing the architecture, writing and reviewing the code, and shipping it. Start with `claude --agent sulis`."
+      "description": "Your AI engineering team in a plugin. Talk through what you want to build, and Sulis takes it end-to-end \u2014 gathering requirements, designing the architecture, writing and reviewing the code, and shipping it. Start with `claude --agent sulis`."
     }
   ]
 }
