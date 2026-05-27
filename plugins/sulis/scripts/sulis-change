@@ -43,6 +43,7 @@ from _change_state import (  # noqa: E402
     changes_base,
     is_valid_stage,
     list_all_changes,
+    mark_change_shipped,
     read_change_record,
     write_change_record,
     write_change_stage,
@@ -492,35 +493,34 @@ def cmd_finish(args: argparse.Namespace) -> None:
     else:
         emit_error("Pass --merge (squash-merge locally) or --pr (open a PR).")
 
-    # Cleanup (default; unless --no-cleanup)
-    cleanup_summary: dict = {}
-    if not args.no_cleanup:
-        # Force-remove the worktree. --force is needed because the
-        # `.changes/{primitive}-{slug}.yaml` metadata file is untracked
-        # by design (ephemeral lifecycle state). The work itself has
-        # already merged to dev, so discarding the untracked metadata
-        # is the correct cleanup.
-        ok, msg = git_worktree_remove(repo_root, worktree_dest, force=True)
-        cleanup_summary["worktree_removed"] = ok
-        cleanup_summary["worktree_detail"] = msg
-
-        # Prune any stale worktree refs before deleting the branch
-        _run(["git", "worktree", "prune"], cwd=repo_root, timeout=10)
-
-        # Delete the local branch
-        rc, out, err = _run(["git", "branch", "-D", branch],
-                           cwd=repo_root, timeout=10)
-        cleanup_summary["branch_deleted"] = rc == 0
-        if rc != 0:
-            cleanup_summary["branch_detail"] = (err or out or
-                                                "branch delete returned non-zero").strip()
+    # Archive, never delete (#38). On a successful merge, mark the change as
+    # shipped (stage='shipped' + shipped_at) and leave EVERYTHING else intact:
+    # worktree, local branch, change record, in-repo records under
+    # .architecture/ (#42). The cockpit + future sessions can retrace what
+    # happened by opening the change exactly the same way as a live one.
+    # Removal is a separate, explicit founder act via `nuke --force` (and the
+    # default `nuke` refuses on a shipped change, preserving the audit trail).
+    archived: dict = {"archived": False}
+    metadata = read_change_metadata(_metadata_path(worktree_dest, primitive, slug))
+    change_id = metadata.get("change_id")
+    if change_id:
+        record_path = mark_change_shipped(str(change_id))
+        archived = {
+            "archived": record_path is not None,
+            "change_id": change_id,
+            "stage": "shipped",
+        }
+    if args.no_cleanup:
+        # Back-compat: the flag used to opt OUT of cleanup. Cleanup is gone
+        # (we never delete on a happy ship now), so the flag is a no-op.
+        archived["no_cleanup_flag"] = "deprecated — archive-on-ship is the default; flag is a no-op"
 
     emit_ok(data={
         "branch": branch,
         "primitive": primitive,
         "slug": slug,
         "outcome": outcome,
-        "cleanup": cleanup_summary,
+        "archived": archived,
     })
 
 
@@ -872,6 +872,21 @@ def cmd_nuke(args: argparse.Namespace) -> None:
             context={"current_branch": current_branch},
         )
 
+    # Safety 1.5 (#38): refuse to nuke a SHIPPED change unless --force. The
+    # archive is the audit trail — destroying it loses the retrace path for a
+    # change the founder may need to inspect later (this is exactly the
+    # premature-nuke incident class). --force still works for genuine cleanup.
+    if change_id:
+        record = read_change_record(change_id)
+        if record and str(record.get("stage", "")).strip().lower() == "shipped" and not args.force:
+            emit_error(
+                f"Refusing to nuke a shipped change ({branch}) — the worktree "
+                f"and branch are the audit trail (#38). The cockpit + future "
+                f"sessions read them. Use `--force` to override if you really "
+                f"mean to destroy the archive.",
+                context={"branch": branch, "change_id": change_id, "stage": "shipped"},
+            )
+
     state_dir = change_dir(change_id) if change_id else None
 
     # Safety 2: refuse to nuke a branch with unmerged commits unless --force.
@@ -1065,6 +1080,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Change ULID to stamp (default: the SULIS_CHANGE_ID env var)",
     )
 
+    # `mark-shipped` is the terminal-stage transition (#38). Called by the
+    # `/sulis:change ship` skill after `gh pr merge` succeeds: flips
+    # stage='shipped' + records shipped_at on the change record. Idempotent;
+    # never deletes anything (archive, not delete). Distinct from the `stage`
+    # subcommand which only updates state.json.
+    p_mark_shipped = sub.add_parser(
+        "mark-shipped",
+        help="Mark a change as shipped (archive, no deletion) — #38.",
+    )
+    p_mark_shipped.add_argument("--change-id", default=None,
+                                help="Change ULID (default: SULIS_CHANGE_ID env var)")
+    p_mark_shipped.add_argument("--handle", default=None,
+                                help="Change handle (e.g. CH-01HYQC) to resolve the ULID")
+    p_mark_shipped.add_argument("--repo-root", default=os.getcwd(),
+                                help="Path to the repo root (default: cwd)")
+
     p_nuke = sub.add_parser(
         "nuke",
         help="Abandon + delete a change and its full footprint "
@@ -1087,6 +1118,37 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def cmd_mark_shipped(args: argparse.Namespace) -> None:
+    """#38 — flip stage='shipped' + record shipped_at on a change.
+
+    Called by the `/sulis:change ship` skill after `gh pr merge` succeeds.
+    Resolves the change_id from --change-id, --handle, or SULIS_CHANGE_ID.
+    Idempotent: a repeat call preserves the first shipped_at timestamp.
+    """
+    change_id = args.change_id or os.environ.get("SULIS_CHANGE_ID")
+    if not change_id and args.handle:
+        # Resolve a handle → change_id via the global store.
+        handle = args.handle.upper()
+        for record in list_all_changes():
+            if str(record.get("handle", "")).upper() == handle:
+                change_id = record.get("change_id")
+                break
+        if not change_id:
+            emit_error(f"no change found for handle {args.handle!r}")
+    if not change_id:
+        emit_error("--change-id, --handle, or SULIS_CHANGE_ID required")
+    record_path = mark_change_shipped(str(change_id))
+    if record_path is None:
+        emit_error(f"no change record found for change_id={change_id!r}")
+    record = read_change_record(str(change_id)) or {}
+    emit_ok(data={
+        "change_id": change_id,
+        "stage": "shipped",
+        "shipped_at": record.get("shipped_at"),
+        "record_path": str(record_path),
+    })
+
+
 HANDLERS = {
     "start": cmd_start,
     "adopt": cmd_adopt,
@@ -1094,6 +1156,7 @@ HANDLERS = {
     "list": cmd_list,
     "status": cmd_status,
     "stage": cmd_stage,
+    "mark-shipped": cmd_mark_shipped,
     "nuke": cmd_nuke,
 }
 

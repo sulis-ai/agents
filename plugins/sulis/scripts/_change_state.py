@@ -93,13 +93,22 @@ WORKFLOW_STAGES: tuple[str, ...] = (
     "ship",
 )
 
+# Terminal stages — past the six-stage workflow. A change in a terminal stage
+# is done; its audit trail (worktree, branch, change record, in-repo records
+# under .architecture/ via #42) is preserved so the cockpit + future sessions
+# can retrace what happened. `nuke` refuses on a terminal stage by default
+# (the audit trail is the point of archiving).
+TERMINAL_STAGES: tuple[str, ...] = (
+    "shipped",
+)
+
 
 def is_valid_stage(stage: str) -> bool:
-    """Return True iff ``stage`` is one of the six canonical stages.
+    """Return True iff ``stage`` is one of the workflow OR terminal stages.
 
     Case-sensitive: stages are lower-case by convention.
     """
-    return stage in WORKFLOW_STAGES
+    return stage in WORKFLOW_STAGES or stage in TERMINAL_STAGES
 
 
 def _now_iso() -> str:
@@ -225,6 +234,7 @@ _CHANGE_RECORD_FIELDS: tuple[str, ...] = (
     "base_sha",
     "created_at",
     "stage",
+    "shipped_at",
 )
 
 
@@ -272,6 +282,36 @@ def read_change_record(change_id: str) -> dict | None:
     except (OSError, json.JSONDecodeError) as exc:
         _emit_warning(f"could not read change record at {record_path}: {exc}")
         return None
+
+
+def mark_change_shipped(change_id: str, *, now: str | None = None) -> Path | None:
+    """Mark a change as shipped (#38): flip stage→'shipped', record shipped_at.
+
+    Idempotent: a second call preserves the original ``shipped_at`` (the audit
+    trail is the FIRST ship event; re-running the ship flow must not rewrite
+    history). Returns the record path on success, None if the record doesn't
+    exist.
+
+    No deletion: the worktree, branch, change record, and in-repo records all
+    stay so the cockpit + future sessions can retrace. Removal is a separate
+    explicit founder act (`/sulis:change nuke --force`); the default `nuke`
+    refuses on a terminal stage.
+    """
+    record = read_change_record(change_id)
+    if record is None:
+        return None
+    timestamp = now or _now_iso()
+    # Idempotency: preserve the first ship timestamp.
+    existing = str(record.get("shipped_at") or "").strip()
+    if not existing:
+        record["shipped_at"] = timestamp
+    # Persist `stage: shipped` on BOTH stores: state.json (the overlay
+    # list_all_changes reads) AND change.json (what direct `read_change_record`
+    # readers like cmd_nuke see). Without this update to the record itself,
+    # the two stores disagree and the nuke shipped-protection misfires.
+    record["stage"] = "shipped"
+    write_change_stage(change_id, "shipped")
+    return write_change_record(change_id, record)
 
 
 def list_all_changes() -> list[dict]:

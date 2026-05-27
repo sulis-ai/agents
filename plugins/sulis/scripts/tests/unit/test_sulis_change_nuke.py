@@ -462,3 +462,67 @@ def test_nuke_state_dir_already_gone_is_truthful_and_idempotent(local_git_repo, 
     removed = data["removed"]
     assert removed["state_dir"] is False
     assert "already absent" in removed.get("state_dir_detail", "")
+
+
+# ─── #38: nuke refuses to destroy a shipped change's audit trail ───────────
+
+
+def _seed_shipped_record(home: Path, change_id: str) -> None:
+    """Seed a change.json with stage='shipped' so cmd_nuke's check fires."""
+    d = home / ".sulis" / "changes" / change_id
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "state.json").write_text('{"stage": "shipped"}', encoding="utf-8")
+    (d / "change.json").write_text(
+        '{"change_id": "' + change_id + '", "stage": "shipped", '
+        '"shipped_at": "2026-05-27T16:00:00Z"}',
+        encoding="utf-8",
+    )
+
+
+def test_nuke_refuses_shipped_change_without_force(
+    local_git_repo, tmp_path, monkeypatch,
+):
+    """A shipped change's worktree + branch ARE the audit trail (#38). Nuke
+    without --force must refuse loudly so the founder doesn't lose retrace."""
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path / "home" / ".sulis"))
+    home = tmp_path / "home"
+    home.mkdir()
+    meta = _make_change_branch(local_git_repo, "feat", "shipped-archive")
+    _seed_shipped_record(home, meta["change_id"])
+
+    captured, patches = _capture_emit()
+    _run_nuke(_nuke_args(local_git_repo, slug="shipped-archive", force=False),
+              captured, patches)
+
+    assert captured["ok"] is False
+    assert "shipped" in captured["error"].lower()
+    assert "audit trail" in captured["error"].lower()
+    # Worktree + branch must still exist
+    assert meta["worktree_path"].exists()
+    branches = subprocess.run(
+        ["git", "branch", "--list", meta["branch"]],
+        cwd=local_git_repo, capture_output=True, text=True,
+    ).stdout
+    assert meta["branch"] in branches
+
+
+def test_nuke_force_overrides_shipped_protection(
+    local_git_repo, tmp_path, monkeypatch,
+):
+    """The protection is a default refusal, not a hard block. --force still
+    works for genuine cleanup of an old archived change."""
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path / "home" / ".sulis"))
+    home = tmp_path / "home"
+    home.mkdir()
+    meta = _make_change_branch(local_git_repo, "feat", "shipped-force")
+    _seed_shipped_record(home, meta["change_id"])
+
+    captured, patches = _capture_emit()
+    _run_nuke(_nuke_args(local_git_repo, slug="shipped-force", force=True),
+              captured, patches)
+
+    # --force completes the nuke; the shipped check is bypassed.
+    assert captured["ok"] is True
+    assert not meta["worktree_path"].exists()
