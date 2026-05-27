@@ -1,5 +1,15 @@
 # Sulis — Changelog
 
+## v0.60.0 — 2026-05-27
+
+**Minor — Mobbin inspiration probe wired into the visual contract producer.**
+
+Closes a real gap in #45: UXD-15 described the Mobbin integration ("inspiration informs patterns, never identity") but the producer skill never invoked it — the visual-contract gate was structurally complete but its research input was absent.
+
+`draft-architecture` step 3.5(b) now runs an MCP-gated Mobbin probe BEFORE producing the mockup, persisting a referenceable artifact at `.architecture/{project}/contracts/visual/_mobbin-context.md` (per-reference observations + synthesis). The visual-contract WP carries an `inspiration:` frontmatter field citing the path; `review` reads it post-build to verify the shipped surface honoured the cited structural patterns. Pattern ported natively from honest's `build-ui` — capability-gated (no fabrication when MCP unavailable), worked-example carve-out, scope hard-bound (structural transferable; visual NOT). UXD-15 sharpened from "MUST when used" (passive) to "MUST when MCP connected, MAY otherwise" — the producer is now what triggers the use.
+
+Prose-only — no code changes; 595 unit tests unchanged (green).
+
 ## v0.59.0 — 2026-05-27
 
 **Minor — archive on ship: preserve the audit trail, refuse to nuke it.**
