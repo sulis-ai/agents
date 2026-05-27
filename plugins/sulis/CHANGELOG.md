@@ -1,5 +1,19 @@
 # Sulis — Changelog
 
+## v0.56.0 — 2026-05-27
+
+**Minor — executor change-branch + published-artifact fit (Cluster A), and one pithy CLI description per skill/agent.**
+
+(1) **Cluster A (L-01..L-05) — the five factory-floor defects that made the cockpit MVP's Work Packages un-runnable as generated.** All fixed TDD/characterisation-first on a hand-driven change branch; 623 tests green; end-to-end `list-ready` on a canonical `Depends On` + `pending` INDEX now passes (the original failure shape).
+
+- **L-02 — one shared INDEX column resolver.** `_wpxlib.resolve_wp_columns` is now the single source of truth both `wpx-index` and `parse_index_md` call, so they no longer disagree on the `Depends On` header. `list-ready` stops silently rejecting a correctly-generated INDEX, and the `Depends` spelling stops silently losing dependencies.
+- **L-03 — single status vocabulary, canonical `pending`.** The read path (`_lib.wp_index` buckets) stays lenient (`pending`/`todo`/`ready` all surface as ready); the write path (`add-wp` / `sync-auto-drafts`, via `validate_wp_status` over `CANONICAL_WP_STATUSES`) rejects a drifted status loudly instead of letting the WP vanish from the ready set. `wpx-index` flip/add `choices` derive from the one set. WP-07 canonical word updated; `todo`/`ready` documented as read-only legacy aliases.
+- **L-04 — `wpx-worktree create --base-branch`** (default `dev`). Fetch-first resolution keeps the default-`dev` path byte-identical to before; a local `change/*` branch that origin doesn't have falls back to the local ref. CW-04 change flows no longer need a manual `git worktree add`.
+- **L-05 — published-artifact / no-deploy fit (also closes #39).** `read_repo_contract` + `deploy_is_applicable` promoted into `_wpxlib` (one parser; `wpx-arrival-check` delegates). `wpx-pipeline` + `wpx-train` skip the deploy→health→smoke poll on a `published-artifact` / `internal-tool` / `deploy_target: none` repo; `--deploy-workflow` is now optional (required only for a deployable repo, enforced with a clean config error).
+- **L-01 — `resolve_current_change` works from inside a change worktree.** Cwd-first resolution (current branch + the committed `repo_root/.changes/` manifest) with a `.changes/` scan and the original sibling-worktree iteration as fallbacks. `find_change_branches` now also surfaces origin-only change branches.
+
+(2) **CLI descriptions — one pithy sentence each.** Every skill (48) + agent (7) `description` rewritten from a folded paragraph — which leaked internal IDs (SEC-01..07, CR-01..10, MECE-3), methodology acronyms (OODA, RGB), duplicated `Usage:` strings, and version notes — to a single plain-English sentence. 351 lines removed. Detailed triggers/usage remain in each SKILL.md body. Trade-off accepted: the description doubles as Claude Code's auto-invocation signal, so explicit `Use when…` triggers are gone; skills remain explicitly invocable.
+
 ## v0.55.1 — 2026-05-26
 
 **Patch — encode two implicit rules the agent had been running on judgement.**
