@@ -15,7 +15,11 @@ frontmatter`), exactly like the L-03 status validator.
 
 from __future__ import annotations
 
-from _wpxlib import validate_frontend_wp_visual_contract
+from _wpxlib import (
+    is_visual_contract_wp,
+    validate_frontend_wp_visual_contract,
+    visual_contract_signed_off,
+)
 
 
 def _fe(**overrides) -> dict:
@@ -107,3 +111,52 @@ def test_depends_absent_with_contract_is_rejected():
     )
     assert msg is not None
     assert "dependsOn" in msg
+
+
+# ─── is_visual_contract_wp ──────────────────────────────────────────────────
+
+
+def test_is_visual_contract_wp_true_for_contract_visual():
+    assert is_visual_contract_wp({"kind": "contract", "contract_type": "visual"})
+
+
+def test_is_visual_contract_wp_false_for_data_contract():
+    assert not is_visual_contract_wp({"kind": "contract", "contract_type": "data"})
+
+
+def test_is_visual_contract_wp_false_for_frontend():
+    assert not is_visual_contract_wp({"kind": "frontend"})
+
+
+# ─── visual_contract_signed_off (the runtime done-gate predicate) ───────────
+
+
+def _signed(**overrides) -> dict:
+    base = {
+        "kind": "contract",
+        "contract_type": "visual",
+        "signed_off_at": "2026-05-27T14:00:00Z",
+        "provenance": "production-approved",
+    }
+    base.update(overrides)
+    return base
+
+
+def test_signed_off_passes():
+    assert visual_contract_signed_off(_signed()) is None
+
+
+def test_unsigned_is_rejected():
+    msg = visual_contract_signed_off(_signed(signed_off_at=""))
+    assert msg is not None
+    assert "signed_off_at" in msg
+
+
+def test_wrong_provenance_is_rejected():
+    msg = visual_contract_signed_off(_signed(provenance="draft"))
+    assert msg is not None
+    assert "production-approved" in msg
+
+
+def test_signed_off_provenance_is_case_insensitive():
+    assert visual_contract_signed_off(_signed(provenance="Production-Approved")) is None

@@ -296,3 +296,62 @@ def test_add_frontend_wp_with_logged_exemption_succeeds(
     )
     assert result.ok, f"exempt frontend WP should be admitted: {result.error}"
     assert "WP-052" in tmp_project.index_md.read_text()
+
+
+def test_visual_contract_wp_cannot_go_done_unsigned(
+    tmp_project, seed_index, run_tool,
+):
+    """#45 runtime gate: a visual-contract WP whose mockup isn't signed off
+    must be refused at flip-status --to done (so the frontend WPs depending on
+    it stay undispatchable)."""
+    seed_index("INDEX-minimal.md")
+    # WP-001 exists in INDEX-minimal; make it the (unsigned) visual contract.
+    _write_wp(tmp_project.wp_dir, "WP-001", "visual", [
+        "id: WP-001",
+        "title: Visual contract — dashboard",
+        "kind: contract",
+        "contract_type: visual",
+        "mockup: contracts/visual/dashboard.html",
+        "signed_off_at:",          # not signed off
+        "provenance: draft",
+    ])
+    result = run_tool(
+        "wpx-index", "flip-status", "--wp", "WP-001", "--to", "done",
+        *_common(tmp_project),
+    )
+    assert not result.ok, "unsigned visual contract must not reach done"
+    assert "signed off" in (result.error or "").lower()
+
+
+def test_visual_contract_wp_goes_done_when_signed_off(
+    tmp_project, seed_index, run_tool,
+):
+    """Once signed off, the visual-contract WP flips to done normally."""
+    seed_index("INDEX-minimal.md")
+    _write_wp(tmp_project.wp_dir, "WP-001", "visual", [
+        "id: WP-001",
+        "title: Visual contract — dashboard",
+        "kind: contract",
+        "contract_type: visual",
+        "mockup: contracts/visual/dashboard.html",
+        "signed_off_at: 2026-05-27T14:00:00Z",
+        "provenance: production-approved",
+    ])
+    result = run_tool(
+        "wpx-index", "flip-status", "--wp", "WP-001", "--to", "done",
+        *_common(tmp_project),
+    )
+    assert result.ok, f"signed-off contract should flip to done: {result.error}"
+
+
+def test_non_contract_wp_done_flip_is_unaffected(
+    tmp_project, seed_index, run_tool,
+):
+    """A normal WP with no WP file (or non-contract) flips to done untouched —
+    the gate is a no-op for anything that isn't a visual-contract WP."""
+    seed_index("INDEX-minimal.md")
+    result = run_tool(
+        "wpx-index", "flip-status", "--wp", "WP-002", "--to", "done",
+        *_common(tmp_project),
+    )
+    assert result.ok, f"ordinary WP done-flip must be unaffected: {result.error}"

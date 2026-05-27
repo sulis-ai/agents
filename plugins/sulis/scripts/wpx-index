@@ -26,12 +26,15 @@ from _wpxlib import (  # noqa: E402
     compute_wp_status,
     emit_error,
     emit_ok,
+    is_visual_contract_wp,
     parse_index_md,
     parse_md_table,
     paths_from_args,
+    read_frontmatter,
     resolve_wp_columns,
     validate_frontend_wp_visual_contract,
     validate_wp_status,
+    visual_contract_signed_off,
 )
 
 # Argparse choice lists for status flags derive from the one canonical set
@@ -153,7 +156,31 @@ def _find_wp_table(text: str) -> tuple[int, int, str]:
     raise ValueError("Could not find WP table in INDEX.md (no | ID | header)")
 
 
+def _enforce_visual_contract_signoff_on_done(args: argparse.Namespace) -> None:
+    """#45 / UXD-14 runtime gate — a visual-contract WP cannot be flipped to
+    `done` until its mockup is signed off. No-op for any other WP / status.
+
+    Because frontend WPs `dependsOn` the contract WP (Phase 1 write-time gate)
+    and list-ready only releases deps that are `done`, refusing this flip keeps
+    the frontend work undispatchable until the founder has signed off.
+    """
+    if args.to != "done":
+        return
+    paths = paths_from_args(args)
+    try:
+        wp_path = paths.wp_file(args.wp)
+    except (FileNotFoundError, ValueError):
+        return  # no WP file → not a checkable visual-contract WP
+    fm = read_frontmatter(wp_path)
+    if not is_visual_contract_wp(fm):
+        return
+    err = visual_contract_signed_off(fm)
+    if err is not None:
+        emit_error(f"{args.wp}: {err}")
+
+
 def cmd_flip_status(args: argparse.Namespace) -> None:
+    _enforce_visual_contract_signoff_on_done(args)
     text = _read_index(args)
     start, end, table_text = _find_wp_table(text)
     table = parse_md_table(table_text)

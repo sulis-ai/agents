@@ -458,6 +458,43 @@ def validate_frontend_wp_visual_contract(fm: dict) -> str | None:
     return None
 
 
+def is_visual_contract_wp(fm: dict) -> bool:
+    """True if a WP's frontmatter marks it as the visual-contract WP
+    (``kind: contract`` + ``contract_type: visual``)."""
+    return (
+        str(fm.get("kind", "")).strip().lower() == "contract"
+        and str(fm.get("contract_type", "")).strip().lower() == "visual"
+    )
+
+
+def visual_contract_signed_off(fm: dict) -> str | None:
+    """Return None if a visual-contract WP's frontmatter shows founder
+    sign-off, else an error message (the runtime half of the #45 / UXD-14
+    gate, wired at the visual-contract WP's done-transition).
+
+    Signed off = a non-empty ``signed_off_at`` timestamp AND
+    ``provenance: production-approved`` (UXD-13's strongest track — the founder
+    has seen the real-token mockup *rendered*, per L-13, not merely matched
+    token values). Until then the contract WP cannot reach ``done``, so the
+    frontend WPs that ``dependsOn`` it stay undispatchable.
+    """
+    signed_at = str(fm.get("signed_off_at", "") or "").strip()
+    provenance = str(fm.get("provenance", "") or "").strip().lower()
+    if not signed_at:
+        return (
+            "visual contract not signed off — `signed_off_at` is empty. The "
+            "founder must sign off the rendered real-token mockup before this "
+            "contract WP can reach `done` (UXD-14)."
+        )
+    if provenance != "production-approved":
+        return (
+            f"visual contract provenance is {provenance!r}, not "
+            f"'production-approved' — sign-off means the founder approved the "
+            f"rendered mockup, not just that token values matched (UXD-13/L-13)."
+        )
+    return None
+
+
 # ─── Repository contract (RC v0.3.0 profile model) — L-05 ───────────────
 #
 # Promoted from wpx-arrival-check._read_contract so the pipeline, the train,
