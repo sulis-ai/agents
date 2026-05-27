@@ -1,5 +1,23 @@
 # Sulis — Changelog
 
+## v0.65.0 — 2026-05-27
+
+**Minor — recon code-area pointers now surface subjects, not mentioners (closes #31).**
+
+The recon's `_locate_code_areas` returned files that *mention* the intent's backticked tokens in their content (CHANGELOGs, design docs) rather than the files those tokens *refer to* — bit at least three changes this session (actual seams missing from pointers, or buried among doc/SPEC noise).
+
+Two complementary heuristics in `plugins/sulis/scripts/_change_context.py`, both pure + deterministic:
+
+1. **Path-token recognition** — `_looks_like_path(token)`: true when a token has a directory separator OR ends in a known code/doc/config extension. When a path-token resolves to a real file under `repo_root`, the relative path is listed **first** in pointers as a direct reference; the grep is skipped for that token. Defended against path-traversal via `try/except ValueError` on `resolve().relative_to(repo_root)`.
+
+2. **Doc-file exclusion on symbol grep** — `_is_doc_file(path)`: true for `.md` / `.txt` / `.rst`. For non-path tokens (symbols like `cmd_finish`), `git grep -l -F` still runs but doc-extension matches are filtered out. The path-token branch is unaffected — a founder explicitly backticking `README.md` still gets it listed.
+
+Direct paths come first; combined cap at 5 unchanged. 11 new tests (6 pure-predicate + 5 integration via `_run`-monkeypatch); all 25 prior `test_change_context.py` tests untouched.
+
+Pre-merge review on PR #36 empirically verified red-then-green (9/11 new tests fail without the fix) and traced the path-traversal defence through `is_file()` + `resolve().relative_to()`.
+
+711 unit + integration tests green (+11 new pins); lint clean.
+
 ## v0.64.0 — 2026-05-27
 
 **Minor — GitHub-interaction polish bundle (closes #23 + #34).**
