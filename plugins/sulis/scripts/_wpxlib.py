@@ -389,6 +389,95 @@ def validate_wp_status(status: str) -> str | None:
     )
 
 
+# ─── Repository contract (RC v0.3.0 profile model) — L-05 ───────────────
+#
+# Promoted from wpx-arrival-check._read_contract so the pipeline, the train,
+# AND the arrival check all read the contract through ONE parser. A duplicated
+# parser drifting from its twin is exactly the bug class that produced L-02 —
+# arrival-check now delegates here. Stdlib-only, indentation-aware enough for
+# the well-formed contract shape.
+
+_RC_DEPLOYABLE_ARTIFACT_TYPE = "deployable-web-app"
+
+
+def _rc_strip_value(raw: str) -> str:
+    """Strip an inline `# comment` and surrounding whitespace from a value."""
+    return raw.split(" #", 1)[0].strip()
+
+
+def read_repo_contract(repo_root: Path) -> dict:
+    """Parse `.sulis/repo-contract.yml` into a normalised dict.
+
+    Returns {profile, contribution_model, artifacts: [{name, type}],
+    deploy_target}. A missing file returns the all-None/empty shape (callers
+    treat that as the strict deployable default).
+    """
+    result: dict = {
+        "profile": None, "contribution_model": None,
+        "artifacts": [], "deploy_target": None,
+    }
+    contract = Path(repo_root) / ".sulis" / "repo-contract.yml"
+    if not contract.is_file():
+        return result
+
+    in_artifacts = False
+    cur: dict | None = None
+    for line in contract.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        top_level = not line[:1].isspace()
+        if top_level:
+            in_artifacts = False
+            if stripped.startswith("profile:"):
+                result["profile"] = _rc_strip_value(stripped.split(":", 1)[1]) or None
+            elif stripped.startswith("contribution_model:"):
+                result["contribution_model"] = _rc_strip_value(stripped.split(":", 1)[1]) or None
+            elif stripped.startswith("deploy_target:"):
+                result["deploy_target"] = _rc_strip_value(stripped.split(":", 1)[1]) or None
+            elif stripped.startswith("artifacts:"):
+                in_artifacts = True
+            continue
+        if in_artifacts:
+            if stripped.startswith("- name:"):
+                if cur:
+                    result["artifacts"].append(cur)
+                cur = {"name": _rc_strip_value(stripped.split(":", 1)[1]), "type": None}
+            elif stripped.startswith("name:"):
+                if cur:
+                    result["artifacts"].append(cur)
+                cur = {"name": _rc_strip_value(stripped.split(":", 1)[1]), "type": None}
+            elif stripped.startswith("type:") and cur is not None:
+                cur["type"] = _rc_strip_value(stripped.split(":", 1)[1])
+    if cur:
+        result["artifacts"].append(cur)
+    return result
+
+
+def deploy_is_applicable(contract: dict) -> bool:
+    """True iff a deploy → health → smoke phase applies to this repo (L-05).
+
+    Only a ``deployable-web-app`` runs a staging deploy poll + health check.
+    A ``published-artifact`` (this marketplace) or ``internal-tool`` ships
+    without one; ``deploy_target: none`` is the explicit opt-out. An unset
+    profile defaults to deployable (strict — matches arrival-check's
+    backward-compat default). Multi-artifact → True iff ANY artifact is
+    deployable.
+    """
+    if (contract.get("deploy_target") or "").strip().lower() == "none":
+        return False
+    artifacts = contract.get("artifacts") or []
+    if artifacts:
+        return any(
+            (a.get("type") or "") == _RC_DEPLOYABLE_ARTIFACT_TYPE
+            for a in artifacts
+        )
+    profile = (contract.get("profile") or "").strip()
+    if not profile:
+        return True  # strict default = deployable-web-app
+    return profile == _RC_DEPLOYABLE_ARTIFACT_TYPE
+
+
 def find_section(text: str, heading: str) -> tuple[int, int]:
     """Find the byte range of a Markdown section by heading.
 
