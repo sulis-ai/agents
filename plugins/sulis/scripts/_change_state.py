@@ -273,7 +273,14 @@ def write_change_record(change_id: str, record: dict) -> Path | None:
 
 
 def read_change_record(change_id: str) -> dict | None:
-    """Read + parse ``change.json``. Returns the dict, or None if missing/corrupt."""
+    """Read + parse ``change.json``. Returns the dict, or None if missing/corrupt.
+
+    NOTE: this collapses two distinct states to ``None`` — "file absent"
+    (benign) and "file exists but is unreadable" (load-bearing for safety
+    checks). Callers that need to distinguish (e.g. ``sulis-change nuke``'s
+    #38 shipped-protection guard, which must refuse to fail open) should
+    use :func:`change_record_is_unreadable` instead of (or alongside) this.
+    """
     record_path = _change_record_path(change_id)
     if not record_path.exists():
         return None
@@ -282,6 +289,29 @@ def read_change_record(change_id: str) -> dict | None:
     except (OSError, json.JSONDecodeError) as exc:
         _emit_warning(f"could not read change record at {record_path}: {exc}")
         return None
+
+
+def change_record_is_unreadable(change_id: str) -> bool:
+    """Predicate: is the change record file present-but-unreadable? (#22)
+
+    Returns True iff the ``change.json`` file exists on disk AND
+    :func:`read_change_record` returns ``None`` (parse / OS failure).
+    Returns False both when the file is absent (legitimate "no record" —
+    common immediately after ``start`` before anything writes
+    ``change.json``) and when the file reads cleanly.
+
+    Used by safety checks (e.g. ``sulis-change nuke``'s #38 shipped-
+    protection guard) that need to distinguish "no record to consult"
+    from "record can't be consulted" — the former is benign; the latter
+    must refuse to fail open. Without this distinction, a corrupt
+    ``change.json`` causes the shipped check to silently pass and the
+    nuke proceeds, destroying exactly the audit trail #38 was designed
+    to preserve.
+    """
+    record_path = _change_record_path(change_id)
+    if not record_path.exists():
+        return False
+    return read_change_record(change_id) is None
 
 
 def mark_change_shipped(change_id: str, *, now: str | None = None) -> Path | None:

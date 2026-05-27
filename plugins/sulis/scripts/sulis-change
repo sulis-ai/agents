@@ -40,6 +40,7 @@ from _change_context import write_change_context  # noqa: E402
 from _change_state import (  # noqa: E402
     WORKFLOW_STAGES,
     change_dir,
+    change_record_is_unreadable,
     changes_base,
     is_valid_stage,
     list_all_changes,
@@ -870,6 +871,25 @@ def cmd_nuke(args: argparse.Namespace) -> None:
             f"Can't nuke the change you're currently on ({branch}) — "
             f"switch to dev first (`git checkout dev`), then re-run.",
             context={"current_branch": current_branch},
+        )
+
+    # Safety 1.4 (#22): refuse to nuke when the change record EXISTS but
+    # can't be read (corrupt JSON, truncated write, OS error). Without
+    # this guard, `read_change_record` returns None for BOTH 'file absent'
+    # (benign) and 'file unreadable' (load-bearing), so Safety 1.5's
+    # shipped check below would silently fail open on a corrupt record
+    # and the nuke would destroy the audit trail #38 was designed to
+    # preserve. --force still overrides (same refusal-by-default
+    # semantics as Safety 1.5).
+    if change_id and change_record_is_unreadable(change_id) and not args.force:
+        emit_error(
+            f"Refusing to nuke {branch}: the change record exists but "
+            f"can't be read (corrupt or unreadable). I can't verify "
+            f"this isn't a shipped change, so I won't risk destroying "
+            f"its audit trail. Run with `--force` if you really mean "
+            f"to remove it.",
+            context={"branch": branch, "change_id": change_id,
+                     "reason": "record_unreadable"},
         )
 
     # Safety 1.5 (#38): refuse to nuke a SHIPPED change unless --force. The
