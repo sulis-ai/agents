@@ -13,6 +13,9 @@ const STAGE_CLASS: Record<WorkflowStage, string> = {
   implement: styles.implement!,
   review: styles.review!,
   ship: styles.ship!,
+  // #38: shipped is a terminal stage past the six-stage workflow. Muted on
+  // purpose — the badge signals "archived", not "active step".
+  shipped: styles.shipped!,
 };
 
 // The six-stage workflow, in order. Used to render a stage as its
@@ -34,10 +37,12 @@ const STAGE_NAME: Record<WorkflowStage, string> = {
   implement: "Implement",
   review: "Review",
   ship: "Ship",
+  shipped: "Shipped",
 };
 
 /** "Review · 5/6" — title-cased stage name + its position in the six-stage
- *  workflow. Shared so the badge and the thread header read identically. */
+ *  workflow. Terminal stages (e.g. "Shipped") read as just the name — they
+ *  are *past* the workflow, not a position within it (#38). */
 export function stageLabel(stage: WorkflowStage): string {
   const i = STAGE_ORDER.indexOf(stage);
   const name = STAGE_NAME[stage] ?? stage;

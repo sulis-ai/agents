@@ -393,3 +393,38 @@ def test_start_does_not_pollute_real_home(local_git_repo, run_tool, monkeypatch)
     # ... and NOTHING was written under the (fake) real home's ~/.sulis.
     assert not (fake_home / ".sulis").exists(), \
         "start polluted the real home's ~/.sulis despite SULIS_STATE_DIR"
+
+
+# ─── #38: mark-shipped subcommand (the gh-PR ship-skill seam) ──────────────
+
+
+def test_mark_shipped_via_handle_flips_stage(local_git_repo, run_tool):
+    """The mark-shipped subcommand is what the change skill calls AFTER
+    `gh pr merge` succeeds. It must resolve the change via --handle, flip
+    stage='shipped', and persist shipped_at on the change record so the
+    cockpit's 'Shipped' section can read it AND cmd_nuke's protection
+    fires."""
+    start = run_tool("sulis-change", "start",
+                     "--repo-root", str(local_git_repo),
+                     "--slug", "mark-shipped-test", "--primitive", "feat")
+    assert start.ok
+    handle = start.data["handle"]
+
+    result = run_tool("sulis-change", "mark-shipped",
+                      "--handle", handle,
+                      "--repo-root", str(local_git_repo))
+    assert result.ok, f"mark-shipped failed: {result.error}; stderr={result.stderr}"
+    assert result.data["stage"] == "shipped"
+    assert result.data["shipped_at"]  # non-empty ISO timestamp
+
+
+def test_mark_shipped_requires_an_identifier(local_git_repo, run_tool):
+    """Without --change-id / --handle / SULIS_CHANGE_ID, mark-shipped errors
+    cleanly (no destructive default)."""
+    result = run_tool(
+        "sulis-change", "mark-shipped",
+        "--repo-root", str(local_git_repo),
+        env={"PATH": os.environ.get("PATH", "")},  # no SULIS_CHANGE_ID
+    )
+    assert not result.ok
+    assert "change-id" in (result.error or "") or "handle" in (result.error or "")
