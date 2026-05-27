@@ -1,5 +1,21 @@
 # Sulis — Changelog
 
+## v0.64.0 — 2026-05-27
+
+**Minor — GitHub-interaction polish bundle (closes #23 + #34).**
+
+Two small GitHub-interaction edge cases bundled because they touch the same surface and both had bitten the session multiple times.
+
+**#23 — `sulis-lessons capture` dedup query.** `gh issue list --label lesson --state open` uses GitHub's eventually-consistent REST filter index — a freshly-created issue may not appear for ~seconds. Swap to `gh issue list --search 'label:lesson is:open'` which uses the immediate GraphQL search backend. The dedup scan now sees the new issue in time. New integration test pins the new `--search` argv via a `--search`-only stub that falls through if the legacy `--label` form is ever restored (TDD-red-then-green proven by the pre-merge reviewer empirically).
+
+**#34 — `/sulis:change ship` PR-body close-trailer rule.** Added a MUST block to ship subcommand step 3 with accepted/forbidden close-syntax tables. GitHub's auto-close-on-merge needs the keyword per issue (`Closes #N, closes #M`); chained `Closes #N and #M` only closes the first issue. Bit PR #33 (#27 closed; #28 didn't). Pure SKILL.md prose.
+
+**Dog-food validation:** the PR body for this very bundle used `Closes #23, closes #34` — and BOTH auto-closed on merge. Fix #34 validated empirically by the merge that shipped it.
+
+The new step 4.5 review gate (#30) ran on PR #35 and verified both fixes empirically — including running the new `--search` query against the real repo to confirm shape equivalence, and reverting the production fix to confirm the new test is genuinely red-then-green. Highest-quality review pass of the session.
+
+700 unit + integration tests green (+1 new pin); lint clean.
+
 ## v0.63.0 — 2026-05-27
 
 **Minor — harden the spawned Sulis's change-context greeting discipline (closes #27 + #28).**
