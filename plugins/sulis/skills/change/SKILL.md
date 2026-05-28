@@ -170,9 +170,13 @@ three sources and merge them:
    ```
 
 2. **Local session state** — `~/.sulis/changes/*/session.json` (carries
-   `pid`, `terminal_app_used`, `spawned_at`). A session looks live if its
-   `session.json` exists and the recorded `pid` is still running. Read each
-   with the Read tool; check liveness with `kill -0 <pid> 2>/dev/null`.
+   `pid`, `pid_kind`, `tty`, `terminal_app_used`, `spawned_at`).
+   A session is live iff `session_is_live(change_id)` from
+   `_change_state.py` returns True — the helper dispatches on
+   `pid_kind` (macOS sessions check the tty; Linux/headless check
+   the pid via `os.kill(pid, 0)`). A bare `kill -0 <pid>` would
+   false-negative on macOS (the launcher pid exits within ~1s; the
+   tty is the real handle).
 
 3. **Branches** — `git branch --list 'change/*'` (the ground truth for
    what exists, even without local session state — e.g. a teammate's
@@ -211,9 +215,10 @@ say so plainly and offer `list`:
 
 **3. Branch on liveness.**
 
-- **Session looks live** (`session.json` present, `pid` still running via
-  `kill -0`): point the founder at the existing terminal — do NOT spawn a
-  second one (MUC-F5: don't act on stale belief, and don't duplicate):
+- **Session looks live** (`session_is_live(change_id)` returns True
+  — the helper checks the right handle for the platform): point the
+  founder at the existing terminal — do NOT spawn a second one
+  (MUC-F5: don't act on stale belief, and don't duplicate):
 
   > *"**fix the login bug** (`CH-01HQ8X`) is already open in another
   > terminal (started 12 min ago). Switch to that window to pick up where
@@ -566,9 +571,12 @@ them the dashboard updates on its own as work progresses, and point them at
   `git branch`. If you find yourself reaching for a database, you've drifted
   from the contract.
 - **A `session.json` is not proof a terminal is live.** The recorded `pid`
-  can be dead (terminal closed, machine rebooted). Check `kill -0 <pid>`
-  before claiming a workspace is open, and before deciding whether `focus`
-  should re-spawn. (MUC-F2 / MUC-F5)
+  can be dead (terminal closed, machine rebooted). On macOS the launcher
+  pid exits within ~1s — `pid` is `null` and the real handle is the
+  recorded `tty`. Always use `session_is_live(change_id)` from
+  `_change_state.py`; it dispatches on `pid_kind` to the right check.
+  Never inline `kill -0 <pid>` — that false-negatives on macOS.
+  (MUC-F2 / MUC-F5)
 - **`rebase` uses merge, not rebase** (the name is the founder's word for
   "catch up", not the git operation). Merge preserves SHAs so in-flight WP
   worktrees stay valid (CW-04). Do not "fix" this to a real git rebase.

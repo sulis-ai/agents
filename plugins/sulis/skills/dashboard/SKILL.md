@@ -101,9 +101,24 @@ If the list is empty, say so plainly and point at the next step:
 record is the index; cross-check it against reality so the dashboard never
 lies:
 
-- **Workspace open?** Read `{change_dir}/session.json` (if present) for its
-  `pid`, then `kill -0 <pid> 2>/dev/null`. Alive → "workspace open"; dead or
-  no session → "no live workspace".
+- **Workspace open?** Call `session_is_live(change_id)` from
+  `_change_state.py`. The helper dispatches on `pid_kind`: macOS
+  sessions (`pid_kind="session"`) check the recorded `tty` device
+  file + active processes on it; Linux/headless sessions
+  (`pid_kind="launcher"`) check `os.kill(pid, 0)`. A bare
+  `kill -0 <pid>` would false-negative on the macOS path (the
+  launcher pid exits within ~1s; the tty is the real liveness
+  handle). Invoke via:
+
+  ```bash
+  python3 -c "
+  import sys; sys.path.insert(0, '$SCRIPTS_DIR')
+  from _change_state import session_is_live
+  print('1' if session_is_live('<change_id>') else '0')
+  "
+  ```
+
+  Output `1` → "workspace open"; `0` → "no live workspace".
 - **Branch still there?** `git branch --list <branch>` — a change whose
   branch is gone has almost certainly shipped or been nuked.
 - **Worktree still there?** `Path(worktree_path).exists()`.

@@ -314,6 +314,69 @@ def change_record_is_unreadable(change_id: str) -> bool:
     return read_change_record(change_id) is None
 
 
+def session_is_live(change_id: str) -> bool:
+    """Honest liveness check for a change's spawned-terminal session.
+
+    The v0.36.0 launcher contract is two-shape: macOS sessions record
+    ``pid=None, pid_kind="session", tty="/dev/ttys..."`` because the
+    osascript helper pid exits within ~1s — the real liveness handle is
+    the spawned tab's controlling tty. Linux + headless paths use
+    ``pid=<int>, pid_kind="launcher", tty=None``. A bare ``kill -0 <pid>``
+    works for the latter but raises TypeError on a None pid → every
+    macOS session was incorrectly reported as "not live" (TaskCreate #32).
+
+    This helper dispatches on ``pid_kind``:
+
+    - ``"session"`` → check the tty's device file exists AND has at
+      least one active process (``ps -t <tty>`` non-empty). Both checks
+      needed because the tty device persists briefly after the
+      terminal closes.
+    - ``"launcher"`` → check ``os.kill(pid, 0)`` succeeds. Catches the
+      ``ProcessLookupError`` for dead pids.
+    - missing session.json, malformed json, no usable signal → False.
+
+    Returns True iff the session is genuinely live (a real terminal is
+    open on the founder's machine).
+    """
+    session_path = change_dir(change_id) / "session.json"
+    if not session_path.exists():
+        return False
+    try:
+        session = json.loads(session_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    pid_kind = str(session.get("pid_kind") or "").strip().lower()
+    if pid_kind == "session":
+        tty = session.get("tty")
+        if not tty:
+            return False
+        if not Path(tty).exists():
+            return False
+        # ps -t <tty> lists processes attached to the tty. Empty output
+        # means the device persists but no shell is using it (terminal
+        # already closed; tty hasn't been GC'd yet).
+        import subprocess
+        try:
+            proc = subprocess.run(  # noqa: S603
+                ["ps", "-t", tty, "-o", "pid="],
+                capture_output=True, text=True, timeout=2,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            return False
+        return bool(proc.stdout.strip())
+    if pid_kind == "launcher":
+        pid = session.get("pid")
+        if not isinstance(pid, int) or pid <= 0:
+            return False
+        try:
+            os.kill(pid, 0)
+        except (ProcessLookupError, PermissionError, OSError):
+            return False
+        return True
+    # Unknown pid_kind / missing field → no usable signal → not live.
+    return False
+
+
 def mark_change_shipped(change_id: str, *, now: str | None = None) -> Path | None:
     """Mark a change as shipped (#38): flip stage→'shipped', record shipped_at.
 
