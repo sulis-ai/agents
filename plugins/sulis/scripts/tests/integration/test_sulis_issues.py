@@ -212,3 +212,111 @@ def test_capture_with_unknown_descriptor_errors(tmp_path, run_tool, mock_gh):
     assert "lesson" in err
     assert "feedback" in err
 
+
+# ─── list (the resolve-lessons read-path, #52) ───────────────────────────────
+
+
+def test_list_returns_open_lessons_with_bodies_and_disposition(
+    tmp_path, run_tool, mock_gh,
+):
+    """The orchestrator needs number + title + body + parsed disposition.
+    Disposition is read back out of the lesson's provenance footer."""
+    listing = json.dumps([
+        {"number": 53, "title": "lesson: git stash leaks across worktrees",
+         "body": "Body text.\n\n_Captured as a lesson (disposition: TASK; "
+                 "L-AJ-STASH) by /sulis:capture-lessons._",
+         "labels": [{"name": "lesson"}], "url": "https://x/issues/53"},
+        {"number": 30, "title": "lesson: SQLite global change store",
+         "body": "Design-heavy.\n\n_Captured (disposition: SEA) ._",
+         "labels": [{"name": "lesson"}, {"name": "enhancement"}],
+         "url": "https://x/issues/30"},
+    ])
+    mock_gh([
+        {"match": "auth status", "stdout": "Logged in"},
+        {"match": "label:lesson is:open", "stdout": listing},
+    ])
+    result = run_tool("sulis-issues", "list", "--descriptor", "lesson",
+                      "--repo", "o/r")
+    assert result.ok, f"list failed: {result.error}"
+    data = result.data
+    assert data["degraded"] is False
+    assert data["count"] == 2
+    by_num = {i["number"]: i for i in data["issues"]}
+    assert by_num[53]["disposition"] == "task"
+    assert by_num[30]["disposition"] == "sea"
+    assert "git stash" in by_num[53]["title"]
+    assert by_num[53]["body"]  # full body present for drafting + prediction
+    assert "lesson" in by_num[30]["labels"]
+
+
+def test_list_degrades_when_gh_unavailable(tmp_path, run_tool, mock_gh):
+    mock_gh([{"match": "auth status", "stderr": "not logged in",
+              "exit_code": 1}])
+    result = run_tool("sulis-issues", "list", "--descriptor", "lesson")
+    assert result.ok
+    assert result.data["degraded"] is True
+    assert result.data["issues"] == []
+
+
+def test_list_empty_backlog_returns_zero(tmp_path, run_tool, mock_gh):
+    mock_gh([
+        {"match": "auth status", "stdout": "Logged in"},
+        {"match": "label:lesson is:open", "stdout": "[]"},
+    ])
+    result = run_tool("sulis-issues", "list", "--descriptor", "lesson")
+    assert result.ok
+    assert result.data["count"] == 0
+    assert result.data["issues"] == []
+
+
+def test_list_disposition_absent_is_empty_string(tmp_path, run_tool, mock_gh):
+    """A lesson body with no parseable disposition → '' (the orchestrator
+    treats unknown-disposition as needs-founder-triage, never auto-runs)."""
+    listing = json.dumps([
+        {"number": 99, "title": "lesson: no footer", "body": "just text",
+         "labels": [{"name": "lesson"}], "url": "https://x/issues/99"},
+    ])
+    mock_gh([
+        {"match": "auth status", "stdout": "Logged in"},
+        {"match": "label:lesson is:open", "stdout": listing},
+    ])
+    result = run_tool("sulis-issues", "list", "--descriptor", "lesson")
+    assert result.ok
+    assert result.data["issues"][0]["disposition"] == ""
+
+
+def test_list_unknown_descriptor_errors(tmp_path, run_tool, mock_gh):
+    mock_gh([])
+    result = run_tool("sulis-issues", "list", "--descriptor", "nonsense")
+    assert not result.ok
+    assert "nonsense" in (result.error or "").lower()
+
+
+def test_list_disposition_takes_footer_not_prose_mention(
+    tmp_path, run_tool, mock_gh,
+):
+    """#54 review: a body that mentions 'disposition:' in PROSE before the
+    real footer must parse the FOOTER's value, not the prose word.
+    First-match would return 'in' (from 'the disposition: in the design
+    phase'); last-match correctly returns 'task' (the footer)."""
+    body = (
+        "We debated the disposition: in the design phase the team wasn't "
+        "sure. Suggested fix: edit `_anonymiser.py`.\n\n"
+        "_Captured as a lesson (disposition: TASK; L-99) by "
+        "/sulis:capture-lessons._"
+    )
+    listing = json.dumps([
+        {"number": 77, "title": "lesson: tricky body", "body": body,
+         "labels": [{"name": "lesson"}], "url": "https://x/issues/77"},
+    ])
+    mock_gh([
+        {"match": "auth status", "stdout": "Logged in"},
+        {"match": "label:lesson is:open", "stdout": listing},
+    ])
+    result = run_tool("sulis-issues", "list", "--descriptor", "lesson")
+    assert result.ok
+    assert result.data["issues"][0]["disposition"] == "task", (
+        "parsed the prose 'disposition:' mention instead of the footer — "
+        "the first-match bug the #54 review caught"
+    )
+
