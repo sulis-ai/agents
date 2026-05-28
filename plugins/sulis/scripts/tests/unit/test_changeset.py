@@ -222,6 +222,39 @@ def test_write_read_changeset_round_trip(tmp_path):
     assert fix["summary"].strip() == "Fix the journal step guard."
 
 
+def test_write_read_changeset_round_trip_accepts_str_dir(tmp_path):
+    """A plain `str` dir round-trips through write + read (WP-009 / CR-BATCH-01).
+
+    The ship flow's step 4.7 passes the plain string `'.changesets'` (not a
+    `Path`). Pre-fix, `write_changeset` called `.mkdir()` on the `str` and
+    `read_changesets` called `.is_dir()` on it, both raising `AttributeError`,
+    so the producer crashed and `dev` accumulated no changesets. The keystone
+    now coerces `Path(changesets_dir)` at entry of both functions; this test
+    pins the `str` path so the regression cannot return. Mirrors
+    `test_write_read_changeset_round_trip`; the only difference is the dir
+    argument is a `str`, not a `Path`.
+    """
+    str_dir = str(tmp_path / ".changesets")
+    t = datetime(2026, 5, 28, 17, 30, 0, tzinfo=timezone.utc)
+    path = cs.write_changeset(
+        str_dir, change_id=_CHANGE_ID, primitive="fix", tier="patch",
+        touches_plugin=True, summary="Round-trip a str dir.",
+        slug="release-train", created_at=t,
+    )
+    assert path.exists()
+
+    # Read back from the SAME str dir — exercises read_changesets' coercion too.
+    records = cs.read_changesets(str_dir)
+    assert len(records) == 1
+    record = records[0]
+    assert record["change_id"] == _CHANGE_ID
+    assert record["primitive"] == "fix"
+    assert record["tier"] == "patch"
+    assert record["touches_plugin"] is True
+    assert record["summary"].strip() == "Round-trip a str dir."
+    assert record["created_at"] == "2026-05-28T17:30:00Z"
+
+
 def test_write_changeset_honours_human_slug(tmp_path):
     """WP-002 passes the change's human slug → it appears in the filename
     (the ADR-005 worked-example shape, not the raw change_id)."""

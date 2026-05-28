@@ -28,12 +28,16 @@ jobs:
   release:
     # Loop-guard: skip the bot's own release commits (prefix matches the commit
     # message assembled in the "Commit, tag, push" step below, exactly).
-    # The value is single-quoted at the YAML level because the `: ` inside the
+    # The whole value is a single-quoted YAML scalar because the `: ` inside the
     # string literal would otherwise be read by YAML as a nested mapping. The
-    # expression's own string literal uses double quotes so the wrapping is
-    # unambiguous. The prefix "release: sulis" matches the commit message in the
-    # final "Commit, tag, push" step exactly — keep the two in lockstep.
-    if: '${{ !startsWith(github.event.head_commit.message, "release: sulis") }}'
+    # expression's own string literal is SINGLE-quoted too — GitHub Actions
+    # expressions accept single-quoted literals only (a double-quoted literal is
+    # rejected at expression evaluation while still passing YAML lint). Inside a
+    # single-quoted YAML scalar each inner `'` is doubled, so ''release: sulis''
+    # renders as the expression literal 'release: sulis'. The prefix
+    # 'release: sulis' matches the commit message in the final "Commit, tag,
+    # push" step exactly — keep the two in lockstep.
+    if: '${{ !startsWith(github.event.head_commit.message, ''release: sulis'') }}'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
