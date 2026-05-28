@@ -1,0 +1,329 @@
+diff --git a/plugins/sulis/scripts/_wpxlib.py b/plugins/sulis/scripts/_wpxlib.py
+index 171bd3a..7782198 100644
+--- a/plugins/sulis/scripts/_wpxlib.py
++++ b/plugins/sulis/scripts/_wpxlib.py
+@@ -662,6 +662,29 @@ def deploy_is_applicable(contract: dict) -> bool:
+     return profile == _RC_DEPLOYABLE_ARTIFACT_TYPE
+ 
+ 
++# ─── Free-plan branch-protection predicate (HD-003/HD-004) ──────────────────
++#
++# GitHub's protection API returns this body (on stderr via `gh`) when a repo
++# is private on the free plan — branch protection is unavailable ON THE PLAN,
++# not merely unconfigured. Stable enough to match on; if GitHub changes the
++# wording the tests pin the expectation and the failure is loud (HD-003).
++#
++# Promoted here (CLAUDE.md #2 extract-now) once a SECOND caller appeared:
++# wpx-arrival-check's RC-02 check (HD-003) and wpx-preflight's
++# protection-status subcommand (HD-004) both classify the same 403. One home
++# so the free-plan vs unconfigured distinction can never drift between the
++# arrival-check surface and the per-run/per-ship surface.
++
++_FREEPLAN_403_MARKER = "upgrade to github pro"
++
++
++def is_freeplan_protection_403(rc: int, stderr: str) -> bool:
++    """True when the branch-protection API was unavailable because the repo is
++    private on the free plan (403 'Upgrade to GitHub Pro…'), as opposed to a
++    genuine missing/misconfigured protection on a protection-capable repo."""
++    return rc != 0 and _FREEPLAN_403_MARKER in (stderr or "").lower()
++
++
+ def find_section(text: str, heading: str) -> tuple[int, int]:
+     """Find the byte range of a Markdown section by heading.
+ 
+diff --git a/plugins/sulis/scripts/tests/unit/test_wpx_preflight.py b/plugins/sulis/scripts/tests/unit/test_wpx_preflight.py
+index 08a7a67..68f5eb5 100644
+--- a/plugins/sulis/scripts/tests/unit/test_wpx_preflight.py
++++ b/plugins/sulis/scripts/tests/unit/test_wpx_preflight.py
+@@ -110,3 +110,64 @@ def test_preflight_pending_in_flight_is_ok_with_warning(tmp_path, run_tool, mock
+     assert result.returncode == 0
+     assert result.json["errors"] == []
+     assert result.json["warnings"], "pending (in-flight) should surface an advisory warning"
++
++
++# ─── protection-status (HD-004 / WP-004) ─────────────────────────────────────
++#
++# `wpx-preflight protection-status --repo <org/repo> --branch <branch=dev>`
++# probes branch protection and reports a CLOSED three-state enum. It is
++# INFORMATIONAL — always ok:true, never a blocker (the skills own the
++# warn-once-per-invocation semantics; the script only classifies):
++#
++#   protected              — protection API 200 (gating in force)
++#   unavailable-free-plan  — 403 with the "Upgrade to GitHub Pro…" marker
++#                            (private repo on the free plan — reuses WP-002's
++#                            free-plan predicate)
++#   unconfigured           — rc!=0 WITHOUT the free-plan marker (the repo is
++#                            protection-capable but protection is not set)
++#
++# The protection endpoint is `repos/<repo>/branches/<branch>/protection`, so
++# the match string `branches/dev/protection` selects it.
++
++
++def test_protection_status_freeplan_403_reports_unprotected(tmp_path, run_tool, mock_gh):
++    """A free-plan 403 ('Upgrade to GitHub Pro…') → ok:true (informational,
++    never blocks) and protection == 'unavailable-free-plan'."""
++    mock_gh([{"match": "branches/dev/protection", "exit_code": 1,
++        "stderr": ("gh: Upgrade to GitHub Pro or make this repository public "
++                   "to enable this feature. (HTTP 403)")}])
++
++    result = run_tool("wpx-preflight", "protection-status",
++                      "--repo", "sulis-ai/agents", "--branch", "dev")
++
++    assert result.json["ok"] is True            # informational, never blocks
++    assert result.returncode == 0
++    assert result.json["data"]["protection"] == "unavailable-free-plan"
++
++
++def test_protection_status_protected_reports_protected(tmp_path, run_tool, mock_gh):
++    """A 200 with required status checks → protection == 'protected'."""
++    mock_gh([{"match": "branches/dev/protection", "stdout": json.dumps({
++        "required_status_checks": {"contexts": ["branch-ci"]}})}])
++
++    result = run_tool("wpx-preflight", "protection-status",
++                      "--repo", "sulis-ai/agents", "--branch", "dev")
++
++    assert result.json["ok"] is True
++    assert result.returncode == 0
++    assert result.json["data"]["protection"] == "protected"
++
++
++def test_protection_status_genuine_missing_reports_unconfigured(tmp_path, run_tool, mock_gh):
++    """rc!=0 but NOT the free-plan body (e.g. 404) → 'unconfigured' — a
++    protection-capable repo with protection unset, distinct from the free-plan
++    case (no GitHub-Pro upsell to surface)."""
++    mock_gh([{"match": "branches/dev/protection", "exit_code": 1,
++              "stderr": "gh: Not Found (HTTP 404)"}])
++
++    result = run_tool("wpx-preflight", "protection-status",
++                      "--repo", "sulis-ai/agents", "--branch", "dev")
++
++    assert result.json["ok"] is True
++    assert result.returncode == 0
++    assert result.json["data"]["protection"] == "unconfigured"
+diff --git a/plugins/sulis/scripts/wpx-arrival-check b/plugins/sulis/scripts/wpx-arrival-check
+index 28491b3..e47420e 100755
+--- a/plugins/sulis/scripts/wpx-arrival-check
++++ b/plugins/sulis/scripts/wpx-arrival-check
+@@ -48,7 +48,10 @@ import sys
+ from pathlib import Path
+ 
+ sys.path.insert(0, str(Path(__file__).parent))
+-from _wpxlib import read_repo_contract  # noqa: E402
++from _wpxlib import (  # noqa: E402
++    is_freeplan_protection_403,
++    read_repo_contract,
++)
+ 
+ VALID_PROFILES = {"deployable-web-app", "published-artifact", "internal-tool"}
+ VALID_MODELS = {"team", "solo"}
+@@ -129,18 +132,11 @@ def _check_rc01_branches(repo: str, rep: _Report) -> None:
+             rep.error("RC-01", f"{branch} branch exists", "missing", "present")
+ 
+ 
+-# GitHub's protection API returns this body (on stderr via `gh`) when a repo
+-# is private on the free plan — branch protection is unavailable on the plan,
+-# not merely unconfigured. Stable enough to match on; if GitHub changes the
+-# wording the test pins the expectation and the failure is loud (HD-003).
+-_FREEPLAN_403_MARKER = "upgrade to github pro"
+-
+-
+-def _is_freeplan_protection_403(rc: int, stderr: str) -> bool:
+-    """True when the protection API was unavailable because the repo is
+-    private on the free plan (403 'Upgrade to GitHub Pro…'), as opposed to a
+-    genuine missing/misconfigured protection on a protection-capable repo."""
+-    return rc != 0 and _FREEPLAN_403_MARKER in (stderr or "").lower()
++# The free-plan branch-protection predicate (`is_freeplan_protection_403`) +
++# its marker were promoted to _wpxlib (CLAUDE.md #2 extract-now) once
++# wpx-preflight's protection-status subcommand became a second caller (HD-004).
++# Imported above so the arrival-check surface and the per-run/per-ship surface
++# classify the same 403 identically.
+ 
+ 
+ def _check_rc02_protections(repo: str, rep: _Report) -> None:
+@@ -155,7 +151,7 @@ def _check_rc02_protections(repo: str, rep: _Report) -> None:
+     error. A genuine missing protection on a protection-capable repo (any
+     other non-zero rc) keeps the exact RC-02 error semantics."""
+     rc, out, err = _gh(["api", f"repos/{repo}/branches/dev/protection"])
+-    if _is_freeplan_protection_403(rc, err):
++    if is_freeplan_protection_403(rc, err):
+         rep.warn(
+             "RC-02", "dev branch protection unavailable on free plan",
+             "private repo on free plan (protection API 403)",
+@@ -178,7 +174,7 @@ def _check_rc02_protections(repo: str, rep: _Report) -> None:
+                 "absent — it is the queue's merge_group gate (ADR-003)",
+             )
+     rc, _out, err = _gh(["api", f"repos/{repo}/branches/main/protection"])
+-    if _is_freeplan_protection_403(rc, err):
++    if is_freeplan_protection_403(rc, err):
+         pass  # one RC-02 free-plan warning is enough; don't double-warn on main
+     elif rc != 0:
+         rep.error("RC-02", "main branch protected", "no protection", "protected")
+diff --git a/plugins/sulis/scripts/wpx-preflight b/plugins/sulis/scripts/wpx-preflight
+index 57edd30..d76d520 100755
+--- a/plugins/sulis/scripts/wpx-preflight
++++ b/plugins/sulis/scripts/wpx-preflight
+@@ -53,11 +53,15 @@ from __future__ import annotations
+ 
+ import argparse
+ import json
++import subprocess
+ import sys
+ from pathlib import Path
+ 
+ sys.path.insert(0, str(Path(__file__).parent))
+-from _wpxlib import _preflight_ci_conclusion  # noqa: E402
++from _wpxlib import (  # noqa: E402
++    _preflight_ci_conclusion,
++    is_freeplan_protection_403,
++)
+ 
+ 
+ def _emit(ok: bool, errors: list[dict], warnings: list[dict]) -> int:
+@@ -112,6 +116,36 @@ def _dev_clean(repo: str, branch: str) -> int:
+     return _emit(ok=True, errors=[], warnings=[])
+ 
+ 
++def _protection_status(repo: str, branch: str) -> int:
++    """Probe `branch` protection and report a CLOSED three-state enum. Always
++    `ok:true` — INFORMATIONAL, never a blocker (the skills own the
++    warn-once-per-invocation semantics; this only classifies):
++
++        protected              — protection API 200 (gating in force)
++        unavailable-free-plan  — 403 'Upgrade to GitHub Pro…' (private repo on
++                                 the free plan — protection unavailable ON the
++                                 plan, reusing WP-002's free-plan predicate)
++        unconfigured           — rc!=0 WITHOUT the free-plan marker (the repo
++                                 is protection-capable but protection is unset)
++
++    The free-plan vs unconfigured distinction is what keeps the warning honest:
++    only the free-plan case warrants the 'upgrade or make public' nudge; an
++    unconfigured-but-capable repo is a different fix.
++    """
++    proc = subprocess.run(
++        ["gh", "api", f"repos/{repo}/branches/{branch}/protection"],
++        capture_output=True, text=True,
++    )
++    if proc.returncode == 0:
++        protection = "protected"
++    elif is_freeplan_protection_403(proc.returncode, proc.stderr):
++        protection = "unavailable-free-plan"
++    else:
++        protection = "unconfigured"
++    print(json.dumps({"ok": True, "data": {"protection": protection}}))
++    return 0
++
++
+ def main() -> int:
+     parser = argparse.ArgumentParser(
+         description="Pre-flight checks for /sulis:run-all")
+@@ -124,10 +158,20 @@ def main() -> int:
+     dc.add_argument("--branch", default="dev",
+                     help="base branch to read CI for (default: dev)")
+ 
++    ps = sub.add_parser(
++        "protection-status",
++        help="Is branch protection in force, unavailable on a free plan, or "
++             "unconfigured? Informational — never blocks.")
++    ps.add_argument("--repo", required=True, help="owner/name")
++    ps.add_argument("--branch", default="dev",
++                    help="branch to probe protection for (default: dev)")
++
+     args = parser.parse_args()
+ 
+     if args.command == "dev-clean":
+         return _dev_clean(args.repo, args.branch)
++    if args.command == "protection-status":
++        return _protection_status(args.repo, args.branch)
+ 
+     parser.error(f"unknown command: {args.command}")  # pragma: no cover
+     return 2  # pragma: no cover
+diff --git a/plugins/sulis/skills/change/SKILL.md b/plugins/sulis/skills/change/SKILL.md
+index c970476..e4c982b 100644
+--- a/plugins/sulis/skills/change/SKILL.md
++++ b/plugins/sulis/skills/change/SKILL.md
+@@ -325,6 +325,40 @@ issue near the bottom, separated per rule above.
+ gh pr checks change/fix-login-bug --watch
+ ```
+ 
++Alongside the wait — ONCE per ship — probe branch protection on the
++landing line (`dev`). This is purely informational: it NEVER gates the
++ship, no matter what it returns. The PR, the branch-ci wait, and the
++review gate are all unchanged.
++
++```bash
++PROTECTION=$("$SCRIPTS_DIR/wpx-preflight" protection-status \
++  --repo <org/repo> --branch dev)
++```
++
++Read `data.protection` from the JSON it emits:
++
++- `protected` → say nothing. Protection is in force; the automated
++  checks gate the merge. (Public / properly-protected repos behave
++  exactly as before — no notice.)
++- `unconfigured` → say nothing here. The repo CAN enforce gating but
++  hasn't set it up; that is a one-time repo-setup matter the arrival
++  check already surfaces, not a per-ship notice.
++- `unavailable-free-plan` → emit the one-time warning below (founder-
++  English — no rule codes, no HTTP status, no script or command
++  names), THEN PROCEED with the ship regardless. Show it at most once
++  per ship:
++
++  > *"Heads-up before this lands: branch protection isn't available on
++  > your plan, so the automated checks can't block a manual merge —
++  > only merges I route through Sulis are checked before landing. This
++  > ship goes through the checks as normal; I'm just flagging that a
++  > merge by hand or a direct push to the shared line wouldn't be
++  > stopped if it were broken. To close that gap you can make the repo
++  > public or move to a paid plan. Carrying on with the ship now."*
++
++  The notice never blocks: the ship continues to the checks + review
++  gate exactly as it would on a protected repo.
++
+ - **Checks pass** → proceed to step 4.5.
+ - **Checks fail** → STOP. Do NOT merge. Surface the failure in plain
+   English with the next step (Rule 5):
+diff --git a/plugins/sulis/skills/run-all/SKILL.md b/plugins/sulis/skills/run-all/SKILL.md
+index d7bf8a8..451f86b 100644
+--- a/plugins/sulis/skills/run-all/SKILL.md
++++ b/plugins/sulis/skills/run-all/SKILL.md
+@@ -172,6 +172,39 @@ loop:
+          the pre-flight reads recorded state, it never waits; an
+          absence of evidence is not a red.
+ 
++       After the dev-clean gate passes (ok:true), and BEFORE reading
++       the INDEX, probe branch protection on the base branch ONCE per
++       run. This is purely informational — it NEVER blocks the run,
++       no matter what it returns:
++
++           PROTECTION=$("$WPX_DIR/wpx-preflight" protection-status \
++             --repo <org/repo> --branch "$BASE_BRANCH")
++
++       Read `data.protection` from the JSON it emits:
++
++       - `protected` → say nothing. Protection is in force; the
++         automated checks gate every merge. (Public / properly-
++         protected repos behave byte-for-byte as before — no notice.)
++       - `unconfigured` → say nothing here. The repo CAN enforce
++         gating but hasn't set it up; that is a one-time repo-setup
++         matter the arrival check already surfaces, not a per-run
++         notice.
++       - `unavailable-free-plan` → emit the one-time warning below
++         (founder-English — no rule codes, no HTTP status, no script
++         or command names), THEN PROCEED with the run regardless. Show
++         it at most once per run:
++
++             "Heads-up before I start: branch protection isn't
++              available on your plan, so the automated checks can't
++              block a manual merge — only merges I route through Sulis
++              are checked before landing. If you merge by hand or push
++              straight to the shared line, nothing stops a broken
++              change from landing. To close that gap you can make the
++              repo public or move to a paid plan. I'll carry on now."
++
++         This is the awareness notice, not a gate: the run continues
++         exactly as it would on a protected repo.
++
+     1. Read .architecture/{project}/work-packages/INDEX.md.
+ 
+     2. Read INDEX header for max_parallel (default 3 if absent).

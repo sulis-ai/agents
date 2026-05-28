@@ -48,7 +48,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from _wpxlib import read_repo_contract  # noqa: E402
+from _wpxlib import (  # noqa: E402
+    is_freeplan_protection_403,
+    read_repo_contract,
+)
 
 VALID_PROFILES = {"deployable-web-app", "published-artifact", "internal-tool"}
 VALID_MODELS = {"team", "solo"}
@@ -129,18 +132,11 @@ def _check_rc01_branches(repo: str, rep: _Report) -> None:
             rep.error("RC-01", f"{branch} branch exists", "missing", "present")
 
 
-# GitHub's protection API returns this body (on stderr via `gh`) when a repo
-# is private on the free plan — branch protection is unavailable on the plan,
-# not merely unconfigured. Stable enough to match on; if GitHub changes the
-# wording the test pins the expectation and the failure is loud (HD-003).
-_FREEPLAN_403_MARKER = "upgrade to github pro"
-
-
-def _is_freeplan_protection_403(rc: int, stderr: str) -> bool:
-    """True when the protection API was unavailable because the repo is
-    private on the free plan (403 'Upgrade to GitHub Pro…'), as opposed to a
-    genuine missing/misconfigured protection on a protection-capable repo."""
-    return rc != 0 and _FREEPLAN_403_MARKER in (stderr or "").lower()
+# The free-plan branch-protection predicate (`is_freeplan_protection_403`) +
+# its marker were promoted to _wpxlib (CLAUDE.md #2 extract-now) once
+# wpx-preflight's protection-status subcommand became a second caller (HD-004).
+# Imported above so the arrival-check surface and the per-run/per-ship surface
+# classify the same 403 identically.
 
 
 def _check_rc02_protections(repo: str, rep: _Report) -> None:
@@ -155,7 +151,7 @@ def _check_rc02_protections(repo: str, rep: _Report) -> None:
     error. A genuine missing protection on a protection-capable repo (any
     other non-zero rc) keeps the exact RC-02 error semantics."""
     rc, out, err = _gh(["api", f"repos/{repo}/branches/dev/protection"])
-    if _is_freeplan_protection_403(rc, err):
+    if is_freeplan_protection_403(rc, err):
         rep.warn(
             "RC-02", "dev branch protection unavailable on free plan",
             "private repo on free plan (protection API 403)",
@@ -178,7 +174,7 @@ def _check_rc02_protections(repo: str, rep: _Report) -> None:
                 "absent — it is the queue's merge_group gate (ADR-003)",
             )
     rc, _out, err = _gh(["api", f"repos/{repo}/branches/main/protection"])
-    if _is_freeplan_protection_403(rc, err):
+    if is_freeplan_protection_403(rc, err):
         pass  # one RC-02 free-plan warning is enough; don't double-warn on main
     elif rc != 0:
         rep.error("RC-02", "main branch protected", "no protection", "protected")

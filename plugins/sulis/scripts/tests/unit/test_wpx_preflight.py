@@ -110,3 +110,64 @@ def test_preflight_pending_in_flight_is_ok_with_warning(tmp_path, run_tool, mock
     assert result.returncode == 0
     assert result.json["errors"] == []
     assert result.json["warnings"], "pending (in-flight) should surface an advisory warning"
+
+
+# ─── protection-status (HD-004 / WP-004) ─────────────────────────────────────
+#
+# `wpx-preflight protection-status --repo <org/repo> --branch <branch=dev>`
+# probes branch protection and reports a CLOSED three-state enum. It is
+# INFORMATIONAL — always ok:true, never a blocker (the skills own the
+# warn-once-per-invocation semantics; the script only classifies):
+#
+#   protected              — protection API 200 (gating in force)
+#   unavailable-free-plan  — 403 with the "Upgrade to GitHub Pro…" marker
+#                            (private repo on the free plan — reuses WP-002's
+#                            free-plan predicate)
+#   unconfigured           — rc!=0 WITHOUT the free-plan marker (the repo is
+#                            protection-capable but protection is not set)
+#
+# The protection endpoint is `repos/<repo>/branches/<branch>/protection`, so
+# the match string `branches/dev/protection` selects it.
+
+
+def test_protection_status_freeplan_403_reports_unprotected(tmp_path, run_tool, mock_gh):
+    """A free-plan 403 ('Upgrade to GitHub Pro…') → ok:true (informational,
+    never blocks) and protection == 'unavailable-free-plan'."""
+    mock_gh([{"match": "branches/dev/protection", "exit_code": 1,
+        "stderr": ("gh: Upgrade to GitHub Pro or make this repository public "
+                   "to enable this feature. (HTTP 403)")}])
+
+    result = run_tool("wpx-preflight", "protection-status",
+                      "--repo", "sulis-ai/agents", "--branch", "dev")
+
+    assert result.json["ok"] is True            # informational, never blocks
+    assert result.returncode == 0
+    assert result.json["data"]["protection"] == "unavailable-free-plan"
+
+
+def test_protection_status_protected_reports_protected(tmp_path, run_tool, mock_gh):
+    """A 200 with required status checks → protection == 'protected'."""
+    mock_gh([{"match": "branches/dev/protection", "stdout": json.dumps({
+        "required_status_checks": {"contexts": ["branch-ci"]}})}])
+
+    result = run_tool("wpx-preflight", "protection-status",
+                      "--repo", "sulis-ai/agents", "--branch", "dev")
+
+    assert result.json["ok"] is True
+    assert result.returncode == 0
+    assert result.json["data"]["protection"] == "protected"
+
+
+def test_protection_status_genuine_missing_reports_unconfigured(tmp_path, run_tool, mock_gh):
+    """rc!=0 but NOT the free-plan body (e.g. 404) → 'unconfigured' — a
+    protection-capable repo with protection unset, distinct from the free-plan
+    case (no GitHub-Pro upsell to surface)."""
+    mock_gh([{"match": "branches/dev/protection", "exit_code": 1,
+              "stderr": "gh: Not Found (HTTP 404)"}])
+
+    result = run_tool("wpx-preflight", "protection-status",
+                      "--repo", "sulis-ai/agents", "--branch", "dev")
+
+    assert result.json["ok"] is True
+    assert result.returncode == 0
+    assert result.json["data"]["protection"] == "unconfigured"

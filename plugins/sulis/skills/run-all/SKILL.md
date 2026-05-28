@@ -172,6 +172,39 @@ loop:
          the pre-flight reads recorded state, it never waits; an
          absence of evidence is not a red.
 
+       After the dev-clean gate passes (ok:true), and BEFORE reading
+       the INDEX, probe branch protection on the base branch ONCE per
+       run. This is purely informational — it NEVER blocks the run,
+       no matter what it returns:
+
+           PROTECTION=$("$WPX_DIR/wpx-preflight" protection-status \
+             --repo <org/repo> --branch "$BASE_BRANCH")
+
+       Read `data.protection` from the JSON it emits:
+
+       - `protected` → say nothing. Protection is in force; the
+         automated checks gate every merge. (Public / properly-
+         protected repos behave byte-for-byte as before — no notice.)
+       - `unconfigured` → say nothing here. The repo CAN enforce
+         gating but hasn't set it up; that is a one-time repo-setup
+         matter the arrival check already surfaces, not a per-run
+         notice.
+       - `unavailable-free-plan` → emit the one-time warning below
+         (founder-English — no rule codes, no HTTP status, no script
+         or command names), THEN PROCEED with the run regardless. Show
+         it at most once per run:
+
+             "Heads-up before I start: branch protection isn't
+              available on your plan, so the automated checks can't
+              block a manual merge — only merges I route through Sulis
+              are checked before landing. If you merge by hand or push
+              straight to the shared line, nothing stops a broken
+              change from landing. To close that gap you can make the
+              repo public or move to a paid plan. I'll carry on now."
+
+         This is the awareness notice, not a gate: the run continues
+         exactly as it would on a protected repo.
+
     1. Read .architecture/{project}/work-packages/INDEX.md.
 
     2. Read INDEX header for max_parallel (default 3 if absent).

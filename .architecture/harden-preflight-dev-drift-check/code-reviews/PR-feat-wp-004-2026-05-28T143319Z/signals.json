@@ -1,0 +1,34 @@
+{
+  "pr": "feat/wp-004-unprotected-repo-onetime-warning",
+  "base": "change/harden-preflight-dev-drift-check",
+  "timestamp": "2026-05-28T143319Z",
+  "verdict": "PASS",
+  "verdict_plain": "Ready to merge",
+  "build_verification": {"pr_introduced_errors": 0, "compileall": "clean", "ruff_changed_files": "clean"},
+  "hygiene": {
+    "scope": {"severity": "clean", "commit_type_spread": ["feat"], "module_fan_out": 1},
+    "size": {"severity": "clean", "lines_added": 207, "lines_removed": 16, "files_changed": 6},
+    "safety": {"severity": "clean", "migration_count": 0, "schema_idl_count": 0, "secret_pattern_hits": 0, "infra_files": 0},
+    "completeness": {"severity": "clean", "new_source_without_test": 0, "new_tests": 3}
+  },
+  "findings": {
+    "in_changes": [
+      {"id": "F-01", "severity": "medium", "lens": "architecture", "file": "plugins/sulis/scripts/wpx-preflight",
+       "symbol": "_protection_status", "rule": "CR-10-timeout",
+       "summary": "new gh api subprocess call had no explicit timeout",
+       "resolution": "fixed inline — added timeout=30 + TimeoutExpired handler; classifies as unconfigured on timeout; never blocks"}
+    ],
+    "in_neighbours": [],
+    "watch_list": [
+      {"file": "plugins/sulis/scripts/_wpxlib.py", "line": 1880, "rule": "ruff F841", "note": "pre-existing, outside diff hunk"},
+      {"file": "plugins/sulis/scripts/_wpxlib.py", "line": 3531, "rule": "ruff E402", "note": "pre-existing lazy-import block, outside diff hunk"},
+      {"file": "plugins/sulis/scripts/_wpxlib.py", "line": 3532, "rule": "ruff E402", "note": "pre-existing lazy-import block, outside diff hunk"}
+    ]
+  },
+  "draft_deltas": [],
+  "self_attestation": {
+    "CR-01": true, "CR-02": true, "CR-03": true, "CR-04": true, "CR-05": true,
+    "CR-06": true, "CR-07": true, "CR-08": true, "CR-09": true
+  },
+  "auto_downgrade_triggers_fired": []
+}
