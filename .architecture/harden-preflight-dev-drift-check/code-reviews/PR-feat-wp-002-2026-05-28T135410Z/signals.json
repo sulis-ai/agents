@@ -1,0 +1,33 @@
+{
+  "pr": "feat/wp-002-freeplan-403-protection-distinction",
+  "project": "harden-preflight-dev-drift-check",
+  "timestamp": "2026-05-28T135410Z",
+  "base_ref": "change/harden-preflight-dev-drift-check",
+  "head_ref": "feat/wp-002-freeplan-403-protection-distinction",
+  "verdict": "PASS",
+  "build_verification": {
+    "type_check": "none configured (stdlib-only per plugin contract) — coverage gap, recorded",
+    "lint_compileall": "clean",
+    "manifest_json": "valid",
+    "routing_coverage_gate": "passed",
+    "unit_tests": "15 passed (test_wpx_arrival_check.py); full suite 767 passed / 1 skipped",
+    "pr_introduced_errors": 0
+  },
+  "pr_hygiene": {
+    "scope_PH01": {"commit_type_spread": ["refactor"], "module_fan_out": 1, "severity": "clean"},
+    "size_PH02": {"lines_added": 90, "lines_removed": 5, "files_changed": 2, "severity": "clean"},
+    "safety_PH03": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "clean"},
+    "completeness_PH04": {"new_source_without_test": 0, "tests_included": true, "severity": "clean"}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"total": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "result": "nothing surfaced"},
+    "security": {"findings": 0, "result": "nothing surfaced"},
+    "quality": {"findings": 0, "result": "nothing surfaced"}
+  },
+  "draft_deltas": 0,
+  "dispatch_shape": "single-reader (90 lines / 2 files — within CR-02 carve-out)"
+}
