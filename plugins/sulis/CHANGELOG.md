@@ -1,5 +1,17 @@
 # Sulis — Changelog
 
+## v0.76.0 — 2026-05-28
+
+**Patch — lesson-capture is now a mandatory pre-merge ship gate, never a founder question.**
+
+Lessons surfaced while doing a change (tooling gaps, recurring friction, bugs in Sulis's own machinery) are now captured as durable issues **automatically, as a required step of `/sulis:change ship` — before the merge** — instead of being raised as an optional *"want me to capture these? before or after you ship?"* question at the end of review. That question was the same permission-theatre class as the spec-depth ask: a process step the agent owns, dressed up as a founder decision.
+
+- **`/sulis:change ship` gains step 4.6** (Capture lessons, REQUIRED) between the review gate and the squash-merge. Runs automatically; a no-op when nothing actionable was learned, so it's safe on every ship. The ship report states what was captured ("Captured 4 lessons as issues #60-63"), never a choice.
+- **`/sulis:review`** routes observations about Sulis's own tooling/process to ship-time capture rather than asking the founder whether/when to record them. Findings about the *change* shape the verdict; observations about the *machinery* are carried to step 4.6.
+- **`/sulis:capture-lessons`** reframed from a post-ship afterthought to a ship-time (pre-merge) gate; its primary trigger is now the automatic ship step, with the manual ad-hoc trigger secondary.
+
+Scoped follow-up: the run-all/train ship path captures findings via a different (auto-draft) mechanism — extending the same explicit pre-ship capture there is left as a separate change.
+
 ## v0.75.0 — 2026-05-28
 
 **Minor — harden the ship path for the multi-worktree model (closes #56).**
