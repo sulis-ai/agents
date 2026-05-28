@@ -1,5 +1,31 @@
 # Sulis — Changelog
 
+## v0.79.0 — 2026-05-28
+
+**Patch — Sulis decides engineering-internal calls instead of interrogating the founder (closes #71, mechanical part).**
+
+A non-technical founder kept being asked questions they had no basis to answer ("how would a founder know?"). A sweep of all 51 skills found two that *hardcoded* a founder confirmation of a deterministically-computed engineering quantity. Both converted to decide-and-report:
+
+- **`/sulis:specify`** no longer asks the founder to confirm/override the computed spec depth — it decides, announces the choice in plain English, and runs; the founder can redirect after. Only a *deep* (~20-min) spec gets a one-line, non-blocking heads-up.
+- **`/sulis:draft-architecture`** no longer puts raw sFPC/ASR sizing numbers to the founder as a "proceed, override, or stop?" gate. It records the breakdown in `SIZING.md`, announces only what the tier *means* (the build size) in plain terms, and proceeds; the founder can redirect the size after.
+- **Agent body** gains the **HOW-vs-WHAT test** (MUST): before any founder question, ask *is this about how it's built (mine — decide + report) or what the product is (theirs — ask)?* The prose guard for the improvised over-asks.
+
+Ship / nuke / scope / risk confirmations are untouched — those are genuinely founder-owned.
+
+Scoped follow-on (#71 structural part): a headless-Claude `Stop`-hook gate that bounces any engineering-internal question or un-translated jargon before the founder sees it — the durable backstop prose alone won't provide. Spike + measure before adopting.
+
+## v0.78.0 — 2026-05-28
+
+**Patch — autonomous run-all progress is founder-legible + trackable (closes #69).**
+
+A multi-hour `/sulis:run-all` was reporting in operator-English (raw SHAs, internal WP/DC IDs, mechanism narration) — unreadable to a non-technical founder, who is trusting a long process they can't follow line-by-line. The founder-English standard already covered this (it even predicted it in Anchor case 5) but the discipline never reached `run-all`'s two highest-frequency surfaces. Now it does:
+
+- **The two leaking surfaces are translated.** Every Bash/Agent `description` and every progress line passes the FE-06 scan — plain English, no WP/DC IDs, SHAs, or `rebase`/`ruff`/critical-path jargon. `run-all`'s own example descriptions, which modelled the violation (`"Ship WP-AJ-FE-07 end-to-end"`), are fixed (`"Building the sign-up screen"`). The raw command + output remain (unavoidable harness chrome); the *description* the founder reads is plain.
+- **A fixed-shape progress frame at each wave boundary** — `{done} of {total} done · just finished · now building · next up · what (if anything) needs you` — so the founder tracks the delta in a stable frame, not a scrolling transcript. The "nothing needs you / here's what does" line is the trust anchor.
+- **Founder-mode is the default for the whole run**; the operator firehose is opt-in via `--raw` / `/sulis:jargon on`.
+
+Follow-on (#69 layer 3, separate change): a living `/sulis:dashboard` / PROGRESS view at the piece level so tracking can leave the chat stream entirely.
+
 ## v0.77.0 — 2026-05-28
 
 **Minor — run-all pre-flight dev-clean check + unprotected-repo warning (closes #52).**

@@ -63,6 +63,7 @@ from _wpxlib import (  # noqa: E402
     TRAIN_BLOCKED_STATUS,
     TRAIN_DONE_STATUS,
     TRAIN_ELIGIBLE_STATUS,
+    TRAIN_HELD_STATUS,
     CommitResult,
     EligibilityResult,
     PlanResult,
@@ -1854,6 +1855,63 @@ def _step_12_5_back_integration(
         _log(f"{train_id}: Step 12.5: {base_branch} already current with origin/dev")
 
 
+# Phases an abandoned-on-error train can be sitting in before any merge
+# could possibly have landed. A train errors here only via an unexpected
+# exception (clone fail, gh ref-sha 404, etc.) — there is no intentional
+# resumable state at these phases. ``paused`` is deliberately EXCLUDED:
+# _pause_train_state writes a resumable paused state on purpose (CI flake,
+# deploy timeout) and the founder owns the resume/abort decision; rolling
+# that back would erase a state the founder is meant to inspect.
+_ROLLBACK_ELIGIBLE_PHASES: frozenset[str] = frozenset({
+    "pending", "rebasing", "ci_running",
+})
+
+
+def _rollback_pre_merge_train_state(paths, train_id: str) -> bool:
+    """Clean up the in-flight train state IFF the run was abandoned by an
+    error before any merge could have landed.
+
+    Issue #62 rollback invariant: when ``cmd_run`` errors before any
+    merge has landed, the run must leave WP statuses exactly as it found
+    them. ``step-7-shipping`` is a *computed* status derived from the
+    presence of an in-flight ``*.state.json`` whose bundle lists the WP
+    (see ``compute_wp_status`` / ``_in_flight_train_has_wp``), so an
+    abandoned pre-merge state file strands the bundle WPs and the next
+    run reports ``nothing_to_pack``.
+
+    Rolls back only when the state's phase is one of the pre-merge,
+    non-resumable phases (``pending`` / ``rebasing`` / ``ci_running``)
+    AND no bundle entry carries a ``merge_sha_on_dev``. This excludes:
+
+      - ``paused`` — _pause_train_state writes it intentionally; the
+        founder inspects + resumes/aborts. Must survive.
+      - ``merging`` and later — a merge exists; _handle_post_merge_failure
+        owns the ADR-212 revert + its own cleanup.
+      - terminal phases (``success`` / ``failed`` / ``aborted``) — already
+        cleaned up by their own paths.
+
+    Reuses ``cleanup_train_state`` (the same primitive every terminal
+    path calls) rather than duplicating the unlink. Returns True when the
+    state file was rolled back; False when it was left intact.
+    """
+    state_path = train_state_path(paths.train_runs_dir, train_id)
+    if not state_path.exists():
+        return False
+    try:
+        state = read_train_state(state_path)
+    except RuntimeError:
+        # Unreadable state: leave it for manual inspection rather than
+        # silently deleting — we can't verify nothing merged.
+        return False
+    phase = state.get("phase")
+    if phase not in _ROLLBACK_ELIGIBLE_PHASES:
+        return False
+    if any(e.get("merge_sha_on_dev") for e in state.get("bundle", [])):
+        return False
+    cleanup_train_state(paths.train_runs_dir, train_id)
+    return True
+
+
 def cmd_run(args: argparse.Namespace) -> None:
     """Fire the train — thin orchestrator over plan / commit / verify phases.
 
@@ -1992,10 +2050,20 @@ def cmd_run(args: argparse.Namespace) -> None:
             write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
         except Exception:  # noqa: BLE001
             pass
+        # Issue #62 — if the error landed before any merge, roll back the
+        # in-flight state so the bundle WPs don't strand in step-7-shipping.
+        _rollback_pre_merge_train_state(paths, train_id)
         emit_result(record, exit_code=2)
     except SystemExit:
+        # Issue #62 — failure handlers (_plan_phase "all branches failed
+        # to rebase", emit_result) raise SystemExit before any merge. Only
+        # _rollback_pre_merge_train_state's guard (no merge SHA) decides
+        # whether to clean up; the post-merge revert path already manages
+        # its own state, so this is a no-op there.
+        _rollback_pre_merge_train_state(paths, train_id)
         raise
     except Exception as exc:  # noqa: BLE001
+        _rollback_pre_merge_train_state(paths, train_id)
         emit_internal_error(exc)
     finally:
         shutil.rmtree(clone_dir, ignore_errors=True)
