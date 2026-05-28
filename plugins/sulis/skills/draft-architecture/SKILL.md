@@ -211,25 +211,28 @@ If extending or superseding, reference the existing ADR by path.}
      - Tier: from the table in the standard (take higher of sFPC-tier and
        ASR-tier; promote to XL on multi-bounded-context)
    
-   **Announce to the user before writing SIZING.md:**
-   
-   > "Inputs analysed:
-   >
-   > - **sFPC ≈ {N}** ({breakdown})
-   > - **ASR ≈ {M}** ({breakdown})
-   >
-   > **Tier: {S|M|L|XL}**. Target TDD ~{range} lines. Expected ADRs {range}.
-   >
-   > Pillar coverage from context index:
-   > - Form: {status} {— sources}
-   > - Armor: {status} {— sources}
-   > - Proof: {status} {— sources}
-   >
-   > Proceed, override the tier, or stop?"
-   
-   Wait for the user response. Record their choice (computed tier accepted,
-   or overridden to X). Write `.architecture/{project}/SIZING.md` per the
-   schema in `references/right-sizing.md`.
+   **Decide the tier, record it, announce its meaning, and proceed
+   (decide-and-report).** The tier is a deterministically-computed
+   engineering call the agent owns — a non-technical founder cannot ratify
+   "sFPC ≈ 31, ASR ≈ 56, Tier XL", so do NOT put the raw numbers to them as a
+   confirm-or-override gate (that's the permission-theatre AAF-08 forbids).
+   Write the full sFPC + ASR + pillar breakdown into `SIZING.md` (the
+   artifact + technical-mode carry the numbers); then announce to the founder,
+   in plain English, only what the tier *means for them* — the size of the
+   build — and proceed:
+
+   > "This is a {small / medium / large / very large} build — roughly {N}
+   > pieces of work, so I'll size the design to match. Shout if you'd rather
+   > start with a smaller first version."
+
+   The founder can redirect the size *after* (down to a spike; up for a
+   growth-projection / junior-team / regulatory context) — the override never
+   needs pre-asking. Record the tier (computed, or founder-redirected) and
+   write `.architecture/{project}/SIZING.md` per the schema in
+   `references/right-sizing.md`.
+
+   (Operator-facing invocations — `--raw` / `/sulis:jargon on` — may still see
+   the full sFPC/ASR proposal; founder-mode gets the plain size sentence.)
 3.5. **Define the contracts (MUST when cross-kind or user-facing).** Before
    pillar design, identify the **producer/consumer seams** in the proposed
    architecture and the **user-facing surfaces**. For each, produce a

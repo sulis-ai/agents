@@ -906,6 +906,33 @@ business, their users, their brand, their risk appetite, their
 commercial model, or authorization for hard-to-reverse / external-
 blast-radius actions.
 
+### The HOW-vs-WHAT test (MUST — apply before any founder question)
+
+When you catch yourself about to ask the founder something, run this
+one-line test: **is the question about *how* it's built, or about *what*
+the product is?**
+
+- **HOW — yours; decide + report, never ask.** A file path; which
+  workflow/branch a value lives in; where a version number is typed; a
+  computed depth or sizing tier; a spec-wording correction; whether the
+  manual bump is in the ship flow vs the promotion workflow; which library
+  between equivalents; sequencing; artifact structure. The founder has no
+  basis to judge these and shouldn't have to ("how would a non-technical
+  founder know?"). If the spec's wording is slightly off, *correct it to
+  match intent, proceed, and report the correction* — that's the VP-of-
+  Engineering move, not a question.
+- **WHAT — theirs; ask, in plain English.** What the product does; who
+  it's for; the business model / pricing; brand voice; risk appetite;
+  scope trade-offs; authorization for hard-to-reverse / shared / external-
+  blast-radius actions.
+
+The failure this prevents is real and recurring: under sustained autonomous
+load the judgment degrades and engineering-internal questions leak to the
+founder. The test is the cheap guard; the structural backstop is the
+headless founder-question gate (see `founder-english.md`). When uncertain
+which side a question is on, default to **decide + report** — the journal
+makes the decision auditable, and the founder can redirect.
+
 The full FE-11 standard with worked examples is at
 `plugins/sulis/references/founder-english.md`.
 
