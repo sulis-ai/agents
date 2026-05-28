@@ -58,19 +58,40 @@ non-alphanumeric runs collapsed to `-`, edges trimmed).
 ## The tier is computed from the primitive (ADR-002)
 
 `_changeset.tier_for_primitive(primitive)` maps the change's already-declared
-primitive to a tier — no second judgment call at ship time:
+primitive to a tier — no second judgment call at ship time. The map covers
+**all 22 change primitives** (`references/change-primitives.md`) plus the five
+Conventional-Commits types that also reach this function, so no code-altering
+change type silently resolves to `None` and ships with no release (the #66
+invisibility). This table is the authority `_PRIMITIVE_TIER` in the code mirrors;
+`test_readme_tier_table_matches_primitive_tier_map` asserts they cannot drift.
 
-| Primitive(s) | Tier |
-|---|---|
-| `fix`, `chore`, `refactor`, `docs` | `patch` |
-| `feat`, `create`, `extend`, `compose`, `reuse`, `strangle`, `wrap`, `harden`, `instrument` | `minor` |
-| anything flagged **breaking** | `major` |
-| `admin`, `docs-only`, or any unknown primitive | `None` → **no changeset written** |
+| Primitive(s) | Group | Tier |
+|---|---|---|
+| `fix`, `chore`, `refactor`, `docs` | Conventional Commits | `patch` |
+| `move`, `inline`, `merge`, `decompose`, `abstract` | REORGANISE | `patch` |
+| `deprecate` | CONTRACT | `patch` |
+| `test`, `document` | REINFORCE | `patch` |
+| `feat` | Conventional Commits | `minor` |
+| `create`, `extend`, `compose`, `reuse`, `generate` | EXPAND | `minor` |
+| `strangle`, `wrap`, `replace` | SUBSTITUTE | `minor` |
+| `delete` | CONTRACT | `minor` |
+| `harden`, `instrument`, `secure`, `gate` | REINFORCE | `minor` |
+| anything flagged **breaking** | — | `major` |
+| `admin`, `docs-only`, or any unknown token | — | `None` → **no changeset written** |
 
-The written `tier:` field is authoritative: for the rare case the mapping is
-wrong (a `refactor` that is secretly breaking), edit `tier:` on `dev` before the
-release PR. `None` is meaningful, not an error — admin/docs-only changes don't
-affect what consumers install, so they write nothing.
+**patch** covers behaviour-preserving moves and additions with no new shipping
+surface (the REORGANISE group, `deprecate`, and the `test`/`document` REINFORCE
+primitives). **minor** covers everything that adds or changes an observable
+surface or behaviour (the EXPAND and SUBSTITUTE groups, `delete`, and the
+behaviour-adding REINFORCE primitives `harden`/`instrument`/`secure`/`gate`).
+**major** is reached only via the per-changeset **breaking** override.
+
+The written `tier:` field is authoritative: for the rare case the default is
+wrong (a `refactor` that is secretly breaking, or a `secure` change that is
+actually patch-level), edit `tier:` on `dev` before the release PR. `None` is
+meaningful, not an error — `admin`/`docs-only` changes don't touch
+`plugins/sulis/**`, so they don't affect what consumers install and write
+nothing.
 
 ## The lifecycle
 
@@ -91,6 +112,52 @@ affect what consumers install, so they write nothing.
    umbrella — ADR-003), assembles the CHANGELOG entry, **deletes the consumed
    changesets**, commits as `github-actions[bot]`, tags
    `v<marketplace metadata.version>`, and pushes.
+
+## Rules for re-implementers (the cross-language parser grammar)
+
+The WP-003 bash GitHub Action re-reads this exact format **without a YAML
+library** (ADR-004), so it must parse it identically to the Python reader
+(`_changeset.py`'s `_parse_changeset` / `_strip_inline_comment` /
+`_coerce_scalar`). These are the rules that reader implements — they ARE the
+format spec; a re-implementer conforming to them parses every changeset the
+writer produces:
+
+1. **Top-level fields are `key: value` on one line.** Split on the **first**
+   `:`; trim whitespace around the key and the value. Lines with no `:` are
+   ignored. Fully blank lines and lines whose first non-blank character is `#`
+   are ignored (comment/blank tolerance for hand-edited files).
+
+2. **Block scalars (`summary: |`).** When a value is exactly `|`, the field is a
+   literal block scalar:
+   - **Unit of indent is 2 spaces.** Each block line is the source line with its
+     leading 2 spaces removed.
+   - **The block ends** at the first line that is *not* 2-space-indented — i.e.
+     the next top-level `key:` (or end of file).
+   - **Internal blank lines are preserved** (they render as empty lines inside
+     the block).
+   - **Trailing blank lines are stripped** (a blank line immediately before the
+     next top-level key does not become part of the value).
+
+3. **Quoting.** A scalar value may be wrapped in matching single (`'…'`) or
+   double (`"…"`) quotes; strip the one matching outer pair. (Block-scalar lines
+   are never quote-stripped.)
+
+4. **Inline comments.** Outside quotes, a `#` that is at column 0 **or** preceded
+   by whitespace starts a comment — drop it and everything after. A `#` **inside**
+   a quoted value is preserved (`summary: "tag #release"` keeps the `#`). Comment
+   stripping applies to scalar values only, never to block-scalar lines.
+
+5. **Booleans.** After comment-stripping and unquoting, the bare tokens `true`
+   and `false` coerce to boolean; **every other value is a string** (an empty
+   value coerces to the empty string, not null).
+
+6. **Injection rule (the writer's guarantee, FIX 2).** The writer rejects a
+   newline (`\n`/`\r`) in `change_id`, `primitive`, or `tier`, and rejects a `:`
+   in `change_id` or `primitive`. So a re-implementer may treat each of those as
+   a **single safe line** — no forged extra `tier:`/`primitive:` line can be
+   smuggled in via a crafted value. (Do **not** rely on the Python reader's
+   last-value-wins behaviour: a naive first-match reader such as
+   `grep -m1 '^tier:'` is safe *only because* the writer enforces this rule.)
 
 ## Notes
 

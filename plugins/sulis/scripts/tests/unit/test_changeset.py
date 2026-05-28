@@ -23,18 +23,77 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 import _changeset as cs
 
 
 # The parent change's ULID, per the contract example in .changesets/README.md.
 _CHANGE_ID = "01KSQNPBPN7W74QVAZ25F79RNH"
 
+# The canonical 22 change primitives (references/change-primitives.md). The
+# module exposes this as a constant (cs.CHANGE_PRIMITIVES) so this test and the
+# module's own coverage assertion share ONE source of truth and cannot drift.
+_THE_22_PRIMITIVES = (
+    # EXPAND
+    "reuse", "compose", "extend", "generate", "create",
+    # REORGANISE
+    "move", "refactor", "inline", "merge", "decompose", "abstract",
+    # SUBSTITUTE
+    "replace", "strangle", "wrap",
+    # CONTRACT
+    "deprecate", "delete",
+    # REINFORCE
+    "test", "instrument", "secure", "harden", "gate", "document",
+)
+
 
 # ─── tier_for_primitive (ADR-002) ─────────────────────────────────────────
 
 
-def test_tier_for_primitive_full_mapping():
-    """Table-driven: patch primitives → patch; minor primitives → minor."""
+def test_change_primitives_constant_is_the_22_vocabulary():
+    """The module's CHANGE_PRIMITIVES constant IS the canonical 22 — the single
+    source of truth the full-coverage test parametrises over and the module's
+    own audit comment cites. This guard pins it to the reference vocabulary
+    (`_THE_22_PRIMITIVES` mirrors `references/change-primitives.md`), so if the
+    module list ever drifts from the reference this fails loudly (Blue
+    invariant: one list, referenced by both the test and the comment)."""
+    assert set(cs.CHANGE_PRIMITIVES) == set(_THE_22_PRIMITIVES)
+    assert len(cs.CHANGE_PRIMITIVES) == 22
+
+
+@pytest.mark.parametrize("primitive", cs.CHANGE_PRIMITIVES)
+def test_tier_for_primitive_all_22_primitives_mapped(primitive):
+    """The keystone assertion: EVERY primitive in the vocabulary maps to a
+    non-None tier — the founder's "cover all 22" decision. No code-altering
+    change type may resolve to None (that reproduces #66 invisibility for a
+    different primitive set). Parametrised over the module's own
+    CHANGE_PRIMITIVES so adding a primitive without a tier fails here."""
+    assert cs.tier_for_primitive(primitive) is not None, primitive
+
+
+def test_tier_for_primitive_newly_mapped_patch_primitives():
+    """The 8 newly-mapped patch primitives (REORGANISE behaviour-preserving +
+    CONTRACT-deprecate + REINFORCE test/document) each → patch."""
+    for primitive in (
+        "move", "inline", "merge", "decompose", "abstract",
+        "deprecate", "test", "document",
+    ):
+        assert cs.tier_for_primitive(primitive) == "patch", primitive
+
+
+def test_tier_for_primitive_newly_mapped_minor_primitives():
+    """The 5 newly-mapped minor primitives (EXPAND-generate, SUBSTITUTE-replace,
+    CONTRACT-delete, REINFORCE-secure/gate) each → minor."""
+    for primitive in ("generate", "replace", "delete", "secure", "gate"):
+        assert cs.tier_for_primitive(primitive) == "minor", primitive
+
+
+def test_tier_for_primitive_named_subset():
+    """The originally-named subset (renamed from the misnamed
+    ..._full_mapping, which asserted a *partial* mapping): the spec-named patch
+    + minor primitives. Genuine full coverage is asserted by
+    test_tier_for_primitive_all_22_primitives_mapped."""
     for primitive in ("fix", "chore", "refactor", "docs"):
         assert cs.tier_for_primitive(primitive) == "patch", primitive
     for primitive in (
@@ -298,6 +357,143 @@ def test_parse_tolerates_comments_and_blank_lines(tmp_path):
     assert record["summary"] == "tag #release please"  # quoted '#' preserved
     assert record["tier"] == "minor"
     assert record["touches_plugin"] is True
+
+
+# ─── writer injection guard (FIX 2 — newline / colon in raw scalar fields) ──
+#
+# change_id / primitive / tier are interpolated raw into the YAML. A newline in
+# any of them forges an extra YAML line — e.g. a fake `tier: major` ahead of the
+# real one. The Python reader is last-value-wins (immune), but the WP-003 bash
+# GHA re-reads this format and a naive first-match reader (`grep -m1 '^tier:'`)
+# would trust the forged value. The writer rejects the unsafe scalars up front.
+
+
+def test_dump_changeset_rejects_newline_in_change_id(tmp_path):
+    """A change_id containing a newline raises ValueError (no forged line)."""
+    d = tmp_path / ".changesets"
+    with pytest.raises(ValueError, match="change_id"):
+        cs.write_changeset(
+            d, change_id="01ABC\ntier: major", primitive="create", tier="minor",
+            touches_plugin=True, summary="forged via change_id",
+            created_at=datetime(2026, 5, 28, 17, 30, 0, tzinfo=timezone.utc),
+        )
+
+
+def test_dump_changeset_rejects_newline_in_primitive(tmp_path):
+    """A primitive containing a newline raises ValueError."""
+    d = tmp_path / ".changesets"
+    with pytest.raises(ValueError, match="primitive"):
+        cs.write_changeset(
+            d, change_id=_CHANGE_ID, primitive="create\ntier: major", tier="minor",
+            touches_plugin=True, summary="forged via primitive",
+            created_at=datetime(2026, 5, 28, 17, 30, 0, tzinfo=timezone.utc),
+        )
+
+
+def test_dump_changeset_rejects_newline_in_tier(tmp_path):
+    """A tier containing a newline (incl. \\r) raises ValueError."""
+    d = tmp_path / ".changesets"
+    with pytest.raises(ValueError, match="tier"):
+        cs.write_changeset(
+            d, change_id=_CHANGE_ID, primitive="create", tier="minor\rtier: major",
+            touches_plugin=True, summary="forged via tier",
+            created_at=datetime(2026, 5, 28, 17, 30, 0, tzinfo=timezone.utc),
+        )
+
+
+def test_dump_changeset_rejects_colon_in_change_id_and_primitive(tmp_path):
+    """A ':' in change_id or primitive raises ValueError — neither legitimately
+    contains a colon (a ULID is [0-9A-Z]; a primitive is a single lowercase
+    token), and a ':' could split a line into a forged key/value."""
+    d = tmp_path / ".changesets"
+    with pytest.raises(ValueError, match="change_id"):
+        cs.write_changeset(
+            d, change_id="01ABC: major", primitive="create", tier="minor",
+            touches_plugin=True, summary="colon in change_id",
+            created_at=datetime(2026, 5, 28, 17, 30, 0, tzinfo=timezone.utc),
+        )
+    with pytest.raises(ValueError, match="primitive"):
+        cs.write_changeset(
+            d, change_id=_CHANGE_ID, primitive="create: major", tier="minor",
+            touches_plugin=True, summary="colon in primitive",
+            created_at=datetime(2026, 5, 28, 17, 30, 0, tzinfo=timezone.utc),
+        )
+
+
+def test_write_changeset_rejects_injected_newline(tmp_path):
+    """The guard fires through the public write_changeset entry point (the
+    realistic injection vector): the concrete forged-`tier: major` payload from
+    the WP-001 review is rejected and NO file is written."""
+    d = tmp_path / ".changesets"
+    # The review's vector: a newline in change_id injects a forged top-level
+    # `tier: major` line that a first-match bash reader would bump on.
+    forged_change_id = "01KSQNPBPN7W74QVAZ25F79RNH\ntier: major"
+    with pytest.raises(ValueError):
+        cs.write_changeset(
+            d, change_id=forged_change_id, primitive="fix", tier="patch",
+            touches_plugin=True, summary="should never be written",
+            created_at=datetime(2026, 5, 28, 17, 30, 0, tzinfo=timezone.utc),
+        )
+    # No changeset file slipped through.
+    assert cs.read_changesets(d) == []
+
+
+# ─── doc/code conformance (FIX 4 — README tier table ↔ _PRIMITIVE_TIER) ─────
+
+
+def test_readme_tier_table_matches_primitive_tier_map():
+    """The .changesets/README.md tier table is parsed and every
+    `(primitive → tier)` row must match _PRIMITIVE_TIER, and the table must
+    cover all 22 primitives — closing the doc-drift loop the worked-example
+    test (test_readme_examples_parse) left open for the *table*."""
+    readme = _locate_changesets_readme()
+    assert readme.exists(), f"contract doc missing: {readme}"
+
+    table = _parse_readme_tier_table(readme.read_text(encoding="utf-8"))
+    # Every primitive in the 22-vocabulary appears in the documented table.
+    for primitive in _THE_22_PRIMITIVES:
+        assert primitive in table, f"{primitive} missing from README tier table"
+    # Every documented (primitive → tier) row matches the code's map exactly.
+    for primitive, tier in table.items():
+        assert cs.tier_for_primitive(primitive) == tier, (
+            f"README says {primitive} → {tier} but code says "
+            f"{cs.tier_for_primitive(primitive)}"
+        )
+
+
+def _parse_readme_tier_table(text: str) -> dict[str, str]:
+    """Extract the documented primitive→tier rows from the README's tier table.
+
+    A tier-table row lists one-or-more backtick-quoted primitives in its first
+    cell and exactly one backtick-quoted tier (`patch`/`minor`/`major`)
+    elsewhere in the row. Robust to the table's column count (a `Group` column
+    sits between primitive and tier) and to markdown-escaped pipes. Rows whose
+    lone tier token is also one of the listed "primitives" (the field-spec
+    table's `tier` row, whose first cell is literally `` `tier` ``) are skipped:
+    a primitives cell containing a tier-name token is not a real mapping row."""
+    import re
+
+    mapping: dict[str, str] = {}
+    tiers = {"patch", "minor", "major"}
+    for line in text.splitlines():
+        if not line.lstrip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 2:
+            continue
+        primitives = re.findall(r"`([a-z]+)`", cells[0])
+        # The lone tier token may live in any later cell (Group column between).
+        rest_tokens = re.findall(r"`([a-z-]+)`", " ".join(cells[1:]))
+        row_tiers = [t for t in rest_tokens if t in tiers]
+        # Skip the field-spec `tier` row (its first cell IS a tier name) and any
+        # row that doesn't carry exactly one tier (the breaking/None/header rows).
+        if not primitives or len(row_tiers) != 1:
+            continue
+        if any(p in tiers for p in primitives):
+            continue
+        for primitive in primitives:
+            mapping[primitive] = row_tiers[0]
+    return mapping
 
 
 def _locate_changesets_readme() -> Path:
