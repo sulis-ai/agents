@@ -325,6 +325,14 @@ issue near the bottom, separated per rule above.
 gh pr checks change/fix-login-bug --watch
 ```
 
+`gh pr checks --watch` is the correct gate — it exits non-zero on
+failure. Read the CI *conclusion*, never a shell exit code: NEVER
+substitute a chained `gh run watch <id>; echo $?` (the echo's exit is
+always 0, not gh's) or a `gh run watch` without `--exit-status` (it
+exits 0 on completion regardless of pass/fail) — see
+`git-workflow-standard.md` GIT-04 *"Confirm CI by reading the
+conclusion, not a shell exit code"*.
+
 - **Checks pass** → proceed to step 4.5.
 - **Checks fail** → STOP. Do NOT merge. Surface the failure in plain
   English with the next step (Rule 5):

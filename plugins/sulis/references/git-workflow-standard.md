@@ -256,6 +256,39 @@ ancestor SHA — so the gate fires both at the branch level (during
 the run) and at the dev-merge level (when branch protection
 verifies before allowing the merge).
 
+### Confirm CI by reading the conclusion, not a shell exit code (MUST, v0.1.4+)
+
+The CI-green gate (GIT-04 above; GIT-05 merge-mechanics step 3) only
+holds if the agent reads the **CI conclusion** — not a shell exit
+code that happens to be `0`. When confirming CI for a feature branch
+**read the conclusion explicitly**:
+
+```bash
+# Authoritative: read the recorded conclusion (expect "success").
+gh run view <run-id> --json conclusion -q .conclusion
+
+# Or watch with the exit status wired through (exits non-zero on failure):
+gh pr checks <branch> --watch
+```
+
+- **NEVER** trust a chained `; echo $?` after `gh run watch`. The
+  `echo` always exits `0`, so `$?` reports the **echo's** exit code,
+  not `gh`'s — a guaranteed false green.
+- **NEVER** use `gh run watch` *without* `--exit-status` as a gate
+  signal. Plain `gh run watch` exits `0` on run **completion**
+  regardless of pass/fail; only `--exit-status` makes the exit code
+  track the conclusion.
+
+This is the single guardrail that defends the don't-merge-on-red gate
+against a hand-typed CI watch. A red merge on a foundation branch has
+already slipped through this way (issue #59); the marketplace tooling
+(`wpx-train` / `wpx-pipeline` read the verdict explicitly; the
+`/sulis:change` ship flow uses `gh pr checks --watch`) is safe — the
+rule exists so an agent improvising an ad-hoc watch cannot reintroduce
+the false green. GIT-05's merge-mechanics step 3 (*"poll CI status …
+on green, proceed"*) is governed by this subsection: "green" means
+`conclusion == success`, never a bare exit `0`.
+
 ### Local pre-commit fallback (SHOULD when feature-branch CI is absent)
 
 When a project's CI does not yet run on feature branches (legacy
@@ -315,7 +348,10 @@ that is the quality gate.
    CI on the branch.
 3. Executor polls CI status (per `executor-loop-standard.md` self-heal
    budget). On green, proceeds to step 4. On red, runs OODA + Five Whys
-   per the loop standard.
+   per the loop standard. **"Green" means `conclusion == success`, read
+   explicitly — never a bare shell exit `0`.** See GIT-04 *"Confirm CI
+   by reading the conclusion, not a shell exit code"* for the exact
+   commands and the two never-rules.
 4. **Verify dev hasn't advanced since CI ran (load-bearing for parallel
    dispatch, sulis-execution v0.8.1+).** Fetch the latest dev. Compare
    the current `origin/dev` SHA against the dev SHA recorded when the
@@ -977,3 +1013,4 @@ Acceptance Evidence` section.
 | 0.1.1 | 2026-05-17 | GIT-07 tightening — the original draft was ambiguous about worktree cleanup timing (prose said "after merge" while the worked example showed cleanup at end of lifecycle). Founder caught the inconsistency. Now explicit: local worktree removed at lifecycle **step 10** (after WP marked `done` in INDEX), not at the merge. Remote branch is still deleted at step 7 (separate cleanup). New subsection covers the escalation case — worktree left in place when scope guard fires, so the BLOCKER record can point at it. | Standards team |
 | 0.1.2 | 2026-05-18 | Parallel-safe merge discipline (load-bearing for sulis-execution v0.8.0+ parallel dispatch). **GIT-04** extended with CI concurrency requirement — workflows must support concurrent runs across different feature branches via per-branch concurrency keying (not global). **GIT-05** mechanics insert a step-4 fetch-dev + rebase-if-advanced + re-CI sub-step before the squash-merge — prevents the parallel-merge race condition where WP-A's CI was green against stale dev that WP-B has since advanced. **GIT-10** extended with "Rollback during parallel execution" subsection — the rollback executor doesn't coordinate with in-flight peers; peers detect via their own GIT-05 step-4 rebase logic; rebased CI surfaces semantic dependencies on the reverted code as BLOCKERs. **NEW GIT-11**: Hot-fix path for production — encodes the bypass for prod emergencies (severity threshold, founder authorisation, hotfix branch off main, RGB discipline preserved, SemVer patch tag, backport to dev within 48 hours, post-mortem MUST). New Example 3 walks through the parallel-merge race scenario showing the rebase resolving it. | Standards team |
 | 0.1.3 | 2026-05-18 | First-live-run gaps from WP-7 execution surface two clarifications. **GIT-04** new subsection "CI must run on feature branches (MUST)" — required status checks must fire on every feature-branch push, not only on dev/main pushes. Without feature-branch CI, the merge gate is post-merge and broken code can land before any CI catches it. Example trigger config covers all Conventional Commits prefix globs (feat/, fix/, chore/, etc.) per GIT-02. Plus new subsection "Local pre-commit fallback (SHOULD when feature-branch CI is absent)" — documents the substitute pattern for transitional projects with explicit guard-rails (journal record, recommendation surfaced to founder via concierge). Fallback is SHOULD, not MUST — projects must eventually wire feature-branch CI to satisfy GIT-04's MUST. **GIT-05** new anti-pattern subsection "git switch dev from a worktree" — explicit forbidden mental model (`git switch dev` fails when dev is checked out elsewhere, which is the normal state under parallel dispatch). Canonical merge paths named: host API for all cases (preferred); refspec push (`git push origin feat/wp-NNN:dev`) acceptable shortcut for single-commit branches only; multi-commit feature branches must use host API to satisfy GIT-04's linear-history requirement. Provenance: WP-7 executor improvised both patterns correctly under stress; this commit makes them canonical. | Standards team |
+| 0.1.4 | 2026-05-28 | False-green guardrail (issue #59). **GIT-04** new subsection "Confirm CI by reading the conclusion, not a shell exit code (MUST)" — confirming CI MUST read the conclusion explicitly (`gh run view <id> --json conclusion -q .conclusion`, expect `success`; or `gh pr checks --watch`, exit-status-correct). Two never-rules: NEVER trust a chained `; echo $?` after `gh run watch` (the echo's exit is always 0, not gh's); NEVER use `gh run watch` without `--exit-status` as a gate signal (it exits 0 on completion regardless of pass/fail). **GIT-05** merge-mechanics step 3 now cross-references the subsection — "green" means `conclusion == success`, never a bare exit 0. Provenance: a run-all session merged a foundation WP on a RED CI by trusting a hand-typed `gh run watch <id>; echo "exit: $?"`; 9 downstream WPs depended on it. Marketplace tooling (`wpx-train` / `wpx-pipeline`, `/sulis:change` ship) was already safe — this encodes the correct pattern as a citable guardrail so an improvised watch cannot reintroduce the bug. | Standards team |
