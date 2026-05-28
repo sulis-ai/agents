@@ -37,6 +37,7 @@ from _wpxlib import (  # noqa: E402
     validate_wp_status,
     visual_contract_signed_off,
 )
+from _wpxlib import _normalise_wp_reference  # noqa: E402  (#50 frontmatter deps)
 
 # Argparse choice lists for status flags derive from the one canonical set
 # (L-03) so flip-status / add-wp can never drift from the validator again.
@@ -157,6 +158,154 @@ def _find_wp_table(text: str) -> tuple[int, int, str]:
     raise ValueError("Could not find WP table in INDEX.md (no | ID | header)")
 
 
+def _find_all_wp_tables(text: str) -> list[tuple[int, int, str]]:
+    """Every WP status sub-table in document order (#50).
+
+    Multi-table-aware sibling of ``_find_wp_table``. Contract-first
+    decompose produces one WP sub-table per kind (Data contracts /
+    Visual contracts / Backend / Frontend / Integration), each with
+    its own column set. Returns each ``| ID |``-headed table that has
+    a ``Status`` column (which is what distinguishes a WP table from
+    the wrap-audit or primitive-distribution tables).
+
+    A single-table INDEX yields a 1-element list, so callers that
+    iterate behave byte-identically to the old single-table path.
+    """
+    table_re = re.compile(
+        r"(^\|\s*ID\s*\|[^\n]+\n\|[^\n]+\n(?:\|[^\n]*\n)*)",
+        re.MULTILINE,
+    )
+    out: list[tuple[int, int, str]] = []
+    for m in table_re.finditer(text):
+        header_line = m.group(1).split("\n", 1)[0]
+        cols = [c.strip().lower() for c in header_line.strip("|").split("|")]
+        if "status" in cols:
+            out.append((m.start(), m.end(), m.group(1)))
+    return out
+
+
+def _collect_status_across_tables(text: str) -> dict[str, str]:
+    """Map WP-ID → live status across ALL WP sub-tables (#50).
+
+    Live status is the INDEX cell (written by flip-status); this reads
+    it from every sub-table so list-ready / propagate-blocked see the
+    whole project, not just the first table."""
+    status_by_id: dict[str, str] = {}
+    for _, _, table_text in _find_all_wp_tables(text):
+        table = parse_md_table(table_text)
+        cols = resolve_wp_columns(table.headers)
+        if "id" not in cols or "status" not in cols:
+            continue
+        for row in table.rows:
+            if cols["id"] >= len(row):
+                continue
+            wp_id = row[cols["id"]].strip()
+            if not wp_id:
+                continue
+            if cols["status"] < len(row):
+                status_by_id[wp_id] = row[cols["status"]].strip()
+    return status_by_id
+
+
+def _load_deps_from_frontmatter(
+    args: argparse.Namespace, known_wps: set[str],
+) -> dict[str, list[str]]:
+    """Map WP-ID → list of full dep IDs from each WP file's ``dependsOn``
+    frontmatter (#50).
+
+    Frontmatter ``dependsOn`` is the complete, uniform, kind-agnostic
+    executable-dependency set — unlike the INDEX dep columns, which are
+    heterogeneous per kind (the visual-contract sub-table carries a
+    "Data contract" column that is informational pairing, NOT a
+    readiness dependency; VC WPs correctly have ``dependsOn: []``).
+
+    Returns a dict keyed ONLY by the WPs that actually have a file —
+    a WP absent from the filesystem is OMITTED (not mapped to ``[]``).
+    This is load-bearing: callers must distinguish "this WP has a file,
+    its deps are []" from "this WP has no file, fall back to the table
+    cell". Mapping a fileless WP to ``[]`` would silently make it appear
+    ready before its deps are done (#50 review finding).
+    """
+    paths = paths_from_args(args)
+    wp_dir = paths.wp_dir
+    if not wp_dir.exists():
+        return {}
+    deps_by_id: dict[str, list[str]] = {}
+    for wp_file in sorted(wp_dir.glob("WP-*.md")):
+        fm = read_frontmatter(wp_file)
+        wp_id = str(fm.get("id") or "").strip()
+        if not wp_id:
+            continue
+        raw = fm.get("dependsOn") or []
+        if isinstance(raw, str):
+            raw = [d.strip() for d in re.split(r"[,\s]+", raw) if d.strip()]
+        deps: list[str] = []
+        for dep in raw:
+            dep = str(dep).strip()
+            if not dep:
+                continue
+            resolved, _ = _normalise_wp_reference(dep, known_wps)
+            deps.append(resolved)
+        deps_by_id[wp_id] = deps
+    return deps_by_id
+
+
+def _resolve_deps(
+    args: argparse.Namespace, text: str, known_wps: set[str],
+) -> dict[str, list[str]]:
+    """Per-WP dependency resolution (#50 + review hardening).
+
+    For each WP: use its frontmatter ``dependsOn`` (the canonical,
+    complete, kind-agnostic source) when the WP file exists; otherwise
+    fall back to its per-table "depends" column. NEVER silently treats
+    a WP's deps as empty just because its file is missing — a fileless
+    WP uses the table cell, which is conservative (a WP listed in the
+    INDEX with table deps stays constrained rather than wrongly
+    becoming ready).
+
+    This handles the partial-existence case (some WP files present,
+    others not — e.g. mid-migration) correctly: each WP resolves
+    independently from the best available source.
+    """
+    fm_deps = _load_deps_from_frontmatter(args, known_wps)
+    table_deps: dict[str, list[str]] = {}
+    for _, _, table_text in _find_all_wp_tables(text):
+        table_deps.update(_deps_from_table(table_text))
+    resolved: dict[str, list[str]] = {}
+    for wp_id in known_wps:
+        if wp_id in fm_deps:
+            resolved[wp_id] = fm_deps[wp_id]
+        else:
+            resolved[wp_id] = table_deps.get(wp_id, [])
+    return resolved
+
+
+def _deps_from_table(table_text: str) -> dict[str, list[str]]:
+    """Fallback dep source: parse the per-table "depends" column.
+
+    Used only when frontmatter is unavailable (no WP files). Preserves
+    the single-table back-compat path for INDEX-only fixtures."""
+    deps_by_id: dict[str, list[str]] = {}
+    table = parse_md_table(table_text)
+    cols = resolve_wp_columns(table.headers)
+    if "id" not in cols or "depends" not in cols:
+        return deps_by_id
+    for row in table.rows:
+        if cols["id"] >= len(row):
+            continue
+        wp_id = row[cols["id"]].strip()
+        if not wp_id:
+            continue
+        deps_cell = row[cols["depends"]].strip() if cols["depends"] < len(row) else ""
+        if deps_cell in ("—", "-", "", "None", "[]"):
+            deps_by_id[wp_id] = []
+        else:
+            deps_by_id[wp_id] = [
+                d.strip() for d in re.split(r"[, ]+", deps_cell) if d.strip()
+            ]
+    return deps_by_id
+
+
 def _enforce_visual_contract_signoff_on_done(args: argparse.Namespace) -> None:
     """#45 / UXD-14 runtime gate — a visual-contract WP cannot be flipped to
     `done` until its mockup is signed off. No-op for any other WP / status.
@@ -183,33 +332,43 @@ def _enforce_visual_contract_signoff_on_done(args: argparse.Namespace) -> None:
 def cmd_flip_status(args: argparse.Namespace) -> None:
     _enforce_visual_contract_signoff_on_done(args)
     text = _read_index(args)
-    start, end, table_text = _find_wp_table(text)
-    table = parse_md_table(table_text)
-    # Find the status column index
-    try:
-        status_idx = next(i for i, h in enumerate(table.headers) if h.lower() == "status")
-        id_idx = next(i for i, h in enumerate(table.headers) if h.lower() == "id")
-    except StopIteration:
-        emit_error("INDEX.md WP table is missing required 'ID' or 'Status' column")
 
-    found = False
-    for row in table.rows:
-        if id_idx < len(row) and row[id_idx].strip() == args.wp:
-            if status_idx < len(row):
-                actual = row[status_idx].strip()
-                if args.expected and actual != args.expected:
-                    emit_error(
-                        f"WP {args.wp} status is '{actual}', expected '{args.expected}'"
-                    )
-                row[status_idx] = args.to
-                found = True
-    if not found:
-        emit_error(f"WP {args.wp} not found in INDEX.md")
+    # Iterate ALL WP sub-tables (#50). The contract-first decompose
+    # produces one table per kind; the target WP lives in exactly one.
+    # Find it, flip its status cell, rewrite only that sub-table.
+    tables = _find_all_wp_tables(text)
+    if not tables:
+        # Fall back to the legacy single-table finder for an INDEX whose
+        # WP table doesn't carry a Status header (older fixtures).
+        start, end, table_text = _find_wp_table(text)
+        tables = [(start, end, table_text)]
 
-    new_table = table.render() + "\n"
-    text = text[:start] + new_table + text[end:]
-    _write_index(args, text)
-    emit_ok(data={"wp": args.wp, "status": args.to})
+    for start, end, table_text in tables:
+        table = parse_md_table(table_text)
+        cols = resolve_wp_columns(table.headers)
+        if "id" not in cols or "status" not in cols:
+            continue
+        id_idx, status_idx = cols["id"], cols["status"]
+        found = False
+        for row in table.rows:
+            if id_idx < len(row) and row[id_idx].strip() == args.wp:
+                if status_idx < len(row):
+                    actual = row[status_idx].strip()
+                    if args.expected and actual != args.expected:
+                        emit_error(
+                            f"WP {args.wp} status is '{actual}', "
+                            f"expected '{args.expected}'"
+                        )
+                    row[status_idx] = args.to
+                    found = True
+        if found:
+            new_table = table.render() + "\n"
+            text = text[:start] + new_table + text[end:]
+            _write_index(args, text)
+            emit_ok(data={"wp": args.wp, "status": args.to})
+            return
+
+    emit_error(f"WP {args.wp} not found in INDEX.md")
 
 
 def cmd_set_status(args: argparse.Namespace) -> None:
@@ -220,30 +379,20 @@ def cmd_set_status(args: argparse.Namespace) -> None:
 
 def cmd_list_ready(args: argparse.Namespace) -> None:
     text = _read_index(args)
-    start, end, table_text = _find_wp_table(text)
-    table = parse_md_table(table_text)
-    cols = resolve_wp_columns(table.headers)  # shared resolver (L-02)
-    required = {"id", "status", "depends"}
-    if not required <= cols.keys():
-        emit_error(
-            f"INDEX.md WP table missing required columns; have {list(cols.keys())}"
-        )
 
-    # Build map of WP-ID → status
-    status_by_id: dict[str, str] = {}
-    depends_by_id: dict[str, list[str]] = {}
-    for row in table.rows:
-        wp_id = row[cols["id"]].strip()
-        if not wp_id:
-            continue
-        status_by_id[wp_id] = row[cols["status"]].strip()
-        deps_cell = row[cols["depends"]].strip()
-        if deps_cell in ("—", "-", "", "None", "[]"):
-            depends_by_id[wp_id] = []
-        else:
-            depends_by_id[wp_id] = [
-                d.strip() for d in re.split(r"[, ]+", deps_cell) if d.strip()
-            ]
+    # Status: live INDEX cells across ALL WP sub-tables (#50).
+    status_by_id = _collect_status_across_tables(text)
+    if not status_by_id:
+        emit_error("INDEX.md has no WP table with ID + Status columns")
+
+    # Dependencies: per-WP — frontmatter `dependsOn` (canonical) when the
+    # WP file exists, else the per-table dep column (#50 + review). The
+    # INDEX dep columns are heterogeneous display variants (the
+    # visual-contract "Data contract" column is informational pairing,
+    # not a readiness dependency), so frontmatter is preferred; the
+    # table fallback covers WPs absent from the filesystem without
+    # silently treating their deps as empty.
+    depends_by_id = _resolve_deps(args, text, set(status_by_id))
 
     ready: list[str] = []
     for wp_id, status in status_by_id.items():
@@ -273,26 +422,15 @@ def cmd_read_config(args: argparse.Namespace) -> None:
 
 def cmd_propagate_blocked(args: argparse.Namespace) -> None:
     text = _read_index(args)
-    start, end, table_text = _find_wp_table(text)
-    table = parse_md_table(table_text)
-    cols = resolve_wp_columns(table.headers)  # shared resolver (L-02)
 
-    # Build transitive descendants
-    depends_map: dict[str, list[str]] = {}
-    status_map: dict[str, str] = {}
-    for row in table.rows:
-        wp_id = row[cols["id"]].strip()
-        if not wp_id:
-            continue
-        status_map[wp_id] = row[cols["status"]].strip()
-        deps_cell = row[cols["depends"]].strip()
-        depends_map[wp_id] = (
-            [] if deps_cell in ("—", "-", "", "None", "[]")
-            else [d.strip() for d in re.split(r"[, ]+", deps_cell) if d.strip()]
-        )
+    # Status + deps span ALL WP sub-tables (#50). Status from the live
+    # INDEX cells; deps from frontmatter (uniform) with a per-table
+    # fallback for pure-INDEX fixtures.
+    status_map = _collect_status_across_tables(text)
+    depends_map = _resolve_deps(args, text, set(status_map))
 
     # BFS: starting from args.wp, find all WPs that (transitively) depend on it
-    transitively_dependent = set()
+    transitively_dependent: set[str] = set()
     queue = [args.wp]
     while queue:
         current = queue.pop()
@@ -301,18 +439,34 @@ def cmd_propagate_blocked(args: argparse.Namespace) -> None:
                 transitively_dependent.add(wp_id)
                 queue.append(wp_id)
 
-    # Mark each one as dependency_blocked (only if currently pending)
+    # Mark each transitively-dependent pending WP as dependency_blocked,
+    # writing into whichever sub-table the WP lives in. Process sub-table
+    # spans in REVERSE document order so splicing a later table can't
+    # shift the (start, end) offsets of an earlier one.
     flipped: list[str] = []
-    for row in table.rows:
-        if cols["id"] < len(row):
+    for start, end, table_text in reversed(_find_all_wp_tables(text)):
+        table = parse_md_table(table_text)
+        cols = resolve_wp_columns(table.headers)
+        if "id" not in cols or "status" not in cols:
+            continue
+        changed = False
+        for row in table.rows:
+            if cols["id"] >= len(row):
+                continue
             wp_id = row[cols["id"]].strip()
-            if wp_id in transitively_dependent and status_map[wp_id] == "pending":
+            if (wp_id in transitively_dependent
+                    and status_map.get(wp_id) == "pending"
+                    and cols["status"] < len(row)):
                 row[cols["status"]] = "dependency_blocked"
                 flipped.append(wp_id)
+                changed = True
+        if changed:
+            new_table = table.render() + "\n"
+            text = text[:start] + new_table + text[end:]
 
-    new_table = table.render() + "\n"
-    text = text[:start] + new_table + text[end:]
-    _write_index(args, text)
+    if flipped:
+        _write_index(args, text)
+    flipped.sort()
     emit_ok(data={"blocker_wp": args.wp, "flipped_to_dependency_blocked": flipped})
 
 
