@@ -15,6 +15,7 @@ Covers:
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import _change_state as cs
 
@@ -242,6 +243,110 @@ def test_change_record_is_unreadable_returns_true_on_empty_file(
     (d / "change.json").write_text("", encoding="utf-8")
     with mock_warning(cs):
         assert cs.change_record_is_unreadable(_GOOD_ULID) is True
+
+
+# ─── session_is_live (TaskCreate #32) ─────────────────────────────────────────
+#
+# A change's "is the terminal still open" check has to honour the v0.36.0
+# launcher contract:
+#   - macOS sessions: pid=null, pid_kind="session", tty=/dev/ttys...
+#   - Linux/headless: pid=<int>, pid_kind="launcher", tty=null
+# A bare `kill -0 <pid>` works for the second but not the first.
+
+
+import os
+
+
+def _seed_session(home: Path, change_id: str, **fields) -> Path:
+    """Write a session.json under SULIS_STATE_DIR for the given change."""
+    d = home / "changes" / change_id
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "session.json").write_text(json.dumps(fields), encoding="utf-8")
+    return d
+
+
+def test_session_is_live_returns_false_when_no_session_file(
+    tmp_path, monkeypatch,
+):
+    """Normal state immediately after `start` before any spawn happens."""
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
+    assert cs.session_is_live(_GOOD_ULID) is False
+
+
+def test_session_is_live_returns_false_on_malformed_json(
+    tmp_path, monkeypatch,
+):
+    """Corrupt session.json must not raise — return False."""
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
+    d = tmp_path / "changes" / _GOOD_ULID
+    d.mkdir(parents=True)
+    (d / "session.json").write_text("{not json", encoding="utf-8")
+    assert cs.session_is_live(_GOOD_ULID) is False
+
+
+def test_session_is_live_launcher_pid_alive_returns_true(
+    tmp_path, monkeypatch,
+):
+    """Linux/headless: pid_kind=launcher; current process is always alive."""
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
+    _seed_session(tmp_path, _GOOD_ULID,
+                  pid=os.getpid(), pid_kind="launcher", tty=None)
+    assert cs.session_is_live(_GOOD_ULID) is True
+
+
+def test_session_is_live_launcher_pid_dead_returns_false(
+    tmp_path, monkeypatch,
+):
+    """Dead pid → kill -0 fails → not live."""
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
+    # PID 1 is init/launchd — owned by another user, kill -0 raises
+    # PermissionError, which counts as "process exists" — wrong proof.
+    # Use a high-numbered pid very unlikely to exist.
+    dead_pid = 999999
+    _seed_session(tmp_path, _GOOD_ULID,
+                  pid=dead_pid, pid_kind="launcher", tty=None)
+    assert cs.session_is_live(_GOOD_ULID) is False
+
+
+def test_session_is_live_session_tty_missing_returns_false(
+    tmp_path, monkeypatch,
+):
+    """macOS session: pid_kind=session; the recorded tty doesn't exist
+    (terminal closed) → not live."""
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
+    _seed_session(tmp_path, _GOOD_ULID,
+                  pid=None, pid_kind="session",
+                  tty="/dev/ttys999")  # bogus tty
+    assert cs.session_is_live(_GOOD_ULID) is False
+
+
+def test_session_is_live_session_tty_present_with_processes_returns_true(
+    tmp_path, monkeypatch,
+):
+    """macOS session: pid_kind=session; the recorded tty is the
+    current process's controlling terminal → at least one process
+    on it → live."""
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
+    # Use the current process's own tty if available.
+    try:
+        my_tty = os.ttyname(0)  # may raise OSError if not a tty (CI)
+    except OSError:
+        import pytest
+        pytest.skip("test runs without a controlling terminal (CI)")
+    _seed_session(tmp_path, _GOOD_ULID,
+                  pid=None, pid_kind="session", tty=my_tty)
+    assert cs.session_is_live(_GOOD_ULID) is True
+
+
+def test_session_is_live_no_pid_no_tty_returns_false(
+    tmp_path, monkeypatch,
+):
+    """Degenerate / honest-degrade case: launcher couldn't capture
+    either signal. No liveness signal → not live."""
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
+    _seed_session(tmp_path, _GOOD_ULID,
+                  pid=None, pid_kind="launcher", tty=None)
+    assert cs.session_is_live(_GOOD_ULID) is False
 
 
 # ─── list_all_changes ──────────────────────────────────────────────────────
