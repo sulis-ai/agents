@@ -1,0 +1,11 @@
+train_id: "train-2026-05-28T135741Z"
+started_at: "2026-05-28T13:57:41Z"
+completed_at: "2026-05-28T13:57:44Z"
+outcome: "error"
+outcome_reason: "internal: gh ref-sha failed for change/harden-preflight-dev-drift-check: gh: Not Found (HTTP 404)
+"
+batch_size: 2
+deploy_url: null
+deploy_workflow_run: null
+health_status: null
+smoke_verdict: null

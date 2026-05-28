@@ -1,0 +1,22 @@
+train_id: "train-2026-05-28T140133Z"
+started_at: "2026-05-28T14:01:33Z"
+completed_at: "2026-05-28T14:07:07Z"
+outcome: "success"
+batch_size: 2
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-05-28T14:02:51Z"
+gate_findings_path: ".architecture/harden-preflight-dev-drift-check/code-reviews/PR-de2ba4b-1624e0f-2026-05-28T140609Z/REVIEW.md"
+bundle:
+  - wp: WP-001
+    branch: feat/wp-001-preflight-ci-conclusion-helper
+    pre_train_sha: 57142abd5b7457a5205a9335a8a1a526660b9821
+    rebased_to_sha: 57142abd5b7457a5205a9335a8a1a526660b9821
+    merge_sha_on_dev: 6bba0e99ac9ce2d7f847c2274bacde2a47ae7482
+  - wp: WP-002
+    branch: feat/wp-002-freeplan-403-protection-distinction
+    pre_train_sha: bc5efac7bdf0eaffeedc507069da1f3506cda93d
+    rebased_to_sha: 71a7af7731a1f27cd9c7acbd8fc088e549c941cc
+    merge_sha_on_dev: 1624e0f842bf97fb1dd83d153ea0b28a489fadb1
