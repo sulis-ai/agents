@@ -1,5 +1,11 @@
 # Sulis — Changelog
 
+## v0.70.0 — 2026-05-28
+
+**Patch — anonymiser _LONG_TOKEN tightened to drop casual-prose false positives (closes #42).**
+
+Split Slack tokens (`xoxp/xoxb/xoxa/xoxr/xoxs`) into dedicated `_SLACK_TOKEN` pattern requiring real shape (≥ 3 hyphen-separated numeric blocks + 20+ alnum tail); tightened `_LONG_TOKEN` suffix to `[A-Za-z0-9_]{20,}` (no hyphens). Casual references like `xoxp-token-style-identifiers` now preserved as docs prose. Real Slack tokens + Stripe + GitHub PAT + AWS keys + Google API keys still caught. 5 new tests; 807/807 pass.
+
 ## v0.69.0 — 2026-05-28
 
 **Patch — anonymiser scrubs private + loopback + link-local IPs (closes #40).**
