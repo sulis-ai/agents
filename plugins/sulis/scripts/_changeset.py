@@ -7,8 +7,11 @@ nothing from the rest of the toolchain and lives alongside `_wpxlib.py` in
 documented in `.changesets/README.md`:
 
   - `tier_for_primitive` — deterministic SemVer tier from the change primitive
-    (ADR-002). The mapping is a literal dict, audited against the 22-primitive
-    vocabulary in `references/change-primitives.md`.
+    (ADR-002). The mapping is a literal dict covering ALL 22 change primitives
+    in `references/change-primitives.md` (the `CHANGE_PRIMITIVES` constant is
+    the single source of truth for that vocabulary, and `test_changeset.py`
+    asserts every one resolves to a non-None tier). None is returned only for
+    genuinely-unmapped/admin tokens (`admin`, `docs-only`, unknown strings).
   - `cumulative_tier`    — the SemVer max over a batch of changesets.
   - `next_version`       — series-agnostic SemVer bump; serves BOTH the 0.x.y
     plugin series and the 1.x.y marketplace series (ADR-003).
@@ -42,29 +45,74 @@ Tier = Literal["patch", "minor", "major"]
 # Index in this tuple IS the SemVer severity rank.
 _TIER_ORDER: tuple[Tier, ...] = ("patch", "minor", "major")
 
-# Primitive → tier (ADR-002). Audited against the 22-primitive vocabulary in
-# `references/change-primitives.md` (EXPAND / REORGANISE / SUBSTITUTE /
-# CONTRACT / REINFORCE). Conventional-Commits types (`fix`, `chore`, `docs`)
-# sit alongside the change-primitive names because both vocabularies reach this
-# function (the ship flow declares a primitive; some callers pass a CC type).
-# Any primitive NOT in this map → None (see `tier_for_primitive`): a new
-# primitive surfaces loudly rather than silently defaulting to a tier.
+# The canonical 22 change primitives (`references/change-primitives.md`), the
+# single source of truth for the vocabulary `_PRIMITIVE_TIER` must cover. Listed
+# by MECE group so a reader can see the coverage at a glance; the order matches
+# the reference. `test_changeset.py` cross-checks this constant against its own
+# copy of the 22, so a primitive added to the vocabulary fails loudly here until
+# it is given a tier below.
+CHANGE_PRIMITIVES: tuple[str, ...] = (
+    # EXPAND — introduce new code or new usage
+    "reuse", "compose", "extend", "generate", "create",
+    # REORGANISE — restructure, behaviour-preserving
+    "move", "refactor", "inline", "merge", "decompose", "abstract",
+    # SUBSTITUTE — swap implementation behind a preserved surface
+    "replace", "strangle", "wrap",
+    # CONTRACT — remove behaviour
+    "deprecate", "delete",
+    # REINFORCE — add a cross-cutting concern
+    "test", "instrument", "secure", "harden", "gate", "document",
+)
+
+# Primitive → tier (ADR-002). Covers ALL 22 change primitives in
+# `CHANGE_PRIMITIVES` across the five MECE groups (EXPAND / REORGANISE /
+# SUBSTITUTE / CONTRACT / REINFORCE) — the founder's "cover all 22" decision, so
+# no code-altering change type silently resolves to None and ships with no
+# release (the #66 invisibility). Conventional-Commits types (`fix`, `chore`,
+# `refactor`, `docs`, `feat`) sit alongside the change-primitive names because
+# both vocabularies reach this function (the ship flow declares a primitive;
+# some callers pass a CC type). The written `tier:` field stays authoritative —
+# the per-changeset override on `dev` is the escape hatch when a default is
+# wrong (ADR-002). A token NOT in this map → None (see `tier_for_primitive`):
+# admin / docs-only / unknown strings touch nothing consumers install.
 _PRIMITIVE_TIER: dict[str, Tier] = {
-    # patch — fixes and behaviour-preserving housekeeping
+    # patch — behaviour-preserving / no new shipping surface
+    # Conventional-Commits types:
     "fix": "patch",
     "chore": "patch",
     "refactor": "patch",
     "docs": "patch",
-    # minor — adds behaviour or an orthogonal layer (EXPAND + REINFORCE)
+    # REORGANISE — behaviour-preserving restructuring:
+    "move": "patch",
+    "inline": "patch",
+    "merge": "patch",
+    "decompose": "patch",
+    "abstract": "patch",
+    # CONTRACT-deprecate — marks for removal; behaviour preserved:
+    "deprecate": "patch",
+    # REINFORCE — no shipping-surface / runtime change:
+    "test": "patch",
+    "document": "patch",
+    # minor — new or changed surface / behaviour
+    # Conventional-Commits:
     "feat": "minor",
+    # EXPAND — adds surface / behaviour:
     "create": "minor",
     "extend": "minor",
     "compose": "minor",
     "reuse": "minor",
+    "generate": "minor",
+    # SUBSTITUTE — swaps implementation; observable behaviour may change:
     "strangle": "minor",
     "wrap": "minor",
+    "replace": "minor",
+    # CONTRACT-delete — removes behaviour consumers may depend on:
+    "delete": "minor",
+    # REINFORCE — adds an observable behaviour / surface:
     "harden": "minor",
     "instrument": "minor",
+    "secure": "minor",
+    "gate": "minor",
 }
 
 
@@ -104,6 +152,12 @@ def next_version(current: str, tier: Tier | None) -> str:
     series (ADR-003) — the GHA applies it three times, once per version value.
     `tier=None` → `current` unchanged. patch: x.y.(z+1); minor: x.(y+1).0;
     major: (x+1).0.0.
+
+    `current` MUST be a strict dotted triple of integers (`x.y.z`). A malformed
+    string raises `ValueError` (too few/many parts → unpack error; a non-integer
+    part → `int()` error): the version values come from the marketplace/plugin
+    manifests, so a malformed one is a contract breach worth failing loudly on,
+    not silently passing through.
 
     NOTE: the WP-003 GitHub Action mirrors this exact arithmetic in bash (the
     accepted Python/bash duplication of ADR-004) — keep the two in lockstep.
@@ -230,6 +284,28 @@ def _as_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+def _reject_unsafe_scalar(field_name: str, value: str, *, forbid_colon: bool) -> None:
+    """Guard a raw-interpolated scalar against YAML line injection (FIX 2).
+
+    `change_id`, `primitive`, and `tier` are interpolated raw into the YAML
+    (`f"tier: {tier}"`). A newline (`\\n` or `\\r`) in any of them forges an
+    extra top-level line — e.g. a fake `tier: major` ahead of the real one. The
+    Python reader is last-value-wins (immune), but the WP-003 bash GHA re-reads
+    this format and a naive first-match reader (`grep -m1 '^tier:'`) would trust
+    the forged value. Reject newlines for all three; additionally reject `:` in
+    `change_id`/`primitive` (a ULID is `[0-9A-Z]`, a primitive is a single
+    lowercase token — neither legitimately contains a colon, which could split a
+    line into a forged key/value). `summary` is a `|` block scalar (every line
+    forced to a 2-space indent) and cannot escape to a top-level key, so it is
+    NOT passed through this guard. Raises `ValueError` naming the offending
+    field.
+    """
+    if "\n" in value or "\r" in value:
+        raise ValueError(f"{field_name} must not contain a newline: {value!r}")
+    if forbid_colon and ":" in value:
+        raise ValueError(f"{field_name} must not contain ':': {value!r}")
+
+
 def _dump_changeset(
     *,
     change_id: str,
@@ -244,7 +320,15 @@ def _dump_changeset(
     `summary` is written as a `|` literal block scalar (founder-readable,
     possibly multi-line). All other fields are simple scalars. Booleans render
     lowercase (`true`/`false`) to match YAML + the bash reader's expectation.
+
+    The raw-interpolated scalar fields (`change_id`, `primitive`, `tier`) are
+    guarded against newline/colon injection first (`_reject_unsafe_scalar`,
+    FIX 2) so a crafted value cannot forge an extra YAML line a first-match bash
+    reader would trust.
     """
+    _reject_unsafe_scalar("change_id", change_id, forbid_colon=True)
+    _reject_unsafe_scalar("primitive", primitive, forbid_colon=True)
+    _reject_unsafe_scalar("tier", tier, forbid_colon=False)
     lines = [
         f"change_id: {change_id}",
         f"primitive: {primitive}",
