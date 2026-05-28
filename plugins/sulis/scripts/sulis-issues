@@ -96,9 +96,16 @@ def _parse_disposition(body: str) -> str:
     reads the disposition back out so the resolve-lessons orchestrator
     can triage mechanical (TASK / clear-fix SEA) from design-heavy.
     Returns the lowercased disposition, or ``""`` when absent.
+
+    Takes the LAST match, not the first: the provenance footer is at the
+    END of the body, but a lesson body may also mention "disposition:" in
+    prose (e.g. a disposition-routing table, or "the disposition in the
+    design phase…") BEFORE the footer. First-match would capture the
+    prose word and mis-triage the lesson; last-match anchors on the
+    footer (#54 review).
     """
-    m = _DISPOSITION_RE.search(body or "")
-    return m.group(1).strip().lower() if m else ""
+    matches = _DISPOSITION_RE.findall(body or "")
+    return matches[-1].strip().lower() if matches else ""
 
 
 def _list_open_issues(descriptor: IssueTypeDescriptor,

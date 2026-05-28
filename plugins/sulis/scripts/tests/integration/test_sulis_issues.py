@@ -291,3 +291,32 @@ def test_list_unknown_descriptor_errors(tmp_path, run_tool, mock_gh):
     assert not result.ok
     assert "nonsense" in (result.error or "").lower()
 
+
+def test_list_disposition_takes_footer_not_prose_mention(
+    tmp_path, run_tool, mock_gh,
+):
+    """#54 review: a body that mentions 'disposition:' in PROSE before the
+    real footer must parse the FOOTER's value, not the prose word.
+    First-match would return 'in' (from 'the disposition: in the design
+    phase'); last-match correctly returns 'task' (the footer)."""
+    body = (
+        "We debated the disposition: in the design phase the team wasn't "
+        "sure. Suggested fix: edit `_anonymiser.py`.\n\n"
+        "_Captured as a lesson (disposition: TASK; L-99) by "
+        "/sulis:capture-lessons._"
+    )
+    listing = json.dumps([
+        {"number": 77, "title": "lesson: tricky body", "body": body,
+         "labels": [{"name": "lesson"}], "url": "https://x/issues/77"},
+    ])
+    mock_gh([
+        {"match": "auth status", "stdout": "Logged in"},
+        {"match": "label:lesson is:open", "stdout": listing},
+    ])
+    result = run_tool("sulis-issues", "list", "--descriptor", "lesson")
+    assert result.ok
+    assert result.data["issues"][0]["disposition"] == "task", (
+        "parsed the prose 'disposition:' mention instead of the footer — "
+        "the first-match bug the #54 review caught"
+    )
+
