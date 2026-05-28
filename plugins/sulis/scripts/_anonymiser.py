@@ -166,18 +166,33 @@ _JWT = re.compile(
     r"\beyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\b"
 )
 
+# Slack tokens — distinct shape (#42). Real tokens look like
+# ``xoxp-1234567890-1234567890-1234567890-{20+ alphanumerics}`` — at
+# least three hyphen-separated numeric blocks then an alphanumeric
+# tail. Casual prose like ``xoxp-token-style-identifiers`` doesn't
+# have the numeric blocks and falls through to no match.
+_SLACK_TOKEN = re.compile(
+    r"\b(?:xox[abprs])-[0-9]+-[0-9]+-[0-9]+-[A-Za-z0-9]{20,}\b"
+)
+
 # Bare opaque tokens — long opaque-looking strings (≥ 20 chars after the
 # prefix) of the shape an API key takes (sk_..., ghp_..., pat_..., AKIA...,
 # AIza..., etc.). Specific prefix-list to reduce false positives on
 # normal identifiers + commit SHAs (which would risk being stripped as
 # "high-entropy" though they're useful for debugging — we leave them).
+#
+# Suffix excludes ``-`` (#42): real tokens after these prefixes are
+# alphanumeric + underscore, not hyphenated. Allowing hyphens caused
+# false positives on casual references like ``xoxp-token-style-…``;
+# Slack tokens (which DO have hyphens) are now caught by the dedicated
+# ``_SLACK_TOKEN`` pattern above.
 _LONG_TOKEN = re.compile(
     r"""
     \b
     (?:sk_live_|sk_test_|ghp_|gho_|ghr_|gha_|ghs_|github_pat_|pat_|
-       AKIA|AIza|ya29\.|nrn_|xoxp-|xoxb-|xoxa-|xoxr-|
+       AKIA|AIza|ya29\.|nrn_|
        npm_|pypi-)
-    [A-Za-z0-9_\-]{20,}                          # high-entropy suffix
+    [A-Za-z0-9_]{20,}                            # high-entropy suffix, no hyphens
     \b
     """,
     re.VERBOSE,
@@ -481,6 +496,7 @@ _PASSES: list[tuple[str, re.Pattern, callable]] = [
     ("url", _URL, _replace_url),
     ("secret", _ENV_SECRET_ASSIGNMENT, _replace_env_secret),
     ("secret", _JWT, _replace_jwt),
+    ("secret", _SLACK_TOKEN, _replace_long_token),
     ("secret", _LONG_TOKEN, _replace_long_token),
     ("email", _EMAIL, _replace_email),
     ("other-repo", _OTHER_REPO_REF, _replace_other_repo),
