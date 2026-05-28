@@ -85,6 +85,24 @@ retires here, at go-live, once the train is proven:
   it). Do this only AFTER the throwaway bot-push proof + the first real train cut
   succeed, so there's always a working promotion path.
 
+### Bootstrapping double-count guard (MUST at the last manual promotion)
+
+This change ships to `dev` carrying its OWN changeset
+(`create-release-train-*.yaml`, tier minor) — the closing-loop proof that the
+new ship step works. But this change is ALSO covered by the **manual bump** at
+its dev→main promotion (the old flow, one last time). To avoid the first train
+cut re-counting it:
+
+- At the **final manual dev→main promotion** (the one that releases this change
+  + the pre-existing changeset-less commits), after applying the manual SemVer
+  bump, **`git rm` ALL accumulated `.changesets/*.yaml`** (this change's
+  included) and commit that deletion as part of the promotion. They are released
+  by the manual bump; clearing them means the train derives versions only from
+  changesets written AFTER go-live. (Keep `.changesets/README.md`.)
+- Equivalently: the manual bump is the "consumer" for the bootstrapping batch;
+  the train takes over fresh from the next changeset. Do NOT leave this change's
+  changeset on `dev` for the first train cut, or its version is bumped twice.
+
 ## Rollback
 
 Re-apply the captured baseline (no required PR, no required checks; enforce_admins
