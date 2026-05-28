@@ -1,5 +1,13 @@
 # Sulis — Changelog
 
+## v0.72.0 — 2026-05-28
+
+**Patch — `session_is_live(change_id)` helper for dashboard + change liveness (closes TaskCreate #32).**
+
+v0.36.0 fixed the underlying pid-vs-tty issue at the launcher level (macOS sessions record `pid=null, pid_kind="session", tty=...` because the osascript helper pid exits within ~1s). But dashboard + change SKILL.md still inlined `kill -0 <pid>` — false-negative on null pid → every macOS-spawned workspace was reported as "no live workspace."
+
+New `session_is_live(change_id)` in `_change_state.py` dispatches on `pid_kind`: `"session"` checks the tty + `ps -t`; `"launcher"` checks `os.kill(pid, 0)`. SKILL.md call sites in `dashboard/` and `change/` updated to use it. 7 new tests; 820 pass + 1 skipped (tty-on-CI).
+
 ## v0.71.0 — 2026-05-28
 
 **Patch — anonymiser NFKC-normalises input + explicit re.UNICODE on project pass (closes #41).**
