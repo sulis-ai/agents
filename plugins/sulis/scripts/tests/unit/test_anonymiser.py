@@ -112,6 +112,56 @@ def test_short_string_is_not_a_secret():
     assert "<secret>" not in r.redacted_text
 
 
+# ─── #42: tighten _LONG_TOKEN against casual hyphenated prose ────────────────
+
+
+def test_xoxp_token_style_casual_reference_is_preserved():
+    """`xoxp-token-style-identifiers` is docs prose, not a real token —
+    must NOT be scrubbed after the regex tightening. The lesson body's
+    exact example."""
+    text = "Slack uses xoxp-token-style-identifiers for user tokens"
+    r = anonymise(text)
+    assert "xoxp-token-style-identifiers" in r.redacted_text
+    assert "<secret>" not in r.redacted_text
+
+
+def test_xoxb_casual_reference_is_preserved():
+    text = "the xoxb-bot-token-format is documented at api.slack.com"
+    r = anonymise(text)
+    assert "xoxb-bot-token-format" in r.redacted_text
+
+
+def test_real_slack_token_shape_is_still_redacted():
+    """A real-shape Slack token (three numeric blocks + alphanumeric
+    tail) MUST still be redacted. Pin so the tightening doesn't go
+    too far."""
+    # Built at runtime to dodge GitHub's push-protection scanner.
+    real_slack = ("xoxp-" + "1234567890" + "-" + "9876543210" + "-" +
+                  "1357924680" + "-" + "abcdef0123456789ABCDEFGH")
+    text = f"the leaked token was {real_slack}"
+    r = anonymise(text)
+    assert "<secret>" in r.redacted_text
+    assert real_slack not in r.redacted_text
+
+
+def test_stripe_key_still_redacted_after_tightening():
+    """Pinned regression: tightening suffix to no-hyphens must not break
+    Stripe key matching (Stripe keys are alphanumeric+underscore, no
+    hyphens in the suffix)."""
+    text = f"key: {_STRIPE_KEY}"
+    r = anonymise(text)
+    assert "<secret>" in r.redacted_text
+    assert _STRIPE_KEY not in r.redacted_text
+
+
+def test_github_pat_still_redacted_after_tightening():
+    """Pinned regression: GitHub PATs are alphanumeric, no hyphens in
+    the suffix."""
+    text = f"the token is {_GITHUB_PAT}"
+    r = anonymise(text)
+    assert "<secret>" in r.redacted_text
+
+
 # ─── File paths ──────────────────────────────────────────────────────────────
 
 
