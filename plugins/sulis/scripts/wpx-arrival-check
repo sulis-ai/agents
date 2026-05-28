@@ -15,6 +15,10 @@ warning, or skipped:
 - RC-02 deadlock fix: classic required checks on dev = `branch-ci` ONLY;
   `merge-queue-ci` is the queue's internal merge_group gate, NEVER a classic
   required check.
+- RC-02 free-plan distinction (HD-003): a private repo on the free plan cannot
+  enable branch protection (the API 403s with "Upgrade to GitHub Pro…"); that
+  is reported as a WARNING (unavailable-on-plan), not a hard error — a genuine
+  missing protection on a protection-capable repo still errors.
 - RC-03 (volume): team → merge queue MUST exist; solo → MUST be absent.
 - RC-04 workflows: branch-ci + promote always; merge-queue-ci iff team;
   deploy/health/release per deployable/published artifact (namespaced in
@@ -125,12 +129,40 @@ def _check_rc01_branches(repo: str, rep: _Report) -> None:
             rep.error("RC-01", f"{branch} branch exists", "missing", "present")
 
 
+# GitHub's protection API returns this body (on stderr via `gh`) when a repo
+# is private on the free plan — branch protection is unavailable on the plan,
+# not merely unconfigured. Stable enough to match on; if GitHub changes the
+# wording the test pins the expectation and the failure is loud (HD-003).
+_FREEPLAN_403_MARKER = "upgrade to github pro"
+
+
+def _is_freeplan_protection_403(rc: int, stderr: str) -> bool:
+    """True when the protection API was unavailable because the repo is
+    private on the free plan (403 'Upgrade to GitHub Pro…'), as opposed to a
+    genuine missing/misconfigured protection on a protection-capable repo."""
+    return rc != 0 and _FREEPLAN_403_MARKER in (stderr or "").lower()
+
+
 def _check_rc02_protections(repo: str, rep: _Report) -> None:
     """RC-02 (v0.3.0 deadlock fix): dev classic required checks = branch-ci
     ONLY. merge-queue-ci present as a classic check is an ERROR — it is the
-    queue's internal merge_group gate, never a classic required check."""
-    rc, out, _ = _gh(["api", f"repos/{repo}/branches/dev/protection"])
-    if rc != 0:
+    queue's internal merge_group gate, never a classic required check.
+
+    Free-plan distinction (HD-003): a private repo on the free GitHub plan
+    cannot enable branch protection at all (the API 403s with 'Upgrade to
+    GitHub Pro…'). That is a warning-eligible *unavailable-on-plan* condition,
+    not a misconfiguration — so it is surfaced as a warning, never a hard
+    error. A genuine missing protection on a protection-capable repo (any
+    other non-zero rc) keeps the exact RC-02 error semantics."""
+    rc, out, err = _gh(["api", f"repos/{repo}/branches/dev/protection"])
+    if _is_freeplan_protection_403(rc, err):
+        rep.warn(
+            "RC-02", "dev branch protection unavailable on free plan",
+            "private repo on free plan (protection API 403)",
+            "branch-ci gates only Sulis-routed merges; manual merges to dev "
+            "are not gated until the repo is on a protection-capable plan",
+        )
+    elif rc != 0:
         rep.error("RC-02", "dev branch protected", "no protection", "protected")
     else:
         try:
@@ -145,8 +177,10 @@ def _check_rc02_protections(repo: str, rep: _Report) -> None:
                 "present in classic checks (re-introduces the deadlock)",
                 "absent — it is the queue's merge_group gate (ADR-003)",
             )
-    rc, _, _ = _gh(["api", f"repos/{repo}/branches/main/protection"])
-    if rc != 0:
+    rc, _out, err = _gh(["api", f"repos/{repo}/branches/main/protection"])
+    if _is_freeplan_protection_403(rc, err):
+        pass  # one RC-02 free-plan warning is enough; don't double-warn on main
+    elif rc != 0:
         rep.error("RC-02", "main branch protected", "no protection", "protected")
 
 
