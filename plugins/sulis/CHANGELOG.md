@@ -1,5 +1,17 @@
 # Sulis — Changelog
 
+## v0.77.0 — 2026-05-28
+
+**Minor — run-all pre-flight dev-clean check + unprotected-repo warning (closes #52).**
+
+Two surfaces, both orchestration-side, that stop pre-existing CI drift on the shared line from blocking every dispatch:
+
+- **Pre-flight dev-clean check on run-all.** Before dispatching a wave, the shared `dev` line is checked for pre-existing CI failures and surfaced as a single up-front blocker ("dev has N pre-existing failures — fix these first") instead of every task rediscovering the same breakage per-branch.
+- **Unprotected-repo warning (once per ship).** On run-all / ship, branch protection is probed; on the common private + free-plan case (where protection 403s and merges can't be gated), the founder is told plainly that only Sulis-routed (train) merges are CI-gated — manual `gh pr merge` / direct pushes are not.
+- No redundant "train-refuses-on-red" guard: `wpx-train` already pauses before the merge loop on red.
+
+Shipped to `dev` earlier without a release bump; this release records it. (See #66 — the ship flow should mandate the version bump; release-train fix planned.)
+
 ## v0.76.0 — 2026-05-28
 
 **Patch — lesson-capture is now a mandatory pre-merge ship gate, never a founder question.**
