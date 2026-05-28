@@ -716,7 +716,9 @@ them the dashboard updates on its own as work progresses, and point them at
 - The founder wants to resume a *journey* (the seven-phase coaching arc),
   not start/list/ship a change — that is `/sulis:start`.
 - The founder wants to promote `dev` to `main` (release to production) —
-  that is a separate, deliberate promotion step, not `ship`.
+  that is a separate, deliberate step (`/sulis:release-train` opens the
+  reviewed promotion PR; the release Action applies the version bump from
+  the accumulated release notes), not `ship`.
 - The founder wants a read-only status summary of one change's WPs — that
   is `/sulis:status` / `/sulis:wp-status`.
 
