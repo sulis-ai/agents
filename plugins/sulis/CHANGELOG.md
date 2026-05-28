@@ -1,5 +1,11 @@
 # Sulis — Changelog
 
+## v0.71.0 — 2026-05-28
+
+**Patch — anonymiser NFKC-normalises input + explicit re.UNICODE on project pass (closes #41).**
+
+ASCII-only regex classes used to skip full-width ASCII lookalikes. NFKC normalisation at `anonymise()` ingress compatibility-decomposes CJK fullwidth + lookalike forms to canonical ASCII so the existing regexes catch them. Innocuous unicode (emoji, plain non-Latin scripts) preserved. Project-name pattern now explicitly `re.IGNORECASE | re.UNICODE` for documented intent. 7 new tests including pinned Cyrillic/Chinese/Arabic project names + an explicit out-of-scope marker for homograph attacks (Cyrillic 'а' vs Latin 'a' — would need a unicode TR39 confusables layer). 814/814 pass.
+
 ## v0.70.0 — 2026-05-28
 
 **Patch — anonymiser _LONG_TOKEN tightened to drop casual-prose false positives (closes #42).**
