@@ -1,0 +1,18 @@
+{
+  "pr": "feat/wp-003-release-on-merge-gha",
+  "base": "change/create-release-train",
+  "files_changed": 1,
+  "lines_added": 242,
+  "lines_removed": 0,
+  "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "low"},
+  "size": {"total": 242, "files": 1, "severity": "low-medium", "note": "single self-contained infra YAML file; majority comments + bash"},
+  "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 1, "secret_pattern_hits": 0, "severity": "medium", "note": "new GHA workflow with contents:write + push to main; PH-03 infra flag (not high)"},
+  "completeness": {"new_source_without_test": 0, "note": "kind:infra; gate is in-workflow post-bump verification + real-cut, no unit test expected (bash-in-YAML)", "severity": "low"},
+  "build_verification": {"errors": 0, "checks": ["yaml.safe_load", "ruff (embedded python)"]},
+  "findings": {
+    "changes": {"critical": 0, "high": 0, "medium": 2, "low": 2},
+    "neighbours": {"total": 0}
+  },
+  "verdict": "Approve with fixes",
+  "lenses": {"architecture": "ran", "security": "nothing surfaced", "quality": "ran"}
+}
