@@ -187,7 +187,7 @@ def changeset_filename(primitive: str, slug: str, created_at: datetime) -> str:
 
 
 def write_changeset(
-    changesets_dir: Path,
+    changesets_dir: str | Path,
     *,
     change_id: str,
     primitive: str,
@@ -199,12 +199,16 @@ def write_changeset(
 ) -> Path:
     """Write one changeset YAML; return the path written.
 
+    `changesets_dir` accepts a `str` OR a `pathlib.Path` — a `str` is coerced
+    to `Path` at entry (the ship flow passes the plain string `'.changesets'`),
+    so a string argument no longer raises `AttributeError` on `.mkdir()`.
     Creates `changesets_dir` if absent. The filename is the collision-proof
     triple key (`changeset_filename`). `created_at` defaults to now (UTC).
     `slug` is the human filename component — the change's own slug (e.g.
     `release-train`); when omitted it falls back to the `change_id` so the
     helper is self-contained for direct callers. WP-002 passes the human slug.
     """
+    changesets_dir = Path(changesets_dir)
     when = created_at or datetime.now(timezone.utc)
     changesets_dir.mkdir(parents=True, exist_ok=True)
     name = changeset_filename(primitive, slug=slug or change_id, created_at=when)
@@ -223,13 +227,17 @@ def write_changeset(
     return path
 
 
-def read_changesets(changesets_dir: Path) -> list[dict]:
+def read_changesets(changesets_dir: str | Path) -> list[dict]:
     """Read every `*.yaml` in the dir into dicts.
 
+    `changesets_dir` accepts a `str` OR a `pathlib.Path` — a `str` is coerced
+    to `Path` at entry (symmetric with `write_changeset`), so a string argument
+    no longer raises `AttributeError` on `.is_dir()`.
     Ignores non-`.yaml` files (README.md, scratch .txt). A missing dir → [].
     Order is sorted by filename for determinism (the triple-key filename sorts
     primitive-then-slug-then-time).
     """
+    changesets_dir = Path(changesets_dir)
     if not changesets_dir.is_dir():
         return []
     records = []
