@@ -396,6 +396,29 @@ If the executor's worktree somehow accumulates multiple commits
 squash-merge via the host API, not refspec push. Single-commit is
 the default; multi-commit is the exception requiring host API.
 
+**Tooling enforces this (v0.75.0+, issue #56).** `sulis-change finish
+--merge` is **worktree-aware**: it locates which worktree holds the base
+ref (via `git worktree list --porcelain`) and performs the squash-merge
+THERE, rather than blind-`git checkout {base}` in the repo root. The norm
+above — *a change worktree only ever holds its own change branch; never
+`git checkout dev` inside one* — is therefore upheld by the tool, not just
+by convention. A worktree only ever has its own `change/*` branch checked
+out.
+
+### Worktree lifecycle: remove on ship, recreate on demand (v0.75.0+, issue #56)
+
+On a successful ship, the change's worktree is **removed** (ending the
+worktree sprawl that accumulated under parallel dispatch), while the
+**branch + change record are kept** as the audit trail. The change-branch
+tip is pinned as `shipped_sha` ("the state it was in when we shipped"). The
+removal is gated: a worktree with a **live bound session** or with
+**genuine uncommitted work** is kept (only regenerable `.changes/` metadata
+is safe to discard). `sulis-change recreate <handle>` re-materialises the
+worktree on demand — on the kept branch (resume work), or detached at
+`shipped_sha` if the branch is gone (view the exact shipped state). This
+keeps the #38 "changes stay visible/retraceable" intent (via the branch +
+record + cockpit) while the redundant working copy no longer lingers.
+
 ### Anti-pattern: `git stash` in a change worktree (v0.74.0+, issue #53)
 
 **Never `git stash` in a change worktree.** The stash stack is shared

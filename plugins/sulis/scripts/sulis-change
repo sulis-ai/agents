@@ -46,6 +46,7 @@ from _change_state import (  # noqa: E402
     list_all_changes,
     mark_change_shipped,
     read_change_record,
+    session_is_live,
     write_change_record,
     write_change_stage,
 )
@@ -101,17 +102,198 @@ def _resolve_repo_root(args: argparse.Namespace) -> Path:
     return repo_root
 
 
+def _dedouble_slug(primitive: str, slug: str) -> str:
+    """Strip a redundant leading ``{primitive}-`` from a slug (#56 Part 4).
+
+    The `/sulis:change` skill derives a slug from an intent that leads with
+    the verb — "fix the login bug" → slug ``fix-login-bug`` — and pairs it
+    with primitive ``fix``. ``compose_change_branch`` would then produce
+    ``change/fix-fix-login-bug`` (the doubling the founder kept hitting) and
+    a matching ``…-change-fix-fix-login-bug`` worktree.
+
+    The fix is canonical (applied once, at resolution) so EVERY downstream
+    consumer — branch compose, worktree path, metadata, parse round-trip —
+    agrees. Conservative: only strip when what remains is STILL a valid slug
+    (2-5 kebab words). A degenerate 1-word remainder (``fix-login`` →
+    ``login``) is left doubled rather than produce an invalid slug.
+    """
+    prefix = f"{primitive}-"
+    if slug.startswith(prefix):
+        candidate = slug[len(prefix):]
+        cand_ok, _ = validate_change_slug(candidate)
+        if cand_ok:
+            return candidate
+    return slug
+
+
 def _resolve_primitive_and_slug(args: argparse.Namespace) -> tuple[str, str]:
-    """Validate and return (primitive, slug)."""
+    """Validate and return (primitive, slug), de-doubled (#56 Part 4)."""
     primitive = (args.primitive or "feat").lower()
     slug = args.slug.lower()
     ok, reason = validate_change_primitive(primitive)
     if not ok:
         emit_error(reason)
+    slug = _dedouble_slug(primitive, slug)
     ok, reason = validate_change_slug(slug)
     if not ok:
         emit_error(reason)
     return primitive, slug
+
+
+def _worktree_for_branch(repo_root: Path, branch_ref: str) -> Path | None:
+    """Return the worktree path that has ``branch_ref`` checked out, or None.
+
+    The keystone of the #56 fix. git forbids the same branch in two
+    worktrees BY DESIGN (independent indexes can't reconcile), so the ship
+    path must never blind-``git checkout {base}`` in ``repo_root`` — base may
+    be checked out in a sibling worktree. This parses ``git worktree list
+    --porcelain`` to find where ``branch_ref`` actually lives so the squash-
+    merge runs THERE.
+
+    ``branch_ref`` is a short name like ``dev``; git reports the full
+    ``refs/heads/dev`` in the ``branch`` line of each worktree block.
+    Returns None when ``branch_ref`` is not checked out in any worktree
+    (then the caller may safely check it out in ``repo_root``).
+    """
+    rc, out, _ = _run(["git", "worktree", "list", "--porcelain"],
+                      cwd=repo_root, timeout=10)
+    if rc != 0:
+        return None
+    target = f"refs/heads/{branch_ref}"
+    current_path: str | None = None
+    for line in out.splitlines():
+        if line.startswith("worktree "):
+            current_path = line[len("worktree "):].strip()
+        elif line.startswith("branch ") and current_path is not None:
+            if line[len("branch "):].strip() == target:
+                return Path(current_path)
+    return None
+
+
+def _compose_squash_message(primitive: str, slug: str, metadata: dict) -> str:
+    """Conventional-Commit squash message (#56 Part 3).
+
+    ``{primitive}: {slug}`` subject (the change primitive IS the commit
+    type — most are real CC types: feat/fix/refactor/chore; the rest degrade
+    cleanly to a custom type), the change's plain-English intent in the body,
+    and the Sulis co-author trailer. Replaces the old hardcoded
+    ``feat({branch}): squash-merge {branch}`` which ignored the primitive and
+    duplicated the branch name into both scope and body.
+    """
+    subject = f"{primitive}: {slug}"
+    body_parts: list[str] = []
+    intent = str(metadata.get("intent") or "").strip()
+    if intent:
+        body_parts.append(intent)
+    body_parts.append("Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>")
+    return subject + "\n\n" + "\n\n".join(body_parts)
+
+
+# Uncommitted paths under these prefixes are sulis-managed metadata, not
+# founder work: `start` writes `.changes/{...}.yaml` into the worktree and
+# never commits it (the canonical copy lives in the branch-independent global
+# store). They are safe to discard when removing a shipped worktree.
+_SULIS_MANAGED_UNCOMMITTED: tuple[str, ...] = (".changes/",)
+
+
+def _worktree_blocking_changes(worktree: Path) -> list[str]:
+    """Uncommitted paths in ``worktree`` that are NOT sulis-managed metadata.
+
+    ``git worktree remove`` (no ``--force``) refuses on ANY uncommitted or
+    untracked content — and ``start`` always leaves ``.changes/{...}.yaml``
+    uncommitted, so a blanket no-force remove would NEVER fire and #56 Part 2
+    would be a silent no-op. This returns the genuinely-at-risk paths:
+    anything dirty that isn't sulis-managed. An empty list means removal is
+    safe (only regenerable metadata is dirty → force-remove); a non-empty
+    list means there's real uncommitted founder work → KEEP + report it.
+    """
+    rc, out, _ = _run(["git", "status", "--porcelain"],
+                      cwd=worktree, timeout=10)
+    if rc != 0:
+        return ["<could not read worktree git status>"]
+    blocking: list[str] = []
+    for line in out.splitlines():
+        path = line[3:].strip()  # porcelain line: 'XY <path>'
+        if not path:
+            continue
+        if " -> " in path:  # rename: 'old -> new'
+            path = path.split(" -> ", 1)[1]
+        if not any(path.startswith(p) for p in _SULIS_MANAGED_UNCOMMITTED):
+            blocking.append(path)
+    return blocking
+
+
+def _remove_shipped_worktree(repo_root: Path, change_id: str,
+                             worktree_dest: Path) -> dict:
+    """Remove a shipped change's redundant worktree, safely (#56 Part 2).
+
+    Gated: never remove the worktree the caller's shell is standing in; never
+    remove a worktree with a live bound session (#32); never discard genuine
+    uncommitted work (only regenerable `.changes/` metadata is safe).
+    Force-removes only when the worktree is clean-enough. Returns a dict with
+    ``worktree_removed`` + (when kept) ``worktree_kept_reason``.
+    """
+    # Never remove the worktree the caller is currently inside — that would
+    # leave their shell in a deleted directory. This is independent of
+    # session_is_live (which only catches spawned-terminal sessions, not a
+    # manual `cd` into the worktree before running ship).
+    try:
+        cwd = Path.cwd().resolve()
+        wt_resolved = worktree_dest.resolve()
+        if cwd == wt_resolved or wt_resolved in cwd.parents:
+            return {"worktree_removed": False,
+                    "worktree_kept_reason": "the current shell is inside this "
+                                            "worktree"}
+    except OSError:
+        pass
+    if session_is_live(str(change_id)):
+        return {"worktree_removed": False,
+                "worktree_kept_reason": "a live session is bound to this change"}
+    if not worktree_dest.exists():
+        return {"worktree_removed": False,
+                "worktree_kept_reason": "worktree already absent"}
+    blocking = _worktree_blocking_changes(worktree_dest)
+    if blocking:
+        return {"worktree_removed": False,
+                "worktree_kept_reason": (
+                    "uncommitted work present (not part of the ship): "
+                    + ", ".join(blocking[:5]))}
+    # Only regenerable sulis metadata is dirty → safe to force-remove (the
+    # global store holds the canonical record; shipped_sha pins the committed
+    # state; `recreate` restores the worktree on demand).
+    ok, msg = git_worktree_remove(repo_root, worktree_dest, force=True)
+    out = {"worktree_removed": ok}
+    if not ok:
+        out["worktree_kept_reason"] = msg
+    return out
+
+
+def _archive_after_ship(repo_root: Path, change_id: str, branch: str,
+                        worktree_dest: Path, *, remove_worktree: bool) -> dict:
+    """Mark a change shipped (+ pin shipped_sha) and optionally remove its
+    worktree. The SINGLE source both ship paths share — `finish --merge`
+    (this script) and `mark-shipped` (the gh-based `/sulis:change ship`
+    skill) — so the post-ship state can never drift between them.
+
+    Pins ``shipped_sha`` = the change-branch tip ("the state it was in when
+    we shipped"). Keeps the branch + record (the audit trail). Returns the
+    ``archived`` dict for the command's JSON output.
+    """
+    rc, sha_out, _ = _run(["git", "rev-parse", f"refs/heads/{branch}"],
+                          cwd=repo_root, timeout=10)
+    shipped_sha = sha_out.strip() if rc == 0 else ""
+    record_path = mark_change_shipped(str(change_id),
+                                      shipped_sha=shipped_sha or None)
+    archived = {
+        "archived": record_path is not None,
+        "change_id": change_id,
+        "stage": "shipped",
+        "shipped_sha": shipped_sha,
+    }
+    if remove_worktree:
+        archived.update(
+            _remove_shipped_worktree(repo_root, change_id, worktree_dest))
+    return archived
 
 
 def _metadata_path(repo_root: Path, primitive: str, slug: str) -> Path:
@@ -476,6 +658,12 @@ def cmd_finish(args: argparse.Namespace) -> None:
 
     worktree_dest = change_worktree_path(repo_root, primitive, slug)
 
+    # Read the change metadata ONCE, up front — before any worktree removal
+    # (#56 Part 2 may remove the worktree on a happy ship, and the metadata
+    # lives inside it). Reused for the PR body, the squash commit message,
+    # and the archive step.
+    metadata = read_change_metadata(_metadata_path(worktree_dest, primitive, slug))
+
     # Fetch latest origin/{base_ref}
     rc, _, err = _run(["git", "fetch", "origin", base_ref],
                      cwd=repo_root, timeout=60)
@@ -491,11 +679,10 @@ def cmd_finish(args: argparse.Namespace) -> None:
             emit_error(f"git push origin {branch} failed: {err}")
 
         # Compose PR body from metadata
-        meta = read_change_metadata(_metadata_path(worktree_dest, primitive, slug))
         pr_body = (
             f"Change: `{branch}`\n\n"
-            f"Primitive: {meta.get('primitive', primitive)}\n"
-            f"Started at: {meta.get('started_at', 'unknown')}\n"
+            f"Primitive: {metadata.get('primitive', primitive)}\n"
+            f"Started at: {metadata.get('started_at', 'unknown')}\n"
         )
         rc, out, err = _run(
             ["gh", "pr", "create",
@@ -511,63 +698,99 @@ def cmd_finish(args: argparse.Namespace) -> None:
         outcome = {"mode": "pr", "pr_url": pr_url}
 
     elif args.merge:
-        # Squash-merge locally
-        # 1. Checkout base
-        rc, _, err = _run(["git", "checkout", base_ref], cwd=repo_root, timeout=30)
-        if rc != 0:
-            emit_error(f"git checkout {base_ref} failed: {err}")
+        # Squash-merge locally — WORKTREE-AWARE (#56 Part 1).
+        # git forbids the same branch in two worktrees, so we must perform the
+        # merge in WHATEVER worktree already holds {base_ref} — never blindly
+        # `git checkout {base_ref}` in repo_root (the recurring #56 fatal when
+        # dev lives in a sibling worktree).
+        base_dir = _worktree_for_branch(repo_root, base_ref)
+        if base_dir is None:
+            # base isn't checked out anywhere → safe to check it out here.
+            rc, _, err = _run(["git", "checkout", base_ref],
+                             cwd=repo_root, timeout=30)
+            if rc != 0:
+                emit_error(
+                    f"git checkout {base_ref} failed: {err}",
+                    context={"hint": f"'{base_ref}' could not be checked out "
+                                     f"in {repo_root}. If it is checked out in "
+                                     f"another worktree, run the ship from "
+                                     f"that worktree, or free it there first."},
+                )
+            base_dir = repo_root
+        elif not base_dir.exists():
+            emit_error(
+                f"'{base_ref}' is registered to a worktree that no longer "
+                f"exists on disk: {base_dir}",
+                context={"hint": "Run `git worktree prune`, then retry — or "
+                                 f"check out {base_ref} somewhere first."},
+            )
+        # From here, operate in base_dir (the worktree that holds base_ref).
+        # 1. Pull latest base.
         rc, _, err = _run(["git", "pull", "origin", base_ref],
-                         cwd=repo_root, timeout=60)
+                         cwd=base_dir, timeout=60)
         if rc != 0:
             emit_error(f"git pull origin {base_ref} failed: {err}")
 
-        # 2. Squash-merge
+        # 2. Squash-merge the change branch into base.
         rc, _, err = _run(["git", "merge", "--squash", branch],
-                         cwd=repo_root, timeout=30)
+                         cwd=base_dir, timeout=30)
         if rc != 0:
             emit_error(f"git merge --squash {branch} failed: {err}")
 
-        # 3. Commit (only if there's anything staged)
+        # 3. Commit (only if there's anything staged) — Conventional-Commit
+        #    message derived from the change (#56 Part 3).
         rc, status_out, _ = _run(["git", "status", "--porcelain"],
-                                 cwd=repo_root, timeout=10)
+                                 cwd=base_dir, timeout=10)
         if status_out.strip():
-            commit_msg = f"feat({branch.replace('change/', '')}): squash-merge {branch}"
+            commit_msg = _compose_squash_message(primitive, slug, metadata)
             rc, _, err = _run(["git", "commit", "-m", commit_msg],
-                             cwd=repo_root, timeout=30)
+                             cwd=base_dir, timeout=30)
             if rc != 0:
                 emit_error(f"git commit (merge) failed: {err}")
 
-        # 4. Push
+        # 4. Push base.
         rc, _, err = _run(["git", "push", "origin", base_ref],
-                         cwd=repo_root, timeout=60)
+                         cwd=base_dir, timeout=60)
         if rc != 0:
             emit_error(f"git push origin {base_ref} failed: {err}")
 
-        outcome = {"mode": "merge"}
+        outcome = {"mode": "merge", "merged_in": str(base_dir)}
     else:
         emit_error("Pass --merge (squash-merge locally) or --pr (open a PR).")
 
-    # Archive, never delete (#38). On a successful merge, mark the change as
-    # shipped (stage='shipped' + shipped_at) and leave EVERYTHING else intact:
-    # worktree, local branch, change record, in-repo records under
-    # .architecture/ (#42). The cockpit + future sessions can retrace what
-    # happened by opening the change exactly the same way as a live one.
-    # Removal is a separate, explicit founder act via `nuke --force` (and the
-    # default `nuke` refuses on a shipped change, preserving the audit trail).
+    # Archive, never delete the BRANCH or RECORD (#38). On a successful merge:
+    #   - mark the change shipped (stage='shipped' + shipped_at + shipped_sha),
+    #   - pin the change-branch tip as the shipped state (#56 Part 2),
+    #   - remove the now-redundant WORKTREE (gated on no live session, #32),
+    #   - KEEP the branch + record — the audit trail. `sulis-change recreate`
+    #     re-materialises the worktree on demand from the pinned sha.
+    # Claim-3 (validated): the cockpit uses worktree_path only for `.exists()`;
+    # retrace/diff is git-based (base_sha + branch). So removing the worktree
+    # preserves full visibility while ending worktree sprawl.
+    # Archive ONLY on a real merge ship. A --pr opens a PR but does NOT merge,
+    # so the change is not shipped yet — it gets marked shipped later, when the
+    # PR lands and the skill calls `mark-shipped`. (Pre-#56, --pr wrongly
+    # flipped the change to 'shipped'; this corrects it.)
     archived: dict = {"archived": False}
-    metadata = read_change_metadata(_metadata_path(worktree_dest, primitive, slug))
-    change_id = metadata.get("change_id")
-    if change_id:
-        record_path = mark_change_shipped(str(change_id))
-        archived = {
-            "archived": record_path is not None,
-            "change_id": change_id,
-            "stage": "shipped",
-        }
-    if args.no_cleanup:
-        # Back-compat: the flag used to opt OUT of cleanup. Cleanup is gone
-        # (we never delete on a happy ship now), so the flag is a no-op.
-        archived["no_cleanup_flag"] = "deprecated — archive-on-ship is the default; flag is a no-op"
+    if outcome.get("mode") == "merge":
+        change_id = metadata.get("change_id")
+        if change_id:
+            # The shared helper applies the safety gates (cwd, live session,
+            # uncommitted work). Both this path and the gh-based `mark-shipped`
+            # path go through it so they can't drift (the same DRY discipline
+            # that fixed the L-02 parser split). --no-cleanup keeps the worktree.
+            archived = _archive_after_ship(
+                repo_root, str(change_id), branch, worktree_dest,
+                remove_worktree=not args.no_cleanup)
+            if args.no_cleanup:
+                archived["no_cleanup_flag"] = (
+                    "set — worktree removal skipped; the worktree is kept")
+        else:
+            # The merge is real, but with no change_id we can't advance the
+            # record — surface it rather than silently returning archived=False.
+            archived["warning"] = (
+                "no change_id in the change manifest — the merge succeeded but "
+                "the change record was not advanced to 'shipped'")
 
     emit_ok(data={
         "branch": branch,
@@ -1188,16 +1411,38 @@ def build_parser() -> argparse.ArgumentParser:
              "commits.",
     )
 
+    # `recreate` re-materialises a shipped change's worktree on demand (#56
+    # Part 2). After ship the worktree is removed but the branch + record
+    # (with the pinned shipped_sha) are kept; this brings the worktree back.
+    p_recreate = sub.add_parser(
+        "recreate",
+        help="Re-materialise a shipped change's worktree from its pinned "
+             "state (on the branch if present, else detached at shipped_sha).",
+    )
+    p_recreate.add_argument("--repo-root", default=os.getcwd(),
+                            help="Path to the repo root (default: cwd)")
+    p_recreate.add_argument("--handle", default=None,
+                            help="Change handle (e.g. CH-01HYQC)")
+    p_recreate.add_argument("--slug", default=None,
+                            help="Change slug (alternative to --handle)")
+    p_recreate.add_argument(
+        "--primitive", default="feat",
+        help="Change primitive (used with --slug; default: feat)")
+
     return parser
 
 
 def cmd_mark_shipped(args: argparse.Namespace) -> None:
-    """#38 — flip stage='shipped' + record shipped_at on a change.
+    """#38/#56 — flip stage='shipped', pin shipped_sha, remove the worktree.
 
-    Called by the `/sulis:change ship` skill after `gh pr merge` succeeds.
-    Resolves the change_id from --change-id, --handle, or SULIS_CHANGE_ID.
-    Idempotent: a repeat call preserves the first shipped_at timestamp.
+    Called by the `/sulis:change ship` skill after `gh pr merge` succeeds (the
+    founder-facing ship path; the local `finish --merge` path is the other).
+    Both go through `_archive_after_ship` so the post-ship state is identical:
+    branch + record kept (audit trail), shipped_sha pinned, redundant worktree
+    removed (gated on no live session + no uncommitted work). Idempotent: a
+    repeat call preserves the first shipped_at + shipped_sha.
     """
+    repo_root = Path(getattr(args, "repo_root", None) or os.getcwd()).resolve()
     change_id = args.change_id or os.environ.get("SULIS_CHANGE_ID")
     if not change_id and args.handle:
         # Resolve a handle → change_id via the global store.
@@ -1210,15 +1455,107 @@ def cmd_mark_shipped(args: argparse.Namespace) -> None:
             emit_error(f"no change found for handle {args.handle!r}")
     if not change_id:
         emit_error("--change-id, --handle, or SULIS_CHANGE_ID required")
-    record_path = mark_change_shipped(str(change_id))
-    if record_path is None:
+    record = read_change_record(str(change_id))
+    if record is None:
         emit_error(f"no change record found for change_id={change_id!r}")
+        return  # for type checker
+    primitive = str(record.get("primitive") or "feat")
+    slug = str(record.get("slug") or "")
+    branch = str(record.get("branch")
+                 or compose_change_branch(primitive, slug))
+    worktree_dest = Path(record.get("worktree_path")
+                         or change_worktree_path(repo_root, primitive, slug))
+
+    archived = _archive_after_ship(repo_root, str(change_id), branch,
+                                   worktree_dest, remove_worktree=True)
     record = read_change_record(str(change_id)) or {}
     emit_ok(data={
         "change_id": change_id,
         "stage": "shipped",
         "shipped_at": record.get("shipped_at"),
-        "record_path": str(record_path),
+        "shipped_sha": record.get("shipped_sha"),
+        "archived": archived,
+    })
+
+
+def cmd_recreate(args: argparse.Namespace) -> None:
+    """Re-materialise a shipped change's worktree on demand (#56 Part 2).
+
+    After a successful ship the worktree is removed but the branch + record
+    (with the pinned ``shipped_sha``) are kept. This brings the worktree
+    back — ON the branch if it still exists (founder resumes work), else
+    DETACHED at the pinned ``shipped_sha`` (view the exact shipped state).
+    Resolved by ``--handle`` (preferred) or ``--slug [--primitive]``.
+    """
+    repo_root = _resolve_repo_root(args)
+
+    record: dict | None = None
+    if args.handle:
+        handle = args.handle.upper()
+        for r in list_all_changes():
+            if str(r.get("handle", "")).upper() == handle:
+                record = r
+                break
+        if record is None:
+            emit_error(f"no change found for handle {args.handle!r}")
+            return  # for type checker
+        primitive = str(record.get("primitive") or "feat")
+        slug = str(record.get("slug") or "")
+        branch = str(record.get("branch")
+                     or compose_change_branch(primitive, slug))
+    else:
+        if not args.slug:
+            emit_error("--handle or --slug is required")
+        primitive, slug = _resolve_primitive_and_slug(args)
+        branch = compose_change_branch(primitive, slug)
+        for r in list_all_changes():
+            if str(r.get("branch", "")) == branch:
+                record = r
+                break
+
+    worktree_dest = change_worktree_path(repo_root, primitive, slug)
+    if worktree_dest.exists():
+        emit_ok(data={
+            "recreated": False,
+            "reason": "worktree already exists",
+            "worktree": str(worktree_dest),
+            "branch": branch,
+        })
+        return
+
+    # Prefer the branch (attached → resume work). Fall back to the pinned
+    # shipped_sha (detached → view the exact shipped state) if it's gone.
+    rc, _, _ = _run(["git", "rev-parse", "--verify", f"refs/heads/{branch}"],
+                    cwd=repo_root, timeout=10)
+    branch_exists = rc == 0
+
+    if branch_exists:
+        ok, msg = git_worktree_add(repo_root, branch, worktree_dest)
+        if not ok:
+            emit_error(f"could not recreate worktree: {msg}")
+        ref_used, detached = branch, False
+    else:
+        shipped_sha = str((record or {}).get("shipped_sha") or "").strip()
+        if not shipped_sha:
+            emit_error(
+                f"branch {branch} is gone and no shipped_sha is recorded — "
+                f"cannot recreate the worktree",
+                context={"hint": "This change predates shipped_sha recording; "
+                                 "the exact shipped state is unavailable."},
+            )
+        rc, _, err = _run(["git", "worktree", "add", "--detach",
+                           str(worktree_dest), shipped_sha],
+                          cwd=repo_root, timeout=60)
+        if rc != 0:
+            emit_error(f"git worktree add --detach failed: {err}")
+        ref_used, detached = shipped_sha, True
+
+    emit_ok(data={
+        "recreated": True,
+        "worktree": str(worktree_dest),
+        "branch": branch,
+        "ref": ref_used,
+        "detached": detached,
     })
 
 
@@ -1231,6 +1568,7 @@ HANDLERS = {
     "stage": cmd_stage,
     "mark-shipped": cmd_mark_shipped,
     "nuke": cmd_nuke,
+    "recreate": cmd_recreate,
 }
 
 

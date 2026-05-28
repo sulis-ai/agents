@@ -235,6 +235,7 @@ _CHANGE_RECORD_FIELDS: tuple[str, ...] = (
     "created_at",
     "stage",
     "shipped_at",
+    "shipped_sha",
 )
 
 
@@ -377,18 +378,30 @@ def session_is_live(change_id: str) -> bool:
     return False
 
 
-def mark_change_shipped(change_id: str, *, now: str | None = None) -> Path | None:
+def mark_change_shipped(
+    change_id: str,
+    *,
+    now: str | None = None,
+    shipped_sha: str | None = None,
+) -> Path | None:
     """Mark a change as shipped (#38): flip stage→'shipped', record shipped_at.
 
-    Idempotent: a second call preserves the original ``shipped_at`` (the audit
-    trail is the FIRST ship event; re-running the ship flow must not rewrite
-    history). Returns the record path on success, None if the record doesn't
-    exist.
+    Idempotent: a second call preserves the original ``shipped_at`` AND the
+    original ``shipped_sha`` (the audit trail is the FIRST ship event;
+    re-running the ship flow must not rewrite history). Returns the record
+    path on success, None if the record doesn't exist.
 
-    No deletion: the worktree, branch, change record, and in-repo records all
-    stay so the cockpit + future sessions can retrace. Removal is a separate
-    explicit founder act (`/sulis:change nuke --force`); the default `nuke`
-    refuses on a terminal stage.
+    ``shipped_sha`` (#56 Part 2) pins the change-branch tip at ship time —
+    "the state it was in when we shipped". It joins ``base_sha`` (the fork
+    point) so the cockpit can show the exact shipped diff and
+    ``sulis-change recreate`` can re-materialise the worktree from a stable
+    ref even after the worktree is removed.
+
+    No deletion of the *record*: the branch + change record stay so the
+    cockpit + future sessions can retrace. (The ship flow removes the
+    redundant *worktree* separately, gated on ``session_is_live``; recreate
+    brings it back on demand.) Permanent removal is a separate explicit
+    founder act (`/sulis:change nuke --force`).
     """
     record = read_change_record(change_id)
     if record is None:
@@ -398,6 +411,9 @@ def mark_change_shipped(change_id: str, *, now: str | None = None) -> Path | Non
     existing = str(record.get("shipped_at") or "").strip()
     if not existing:
         record["shipped_at"] = timestamp
+    # Idempotency: preserve the first shipped_sha (the pinned shipped state).
+    if shipped_sha and not str(record.get("shipped_sha") or "").strip():
+        record["shipped_sha"] = shipped_sha
     # Persist `stage: shipped` on BOTH stores: state.json (the overlay
     # list_all_changes reads) AND change.json (what direct `read_change_record`
     # readers like cmd_nuke see). Without this update to the record itself,

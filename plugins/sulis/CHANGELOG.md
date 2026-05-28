@@ -1,5 +1,17 @@
 # Sulis — Changelog
 
+## v0.75.0 — 2026-05-28
+
+**Minor — harden the ship path for the multi-worktree model (closes #56).**
+
+Every recurring git-state failure on ship traced to one root cause: the change tooling assumed a *single-working-tree* git model while operating in a *multi-worktree* one (where the stash stack and which-branch-is-checked-out-where are shared per-repo). This makes the ship path worktree-native:
+
+- **Worktree-aware ship.** `sulis-change finish --merge` no longer blind-`git checkout {base}` in the repo root (which git refuses when `dev` is checked out in a sibling worktree — the exact #56 fatal). It locates where the base ref lives via `git worktree list --porcelain` and runs the squash-merge there.
+- **Remove the worktree on ship; pin the shipped state; recreate on demand.** A successful ship now removes the redundant worktree (ending the sprawl) while keeping the branch + record, and pins `shipped_sha` (the change-branch tip — "the state it was in when we shipped"). New `sulis-change recreate <handle>` re-materialises the worktree on the branch, or detached at `shipped_sha` if the branch is gone. Removal is gated: kept when a live session is bound, when there's genuine uncommitted work, or when the caller's shell is inside the worktree.
+- **Conventional-Commit squash message.** The squash-merge message is `{primitive}: {slug}` + the change intent + co-author trailer, replacing the hardcoded `feat({branch}): squash-merge {branch}`.
+- **Slug de-doubling.** `start` no longer produces `change/fix-fix-login-bug` when the slug already leads with the primitive — it strips the redundant prefix (`change/fix-the-login-bug`).
+- Both ship paths (`finish --merge` and the gh-based `mark-shipped`) go through one shared archive helper so they can't drift. The norm — *a change worktree only ever holds its own change branch* — is now enforced by the tool, not just documented.
+
 ## v0.74.0 — 2026-05-28
 
 **Minor — `/sulis:resolve-lessons`: proactive, collision-aware lesson-backlog drain.**

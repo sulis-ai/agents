@@ -168,6 +168,30 @@ def test_mark_change_shipped_returns_none_for_missing_record(tmp_path, monkeypat
                                   now="2026-05-27T16:00:00Z") is None
 
 
+def test_mark_change_shipped_records_shipped_sha(tmp_path, monkeypatch):
+    """#56 Part 2 — the change-branch tip is pinned as shipped_sha so the
+    shipped state is viewable + recreatable after the worktree is removed."""
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
+    cs.write_change_record(_GOOD_ULID, _record(_GOOD_ULID))
+    cs.mark_change_shipped(_GOOD_ULID, now="2026-05-27T16:00:00Z",
+                           shipped_sha="deadbeef" * 5)  # 40-char sha
+    record = cs.read_change_record(_GOOD_ULID)
+    assert record["shipped_sha"] == "deadbeef" * 5
+
+
+def test_mark_change_shipped_preserves_first_shipped_sha(tmp_path, monkeypatch):
+    """Idempotent like shipped_at: a re-run preserves the FIRST pinned sha —
+    re-shipping must not rewrite the audit trail."""
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
+    cs.write_change_record(_GOOD_ULID, _record(_GOOD_ULID))
+    cs.mark_change_shipped(_GOOD_ULID, now="2026-05-27T16:00:00Z",
+                           shipped_sha="a" * 40)
+    cs.mark_change_shipped(_GOOD_ULID, now="2026-05-27T17:00:00Z",
+                           shipped_sha="b" * 40)  # later re-ship
+    record = cs.read_change_record(_GOOD_ULID)
+    assert record["shipped_sha"] == "a" * 40
+
+
 def test_write_change_record_defaults_missing_fields(tmp_path, monkeypatch):
     """Missing keys default to "" (str); stage defaults to recon."""
     monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
