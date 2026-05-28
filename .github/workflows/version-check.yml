@@ -1,0 +1,157 @@
+name: version-check
+# WP-005 — the changeset-presence guard. ADVISORY-FIRST this cycle (ADR-006).
+#
+# ADVISORY-ONLY THIS CYCLE — IT DOES NOT BLOCK ANY MERGE.
+# On a plugin-affecting diff (plugins/sulis/**) that carries NO new
+# .changesets/*.yaml, this job emits a `::warning::` and EXITS 0. It does
+# NOT fail the check. The ONLY non-zero exits are genuine infrastructure
+# errors (e.g. malformed manifest JSON) — never the missing-changeset case.
+#
+# WHY ADVISORY AND NOT REQUIRED (the self-lockout reason — ADR-006):
+# `dev` currently has unbumped commits with NO changesets (the #66
+# situation). If this guard were a *required* check the moment it shipped,
+# the very next `dev→main` PR — which legitimately carries those
+# pre-existing unlabelled commits — would be BLOCKED, locking the team out
+# of releasing at all. The writer (/sulis:change ship, WP-002) must be live
+# and reliably producing changesets BEFORE the *absence* of one can be a
+# hard error. So this cycle: warn + exit 0.
+#
+# PROMOTION TO A REQUIRED (BLOCKING) CHECK IS A SEPARATE, LATER,
+# FOUNDER-GATED STEP in a future cycle — NOT this WP. It happens only once
+# (a) the writer reliably produces changesets and (b) the founder
+# explicitly authorises it. See ADR-006 and the deferred-promotion marker
+# at the `exit 0` below for the single line that flips this guard from
+# advisory to required.
+on:
+  push:
+    branches:
+      - 'change/**'
+  pull_request:
+    branches: [main]
+concurrency:
+  group: version-check-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  version-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Full history so the merge-base against the integration branch
+      # resolves on a `change/**` push (the PR trigger gets its base SHA
+      # from the event payload and does not need deep history, but a
+      # full checkout is harmless and keeps the two paths uniform).
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Resolve BASE for BOTH triggers:
+      #   * pull_request (the dev→main PR): the PR base is `main`'s tip,
+      #     supplied by the event payload. Diff base..HEAD captures
+      #     everything `dev` accumulated since `main`.
+      #   * push to change/**: there is no PR base in the payload, so use
+      #     the merge-base of HEAD against the integration branch
+      #     (origin/dev, falling back to origin/main). Diff base..HEAD then
+      #     captures everything the change branch has accumulated since it
+      #     forked — the right question for "does this change carry a
+      #     changeset", not just the last push's delta.
+      - name: Resolve base ref
+        id: base
+        # GitHub event context is passed through `env:` (not interpolated
+        # directly into the script with `${{ }}`) — the GHA hardening
+        # convention this repo already follows in release-on-merge.yml. These
+        # values are GitHub-controlled SHAs/enums, but env-passing keeps the
+        # shell free of any `${{ }}` expansion regardless.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -uo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            BASE="$PR_BASE_SHA"
+            echo "pull_request trigger: BASE = PR base sha ($BASE)"
+          else
+            # push to change/** — merge-base against the integration branch.
+            BASE=""
+            for ref in origin/dev origin/main; do
+              if git rev-parse --verify --quiet "$ref" >/dev/null; then
+                BASE=$(git merge-base "$ref" HEAD 2>/dev/null || true)
+                if [ -n "$BASE" ]; then
+                  echo "push trigger: BASE = merge-base($ref, HEAD) = $BASE"
+                  break
+                fi
+              fi
+            done
+            if [ -z "$BASE" ]; then
+              # No integration branch reachable (rare). Fall back to the
+              # push's previous tip; worst case the diff is narrower, which
+              # only makes the advisory check quieter — never a false block.
+              BASE="$PUSH_BEFORE_SHA"
+              echo "push trigger: no integration branch reachable; BASE = github.event.before ($BASE)"
+            fi
+          fi
+          if [ -z "$BASE" ]; then
+            echo "::error::could not resolve a BASE ref to diff against"
+            exit 1   # genuine infra error — base resolution is a prerequisite
+          fi
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
+
+      # The advisory changeset-presence guard. A plugin-affecting diff
+      # (plugins/sulis/**) SHOULD carry >=1 new .changesets/*.yaml. When it
+      # does not, WARN and EXIT 0 — advisory this cycle, never blocking.
+      #
+      # NOTE: this step deliberately does NOT use `set -e`. A no-match
+      # `ls .changesets/*.yaml` returns non-zero, and under `set -e` that
+      # would abort the step before the `exit 0` — turning the advisory
+      # warning into a job failure (the exact self-lockout this WP forbids).
+      - name: Changeset-presence guard (advisory)
+        env:
+          BASE: ${{ steps.base.outputs.base }}
+        run: |
+          set -uo pipefail
+          TOUCHED=$(git diff --name-only "$BASE...HEAD" -- plugins/sulis/ | wc -l | tr -d ' ')
+          PENDING=0
+          [ -d .changesets ] && PENDING=$(ls .changesets/*.yaml 2>/dev/null | wc -l | tr -d ' ')
+          echo "plugins/sulis files touched since base: $TOUCHED ; pending changesets: $PENDING"
+
+          if [ "$TOUCHED" -gt 0 ] && [ "$PENDING" -eq 0 ]; then
+            echo "::warning::This change touches plugins/sulis/ but has no .changesets/*.yaml."
+            echo "::warning::Run /sulis:change ship (it writes one), or add one per .changesets/README.md."
+            echo "ADVISORY this cycle — not blocking. (Promotion to a required check is a later, founder-gated step — see ADR-006.)"
+            # TODO(deferred): promote this advisory guard to a REQUIRED check.
+            # Flip the `exit 0` below to `exit 1` so a plugin-diff without a
+            # changeset BLOCKS the merge. Do this ONLY once (a) the writer
+            # (/sulis:change ship) reliably produces changesets and (b) the
+            # founder explicitly authorises it — at which point version-check
+            # is also added to main's required status checks (WP-006 territory).
+            # REASON: dev currently has unbumped, changeset-less commits (#66);
+            #   a required check now would block the next dev→main PR (self-lockout).
+            # RESOLVE_BY: a later, founder-gated cycle (no fixed date — gated on the
+            #   writer being live + producing changesets + founder authorisation).
+            # ADR: .architecture/release-train/adrs/ADR-006-version-check-advisory-first.md
+            exit 0     # <-- ADVISORY: warn, do NOT fail. (promotion site: exit 1)
+          fi
+          echo "changeset state consistent with the plugin diff (advisory check)"
+
+      # Advisory version-sync check: plugin.json .version MUST eventually
+      # equal the marketplace sulis-entry .version. A mismatch usually means
+      # a prior partial bump. Surface it as a WARNING — this cycle it does
+      # not block. (The hard VERSION_DRIFT guard lives in release-on-merge.yml,
+      # which runs at the actual bump.)
+      #
+      # No `set -e` here for the same reason as above: a warning must never
+      # become a job failure in advisory mode.
+      - name: Version-sync check (advisory)
+        run: |
+          set -uo pipefail
+          PLUGIN_JSON="plugins/sulis/.claude-plugin/plugin.json"
+          MARKET_JSON=".claude-plugin/marketplace.json"
+          P=$(jq -r '.version' "$PLUGIN_JSON")
+          M=$(jq -r '.plugins[] | select(.name=="sulis") | .version' "$MARKET_JSON")
+          echo "plugin.json .version = $P ; marketplace sulis-entry .version = $M"
+          if [ "$P" != "$M" ]; then
+            echo "::warning::VERSION_DRIFT: plugin.json ($P) != marketplace sulis-entry ($M)."
+            echo "::warning::Usually a prior partial bump. ADVISORY this cycle — not blocking."
+          else
+            echo "version-sync ok: plugin == marketplace-sulis == $P (advisory check)"
+          fi
