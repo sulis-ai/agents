@@ -125,6 +125,53 @@ them; each subagent finds its own.
 
 ```
 loop:
+    0. Pre-flight: base branch CI-clean gate (MUST — run BEFORE
+       reading the INDEX, before any wave is dispatched).
+
+       Determine the base branch with the SAME CW-04 detection the
+       train uses at Step 12 (reuse it — do not re-derive):
+
+           CURRENT_BRANCH=$(git -C <repo-root> branch --show-current)
+           if [[ "$CURRENT_BRANCH" == change/* ]]; then
+               BASE_BRANCH="$CURRENT_BRANCH"
+           else
+               BASE_BRANCH="dev"
+           fi
+
+       Then read the base branch HEAD's CURRENT recorded CI
+       conclusion (no polling) via the wpx-preflight gate:
+
+           PREFLIGHT=$("$WPX_DIR/wpx-preflight" dev-clean \
+             --repo <org/repo> --branch "$BASE_BRANCH")
+
+       The gate emits the same {"ok", "errors", "warnings"} envelope
+       as wpx-arrival-check (parse it the way the loop already parses
+       that contract):
+
+       - ok:false  → STOP. The base branch HEAD has pre-existing CI
+         failures (landed via a manual/non-train merge). Surface ONE
+         plain-English blocker and dispatch NOTHING. This is a hard
+         stop — there is no "proceed anyway" path (a red base branch
+         is inherited by every branch cut from it, so every WP would
+         rediscover the SAME red per-branch). The blocker copy is
+         founder-English — no internal IDs, no rule codes, no script
+         names. Name the count and the failing checks, lead with what
+         to do:
+
+             "<BASE_BRANCH> has N pre-existing CI failures — fix
+              these first, then re-run. (Failing checks: <names>.)
+              Nothing was dispatched."
+
+         (The count + check names come from the gate's PRE-01 error:
+         its `actual` carries "N pre-existing CI failures: [names]".)
+
+       - ok:true   → proceed to step 1 below, exactly as today. A
+         green base branch makes the run behave byte-for-byte as it
+         did before this gate existed. An advisory `warnings` entry
+         (no CI recorded yet, or CI still running) does NOT block —
+         the pre-flight reads recorded state, it never waits; an
+         absence of evidence is not a red.
+
     1. Read .architecture/{project}/work-packages/INDEX.md.
 
     2. Read INDEX header for max_parallel (default 3 if absent).
