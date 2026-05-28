@@ -662,6 +662,29 @@ def deploy_is_applicable(contract: dict) -> bool:
     return profile == _RC_DEPLOYABLE_ARTIFACT_TYPE
 
 
+# ─── Free-plan branch-protection predicate (HD-003/HD-004) ──────────────────
+#
+# GitHub's protection API returns this body (on stderr via `gh`) when a repo
+# is private on the free plan — branch protection is unavailable ON THE PLAN,
+# not merely unconfigured. Stable enough to match on; if GitHub changes the
+# wording the tests pin the expectation and the failure is loud (HD-003).
+#
+# Promoted here (CLAUDE.md #2 extract-now) once a SECOND caller appeared:
+# wpx-arrival-check's RC-02 check (HD-003) and wpx-preflight's
+# protection-status subcommand (HD-004) both classify the same 403. One home
+# so the free-plan vs unconfigured distinction can never drift between the
+# arrival-check surface and the per-run/per-ship surface.
+
+_FREEPLAN_403_MARKER = "upgrade to github pro"
+
+
+def is_freeplan_protection_403(rc: int, stderr: str) -> bool:
+    """True when the branch-protection API was unavailable because the repo is
+    private on the free plan (403 'Upgrade to GitHub Pro…'), as opposed to a
+    genuine missing/misconfigured protection on a protection-capable repo."""
+    return rc != 0 and _FREEPLAN_403_MARKER in (stderr or "").lower()
+
+
 def find_section(text: str, heading: str) -> tuple[int, int]:
     """Find the byte range of a Markdown section by heading.
 

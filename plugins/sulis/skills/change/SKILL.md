@@ -325,6 +325,40 @@ issue near the bottom, separated per rule above.
 gh pr checks change/fix-login-bug --watch
 ```
 
+Alongside the wait — ONCE per ship — probe branch protection on the
+landing line (`dev`). This is purely informational: it NEVER gates the
+ship, no matter what it returns. The PR, the branch-ci wait, and the
+review gate are all unchanged.
+
+```bash
+PROTECTION=$("$SCRIPTS_DIR/wpx-preflight" protection-status \
+  --repo <org/repo> --branch dev)
+```
+
+Read `data.protection` from the JSON it emits:
+
+- `protected` → say nothing. Protection is in force; the automated
+  checks gate the merge. (Public / properly-protected repos behave
+  exactly as before — no notice.)
+- `unconfigured` → say nothing here. The repo CAN enforce gating but
+  hasn't set it up; that is a one-time repo-setup matter the arrival
+  check already surfaces, not a per-ship notice.
+- `unavailable-free-plan` → emit the one-time warning below (founder-
+  English — no rule codes, no HTTP status, no script or command
+  names), THEN PROCEED with the ship regardless. Show it at most once
+  per ship:
+
+  > *"Heads-up before this lands: branch protection isn't available on
+  > your plan, so the automated checks can't block a manual merge —
+  > only merges I route through Sulis are checked before landing. This
+  > ship goes through the checks as normal; I'm just flagging that a
+  > merge by hand or a direct push to the shared line wouldn't be
+  > stopped if it were broken. To close that gap you can make the repo
+  > public or move to a paid plan. Carrying on with the ship now."*
+
+  The notice never blocks: the ship continues to the checks + review
+  gate exactly as it would on a protected repo.
+
 - **Checks pass** → proceed to step 4.5.
 - **Checks fail** → STOP. Do NOT merge. Surface the failure in plain
   English with the next step (Rule 5):
