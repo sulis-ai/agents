@@ -433,6 +433,21 @@ graph TD
 4. ...
 ```
 
+**The WP Table header is canonical — emit it exactly.** The header MUST
+begin `| ID | Title | Primitive | Status | Depends On | Blocks |` (ID
+first; no separate `kind` column — `kind` aliases to `primitive` and
+silently wins first-match, so a `| WP | Title | kind | Primitive | ... |`
+header makes the table invisible to the run-all loop). After writing
+`INDEX.md`, run the decompose-time lint to catch a drifted header before
+it reaches the loop:
+
+```bash
+wpx-index lint --project {project}
+```
+
+A non-zero exit means the header drifted — fix it to the canonical form
+above and re-run.
+
 ---
 
 ## Adapting Depth

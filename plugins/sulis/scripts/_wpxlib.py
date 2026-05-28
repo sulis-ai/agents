@@ -1479,6 +1479,38 @@ _WP_TABLE_HEADER_RE = re.compile(
     r"^\|\s*ID\s*\|\s*Title\s*\|", re.MULTILINE
 )
 
+# The canonical WP INDEX header — what plan-work's decompose template emits
+# and what the lint reports as "expected". Kept here next to the regex so the
+# message and the matcher can never drift apart.
+CANONICAL_WP_INDEX_HEADER = (
+    "| ID | Title | Primitive | Status | Depends On | Blocks |"
+)
+
+
+def validate_wp_index_header(index_text: str) -> str | None:
+    """Decompose-time lint: does INDEX.md contain a recognisable WP table?
+
+    Reuses ``_WP_TABLE_HEADER_RE`` — the SAME matcher ``parse_index_md`` uses
+    to find tables — so the lint can never disagree with the parser (#60,
+    EP-03 single source of truth). A drifted header like
+    ``| WP | Title | kind | Primitive | ... |`` is invisible to that regex,
+    so the table silently vanishes from the run-all loop (list-ready /
+    flip-status fail mid-run with "Could not find WP table"). The lint turns
+    that silent mid-run failure into a surgical decompose-time error.
+
+    Returns ``None`` when the INDEX has at least one canonical-headed WP
+    table, or an error message naming the expected header when it doesn't.
+    """
+    if _WP_TABLE_HEADER_RE.search(index_text) is not None:
+        return None
+    return (
+        "INDEX.md has no recognisable WP table — its header must begin "
+        f"`{CANONICAL_WP_INDEX_HEADER}` (ID first; no duplicate `kind` "
+        "column). A drifted header (e.g. `| WP | Title | kind | "
+        "Primitive | ... |`) is invisible to the run-all loop and fails "
+        "silently mid-run. Fix the header to the canonical form above."
+    )
+
 
 @dataclass
 class WPRow:

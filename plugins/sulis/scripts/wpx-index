@@ -7,6 +7,8 @@ Subcommands:
   read-config           Read project config (max_parallel, etc.).
   propagate-blocked     Mark transitively-dependent WPs as dependency_blocked.
   set-status            Force a specific status on a WP.
+  lint                  Fail loudly if INDEX.md's WP table header drifted
+                        from the canonical `| ID | Title | ... |` form (#60).
 
 Exit codes: 0 success, 1 user/data error, 2 internal error.
 """
@@ -34,6 +36,7 @@ from _wpxlib import (  # noqa: E402
     resolve_wp_columns,
     validate_cross_kind_contract_wiring,
     validate_frontend_wp_visual_contract,
+    validate_wp_index_header,
     validate_wp_status,
     visual_contract_signed_off,
 )
@@ -708,6 +711,26 @@ def cmd_audit_contracts(args: argparse.Namespace) -> None:
     emit_ok(data={"violations": [], "wp_count": len(wps)})
 
 
+def cmd_lint(args: argparse.Namespace) -> None:
+    """#60 — fail loudly if INDEX.md's WP table header drifted.
+
+    Decompose-time gate: a non-canonical header (e.g.
+    ``| WP | Title | kind | Primitive | ... |``) is invisible to
+    ``_WP_TABLE_HEADER_RE`` and so vanishes from the run-all loop, where
+    flip-status / list-ready then fail silently mid-run. Running this at
+    decompose time converts that silent failure into a surgical error.
+
+    Reuses ``validate_wp_index_header`` (which keys off the SAME regex
+    ``parse_index_md`` uses), so the lint can never disagree with the
+    parser about what counts as a WP table.
+    """
+    text = _read_index(args)
+    error = validate_wp_index_header(text)
+    if error is not None:
+        emit_error(error)
+    emit_ok(data={"header": "canonical"})
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # HD-008 — wpx-index status (read-only computed view)
 # ─────────────────────────────────────────────────────────────────────────
@@ -903,6 +926,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_common_args(p_audit)
 
+    p_lint = sub.add_parser(
+        "lint",
+        help="Fail loudly (#60) if INDEX.md's WP table header drifted from "
+             "the canonical `| ID | Title | Primitive | Status | Depends On "
+             "| Blocks |` form. Run at decompose time so a drifted header "
+             "fails surgically instead of vanishing silently mid-run-all.",
+    )
+    add_common_args(p_lint)
+
     # HD-008 — read-only computed-status view.
     p_status = sub.add_parser(
         "status",
@@ -951,6 +983,7 @@ HANDLERS = {
     "add-wp": cmd_add_wp,
     "sync-auto-drafts": cmd_sync_auto_drafts,
     "audit-contracts": cmd_audit_contracts,
+    "lint": cmd_lint,
     "status": cmd_status,
 }
 

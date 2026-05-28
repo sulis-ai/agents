@@ -13,7 +13,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from _wpxlib import parse_index_md, resolve_wp_columns
+from _wpxlib import (
+    parse_index_md,
+    resolve_wp_columns,
+    validate_wp_index_header,
+)
 
 
 def _parse(tmp_path: Path, index_text: str):
@@ -99,3 +103,76 @@ def test_parse_index_extras_exclude_resolved_columns(tmp_path):
     rows = _parse(tmp_path, index)
     # Token is the only non-standard column → the only extra.
     assert list(rows[0].extras) == ["Token"]
+
+
+# ─── validate_wp_index_header: decompose-time loud lint (#60) ───────────────
+#
+# A drifted WP INDEX header (e.g. `| WP | Title | kind | Primitive | ... |`)
+# is invisible to `_WP_TABLE_HEADER_RE` — parse_index_md / list-ready /
+# flip-status all silently fail to find the table. The lint reuses the same
+# regex (single source of truth, EP-03) and converts that silent mid-run-all
+# failure into a surgical decompose-time error.
+
+_CANONICAL_INDEX = """# Work Package Index
+
+## Work Packages
+
+| ID | Title | Primitive | Status | Depends On | Blocks |
+|---|---|---|---|---|---|
+| WP-001 | Foundation | create | pending | — | WP-002 |
+"""
+
+# The exact drifted shape observed in #60: WP-first + a duplicate `kind`
+# column that aliases to primitive and silently wins first-match.
+_NONCANONICAL_INDEX = """# Work Package Index
+
+## Work Packages
+
+| WP | Title | kind | Primitive | Status | Depends On | Blocks |
+|---|---|---|---|---|---|---|
+| WP-001 | Foundation | backend | create | pending | — | WP-002 |
+"""
+
+
+def test_lint_accepts_canonical_header():
+    # Canonical header passes: returns None (no error).
+    assert validate_wp_index_header(_CANONICAL_INDEX) is None
+
+
+def test_lint_rejects_noncanonical_header():
+    # Drifted header is rejected with an error message that names the
+    # expected canonical header so the author can fix it.
+    err = validate_wp_index_header(_NONCANONICAL_INDEX)
+    assert err is not None
+    assert "| ID | Title |" in err
+
+
+def test_lint_rejects_when_no_wp_table_at_all():
+    # An INDEX with no WP table at all is also a lint failure.
+    err = validate_wp_index_header("# Work Package Index\n\nNo table here.\n")
+    assert err is not None
+    assert "| ID | Title |" in err
+
+
+def test_lint_reuses_wp_table_header_re():
+    # Single source of truth (EP-03): the lint MUST key off the same regex
+    # parse_index_md uses, not a second hand-rolled one. Any header the
+    # regex matches must pass the lint, and vice-versa.
+    from _wpxlib import _WP_TABLE_HEADER_RE
+
+    assert _WP_TABLE_HEADER_RE.search(_CANONICAL_INDEX) is not None
+    assert validate_wp_index_header(_CANONICAL_INDEX) is None
+
+    assert _WP_TABLE_HEADER_RE.search(_NONCANONICAL_INDEX) is None
+    assert validate_wp_index_header(_NONCANONICAL_INDEX) is not None
+
+
+def test_lint_canonical_index_parses_primitive_not_kind(tmp_path):
+    # Guard (DoD #3): a canonical INDEX (no `kind` column) parses primitive
+    # correctly — there is no kind-wins-first ambiguity because the canonical
+    # template has no kind column.
+    p = tmp_path / "INDEX.md"
+    p.write_text(_CANONICAL_INDEX, encoding="utf-8")
+    rows = parse_index_md(p)
+    by_id = {r.id: r for r in rows}
+    assert by_id["WP-001"].primitive == "create"

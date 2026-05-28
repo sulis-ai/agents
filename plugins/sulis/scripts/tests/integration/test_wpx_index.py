@@ -410,3 +410,46 @@ def test_audit_contracts_noop_for_single_kind(
     seed_index("INDEX-minimal.md")
     result = run_tool("wpx-index", "audit-contracts", *_common(tmp_project))
     assert result.ok, f"single-kind set should pass: {result.error}"
+
+
+# ─── #60: lint — decompose-time canonical-header gate ─────────────────────
+
+
+def test_lint_passes_canonical_index(tmp_project, seed_index, run_tool):
+    """The canonical INDEX-minimal header passes the lint (exit 0)."""
+    seed_index("INDEX-minimal.md")
+    result = run_tool("wpx-index", "lint", *_common(tmp_project))
+    assert result.ok, f"canonical INDEX should pass lint: {result.error}"
+    assert result.returncode == 0
+
+
+def test_lint_rejects_noncanonical_header(tmp_project, run_tool):
+    """A drifted header (`| WP | Title | kind | Primitive |`) is rejected
+    loudly: non-zero exit + a message naming the expected canonical header.
+
+    This is the #60 regression — pre-fix the table was invisible to the
+    run-all loop and failed silently mid-run; the lint surfaces it at
+    decompose time instead."""
+    tmp_project.index_md.write_text(
+        "# Work Package Index\n\n"
+        "## Work Packages\n\n"
+        "| WP | Title | kind | Primitive | Status | Depends On | Blocks |\n"
+        "|---|---|---|---|---|---|---|\n"
+        "| WP-001 | Foundation | backend | create | pending | — | WP-002 |\n",
+        encoding="utf-8",
+    )
+    result = run_tool("wpx-index", "lint", *_common(tmp_project))
+    assert not result.ok, "drifted header must be rejected"
+    assert result.returncode != 0
+    assert "| ID | Title |" in (result.error or "")
+
+
+def test_lint_rejects_missing_wp_table(tmp_project, run_tool):
+    """An INDEX with no WP table at all also fails the lint."""
+    tmp_project.index_md.write_text(
+        "# Work Package Index\n\nNo work-package table here yet.\n",
+        encoding="utf-8",
+    )
+    result = run_tool("wpx-index", "lint", *_common(tmp_project))
+    assert not result.ok
+    assert "| ID | Title |" in (result.error or "")
