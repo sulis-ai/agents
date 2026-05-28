@@ -49,6 +49,69 @@ def test_journal_step_trace_round_trip(tmp_project, run_tool):
     assert r3.data["value"] == "completed"
 
 
+# ─── Loud-failure on a missing prerequisite step row (#63) ────────────────
+#
+# A skipped `start-step` must be caught the moment the next step-dependent
+# call runs, not pages later. `complete-step` already errored for this case;
+# the fix makes every step-trace-dependent command (complete-step,
+# record-attempt) consistent via a single shared prerequisite check.
+
+
+def test_complete_step_fails_loudly_on_missing_start_step(tmp_project, run_tool):
+    """complete-step --step N must exit non-zero with a clear message naming
+    the missing prerequisite when start-step --step N was never recorded."""
+    run_tool("wpx-journal", "init", "--wp", "WP-001", *_common(tmp_project))
+    # No start-step for step 3 — go straight to complete-step.
+    r = run_tool(
+        "wpx-journal", "complete-step",
+        "--wp", "WP-001", "--step", "3", "--outcome", "done",
+        *_common(tmp_project),
+    )
+    assert not r.ok, "complete-step on a missing step row must fail"
+    assert r.returncode != 0, "exit code must be non-zero"
+    assert "3" in r.error and "start-step" in r.error, (
+        f"error must name the missing prerequisite step + remedy; got: {r.error}"
+    )
+
+
+def test_record_attempt_fails_loudly_on_missing_start_step(tmp_project, run_tool):
+    """record-attempt --step N presumes a prior start-step row for step N.
+    When that row is missing it must fail loudly (consistent with
+    complete-step) rather than silently appending an orphan attempt row."""
+    run_tool("wpx-journal", "init", "--wp", "WP-001", *_common(tmp_project))
+    # No start-step for step 4 — record-attempt should refuse.
+    r = run_tool(
+        "wpx-journal", "record-attempt",
+        "--wp", "WP-001", "--step", "4", "--attempt", "1",
+        "--failure", "import error", "--root-cause", "wrong path",
+        "--change", "fixed import", "--outcome", "still-failing",
+        *_common(tmp_project),
+    )
+    assert not r.ok, "record-attempt on a missing step row must fail"
+    assert r.returncode != 0, "exit code must be non-zero"
+    assert "4" in r.error and "start-step" in r.error, (
+        f"error must name the missing prerequisite step + remedy; got: {r.error}"
+    )
+
+
+def test_record_attempt_succeeds_after_start_step(tmp_project, run_tool):
+    """Happy path: with the prerequisite start-step row present,
+    record-attempt succeeds."""
+    run_tool("wpx-journal", "init", "--wp", "WP-001", *_common(tmp_project))
+    run_tool(
+        "wpx-journal", "start-step", "--wp", "WP-001", "--step", "4",
+        *_common(tmp_project),
+    )
+    r = run_tool(
+        "wpx-journal", "record-attempt",
+        "--wp", "WP-001", "--step", "4", "--attempt", "1",
+        "--failure", "import error", "--root-cause", "wrong path",
+        "--change", "fixed import", "--outcome", "passed",
+        *_common(tmp_project),
+    )
+    assert r.ok, f"record-attempt after start-step should succeed; got {r.error}"
+
+
 def test_step_trace_accepts_half_step_six_point_five(tmp_project, run_tool):
     """v0.20.1+: --step 6.5 is accepted (used by the executor's Step 6.5
     code-review gate). Pre-v0.20.1 the script rejected 6.5 because --step

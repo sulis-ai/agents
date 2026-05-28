@@ -121,6 +121,55 @@ def _format_step(step: float) -> str:
     return str(step)
 
 
+def _read_step_trace(text: str) -> MdTable:
+    """Read the ## Step trace section's table.
+
+    Returns a populated MdTable when rows exist, or an empty-but-shaped
+    table otherwise. Shared by every step-trace-dependent command so they
+    parse the trace identically.
+    """
+    start, end = find_section(text, "## Step trace")
+    section = text[start:end]
+    table_text = "\n".join(
+        ln for ln in section.splitlines()[1:] if ln.startswith("|")
+    )
+    if table_text.strip():
+        return parse_md_table(table_text)
+    return MdTable(
+        headers=["Step", "Started", "Completed", "Outcome"],
+        alignments=["---:", "---", "---", "---"],
+        rows=[],
+    )
+
+
+def _find_step_row(table: MdTable, step: float) -> list[str] | None:
+    """Return the trace row whose first cell matches `step`, or None."""
+    target = _format_step(step)
+    for row in table.rows:
+        if row and row[0].strip() == target:
+            return row
+    return None
+
+
+def _require_step_started(table: MdTable, step: float) -> list[str]:
+    """Return the trace row for `step`, or fail loudly if it is missing.
+
+    Every step-trace-dependent command (complete-step, record-attempt)
+    presumes a prior `start-step --step N` row. A skipped `start-step`
+    means the executor's journal bookkeeping silently drifted; surfacing
+    it the moment the next dependent call runs (rather than pages later,
+    or never) is the point of #63. Single shared check — never duplicated
+    per command — so the loud-failure behaviour stays consistent.
+    """
+    row = _find_step_row(table, step)
+    if row is None:
+        emit_error(
+            f"Step {_format_step(step)} not started in journal. "
+            f"Call `start-step --step {_format_step(step)}` first."
+        )
+    return row  # type: ignore[return-value]  # emit_error sys.exits on None
+
+
 def cmd_init(args: argparse.Namespace) -> None:
     paths = paths_from_args(args)
     j = paths.journal(args.wp)
@@ -139,22 +188,13 @@ def cmd_start_step(args: argparse.Namespace) -> None:
     text = _read_journal(paths, args.wp)
     # Find the Step trace table and add a new row with Started timestamp.
     start, end = find_section(text, "## Step trace")
-    section = text[start:end]
-    table_text = "\n".join(
-        ln for ln in section.splitlines()[1:] if ln.startswith("|")
-    )
-    table = parse_md_table(table_text) if table_text.strip() else MdTable(
-        headers=["Step", "Started", "Completed", "Outcome"],
-        alignments=["---:", "---", "---", "---"],
-        rows=[],
-    )
-    # Add the new row if not already present
-    for row in table.rows:
-        if row and row[0].strip() == _format_step(args.step):
-            emit_error(
-                f"Step {args.step} already started in journal "
-                f"(row found in Step trace)."
-            )
+    table = _read_step_trace(text)
+    # Refuse a duplicate start for the same step.
+    if _find_step_row(table, args.step) is not None:
+        emit_error(
+            f"Step {args.step} already started in journal "
+            f"(row found in Step trace)."
+        )
     table.rows.append([_format_step(args.step), _now(), "(in flight)", "—"])
     new_section = "## Step trace\n\n" + table.render() + "\n\n"
     text = text[:start] + new_section + text[end:]
@@ -168,23 +208,11 @@ def cmd_complete_step(args: argparse.Namespace) -> None:
     paths = paths_from_args(args)
     text = _read_journal(paths, args.wp)
     start, end = find_section(text, "## Step trace")
-    section = text[start:end]
-    table_text = "\n".join(
-        ln for ln in section.splitlines()[1:] if ln.startswith("|")
-    )
-    table = parse_md_table(table_text)
-    found = False
-    for row in table.rows:
-        if row and row[0].strip() == _format_step(args.step):
-            row[2] = _now()
-            row[3] = args.outcome
-            found = True
-            break
-    if not found:
-        emit_error(
-            f"Step {args.step} not started in journal. "
-            f"Call `start-step --step {args.step}` first."
-        )
+    table = _read_step_trace(text)
+    # Fail loudly if the prerequisite start-step row is missing.
+    row = _require_step_started(table, args.step)
+    row[2] = _now()
+    row[3] = args.outcome
     new_section = "## Step trace\n\n" + table.render() + "\n\n"
     text = text[:start] + new_section + text[end:]
     _write_journal(paths, args.wp, text)
@@ -194,6 +222,11 @@ def cmd_complete_step(args: argparse.Namespace) -> None:
 def cmd_record_attempt(args: argparse.Namespace) -> None:
     paths = paths_from_args(args)
     text = _read_journal(paths, args.wp)
+    # A self-heal attempt presumes the step it heals was started. Fail
+    # loudly if the prerequisite start-step row is missing, consistent
+    # with complete-step (#63) — an orphan attempt row is a silent
+    # journal-drift signal we never want to write.
+    _require_step_started(_read_step_trace(text), args.step)
     start, end = find_section(text, "## Self-heal attempts")
     section = text[start:end]
     table_text = "\n".join(

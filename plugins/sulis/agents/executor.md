@@ -601,6 +601,25 @@ JSON** — don't rely on the prose summary. Exit codes: `0` success,
 `1` user/data error (parseable from JSON), `2` internal error (rare;
 report verbatim in BLOCKER if encountered).
 
+**Issue every `wpx-journal` call as a single, output-visible Bash
+invocation — never chained into a multi-line block, never with output
+suppressed.** Each bookkeeping call gets its own Bash tool invocation
+so you SEE its `{"ok": ...}` JSON and confirm it actually ran before
+moving on. Do NOT pack `record-preflight`/`start-step`/`complete-step`/
+`mark-plan-item` together into one `&&`-chained or heredoc block, and
+do NOT pipe their output to `/dev/null`, `> /dev/null 2>&1`, `| tail`,
+or similar. The failure mode this prevents: a chained, output-
+suppressed block where an early call fails silently (or the block is
+written but never actually dispatched), leaving the journal
+silently-incomplete — which the run-all loop then trusts when it reads
+the step trace to classify done-Step-7 vs error. The journal is the
+load-bearing handoff contract; one visible call per line keeps it
+honest. (The step-dependent commands now also fail loudly with a
+non-zero exit when their prerequisite `start-step` row is missing —
+so a skipped `start-step` is caught the moment the next dependent call
+runs — but that defense-in-depth only fires if you actually run the
+calls and read their output.)
+
 ### Example: Step 1 worktree + journal initialisation
 
 ```bash

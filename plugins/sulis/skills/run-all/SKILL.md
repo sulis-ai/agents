@@ -340,7 +340,11 @@ loop:
        Use wpx-* CLI tools for all bookkeeping (journal, blocker)
        per "Bookkeeping via wpx-* tools" in agents/executor.md.
        Direct Markdown edits to .executor-WP-NNN.md or BLOCKER-*.md
-       are FORBIDDEN.
+       are FORBIDDEN. Issue every wpx-journal call as a single,
+       output-visible Bash invocation — never chained into a
+       multi-line block, never output-suppressed — so you confirm
+       each one actually ran before moving on (a silently-skipped
+       call leaves the journal incomplete, which this loop trusts).
 
        If the journal at .architecture/{project}/work-packages/
        .executor-WP-NNN.md exists with an incomplete tail (read
