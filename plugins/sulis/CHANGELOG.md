@@ -1,5 +1,16 @@
 # Sulis — Changelog
 
+## v0.73.0 — 2026-05-28
+
+**Minor — wpx-index drives the multi-table per-kind INDEX (closes #50).**
+
+Contract-first decompose (#33–#37) produces one WP sub-table per kind (Data contracts / Visual contracts / Backend / Frontend / Integration), each with different columns. `parse_index_md` already handled multi-table, but `flip-status` / `set-status` / `list-ready` / `propagate-blocked` used `_find_wp_table` (first table only) — so a WP in any later sub-table was invisible and `/sulis:run-all` couldn't drive a contract-first project (the platform agent's blocker). This blocked every XL/contract-first project.
+
+New helpers in `wpx-index`: `_find_all_wp_tables`, `_collect_status_across_tables`, `_load_deps_from_frontmatter`, `_resolve_deps`. The four subcommands now span all sub-tables. **Dependencies resolve per-WP**: frontmatter `dependsOn` (the complete, uniform, kind-agnostic source) when the WP file exists, else the per-table dep column — never silently empty, even for fileless WPs (mid-migration). The INDEX dep columns are heterogeneous display variants (the visual-contract "Data contract" column is informational pairing, not a readiness dep; VC WPs correctly have `dependsOn: []`).
+
+Single-table behaviour preserved; the one intentional change is that frontmatter wins over a disagreeing hand-edited INDEX dep column (the more-correct source).
+
+Pre-merge review (step 4.5) caught a silent-fail-open in the first cut (all-or-nothing frontmatter fallback → fileless WP wrongly appears ready); fixed with per-WP resolution + a red-then-green regression pin. 16 new tests + verified end-to-end against the real platform 53-WP INDEX (flip-status WP-AJ-DC-01 succeeds; propagate marks 26 dependents). 836/836 pass.
 ## v0.72.0 — 2026-05-28
 
 **Patch — `session_is_live(change_id)` helper for dashboard + change liveness (closes TaskCreate #32).**
