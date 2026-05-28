@@ -40,6 +40,7 @@ counted as both "code-snippet" and "email".
 
 from __future__ import annotations
 
+import ipaddress
 import re
 from dataclasses import dataclass, field
 
@@ -219,6 +220,22 @@ _DOMAIN = re.compile(
     r"gov|edu|uk|us|de|fr|jp|cn|au|ca|info|biz)\b",
     re.IGNORECASE,
 )
+
+# IP addresses (v4 dotted-quad + v6 compact/full). Whether a match is
+# REDACTED depends on `ipaddress` stdlib classification — see
+# ``_replace_ip``. The regex over-matches (e.g. could grab version-string-
+# shaped quads); the replacer parses each candidate via the stdlib and
+# returns it unchanged when it's not a real IP or when it's globally
+# routable. (#40)
+_IPV4 = r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b"
+# IPv6 is permissive — full + compressed forms + the common
+# loopback/ULA/link-local shapes. We rely on
+# ``ipaddress.ip_address`` to reject false positives.
+_IPV6 = (r"\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b"
+         r"|::1\b"
+         r"|\bfe80::[0-9a-fA-F:]+\b"
+         r"|\bfc[0-9a-fA-F]{2}:[0-9a-fA-F:]+\b")
+_IP_ADDRESS = re.compile(rf"(?:{_IPV4})|(?:{_IPV6})")
 
 
 # ─── Pass implementations ────────────────────────────────────────────────────
@@ -426,10 +443,39 @@ def _replace_domain(match: re.Match, keep: set[str]) -> str:
     return "<domain>"
 
 
+def _replace_ip(match: re.Match, keep: set[str]) -> str:
+    """Scrub private / loopback / link-local IPs to ``<ip>``; preserve
+    globally-routable IPs (#40).
+
+    Uses Python's stdlib ``ipaddress`` module rather than hand-coded
+    range bounds — ``is_private``, ``is_loopback``, and ``is_link_local``
+    encode the relevant RFCs (1918 v4 private, 4193 v6 ULA, 3927 v4
+    link-local, 4291 v6 link-local, plus loopback for both families).
+    The lesson body itself cited these RFCs; the stdlib IS the citation.
+
+    Regex over-matches on purpose (catches version-string-shaped quads,
+    malformed IP shapes); when ``ip_address`` fails to parse the match,
+    preserve the original substring — that's a false-positive from the
+    regex, not an IP to scrub.
+    """
+    s = match.group(0)
+    if _is_kept(s, keep):
+        return s
+    try:
+        addr = ipaddress.ip_address(s)
+    except ValueError:
+        return s  # not a real IP — preserve (regex false-positive)
+    if addr.is_private or addr.is_loopback or addr.is_link_local:
+        return "<ip>"
+    return s  # globally routable — preserve
+
+
 # Pass order: code → URLs → secrets (env + JWT + long-token) → emails →
-# other-repo → paths (absolute then relative) → domains. Precision
+# other-repo → IPs → paths (absolute then relative) → domains. Precision
 # decreases left-to-right; URLs run early so the path/domain passes
-# never get a chance to gobble the host out of an http(s):// URL.
+# never get a chance to gobble the host out of an http(s):// URL. IPs
+# run before path passes so `10.0.0.5:8080` doesn't get partly grabbed
+# by the path regex.
 _PASSES: list[tuple[str, re.Pattern, callable]] = [
     ("code", _CODE_BLOCK, _replace_code_block),
     ("url", _URL, _replace_url),
@@ -438,6 +484,7 @@ _PASSES: list[tuple[str, re.Pattern, callable]] = [
     ("secret", _LONG_TOKEN, _replace_long_token),
     ("email", _EMAIL, _replace_email),
     ("other-repo", _OTHER_REPO_REF, _replace_other_repo),
+    ("ip", _IP_ADDRESS, _replace_ip),
     ("path", _ABS_PATH, _replace_abs_path),
     ("path", _REL_PATH, _replace_rel_path),
     ("domain", _DOMAIN, _replace_domain),

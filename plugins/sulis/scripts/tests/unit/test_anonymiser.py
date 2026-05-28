@@ -215,6 +215,102 @@ def test_url_without_credentials_on_non_allowlisted_host_redacted():
     assert "<url>" in r.redacted_text
 
 
+# ─── IP address scrubbing (#40) ─────────────────────────────────────────────
+#
+# Private + loopback + link-local IPs are scrubbed (RFC 1918, RFC 4193,
+# RFC 3927, RFC 4291); globally-routable IPs are preserved (public DNS,
+# well-known services — maintainer context).
+
+
+def test_rfc1918_10_dot_is_scrubbed():
+    r = anonymise("our k8s pod is at 10.0.0.5 internally")
+    assert "<ip>" in r.redacted_text
+    assert "10.0.0.5" not in r.redacted_text
+
+
+def test_rfc1918_192_168_is_scrubbed():
+    r = anonymise("the router admin is on 192.168.1.1")
+    assert "<ip>" in r.redacted_text
+    assert "192.168.1.1" not in r.redacted_text
+
+
+def test_rfc1918_172_16_is_scrubbed():
+    r = anonymise("docker network at 172.16.0.5")
+    assert "<ip>" in r.redacted_text
+    assert "172.16.0.5" not in r.redacted_text
+
+
+def test_172_outside_private_range_is_preserved():
+    """172.16.0.0/12 — 172.16.x to 172.31.x is private; 172.32+ is public."""
+    r = anonymise("the public service at 172.217.0.46")
+    assert "172.217.0.46" in r.redacted_text
+
+
+def test_loopback_127_is_scrubbed():
+    r = anonymise("dev server on 127.0.0.1:3000")
+    assert "<ip>" in r.redacted_text
+    assert "127.0.0.1" not in r.redacted_text
+
+
+def test_link_local_169_254_is_scrubbed():
+    r = anonymise("cloud metadata at 169.254.169.254")
+    assert "<ip>" in r.redacted_text
+    assert "169.254.169.254" not in r.redacted_text
+
+
+def test_ipv6_ula_is_scrubbed():
+    r = anonymise("ULA host at fc00::1")
+    assert "<ip>" in r.redacted_text
+    assert "fc00::1" not in r.redacted_text
+
+
+def test_ipv6_loopback_is_scrubbed():
+    r = anonymise("listening on ::1 port 8080")
+    assert "<ip>" in r.redacted_text
+
+
+def test_ipv6_link_local_is_scrubbed():
+    r = anonymise("see fe80::1")
+    assert "<ip>" in r.redacted_text
+    assert "fe80::1" not in r.redacted_text
+
+
+def test_public_ipv4_dns_is_preserved():
+    """Public DNS IPs (8.8.8.8, 1.1.1.1) are maintainer context — preserved."""
+    r = anonymise("the DNS query went to 8.8.8.8 and timed out")
+    assert "8.8.8.8" in r.redacted_text
+    r2 = anonymise("retry via 1.1.1.1")
+    assert "1.1.1.1" in r2.redacted_text
+
+
+def test_public_ipv6_dns_is_preserved():
+    r = anonymise("ipv6 dns at 2001:4860:4860::8888")
+    assert "2001:4860:4860::8888" in r.redacted_text
+
+
+def test_version_string_not_misclassified_as_ipv4():
+    """A version like `3.11.2` has 3 octets — must not match the IPv4
+    regex (which requires 4) and must not be scrubbed."""
+    r = anonymise("we run python 3.11.2 on the server")
+    assert "3.11.2" in r.redacted_text
+
+
+def test_port_numbers_not_scrubbed():
+    """An IP:port combo — port should not be touched even when the IP
+    is scrubbed."""
+    r = anonymise("connecting to 10.0.0.5:8080")
+    assert "<ip>" in r.redacted_text
+    assert "8080" in r.redacted_text
+
+
+def test_keep_list_short_circuits_ip():
+    """Founder-opt-in: a private IP they explicitly choose to keep
+    survives."""
+    context = AnonymisationContext(keep_strings=["192.168.1.1"])
+    r = anonymise("the gateway is 192.168.1.1", context)
+    assert "192.168.1.1" in r.redacted_text
+
+
 # ─── _url_has_userinfo predicate (direct unit tests) ─────────────────────────
 #
 # Direct helper tests distinguish "deliberately correct" from the
