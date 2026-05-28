@@ -1,0 +1,26 @@
+{
+  "pr": "feat/wp-004-release-train-skill",
+  "project": "release-train",
+  "timestamp": "2026-05-28T184815Z",
+  "base": "change/create-release-train",
+  "head": "feat/wp-004-release-train-skill",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "hygiene": {
+    "scope":        { "module_fan_out": 1, "commit_type_spread": ["docs"], "severity": "note" },
+    "size":         { "lines_added": 437, "lines_removed": 0, "files_changed": 1, "severity": "note" },
+    "safety":       { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "note" },
+    "completeness": { "new_source_without_test": 0, "api_change_without_schema": false, "severity": "note", "note": "kind:docs SKILL.md; computation proven by WP-001 suite per WP DoD" }
+  },
+  "findings": {
+    "in_changes":   { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+    "in_neighbours":{ "critical": 0, "high": 0, "medium": 0, "low": 0 }
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "note": "SKILL.md has no resilience surface of its own; single-bump-authority preserved (skill read-only, GHA owns bump)" },
+    "security":     { "findings": 0, "primitives_checked": ["SEC-01..07","SC-01..04"], "note": "no secrets, no injection surface, read-only-bar-the-PR confirmed" },
+    "quality":      { "findings": 0, "note": "no contract drift (references real _changeset public fns); ADR-003 three-value+tag match verified; 0 TODO/FIXME" }
+  },
+  "hardening_deltas": 0,
+  "auto_downgrade_triggers": []
+}
