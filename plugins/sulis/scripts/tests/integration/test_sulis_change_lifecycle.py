@@ -614,27 +614,27 @@ def test_status_reports_sha_and_ahead_behind(local_git_repo, run_tool):
 # ─── finish ─────────────────────────────────────────────────────────────
 
 
-def test_finish_merge_archives_and_preserves_worktree(local_git_repo, run_tool):
-    """`finish --merge` squash-merges to dev and ARCHIVES (no deletion) — #38.
+def test_finish_merge_removes_worktree_keeps_branch_and_record(local_git_repo,
+                                                               run_tool):
+    """`finish --merge` ships, then REMOVES the worktree but KEEPS the branch +
+    record — #56 Part 2 (refines #38's archive-don't-delete).
 
-    Reverses the old delete-on-ship behaviour: the worktree, the local branch,
-    and the change record all stay so the cockpit + future sessions can
-    retrace what happened. The change record's stage flips to 'shipped' and
-    `shipped_at` is set.
+    The committed work merges to dev; the change-branch tip is pinned as
+    `shipped_sha`; the now-redundant worktree is removed (only regenerable
+    `.changes/` metadata was uncommitted in it); the local branch + change
+    record stay so the cockpit can retrace and `recreate` can re-materialise.
     """
-    # Start a change
     start_result = run_tool("sulis-change", "start",
                             "--repo-root", str(local_git_repo),
                             "--slug", "merge-test", "--primitive", "feat")
     change_id = start_result.data["change_id"]
 
-    # Add a commit on the change branch
-    worktree_dest = local_git_repo.parent / f"{local_git_repo.name}-change-feat-merge-test"
+    worktree_dest = (local_git_repo.parent
+                     / f"{local_git_repo.name}-change-feat-merge-test")
     (worktree_dest / "merged.txt").write_text("merged content\n")
     _run(["git", "add", "merged.txt"], cwd=worktree_dest)
     _run(["git", "commit", "-m", "feat: merge-test work"], cwd=worktree_dest)
 
-    # Finish with --merge
     result = run_tool("sulis-change", "finish",
                       "--repo-root", str(local_git_repo),
                       "--slug", "merge-test", "--primitive", "feat",
@@ -642,21 +642,52 @@ def test_finish_merge_archives_and_preserves_worktree(local_git_repo, run_tool):
     assert result.ok, f"finish failed: stderr={result.stderr}"
     assert result.data["outcome"]["mode"] == "merge"
 
-    # Archived (NOT deleted): the new contract.
-    assert result.data["archived"]["archived"] is True
-    assert result.data["archived"]["stage"] == "shipped"
-    assert result.data["archived"]["change_id"] == change_id
+    archived = result.data["archived"]
+    assert archived["archived"] is True
+    assert archived["stage"] == "shipped"
+    assert archived["change_id"] == change_id
+    # shipped_sha is pinned (#56 Part 2) — non-empty, a 40-char git sha.
+    assert archived["shipped_sha"] and len(archived["shipped_sha"]) == 40
+    # The worktree was removed (only sulis metadata was dirty → safe).
+    assert archived["worktree_removed"] is True
+    assert not worktree_dest.exists(), "worktree must be removed on ship"
 
-    # Worktree + local branch BOTH remain — the audit trail is preserved.
-    assert worktree_dest.exists(), "worktree must remain after archive-on-ship"
-    proc = _run(
-        ["git", "branch", "--list", "change/feat-merge-test"], cwd=local_git_repo,
-    )
+    # The local branch + record BOTH remain — the audit trail.
+    proc = _run(["git", "branch", "--list", "change/feat-merge-test"],
+                cwd=local_git_repo)
     assert "change/feat-merge-test" in proc.stdout, \
-        "local change branch must remain after archive-on-ship"
+        "local change branch must remain after ship"
 
-    # The work is on dev
+    # The work is on dev.
     assert (local_git_repo / "merged.txt").exists()
+
+
+def test_finish_merge_keeps_worktree_when_uncommitted_work_present(
+        local_git_repo, run_tool):
+    """The worktree is KEPT (never force-discarded) when genuine uncommitted
+    work is present — #56 Part 2 safety. Only sulis-managed `.changes/`
+    metadata is safe to discard; real founder WIP blocks removal."""
+    run_tool("sulis-change", "start",
+             "--repo-root", str(local_git_repo),
+             "--slug", "wip-test", "--primitive", "feat")
+    worktree_dest = (local_git_repo.parent
+                     / f"{local_git_repo.name}-change-feat-wip-test")
+    # Commit the shippable work...
+    (worktree_dest / "shipped.txt").write_text("done\n")
+    _run(["git", "add", "shipped.txt"], cwd=worktree_dest)
+    _run(["git", "commit", "-m", "feat: wip-test work"], cwd=worktree_dest)
+    # ...then leave a genuine uncommitted file behind.
+    (worktree_dest / "scratch-notes.txt").write_text("half-finished idea\n")
+
+    result = run_tool("sulis-change", "finish",
+                      "--repo-root", str(local_git_repo),
+                      "--slug", "wip-test", "--primitive", "feat", "--merge")
+    assert result.ok, f"finish failed: stderr={result.stderr}"
+    archived = result.data["archived"]
+    assert archived["worktree_removed"] is False
+    assert "uncommitted work" in archived["worktree_kept_reason"]
+    assert worktree_dest.exists(), "worktree must be kept when WIP present"
+    assert (worktree_dest / "scratch-notes.txt").exists()
 
 
 def test_finish_requires_merge_or_pr(local_git_repo, run_tool):

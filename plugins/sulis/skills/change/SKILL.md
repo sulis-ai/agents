@@ -43,6 +43,7 @@ You give it a subcommand and it does the right thing:
 | `/sulis:change focus CH-01HQ8X` | Jumps you back into a piece of work you started earlier. |
 | `/sulis:change ship CH-01HQ8X` | Lands the finished work into the shared `dev` line (after the safety checks pass). |
 | `/sulis:change rebase CH-01HQ8X` | Pulls in everyone else's latest work so yours stays current. |
+| `/sulis:change recreate CH-01HQ8X` | Re-opens the workspace for a shipped change, exactly as it was when it shipped. |
 | `/sulis:change nuke CH-01HQ8X` | Throws a change away — deletes its branch, workspace, and local state. Asks first; can't be undone. |
 
 This skill is an **orchestrator** — it tells the Sulis session which
@@ -271,10 +272,12 @@ exact branch and the irreversible step BEFORE doing it, and require an
 explicit yes:
 
 > *"This will merge **fix the login bug** (`change/fix-login-bug`) into the
-> shared `dev` line. The merge itself can't be casually undone. Your
-> workspace + branch stay intact afterwards (as an audit trail you can
-> retrace in the cockpit) — they're marked as shipped, not deleted. I'll
-> only merge once the automated checks pass. Go ahead? (yes / no)"*
+> shared `dev` line. The merge itself can't be casually undone. Afterwards
+> I'll tidy away the workspace (you don't need it once it's shipped), but
+> the branch + the full history stay as an audit trail you can retrace in
+> the cockpit — and I can re-open the exact workspace any time with
+> `recreate`. I'll only merge once the automated checks pass. Go ahead?
+> (yes / no)"*
 
 Do not proceed without an affirmative. If the founder's phrasing was
 ambiguous ("get rid of this", "clear it"), do NOT treat it as ship — ask
@@ -389,30 +392,37 @@ gh pr merge change/fix-login-bug --squash --delete-branch
 ```
 
 `--delete-branch` deletes only the **remote** branch (the merge artefact gh
-no longer needs). The local branch + worktree stay intact — they are the
-audit trail.
+no longer needs). The **local** branch stays — it's the audit trail. (The
+local worktree is tidied away in step 6.)
 
-Then sync local `dev`:
+Then sync local `dev` — **in whichever worktree holds it** (never `git
+checkout dev` inside a change worktree; in the multi-worktree model `dev`
+may be checked out elsewhere and git forbids the same branch in two
+worktrees):
 
 ```bash
-git checkout dev && git pull origin dev
+git -C "$(git worktree list --porcelain | awk '/^worktree /{p=$2} /^branch refs\/heads\/dev$/{print p}')" pull origin dev 2>/dev/null \
+  || { git checkout dev && git pull origin dev; }
 ```
 
-**6. Mark the change as shipped (#38).** Flips `stage='shipped'` + records
-`shipped_at` on the change. The cockpit reads this to show the change in its
-"Shipped" section; `nuke` reads it to refuse destroying the archive by
-default:
+**6. Mark the change as shipped, and tidy the workspace (#38/#56).** Flips
+`stage='shipped'`, pins `shipped_sha` (the branch tip — "the state it was in
+when we shipped"), and **removes the now-redundant worktree** (kept if a live
+session is bound or if there's uncommitted work). The branch + record stay;
+`recreate` brings the worktree back on demand:
 
 ```bash
-"$SCRIPTS_DIR/sulis-change" mark-shipped --handle CH-01HQ8X
+"$SCRIPTS_DIR/sulis-change" mark-shipped --handle CH-01HQ8X \
+  --repo-root <main-repo-root>
 ```
 
 **7. Report:**
 
-> *"Shipped **fix the login bug** (`CH-01HQ8X`) into `dev`. The workspace +
-> branch are preserved as an audit trail you can retrace in the cockpit
-> (under 'Shipped'). When you're ready to release everything on `dev` to
-> production, that's a separate, deliberate step — just ask."*
+> *"Shipped **fix the login bug** (`CH-01HQ8X`) into `dev`. I've tidied away
+> the workspace, but the full history is preserved as an audit trail you can
+> retrace in the cockpit (under 'Shipped') — and I can re-open the exact
+> workspace any time with `recreate`. When you're ready to release everything
+> on `dev` to production, that's a separate, deliberate step — just ask."*
 
 ### `rebase <CH-handle>` — pull in the latest
 
@@ -457,6 +467,37 @@ print(json.dumps(r))
   CH-01HQ8X` again."*
 - `internal_error` → surface plainly + suggest re-running; if it persists,
   it's a tooling issue to raise.
+
+### `recreate <CH-handle>` — re-open a shipped change's workspace
+
+After a change ships, its workspace (worktree) is tidied away to avoid
+sprawl — but the branch + full history are kept and the shipped state is
+pinned (`shipped_sha`). `recreate` brings the workspace back, exactly as it
+was. Safe action (no prompt needed), but echo what's happening (Rule 3).
+
+**1. Resolve the change** (same as `focus`); get its handle.
+
+**2. Run the tool:**
+
+```bash
+"$SCRIPTS_DIR/sulis-change" recreate --handle CH-01HQ8X \
+  --repo-root <main-repo-root>
+```
+
+It re-materialises the worktree on the kept branch (so the founder can pick
+work back up), or — if the branch has since been deleted — detached at the
+pinned `shipped_sha` (a read-only view of exactly what shipped).
+
+**3. Report by the JSON (Rule 1):**
+
+- `recreated: true`, `detached: false` → *"Re-opened the workspace for
+  **fix the login bug** (`CH-01HQ8X`) on its branch — pick up right where it
+  shipped."*
+- `recreated: true`, `detached: true` → *"Re-opened **fix the login bug**
+  (`CH-01HQ8X`) as a read-only snapshot of exactly what shipped (its branch
+  was removed, so it's a view, not a place to keep working)."*
+- `recreated: false` (`already exists`) → *"The workspace for **fix the
+  login bug** (`CH-01HQ8X`) is already open at `{worktree}`."*
 
 ### `nuke <CH-handle>` — throw a change away
 
@@ -587,6 +628,18 @@ them the dashboard updates on its own as work progresses, and point them at
   file movement (`transfer_worktree_changes`), never the shared stash stack.
   If you ever need to park transient state, make a throwaway WIP commit —
   don't reach for `git stash`.
+- **Never `git checkout dev` inside a change worktree (issue #56).** A change
+  worktree only ever holds its OWN `change/*` branch. In the multi-worktree
+  model `dev` is checked out elsewhere and git forbids the same branch in two
+  worktrees — `git checkout dev` returns *"fatal: 'dev' is already checked
+  out"*. To sync `dev`, operate in whatever worktree holds it (`git worktree
+  list --porcelain`). `sulis-change finish --merge` already does this for you.
+- **Ship removes the worktree but keeps the branch — that's intended (issue
+  #56).** After ship, the worktree is tidied away (it's redundant; the branch
+  + record + cockpit preserve full retrace) and `shipped_sha` pins the exact
+  shipped state. It is KEPT when a live session is bound or there's
+  uncommitted work. If the founder wants it back, that's `recreate` — never
+  tell them their work is gone.
 - **`nuke` is irreversible — dry-run, echo, confirm, then `--force`.** Never
   pass `--force` on the first call. Run the dry-run, show the founder the
   exact footprint (and call out any unmerged commits that would be lost),
