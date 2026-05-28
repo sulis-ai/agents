@@ -452,6 +452,60 @@ every ship is safe. If there are findings, surface what was captured in the
 ship report (step 7) — "Captured 4 lessons as issues #60-63" — never as a
 question. By the time the merge runs, the lessons are already filed.
 
+**4.7. Write the changeset (REQUIRED — before the merge, never a post-ship
+question).** Every change that touches what people install records a one-line
+**release note** of its own, automatically, before it lands. That note is what
+lets the project assemble the next release — its version and its changelog —
+in one batched, deterministic step instead of leaving it to whoever ships to
+remember. Like the review gate and the lesson capture, this is a step the agent
+owns, not a *"want me to record a release note?"* question (AAF-08).
+
+The note records *what changed and how big a release it is* — never a version
+number. The size (`patch` / `minor` / `major`) is read straight off the kind of
+change the founder already chose at `start` (its primitive), so there is no
+second judgment call to get wrong. Admin-only or docs-only changes that don't
+touch what people install record **no** note — that's expected, not a miss.
+
+Resolve `$SCRIPTS_DIR` exactly as the block at the top of this skill already
+does (don't re-derive it), then:
+
+```bash
+# Does this change touch what people install? (the sulis plugin tree)
+git fetch origin dev -q
+TOUCHES_PLUGIN=$( [ -n "$(git diff --name-only origin/dev...HEAD -- plugins/sulis/)" ] \
+  && echo True || echo False )
+
+# Record the release note. The size is read from the change's primitive;
+# admin/docs-only changes (size = none) record nothing — and that's fine.
+python3 -c "
+import sys; sys.path.insert(0, '$SCRIPTS_DIR')
+import _changeset, datetime, json
+primitive = '<the change primitive, e.g. fix / feat / extend>'
+tier = _changeset.tier_for_primitive(primitive)
+if tier is None:
+    print(json.dumps({'wrote': False, 'reason': 'admin/docs-only — no release note'}))
+else:
+    p = _changeset.write_changeset(
+        '.changesets',
+        change_id='<this change ULID>',
+        primitive=primitive,
+        tier=tier,
+        touches_plugin=$TOUCHES_PLUGIN,
+        summary='''<the change intent, in plain English — this becomes the changelog line>''',
+        slug='<the change slug, e.g. release-train>',
+        created_at=datetime.datetime.now(datetime.timezone.utc),
+    )
+    print(json.dumps({'wrote': True, 'path': str(p), 'tier': tier}))
+"
+git add .changesets/   # the note is part of the change, so it lands on dev with the squash
+```
+
+The note is written **before** the squash-merge so it travels in with the
+merged change and lands on `dev`. **This step records the note and explicitly
+does NOT bump any version** — the version is computed and applied once, for the
+whole batch, when `dev` is released to production. Read the `wrote` field of the
+JSON to know what to say in the ship report (step 7).
+
 **5. Squash-merge** (only after green + confirmation):
 
 ```bash
@@ -483,16 +537,22 @@ session is bound or if there's uncommitted work). The branch + record stay;
   --repo-root <main-repo-root>
 ```
 
-**7. Report** (include the lessons captured at step 4.6, if any):
+**7. Report** (include the lessons captured at step 4.6 and the release note
+recorded at step 4.7, if any):
 
-> *"Shipped **fix the login bug** (`CH-01HQ8X`) into `dev`. Captured 2
-> lessons along the way (issues #60-61). I've tidied away the workspace, but
-> the full history is preserved as an audit trail you can retrace in the
-> cockpit (under 'Shipped') — and I can re-open the exact workspace any time
-> with `recreate`. When you're ready to release everything on `dev` to
-> production, that's a separate, deliberate step — just ask."*
+> *"Shipped **fix the login bug** (`CH-01HQ8X`) into `dev`. Recorded this as a
+> `minor` release note, and captured 2 lessons along the way (issues #60-61).
+> I've tidied away the workspace, but the full history is preserved as an audit
+> trail you can retrace in the cockpit (under 'Shipped') — and I can re-open the
+> exact workspace any time with `recreate`. When you're ready to release
+> everything on `dev` to production, that's a separate, deliberate step — just
+> ask."*
 
-(Drop the lessons sentence when step 4.6 captured none.)
+State the release note as a fact, never as a question. When step 4.7 wrote one,
+name its size (*"Recorded this as a `minor` release note."*); when it wrote none
+(an admin/docs-only change), say so plainly (*"No release note needed — this
+doesn't change what people install."*). Drop the lessons sentence when step 4.6
+captured none.
 
 ### `rebase <CH-handle>` — pull in the latest
 
@@ -723,6 +783,14 @@ them the dashboard updates on its own as work progresses, and point them at
   `launch_change_terminal`, `back_integrate_change_branch`, or
   `SULIS_CHANGE_ID`. Surface what is now true and what they should do next
   (FE-09 / no mechanism narration).
+- **The release note is written before the merge, and it never bumps a
+  version.** Step 4.7 writes the changeset on the change branch so it travels
+  in with the squash and lands on `dev` — write it after the squash and it
+  never reaches the shared line. The step records *intent and size only*; the
+  version bump happens once, for the whole batch, when `dev` is released to
+  production (a separate, automated step). A ship step that bumps a version is
+  a bug. Admin-only / docs-only changes (ones that don't touch what people
+  install) write no note — that's expected, not a missed step.
 
 ## Vocabulary
 
