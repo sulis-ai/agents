@@ -18,14 +18,31 @@ import os
 import subprocess
 from pathlib import Path
 
-import pytest
-
-from _wpxlib import change_worktree_path, read_change_metadata
+import _wpxlib
+from _wpxlib import (
+    adopt_uncommitted_into_change,
+    change_worktree_path,
+    compose_change_branch,
+    read_change_metadata,
+)
 
 
 def _run(cmd, cwd):
     return subprocess.run(cmd, cwd=cwd, capture_output=True,
                           text=True, check=True)
+
+
+def _git(cwd, *args):
+    """Run a git command in `cwd`, returning stripped stdout."""
+    return subprocess.run(
+        ["git", *args], cwd=cwd, capture_output=True, text=True, check=True,
+    ).stdout.strip()
+
+
+def _stash_entries(repo: Path) -> list[str]:
+    """Return the messages of every stash currently on `repo`'s shared stack."""
+    out = _git(repo, "stash", "list")
+    return [line for line in out.splitlines() if line.strip()]
 
 
 # ─── start ──────────────────────────────────────────────────────────────
@@ -93,7 +110,7 @@ def test_start_validates_slug(local_git_repo, run_tool):
 
 
 def test_adopt_uncommitted_changes_into_change_branch(local_git_repo, run_tool):
-    """Stash + worktree + unstash retrofits uncommitted work."""
+    """Worktree-safe file transfer retrofits uncommitted work."""
     # Make some uncommitted changes on dev
     (local_git_repo / "new-file.md").write_text("WIP design notes\n")
 
@@ -133,6 +150,381 @@ def test_adopt_local_commits_into_change_branch(local_git_repo, run_tool):
 
     # Local dev should be reset to origin/dev (no feature.md there)
     assert not (local_git_repo / "feature.md").exists()
+
+
+# ─── adopt: worktree-safety regression (issue #53) ────────────────────────
+
+
+def test_adopt_does_not_consume_sibling_worktree_stash(local_git_repo):
+    """Load-bearing regression for issue #53.
+
+    The shared stash stack is per-repo, so a positional ``git stash pop``
+    in a change worktree can grab an UNRELATED sibling worktree's stash.
+    This is the DC-04 incident: an adopt run popped a hardening stash
+    pushed from a different worktree and dumped its files in as cruft.
+
+    Reproduction (white-box, real git): a sibling worktree's stash is
+    interleaved onto the shared stack at the exact moment between the
+    adopt's own stash push and its worktree pop — i.e. it lands on TOP
+    of the adopt's stash, so the positional pop grabs the WRONG one.
+    We model the interleave by wrapping ``git_worktree_add`` (the step
+    that runs between push and pop in the buggy code) to push the
+    sibling stash. The function under test still uses real git.
+
+    Assertion: after adopt, the sibling stash is STILL on the stack and
+    its content is untouched. Against the buggy (positional-pop) code
+    this FAILS — the sibling stash is consumed.
+    """
+    repo = local_git_repo
+
+    # The sibling worktree's parked work (a tracked-file modification +
+    # an untracked file). We capture it as a stash-like payload that the
+    # interleave hook will push at the hazardous moment.
+    real_worktree_add = _wpxlib.git_worktree_add
+
+    def _interleaving_worktree_add(repo_root, branch, dest, base_ref="dev"):
+        # Simulate a sibling worktree pushing its own stash onto the
+        # shared stack right now (after adopt's push, before adopt's pop).
+        (repo / "sibling-unrelated.txt").write_text("SIBLING worktree's work\n")
+        _git(repo, "stash", "push", "-u", "-m", "SIBLING-hardening-work")
+        return real_worktree_add(repo_root, branch, dest, base_ref)
+
+    _wpxlib.git_worktree_add = _interleaving_worktree_add
+    try:
+        # The adopt's OWN uncommitted work.
+        (repo / "adopt-own.txt").write_text("this change's own work\n")
+        branch = compose_change_branch("refactor", "interleave-victim")
+        worktree_dest = change_worktree_path(repo, "refactor", "interleave-victim")
+
+        ok, msg = adopt_uncommitted_into_change(
+            repo, branch, "dev", worktree_dest, ["adopt-own.txt"],
+        )
+    finally:
+        _wpxlib.git_worktree_add = real_worktree_add
+
+    assert ok, f"adopt should succeed: {msg}"
+
+    # The sibling stash MUST still be on the shared stack, untouched.
+    entries = _stash_entries(repo)
+    assert any("SIBLING-hardening-work" in e for e in entries), (
+        "the sibling worktree's stash was consumed by the adopt — "
+        f"cross-worktree contamination (issue #53). stack now: {entries}"
+    )
+
+    # And its content must be recoverable intact (still parked, not applied
+    # into either tree as cruft).
+    assert not (repo / "sibling-unrelated.txt").exists(), (
+        "sibling stash content leaked back into the source tree"
+    )
+    assert not (worktree_dest / "sibling-unrelated.txt").exists(), (
+        "sibling stash content leaked into the adopt worktree as cruft"
+    )
+
+
+def test_adopt_preexisting_sibling_stash_survives(local_git_repo, run_tool):
+    """A sibling stash already parked on the shared stack before an adopt
+    must remain present and unchanged after the adopt completes.
+
+    (Acceptance-criteria phrasing of the regression. After the fix this
+    is rock-solid because the adopt path uses no stash at all.)
+    """
+    repo = local_git_repo
+
+    # Park an unrelated sibling stash on the shared stack first.
+    (repo / "sibling.txt").write_text("sibling parked work\n")
+    _git(repo, "stash", "push", "-u", "-m", "SIBLING-parked")
+    before = _stash_entries(repo)
+    assert any("SIBLING-parked" in e for e in before)
+
+    # Now adopt this change's own uncommitted work.
+    (repo / "my-work.md").write_text("my own WIP\n")
+    result = run_tool(
+        "sulis-change", "adopt",
+        "--repo-root", str(repo),
+        "--slug", "park-safe", "--primitive", "refactor",
+    )
+    assert result.ok, f"adopt failed: {result.stderr}"
+
+    after = _stash_entries(repo)
+    assert any("SIBLING-parked" in e for e in after), (
+        f"sibling stash disappeared after adopt. before={before} after={after}"
+    )
+
+
+def test_adopt_transfers_tracked_and_untracked_work(local_git_repo, run_tool):
+    """Both a tracked modification and an untracked file must land in the
+    new worktree with correct content."""
+    repo = local_git_repo
+
+    # Tracked modification: change the committed README.
+    (repo / "README.md").write_text("# test repo\nADOPTED tracked edit\n")
+    # Untracked new file.
+    (repo / "brand-new.txt").write_text("untracked content\n")
+
+    result = run_tool(
+        "sulis-change", "adopt",
+        "--repo-root", str(repo),
+        "--slug", "tracked-untracked", "--primitive", "refactor",
+    )
+    assert result.ok, f"adopt failed: {result.stderr}"
+    worktree_dest = Path(result.data["worktree_path"])
+
+    # Tracked modification carried across with correct content.
+    assert (worktree_dest / "README.md").read_text() == (
+        "# test repo\nADOPTED tracked edit\n"
+    )
+    # Untracked file carried across with correct content.
+    assert (worktree_dest / "brand-new.txt").exists()
+    assert (worktree_dest / "brand-new.txt").read_text() == "untracked content\n"
+
+
+def test_adopt_preserves_untracked_symlink_fidelity(local_git_repo, run_tool):
+    """ADVISORY (symlink fidelity): an untracked symlink must arrive in the
+    worktree AS A SYMLINK — not silently followed-and-transmuted into a
+    regular file (file target) nor silently dropped (directory target)."""
+    repo = local_git_repo
+
+    # Untracked symlink -> a (committed) file. The link points at README.md.
+    file_link = repo / "link-to-readme"
+    file_link.symlink_to("README.md")
+
+    # Untracked symlink -> a directory. Create a real dir to point at.
+    (repo / "subdir").mkdir()
+    (repo / "subdir" / "inner.txt").write_text("inside\n")
+    _run(["git", "add", "subdir/inner.txt"], cwd=repo)
+    _run(["git", "commit", "-qm", "add subdir/inner.txt"], cwd=repo)
+    dir_link = repo / "link-to-subdir"
+    dir_link.symlink_to("subdir")
+
+    result = run_tool(
+        "sulis-change", "adopt",
+        "--repo-root", str(repo),
+        "--slug", "symlink-fidelity", "--primitive", "refactor",
+    )
+    assert result.ok, f"adopt failed: {result.stderr}"
+    worktree_dest = Path(result.data["worktree_path"])
+
+    # File symlink preserved as a symlink (not transmuted to a regular file).
+    moved_file_link = worktree_dest / "link-to-readme"
+    assert moved_file_link.is_symlink(), (
+        "untracked file-symlink was transmuted into a regular file "
+        "(symlink-ness lost)"
+    )
+    assert os.readlink(moved_file_link) == "README.md"
+
+    # Directory symlink preserved as a symlink (not silently dropped).
+    moved_dir_link = worktree_dest / "link-to-subdir"
+    assert moved_dir_link.is_symlink(), (
+        "untracked directory-symlink was silently dropped at capture"
+    )
+    assert os.readlink(moved_dir_link) == "subdir"
+
+
+def test_adopt_leaves_source_tree_clean(local_git_repo, run_tool):
+    """After a successful adopt, the source repo working tree has no
+    leftover tracked modifications and no moved untracked files."""
+    repo = local_git_repo
+
+    (repo / "README.md").write_text("# test repo\nmoved edit\n")
+    (repo / "moved-untracked.txt").write_text("moved\n")
+
+    result = run_tool(
+        "sulis-change", "adopt",
+        "--repo-root", str(repo),
+        "--slug", "clean-source", "--primitive", "refactor",
+    )
+    assert result.ok, f"adopt failed: {result.stderr}"
+
+    # Source tree clean: no porcelain status output at all.
+    status = _git(repo, "status", "--porcelain")
+    assert status == "", f"source tree not clean after adopt: {status!r}"
+    # The moved untracked file is gone from source.
+    assert not (repo / "moved-untracked.txt").exists()
+    # The tracked file is restored to its committed content.
+    assert (repo / "README.md").read_text() == "# test repo\n"
+
+
+def test_adopt_local_commits_plus_uncommitted_no_stash(local_git_repo, run_tool):
+    """Combined case: local-only commits cherry-picked onto the change
+    branch AND trailing uncommitted (tracked + untracked) work lands in
+    the worktree — with no shared-stack pop consuming a sibling stash."""
+    repo = local_git_repo
+
+    # A local-only commit (not on origin/dev).
+    (repo / "feature.md").write_text("committed feature work\n")
+    _run(["git", "add", "feature.md"], cwd=repo)
+    _run(["git", "commit", "-m", "feat: local-only commit"], cwd=repo)
+
+    # Trailing uncommitted work on top: a tracked edit + an untracked file.
+    (repo / "feature.md").write_text("committed feature work\nplus WIP edit\n")
+    (repo / "wip-extra.txt").write_text("uncommitted extra\n")
+
+    # Park an unrelated sibling stash that must survive. Scope the stash to
+    # the sibling file only (a pathspec) so it does NOT swallow this change's
+    # own WIP — exactly how a sibling worktree's parked work would look on
+    # the shared stack.
+    (repo / "sibling2.txt").write_text("sibling parked\n")
+    _git(repo, "stash", "push", "-u", "-m", "SIBLING-combined", "--", "sibling2.txt")
+
+    result = run_tool(
+        "sulis-change", "adopt",
+        "--repo-root", str(repo),
+        "--slug", "combined-case", "--primitive", "feat",
+        "--remote-ref", "origin/dev",
+    )
+    assert result.ok, f"adopt failed: {result.stderr}"
+    assert result.data["local_commits_count"] == 1
+    worktree_dest = Path(result.data["worktree_path"])
+
+    # The cherry-picked commit landed (feature.md exists on the branch).
+    assert (worktree_dest / "feature.md").exists()
+    # The trailing uncommitted edit + untracked file landed too.
+    assert "plus WIP edit" in (worktree_dest / "feature.md").read_text()
+    assert (worktree_dest / "wip-extra.txt").exists()
+    assert (worktree_dest / "wip-extra.txt").read_text() == "uncommitted extra\n"
+
+    # The sibling stash survives untouched.
+    entries = _stash_entries(repo)
+    assert any("SIBLING-combined" in e for e in entries), (
+        f"sibling stash consumed by combined adopt. stack: {entries}"
+    )
+
+
+# ─── adopt: durable-recovery on combined-path failure (data-loss window) ──
+
+
+def _force_conflicting_local_commit(repo: Path) -> None:
+    """Set up the combined-adopt failure scenario with REAL git.
+
+    Advances origin/dev with one change to README.md, then makes a
+    conflicting local-only commit to the SAME lines. Cherry-picking the
+    local commit onto the (advanced) remote tip is then guaranteed to
+    CONFLICT — which is exactly the cherry-pick-failure leg of the
+    combined adopt path. No mocking: the failure is genuine.
+    """
+    # Seed README with multiple lines so a mid-file edit conflicts cleanly.
+    (repo / "README.md").write_text("line1\nline2\nline3\n")
+    _run(["git", "commit", "-qam", "seed multi-line readme"], cwd=repo)
+    _run(["git", "push", "-q", "origin", "dev"], cwd=repo)
+
+    # Advance origin/dev via a sibling clone: change line2 -> REMOTE.
+    other = repo.parent / "_origin_advancer"
+    origin = repo.parent / "_origin.git"
+    _run(["git", "clone", "-q", str(origin), str(other)], cwd=repo.parent)
+    _run(["git", "config", "user.email", "t@e.com"], cwd=other)
+    _run(["git", "config", "user.name", "T"], cwd=other)
+    (other / "README.md").write_text("line1\nREMOTE-CHANGE\nline3\n")
+    _run(["git", "commit", "-qam", "remote advances line2"], cwd=other)
+    _run(["git", "push", "-q", "origin", "dev"], cwd=other)
+
+    # Locally: fetch so origin/dev is ahead, then make a conflicting
+    # local-only commit touching the SAME line2.
+    _run(["git", "fetch", "-q", "origin"], cwd=repo)
+    (repo / "README.md").write_text("line1\nLOCAL-CHANGE\nline3\n")
+    _run(["git", "commit", "-qam", "local conflicting commit"], cwd=repo)
+
+
+def test_combined_adopt_cherrypick_failure_is_loud_and_recoverable(
+    local_git_repo, run_tool,
+):
+    """MUST FIX (data-loss window): when the cherry-pick fails in the
+    combined path AFTER the source tree has been cleaned, the command
+    must (a) fail loudly — non-zero exit / emit_error, never
+    success-with-WARN — and (b) leave the founder's uncommitted work
+    recoverable in a durable on-disk location surfaced in the error.
+    """
+    repo = local_git_repo
+    _force_conflicting_local_commit(repo)
+
+    # Trailing uncommitted work on top of the local commit: a tracked edit
+    # to a different file (so it captures cleanly) + an untracked file.
+    (repo / "feature.txt").write_text("WIP tracked work\n")
+    _run(["git", "add", "feature.txt"], cwd=repo)
+    _run(["git", "commit", "-qm", "add feature.txt placeholder"], cwd=repo)
+    _run(["git", "push", "-q", "origin", "HEAD:refs/heads/_throwaway"], cwd=repo)
+    # ^ no-op push to a throwaway ref just to keep origin tidy; the local
+    #   commit above is now ALSO ahead of origin/dev, which is fine — what
+    #   matters is the conflicting commit will fail to cherry-pick.
+    (repo / "feature.txt").write_text("WIP tracked work\nUNCOMMITTED EDIT\n")
+    (repo / "wip-untracked.txt").write_text("precious untracked WIP\n")
+
+    result = run_tool(
+        "sulis-change", "adopt",
+        "--repo-root", str(repo),
+        "--slug", "cp-fail", "--primitive", "feat",
+        "--remote-ref", "origin/dev",
+    )
+
+    # (a) Loud failure — NEVER success-with-WARN.
+    assert not result.ok, (
+        "combined adopt reported success despite a cherry-pick failure "
+        f"after source-clean. data={result.data}"
+    )
+    assert result.returncode != 0, "expected non-zero exit on cherry-pick failure"
+
+    # (b) The founder's uncommitted work is recoverable: the error surfaces
+    #     a durable recovery location that still holds the work.
+    recovery = result.json.get("context", {}).get("recovery_dir") if result.json else None
+    assert recovery, (
+        "cherry-pick-failure error did not surface a durable recovery_dir; "
+        f"error={result.error!r}"
+    )
+    recovery_dir = Path(recovery)
+    assert recovery_dir.exists(), f"recovery dir missing: {recovery_dir}"
+
+    # The untracked file content is preserved verbatim under the recovery dir.
+    recovered_untracked = list(recovery_dir.rglob("wip-untracked.txt"))
+    assert recovered_untracked, (
+        f"untracked WIP not found under recovery dir {recovery_dir}; "
+        f"contents={[p.name for p in recovery_dir.rglob('*')]}"
+    )
+    assert recovered_untracked[0].read_bytes() == b"precious untracked WIP\n"
+
+    # The tracked delta is preserved as a patch under the recovery dir.
+    patch_files = list(recovery_dir.rglob("*.patch"))
+    assert patch_files, f"tracked-delta patch not found under {recovery_dir}"
+    patch_text = patch_files[0].read_text()
+    assert "UNCOMMITTED EDIT" in patch_text, (
+        "tracked uncommitted edit not preserved in recovery patch"
+    )
+
+
+def test_combined_adopt_success_cleans_up_durable_recovery(
+    local_git_repo, run_tool,
+):
+    """On the success path, the durable recovery copy must be cleaned up —
+    it exists only as a failure safety net, not as cruft left behind."""
+    repo = local_git_repo
+
+    # A local-only commit that cherry-picks cleanly (no conflict).
+    (repo / "feature.md").write_text("committed feature work\n")
+    _run(["git", "add", "feature.md"], cwd=repo)
+    _run(["git", "commit", "-qm", "feat: local-only commit"], cwd=repo)
+
+    # Trailing uncommitted work.
+    (repo / "feature.md").write_text("committed feature work\nWIP edit\n")
+    (repo / "wip-extra.txt").write_text("uncommitted extra\n")
+
+    before = set(_change_recovery_dirs())
+    result = run_tool(
+        "sulis-change", "adopt",
+        "--repo-root", str(repo),
+        "--slug", "combined-clean", "--primitive", "feat",
+        "--remote-ref", "origin/dev",
+    )
+    assert result.ok, f"adopt failed: {result.stderr}"
+
+    # No durable recovery dir leaked after a clean success.
+    after = set(_change_recovery_dirs())
+    leaked = after - before
+    assert not leaked, f"durable recovery dir not cleaned up on success: {leaked}"
+
+
+def _change_recovery_dirs() -> list[Path]:
+    """Enumerate any sulis-adopt durable recovery dirs in the temp area."""
+    import tempfile as _tf
+    tmp = Path(_tf.gettempdir())
+    return [p for p in tmp.glob("sulis-adopt-recovery-*") if p.is_dir()]
 
 
 def test_adopt_rewrite_mode_requires_force(local_git_repo, run_tool):

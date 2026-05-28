@@ -52,6 +52,9 @@ from _change_state import (  # noqa: E402
 from _terminal_launcher import launch_change_terminal  # noqa: E402
 from _wpxlib import (  # noqa: E402
     ALLOWED_CHANGE_PRIMITIVES,
+    _apply_worktree_changes,
+    _capture_worktree_changes,
+    _clean_source_worktree,
     _gh_ref_sha,
     _log,
     _run,
@@ -62,10 +65,12 @@ from _wpxlib import (  # noqa: E402
     cli_main,
     compose_change_branch,
     detect_adopt_state,
+    discard_persisted_capture,
     emit_error,
     emit_internal_error,
     emit_ok,
     find_change_branches,
+    persist_capture_durably,
     generate_change_ulid,
     git_worktree_add,
     git_worktree_remove,
@@ -324,7 +329,7 @@ def cmd_adopt(args: argparse.Namespace) -> None:
             context={"local_commits_ahead": len(local_commits)},
         )
 
-    # Case 1: uncommitted only — stash + worktree + unstash
+    # Case 1: uncommitted only — worktree + worktree-safe file transfer
     # Case 2: local commits (and maybe uncommitted) — cherry-pick path
     # Case 3 (rewrite): same as case 2 but with --force semantics
 
@@ -335,29 +340,77 @@ def cmd_adopt(args: argparse.Namespace) -> None:
         # The change branch starts at the REMOTE ref (clean state), not
         # the local ref (which already has the commits we want to
         # relocate — cherry-picking onto it would produce empty commits).
+        #
+        # Worktree-safe transfer (issue #53): we do NOT use `git stash` to
+        # park the trailing uncommitted work, because the stash stack is
+        # shared per-repo and a positional pop can grab a sibling worktree's
+        # stash. Instead we capture the uncommitted delta + untracked files
+        # explicitly, clean the source tree so the cherry-pick runs clean,
+        # then re-apply the captured work into the worktree after the
+        # cherry-pick. No shared-stack pop anywhere.
+        capture: dict = {}
+        recovery_dir = None
         if has_uncommitted:
-            # Stash first so cherry-pick is clean
-            rc, _, err = _run(["git", "stash", "push", "-u", "-m",
-                              f"sulis-change adopt {branch}"],
-                             cwd=repo_root, timeout=30)
-            if rc != 0:
-                emit_error(f"git stash push failed: {err}")
-            moved_what.append(f"{len(state['uncommitted_files'])} uncommitted change(s) stashed")
+            ok, msg, capture = _capture_worktree_changes(repo_root)
+            if not ok:
+                emit_error(f"capturing uncommitted work failed: {msg}")
+            # DURABILITY (data-loss window): the source tree is about to be
+            # cleaned while the ONLY copy of the founder's uncommitted work
+            # is the in-memory `capture`. A cherry-pick or apply failure
+            # after the clean would discard it on exit — silent loss. Persist
+            # to a durable on-disk location FIRST (mirrors the old
+            # `git stash push -u`'s recoverable on-disk park), surface it on
+            # any failure leg, and discard it only once apply succeeds.
+            ok, msg, recovery_dir = persist_capture_durably(capture)
+            if not ok:
+                emit_error(
+                    f"persisting uncommitted work durably failed: {msg}. "
+                    f"Source tree NOT cleaned; your work is intact."
+                )
+            # Clear the source tree so adopt_local_commits_into_change's
+            # cherry-pick + reset operate on a clean working tree.
+            ok, msg = _clean_source_worktree(repo_root, capture)
+            if not ok:
+                discard_persisted_capture(recovery_dir)
+                emit_error(f"clearing source tree failed: {msg}")
+            moved_what.append(
+                f"{len(state['uncommitted_files'])} uncommitted change(s) "
+                f"captured for worktree-safe transfer"
+            )
 
         ok, msg = adopt_local_commits_into_change(
             repo_root, branch, remote_ref, worktree_dest, local_commits,
         )
         if not ok:
+            # Source tree already cleaned; the durable copy is the founder's
+            # only recovery path. Surface it loudly — never lose it silently.
+            if recovery_dir is not None:
+                emit_error(
+                    f"adopt local-commits failed: {msg}. Your uncommitted "
+                    f"work was saved before the source tree was cleaned and "
+                    f"is recoverable at: {recovery_dir}",
+                    context={"recovery_dir": str(recovery_dir)},
+                )
             emit_error(f"adopt local-commits failed: {msg}")
         moved_what.append(msg)
 
         if has_uncommitted:
-            # Pop the stash in the worktree (where the work belongs now)
-            rc, _, err = _run(["git", "stash", "pop"],
-                             cwd=worktree_dest, timeout=30)
-            if rc != 0:
-                # Best-effort warning; the stash is recoverable manually
-                moved_what.append(f"WARN: stash pop in worktree failed: {err}")
+            # Re-apply the captured work into the worktree (where it belongs
+            # now) — explicit file movement, never the shared stash stack.
+            ok, msg = _apply_worktree_changes(repo_root, worktree_dest, capture)
+            if not ok:
+                # HARD ERROR (never success-with-WARN): the source tree is
+                # cleaned, so a swallowed warning would report success while
+                # the founder's work is gone from the source. Fail loudly and
+                # point at the durable recovery copy.
+                emit_error(
+                    f"applying captured work to worktree failed: {msg}. Your "
+                    f"uncommitted work is recoverable at: {recovery_dir}",
+                    context={"recovery_dir": str(recovery_dir)},
+                )
+            # Success: the work is now safely in the worktree. Discard the
+            # durable recovery copy — it was only a failure safety net.
+            discard_persisted_capture(recovery_dir)
 
     elif has_uncommitted:
         # Case 1: uncommitted only

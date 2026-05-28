@@ -580,6 +580,13 @@ them the dashboard updates on its own as work progresses, and point them at
 - **`rebase` uses merge, not rebase** (the name is the founder's word for
   "catch up", not the git operation). Merge preserves SHAs so in-flight WP
   worktrees stay valid (CW-04). Do not "fix" this to a real git rebase.
+- **Never `git stash` in a change worktree (issue #53).** The stash stack
+  is shared per-repo across every worktree, so a positional `git stash pop`
+  can grab an *unrelated* sibling worktree's stash and dump its files in as
+  cruft (the DC-04 incident). `adopt` moves uncommitted work with explicit
+  file movement (`transfer_worktree_changes`), never the shared stash stack.
+  If you ever need to park transient state, make a throwaway WIP commit —
+  don't reach for `git stash`.
 - **`nuke` is irreversible — dry-run, echo, confirm, then `--force`.** Never
   pass `--force` on the first call. Run the dry-run, show the founder the
   exact footprint (and call out any unmerged commits that would be lost),

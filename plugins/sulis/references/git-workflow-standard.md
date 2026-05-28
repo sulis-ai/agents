@@ -396,6 +396,21 @@ If the executor's worktree somehow accumulates multiple commits
 squash-merge via the host API, not refspec push. Single-commit is
 the default; multi-commit is the exception requiring host API.
 
+### Anti-pattern: `git stash` in a change worktree (v0.74.0+, issue #53)
+
+**Never `git stash` in a change worktree.** The stash stack is shared
+per-repository across ALL of that repo's worktrees, so a positional
+`git stash pop` (top-of-stack) can grab an **unrelated** sibling
+worktree's stash — silent cross-worktree contamination. This already
+happened once (the DC-04 incident): a `git stash pop` in a change
+worktree popped a hardening stash pushed from a different worktree and
+dumped its files in as untracked cruft. To park transient state,
+either make a throwaway WIP commit on the branch, or transfer
+working-tree work between trees with explicit file movement (capture
+`git diff HEAD --binary` + `git ls-files --others --exclude-standard`,
+apply into the destination, restore/clean the source) — never the
+shared stash stack. See `_wpxlib.transfer_worktree_changes`.
+
 ### Rationale
 
 Pull requests are a **human-review ceremony**. For autonomously-executed

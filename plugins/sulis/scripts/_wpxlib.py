@@ -13,8 +13,10 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import traceback
 from dataclasses import dataclass, field
@@ -3754,6 +3756,270 @@ def detect_adopt_state(repo_root: Path,
     return out
 
 
+# ─── Worktree-safe uncommitted-work transfer (issue #53) ──────────────────
+#
+# ``git stash`` operates on a single stack PER REPOSITORY, shared across ALL
+# of that repo's worktrees. The change-as-primitive model spawns many
+# sibling worktrees per repo, so a positional ``git stash pop`` in one
+# worktree can silently consume an *unrelated* sibling worktree's stash
+# (the DC-04 incident: an adopt popped a hardening stash pushed from a
+# different worktree and dumped its files in as cruft).
+#
+# These helpers transfer uncommitted work between trees with EXPLICIT,
+# worktree-local file movement — never the shared stash stack — so a
+# sibling worktree's stash is never observed, applied, or dropped.
+
+
+def _capture_worktree_changes(source_root: Path) -> tuple[bool, str, dict]:
+    """Capture the source tree's uncommitted work without moving it.
+
+    Returns (ok, message, capture) where ``capture`` is a dict with:
+      - ``patch``: the ``git diff HEAD --binary`` text (staged + unstaged
+        delta relative to HEAD), or "" if there is none.
+      - ``untracked``: list of {"path": rel, "bytes": <file content>} for
+        each untracked, non-ignored regular file. The content is snapshotted
+        at capture time so the capture remains valid even after the source
+        tree is cleaned (the combined local-commits path cleans the source
+        BEFORE applying to the worktree).
+      - ``untracked_symlinks``: list of {"path": rel, "target": <link
+        target>} for each untracked, non-ignored symlink (whether it points
+        at a file OR a directory). Captured as the link target string so the
+        symlink is re-materialised AS A SYMLINK at apply time — never
+        followed-and-transmuted into a regular file, never silently dropped.
+
+    Does NOT modify the source tree — pair with :func:`_clean_source_worktree`
+    after the captured work has been applied to the destination.
+    """
+    rc, patch_text, err = _run(["git", "diff", "HEAD", "--binary"],
+                               cwd=source_root, timeout=60)
+    if rc != 0:
+        return False, f"git diff HEAD failed: {err}", {}
+
+    rc, others_out, err = _run(
+        ["git", "ls-files", "--others", "--exclude-standard"],
+        cwd=source_root, timeout=30,
+    )
+    if rc != 0:
+        return False, f"git ls-files --others failed: {err}", {}
+
+    untracked: list[dict] = []
+    untracked_symlinks: list[dict] = []
+    for rel in others_out.splitlines():
+        rel = rel.strip()
+        if not rel:
+            continue
+        src_path = source_root / rel
+        # Check symlink-ness FIRST: a symlink-to-file would otherwise pass
+        # is_file() (which follows the link) and get transmuted into a
+        # regular file; a symlink-to-directory would be skipped entirely.
+        if src_path.is_symlink():
+            untracked_symlinks.append(
+                {"path": rel, "target": os.readlink(src_path)}
+            )
+            continue
+        if not src_path.is_file():
+            continue
+        untracked.append({"path": rel, "bytes": src_path.read_bytes()})
+
+    return True, "captured", {
+        "patch": patch_text,
+        "untracked": untracked,
+        "untracked_symlinks": untracked_symlinks,
+    }
+
+
+def _apply_worktree_changes(
+    source_root: Path,
+    dest_worktree: Path,
+    capture: dict,
+) -> tuple[bool, str]:
+    """Apply a capture from :func:`_capture_worktree_changes` into a clean
+    destination worktree: ``git apply`` the tracked delta and write each
+    snapshotted untracked file to the same relative path. Does not touch the
+    source tree.
+
+    ``source_root`` is accepted for call-site symmetry with the other
+    transfer helpers; the capture is self-contained (it snapshots untracked
+    content), so this function never reads from the source tree.
+    """
+    _ = source_root  # capture is self-contained; source no longer read here
+    patch_text = capture.get("patch", "")
+    untracked = capture.get("untracked", [])
+    untracked_symlinks = capture.get("untracked_symlinks", [])
+
+    if patch_text.strip():
+        # A temp file (not stdin) keeps binary hunks intact and avoids any
+        # shell-quoting hazard on the diff text.
+        fd, patch_path = tempfile.mkstemp(prefix="sulis-adopt-", suffix=".patch")
+        try:
+            with os.fdopen(fd, "w") as fh:
+                fh.write(patch_text)
+            rc, _, err = _run(["git", "apply", patch_path],
+                             cwd=dest_worktree, timeout=60)
+            if rc != 0:
+                return False, f"git apply of tracked delta failed: {err}"
+        finally:
+            try:
+                os.unlink(patch_path)
+            except OSError:
+                pass
+
+    for entry in untracked:
+        dest_file = dest_worktree / entry["path"]
+        dest_file.parent.mkdir(parents=True, exist_ok=True)
+        dest_file.write_bytes(entry["bytes"])
+
+    # Re-materialise untracked symlinks AS symlinks (preserve fidelity).
+    for entry in untracked_symlinks:
+        dest_link = dest_worktree / entry["path"]
+        dest_link.parent.mkdir(parents=True, exist_ok=True)
+        if dest_link.is_symlink() or dest_link.exists():
+            dest_link.unlink()
+        os.symlink(entry["target"], dest_link)
+
+    return True, "applied"
+
+
+def _clean_source_worktree(
+    source_root: Path,
+    capture: dict,
+) -> tuple[bool, str]:
+    """Clear the captured work from the source tree: restore tracked files
+    to HEAD and remove the moved untracked files. This matches the old
+    stash-push semantics (push cleared the source tree) — it is the adopt
+    contract, not new destructive behaviour.
+    """
+    untracked = capture.get("untracked", [])
+    untracked_symlinks = capture.get("untracked_symlinks", [])
+
+    # Tracked files: restore to HEAD (drops staged + unstaged edits).
+    rc, _, err = _run(["git", "restore", "--staged", "--worktree", "."],
+                     cwd=source_root, timeout=30)
+    if rc != 0:
+        # Older gits without `git restore`: fall back to reset + checkout.
+        _run(["git", "reset", "--quiet", "HEAD", "."],
+             cwd=source_root, timeout=30)
+        rc, _, err = _run(["git", "checkout", "--", "."],
+                         cwd=source_root, timeout=30)
+        if rc != 0:
+            return False, f"failed to restore source tree: {err}"
+
+    # Untracked files + symlinks: remove the ones we moved.
+    for entry in (*untracked, *untracked_symlinks):
+        rel = entry["path"]
+        src_path = source_root / rel
+        try:
+            if src_path.is_symlink() or src_path.is_file():
+                src_path.unlink()
+        except OSError as exc:  # pragma: no cover - defensive
+            return False, f"failed to remove moved untracked file {rel}: {exc}"
+
+    return True, "source cleaned"
+
+
+def persist_capture_durably(capture: dict) -> tuple[bool, str, Path | None]:
+    """Write an in-memory :func:`_capture_worktree_changes` capture to a
+    durable on-disk location OUTSIDE any worktree, so the founder's
+    uncommitted work survives a failure between source-clean and apply.
+
+    The combined local-commits adopt path cleans the source tree while the
+    ONLY surviving copy of the uncommitted work is the in-memory ``capture``
+    dict. A cherry-pick or apply failure after that point would discard the
+    capture on process exit — silent data loss. This mirrors the durability
+    the old ``git stash push -u`` gave (an on-disk park recoverable via
+    ``git stash list``): persist before destroying the source, surface the
+    location on failure, discard on success.
+
+    Layout under the recovery dir:
+      - ``tracked.patch``  — the ``git diff HEAD --binary`` text (if any).
+      - ``untracked/<rel>`` — each snapshotted untracked regular file.
+      - ``symlinks.txt``   — one ``<rel> -> <target>`` line per untracked
+        symlink (recorded as text since a symlink target may point outside
+        the recovery dir).
+
+    Returns (ok, message, recovery_dir). On success the caller owns the dir
+    and MUST either surface it (failure path) or
+    :func:`discard_persisted_capture` it (success path).
+    """
+    patch_text = capture.get("patch", "")
+    untracked = capture.get("untracked", [])
+    untracked_symlinks = capture.get("untracked_symlinks", [])
+
+    try:
+        recovery_dir = Path(
+            tempfile.mkdtemp(prefix="sulis-adopt-recovery-")
+        )
+    except OSError as exc:
+        return False, f"could not create durable recovery dir: {exc}", None
+
+    try:
+        if patch_text.strip():
+            (recovery_dir / "tracked.patch").write_text(patch_text)
+
+        for entry in untracked:
+            dest = recovery_dir / "untracked" / entry["path"]
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(entry["bytes"])
+
+        if untracked_symlinks:
+            lines = [
+                f"{e['path']} -> {e['target']}" for e in untracked_symlinks
+            ]
+            (recovery_dir / "symlinks.txt").write_text(
+                "\n".join(lines) + "\n"
+            )
+    except OSError as exc:
+        # Best-effort cleanup of the half-written dir; report the failure so
+        # the caller does NOT destroy the source (the durable copy is the
+        # safety net and it failed).
+        shutil.rmtree(recovery_dir, ignore_errors=True)
+        return False, f"failed to persist capture durably: {exc}", None
+
+    return True, "persisted", recovery_dir
+
+
+def discard_persisted_capture(recovery_dir: Path | None) -> None:
+    """Remove a durable recovery dir created by
+    :func:`persist_capture_durably`. Called on the adopt success path — the
+    durable copy exists only as a failure safety net, not as cruft.
+    """
+    if recovery_dir is None:
+        return
+    shutil.rmtree(recovery_dir, ignore_errors=True)
+
+
+def transfer_worktree_changes(
+    source_root: Path,
+    dest_worktree: Path,
+) -> tuple[bool, str]:
+    """Move the source tree's *uncommitted* working-tree work into a clean
+    destination worktree, WITHOUT touching git's shared per-repo stash stack.
+
+    Single shared primitive for the adopt path (issue #53, EP-03): capture
+    the tracked delta + untracked files, apply them into ``dest_worktree``,
+    then clean the source tree. No ``git stash`` is used anywhere, so a
+    sibling worktree's stash on the shared stack is never observed, applied,
+    or dropped.
+
+    Returns (ok, message_or_error). On any failure before the source tree is
+    cleaned, the source tree is left intact (the caller can re-try).
+    """
+    ok, msg, capture = _capture_worktree_changes(source_root)
+    if not ok:
+        return False, msg
+
+    ok, msg = _apply_worktree_changes(source_root, dest_worktree, capture)
+    if not ok:
+        return False, msg
+
+    ok, msg = _clean_source_worktree(source_root, capture)
+    if not ok:
+        return False, msg
+
+    n = (1 if capture["patch"].strip() else 0) + len(capture["untracked"])
+    return True, f"transferred {n} working-tree change(s) via explicit file movement"
+
+
 def adopt_uncommitted_into_change(
     repo_root: Path,
     branch: str,
@@ -3761,8 +4027,14 @@ def adopt_uncommitted_into_change(
     worktree_dest: Path,
     uncommitted_files: list[str],
 ) -> tuple[bool, str]:
-    """Retrofit case 1: stash uncommitted changes, create change branch +
-    worktree, unstash into the worktree.
+    """Retrofit case 1: move uncommitted changes into a new change worktree.
+
+    Worktree-safe (issue #53): instead of ``git stash push``/positional
+    ``git stash pop`` — which share a per-repo stack and can grab a sibling
+    worktree's stash — this creates the change worktree off ``base_ref``
+    (clean) and transfers the uncommitted work via
+    :func:`transfer_worktree_changes` (explicit file movement, never the
+    shared stash stack).
 
     Returns (ok, message).
     """
@@ -3770,25 +4042,17 @@ def adopt_uncommitted_into_change(
         # Nothing to move — caller should not call this
         return True, "no uncommitted changes; nothing to adopt"
 
-    # Stash the uncommitted work
-    rc, _, err = _run(["git", "stash", "push", "-u", "-m",
-                       f"sulis-change adopt {branch}"],
-                     cwd=repo_root, timeout=30)
-    if rc != 0:
-        return False, f"git stash push failed: {err}"
-
-    # Create the change branch + worktree
+    # Create the change branch + worktree off the base ref (clean state).
+    # We do this BEFORE capturing/clearing the source tree so a worktree-add
+    # failure leaves the source work untouched.
     ok, msg = git_worktree_add(repo_root, branch, worktree_dest, base_ref)
     if not ok:
-        # Try to restore the stash before returning the error
-        _run(["git", "stash", "pop"], cwd=repo_root, timeout=30)
-        return False, f"worktree creation failed: {msg}; stash restored"
+        return False, f"worktree creation failed: {msg}"
 
-    # Pop the stash into the new worktree (git stash pop in the worktree
-    # restores the changes there)
-    rc, _, err = _run(["git", "stash", "pop"], cwd=worktree_dest, timeout=30)
-    if rc != 0:
-        return False, f"git stash pop in worktree failed: {err}"
+    # Move the uncommitted work into the worktree without using the stash.
+    ok, msg = transfer_worktree_changes(repo_root, worktree_dest)
+    if not ok:
+        return False, f"worktree-safe transfer failed: {msg}"
 
     return True, f"adopted {len(uncommitted_files)} uncommitted change(s) into {branch}"
 
