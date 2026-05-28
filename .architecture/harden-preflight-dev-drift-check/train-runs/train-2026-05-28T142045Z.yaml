@@ -1,0 +1,17 @@
+train_id: "train-2026-05-28T142045Z"
+started_at: "2026-05-28T14:20:45Z"
+completed_at: "2026-05-28T14:22:17Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-05-28T14:20:53Z"
+gate_findings_path: ".architecture/harden-preflight-dev-drift-check/code-reviews/PR-1624e0f-29ca432-2026-05-28T142145Z/REVIEW.md"
+bundle:
+  - wp: WP-003
+    branch: feat/wp-003-runall-preflight-dev-clean-gate
+    pre_train_sha: dc1be7abfc4f92693e4571c39791013088b5f874
+    rebased_to_sha: dc1be7abfc4f92693e4571c39791013088b5f874
+    merge_sha_on_dev: 29ca4324b60d381339845a8a2f63c92065c82ebd

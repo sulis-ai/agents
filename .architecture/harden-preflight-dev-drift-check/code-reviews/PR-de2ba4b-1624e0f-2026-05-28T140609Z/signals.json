@@ -1,0 +1,17 @@
+{
+  "scope": "step-10.5-bundled-tip",
+  "train_id": "train-2026-05-28T140133Z",
+  "range": "de2ba4b..1624e0f",
+  "wps": ["WP-001", "WP-002"],
+  "verdict": "PASS",
+  "build_verification": {"errors": 0, "source": "combined-tip branch-ci green"},
+  "hygiene": {"scope": "clean", "size": "clean", "safety": "clean", "completeness": "clean"},
+  "findings": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+  "lenses": {
+    "architecture": {"findings": 0, "note": "GHClient port reuse; _poll_ci untouched"},
+    "security": {"findings": 0, "note": "read-only probes; no input/auth/mutation/secrets/new-deps"},
+    "quality": {"findings": 0, "note": "tests-first; WP-002 characterisation-pinned"}
+  },
+  "draft_fixes": 0,
+  "dispatch": "single-reader (proportionate: ~150 source lines, disjoint files, per-WP reviewed clean, combined-tip CI green, no attack surface)"
+}

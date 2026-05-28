@@ -1,0 +1,17 @@
+train_id: "train-2026-05-28T143933Z"
+started_at: "2026-05-28T14:39:33Z"
+completed_at: "2026-05-28T14:41:07Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-05-28T14:39:40Z"
+gate_findings_path: ".architecture/harden-preflight-dev-drift-check/code-reviews/PR-29ca432-3833210-2026-05-28T144030Z/REVIEW.md"
+bundle:
+  - wp: WP-004
+    branch: feat/wp-004-unprotected-repo-onetime-warning
+    pre_train_sha: ba1ff2c66ee76e3e2c8ce2dc857acb669d96ec43
+    rebased_to_sha: ba1ff2c66ee76e3e2c8ce2dc857acb669d96ec43
+    merge_sha_on_dev: 3833210e23284a5a8a3615dcc0814b2a8ab21ace

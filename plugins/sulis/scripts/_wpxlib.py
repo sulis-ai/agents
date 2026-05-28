@@ -662,6 +662,29 @@ def deploy_is_applicable(contract: dict) -> bool:
     return profile == _RC_DEPLOYABLE_ARTIFACT_TYPE
 
 
+# ─── Free-plan branch-protection predicate (HD-003/HD-004) ──────────────────
+#
+# GitHub's protection API returns this body (on stderr via `gh`) when a repo
+# is private on the free plan — branch protection is unavailable ON THE PLAN,
+# not merely unconfigured. Stable enough to match on; if GitHub changes the
+# wording the tests pin the expectation and the failure is loud (HD-003).
+#
+# Promoted here (CLAUDE.md #2 extract-now) once a SECOND caller appeared:
+# wpx-arrival-check's RC-02 check (HD-003) and wpx-preflight's
+# protection-status subcommand (HD-004) both classify the same 403. One home
+# so the free-plan vs unconfigured distinction can never drift between the
+# arrival-check surface and the per-run/per-ship surface.
+
+_FREEPLAN_403_MARKER = "upgrade to github pro"
+
+
+def is_freeplan_protection_403(rc: int, stderr: str) -> bool:
+    """True when the branch-protection API was unavailable because the repo is
+    private on the free plan (403 'Upgrade to GitHub Pro…'), as opposed to a
+    genuine missing/misconfigured protection on a protection-capable repo."""
+    return rc != 0 and _FREEPLAN_403_MARKER in (stderr or "").lower()
+
+
 def find_section(text: str, heading: str) -> tuple[int, int]:
     """Find the byte range of a Markdown section by heading.
 
@@ -1192,6 +1215,57 @@ def _gh_deploy_runs(repo: str, workflow: str, commit: str,
 
 
 # --- Phase implementations ----------------------------------------------
+
+def _preflight_ci_conclusion(
+    repo: str, branch: str, *, gh: GHClient | None = None,
+) -> tuple[str, list[str]]:
+    """Read branch HEAD's CURRENT recorded CI conclusion. No polling.
+
+    Returns ``(verdict, failed_check_names)`` where verdict is one of a
+    closed set:
+
+      - ``"green"``,   ``[]``            — every completed run is in the pass
+                                           set (success / neutral / skipped)
+      - ``"failed"``,  ``[name, ...]``   — >=1 completed run is NOT in the
+                                           pass set; names are returned so a
+                                           caller can say "dev has N failures"
+      - ``"pending"``, ``[]``            — runs exist but not all are
+                                           completed (returned immediately —
+                                           this helper never waits)
+      - ``"unknown"``, ``[]``            — no check-runs recorded for this
+                                           HEAD yet
+
+    Faithful by construction: it reads GitHub's *recorded* conclusion for
+    the workflow GitHub actually ran, so build/prepare order fidelity is
+    inherited for free — there is no local re-run to drift from CI. Reads
+    each run's ``conclusion`` EXPLICITLY (lesson #59) — never a chained
+    exit code, so a build-step failure after a "completed" status cannot
+    read as green.
+
+    Reuses ``_gh_check_runs`` (the ``GHClient.check_runs`` port); it does
+    NOT re-read CI by any other mechanism. The ``gh`` keyword is the
+    existing injection seam for tests — no monkeypatching of internals.
+
+    Distinct from ``_poll_ci`` on purpose: ``_poll_ci`` serves the train's
+    wait-then-verdict need (it sleeps until in-flight runs complete, then
+    returns ``green``/``failed``/``timeout``); this pre-flight read wants
+    the latest *recorded* conclusion cheaply, with no wait, plus the failed
+    names. The pass-set predicate is intentionally duplicated rather than
+    shared: the train verdict and the pre-flight verdict are independently
+    calibrated and must be free to diverge. If/when a third caller appears,
+    extract a shared ``_classify_check_runs`` then — not now (two callers,
+    deliberate independence).
+    """
+    runs = _gh_check_runs(repo, branch, gh=gh)["check_runs"]
+    if not runs:
+        return "unknown", []
+    statuses = [(r["name"], r["status"], r["conclusion"]) for r in runs]
+    if not all(s[1] == "completed" for s in statuses):
+        return "pending", []
+    _PASS = ("success", "neutral", "skipped")
+    failed = [s[0] for s in statuses if s[2] not in _PASS]
+    return ("green", []) if not failed else ("failed", failed)
+
 
 def _poll_ci(repo: str, branch: str, interval: int, cap: int) -> str:
     """Poll CI on branch HEAD; return verdict 'green'|'failed'|'timeout'."""

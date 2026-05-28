@@ -120,6 +120,57 @@ def test_rc02_fails_if_merge_queue_ci_is_a_classic_required_check(tmp_path, run_
     assert rc02_errors, "merge-queue-ci as a classic required check must fail RC-02"
 
 
+# ─── RC-02 free-plan 403 vs genuine missing protection (HD-003 / WP-002) ─────
+
+
+def test_rc02_genuine_missing_protection_still_errors(tmp_path, run_tool, mock_gh):
+    """CHARACTERISATION: a protection-capable repo with no protection
+    configured (rc!=0, NO 'Upgrade to GitHub Pro' body) still hard-errors
+    RC-02. Pins the behaviour the refactor must preserve."""
+    _write_contract(tmp_path, "profile: published-artifact\ncontribution_model: solo\n")
+    _write_workflows(tmp_path, ["branch-ci", "promote-dev-to-main",
+                                "deploy-staging", "health-and-smoke", "release-prod"])
+    (tmp_path / ".github" / "CODEOWNERS").write_text("* @iainn\n")
+    responses = _gh_base(queue_present=False)
+    responses[1] = {"match": "branches/dev/protection", "exit_code": 1,
+                    "stderr": "gh: Not Found (HTTP 404)"}
+    mock_gh(responses)
+
+    result = _run(run_tool, tmp_path)
+
+    rc02 = [e for e in result.json["errors"] if e["rule"] == "RC-02"]
+    assert rc02, "genuine missing protection must still hard-error RC-02"
+
+
+def test_rc02_freeplan_403_is_not_a_hard_error(tmp_path, run_tool, mock_gh):
+    """NEW: a private free-plan 403 ('Upgrade to GitHub Pro…') must NOT be a
+    hard RC-02 error — it is reported as a warning-eligible
+    unprotected-free-plan condition (a warning, surfaced for WP-004)."""
+    _write_contract(tmp_path, "profile: published-artifact\ncontribution_model: solo\n")
+    _write_workflows(tmp_path, ["branch-ci", "promote-dev-to-main",
+                                "deploy-staging", "health-and-smoke", "release-prod"])
+    (tmp_path / ".github" / "CODEOWNERS").write_text("* @iainn\n")
+    responses = _gh_base(queue_present=False)
+    responses[1] = {"match": "branches/dev/protection", "exit_code": 1,
+        "stderr": ("gh: Upgrade to GitHub Pro or make this repository public "
+                   "to enable this feature. (HTTP 403)")}
+    # main/protection probe also 403 on a free-plan repo:
+    responses.insert(0, {"match": "branches/main/protection", "exit_code": 1,
+        "stderr": ("gh: Upgrade to GitHub Pro or make this repository public "
+                   "to enable this feature. (HTTP 403)")})
+    mock_gh(responses)
+
+    result = _run(run_tool, tmp_path)
+
+    rc02_errors = [e for e in result.json["errors"] if e["rule"] == "RC-02"]
+    rc02_warns = [w for w in result.json["warnings"] if w["rule"] == "RC-02"]
+    assert rc02_errors == [], "free-plan 403 must NOT be a hard RC-02 error"
+    assert rc02_warns, "free-plan 403 should surface as an RC-02 warning"
+    assert any("free" in (w.get("check", "") + w.get("actual", "")).lower()
+               or "protection unavailable" in (w.get("actual", "") + w.get("check", "")).lower()
+               for w in rc02_warns), "warning must name the unavailable-on-plan case"
+
+
 # ─── RC-03 keyed on contribution_model ──────────────────────────────────────
 
 

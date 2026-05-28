@@ -1,0 +1,189 @@
+#!/usr/bin/env python3
+"""wpx-preflight — pre-flight checks for /sulis:run-all.
+
+Today there is one subcommand: ``dev-clean`` (is the base branch HEAD
+CI-green before a wave is dispatched?). It exists so the run-all loop can
+STOP with ONE up-front blocker when pre-existing red sits on the base branch
+(landed via a manual/non-train merge on an unprotected repo — lesson #52),
+instead of every WP's branch-ci rediscovering the SAME red per-branch.
+
+skill <-> script split (repo convention): deterministic logic that MUST
+faithfully reproduce CI's conclusion lives in a tested ``wpx-*`` script; the
+skill orchestrates by invoking it (cf. ``wpx-arrival-check``, ``wpx-train``).
+
+It wraps WP-001's ``_wpxlib._preflight_ci_conclusion`` — a NON-polling read
+of the branch HEAD's currently recorded CI conclusion — and adds no
+CI-reading logic of its own (faithful reproduction, including build/prepare
+order, is inherited from that helper, which reads each run's ``conclusion``
+explicitly per lesson #59).
+
+Emits the SAME JSON envelope shape as ``wpx-arrival-check``'s ``_Report.emit``
+to stdout::
+
+    {"ok": bool, "errors": [...], "warnings": [...]}
+
+so the run-all Step 0 gate parses it with the pattern it already uses — no
+new contract for the skill to learn. The envelope is trivial enough that a
+local builder is used rather than importing ``wpx-arrival-check``'s
+``_Report`` (that sibling is an executable script, not an importable module);
+the shape is kept byte-for-byte identical so the two never drift.
+
+Verdict -> envelope mapping (decided-by-default in the spec — honoured here):
+
+==========================  =====  ====  ===================================
+verdict (from WP-001)       ok     exit  errors / warnings
+==========================  =====  ====  ===================================
+green                       true   0     -
+unknown (no runs recorded)  true   0     advisory warning ("no CI recorded")
+pending (runs in-flight)    true   0     advisory warning ("CI still running")
+failed                      false  2     error rule:"PRE-01", names the count
+==========================  =====  ====  ===================================
+
+The PRE-01 blocker is a HARD STOP — no override (matches the train pausing on
+red). Absence of evidence (unknown / pending) does NOT block: the pre-flight
+reads recorded state, it never waits or polls.
+
+Exit codes: 0 = ok (green / unknown / pending), 2 = failed (PRE-01).
+
+Usage:
+    wpx-preflight dev-clean --repo owner/name [--branch dev]
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _wpxlib import (  # noqa: E402
+    _preflight_ci_conclusion,
+    is_freeplan_protection_403,
+)
+
+
+def _emit(ok: bool, errors: list[dict], warnings: list[dict]) -> int:
+    """Print the run-all envelope (same shape as wpx-arrival-check's
+    _Report.emit) and return the exit code: 0 when ok, 2 when not."""
+    print(json.dumps({"ok": ok, "errors": errors, "warnings": warnings}))
+    return 0 if ok else 2
+
+
+def _dev_clean(repo: str, branch: str) -> int:
+    """Read `branch` HEAD's recorded CI conclusion and map it to the
+    envelope. Never polls (an in-flight run is reported, not waited on)."""
+    verdict, failed = _preflight_ci_conclusion(repo, branch)
+
+    if verdict == "failed":
+        names = ", ".join(failed)
+        return _emit(
+            ok=False,
+            errors=[{
+                "rule": "PRE-01",
+                "check": f"{branch} HEAD CI-green before wave dispatch",
+                "actual": f"{len(failed)} pre-existing CI failures: [{names}]",
+                "detail": f"failing checks: {names}",
+                "expected": "green",
+            }],
+            warnings=[],
+        )
+
+    if verdict == "unknown":
+        return _emit(
+            ok=True, errors=[],
+            warnings=[{
+                "rule": "PRE-01",
+                "check": f"{branch} HEAD CI recorded",
+                "actual": f"no CI recorded for {branch} HEAD yet",
+                "expected": "advisory only — absence of evidence does not block",
+            }],
+        )
+
+    if verdict == "pending":
+        return _emit(
+            ok=True, errors=[],
+            warnings=[{
+                "rule": "PRE-01",
+                "check": f"{branch} HEAD CI complete",
+                "actual": f"CI still running on {branch}",
+                "expected": "advisory only — pre-flight reads recorded state, does not wait",
+            }],
+        )
+
+    # verdict == "green"
+    return _emit(ok=True, errors=[], warnings=[])
+
+
+def _protection_status(repo: str, branch: str) -> int:
+    """Probe `branch` protection and report a CLOSED three-state enum. Always
+    `ok:true` — INFORMATIONAL, never a blocker (the skills own the
+    warn-once-per-invocation semantics; this only classifies):
+
+        protected              — protection API 200 (gating in force)
+        unavailable-free-plan  — 403 'Upgrade to GitHub Pro…' (private repo on
+                                 the free plan — protection unavailable ON the
+                                 plan, reusing WP-002's free-plan predicate)
+        unconfigured           — rc!=0 WITHOUT the free-plan marker (the repo
+                                 is protection-capable but protection is unset)
+
+    The free-plan vs unconfigured distinction is what keeps the warning honest:
+    only the free-plan case warrants the 'upgrade or make public' nudge; an
+    unconfigured-but-capable repo is a different fix.
+    """
+    # Bounded like the sibling `gh` callsites (_wpxlib._run / _gh use 30s) so a
+    # network stall can't hang the run-all Step 0 / ship gate. A timeout (or any
+    # non-zero rc without the free-plan marker) classifies as `unconfigured` —
+    # the informational verdict never blocks regardless of why the probe failed.
+    try:
+        proc = subprocess.run(
+            ["gh", "api", f"repos/{repo}/branches/{branch}/protection"],
+            capture_output=True, text=True, timeout=30,
+        )
+        rc, stderr = proc.returncode, proc.stderr
+    except subprocess.TimeoutExpired:
+        rc, stderr = 124, "timeout"
+    if rc == 0:
+        protection = "protected"
+    elif is_freeplan_protection_403(rc, stderr):
+        protection = "unavailable-free-plan"
+    else:
+        protection = "unconfigured"
+    print(json.dumps({"ok": True, "data": {"protection": protection}}))
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Pre-flight checks for /sulis:run-all")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    dc = sub.add_parser(
+        "dev-clean",
+        help="Is the base branch HEAD CI-green before a wave dispatches?")
+    dc.add_argument("--repo", required=True, help="owner/name")
+    dc.add_argument("--branch", default="dev",
+                    help="base branch to read CI for (default: dev)")
+
+    ps = sub.add_parser(
+        "protection-status",
+        help="Is branch protection in force, unavailable on a free plan, or "
+             "unconfigured? Informational — never blocks.")
+    ps.add_argument("--repo", required=True, help="owner/name")
+    ps.add_argument("--branch", default="dev",
+                    help="branch to probe protection for (default: dev)")
+
+    args = parser.parse_args()
+
+    if args.command == "dev-clean":
+        return _dev_clean(args.repo, args.branch)
+    if args.command == "protection-status":
+        return _protection_status(args.repo, args.branch)
+
+    parser.error(f"unknown command: {args.command}")  # pragma: no cover
+    return 2  # pragma: no cover
+
+
+if __name__ == "__main__":
+    sys.exit(main())
