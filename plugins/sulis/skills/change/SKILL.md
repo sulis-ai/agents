@@ -325,6 +325,14 @@ issue near the bottom, separated per rule above.
 gh pr checks change/fix-login-bug --watch
 ```
 
+`gh pr checks --watch` is the correct gate — it exits non-zero on
+failure. Read the CI *conclusion*, never a shell exit code: NEVER
+substitute a chained `gh run watch <id>; echo $?` (the echo's exit is
+always 0, not gh's) or a `gh run watch` without `--exit-status` (it
+exits 0 on completion regardless of pass/fail) — see
+`git-workflow-standard.md` GIT-04 *"Confirm CI by reading the
+conclusion, not a shell exit code"*.
+
 Alongside the wait — ONCE per ship — probe branch protection on the
 landing line (`dev`). This is purely informational: it NEVER gates the
 ship, no matter what it returns. The PR, the branch-ci wait, and the
@@ -419,6 +427,31 @@ The skill returns one of **PASS** / **CONCERN** / **CRITICAL**:
   > file:line}. I haven't merged. Fix on the change branch, then run
   > `/sulis:change ship CH-01HQ8X` again."*
 
+**4.6. Capture lessons (REQUIRED — before the merge, never a post-ship
+question).** Any lessons surfaced while doing this change — gaps or bugs
+in Sulis's own tooling, recurring friction, design observations worth
+keeping — get captured as durable issues **now, automatically, before the
+merge**. This is a mandatory gate, not a *"want me to capture these? before
+or after you ship?"* question. Asking would be the permission-theatre
+AAF-08 forbids: capturing lessons is a process step the agent owns, like
+the review gate itself. (A lost lesson is the expensive failure; an empty
+capture run costs nothing.)
+
+Assemble the change's findings into an items file (each with a
+`disposition`: `sea`/`task` = actionable → durable issue; `fix-now` /
+`fixed` / `note` = recorded without an issue) and run the capture — or
+invoke `/sulis:capture-lessons`, which assembles + files them:
+
+```bash
+"$SCRIPTS_DIR/sulis-issues" capture --descriptor lesson \
+  --items-file /tmp/lessons-{slug}.json --repo <owner/repo>
+```
+
+It is a **no-op when there are no actionable findings**, so running it on
+every ship is safe. If there are findings, surface what was captured in the
+ship report (step 7) — "Captured 4 lessons as issues #60-63" — never as a
+question. By the time the merge runs, the lessons are already filed.
+
 **5. Squash-merge** (only after green + confirmation):
 
 ```bash
@@ -450,13 +483,16 @@ session is bound or if there's uncommitted work). The branch + record stay;
   --repo-root <main-repo-root>
 ```
 
-**7. Report:**
+**7. Report** (include the lessons captured at step 4.6, if any):
 
-> *"Shipped **fix the login bug** (`CH-01HQ8X`) into `dev`. I've tidied away
-> the workspace, but the full history is preserved as an audit trail you can
-> retrace in the cockpit (under 'Shipped') — and I can re-open the exact
-> workspace any time with `recreate`. When you're ready to release everything
-> on `dev` to production, that's a separate, deliberate step — just ask."*
+> *"Shipped **fix the login bug** (`CH-01HQ8X`) into `dev`. Captured 2
+> lessons along the way (issues #60-61). I've tidied away the workspace, but
+> the full history is preserved as an audit trail you can retrace in the
+> cockpit (under 'Shipped') — and I can re-open the exact workspace any time
+> with `recreate`. When you're ready to release everything on `dev` to
+> production, that's a separate, deliberate step — just ask."*
+
+(Drop the lessons sentence when step 4.6 captured none.)
 
 ### `rebase <CH-handle>` — pull in the latest
 

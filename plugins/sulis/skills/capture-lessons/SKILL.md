@@ -7,10 +7,15 @@ description: "Captures the lessons from a piece of work as durable GitHub issues
 
 ## Conclusion (lead with the answer)
 
-After a piece of work ships, this skill **captures the lessons so they don't
-evaporate**. A lesson the session noticed (a tooling gap, a process slip, a
-"we should really fix X later") lives only in the session's memory until it's
-written down — and the in-session to-do list disappears when the session ends.
+**As a change ships — before the merge, automatically — this skill captures
+the lessons so they don't evaporate.** It is a required step of
+`/sulis:change ship` (step 4.6), not a post-ship afterthought and never a
+*"want me to capture these? before or after?"* question to the founder
+(capturing is a process step the agent owns; asking is the permission-
+theatre AAF-08 forbids). A lesson the session noticed (a tooling gap, a
+process slip, a "we should really fix X later") lives only in the session's
+memory until it's written down — and the in-session to-do list disappears
+when the session ends.
 This skill promotes the **actionable** lessons into **GitHub issues** (durable,
 discoverable, closeable, and they auto-close when a future PR says `Closes #N`)
 and records the **narrative** in a digest in the repo.
@@ -122,19 +127,21 @@ discoverable on the branch.
 - **Degrade is not failure.** No `gh` / non-GitHub remote → digest-only is a
   valid outcome; report it plainly, don't error.
 - **This is not the finding-triage policy.** Finding-triage (in the Sulis
-  agent body) handles findings *mid-work*; this captures lessons *post-ship*.
-  They share the disposition vocabulary on purpose.
+  agent body) handles findings *mid-work*; this captures lessons *at ship
+  time, before the merge*. They share the disposition vocabulary on purpose.
 
 ## When to invoke this skill
 
-- After a piece of work ships, to capture what it taught us.
+- **Automatically, as a required step of `/sulis:change ship` (step 4.6),
+  before the merge** — this is the primary trigger, not a founder request.
+  Run it on every ship; it's a no-op when nothing actionable was learned.
 - The founder says "capture the lessons" / "what did we learn?" / "log that as
-  something to fix later."
+  something to fix later" (the manual, ad-hoc trigger).
 
 ## When NOT to invoke this skill
 
 - Mid-work findings that block the current task — that's finding-triage (fix
-  now or surface), not post-ship capture.
+  now or surface), not lesson capture.
 - A trivial change with nothing learned — there's nothing to capture.
 
 ## See also

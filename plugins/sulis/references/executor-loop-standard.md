@@ -159,6 +159,22 @@ extract the relevant slice — but the extraction must be conservative
 (retain context lines before/after the failure marker) and journal
 the original output's location for retrieval.
 
+### When CI is the signal, Observe reads the conclusion (MUST)
+
+When the failed step is **CI** (EL-01 lists "CI fails" as a fallible
+step), the verbatim observation is the CI **conclusion**, not a shell
+exit code. Read it explicitly: `gh run view <id> --json conclusion -q
+.conclusion` (expect `success`), or `gh pr checks <branch> --watch`
+(exit-status-correct). **NEVER** trust a chained `; echo $?` after
+`gh run watch` — the `echo` always exits `0`, so `$?` reports the
+echo's exit, not `gh`'s. **NEVER** use `gh run watch` without
+`--exit-status` as a gate signal — it exits `0` on completion
+regardless of pass/fail. Observing a bare exit `0` as "CI green" is a
+false observation that poisons the whole loop: Orient diagnoses a
+non-existent success and the agent advances (or merges) on a red.
+See `git-workflow-standard.md` GIT-04 *"Confirm CI by reading the
+conclusion, not a shell exit code"* for the load-bearing rule.
+
 ---
 
 ## EL-03: Orient runs Five Whys, bounded at 5 (MUST)
@@ -657,3 +673,4 @@ of the loop, not in spite of it.
 | Version | Date | Change | Author |
 |---|---|---|---|
 | 0.1.0 | 2026-05-17 | Initial draft. Calibration period: 90 days. Promotion to MUST repo-wide requires evidence from three executor sessions in which the loop fired and produced (a) correct self-healing for in-scope failures, (b) correct escalation for out-of-scope failures, (c) correct BLOCKER records that downstream agents and humans could act on without re-asking the executor for context. Encodes EL-01..EL-08. Provenance: founder articulated the shape as "OODA spiral with Five Whys for self-healing and propelling"; this standard names the discipline, the bounded mechanism, and the escalation contract. | Standards team |
+| 0.1.1 | 2026-05-28 | EL-02 gains a subsection "When CI is the signal, Observe reads the conclusion (MUST)" — when the failed step is CI, the verbatim observation is the CI conclusion (`gh run view <id> --json conclusion`, expect `success`; or `gh pr checks --watch`), not a shell exit code. Two never-rules: never trust a chained `; echo $?` after `gh run watch`; never use `gh run watch` without `--exit-status` as a gate. Observing a bare exit 0 as "CI green" is a false observation that poisons the loop. Cross-references git-workflow-standard.md GIT-04. Provenance: issue #59 — a session merged a foundation WP on a red CI by trusting a hand-typed `gh run watch <id>; echo "exit: $?"`. | Standards team |

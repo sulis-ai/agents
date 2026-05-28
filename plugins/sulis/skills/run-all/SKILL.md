@@ -811,6 +811,16 @@ loop:
        background Bash exits. **No polling, no sleep, no manual
        check.** Read /tmp/pipeline-WP-NNN.json on completion.
 
+       `wpx-pipeline` reads the CI *conclusion* explicitly (`_poll_ci`:
+       merge only when `conclusion == success`) — that is why this path
+       is safe. If you ever confirm CI by hand instead, read the
+       conclusion, never a shell exit code: NEVER trust a chained
+       `gh run watch <id>; echo $?` (the echo's exit is always 0) and
+       NEVER use `gh run watch` without `--exit-status` — both report a
+       false green and have merged a foundation WP on a red (issue #59).
+       See `git-workflow-standard.md` GIT-04 *"Confirm CI by reading the
+       conclusion, not a shell exit code"*.
+
        Inspect the JSON. If `outcome: "blocker"`:
 
            # Write BLOCKER capturing the pipeline failure
