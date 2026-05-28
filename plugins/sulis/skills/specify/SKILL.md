@@ -43,9 +43,11 @@ related_skills:
 ## Conclusion (lead with the answer)
 
 `/sulis:specify` captures what a piece of work should do, at a depth that
-matches the work. It looks at the change you're in, proposes one of three
-depths in plain English, lets you confirm or change it, then runs that mode
-and writes a `SPEC.md` next to the change.
+matches the work. It looks at the change you're in, **picks** one of three
+depths (a deterministic call the agent owns), announces it in plain English,
+and runs it — writing a `SPEC.md` next to the change. You can redirect the
+depth any time ("keep it light" / "go deeper"); you're never asked to ratify
+it up front.
 
 | Depth | What you do | What you get | Good for |
 |---|---|---|---|
@@ -53,11 +55,13 @@ and writes a `SPEC.md` next to the change.
 | **Standard** (default) | A few questions, back and forth (~3 minutes) | A `SPEC.md` with the goal, what's in and out, how you'll know it's done, and what to avoid | Most work |
 | **Deep** | A full guided requirements session | A `SPEC.md` plus flow diagrams (the requirements specialist runs this) | A new feature, a new system, anything your users will see |
 
-The skill **proposes** a depth — it never silently picks one and runs. The
-proposal is the one user-facing choice that matters here, so it's always
-surfaced (e.g. *"This looks like a small, contained change — I'd do a quick
-lite spec. Sound right, or want the fuller version?"*). You confirm or
-override; then it runs.
+The skill **decides** the depth and announces it (e.g. *"This is a small,
+contained change, so I'll write a quick lite spec — shout if you'd rather a
+fuller one."*), then runs. The depth is the agent's call, not a question put
+to you — a non-technical founder has no basis to ratify "lite vs standard",
+and asking would be permission-theatre. Only a *deep* spec (a ~20-min guided
+session) gets a one-line heads-up before it starts, since that's real time of
+yours — and even then it starts, it doesn't block.
 
 Founder-mode is the default: plain English, no jargon. You can ask for the
 raw output any time (*"show me the technical version"* / `--raw`) and get the
@@ -170,28 +174,31 @@ The classifier is **deterministic** and **defaults to standard on
 uncertainty** (unknown primitive, mid-size work, ambiguous signals). It only
 proposes — it never runs a mode.
 
-## Step 3 — echo the proposal, let the founder confirm or override (Rule 3 + AAF)
+## Step 3 — decide the depth, announce it, proceed (Rule 3 + AAF; decide-and-report)
 
-Surfacing the depth choice is correct here — it changes how much of the
-founder's time the next few minutes cost, which is a real user-facing
-consequence. Use the classifier's `proposal_sentence()` (already founder
-English), e.g.:
+The depth is an **engineering-internal decision the agent owns** — the
+classifier already computed it deterministically, and a founder has no basis
+to ratify "lite vs standard". Do **not** ask them to confirm or override it;
+that's the permission-theatre AAF-08 forbids (a process decision dressed as a
+founder choice). Take the classified depth, announce it in one plain sentence,
+and run it. The founder can always redirect *after* ("make it lighter" / "go
+deeper") — the override never needs pre-asking.
 
-> *"This looks like a small, contained change, so a quick three-line spec
-> should be plenty. I'd do a quick lite spec. Sound right, or would you
-> rather the fuller version?"*
+> *"This is a small, contained change, so I'll write a quick three-line spec —
+> shout if you'd rather a fuller one."*
 
-- **Founder confirms** → run that mode (Step 4).
-- **Founder overrides** ("no, do the full one" / "just the quick version") →
-  run the mode they asked for. The override always wins; the classifier is a
-  starting suggestion, not a gate.
-- **Founder is unsure** → default to standard and say why in one line
-  (*"When it's not clear-cut, the standard spec is the safe middle — a few
-  questions, a couple of minutes. We can always go deeper."*).
+- **lite / standard** → just run it (announce + proceed). No question.
+- **deep** is the one case with a genuine founder-facing consequence — a full
+  guided requirements session is ~20–30 min of *your* time. Still don't block:
+  start it with a one-line heads-up + a cheap opt-out
+  (*"This looks big enough for a full spec — that's ~20 min of questions; say
+  'keep it light' if you'd rather a quick version."*), then proceed.
+- The classifier defaults to standard on uncertainty; that default is the
+  agent's to apply, not the founder's to confirm.
 
-Never run a mode without the founder's confirmation of the depth. The
-classifier proposing the wrong depth is expected sometimes — the confirm step
-is the safety net (see Gotchas / MUC-F3).
+Never *interrogate* the founder to ratify the computed depth. (Genuine scope
+questions discovered *while writing* the spec — what a feature should do, who
+it's for — are different: those are founder-owned, ask them per AAF-01.)
 
 ## Step 4 — run the chosen mode
 
@@ -373,11 +380,14 @@ or, after lite:
 
 ## Gotchas
 
-- **The classifier proposes; the founder decides.** It picks a depth from
-  three signals and will sometimes pick wrong (a one-file change that's
-  actually load-bearing; a `create` that's really a tiny stub). Always echo
-  the proposal and wait for confirmation — never run a mode silently off the
-  classifier. The confirm step is the whole safety net. (MUC-F3)
+- **The classifier decides; the agent announces; the founder can redirect.**
+  It picks a depth from three signals and will sometimes pick wrong (a
+  one-file change that's actually load-bearing; a `create` that's really a
+  tiny stub). Announce the chosen depth and run it — do NOT wait for the
+  founder to ratify it (they have no basis to judge "lite vs standard", and
+  asking is permission-theatre, AAF-08). The safety net is that the founder
+  can redirect *after* ("go deeper" / "keep it light") and the cost of a
+  wrong default is one cheap correction, not a blocking question every time.
 - **Operator vocabulary must not leak.** The signals are `primitive`,
   `file_count`, `founder_facing`; the manifest carries `change_id`, `branch`,
   `worktree_path`. None of these appear in what the founder reads. Lead with
