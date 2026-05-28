@@ -66,9 +66,26 @@ agent's exact blocker).
 ### Back-compat guarantee
 
 Single-table INDEX → `_find_all_wp_tables` returns a 1-element list →
-behaviour byte-identical. Deps-from-frontmatter falls back to table
-deps when WP files are absent, so existing INDEX-only test fixtures
-are unaffected.
+status read/write behaviour preserved. Dependency resolution is
+**per-WP** (`_resolve_deps`): frontmatter `dependsOn` when the WP file
+exists (the canonical source), else the per-table dep column. So:
+
+- INDEX-only fixtures (no WP files) → table deps → identical to before.
+- Normal projects (frontmatter + table agree) → identical result.
+- The ONE behaviour change: when a WP's frontmatter `dependsOn`
+  disagrees with its INDEX "Depends On" column (e.g. a hand-edited
+  INDEX), frontmatter now wins — which is the *more correct* source
+  (decompose writes it; plan-work reads it). This is intentional, not
+  a regression, and is pinned by
+  `test_single_table_with_wp_files_uses_frontmatter_deps`.
+
+**Partial-existence safety** (review finding): a WP listed in the INDEX
+but missing its file does NOT silently get empty deps — it falls back
+to its table dep cell. `_load_deps_from_frontmatter` omits fileless WPs
+from its result (rather than mapping them to `[]`) precisely so
+`_resolve_deps` can tell "file exists, deps empty" apart from "no
+file, use the table". Pinned by
+`test_partial_wp_files_missing_falls_back_to_table_not_silent_empty`.
 
 ## How we'll know it's done
 

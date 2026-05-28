@@ -314,3 +314,67 @@ def test_single_table_propagate_blocked_unchanged(tmp_path):
     assert result["ok"] is True
     assert result["data"]["flipped_to_dependency_blocked"] == ["WP-002"]
     assert "| WP-002 | Builds on it | create | dependency_blocked |" in _index_text(tmp_path)
+
+
+def test_single_table_with_wp_files_uses_frontmatter_deps(tmp_path):
+    """Single-table INDEX WITH WP files present → deps come from
+    frontmatter (the canonical source), matching the multi-table path.
+    Pins the review's flagged behaviour: frontmatter wins when a file
+    exists. Here WP-002's frontmatter dep on WP-001 (pending) keeps it
+    not-ready; WP-001 (empty deps) is ready."""
+    fm = {"WP-001": [], "WP-002": ["WP-001"]}
+    _write_project(tmp_path, _SINGLETABLE_INDEX, frontmatter=fm)
+    result = _run(wpx.cmd_list_ready, _ns(tmp_path))
+    assert result["data"]["ready"] == ["WP-001"]
+
+
+# ─── partial WP-file existence (review finding #3/#4) ────────────────────────
+
+
+def test_partial_wp_files_missing_falls_back_to_table_not_silent_empty(tmp_path):
+    """The review's HIGH finding: when SOME WP files exist and others
+    don't, a missing-file WP must NOT silently get empty deps (which
+    would make it wrongly appear ready). It must fall back to its table
+    dep cell.
+
+    Here WP-002 depends on WP-001 (per the INDEX table column). WP-001
+    has a frontmatter file; WP-002 does NOT. WP-002 must still be
+    recognised as depending on WP-001 (from the table) and therefore
+    NOT ready while WP-001 is pending."""
+    wp_dir = tmp_path / ".architecture" / "proj" / "work-packages"
+    wp_dir.mkdir(parents=True)
+    (wp_dir / "INDEX.md").write_text(_SINGLETABLE_INDEX, encoding="utf-8")
+    # Only WP-001 gets a file; WP-002 is fileless (mid-migration state).
+    (wp_dir / "WP-001-stub.md").write_text(
+        "---\nid: WP-001\nstatus: pending\ndependsOn: []\nblocks: []\n---\n",
+        encoding="utf-8",
+    )
+    result = _run(wpx.cmd_list_ready, _ns(tmp_path))
+    # WP-002 (fileless, table-dep on WP-001 pending) must NOT be ready.
+    assert "WP-002" not in result["data"]["ready"], (
+        "fileless WP-002 wrongly became ready — its table dep on WP-001 "
+        "was silently dropped (the partial-existence silent-empty bug)"
+    )
+    assert result["data"]["ready"] == ["WP-001"]
+
+
+def test_partial_wp_files_present_file_with_empty_deps_is_ready(tmp_path):
+    """Distinguish 'file exists, deps empty' (ready) from 'no file'
+    (fall back to table). WP-001 has a file with dependsOn: [] → ready
+    regardless of any table column content."""
+    wp_dir = tmp_path / ".architecture" / "proj" / "work-packages"
+    wp_dir.mkdir(parents=True)
+    # INDEX claims WP-001 depends on WP-999 (a non-existent WP), but the
+    # frontmatter says dependsOn: [] — frontmatter wins, so WP-001 ready.
+    index = _SINGLETABLE_INDEX.replace(
+        "| WP-001 | Foundation | create | pending | — | WP-002 |",
+        "| WP-001 | Foundation | create | pending | WP-999 | WP-002 |",
+    )
+    (wp_dir / "INDEX.md").write_text(index, encoding="utf-8")
+    (wp_dir / "WP-001-stub.md").write_text(
+        "---\nid: WP-001\nstatus: pending\ndependsOn: []\nblocks: []\n---\n",
+        encoding="utf-8",
+    )
+    result = _run(wpx.cmd_list_ready, _ns(tmp_path))
+    # Frontmatter [] beats the table's bogus WP-999 dep → WP-001 ready.
+    assert "WP-001" in result["data"]["ready"]
