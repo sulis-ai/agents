@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -81,6 +82,59 @@ def _existing_issue_titles(descriptor: IssueTypeDescriptor,
         return [row.get("title", "") for row in json.loads(out)]
     except (json.JSONDecodeError, AttributeError):
         return []
+
+
+_DISPOSITION_RE = re.compile(r"disposition:\s*([A-Za-z][A-Za-z0-9_-]*)",
+                             re.IGNORECASE)
+
+
+def _parse_disposition(body: str) -> str:
+    """Extract the disposition from a captured issue body.
+
+    Lesson bodies carry a provenance footer like
+    ``_Captured as a lesson (disposition: SEA; L-15) by ...._`` — this
+    reads the disposition back out so the resolve-lessons orchestrator
+    can triage mechanical (TASK / clear-fix SEA) from design-heavy.
+    Returns the lowercased disposition, or ``""`` when absent.
+    """
+    m = _DISPOSITION_RE.search(body or "")
+    return m.group(1).strip().lower() if m else ""
+
+
+def _list_open_issues(descriptor: IssueTypeDescriptor,
+                      repo: str | None) -> list[dict]:
+    """List OPEN issues carrying the descriptor's base label, with full
+    bodies + parsed disposition. The read-path sibling of capture (#52
+    resolve-lessons): the orchestrator needs number (to close via
+    ``Closes #N``), title (slug/dedup), body (draft the spec + predict
+    file-touch), and disposition (triage).
+
+    Uses the immediate ``--search`` backend (#23). Returns [] when the
+    query fails (degrades like the dedup read)."""
+    base = descriptor.base_labels[0] if descriptor.base_labels else descriptor.name
+    cmd = ["gh", "issue", "list", "--search", f"label:{base} is:open",
+           "--limit", "200", "--json", "number,title,body,labels,url"]
+    if repo:
+        cmd += ["--repo", repo]
+    rc, out, _ = _run(cmd)
+    if rc != 0:
+        return []
+    try:
+        rows = json.loads(out)
+    except (json.JSONDecodeError, AttributeError):
+        return []
+    issues: list[dict] = []
+    for row in rows:
+        body = row.get("body", "") or ""
+        issues.append({
+            "number": row.get("number"),
+            "title": row.get("title", ""),
+            "body": body,
+            "url": row.get("url", ""),
+            "disposition": _parse_disposition(body),
+            "labels": [l.get("name", "") for l in (row.get("labels") or [])],
+        })
+    return issues
 
 
 def _ensure_labels(descriptor: IssueTypeDescriptor, repo: str | None) -> None:
@@ -189,9 +243,39 @@ def cmd_capture(args: argparse.Namespace) -> None:
     })
 
 
+def cmd_list(args: argparse.Namespace) -> None:
+    """List open issues for a descriptor with bodies + parsed disposition.
+
+    The read-path the resolve-lessons orchestrator drains (#52). Degrades
+    cleanly to an empty list when gh is unavailable / not authenticated.
+    """
+    try:
+        descriptor = get_descriptor(args.descriptor)
+    except KeyError as exc:
+        emit_error(str(exc))
+        return
+
+    if not _gh_available():
+        emit_ok(data={
+            "degraded": True,
+            "reason": "gh unavailable or not authenticated",
+            "descriptor": descriptor.name,
+            "issues": [],
+        })
+        return
+
+    issues = _list_open_issues(descriptor, args.repo)
+    emit_ok(data={
+        "degraded": False,
+        "descriptor": descriptor.name,
+        "count": len(issues),
+        "issues": issues,
+    })
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Capture items as durable GitHub issues (lessons, "
+        description="Capture + list durable GitHub issues (lessons, "
                     "feedback, ...).")
     sub = parser.add_subparsers(dest="subcommand", required=True)
     p_cap = sub.add_parser("capture", help="Raise GitHub issues for "
@@ -208,10 +292,20 @@ def build_parser() -> argparse.ArgumentParser:
                             "remote)")
     p_cap.add_argument("--dry-run", action="store_true",
                        help="Compute the partition; create no issues")
+
+    p_list = sub.add_parser("list", help="List open issues for a descriptor "
+                                         "with bodies + parsed disposition")
+    p_list.add_argument(
+        "--descriptor", required=True,
+        help=f"Issue type. One of: {', '.join(available_descriptors())}",
+    )
+    p_list.add_argument("--repo", default=None,
+                        help="GitHub OWNER/REPO (defaults to the current "
+                             "remote)")
     return parser
 
 
-HANDLERS = {"capture": cmd_capture}
+HANDLERS = {"capture": cmd_capture, "list": cmd_list}
 
 
 if __name__ == "__main__":
