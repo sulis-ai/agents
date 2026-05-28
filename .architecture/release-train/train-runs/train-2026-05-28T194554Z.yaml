@@ -1,0 +1,17 @@
+train_id: "train-2026-05-28T194554Z"
+started_at: "2026-05-28T19:45:54Z"
+completed_at: "2026-05-28T19:46:24Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-05-28T19:46:00Z"
+gate_findings_path: ".architecture/release-train/code-reviews/PR-fdbb1a0-2026-05-28T194624Z/REVIEW.md"
+bundle:
+  - wp: WP-005
+    branch: feat/wp-005-version-check-ci-guard
+    pre_train_sha: 181d12afd95c4962252d326b244180141e240339
+    rebased_to_sha: 181d12afd95c4962252d326b244180141e240339
+    merge_sha_on_dev: fdbb1a0a858eb5bae1c0f13e92fa5aa81719d369

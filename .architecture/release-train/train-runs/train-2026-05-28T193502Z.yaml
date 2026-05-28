@@ -1,0 +1,17 @@
+train_id: "train-2026-05-28T193502Z"
+started_at: "2026-05-28T19:35:02Z"
+completed_at: "2026-05-28T19:35:47Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-05-28T19:35:08Z"
+gate_findings_path: ".architecture/release-train/code-reviews/PR-da2da59-2026-05-28T193547Z/REVIEW.md"
+bundle:
+  - wp: WP-009
+    branch: feat/wp-009-batch-defect-remediation
+    pre_train_sha: 401f16c038715ed055f8f8b1c4610432bc8784d2
+    rebased_to_sha: 401f16c038715ed055f8f8b1c4610432bc8784d2
+    merge_sha_on_dev: da2da59dc52195e1c91fec69b244d3bc0e58a82f

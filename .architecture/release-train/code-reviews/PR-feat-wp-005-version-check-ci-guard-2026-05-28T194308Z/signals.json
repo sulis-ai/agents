@@ -1,0 +1,40 @@
+{
+  "pr": "feat-wp-005-version-check-ci-guard",
+  "timestamp": "2026-05-28T194308Z",
+  "verdict": "PASS",
+  "build_verification": {
+    "yaml_parse_head": "clean",
+    "bash_syntax_all_run_steps": "clean",
+    "pr_introduced_errors": 0
+  },
+  "hygiene": {
+    "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "none"},
+    "size": {"lines_added": 156, "lines_removed": 0, "files_changed": 1, "severity": "none"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 1, "secret_pattern_hits": 0, "severity": "none"},
+    "completeness": {"new_source_without_test": 0, "note": "kind:infra — verification is workflow-lint + advisory-semantics assertion, not unit tests", "severity": "none"}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"total": 0},
+    "addressed_inline": [
+      {
+        "id": "F-01",
+        "lens": "security + quality",
+        "primitive": "SEC-02",
+        "severity_pre_fix": "low",
+        "file": ".github/workflows/version-check.yml",
+        "step": "Resolve base ref",
+        "summary": "GitHub event context interpolated directly into the shell via ${{ }} (event_name, pull_request.base.sha, github.event.before). Values are GitHub-controlled SHA/enum (not attacker-controlled free text), so not exploitable — but drifts from the repo convention (release-on-merge.yml passes context via env: then references $VAR).",
+        "resolution": "inline fix: moved all three context values to env: (EVENT_NAME, PR_BASE_SHA, PUSH_BEFORE_SHA), referenced as shell vars. Re-review: zero ${{ }} expansion in any run body."
+      }
+    ]
+  },
+  "draft_deltas": 0,
+  "lenses": {
+    "architecture": {"findings": 0, "checks": "timeout-minutes bounded (10), concurrency cancel-in-progress, actions/checkout@v4 pinned, no secrets, no unbounded external calls, no missing-timeout network calls"},
+    "security": {"findings_after_fix": 0, "primitives_checked": ["SEC-02 (injection/script-injection)", "SEC-06 (secrets exposure)"], "note": "no plaintext secrets; event-context injection addressed inline via env-passing"},
+    "quality": {"findings": 0, "cr10_performance": "no anti-pattern matches (no loops over collections beyond bounded 2-iter ref loop; no DB/RPC/FS)", "test_coverage": "kind:infra — advisory-semantics assertion is the verification gate, hand-traced + scratch-run"}
+  },
+  "carve_out": "single-reader pass justified: 148-156 lines, 1 file (within CR-02 threshold of <=200 lines AND <=5 files)",
+  "coverage_gaps": ["actionlint absent", "shellcheck absent (mitigated: bash -n syntax check on each run-step body; repo contract is stdlib-only tooling, matching branch-ci.yml)"]
+}

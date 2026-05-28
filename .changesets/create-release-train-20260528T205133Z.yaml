@@ -1,0 +1,7 @@
+change_id: 01KSQNPBPN7W74QVAZ25F79RNH
+primitive: create
+tier: minor
+touches_plugin: true
+summary: |
+  Changeset-based release-train (Option B): per-change ship writes a changeset, /sulis:release-train opens the dev->main PR, and release-on-merge.yml bumps plugin.json + marketplace.json + assembles the CHANGELOG + tags as the bot. Adds advisory version-check CI and a recorded branch-protection go-live runbook. Closes #66.
+created_at: 2026-05-28T20:51:33Z

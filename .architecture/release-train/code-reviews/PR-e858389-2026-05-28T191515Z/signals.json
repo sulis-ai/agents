@@ -1,0 +1,32 @@
+{
+  "target": "4c1cbf69..e858389",
+  "train_id": "train-2026-05-28T185209Z",
+  "batch_size": 3,
+  "wps": ["WP-002", "WP-003", "WP-004"],
+  "verdict": "Block",
+  "seam_test": {"changesets": 3, "cumulative_tier": "minor", "plugin": "0.77.0->0.78.0", "metadata": "1.122.0->1.123.0", "tag": "v1.123.0", "changelog_header": "## v0.78.0", "injection_guard": "holds"},
+  "findings": [
+    {
+      "id": "CR-BATCH-01",
+      "severity": "critical",
+      "lens": "composition",
+      "file": "plugins/sulis/skills/change/SKILL.md",
+      "line": "488-489",
+      "also": ".architecture/release-train/work-packages/WP-002-ship-writes-changeset.md:94",
+      "summary": "Ship step 4.7 calls write_changeset('.changesets', ...) with a str; _changeset.py calls changesets_dir.mkdir() -> AttributeError. Producer never writes a changeset; dev accumulates none.",
+      "disposition": "forward-remediation-WP-009",
+      "suggested_fix": "Coerce str|Path at entry of write_changeset + read_changesets (with test), and/or fix the snippet to Path('.changesets') + import. Correct the WP-002 spec example too."
+    },
+    {
+      "id": "CR-BATCH-02",
+      "severity": "high",
+      "lens": "infra",
+      "file": ".github/workflows/release-on-merge.yml",
+      "line": "36",
+      "summary": "Loop-guard expression uses double-quoted string literal inside ${{ }}; GitHub Actions rejects at expression evaluation (YAML lint passes). Guard may not protect against the bot's own push re-triggering the workflow.",
+      "disposition": "forward-remediation-WP-009",
+      "suggested_fix": "Single-quote the literal: ${{ !startsWith(github.event.head_commit.message, 'release: sulis') }}. Verify with actionlint."
+    }
+  ],
+  "clean_checks": ["contract-coherence", "single-source-bump", "last-wins-tier-read", "version-drift-guard", "post-bump-verification", "nothing-to-release-exit-0", "three-value-bump-paths", "token-permission-posture", "readme-preserved", "explicit-named-staging"]
+}

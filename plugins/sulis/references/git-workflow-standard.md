@@ -8,12 +8,18 @@ cut). Feature branches merge **directly to `dev`** via squash-merge when
 CI on the branch is green — **no PR ceremony**. Branch protection on
 `dev` enforces the CI-green status check; that is the quality gate.
 `main` is promoted from `dev` only with explicit founder authorisation.
-Conventional Commits 1.0.0 for commit messages. SemVer 2.0.0 for release
-tags. No `--no-verify`, no force-push to protected branches, no hook
-bypass.
+Releases run on the **changeset-based release train** (ADR-001): each
+change records a changeset on ship, `/sulis:release-train` opens a
+reviewed `dev → main` PR, and the `release-on-merge.yml` GitHub Action —
+the single bump authority (ADR-004) — computes the cumulative SemVer
+version from the accumulated changesets and bumps + tags as the bot on
+merge to `main`. For a normal release a human no longer hand-picks or
+types a version number. Conventional Commits 1.0.0 for commit messages.
+SemVer 2.0.0 for release tags. No `--no-verify`, no force-push to
+protected branches, no hook bypass.
 <!-- /summary -->
 
-> **Version:** 0.1.0
+> **Version:** 0.2.0
 > **Status:** Active — Calibration Period (90 days from 2026-05-16)
 > **Applies to:** All agents and projects in the Sulis AI marketplace,
 > and any downstream project an executor or orchestrator operates on.
@@ -38,6 +44,16 @@ neither full GitFlow (which adds `release/*`, `hotfix/*`, `develop`,
 integration buffer). It is the middle ground that gives autonomous
 executors a CI-gated landing strip without the overhead of release
 branches.
+
+The **release-train rework of GIT-06** (v0.2.0) closes
+[#66](https://github.com/sulis-ai/agents/issues/66): the ship flow
+relied on a human/agent remembering to bump the version on promotion,
+and three releases in a row landed unlabelled. The fix decouples
+integration from release via changesets and moves the bump from a
+hand-typed `workflow_dispatch` input to a deterministic, bot-driven
+GitHub Action (ADR-001 + ADR-004). The convention is the established
+one — the Changesets tool / honest-claude's `/release-train` — so
+downstream agents and humans pattern-match it.
 
 The **no-PR-ceremony rule** (GIT-05) is the load-bearing departure from
 the GitHub-default workflow. Pull requests exist as a human-review
@@ -504,27 +520,70 @@ either a comment-on-commit flow or a manual `dev → main` ratification):
 
 ---
 
-## GIT-06: `dev → main` promotion (MUST)
+## GIT-06: `dev → main` promotion — the changeset-based release train (MUST)
 
-Production releases occur by merging `dev` into `main`. This is a
-**fast-forward merge** (or merge commit if fast-forward is not possible)
-that **does not squash** — `main` preserves `dev`'s history of
-individual WP squash-merges.
+Production releases occur by promoting `dev` to `main` through the
+**changeset-based release train** (ADR-001, the root fix for
+[#66](https://github.com/sulis-ai/agents/issues/66)). Promotion is a
+**reviewed `dev → main` pull request**, and the version bump is applied
+by a GitHub Action — **not** hand-typed by a human.
+
+The two halves that used to be coupled are decoupled: *integration*
+(landing a change on `dev`) and *release* (bumping the version,
+assembling the CHANGELOG, tagging). Each change records a **changeset**
+on ship (a `.changesets/*.yaml` file carrying its intent and tier but
+**no version number** — see the `/sulis:change` ship flow). Changesets
+accumulate on `dev`. A separate, on-demand release step batches them
+into one deterministic, bot-driven bump on merge to `main`.
+
+The merge of the `dev → main` PR is **not squashed** — `main` preserves
+`dev`'s history of individual WP squash-merges. The Action's bump + tag
+commit lands on top of that preserved history.
 
 ### Mechanics
 
 1. **Founder requests promotion.** The concierge surfaces the request
    in plain English (*"You have 12 things ready to ship to production.
    Want to promote them?"*) and waits for explicit confirmation.
-2. **Pre-promotion gates.** Same CI suite as `dev`, plus any additional
+2. **Open the reviewed `dev → main` PR.** `/sulis:release-train` drafts
+   the promotion PR from the accumulated changesets (read-only — it
+   does **not** bump anything). This is the human review gate for the
+   release.
+3. **Pre-promotion gates.** Same CI suite as `dev`, plus any additional
    production-gate checks (canary deploy on dev healthy for N minutes;
    no open BLOCKER files; security scan clean).
-3. **Promotion.** `git merge dev` on `main`. Tag the resulting commit
-   with a SemVer release tag per GIT-08.
-4. **Production deploy.** Tag push triggers production deploy via the
+4. **Merge the PR → the Action bumps + tags.** On merge to `main`,
+   `release-on-merge.yml` — the **single bump authority** (ADR-004) —
+   computes the cumulative SemVer version from the consumed changesets,
+   bumps the version values, assembles the CHANGELOG, deletes the
+   consumed changesets, tags the release per GIT-08, and pushes back to
+   `main` as `github-actions[bot]`. **A human does not hand-pick or
+   type a version number for a normal release** — the Action derives it
+   from the changesets. (This requires `main` branch protection
+   configured so the bot can push; see ADR-004 and the WP-006 go-live
+   runbook.)
+5. **Production deploy.** The tag push triggers production deploy via the
    Sulis SDK or project-equivalent CD pipeline.
-5. **Post-promotion verification.** Production health-checks pass; if
+6. **Post-promotion verification.** Production health-checks pass; if
    any fail within the rollback window, automatic revert per GIT-10.
+
+> **Scope of the bump-authority move.** Only *who/what* applies the
+> version moves — from a human to the Action. The **SemVer scheme is
+> unchanged** (GIT-08 still governs MAJOR/MINOR/PATCH). The **hot-fix
+> path (GIT-11) is unaffected** — a hot-fix is its own emergency release
+> off `main`, outside the train, and legitimately keeps its own
+> SemVer-patch tag step.
+
+> **One-last-manual-bump carve-out (transitional).** The change that
+> *introduces* this train ships through the **old** flow — a manual
+> bump **one last time** — because the train is not live yet. WP-007
+> retires the manual bump from the *documented* flow **going forward**;
+> it does **not** block that change's own final manual-bump ship. The
+> manual-bump *mechanism* (`promote-dev-to-main.yml`'s hand-typed
+> `version` input) is retired separately at **go-live**, once the train
+> is proven end-to-end — see
+> `.architecture/release-train/wp-006-config/RUNBOOK.md` for the
+> mechanism removal + `main` branch-protection apply.
 
 ### Cadence
 
@@ -853,18 +912,27 @@ $ cd ../main-worktree
 $ git worktree remove ../wp-007
 ```
 
-### Example 2 — `dev → main` promotion
+### Example 2 — `dev → main` promotion (the release train)
 
 ```
 # Founder confirms via concierge: "yes, promote these 12 WPs."
 
-# Orchestrator (with founder authorisation):
-$ git checkout main
-$ git merge dev   # fast-forward
-$ git tag -a v1.5.0 -m "Release v1.5.0 — adds cancel-subscription, ..."
-$ git push origin main --tags
+# 1. Open the reviewed dev → main PR from the accumulated changesets
+#    (read-only — drafts the PR, bumps nothing):
+$ /sulis:release-train
 
-# Production deploy triggered by tag push.
+# 2. CI + pre-promotion gates run on the PR. On green, the founder
+#    merges it.
+
+# 3. On merge to main, release-on-merge.yml (the bump authority) runs
+#    as github-actions[bot]:
+#      - computes the cumulative SemVer version from the consumed changesets
+#      - bumps the version values + assembles the CHANGELOG
+#      - deletes the consumed changesets
+#      - tags the release (SemVer per GIT-08) and pushes back to main
+#    No human types a version number.
+
+# Production deploy triggered by the bot's tag push.
 # Health-check window: 10 minutes.
 # If healthy → release announced.
 # If failing → automatic revert per GIT-10.
@@ -1014,3 +1082,4 @@ Acceptance Evidence` section.
 | 0.1.2 | 2026-05-18 | Parallel-safe merge discipline (load-bearing for sulis-execution v0.8.0+ parallel dispatch). **GIT-04** extended with CI concurrency requirement — workflows must support concurrent runs across different feature branches via per-branch concurrency keying (not global). **GIT-05** mechanics insert a step-4 fetch-dev + rebase-if-advanced + re-CI sub-step before the squash-merge — prevents the parallel-merge race condition where WP-A's CI was green against stale dev that WP-B has since advanced. **GIT-10** extended with "Rollback during parallel execution" subsection — the rollback executor doesn't coordinate with in-flight peers; peers detect via their own GIT-05 step-4 rebase logic; rebased CI surfaces semantic dependencies on the reverted code as BLOCKERs. **NEW GIT-11**: Hot-fix path for production — encodes the bypass for prod emergencies (severity threshold, founder authorisation, hotfix branch off main, RGB discipline preserved, SemVer patch tag, backport to dev within 48 hours, post-mortem MUST). New Example 3 walks through the parallel-merge race scenario showing the rebase resolving it. | Standards team |
 | 0.1.3 | 2026-05-18 | First-live-run gaps from WP-7 execution surface two clarifications. **GIT-04** new subsection "CI must run on feature branches (MUST)" — required status checks must fire on every feature-branch push, not only on dev/main pushes. Without feature-branch CI, the merge gate is post-merge and broken code can land before any CI catches it. Example trigger config covers all Conventional Commits prefix globs (feat/, fix/, chore/, etc.) per GIT-02. Plus new subsection "Local pre-commit fallback (SHOULD when feature-branch CI is absent)" — documents the substitute pattern for transitional projects with explicit guard-rails (journal record, recommendation surfaced to founder via concierge). Fallback is SHOULD, not MUST — projects must eventually wire feature-branch CI to satisfy GIT-04's MUST. **GIT-05** new anti-pattern subsection "git switch dev from a worktree" — explicit forbidden mental model (`git switch dev` fails when dev is checked out elsewhere, which is the normal state under parallel dispatch). Canonical merge paths named: host API for all cases (preferred); refspec push (`git push origin feat/wp-NNN:dev`) acceptable shortcut for single-commit branches only; multi-commit feature branches must use host API to satisfy GIT-04's linear-history requirement. Provenance: WP-7 executor improvised both patterns correctly under stress; this commit makes them canonical. | Standards team |
 | 0.1.4 | 2026-05-28 | False-green guardrail (issue #59). **GIT-04** new subsection "Confirm CI by reading the conclusion, not a shell exit code (MUST)" — confirming CI MUST read the conclusion explicitly (`gh run view <id> --json conclusion -q .conclusion`, expect `success`; or `gh pr checks --watch`, exit-status-correct). Two never-rules: NEVER trust a chained `; echo $?` after `gh run watch` (the echo's exit is always 0, not gh's); NEVER use `gh run watch` without `--exit-status` as a gate signal (it exits 0 on completion regardless of pass/fail). **GIT-05** merge-mechanics step 3 now cross-references the subsection — "green" means `conclusion == success`, never a bare exit 0. Provenance: a run-all session merged a foundation WP on a RED CI by trusting a hand-typed `gh run watch <id>; echo "exit: $?"`; 9 downstream WPs depended on it. Marketplace tooling (`wpx-train` / `wpx-pipeline`, `/sulis:change` ship) was already safe — this encodes the correct pattern as a citable guardrail so an improvised watch cannot reintroduce the bug. | Standards team |
+| 0.2.0 | 2026-05-28 | Changeset-based release train ([#66](https://github.com/sulis-ai/agents/issues/66)). **GIT-06** reworked: `dev → main` promotion is now a reviewed PR opened by `/sulis:release-train` from accumulated changesets, and the version bump is applied by the `release-on-merge.yml` GitHub Action (the single bump authority) on merge to `main` — a human no longer hand-picks or types a SemVer version for a normal release. Integration and release are decoupled via per-change changesets (ADR-001); the Action is the bump authority (ADR-004). **Summary** + **Provenance** updated; **Example 2** rewritten to the train flow. **GIT-08 (SemVer scheme) unchanged** — only *who/what* applies the version moves from a human to the Action. **GIT-11 (hot-fix path) unaffected** — a hot-fix is its own emergency release off `main` and keeps its own SemVer-patch tag step. **Carve-out:** the change that introduces the train ships through the OLD manual-bump flow ONE last time (the train isn't live yet); this row retires the manual bump from the *documented* flow going forward, not that change's own ship. The manual-bump *mechanism* (`promote-dev-to-main.yml`'s hand-typed `version` input) is retired at go-live — see `.architecture/release-train/wp-006-config/RUNBOOK.md`. (Header version bumped 0.1.0 → 0.2.0; the header had drifted behind the 0.1.x patch rows.) | Standards team |
