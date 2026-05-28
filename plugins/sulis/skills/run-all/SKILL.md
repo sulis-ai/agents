@@ -121,6 +121,48 @@ in their own prompts (`agents/executor.md`) — they resolve
 independently in their own contexts. You do NOT pass `$WPX_DIR` to
 them; each subagent finds its own.
 
+## Founder progress discipline (MUST — this is a multi-hour run the founder must be able to TRACK)
+
+A `run-all` is the longest unattended thing Sulis does. The founder is
+trusting a multi-hour process they can't watch line-by-line. If the only
+signal is an operator firehose (raw SHAs, WP/DC IDs, `rebase+merge`,
+`ruff I001`, critical-path arrows), they can't track it and trust collapses
+— "it may be right, but I'm putting huge faith in something I can't follow."
+Founder-mode is the **default** for the whole loop; the raw stream is opt-in
+(`--raw` / `/sulis:jargon on`). Two rules:
+
+**1. Every founder-visible string passes the FE-06 scan — including the
+high-frequency surfaces.** This is where jargon leaks because it feels like
+"ops chatter, not a real message" (founder-english.md Anchor case 5). It is
+not exempt:
+- **Bash `description`** and **Agent `description`** — the one line rendered
+  above each tool call. Plain English, always (the plain translation of the
+  WP title), never a WP/DC ID, SHA, or "Ship WP-NNN". (The raw command +
+  output below it are unavoidable harness chrome — leave them; the founder
+  accepts those. It's the *description* + your *prose* that must be legible.)
+- **Per-wave prose** — no SHAs, no `WP-AJ-NNN`/`DC-NN`, no `rebase`/`FF`/
+  `ruff`/`I001`/critical-path arrows. Translate WP titles to what the founder
+  asked for ("the sign-up screen", "the billing screen").
+
+**2. Emit a fixed-shape progress frame at each WAVE boundary — not
+per-command.** Same template every wave, so the founder tracks the *delta*,
+not the mechanism. Four things, always:
+
+> *"Building your app — **{done} of {total} pieces done ({pct}%)**.
+> Just finished: {plain titles of the wave that just merged}.
+> Now building: {plain titles in flight}.
+> Next up: {plain titles of the next ready set}.
+> {Nothing needs you — I'll surface anything that does. | ⚠ One thing needs
+> you: {plain-English blocker/decision}.}"*
+
+The "needs you / nothing needs you" line is the trust anchor — it tells the
+founder, every wave, that nothing is silently broken. Surface blockers +
+founder decisions in this frame in plain English (no rule codes); keep the
+per-command narration out of the founder's way (it lives in `--raw`).
+
+(Layer-3 follow-on, out of scope here: a living `/sulis:dashboard` / PROGRESS
+view at the piece level so tracking can leave the chat stream entirely.)
+
 ### The parallel loop
 
 ```
@@ -279,23 +321,27 @@ loop:
 
     8. Dispatch ALL picked WPs in a SINGLE message containing
        multiple Agent tool_use blocks — Claude Code runs them
-       concurrently:
+       concurrently. The Agent `description` is rendered on the
+       founder's screen — it MUST be founder-English (the plain
+       translation of the WP's title), NEVER a raw WP ID or
+       "Ship WP-NNN". See "Founder progress discipline" below.
 
        Agent({
          subagent_type: "sulis:executor",
-         description: "Ship WP-007 end-to-end",
+         description: "Building the sign-up screen",   # plain-English WP title
+         model: <executor_model from WP frontmatter, if present>,
+         prompt: """<executor brief per below — the WP-NNN lives HERE,
+                     not in the founder-facing description>""",
+       })
+       Agent({
+         subagent_type: "sulis:executor",
+         description: "Building the billing screen",
          model: <executor_model from WP frontmatter, if present>,
          prompt: """<executor brief per below>""",
        })
        Agent({
          subagent_type: "sulis:executor",
-         description: "Ship WP-008 end-to-end",
-         model: <executor_model from WP frontmatter, if present>,
-         prompt: """<executor brief per below>""",
-       })
-       Agent({
-         subagent_type: "sulis:executor",
-         description: "Ship WP-009 end-to-end",
+         description: "Building the device-connection screen",
          model: <executor_model from WP frontmatter, if present>,
          prompt: """<executor brief per below>""",
        })

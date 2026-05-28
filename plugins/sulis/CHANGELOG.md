@@ -1,5 +1,17 @@
 # Sulis — Changelog
 
+## v0.78.0 — 2026-05-28
+
+**Patch — autonomous run-all progress is founder-legible + trackable (closes #69).**
+
+A multi-hour `/sulis:run-all` was reporting in operator-English (raw SHAs, internal WP/DC IDs, mechanism narration) — unreadable to a non-technical founder, who is trusting a long process they can't follow line-by-line. The founder-English standard already covered this (it even predicted it in Anchor case 5) but the discipline never reached `run-all`'s two highest-frequency surfaces. Now it does:
+
+- **The two leaking surfaces are translated.** Every Bash/Agent `description` and every progress line passes the FE-06 scan — plain English, no WP/DC IDs, SHAs, or `rebase`/`ruff`/critical-path jargon. `run-all`'s own example descriptions, which modelled the violation (`"Ship WP-AJ-FE-07 end-to-end"`), are fixed (`"Building the sign-up screen"`). The raw command + output remain (unavoidable harness chrome); the *description* the founder reads is plain.
+- **A fixed-shape progress frame at each wave boundary** — `{done} of {total} done · just finished · now building · next up · what (if anything) needs you` — so the founder tracks the delta in a stable frame, not a scrolling transcript. The "nothing needs you / here's what does" line is the trust anchor.
+- **Founder-mode is the default for the whole run**; the operator firehose is opt-in via `--raw` / `/sulis:jargon on`.
+
+Follow-on (#69 layer 3, separate change): a living `/sulis:dashboard` / PROGRESS view at the piece level so tracking can leave the chat stream entirely.
+
 ## v0.77.0 — 2026-05-28
 
 **Minor — run-all pre-flight dev-clean check + unprotected-repo warning (closes #52).**
