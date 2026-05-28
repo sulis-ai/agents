@@ -74,6 +74,82 @@ def test_start_creates_branch_and_worktree(local_git_repo, run_tool):
     assert metadata["primitive"] == "create"
 
 
+def test_start_pushes_change_branch_to_origin(local_git_repo, run_tool):
+    """`sulis-change start` publishes the change branch to origin (#61).
+
+    The integration train merges via the GitHub API, so the change branch
+    (the train's --base-branch) MUST exist on origin or the first train run
+    404s. `start` therefore pushes the new branch at creation. The
+    local_git_repo fixture wires up a bare `origin` remote, so after `start`
+    the branch must be a ref in that remote.
+    """
+    result = run_tool(
+        "sulis-change", "start",
+        "--repo-root", str(local_git_repo),
+        "--slug", "publish-me",
+        "--primitive", "feat",
+    )
+    assert result.ok, f"start failed: stderr={result.stderr}"
+    branch = "change/feat-publish-me"
+    assert result.data["branch"] == branch
+
+    # The push outcome is reported in the JSON (additive field).
+    assert result.data["pushed_to_origin"] is True, (
+        f"start did not report pushing the branch: data={result.data}"
+    )
+
+    # The branch is a real ref on origin (the bare remote).
+    ls_remote = _git(local_git_repo, "ls-remote", "origin",
+                     f"refs/heads/{branch}")
+    assert ls_remote, (
+        f"change branch {branch} is not on origin after start — the train "
+        f"will 404 on its first run. ls-remote returned empty."
+    )
+    assert branch in ls_remote
+
+
+def test_start_degrades_gracefully_with_no_remote(tmp_path, run_tool):
+    """`start` with NO origin remote still succeeds locally and reports
+    `pushed_to_origin: false` without crashing (#61 graceful-degrade).
+
+    The push is an enhancement, not a new precondition — an offline / no-remote
+    repo must still get its local branch + worktree.
+    """
+    # A real git repo on a dev branch, but with NO origin remote configured.
+    repo = tmp_path / "_no_remote_repo"
+    repo.mkdir()
+    _run(["git", "init", "-q", "-b", "dev"], cwd=repo)
+    _run(["git", "config", "user.email", "test@example.com"], cwd=repo)
+    _run(["git", "config", "user.name", "Test"], cwd=repo)
+    (repo / "README.md").write_text("# no remote\n")
+    _run(["git", "add", "."], cwd=repo)
+    _run(["git", "commit", "-q", "-m", "initial"], cwd=repo)
+
+    result = run_tool(
+        "sulis-change", "start",
+        "--repo-root", str(repo),
+        "--slug", "offline-change",
+        "--primitive", "feat",
+    )
+    # Local branch + worktree creation still succeeds (no crash, exit 0).
+    assert result.ok, f"start must not crash with no remote: stderr={result.stderr}"
+    assert result.returncode == 0
+    branch = "change/feat-offline-change"
+    assert result.data["branch"] == branch
+
+    # The push could not happen → reported false, not crashed.
+    assert result.data["pushed_to_origin"] is False, (
+        f"start should report pushed_to_origin=false with no remote: "
+        f"data={result.data}"
+    )
+
+    # The local branch + worktree genuinely exist.
+    worktree_dest = Path(result.data["worktree_path"])
+    assert worktree_dest.exists()
+    branches = _git(repo, "branch", "--list", branch)
+    assert branch in branches
+
+
 def test_start_rejects_existing_branch(local_git_repo, run_tool):
     """Starting twice with the same slug fails the second time."""
     run_tool("sulis-change", "start",

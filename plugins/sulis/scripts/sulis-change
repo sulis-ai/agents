@@ -342,6 +342,54 @@ def _build_change_pre_prompt(
     return body
 
 
+def _has_origin_remote(repo_root: Path) -> bool:
+    """True when an ``origin`` remote is configured in ``repo_root``.
+
+    Used by `start` to decide whether to even attempt the publish-at-creation
+    push (#61). A missing origin is the normal local-only / offline case, not
+    an error — it degrades to ``pushed_to_origin: false`` rather than a failed
+    push attempt with noisy git stderr.
+    """
+    rc, out, _ = _run(["git", "remote"], cwd=repo_root, timeout=10)
+    if rc != 0:
+        return False
+    return "origin" in out.split()
+
+
+def _push_change_branch_to_origin(repo_root: Path, branch: str) -> bool:
+    """Publish the freshly-created change branch to origin (#61, best-effort).
+
+    The integration train merges via the GitHub API, so the change branch (the
+    train's --base-branch) MUST exist on origin or the first train run 404s.
+    `start` publishes it at creation so the founder never has to run a manual
+    `git push -u origin <branch>` first.
+
+    Graceful-degrade contract: the push is an ENHANCEMENT to `start`, never a
+    new precondition. No origin remote, or a failed push (offline / auth /
+    unreachable), must NOT crash `start` or unwind the local branch + worktree
+    — it logs a clear warning and returns False so the caller can report
+    ``pushed_to_origin: false``. Returns True only when the branch is genuinely
+    published to origin.
+    """
+    if not _has_origin_remote(repo_root):
+        _log(f"No 'origin' remote configured; change branch {branch} was NOT "
+             f"published. The integration train will need it pushed first "
+             f"(`git push -u origin {branch}`).")
+        return False
+
+    rc, _, err = _run(["git", "push", "-u", "origin", branch],
+                      cwd=repo_root, timeout=60)
+    if rc != 0:
+        _log(f"Could not publish change branch {branch} to origin "
+             f"(push failed: {err.strip() or 'unknown error'}). `start` "
+             f"succeeded locally; push the branch before the integration "
+             f"train runs (`git push -u origin {branch}`).")
+        return False
+
+    _log(f"Published change branch {branch} to origin.")
+    return True
+
+
 # ─── Subcommand: start ────────────────────────────────────────────────────
 
 def cmd_start(args: argparse.Namespace) -> None:
@@ -461,6 +509,12 @@ def cmd_start(args: argparse.Namespace) -> None:
             pre_prompt=pre_prompt,
         )
 
+    # Publish the change branch to origin (#61) — best-effort, graceful-degrade.
+    # The branch ref already exists (git_worktree_add created it), so this just
+    # publishes it. A no/unreachable remote degrades to pushed_to_origin=False
+    # with a logged warning; it never unwinds the local branch + worktree.
+    pushed_to_origin = _push_change_branch_to_origin(repo_root, branch)
+
     _log(f"Change started: {branch} ({handle}) at {worktree_dest}")
     emit_ok(data={
         "change_id": change_id,
@@ -474,6 +528,7 @@ def cmd_start(args: argparse.Namespace) -> None:
         "metadata_path": str(_metadata_path(worktree_dest, primitive, slug)),
         "context_md_path": str(context_path) if context_path is not None else None,
         "spawn_result": spawn_result,
+        "pushed_to_origin": pushed_to_origin,
     })
 
 
