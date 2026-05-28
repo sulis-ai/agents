@@ -628,3 +628,87 @@ def test_innocuous_text_passes_through_unchanged():
     r = anonymise(text)
     assert r.redacted_text == text
     assert r.redactions == []
+
+
+# ─── Non-Latin script handling via NFKC (closes #41) ─────────────────────────
+#
+# Full-width ASCII lookalikes (CJK compatibility forms that look identical
+# to ASCII when rendered) used to slip past the ASCII-only regex classes.
+# Fix: NFKC-normalise the input at ingress, so the regexes see the
+# canonical ASCII form. Probed today as the lesson body claimed.
+
+
+def test_full_width_secret_assignment_is_redacted_via_nfkc():
+    """Full-width 'STRIPE_SECRET_KEY=...' (CJK compatibility chars) used
+    to pass through the env-secret regex unchanged. NFKC normalises to
+    ASCII before the regex pass, so this now redacts correctly."""
+    # The full-width chars compatibility-decompose to ASCII.
+    full_width = "ＳＴＲＩＰＥ＿ＳＥＣＲＥＴ＿ＫＥＹ=ｓｋ_ｌｉｖｅ_abc123def456ghi789jklmno"
+    r = anonymise(full_width)
+    # After NFKC, env-secret pass fires.
+    assert "<secret>" in r.redacted_text
+    # The original (or its normalised form) sk_live_... value is gone.
+    assert "abc123def456ghi789jklmno" not in r.redacted_text
+
+
+def test_full_width_email_is_redacted_via_nfkc():
+    full_width = "contact ｉａｉｎ@ｅｘａｍｐｌｅ.com"
+    r = anonymise(full_width)
+    assert "<email>" in r.redacted_text
+
+
+def test_cyrillic_project_name_is_redacted():
+    """Cyrillic project names — Python 3 regex is unicode-aware, but pin
+    that the project-name pass with re.UNICODE works for non-Latin."""
+    context = AnonymisationContext(project_names=["МойПроект"])
+    text = "the bug was in МойПроект checkout flow"
+    r = anonymise(text, context)
+    assert "<project>" in r.redacted_text
+    assert "МойПроект" not in r.redacted_text
+
+
+def test_chinese_project_name_is_redacted():
+    context = AnonymisationContext(project_names=["我的项目"])
+    text = "我的项目 hit the bug last week"
+    r = anonymise(text, context)
+    assert "<project>" in r.redacted_text
+    assert "我的项目" not in r.redacted_text
+
+
+def test_arabic_project_name_is_redacted():
+    context = AnonymisationContext(project_names=["مشروعي"])
+    text = "we shipped مشروعي with this change"
+    r = anonymise(text, context)
+    assert "<project>" in r.redacted_text
+    assert "مشروعي" not in r.redacted_text
+
+
+def test_innocuous_unicode_passes_through_unchanged():
+    """Innocuous non-ASCII text (e.g. an emoji in feedback) must not
+    be redacted — NFKC normalisation should not affect content without
+    triggers."""
+    text = "the change shipped cleanly 🚀 — onwards"
+    r = anonymise(text)
+    # NFKC may normalise the emoji (no-op for most), but no redactions
+    # should fire.
+    assert r.redactions == []
+    # Emoji preserved
+    assert "🚀" in r.redacted_text
+
+
+def test_homograph_attack_documented_as_out_of_scope():
+    """Cyrillic 'а' (U+0430) visually identical to Latin 'a' (U+0061)
+    is NOT caught — NFKC doesn't canonicalise homographs. Out of scope
+    for this fix; would need a unicode TR39 confusables layer.
+
+    This test pins TODAY's behaviour so a future "fix" doesn't ship
+    without intent. To genuinely close the homograph hole, file a
+    separate follow-up issue."""
+    # First char is Cyrillic 'а', not Latin 'a' — looks identical
+    text = "user аdmin@host.com reported it"  # noqa: RUF001
+    r = anonymise(text)
+    # NFKC preserves the Cyrillic 'а' (it's NOT a compatibility
+    # decomposition). The email pass requires ASCII chars in the
+    # local part, so this email is NOT caught today.
+    # We accept this as known limitation; the domain still gets caught.
+    assert "<domain>" in r.redacted_text  # at minimum, the domain went

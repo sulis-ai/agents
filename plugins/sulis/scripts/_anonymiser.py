@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import ipaddress
 import re
+import unicodedata
 from dataclasses import dataclass, field
 
 
@@ -509,15 +510,23 @@ _PASSES: list[tuple[str, re.Pattern, callable]] = [
 
 def _project_names_pattern(names: list[str]) -> re.Pattern | None:
     """Compile a single combined pattern matching any of the founder's
-    project names (case-insensitive, whole-word). Returns None when the
-    list is empty so the caller can skip the pass cheaply."""
+    project names (case-insensitive, whole-word, unicode-aware). Returns
+    None when the list is empty so the caller can skip the pass cheaply.
+
+    `re.UNICODE` is the default in Python 3, but listed explicitly here
+    to document intent (#41) — non-Latin project names (Cyrillic,
+    Chinese, Arabic) match the same way ASCII names do, because `\\b`
+    word boundaries operate on the unicode word/non-word transition."""
     cleaned = [re.escape(n) for n in names if n and len(n) >= 3]
     if not cleaned:
         return None
     # Sort longest-first so a substring match doesn't shadow a longer
     # name. E.g. ``my-app`` is preferred over ``app`` if both are listed.
     cleaned.sort(key=len, reverse=True)
-    return re.compile(r"\b(?:" + "|".join(cleaned) + r")\b", re.IGNORECASE)
+    return re.compile(
+        r"\b(?:" + "|".join(cleaned) + r")\b",
+        re.IGNORECASE | re.UNICODE,
+    )
 
 
 def _change_branch_pattern() -> re.Pattern:
@@ -546,6 +555,19 @@ def anonymise(text: str,
     """
     if context is None:
         context = AnonymisationContext()
+
+    # NFKC-normalise at ingress (#41). Compatibility-decomposes lookalike
+    # forms (full-width ASCII, CJK compatibility forms) to their canonical
+    # ASCII so the ASCII-only regex classes catch them. Innocuous unicode
+    # (emoji, plain non-Latin scripts like Cyrillic / Chinese / Arabic) is
+    # preserved verbatim — NFKC is idempotent on already-canonical content.
+    #
+    # NOT covered by this pass: homograph attacks (Cyrillic 'а' (U+0430)
+    # visually identical to Latin 'a' (U+0061)). NFKC does not canonicalise
+    # homographs — they're visually identical but distinct code points.
+    # Catching them needs a unicode TR39 confusables layer; tracked as a
+    # follow-up if needed.
+    text = unicodedata.normalize("NFKC", text)
 
     result_text = text
     redactions: list[Redaction] = []
