@@ -1,5 +1,11 @@
 # Sulis — Changelog
 
+## v0.69.0 — 2026-05-28
+
+**Patch — anonymiser scrubs private + loopback + link-local IPs (closes #40).**
+
+PR #38's review surfaced that IP addresses pass through unchanged. Now private (RFC 1918), ULA (RFC 4193), loopback, and link-local (RFC 3927, 4291) ranges → `<ip>`; globally-routable IPs (public DNS, well-known services) preserved. Stdlib `ipaddress.ip_address(s).is_private / is_loopback / is_link_local` does the classification — the lesson body cited the RFCs; the stdlib IS the citation. 14 new tests; 802/802 pass.
+
 ## v0.68.0 — 2026-05-28
 
 **Patch — anonymiser URL pass redacts credential-bearing URLs unconditionally (closes #39).**
