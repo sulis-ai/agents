@@ -1,5 +1,16 @@
 # Sulis — Changelog
 
+## v0.74.0 — 2026-05-28
+
+**Minor — `/sulis:resolve-lessons`: proactive, collision-aware lesson-backlog drain.**
+
+New orchestrator that turns the open `lesson` backlog into shipped fixes: read open lessons → triage (mechanical / defer-design-heavy / defer-unknown) → draft a change per in-scope lesson → predict file-touch (recon code-area pointers) → **collision-schedule** → **plan-then-approve gate** → ship each through the existing pipeline (review gate included) → close the issue on merge → batch-report. Structurally a sibling of `/sulis:run-all` (inline loop, never a spawned subagent).
+
+Three pieces: `sulis-issues list` (the backlog read-path — open lessons with bodies + parsed disposition); `_collision_schedule.py` (pure wave scheduler — shared-file-overlap graph → connected components = collision groups → serialise within, parallelise across, respect max_parallel; guarantees no two items in a wave share a file — the #39-#42 anonymiser case lands in one group, fully serialised); and the `/sulis:resolve-lessons` SKILL.md (the inline loop + five guardrails).
+
+v1 is **plan-then-approve only** (no autonomous mode — always shows the schedule + drafted specs and waits for "go"); **mechanical lessons only** (design-heavy SEA deferred, no agent-teams coupling — that's a documented v2 slot). The orchestrator beats agent-teams self-claim here because the collision schedule is computed up front from predicted file-touch, not negotiated at runtime; prediction is a lower bound, a real merge conflict is the fail-safe.
+
+Pre-merge review (step 4.5) verified the scheduler invariant (no intra-wave collision, no drops/dups, deterministic) + the fail-safe, and caught a first-match bug in the disposition parser (prose 'disposition:' before the footer → wrong value); fixed with last-match + a regression pin. 19 new tests (13 scheduler + 6 list/parse). 855/855 pass.
 ## v0.73.0 — 2026-05-28
 
 **Minor — wpx-index drives the multi-table per-kind INDEX (closes #50).**
