@@ -227,6 +227,23 @@ Coaching applies here (COACHING_STANDARD): deliver findings structurally
 forgot X"). The founder built this; the review's job is to make it safe to
 ship without triggering defensiveness.
 
+## Lessons surfaced during review go to ship-time capture, never a question (MUST)
+
+While reviewing you may notice things about **Sulis's own tooling or
+process** — a generator that emits an unparseable header, a step that
+strands work, recurring friction worth keeping. Those are not findings
+about the founder's change; they're dogfooding lessons. Do **not** end the
+review by asking *"want me to capture these as lessons? before or after you
+ship?"* — that is the permission-theatre AAF-08 forbids. Lesson-capture is a
+**mandatory, automatic step of `/sulis:change ship`** (step 4.6, before the
+merge): note the observations so that step files them; never make the
+founder decide whether or when to record them.
+
+Keep the two streams distinct: findings about the **change** shape the
+ship / needs-attention verdict above; observations about **Sulis's
+machinery** are carried forward and captured at ship — not offered as a
+choice.
+
 ## When to invoke this skill
 
 - The work on a change is built and the founder wants to know if it's safe to
