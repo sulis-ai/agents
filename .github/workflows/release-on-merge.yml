@@ -1,0 +1,246 @@
+name: release-on-merge
+# WP-003 — the ONE bump authority (ADR-004, Option B).
+#
+# On push to main, this workflow reads the accumulated `.changesets/*.yaml`,
+# computes the cumulative tier + next version, bumps THREE version values in
+# lockstep at one tier (ADR-003), assembles the CHANGELOG entry, deletes the
+# consumed changesets, commits as github-actions[bot], tags v<metadata.version>,
+# and pushes. The pushed tag then triggers release-prod.yml (already present),
+# which turns the tag into a GitHub Release from the top CHANGELOG section.
+#
+# Single-source-of-truth (ADR-004 alt-2 / EP-03): the tier + version math and
+# the changeset reading are done by CALLING plugins/sulis/scripts/_changeset.py
+# directly (cumulative_tier / next_version / read_changesets), not by a bash
+# re-implementation of the YAML grammar. The contract (.changesets/README.md)
+# and the keystone module are the single source; the post-bump verification
+# step is the in-workflow self-test that no half-bump can ever reach a tag.
+#
+# Loop-guard: the job is SKIPPED when the head commit is the bot's own release
+# commit (message starts with "release: sulis"), so the push-back in the final
+# step does not re-trigger this workflow.
+on:
+  push:
+    branches: [main]
+concurrency:
+  group: release-on-merge
+  cancel-in-progress: false
+jobs:
+  release:
+    # Loop-guard: skip the bot's own release commits (prefix matches the commit
+    # message assembled in the "Commit, tag, push" step below, exactly).
+    # The value is single-quoted at the YAML level because the `: ` inside the
+    # string literal would otherwise be read by YAML as a nested mapping. The
+    # expression's own string literal uses double quotes so the wrapping is
+    # unambiguous. The prefix "release: sulis" matches the commit message in the
+    # final "Commit, tag, push" step exactly — keep the two in lockstep.
+    if: '${{ !startsWith(github.event.head_commit.message, "release: sulis") }}'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      # 1. Full-history checkout so we can commit + tag + push back to main.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # 2. Check for pending changesets. None → nothing to release, exit 0.
+      #    All later steps gate on steps.detect.outputs.skip != 'true'.
+      - name: Check for pending changesets
+        id: detect
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          pending=( .changesets/*.yaml )
+          if [ ${#pending[@]} -eq 0 ]; then
+            echo "No pending changesets. Nothing to release."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Found ${#pending[@]} pending changeset(s)."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 3. VERSION_DRIFT guard (BEFORE any bump). plugin.json .version MUST equal
+      #    the marketplace sulis-entry .version; a mismatch means a prior partial
+      #    bump — abort rather than compound the drift.
+      - name: VERSION_DRIFT guard
+        if: steps.detect.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          P=$(jq -r '.version' plugins/sulis/.claude-plugin/plugin.json)
+          M=$(jq -r '.plugins[] | select(.name=="sulis") | .version' .claude-plugin/marketplace.json)
+          if [ "$P" != "$M" ]; then
+            echo "VERSION_DRIFT: plugin=$P marketplace-sulis=$M"
+            exit 1
+          fi
+          echo "no drift: plugin == marketplace-sulis == $P"
+
+      # 4. Compute the cumulative tier + next version. Single-sourced: calls
+      #    _changeset.cumulative_tier / next_version (ADR-004 alt-2 / EP-03) so
+      #    the bash mirror can never diverge from the keystone. Emits new_plugin,
+      #    new_meta, tier, and the old values as step outputs.
+      - name: Compute next version
+        id: compute
+        if: steps.detect.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          OLD_PLUGIN=$(jq -r '.version' plugins/sulis/.claude-plugin/plugin.json)
+          OLD_META=$(jq -r '.metadata.version' .claude-plugin/marketplace.json)
+          python3 - "$OLD_PLUGIN" "$OLD_META" >> "$GITHUB_OUTPUT" <<'PY'
+          import sys
+          sys.path.insert(0, "plugins/sulis/scripts")
+          import _changeset
+          from pathlib import Path
+
+          old_plugin, old_meta = sys.argv[1], sys.argv[2]
+          changesets = _changeset.read_changesets(Path(".changesets"))
+          tier = _changeset.cumulative_tier(changesets)
+          if tier is None:
+              # All pending changesets carried no usable tier — nothing to bump.
+              # (Distinct from "no changesets", handled by the detect step.)
+              print("No releasable tier across the pending changesets.", file=sys.stderr)
+              sys.exit(1)
+          new_plugin = _changeset.next_version(old_plugin, tier)
+          new_meta = _changeset.next_version(old_meta, tier)
+          print(f"new_plugin={new_plugin}")
+          print(f"new_meta={new_meta}")
+          print(f"tier={tier}")
+          print(f"tier_title={tier.capitalize()}")
+          PY
+          echo "computed tier + next versions written to step outputs"
+
+      # 5. Assemble the CHANGELOG entry and prepend it to plugins/sulis/CHANGELOG.md.
+      #    Header uses the PLUGIN version (ADR-003): "## v<new_plugin> — <date>".
+      #    release-prod.yml's awk reads the FIRST `## ` section, so this header
+      #    shape is what becomes the GitHub Release notes.
+      - name: Assemble CHANGELOG entry
+        if: steps.detect.outputs.skip != 'true'
+        env:
+          NEW_PLUGIN: ${{ steps.compute.outputs.new_plugin }}
+          TIER_TITLE: ${{ steps.compute.outputs.tier_title }}
+        run: |
+          set -euo pipefail
+          CHANGELOG="plugins/sulis/CHANGELOG.md"
+          DATE=$(date -u +%Y-%m-%d)
+          ENTRY=$(mktemp)
+          {
+            echo "## v${NEW_PLUGIN} — ${DATE}"
+            echo
+            echo "**${TIER_TITLE} — release-train batch.**"
+            echo
+            # One bullet per changeset summary, sorted by filename for determinism
+            # (matches _changeset.read_changesets' sort order). The summary block
+            # is read via the keystone reader so the bullet text can't diverge.
+            python3 - <<'PY'
+          import sys
+          sys.path.insert(0, "plugins/sulis/scripts")
+          import _changeset
+          from pathlib import Path
+          for cs in _changeset.read_changesets(Path(".changesets")):
+              summary = (cs.get("summary") or "").strip()
+              if not summary:
+                  continue
+              # First line is the headline bullet; subsequent lines indented under it.
+              lines = summary.splitlines()
+              print(f"- {lines[0]}")
+              for extra in lines[1:]:
+                  if extra.strip():
+                      print(f"  {extra}")
+          PY
+            echo
+          } > "$ENTRY"
+          # Prepend the new section directly under the top-of-file title line.
+          if [ -f "$CHANGELOG" ] && head -1 "$CHANGELOG" | grep -q '^# '; then
+            TITLE=$(head -1 "$CHANGELOG")
+            BODY=$(mktemp)
+            tail -n +2 "$CHANGELOG" > "$BODY"
+            {
+              echo "$TITLE"
+              echo
+              cat "$ENTRY"
+              # drop a leading blank from the old body to avoid a double blank
+              sed '/./,$!d' "$BODY"
+            } > "$CHANGELOG"
+          else
+            # No title line — just prepend the entry.
+            cat "$ENTRY" "$CHANGELOG" > "${CHANGELOG}.new" 2>/dev/null || cp "$ENTRY" "${CHANGELOG}.new"
+            mv "${CHANGELOG}.new" "$CHANGELOG"
+          fi
+          echo "prepended CHANGELOG entry: ## v${NEW_PLUGIN} — ${DATE}"
+
+      # 6. Apply the bump — all THREE values at one tier (ADR-003). Explicit jq
+      #    paths, one edit per line, no clever one-liners that hide the three edits.
+      - name: Apply the version bump (three values, one tier)
+        if: steps.detect.outputs.skip != 'true'
+        env:
+          NEW_PLUGIN: ${{ steps.compute.outputs.new_plugin }}
+          NEW_META: ${{ steps.compute.outputs.new_meta }}
+        run: |
+          set -euo pipefail
+          # 1) plugin.json .version
+          jq --arg v "$NEW_PLUGIN" '.version=$v' \
+            plugins/sulis/.claude-plugin/plugin.json > /tmp/p && \
+            mv /tmp/p plugins/sulis/.claude-plugin/plugin.json
+          # 2) marketplace sulis-entry .version
+          jq --arg v "$NEW_PLUGIN" '(.plugins[] | select(.name=="sulis")).version=$v' \
+            .claude-plugin/marketplace.json > /tmp/m && \
+            mv /tmp/m .claude-plugin/marketplace.json
+          # 3) marketplace .metadata.version
+          jq --arg v "$NEW_META" '.metadata.version=$v' \
+            .claude-plugin/marketplace.json > /tmp/m && \
+            mv /tmp/m .claude-plugin/marketplace.json
+          echo "bumped: plugin=$NEW_PLUGIN  marketplace-sulis=$NEW_PLUGIN  metadata=$NEW_META"
+
+      # 7. Post-bump verification (the in-workflow self-test). Re-read all three
+      #    values; fail the workflow if ANY did not move to the expected version.
+      #    A half-bump can never reach a tag.
+      - name: Post-bump verification
+        if: steps.detect.outputs.skip != 'true'
+        env:
+          NEW_PLUGIN: ${{ steps.compute.outputs.new_plugin }}
+          NEW_META: ${{ steps.compute.outputs.new_meta }}
+        run: |
+          set -euo pipefail
+          P=$(jq -r '.version' plugins/sulis/.claude-plugin/plugin.json)
+          M=$(jq -r '.plugins[] | select(.name=="sulis") | .version' .claude-plugin/marketplace.json)
+          META=$(jq -r '.metadata.version' .claude-plugin/marketplace.json)
+          if [ "$P" != "$NEW_PLUGIN" ] || [ "$M" != "$NEW_PLUGIN" ] || [ "$META" != "$NEW_META" ]; then
+            echo "post-bump verification failed: plugin=$P (want $NEW_PLUGIN) marketplace-sulis=$M (want $NEW_PLUGIN) metadata=$META (want $NEW_META)"
+            exit 1
+          fi
+          echo "post-bump verification ok: plugin=$P marketplace-sulis=$M metadata=$META"
+
+      # 8. Delete the consumed changesets (staged for the release commit).
+      - name: Delete consumed changesets
+        if: steps.detect.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          git rm .changesets/*.yaml
+          echo "removed consumed changesets"
+
+      # 9. Commit as the bot, tag v<metadata.version>, push commit + tag.
+      #    The commit message prefix "release: sulis" is the loop-guard's gate
+      #    (job-level if: above) — keep the two in lockstep.
+      - name: Commit, tag, push
+        if: steps.detect.outputs.skip != 'true'
+        env:
+          NEW_PLUGIN: ${{ steps.compute.outputs.new_plugin }}
+          NEW_META: ${{ steps.compute.outputs.new_meta }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Stage exactly the intended payload by name (the changeset deletions
+          # are already staged by the `git rm` in step 8). Avoid `git add -A`,
+          # which would sweep any stray runner-introduced file into the release
+          # commit (code-review F1).
+          git add \
+            plugins/sulis/.claude-plugin/plugin.json \
+            .claude-plugin/marketplace.json \
+            plugins/sulis/CHANGELOG.md
+          git commit -m "release: sulis v${NEW_PLUGIN} (v${NEW_META})"
+          git tag "v${NEW_META}"
+          git push origin main
+          git push origin "v${NEW_META}"
+          echo "released sulis v${NEW_PLUGIN} (v${NEW_META}); tag v${NEW_META} pushed"
