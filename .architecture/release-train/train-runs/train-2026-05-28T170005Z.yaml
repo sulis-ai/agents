@@ -1,0 +1,17 @@
+train_id: "train-2026-05-28T170005Z"
+started_at: "2026-05-28T17:00:05Z"
+completed_at: "2026-05-28T17:13:53Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-05-28T17:05:14Z"
+gate_findings_path: ".architecture/release-train/code-reviews/PR-1fd6d60-2026-05-28T171158Z/REVIEW.md"
+bundle:
+  - wp: WP-001
+    branch: feat/wp-001-changeset-data-model-helper
+    pre_train_sha: a8e1fc0d962028ac0ca4b58dbb7a1ba85bf7e86b
+    rebased_to_sha: 8b3d367e25f7bed96b5146b6a4e9c2e2e07bef04
+    merge_sha_on_dev: 1fd6d604dd094ae08303ebe92f3646828b9e3a46

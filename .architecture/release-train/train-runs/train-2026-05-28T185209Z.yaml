@@ -1,0 +1,28 @@
+train_id: "train-2026-05-28T185209Z"
+started_at: "2026-05-28T18:52:09Z"
+completed_at: "2026-05-28T19:16:09Z"
+outcome: "gate_blocker"
+outcome_reason: "Gate found CRITICAL finding(s); see .architecture/release-train/code-reviews/PR-e858389-2026-05-28T191515Z/REVIEW.md"
+batch_size: 3
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-05-28T18:57:26Z"
+gate_findings_path: ".architecture/release-train/code-reviews/PR-e858389-2026-05-28T191515Z/REVIEW.md"
+bundle:
+  - wp: WP-002
+    branch: feat/wp-002-ship-writes-changeset
+    pre_train_sha: cc446438bdc89ca815ec8ac7e1f6a34d634dff95
+    rebased_to_sha: cc446438bdc89ca815ec8ac7e1f6a34d634dff95
+    merge_sha_on_dev: f91740932e1a58445655afac4f6eb5411aa2e455
+  - wp: WP-003
+    branch: feat/wp-003-release-on-merge-gha
+    pre_train_sha: d7d93c8bc8a6133d84e5bb30746ccdae97b1333d
+    rebased_to_sha: 5d52823cfc79d4571cc2036bfe71d09148d45633
+    merge_sha_on_dev: 1988ee3d6de093a0a1ed447a3e26b7fd8013857f
+  - wp: WP-004
+    branch: feat/wp-004-release-train-skill
+    pre_train_sha: 79022320009c9870a9ce6e91faeb5466a87b56fb
+    rebased_to_sha: 6d1395680ebd2181c0a3fbc9f4ed40b38a3039ff
+    merge_sha_on_dev: e858389e81298b569a725b7bec6579eb771b78a8

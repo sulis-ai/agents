@@ -1,0 +1,17 @@
+train_id: "train-2026-05-28T183603Z"
+started_at: "2026-05-28T18:36:03Z"
+completed_at: "2026-05-28T18:37:37Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-05-28T18:36:10Z"
+gate_findings_path: ".architecture/release-train/code-reviews/PR-4c1cbf6-2026-05-28T183710Z/REVIEW.md"
+bundle:
+  - wp: WP-008
+    branch: feat/wp-008-keystone-tier-coverage-and-hardening
+    pre_train_sha: b5d79fbd208625eafabec6d05836674dc90fe892
+    rebased_to_sha: b5d79fbd208625eafabec6d05836674dc90fe892
+    merge_sha_on_dev: 4c1cbf6928b272a54cf3239a12721631a23fa0c2

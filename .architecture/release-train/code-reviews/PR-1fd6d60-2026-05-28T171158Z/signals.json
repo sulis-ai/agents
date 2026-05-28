@@ -1,0 +1,49 @@
+{
+  "target": "be79e53..1fd6d604",
+  "train_id": "train-2026-05-28T170005Z",
+  "batch_size": 1,
+  "wps": ["WP-001"],
+  "verdict": "Request changes",
+  "build_verification": {"pr_introduced_errors": 0, "pytest": "19 passed", "ruff": "clean", "mypy": "clean"},
+  "hygiene": {"scope": "low", "size": "medium", "safety": "none", "completeness": "good"},
+  "findings": [
+    {
+      "id": "CR-WP001-01",
+      "severity": "high",
+      "lens": "quality + architecture",
+      "file": "plugins/sulis/scripts/_changeset.py",
+      "line": "45-68",
+      "summary": "_PRIMITIVE_TIER omits 13 of 22 change primitives (delete/replace/move/decompose/generate/deprecate/merge/inline/abstract/test/secure/gate/document) -> silent None -> no changeset -> no release. Docstring claims a full 22-primitive audit; false.",
+      "disposition": "founder-decision-then-keystone-remediation",
+      "suggested_fix": "Decide tier policy for the 13 unmapped primitives; complete the map + docstring + add a pinning test."
+    },
+    {
+      "id": "CR-WP001-02",
+      "severity": "medium",
+      "lens": "security",
+      "file": "plugins/sulis/scripts/_changeset.py",
+      "line": "248-252",
+      "summary": "Raw scalar fields (change_id/primitive/tier) allow newline injection -> forged extra YAML line (e.g. tier: major). Python reader safe (last-wins); bash GHA first-match reader would forge a bump.",
+      "disposition": "keystone-remediation",
+      "suggested_fix": "Reject newlines (and ideally ':') in scalar fields at _dump_changeset."
+    },
+    {
+      "id": "CR-WP001-03",
+      "severity": "medium",
+      "lens": "architecture",
+      "file": ".changesets/README.md",
+      "line": "97-100",
+      "summary": "Block-scalar/quote/comment grammar the bash re-implementer must match lives only in Python; README promises bash parsing but doesn't specify the rules.",
+      "disposition": "keystone-remediation",
+      "suggested_fix": "Add a 'rules for re-implementers' section (2-space indent unit; block ends at first non-indented line; internal blanks preserved; trailing blanks stripped; quote/comment handling)."
+    },
+    {
+      "id": "CR-WP001-04",
+      "severity": "low",
+      "lens": "quality",
+      "file": "multiple",
+      "summary": "README tier-table not conformance-tested; next_version undocumented ValueError; test_..._full_mapping misnamed; comment L46 overclaims group coverage; empty scalar -> '' not None; read_changeset_examples negative-filter branch untested.",
+      "disposition": "keystone-remediation"
+    }
+  ]
+}
