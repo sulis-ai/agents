@@ -1,0 +1,17 @@
+train_id: "train-2026-05-28T202753Z"
+started_at: "2026-05-28T20:27:53Z"
+completed_at: "2026-05-28T20:28:24Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-05-28T20:27:59Z"
+gate_findings_path: ".architecture/release-train/code-reviews/PR-b00dd46-2026-05-28T202823Z/REVIEW.md"
+bundle:
+  - wp: WP-007
+    branch: feat/wp-007-standards-docs-retire-manual-bump
+    pre_train_sha: 62454d84413c28079ba956d0693f653935a21f34
+    rebased_to_sha: 62454d84413c28079ba956d0693f653935a21f34
+    merge_sha_on_dev: b00dd4693b123fa930d82693690e43a3c8443765

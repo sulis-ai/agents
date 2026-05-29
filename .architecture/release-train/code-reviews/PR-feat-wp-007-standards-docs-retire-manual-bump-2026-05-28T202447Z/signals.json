@@ -1,0 +1,56 @@
+{
+  "target": "feat/wp-007-standards-docs-retire-manual-bump",
+  "base": "origin/change/create-release-train",
+  "project": "release-train",
+  "wp": "WP-007",
+  "kind": "docs",
+  "timestamp": "2026-05-28T202447Z",
+  "depth_mode": "standard",
+  "diff": {
+    "files_changed": 2,
+    "lines_added": 93,
+    "lines_removed": 22,
+    "total_lines": 115,
+    "file_types": ["md"]
+  },
+  "dispatch": {
+    "shape": "single-reader",
+    "justification": "diff within CR-02 carve-out: 115 lines, 2 files (<=200 lines AND <=5 files)"
+  },
+  "build_verification": {
+    "errors": 0,
+    "note": "docs-only; no compiler/linter language signal applies to the changed .md files. Markdown link-integrity = repo docs gate; checker absent, manual fallback ran (see tool-outputs/mechanical-baseline.log)."
+  },
+  "pr_hygiene": {
+    "scope": { "commit_type_spread": ["docs"], "module_fan_out": 1, "severity": "none" },
+    "size": { "lines": 115, "files": 2, "severity": "none" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none" },
+    "completeness": { "new_source_without_test": 0, "api_change_without_schema": false, "severity": "none" }
+  },
+  "lenses": {
+    "architecture": {
+      "findings": 1,
+      "resolved_inline": 1,
+      "detail": "F-01 (low, in-changes): GIT-06 rewrite initially dropped the 'dev->main merge is not squashed; main preserves dev history' mechanic. Restored inline."
+    },
+    "security": { "findings": 0, "note": "docs-only; SEC/SC primitives N/A; secret-pattern scan clean (promote-dev-to-main.yml 'version' input mention is documentation, not a secret)." },
+    "quality": { "findings": 0, "note": "no trailing whitespace; fences balanced; table column-consistent; GIT-06 list renumbers cleanly; CR-10 N/A (no code); acceptance grep passes." }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "lens": "architecture",
+      "severity": "low",
+      "ring": "changes",
+      "file": "plugins/sulis/references/git-workflow-standard.md",
+      "line": 538,
+      "title": "GIT-06 rewrite dropped the dev->main merge mechanic (no-squash / preserves history)",
+      "status": "resolved-inline",
+      "resolution": "Restored a sentence stating the dev->main PR merge is not squashed and main preserves dev's history; the Action's bump+tag lands on top."
+    }
+  ],
+  "hardening_deltas": [],
+  "verdict": "PASS",
+  "verdict_reason": "No critical/high in diff; Build Verification empty; full diff read end-to-end (CR-03); all three lenses produced output; the one low finding was resolved inline and the re-run surfaced zero findings.",
+  "auto_downgrades_fired": []
+}

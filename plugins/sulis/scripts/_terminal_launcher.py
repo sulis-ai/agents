@@ -70,8 +70,9 @@ _ENV_SCRUB_LINE = (
 # Linux terminal-app priority order (matches ae's dispatch; first found wins).
 _LINUX_TERMINAL_APPS = ("gnome-terminal", "konsole", "xterm")
 
-# Pre-prompt delivery (ADR-003).
+# Pre-prompt delivery (ADR-003; sidecar-file delivery since #86).
 _PRE_PROMPT_HEREDOC_TAG = "SULIS_PROMPT_EOF"
+_PRE_PROMPT_SIDECAR = "pre_prompt.txt"  # co-located with launch.sh in the change dir
 _PRE_PROMPT_MAX_BYTES = 50_000
 
 
@@ -126,18 +127,14 @@ def validate_worktree_path(path: Path | str) -> tuple[bool, Path]:
 def _validate_pre_prompt(text: str | None) -> tuple[bool, str]:
     """Return ``(True, "")`` if ``text`` is None or safe; else ``(False, reason)``.
 
-    Rejects (per ADR-003 + WP-006):
-      - text containing the literal heredoc tag ``SULIS_PROMPT_EOF`` (would
-        close the heredoc early — script-injection vector)
+    Since #86 the pre_prompt is delivered via a sidecar file read at runtime
+    (``"$(cat <file>)"``), never embedded in the launch script — so its bytes
+    are never shell-parsed. There is no heredoc tag to close early and no
+    injection surface; the only remaining guard is size:
       - text exceeding ``_PRE_PROMPT_MAX_BYTES`` (UTF-8) — pathological guard
     """
     if text is None:
         return True, ""
-    if _PRE_PROMPT_HEREDOC_TAG in text:
-        return False, (
-            f"pre_prompt contains the reserved heredoc tag "
-            f"{_PRE_PROMPT_HEREDOC_TAG!r}; would close the heredoc early"
-        )
     if len(text.encode("utf-8")) > _PRE_PROMPT_MAX_BYTES:
         return False, (
             f"pre_prompt exceeds {_PRE_PROMPT_MAX_BYTES} bytes; "
@@ -147,17 +144,6 @@ def _validate_pre_prompt(text: str | None) -> tuple[bool, str]:
 
 
 # ─── Shell-script construction ─────────────────────────────────────────────
-
-
-def _render_heredoc(tag: str, body: str) -> str:
-    """Render a quoted HERE-DOC delivering ``body`` as ``claude``'s argv.
-
-    Single-quoting the tag (``<<'TAG'``) disables bash parameter expansion
-    and command substitution inside the body (ADR-003). The whole
-    substitution is double-quoted so the captured string is one argv
-    element including newlines.
-    """
-    return f'"$(cat <<\'{tag}\'\n{body}\n{tag}\n)"'
 
 
 def _build_launch_script(
@@ -199,7 +185,16 @@ def _build_launch_script(
     extra_env_block = "\n".join(extra_env_lines)
 
     if pre_prompt is not None:
-        exec_line = f"exec {entry_command} {_render_heredoc(_PRE_PROMPT_HEREDOC_TAG, pre_prompt)}"
+        # Deliver the pre_prompt via a SIDECAR FILE read at runtime — NOT a
+        # heredoc (#86). macOS ships bash 3.2, which mis-parses a quoted
+        # heredoc nested inside "$(...)": any apostrophe in the brief is read
+        # as an unterminated quote, the script aborts, and claude never starts
+        # (silently — the launcher still reports spawned). A `cat` of a file
+        # has no heredoc nesting (parses clean under bash 3.2), and the
+        # pre_prompt bytes are never shell-parsed — so there is no injection
+        # surface either (what the old heredoc's single-quoted tag guarded).
+        sidecar = _change_dir(change_id) / _PRE_PROMPT_SIDECAR
+        exec_line = f'exec {entry_command} "$(cat {shlex.quote(str(sidecar))})"'
     else:
         exec_line = f"exec {entry_command}"
 
@@ -480,7 +475,14 @@ def launch_change_terminal(
     # _failed(...) dict — never an unhandled OSError traceback to the founder.
     try:
         change_dir = _change_dir(change_id)
+        change_dir.mkdir(parents=True, exist_ok=True)
         script_path = change_dir / "launch.sh"
+        # Write the pre_prompt sidecar the exec line reads (#86). The brief
+        # lives in a file, never inline in the script, so bash never parses
+        # its bytes — apostrophes/quotes/backticks are safe, and it is
+        # inspectable.
+        if pre_prompt is not None:
+            (change_dir / _PRE_PROMPT_SIDECAR).write_text(pre_prompt)
         script_path.write_text(script_body)
         script_path.chmod(0o755)
     except OSError as exc:

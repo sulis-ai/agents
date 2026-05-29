@@ -1,5 +1,58 @@
 # Sulis — Changelog
 
+## v0.84.0 — 2026-05-29
+
+**Minor — founder-legibility reaches the design + standards layers (closes #88, #89).**
+
+The non-technical-founder audience was baked into how Sulis *talks* (AAF/FE/dual-register) but not into what it *designs* — so designs defaulted to the engineer's view (a contract viewer specced as raw Redoc; the founder had to prompt for legibility), and the contract standard was a thin developer seam (schemas + errors + transport) the platform's own ServiceSpec had already outgrown.
+
+- **`CONTRACT_FIRST_STANDARD` gains CF-10:** a contract carries operational + founder-facing semantics per operation — **auth/permissions, audience, a plain-language guide (what/when/prerequisites/next-steps), and error-fixes** — the ServiceSpec dimensions, not only schemas. MUST for any contract a founder reviews; it's what makes a contract *founder-reviewable* (the cockpit preview renders exactly these) and catches gaps before anything builds on it. (#89)
+- **Agent body — "design for the audience" (MUST):** when a design introduces an output surface a human reads, identify its audience first; **founder-facing → founder-legible by default** (plain-English-first, worked example, dual-register), never the engineer's view with legibility bolted on optionally. (#88)
+- **`/sulis:draft-architecture`** wires CF-10 into the data-contract step.
+
+This is the standards-layer sibling of #45 (design must produce the visual contract): the audience lens now reaches the artifacts being designed, not just the conversation.
+
+## v0.83.0 — 2026-05-29
+
+**Patch — `session_is_live` verifies `claude` is running, not just that the tty has a process (closes #87).**
+
+The session liveness check (`pid_kind=session`) returned True whenever the recorded tty had *any* process — so after a spawned `launch.sh` died (e.g. the #86 quoting abort) or after claude exited, the shell still attached to the tty made a **dead** session report as live. It checked "the terminal is open," not "the bound agent is running." Now it reads `ps -t <tty> -o command=` and requires a `claude` process (the launcher `exec`s claude, replacing the shell) — the honest signal. Refines #32. Regression-locked: live when a claude process is on the tty; not-live for the shell-only dead-spawn case.
+
+## v0.82.0 — 2026-05-29
+
+**Patch — spawned-change briefs survive apostrophes (closes #86): pre_prompt delivered via a sidecar file, not a heredoc.**
+
+A spawned change session silently failed to start `claude` whenever its brief contained an apostrophe. Cause: `launch_change_terminal` embedded the pre_prompt as a quoted heredoc nested inside `"$(...)"`, and **macOS ships bash 3.2**, which mis-parses that nesting — any `'` is read as an unterminated quote, the launch script aborts, and (worse) the launcher still reports `spawned`. Apostrophes are ubiquitous in natural-language briefs, so this was breaking a large fraction of spawns invisibly.
+
+- The pre_prompt is now written to a **sidecar file** (`pre_prompt.txt`) co-located with `launch.sh`, and the exec line reads it via `"$(cat <file>)"` — no heredoc nesting (parses clean under bash 3.2), the brief's bytes are never shell-parsed (apostrophes/quotes/backticks/`$` are inert), and the brief is inspectable.
+- The heredoc-tag injection guard in `_validate_pre_prompt` is removed — it guarded the heredoc that no longer exists, and the sidecar has no injection surface; a brief mentioning the old tag is now (correctly) accepted. Dead `_render_heredoc` removed.
+- Regression-locked: a test generates the script with apostrophes/quotes/backticks/`$` and asserts it passes `bash -n`, plus a test that the sidecar carries the exact bytes.
+
+(Companion finding #87 — `session_is_live` reporting True when the spawn actually died — is tracked separately.)
+
+## v0.81.0 — 2026-05-29
+
+**Minor — the watchlist gets consulted by riding existing reflexes, not a new skill.**
+
+The marketplace now keeps a **watchlist** — open GitHub issues labelled `watching` — of disciplines patched in *prose* and on probation (the Definition-of-Done, the HOW-vs-WHAT test, founder-progress legibility; #81-83). Each carries a *symptom* that means the prose isn't holding, plus an escalation rule (2 observed failures → build the structural fix; 5 clean runs → graduate). This change makes the watchlist actually get *looked at* — without adding a slash command (a command you must remember to run would be the same prose-rot the watchlist exists to catch):
+
+- **Agent body — "When Things Go Wrong" (MUST):** when a failure or surprise crops up, scan the `watching` items (`--search`, not `--label` — the index lags) and check whether it matches a watch symptom; if so it's not a one-off — record an observation + apply the escalation rule.
+- **`/sulis:capture-lessons`** surfaces the open `watching` items during the dedup query it *already* runs at ship — so "is this a watch hit?" rides the existing reflex, at the moment the agent is already reflecting on what the change taught.
+
+Deliberately deferred: a `/sulis:watchlist` skill — until the manual observe/escalate is felt as friction (build the automation when it hurts, not in anticipation).
+
+## v0.80.0 — 2026-05-29
+
+**Patch — "shipped/complete" is claimed only against the gate that actually blocks (closes #79).**
+
+An autonomous run-all reported a 55-WP product as "complete — dev is green, nothing blocked" when it wasn't: the deploy gate then failed with 6 broken tests. Root cause — the completion claim was grounded in **branch-CI, which is advisory** on the common founder repo (private + free plan, branch protection unavailable; #52). branch-CI ran red, the merge landed anyway, and the agent called it done. The "ship on branch-CI green, no PR ceremony" model silently assumed branch-CI was a *required* check.
+
+- **Agent body — Definition of Done (MUST):** a completion claim ("shipped", "complete", "dev is green", "nothing blocked") must be grounded in the gate that actually blocks the merge/deploy — never an advisory one. If the blocking gate isn't verified green, the only honest claim is "merged — not yet verified."
+- **`/sulis:run-all`** checks the gate type (the existing #52 protection-status) before the completion report. On advisory CI it reports "merged to dev — not verified-shippable until the blocking gate (e.g. deploy-to-dev) is green," names that gate, and verifies it before claiming done. Never "journey complete" off advisory CI.
+- **GIT-05 caveat:** branch-CI green is a ship gate only when branch protection makes branch-CI *required*; on advisory-CI repos it's informational, and "done" is grounded in the blocking gate.
+
+Scoped follow-on (#79): make run-all/train **poll the post-merge blocking gate** (the deploy workflow conclusion) programmatically, turning "verify the blocking gate" from instruction into a mechanical check.
+
 ## v0.79.0 — 2026-05-28
 
 **Patch — Sulis decides engineering-internal calls instead of interrogating the founder (closes #71, mechanical part).**

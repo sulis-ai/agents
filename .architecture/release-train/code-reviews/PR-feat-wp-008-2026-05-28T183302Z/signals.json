@@ -1,0 +1,39 @@
+{
+  "review": {
+    "target": "feat/wp-008-keystone-tier-coverage-and-hardening",
+    "base": "change/create-release-train",
+    "project": "release-train",
+    "timestamp": "2026-05-28T183302Z",
+    "files_changed": 3,
+    "lines_added": 373,
+    "lines_removed": 26
+  },
+  "verdict": "PASS",
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "ruff": "pass",
+    "mypy": "pass",
+    "pytest": "50 passed",
+    "py_compile": "ok"
+  },
+  "pr_hygiene": {
+    "scope": {"severity": "none", "commit_type_spread": ["extend"], "module_fan_out": 2},
+    "size": {"severity": "none", "lines_total": 399, "files_changed": 3, "generated_ratio": 0.0, "lock_file_ratio": 0.0},
+    "safety": {"severity": "none", "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0},
+    "completeness": {"severity": "none", "new_source_without_test": 0, "api_change_without_schema": false}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"total": 0},
+    "lenses": {
+      "architecture": {"findings": 0, "status": "nothing-surfaced"},
+      "security": {"findings": 0, "status": "nothing-surfaced", "note": "diff closes prior CR-WP001-02 newline-injection vector"},
+      "quality": {"findings": 0, "status": "complete", "test_cases_added": 31}
+    }
+  },
+  "auto_downgrade_triggers_fired": [],
+  "hardening_deltas": [],
+  "addresses_prior_findings": [
+    "CR-WP001-01", "CR-WP001-02", "CR-WP001-03", "CR-WP001-04"
+  ]
+}

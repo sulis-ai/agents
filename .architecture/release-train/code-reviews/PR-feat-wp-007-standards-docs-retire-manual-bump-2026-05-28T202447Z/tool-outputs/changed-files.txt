@@ -1,0 +1,2 @@
+plugins/sulis/references/git-workflow-standard.md
+plugins/sulis/skills/change/SKILL.md

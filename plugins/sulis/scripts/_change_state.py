@@ -328,10 +328,11 @@ def session_is_live(change_id: str) -> bool:
 
     This helper dispatches on ``pid_kind``:
 
-    - ``"session"`` → check the tty's device file exists AND has at
-      least one active process (``ps -t <tty>`` non-empty). Both checks
-      needed because the tty device persists briefly after the
-      terminal closes.
+    - ``"session"`` → check the tty's device file exists AND a ``claude``
+      process is actually running on it (``ps -t <tty> -o command=``
+      contains ``claude``). NOT merely "any process" — after a failed
+      launch.sh or after claude exits, the shell is still attached, so
+      "any process" reported a dead spawn as live (#87).
     - ``"launcher"`` → check ``os.kill(pid, 0)`` succeeds. Catches the
       ``ProcessLookupError`` for dead pids.
     - missing session.json, malformed json, no usable signal → False.
@@ -353,18 +354,21 @@ def session_is_live(change_id: str) -> bool:
             return False
         if not Path(tty).exists():
             return False
-        # ps -t <tty> lists processes attached to the tty. Empty output
-        # means the device persists but no shell is using it (terminal
-        # already closed; tty hasn't been GC'd yet).
+        # A live session means the spawned `claude` is actually RUNNING on
+        # the tty — not merely that the tty has *a* process (#87). After a
+        # failed launch.sh (e.g. a quoting abort), or after claude exits, the
+        # shell is still attached to the tty, so "any process" reported a
+        # dead spawn as live. The launcher `exec`s `claude ...` (replacing
+        # the shell), so a claude process on the tty is the honest signal.
         import subprocess
         try:
             proc = subprocess.run(  # noqa: S603
-                ["ps", "-t", tty, "-o", "pid="],
+                ["ps", "-t", tty, "-o", "command="],
                 capture_output=True, text=True, timeout=2,
             )
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return False
-        return bool(proc.stdout.strip())
+        return any("claude" in line for line in proc.stdout.splitlines())
     if pid_kind == "launcher":
         pid = session.get("pid")
         if not isinstance(pid, int) or pid <= 0:

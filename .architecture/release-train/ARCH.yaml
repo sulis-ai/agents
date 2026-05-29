@@ -1,0 +1,44 @@
+id: ARCH-release-train
+status: decomposed          # draft → designed → decomposed → implemented → verified
+change_id: 01KSQNPBPN7W74QVAZ25F79RNH
+handle: CH-01KSQN
+slug: release-train
+primitive: create
+branch: change/create-release-train
+
+sourced_from:
+  spec: .changes/release-train.SPEC.md
+  context: ~/.sulis/changes/01KSQNPBPN7W74QVAZ25F79RNH/CONTEXT.md
+  closes_issue: 66
+  symptom_issues: [52, 59, 53]
+  conflict_class: "#64-vs-#52 (two changes bumping the same version)"
+
+inspiration:
+  repo: honest-claude
+  sources:
+    - .claude/skills/release-train/SKILL.md
+    - .changesets/README.md
+    - .github/workflows/release-on-merge.yml
+    - .github/workflows/version-check.yml
+
+tier: M                    # sFPC ~12, ASR ~10 — see TDD.md Sizing Report
+
+deliverables:
+  tdd: TDD.md
+  adrs:
+    - adrs/ADR-001-decouple-integration-from-release.md
+    - adrs/ADR-002-tier-from-primitive.md
+    - adrs/ADR-003-dual-version-bump-scheme.md
+    - adrs/ADR-004-gha-bump-authority-not-local-script.md
+    - adrs/ADR-005-changeset-yaml-contract-keystone.md
+    - adrs/ADR-006-version-check-advisory-first.md
+  work_packages: work-packages/INDEX.md
+
+build_order:
+  # dependency-correct; see work-packages/INDEX.md for the graph
+  - WP-001        # keystone — changeset data model + helper + contract
+  - [WP-002, WP-003]   # writer + bump authority (both depend on WP-001)
+  - WP-006        # main branch protection (founder-gated, lands with WP-003)
+  - WP-004        # release-train skill (depends on WP-001)
+  - WP-005        # version-check CI guard, advisory-first (depends on WP-004)
+  - WP-007        # standards + docs + retire manual bump (depends on WP-005)
