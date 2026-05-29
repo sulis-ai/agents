@@ -1,5 +1,16 @@
 # Sulis — Changelog
 
+## v0.81.0 — 2026-05-29
+
+**Minor — the watchlist gets consulted by riding existing reflexes, not a new skill.**
+
+The marketplace now keeps a **watchlist** — open GitHub issues labelled `watching` — of disciplines patched in *prose* and on probation (the Definition-of-Done, the HOW-vs-WHAT test, founder-progress legibility; #81-83). Each carries a *symptom* that means the prose isn't holding, plus an escalation rule (2 observed failures → build the structural fix; 5 clean runs → graduate). This change makes the watchlist actually get *looked at* — without adding a slash command (a command you must remember to run would be the same prose-rot the watchlist exists to catch):
+
+- **Agent body — "When Things Go Wrong" (MUST):** when a failure or surprise crops up, scan the `watching` items (`--search`, not `--label` — the index lags) and check whether it matches a watch symptom; if so it's not a one-off — record an observation + apply the escalation rule.
+- **`/sulis:capture-lessons`** surfaces the open `watching` items during the dedup query it *already* runs at ship — so "is this a watch hit?" rides the existing reflex, at the moment the agent is already reflecting on what the change taught.
+
+Deliberately deferred: a `/sulis:watchlist` skill — until the manual observe/escalate is felt as friction (build the automation when it hurts, not in anticipation).
+
 ## v0.80.0 — 2026-05-29
 
 **Patch — "shipped/complete" is claimed only against the gate that actually blocks (closes #79).**
