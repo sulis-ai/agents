@@ -344,22 +344,46 @@ def test_session_is_live_session_tty_missing_returns_false(
     assert cs.session_is_live(_GOOD_ULID) is False
 
 
-def test_session_is_live_session_tty_present_with_processes_returns_true(
+def test_session_is_live_session_with_claude_process_returns_true(
     tmp_path, monkeypatch,
 ):
-    """macOS session: pid_kind=session; the recorded tty is the
-    current process's controlling terminal → at least one process
-    on it → live."""
+    """macOS session: pid_kind=session; a `claude` process is on the tty
+    (the launcher exec'd it) → genuinely live."""
     monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
-    # Use the current process's own tty if available.
-    try:
-        my_tty = os.ttyname(0)  # may raise OSError if not a tty (CI)
-    except OSError:
-        import pytest
-        pytest.skip("test runs without a controlling terminal (CI)")
+    fake_tty = tmp_path / "ttys-fake"   # exists, so the device-file check passes
+    fake_tty.write_text("")
+    import subprocess
+    monkeypatch.setattr(
+        subprocess, "run",
+        lambda *a, **k: subprocess.CompletedProcess(
+            a[0], 0,
+            stdout="login -pf iain\n-zsh\n"
+                   "claude --dangerously-skip-permissions --agent sulis brief\n",
+            stderr=""),
+    )
     _seed_session(tmp_path, _GOOD_ULID,
-                  pid=None, pid_kind="session", tty=my_tty)
+                  pid=None, pid_kind="session", tty=str(fake_tty))
     assert cs.session_is_live(_GOOD_ULID) is True
+
+
+def test_session_is_live_session_dead_spawn_shell_only_returns_false(
+    tmp_path, monkeypatch,
+):
+    """#87: the spawned launch.sh died (e.g. a quoting abort) so `claude`
+    never started — only the shell is attached to the tty. 'Any process'
+    wrongly reported this live; the claude-process check returns False."""
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path))
+    fake_tty = tmp_path / "ttys-fake"
+    fake_tty.write_text("")
+    import subprocess
+    monkeypatch.setattr(
+        subprocess, "run",
+        lambda *a, **k: subprocess.CompletedProcess(
+            a[0], 0, stdout="login -pf iain\n-zsh\n", stderr=""),
+    )
+    _seed_session(tmp_path, _GOOD_ULID,
+                  pid=None, pid_kind="session", tty=str(fake_tty))
+    assert cs.session_is_live(_GOOD_ULID) is False
 
 
 def test_session_is_live_no_pid_no_tty_returns_false(

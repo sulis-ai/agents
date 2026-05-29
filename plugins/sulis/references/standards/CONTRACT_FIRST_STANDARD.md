@@ -176,6 +176,36 @@ scrape an unstructured stream.
 > set (`system` / `assistant` delta / `result`); fixtures are recorded NDJSON;
 > the frontend renders against fixtures while the real bridge is built.
 
+### CF-10 — The contract carries operational + founder-facing semantics, not only schemas · SHOULD (MUST for founder-reviewed surfaces)
+
+A schema-only contract (inputs, outputs, errors) is enough for two engineers
+to integrate — but it is **unreviewable by the non-technical founder** who has
+to greenlight the work, and thinner than a real service needs. So a contract
+carries, **per operation**, beyond the schema:
+
+- **auth / permissions** — does it require sign-in, and what permission or
+  scope (e.g. `platform.platforms:create`);
+- **audience** — who the operation is for (admin / operator vs founder /
+  end-user);
+- **a plain-language user guide** — what it does in one sentence, when to use
+  it, prerequisites, and the natural **next steps** ("leads to");
+- **error fixes** — for each error, not just code + message but the *cause*
+  and the *fix* (what the user does vs what a developer does).
+
+These are exactly the dimensions the platform's **ServiceSpec**
+(`architecture/SERVICE_SPECIFICATION.md`) carries natively — it evolved
+because the generic schema-contract was too thin for a real product (the
+offspring outgrew this standard; #89). Treat the ServiceSpec as the reference
+shape: where a project already produces ServiceSpecs, **that is the contract**;
+elsewhere, enrich the contract with these fields. They are what make a contract
+**founder-reviewable** (the cockpit contract-preview, #85, renders exactly
+these) and what catches gaps — a missing `list` operation behind a list view,
+an unflagged auth requirement — *before* anything is built on the contract.
+
+**MUST for any contract a founder reviews** (a user-facing surface); SHOULD
+elsewhere. The schema layer (CF-02) + three-category errors (CF-03) remain the
+floor; CF-10 is the founder-facing + operational layer on top.
+
 ---
 
 ## Tiers (scope the rigor to the case)

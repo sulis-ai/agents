@@ -1,5 +1,35 @@
 # Sulis — Changelog
 
+## v0.84.0 — 2026-05-29
+
+**Minor — founder-legibility reaches the design + standards layers (closes #88, #89).**
+
+The non-technical-founder audience was baked into how Sulis *talks* (AAF/FE/dual-register) but not into what it *designs* — so designs defaulted to the engineer's view (a contract viewer specced as raw Redoc; the founder had to prompt for legibility), and the contract standard was a thin developer seam (schemas + errors + transport) the platform's own ServiceSpec had already outgrown.
+
+- **`CONTRACT_FIRST_STANDARD` gains CF-10:** a contract carries operational + founder-facing semantics per operation — **auth/permissions, audience, a plain-language guide (what/when/prerequisites/next-steps), and error-fixes** — the ServiceSpec dimensions, not only schemas. MUST for any contract a founder reviews; it's what makes a contract *founder-reviewable* (the cockpit preview renders exactly these) and catches gaps before anything builds on it. (#89)
+- **Agent body — "design for the audience" (MUST):** when a design introduces an output surface a human reads, identify its audience first; **founder-facing → founder-legible by default** (plain-English-first, worked example, dual-register), never the engineer's view with legibility bolted on optionally. (#88)
+- **`/sulis:draft-architecture`** wires CF-10 into the data-contract step.
+
+This is the standards-layer sibling of #45 (design must produce the visual contract): the audience lens now reaches the artifacts being designed, not just the conversation.
+
+## v0.83.0 — 2026-05-29
+
+**Patch — `session_is_live` verifies `claude` is running, not just that the tty has a process (closes #87).**
+
+The session liveness check (`pid_kind=session`) returned True whenever the recorded tty had *any* process — so after a spawned `launch.sh` died (e.g. the #86 quoting abort) or after claude exited, the shell still attached to the tty made a **dead** session report as live. It checked "the terminal is open," not "the bound agent is running." Now it reads `ps -t <tty> -o command=` and requires a `claude` process (the launcher `exec`s claude, replacing the shell) — the honest signal. Refines #32. Regression-locked: live when a claude process is on the tty; not-live for the shell-only dead-spawn case.
+
+## v0.82.0 — 2026-05-29
+
+**Patch — spawned-change briefs survive apostrophes (closes #86): pre_prompt delivered via a sidecar file, not a heredoc.**
+
+A spawned change session silently failed to start `claude` whenever its brief contained an apostrophe. Cause: `launch_change_terminal` embedded the pre_prompt as a quoted heredoc nested inside `"$(...)"`, and **macOS ships bash 3.2**, which mis-parses that nesting — any `'` is read as an unterminated quote, the launch script aborts, and (worse) the launcher still reports `spawned`. Apostrophes are ubiquitous in natural-language briefs, so this was breaking a large fraction of spawns invisibly.
+
+- The pre_prompt is now written to a **sidecar file** (`pre_prompt.txt`) co-located with `launch.sh`, and the exec line reads it via `"$(cat <file>)"` — no heredoc nesting (parses clean under bash 3.2), the brief's bytes are never shell-parsed (apostrophes/quotes/backticks/`$` are inert), and the brief is inspectable.
+- The heredoc-tag injection guard in `_validate_pre_prompt` is removed — it guarded the heredoc that no longer exists, and the sidecar has no injection surface; a brief mentioning the old tag is now (correctly) accepted. Dead `_render_heredoc` removed.
+- Regression-locked: a test generates the script with apostrophes/quotes/backticks/`$` and asserts it passes `bash -n`, plus a test that the sidecar carries the exact bytes.
+
+(Companion finding #87 — `session_is_live` reporting True when the spawn actually died — is tracked separately.)
+
 ## v0.81.0 — 2026-05-29
 
 **Minor — the watchlist gets consulted by riding existing reflexes, not a new skill.**

@@ -100,10 +100,14 @@ jobs:
       # (plugins/sulis/**) SHOULD carry >=1 new .changesets/*.yaml. When it
       # does not, WARN and EXIT 0 — advisory this cycle, never blocking.
       #
-      # NOTE: this step deliberately does NOT use `set -e`. A no-match
-      # `ls .changesets/*.yaml` returns non-zero, and under `set -e` that
-      # would abort the step before the `exit 0` — turning the advisory
-      # warning into a job failure (the exact self-lockout this WP forbids).
+      # NOTE: GitHub's default `run:` shell is `bash --noprofile --norc -e -o
+      # pipefail {0}` — errexit is injected by the RUNNER even though this
+      # script never writes `set -e`. A no-match `ls .changesets/*.yaml`
+      # returns non-zero, and under that injected `-e` + pipefail the step
+      # aborted (exit 2) BEFORE reaching the `exit 0` — turning the advisory
+      # warning into a hard failure (the exact self-lockout this WP forbids).
+      # Counting with `find` (which exits 0 on no match inside an existing
+      # dir) keeps the count errexit-safe.
       - name: Changeset-presence guard (advisory)
         env:
           BASE: ${{ steps.base.outputs.base }}
@@ -111,7 +115,9 @@ jobs:
           set -uo pipefail
           TOUCHED=$(git diff --name-only "$BASE...HEAD" -- plugins/sulis/ | wc -l | tr -d ' ')
           PENDING=0
-          [ -d .changesets ] && PENDING=$(ls .changesets/*.yaml 2>/dev/null | wc -l | tr -d ' ')
+          if [ -d .changesets ]; then
+            PENDING=$(find .changesets -maxdepth 1 -name '*.yaml' 2>/dev/null | wc -l | tr -d ' ')
+          fi
           echo "plugins/sulis files touched since base: $TOUCHED ; pending changesets: $PENDING"
 
           if [ "$TOUCHED" -gt 0 ] && [ "$PENDING" -eq 0 ]; then
