@@ -1,5 +1,17 @@
 # Sulis — Changelog
 
+## v0.82.0 — 2026-05-29
+
+**Patch — spawned-change briefs survive apostrophes (closes #86): pre_prompt delivered via a sidecar file, not a heredoc.**
+
+A spawned change session silently failed to start `claude` whenever its brief contained an apostrophe. Cause: `launch_change_terminal` embedded the pre_prompt as a quoted heredoc nested inside `"$(...)"`, and **macOS ships bash 3.2**, which mis-parses that nesting — any `'` is read as an unterminated quote, the launch script aborts, and (worse) the launcher still reports `spawned`. Apostrophes are ubiquitous in natural-language briefs, so this was breaking a large fraction of spawns invisibly.
+
+- The pre_prompt is now written to a **sidecar file** (`pre_prompt.txt`) co-located with `launch.sh`, and the exec line reads it via `"$(cat <file>)"` — no heredoc nesting (parses clean under bash 3.2), the brief's bytes are never shell-parsed (apostrophes/quotes/backticks/`$` are inert), and the brief is inspectable.
+- The heredoc-tag injection guard in `_validate_pre_prompt` is removed — it guarded the heredoc that no longer exists, and the sidecar has no injection surface; a brief mentioning the old tag is now (correctly) accepted. Dead `_render_heredoc` removed.
+- Regression-locked: a test generates the script with apostrophes/quotes/backticks/`$` and asserts it passes `bash -n`, plus a test that the sidecar carries the exact bytes.
+
+(Companion finding #87 — `session_is_live` reporting True when the spawn actually died — is tracked separately.)
+
 ## v0.81.0 — 2026-05-29
 
 **Minor — the watchlist gets consulted by riding existing reflexes, not a new skill.**
