@@ -850,6 +850,37 @@ loop:
         "expected phase=verifying_gates" since the state file no longer
         exists.
 
+   14.6. **Per-WP Step 12 wrap — batched gate-handoff path (#75).**
+        The train ships a *batch* and does NOT run the per-WP Step 12
+        wrap (acceptance evidence + INDEX flip + worktree removal) the
+        legacy per-WP path runs at Step 12 — the train operates on its
+        own clone and never sees the executor worktrees. So after a
+        **clean** `mark-gates-complete` (Step 14.5), the shipped WPs are
+        merged on `dev` but their worktrees + branches are still present
+        and their INDEX cache cells still read `step-7-complete`. Left
+        undone, the calling session ends up flipping status, removing
+        worktrees, and deleting branches by hand for every WP (the toil
+        lesson #75 captured across 6 train runs).
+
+        `mark-gates-complete`'s clean-success envelope carries a
+        `pending_step12` checklist — one `{wp, branch}` per shipped WP.
+        **For each entry, run the same Step 12 wrap the legacy path uses,
+        then delete the merged branch:**
+
+            # one per pending_step12 entry; <worktree> is the executor
+            # worktree this run-all session created for the WP at Step 1-7
+            "$WPX_DIR/wpx-step12" wrap \
+              --wp <wp> --project <slug> \
+              --branch <branch> \
+              --pipeline-result @<batch deploy/verify result JSON> \
+              --worktree-path <worktree>
+            git branch -D <branch>   # merged to dev; safe to delete
+
+        Only the calling run-all session has the per-WP worktree paths,
+        so this step lives here, not in `mark-gates-complete`. Skip it on
+        a `--critical-found` finalise — those WPs got BLOCKERs, not a
+        clean ship.
+
        ---
 
        **(v0.10.7 fallback — preserved for reference)**

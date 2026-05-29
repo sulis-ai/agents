@@ -33,8 +33,8 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 @pytest.fixture(autouse=True)
 def _isolate_sulis_state(tmp_path_factory, monkeypatch):
-    """Point SULIS_STATE_DIR at a per-test tmp dir for EVERY test (unit +
-    integration).
+    """Point SULIS_STATE_DIR at a per-test tmp dir, and clear SULIS_CHANGE_ID,
+    for EVERY test (unit + integration).
 
     `_change_state.sulis_state_base()` resolves SULIS_STATE_DIR first, falling
     back to ~/.sulis. Both in-process writes (unit tests calling
@@ -45,9 +45,22 @@ def _isolate_sulis_state(tmp_path_factory, monkeypatch):
     dashboard's global cross-change view. Living at the root conftest, this
     covers unit tests too (the integration-only fixture left that gap, which
     leaked a test-fixture ULID into the real store).
+
+    SULIS_CHANGE_ID is the second half of the same isolation gap: when the
+    suite runs inside a change-bound session (a terminal spawned by
+    `sulis-change start --spawn`, which exports SULIS_CHANGE_ID), subcommands
+    that fall back to `os.environ["SULIS_CHANGE_ID"]` when no explicit
+    --change-id/--handle resolves — e.g. `sulis-change mark-shipped` — pick up
+    the *real* session's change id through run_tool's `os.environ.copy()`,
+    instead of the per-test fixture's change. That made
+    test_mark_shipped_via_handle_flips_stage fail with "no change record found
+    for change_id='<the real session id>'": it passed in CI (env var unset)
+    and locally with the var cleared, but not inside a change session.
+    Clearing it here closes the gap (lesson #74).
     """
     state_dir = tmp_path_factory.mktemp("sulis-state")
     monkeypatch.setenv("SULIS_STATE_DIR", str(state_dir))
+    monkeypatch.delenv("SULIS_CHANGE_ID", raising=False)
 
 
 # ─── Project path helpers ─────────────────────────────────────────────────

@@ -251,6 +251,14 @@ If extending or superseding, reference the existing ADR by path.}
    - **the transport binding** (HTTP/REST + OpenAPI 3.1 for web seams;
      JSON-RPC/MCP for agent tools; subprocess+NDJSON for streaming local
      pipes; library for in-process)
+   - **operational + founder-facing semantics per operation (CF-10)** — not
+     only schemas: **auth/permissions**, **audience** (admin/operator vs
+     founder), a **plain-language guide** (what it does, when to use,
+     prerequisites, next steps), and **error fixes** (cause + user/developer
+     action). These are the ServiceSpec dimensions; where the project
+     produces ServiceSpecs, that IS the contract. MUST for any contract a
+     founder reviews — it is what makes the contract founder-reviewable
+     (rendered by the cockpit preview, #85), not just engineer-integratable.
 
    Write the contract sketch to `.architecture/{project}/contracts/{seam}.md`
    (or `.yaml`/`.json` if you can already commit to OpenAPI/JSON Schema at

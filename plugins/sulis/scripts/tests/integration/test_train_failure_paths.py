@@ -507,6 +507,64 @@ def test_mark_gates_complete_preserves_bundle_and_deploy_fields(train_testbed):
         )
 
 
+def test_mark_gates_complete_emits_pending_step12_checklist(train_testbed, capsys):
+    """#75 RED — on the clean-success path, the result envelope must carry a
+    `pending_step12` checklist of the shipped WPs + their merged branches.
+
+    The batched gate-handoff path never runs the per-WP Step 12 wrap
+    (acceptance evidence + INDEX flip + worktree removal + branch delete) the
+    legacy per-WP path does — the train doesn't own the executor worktrees.
+    Emitting the checklist lets the calling run-all session drive the wrap
+    deterministically (Step 12.6) instead of reconstructing the batch by hand,
+    which is the repeated toil this lesson captured.
+    """
+    import json
+
+    wps = _seed_three_wp_bundle(train_testbed)
+    args = train_testbed.make_args(enable_gate_handoff=True)
+    record, _ = train_testbed.run_train(args)
+    assert record.get("outcome") == "awaiting_gates"
+    train_id = record.get("train_id")
+
+    capsys.readouterr()  # drain run_train's output
+
+    wpx = _load_wpx_train_module()
+    mark_args = SimpleNamespace(
+        project=train_testbed.project,
+        repo_root=str(train_testbed.workspace),
+        repo="acme/test-repo",
+        train_id=train_id,
+        gate_findings=None,
+        critical_found=False,
+    )
+    try:
+        wpx.cmd_mark_gates_complete(mark_args)
+    except SystemExit as exc:
+        assert int(exc.code or 0) == 0
+
+    raw = json.loads(capsys.readouterr().out.strip())
+    assert raw.get("ok") is True, f"mark-gates-complete should succeed: {raw}"
+    envelope = raw["data"]["result"]
+    assert envelope.get("outcome") == "success"
+
+    pending = envelope.get("pending_step12")
+    assert pending is not None, (
+        "clean-success envelope must carry a pending_step12 checklist so the "
+        f"calling session can run the per-WP Step 12 wrap. Envelope: {envelope}"
+    )
+    # Every shipped WP must appear, each with a non-empty branch to wrap +
+    # delete.
+    assert {e["wp"] for e in pending} == set(wps), (
+        f"pending_step12 must list all shipped WPs {wps}; got {pending}"
+    )
+    assert all(e.get("branch") for e in pending), (
+        f"each pending_step12 entry needs a branch to delete; got {pending}"
+    )
+    assert envelope.get("next_action"), (
+        "envelope must name the Step 12.6 follow-on action"
+    )
+
+
 def test_mark_gates_complete_with_critical_marks_gate_blocker(train_testbed):
     """HD-007 RED — --critical-found records gate_blocker (phase=failed)
     without invoking ADR-212 revert. The gate dispatchers already wrote
