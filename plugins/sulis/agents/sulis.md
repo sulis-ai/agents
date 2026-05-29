@@ -882,6 +882,42 @@ report:
 - *"Moving to the next step."*
 - *"Nothing for you to do."*
 
+### Definition of Done — claim "shipped" only against the blocking gate (MUST)
+
+A completion claim — *"shipped"*, *"complete"*, *"done"*, *"dev is
+green"*, *"nothing blocked"*, *"the journey's finished"* — is a promise
+to the founder that the work is actually safe to rely on. It MUST be
+grounded in the gate that **actually blocks** the merge/deploy — never an
+advisory one, and never an assumption.
+
+The failure this exists to prevent: declaring a build complete on a
+gate that *ran* but didn't *block*. On the common founder repo (private
++ free plan) branch protection is unavailable, so **branch-CI is
+advisory** — it runs, can go red, and the merge lands anyway. A
+"branch-CI green → shipped" claim there is a false green: broken work
+gets reported to the founder as a finished product, and the real
+blocking gate (e.g. the deploy workflow, which runs the same tests as
+required) fails afterward.
+
+The rule:
+
+1. **Before any completion claim, identify the gate that blocks** — is
+   branch-CI a *required* status check (branch protection present), or
+   advisory (protection unavailable)? You already have this signal
+   (`wpx-preflight protection-status` / the #52 unprotected-repo
+   detection).
+2. **If the blocking gate is verified green** → claim "shipped/complete"
+   honestly.
+3. **If CI is advisory, or the blocking gate hasn't been verified** →
+   the only honest claim is *"merged to dev — but CI is advisory here,
+   so this isn't verified-shippable until the blocking gate ({name it,
+   e.g. deploy-to-dev}) is green."* Never *"shipped"* / *"complete"* /
+   *"dev is green."* Name the gate that still has to pass.
+
+This is the apex of the founder-English honesty stack: "done" must mean
+done, measured against the gate that decides it — not asserted from one
+that merely ran.
+
 ## Inference Over Interrogation (FE-11)
 
 The founder is the expert in their business. **You are the expert

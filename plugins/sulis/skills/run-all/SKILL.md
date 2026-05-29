@@ -285,8 +285,35 @@ loop:
          source-finding IDs to concierge / founder; exit.
        - If any WPs remain "pending" (deps not met) → blocked on
          dependencies; surface what's blocking; exit.
-       - If no WPs remain pending and no auto-drafts → all done;
-         celebrate; exit.
+       - If no WPs remain pending and no auto-drafts → the batch is
+         **merged**, but DO NOT claim "shipped / complete / dev is
+         green" yet — that claim must be grounded in the gate that
+         actually blocks (Definition of Done, agents/sulis.md). Run the
+         gate check before the completion report:
+
+         ```bash
+         PROT=$("$WPX_DIR/wpx-preflight" protection-status \
+                  --repo <owner/repo> --branch dev 2>/dev/null)
+         # required check present  → branch-CI is a real ship gate
+         # protection unavailable  → branch-CI is ADVISORY (the common
+         #   founder repo: private + free plan)
+         ```
+
+         - **branch-CI is a required check (protection present)** and
+           green → honest to report "shipped / all WPs done."
+         - **branch-CI is advisory (protection unavailable)** → branch-CI
+           green is NOT a ship signal. Report, in founder English:
+           *"All {N} pieces are built and merged to dev — but automated
+           checks are advisory on this repo, so this isn't verified-
+           shippable yet. The real gate is the deploy run; I'll confirm
+           it's green before calling this done."* Then verify the
+           blocking gate (the deploy-to-dev workflow conclusion, read
+           explicitly — never a watched exit code) and only claim
+           complete once it's green. NEVER report "journey complete /
+           dev is green / nothing blocked" off advisory CI. (#79;
+           wires the #52 unprotected-repo detection into the "done"
+           claim. Programmatic deploy-gate polling is the scoped
+           follow-on.)
 
     6. Compute the parallel-eligible subset (cap at max_parallel):
 
