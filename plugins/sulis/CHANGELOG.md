@@ -1,5 +1,11 @@
 # Sulis — Changelog
 
+## v0.83.0 — 2026-05-29
+
+**Patch — `session_is_live` verifies `claude` is running, not just that the tty has a process (closes #87).**
+
+The session liveness check (`pid_kind=session`) returned True whenever the recorded tty had *any* process — so after a spawned `launch.sh` died (e.g. the #86 quoting abort) or after claude exited, the shell still attached to the tty made a **dead** session report as live. It checked "the terminal is open," not "the bound agent is running." Now it reads `ps -t <tty> -o command=` and requires a `claude` process (the launcher `exec`s claude, replacing the shell) — the honest signal. Refines #32. Regression-locked: live when a claude process is on the tty; not-live for the shell-only dead-spawn case.
+
 ## v0.82.0 — 2026-05-29
 
 **Patch — spawned-change briefs survive apostrophes (closes #86): pre_prompt delivered via a sidecar file, not a heredoc.**
