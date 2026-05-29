@@ -1,0 +1,69 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Widget API", "version": "1.0.0" },
+  "tags": [
+    { "name": "Widgets", "description": "Widget management" },
+    { "name": "Gadgets", "description": "Gadget management" }
+  ],
+  "paths": {
+    "/widgets": {
+      "post": {
+        "operationId": "createWidget",
+        "summary": "Create a widget",
+        "tags": ["Widgets"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": { "type": "string", "pattern": "^[A-Za-z ]+$" },
+                  "size": { "type": "string", "enum": ["small", "large"] }
+                }
+              },
+              "example": { "name": "Acme Widget", "size": "large" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "id": { "type": "string" } }
+                }
+              }
+            }
+          },
+          "409": { "description": "A widget with that name already exists." }
+        }
+      }
+    },
+    "/gadgets": {
+      "post": {
+        "operationId": "createGadget",
+        "summary": "Create a gadget",
+        "tags": ["Gadgets"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["label"],
+                "properties": {
+                  "label": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created" }
+        }
+      }
+    }
+  }
+}

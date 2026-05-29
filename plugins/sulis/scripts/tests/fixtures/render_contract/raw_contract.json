@@ -1,0 +1,5 @@
+{
+  "contract_name": "legacy-thing",
+  "fields": ["foo", "bar"],
+  "note": "This is a hand-rolled contract that is neither a ServiceSpec nor an OpenAPI document."
+}

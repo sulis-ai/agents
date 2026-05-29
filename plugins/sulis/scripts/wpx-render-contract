@@ -1,0 +1,899 @@
+#!/usr/bin/env python3
+"""wpx-render-contract — render a change's data contract into a founder-legible
+CONTRACT.html (keystone, WP-001, cockpit-contract-preview).
+
+Discovers the data contract(s) inside a worktree by convention-glob + content
+sniff in ServiceSpec → OpenAPI → raw precedence (ADR-005/003), projects them
+into one format-agnostic ContractModel, and composes a self-contained
+CONTRACT.html + a manifest JSON. The default view is the full picture,
+auto-trimmed section-by-section (ADR-002); a change spanning more than one
+service/area is grouped per area with an "areas covered" overview (ADR-006).
+
+Stdlib-only, built on _wpxlib.py, dispatched via the `wpx` shim (ADR-001).
+
+Usage:
+  wpx-render-contract --worktree <path> [--out <path>]
+
+Exit codes: 0 success, 1 user/data error, 2 internal error.
+"""
+
+from __future__ import annotations
+
+import argparse
+import html as _html
+import json
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _wpxlib import emit_error, emit_internal_error, emit_ok  # noqa: E402
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Internal model (format-agnostic — TDD §2.3)
+# ─────────────────────────────────────────────────────────────────────────
+
+
+@dataclass
+class FormField:
+    name: str
+    label: str
+    description: str | None = None
+    placeholder: str | None = None
+    input_type: str | None = None
+    group: str | None = None
+    order: int | None = None
+    required: bool = False
+    min_length: int | None = None
+    max_length: int | None = None
+    min_value: int | None = None
+    max_value: int | None = None
+    pattern: str | None = None
+    enum: list[str] = field(default_factory=list)
+    enum_labels: dict[str, str] = field(default_factory=dict)
+    error_message: str | None = None
+    visible_when: str | None = None
+    depends_on: str | None = None
+
+
+@dataclass
+class PermissionView:
+    code: str | None = None
+    meaning: str | None = None          # readable line, from description
+    who_can: str | None = None          # from typicallyAssignedTo
+    grants_access_to: str | None = None
+
+
+@dataclass
+class RetirementView:
+    deprecated: bool = False
+    sunset_date: str | None = None
+    replacement: str | None = None
+
+
+@dataclass
+class Operation:
+    key: str                            # the {service}/{op} key or bare name
+    name: str
+    description: str | None = None
+    summary: str | None = None
+    method: str | None = None
+    needs_signin: bool = False
+    runs_in_background: bool = False
+    permission_views: list[PermissionView] = field(default_factory=list)
+    form_fields: list[FormField] = field(default_factory=list)
+    example_input: dict | None = None
+    example_output: dict | None = None
+    state_effects: list[tuple[str, str]] = field(default_factory=list)  # (entity, toState)
+    next_steps: list[str] = field(default_factory=list)
+    retirement: RetirementView | None = None
+    area: str = ""
+
+
+@dataclass
+class Entity:
+    name: str
+    description: str | None = None
+    form_fields: list[FormField] = field(default_factory=list)
+    lifecycle: list[str] = field(default_factory=list)
+    constraints: list[str] = field(default_factory=list)
+    area: str = ""
+
+
+@dataclass
+class Workflow:
+    name: str
+    steps: list[str] = field(default_factory=list)
+    success_criteria: list[str] = field(default_factory=list)
+    area: str = ""
+
+
+@dataclass
+class ErrorView:
+    code: str
+    message: str
+    cause: str | None = None
+    fix: str | None = None
+
+
+@dataclass
+class ContractModel:
+    fmt: str                            # servicespec | openapi | raw
+    name: str = ""
+    operations: list[Operation] = field(default_factory=list)
+    entities: list[Entity] = field(default_factory=list)
+    workflows: list[Workflow] = field(default_factory=list)
+    errors: list[ErrorView] = field(default_factory=list)
+    default_locale: str = "en"
+    supported_locales: list[str] = field(default_factory=lambda: ["en"])
+    raw_text: str | None = None
+    technical: str = ""                 # HTML fragment for the toggle
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Discovery (generic glob + content sniff; ADR-003/005)
+# ─────────────────────────────────────────────────────────────────────────
+
+
+def _sniff_format(path: Path) -> str | None:
+    """Return 'servicespec' | 'openapi' | 'raw' | None (unreadable)."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    try:
+        doc = json.loads(text)
+    except json.JSONDecodeError:
+        # A YAML-ish OpenAPI doc — sniff by leading key.
+        head = text.lstrip()[:200].lower()
+        if head.startswith("openapi:") or "swagger:" in head:
+            return "openapi"
+        return "raw"
+    if isinstance(doc, dict):
+        at_type = str(doc.get("@type", "")).lower()
+        if at_type in ("servicespec", "servicecatalog"):
+            return "servicespec"
+        if "operations" in doc and ("permissions" in doc or "entities" in doc
+                                    or "contributions" in doc):
+            return "servicespec"
+        if "openapi" in doc or "swagger" in doc or "paths" in doc:
+            return "openapi"
+    return "raw"
+
+
+_PRECEDENCE = {"servicespec": 0, "openapi": 1, "raw": 2}
+
+
+def locate_contracts(worktree: Path) -> list[tuple[Path, str]]:
+    """Find contract files inside the worktree, in precedence order.
+
+    Generic: globs *.json / *.jsonld / *.yaml / *.yml under the worktree root
+    and content-sniffs each. Stays inside the resolved worktree root.
+    """
+    worktree = worktree.resolve()
+    found: list[tuple[Path, str]] = []
+    seen_raw: list[tuple[Path, str]] = []
+    for pattern in ("*.jsonld", "*.json", "*.yaml", "*.yml"):
+        for p in sorted(worktree.glob(pattern)):
+            rp = p.resolve()
+            # path-safety: never escape the worktree root.
+            if worktree not in rp.parents and rp != worktree:
+                continue
+            fmt = _sniff_format(p)
+            if fmt is None:
+                continue
+            if fmt == "raw":
+                seen_raw.append((p, fmt))
+            else:
+                found.append((p, fmt))
+    # Only fall back to a raw contract when no structured contract exists.
+    if not found and seen_raw:
+        found = seen_raw[:1]
+    found.sort(key=lambda pf: (_PRECEDENCE[pf[1]], pf[0].name))
+    return found
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Form-field projection (the priority surface) — defensive, field-by-field
+# ─────────────────────────────────────────────────────────────────────────
+
+
+def _humanise(name: str) -> str:
+    return name.replace("_", " ").replace("-", " ").strip().capitalize()
+
+
+def _infer_input_type(prop: dict) -> str:
+    xd = prop.get("x-display") or {}
+    if xd.get("inputType"):
+        return str(xd["inputType"])
+    t = prop.get("type")
+    fmt = prop.get("format")
+    if prop.get("enum"):
+        return "select"
+    if t == "integer" or t == "number":
+        return "number"
+    if t == "boolean":
+        return "checkbox"
+    if fmt in ("date", "date-time"):
+        return "date"
+    return "text"
+
+
+def build_form_fields(schema: dict | None) -> list[FormField]:
+    """Project a JSON-Schema object into founder-legible form fields.
+
+    Reads each metadata key defensively: a bare-typed property still renders
+    as a basic field (humanised name + inferred input type); richer properties
+    render richer cards. A `hidden` property is not shown.
+    """
+    if not isinstance(schema, dict):
+        return []
+    props = schema.get("properties")
+    if not isinstance(props, dict):
+        return []
+    required = set(schema.get("required") or [])
+    fields: list[FormField] = []
+    for pname, prop in props.items():
+        if not isinstance(prop, dict):
+            continue
+        display = prop.get("x-display") or {}
+        if prop.get("hidden") or display.get("hidden"):
+            continue
+        label = (display.get("label") or prop.get("label")
+                 or _humanise(pname))
+        enum_labels = prop.get("x-enum-labels") or prop.get("enum_labels") or {}
+        visibility = prop.get("x-visibility")
+        visible_when = None
+        if isinstance(visibility, dict):
+            fld = visibility.get("field")
+            eq = visibility.get("equals")
+            if fld is not None:
+                visible_when = (f"{fld} is {eq}" if eq is not None else str(fld))
+        dependent = prop.get("x-dependent-enum")
+        depends_on = None
+        if isinstance(dependent, dict):
+            depends_on = dependent.get("field") or dependent.get("dependsOn")
+        elif isinstance(dependent, str):
+            depends_on = dependent
+        fields.append(FormField(
+            name=pname,
+            label=str(label),
+            description=prop.get("description"),
+            placeholder=prop.get("placeholder") or display.get("placeholder"),
+            input_type=_infer_input_type(prop),
+            group=prop.get("group") or display.get("group"),
+            order=prop.get("order") if isinstance(prop.get("order"), int) else None,
+            required=pname in required or bool(prop.get("required")),
+            min_length=prop.get("min_length") or prop.get("minLength"),
+            max_length=prop.get("max_length") or prop.get("maxLength"),
+            min_value=prop.get("min_value") or prop.get("minimum"),
+            max_value=prop.get("max_value") or prop.get("maximum"),
+            pattern=prop.get("pattern"),
+            enum=list(prop.get("enum") or []),
+            enum_labels=dict(enum_labels) if isinstance(enum_labels, dict) else {},
+            error_message=prop.get("error_message") or prop.get("errorMessage"),
+            visible_when=visible_when,
+            depends_on=depends_on,
+        ))
+    fields.sort(key=lambda f: (f.order if f.order is not None else 999, f.label))
+    return fields
+
+
+def synthesise_example(schema: dict | None) -> dict | None:
+    if not isinstance(schema, dict):
+        return None
+    props = schema.get("properties")
+    if not isinstance(props, dict):
+        return None
+    out: dict = {}
+    for pname, prop in props.items():
+        if not isinstance(prop, dict):
+            continue
+        if prop.get("placeholder"):
+            out[pname] = prop["placeholder"]
+        elif prop.get("enum"):
+            out[pname] = prop["enum"][0]
+        else:
+            t = prop.get("type")
+            out[pname] = {"string": "text", "integer": 0, "number": 0,
+                          "boolean": True}.get(t, "…")
+    return out or None
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Area attribution (ADR-006)
+# ─────────────────────────────────────────────────────────────────────────
+
+
+def _area_from_key(key: str) -> str | None:
+    if "/" in key:
+        return key.split("/", 1)[0]
+    return None
+
+
+def derive_areas(model: ContractModel) -> list[str]:
+    """The ordered set of distinct areas across the model (ADR-006)."""
+    seen: list[str] = []
+    for op in model.operations:
+        if op.area and op.area not in seen:
+            seen.append(op.area)
+    for e in model.entities:
+        if e.area and e.area not in seen:
+            seen.append(e.area)
+    for w in model.workflows:
+        if w.area and w.area not in seen:
+            seen.append(w.area)
+    return seen
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# ServiceSpec front-end (PRIMARY)
+# ─────────────────────────────────────────────────────────────────────────
+
+
+def _enrich_permission(code: str, perm_defs: dict) -> PermissionView:
+    pv = PermissionView(code=code)
+    defn = perm_defs.get(code) if isinstance(perm_defs, dict) else None
+    if isinstance(defn, dict):
+        desc = defn.get("description")
+        if desc:
+            pv.meaning = f"lets you {desc}" if not str(desc).lower().startswith("lets") else str(desc)
+        who = defn.get("typicallyAssignedTo")
+        if who:
+            pv.who_can = str(who)
+        grants = defn.get("grantsAccessTo")
+        if grants:
+            pv.grants_access_to = str(grants)
+    return pv
+
+
+def parse_servicespec(path: Path) -> ContractModel:
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    model = ContractModel(fmt="servicespec", name=str(doc.get("name") or ""))
+
+    # i18n / languages — reliably emitted.
+    i18n = doc.get("i18n") or {}
+    model.default_locale = (i18n.get("defaultLocale")
+                            or doc.get("default_locale") or "en")
+    model.supported_locales = (i18n.get("supportedLocales")
+                               or doc.get("supported_locales") or [model.default_locale])
+
+    perm_defs = doc.get("permissions") or {}
+    single_area = ""
+    at_type = str(doc.get("@type", "")).lower()
+    if at_type == "servicespec" and doc.get("name"):
+        single_area = str(doc["name"])
+
+    # operations
+    for key, op in (doc.get("operations") or {}).items():
+        if not isinstance(op, dict):
+            continue
+        area = _area_from_key(key) or single_area or model.name or ""
+        guide = op.get("userGuide") or {}
+        perms = op.get("permissions") or []
+        perm_views = [_enrich_permission(c, perm_defs) for c in perms]
+        needs_signin = bool(perms) or any(
+            "sign" in str(p).lower() or "auth" in str(p).lower()
+            for p in (guide.get("prerequisites") or [])
+        )
+        retire = None
+        if op.get("deprecated"):
+            retire = RetirementView(
+                deprecated=True,
+                sunset_date=op.get("sunsetDate"),
+                replacement=op.get("replacementOperation"),
+            )
+        state_effects = []
+        for se in (op.get("stateEffects") or []):
+            if isinstance(se, dict):
+                ent = se.get("entity") or se.get("entityName") or ""
+                to = se.get("toState") or se.get("to") or ""
+                if ent and to:
+                    state_effects.append((str(ent), str(to)))
+        ex_in = op.get("input", {}).get("example") if isinstance(op.get("input"), dict) else None
+        model.operations.append(Operation(
+            key=key,
+            name=str(op.get("name") or key),
+            description=op.get("description"),
+            summary=guide.get("summary"),
+            method=op.get("method"),
+            needs_signin=needs_signin,
+            runs_in_background=bool(op.get("async")),
+            permission_views=perm_views,
+            form_fields=build_form_fields(op.get("input")),
+            example_input=ex_in or synthesise_example(op.get("input")),
+            example_output=synthesise_example(op.get("output")),
+            state_effects=state_effects,
+            next_steps=list(guide.get("nextSteps") or []),
+            retirement=retire,
+            area=area,
+        ))
+
+    # entities
+    for ename, ent in (doc.get("entities") or {}).items():
+        if not isinstance(ent, dict):
+            continue
+        area = (ent.get("service_name") or single_area
+                or _area_from_key(ename) or model.name or "")
+        constraints = []
+        for c in (ent.get("constraints") or []):
+            if isinstance(c, dict):
+                d = c.get("description") or c.get("rule")
+                if d:
+                    constraints.append(str(d))
+            elif isinstance(c, str):
+                constraints.append(c)
+        model.entities.append(Entity(
+            name=str(ent.get("name") or ename),
+            description=ent.get("description"),
+            form_fields=build_form_fields(ent),
+            lifecycle=[str(s) for s in (ent.get("lifecycle") or [])],
+            constraints=constraints,
+            area=area,
+        ))
+
+    # workflows
+    for wname, wf in (doc.get("workflows") or {}).items():
+        if not isinstance(wf, dict):
+            continue
+        area = wf.get("service_name") or single_area or model.name or ""
+        model.workflows.append(Workflow(
+            name=str(wf.get("name") or wname),
+            steps=[str(s) for s in (wf.get("steps") or [])],
+            success_criteria=[str(s) for s in (wf.get("successCriteria") or [])],
+            area=area,
+        ))
+
+    # contract-level errors + per-operation errors
+    _collect_errors_servicespec(doc, model)
+
+    model.technical = _render_technical_servicespec(doc)
+    return model
+
+
+def _collect_errors_servicespec(doc: dict, model: ContractModel) -> None:
+    def _add(errs: dict) -> None:
+        for code, e in errs.items():
+            if isinstance(e, dict) and e.get("message"):
+                model.errors.append(ErrorView(
+                    code=str(code), message=str(e["message"]),
+                    cause=e.get("cause"), fix=e.get("fix"),
+                ))
+    if isinstance(doc.get("errors"), dict):
+        _add(doc["errors"])
+    for op in (doc.get("operations") or {}).values():
+        if isinstance(op, dict) and isinstance(op.get("errors"), dict):
+            _add(op["errors"])
+
+
+def _pretty_json_block(doc: dict, css_class: str) -> str:
+    """Render a contract doc as an escaped, self-contained <pre> block.
+
+    Shared by both technical renderers (ServiceSpec JSON-LD + OpenAPI/Redoc) —
+    the single place that pretty-prints + HTML-escapes a raw contract for the
+    technical-detail toggle.
+    """
+    pretty = _html.escape(json.dumps(doc, indent=2, sort_keys=True))
+    return f'<pre class="{css_class}">{pretty}</pre>'
+
+
+def _render_technical_servicespec(doc: dict) -> str:
+    return (
+        '<h3>Full contract (ServiceSpec JSON-LD)</h3>'
+        + _pretty_json_block(doc, "jsonld")
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# OpenAPI front-end (SECONDARY) — graceful degradation
+# ─────────────────────────────────────────────────────────────────────────
+
+
+def parse_openapi(path: Path) -> ContractModel:
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    info = doc.get("info") or {}
+    model = ContractModel(fmt="openapi", name=str(info.get("title") or "API"))
+
+    for route, methods in (doc.get("paths") or {}).items():
+        if not isinstance(methods, dict):
+            continue
+        for verb, spec in methods.items():
+            if not isinstance(spec, dict) or verb.lower() not in (
+                "get", "post", "put", "patch", "delete"
+            ):
+                continue
+            tags = spec.get("tags") or []
+            area = str(tags[0]) if tags else ""
+            req_schema = _openapi_request_schema(spec)
+            example = _openapi_example(spec) or synthesise_example(req_schema)
+            op = Operation(
+                key=str(spec.get("operationId") or f"{verb} {route}"),
+                name=str(spec.get("summary") or spec.get("operationId") or route),
+                description=spec.get("summary") or spec.get("description"),
+                summary=spec.get("description"),
+                method=spec.get("operationId"),
+                needs_signin=False,
+                runs_in_background=False,
+                permission_views=[],          # OpenAPI carries no permission defs
+                form_fields=build_form_fields(req_schema),
+                example_input=example,
+                area=area,
+            )
+            model.operations.append(op)
+            _openapi_response_errors(spec, model)
+
+    model.technical = _render_technical_openapi(doc)
+    return model
+
+
+def _openapi_request_schema(spec: dict) -> dict | None:
+    body = spec.get("requestBody") or {}
+    content = body.get("content") or {}
+    for media in content.values():
+        if isinstance(media, dict) and isinstance(media.get("schema"), dict):
+            return media["schema"]
+    return None
+
+
+def _openapi_example(spec: dict) -> dict | None:
+    body = spec.get("requestBody") or {}
+    content = body.get("content") or {}
+    for media in content.values():
+        if isinstance(media, dict) and media.get("example") is not None:
+            return media["example"]
+    return None
+
+
+def _openapi_response_errors(spec: dict, model: ContractModel) -> None:
+    for code, resp in (spec.get("responses") or {}).items():
+        if str(code).startswith(("4", "5")) and isinstance(resp, dict):
+            desc = resp.get("description")
+            if desc:
+                model.errors.append(ErrorView(code=str(code), message=str(desc)))
+
+
+def _render_technical_openapi(doc: dict) -> str:
+    return (
+        '<h3>Full contract (OpenAPI / Redoc)</h3>'
+        '<p>Redoc render of the OpenAPI document.</p>'
+        + _pretty_json_block(doc, "openapi")
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# HTML composition (auto-trim + area grouping)
+# ─────────────────────────────────────────────────────────────────────────
+
+
+def _e(text) -> str:
+    return _html.escape(str(text))
+
+
+def _locale_name(code: str) -> str:
+    return {
+        "en": "English", "es": "Spanish", "fr": "French", "de": "German",
+        "pt": "Portuguese", "it": "Italian", "ja": "Japanese", "zh": "Chinese",
+    }.get(code.split("-")[0].lower(), code)
+
+
+def _render_form_field(f: FormField) -> str:
+    parts = [f'<div class="field"><strong>{_e(f.label)}</strong>']
+    if f.input_type:
+        parts.append(f' <span class="input-type">({_e(f.input_type)})</span>')
+    if f.placeholder:
+        parts.append(f'<div class="placeholder">e.g. {_e(f.placeholder)}</div>')
+    if f.group:
+        parts.append(f'<div class="group">Group: {_e(f.group)}</div>')
+    rules = []
+    if f.required:
+        rules.append("required")
+    if f.min_length or f.max_length:
+        rules.append(f"length {f.min_length or 0}–{f.max_length or '∞'}")
+    if f.min_value is not None or f.max_value is not None:
+        rules.append(f"between {f.min_value} and {f.max_value}")
+    if f.pattern:
+        rules.append("must match a set format")
+    if rules:
+        parts.append(f'<div class="rules">Rules: {_e(", ".join(rules))}</div>')
+    if f.enum:
+        opts = [f"{_e(v)} — {_e(f.enum_labels.get(v, v))}" if f.enum_labels.get(v)
+                else _e(v) for v in f.enum]
+        parts.append('<div class="options">Options: ' + "; ".join(opts) + "</div>")
+    if f.visible_when:
+        parts.append(f'<div class="show-when">Show-when: {_e(f.visible_when)}</div>')
+    if f.depends_on:
+        parts.append(f'<div class="depends-on">Depends on: {_e(f.depends_on)}</div>')
+    parts.append("</div>")
+    return "".join(parts)
+
+
+def _render_operation(op: Operation) -> str:
+    out = [f'<div class="operation"><h3>{_e(op.description or op.name)}</h3>']
+    # actual operation identifier paired with the readable description (Rev 6)
+    ident = op.key if "/" in op.key else (op.method or op.key)
+    out.append(f'<code class="op-id">{_e(ident)}</code>')
+    if op.method and op.method != ident:
+        out.append(f' <code class="op-method">{_e(op.method)}</code>')
+    if op.summary:
+        out.append(f'<p class="summary">{_e(op.summary)}</p>')
+    # auth + permission (default view, Rev 6)
+    if op.permission_views:
+        for pv in op.permission_views:
+            out.append('<div class="permission">')
+            if pv.meaning:
+                out.append(f'<div class="perm-meaning">Permission: {_e(pv.meaning)}'
+                           f' <code class="perm-code">{_e(pv.code)}</code></div>')
+            elif pv.code:
+                out.append(f'<div class="perm-meaning">Requires sign-in '
+                           f'<code class="perm-code">{_e(pv.code)}</code></div>')
+            if pv.who_can:
+                out.append(f'<div class="who-can">Who can do this: {_e(pv.who_can)}</div>')
+            out.append('</div>')
+        out.append('<div class="signin-flag">Needs sign-in</div>')
+    else:
+        out.append('<div class="signin-flag">No sign-in / anyone</div>')
+    if op.runs_in_background:
+        out.append('<div class="bg-flag">Runs in the background</div>')
+    if op.retirement and op.retirement.deprecated:
+        badge = "Being retired"
+        if op.retirement.sunset_date:
+            badge += f" — until {op.retirement.sunset_date}"
+        if op.retirement.replacement:
+            badge += f"; use {op.retirement.replacement} instead"
+        out.append(f'<div class="retired-badge">{_e(badge)}</div>')
+    if op.form_fields:
+        out.append('<div class="form-fields"><h4>Fields a user fills in</h4>')
+        out.extend(_render_form_field(f) for f in op.form_fields)
+        out.append('</div>')
+    if op.example_input is not None or op.example_output is not None:
+        out.append('<div class="example"><h4>Example</h4>')
+        if op.example_input is not None:
+            out.append('<div class="ex-request">Request: <pre>'
+                       + _e(json.dumps(op.example_input, indent=2)) + '</pre></div>')
+        if op.example_output is not None:
+            out.append('<div class="ex-response">Response: <pre>'
+                       + _e(json.dumps(op.example_output, indent=2)) + '</pre></div>')
+        out.append('</div>')
+    if op.state_effects:
+        out.append('<div class="state-effects"><h4>What each action changes</h4><ul>')
+        for ent, to in op.state_effects:
+            out.append(f'<li>{_e(ent)} → {_e(to)}</li>')
+        out.append('</ul></div>')
+    out.append('</div>')
+    return "".join(out)
+
+
+def _render_entity(ent: Entity) -> str:
+    out = [f'<div class="entity"><h4>{_e(ent.name)}</h4>']
+    if ent.description:
+        out.append(f'<p>{_e(ent.description)}</p>')
+    if ent.lifecycle:
+        chain = " → ".join(_e(s) for s in ent.lifecycle)
+        out.append(f'<div class="lifecycle">Lifecycle: {chain}</div>')
+    if ent.form_fields:
+        out.append('<div class="entity-fields">')
+        out.extend(_render_form_field(f) for f in ent.form_fields)
+        out.append('</div>')
+    if ent.constraints:
+        out.append('<div class="business-rules"><h5>Business rules</h5><ul>')
+        for c in ent.constraints:
+            out.append(f'<li>{_e(c)}</li>')
+        out.append('</ul></div>')
+    out.append('</div>')
+    return "".join(out)
+
+
+def _render_workflow(wf: Workflow) -> str:
+    out = [f'<div class="workflow"><h4>{_e(wf.name)}</h4><ol>']
+    for s in wf.steps:
+        out.append(f'<li>{_e(s)}</li>')
+    out.append('</ol>')
+    if wf.success_criteria:
+        out.append('<div class="success">Success: '
+                   + "; ".join(_e(s) for s in wf.success_criteria) + '</div>')
+    out.append('</div>')
+    return "".join(out)
+
+
+def _render_area_block(model: ContractModel, area: str, grouped: bool) -> str:
+    ops = [o for o in model.operations if (o.area == area or not grouped)]
+    ents = [e for e in model.entities if (e.area == area or not grouped)]
+    wfs = [w for w in model.workflows if (w.area == area or not grouped)]
+    out: list[str] = []
+    if grouped:
+        out.append(f'<h2 class="area-heading">{_e(area)}</h2>')
+    if ops:
+        out.append('<div class="what-it-does"><h3>What it does</h3></div>')
+        out.extend(_render_operation(o) for o in ops)
+    if any(e.lifecycle or e.form_fields or e.constraints for e in ents) or ents:
+        if ents:
+            out.append('<div class="entities"><h3>The things that exist</h3>')
+            out.extend(_render_entity(e) for e in ents)
+            out.append('</div>')
+    if wfs:
+        out.append('<div class="journeys"><h3>Step-by-step journeys</h3>')
+        out.extend(_render_workflow(w) for w in wfs)
+        out.append('</div>')
+    return "".join(out)
+
+
+def _render_languages(model: ContractModel) -> str:
+    locales = model.supported_locales or []
+    # auto-trim: a single default "en" locale is uninformative.
+    if len(locales) <= 1:
+        return ""
+    names = ", ".join(_locale_name(c) for c in locales)
+    return f'<div class="languages">Available in: {_e(names)}</div>'
+
+
+def _render_walkthrough(model: ContractModel) -> str:
+    for op in model.operations:
+        if op.summary or op.description:
+            hero = op.summary or op.description
+            return (f'<div class="walkthrough"><h3>A worked walkthrough</h3>'
+                    f'<p>For example: {_e(hero)}</p></div>')
+    return ""
+
+
+def _render_errors(model: ContractModel) -> str:
+    if not model.errors:
+        return ""
+    out = ['<div class="errors"><h3>Error behaviour</h3><ul>']
+    for e in model.errors:
+        out.append(f'<li>{_e(e.message)}</li>')
+    out.append('</ul></div>')
+    return "".join(out)
+
+
+_BASE_CSS = """
+body{font-family:system-ui,sans-serif;max-width:60rem;margin:2rem auto;padding:0 1rem;line-height:1.5}
+.area-heading{border-bottom:2px solid #333;padding-bottom:.25rem}
+.operation,.entity,.workflow{border:1px solid #ddd;border-radius:8px;padding:1rem;margin:1rem 0}
+.op-id,.op-method,.perm-code{font-family:ui-monospace,monospace;background:#f4f4f4;padding:.1rem .3rem;border-radius:4px;color:#555}
+.retired-badge{display:inline-block;background:#fde;padding:.2rem .5rem;border-radius:4px}
+.bg-flag,.signin-flag{display:inline-block;background:#eef;padding:.2rem .5rem;border-radius:4px;margin:.2rem 0}
+pre{background:#f7f7f7;padding:.5rem;overflow:auto;border-radius:6px}
+details.technical{margin-top:2rem;border-top:1px solid #ccc;padding-top:1rem}
+"""
+
+
+def compose_html(models: list[ContractModel]) -> str:
+    body: list[str] = []
+    technical: list[str] = []
+    title = "Contract preview"
+
+    for model in models:
+        if model.fmt == "raw":
+            body.append('<section data-region="default">')
+            body.append('<h2>Raw contract</h2>')
+            body.append('<p>No structured contract found — this is the raw '
+                        'contract file, shown as-is.</p>')
+            body.append(f'<pre>{_e(model.raw_text or "")}</pre>')
+            body.append('</section>')
+            technical.append('<div data-region="technical"><p>Raw contract; '
+                             'no technical render available.</p></div>')
+            continue
+
+        areas = derive_areas(model)
+        grouped = len(areas) > 1
+        section = ['<section data-region="default">']
+        if model.fmt == "openapi":
+            section.append('<p class="degraded-note">This contract carries '
+                           'less guidance (OpenAPI only).</p>')
+        if grouped:
+            section.append('<div class="areas-overview"><h2>Areas covered</h2><ul>'
+                           + "".join(f'<li>{_e(a)}</li>' for a in areas)
+                           + '</ul></div>')
+        # languages (default view, auto-trimmed)
+        section.append(_render_languages(model))
+        # walkthrough hero
+        section.append(_render_walkthrough(model))
+        if grouped:
+            for a in areas:
+                section.append(_render_area_block(model, a, grouped=True))
+        else:
+            section.append(_render_area_block(model, areas[0] if areas else "",
+                                               grouped=False))
+        section.append(_render_errors(model))
+        section.append('</section>')
+        body.append("".join(section))
+
+        technical.append('<div data-region="technical">' + model.technical + '</div>')
+
+    doc = [
+        '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">',
+        f'<title>{_e(title)}</title>',
+        f'<style>{_BASE_CSS}</style></head><body>',
+        f'<h1>{_e(title)}</h1>',
+        "".join(body),
+        '<details class="technical"><summary>Show technical detail</summary>',
+        "".join(technical),
+        '</details>',
+        '</body></html>',
+    ]
+    return "".join(doc)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# CLI
+# ─────────────────────────────────────────────────────────────────────────
+
+
+def _parse_one(path: Path, fmt: str) -> ContractModel:
+    if fmt == "servicespec":
+        return parse_servicespec(path)
+    if fmt == "openapi":
+        return parse_openapi(path)
+    model = ContractModel(fmt="raw", name=path.name)
+    try:
+        model.raw_text = path.read_text(encoding="utf-8")
+    except OSError:
+        model.raw_text = ""
+    return model
+
+
+def cmd_render(args: argparse.Namespace) -> None:
+    worktree = Path(args.worktree).resolve()
+    if not worktree.is_dir():
+        emit_error(f"Worktree path does not exist: {worktree}")
+
+    out_path = Path(args.out).resolve() if args.out else worktree / "CONTRACT.html"
+    # path-safety: artifact writes stay inside the worktree root.
+    if args.out and worktree not in out_path.parents and out_path.parent != worktree:
+        emit_error(f"Output path escapes the worktree root: {out_path}")
+
+    contracts = locate_contracts(worktree)
+    models = [_parse_one(p, fmt) for p, fmt in contracts]
+
+    html_text = compose_html(models)
+    out_path.write_text(html_text, encoding="utf-8")
+
+    manifest_path = worktree / "CONTRACT.manifest.json"
+    primary = models[0] if models else None
+    manifest = {
+        "data_contract": {
+            "format": primary.fmt if primary else "none",
+            "name": primary.name if primary else None,
+            "contracts": [{"path": str(p), "format": fmt} for p, fmt in contracts],
+        },
+        "contract_html": str(out_path),
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True),
+                             encoding="utf-8")
+
+    emit_ok(data={
+        "worktree": str(worktree),
+        "contract_html": str(out_path),
+        "manifest": str(manifest_path),
+        "format": primary.fmt if primary else "none",
+        "contracts_found": len(contracts),
+    })
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Render a change's data contract into a founder-legible "
+                    "CONTRACT.html (ADR-001/002/005/006).",
+    )
+    parser.add_argument("--worktree", required=True,
+                        help="Path to the change worktree to render.")
+    parser.add_argument("--out", default=None,
+                        help="Output HTML path (default: <worktree>/CONTRACT.html).")
+    return parser
+
+
+def main() -> None:
+    args = build_parser().parse_args()
+    try:
+        cmd_render(args)
+    except SystemExit:
+        raise
+    except (FileNotFoundError, ValueError, json.JSONDecodeError) as e:
+        emit_error(str(e))
+    except BaseException as e:  # noqa: BLE001
+        emit_internal_error(e)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,212 @@
+{
+  "@context": "https://schema.org",
+  "@type": "ServiceCatalog",
+  "name": "Acme Platform Suite",
+  "description": "Platform provisioning and customer notifications.",
+  "default_locale": "en",
+  "supported_locales": ["en", "es"],
+  "i18n": {
+    "defaultLocale": "en",
+    "supportedLocales": ["en", "es"]
+  },
+  "contributions": [
+    { "service_name": "platform", "description": "Platform provisioning" },
+    { "service_name": "notifications", "description": "Customer notifications" }
+  ],
+  "permissions": {
+    "platform.platforms:create": {
+      "description": "lets you create platforms",
+      "grantsAccessTo": "platform provisioning",
+      "typicallyAssignedTo": "Platform administrators"
+    },
+    "platform.platforms:read": {
+      "description": "lets you view platforms",
+      "grantsAccessTo": "platform read access",
+      "typicallyAssignedTo": "Platform operators"
+    },
+    "notifications.messages:send": {
+      "description": "lets you send customer notifications",
+      "grantsAccessTo": "notification dispatch",
+      "typicallyAssignedTo": "Notification managers"
+    }
+  },
+  "operations": {
+    "platform/create-platform": {
+      "name": "Create platform",
+      "method": "create_platform",
+      "description": "An admin can set up a new platform",
+      "async": false,
+      "permissions": ["platform.platforms:create"],
+      "audiences": ["admin"],
+      "userGuide": {
+        "summary": "Set up a new platform for a customer organisation.",
+        "whenToUse": "When onboarding a new customer organisation.",
+        "prerequisites": ["You must be signed in as a platform administrator."],
+        "nextSteps": ["Configure the platform's first notification channel."]
+      },
+      "input": {
+        "type": "object",
+        "required": ["platform_name", "tier"],
+        "properties": {
+          "platform_name": {
+            "type": "string",
+            "label": "Platform name",
+            "placeholder": "e.g. Acme Production",
+            "group": "Basics",
+            "order": 1,
+            "min_length": 3,
+            "max_length": 60,
+            "x-display": { "label": "Platform name", "inputType": "text" }
+          },
+          "tier": {
+            "type": "string",
+            "label": "Service tier",
+            "group": "Basics",
+            "order": 2,
+            "enum": ["starter", "growth", "enterprise"],
+            "x-enum-labels": {
+              "starter": "Starter (single region)",
+              "growth": "Growth (multi region)",
+              "enterprise": "Enterprise (dedicated)"
+            }
+          }
+        }
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "platform_id": { "type": "string" },
+          "status": { "type": "string" }
+        }
+      },
+      "leadsTo": ["platform/configure-platform"],
+      "stateEffects": [
+        { "entity": "Platform", "toState": "active" }
+      ],
+      "errors": {
+        "PLATFORM_NAME_TAKEN": {
+          "message": "That platform name is already in use.",
+          "cause": "A platform with the same name already exists.",
+          "fix": "Choose a different platform name."
+        }
+      }
+    },
+    "platform/provision-platform-async": {
+      "name": "Provision platform infrastructure",
+      "method": "provision_platform_async",
+      "description": "Spin up the platform's infrastructure in the background",
+      "async": true,
+      "permissions": ["platform.platforms:create"],
+      "audiences": ["admin"],
+      "userGuide": {
+        "summary": "Provision the underlying infrastructure for a platform.",
+        "prerequisites": ["You must be signed in."]
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "platform_id": { "type": "string" }
+        }
+      },
+      "output": {
+        "type": "object",
+        "properties": { "job_id": { "type": "string" } }
+      },
+      "stateEffects": [
+        { "entity": "Platform", "toState": "suspended" }
+      ]
+    },
+    "notifications/send-legacy-digest": {
+      "name": "Send legacy digest",
+      "method": "send_legacy_digest",
+      "description": "Send the old-style daily digest email",
+      "async": false,
+      "deprecated": true,
+      "sunsetDate": "2026-12-31",
+      "replacementOperation": "notifications/send-realtime-notification",
+      "permissions": ["notifications.messages:send"],
+      "audiences": ["admin"],
+      "userGuide": {
+        "summary": "Send the legacy daily digest to subscribed customers."
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "audience": { "type": "string" }
+        }
+      },
+      "output": { "type": "object", "properties": { "sent": { "type": "integer" } } },
+      "errors": {
+        "NO_SUBSCRIBERS": {
+          "message": "There are no subscribers for this digest.",
+          "cause": "No customers have opted into the digest.",
+          "fix": "Wait until at least one customer subscribes."
+        }
+      }
+    }
+  },
+  "entities": {
+    "Platform": {
+      "name": "Platform",
+      "description": "A customer-facing platform instance.",
+      "service_name": "platform",
+      "lifecycle": ["draft", "active", "suspended"],
+      "constraints": [
+        { "description": "A platform name must be unique within the organisation." },
+        { "description": "A suspended platform cannot send notifications." }
+      ],
+      "properties": {
+        "platform_name": {
+          "type": "string",
+          "label": "Platform name",
+          "placeholder": "e.g. Acme Production",
+          "group": "Identity",
+          "order": 1,
+          "required": true,
+          "min_length": 3,
+          "max_length": 60,
+          "x-display": { "label": "Platform name", "inputType": "text" }
+        },
+        "region": {
+          "type": "string",
+          "label": "Primary region",
+          "group": "Placement",
+          "order": 2,
+          "enum": ["us-east", "us-west", "eu-central"],
+          "x-enum-labels": {
+            "us-east": "US East (Virginia)",
+            "us-west": "US West (Oregon)",
+            "eu-central": "EU Central (Frankfurt)"
+          }
+        },
+        "dedicated_capacity": {
+          "type": "integer",
+          "label": "Dedicated capacity (vCPU)",
+          "group": "Placement",
+          "order": 3,
+          "min_value": 1,
+          "max_value": 256,
+          "x-visibility": { "field": "tier", "equals": "enterprise" }
+        },
+        "internal_token": {
+          "type": "string",
+          "hidden": true
+        }
+      }
+    }
+  },
+  "workflows": {
+    "onboard-customer": {
+      "name": "Onboard a new customer",
+      "service_name": "platform",
+      "steps": [
+        "Create the platform",
+        "Provision the platform infrastructure",
+        "Send the welcome notification"
+      ],
+      "successCriteria": [
+        "The platform is active and the customer received a welcome notification."
+      ]
+    }
+  }
+}
