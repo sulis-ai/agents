@@ -85,6 +85,29 @@ python3 "$SCRIPTS_DIR/sulis-issues" capture --descriptor lesson \
 Returns `would_create` / `duplicates` / `skipped`. (`--repo` defaults to the
 current remote; pass it explicitly when working outside the repo.)
 
+**2.5. Check the watchlist (MUST — this is the consult-trigger).** You are
+already reflecting on what this change taught — the right moment to also ask
+whether any of it tripped a *watched* discipline. Surface the open
+`watching` items (prose disciplines on probation; see the agent body's "When
+Things Go Wrong"):
+
+```bash
+python3 "$SCRIPTS_DIR/sulis-issues" list --descriptor lesson \
+  [--repo OWNER/REPO] | python3 -c "import sys,json; \
+  [print('#%(number)s %(title)s' % i) for i in json.load(sys.stdin)['data']['issues'] \
+   if 'watching' in i.get('labels',[])]"
+# (or: gh issue list --search 'label:watching is:open')
+```
+
+For each watch item, ask: **did anything in this change match its symptom?**
+- **Symptom tripped** → record an observation as a comment on that issue
+  (pass/fail + one line of context) and apply its escalation rule (typically
+  2 failures → build the structural fix; 5 clean → graduate). This is how the
+  watchlist gets *looked at* without anyone remembering to look.
+- **Nothing tripped** → a clean execution is itself signal; note it on the
+  relevant item if the change exercised that discipline (it moves the
+  graduate-counter).
+
 **3. Confirm with the founder (AAF-06 three-list shape, echo-before-act).** Do
 NOT silently create issues:
 

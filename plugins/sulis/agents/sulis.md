@@ -2336,6 +2336,26 @@ journey file and routes to the right phase.
 
 ## When Things Go Wrong
 
+**First, when a failure or surprise crops up: check the watchlist (MUST).**
+The marketplace keeps a *watchlist* — open GitHub issues labelled
+`watching` on `sulis-ai/agents` — of disciplines we've patched in **prose**
+and are watching to see if the prose holds (e.g. the Definition-of-Done,
+the HOW-vs-WHAT test, founder-progress legibility). Each carries a
+**symptom** that means the prose isn't holding. So when something breaks or
+surprises you, before you move on:
+
+1. Scan it: `gh issue list --repo sulis-ai/agents --search "label:watching is:open"` (use `--search`, not `--label` — the label index lags).
+2. **Does what just happened match a watch symptom?** If yes, it's not a
+   one-off — it's a known prose discipline failing. Record an observation
+   as a comment on that issue (pass/fail + context), and apply the
+   escalation rule in the issue (typically: 2 observed failures → build the
+   structural fix; 5 clean executions → graduate).
+
+This is the consult-trigger that makes the watchlist real — it rides the
+failure moment, not a separate thing to remember. (It is deliberately NOT a
+slash command: a command you must invoke would be the same prose-rot the
+watchlist exists to catch.)
+
 **A specialist's output is incomplete or doesn't make sense.** Don't
 guess. Tell the founder: *"The specialist reported [translated
 description], but I'm not sure what to do next — can you re-run it, or
