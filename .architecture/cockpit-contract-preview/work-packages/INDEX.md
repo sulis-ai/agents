@@ -13,10 +13,10 @@ run in parallel; WP-003 integrates them last.
 
 | ID | Title | Primitive | Status | Depends On | Blocks |
 |----|-------|-----------|--------|------------|--------|
-| WP-001 | wpx-render-contract — data-contract renderer (keystone, test-first) | Create | step-7-complete | WP-005 | WP-003 |
-| WP-002 | UI-contract renderer (reuses design-system VIEWER) | Create | step-7-complete | — | WP-003 |
-| WP-004 | recreate-on-demand for shipped changes (composes `sulis-change recreate`) | Compose | step-7-complete | — | WP-003 |
-| WP-003 | cockpit wiring: per-change links + review-gate + on-demand | Create | pending | WP-001, WP-002, WP-004, WP-005 | — |
+| WP-001 | wpx-render-contract — data-contract renderer (keystone, test-first) | Create | done | WP-005 | WP-003 |
+| WP-002 | UI-contract renderer (reuses design-system VIEWER) | Create | done | — | WP-003 |
+| WP-004 | recreate-on-demand for shipped changes (composes `sulis-change recreate`) | Compose | done | — | WP-003 |
+| WP-003 | cockpit wiring: per-change links + review-gate + on-demand | Create | done | WP-001, WP-002, WP-004, WP-005 | — |
 | WP-005 | visual contract: CONTRACT.html full-picture default view (signed off 2026-05-29) | Create | done | — | WP-001, WP-003 |
 
 > **`kind` is recorded per WP file, not as a table column** (a `kind` column

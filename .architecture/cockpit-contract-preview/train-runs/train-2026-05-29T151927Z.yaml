@@ -1,0 +1,27 @@
+train_id: "train-2026-05-29T151927Z"
+started_at: "2026-05-29T15:19:27Z"
+completed_at: "2026-05-29T15:32:34Z"
+outcome: "success"
+batch_size: 3
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-05-29T15:24:46Z"
+gate_findings_path: ".architecture/cockpit-contract-preview/code-reviews/BATCH-train-151927Z-2026-05-29T153234Z/REVIEW.md"
+bundle:
+  - wp: WP-001
+    branch: feat/wp-001-data-contract-renderer
+    pre_train_sha: 65fcfb6d9b8b2df9aafaddfd694d75f66da11de6
+    rebased_to_sha: 1eb5cac75346fa97e9b9567c9be16451bde1ca17
+    merge_sha_on_dev: 45e31e1076daa3cc7d0bd64dc1fa32d486ce2a89
+  - wp: WP-002
+    branch: feat/wp-002-ui-contract-renderer
+    pre_train_sha: 4ef2ffc9dba7cb5507bfe3cd607efb8a13b8b5ab
+    rebased_to_sha: a62de3e05ec0225e8899d9a1e232d9ea6b1e2c52
+    merge_sha_on_dev: 6f790e75e68bef4b6be1e7d51965f32d116fc92a
+  - wp: WP-004
+    branch: feat/wp-004-recreate-on-demand
+    pre_train_sha: 2e48cb538f6d1a12e3a94c91b52e6dcbf02bfc6c
+    rebased_to_sha: 65f3d3e8f33893015b6417ca645028214c3db96e
+    merge_sha_on_dev: dde80c46e19a05896254384ee38056939b61468b
