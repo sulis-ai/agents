@@ -128,8 +128,8 @@ apps/cockpit/
 │   ├── index.ts            # bootstrap — binds 127.0.0.1:5174
 │   ├── app.ts              # createApp(deps) Express factory (testable)
 │   ├── config.ts           # CONFIG — bindAddress is hard-coded
-│   ├── ports/              # one port: ChangeStoreReader (extractability seam)
-│   ├── adapters/           # SulisChangeStoreReader (the Python helper bridge)
+│   ├── ports/              # ChangeStoreReader (extractability seam) + RecreateRunner (recreate-on-demand seam, WP-004)
+│   ├── adapters/           # SulisChangeStoreReader (Python helper bridge); SulisChangeRecreator + FakeRecreateRunner (recreate-on-demand, WP-004)
 │   ├── routes/             # six GET handlers + shared shims
 │   ├── middleware/         # request-log + typed-error → JSON mapper
 │   ├── lib/                # domain logic — no framework imports
