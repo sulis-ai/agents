@@ -47,7 +47,9 @@ def test_cli_emits_ok_and_manifest_records_ui_state(run_tool, tmp_path):
     assert "<!DOCTYPE html>" in ui_html.read_text(encoding="utf-8")
 
     # Manifest records the ui state generically.
-    manifest = json.loads((wt / "manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (wt / "CONTRACT.manifest.json").read_text(encoding="utf-8")
+    )
     assert manifest["ui_contract"] == "present"
     assert manifest["path"].endswith("UI.html")
 
@@ -66,7 +68,9 @@ def test_cli_no_visual_contract_records_none_no_html(run_tool, tmp_path):
     assert not (wt / "UI.html").exists()
 
     # Manifest records none + the note.
-    manifest = json.loads((wt / "manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (wt / "CONTRACT.manifest.json").read_text(encoding="utf-8")
+    )
     assert manifest["ui_contract"] == "none"
     assert manifest["note"]
 

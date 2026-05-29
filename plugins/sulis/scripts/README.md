@@ -300,7 +300,7 @@ touching `plugins/sulis-execution/scripts/**`.
   the worktree by convention — generic, never hard-wired per ADR-003). When the
   change carries no visual contract (a non-user-facing change), it writes
   nothing for `UI.html` and records `ui_contract: "none"` plus a plain note in
-  the shared `manifest.json`, so the cockpit shows "no UI contract for this
+  the shared `CONTRACT.manifest.json`, so the cockpit shows "no UI contract for this
   change" rather than a broken link (TDD §2.4). Worktree-only input, emit_ok /
   emit_error JSON — same wpx shape as `wpx-render-contract` (ADR-001). The pure
   logic lives in `_render_ui.py`.
