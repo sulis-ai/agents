@@ -178,7 +178,7 @@ def test_write_manifest_preserves_existing_keys(tmp_path):
     """The manifest is shared with WP-001 (data_contract). Writing the ui
     state must MERGE, not clobber a sibling renderer's data_contract entry."""
     wt = _make_visual_worktree(tmp_path)
-    existing = wt / "manifest.json"
+    existing = wt / _render_ui.MANIFEST_NAME
     existing.write_text(
         json.dumps({"data_contract": "present", "data_path": "CONTRACT.html"}),
         encoding="utf-8",
@@ -196,7 +196,7 @@ def test_write_manifest_preserves_existing_keys(tmp_path):
 
 def test_writes_stay_inside_worktree_root(tmp_path):
     """Armor: artifact writes stay inside the resolved worktree root — UI.html
-    and manifest.json are written under the worktree, never outside it."""
+    and the shared manifest are written under the worktree, never outside it."""
     wt = _make_visual_worktree(tmp_path)
     result = _render_ui.render_ui(wt)
     manifest_path = _render_ui.write_manifest(wt, result)

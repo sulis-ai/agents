@@ -849,16 +849,27 @@ def cmd_render(args: argparse.Namespace) -> None:
     html_text = compose_html(models)
     out_path.write_text(html_text, encoding="utf-8")
 
+    # The manifest is SHARED with the UI-contract renderer (wpx-render-ui), so
+    # this MERGES the data-contract keys into any existing manifest rather than
+    # clobbering a sibling renderer's ``ui_contract`` entry. Either renderer may
+    # run first; whichever runs second must preserve the other's keys so the
+    # cockpit-wiring WP (WP-003) reads both contracts from one file.
     manifest_path = worktree / "CONTRACT.manifest.json"
     primary = models[0] if models else None
-    manifest = {
+    manifest: dict = {}
+    if manifest_path.is_file():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            manifest = {}
+    manifest.update({
         "data_contract": {
             "format": primary.fmt if primary else "none",
             "name": primary.name if primary else None,
             "contracts": [{"path": str(p), "format": fmt} for p, fmt in contracts],
         },
         "contract_html": str(out_path),
-    }
+    })
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True),
                              encoding="utf-8")
 

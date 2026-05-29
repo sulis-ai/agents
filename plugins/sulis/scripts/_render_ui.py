@@ -245,7 +245,10 @@ def build_viewer_html(contract_path: Path) -> str:
 
 # Filenames are conventional, written inside the resolved worktree root.
 UI_HTML_NAME = "UI.html"
-MANIFEST_NAME = "manifest.json"
+# The single canonical manifest shared with WP-001's data-contract renderer
+# (wpx-render-contract). BOTH renderers read-modify-write this one file so the
+# cockpit-wiring WP (WP-003) reads data_contract + ui_contract from one source.
+MANIFEST_NAME = "CONTRACT.manifest.json"
 
 _NO_VISUAL_NOTE = (
     "No UI contract for this change — it carries no visual contract / design "
@@ -267,7 +270,10 @@ def render_ui(worktree: Path | str) -> dict:
     that is a caller error, distinct from the in-scope "no visual contract"
     case.
     """
-    worktree = Path(worktree)
+    # Resolve for parity with wpx-render-contract — both renderers anchor their
+    # writes to the same resolved worktree root so the shared manifest lands in
+    # one place regardless of how the caller spelled the path.
+    worktree = Path(worktree).resolve()
     if not worktree.is_dir():
         raise FileNotFoundError(f"worktree not found: {worktree}")
 
@@ -291,7 +297,7 @@ def write_manifest(worktree: Path | str, ui_state: dict) -> Path:
     """
     import json
 
-    worktree = Path(worktree)
+    worktree = Path(worktree).resolve()
     manifest_path = worktree / MANIFEST_NAME
 
     manifest: dict = {}
