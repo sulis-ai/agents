@@ -30,6 +30,7 @@ For the architectural rationale, see
 | `wpx-blocker` | Write BLOCKER-WP-NNN.md per EL-08 format | Executor agent |
 | `wpx-findings` | Findings register + SF files + auto-draft WPs | Calling session |
 | `wpx-worktree` | Create/remove worktrees; record dev SHA | Executor + calling session |
+| `wpx-render-ui` | Render a change's visual contract to `UI.html` (reuses the design-system VIEWER), or record `ui_contract: none` + a note when a change has no visual contract | Design-time review gate + cockpit (cockpit-contract-preview) |
 | `wpx-pipeline` | Steps 8-10: CI poll + merge + deploy + health + smoke | Calling session (via background Bash) |
 | `wpx-step12` | Step 12 bookkeeping wrap (atomic) | Calling session |
 | `wpx-render-contract` | Render a change's data contract into a founder-legible `CONTRACT.html` + manifest (ServiceSpec→OpenAPI→raw precedence; ADR-001/002/005/006) | Design-time review gate + cockpit on-demand |
@@ -293,3 +294,13 @@ touching `plugins/sulis-execution/scripts/**`.
   contents as JSON for the cockpit's `SulisChangeStoreReader` adapter
   (WP-003, ADR-008). Wraps `_change_state.list_all_changes`,
   `read_change_record`, `read_change_stage` — the canonical source.
+- `wpx-render-ui render --worktree <path>` — renders the change's visual
+  contract to a self-contained `UI.html` by reusing the design-system skill's
+  VIEWER mechanism (discovers the change's design tokens / DESIGN source inside
+  the worktree by convention — generic, never hard-wired per ADR-003). When the
+  change carries no visual contract (a non-user-facing change), it writes
+  nothing for `UI.html` and records `ui_contract: "none"` plus a plain note in
+  the shared `manifest.json`, so the cockpit shows "no UI contract for this
+  change" rather than a broken link (TDD §2.4). Worktree-only input, emit_ok /
+  emit_error JSON — same wpx shape as `wpx-render-contract` (ADR-001). The pure
+  logic lives in `_render_ui.py`.
