@@ -2084,6 +2084,14 @@ def cmd_mark_gates_complete(args: argparse.Namespace) -> None:
     + Step 11; the session invokes this subcommand to finalise. No git
     operations, no shell-outs, no agent dispatch — just a state-machine
     transition + record write.
+
+    On the clean-success path the result envelope carries a
+    ``pending_step12`` checklist (#75): the shipped WPs + their merged
+    branches, so the calling run-all session can run the per-WP Step 12
+    wrap (acceptance evidence + INDEX flip + worktree removal + branch
+    delete) it would otherwise have to reconstruct by hand. The wrap
+    itself stays with the caller because only it owns the executor
+    worktree paths — the train operates on its own clone.
     """
     paths = paths_from_args(args)
     state_path = train_state_path(paths.train_runs_dir, args.train_id)
@@ -2169,12 +2177,41 @@ def cmd_mark_gates_complete(args: argparse.Namespace) -> None:
     if args.gate_findings:
         record["gate_findings_path"] = args.gate_findings
     write_train_run_record(record_path, record)
+
+    # #75: the batched gate-handoff path never ran the per-WP Step 12 wrap
+    # (acceptance evidence + INDEX cache flip + worktree removal + branch
+    # delete) that the legacy per-WP path does — that wrap belongs to the
+    # calling run-all session, which owns the executor worktree paths the
+    # train (operating on its own clone) never sees. The result was shipped
+    # WPs left at step-7-complete with stranded worktrees + branches, which
+    # the calling session reconstructed by hand across every train run.
+    #
+    # Emit a machine-readable checklist of the shipped WPs + their merged
+    # branches so the calling session can drive `wpx-step12 wrap` (+ branch
+    # delete) deterministically rather than rebuilding the batch by hand.
+    # All bundle WPs are merged by definition at the verifying_gates boundary
+    # (the gate handoff is strictly post-merge). This stays a pure record
+    # read — no git operations, preserving mark-gates-complete's contract;
+    # the run-all loop's Step 12.6 consumes the checklist.
+    pending_step12 = [
+        {"wp": e.get("wp"), "branch": e.get("branch")}
+        for e in state.get("bundle", [])
+        if e.get("wp")
+    ]
     cleanup_train_state(paths.train_runs_dir, args.train_id)
     emit_result({
         "train_id": args.train_id,
         "outcome": "success",
         "phase": "success",
         "record_path": str(record_path),
+        "pending_step12": pending_step12,
+        "next_action": (
+            "Per-WP Step 12 wrap was NOT run (the train doesn't own the "
+            "executor worktrees). For each entry in pending_step12 the "
+            "calling session MUST run `wpx-step12 wrap` (acceptance evidence "
+            "+ INDEX flip + worktree removal) and delete the merged branch "
+            "(`git branch -D <branch>`). See run-all SKILL.md Step 12.6."
+        ),
     }, exit_code=0)
 
 
