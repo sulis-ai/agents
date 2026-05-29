@@ -75,6 +75,30 @@ the OpenAPI spec on the `CONTRACT.html` page (openapi-generator convention).
 - Don't reinvent the visual preview — reuse the `design-system` VIEWER.
 - Don't assume every project's data contract is OpenAPI — degrade gracefully.
 
+## Design-stage founder decisions (2026-05-29)
+
+Founder is non-technical; a raw Redoc/OpenAPI render is unreadable to the
+primary user. These decisions reshape the spec:
+
+1. **Default data-contract view = a worked walkthrough, founder-legible.**
+   `CONTRACT.html` opens with a concrete end-to-end scenario ("a customer
+   signs up → here's exactly what the product promises back: an account
+   with {id, name, email, created}"), then a plain-English list of what
+   the contract promises, then the full technical render (Redoc) behind a
+   **"show technical detail"** toggle. Plain-English first, detail on
+   request — the Sulis dual-register pattern.
+2. **"Bring it to life" (worked examples / usage) is CORE, not optional.**
+   The old WP-5 (SDK/usage face) folds into WP-1's renderer as the hero of
+   the default view — the walkthrough and example request/response are
+   derived from the spec's operations + `examples` (synthesised from the
+   schema where examples are absent), so they cannot drift.
+3. **Per-change resolution must be generic — no change is ever hard-wired.**
+   All paths derive from each change's own record (verified: the cockpit
+   data layer already lists/opens changes generically via the change store;
+   `/api/changes` + `/api/changes/:id`). Release acceptance gains an
+   explicit check: *open the cockpit, walk every in-flight change, confirm
+   each surfaces its own data + UI contracts.*
+
 ## References / composes with
 
 - `design-system` skill (VIEWER.html) — the UI render building block
