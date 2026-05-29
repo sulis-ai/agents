@@ -32,6 +32,7 @@ For the architectural rationale, see
 | `wpx-worktree` | Create/remove worktrees; record dev SHA | Executor + calling session |
 | `wpx-pipeline` | Steps 8-10: CI poll + merge + deploy + health + smoke | Calling session (via background Bash) |
 | `wpx-step12` | Step 12 bookkeeping wrap (atomic) | Calling session |
+| `wpx-render-contract` | Render a change's data contract into a founder-legible `CONTRACT.html` + manifest (ServiceSpec→OpenAPI→raw precedence; ADR-001/002/005/006) | Design-time review gate + cockpit on-demand |
 | `wpx` (v0.10.1+) | Dispatcher wrapper — one-time PATH install for human ad-hoc use | Humans (debug, recovery, exploration) |
 
 ## Common conventions

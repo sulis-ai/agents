@@ -1,0 +1,37 @@
+{
+  "@context": "https://schema.org",
+  "@type": "ServiceSpec",
+  "name": "Ping",
+  "description": "A minimal single-operation service.",
+  "default_locale": "en",
+  "supported_locales": ["en"],
+  "i18n": {
+    "defaultLocale": "en",
+    "supportedLocales": ["en"]
+  },
+  "operations": {
+    "ping": {
+      "name": "Ping",
+      "method": "ping",
+      "description": "Check that the service is alive",
+      "async": false,
+      "userGuide": {
+        "summary": "Send a ping and get a pong back."
+      },
+      "input": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": { "type": "string" },
+          "count": { "type": "integer" }
+        }
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "reply": { "type": "string" }
+        }
+      }
+    }
+  }
+}
