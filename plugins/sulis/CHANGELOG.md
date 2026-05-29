@@ -1,5 +1,17 @@
 # Sulis — Changelog
 
+## v0.80.0 — 2026-05-29
+
+**Patch — "shipped/complete" is claimed only against the gate that actually blocks (closes #79).**
+
+An autonomous run-all reported a 55-WP product as "complete — dev is green, nothing blocked" when it wasn't: the deploy gate then failed with 6 broken tests. Root cause — the completion claim was grounded in **branch-CI, which is advisory** on the common founder repo (private + free plan, branch protection unavailable; #52). branch-CI ran red, the merge landed anyway, and the agent called it done. The "ship on branch-CI green, no PR ceremony" model silently assumed branch-CI was a *required* check.
+
+- **Agent body — Definition of Done (MUST):** a completion claim ("shipped", "complete", "dev is green", "nothing blocked") must be grounded in the gate that actually blocks the merge/deploy — never an advisory one. If the blocking gate isn't verified green, the only honest claim is "merged — not yet verified."
+- **`/sulis:run-all`** checks the gate type (the existing #52 protection-status) before the completion report. On advisory CI it reports "merged to dev — not verified-shippable until the blocking gate (e.g. deploy-to-dev) is green," names that gate, and verifies it before claiming done. Never "journey complete" off advisory CI.
+- **GIT-05 caveat:** branch-CI green is a ship gate only when branch protection makes branch-CI *required*; on advisory-CI repos it's informational, and "done" is grounded in the blocking gate.
+
+Scoped follow-on (#79): make run-all/train **poll the post-merge blocking gate** (the deploy workflow conclusion) programmatically, turning "verify the blocking gate" from instruction into a mechanical check.
+
 ## v0.79.0 — 2026-05-28
 
 **Patch — Sulis decides engineering-internal calls instead of interrogating the founder (closes #71, mechanical part).**

@@ -305,6 +305,36 @@ the false green. GIT-05's merge-mechanics step 3 (*"poll CI status …
 on green, proceed"*) is governed by this subsection: "green" means
 `conclusion == success`, never a bare exit `0`.
 
+### branch-CI is a ship gate ONLY when it is a *required* check (MUST, issue #79)
+
+The whole "ship on branch-CI green, no PR ceremony" model (GIT-04 / GIT-05)
+assumes branch protection makes branch-CI a **required** status check that
+*blocks* the merge. On the common founder repo — **private, on the free
+GitHub plan** — branch protection is unavailable (`gh api
+.../branches/dev/protection` → 403 "Upgrade to GitHub Pro or make this
+repository public"). There, branch-CI still *runs*, but it does not *block*:
+a red branch-CI can land on `dev` (issue #52 / platform#36).
+
+So a correctly-read `conclusion == success` on branch-CI is **necessary but
+not sufficient** to call work shipped when CI is advisory. The
+definition-of-done rule:
+
+- **Determine whether branch-CI is required or advisory** before any
+  "shipped/complete" claim — `wpx-preflight protection-status` (the #52
+  detection) tells you.
+- **Required + green** → branch-CI is the ship gate; claim shipped honestly.
+- **Advisory** → branch-CI green is informational, not a ship gate. The
+  completion claim must be grounded in the gate that actually **blocks**
+  (e.g. the `deploy-to-dev` workflow, which runs the same tests as
+  required). Until that gate is verified green, the only honest claim is
+  *"merged — not yet verified-shippable."* Reporting "shipped / dev is
+  green / journey complete" off advisory CI is a false-completion claim
+  (issue #79: a broken 55-WP build was reported to the founder as a
+  finished product this way).
+
+"Done" is measured against the gate that decides it, never one that merely
+ran.
+
 ### Local pre-commit fallback (SHOULD when feature-branch CI is absent)
 
 When a project's CI does not yet run on feature branches (legacy
