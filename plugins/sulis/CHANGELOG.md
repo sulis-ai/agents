@@ -1,5 +1,11 @@
 # Sulis — Changelog
 
+## v0.85.0 — 2026-05-29
+
+**Minor — release-train batch.**
+
+- Cockpit "see-the-contracts-before-you-go" preview: render each change's data contract (founder-legible, ServiceSpec-first) + UI/visual contract, surfaced as one-click links in the cockpit, as a pre-dispatch review gate + on-demand. Degrades gracefully; nothing hard-wired.
+
 ## v0.84.0 — 2026-05-29
 
 **Minor — founder-legibility reaches the design + standards layers (closes #88, #89).**
