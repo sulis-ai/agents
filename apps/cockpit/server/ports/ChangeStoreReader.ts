@@ -38,6 +38,20 @@ export type ChangeStoreRecord = {
   intent: string;
   baseBranch: string;
   baseSha: string | null;
+  /**
+   * The commit a shipped change's worktree is recreated from once it has
+   * been tidied (WP-004 / ADR-004). `null` for not-yet-shipped changes and
+   * for legacy records that predate the field. It is one of the facts the
+   * recreate-on-demand path reads off the record to decide recreatability
+   * (ADR-003 — generic, never hard-wired).
+   *
+   * Optional on the port so existing consumers (and the wire-shape
+   * `Change`, owned by the serving WP) are unaffected: the adapter
+   * populates it when the store carries `shipped_sha`, and the
+   * recreate-on-demand resolver reads it defensively (absent ⇒ treated
+   * as `null` ⇒ not recreatable via a pin).
+   */
+  shippedSha?: string | null;
   /** ISO 8601 UTC */
   createdAt: string;
   /** ISO 8601 UTC (from state.json; may equal createdAt) */

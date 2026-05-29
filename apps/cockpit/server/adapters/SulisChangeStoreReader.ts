@@ -110,6 +110,7 @@ type RawChangeRecord = {
   intent?: unknown;
   base_branch?: unknown;
   base_sha?: unknown;
+  shipped_sha?: unknown;
   created_at?: unknown;
   updated_at?: unknown;
   stage?: unknown;
@@ -134,6 +135,9 @@ function toRecord(raw: RawChangeRecord): ChangeStoreRecord {
     intent: str(raw.intent),
     baseBranch: str(raw.base_branch),
     baseSha: strOrNull(raw.base_sha),
+    // WP-004: the pin a tidied shipped change's worktree is recreated
+    // from (ADR-004). Same null-on-absent shape as base_sha.
+    shippedSha: strOrNull(raw.shipped_sha),
     createdAt,
     updatedAt,
     stage: str(raw.stage, "recon") as WorkflowStage,
