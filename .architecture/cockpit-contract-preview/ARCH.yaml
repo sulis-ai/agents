@@ -1,0 +1,8 @@
+id: cockpit-contract-preview
+handle: CH-01KSSV
+change_id: 01KSSV19SFWBJM01BM2XP6CZZ0
+status: designed
+sourced_from: .changes/cockpit-contract-preview.SPEC.md
+closes: 85
+branch: change/feat-cockpit-contract-preview
+tier: M

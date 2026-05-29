@@ -1,0 +1,47 @@
+{
+  "wp": "WP-002",
+  "project": "cockpit-contract-preview",
+  "branch": "feat/wp-002-ui-contract-renderer",
+  "base": "change/feat-cockpit-contract-preview",
+  "timestamp": "2026-05-29T150501Z",
+  "verdict": "PASS",
+  "outcome_plain": "Ready to merge",
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "ruff_check": "pass",
+    "mypy": "pass",
+    "py_compile": "pass",
+    "tests": "16 passed",
+    "coverage_pct_new_module": 94
+  },
+  "pr_hygiene": {
+    "scope": "none",
+    "size": "none",
+    "safety": "none",
+    "completeness": "none"
+  },
+  "findings": {
+    "in_changes": [
+      {
+        "id": "F-01",
+        "lens": "security",
+        "severity": "low",
+        "file": "plugins/sulis/scripts/_render_ui.py",
+        "symbol": "build_viewer_html",
+        "summary": "Inlined design-token value could carry a </style> breakout into the VIEWER <style> block.",
+        "disposition": "resolved-inline",
+        "resolution": "_css_value_safe() escapes '<' to CSS hex \\3c; pinned by test_inlined_token_values_cannot_break_out_of_style_block",
+        "delta": null
+      }
+    ],
+    "in_neighbours": []
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "status": "nothing-surfaced"},
+    "security": {"findings": 1, "status": "1-low-resolved-inline"},
+    "quality": {"findings": 0, "status": "nothing-surfaced"}
+  },
+  "auto_downgrade_triggers": [],
+  "draft_deltas": 0,
+  "addressed": true
+}

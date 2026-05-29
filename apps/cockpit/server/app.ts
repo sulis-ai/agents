@@ -21,6 +21,7 @@ import express, { type Application } from "express";
 import cors from "cors";
 
 import type { ChangeStoreReader } from "./ports/ChangeStoreReader";
+import type { RecreateRunner } from "./ports/RecreateRunner";
 
 import { createChangesRouter } from "./routes/changes";
 import { createChangeDetailRouter } from "./routes/change-detail";
@@ -28,12 +29,20 @@ import { createTreeRouter } from "./routes/tree";
 import { createFileRouter } from "./routes/file";
 import { createDiffRouter } from "./routes/diff";
 import { createTranscriptRouter } from "./routes/transcript";
+import { createContractRouter } from "./routes/contract";
 
 import { errorMiddleware } from "./middleware/errors";
 import { requestLogMiddleware } from "./middleware/request-log";
 
 export interface CreateAppDeps {
   changeStore: ChangeStoreReader;
+  /**
+   * The recreate-on-demand runner (WP-004), used by the contract-preview
+   * endpoints to re-materialise a tidied shipped change's worktree before
+   * serving its contracts. Optional: when absent, a present worktree still
+   * serves, but a tidied one degrades to a plain "unavailable" note.
+   */
+  recreateRunner?: RecreateRunner;
   sulisStateDir: string;
   claudeProjectsDir: string;
   /** Optional override for the 1 MiB file cap (tests + future tuning). */
@@ -106,6 +115,17 @@ export function createApp(deps: CreateAppDeps): Application {
     createTranscriptRouter({
       changeStore: deps.changeStore,
       claudeProjectsDir: deps.claudeProjectsDir,
+    }),
+  );
+
+  // WP-003 — contract-preview endpoints. GET-only; serves the rendered
+  // CONTRACT.html + UI.html from the change's worktree, recreating a tidied
+  // worktree on demand via the injected RecreateRunner (ADR-001/003/004).
+  app.use(
+    "/api/changes/:id/contract",
+    createContractRouter({
+      changeStore: deps.changeStore,
+      recreateRunner: deps.recreateRunner,
     }),
   );
 

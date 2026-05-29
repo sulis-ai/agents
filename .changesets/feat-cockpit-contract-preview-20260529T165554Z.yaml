@@ -1,0 +1,7 @@
+change_id: 01KSSV19SFWBJM01BM2XP6CZZ0
+primitive: feat
+tier: minor
+touches_plugin: true
+summary: |
+  Cockpit "see-the-contracts-before-you-go" preview: render each change's data contract (founder-legible, ServiceSpec-first) + UI/visual contract, surfaced as one-click links in the cockpit, as a pre-dispatch review gate + on-demand. Degrades gracefully; nothing hard-wired.
+created_at: 2026-05-29T16:55:54Z

@@ -12,6 +12,7 @@
 #
 # Subtools (one per wpx-* script):
 #   journal | index | wp | blocker | findings | worktree | pipeline | step12
+#   | render-contract
 #
 # Exit codes:
 #   0    success
@@ -36,6 +37,7 @@ Subtools:
   worktree    — manage git worktrees per GIT-07
   pipeline    — run Steps 8-10 (CI poll + merge + deploy + health + smoke)
   step12      — atomic Step 12 wrap (acceptance + INDEX flip + worktree remove)
+  render-contract — render a change's data contract into a founder-legible CONTRACT.html
   resolve     — print the resolved wpx-* tool directory (diagnostic)
 
 Run `wpx <subtool> --help` for subtool-specific options.

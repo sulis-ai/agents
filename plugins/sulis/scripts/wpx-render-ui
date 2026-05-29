@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""wpx-render-ui — render a change's visual contract to UI.html.
+
+Reuses the design-system skill's VIEWER mechanism (see _render_ui.py) to
+produce a self-contained UI.html from a change's visual contract / design
+tokens, discovered inside the worktree by convention (ADR-003). When the
+change has no visual contract (a non-user-facing change), emits nothing for
+UI.html and records ``ui_contract: "none"`` plus a plain human note in the
+shared manifest, so the cockpit shows "no UI contract for this change" rather
+than a broken link or an exception (TDD §2.4).
+
+Same wpx shape as wpx-render-contract (WP-001): worktree-only input, no
+hard-wired change, emit_ok/emit_error JSON (ADR-001).
+
+Subcommands:
+  render                Render UI.html (or emit none + note) for a worktree.
+
+Exit codes: 0 success, 1 user/data error, 2 internal error.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _render_ui import render_ui, write_manifest  # noqa: E402
+from _wpxlib import cli_main, emit_error, emit_ok  # noqa: E402
+
+
+def cmd_render(args: argparse.Namespace) -> None:
+    worktree = Path(args.worktree)
+    if not worktree.is_dir():
+        emit_error(f"worktree not found: {worktree}")
+
+    # render_ui never raises for the in-scope "no visual contract" case — it
+    # returns a none-with-note state — so a non-user-facing change emits clean
+    # ok JSON, not an error (TDD §2.4).
+    state = render_ui(worktree)
+    manifest_path = write_manifest(worktree, state)
+
+    emit_ok(data={**state, "manifest": str(manifest_path)})
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="wpx-render-ui",
+        description="Render a change's visual contract to UI.html.",
+    )
+    sub = parser.add_subparsers(dest="subcommand", required=True)
+
+    p_render = sub.add_parser(
+        "render", help="Render UI.html (or emit none + note) for a worktree."
+    )
+    p_render.add_argument(
+        "--worktree",
+        required=True,
+        help="Path to the change's worktree (the only input — ADR-001/003).",
+    )
+
+    return parser
+
+
+if __name__ == "__main__":
+    cli_main(_build_parser(), {"render": cmd_render})

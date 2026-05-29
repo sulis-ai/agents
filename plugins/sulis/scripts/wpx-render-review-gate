@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+"""wpx-render-review-gate — render a change's contracts at the pre-dispatch review gate.
+
+The design-time half of WP-003's two-moment timing (TDD §5): after
+``decompose`` and BEFORE ``run-all`` dispatch, render the in-flight change's
+``CONTRACT.html`` + ``UI.html`` so the founder can eyeball them — a
+defect-prevention review gate — before anything is built on the contract.
+The on-demand half lives in the cockpit server (the per-change links
+re-render via the same renderers; this WP's routes/contract.ts).
+
+This is a thin ORCHESTRATOR over the already-shipped renderers (WP-001
+``wpx-render-contract`` and WP-002 ``wpx-render-ui``) — it does NOT
+re-implement rendering. It composes them against one worktree, in the
+cockpit's subprocess discipline (TDD §3): an argv array, ``shell=False``,
+and a bounded per-call timeout — never a string command line.
+
+Generic per-change resolution (ADR-003): the worktree path is the only
+input; nothing is hard-wired to a specific change. The two renderers
+discover the change's contracts inside that worktree by convention and
+read-modify-write the SHARED ``CONTRACT.manifest.json`` the cockpit then
+consumes.
+
+Usage:
+  wpx-render-review-gate --worktree <path>
+
+Exit codes: 0 success, 1 user/data error, 2 internal error.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _wpxlib import emit_error, emit_internal_error, emit_ok  # noqa: E402
+
+# The two shipped renderers, resolved next to this script (ADR-001 — the
+# renderers are wpx-* Python steps in this same scripts/ dir).
+_SCRIPTS_DIR = Path(__file__).parent
+_RENDER_CONTRACT = _SCRIPTS_DIR / "wpx-render-contract"
+_RENDER_UI = _SCRIPTS_DIR / "wpx-render-ui"
+
+# A bounded per-renderer timeout. Rendering is local file I/O (and, for the
+# OpenAPI fallback, a Redoc invocation inside the renderer), so a generous
+# but firm upper bound keeps the review gate from hanging on a wedged step.
+_RENDER_TIMEOUT_S = 120
+
+
+def _run_step(argv: list[str]) -> dict:
+    """Run one renderer with subprocess discipline; return its parsed JSON.
+
+    argv array + ``shell=False`` + a bounded timeout (TDD §3 subprocess
+    discipline — matches SulisChangeRecreator / wpx-worktree). Never a string
+    command line. Raises ValueError on a non-zero exit, a timeout, or a
+    renderer that doesn't emit parseable JSON, so the orchestrator can map it
+    to a single emit_error.
+    """
+    try:
+        proc = subprocess.run(  # noqa: S603 — argv array, shell=False, bounded
+            argv,
+            capture_output=True,
+            text=True,
+            timeout=_RENDER_TIMEOUT_S,
+            shell=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ValueError(
+            f"renderer exceeded {_RENDER_TIMEOUT_S}s timeout: {argv[0]}"
+        ) from exc
+
+    if proc.returncode != 0:
+        detail = proc.stderr.strip() or proc.stdout.strip() or "(no output)"
+        raise ValueError(f"renderer failed ({argv[0]}, exit {proc.returncode}): {detail}")
+
+    try:
+        return json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"renderer emitted non-JSON output ({argv[0]}): {proc.stdout[:200]}"
+        ) from exc
+
+
+def cmd_render(args: argparse.Namespace) -> None:
+    worktree = Path(args.worktree)
+    if not worktree.is_dir():
+        emit_error(f"worktree not found: {worktree}")
+        return
+
+    # Data contract first, then the UI contract. Either renderer may run
+    # first as far as the shared manifest is concerned (both merge, not
+    # clobber), but rendering the data contract first gives the founder the
+    # primary artifact even if the UI step has nothing to render.
+    data_result = _run_step([sys.executable, str(_RENDER_CONTRACT), "--worktree", str(worktree)])
+    ui_result = _run_step([sys.executable, str(_RENDER_UI), "render", "--worktree", str(worktree)])
+
+    emit_ok(data={
+        "worktree": str(worktree),
+        "data_contract": data_result,
+        "ui_contract": ui_result,
+        "manifest": str(worktree / "CONTRACT.manifest.json"),
+    })
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="wpx-render-review-gate",
+        description="Render a change's CONTRACT.html + UI.html at the "
+                    "pre-dispatch review gate (TDD §5; composes WP-001/002).",
+    )
+    parser.add_argument(
+        "--worktree",
+        required=True,
+        help="Path to the in-flight change's worktree (the only input — ADR-003).",
+    )
+    return parser
+
+
+def main() -> None:
+    args = build_parser().parse_args()
+    try:
+        cmd_render(args)
+    except SystemExit:
+        raise
+    except (FileNotFoundError, ValueError, json.JSONDecodeError) as e:
+        emit_error(str(e))
+    except BaseException as e:  # noqa: BLE001
+        emit_internal_error(e)
+
+
+if __name__ == "__main__":
+    main()

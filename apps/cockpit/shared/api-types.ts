@@ -114,3 +114,49 @@ export type AssistantBlock =
   | { kind: "text"; text: string }
   | { kind: "tool-use"; toolName: string; input: unknown }
   | { kind: "tool-result"; toolUseId: string; content: unknown };
+
+// ─── WP-003 — contract-preview wire types ─────────────────────────────────
+//
+// The cockpit serves the renderers' (WP-001/002) rendered artifacts —
+// CONTRACT.html + UI.html — read from the shared `CONTRACT.manifest.json`
+// (TDD §2.3 the data seam; ADR-001 read-only). The summary endpoint
+// (`GET /api/changes/:id/contract`) returns `ContractAvailability`, which the
+// per-change "open data contract / open UI" links read to decide what to
+// render (present / no-UI note / unavailable). The cockpit never parses the
+// contracts itself; this shape is a projection of the manifest.
+
+/** The data-contract half of the manifest (what was rendered). */
+export interface DataContractSummary {
+  /** "servicespec" | "openapi" | "raw" | "none" (renderer-reported). */
+  format: string;
+  /** The primary contract's name, when the renderer derived one. */
+  name: string | null;
+}
+
+/** The UI-contract half: present (a UI.html exists) or none (+ a note). */
+export type UiContractSummary =
+  | { status: "present" }
+  | { status: "none"; note: string };
+
+/**
+ * Whether a change's rendered contracts are reachable, and what they are.
+ *
+ *   - `ready`        → the worktree resolved (present, or recreated on
+ *                      demand); `dataContract` + `uiContract` describe what
+ *                      the manifest carries. `present` is false when the
+ *                      worktree resolved but no manifest has been rendered
+ *                      yet (the links show a "not rendered yet" affordance).
+ *   - `unavailable`  → the worktree is gone and couldn't be reached
+ *                      (a shipped change that isn't recreatable, or a
+ *                      recreate that failed / a malformed handle the
+ *                      shape-guard refused). `note` is a plain message.
+ */
+export type ContractAvailability =
+  | {
+      status: "ready";
+      /** false → worktree present but no CONTRACT.manifest.json yet. */
+      present: boolean;
+      dataContract: DataContractSummary | null;
+      uiContract: UiContractSummary;
+    }
+  | { status: "unavailable"; note: string };

@@ -1,0 +1,68 @@
+{
+  "review": {
+    "target": "feat/wp-004-recreate-on-demand",
+    "project": "cockpit-contract-preview",
+    "timestamp": "2026-05-29T150605Z",
+    "base": "origin/dev",
+    "head": "feat/wp-004-recreate-on-demand (working tree, pre-commit)",
+    "verdict": "PASS",
+    "outcome_plain": "Ready to merge"
+  },
+  "build_verification": {
+    "typecheck_errors_introduced": 0,
+    "lint_errors_introduced": 0,
+    "read_only_gate": "clean"
+  },
+  "pr_hygiene": {
+    "scope": { "severity": "none", "commit_types": ["feat"], "module_fan_out": 1 },
+    "size": { "severity": "none", "lines_total": 600, "files_changed": 8 },
+    "safety": {
+      "severity": "none",
+      "migration_count": 0,
+      "schema_idl_count": 0,
+      "infra_files": 0,
+      "secret_pattern_hits": 0,
+      "new_subprocess_spawn": 1,
+      "spawn_read_only_verified": true
+    },
+    "completeness": {
+      "severity": "none",
+      "new_source_without_test": 0,
+      "new_source_files": 4,
+      "new_test_files": 1,
+      "test_count": 14
+    }
+  },
+  "findings": {
+    "in_changes": [
+      {
+        "id": "F-01",
+        "severity": "low",
+        "lens": "security",
+        "file": "apps/cockpit/server/adapters/SulisChangeRecreator.ts",
+        "line": 78,
+        "summary": "handle not shape-validated before spawn; no injection vector (shell:false + argv array); defense-in-depth parity with CHANGE_ID_PATTERN suggested",
+        "disposition": "watch-list",
+        "delta": null
+      },
+      {
+        "id": "F-02",
+        "severity": "note",
+        "lens": "architecture",
+        "file": "apps/cockpit/server/routes/_recreate-on-demand.ts",
+        "line": 109,
+        "summary": "WPB-09 wiring deferred to WP-003 by design (build against FakeRecreateRunner seam to ship in parallel)",
+        "disposition": "by-design",
+        "delta": null
+      }
+    ],
+    "in_neighbours": []
+  },
+  "lenses": {
+    "architecture": { "findings": 1, "status": "complete" },
+    "security": { "findings": 1, "status": "complete" },
+    "quality": { "findings": 0, "status": "complete", "note": "nothing surfaced; 14 tests cover all branches; CR-10 no matches; no TSX/JSX" }
+  },
+  "draft_fixes": 0,
+  "auto_downgrade_triggers": []
+}

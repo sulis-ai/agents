@@ -1,0 +1,40 @@
+{
+  "pr": "feat/wp-001-data-contract-renderer",
+  "wp": "WP-001",
+  "project": "cockpit-contract-preview",
+  "timestamp": "2026-05-29T151128Z",
+  "kind": "backend",
+  "verdict": "PASS",
+  "build_verification": {
+    "commands": ["py_compile", "compileall", "bash -n wpx"],
+    "base_errors": 0,
+    "head_errors": 0,
+    "type_checker": "none (stdlib-only plugin contract)"
+  },
+  "hygiene": {
+    "scope": {"severity": "none", "commit_types": ["feat"], "module_fan_out": 1},
+    "size": {"severity": "none", "lines_added": 1000, "files_changed": 8},
+    "safety": {"severity": "none", "migrations": 0, "schemas": 0, "secrets": 0, "infra": 0},
+    "completeness": {"severity": "none", "new_source_without_test": 0}
+  },
+  "lenses": {
+    "architecture": {"in_changes": 0, "in_neighbours": 0, "surfaced": false},
+    "security": {"in_changes": 0, "in_neighbours": 0, "surfaced": false},
+    "quality": {"in_changes": 1, "in_neighbours": 0, "surfaced": true}
+  },
+  "findings": [
+    {
+      "id": "Q-1",
+      "lens": "quality",
+      "severity": "low",
+      "file": "plugins/sulis/scripts/wpx-render-contract",
+      "line": 498,
+      "title": "Dead surface: unused tag_descriptions in parse_openapi",
+      "status": "fixed-inline",
+      "resolution": "Removed during review (Path A inline fix); 24 tests stay green."
+    }
+  ],
+  "draft_deltas": [],
+  "auto_downgrade_triggers": [],
+  "scanners_unavailable": ["gitleaks", "semgrep", "trivy"]
+}
