@@ -20,6 +20,7 @@ import { ThreadHeader } from "../components/ThreadHeader";
 import { ThreadTabs } from "../components/ThreadTabs";
 import { Chat } from "../components/Chat";
 import { FilesPanel } from "../components/FilesPanel";
+import { ContractLinks } from "../components/ContractLinks";
 import styles from "../styles/Thread.module.css";
 
 export function ThreadView() {
@@ -64,6 +65,9 @@ export function ThreadView() {
   return (
     <section data-testid="page-thread" className={styles.page}>
       <ThreadHeader change={change} />
+      {/* WP-003 — per-change contract preview: each change surfaces its OWN
+          rendered data + UI contracts (generic resolution, ADR-003). */}
+      <ContractLinks change={change} />
       <ThreadTabs
         chat={<Chat changeId={id} />}
         files={<FilesPanel changeId={id} />}

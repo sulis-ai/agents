@@ -68,6 +68,23 @@ describe("end-to-end integration smoke (TDD §14.6)", () => {
       "utf8",
     );
     await writeFile(join(worktree, "README.md"), "# demo\n", "utf8");
+    // WP-003 — rendered contract artifacts + shared manifest, so the
+    // contract endpoints are reachable end-to-end.
+    await writeFile(
+      join(worktree, "CONTRACT.html"),
+      "<!doctype html><title>Contract</title><h1>What it does</h1>",
+      "utf8",
+    );
+    await writeFile(
+      join(worktree, "CONTRACT.manifest.json"),
+      JSON.stringify({
+        data_contract: { format: "servicespec", name: "Smoke", contracts: [] },
+        contract_html: join(worktree, "CONTRACT.html"),
+        ui_contract: "none",
+        note: "No UI contract for this change.",
+      }),
+      "utf8",
+    );
     await mkdir(join(worktree, "node_modules", "skip-me"), { recursive: true });
     await writeFile(
       join(worktree, "node_modules", "skip-me", "x.js"),
@@ -246,5 +263,28 @@ describe("end-to-end integration smoke (TDD §14.6)", () => {
   it("rejects non-GET methods with 405", async () => {
     const res = await request(app).post("/api/changes");
     expect(res.status).toBe(405);
+  });
+
+  it("GET /api/changes/:id/contract is mounted + reachable (summary)", async () => {
+    const res = await request(app).get(`/api/changes/${changeId}/contract`);
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      status: string;
+      dataContract: { name: string } | null;
+      uiContract: { status: string };
+    };
+    expect(body.status).toBe("ready");
+    expect(body.dataContract?.name).toBe("Smoke");
+    // This change has no UI contract → a note, not a broken link.
+    expect(body.uiContract.status).toBe("none");
+  });
+
+  it("GET /api/changes/:id/contract/data serves the rendered CONTRACT.html", async () => {
+    const res = await request(app).get(
+      `/api/changes/${changeId}/contract/data`,
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toMatch(/text\/html/);
+    expect(res.text).toContain("What it does");
   });
 });

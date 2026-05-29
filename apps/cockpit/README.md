@@ -39,10 +39,10 @@ configurable.
 
 ## The HTTP surface
 
-Six GET endpoints, JSON only, all bound to `127.0.0.1:5174` by default
-(TDD §5, ADR-002, ADR-003). The route handlers are thin — they
-delegate to the lib functions (WP-005..WP-009) and the change-store
-port (WP-003).
+GET endpoints, JSON only (plus two HTML-serving contract endpoints),
+all bound to `127.0.0.1:5174` by default (TDD §5, ADR-002, ADR-003).
+The route handlers are thin — they delegate to the lib functions
+(WP-005..WP-009) and the change-store port (WP-003).
 
 | Method + path                                | Purpose                                                       | Wire shape           |
 | -------------------------------------------- | ------------------------------------------------------------- | -------------------- |
@@ -52,6 +52,48 @@ port (WP-003).
 | `GET /api/changes/:id/file?path=...`         | Current contents of a file in the worktree (1 MiB cap).       | `FileContents`       |
 | `GET /api/changes/:id/diff?path=...`         | Base (at `baseSha`) + current contents for Monaco's DiffEditor. | `FileDiff`         |
 | `GET /api/changes/:id/transcript`            | Chronologically-merged chat messages from the change's transcripts. | `TranscriptMessage[]` |
+| `GET /api/changes/:id/contract`              | Whether the change's rendered contracts are reachable + what they are. | `ContractAvailability` |
+| `GET /api/changes/:id/contract/data`         | Serves the rendered `CONTRACT.html` (the data-contract preview). | `text/html`        |
+| `GET /api/changes/:id/contract/ui`           | Serves the rendered `UI.html`, or a typed JSON note when the change has no UI contract (never a broken link). | `text/html` or `{ uiContract, note }` |
+
+### Contract preview (WP-003)
+
+The three `/contract` endpoints let the founder **see the contracts
+before going** — the data contract and the visual/UI contract rendered
+from the change's own files. They CONSUME the shared
+`CONTRACT.manifest.json` the renderers (`wpx-render-contract`,
+`wpx-render-ui`) write into each change's worktree, and serve the named
+`CONTRACT.html` / `UI.html` artifacts. The cockpit never parses the
+contracts itself — it stays read-only (ADR-001).
+
+Resolution is **generic** (ADR-003): the change is resolved by `:id`
+through the same `ChangeStoreReader` port + recreate-on-demand path the
+tree/file/diff endpoints use; nothing is hard-wired to a specific
+change. A **shipped (tidied) change** has its worktree re-materialised
+transparently via the `RecreateRunner` port (WP-004) before its
+contracts are served. A malformed change handle is refused by a
+defence-in-depth shape-guard (`lib/changeHandleGuard.ts`) **before** it
+can reach the recreate spawn (mirrors `CHANGE_ID_PATTERN` + explicitly
+rejects a leading `-` to foreclose argparse flag-confusion).
+
+**Two rendering moments, one renderer** (TDD §5):
+
+- **Design-time (pre-dispatch review gate):** after `decompose` and
+  before `run-all` dispatch, `plugins/sulis/scripts/wpx-render-review-gate
+  --worktree <path>` renders the in-flight change's `CONTRACT.html` +
+  `UI.html` so the founder can eyeball them before anything is built on
+  the contract. It is a thin orchestrator over the two renderers
+  (subprocess discipline: argv array, `shell=false`, bounded timeout).
+- **On-demand (the testing moment):** the cockpit's per-change "open
+  data contract / open UI" links (the `ContractLinks` component, on the
+  per-change page) render or re-render via the same renderers when the
+  founder clicks. The founder never navigates a worktree.
+
+`ContractAvailability` is `{ status: "ready", present, dataContract,
+uiContract }` (the links read this to decide what to show) or
+`{ status: "unavailable", note }` (a shipped change that couldn't be
+reached). `/contract/data` and `/contract/ui` add `CONTRACT_UNAVAILABLE`
+(404) and `CONTRACT_NOT_RENDERED` (404) to the `code` set below.
 
 Non-2xx responses use a single envelope:
 

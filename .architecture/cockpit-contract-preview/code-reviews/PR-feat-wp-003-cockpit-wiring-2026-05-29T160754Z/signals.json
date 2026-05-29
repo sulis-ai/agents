@@ -1,0 +1,19 @@
+{
+  "pr": "feat/wp-003-cockpit-wiring",
+  "base": "change/feat-cockpit-contract-preview",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["feat"], "module_fan_out": 3, "severity": "low" },
+    "size": { "lines_added": 2567, "lines_removed": 69, "files_changed": 20, "lock_file_present": true, "severity": "medium" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "secret_pattern_hits": 0, "infra_files": 0, "severity": "low" },
+    "completeness": { "new_source_without_test": 0, "new_source_files": 7, "new_test_files": 6, "api_change_without_schema": false, "severity": "low" }
+  },
+  "lenses": {
+    "architecture": { "in_changes": 0, "in_neighbours": 0, "top_concern": "none — dependency direction inward to ports, read-only invariant preserved, subprocess discipline honoured" },
+    "security": { "in_changes": 0, "in_neighbours": 0, "top_concern": "none — shape-guard forecloses recreate flag-confusion before spawn; path safety via safeJoin" },
+    "quality": { "in_changes": 0, "in_neighbours": 0, "top_concern": "none — tsc+eslint clean, full test coverage, no dead surface, no CR-10 anti-patterns" }
+  },
+  "findings": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+  "draft_fixes": 0
+}
