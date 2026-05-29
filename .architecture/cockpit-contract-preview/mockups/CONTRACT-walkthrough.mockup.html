@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Contract preview — full-picture default view, multi-area (real-token mockup)</title>
+<!--
+  UXD-14 visual-contract mockup for the cockpit-contract-preview change.
+
+  This is the SIGN-OFF ARTIFACT for the founder-facing DEFAULT view of
+  CONTRACT.html. It is a hand-built mockup using the cockpit's REAL design
+  tokens (copied verbatim from apps/cockpit/client/src/tokens.css, v4.2.0).
+  The shipped renderer (WP-1) MUST reproduce this layout from the contract —
+  no hardcoded prose, every value derived from the contract's own fields.
+
+  ── REVISION (founder review of the rendered mockup, 2026-05-29) ──
+  Three view-structure refinements. The renderer's source-of-truth / no-drift /
+  auto-trim rules are UNCHANGED — only the founder-facing view structure.
+
+  ISSUE 1 — PERMISSIONS LEAD WITH "WHO CAN DO THIS", NOT A JARGON CODE
+    Each operation in the default view LEADS with a plain-English
+    "Who can do this: …" line, derived from the permission definition's
+    `typicallyAssignedTo`. The raw permission code (the dotted policy string)
+    is DEMOTED OUT of the default view, INTO the "show technical detail"
+    toggle. Operations with no required permission still show "No sign-in /
+    anyone". ADR-002 Revision 4 supersedes the prior "enriched code pill with
+    expander".
+
+  ISSUE 3 — RESTORE THE PERMISSION (READABLE) TO THE DEFAULT VIEW (ADR-002 Rev 5)
+    Revision 4 over-corrected: by demoting the raw code AND under-surfacing
+    the meaning, it demoted the PERMISSION ITSELF out of the default view —
+    a founder reviewing the page asked "I can't see the permissions any more?"
+    Rev 5 restores the permission to the default view in READABLE form. Each
+    operation now shows TWO labelled lines on its own row:
+      (a) "Permission:" — the permission as a readable CAPABILITY, its
+          plain-English meaning from spec.permissions[code].description
+          (e.g. "lets you create platforms"); and
+      (b) "Who can do this:" — who holds it, from typicallyAssignedTo.
+    Operations with no required permission still show "No sign-in / anyone".
+    Both lines belong to the operation's row (tied to the action), not a
+    separate global block.
+
+  ISSUE 4 — ALSO SHOW THE ACTUAL VALUES, PAIRED WITH THE READABLE TEXT (ADR-002 Rev 6)
+    The human-readable text from Rev 5 is right and KEPT — but the founder also
+    wants to SEE the ACTUAL machine value next to each readable form, in the
+    DEFAULT view, for BOTH the action and the permission:
+      (a) ACTION — alongside the human action description ("An admin can set up
+          a new platform") show the operation's ACTUAL canonical identifier as a
+          secondary, monospace value: the {service}/{operation} key (e.g.
+          `platform/create-platform`, from core/service/registry.py) and/or the
+          method_name (e.g. `create_platform`, OperationMetadata.method_name).
+      (b) PERMISSION — alongside the readable "Permission: …" meaning + "Who can
+          do this: …", BRING THE ACTUAL PERMISSION CODE BACK into the default
+          view (e.g. `platform.platforms:create`), paired with its readable
+          meaning. Rev 5's toggle-only code is SUPERSEDED.
+    Pattern: readable label primary, the actual machine value paired as a
+    secondary (monospace, muted). Readable + real value TOGETHER, per action and
+    per permission. Auto-trim unchanged (no value → omit). The technical toggle
+    no longer needs to duplicate the bare code.
+
+  ISSUE 2 — GROUP BY SERVICE/AREA WHEN A CHANGE TOUCHES MORE THAN ONE
+    A real change's contract can span multiple services/areas. When it does,
+    the default view GROUPS by area under clear headings, each area carrying
+    its own operations / form fields / entities+states / rules / journeys /
+    what-changes (all still auto-trimmed). A short "areas covered" overview
+    sits at the top. A single-area change renders ONE ungrouped block with NO
+    heading and NO overview. Area grouping is derived from the ServiceSpec
+    structure: operation keys {Service}/{Operation}, the @type:ServiceCatalog
+    shape with its `contributions`, and/or multiple ServiceSpec sources
+    (see core/service/types.py: ServiceContribution.service_name,
+    ServiceCatalog merging multiple contributions; registry.py keys
+    operations as f"{service_name}/{op}"). ADR-006.
+
+  THIS MOCKUP SHOWS A TWO-AREA CHANGE — a "Platforms" area and a
+  "Notifications" area — so the grouping + the "areas covered" overview are
+  visible, and so every operation shows the readable "Permission:" line (the
+  meaning) and the "Who can do this" line, with only the raw permission code
+  string living in the technical toggle.
+
+  FULL-PICTURE DEFAULT VIEW (binding founder decision, 2026-05-29), per area:
+    1. What it does        ← operations + userGuide; the ACTION's actual
+                             identifier ({service}/{operation} key / method_name)
+                             paired with its readable description (Rev 6); the
+                             PERMISSION in readable form — "Permission:" (meaning,
+                             from spec.permissions[code].description) + "Who can do
+                             this:" (from typicallyAssignedTo) PAIRED WITH the
+                             ACTUAL permission code (Rev 6); sign-in flag;
+                             BACKGROUND flag (operations.{op}.async); ENRICHED
+                             retirement (deprecated + sunsetDate +
+                             replacementOperation).
+    2. What you fill in    ← FORM FIELDS (the priority surface): projected from
+       (the form fields)     entity properties + operation input schemas.
+    3. The things that     ← entities: name/description + lifecycle states.
+       exist + their states
+    4. Business rules      ← entity constraints, in plain language.
+    5. Languages           ← i18n: defaultLocale + supportedLocales.
+    6. Step-by-step        ← workflows (steps + successCriteria).
+       journeys
+    7. What each action    ← operation stateEffects, linked to lifecycle (3).
+       changes
+    8. A real example      ← operation input/output (real or synthesised).
+    9. When something      ← errors catalog (user-facing message).
+       goes wrong
+   10. [collapsed] Show    ← rateLimits, idempotent flag, bindings, raw schemas,
+       technical detail      error relatedDocs links, full ServiceSpec JSON-LD.
+                             (i18n is NOT here — see 5. The permission code and
+                             operation identifier are NOW in the default view
+                             paired with their readable forms — Rev 6.)
+
+  AUTO-TRIM: each section renders only if the spec carries content for it.
+  This mockup shows a RICH multi-area change. A minimal single-area change
+  renders one ungrouped block (no area heading, no overview) with only the
+  sections it carries — proven by the unit tests (Fixture B, OpenAPI fallback),
+  not by this mockup.
+
+  OUT OF SCOPE — EVENTS: the platform has domain events but the ServiceSpec
+  CONTRACT does not carry them, so rendering them would break the no-drift
+  guarantee. Excluded pending a contract-format extension (ADR-005). The
+  contract-native approximation — stateEffects ("what each action changes",
+  section 7) — is already shown.
+
+  Scenarios shown are illustrative; the real renderer synthesises the
+  equivalent from each change's own contract.
+-->
+<style>
+  :root {
+    /* ── Copied verbatim from apps/cockpit/client/src/tokens.css (v4.2.0) ── */
+    --background: #fafafa;
+    --foreground: #171717;
+    --card: #ffffff;
+    --card-foreground: #171717;
+    --muted: #f5f5f5;
+    --muted-foreground: #737373;
+    --secondary: #f5f5f5;
+    --border: #e5e5e5;
+    --border-muted: #f0f0f0;
+    --primary: #2563EB;
+    --primary-foreground: #FFFFFF;
+    --accent: #2D7D90;
+    --positive: #16A34A;
+    --positive-foreground: #FFFFFF;
+    --warning: #F59E0B;
+    --destructive: #DC2626;
+    --brand-gold: #C9A962;
+    --brand-depth: #1E3A5F;
+    --radius-interactive: 4px;
+    --radius-button: 9999px;
+    --radius-container: 4px;
+    --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', 'Monaco', monospace;
+    --weight-body: 400;
+    --weight-heading: 300;
+    --weight-label: 500;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-sans);
+    background: var(--background);
+    color: var(--foreground);
+    line-height: 1.55;
+    padding: 2.5rem 1.5rem 5rem;
+  }
+  .page { max-width: 820px; margin: 0 auto; }
+
+  /* ── Header ── */
+  .doc-head { border-bottom: 1px solid var(--border); padding-bottom: 1.25rem; margin-bottom: 1.5rem; }
+  .doc-eyebrow {
+    font-size: 0.75rem; font-weight: var(--weight-label); letter-spacing: 0.05em;
+    text-transform: uppercase; color: var(--accent);
+  }
+  .doc-title { font-family: var(--font-sans); font-weight: var(--weight-heading); font-size: 1.85rem; margin-top: 0.35rem; }
+  .doc-sub { color: var(--muted-foreground); font-size: 0.95rem; margin-top: 0.4rem; }
+
+  /* ── "Areas covered" overview (only when areas > 1; ADR-006) ── */
+  .areas-overview {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-container); padding: 1.1rem 1.25rem; margin-bottom: 2.25rem;
+  }
+  .areas-overview-label {
+    font-size: 0.78rem; font-weight: var(--weight-label); color: var(--muted-foreground);
+    text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.6rem;
+  }
+  .area-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .area-chip {
+    font-size: 0.85rem; font-weight: var(--weight-label);
+    padding: 0.25rem 0.75rem; border-radius: var(--radius-button);
+    background: var(--secondary); color: var(--brand-depth); border: 1px solid var(--border);
+    display: inline-flex; align-items: baseline; gap: 0.4rem;
+  }
+  .area-chip .area-chip-count { font-size: 0.72rem; font-weight: var(--weight-body); color: var(--muted-foreground); }
+
+  /* ── Area group (one per service/area; ADR-006) ── */
+  .area {
+    border: 1px solid var(--border); border-radius: var(--radius-container);
+    padding: 1.5rem 1.5rem 0.5rem; margin-bottom: 2.25rem; background: var(--background);
+  }
+  .area-head {
+    display: flex; align-items: baseline; gap: 0.65rem;
+    border-bottom: 1px solid var(--border); padding-bottom: 0.85rem; margin-bottom: 1.5rem;
+  }
+  .area-name { font-size: 1.4rem; font-weight: var(--weight-heading); }
+  .area-tag {
+    font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent);
+    background: var(--secondary); padding: 0.1rem 0.5rem; border-radius: var(--radius-button);
+  }
+  .area-desc { color: var(--muted-foreground); font-size: 0.9rem; }
+
+  /* ── Section scaffolding ── */
+  .section { margin-bottom: 2rem; }
+  .section-title { font-size: 1.1rem; font-weight: var(--weight-label); margin-bottom: 0.9rem; }
+  .section-lede { color: var(--muted-foreground); font-size: 0.9rem; margin: -0.5rem 0 0.9rem; }
+
+  /* ── Worked walkthrough hero ── */
+  .walkthrough {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-container); padding: 1.75rem; margin-bottom: 1.25rem;
+  }
+  .step-flow { display: flex; align-items: stretch; gap: 0.75rem; flex-wrap: wrap; }
+  .step {
+    flex: 1 1 0; min-width: 200px;
+    background: var(--muted); border: 1px solid var(--border-muted);
+    border-radius: var(--radius-interactive); padding: 1rem 1.1rem;
+  }
+  .step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.5rem; height: 1.5rem; border-radius: var(--radius-button);
+    background: var(--primary); color: var(--primary-foreground);
+    font-size: 0.78rem; font-weight: var(--weight-label); margin-bottom: 0.6rem;
+  }
+  .step-label { font-weight: var(--weight-label); font-size: 0.92rem; }
+  .step-detail { color: var(--muted-foreground); font-size: 0.85rem; margin-top: 0.25rem; }
+  .arrow { align-self: center; color: var(--muted-foreground); font-size: 1.2rem; }
+
+  .promise-card {
+    margin-top: 1.4rem; background: var(--background);
+    border: 1px solid var(--border); border-left: 3px solid var(--positive);
+    border-radius: var(--radius-interactive); padding: 1.1rem 1.25rem;
+  }
+  .promise-card h3 { font-size: 0.95rem; font-weight: var(--weight-label); margin-bottom: 0.6rem; }
+  .field-row { display: flex; gap: 0.75rem; padding: 0.35rem 0; border-bottom: 1px solid var(--border-muted); font-size: 0.88rem; }
+  .field-row:last-child { border-bottom: none; }
+  .field-name { font-family: var(--font-mono); color: var(--brand-depth); min-width: 90px; }
+  .field-type { color: var(--accent); font-family: var(--font-mono); font-size: 0.8rem; min-width: 70px; }
+  .field-desc { color: var(--muted-foreground); }
+
+  /* ── "What it does" list (one line per operation) ── */
+  .op-list { list-style: none; display: grid; gap: 0.55rem; }
+  .op-list li {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-interactive); padding: 0.7rem 1rem;
+    font-size: 0.92rem; display: flex; gap: 0.6rem; align-items: baseline; flex-wrap: wrap;
+  }
+  .verb {
+    font-family: var(--font-mono); font-size: 0.72rem; font-weight: var(--weight-label);
+    padding: 0.12rem 0.5rem; border-radius: var(--radius-button);
+    background: var(--secondary); color: var(--brand-depth); white-space: nowrap;
+  }
+  .verb.get { color: var(--accent); }
+  .verb.post { color: var(--positive); }
+  .op-list li .op-text { flex: 1 1 200px; }
+
+  /* ── Action's ACTUAL identifier, paired with the readable description (Rev 6) ──
+     The human description is primary; the operation's real {service}/{operation}
+     key and/or method_name shows as a muted, monospace SECONDARY on the row.
+     Auto-trim: no identifier on the contract → this element is simply omitted. */
+  .op-id {
+    width: 100%; display: flex; gap: 0.4rem; align-items: baseline; flex-wrap: wrap;
+    margin-top: 0.1rem;
+  }
+  .op-id-label {
+    font-size: 0.7rem; font-weight: var(--weight-label); color: var(--muted-foreground);
+    text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap;
+  }
+  .op-id-value {
+    font-family: var(--font-mono); font-size: 0.74rem; color: var(--muted-foreground);
+    background: var(--muted); border: 1px solid var(--border-muted);
+    padding: 0.06rem 0.4rem; border-radius: var(--radius-button);
+  }
+
+  /* deprecated badge */
+  .badge-retiring {
+    font-size: 0.68rem; font-weight: var(--weight-label);
+    padding: 0.1rem 0.5rem; border-radius: var(--radius-button);
+    background: var(--background); color: var(--warning);
+    border: 1px solid var(--warning); white-space: nowrap;
+  }
+
+  /* ── Per-operation flags: sign-in + background ── */
+  .op-flags { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+  .flag {
+    font-size: 0.72rem; font-weight: var(--weight-label);
+    padding: 0.12rem 0.55rem; border-radius: var(--radius-button);
+    display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap;
+  }
+  .flag.signin { background: var(--secondary); color: var(--brand-depth); border: 1px solid var(--border); }
+  .flag.signin.open { color: var(--muted-foreground); }
+  .flag .dot { width: 0.45rem; height: 0.45rem; border-radius: var(--radius-button); display: inline-block; }
+  .flag.signin .dot { background: var(--warning); }
+  .flag.signin.open .dot { background: var(--positive); }
+  .flag.bg { background: var(--background); color: var(--accent); border: 1px solid var(--accent); }
+  .flag.bg .dot { background: var(--accent); }
+
+  /* ── Permission block: readable form PAIRED WITH the actual code (ADR-002 Rev 6) ──
+     Lines tied to the operation's row, ALL visible in the default view:
+       .permission       — the permission as a readable CAPABILITY (meaning),
+                           from spec.permissions[code].description (PRIMARY).
+       .permission-code  — the ACTUAL permission code (e.g. platform.platforms:create),
+                           a muted monospace SECONDARY paired with the meaning (Rev 6).
+       .who-can          — who holds it, from typicallyAssignedTo.
+     Rev 4 demoted the code to the toggle; Rev 5 restored the readable meaning;
+     Rev 6 brings the ACTUAL code back into the default view, paired with its
+     meaning (readable primary, code secondary). */
+  .perm-block {
+    width: 100%; margin-top: 0.5rem;
+    border-left: 3px solid var(--accent); padding-left: 0.7rem;
+    display: grid; gap: 0.25rem;
+  }
+  .permission, .who-can {
+    display: flex; gap: 0.5rem; align-items: baseline; flex-wrap: wrap;
+    font-size: 0.86rem;
+  }
+  .permission-label, .who-can-label { font-weight: var(--weight-label); color: var(--brand-depth); white-space: nowrap; }
+  .permission-value, .who-can-value { color: var(--foreground); }
+  .permission-code {
+    font-family: var(--font-mono); font-size: 0.74rem; color: var(--muted-foreground);
+    background: var(--muted); border: 1px solid var(--border-muted);
+    padding: 0.06rem 0.4rem; border-radius: var(--radius-button); white-space: nowrap;
+  }
+  .perm-block.anyone { border-left-color: var(--border); }
+  .perm-block.anyone .who-can-label { color: var(--muted-foreground); }
+
+  /* ── Form fields (the priority surface) ── */
+  .field-group { margin-bottom: 1rem; }
+  .field-group-name {
+    font-size: 0.78rem; font-weight: var(--weight-label); color: var(--muted-foreground);
+    text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.5rem;
+  }
+  .field-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-interactive); padding: 0.85rem 1rem; margin-bottom: 0.55rem;
+  }
+  .field-head { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+  .field-label { font-weight: var(--weight-label); font-size: 0.95rem; }
+  .field-input-type {
+    font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent);
+    background: var(--secondary); padding: 0.08rem 0.45rem; border-radius: var(--radius-button);
+  }
+  .field-req {
+    font-size: 0.68rem; font-weight: var(--weight-label); color: var(--destructive);
+    border: 1px solid var(--destructive); padding: 0.06rem 0.45rem; border-radius: var(--radius-button);
+  }
+  .field-optional { font-size: 0.7rem; color: var(--muted-foreground); }
+  .field-placeholder { color: var(--muted-foreground); font-size: 0.85rem; font-style: italic; margin-top: 0.25rem; }
+  .field-rules { list-style: none; display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.5rem; }
+  .field-rules li {
+    font-size: 0.74rem; color: var(--brand-depth); background: var(--muted);
+    border: 1px solid var(--border-muted); padding: 0.12rem 0.5rem; border-radius: var(--radius-button);
+  }
+  .field-options { margin-top: 0.55rem; }
+  .field-options-label { font-size: 0.74rem; color: var(--muted-foreground); margin-bottom: 0.3rem; }
+  .opt-list { list-style: none; display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .opt-list li {
+    font-size: 0.78rem; padding: 0.14rem 0.6rem; border-radius: var(--radius-button);
+    background: var(--secondary); color: var(--brand-depth); border: 1px solid var(--border);
+  }
+  .opt-list li .opt-code { font-family: var(--font-mono); font-size: 0.68rem; color: var(--muted-foreground); margin-left: 0.35rem; }
+  .field-showwhen {
+    margin-top: 0.5rem; font-size: 0.78rem; color: var(--muted-foreground);
+    border-left: 3px solid var(--brand-gold); padding-left: 0.6rem;
+  }
+  .field-showwhen strong { color: var(--brand-depth); font-weight: var(--weight-label); }
+
+  /* ── Languages line (i18n) ── */
+  .languages {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-interactive); padding: 0.8rem 1.1rem;
+    font-size: 0.92rem; display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;
+  }
+  .languages .lang-label { color: var(--muted-foreground); }
+  .lang-chip {
+    font-size: 0.78rem; font-weight: var(--weight-label);
+    padding: 0.14rem 0.6rem; border-radius: var(--radius-button);
+    background: var(--secondary); color: var(--brand-depth); border: 1px solid var(--border);
+  }
+  .lang-chip.default { border-color: var(--primary); color: var(--primary); }
+
+  /* ── Enriched retirement note ── */
+  .retire-note { font-size: 0.78rem; color: var(--warning); margin-top: 0.3rem; }
+  .retire-note strong { font-weight: var(--weight-label); }
+
+  /* ── Entities + lifecycle ── */
+  .entity-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-interactive); padding: 1rem 1.1rem; margin-bottom: 0.75rem;
+  }
+  .entity-name { font-weight: var(--weight-label); font-size: 1rem; }
+  .entity-desc { color: var(--muted-foreground); font-size: 0.88rem; margin-top: 0.15rem; }
+  .lifecycle-label { font-size: 0.78rem; color: var(--muted-foreground); margin: 0.85rem 0 0.45rem; font-weight: var(--weight-label); }
+  .lifecycle { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
+  .state {
+    font-family: var(--font-mono); font-size: 0.78rem; font-weight: var(--weight-label);
+    padding: 0.2rem 0.65rem; border-radius: var(--radius-button);
+    background: var(--secondary); color: var(--brand-depth); border: 1px solid var(--border);
+  }
+  .state.initial { border-color: var(--positive); color: var(--positive); }
+  .state.terminal { border-color: var(--muted-foreground); color: var(--muted-foreground); }
+  .lc-arrow { color: var(--muted-foreground); font-size: 0.95rem; }
+
+  /* ── Business rules ── */
+  .rule-list { list-style: none; display: grid; gap: 0.5rem; }
+  .rule-list li {
+    background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--brand-gold);
+    border-radius: var(--radius-interactive); padding: 0.65rem 1rem; font-size: 0.9rem;
+    display: flex; gap: 0.6rem; align-items: baseline;
+  }
+  .rule-list li .rule-on {
+    font-family: var(--font-mono); font-size: 0.72rem; color: var(--brand-depth);
+    background: var(--secondary); padding: 0.1rem 0.45rem; border-radius: var(--radius-button); white-space: nowrap;
+  }
+
+  /* ── Step-by-step journeys (workflows) ── */
+  .journey {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-interactive); padding: 1.1rem 1.25rem; margin-bottom: 0.75rem;
+  }
+  .journey-name { font-weight: var(--weight-label); font-size: 0.98rem; margin-bottom: 0.7rem; }
+  .journey-steps { list-style: none; counter-reset: jstep; display: grid; gap: 0.5rem; }
+  .journey-steps li { display: flex; gap: 0.65rem; align-items: baseline; font-size: 0.9rem; }
+  .journey-steps li::before {
+    counter-increment: jstep; content: counter(jstep);
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 1.35rem; height: 1.35rem; border-radius: var(--radius-button);
+    background: var(--primary); color: var(--primary-foreground);
+    font-size: 0.72rem; font-weight: var(--weight-label); flex: 0 0 auto;
+  }
+  .journey-success {
+    margin-top: 0.85rem; padding-top: 0.7rem; border-top: 1px solid var(--border-muted);
+    font-size: 0.85rem; color: var(--muted-foreground);
+  }
+  .journey-success strong { color: var(--positive); font-weight: var(--weight-label); }
+
+  /* ── What each action changes (stateEffects) ── */
+  .effect-list { list-style: none; display: grid; gap: 0.5rem; }
+  .effect-list li {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-interactive); padding: 0.65rem 1rem; font-size: 0.9rem;
+    display: flex; gap: 0.55rem; align-items: center; flex-wrap: wrap;
+  }
+  .effect-op { font-family: var(--font-mono); font-size: 0.74rem; color: var(--positive); white-space: nowrap; }
+  .effect-arrow { color: var(--muted-foreground); }
+  .effect-state {
+    font-family: var(--font-mono); font-size: 0.74rem; font-weight: var(--weight-label);
+    padding: 0.12rem 0.55rem; border-radius: var(--radius-button);
+    background: var(--secondary); color: var(--brand-depth); border: 1px solid var(--border);
+  }
+
+  /* ── Example request/response ── */
+  pre {
+    background: var(--brand-depth); color: #e8eef5;
+    border-radius: var(--radius-interactive); padding: 1rem 1.2rem;
+    font-family: var(--font-mono); font-size: 0.82rem; overflow-x: auto; line-height: 1.5;
+  }
+  .ex-label { font-size: 0.78rem; color: var(--muted-foreground); margin: 0.9rem 0 0.4rem; font-weight: var(--weight-label); }
+
+  /* ── Technical-detail toggle ── */
+  .tech-toggle {
+    width: 100%; text-align: left; cursor: pointer;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-interactive); padding: 0.9rem 1.1rem;
+    font-size: 0.95rem; font-weight: var(--weight-label); color: var(--foreground);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .tech-toggle:hover { border-color: var(--primary); }
+  .tech-hint { font-size: 0.8rem; color: var(--muted-foreground); font-weight: var(--weight-body); }
+  .tech-region {
+    border: 1px solid var(--border); border-top: none;
+    border-radius: 0 0 var(--radius-interactive) var(--radius-interactive);
+    padding: 1.25rem; color: var(--muted-foreground); font-size: 0.88rem; background: var(--muted);
+  }
+  .tech-region ul { margin: 0.6rem 0 0 1.1rem; }
+  .tech-region code { font-family: var(--font-mono); font-size: 0.82rem; color: var(--brand-depth); }
+  details.tech[open] .tech-toggle { border-radius: var(--radius-interactive) var(--radius-interactive) 0 0; border-color: var(--primary); }
+  summary { list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="doc-head">
+    <div class="doc-eyebrow">Data contract preview</div>
+    <h1 class="doc-title">What this change does</h1>
+    <p class="doc-sub">Change CH-01KSSV · cockpit-contract-preview · rendered from the change's own ServiceSpec</p>
+  </div>
+
+  <!-- ════════ AREAS COVERED OVERVIEW ════════
+       Shown only when the change spans more than one area (ADR-006).
+       Derived from the distinct service areas in the contract. -->
+  <div class="areas-overview">
+    <div class="areas-overview-label">This change touches 2 areas</div>
+    <div class="area-chips">
+      <span class="area-chip">Platforms <span class="area-chip-count">4 actions</span></span>
+      <span class="area-chip">Notifications <span class="area-chip-count">2 actions</span></span>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       AREA 1 — PLATFORMS
+       Derived from operation keys "platforms/..." (or a ServiceSpec named
+       "Platforms"). Each section below is auto-trimmed WITHIN this area.
+       ════════════════════════════════════════════════════════════════ -->
+  <section class="area">
+    <div class="area-head">
+      <h2 class="area-name">Platforms</h2>
+      <span class="area-tag">platforms</span>
+    </div>
+    <p class="area-desc" style="margin-top:-1rem;margin-bottom:1.5rem;">Creating and managing the isolated environments customers run on.</p>
+
+    <!-- ── 1. WHAT IT DOES ── -->
+    <section class="section">
+      <h3 class="section-title">What it does</h3>
+
+      <div class="walkthrough">
+        <div class="step-flow">
+          <div class="step">
+            <span class="step-num">1</span>
+            <div class="step-label">An admin sets up a new platform</div>
+            <div class="step-detail">They send a name and a slug for the new platform.</div>
+          </div>
+          <div class="arrow">&rarr;</div>
+          <div class="step">
+            <span class="step-num">2</span>
+            <div class="step-label">The product creates the platform</div>
+            <div class="step-detail">It stores the details and assigns an ID.</div>
+          </div>
+          <div class="arrow">&rarr;</div>
+          <div class="step">
+            <span class="step-num">3</span>
+            <div class="step-label">Here's exactly what comes back</div>
+            <div class="step-detail">The product returns this shape, every time.</div>
+          </div>
+        </div>
+
+        <div class="promise-card">
+          <h3>A platform, with these fields:</h3>
+          <div class="field-row"><span class="field-name">id</span><span class="field-type">string</span><span class="field-desc">A unique identifier for the platform.</span></div>
+          <div class="field-row"><span class="field-name">name</span><span class="field-type">string</span><span class="field-desc">The platform name, exactly as it was entered.</span></div>
+          <div class="field-row"><span class="field-name">slug</span><span class="field-type">string</span><span class="field-desc">The short URL-safe handle for the platform.</span></div>
+          <div class="field-row"><span class="field-name">created</span><span class="field-type">date-time</span><span class="field-desc">When the platform was created.</span></div>
+        </div>
+      </div>
+
+      <ul class="op-list">
+        <li>
+          <span class="verb post">create</span>
+          <span class="op-text">An admin can set up a new platform.</span>
+          <!-- ACTION's ACTUAL identifier, paired with the readable description (Rev 6):
+               the {service}/{operation} registry key + the method_name. -->
+          <span class="op-id" title="Derived from the operation key {service}/{operation} + OperationMetadata.method_name">
+            <span class="op-id-label">Operation</span>
+            <span class="op-id-value">platform/create-platform</span>
+            <span class="op-id-value">create_platform</span>
+          </span>
+          <span class="op-flags">
+            <span class="flag signin" title="Derived from userGuide.prerequisites"><span class="dot"></span>Needs sign-in</span>
+            <span class="flag bg" title="Derived from operations.{op}.async"><span class="dot"></span>Runs in the background</span>
+          </span>
+          <!-- THE PERMISSION, READABLE + ACTUAL CODE (ADR-002 Rev 6). The readable
+               meaning is primary; the actual permission code is its paired
+               monospace secondary, in the default view. "Who can do this:" =
+               typicallyAssignedTo. -->
+          <div class="perm-block">
+            <div class="permission">
+              <span class="permission-label">Permission:</span>
+              <span class="permission-value">lets you create new platforms</span>
+              <span class="permission-code" title="The actual permission code (Rev 6)">platform.platforms:create</span>
+            </div>
+            <div class="who-can">
+              <span class="who-can-label">Who can do this:</span>
+              <span class="who-can-value">Platform administrators and account owners</span>
+            </div>
+          </div>
+        </li>
+        <li>
+          <span class="verb get">read</span>
+          <span class="op-text">The product can fetch a platform by its ID.</span>
+          <span class="op-id" title="Derived from the operation key {service}/{operation} + OperationMetadata.method_name">
+            <span class="op-id-label">Operation</span>
+            <span class="op-id-value">platform/get-platform</span>
+            <span class="op-id-value">get_platform</span>
+          </span>
+          <span class="op-flags">
+            <span class="flag signin" title="Derived from userGuide.prerequisites"><span class="dot"></span>Needs sign-in</span>
+          </span>
+          <div class="perm-block">
+            <div class="permission">
+              <span class="permission-label">Permission:</span>
+              <span class="permission-value">lets you view a platform's details</span>
+              <span class="permission-code" title="The actual permission code (Rev 6)">platform.platforms:read</span>
+            </div>
+            <div class="who-can">
+              <span class="who-can-label">Who can do this:</span>
+              <span class="who-can-value">Any signed-in member of the platform</span>
+            </div>
+          </div>
+        </li>
+        <li>
+          <span class="verb get">list</span>
+          <span class="op-text">Anyone can list the public platforms.</span>
+          <span class="op-id" title="Derived from the operation key {service}/{operation} + OperationMetadata.method_name">
+            <span class="op-id-label">Operation</span>
+            <span class="op-id-value">platform/list-platforms</span>
+            <span class="op-id-value">list_platforms</span>
+          </span>
+          <span class="op-flags">
+            <span class="flag signin open" title="No auth prerequisite; no required permissions"><span class="dot"></span>No sign-in</span>
+          </span>
+          <!-- No required permission → no "Permission:" line and no code; just "anyone". -->
+          <div class="perm-block anyone">
+            <div class="who-can">
+              <span class="who-can-label">Who can do this:</span>
+              <span class="who-can-value">Anyone &mdash; no sign-in required</span>
+            </div>
+          </div>
+        </li>
+        <li>
+          <span class="verb post">rename</span>
+          <span class="op-text">An admin can rename a platform.</span>
+          <span class="op-id" title="Derived from the operation key {service}/{operation} + OperationMetadata.method_name">
+            <span class="op-id-label">Operation</span>
+            <span class="op-id-value">platform/rename-platform</span>
+            <span class="op-id-value">rename_platform</span>
+          </span>
+          <span class="badge-retiring" title="Derived from operations.{op}.deprecated + sunsetDate + replacementOperation">being retired &mdash; until 2026-09-30</span>
+          <span class="retire-note" style="width:100%"><strong>Use &ldquo;Configure Platform&rdquo; instead.</strong> This action is being retired on 30 September 2026.</span>
+          <span class="op-flags">
+            <span class="flag signin" title="Derived from userGuide.prerequisites"><span class="dot"></span>Needs sign-in</span>
+          </span>
+          <div class="perm-block">
+            <div class="permission">
+              <span class="permission-label">Permission:</span>
+              <span class="permission-value">lets you change a platform's settings</span>
+              <span class="permission-code" title="The actual permission code (Rev 6)">platform.platforms:update</span>
+            </div>
+            <div class="who-can">
+              <span class="who-can-label">Who can do this:</span>
+              <span class="who-can-value">Platform administrators</span>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <!-- ── 2. WHAT YOU FILL IN ── -->
+    <section class="section">
+      <h3 class="section-title">What you fill in</h3>
+      <p class="section-lede">The fields a user fills in when they set up a platform &mdash; with the labels, rules and options exactly as they'll appear.</p>
+
+      <div class="field-group">
+        <div class="field-group-name">Identity</div>
+
+        <div class="field-card">
+          <div class="field-head">
+            <span class="field-label">Platform Name</span>
+            <span class="field-input-type">text</span>
+            <span class="field-req">required</span>
+          </div>
+          <div class="field-placeholder">e.g. &ldquo;My Platform&rdquo;</div>
+          <ul class="field-rules">
+            <li>2&ndash;60 characters</li>
+          </ul>
+        </div>
+
+        <div class="field-card">
+          <div class="field-head">
+            <span class="field-label">Slug</span>
+            <span class="field-input-type">text</span>
+            <span class="field-req">required</span>
+          </div>
+          <div class="field-placeholder">e.g. &ldquo;my-platform&rdquo;</div>
+          <ul class="field-rules">
+            <li>3&ndash;40 characters</li>
+            <li>lowercase letters, numbers and hyphens only</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-group-name">Configuration</div>
+
+        <div class="field-card">
+          <div class="field-head">
+            <span class="field-label">Plan</span>
+            <span class="field-input-type">choice</span>
+            <span class="field-req">required</span>
+          </div>
+          <div class="field-options">
+            <div class="field-options-label">One of:</div>
+            <ul class="opt-list">
+              <li>Free<span class="opt-code">free</span></li>
+              <li>Pro<span class="opt-code">pro</span></li>
+              <li>Enterprise<span class="opt-code">enterprise</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="field-card">
+          <div class="field-head">
+            <span class="field-label">Company Name</span>
+            <span class="field-input-type">text</span>
+            <span class="field-optional">optional</span>
+          </div>
+          <div class="field-showwhen">Shown only when <strong>Plan</strong> is <strong>Enterprise</strong>.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 3. THE THINGS THAT EXIST + THEIR STATES ── -->
+    <section class="section">
+      <h3 class="section-title">The things that exist, and the states they move through</h3>
+      <div class="entity-card">
+        <div class="entity-name">Platform</div>
+        <div class="entity-desc">An isolated environment for one customer's application.</div>
+        <div class="lifecycle-label">A platform moves through these states:</div>
+        <div class="lifecycle">
+          <span class="state initial">draft</span>
+          <span class="lc-arrow">&rarr;</span>
+          <span class="state">active</span>
+          <span class="lc-arrow">&rarr;</span>
+          <span class="state terminal">suspended</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 4. BUSINESS RULES ── -->
+    <section class="section">
+      <h3 class="section-title">The rules it follows</h3>
+      <ul class="rule-list">
+        <li><span class="rule-on">Platform</span><span>A slug can't change once the platform is created.</span></li>
+        <li><span class="rule-on">Platform</span><span>Two platforms can't share the same slug.</span></li>
+        <li><span class="rule-on">Platform</span><span>A suspended platform can't be set back to draft.</span></li>
+      </ul>
+    </section>
+
+    <!-- ── 5. LANGUAGES ── -->
+    <section class="section">
+      <h3 class="section-title">Languages</h3>
+      <div class="languages">
+        <span class="lang-label">Available in:</span>
+        <span class="lang-chip default">English <span style="font-weight:var(--weight-body)">(default)</span></span>
+        <span class="lang-chip">Spanish</span>
+      </div>
+    </section>
+
+    <!-- ── 6. STEP-BY-STEP JOURNEYS ── -->
+    <section class="section">
+      <h3 class="section-title">Step-by-step journeys</h3>
+      <div class="journey">
+        <div class="journey-name">Onboard a new customer</div>
+        <ol class="journey-steps">
+          <li>An admin creates a platform with a name and slug.</li>
+          <li>The admin configures the platform's settings.</li>
+          <li>The admin invites the customer's first users.</li>
+        </ol>
+        <div class="journey-success"><strong>Done when:</strong> the platform is active and at least one user has been invited.</div>
+      </div>
+    </section>
+
+    <!-- ── 7. WHAT EACH ACTION CHANGES ── -->
+    <section class="section">
+      <h3 class="section-title">What each action changes</h3>
+      <ul class="effect-list">
+        <li>
+          <span class="effect-op">create</span>
+          <span>sets a</span><span class="effect-state">Platform</span><span class="effect-arrow">&rarr;</span><span class="effect-state">draft</span>
+        </li>
+        <li>
+          <span class="effect-op">activate</span>
+          <span>moves a</span><span class="effect-state">Platform</span>
+          <span>from</span><span class="effect-state">draft</span><span class="effect-arrow">&rarr;</span><span class="effect-state">active</span>
+        </li>
+        <li>
+          <span class="effect-op">suspend</span>
+          <span>moves a</span><span class="effect-state">Platform</span>
+          <span>from</span><span class="effect-state">active</span><span class="effect-arrow">&rarr;</span><span class="effect-state">suspended</span>
+        </li>
+      </ul>
+    </section>
+
+    <!-- ── 8. A REAL EXAMPLE ── -->
+    <section class="section">
+      <h3 class="section-title">A real example</h3>
+      <div class="ex-label">When the admin sends &mdash;</div>
+<pre>POST /platforms
+{
+  "name": "Acme Production",
+  "slug": "acme-prod"
+}</pre>
+      <div class="ex-label">&mdash; the product returns:</div>
+<pre>201 Created
+{
+  "id": "plt_01H8X...",
+  "name": "Acme Production",
+  "slug": "acme-prod",
+  "created": "2026-05-29T10:24:00Z"
+}</pre>
+    </section>
+
+    <!-- ── 9. WHEN SOMETHING GOES WRONG ── -->
+    <section class="section">
+      <h3 class="section-title">When something goes wrong</h3>
+      <ul class="op-list">
+        <li>
+          <span class="verb get">DUPLICATE_SLUG</span>
+          <span class="op-text">A platform with this slug already exists. Choose a different slug.</span>
+        </li>
+        <li>
+          <span class="verb get">VALIDATION_ERROR</span>
+          <span class="op-text">One of the fields didn't meet requirements. Check the name and slug and try again.</span>
+        </li>
+      </ul>
+    </section>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       AREA 2 — NOTIFICATIONS
+       Derived from operation keys "notifications/..." (or a second
+       ServiceSpec / ServiceContribution named "Notifications"). A
+       different, thinner area — proves grouping works for a second area
+       and that auto-trim still applies WITHIN each area (this area has no
+       workflows, so no "journeys" section appears).
+       ════════════════════════════════════════════════════════════════ -->
+  <section class="area">
+    <div class="area-head">
+      <h2 class="area-name">Notifications</h2>
+      <span class="area-tag">notifications</span>
+    </div>
+    <p class="area-desc" style="margin-top:-1rem;margin-bottom:1.5rem;">Sending and tracking the messages that go out to a platform's members.</p>
+
+    <!-- ── 1. WHAT IT DOES ── -->
+    <section class="section">
+      <h3 class="section-title">What it does</h3>
+      <ul class="op-list">
+        <li>
+          <span class="verb post">send</span>
+          <span class="op-text">An admin can send a notification to a platform's members.</span>
+          <span class="op-id" title="Derived from the operation key {service}/{operation} + OperationMetadata.method_name">
+            <span class="op-id-label">Operation</span>
+            <span class="op-id-value">notification/send-notification</span>
+            <span class="op-id-value">send_notification</span>
+          </span>
+          <span class="op-flags">
+            <span class="flag signin" title="Derived from userGuide.prerequisites"><span class="dot"></span>Needs sign-in</span>
+            <span class="flag bg" title="Derived from operations.{op}.async"><span class="dot"></span>Runs in the background</span>
+          </span>
+          <div class="perm-block">
+            <div class="permission">
+              <span class="permission-label">Permission:</span>
+              <span class="permission-value">lets you send notifications to members</span>
+              <span class="permission-code" title="The actual permission code (Rev 6)">platform.notifications:send</span>
+            </div>
+            <div class="who-can">
+              <span class="who-can-label">Who can do this:</span>
+              <span class="who-can-value">Platform administrators</span>
+            </div>
+          </div>
+        </li>
+        <li>
+          <span class="verb get">list</span>
+          <span class="op-text">A member can see the notifications sent to them.</span>
+          <span class="op-id" title="Derived from the operation key {service}/{operation} + OperationMetadata.method_name">
+            <span class="op-id-label">Operation</span>
+            <span class="op-id-value">notification/list-notifications</span>
+            <span class="op-id-value">list_notifications</span>
+          </span>
+          <span class="op-flags">
+            <span class="flag signin" title="Derived from userGuide.prerequisites"><span class="dot"></span>Needs sign-in</span>
+          </span>
+          <div class="perm-block">
+            <div class="permission">
+              <span class="permission-label">Permission:</span>
+              <span class="permission-value">lets you read your own notifications</span>
+              <span class="permission-code" title="The actual permission code (Rev 6)">platform.notifications:read</span>
+            </div>
+            <div class="who-can">
+              <span class="who-can-label">Who can do this:</span>
+              <span class="who-can-value">Any signed-in member of the platform</span>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <!-- ── 2. WHAT YOU FILL IN ── -->
+    <section class="section">
+      <h3 class="section-title">What you fill in</h3>
+      <p class="section-lede">The fields a user fills in when they send a notification.</p>
+      <div class="field-group">
+        <div class="field-group-name">Message</div>
+
+        <div class="field-card">
+          <div class="field-head">
+            <span class="field-label">Title</span>
+            <span class="field-input-type">text</span>
+            <span class="field-req">required</span>
+          </div>
+          <div class="field-placeholder">e.g. &ldquo;Scheduled maintenance&rdquo;</div>
+          <ul class="field-rules">
+            <li>1&ndash;120 characters</li>
+          </ul>
+        </div>
+
+        <div class="field-card">
+          <div class="field-head">
+            <span class="field-label">Channel</span>
+            <span class="field-input-type">choice</span>
+            <span class="field-req">required</span>
+          </div>
+          <div class="field-options">
+            <div class="field-options-label">One of:</div>
+            <ul class="opt-list">
+              <li>In-app<span class="opt-code">in_app</span></li>
+              <li>Email<span class="opt-code">email</span></li>
+              <li>Both<span class="opt-code">both</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 3. THE THINGS THAT EXIST + THEIR STATES ── -->
+    <section class="section">
+      <h3 class="section-title">The things that exist, and the states they move through</h3>
+      <div class="entity-card">
+        <div class="entity-name">Notification</div>
+        <div class="entity-desc">A single message sent to one or more platform members.</div>
+        <div class="lifecycle-label">A notification moves through these states:</div>
+        <div class="lifecycle">
+          <span class="state initial">queued</span>
+          <span class="lc-arrow">&rarr;</span>
+          <span class="state">sent</span>
+          <span class="lc-arrow">&rarr;</span>
+          <span class="state terminal">read</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 4. BUSINESS RULES ── -->
+    <section class="section">
+      <h3 class="section-title">The rules it follows</h3>
+      <ul class="rule-list">
+        <li><span class="rule-on">Notification</span><span>A notification can't be edited once it has been sent.</span></li>
+        <li><span class="rule-on">Notification</span><span>Email notifications only go to members who've verified their email.</span></li>
+      </ul>
+    </section>
+
+    <!-- NOTE: no "Languages", no "Step-by-step journeys" section here —
+         this area's contract carries no i18n block and no workflows, so
+         auto-trim hides those headings WITHIN this area (ADR-002 §auto-trim,
+         applied per-area by ADR-006). -->
+
+    <!-- ── 7. WHAT EACH ACTION CHANGES ── -->
+    <section class="section">
+      <h3 class="section-title">What each action changes</h3>
+      <ul class="effect-list">
+        <li>
+          <span class="effect-op">send</span>
+          <span>sets a</span><span class="effect-state">Notification</span><span class="effect-arrow">&rarr;</span><span class="effect-state">queued</span>
+        </li>
+      </ul>
+    </section>
+
+    <!-- ── 8. A REAL EXAMPLE ── -->
+    <section class="section">
+      <h3 class="section-title">A real example</h3>
+      <div class="ex-label">When the admin sends &mdash;</div>
+<pre>POST /notifications
+{
+  "title": "Scheduled maintenance",
+  "channel": "both"
+}</pre>
+      <div class="ex-label">&mdash; the product returns:</div>
+<pre>202 Accepted
+{
+  "id": "ntf_01J2K...",
+  "title": "Scheduled maintenance",
+  "channel": "both",
+  "state": "queued"
+}</pre>
+    </section>
+  </section>
+
+  <!-- ════════ 10. TECHNICAL DETAIL (collapsed by default) ════════
+       Holds the engineer-facing detail kept OUT of the default view:
+       rateLimits, idempotent flag, bindings, raw schemas, error relatedDocs
+       links, and the full ServiceSpec JSON-LD (or Redoc for OpenAPI).
+       NOTE: i18n/locales is NOT here — it moved to the default view (5).
+       NOTE: the permission codes and operation identifiers are NOT demoted
+       here any more — ADR-002 Rev 6 shows them in the default view paired with
+       their readable forms. -->
+  <details class="tech">
+    <summary>
+      <div class="tech-toggle">
+        <span>Show technical detail</span>
+        <span class="tech-hint">the full technical contract &mdash; for developers</span>
+      </div>
+    </summary>
+    <div class="tech-region">
+      The complete technical render embeds here. For this change the source is a
+      ServiceSpec, so this region holds the full ServiceSpec JSON-LD. Where a
+      change has only an OpenAPI document, this region holds the self-contained
+      Redoc reference instead. Kept here, out of the default view above:
+      <ul>
+        <li>rate limits (per-operation request throttling)</li>
+        <li>whether each operation is idempotent (safe to retry)</li>
+        <li>bindings &mdash; host, base path, routing</li>
+        <li>the raw input/output JSON schemas (the founder-legible field view is above, in &ldquo;What you fill in&rdquo;)</li>
+        <li>links from each error to its related developer docs</li>
+        <li>the full ServiceSpec JSON-LD (or the Redoc render for OpenAPI)</li>
+      </ul>
+      The actual permission codes (e.g. <code>platform.platforms:create</code>)
+      and operation identifiers (e.g. <code>platform/create-platform</code> /
+      <code>create_platform</code>) are now shown in the default view above,
+      paired with their readable forms (ADR-002 Rev 6). The JSON-LD here still
+      carries them in full context. Everything above was derived from the same
+      contract this region renders in full.
+    </div>
+  </details>
+
+</div>
+</body>
+</html>

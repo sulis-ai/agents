@@ -1,0 +1,37 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Simple API", "version": "1.0.0" },
+  "paths": {
+    "/things": {
+      "post": {
+        "operationId": "createThing",
+        "summary": "Create a thing",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title"],
+                "properties": {
+                  "title": { "type": "string", "pattern": "^.{1,80}$" },
+                  "kind": { "type": "string", "enum": ["a", "b", "c"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "id": { "type": "string" } } }
+              }
+            }
+          },
+          "400": { "description": "The request was invalid." }
+        }
+      }
+    }
+  }
+}
