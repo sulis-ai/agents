@@ -198,6 +198,38 @@ structural change to existing components follows characterisation-test-first.
 > real access gate is the backend (WPB-05). Never treat client-side
 > show/hide as a security control.
 
+### WPF-14 — Build workspace dependencies before local verify (monorepo) · MUST
+
+When the app imports `workspace:*` packages whose `exports` resolve to a built
+`./dist/*` (a monorepo with internal SDK / shared packages), the executor's
+**local** typecheck / test / lint MUST build those workspace dependencies
+first, reproducing the CI build order:
+
+```bash
+# 1. Build the workspace deps the app imports, from the repo root, in topo order
+pnpm --filter "<app-package>..." build
+# 2. Then run the local gates from the app dir
+cd <app-dir> && pnpm run typecheck && pnpm run test && pnpm run lint
+```
+
+**Why this is a MUST, not a nicety.** With `dist/` absent, `tsc` fails fast on
+module resolution (`Cannot find module '@org/pkg/server'`) and **never reaches
+the rest of the file** — so genuine downstream type errors are masked. The
+executor honestly reports "typecheck clean" because `tsc` bailed before
+finding the real error: a **false green** that only the deps-built CI surfaces
+(L-02 — the agent-journey frontend wave shipped two WPs that passed local
+typecheck and then failed CI on a real `noUncheckedIndexedAccess` error).
+
+The Definition-of-Done "typecheck clean" claim (WPF-11) is only valid when the
+`workspace:*` deps the app imports are built. The corresponding CI half — the
+`branch-ci` frontend jobs must run the dep-build step before typecheck/test —
+is the producer's responsibility; this pattern governs the executor's local
+verify so local and CI agree.
+
+> **Anti-pattern:** running `pnpm run typecheck` from the app dir against a
+> fresh checkout with no `dist/`, then reporting "typecheck clean" — a false
+> green that masks every type error past the first unresolved import.
+
 ---
 
 ## Verification gates (per `kind: frontend`)
@@ -216,6 +248,10 @@ the frontend gates are:
 
 The tools are scope-specific (declared per project); the **gate classes** are
 fixed for frontend WPs.
+
+In a monorepo, the **Tests / Types / Lint** gates only produce a trustworthy
+verdict once the app's `workspace:*` dependencies are built — see **WPF-14**.
+Running them against an unbuilt `dist/` yields a false green (`tsc` fail-fast).
 
 ---
 
@@ -260,3 +296,4 @@ implementer's choice.
 | Version | Date | Changes |
 |---------|------|---------|
 | 0.1.0 | 2026-05-26 | Initial sulis-local definition. 13 patterns (WPF-01..WPF-13) mirroring the backend spine + frontend-only patterns (a11y/tokens/component-tiers/UI-states/agentic). Builds against two contracts (data: CONTRACT_FIRST; visual: UX_VISUAL_DESIGN). Two profiles (production React / prototype Alpine). Authorization-divergence note. SHOULD-tier items carry 90-day calibration; promote to MUST on evidence from 3+ frontend WP executions. |
+| 0.2.0 | 2026-05-29 | Added WPF-14 (MUST) — build `workspace:*` dependencies before local typecheck/test in a monorepo, reproducing the CI build order, so `tsc` fail-fast on an unbuilt `dist/` can't mask real type errors as a false green. Verification-gates section notes the dependency. Provenance: lesson #78 (L-02, agent-journey frontend wave). |
