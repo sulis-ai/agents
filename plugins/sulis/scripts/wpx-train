@@ -1899,9 +1899,14 @@ def _rollback_pre_merge_train_state(paths, train_id: str) -> bool:
         return False
     try:
         state = read_train_state(state_path)
-    except RuntimeError:
-        # Unreadable state: leave it for manual inspection rather than
-        # silently deleting — we can't verify nothing merged.
+    except (RuntimeError, FileNotFoundError):
+        # Unreadable or vanished state: leave it for manual inspection rather
+        # than silently deleting — we can't verify nothing merged.
+        # FileNotFoundError covers the TOCTOU edge (#68): the file passed the
+        # exists() guard above but vanished before read_train_state re-checked.
+        # Under TrainLock that window is effectively unreachable, but degrading
+        # cleanly here keeps an unhandled exception out of cmd_run's terminal
+        # error handlers.
         return False
     phase = state.get("phase")
     if phase not in _ROLLBACK_ELIGIBLE_PHASES:
