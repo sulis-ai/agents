@@ -31,10 +31,25 @@ The maintainer then **fills in the entity-specific `compose_X_from_Y` function**
 ## When to invoke
 
 Use when adding emission for a new entity type. Each entity already has a
-compiled schema upstream at
-`/Users/iain/Documents/repos/plugins/.specifications/business-dna/tools/dna-runner/out/{entity}.schema.json`
-— this skill vendors it, scaffolds the rest, and points you at the one function
-to write.
+compiled schema upstream at the **canonical consumer location**:
+
+```
+$DNA/compiled/schemas/{domain}/{entity}.schema.json
+```
+
+(where `$DNA=/Users/iain/Documents/repos/plugins/.specifications/business-dna`).
+Domains today: `foundation` (cross-cutting: Tenant, Actor, Credential),
+`product-development` (~20 entities), `insurance-broking` (~17 entities).
+
+To discover what entities exist, see `$DNA/compiled/INDEX.md` (the catalogue)
+and `$DNA/compiled/CONSUMER_HOWTO.md` (the bridge document that names every
+consumer command — schema fetch, validation, mint requests). The bridge doc
+explicitly self-identifies as transient: it'll be superseded by the
+`sulis-brain` marketplace plugin (`/sulis-brain:list-domains`,
+`/sulis-brain:fetch-schema`, etc.) when that ships. Until then, this skill
+reads schemas via the filesystem path above; when `sulis-brain` lands, the
+fetch step transparently shifts to the slash command — no other skill change
+required.
 
 **Do not use** for: per-instance emission of an entity that's already wired
 (that's a one-shot `sulis-emit-X` CLI call); for editing existing emitters
@@ -76,19 +91,27 @@ template path to take.
 ### Step 1. Confirm the upstream schema exists.
 
 ```bash
-ls /Users/iain/Documents/repos/plugins/.specifications/business-dna/tools/dna-runner/out/{entity}.schema.json
+# Pick the right domain — foundation (cross-cutting: Tenant, Actor, Credential),
+# product-development, or insurance-broking. See $DNA/compiled/INDEX.md.
+DOMAIN=product-development   # or foundation, insurance-broking
+ls $DNA/compiled/schemas/$DOMAIN/{entity}.schema.json
 ```
 
 If the file's missing, **stop** — the ontology doesn't yet have this entity.
-Add it there first (separate slice in the plugins repo), then come back.
+Raise a mint request per `$DNA/compiled/CONSUMER_HOWTO.md` §5 (or check
+`$DNA/MINTING_PLAYBOOK.md`); come back here once it's compiled.
 
 ### Step 2. Vendor the schema.
 
 ```bash
-mkdir -p plugins/sulis/brain/compiled/product-development
-cp /Users/iain/Documents/repos/plugins/.specifications/business-dna/tools/dna-runner/out/{entity}.schema.json \
-   plugins/sulis/brain/compiled/product-development/{entity}.schema.json
+mkdir -p plugins/sulis/brain/compiled/$DOMAIN
+cp $DNA/compiled/schemas/$DOMAIN/{entity}.schema.json \
+   plugins/sulis/brain/compiled/$DOMAIN/{entity}.schema.json
 ```
+
+The marketplace mirrors only the schemas it actively consumes — vendor on
+demand, not in bulk. This keeps the diff visible at PR time (one new schema
+per emission slice).
 
 ### Step 3. Generate the four code files from templates.
 
