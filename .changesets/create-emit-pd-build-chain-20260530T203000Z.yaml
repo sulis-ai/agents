@@ -1,0 +1,21 @@
+change_id: 01KSX7STVVRXW3P5BK0WQFFND2
+primitive: create
+tier: minor
+touches_plugin: true
+summary: |
+  Batch 3 of remaining entity emitters: Design (TDD.md →
+  satisfies-Requirement-list + decisions-ADR-list) + Component
+  (.sulis/components/{slug}.yaml → repo/path/version/license + implements
+  + dependencies) + Release (CLI-direct from release-train: version +
+  comprises[] + sbom). Wires up the PD build chain Design → Component →
+  Release end-to-end.
+
+  Cross-emitter ID coordination preserved: Design.satisfies references
+  use the same `req:{srd_path}:{fr_id}` seed Requirement-emission uses;
+  Design.decisions references use the same Decision-emission seed.
+  Component.implements accepts both design + requirement refs per the
+  schema. End-to-end smoke-test produces a connected graph
+  (Design with 3 requirement edges + 2 decision edges, then Component
+  separately, then Release referencing the Component). 20 new tests
+  (7+5+8); 1184 passing total.
+created_at: 2026-05-30T20:30:00Z
