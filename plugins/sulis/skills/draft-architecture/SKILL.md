@@ -81,6 +81,9 @@ path but not the adversarial path SRD already specified.
 .architecture/{project}/
 ├── ARCH.yaml
 ├── TDD.md
+├── service-specs/
+│   ├── {service-name}.servicespec.yaml   # one per service introduced/modified — emitted in step 10
+│   └── ...
 └── adrs/
     ├── ADR-001-{slug}.md
     └── ...
@@ -95,6 +98,19 @@ Every ADR has a paired structured **Decision** entity under
 machine-readable spine — what tooling, cross-references, and the
 golden-thread query layer read. Pairing is one CLI call per ADR (see
 step 9).
+
+**Every service the design introduces or modifies has a paired
+ServiceSpec manifest** under `service-specs/` (see step 10). The
+manifest is the platform's contract for that service — operations,
+errors, entities, bindings, permissions — and is what the platform's
+service-registration apply pipeline (SPEC-006) reads. The TDD describes
+*what to build*; the ServiceSpec describes *what the built service
+exposes to AI agents and SDKs*. Without it, the design has no machine-
+readable service contract and downstream — agent integration, SDK
+generation, MCP routing, the cockpit's service view — has nothing to
+bind to. This is the third design-stage structured deliverable
+alongside the visual contract (`UX_VISUAL_DESIGN_STANDARD`, #45) and
+the data contract (`CONTRACT_FIRST_STANDARD`, #48).
 
 ### `ARCH.yaml`
 
@@ -417,13 +433,29 @@ If extending or superseding, reference the existing ADR by path.}
     ```
 
     This persists a validated structured Decision instance under `.brain/instances/product-development/decision/{ulid}.jsonld` — the machine-readable spine of which the `.md` is the human view. The emitter parses `## Context` / `## Decision` / `## Options Considered` (with `## Alternatives Considered` synonym) / `## Consequences` from the body, plus `title` + `status` from frontmatter (translated to entity `state`). The Decision's `@id` reuses the change's `change_id` when present in frontmatter (giving natural traceability from a Change to the Decisions it produced); fresh ULID otherwise. **Validation is real**: a malformed ADR is rejected at write (no partial persistence). Skipping this step leaves the Brain↔OS graph incomplete for downstream tooling — the cockpit's golden-thread view, lineage queries, and the Storage Service substrate (Track 2) all read instances, not the `.md`.
-10. **Sizing self-check (MUST).** Before writing, review your draft against the tier targets:
+10. **Emit a ServiceSpec manifest for every service the design introduces or modifies (MUST).** The third design-stage structured deliverable — alongside the visual contract (`UX_VISUAL_DESIGN_STANDARD`, #45) and the data contract (`CONTRACT_FIRST_STANDARD`, #48). Without it, the design has no machine-readable service contract and downstream — agent integration, SDK generation, MCP routing, the cockpit's service view — has nothing to bind to.
+
+    Write one manifest per service to `.architecture/{project}/service-specs/{service-name}.servicespec.yaml`. Format follows the platform's **SPEC-006 / Service Registration** spec (the canonical contract every Sulis service registers via). Each manifest declares at minimum:
+
+    - **operations** — every endpoint the service exposes. Each operation MUST carry a `description` (what it does) and a `user_guide` (whenToUse / prerequisites / nextSteps) so an AI agent can decide when to call it without reading docs.
+    - **errors** — the error catalog. Each error MUST carry `httpStatus`, `user_action` (how a human caller fixes it), `developer_action` (how an integrator fixes it), and `retryable`. No bare codes.
+    - **entities** — the Brain-graph nouns this service handles. **Reference compiled entity schemas by id** (e.g. `dna:entity:order`) rather than re-declaring shapes — the marketplace's vendored Brain compile outputs at `plugins/sulis/brain/compiled/` are the source of truth. (When the SPEC-006 entities-block shape stabilises, Slice 3 will emit this block automatically from the Brain compiler.)
+    - **bindings** — per operation: host/basePath/method/auth so the SDK and MCP runtime can route calls without guessing.
+    - **permissions** — every operation's permission, **structurally namespaced** per SPEC-006's namespacing convention (no bare names).
+
+    **The Lovable Test bar applies**: a spec is complete only if an AI agent could build a working integration against it *with no human docs*. Hold this bar by hand for now; the decompose-validation rubric will mechanically enforce it once Slice 2 ships (a new P7 phase parses the manifest and runs the Lovable Test checks).
+
+    For services the design *modifies* rather than introduces: update the existing manifest in place; do not branch it. The manifest is single-source-of-truth across the lifecycle (design → implementation → registration → SDK / MCP / agent consumption), so divergence at any point is a bug.
+
+    For services that are explicitly bridge handlers over an existing system (BYOS per SPEC-006), call this out in the manifest's metadata and produce the bridge-side contract in the same shape — the registration substrate is identical for BWS and BYOS.
+
+11. **Sizing self-check (MUST).** Before writing, review your draft against the tier targets:
     - Total TDD length > 1.5× tier target? → write a "Why is this big?" paragraph or refactor
     - Any section restates content from an authoritative source? → refactor to a reference
     - ADR count > tier maximum? → write an "ADR rationale" paragraph or remove the marginal ones
     - Any pillar marked "fully covered" but actually contains content? → refactor to reference-only
-11. **Write `ARCH.yaml`** — link back to the source SPEC.
-12. **Append a Sizing Report appendix to TDD.md (MUST).** Add this as the last
+12. **Write `ARCH.yaml`** — link back to the source SPEC.
+13. **Append a Sizing Report appendix to TDD.md (MUST).** Add this as the last
     section, cross-referencing the full SIZING.md:
 
     ```markdown
@@ -442,7 +474,7 @@ If extending or superseding, reference the existing ADR by path.}
     ```
     
     Full breakdown stays in SIZING.md to avoid duplication.
-13. **Report** — summarise what was produced, what patterns were chosen, what open questions remain, which misuse cases drove which Armor primitives, and the Sizing Report headlines.
+14. **Report** — summarise what was produced, what patterns were chosen, what open questions remain, which misuse cases drove which Armor primitives, the Sizing Report headlines, **and the list of ServiceSpec manifests written (one per service introduced/modified)**.
 
 After the blueprint is accepted, the user typically runs `/sulis:plan-work`
 next.
