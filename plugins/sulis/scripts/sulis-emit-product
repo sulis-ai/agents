@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""sulis-emit-product — emit Product entity from `.sulis/products/{slug}.yaml`.
+
+Resolves the `belongs_to_tenant` ref from a sibling `.sulis/tenant.yaml`
+unless explicitly set in the product yaml. See `_product_emission.py`.
+
+Usage:
+    sulis-emit-product --from-yaml <path> [--base-dir <dir>] [--domain <domain>] [--repo-root <dir>]
+
+Defaults: domain=product-development, base-dir=<repo-root>/.brain/instances.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+from _entity_adapter_local import LocalFileEntityAdapter  # noqa: E402
+from _entity_repository import EntityValidationError  # noqa: E402
+from _product_emission import emit_product_from_yaml  # noqa: E402
+
+
+def _resolve_repo_root(explicit: str | None) -> Path:
+    if explicit:
+        return Path(explicit).resolve()
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, check=True, timeout=10,
+        )
+        return Path(out.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        return Path.cwd()
+
+
+def _ok(data: dict) -> int:
+    print(json.dumps({"ok": True, "data": data}, indent=2))
+    return 0
+
+
+def _err(message: str) -> int:
+    print(json.dumps({"ok": False, "error": message}, indent=2))
+    return 1
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Emit a Product entity from .sulis/products/{slug}.yaml.")
+    parser.add_argument("--from-yaml", required=True, help="path to product yaml")
+    parser.add_argument("--base-dir")
+    parser.add_argument("--domain", default="product-development")
+    parser.add_argument("--repo-root")
+    args = parser.parse_args()
+
+    yaml_path = Path(args.from_yaml).resolve()
+    if not yaml_path.exists():
+        return _err(f"product yaml not found: {yaml_path}")
+    repo_root = _resolve_repo_root(args.repo_root)
+    base_dir = Path(args.base_dir).resolve() if args.base_dir else repo_root / ".brain" / "instances"
+
+    adapter = LocalFileEntityAdapter(base_dir=base_dir, domain=args.domain)
+    try:
+        products = emit_product_from_yaml(yaml_path, adapter)
+    except EntityValidationError as exc:
+        return _err(str(exc))
+    except FileNotFoundError as exc:
+        return _err(str(exc))
+
+    entries = [
+        {"id": p["id"], "path": str(base_dir / args.domain / "product" / f"{p['id'].rsplit(':', 1)[-1]}.jsonld")}
+        for p in products
+    ]
+    return _ok({"from_yaml": str(yaml_path), "count": len(entries), "entities": entries})
+
+
+if __name__ == "__main__":
+    sys.exit(main())
