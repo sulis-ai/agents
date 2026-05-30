@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/dna/schema/requirement/1.0.0",
+  "title": "Requirement",
+  "description": "a stated need the solution must satisfy",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": [
+    "id",
+    "statement",
+    "priority",
+    "source",
+    "verification_method",
+    "state",
+    "sys_status"
+  ],
+  "properties": {
+    "sys_status": {
+      "enum": [
+        "active",
+        "archived",
+        "deleted",
+        "purged"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^dna:requirement:[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "statement": {
+      "type": "string",
+      "description": "shall-statement"
+    },
+    "rationale": {
+      "type": "string"
+    },
+    "priority": {
+      "enum": [
+        "must",
+        "should",
+        "could",
+        "wont"
+      ]
+    },
+    "source": {
+      "type": "string",
+      "pattern": "^dna:(opportunity|actor):[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "verification_method": {
+      "enum": [
+        "test",
+        "inspection",
+        "analysis",
+        "demonstration"
+      ]
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "state": {
+      "enum": [
+        "draft",
+        "approved",
+        "implemented",
+        "verified"
+      ]
+    }
+  },
+  "x-schema-org-extends": "custom"
+}
