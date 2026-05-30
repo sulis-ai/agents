@@ -25,13 +25,14 @@ jobs:
           python-version: '3.11'
 
       - name: Install test deps
-        # `jsonschema` added 2026-05-30: required by _entity_adapter_local.py
-        # to validate Brain entity instances against the vendored compiled
-        # schemas (Track 1 stretch — EntityRepository port +
-        # LocalFileEntityAdapter). Stdlib + pytest remain the default;
-        # jsonschema is the only runtime external dep introduced by the
-        # Brain↔OS substrate layer.
-        run: pip install pytest jsonschema
+        # External runtime deps introduced by the Brain↔OS substrate layer:
+        #   jsonschema (2026-05-30, CH-01KSWB) — entity-instance validation
+        #     against vendored compiled JSON Schemas.
+        #   pyyaml     (2026-05-30, CH-01KSWM) — ServiceSpec manifest parsing
+        #     in _servicespec_validator.py (Slice 2 / P7 rubric phase).
+        # The wpx-* tooling itself remains stdlib-only per the plugin contract.
+        # See #112 for the longer-term requirements-file fix.
+        run: pip install pytest jsonschema pyyaml
 
       - name: Configure git identity
         run: |
