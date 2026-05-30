@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""sulis-emit-testrun — emit a TestRun event entity (PD).
+
+CLI-direct. Typical caller: a CI step at the moment of a test-run start.
+
+Usage:
+    sulis-emit-testrun [--ran-at <iso>] [--in-run dna:component:<ulid>] [--harness pytest|vitest|...]
+                       [--base-dir <dir>] [--domain <domain>] [--repo-root <dir>]
+
+Defaults:
+    --ran-at   current UTC ISO timestamp
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+from _entity_adapter_local import LocalFileEntityAdapter  # noqa: E402
+from _entity_repository import EntityValidationError  # noqa: E402
+from _testrun_emission import emit_testrun  # noqa: E402
+
+
+def _resolve_repo_root(explicit: str | None) -> Path:
+    if explicit:
+        return Path(explicit).resolve()
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, check=True, timeout=10,
+        )
+        return Path(out.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        return Path.cwd()
+
+
+def _ok(data: dict) -> int:
+    print(json.dumps({"ok": True, "data": data}, indent=2))
+    return 0
+
+
+def _err(message: str) -> int:
+    print(json.dumps({"ok": False, "error": message}, indent=2))
+    return 1
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Emit a TestRun event entity (PD).")
+    parser.add_argument("--ran-at", default=None)
+    parser.add_argument("--in-run", default="", help="optional dna:component:<ulid> for the SUT")
+    parser.add_argument("--harness", default="")
+    parser.add_argument("--base-dir")
+    parser.add_argument("--domain", default="product-development")
+    parser.add_argument("--repo-root")
+    args = parser.parse_args()
+
+    repo_root = _resolve_repo_root(args.repo_root)
+    base_dir = (
+        Path(args.base_dir).resolve()
+        if args.base_dir
+        else repo_root / ".brain" / "instances"
+    )
+    adapter = LocalFileEntityAdapter(base_dir=base_dir, domain=args.domain)
+
+    try:
+        run = emit_testrun(repo=adapter, ran_at=args.ran_at, in_run=args.in_run, harness=args.harness)
+    except ValueError as exc:
+        return _err(str(exc))
+    except EntityValidationError as exc:
+        return _err(str(exc))
+
+    ulid = run["id"].rsplit(":", 1)[-1]
+    path = base_dir / args.domain / "testrun" / f"{ulid}.jsonld"
+    return _ok({"count": 1, "entities": [{"id": run["id"], "path": str(path)}]})
+
+
+if __name__ == "__main__":
+    sys.exit(main())
