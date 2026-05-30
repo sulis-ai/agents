@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+"""sulis-validate-servicespec — run the Lovable Test against a ServiceSpec
+manifest (Decompose Validation Rubric Phase 7).
+
+Pairs with the Slice 1 design-stage methodology gate. `/sulis:plan-work`'s
+rubric phase calls this once per emitted manifest under
+`.architecture/{project}/service-specs/`.
+
+Usage:
+    sulis-validate-servicespec --from-manifest <path>
+                               [--schemas-dir <dir>]
+                               [--domain <domain>]
+
+Output (JSON envelope, marketplace convention):
+
+    {"ok": true,  "data": {manifest, verdict, issues[], summary}}     # PASS / PASS-WITH-RATIONALE
+    {"ok": false, "data": {manifest, verdict, issues[], summary}}     # FAIL (≥1 MUST issue)
+    {"ok": false, "error": "<reason>"}                                # CLI / IO failure
+
+Exit code: 0 on PASS / PASS-WITH-RATIONALE; 1 on FAIL or CLI error.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from dataclasses import asdict
+from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+from _servicespec_validator import (  # noqa: E402
+    compute_verdict,
+    validate_servicespec_file,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Validate a ServiceSpec manifest against the Lovable Test "
+            "(Decompose Validation Rubric Phase 7)."
+        ),
+    )
+    parser.add_argument(
+        "--from-manifest", required=True,
+        help="path to the ServiceSpec manifest YAML",
+    )
+    parser.add_argument(
+        "--schemas-dir",
+        help=(
+            "compiled-schemas directory used to resolve entity refs "
+            "(default: plugins/sulis/brain/compiled)"
+        ),
+    )
+    parser.add_argument(
+        "--domain", default="product-development",
+        help="entity-schema domain (default: product-development)",
+    )
+    args = parser.parse_args()
+
+    manifest_path = Path(args.from_manifest).resolve()
+    if not manifest_path.exists():
+        print(json.dumps(
+            {"ok": False, "error": f"manifest not found: {manifest_path}"},
+            indent=2,
+        ))
+        return 1
+
+    schemas_dir = Path(args.schemas_dir).resolve() if args.schemas_dir else None
+
+    issues = validate_servicespec_file(
+        manifest_path,
+        schemas_dir=schemas_dir,
+        domain=args.domain,
+    )
+    verdict = compute_verdict(issues)
+
+    summary = {
+        "total": len(issues),
+        "must_failures": sum(1 for i in issues if i.severity == "MUST"),
+        "should_failures": sum(1 for i in issues if i.severity == "SHOULD"),
+        "may_failures": sum(1 for i in issues if i.severity == "MAY"),
+    }
+
+    print(json.dumps({
+        "ok": verdict != "FAIL",
+        "data": {
+            "manifest": str(manifest_path),
+            "verdict": verdict,
+            "issues": [asdict(i) for i in issues],
+            "summary": summary,
+        },
+    }, indent=2))
+
+    return 0 if verdict != "FAIL" else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
