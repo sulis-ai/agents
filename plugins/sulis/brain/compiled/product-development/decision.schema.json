@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/dna/schema/decision/1.0.0",
+  "title": "Decision (ADR)",
+  "description": "a recorded, non-trivial choice with alternatives + consequences",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": [
+    "id",
+    "title",
+    "state",
+    "decision",
+    "options_considered",
+    "sys_status"
+  ],
+  "properties": {
+    "sys_status": {
+      "enum": [
+        "active",
+        "archived",
+        "deleted",
+        "purged"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^dna:decision:[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "title": {
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "proposed",
+        "accepted",
+        "superseded"
+      ]
+    },
+    "context": {
+      "type": "string"
+    },
+    "decision": {
+      "type": "string"
+    },
+    "options_considered": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "consequences": {
+      "type": "string"
+    },
+    "supersedes": {
+      "type": "string",
+      "pattern": "^dna:(decision):[0-9A-HJKMNP-TV-Z]{26}$"
+    }
+  },
+  "x-schema-org-extends": "schema:Action"
+}

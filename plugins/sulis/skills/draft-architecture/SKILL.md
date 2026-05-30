@@ -84,7 +84,17 @@ path but not the adversarial path SRD already specified.
 └── adrs/
     ├── ADR-001-{slug}.md
     └── ...
+
+.brain/instances/product-development/
+└── decision/
+    └── {ulid}.jsonld          # one per ADR — emitted in step 9
 ```
+
+Every ADR has a paired structured **Decision** entity under
+`.brain/instances/`. The `.md` is the human view; the `.jsonld` is the
+machine-readable spine — what tooling, cross-references, and the
+golden-thread query layer read. Pairing is one CLI call per ADR (see
+step 9).
 
 ### `ARCH.yaml`
 
@@ -399,6 +409,14 @@ If extending or superseding, reference the existing ADR by path.}
 
 8. **Draft TDD** — write `TDD.md` following the template. Use GLOSSARY.md's preferred terms exactly. Apply Respect-Don't-Restate throughout.
 9. **Extract ADRs** — for each non-trivial decision in the TDD, factor it out into an ADR file. The TDD references the ADR by ID. **Before writing each ADR**, check the External ADR Registry — if an existing ADR covers the same decision, reference it instead. New ADR numbering starts at one past the registry's highest. Do not write ADRs to fill a quota.
+
+    **After writing each ADR file (MUST)**, emit the paired Decision entity through the Brain↔OS port:
+
+    ```
+    plugins/sulis/scripts/sulis-emit-decision --from-adr <path-to-adr>
+    ```
+
+    This persists a validated structured Decision instance under `.brain/instances/product-development/decision/{ulid}.jsonld` — the machine-readable spine of which the `.md` is the human view. The emitter parses `## Context` / `## Decision` / `## Options Considered` (with `## Alternatives Considered` synonym) / `## Consequences` from the body, plus `title` + `status` from frontmatter (translated to entity `state`). The Decision's `@id` reuses the change's `change_id` when present in frontmatter (giving natural traceability from a Change to the Decisions it produced); fresh ULID otherwise. **Validation is real**: a malformed ADR is rejected at write (no partial persistence). Skipping this step leaves the Brain↔OS graph incomplete for downstream tooling — the cockpit's golden-thread view, lineage queries, and the Storage Service substrate (Track 2) all read instances, not the `.md`.
 10. **Sizing self-check (MUST).** Before writing, review your draft against the tier targets:
     - Total TDD length > 1.5× tier target? → write a "Why is this big?" paragraph or refactor
     - Any section restates content from an authoritative source? → refactor to a reference
