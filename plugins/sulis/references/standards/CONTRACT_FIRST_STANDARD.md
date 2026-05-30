@@ -206,6 +206,23 @@ an unflagged auth requirement — *before* anything is built on the contract.
 elsewhere. The schema layer (CF-02) + three-category errors (CF-03) remain the
 floor; CF-10 is the founder-facing + operational layer on top.
 
+**Concrete deliverable (added 2026-05-30):** the design stage
+(`/sulis:draft-architecture`) MUST produce a **ServiceSpec manifest** at
+`.architecture/{project}/service-specs/{service-name}.servicespec.yaml`
+for every service the design introduces or modifies. The manifest is the
+machine-readable contract — operations, errors, entities, bindings,
+permissions — that the platform's **service-registration apply pipeline
+(SPEC-006)** reads to register the service. Format follows SPEC-006; the
+fields above (auth / audience / user-guide / error fixes) live in that
+manifest, not in separate prose. Entities are referenced by id from the
+marketplace's vendored compiled schemas (`plugins/sulis/brain/compiled/`),
+not re-declared. The **Lovable Test** is the completeness bar — an AI
+agent must be able to build a working integration against the manifest
+with no human docs. Slice 2 (decompose-validation rubric P7) will
+mechanically enforce the bar; hold it by hand until then. This is the
+third design-stage structured deliverable alongside the visual contract
+(#45) and the data contract (#48).
+
 ---
 
 ## Tiers (scope the rigor to the case)
