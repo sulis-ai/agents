@@ -23,16 +23,18 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install pytest + jsonschema
-        # pytest is the test runner; jsonschema is the runtime dep introduced
-        # by the Brain↔OS substrate layer (`_entity_adapter_local.py` —
-        # CH-01KSWB, 2026-05-30). The wpx-* tools themselves remain stdlib-
-        # only per the plugin contract; jsonschema is scoped to the
-        # entity-validation seam.
+      - name: Install pytest + Brain↔OS deps
+        # External runtime deps introduced by the Brain↔OS substrate layer:
+        #   jsonschema (2026-05-30, CH-01KSWB) — entity-instance validation
+        #     against vendored compiled JSON Schemas.
+        #   pyyaml     (2026-05-30, CH-01KSWM) — ServiceSpec manifest parsing
+        #     in _servicespec_validator.py (Slice 2 / P7 rubric phase).
+        # The wpx-* tools themselves remain stdlib-only per the plugin
+        # contract; these deps are scoped to the Brain↔OS seam.
         # (Scripts + tests + _wpxlib moved from plugins/sulis-execution/
         # to plugins/sulis/ in v0.30.0 consolidation; workflow paths
-        # updated to match.)
-        run: pip install pytest jsonschema
+        # updated to match.) See #112 for the longer-term requirements-file fix.
+        run: pip install pytest jsonschema pyyaml
 
       - name: Configure git identity
         # The integration testbed performs real git operations; runners
