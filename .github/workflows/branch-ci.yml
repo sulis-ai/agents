@@ -25,7 +25,13 @@ jobs:
           python-version: '3.11'
 
       - name: Install test deps
-        run: pip install pytest
+        # `jsonschema` added 2026-05-30: required by _entity_adapter_local.py
+        # to validate Brain entity instances against the vendored compiled
+        # schemas (Track 1 stretch — EntityRepository port +
+        # LocalFileEntityAdapter). Stdlib + pytest remain the default;
+        # jsonschema is the only runtime external dep introduced by the
+        # Brain↔OS substrate layer.
+        run: pip install pytest jsonschema
 
       - name: Configure git identity
         run: |
