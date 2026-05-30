@@ -1,0 +1,13 @@
+change_id: 01KSWQA76BJJJ87T9A6KJ4WSK9
+primitive: create
+tier: minor
+touches_plugin: true
+summary: |
+  Second worked entity emission (n=2 after CH-01KSWB). Emits Requirement
+  entities from each FR-NN/NFR-NN block in an SRD via sulis-emit-requirements.
+  Deterministic ULIDs; synthetic Opportunity source placeholder (replaceable
+  when Opportunity emission lands). Vendored requirement.schema.json. With
+  n=2 the entity-emitter skill (.claude/skills/) is now buildable from
+  observed pattern diversity: one-vs-many entities per call, frontmatter-vs-
+  body extraction, cross-entity refs with placeholder. 952 tests passing.
+created_at: 2026-05-30T15:24:35Z
