@@ -515,6 +515,20 @@ def cmd_start(args: argparse.Namespace) -> None:
     # with a logged warning; it never unwinds the local branch + worktree.
     pushed_to_origin = _push_change_branch_to_origin(repo_root, branch)
 
+    # Brain emission — record this change-start as a LifecycleRun event in
+    # the brain graph. Best-effort: failure (missing schemas / no .brain dir
+    # / jsonschema absent) is silently absorbed by _brain_emit_helper. The
+    # change-start operation has already succeeded by this point; emission
+    # is a side-effect and never blocks.
+    try:
+        from _brain_emit_helper import emit_change_started_event
+        emit_change_started_event(
+            repo_root, change_id=change_id, handle=handle,
+            slug=slug, primitive=primitive,
+        )
+    except Exception:
+        pass  # belt-and-braces — helper already swallows; this guards an import failure
+
     _log(f"Change started: {branch} ({handle}) at {worktree_dest}")
     emit_ok(data={
         "change_id": change_id,
@@ -1524,6 +1538,19 @@ def cmd_mark_shipped(args: argparse.Namespace) -> None:
     archived = _archive_after_ship(repo_root, str(change_id), branch,
                                    worktree_dest, remove_worktree=True)
     record = read_change_record(str(change_id)) or {}
+
+    # Brain emission — LifecycleRun for the ship event. Best-effort
+    # (see cmd_start for the same pattern + rationale).
+    try:
+        from _brain_emit_helper import emit_change_shipped_event
+        emit_change_shipped_event(
+            repo_root, change_id=str(change_id), handle=str(record.get("handle") or ""),
+            slug=slug, primitive=primitive,
+            shipped_sha=str(record.get("shipped_sha") or ""),
+        )
+    except Exception:
+        pass
+
     emit_ok(data={
         "change_id": change_id,
         "stage": "shipped",
