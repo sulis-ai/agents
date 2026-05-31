@@ -248,3 +248,51 @@ jobs:
           git push origin main
           git push origin "v${NEW_META}"
           echo "released sulis v${NEW_PLUGIN} (v${NEW_META}); tag v${NEW_META} pushed"
+
+      # Brain emission — Release entity for this tag-cut. Best-effort: a
+      # missing brain dir / unavailable jsonschema MUST NOT unwind the
+      # already-published release. The comprises[] list is empty for now
+      # (no Component graph populated yet); the helper short-circuits to
+      # None when comprises[] is empty (Release.comprises minItems=1).
+      # Once Component-emission wires into wpx-train, the comprises list
+      # will be populated from the brain's set of Components touched in
+      # this release window.
+      - name: Emit Release entity (best-effort)
+        if: steps.detect.outputs.skip != 'true'
+        continue-on-error: true
+        env:
+          NEW_META: ${{ steps.compute.outputs.new_meta }}
+        run: |
+          set -euo pipefail
+          # Only emit if uv + the brain machinery are available. A failure
+          # here is logged but never fails the workflow.
+          if [ -d plugins/sulis/scripts ] && [ -f plugins/sulis/scripts/sulis-emit-release ]; then
+            cd plugins/sulis/scripts
+            # Collect any Component entities already in the brain to populate
+            # comprises[]. If there are none yet, the helper skips cleanly
+            # (Release.comprises has minItems=1 per the schema).
+            COMPS=$(uv run python sulis-brain-query --list component --repo-root ../../.. 2>/dev/null \
+                    | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    ids = [e['id'] for e in d.get('data', {}).get('entities', [])]
+    print(' '.join(f'--comprises {x}' for x in ids))
+except Exception:
+    print('')
+" || true)
+            if [ -n "$COMPS" ]; then
+              uv run python sulis-emit-release \
+                --version "v${NEW_META}" \
+                $COMPS \
+                --sbom "urn:sbom:none-yet" \
+                --changelog "v${NEW_META} release-on-merge" \
+                --shipped-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+                --repo-root ../../.. \
+              || echo "[brain-emit] Release emission failed (non-fatal)"
+            else
+              echo "[brain-emit] no Component entities in brain yet; skipping Release emission"
+            fi
+          else
+            echo "[brain-emit] scripts dir not present; skipping"
+          fi
