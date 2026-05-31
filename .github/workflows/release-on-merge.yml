@@ -271,16 +271,16 @@ jobs:
             # Collect any Component entities already in the brain to populate
             # comprises[]. If there are none yet, the helper skips cleanly
             # (Release.comprises has minItems=1 per the schema).
+            # NOTE: the python -c expression MUST stay on one logical line
+            # (joined by `;`). YAML's `run: |` literal-block ends at the
+            # first line that drops below its indentation level — a
+            # column-0 line inside an embedded heredoc/quoted-string broke
+            # the entire workflow parse on 2026-05-31 (PR #130's robot
+            # crash; this fix). Lesson: every line inside `run: |` must
+            # stay at-or-beyond the block's indent.
             COMPS=$(uv run python sulis-brain-query --list component --repo-root ../../.. 2>/dev/null \
-                    | python3 -c "
-import sys, json
-try:
-    d = json.load(sys.stdin)
-    ids = [e['id'] for e in d.get('data', {}).get('entities', [])]
-    print(' '.join(f'--comprises {x}' for x in ids))
-except Exception:
-    print('')
-" || true)
+                    | python3 -c "import sys, json; d = json.load(sys.stdin); ids = [e['id'] for e in d.get('data', {}).get('entities', [])]; print(' '.join(f'--comprises {x}' for x in ids))" \
+                    2>/dev/null || true)
             if [ -n "$COMPS" ]; then
               uv run python sulis-emit-release \
                 --version "v${NEW_META}" \
