@@ -476,6 +476,39 @@ If extending or superseding, reference the existing ADR by path.}
     Full breakdown stays in SIZING.md to avoid duplication.
 14. **Report** — summarise what was produced, what patterns were chosen, what open questions remain, which misuse cases drove which Armor primitives, the Sizing Report headlines, **and the list of ServiceSpec manifests written (one per service introduced/modified)**.
 
+15. **Emit Design + Decision entities to the brain (MUST).** After the
+    TDD + ADRs are written to disk, populate the brain graph so downstream
+    tools (`run-all`, the DoD verifier, the dashboard, cross-change design
+    queries) can see what was decided. The TDD's `satisfies` array auto-
+    resolves to the Requirement entities `specify` emitted (same
+    deterministic ULID seed `req:{srd_path}:{fr_id}`); each ADR becomes
+    one Decision entity.
+    
+    Resolve `$SCRIPTS_DIR` once at the start of the skill (the same
+    resolver pattern other skills use; see `../change/SKILL.md`), then:
+    
+    ```bash
+    # Design entity from TDD (cross-references Requirements + Decisions)
+    "$SCRIPTS_DIR/sulis-emit-design" \
+      --from-tdd ".architecture/{project}/TDD.md" \
+      --repo-root "$(git rev-parse --show-toplevel)" \
+      --state draft
+    
+    # One Decision per ADR file
+    for adr in .architecture/{project}/adrs/ADR-*.md; do
+      "$SCRIPTS_DIR/sulis-emit-decision" \
+        --from-adr "$adr" \
+        --repo-root "$(git rev-parse --show-toplevel)"
+    done
+    ```
+    
+    Best-effort: each call emits `{"ok": false, "error": ...}` on failure
+    (brain unavailable, schemas missing, validation reject — e.g. an ADR
+    with no `## Decision` section). The TDD + ADR files have already
+    persisted on disk; brain emission is a side-effect and never blocks
+    the blueprint step from completing. Don't narrate the emissions to
+    the founder (FE-09) — the brain simply stays current.
+
 After the blueprint is accepted, the user typically runs `/sulis:plan-work`
 next.
 
