@@ -26,18 +26,22 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
-    # Loop-guard: skip the bot's own release commits (prefix matches the commit
-    # message assembled in the "Commit, tag, push" step below, exactly).
-    # The whole value is a single-quoted YAML scalar because the `: ` inside the
-    # string literal would otherwise be read by YAML as a nested mapping. The
-    # expression's own string literal is SINGLE-quoted too — GitHub Actions
-    # expressions accept single-quoted literals only (a double-quoted literal is
-    # rejected at expression evaluation while still passing YAML lint). Inside a
-    # single-quoted YAML scalar each inner `'` is doubled, so ''release: sulis''
-    # renders as the expression literal 'release: sulis'. The prefix
-    # 'release: sulis' matches the commit message in the final "Commit, tag,
-    # push" step exactly — keep the two in lockstep.
-    if: '${{ !startsWith(github.event.head_commit.message, ''release: sulis'') }}'
+    # Loop-guard: skip the bot's OWN release commits, but NOT founder-merged
+    # release-train PRs.
+    #
+    # The previous guard pattern-matched on the commit message prefix
+    # ('release: sulis'), but that matched BOTH:
+    #   - the bot's auto-commit:  'release: sulis v0.86.0 (v1.131.0)'
+    #   - the founder release-PR: 'release: sulis v0.86.0 (minor) (#132)'
+    # because the release-train skill instructs the PR title to start with
+    # 'release: sulis ...'. PR #132 was silently SKIPPED on 2026-05-31 for
+    # exactly this reason — no v0.86.0 release was cut.
+    #
+    # The correct distinguisher is the AUTHOR, not the message. The bot
+    # commits as github-actions[bot]; founder-merged PRs commit as the
+    # founder (or as a co-author of a regular GitHub user). Matching on
+    # author makes the guard precise.
+    if: github.event.head_commit.author.username != 'github-actions[bot]' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
