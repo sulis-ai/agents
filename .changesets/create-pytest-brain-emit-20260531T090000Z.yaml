@@ -1,0 +1,22 @@
+change_id: 01KSYFXMNKSJT13XRXJ29QQ3NY
+primitive: create
+tier: minor
+touches_plugin: true
+summary: |
+  Phase B of the verification-DoD wiring: a pytest plugin that emits
+  TestRun + TestResult entities to the brain on every pytest invocation,
+  driven by `@pytest.mark.verifies("FR-NN")` markers on tests.
+
+  Load-bearing contract: the marker's FR-NN string resolves to
+  `dna:requirement:<ulid>` using the SAME deterministic seed
+  Requirement-emission uses, so the verification graph self-connects
+  without any cross-emitter coordination. Pinned by the
+  TestRequirementIdCoordination test.
+
+  Determinism: outcome doesn't bind TestResult ID — a re-run with
+  flipped pass/fail updates the same record. Self-correcting
+  test-of-record.
+
+  Failure-soft: brain failures never fail pytest. 14 plugin tests
+  (pytester-based); 1290 passing total.
+created_at: 2026-05-31T09:00:00Z
