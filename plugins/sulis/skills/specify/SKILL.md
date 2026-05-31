@@ -447,6 +447,33 @@ Branch-independent, best-effort; it never blocks the stage from completing.
 If `SULIS_CHANGE_ID` is unset (work outside a change), skip it. Don't narrate
 this to the founder; the dashboard simply stays current (FE-09).
 
+## Emit the spec into the brain graph (on completion — MUST)
+
+Deep mode produces an `.specifications/{name}/SRD.md` with FR-NN / NFR-NN
+blocks. Each block is a Requirement entity in the brain ontology — and the
+brain's downstream tools (DoD verification, cross-change requirement
+coverage, the dashboard) depend on those entities existing.
+
+When deep mode has finished and the SRD has been written, emit the
+Requirement entities to the brain:
+
+```bash
+"$SCRIPTS_DIR/sulis-emit-requirements" \
+  --from-srd ".specifications/{name}/SRD.md" \
+  --repo-root "$(git rev-parse --show-toplevel)"
+```
+
+Best-effort: if the brain machinery isn't available (downstream consumer,
+schemas not vendored), the emitter returns `{"ok": false, "error": ...}`
+and you proceed. The host SRD write has already succeeded; emission is a
+side-effect and never blocks the stage from completing. Don't narrate the
+emission to the founder (FE-09) — the brain simply stays current.
+
+For **lite** and **standard** modes (which write a short SPEC.md, not a
+full SRD with FR/NFR blocks), skip the emission — there are no
+Requirement entities to extract. The SPEC.md is the founder-facing
+shorthand; the brain only gets the structured FR/NFR form.
+
 ## See also
 
 - `../../scripts/_specify_classifier.py` — the depth classifier
