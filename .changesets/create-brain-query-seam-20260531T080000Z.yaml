@@ -1,0 +1,18 @@
+change_id: 01KSYE88R3JHKPGV9MNP10YFZN
+primitive: create
+tier: minor
+touches_plugin: true
+summary: |
+  Phase A of wiring the entity-graph DoD: the brain-query read seam.
+  Library `_brain_query.py` + CLI `sulis-brain-query` provide typed
+  queries over `.brain/instances/`, parallel to the existing sulis-emit-*
+  write seam.
+
+  Composable predicates (where_field_equals, where_list_field_contains,
+  where_id_in) plus high-level queries the DoD-flow needs:
+  find_testresults_verifying / find_passing_testresults_verifying /
+  find_requirements. The load-bearing one is
+  find_passing_testresults_verifying — "this Requirement has no passing
+  test" is the verdict the gate uses to block ship. 15 new tests;
+  1249 passing total.
+created_at: 2026-05-31T08:00:00Z
