@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+"""sulis-verify-requirements — the DoD gate.
+
+Reads an SRD, queries the brain at `<repo-root>/.brain/instances/` (or
+`--base-dir`) for passing TestResults verifying each FR/NFR, and reports
+a structured PASS / PARTIAL / FAIL verdict.
+
+This is the gate `change ship` (Phase D) will call to refuse a merge
+when Requirements are unverified.
+
+Usage:
+    sulis-verify-requirements --srd .specifications/demo/SRD.md
+    sulis-verify-requirements --srd ... --base-dir /custom/path
+    sulis-verify-requirements --srd ... --strict     # PARTIAL → exit 1
+
+Output: `{"ok": true, "data": {...}}` always (the verdict is in
+`data.verdict`). Exit code:
+    0 — verdict=pass
+    1 — verdict=partial (some coverage, not full)
+    2 — verdict=fail (zero passing verifiers)
+    3 — gate itself broke (missing SRD, schema parse error)
+
+`--strict` collapses 1 to 2: a CI gate that demands FULL coverage
+treats PARTIAL as a failure.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+from _verify_requirements import verify_requirements  # noqa: E402
+
+
+def _resolve_repo_root(explicit: str | None) -> Path:
+    if explicit:
+        return Path(explicit).resolve()
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, check=True, timeout=10,
+        )
+        return Path(out.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        return Path.cwd()
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="DoD gate: are SRD Requirements verified by passing TestResults?",
+    )
+    parser.add_argument("--srd", required=True, help="Path to SRD.md")
+    parser.add_argument("--base-dir",
+                        help="brain instances dir (default: <repo-root>/.brain/instances)")
+    parser.add_argument("--domain", default="product-development")
+    parser.add_argument("--repo-root", help="repo root (default: git toplevel)")
+    parser.add_argument(
+        "--strict", action="store_true",
+        help="Treat PARTIAL as failure (exit 2); CI gate demanding full coverage",
+    )
+    args = parser.parse_args()
+
+    srd_path = Path(args.srd).resolve()
+    if not srd_path.exists():
+        print(json.dumps({"ok": False, "error": f"SRD not found: {srd_path}"}, indent=2))
+        return 3
+
+    repo_root = _resolve_repo_root(args.repo_root)
+    base_dir = (
+        Path(args.base_dir).resolve()
+        if args.base_dir
+        else repo_root / ".brain" / "instances"
+    )
+
+    try:
+        result = verify_requirements(srd_path, base_dir=base_dir, domain=args.domain)
+    except FileNotFoundError as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}, indent=2))
+        return 3
+    except Exception as exc:
+        print(json.dumps({"ok": False, "error": f"gate failed: {exc}"}, indent=2))
+        return 3
+
+    data = result.as_dict()
+    data["strict"] = args.strict
+    print(json.dumps({"ok": True, "data": data}, indent=2))
+
+    if result.verdict == "pass":
+        return 0
+    if result.verdict == "partial":
+        return 2 if args.strict else 1
+    return 2  # fail
+
+
+if __name__ == "__main__":
+    sys.exit(main())
