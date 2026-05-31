@@ -506,6 +506,78 @@ does NOT bump any version** — the version is computed and applied once, for th
 whole batch, when `dev` is released to production. Read the `wrote` field of the
 JSON to know what to say in the ship report (step 7).
 
+**4.8. DoD verification gate — run `sulis-verify-requirements` (MUST when
+an SRD is touched).** The change's tests claim what they verify via
+`@pytest.mark.verifies("FR-NN")` markers; the pytest brain-emit plugin
+turns those claims into TestResult entities in `.brain/instances/`; this
+gate asks the brain whether every Requirement the change touched has at
+least one passing TestResult verifying it. If yes → ship. If not → the
+founder owns the call.
+
+Detect: does this change touch any SRD?
+
+```bash
+git fetch origin dev -q
+SRDS_TOUCHED=$(git diff --name-only origin/dev...HEAD \
+  | grep -E '^\.specifications/.+/SRD\.md$' || true)
+```
+
+If `SRDS_TOUCHED` is empty → skip the gate silently (lite/standard
+specs and trivial changes don't carry FR-NN blocks; there's nothing
+to verify against). If any SRDs are touched, run the gate against
+EACH and aggregate:
+
+```bash
+WORST=pass
+for srd in $SRDS_TOUCHED; do
+  rc=0
+  OUT=$("$SCRIPTS_DIR/sulis-verify-requirements" --srd "$srd") || rc=$?
+  case $rc in
+    0) ;;  # this SRD passes — keep aggregating
+    1) [ "$WORST" = "pass" ] && WORST=partial ;;
+    2) WORST=fail ;;
+    3) WORST=error ;;  # gate broke — advisory only
+  esac
+  echo "$OUT"  # surface the per-SRD verdict for the report
+done
+```
+
+Verdict policy:
+
+- **WORST=pass** → log it ("DoD gate: every Requirement verified by a
+  passing test.") and continue to step 5.
+- **WORST=partial** → some Requirements have NO passing verifier. The
+  founder owns the call (mirrors the review-gate CONCERN pattern):
+
+  > *"DoD gate: {N} of {M} Requirements aren't yet verified by a
+  > passing test: {fr_ids + titles, plain English, no IDs}. None of
+  > this is broken — these Requirements just don't have a test claim
+  > yet. Proceed with the merge anyway? (yes / no)"*
+
+- **WORST=fail** → STOP. Zero Requirements have a passing verifier,
+  which means either no tests claim them OR every claim is currently
+  failing. Don't merge:
+
+  > *"DoD gate: no Requirements have a passing test verifying them.
+  > That usually means tests aren't tagged with `@pytest.mark.verifies`
+  > yet, or the tests that DO claim Requirements are failing. I
+  > haven't merged. Either add `@verifies` to the tests that prove
+  > the Requirements, or run `sulis-verify-requirements --srd <path>`
+  > locally to see which ones are uncovered. Then
+  > `/sulis:change ship CH-XXXXXX` again."*
+
+- **WORST=error** → log the gate failure but PROCEED with the merge
+  (don't break ship on tooling issues; the gate is advisory when it
+  itself can't run):
+
+  > *"DoD gate couldn't run — proceeding without it. (Tooling issue,
+  > not a coverage issue. See `{error}` for detail.)"*
+
+The gate is best-effort in the same way the review gate's CONCERN is:
+the founder always owns the proceed-anyway decision. Block-by-default
+applies only to verdict=fail (zero coverage), which is genuinely
+broken state.
+
 **5. Squash-merge** (only after green + confirmation):
 
 ```bash
