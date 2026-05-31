@@ -1,0 +1,43 @@
+[project]
+# Internal-only project: not published, not distributable. This file exists so
+# `uv` can manage the marketplace's test + Brain↔OS runtime dependencies from
+# a single source of truth (PEP 621). Every CI workflow installs the same set;
+# every local dev runs the same set.
+#
+# Replaces the prior pattern of `pip install pytest ...` inline in workflow
+# files, which silently degraded into the "missed dep in CI" failure class
+# twice (CH-01KSWB jsonschema, CH-01KSWM pyyaml — captured as #112).
+name = "sulis-marketplace-scripts"
+version = "0.0.0"
+description = "Marketplace scripts + test deps for the Brain↔OS substrate layer (internal)."
+requires-python = ">=3.11"
+
+# Runtime dependencies — what `_entity_adapter_local.py`,
+# `_servicespec_validator.py`, and friends import at runtime.
+#
+# The wpx-* CLI tooling itself remains stdlib-only per the plugin contract;
+# these deps are scoped to the Brain↔OS seam (entity persistence +
+# ServiceSpec compliance) introduced in CH-01KSWB / CH-01KSWM. New runtime
+# deps go here, declared ONCE — both CI workflows then install them via
+# `uv sync --frozen`, so there is no longer a "sweep every workflow"
+# discipline to forget.
+dependencies = [
+    "jsonschema>=4.20",
+    "pyyaml>=6.0",
+]
+
+
+[dependency-groups]
+# Dev-only — test runner. Separated from runtime so a future packaged
+# distribution (if we ever ship the scripts as a Python package) doesn't
+# carry pytest as a runtime requirement.
+dev = [
+    "pytest>=7.4",
+]
+
+
+[tool.uv]
+# Not a distributable package — we never `uv build` this. UV's `package =
+# false` mode means it manages the venv + lockfile without ever trying to
+# build a wheel.
+package = false

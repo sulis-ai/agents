@@ -1,0 +1,27 @@
+change_id: 01KSYGB0C8P1Q2CX72D4X3405E
+primitive: create
+tier: minor
+touches_plugin: true
+summary: |
+  Phase B.5 of the verification-DoD wiring: a production-like e2e
+  harness (`sulis-verify-environment`) that stands up a clean
+  workspace, drops in the marketplace surface, drives the full
+  pipeline (SRD → Requirements → marker-tagged tests → pytest with
+  brain-emit → brain graph query), and reports a structured
+  PASS/PARTIAL/FAIL verdict.
+
+  This is the foundation Phase C (the DoD gate, sulis-verify-
+  requirements) stands on. Before the gate can be trusted to block
+  ships, the pipeline that produces the graph it queries must be
+  proven to work end-to-end. That's what this harness does.
+
+  DoD semantics pinned: a Requirement is VERIFIED iff there exists at
+  least one passing TestResult whose `verifies[]` contains its id.
+  A failing test that claims FR-001 does NOT verify it.
+  `test_failing_test_does_not_count_as_verifying` locks the
+  semantics in.
+
+  7 e2e tests; CLI smoke confirms the default fixture run produces
+  status=partial (2 verified / 1 unverified) as designed; full suite
+  1297 passing.
+created_at: 2026-05-31T10:00:00Z

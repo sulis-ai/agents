@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""sulis-brain-query — typed read CLI over the brain entity graph.
+
+Companion to the `sulis-emit-*` write CLIs. Where the emitters PUT
+entities into `.brain/instances/`, this CLI ASKS the graph questions.
+
+Modes (mutually exclusive):
+
+    --list <entity-type>            Enumerate all instances of one type.
+    --by-id <full-id>               Fetch one instance by its dna:<type>:<ulid> id.
+    --verifying <req-id>            All TestResults whose `verifies` contains <req-id>.
+    --passing-verifying <req-id>    Same, but filtered to outcome=pass.
+
+Common args:
+    [--base-dir <dir>]              Default: <repo-root>/.brain/instances
+    [--domain <name>]               Default: product-development
+    [--repo-root <dir>]             Default: git toplevel (or cwd)
+
+Output: `{"ok": true, "data": {"count": N, "entities": [...]}}` on success
+        `{"ok": false, "error": "..."}` on failure.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+from _brain_query import (  # noqa: E402
+    find_entities,
+    find_passing_testresults_verifying,
+    find_testresults_verifying,
+    iter_entities,
+)
+
+
+def _resolve_repo_root(explicit: str | None) -> Path:
+    if explicit:
+        return Path(explicit).resolve()
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, check=True, timeout=10,
+        )
+        return Path(out.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        return Path.cwd()
+
+
+def _ok(data: dict) -> int:
+    print(json.dumps({"ok": True, "data": data}, indent=2))
+    return 0
+
+
+def _err(message: str) -> int:
+    print(json.dumps({"ok": False, "error": message}, indent=2))
+    return 1
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Query the brain entity graph.")
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--list", dest="list_entity_type",
+                      help="enumerate all instances of one entity type")
+    mode.add_argument("--by-id", help="fetch one instance by full dna:<type>:<ulid> id")
+    mode.add_argument("--verifying", help="dna:requirement:<ulid> — return all TestResults verifying it")
+    mode.add_argument("--passing-verifying",
+                      help="dna:requirement:<ulid> — return only passing TestResults verifying it")
+    parser.add_argument("--base-dir")
+    parser.add_argument("--domain", default="product-development")
+    parser.add_argument("--repo-root")
+    args = parser.parse_args()
+
+    repo_root = _resolve_repo_root(args.repo_root)
+    base_dir = (
+        Path(args.base_dir).resolve()
+        if args.base_dir
+        else repo_root / ".brain" / "instances"
+    )
+
+    try:
+        if args.list_entity_type:
+            entities = list(iter_entities(
+                base_dir, domain=args.domain, entity_type=args.list_entity_type,
+            ))
+            return _ok({"count": len(entities), "entities": entities})
+
+        if args.by_id:
+            # Parse the type from the id; ignores --domain (caller is fetching a known instance)
+            parts = args.by_id.split(":")
+            if len(parts) != 3 or parts[0] != "dna":
+                return _err(f"--by-id must be dna:<type>:<ulid>; got {args.by_id!r}")
+            entity_type = parts[1]
+            matches = find_entities(
+                base_dir, domain=args.domain, entity_type=entity_type,
+                predicate=lambda inst: inst.get("id") == args.by_id,
+            )
+            if not matches:
+                return _ok({"count": 0, "entities": []})
+            return _ok({"count": 1, "entities": [matches[0]]})
+
+        if args.verifying:
+            results = find_testresults_verifying(base_dir, args.verifying, domain=args.domain)
+            return _ok({"count": len(results), "entities": results})
+
+        if args.passing_verifying:
+            results = find_passing_testresults_verifying(
+                base_dir, args.passing_verifying, domain=args.domain,
+            )
+            return _ok({"count": len(results), "entities": results})
+
+    except ValueError as exc:
+        return _err(str(exc))
+    except FileNotFoundError as exc:
+        return _err(str(exc))
+
+    return _err("no mode specified")
+
+
+if __name__ == "__main__":
+    sys.exit(main())

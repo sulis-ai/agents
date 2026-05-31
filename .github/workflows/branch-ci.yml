@@ -19,13 +19,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Install UV
+        # Single source of truth for Brain↔OS Python deps lives in
+        # plugins/sulis/scripts/pyproject.toml; `uv sync --frozen` installs
+        # the exact set pinned in uv.lock. Replaces the prior inline
+        # `pip install ...` pattern (which silently degraded into the
+        # missed-dep failure class — captured as #112). The wpx-* tooling
+        # itself remains stdlib-only; runtime deps are scoped to the
+        # Brain↔OS seam (entity persistence + ServiceSpec validation).
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: '3.11'
+          enable-cache: true
 
-      - name: Install test deps
-        run: pip install pytest
+      - name: Install deps (uv sync --frozen)
+        working-directory: plugins/sulis/scripts
+        run: uv sync --frozen
 
       - name: Configure git identity
         run: |
@@ -48,7 +56,8 @@ jobs:
       - name: unit tests
         # RC-13: branch-ci runs UNIT tests only (fast gate). Integration
         # tests (the real-git train testbed) run in merge-queue-ci.
-        run: pytest plugins/sulis/scripts/tests/unit/ -q
+        working-directory: plugins/sulis/scripts
+        run: uv run pytest tests/unit/ -q
 
       - name: smoke — manifest parse + plugin layout
         run: |

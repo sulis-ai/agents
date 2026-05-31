@@ -18,18 +18,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install pytest
-        # pytest is the only dev dependency; the wpx-* tools themselves
-        # are stdlib-only per the plugin contract.
+      - name: Install UV
+        # Single source of truth for Brain↔OS Python deps lives in
+        # plugins/sulis/scripts/pyproject.toml; `uv sync --frozen` installs
+        # the exact set pinned in uv.lock. Closes #112 — there is no longer
+        # a per-workflow `pip install` list to keep in sync.
         # (Scripts + tests + _wpxlib moved from plugins/sulis-execution/
         # to plugins/sulis/ in v0.30.0 consolidation; workflow paths
         # updated to match.)
-        run: pip install pytest
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install deps (uv sync --frozen)
+        working-directory: plugins/sulis/scripts
+        run: uv sync --frozen
 
       - name: Configure git identity
         # The integration testbed performs real git operations; runners
@@ -39,4 +42,5 @@ jobs:
           git config --global user.name "sulis-ci"
 
       - name: Run wpx-* tests
-        run: pytest plugins/sulis/scripts/tests/ -v
+        working-directory: plugins/sulis/scripts
+        run: uv run pytest tests/ -v

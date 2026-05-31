@@ -117,6 +117,7 @@ in plain English and returns control to the founder.
 | 4 Dependency graph correctness | ... | ... | ... |
 | 5 Performance + non-functional reqs | ... | ... | ... |
 | 6 Peer-collision risk | ... | ... | ... |
+| 7 ServiceSpec compliance (Lovable Test) | ... | ... | ... |
 
 ---
 
@@ -148,6 +149,7 @@ The validating agent attests:
 - [✓] **P4 Dependency graph.** Built dependency DAG from INDEX.md. Cycles: <count>. Orphans: <count>.
 - [✓] **P5 Performance + non-functional.** Per-WP performance-constraint scan. <K> WPs in request-handler primitives without stated SLA.
 - [✓] **P6 Peer-collision risk.** Cross-WP file-create scan. <K> collision pairs detected.
+- [✓] **P7 ServiceSpec compliance.** <N> manifests parsed via `sulis-validate-servicespec`. Lovable Test: <K> manifests PASS, <M> PASS-WITH-RATIONALE, <B> FAIL. Aggregate MUST failures: <count>.
 ```
 
 ---
@@ -262,6 +264,57 @@ or auto-resolve (poorly).
 | **6.03** | SHOULD | Shared scaffolding (`__init__.py`, `index.ts`, `mod.rs`) is created by a foundation WP that other WPs depend on; not co-created by peers | Scan for scaffolding files; assert single creator | Contract parse |
 | **6.04** | SHOULD | Each WP's `Contract` explicitly distinguishes `files.create` from `files.modify` | Sections structured per the contract template | Contract template check |
 | **6.05** | MAY | The Recommended Implementation Order surfaces peer-collision-risk WPs sequentially (not in parallel) | Cross-check 6.01/6.02 results against the order | Order analysis |
+
+---
+
+## Phase 7 — ServiceSpec compliance (the Lovable Test)
+
+The phase that addresses the design-stage **service-contract** failure
+mode. Every service the design introduces or modifies must come out
+with a paired ServiceSpec manifest at
+`.architecture/{project}/service-specs/{name}.servicespec.yaml` (per
+the methodology gate in `/sulis:draft-architecture` step 10 and CF-10).
+**The Lovable Test is the completeness bar**: an AI agent must be able
+to build a working integration against the manifest *with no human docs*.
+This phase mechanically checks the manifests against that bar.
+
+Run the mechanical checks via:
+
+```bash
+plugins/sulis/scripts/sulis-validate-servicespec --from-manifest <path>
+```
+
+Per manifest, the CLI emits `verdict + issues[]` as JSON. Aggregate the
+issues into the table below across the full set of manifests in
+`service-specs/`. A FAIL on any manifest blocks decompose delivery.
+
+| ID | Severity | Check | Pass criterion | Evidence |
+|---|---|---|---|---|
+| **7.01** | MUST | Every service named in the TDD has a paired ServiceSpec manifest | Cross-check `service-specs/` dir entries against the TDD's service inventory | Dir listing vs TDD parse |
+| **7.02** | MUST | Each manifest is valid YAML and a mapping at the root | `yaml.safe_load` returns a dict | YAML parse |
+| **7.03** | MUST | Each manifest declares ≥1 operation | `operations` is a non-empty list | Manifest parse |
+| **7.04** | MUST | Every operation has a non-empty `description` | Per-op field check | Manifest parse |
+| **7.05** | MUST | Every operation has `user_guide.whenToUse` (string, non-empty) | Per-op field check (also accepts `userGuide`) | Manifest parse |
+| **7.06** | SHOULD | Every operation's user_guide also has `prerequisites` and `nextSteps` | Per-op field check | Manifest parse |
+| **7.07** | MUST | Every error in the catalog has `httpStatus` (integer) | Per-error field check | Manifest parse |
+| **7.08** | MUST | Every error has `user_action` (non-empty) | Per-error field check (also accepts `userAction`) | Manifest parse |
+| **7.09** | MUST | Every error has `developer_action` (non-empty) | Per-error field check (also accepts `developerAction`) | Manifest parse |
+| **7.10** | SHOULD | Every error declares a `retryable` flag | Per-error field check | Manifest parse |
+| **7.11** | MUST | Every entity reference (`dna:entity:X`) resolves to a vendored compiled schema | File existence at `plugins/sulis/brain/compiled/{domain}/{X}.schema.json` | Schema-dir check |
+| **7.12** | MUST | Every operation has a `binding` with `host` / `basePath` / `method` / `auth` | Per-op binding field check | Manifest parse |
+| **7.13** | MUST | Every operation's `permission` is structurally namespaced (contains `:`) | Permission regex; reject bare names | Manifest parse |
+| **7.14** | MAY | Operations declare `leadsTo` for HATEOAS / state navigation | Per-op field check | Manifest parse |
+
+**On scope.** Slice 2 (this phase) is the *mechanical* half of the
+Slice 1 design-stage gate. Field shape follows the platform's
+**SPEC-006 / Service Registration** spec; tolerant of minor casing
+variants (`user_guide` / `userGuide`, `user_action` / `userAction`)
+so a SPEC-006 refinement doesn't break the validator. **Slice 3**
+will extend the Brain compiler to *emit* the manifest's `entities`
+block automatically from the same compiled JSON Schemas the validator
+checks against — closing the loop entities-to-services. Until then,
+the design author writes the manifest by hand and this phase catches
+gaps.
 
 ---
 
