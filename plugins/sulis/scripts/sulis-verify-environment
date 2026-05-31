@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+"""sulis-verify-environment — production-like end-to-end pipeline harness.
+
+Stands up a clean workspace with the marketplace surface dropped in,
+drives the full emit-and-verify pipeline (SRD → Requirements → marker-
+tagged tests → pytest + brain-emit plugin → graph), and reports a
+structured PASS/PARTIAL/FAIL verdict.
+
+This is the foundation the DoD gate (sulis-verify-requirements, Phase C)
+stands on. Run it locally before changing anything DoD-related, and run
+it in CI to know the pipeline still works end-to-end.
+
+Usage (default mode — self-test against a built-in fixture):
+
+    sulis-verify-environment
+
+Usage (against your own SRD + tests):
+
+    sulis-verify-environment \\
+        --srd path/to/SRD.md \\
+        --tests path/to/test_module.py
+
+By default, the harness writes the workspace to a temp dir and tears
+it down on exit. Pass `--workspace <dir>` to keep it for inspection.
+
+Output: JSON envelope on stdout. Exit code:
+    0 — pipeline ran and the verdict is PASS or PARTIAL
+    1 — pipeline ran and the verdict is FAIL (no Requirements verified)
+    2 — pipeline itself broke (couldn't run emit/pytest/query)
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+import sys
+import tempfile
+from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+from _verify_environment import run_environment_check  # noqa: E402
+
+
+# Built-in fixture — 3 FR blocks, 4 tests (one passing per FR + one
+# unverified on purpose so the harness output shows the partial-cover case).
+_FIXTURE_SRD = """\
+# SRD — Demo
+
+**FR-001: Authentication**
+
+Users authenticate with email + password.
+
+**Acceptance criteria:**
+- Valid credentials return a session token.
+
+**FR-002: Logout**
+
+Logged-in users may end their session.
+
+**Acceptance criteria:**
+- Logout clears the session cookie.
+
+**FR-003: Profile view**
+
+Users may view their own profile.
+
+**Acceptance criteria:**
+- Profile shows the user's display name.
+"""
+
+_FIXTURE_TESTS = '''\
+"""Demo tests that claim Requirements via @pytest.mark.verifies."""
+
+import pytest
+
+
+@pytest.mark.verifies("FR-001")
+def test_login_returns_session_token():
+    """Pretend login flow — passes."""
+    assert True
+
+
+@pytest.mark.verifies("FR-002")
+def test_logout_clears_cookie():
+    """Pretend logout flow — passes."""
+    assert True
+
+
+# FR-003 is INTENTIONALLY unmarked so the harness shows a partial cover
+# (the brain has the Requirement but no verifying TestResult).
+def test_profile_view_unverified():
+    """No @verifies marker; this test passes but doesn't claim anything."""
+    assert True
+'''
+
+
+def _ok(data: dict, exit_code: int) -> int:
+    print(json.dumps({"ok": exit_code == 0 or data.get("status") in ("pass", "partial"),
+                      "data": data}, indent=2))
+    return exit_code
+
+
+def _err(message: str) -> int:
+    print(json.dumps({"ok": False, "error": message}, indent=2))
+    return 2
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="End-to-end pipeline harness (SRD → emit → tests → query)."
+    )
+    parser.add_argument("--srd", help="Path to SRD.md (default: built-in fixture)")
+    parser.add_argument("--tests",
+                        help="Path to a pytest test module (default: built-in fixture)")
+    parser.add_argument("--workspace",
+                        help="Workspace dir (default: temp; kept on disk if set)")
+    parser.add_argument("--scripts-src",
+                        help=("Path to plugins/sulis/scripts/ (default: this script's "
+                              "own directory — the marketplace's source surface)"))
+    args = parser.parse_args()
+
+    # Resolve inputs — fixtures are used when args are omitted
+    if args.srd:
+        srd_path = Path(args.srd).resolve()
+        if not srd_path.exists():
+            return _err(f"SRD not found: {srd_path}")
+        srd_text = srd_path.read_text()
+    else:
+        srd_text = _FIXTURE_SRD
+
+    if args.tests:
+        tests_path = Path(args.tests).resolve()
+        if not tests_path.exists():
+            return _err(f"tests not found: {tests_path}")
+        tests_text = tests_path.read_text()
+    else:
+        tests_text = _FIXTURE_TESTS
+
+    scripts_src = Path(args.scripts_src).resolve() if args.scripts_src else _HERE
+    if not scripts_src.exists():
+        return _err(f"scripts source not found: {scripts_src}")
+
+    # Resolve workspace — temp dir by default, persistent if specified
+    cleanup_workspace = False
+    if args.workspace:
+        workspace = Path(args.workspace).resolve()
+        workspace.mkdir(parents=True, exist_ok=True)
+    else:
+        workspace = Path(tempfile.mkdtemp(prefix="sulis-verify-env-"))
+        cleanup_workspace = True
+
+    try:
+        result = run_environment_check(
+            workspace,
+            scripts_src=scripts_src,
+            srd_text=srd_text,
+            tests_text=tests_text,
+        )
+    except Exception as exc:
+        if cleanup_workspace:
+            shutil.rmtree(workspace, ignore_errors=True)
+        return _err(f"harness failed: {exc}")
+
+    data = result.as_dict()
+    data["workspace"] = str(workspace) if not cleanup_workspace else None
+
+    # Cleanup BEFORE printing so the workspace is gone if temp
+    if cleanup_workspace:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+    # Exit code: 0 if PASS or PARTIAL (pipeline worked); 1 if FAIL
+    # (pipeline ran but nothing was verified); 2 already-returned for
+    # harness-itself failures upstream.
+    if result.status == "fail":
+        return _ok(data, exit_code=1)
+    return _ok(data, exit_code=0)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
