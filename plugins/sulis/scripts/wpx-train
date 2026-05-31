@@ -1681,6 +1681,29 @@ def _finalise_success(
     record["completed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
     cleanup_train_state(paths.train_runs_dir, train_id)
+
+    # Brain emission — one LifecycleRun for the train completion, and one
+    # per WP shipped in the batch. Best-effort; brain failures must not
+    # unwind the successful train. Per-WP events let the brain graph
+    # answer "was this WP shipped?" without re-parsing INDEX.md.
+    try:
+        from _brain_emit_helper import emit_lifecycle_step_event
+        emit_lifecycle_step_event(
+            paths.repo_root,
+            step_name=f"wpx-train-success:{train_id}",
+            outcome="completed",
+            at=record["completed_at"],
+        )
+        for entry in batch:
+            emit_lifecycle_step_event(
+                paths.repo_root,
+                step_name=f"wp-shipped:{entry.wp}",
+                outcome="completed",
+                at=record["completed_at"],
+            )
+    except Exception:
+        pass  # belt-and-braces
+
     emit_result({
         "train_id": train_id,
         "outcome": "success",

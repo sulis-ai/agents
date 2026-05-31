@@ -304,6 +304,24 @@ def cmd_run(args: argparse.Namespace) -> None:
 
         result["outcome"] = "success"
         result["completed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        # Brain emission — LifecycleRun for the WP-pipeline completion.
+        # Best-effort: a failure inside _brain_emit_helper (missing schemas
+        # / unwritable .brain dir) MUST NOT unwind the successful pipeline.
+        # Per-WP staging deploys are LifecycleRun events, not Deployment
+        # entities — Deployments are Release × Environment, cut at
+        # dev→main promotion not at per-WP CI.
+        try:
+            from _brain_emit_helper import emit_lifecycle_step_event
+            emit_lifecycle_step_event(
+                paths.repo_root,
+                step_name=f"wpx-pipeline-success:{args.wp}",
+                outcome="completed",
+                at=result["completed_at"],
+            )
+        except Exception:
+            pass  # belt-and-braces
+
         emit_result(result, exit_code=0)
 
     except RuntimeError as exc:
