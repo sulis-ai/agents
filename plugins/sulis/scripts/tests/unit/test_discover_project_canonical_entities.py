@@ -18,7 +18,7 @@ Parse + cardinality
 - test_steps_count_is_9
 - test_triggers_count_is_1
 - test_failuremodes_count_is_8
-- test_tools_count_is_5_new
+- test_tools_count_is_6_new  (bumped from 5 by WP-002 — derive-consumer-tenant flipped to state=active)
 
 Schema validation (brain foundation schemas)
 - test_workflow_validates_against_brain_schema
@@ -38,6 +38,7 @@ Cross-WP refs resolve (graph integrity)
 - test_tool_error_catalogue_refs_resolve
 - test_failuremode_user_messages_match_misuse_cases_md
 """
+
 from __future__ import annotations
 
 import json
@@ -56,7 +57,9 @@ _INSTANCES_DIR = _REPO_ROOT / "plugins" / "sulis" / "instances" / "discover-proj
 _SCHEMA_DIR = _REPO_ROOT / "plugins" / "sulis" / "brain" / "compiled" / "foundation"
 _TOOL_SCHEMA_DIR = _INSTANCES_DIR / "schemas" / "tools"
 _RELEASE_TRAIN_DIR = _REPO_ROOT / "plugins" / "sulis" / "instances" / "release-train"
-_MISUSE_CASES_PATH = _REPO_ROOT / ".specifications" / "discover-project" / "MISUSE_CASES.md"
+_MISUSE_CASES_PATH = (
+    _REPO_ROOT / ".specifications" / "discover-project" / "MISUSE_CASES.md"
+)
 
 
 # ─── Canonical identifiers (TDD §Canonical Identifiers — byte-exact) ────
@@ -99,16 +102,16 @@ TOOL_ULIDS = {
 }
 
 # Primary Tools that MUST carry input + output JSON Schemas at schemas/tools/.
-# Per WP-001 Contract: 5 primary Tools × 2 schemas = 10 schema files.
-# derive-consumer-tenant is excluded — its Tool entity + Python implementation
-# + fixed test vectors live in WP-002 (which also authors its schema pair
-# downstream). The 5 primaries here are the Tools authored end-to-end in
-# this WP.
+# Per WP-001 Contract: 5 primary Tools × 2 schemas = 10 schema files; WP-002
+# adds a sixth (derive-consumer-tenant) by flipping its _forward_declaration_ulid
+# descriptor row to a full state=active entity and authoring its schema pair.
+# Post-WP-002: 6 primary Tools × 2 schemas = 12 schema files.
 PRIMARY_TOOL_NAMES = [
     "git-remote-read",
     "read-package-json",
     "read-pyproject-toml",
     "read-ci-workflows",
+    "derive-consumer-tenant",
     "infer-configuration-values",
 ]
 
@@ -178,18 +181,21 @@ def test_failuremodes_count_is_8(failuremodes_doc):
     assert len(failuremodes_doc["failuremodes"]) == 8
 
 
-def test_tools_count_is_5_new(tools_doc):
-    """5 new typed Tools (state=active) authored in this WP.
+def test_tools_count_is_6_new(tools_doc):
+    """6 new typed Tools (state=active) authored across WP-001 + WP-002.
 
-    Reused Tools (`entity-emitter`, `drift-detector`) are declared via
+    WP-001 lands 5 (git-remote-read, read-package-json, read-pyproject-toml,
+    read-ci-workflows, infer-configuration-values); WP-002 flips the sixth
+    (derive-consumer-tenant) from a _forward_declaration_ulid descriptor
+    row to a full state=active entity backed by Sha256CrockfordTenantDeriver.
+
+    Reused Tools (``entity-emitter``, ``drift-detector``) are declared via
     ``_reused_from`` rather than minting new ULIDs — they do not count
-    toward the 5-new bound.
+    toward the 6-new bound.
     """
-    new_tools = [
-        t for t in tools_doc["tools"] if t.get("state") == "active"
-    ]
-    assert len(new_tools) == 5, (
-        f"Expected 5 state=active Tools; got {len(new_tools)}: "
+    new_tools = [t for t in tools_doc["tools"] if t.get("state") == "active"]
+    assert len(new_tools) == 6, (
+        f"Expected 6 state=active Tools; got {len(new_tools)}: "
         f"{[t['name'] for t in new_tools]}"
     )
 
@@ -258,7 +264,11 @@ def test_each_tool_passes_brain_schema(tools_doc):
 
 
 def test_each_primary_tool_input_schema_lints():
-    """Each of 10 sub-schemas (5 input + 5 output) is a valid JSON Schema document."""
+    """Each of 12 sub-schemas (6 input + 6 output) is a valid JSON Schema document.
+
+    Post-WP-002: 6 primary Tools (the 5 from WP-001 plus derive-consumer-tenant)
+    × 2 axes (input + output) = 12 sub-schemas.
+    """
     files_seen = 0
     for tool in PRIMARY_TOOL_NAMES:
         for axis in ("input", "output"):
@@ -271,7 +281,7 @@ def test_each_primary_tool_input_schema_lints():
             # Confirm draft-version validator can compile it (raises on malformed schema).
             _draft_validator(doc).check_schema(doc)
             files_seen += 1
-    assert files_seen == 10, f"Expected 10 sub-schemas; saw {files_seen}"
+    assert files_seen == 12, f"Expected 12 sub-schemas; saw {files_seen}"
 
 
 # ─── Canonical-ULID pin (TDD §Canonical Identifiers byte-exact) ─────────
@@ -328,9 +338,7 @@ def test_step_tool_refs_resolve(steps_doc, tools_doc):
             continue  # mechanism=human Steps may omit tool_ref
         if ref not in resolvable_ids:
             unresolved.append((step["name"], ref))
-    assert not unresolved, (
-        f"Unresolved Step.tool_ref values: {unresolved}"
-    )
+    assert not unresolved, f"Unresolved Step.tool_ref values: {unresolved}"
 
 
 def test_step_failuremode_refs_resolve(steps_doc, failuremodes_doc):
@@ -341,9 +349,7 @@ def test_step_failuremode_refs_resolve(steps_doc, failuremodes_doc):
         for ref in step.get("handles_failures", []) or []:
             if ref not in fm_ids:
                 unresolved.append((step["name"], ref))
-    assert not unresolved, (
-        f"Unresolved Step.handles_failures references: {unresolved}"
-    )
+    assert not unresolved, f"Unresolved Step.handles_failures references: {unresolved}"
 
 
 def test_tool_error_catalogue_refs_resolve(tools_doc, failuremodes_doc):
@@ -356,9 +362,7 @@ def test_tool_error_catalogue_refs_resolve(tools_doc, failuremodes_doc):
         for ref in tool.get("error_catalogue", []) or []:
             if ref not in fm_ids:
                 unresolved.append((tool["name"], ref))
-    assert not unresolved, (
-        f"Unresolved Tool.error_catalogue references: {unresolved}"
-    )
+    assert not unresolved, f"Unresolved Tool.error_catalogue references: {unresolved}"
 
 
 def test_failuremode_user_messages_match_misuse_cases_md(failuremodes_doc):
@@ -394,7 +398,9 @@ def test_failuremode_user_messages_match_misuse_cases_md(failuremodes_doc):
         muc_responses[f"MUC-{muc_num}"] = responses
 
     name_by_id = {fm["id"]: fm.get("name") for fm in failuremodes_doc["failuremodes"]}
-    desc_by_id = {fm["id"]: fm.get("description", "") for fm in failuremodes_doc["failuremodes"]}
+    desc_by_id = {
+        fm["id"]: fm.get("description", "") for fm in failuremodes_doc["failuremodes"]
+    }
 
     drift = []
     for muc, ulid in FAILUREMODE_ULIDS.items():
@@ -417,4 +423,6 @@ def test_failuremode_user_messages_match_misuse_cases_md(failuremodes_doc):
                     f"italic system-response string; FailureMode description must "
                     f"reference {muc!r} by name but does not — description={description!r}"
                 )
-    assert not drift, "MISUSE_CASES.md ↔ failuremodes.jsonld drift:\n  " + "\n  ".join(drift)
+    assert not drift, "MISUSE_CASES.md ↔ failuremodes.jsonld drift:\n  " + "\n  ".join(
+        drift
+    )
