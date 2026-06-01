@@ -1,0 +1,79 @@
+{
+  "@context": {
+    "@vocab": "https://sulis.co/dna/",
+    "dna": "https://sulis.co/dna/"
+  },
+  "@id": "dna:release-train:workflow",
+  "@type": "workflow-instances",
+  "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "_about": "The apex canonical entity for the sulis-plugins-marketplace release-train. Defines the directed graph of 15 Steps (authored in WP-002 steps.jsonld) that compose the per-Project release pipeline: detect -> preflight -> compute -> draft -> open -> wait -> confirm -> merge -> bump -> tag -> publish. Definition-level scope is unscoped (no for_project) - Projects bind to this Workflow per-invocation via Project.release_workflow_ref (authored in WP-005 projects.jsonld). The back-edge wait-for-checks-and-mergeability -> open-release-pr encodes JT-7 cycle-tolerance for PR-conflicts recovery (back-merge then retry). Workflow ULID dna:workflow:01KT0RTRA1NWFW00000000000A is deterministic and reused across every release-train canonical entity (Triggers, Steps - see triggers.jsonld and steps.jsonld for_workflow). Tenant ULID dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM is canonical for the marketplace tenant (derivation recipe documented in failuremodes.jsonld's _about). Schema: plugins/sulis/brain/compiled/foundation/workflow.schema.json (vendored upstream sulis-brain Workflow v1.1.0). Path A per ADR-001 - the imperative release-on-merge.yml implements this canonical (verified via the drift detector in WP-007); the LLM-driven brain executor walks it for /sulis:release-train --dry-run preview.",
+  "captured_on": "2026-06-01",
+
+  "workflows": [
+    {
+      "id": "dna:workflow:01KT0RTRA1NWFW00000000000A",
+      "sys_status": "active",
+      "name": "release-train",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "release-train",
+      "description": "Per-Project release pipeline: detect pending changesets -> pre-flight version-drift -> pre-flight cross-branch-drift -> compute next version -> draft PR body + changelog -> open release PR -> wait for checks + mergeability -> founder confirmation -> squash-merge -> bump version files -> write changelog entry -> commit bump as bot -> tag and push -> publish GitHub release -> emit Release entity. Cycle-tolerant per JT-7: PR-conflicts back-merge then retry from open-pr. Definition unscoped (no for_project); Projects bind via Project.release_workflow_ref per-invocation.",
+      "type": "other",
+      "state_contract": [
+        "target_branch:string",
+        "source_branch:string",
+        "pending_changesets:list",
+        "tier:enum[patch|minor|major|null]",
+        "next_plugin_version:semver",
+        "next_umbrella_version:semver",
+        "pr_url:url",
+        "merge_sha:sha",
+        "tag_pushed:bool",
+        "release_url:url",
+        "final-outcome:enum[shipped|no-changesets|blocked|aborted]"
+      ],
+      "steps": [
+        "detect-pending-changesets",
+        "preflight-version-drift",
+        "preflight-cross-branch-drift",
+        "compute-next-version",
+        "draft-pr-body-and-changelog",
+        "open-release-pr",
+        "wait-for-checks-and-mergeability",
+        "gate-founder-confirmation",
+        "squash-merge",
+        "bump-version-files",
+        "write-changelog-entry",
+        "commit-bump-as-bot",
+        "tag-and-push",
+        "publish-github-release",
+        "emit-release-entity"
+      ],
+      "initial_steps": ["detect-pending-changesets"],
+      "terminal_steps": ["emit-release-entity", "gate-founder-confirmation"],
+      "transitions": [
+        "detect-pending-changesets -> preflight-version-drift [if pending_changesets.non_empty]",
+        "detect-pending-changesets -> [terminal:no-changesets] [if pending_changesets.empty]",
+        "preflight-version-drift -> preflight-cross-branch-drift",
+        "preflight-cross-branch-drift -> compute-next-version",
+        "compute-next-version -> draft-pr-body-and-changelog",
+        "draft-pr-body-and-changelog -> open-release-pr",
+        "open-release-pr -> wait-for-checks-and-mergeability",
+        "wait-for-checks-and-mergeability -> gate-founder-confirmation [if checks_pass AND mergeable]",
+        "wait-for-checks-and-mergeability -> open-release-pr [if pr-conflicts; back-merge then retry]",
+        "wait-for-checks-and-mergeability -> [terminal:aborted] [if checks_fail]",
+        "gate-founder-confirmation -> squash-merge [if confirm=yes]",
+        "gate-founder-confirmation -> [terminal:aborted] [if confirm=no]",
+        "squash-merge -> bump-version-files",
+        "bump-version-files -> write-changelog-entry",
+        "write-changelog-entry -> commit-bump-as-bot",
+        "commit-bump-as-bot -> tag-and-push",
+        "tag-and-push -> publish-github-release",
+        "publish-github-release -> emit-release-entity",
+        "emit-release-entity -> [terminal:shipped]"
+      ],
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.9
+    }
+  ]
+}
