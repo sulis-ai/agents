@@ -1,0 +1,6 @@
+{
+  "branch": "feat/wp-003-author-triggers-instance",
+  "merge_sha": "198bd8f",
+  "health_status": "skipped",
+  "smoke_verdict": "skipped"
+}

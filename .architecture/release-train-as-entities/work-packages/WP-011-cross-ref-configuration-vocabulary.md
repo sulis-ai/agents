@@ -96,3 +96,11 @@ Configuration Vocabulary as your template.
 - If `plugins/sulis/README.md` doesn't have a "For downstream
   consumers" section yet, this WP creates a "Customising the
   release-train for your own marketplace fork" section directly.
+
+## Acceptance Evidence
+
+- Branch: feat/wp-011-cross-ref-configuration-vocabulary (deleted post-merge)
+- Squash-merge SHA on dev: `301dfbe`
+- Health status: `skipped`
+- Smoke-test verdict: skipped
+- Completed: `2026-06-01T10:45:37Z` (Step 12 by calling session)

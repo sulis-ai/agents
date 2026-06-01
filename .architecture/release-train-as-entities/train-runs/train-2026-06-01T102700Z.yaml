@@ -1,0 +1,27 @@
+train_id: "train-2026-06-01T102700Z"
+started_at: "2026-06-01T10:27:00Z"
+completed_at: "2026-06-01T10:43:54Z"
+outcome: "success"
+batch_size: 3
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-01T10:32:17Z"
+gate_findings_path: ".architecture/release-train-as-entities/code-reviews/PR-batch-train-2026-06-01T102700Z-2026-06-01T103909Z/REVIEW.md"
+bundle:
+  - wp: WP-003
+    branch: feat/wp-003-author-triggers-instance
+    pre_train_sha: 4360684b36a03740e553b6165f7e6ce40d4f66f2
+    rebased_to_sha: 4360684b36a03740e553b6165f7e6ce40d4f66f2
+    merge_sha_on_dev: 198bd8fd1c9eed29b4d486ea7f3c242897ef504c
+  - wp: WP-004
+    branch: feat/wp-004-author-failuremodes-instance
+    pre_train_sha: 5fdb123c22695d62cb2c6aadce45276467d19b26
+    rebased_to_sha: 81fe5ae7df2608cc2a45f0dc6c93cf17434c1b7a
+    merge_sha_on_dev: c57c5057eb6b755c7f08325e0782f16517c925e6
+  - wp: WP-011
+    branch: feat/wp-011-cross-ref-configuration-vocabulary
+    pre_train_sha: f4510be06e52afa5621e3b2c103209583e1615bc
+    rebased_to_sha: 36b3e36f9e491635065ab4125acec055da4048b1
+    merge_sha_on_dev: 301dfbe8db293577ca533a40d912f70625d61553

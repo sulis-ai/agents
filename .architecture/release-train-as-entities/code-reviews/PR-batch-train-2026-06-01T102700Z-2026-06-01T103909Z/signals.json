@@ -1,0 +1,77 @@
+{
+  "review_target": "train-2026-06-01T102700Z (3 WPs: WP-003, WP-004, WP-011)",
+  "diff_range": "7943992..301dfbe",
+  "branch": "change/create-release-train-as-entities",
+  "files_changed": 25,
+  "lines_added": 2326,
+  "lines_removed": 0,
+  "commits": [
+    "301dfbe feat(wp-011): squash-merge from feat/wp-011-cross-ref-configuration-vocabulary",
+    "c57c505 feat(wp-004): squash-merge from feat/wp-004-author-failuremodes-instance",
+    "198bd8f feat(wp-003): squash-merge from feat/wp-003-author-triggers-instance",
+    "36b3e36 docs(sulis): cross-reference Configuration Vocabulary for fork-consumers (WP-011, CH-01KSZ4)",
+    "81fe5ae feat(release-train): author 8 FailureMode instances for canonical workflow (WP-004)",
+    "4360684 fix(release-train): canonicalise tenant ULID on triggers.jsonld to WP-004's value",
+    "8726798 feat(release-train): author triggers.jsonld + vendor brain Trigger schema (WP-003)"
+  ],
+  "build_verification": {
+    "pytest": "14 passed in 0.12s (3 new test files: 3+6+5)",
+    "json_validity": "4/4 valid (2 jsonld instances + 2 vendored schemas)",
+    "cross_wp_tenant_ulid_match": true,
+    "tenant_ulid_canonical": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+    "workflow_ulid_canonical": "dna:workflow:01KT0RTRA1NWFW00000000000A",
+    "pr_introduced_errors": 0
+  },
+  "ph_signals": {
+    "scope": {
+      "commit_type_spread": ["feat", "fix", "docs"],
+      "module_fan_out": 1,
+      "severity": "clean"
+    },
+    "size": {
+      "lines_added": 2326,
+      "files_changed": 25,
+      "effective_code_lines": "~340 (excluding vendored schemas + audit artifacts)",
+      "severity": "low (raw bin: 1001-5000; effective bin: 201-500)"
+    },
+    "safety": {
+      "migration_count": 0,
+      "schema_idl_count": 2,
+      "schema_idl_provenance": "vendored byte-equivalent from sulis-brain v0.9.0/v0.9.2",
+      "infra_files": 0,
+      "secret_pattern_hits": 0,
+      "severity": "clean"
+    },
+    "completeness": {
+      "new_source_files": 5,
+      "new_test_files": 3,
+      "test_to_source_ratio_by_wp": "3/3 WPs ship tests",
+      "api_change_without_schema": false,
+      "severity": "clean"
+    }
+  },
+  "lenses": {
+    "architecture": {
+      "findings_count": 2,
+      "severities": {"low": 2},
+      "summary": "Cross-WP composition consistent (tenant ULID match); Path A discipline clean; schemas vendored intact; tests match WP Contracts. Two LOW findings: stale docstring tenant-ULID name in test_triggers; mnemonic workflow ULID coordination risk for WP-001."
+    },
+    "security": {
+      "findings_count": 0,
+      "summary": "Nothing surfaced. No secrets, no PII, no token literals (only class-references in failuremodes prose); no CI/dependency changes."
+    },
+    "quality": {
+      "findings_count": 2,
+      "severities": {"low": 1, "info": 1},
+      "summary": "CR-01 green; no dead surface; LOW dedup'd with architecture's docstring drift; INFO: WP-004 Contract vocabulary drift (shipped code correct against schema; Contract doc needs repair). Tests cover load-bearing checks (parse + cardinality + schema validation + WP-specific assertions). No CR-10 anti-pattern matches."
+    }
+  },
+  "verdict": "PASS",
+  "auto_downgrades_fired": [],
+  "findings_total": {"critical": 0, "high": 0, "medium": 0, "low": 1, "info": 1, "deduplicated_across_lenses": 1},
+  "follow_ups": [
+    "Repair WP-004 Contract section to align vocabulary with canonical FailureMode schema (operational/structural → 10-value kind enum; severity → expected_frequency; drop test_severity_enum_valid DoD line). Shipped code is correct; this is doc reconciliation.",
+    "Patch test_triggers_instance_valid.py:15-17 docstring to name canonical tenant ULID 6XBZ93FSHN5TRX8MCS5R66FNCM (was pre-patch 01JA0AAA1BBBCCCDDDEEEFFFGS). Rollup with next trivial-change pass.",
+    "When WP-001 (Workflow authoring) dispatches, brief the executor to adopt workflow ULID 01KT0RTRA1NWFW00000000000A exactly (Triggers reference it by ID; no drift detector running yet to catch a typo)."
+  ]
+}

@@ -92,3 +92,11 @@ Per brain foundation v0.5.0 Trigger schema:
 - Triggers are informational under Path A — the imperative bash actually
   responds to GH-Actions events. They're recorded for completeness +
   drift-detector validation surface.
+
+## Acceptance Evidence
+
+- Branch: feat/wp-003-author-triggers-instance (deleted post-merge)
+- Squash-merge SHA on dev: `198bd8f`
+- Health status: `skipped`
+- Smoke-test verdict: skipped
+- Completed: `2026-06-01T10:44:51Z` (Step 12 by calling session)

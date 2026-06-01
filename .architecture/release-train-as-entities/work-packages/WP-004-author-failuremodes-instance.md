@@ -111,3 +111,11 @@ as an 8th FailureMode to cover Step 5's token-budget overflow:
 - The Workflow definition (WP-001) lists the `no-changesets-pending` case as a terminal transition guard, NOT a FailureMode. Don't double-record.
 - FailureMode #1 (release-pr-conflicts) is what makes the Workflow cycle-tolerant — its description should explicitly name the back-edge it enables.
 - Update title from "7" to "8" FailureModes on commit (8 instances total once probabilistic-step-token-budget-exceeded is included per NFR-010).
+
+## Acceptance Evidence
+
+- Branch: feat/wp-004-author-failuremodes-instance (deleted post-merge)
+- Squash-merge SHA on dev: `c57c505`
+- Health status: `skipped`
+- Smoke-test verdict: skipped
+- Completed: `2026-06-01T10:45:34Z` (Step 12 by calling session)
