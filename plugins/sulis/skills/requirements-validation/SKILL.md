@@ -20,7 +20,7 @@ GAPS_FOUND verdict.
 
 The completeness assessment uses a spiral approach rather than a single-pass checklist.
 
-**Five perspectives** examine the specification from different angles:
+**The verification perspectives** examine the specification from different angles:
 1. Requirement Traceability — Can every goal be traced through use cases to testable requirements?
 2. Integration Completeness — Is every external system specified well enough to build against?
 3. NFR Coverage — Are non-functional requirements measurable and comprehensive?
@@ -28,6 +28,7 @@ The completeness assessment uses a spiral approach rather than a single-pass che
 5. Referential Integrity — Does the content of generated artifacts accurately reflect the design decisions and assumptions from facilitation?
 6. Term Consistency — Does every recurring noun in the artifacts reconcile with GLOSSARY.md (the locked vocabulary from Phase 3.5 Disambiguation Sweep)?
 7. Adversarial Coverage — Does every security-sensitive use case have a corresponding misuse case (or explicit "no plausible adversary" note), and does every misuse case have a defined system response?
+8. Verification Posture (**P-VER**) — Does every specification artifact (SRD + TDD + WP set) carry a populated `## Verification Plan` section per ADR-001's literal heading, with the six required subsections drawn from the canonical 20-question set, and every named integration carrying its `existing` / `deferred` / `out-of-scope` classification? Invoked as a rubric pass against [`plugins/sulis/references/decompose-validation-rubric.md`](../../references/decompose-validation-rubric.md) §Phase 9. Canonical question set: [`plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md`](../../references/standards/VERIFICATION_QUESTIONS.md). Cross-reference: [`ADR-001`](../../../../.architecture/verification-by-design/adrs/ADR-001-section-name-verification-plan.md) fixes the section name.
 
 **Fix-as-you-go via AAF triage (MUST).** Every gap found by every perspective passes
 through the AAF-01 triage from `plugins/sulis/references/audience-adapted-framing-standard.md`
@@ -93,10 +94,20 @@ is built to consume.
   reconcile with the glossary, every security-sensitive use case has adversarial
   coverage with defined system responses, **every leaf in PRIMITIVE_TREE.jsonld carries
   a `leaf_category`, `RECONCILIATION_MAP.md` has zero unresolved-gap or
-  undisposed-orphan rows, and the Reconciliation Cycle Stack is closed**. No flags
-  remain.
+  undisposed-orphan rows, the Reconciliation Cycle Stack is closed**, **and P-VER
+  passes against every specification artifact** (the eight failure modes 9.01..9.08
+  from the rubric's Phase 9 each pass or are grandfathered per ADR-002's merge-date
+  constant). No flags remain.
 - **GAPS_FOUND** — After 3 passes, some gaps remain that require user input or decisions
   that cannot be made by the agent. All remaining gaps are documented with their flags.
+  **A P-VER FAIL (any of the eight failure modes in
+  [`decompose-validation-rubric.md`](../../references/decompose-validation-rubric.md)
+  §Phase 9) collapses the overall verdict to GAPS_FOUND** — P-VER is a MUST-blocking
+  rubric phase per FR-009, and the overall verdict pass-through is mechanical: any
+  P-VER failure mode that fires on the artifact set produces a GAPS_FOUND verdict
+  regardless of how the other perspectives score. The reciprocal also holds: a P-VER
+  PASS does not by itself elevate the overall verdict to PASS — the other seven
+  perspectives must also pass.
 
 **Sufficiency test:** The guiding question for every check is: "Could a development team
 implement this without making undocumented assumptions?" If the answer is no, a flag is raised.
