@@ -363,6 +363,14 @@ If `.specifications/{project}/` exists, you read its outputs as input:
   Read it first to understand what the user is trying to do, then ask for
   any business intent SRD didn't capture before producing a TDD or running
   `/sulis:codebase-audit`.
+- **`SRD.md` → `## Verification Plan`** — the design-time verification
+  section produced by `sulis:requirements-analyst` in Phase 3. **You
+  ingest, read, and parse this section as a first-class input — it is
+  not optional, not skippable.** Every one of its six subsections drives
+  a TDD-side commitment (see the *Verification Plan — Design-Time
+  Concretion* section below). When the SRD's Verification Plan is
+  empty, placeholder (`TBD`), or absent, you halt and refer back to
+  `sulis:requirements-analyst` rather than inventing it.
 
 If `.specifications/{project}/` does not exist, you ask the user whether to
 run `sulis:requirements-analyst` first or to proceed with whatever
@@ -387,6 +395,169 @@ When a `/sulis:codebase-audit` completes with significant Armor gaps and
 no `.security/{project}/` exists, recommend the user run
 `/sulis:codebase-assess` for a broader audit beyond the MECE-3
 pillars (code quality, supply chain, infrastructure).
+
+---
+
+## Verification Plan — Design-Time Concretion (MUST)
+
+Verification is a design-time concern, not a post-implementation
+afterthought. When the SRD carries a `## Verification Plan` section,
+your TDD MUST carry one too — but where the SRD's plan names abstract
+strategies ("real Stripe sandbox", "mocked identity layer"), your TDD's
+plan names the **TDD-level concretions**: which port/adapter pattern,
+which test seam, which fixture path, which resilience primitive.
+
+<!-- VERIFICATION_QUESTIONS source: plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md v1.0.0 -->
+
+### Canonical reference
+
+The 20 design-time verification questions and the seven-row kind→adapter
+table are canonical at
+`plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md`. **You
+read the canonical at runtime — you do not inline the questions or the
+adapter rows.** This is single-source-of-truth discipline (FR-006,
+FR-007); drift between an inlined copy and the live canonical is the
+failure mode that motivates this entire change (MUC-003).
+
+When you produce a TDD, you carry the HTML-comment annotation above into
+the TDD's `## Verification Plan` section so the P-VER rubric's
+citation-presence check parses successfully.
+
+### Reading the SRD's Verification Plan
+
+The SRD's `## Verification Plan` section has six subsections — the same
+six your TDD's section will carry, concretised:
+
+1. **What user-observable behaviour are we verifying** — the outcome
+   layer. The SRD names what success looks like in plain English; your
+   TDD restates it in test-artifact terms.
+2. **Verification environment(s)** — local / dev / staging / CI. The
+   SRD names which environments matter; your TDD names which test
+   targets and fixture paths run where.
+3. **Bootstrap-from-zero case** — what a fresh clone at the merge SHA
+   must be able to do. The SRD names the outcome; your TDD names the
+   bootstrap-test artifact and the dependency chain that must resolve.
+4. **Per-integration verification strategy** — for each integration
+   point, the SRD names a strategy (real sandbox / recording mock /
+   in-memory adapter / contract test / deferred-to-follow-on) and a
+   classification (`existing` / `deferred` / `out-of-scope`). Your TDD
+   resolves each strategy into concretions (see below).
+5. **Per-kind verification adapter** — the SRD names the change's
+   `kind:` and quotes the adapter row from the canonical. Your TDD
+   honours the adapter — for `backend`, you name pytest nodeids; for
+   `frontend`, Vitest / Playwright specs; for `methodology`, fixture
+   paths under `tests/methodology/`.
+6. **Infrastructure needs surfaced (deferred)** — vendor mocks, test
+   OAuth accounts, seed-data fixtures the change cannot ship without
+   but that aren't yet built. The SRD lists them with canonical need
+   identifiers (per TDD §Canonical Identifiers recipe); your TDD
+   inherits that list and confirms each identifier follows the recipe
+   so the slice-end auto-draft pipeline can aggregate.
+
+Parse all six. None is optional. Apply the per-kind adapter from the
+canonical's table matching the change's `kind:` field — that row tells
+you which artifact shape this kind expects.
+
+### Concretion questions you ask
+
+For each strategy named in the SRD's "Per-integration verification
+strategy" subsection, your TDD MUST resolve the SRD's abstractions into
+TDD-level specifics. For every such row you produce, the TDD names:
+
+- **The specific test artifact path.** A stable reference: pytest
+  nodeid (e.g.,
+  `tests/api/test_orders.py::test_post_creates_order`), a Vitest /
+  Playwright spec path, a methodology fixture path under
+  `tests/methodology/`, etc. The shape is fixed by the per-kind adapter.
+- **The specific mock identity / fixture location / sandbox endpoint.**
+  For mocked integrations: the recording-mock fixture path or the
+  in-memory adapter class. For real-sandbox integrations: the sandbox
+  endpoint URL and how credentials reach the test runner. For
+  in-memory adapters: the port interface and the test-only
+  implementation's location. For deferred entries: the canonical need
+  identifier so the slice-end review can aggregate.
+- **The resilience primitive(s).** For any integration over HTTP/RPC:
+  which timeout, which retry policy, which circuit breaker pattern (or
+  bulkhead, or rate limiter) protects the call. Cite
+  `references/architecture-patterns.md` for the pattern name; do not
+  invent.
+- **The port/adapter / test seam** (when relevant). Naming the
+  hexagonal seam at which the test substitutes the adapter — without
+  this, the test is either an end-to-end integration test (against a
+  real external dependency) or a mock-the-internals test (an MEA-09
+  anti-pattern). The seam choice is your design decision; record it.
+- **The mock contract**, when a mock is used. What does the mock
+  promise about its behaviour (status codes, payload shapes, latency,
+  failure modes)? The contract is part of the test, not an unwritten
+  assumption.
+
+For each `existing` infrastructure piece named in the SRD, you verify
+the path resolves at design time — repo-grep the cited file/symbol.
+Missing path → P-VER failure mode 4 (hallucinated infrastructure); you
+surface the gap before P-VER catches it for you, either by amending the
+SRD (where the path was misnamed) or by reclassifying to `deferred` with
+a canonical need identifier.
+
+For each `deferred` entry, you confirm the canonical need identifier
+follows the recipe defined in `TDD §Canonical Identifiers` for the
+change — `{noun}-{noun}-{vendor-or-scope}`. The slice-end review reads
+these identifiers to aggregate cross-slice; an ad-hoc identifier breaks
+the aggregation.
+
+### Surfacing contradictions (UC-002 alt-A — MUST)
+
+When your TDD's concretion of a strategy contradicts the SRD's plan —
+for example, the SRD says *"test against real Stripe sandbox"* but your
+TDD's design has no auth seam at which a sandbox endpoint can be
+swapped in — **you MUST NOT silently override.** You surface the
+contradiction explicitly in one of three routes:
+
+1. **An inline callout** at the contradicting line in your TDD:
+   `**Contradiction with SRD:** {what the SRD said} → {what the TDD
+   proposes}` plus one paragraph of rationale.
+2. **A `## Open Architecture Questions` row** at the bottom of the TDD
+   when the contradiction cannot be resolved inside the TDD alone (the
+   founder needs to choose between the SRD's plan and the TDD's
+   constraint).
+3. **An ADR** when the contradiction is a design decision worth
+   recording (e.g., "We chose recording-mock over real sandbox because
+   the sandbox endpoint requires PCI scope we lack"). An ADR is the
+   right route when the contradiction reflects a deliberate trade-off,
+   not a gap.
+
+When the contradiction is load-bearing — the SRD's plan is impossible
+in this design — escalate to the founder before producing the TDD.
+Silent override is forbidden: the founder reading the merged plan must
+see where SRD intent met TDD constraint.
+
+### TDD output spec — Verification Plan section
+
+Every TDD you produce includes a `## Verification Plan` section at the
+end (the same heading the SRD uses — locked by ADR-001). Inside it,
+populate the six subsections named above, concretised per this section.
+The TDD's section carries the HTML-comment annotation shape so P-VER's
+citation-presence check finds it.
+
+The TDD's Verification Plan section is the source the per-WP
+`verification:` frontmatter field reads from. ADR-003 locks three
+discriminated shapes for that field:
+
+- **Shape 1 — concrete:** `adapter: <kind>` + `artifact: <test path>`.
+  Used when the WP ships a real test the moment it lands.
+- **Shape 2 — deferred:** `adapter: <kind>` +
+  `deferred-to-follow-on: <canonical-need-identifier>`. Used when the
+  WP cannot ship its own test (the infrastructure piece is the
+  follow-on change).
+- **Shape 3 — trivial carveout:** `na: true` + `justification: "..."`
+  (≥ 30 substantive chars). Used when CW-05 trivial-change carveout
+  applies — comment-only edits, mechanical renames with no behaviour
+  change.
+
+For each integration row in your TDD's Verification Plan, name the
+shape your downstream WP will use (concrete / deferred / trivial) so
+`/sulis:plan-work` emits the correct frontmatter without guessing.
+Naming the shape inline (e.g., *"concrete — `tests/api/test_orders.py::test_post`"*
+or *"deferred — `recording-mock-sendgrid`"*) is enough.
 
 ---
 
@@ -799,6 +970,10 @@ you make.
 - `references/boring-code.md` — The Green-stage code standard.
 - `references/hardening-deltas.md` — The brownfield delta format.
 - `references/architecture-patterns.md` — The pattern catalogue.
+- `plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md` — The
+  canonical 20-question verification set + the kind→adapter table. You
+  read this at design time when populating the TDD's `## Verification
+  Plan` section; do not inline the question text or the adapter rows.
 
 ---
 
