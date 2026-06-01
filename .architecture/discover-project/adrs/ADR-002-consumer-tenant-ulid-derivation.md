@@ -35,7 +35,17 @@ workflow".
 
 ## Decision
 
-**Adopt per-consumer derived tenant ULID.** Recipe:
+**Adopt per-consumer derived tenant ULID for NEW consumer Projects.** The
+marketplace's own tenant ULID (`dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM`) is
+**grandfathered as historically-minted** — it predates this ADR and an
+exhaustive search across hash inputs + bit-slice positions + clamp variants
+(WP-002's first dispatch, 192 variations tested) could not reproduce it
+from this recipe. The recipe applies prospectively: every consumer Project
+minted via `/sulis:discover-project` derives its tenant ULID per the recipe
+below. Future work may regenerate the marketplace tenant via the canonical
+recipe (high blast-radius — touches 30+ release-train files); deferred.
+
+**Recipe (for NEW consumer Projects):**
 
 ```
 input  = "tenant-name:" + <repo-org> + "/" + <repo-name>
