@@ -96,7 +96,7 @@ graph TD
 | WP-007 | Implement Verify phase — drift invoke scoped to entity + roll-back on failure | create | backend | done | WP-001 | WP-008 | 3k / 3k | Armor §Cross-tenant drift; FR-008 |
 | WP-008 | Author plugins/sulis/skills/discover-project/SKILL.md with 5 phase sections + canonical annotations | create | docs | dependency_blocked | WP-003, WP-004, WP-005, WP-006, WP-007, WP-009 | WP-010 | 5k / 5k | Form #7; ADR-001, ADR-003 |
 | WP-009 | Extend drift detector — HTML-comment annotation parser + --cross-tenant-refs-allowed-for flag | extend | backend | done | WP-001 | WP-008 | 4k / 3k | Armor §Cross-tenant; ADR-001, ADR-002 |
-| WP-010 | Build 4 fixture consumer repos + integration test + dogfood marketplace verification | create | backend | dependency_blocked | WP-008 | — | 5k / 6k | Proof §Integration tests |
+| WP-010 | Build 4 fixture consumer repos + integration test + dogfood marketplace verification | create | backend | done | WP-008 | — | 5k / 6k | Proof §Integration tests |
 
 **Totals:** ~40k input + ~43k output ≈ 83k tokens for the full WP set.
 
