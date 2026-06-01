@@ -98,7 +98,7 @@ of it. WP-008 is the terminal sink (everything blocks it).
 
 | ID | Title | Primitive | Kind | Status | Depends On | Blocks | Token (in/out) | TDD § |
 |---|---|---|---|---|---|---|---|---|
-| WP-001 | Author canonical `VERIFICATION_QUESTIONS.md` (20 questions + 7-adapter table + version) | create | docs | pending | — | WP-002..008 | 2k / 5k | Form §canonical (line 129); FR-006, FR-007 |
+| WP-001 | Author canonical `VERIFICATION_QUESTIONS.md` (20 questions + 7-adapter table + version) | create | docs | done | — | WP-002..008 | 2k / 5k | Form §canonical (line 129); FR-006, FR-007 |
 | WP-002 | Extend `decompose-validation-rubric.md` with P-VER (8 failure modes + grandfather + merge-date constant) | extend | docs | pending | WP-001 | WP-005, WP-007, WP-008 | 4k / 4k | Form §rubric (line 130); Armor §gate-integrity; FR-009, FR-014, FR-016 |
 | WP-003 | Extend `requirements-analyst.md` agent prompt — Phase 3 question-asking + canonical citation | extend | docs | pending | WP-001 | WP-008 | 5k / 3k | Form §requirements-analyst (line 131); FR-003 |
 | WP-004 | Extend `engineering-architect.md` agent prompt — concretion questions + SRD↔TDD contradiction surfacing | extend | docs | pending | WP-001 | WP-008 | 3k / 3k | Form §engineering-architect (line 132); FR-004 |
