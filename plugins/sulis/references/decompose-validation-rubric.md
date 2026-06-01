@@ -1,3 +1,7 @@
+---
+verification_required_from: ""    # ISO-8601 date; filled in by `sulis-change finish` at merge of CH-01KT2B (verification-by-design). Empty string means P-VER applies to every change for which it can resolve `started_at` (the NFR-005 dogfood gate); a filled value gates P-VER on changes whose `started_at` postdates it (the ADR-002 grandfather scope).
+---
+
 # Decompose Validation Rubric
 
 <!-- summary -->
@@ -10,7 +14,7 @@ SDK validation rubric pattern — explicit phases, severity convention,
 verdict computation, output report alongside `INDEX.md`.
 <!-- /summary -->
 
-> **Version:** 0.1.0
+> **Version:** 0.3.0
 > **Status:** Active — Calibration Period (90 days from 2026-05-22)
 > **Applies to:** `/sulis:plan-work` (SEA v0.19.0+). Designed to be invoked
 > automatically by the decompose skill at the end of its workflow.
@@ -119,6 +123,7 @@ in plain English and returns control to the founder.
 | 6 Peer-collision risk | ... | ... | ... |
 | 7 ServiceSpec compliance (Lovable Test) | ... | ... | ... |
 | 8 Cross-WP identifier canonicalisation | ... | ... | ... |
+| 9 P-VER (Verification Plan) | ... | ... | ... |
 
 ---
 
@@ -152,6 +157,7 @@ The validating agent attests:
 - [✓] **P6 Peer-collision risk.** Cross-WP file-create scan. <K> collision pairs detected.
 - [✓] **P7 ServiceSpec compliance.** <N> manifests parsed via `sulis-validate-servicespec`. Lovable Test: <K> manifests PASS, <M> PASS-WITH-RATIONALE, <B> FAIL. Aggregate MUST failures: <count>.
 - [✓] **P8 Cross-WP identifier canonicalisation.** <K> cross-WP shared identifiers extracted from WP Contracts. <M> resolve to an authoritative upstream source (TDD section / ADR / instance file). <N> inline identifiers flagged — see /sulis:plan-work step 7c for the remediation path.
+- [✓] **P9 P-VER (Verification Plan).** <N> artifacts checked (SRD + TDD + WP set). Section presence: <K> pass / <M> fail. Placeholder scan: <K> pass / <M> fail. Citation presence: <K> pass / <M> fail. Per-WP `verification:` field: <K> pass / <M> fail. Grandfather: <N> grandfathered changes skipped.
 ```
 
 ---
@@ -364,6 +370,137 @@ the identifier is sourced, not invented.
 
 ---
 
+## Phase 9 — P-VER (Verification Plan)
+
+The phase that addresses the **design-time verification gap**: the
+methodology refinement (CH-01KT2B) asks the verification questions
+at `/sulis:specify`, `/sulis:draft-architecture`, and
+`/sulis:plan-work` time, and this rubric check enforces that the
+answers exist + have substance + cite the canonical question set
+at
+[`plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md`](standards/VERIFICATION_QUESTIONS.md).
+
+<!-- VERIFICATION_QUESTIONS source: plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md v1.0.0 -->
+
+**This rubric does not duplicate the question text.** The eight
+failure modes below test the *presence and shape* of the answers
+each consumer artifact (SRD, TDD, WP) records — the questions
+themselves live in the canonical, and consumers cite it by relative
+path (NFR-004 single-source-of-truth, MUC-003 defence).
+
+Anchor cases: `release-train` and `discovery` both shipped without
+end-to-end verification, surfacing two latent defects post-merge.
+P-VER is the mechanical gate that turns *"verification can't be
+bolted on at the end"* into an enforceable contract.
+
+### Grandfather sub-phase
+
+Before any 9.01..9.08 check runs, the rubric resolves the
+grandfather verdict (per [ADR-002](../../.architecture/verification-by-design/adrs/ADR-002-must-scope-from-merge-date.md)
+and [ADR-006](../../.architecture/verification-by-design/adrs/ADR-006-grandfathering-edit-policy.md)):
+
+1. Read the `verification_required_from:` constant from this file's
+   YAML front matter. (Filled in by `sulis-change finish` when
+   CH-01KT2B merges to `dev`. Empty until then.)
+2. Read `started_at` from `.changes/{slug}.yaml` for the candidate
+   change.
+3. Compare:
+   - If `verification_required_from` is **empty** (pre-merge state —
+     the dogfood case): run all 9.01..9.08 checks against the live
+     artifacts. NFR-005 — the change cannot merge unless its own
+     rubric passes against its own artifacts.
+   - If `started_at` **precedes** `verification_required_from`:
+     return `PASS — grandfathered` and skip all 9.01..9.08 checks.
+     A typo fix on a grandfathered change inherits this verdict
+     (ADR-006 — edits do not retroactively trigger compliance).
+   - If `started_at` is **on or after** `verification_required_from`:
+     run all 9.01..9.08 checks.
+   - If `started_at` is **missing or unparseable**: fall back to
+     "not grandfathered" and apply P-VER normally. A change record
+     without a parseable start timestamp cannot prove its
+     grandfather eligibility.
+
+The trigger is the change record's `started_at` value, **not** the
+lines of code being edited. A new `CH-NNNNNN` created after the
+merge date is gated by P-VER even if it patches code shipped by a
+grandfathered ancestor (ADR-006 substantial-backfill clause).
+
+### Failure modes
+
+The eight checks below are the Armor pillar's gate-integrity
+primitives — one per MUC system response in
+[`MISUSE_CASES.md`](../../.architecture/verification-by-design/MISUSE_CASES.md)
+and one per failure mode in the TDD's
+[Armor pillar table](../../.architecture/verification-by-design/TDD.md).
+
+| ID | Severity | Check | Pass criterion | Source MUC + TDD row |
+|---|---|---|---|---|
+| **9.01** | MUST | `## Verification Plan` section present in the SRD and TDD under inspection | Regex `^##\s+Verification\s+Plan$` matches in each artifact | (structural — ADR-001 anchors the literal heading) |
+| **9.02** | MUST | No placeholder content in any required subsection | Block-list scan (`TBD`, `tbd`, `todo`, `…`, bare blanks) + ≥30 substantive characters per subsection | MUC-001 / TDD Armor row 1 |
+| **9.03** | MUST | Subsections answering `n/a` carry a ≥30-character justification on the same line or the next line | Per-subsection scan; bare `n/a` without justification fails | MUC-008 / TDD Armor row 8 |
+| **9.04** | MUST | Named `existing` infrastructure paths resolve to real files in the repo | Repo grep against each cited path in the artifact's "Per-integration verification strategy" subsection | MUC-002 / TDD Armor row 2 |
+| **9.05** | MUST | The change's `kind:` value has an adapter row in the canonical's kind-to-adapter table | Lookup the change record's `kind:` against `VERIFICATION_QUESTIONS.md` adapter table; fail with the FR-008 verbatim instruction if absent | MUC-007 / TDD Armor row 7 |
+| **9.06** | MUST | The artifact contains a literal citation to `VERIFICATION_QUESTIONS.md` | Regex match on the canonical's relative path + the HTML-comment annotation shape (`<!-- VERIFICATION_QUESTIONS source: … vX.Y.Z -->`) | MUC-003 / TDD Armor row 3 |
+| **9.07** | MUST | The citation's version is within currency of the canonical's `version` field | Parse canonical's `version:` front-matter value; parse citation's annotation version; fail if more than one minor version behind | MUC-004 / TDD Armor row 4 |
+| **9.08** | MUST | Per-WP `verification:` frontmatter present + adapter matches the change's `kind:` | YAML parse of each WP file's frontmatter; the `verification.adapter` value must equal the change `kind:` (or be one of the additional-adapters listed in the WP) | MUC-006 + MUC-007 / TDD Armor rows 6 + 7 |
+
+### Verdict semantics
+
+A Phase 9 MUST failure halts decomposition. The skill reports the
+blocking gap to the founder with this exact failure-message shape:
+
+```
+P-VER: {check ID} failed for {artifact path}.
+Remediation: {one-line action}.
+```
+
+Remediation strings are founder-readable (FE-04 — concrete
+next-action, no jargon). The intent is that a founder reading the
+error knows exactly which file to open and what to add. Sample
+remediations the rubric implementation should emit:
+
+- **9.01 failure:** *"Add a `## Verification Plan` heading to
+  `<artifact>` and populate the six subsections. Template at
+  `plugins/sulis/skills/requirements-templates/SKILL.md` § Verification
+  Plan template."*
+- **9.02 failure:** *"Subsection '`<name>`' in `<artifact>` is a
+  placeholder. Replace `TBD` with a concrete answer of at least 30
+  characters — see Q1..Q4 in
+  `plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md`."*
+- **9.03 failure:** *"Subsection '`<name>`' answers `n/a` without
+  justifying why. Add a sentence explaining why this subsection
+  legitimately does not apply (Q9 / Q17 guidance in the canonical)."*
+- **9.04 failure:** *"`<artifact>` claims `existing` infrastructure at
+  `<path>`, but no file at that path exists in the repo. Either fix
+  the path, classify the integration as `deferred` with a canonical
+  need identifier, or remove the entry."*
+- **9.05 failure:** *"Change `kind: <value>` has no adapter row in
+  `plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md`. Add
+  the row via a methodology change (ADR-007), then re-run P-VER."*
+- **9.06 failure:** *"`<artifact>` is missing the citation to
+  `plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md`. Add
+  the canonical HTML-comment annotation immediately before the
+  `## Verification Plan` section."*
+- **9.07 failure:** *"`<artifact>` cites `VERIFICATION_QUESTIONS.md
+  v<X>.<Y>.<Z>`, but the canonical is now `v<A>.<B>.<C>`. Re-read the
+  canonical and update the annotation; check whether any question has
+  been added that affects this artifact."*
+- **9.08 failure:** *"WP `<file>` is missing the `verification:`
+  frontmatter field — or its `adapter:` value (`<got>`) does not match
+  the change's `kind:` (`<expected>`). See ADR-003 for the three
+  valid shapes (concrete / deferred / trivial carveout)."*
+
+A SHOULD failure does not currently exist in this phase — every
+9.01..9.08 check is MUST. A future calibration pass may demote
+specific checks to SHOULD if false-positive data warrants (per the
+Calibration section below).
+
+**Pass-with-rationale** does not apply to P-VER. The eight checks
+are gates, not heuristics; a failure is a real defect or a real
+grandfather verdict, never a stylistic preference.
+
+---
+
 ## Anti-patterns for the validation run itself
 
 The validating agent must NOT:
@@ -422,3 +559,4 @@ where two parallel WPs both created `apps/api/sulis/shared/workflows/loader/__in
 |---|---|---|
 | 0.1.0 | 2026-05-22 | Initial release. 6 phases. ~30 checks. Anchor case: platform-repo loader/__init__.py collision. |
 | 0.2.0 | 2026-06-01 | Added Phase 8 — Cross-WP identifier canonicalisation. Anchor case: CH-01KSZ4 release-train wave-1 tenant-ULID divergence between WP-003 and WP-004. Mechanical analog of `/sulis:plan-work` step 7c. |
+| 0.3.0 | <date filled at merge> | Added Phase 9 — P-VER (Verification Plan). 8 failure-mode checks (9.01..9.08) + grandfather sub-phase + `verification_required_from:` merge-date constant in front matter. Anchor cases: release-train + discovery dogfood — both shipped without end-to-end verification, surfacing two latent defects post-merge. (CH-01KT2B verification-by-design.) |
