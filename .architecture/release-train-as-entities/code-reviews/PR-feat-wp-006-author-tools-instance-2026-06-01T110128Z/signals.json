@@ -1,0 +1,58 @@
+{
+  "timestamp": "2026-06-01T11:01:28Z",
+  "target": {
+    "branch": "feat/wp-006-author-tools-instance",
+    "base": "change/create-release-train-as-entities",
+    "head_sha": "c66343d",
+    "wp": "WP-006"
+  },
+  "diff_stats": {
+    "lines_added": 925,
+    "lines_removed": 0,
+    "files_changed": 13,
+    "declarative_ratio": 0.92
+  },
+  "pr_hygiene": {
+    "ph_01_scope": {
+      "commit_type_spread": ["feat(release-train)"],
+      "module_fan_out": 3,
+      "severity": "clean"
+    },
+    "ph_02_size": {
+      "lines": 925,
+      "files": 13,
+      "declarative_ratio_adjustment": "downgraded from medium to low — 12 of 13 files are declarative JSON Schemas / JSON-LD entity instances, not executable code",
+      "severity": "low"
+    },
+    "ph_03_safety": {
+      "migration_count": 0,
+      "schema_idl_count": 0,
+      "infra_files": 0,
+      "lock_files": 0,
+      "secret_pattern_hits": 0,
+      "severity": "clean"
+    },
+    "ph_04_completeness": {
+      "new_source_without_test": 0,
+      "new_source_files": 12,
+      "new_test_files": 1,
+      "api_change_without_schema": false,
+      "severity": "clean"
+    }
+  },
+  "build_verification": {
+    "tests_run": 1206,
+    "tests_passed": 1206,
+    "tests_failed": 0,
+    "pr_introduced_errors": 0,
+    "json_schema_metaschema_valid": 11,
+    "json_schema_metaschema_invalid": 0
+  },
+  "lens_findings": {
+    "architecture": {"count": 0, "outcome": "nothing surfaced"},
+    "security": {"count": 0, "outcome": "nothing surfaced"},
+    "quality": {"count": 0, "outcome": "nothing surfaced"}
+  },
+  "verdict": "PASS",
+  "auto_downgrade_triggers": []
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/release-train/tool/changeset-cumulative-tier/input/1.0.0",
+  "title": "_changeset.cumulative_tier — input",
+  "description": "Input for the SemVer-max-over-batch tier calculation. Mirrors plugins/sulis/scripts/_changeset.py::cumulative_tier(changesets). Per ADR-003 Blue invariant: describes only the load-bearing fields, not exhaustive.",
+  "type": "object",
+  "required": ["changesets"],
+  "additionalProperties": false,
+  "properties": {
+    "changesets": {
+      "type": "array",
+      "description": "Parsed changeset dicts; each MAY carry a `tier` field. Items without a `tier` are ignored; empty list → null result.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "tier": {"enum": ["patch", "minor", "major"]},
+          "primitive": {"type": "string"}
+        }
+      }
+    }
+  }
+}

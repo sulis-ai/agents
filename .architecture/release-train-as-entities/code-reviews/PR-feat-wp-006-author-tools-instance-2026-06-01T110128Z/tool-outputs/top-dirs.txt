@@ -1,0 +1,3 @@
+plugins/sulis/brain
+plugins/sulis/instances
+plugins/sulis/scripts

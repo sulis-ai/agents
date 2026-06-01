@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/release-train/tool/gh-pr-create/output/1.0.0",
+  "title": "gh-pr-create — output",
+  "description": "Output: identifying coordinates of the opened PR. `gh pr create` prints the PR URL on success; the workflow extracts {number, url, head_sha}. Per ADR-003 Blue invariant: load-bearing identifiers only.",
+  "type": "object",
+  "required": ["url"],
+  "additionalProperties": false,
+  "properties": {
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "the opened PR's HTML URL — what `gh pr create` echoes on stdout"
+    },
+    "number": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "the PR number (extracted from the URL tail)"
+    },
+    "head_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$",
+      "description": "the commit SHA at the head of the PR's source branch"
+    }
+  }
+}

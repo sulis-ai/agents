@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/release-train/tool/gh-pr-create/input/1.0.0",
+  "title": "gh-pr-create — input",
+  "description": "Input for `gh pr create` invocation — the most-used GitHub seam. Mirrors the gh CLI surface used by Step 6 (open-release-pr). Per ADR-003 Blue invariant: describes only the load-bearing fields the release-train workflow actually sets.",
+  "type": "object",
+  "required": ["title", "body", "base", "head"],
+  "additionalProperties": false,
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "PR title (e.g. 'release: sulis v0.86.0 (minor)')",
+      "minLength": 1
+    },
+    "body": {
+      "type": "string",
+      "description": "PR body — markdown, may be empty but key MUST be present"
+    },
+    "base": {
+      "type": "string",
+      "description": "target branch (typically 'main')",
+      "minLength": 1
+    },
+    "head": {
+      "type": "string",
+      "description": "source branch (typically 'release/auto' or 'release/sulis-vX.Y.Z')",
+      "minLength": 1
+    },
+    "draft": {
+      "type": "boolean",
+      "description": "open as draft; defaults to false"
+    }
+  }
+}

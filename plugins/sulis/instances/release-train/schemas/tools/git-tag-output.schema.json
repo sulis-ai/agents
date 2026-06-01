@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/release-train/tool/git-tag/output/1.0.0",
+  "title": "git-tag — output",
+  "description": "Output: the locally-created tag's name. `git tag` prints nothing on success; the workflow records the tag string for the subsequent push-tag + release-create Steps.",
+  "type": "object",
+  "required": ["tag"],
+  "additionalProperties": false,
+  "properties": {
+    "tag": {
+      "type": "string",
+      "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "the tag name that was created locally"
+    }
+  }
+}
