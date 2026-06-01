@@ -1,0 +1,50 @@
+{
+  "timestamp": "2026-06-01T11:25:03Z",
+  "target": "feat/wp-002-author-steps-instance",
+  "base": "change/create-release-train-as-entities",
+  "project": "release-train-as-entities",
+  "diff": {
+    "files_changed": 3,
+    "lines_added": 875,
+    "lines_removed": 0
+  },
+  "ph_01_scope": {
+    "commit_type_spread": ["feat"],
+    "module_fan_out": 1,
+    "severity": "clean"
+  },
+  "ph_02_size": {
+    "lines_added": 875,
+    "lines_removed": 0,
+    "files_changed": 3,
+    "generated_ratio": 0.15,
+    "lock_file_ratio": 0,
+    "severity": "low",
+    "justification": "Data-heavy: 130 lines vendored schema (verbatim from upstream) + 389 lines canonical entity data (15 near-identical Step records, ~26 lines each) + 356 lines test scaffolding. No logic surface."
+  },
+  "ph_03_safety": {
+    "migration_count": 0,
+    "schema_idl_count": 0,
+    "infra_files": 0,
+    "secret_pattern_hits": 0,
+    "lock_files": 0,
+    "severity": "clean"
+  },
+  "ph_04_completeness": {
+    "new_source_without_test": 0,
+    "new_tests": 1,
+    "api_change_without_schema": false,
+    "severity": "clean"
+  },
+  "build_verification": {
+    "introduced_errors": 0,
+    "tools_run": ["ruff-check", "ruff-format", "pytest", "json.load-jsonld"]
+  },
+  "lens_summary": {
+    "architecture": {"findings": 0, "note": "data file + test only; no resilience/observability/secrets surface"},
+    "security": {"findings": 0, "note": "no auth/authz/IO/network surface; tenant ULID is deterministic hash not secret"},
+    "quality": {"findings": 0, "note": "all 7 quality outputs produced; no dead surface, no contract drift, tests proportional to contract surface, no CR-10 anti-patterns"}
+  },
+  "verdict": "PASS",
+  "auto_downgrade_triggers": []
+}
