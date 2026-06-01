@@ -112,7 +112,13 @@ class StrictDriftMatcher:
         Returns the list of (step_name, unresolved_tool_ref) pairs. Empty list
         means every Step's tool_ref resolves.
         """
-        tool_ids = {t["id"] for t in canonical_tools}
+        # Filter to entries that have an `id` field. Tool entries can be
+        # `_reused_from` descriptor rows (a documented convention from
+        # WP-001's tools.jsonld authoring) that point to a Tool defined
+        # elsewhere — they don't have their own `id` and don't participate
+        # in this `tool_ref` resolution. Bug surfaced when WP-008's drift
+        # check ran against discover-project's tools.jsonld; refs CH-01KT1W.
+        tool_ids = {t["id"] for t in canonical_tools if "id" in t}
         unresolved: list[tuple[str, str]] = []
         for step in canonical_steps:
             tool_ref = step.get("tool_ref")
