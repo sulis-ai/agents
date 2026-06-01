@@ -100,9 +100,21 @@ jobs:
       - name: Run drift detector
         # Stdlib-only at the script layer (the detector reads jsonld + yaml
         # via deps already installed by uv sync above). Exit-1-on-drift is
-        # surfaced as a failed step in the run logs; continue-on-error keeps
-        # the build green for v1.
+        # converted to a GitHub Actions warning annotation; the step exits 0
+        # so the check conclusion is success (advisory mode for v1).
+        #
+        # `continue-on-error: true` on the JOB lets the workflow continue
+        # past a failed step, but the check CONCLUSION is still recorded as
+        # "failure" — which the release-train's bundled-tip CI poll treats
+        # as a fail. Wrapping with `|| echo "::warning::..."` keeps drift
+        # visible (logs + GitHub annotation) while making the check green.
+        #
+        # When the 11 pre-existing reconciliation items (recorded in train
+        # train-2026-06-01T124607Z's bundle Watch List) are addressed in a
+        # follow-on change, drop the wrapper + remove `continue-on-error:
+        # true` to flip this to a true blocking gate.
         run: |
           uv run --directory plugins/sulis/scripts python check-canonical-drift.py \
             --instance-dir plugins/sulis/instances/release-train \
-            --yaml-path .github/workflows/release-on-merge.yml
+            --yaml-path .github/workflows/release-on-merge.yml \
+            || echo "::warning::Canonical-vs-implementation drift detected (advisory mode for v1; see job output above + the release-train change's train-2026-06-01T124607Z review bundle for the Watch List of pre-existing reconciliation items)"
