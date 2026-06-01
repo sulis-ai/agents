@@ -37,8 +37,14 @@ _REPO_ROOT = Path(__file__).resolve().parents[5]
 _WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "branch-ci.yml"
 
 _JOB_KEY = "canonical-drift-check"
-_INSTANCE_ARG = "--instance-dir plugins/sulis/instances/release-train"
-_YAML_ARG = "--yaml-path .github/workflows/release-on-merge.yml"
+# Path fragments — match either relative or $GITHUB_WORKSPACE-absolute forms.
+# The absolute form is required at CI time because `uv run --directory ...`
+# changes the working directory before the Python script runs (refs
+# CH-01KT1Z).
+_INSTANCE_DIR_FRAGMENT = "plugins/sulis/instances/release-train"
+_INSTANCE_ARG = "--instance-dir"  # presence of the flag itself
+_YAML_PATH_FRAGMENT = ".github/workflows/release-on-merge.yml"
+_YAML_ARG = "--yaml-path"
 _SCRIPT_INVOCATION = "check-canonical-drift.py"
 
 
@@ -170,8 +176,16 @@ def test_drift_check_job_invokes_script_with_contracted_args():
     assert _INSTANCE_ARG in run_text, (
         f"job '{_JOB_KEY}' missing required arg: {_INSTANCE_ARG}"
     )
+    assert _INSTANCE_DIR_FRAGMENT in run_text, (
+        f"job '{_JOB_KEY}' --instance-dir value must reference "
+        f"'{_INSTANCE_DIR_FRAGMENT}' (relative or $GITHUB_WORKSPACE-absolute)"
+    )
     assert _YAML_ARG in run_text, (
         f"job '{_JOB_KEY}' missing required arg: {_YAML_ARG}"
+    )
+    assert _YAML_PATH_FRAGMENT in run_text, (
+        f"job '{_JOB_KEY}' --yaml-path value must reference "
+        f"'{_YAML_PATH_FRAGMENT}' (relative or $GITHUB_WORKSPACE-absolute)"
     )
 
 
