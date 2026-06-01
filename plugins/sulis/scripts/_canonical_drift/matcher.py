@@ -154,3 +154,29 @@ class StrictDriftMatcher:
         marketplace = json.loads(marketplace_json_path.read_text())
         registered = {p["name"] for p in marketplace.get("plugins", [])}
         return [p["name"] for p in canonical_projects if p["name"] not in registered]
+
+
+# ─── Cross-tenant boundary check (WP-009 / ADR-002) ──────────────────────
+
+
+def cross_tenant_ref_is_allowed(
+    field_name: str, allowed_cross_tenant_fields: list[str]
+) -> bool:
+    """Is a cross-tenant reference on this field name a recognised pattern?
+
+    Per ADR-002 (discover-project): a consumer Project carries
+    `belongs_to_tenant: <consumer-tenant>` while
+    `release_workflow_ref` points at the marketplace tenant's
+    Workflow — a valid cross-tenant boundary, not drift.
+
+    The detector's caller passes the allow-list via
+    `--cross-tenant-refs-allowed-for=<field-name>[,<field-name>...]`.
+    Default empty preserves the pre-extension stricter-by-default
+    behaviour: every cross-tenant reference is treated as drift
+    unless explicitly opted-in.
+
+    Returns True iff `field_name` appears in the allow-list. The
+    helper is a single source of truth so the resolver does not
+    duplicate the membership check across ref types.
+    """
+    return field_name in allowed_cross_tenant_fields
