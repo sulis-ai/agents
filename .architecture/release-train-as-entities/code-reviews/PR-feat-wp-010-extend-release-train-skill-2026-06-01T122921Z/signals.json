@@ -1,0 +1,49 @@
+{
+  "review_id": "PR-feat-wp-010-extend-release-train-skill-2026-06-01T122921Z",
+  "wp": "WP-010",
+  "project": "release-train-as-entities",
+  "branch_head": "feat/wp-010-extend-release-train-skill",
+  "branch_base": "change/create-release-train-as-entities",
+  "base_sha": "044555dbdaa3573bac0cfad831bb6a1a3e94b887",
+  "timestamp": "2026-06-01T122921Z",
+  "verdict": "PASS",
+  "build_verification": {
+    "errors": 0,
+    "commands_run": ["ruff check", "ruff format --check", "pytest tests/unit/test_release_train_skill_dry_run_section.py", "pytest tests/unit/ (regression)"],
+    "regression_suite": {"tests_passed": 1237, "tests_failed": 0}
+  },
+  "pr_hygiene": {
+    "PH-01_scope": {"severity": "low", "commit_types": ["docs/feat"], "module_fan_out": 2},
+    "PH-02_size": {"severity": "low", "lines_added": 247, "lines_removed": 0, "files_changed": 2},
+    "PH-03_safety": {"severity": "none", "migrations": 0, "schemas": 0, "secrets": 0, "infra": 0},
+    "PH-04_completeness": {"severity": "none", "new_source_without_test": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "checked": ["dependency-direction", "resilience", "observability", "verification"], "outcome": "nothing-surfaced"},
+    "security": {"findings": 0, "checked": ["SEC-01..07", "SC-01..04", "INF-04"], "outcome": "nothing-surfaced"},
+    "quality": {"findings": 0, "checked": ["build-verification", "jsx-scan-n/a", "dead-surface", "contract-drift", "test-coverage", "style", "CR-10-perf-1..10"], "outcome": "nothing-surfaced"}
+  },
+  "findings_in_changes": [],
+  "findings_in_neighbours": [],
+  "watch_list": [
+    {
+      "id": "WL-001",
+      "file": "plugins/sulis/scripts/tests/unit/test_release_train_skill_dry_run_section.py",
+      "note": "dry_run_section fixture finds the section by first-match heading scan; a future edit adding a second matching heading would silently pick the first. Standard one-shot structural-test behaviour, dropped at low/neighbour per CR-05.",
+      "severity": "low",
+      "actionable": false
+    }
+  ],
+  "hardening_deltas_drafted": 0,
+  "self_attestation": {
+    "CR-01": "passed",
+    "CR-02": "single-reader justified (247 lines / 2 files, single concern)",
+    "CR-03": "full reads — SKILL.md (496 lines) + test (188 lines) both end-to-end",
+    "CR-04": "no findings; watch-list cites by file name",
+    "CR-05": "0 critical / 0 high / 0 medium / 0 low",
+    "CR-06": "verdict PASS, no auto-downgrade triggers fired",
+    "CR-07": "all three lenses produced output (all 'nothing-surfaced')",
+    "CR-08": "this attestation present",
+    "CR-09": "PH-01..04 all low/none; no PH-03 high to trigger downgrade"
+  }
+}
