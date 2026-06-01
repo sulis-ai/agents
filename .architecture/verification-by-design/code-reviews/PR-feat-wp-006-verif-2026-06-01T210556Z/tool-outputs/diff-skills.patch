@@ -1,0 +1,290 @@
+diff --git a/plugins/sulis/skills/draft-architecture/SKILL.md b/plugins/sulis/skills/draft-architecture/SKILL.md
+index a6a329d..c54b4e9 100644
+--- a/plugins/sulis/skills/draft-architecture/SKILL.md
++++ b/plugins/sulis/skills/draft-architecture/SKILL.md
+@@ -21,6 +21,20 @@ If no SRD specification exists, stop and tell the user — refer them to
+ 
+ These standards shape the TDD + the new contract artifacts (step 3.5):
+ 
++<!-- VERIFICATION_QUESTIONS source: plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md v1.0.0 -->
++
++- `../../references/standards/VERIFICATION_QUESTIONS.md` — the canonical
++  20-question set (foundational Q1-Q4 + per-integration Q5-Q13 + per-kind
++  Q14-Q20) and the seven-row kind→adapter table. The TDD this skill
++  produces MUST carry a populated `## Verification Plan` section
++  (literal heading per ADR-001) with six subsections referencing
++  questions by ID, never inlining them. The engineering-architect agent
++  is the one that walks the questions; this skill is the orchestrator
++  that ensures the resulting TDD section is present and that **P-VER**
++  is invoked against the TDD before stage completion (FR-002, FR-009).
++  Cross-reference: [`ADR-001`](../../../.architecture/verification-by-design/adrs/ADR-001-section-name-verification-plan.md)
++  fixes the section name; [`decompose-validation-rubric.md`](../../references/decompose-validation-rubric.md)
++  §Phase 9 hosts the P-VER check.
+ - `../../references/standards/CONTRACT_FIRST_STANDARD.md` — the **data
+   contract** seam discipline (two-axis model, three-category error model,
+   stubs include error/empty cases, transport binding).
+@@ -151,6 +165,7 @@ The TDD has a fixed structure. Each section maps to MECE-3 pillars. See
+ 6. **Trade-offs** — patterns chosen, alternatives rejected, with one-line reasons
+ 7. **Open questions** — anything the SRD does not specify that the architecture needs
+ 8. **Canonical Identifiers** *(if any cross-WP identifiers are foreseen)* — when the design foresees parallel WPs cross-referencing a shared identifier (ULID, slug, version literal, namespace, `dna:*:*` shape), pre-mint that identifier here OR author a paired `ADR-NN-canonical-identifiers.md`. Document the minting recipe (e.g. `SHA256(name) → Crockford base32`) so a future regenerate produces the same value. Without this, parallel-dispatched executors each invent their own value and they diverge — anchor case CH-01KSZ4 release-train wave-1 tenant ULID. `/sulis:plan-work` step 7c + Decompose Validation Rubric Phase 8 are the downstream gates that catch a missing canonical source.
++9. **`## Verification Plan`** *(MUST — verbatim heading per ADR-001)* — the design-time commitment to how this work will be verified. The six required subsections, in order: (1) "What user-observable behaviour are we verifying?" — populated from the foundational Q1-Q4; (2) "Verification environment(s)" — local / staging / ephemeral / production-shadow; (3) "Bootstrap-from-zero case" — what verification looks like before any data exists (the anchor failure mode for the release-train + discovery dogfood incidents that motivated this change); (4) "Per-integration verification strategy" — per-touched-integration verdict against Q5-Q13 (real / recorded / simulated / none-with-justification); (5) "Per-kind verification adapter" — the one-liner from the seven-row table in `references/standards/VERIFICATION_QUESTIONS.md` for this change's `kind:`; (6) "Infrastructure needs surfaced (deferred)" — entries that ADR-005's slice-end auto-draft picks up to create follow-on changes. The engineering-architect agent populates this section from the canonical's question set; this skill's Workflow step (after pillar coverage) invokes **P-VER** against the produced TDD before stage completion.
+ 
+ ### ADRs
+ 
+@@ -450,6 +465,35 @@ If extending or superseding, reference the existing ADR by path.}
+ 
+     For services that are explicitly bridge handlers over an existing system (BYOS per SPEC-006), call this out in the manifest's metadata and produce the bridge-side contract in the same shape — the registration substrate is identical for BWS and BYOS.
+ 
++10.5. **Invoke P-VER on the produced TDD + WP set (MUST).** Once the TDD,
++    ADRs, and ServiceSpec manifests are written, run the P-VER rubric
++    check from
++    [`plugins/sulis/references/decompose-validation-rubric.md`](../../references/decompose-validation-rubric.md)
++    §Phase 9 against the produced artifacts. P-VER asserts: (a) the
++    TDD's `## Verification Plan` section is present per ADR-001's
++    literal heading; (b) all six required subsections per
++    [`VERIFICATION_QUESTIONS.md`](../../references/standards/VERIFICATION_QUESTIONS.md)
++    are populated with substantive content (the placeholder block-list
++    per MUC-001 — 30-char minimum); (c) every named integration
++    carries an `existing` / `deferred` / `out-of-scope` classification
++    (MUC-002 defence); (d) the canonical HTML-comment annotation
++    resolves to a live file at a current version (MUC-003 + MUC-004);
++    (e) the change's `kind:` value maps to an adapter row in the
++    seven-row table (MUC-007); and (f) every WP carries the
++    `verification:` frontmatter field per ADR-003.
++
++    **Failure semantics (FR-009).** A P-VER failure halts the design
++    pass and surfaces the failure-mode name + the missing piece. The
++    common failure modes during draft-architecture are: missing
++    Verification Plan section, placeholder content in a subsection,
++    unclassified integration. Fix in-line where possible (P-VER PASS
++    is the gate that lets `/sulis:plan-work` start). If the failure
++    points at an SRD↔TDD contradiction (e.g., the SRD specifies an
++    integration that the TDD did not surface), the engineering-architect
++    agent's responsibility is to surface the contradiction back to the
++    founder; this skill's responsibility is to render the contradiction
++    plainly.
++
+ 11. **Sizing self-check (MUST).** Before writing, review your draft against the tier targets:
+     - Total TDD length > 1.5× tier target? → write a "Why is this big?" paragraph or refactor
+     - Any section restates content from an authoritative source? → refactor to a reference
+diff --git a/plugins/sulis/skills/requirements-templates/SKILL.md b/plugins/sulis/skills/requirements-templates/SKILL.md
+index b85f603..36ebd09 100644
+--- a/plugins/sulis/skills/requirements-templates/SKILL.md
++++ b/plugins/sulis/skills/requirements-templates/SKILL.md
+@@ -156,6 +156,96 @@ See [HANDOVER.md](HANDOVER.md) for the execution agent handover.
+ 
+ ---
+ 
++## Verification Plan section template
++
++This block is the skeleton for the SRD's `## Verification Plan` section
++— the design-time commitment to how the work will be verified, captured
++when the spec is written rather than bolted on at the end. The
++requirements-analyst populates each subsection from the canonical
++20-question set; the P-VER rubric phase (in
++[`decompose-validation-rubric.md`](../../references/decompose-validation-rubric.md)
++§Phase 9) reads this section's shape to verdict it.
++
++**Canonical source.** The questions referenced below (Q1..Q20) live in
++[`plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md`](../../references/standards/VERIFICATION_QUESTIONS.md)
++v1.0.0. **Do not inline the question text into the SRD.** The agent
++reads the canonical at runtime; the SRD's Verification Plan section
++contains the *answers* and references the questions by ID. ADR-001
++fixes the section heading literal (`## Verification Plan`, exact
++casing — the P-VER section-presence regex anchors on it). ADR-007
++fixes the seven-row kind→adapter table that the fifth subsection
++below (the per-kind adapter row) draws from. The placeholder
++instructions below tell the agent which canonical question maps to
++each subsection.
++
++```markdown
++## Verification Plan
++
++<!-- VERIFICATION_QUESTIONS source: plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md v1.0.0 -->
++
++### What user-observable behaviour are we verifying?
++
++{agent populates with answer to Q1, ≥ 30 substantive characters — the
++concrete observable, plain English: a new screen, a faster response,
++an email that arrives. P-VER's MUC-001 placeholder-scan rejects
++shorter / `TBD` / "to be defined" content.}
++
++### Verification environment(s)
++
++{agent populates with answer to Q2 — one or more of: local,
++staging, ephemeral, production-shadow, production-canary. Each named
++environment carries one line of why it's appropriate.}
++
++### Bootstrap-from-zero case
++
++{agent populates with answer to Q3 — what verification looks like
++when no data, no users, no upstream artifacts exist yet. The anchor
++failure mode for the release-train + discovery dogfood incidents
++that motivated this section; do not skip even if "obvious".}
++
++### Per-integration verification strategy
++
++{agent populates with answers to Q5-Q13 per touched integration.
++For each integration, the table row carries: integration name + the
++classification (`existing` with resolvable path / `deferred` with
++canonical identifier / `out-of-scope` with one-line justification) +
++real-vs-recorded-vs-simulated verdict + the test that exercises it.
++P-VER's MUC-002 defence rejects any integration without one of the
++three classifications.}
++
++| Integration | Classification | Real / Recorded / Simulated | Test |
++|---|---|---|---|
++| {name} | `existing` / `deferred` / `out-of-scope` | {verdict} | {path} |
++
++### Per-kind verification adapter
++
++**Adapter (from VERIFICATION_QUESTIONS.md row for `kind: <K>`):**
++{one-liner copied from the seven-row table per ADR-007 — verbatim
++from the canonical}
++
++{agent populates with answers to Q14-Q20 — the per-kind concretion:
++which specific test classes the adapter resolves to in this codebase,
++which fixtures, which CI lane. The adapter row from the canonical is
++the *shape*; this subsection is the *binding* to the specific project.}
++
++### Infrastructure needs surfaced (deferred)
++
++{agent populates with deferred entries per the canonical's deferred-
++need identifier recipe. Each entry: stable identifier + one-line
++description + why-deferred + the change this would become if
++auto-drafted by ADR-005's slice-end trigger. Empty list is acceptable
++if no deferred needs surfaced — the section heading + an explicit
++`*(none)*` line is required by P-VER's section-presence check.}
++```
++
++**No invented subsections, no reordering, no omissions.** The rubric's
++P-VER section-shape check (rubric §9.01) asserts the six subsections
++appear in the order above. The order is anchored by the canonical's
++question grouping (foundational → environment → bootstrap →
++per-integration → per-kind → deferred).
++
++---
++
+ ## Use Case Template
+ 
+ ### UC-{ID}: {Use Case Name}
+diff --git a/plugins/sulis/skills/requirements-validation/SKILL.md b/plugins/sulis/skills/requirements-validation/SKILL.md
+index b75c67c..4afedad 100644
+--- a/plugins/sulis/skills/requirements-validation/SKILL.md
++++ b/plugins/sulis/skills/requirements-validation/SKILL.md
+@@ -20,7 +20,7 @@ GAPS_FOUND verdict.
+ 
+ The completeness assessment uses a spiral approach rather than a single-pass checklist.
+ 
+-**Five perspectives** examine the specification from different angles:
++**The verification perspectives** examine the specification from different angles:
+ 1. Requirement Traceability — Can every goal be traced through use cases to testable requirements?
+ 2. Integration Completeness — Is every external system specified well enough to build against?
+ 3. NFR Coverage — Are non-functional requirements measurable and comprehensive?
+@@ -28,6 +28,7 @@ The completeness assessment uses a spiral approach rather than a single-pass che
+ 5. Referential Integrity — Does the content of generated artifacts accurately reflect the design decisions and assumptions from facilitation?
+ 6. Term Consistency — Does every recurring noun in the artifacts reconcile with GLOSSARY.md (the locked vocabulary from Phase 3.5 Disambiguation Sweep)?
+ 7. Adversarial Coverage — Does every security-sensitive use case have a corresponding misuse case (or explicit "no plausible adversary" note), and does every misuse case have a defined system response?
++8. Verification Posture (**P-VER**) — Does every specification artifact (SRD + TDD + WP set) carry a populated `## Verification Plan` section per ADR-001's literal heading, with the six required subsections drawn from the canonical 20-question set, and every named integration carrying its `existing` / `deferred` / `out-of-scope` classification? Invoked as a rubric pass against [`plugins/sulis/references/decompose-validation-rubric.md`](../../references/decompose-validation-rubric.md) §Phase 9. Canonical question set: [`plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md`](../../references/standards/VERIFICATION_QUESTIONS.md). Cross-reference: [`ADR-001`](../../../.architecture/verification-by-design/adrs/ADR-001-section-name-verification-plan.md) fixes the section name.
+ 
+ **Fix-as-you-go via AAF triage (MUST).** Every gap found by every perspective passes
+ through the AAF-01 triage from `plugins/sulis/references/audience-adapted-framing-standard.md`
+@@ -93,10 +94,20 @@ is built to consume.
+   reconcile with the glossary, every security-sensitive use case has adversarial
+   coverage with defined system responses, **every leaf in PRIMITIVE_TREE.jsonld carries
+   a `leaf_category`, `RECONCILIATION_MAP.md` has zero unresolved-gap or
+-  undisposed-orphan rows, and the Reconciliation Cycle Stack is closed**. No flags
+-  remain.
++  undisposed-orphan rows, the Reconciliation Cycle Stack is closed**, **and P-VER
++  passes against every specification artifact** (the eight failure modes 9.01..9.08
++  from the rubric's Phase 9 each pass or are grandfathered per ADR-002's merge-date
++  constant). No flags remain.
+ - **GAPS_FOUND** — After 3 passes, some gaps remain that require user input or decisions
+   that cannot be made by the agent. All remaining gaps are documented with their flags.
++  **A P-VER FAIL (any of the eight failure modes in
++  [`decompose-validation-rubric.md`](../../references/decompose-validation-rubric.md)
++  §Phase 9) collapses the overall verdict to GAPS_FOUND** — P-VER is a MUST-blocking
++  rubric phase per FR-009, and the overall verdict pass-through is mechanical: any
++  P-VER failure mode that fires on the artifact set produces a GAPS_FOUND verdict
++  regardless of how the other perspectives score. The reciprocal also holds: a P-VER
++  PASS does not by itself elevate the overall verdict to PASS — the other seven
++  perspectives must also pass.
+ 
+ **Sufficiency test:** The guiding question for every check is: "Could a development team
+ implement this without making undocumented assumptions?" If the answer is no, a flag is raised.
+diff --git a/plugins/sulis/skills/specify/SKILL.md b/plugins/sulis/skills/specify/SKILL.md
+index 54c7f50..f7f916d 100644
+--- a/plugins/sulis/skills/specify/SKILL.md
++++ b/plugins/sulis/skills/specify/SKILL.md
+@@ -68,6 +68,42 @@ raw output any time (*"show me the technical version"* / `--raw`) and get the
+ underlying signals and the decision as data — same substance, different shape
+ (Founder-Facing Conventions Rule 6).
+ 
++## Required Reading (verification — MUST when running deep / standard)
++
++A spec without a verification posture is the start of the bolted-on-at-the-end
++failure mode this methodology exists to prevent ("verification can't be bolted
++on at the end. It has to start as a design question — *how would we actually
++verify this works?*"). Before producing a `SPEC.md` whose body is non-trivial
++(standard or deep), load these three references so the spec carries a
++populated `## Verification Plan` section and so the post-spec rubric pass
++runs P-VER cleanly:
++
++<!-- VERIFICATION_QUESTIONS source: plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md v1.0.0 -->
++
++- [`plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md`](../../references/standards/VERIFICATION_QUESTIONS.md)
++  — the canonical 20-question set (foundational Q1-Q4 +
++  per-integration Q5-Q13 + per-kind Q14-Q20) and the seven-row
++  kind→adapter table. **Read it; do not inline it.** The
++  requirements-analyst (dispatched in Deep mode) is the agent that
++  walks the founder through the applicable questions; this skill's
++  job is to make sure the dispatch carries the canonical citation
++  forward to the produced SRD's Verification Plan section.
++- [`plugins/sulis/references/decompose-validation-rubric.md`](../../references/decompose-validation-rubric.md)
++  §Phase 9 — **P-VER (Verification Plan)** — the eight-failure-mode
++  rubric check this skill invokes after the spec is produced (FR-009).
++  P-VER FAIL means the spec is not ready for the design pass; the
++  unresolved questions return to facilitation.
++- [`.architecture/verification-by-design/adrs/ADR-001-section-name-verification-plan.md`](../../../../.architecture/verification-by-design/adrs/ADR-001-section-name-verification-plan.md)
++  — fixes the section heading literal to `## Verification Plan`
++  (exact casing). The P-VER section-presence regex anchors on this
++  literal, so the heading shape is non-negotiable.
++
++For **lite** mode, the verification posture is captured in the short
++"How we'll know it's done" line (the lite SPEC.md's third field), and
++P-VER applies a lighter touch via the rubric's grandfather sub-phase —
++the canonical and ADR-001 are not required reading for lite specs.
++For standard and deep, this section is required reading.
++
+ ## Resolving the change + the tool path (MUST — first action)
+ 
+ This skill runs **inside a change** (a workspace opened by
+@@ -267,6 +303,28 @@ owns this** — do not re-implement SRD facilitation here.
+    and summarise the intent + acceptance at the top so the change has one
+    readable entry point.
+ 
++4. **Invoke P-VER on the produced SRD (MUST for standard + deep).** Once
++   the specialist returns and the SRD is on disk, run the P-VER rubric
++   check from
++   [`plugins/sulis/references/decompose-validation-rubric.md`](../../references/decompose-validation-rubric.md)
++   §Phase 9 against the produced artifacts. P-VER asserts that the SRD's
++   `## Verification Plan` section is present (per ADR-001's literal),
++   the six required subsections are populated with substantive content
++   (the placeholder block-list per MUC-001), every named integration
++   has its `existing` / `deferred` / `out-of-scope` classification per
++   the canonical's Q5-Q13 (the MUC-002 defence), and the canonical
++   HTML-comment annotation resolves to a live file at a current version
++   (MUC-003 + MUC-004).
++
++   **Failure semantics (FR-009).** If P-VER fails, surface the rubric's
++   founder-readable failure message in plain English (the failure mode
++   name, the missing piece, the next step) and re-enter Phase 3 of the
++   requirements-analyst's facilitation against the unresolved questions
++   — do not stamp the specify stage as complete. P-VER PASS is the
++   gate that lets `/sulis:draft-architecture` start. Lite specs skip
++   this step (their verification posture lives in the three-field
++   shape; the rubric's grandfather sub-phase applies).
++
+ ## Output — where SPEC.md lands
+ 
+ Write the change's spec next to its manifest, in the change worktree, using

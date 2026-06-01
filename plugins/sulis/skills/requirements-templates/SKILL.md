@@ -156,6 +156,96 @@ See [HANDOVER.md](HANDOVER.md) for the execution agent handover.
 
 ---
 
+## Verification Plan section template
+
+This block is the skeleton for the SRD's `## Verification Plan` section
+— the design-time commitment to how the work will be verified, captured
+when the spec is written rather than bolted on at the end. The
+requirements-analyst populates each subsection from the canonical
+20-question set; the P-VER rubric phase (in
+[`decompose-validation-rubric.md`](../../references/decompose-validation-rubric.md)
+§Phase 9) reads this section's shape to verdict it.
+
+**Canonical source.** The questions referenced below (Q1..Q20) live in
+[`plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md`](../../references/standards/VERIFICATION_QUESTIONS.md)
+v1.0.0. **Do not inline the question text into the SRD.** The agent
+reads the canonical at runtime; the SRD's Verification Plan section
+contains the *answers* and references the questions by ID. ADR-001
+fixes the section heading literal (`## Verification Plan`, exact
+casing — the P-VER section-presence regex anchors on it). ADR-007
+fixes the seven-row kind→adapter table that the fifth subsection
+below (the per-kind adapter row) draws from. The placeholder
+instructions below tell the agent which canonical question maps to
+each subsection.
+
+```markdown
+## Verification Plan
+
+<!-- VERIFICATION_QUESTIONS source: plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md v1.0.0 -->
+
+### What user-observable behaviour are we verifying?
+
+{agent populates with answer to Q1, ≥ 30 substantive characters — the
+concrete observable, plain English: a new screen, a faster response,
+an email that arrives. P-VER's MUC-001 placeholder-scan rejects
+shorter / `TBD` / "to be defined" content.}
+
+### Verification environment(s)
+
+{agent populates with answer to Q2 — one or more of: local,
+staging, ephemeral, production-shadow, production-canary. Each named
+environment carries one line of why it's appropriate.}
+
+### Bootstrap-from-zero case
+
+{agent populates with answer to Q3 — what verification looks like
+when no data, no users, no upstream artifacts exist yet. The anchor
+failure mode for the release-train + discovery dogfood incidents
+that motivated this section; do not skip even if "obvious".}
+
+### Per-integration verification strategy
+
+{agent populates with answers to Q5-Q13 per touched integration.
+For each integration, the table row carries: integration name + the
+classification (`existing` with resolvable path / `deferred` with
+canonical identifier / `out-of-scope` with one-line justification) +
+real-vs-recorded-vs-simulated verdict + the test that exercises it.
+P-VER's MUC-002 defence rejects any integration without one of the
+three classifications.}
+
+| Integration | Classification | Real / Recorded / Simulated | Test |
+|---|---|---|---|
+| {name} | `existing` / `deferred` / `out-of-scope` | {verdict} | {path} |
+
+### Per-kind verification adapter
+
+**Adapter (from VERIFICATION_QUESTIONS.md row for `kind: <K>`):**
+{one-liner copied from the seven-row table per ADR-007 — verbatim
+from the canonical}
+
+{agent populates with answers to Q14-Q20 — the per-kind concretion:
+which specific test classes the adapter resolves to in this codebase,
+which fixtures, which CI lane. The adapter row from the canonical is
+the *shape*; this subsection is the *binding* to the specific project.}
+
+### Infrastructure needs surfaced (deferred)
+
+{agent populates with deferred entries per the canonical's deferred-
+need identifier recipe. Each entry: stable identifier + one-line
+description + why-deferred + the change this would become if
+auto-drafted by ADR-005's slice-end trigger. Empty list is acceptable
+if no deferred needs surfaced — the section heading + an explicit
+`*(none)*` line is required by P-VER's section-presence check.}
+```
+
+**No invented subsections, no reordering, no omissions.** The rubric's
+P-VER section-shape check (rubric §9.01) asserts the six subsections
+appear in the order above. The order is anchored by the canonical's
+question grouping (foundational → environment → bootstrap →
+per-integration → per-kind → deferred).
+
+---
+
 ## Use Case Template
 
 ### UC-{ID}: {Use Case Name}

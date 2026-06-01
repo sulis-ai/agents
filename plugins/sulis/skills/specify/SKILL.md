@@ -68,6 +68,42 @@ raw output any time (*"show me the technical version"* / `--raw`) and get the
 underlying signals and the decision as data — same substance, different shape
 (Founder-Facing Conventions Rule 6).
 
+## Required Reading (verification — MUST when running deep / standard)
+
+A spec without a verification posture is the start of the bolted-on-at-the-end
+failure mode this methodology exists to prevent ("verification can't be bolted
+on at the end. It has to start as a design question — *how would we actually
+verify this works?*"). Before producing a `SPEC.md` whose body is non-trivial
+(standard or deep), load these three references so the spec carries a
+populated `## Verification Plan` section and so the post-spec rubric pass
+runs P-VER cleanly:
+
+<!-- VERIFICATION_QUESTIONS source: plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md v1.0.0 -->
+
+- [`plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md`](../../references/standards/VERIFICATION_QUESTIONS.md)
+  — the canonical 20-question set (foundational Q1-Q4 +
+  per-integration Q5-Q13 + per-kind Q14-Q20) and the seven-row
+  kind→adapter table. **Read it; do not inline it.** The
+  requirements-analyst (dispatched in Deep mode) is the agent that
+  walks the founder through the applicable questions; this skill's
+  job is to make sure the dispatch carries the canonical citation
+  forward to the produced SRD's Verification Plan section.
+- [`plugins/sulis/references/decompose-validation-rubric.md`](../../references/decompose-validation-rubric.md)
+  §Phase 9 — **P-VER (Verification Plan)** — the eight-failure-mode
+  rubric check this skill invokes after the spec is produced (FR-009).
+  P-VER FAIL means the spec is not ready for the design pass; the
+  unresolved questions return to facilitation.
+- [`.architecture/verification-by-design/adrs/ADR-001-section-name-verification-plan.md`](../../../../.architecture/verification-by-design/adrs/ADR-001-section-name-verification-plan.md)
+  — fixes the section heading literal to `## Verification Plan`
+  (exact casing). The P-VER section-presence regex anchors on this
+  literal, so the heading shape is non-negotiable.
+
+For **lite** mode, the verification posture is captured in the short
+"How we'll know it's done" line (the lite SPEC.md's third field), and
+P-VER applies a lighter touch via the rubric's grandfather sub-phase —
+the canonical and ADR-001 are not required reading for lite specs.
+For standard and deep, this section is required reading.
+
 ## Resolving the change + the tool path (MUST — first action)
 
 This skill runs **inside a change** (a workspace opened by
@@ -266,6 +302,28 @@ owns this** — do not re-implement SRD facilitation here.
    the whole SRD into SPEC.md; point to the `.specifications/{name}/` folder
    and summarise the intent + acceptance at the top so the change has one
    readable entry point.
+
+4. **Invoke P-VER on the produced SRD (MUST for standard + deep).** Once
+   the specialist returns and the SRD is on disk, run the P-VER rubric
+   check from
+   [`plugins/sulis/references/decompose-validation-rubric.md`](../../references/decompose-validation-rubric.md)
+   §Phase 9 against the produced artifacts. P-VER asserts that the SRD's
+   `## Verification Plan` section is present (per ADR-001's literal),
+   the six required subsections are populated with substantive content
+   (the placeholder block-list per MUC-001), every named integration
+   has its `existing` / `deferred` / `out-of-scope` classification per
+   the canonical's Q5-Q13 (the MUC-002 defence), and the canonical
+   HTML-comment annotation resolves to a live file at a current version
+   (MUC-003 + MUC-004).
+
+   **Failure semantics (FR-009).** If P-VER fails, surface the rubric's
+   founder-readable failure message in plain English (the failure mode
+   name, the missing piece, the next step) and re-enter Phase 3 of the
+   requirements-analyst's facilitation against the unresolved questions
+   — do not stamp the specify stage as complete. P-VER PASS is the
+   gate that lets `/sulis:draft-architecture` start. Lite specs skip
+   this step (their verification posture lives in the three-field
+   shape; the rubric's grandfather sub-phase applies).
 
 ## Output — where SPEC.md lands
 
