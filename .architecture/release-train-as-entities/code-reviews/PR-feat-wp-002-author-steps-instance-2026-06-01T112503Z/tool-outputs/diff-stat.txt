@@ -1,0 +1,4 @@
+ .../brain/compiled/foundation/step.schema.json     | 130 +++++++
+ plugins/sulis/instances/release-train/steps.jsonld | 389 +++++++++++++++++++++
+ .../tests/unit/test_steps_instance_valid.py        | 356 +++++++++++++++++++
+ 3 files changed, 875 insertions(+)
