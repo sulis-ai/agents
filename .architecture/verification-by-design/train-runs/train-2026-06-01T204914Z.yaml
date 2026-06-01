@@ -1,0 +1,27 @@
+train_id: "train-2026-06-01T204914Z"
+started_at: "2026-06-01T20:49:14Z"
+completed_at: "2026-06-01T20:54:56Z"
+outcome: "success"
+batch_size: 3
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-01T20:54:31Z"
+gate_findings_path: ".architecture/verification-by-design/code-reviews/PR-batch-train-2026-06-01T204914Z-2026-06-01T205456Z/REVIEW.md"
+bundle:
+  - wp: WP-002
+    branch: feat/wp-002-extend-rubric-with-p-ver
+    pre_train_sha: 9bf2baf71ced7093129c3cef1d8e1d209125da19
+    rebased_to_sha: 9bf2baf71ced7093129c3cef1d8e1d209125da19
+    merge_sha_on_dev: 0e190158b5e3614eab3dcce036211115d92077ce
+  - wp: WP-003
+    branch: feat/wp-003-extend-requirements-analyst-agent
+    pre_train_sha: a50bfa0ab7a2a9f5edbf71004a39a07093761e6f
+    rebased_to_sha: fd3f2fbda3921d185257fa0631cb7a1460808fac
+    merge_sha_on_dev: 9f2c38dfaf9860197efdd2dce64253610cc46b6b
+  - wp: WP-004
+    branch: feat/wp-004-extend-engineering-architect-agent
+    pre_train_sha: a69d961bbc262d8609ebcf512d275feb44fd67c2
+    rebased_to_sha: ec498bb7bbbbae474b9ae1bb66a6f21baef84570
+    merge_sha_on_dev: 7e3bf61ce36df8ef472d421b8f667226d49e9376
