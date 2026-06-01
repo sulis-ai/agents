@@ -87,15 +87,15 @@ graph TD
 
 | ID | Title | Primitive | Kind | Status | Depends On | Blocks | Token (in/out) | TDD § |
 |---|---|---|---|---|---|---|---|---|
-| WP-001 | Author canonical entities + Tool schemas at instances/discover-project/ | create | contract | blocked | — | WP-002, WP-003, WP-004, WP-006, WP-007, WP-009 | 6k / 8k | Form #1-6; Canonical Identifiers |
-| WP-002 | Author derive-consumer-tenant Tool + Python implementation + fixed vectors | create | backend | dependency_blocked | WP-001 | WP-006 | 3k / 3k | Form #8 (`tenant.py`); ADR-002 |
-| WP-003 | Implement Detect phase — RepoInspector port + LocalFilesystemInspector adapter | create | backend | dependency_blocked | WP-001 | WP-008 | 4k / 4k | Form Ports #1; Armor External deps (git CLI) |
-| WP-004 | Implement Infer phase — ConfigurationInferrer port + LLM and Null adapters + token budget | create | backend | dependency_blocked | WP-001 | WP-008 | 4k / 4k | Form Ports #2; Armor External deps (LLM); ADR-006 |
-| WP-005 | Author Ask-phase prose — confirm/override + ambiguous fields + per-field diff (`--update`) | create | docs | step-7-complete | — | WP-008 | 2k / 3k | FR-009, FR-011; ADR-005 |
-| WP-006 | Implement Mint phase — atomic write + path safety + signal handler + slug derivation | create | backend | dependency_blocked | WP-001, WP-002 | WP-008 | 4k / 4k | Armor Atomic write semantics; Form §Slug derivation |
-| WP-007 | Implement Verify phase — drift invoke scoped to entity + roll-back on failure | create | backend | dependency_blocked | WP-001 | WP-008 | 3k / 3k | Armor §Cross-tenant drift; FR-008 |
+| WP-001 | Author canonical entities + Tool schemas at instances/discover-project/ | create | contract | done | — | WP-002, WP-003, WP-004, WP-006, WP-007, WP-009 | 6k / 8k | Form #1-6; Canonical Identifiers |
+| WP-002 | Author derive-consumer-tenant Tool + Python implementation + fixed vectors | create | backend | pending | WP-001 | WP-006 | 3k / 3k | Form #8 (`tenant.py`); ADR-002 |
+| WP-003 | Implement Detect phase — RepoInspector port + LocalFilesystemInspector adapter | create | backend | pending | WP-001 | WP-008 | 4k / 4k | Form Ports #1; Armor External deps (git CLI) |
+| WP-004 | Implement Infer phase — ConfigurationInferrer port + LLM and Null adapters + token budget | create | backend | pending | WP-001 | WP-008 | 4k / 4k | Form Ports #2; Armor External deps (LLM); ADR-006 |
+| WP-005 | Author Ask-phase prose — confirm/override + ambiguous fields + per-field diff (`--update`) | create | docs | done | — | WP-008 | 2k / 3k | FR-009, FR-011; ADR-005 |
+| WP-006 | Implement Mint phase — atomic write + path safety + signal handler + slug derivation | create | backend | pending | WP-001, WP-002 | WP-008 | 4k / 4k | Armor Atomic write semantics; Form §Slug derivation |
+| WP-007 | Implement Verify phase — drift invoke scoped to entity + roll-back on failure | create | backend | pending | WP-001 | WP-008 | 3k / 3k | Armor §Cross-tenant drift; FR-008 |
 | WP-008 | Author plugins/sulis/skills/discover-project/SKILL.md with 5 phase sections + canonical annotations | create | docs | dependency_blocked | WP-003, WP-004, WP-005, WP-006, WP-007, WP-009 | WP-010 | 5k / 5k | Form #7; ADR-001, ADR-003 |
-| WP-009 | Extend drift detector — HTML-comment annotation parser + --cross-tenant-refs-allowed-for flag | extend | backend | dependency_blocked | WP-001 | WP-008 | 4k / 3k | Armor §Cross-tenant; ADR-001, ADR-002 |
+| WP-009 | Extend drift detector — HTML-comment annotation parser + --cross-tenant-refs-allowed-for flag | extend | backend | pending | WP-001 | WP-008 | 4k / 3k | Armor §Cross-tenant; ADR-001, ADR-002 |
 | WP-010 | Build 4 fixture consumer repos + integration test + dogfood marketplace verification | create | backend | dependency_blocked | WP-008 | — | 5k / 6k | Proof §Integration tests |
 
 **Totals:** ~40k input + ~43k output ≈ 83k tokens for the full WP set.

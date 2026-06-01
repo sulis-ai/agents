@@ -1,0 +1,22 @@
+train_id: "train-2026-06-01T165604Z"
+started_at: "2026-06-01T16:56:04Z"
+completed_at: "2026-06-01T17:06:03Z"
+outcome: "success"
+batch_size: 2
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-01T17:01:18Z"
+gate_findings_path: ".architecture/discover-project/code-reviews/PR-batch-train-2026-06-01T165604Z-2026-06-01T170527Z/REVIEW.md"
+bundle:
+  - wp: WP-001
+    branch: feat/wp-001-canonical-entities-discover-project
+    pre_train_sha: 3343dfd7b39150fdc0b614106191d42501b32fde
+    rebased_to_sha: 3343dfd7b39150fdc0b614106191d42501b32fde
+    merge_sha_on_dev: 2159e0291e7eec2f273812cf655863dd140f298a
+  - wp: WP-005
+    branch: feat/wp-005-ask-phase-prose
+    pre_train_sha: 94b165c72edcfa6e58c370cd80b11f5cd9efded5
+    rebased_to_sha: 10f9aa8458a9602490cfce3230aba8603c06daa3
+    merge_sha_on_dev: 998b9f00d478dd1cbcc6a16ad8714f4dda528b08
