@@ -6,7 +6,7 @@
   "@id": "dna:discover-project:tools",
   "@type": "tool-instances",
   "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
-  "_about": "Tool catalogue for the discover-project Workflow. Six new typed Tools are listed in TDD §Canonical Identifiers — Tool ULIDs (one query per Detect Step + the deterministic tenant-derivation Tool + the probabilistic infer-configuration-values Tool). This file authors FIVE of them as full entities with primary input/output JSON Schemas at schemas/tools/ (per WP-001 Contract: 5 primary Tools × 2 schemas = 10 sub-schemas). The sixth Tool — derive-consumer-tenant — is reserved at the canonical ULID here via a _forward_declaration_ulid descriptor row; the full Tool entity + Python implementation + fixed test vectors are authored in WP-002. Two pre-existing Tools (entity-emitter, drift-detector) are declared via _reused_from rather than minting new ULIDs — they live in the marketplace's existing tool catalogue. Per ADR-003 (release-train two-class fidelity strategy applied here): the five Tools authored in this WP carry state=active + populated implementation_detail + error_catalogue cross-refs into failuremodes.jsonld. The descriptor rows (_reused_from / _forward_declaration_ulid) are NOT full Tool entities — they are excluded from brain-schema validation by the test_each_tool_passes_brain_schema filter on state=active. Tenant ULID is canonical for the marketplace tenant; ULIDs come byte-exact from TDD §Canonical Identifiers — Tool ULIDs.",
+  "_about": "Tool catalogue for the discover-project Workflow. Six new typed Tools are listed in TDD §Canonical Identifiers — Tool ULIDs (one query per Detect Step + the deterministic tenant-derivation Tool + the probabilistic infer-configuration-values Tool). All six are authored here as full entities with primary input/output JSON Schemas at schemas/tools/ (6 primary Tools × 2 schemas = 12 sub-schemas). WP-001 landed the first five (git-remote-read, read-package-json, read-pyproject-toml, read-ci-workflows, infer-configuration-values) and reserved the sixth (derive-consumer-tenant) via a _forward_declaration_ulid descriptor row; WP-002 flips that row to a full state=active entity backed by _discovery.tenant.Sha256CrockfordTenantDeriver and authors its schema pair. Two pre-existing Tools (entity-emitter, drift-detector) are declared via _reused_from rather than minting new ULIDs — they live in the marketplace's existing tool catalogue. Per ADR-003 (release-train two-class fidelity strategy applied here): the six Tools authored in this Workflow carry state=active + populated implementation_detail + error_catalogue cross-refs into failuremodes.jsonld. The _reused_from descriptor rows are NOT full Tool entities — they are excluded from brain-schema validation by the test_each_tool_passes_brain_schema filter on state=active. Tenant ULID is canonical for the marketplace tenant; ULIDs come byte-exact from TDD §Canonical Identifiers — Tool ULIDs.",
   "captured_on": "2026-06-01",
 
   "tools": [
@@ -97,11 +97,20 @@
     },
 
     {
-      "_reused_from": "WP-002 (derive-consumer-tenant Tool + Python implementation + fixed test vectors)",
-      "_forward_declaration_ulid": "dna:tool:01KT1WT105DER1VETENANT0000",
+      "id": "dna:tool:01KT1WT105DER1VETENANT0000",
+      "sys_status": "active",
       "name": "derive-consumer-tenant",
-      "_role": "Computes the consumer's tenant ULID deterministically via SHA256('tenant-name:<repo-org>/<repo-name>') → Crockford base32 (first-char clamp). Invoked by the write-project-entity Step (Mint phase) to populate belongs_to_tenant on the Project entity. The ULID is pre-canonicalised in TDD §Canonical Identifiers — Tool ULIDs (WP-001 reserves the ULID and the schema files at schemas/tools/derive-consumer-tenant-{input,output}.schema.json); WP-002 authors the full Tool entity + Python implementation + fixed test vectors. Cross-WP forward reference is captured here so the Step.tool_ref in write-project-entity resolves at parse time.",
-      "_invoked_by_steps": ["write-project-entity"]
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "kind": "query",
+      "inputs_schema_ref": "schemas/tools/derive-consumer-tenant-input.schema.json",
+      "outputs_schema_ref": "schemas/tools/derive-consumer-tenant-output.schema.json",
+      "error_catalogue": [],
+      "implementation_kind": "python_import",
+      "implementation_detail": "{\"module\":\"_discovery.tenant\",\"class\":\"Sha256CrockfordTenantDeriver\",\"method\":\"derive_consumer_tenant\"}",
+      "version": "1.0.0",
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.95
     },
     {
       "_reused_from": "marketplace tool catalogue (per feedback-log task #58)",
