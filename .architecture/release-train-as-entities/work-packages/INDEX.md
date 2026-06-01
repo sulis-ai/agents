@@ -81,7 +81,7 @@ graph TD
 | ID | Title | Primitive | Kind | Status | Depends On | Blocks | Token (in/out) | TDD § |
 |---|---|---|---|---|---|---|---|---|
 | WP-001 | Author release-train Workflow instance | create | contract | pending | WP-002 | WP-005, WP-007, WP-010 | 3k / 2k | Form #1 |
-| WP-002 | Author 15 Step instances | create | contract | pending | WP-004, WP-006 | WP-001, WP-007, WP-009, WP-010 | 6k / 8k | Form #2; Steps table |
+| WP-002 | Author 15 Step instances | create | contract | done | WP-004, WP-006 | WP-001, WP-007, WP-009, WP-010 | 6k / 8k | Form #2; Steps table |
 | WP-003 | Author 2 Trigger instances | create | contract | done | — | WP-007 | 1k / 1k | FR-007 |
 | WP-004 | Author 8 FailureMode instances | create | contract | done | — | WP-002, WP-006, WP-007, WP-009 | 2k / 3k | FR-008 |
 | WP-005 | Author 4 Project instances | create | contract | pending | WP-001 | WP-007 | 2k / 2k | FR-001 |

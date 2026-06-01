@@ -1,0 +1,17 @@
+train_id: "train-2026-06-01T112951Z"
+started_at: "2026-06-01T11:29:51Z"
+completed_at: "2026-06-01T11:33:14Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-01T11:29:59Z"
+gate_findings_path: ".architecture/release-train-as-entities/code-reviews/PR-batch-train-2026-06-01T112951Z-2026-06-01T113228Z/REVIEW.md"
+bundle:
+  - wp: WP-002
+    branch: feat/wp-002-author-steps-instance
+    pre_train_sha: dbd9eb78b14539a604d803b2dc14818f9155b678
+    rebased_to_sha: dbd9eb78b14539a604d803b2dc14818f9155b678
+    merge_sha_on_dev: 7dbd1f2dfe21e6bc5b2a4e63f5277433b39e30e0
