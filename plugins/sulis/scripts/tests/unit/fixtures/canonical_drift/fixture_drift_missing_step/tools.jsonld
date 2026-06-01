@@ -1,0 +1,42 @@
+{
+  "@context": {
+    "@vocab": "https://sulis.co/dna/",
+    "dna": "https://sulis.co/dna/"
+  },
+  "@id": "dna:fixture:tools",
+  "@type": "tool-instances",
+  "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "captured_on": "2026-06-01",
+  "tools": [
+    {
+      "id": "dna:tool:01KT00000000000000000APXTZ",
+      "sys_status": "active",
+      "name": "fixture-tool-alpha",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "kind": "query",
+      "inputs_schema_ref": "fixtures/empty.schema.json",
+      "outputs_schema_ref": "fixtures/empty.schema.json",
+      "implementation_kind": "python_import",
+      "implementation_detail": "{\"module\": \"x\", \"function\": \"y\"}",
+      "version": "1.0.0",
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.9
+    },
+    {
+      "id": "dna:tool:01KT00000000000000000BTXTZ",
+      "sys_status": "active",
+      "name": "fixture-tool-beta",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "kind": "query",
+      "inputs_schema_ref": "fixtures/empty.schema.json",
+      "outputs_schema_ref": "fixtures/empty.schema.json",
+      "implementation_kind": "python_import",
+      "implementation_detail": "{\"module\": \"x\", \"function\": \"z\"}",
+      "version": "1.0.0",
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.9
+    }
+  ]
+}

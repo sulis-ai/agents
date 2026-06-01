@@ -1,0 +1,16 @@
+name: fixture-unhandled-failuremode-workflow
+on:
+  push:
+    branches: [main]
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      # canonical:step:step-alpha
+      # NOTE: fixture-failure-alpha annotation omitted, even though step-alpha's
+      # handles_failures lists it. Drives a missing_failuremode_handling drift.
+      - name: "Step alpha"
+        run: echo "alpha"
+      # canonical:step:step-beta
+      - name: "Step beta"
+        run: echo "beta"

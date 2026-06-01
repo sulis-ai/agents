@@ -1,0 +1,25 @@
+{
+  "@context": {
+    "@vocab": "https://sulis.co/dna/",
+    "dna": "https://sulis.co/dna/"
+  },
+  "@id": "dna:fixture:failuremodes",
+  "@type": "failuremode-instances",
+  "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "captured_on": "2026-06-01",
+  "failuremodes": [
+    {
+      "id": "dna:failuremode:01KT0000000000000000FMAPHA",
+      "sys_status": "active",
+      "name": "fixture-failure-alpha",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "kind": "dependency-unavailable",
+      "description": "A synthetic failure for fixture testing.",
+      "recovery_strategy": "abort",
+      "blocks_progress": true,
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.9
+    }
+  ]
+}
