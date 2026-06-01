@@ -1,0 +1,27 @@
+train_id: "train-2026-06-01T175329Z"
+started_at: "2026-06-01T17:53:29Z"
+completed_at: "2026-06-01T18:00:10Z"
+outcome: "success"
+batch_size: 5
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-01T17:58:48Z"
+gate_findings_path: ".architecture/discover-project/code-reviews/PR-batch-train-2026-06-01T175329Z-2026-06-01T175934Z/REVIEW.md"
+bundle:
+  - wp: WP-002
+    branch: feat/wp-002-tenant-derivation-tool
+    pre_train_sha: dbaa5da474d4a2973dfe4edf24d75d2ef1cde640
+    rebased_to_sha: dbaa5da474d4a2973dfe4edf24d75d2ef1cde640
+    merge_sha_on_dev: 3b39026ffdaa0c11b6ffcfcfc9719779b8a892db
+  - wp: WP-007
+    branch: feat/wp-007-verify-phase
+    pre_train_sha: 914308f820bc002ca910e3884e6079218100bd1d
+    rebased_to_sha: bffaa55362166bde3d28a2077f5b5dde04f8755c
+    merge_sha_on_dev: 5cf7f98c0288e3c00adc8a41b966233b4acfedef
+  - wp: WP-009
+    branch: feat/wp-009-drift-detector-extensions
+    pre_train_sha: 5423e70769ef69f308da8fe9bdd74cc100d62ec2
+    rebased_to_sha: f5093e77e5794e70a691bc6bc08048d29b253455
+    merge_sha_on_dev: 6e55fa22a06e951d773c145840004a7903a46c8a
