@@ -1,0 +1,16 @@
+train_id: "train-2026-06-01T130416Z"
+started_at: "2026-06-01T13:04:16Z"
+completed_at: null
+outcome: "aborted"
+outcome_reason: "superseded by resume"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: null
+smoke_verdict: null
+bundle:
+  - wp: WP-008
+    branch: feat/wp-008-wire-drift-detector-into-branch-ci
+    pre_train_sha: null
+    rebased_to_sha: null
+    merge_sha_on_dev: null
