@@ -45,3 +45,11 @@ node_modules/
 # Logs / scratch
 *.log
 .scratch/
+
+# Discover-project dogfood observations — local calibration log appended by
+# tests/integration/test_discover_e2e.py::test_dogfood_marketplace_repo_acceptance
+# on every run. ADR-006 v1.1 calibration uses observations collected over
+# time; until the real-LLM dogfood lands, the file accumulates duplicate
+# Null-adapter zeroes that would otherwise leak into every developer's
+# next pull request. Local-only.
+.architecture/*/dogfood-tokens.txt

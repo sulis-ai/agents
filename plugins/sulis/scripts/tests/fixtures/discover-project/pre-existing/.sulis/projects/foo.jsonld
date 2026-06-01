@@ -1,0 +1,32 @@
+{
+  "@context": {
+    "@vocab": "https://sulis.co/dna/",
+    "dna": "https://sulis.co/dna/"
+  },
+  "@id": "dna:foo:projects",
+  "@type": "project-instances",
+  "for_tenant": "dna:tenant:0FX5FX5FX5FX5FX5FX5FX5FX5F",
+  "_about": "Pre-existing fixture Project entity for the discover-project re-discovery integration test. The for_tenant ULID here is a placeholder used only by the test; the canonical consumer-tenant ULID derived from acme/foo at runtime is asserted directly in the test, not via this file. The pre-existing entity carries deploy_target=npm-publish so the test can verify the per-field diff flow (LLM proposes github-release; founder chooses 'k' to keep existing).",
+  "captured_on": "2026-06-01",
+  "projects": [
+    {
+      "id": "dna:project:01KT1WTESTFIXTUREPREEXIST00",
+      "sys_status": "active",
+      "name": "foo",
+      "belongs_to_tenant": "dna:tenant:0FX5FX5FX5FX5FX5FX5FX5FX5F",
+      "type": "library",
+      "source": "{\"repo\":\"acme/foo\",\"path\":\".\",\"primary_branch\":\"main\"}",
+      "version_files": ["package.json"],
+      "branch_policy": "trunk-based",
+      "belongs_to_product_ref": "acme-product",
+      "depends_on": [],
+      "consumed_by": [],
+      "release_workflow_ref": "dna:workflow:01KT0RTRA1NWFW00000000000A",
+      "description": "Fixture Project pre-staged so the --update flow can be tested against an existing entity.",
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 1.0,
+      "deploy_target": "npm-publish"
+    }
+  ]
+}
