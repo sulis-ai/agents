@@ -1,0 +1,22 @@
+train_id: "train-2026-06-01T123740Z"
+started_at: "2026-06-01T12:37:40Z"
+completed_at: "2026-06-01T12:44:03Z"
+outcome: "success"
+batch_size: 2
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-01T12:42:55Z"
+gate_findings_path: ".architecture/release-train-as-entities/code-reviews/PR-batch-train-2026-06-01T123740Z-2026-06-01T124330Z/REVIEW.md"
+bundle:
+  - wp: WP-005
+    branch: feat/wp-005-author-projects-instance
+    pre_train_sha: 5b1d778efb06f397d0aaed0468bec081b2e4b8da
+    rebased_to_sha: 5b1d778efb06f397d0aaed0468bec081b2e4b8da
+    merge_sha_on_dev: 85e47096ad748df7d997d405e5e7156699d32066
+  - wp: WP-010
+    branch: feat/wp-010-extend-release-train-skill-for-dry-run
+    pre_train_sha: 8709f82e1a7c7765e4491a037e3fffa8eedd3928
+    rebased_to_sha: 6a0b944fbee916ffaee4cbc03ad390e08b1e7586
+    merge_sha_on_dev: a5d63391d8c972a637268c897c1e7078039564b7
