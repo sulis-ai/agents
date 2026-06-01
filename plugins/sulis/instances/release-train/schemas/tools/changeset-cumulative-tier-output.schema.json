@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/release-train/tool/changeset-cumulative-tier/output/1.0.0",
+  "title": "_changeset.cumulative_tier — output",
+  "description": "Output: the SemVer max-tier (patch < minor < major) over the input batch, or null when the batch is empty or no items carried a tier.",
+  "oneOf": [
+    {"enum": ["patch", "minor", "major"]},
+    {"type": "null"}
+  ]
+}
