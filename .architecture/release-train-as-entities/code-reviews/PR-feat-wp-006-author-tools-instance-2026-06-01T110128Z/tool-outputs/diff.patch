@@ -1,0 +1,1004 @@
+diff --git a/plugins/sulis/brain/compiled/foundation/tool.schema.json b/plugins/sulis/brain/compiled/foundation/tool.schema.json
+new file mode 100644
+index 0000000..8de1533
+--- /dev/null
++++ b/plugins/sulis/brain/compiled/foundation/tool.schema.json
+@@ -0,0 +1,114 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://sulis.co/dna/schema/tool/1.1.0",
++  "title": "Tool",
++  "description": "the declaration of a typed deterministic operation that a Step may invoke \u2014 name + kind + inputs schema reference + outputs schema reference + error catalogue + implementation_kind (the transport binding) + implementation_detail (kind-specific shape). The CONTRACT for one operation, independent of the workflow or step that calls it. Reuse: many Steps across many Workflows reference the same Tool. Belongs to a Tenant (each business's tool catalogue is tenant-scoped). When implementation_kind is `workflow_dispatch`, the Tool's invocation fires another Workflow (same-repo or cross-repo) \u2014 the composition primitive for multi-Workflow orchestration.",
++  "type": "object",
++  "unevaluatedProperties": false,
++  "required": [
++    "id",
++    "name",
++    "for_domain",
++    "kind",
++    "inputs_schema_ref",
++    "outputs_schema_ref",
++    "implementation_kind",
++    "version",
++    "state",
++    "sys_status"
++  ],
++  "properties": {
++    "sys_status": {
++      "enum": [
++        "active",
++        "archived",
++        "deleted",
++        "purged"
++      ]
++    },
++    "valid_from": {
++      "type": "string",
++      "format": "date-time",
++      "description": "business-truth window start"
++    },
++    "valid_to": {
++      "type": "string",
++      "format": "date-time",
++      "description": "business-truth window end"
++    },
++    "confidence": {
++      "type": "number",
++      "minimum": 0,
++      "maximum": 1,
++      "description": "instance reliability score"
++    },
++    "id": {
++      "type": "string",
++      "pattern": "^dna:tool:[0-9A-HJKMNP-TV-Z]{26}$"
++    },
++    "name": {
++      "type": "string",
++      "description": "the operationId such as gh-pr-create, sanctions-screen, stripe-charge"
++    },
++    "for_domain": {
++      "type": "string",
++      "pattern": "^dna:(tenant):[0-9A-HJKMNP-TV-Z]{26}$"
++    },
++    "kind": {
++      "enum": [
++        "query",
++        "mutation",
++        "side-effect",
++        "hybrid"
++      ],
++      "description": "OpenAPI-style classification \u2014 query is read-only, mutation is local state change, side-effect is external effect, hybrid is both"
++    },
++    "inputs_schema_ref": {
++      "type": "string",
++      "description": "URI or path to a JSON Schema 2020-12 document defining the operation input payload"
++    },
++    "outputs_schema_ref": {
++      "type": "string",
++      "description": "URI or path to a JSON Schema 2020-12 document defining the operation output payload"
++    },
++    "error_catalogue": {
++      "type": "array",
++      "items": {
++        "type": "string",
++        "pattern": "^dna:(failuremode):[0-9A-HJKMNP-TV-Z]{26}$"
++      }
++    },
++    "implementation_kind": {
++      "enum": [
++        "mcp_server",
++        "subprocess",
++        "python_import",
++        "http_call",
++        "claude_code_tool",
++        "skill_invocation",
++        "workflow_dispatch"
++      ]
++    },
++    "implementation_detail": {
++      "type": "string",
++      "description": "a JSON-encoded kind-specific object \u2014 for mcp_server has server_id and tool_name; for subprocess has command, args, env_keys; for python_import has module and function; for http_call has endpoint, method, auth_kind; for claude_code_tool has tool_name; for skill_invocation has plugin and skill_name; for workflow_dispatch has target_workflow_ref required as the Workflow to invoke, target_project_ref optional Project scope, target_repo optional owner-slash-name for cross-repo dispatch via gh repository_dispatch or gh workflow run, wait_for_completion bool to block until target Workflow terminates, inputs_ref text content-addressed reference to inputs payload mirroring LifecycleRun.inputs_ref convention from v2.1.0",
++      "x-sensitive": true
++    },
++    "version": {
++      "type": "string",
++      "description": "semver \u2014 the Tool implementation version, independent of schema_version which is the entity-schema version"
++    },
++    "deprecated_for": {
++      "type": "string",
++      "pattern": "^dna:(tool):[0-9A-HJKMNP-TV-Z]{26}$"
++    },
++    "state": {
++      "enum": [
++        "draft",
++        "active",
++        "deprecated"
++      ]
++    }
++  },
++  "x-schema-org-extends": "schema:Action"
++}
+\ No newline at end of file
+diff --git a/plugins/sulis/instances/release-train/schemas/tools/changeset-cumulative-tier-input.schema.json b/plugins/sulis/instances/release-train/schemas/tools/changeset-cumulative-tier-input.schema.json
+new file mode 100644
+index 0000000..6e27b74
+--- /dev/null
++++ b/plugins/sulis/instances/release-train/schemas/tools/changeset-cumulative-tier-input.schema.json
+@@ -0,0 +1,22 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://sulis.co/release-train/tool/changeset-cumulative-tier/input/1.0.0",
++  "title": "_changeset.cumulative_tier — input",
++  "description": "Input for the SemVer-max-over-batch tier calculation. Mirrors plugins/sulis/scripts/_changeset.py::cumulative_tier(changesets). Per ADR-003 Blue invariant: describes only the load-bearing fields, not exhaustive.",
++  "type": "object",
++  "required": ["changesets"],
++  "additionalProperties": false,
++  "properties": {
++    "changesets": {
++      "type": "array",
++      "description": "Parsed changeset dicts; each MAY carry a `tier` field. Items without a `tier` are ignored; empty list → null result.",
++      "items": {
++        "type": "object",
++        "properties": {
++          "tier": {"enum": ["patch", "minor", "major"]},
++          "primitive": {"type": "string"}
++        }
++      }
++    }
++  }
++}
+diff --git a/plugins/sulis/instances/release-train/schemas/tools/changeset-cumulative-tier-output.schema.json b/plugins/sulis/instances/release-train/schemas/tools/changeset-cumulative-tier-output.schema.json
+new file mode 100644
+index 0000000..5743e93
+--- /dev/null
++++ b/plugins/sulis/instances/release-train/schemas/tools/changeset-cumulative-tier-output.schema.json
+@@ -0,0 +1,10 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://sulis.co/release-train/tool/changeset-cumulative-tier/output/1.0.0",
++  "title": "_changeset.cumulative_tier — output",
++  "description": "Output: the SemVer max-tier (patch < minor < major) over the input batch, or null when the batch is empty or no items carried a tier.",
++  "oneOf": [
++    {"enum": ["patch", "minor", "major"]},
++    {"type": "null"}
++  ]
++}
+diff --git a/plugins/sulis/instances/release-train/schemas/tools/changeset-next-version-input.schema.json b/plugins/sulis/instances/release-train/schemas/tools/changeset-next-version-input.schema.json
+new file mode 100644
+index 0000000..0c63695
+--- /dev/null
++++ b/plugins/sulis/instances/release-train/schemas/tools/changeset-next-version-input.schema.json
+@@ -0,0 +1,23 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://sulis.co/release-train/tool/changeset-next-version/input/1.0.0",
++  "title": "_changeset.next_version — input",
++  "description": "Input for the semver bump. Mirrors plugins/sulis/scripts/_changeset.py::next_version(current, tier). Series-agnostic — works identically for plugin (0.x) and marketplace (1.x) series per ADR-003 of release-train.",
++  "type": "object",
++  "required": ["current", "tier"],
++  "additionalProperties": false,
++  "properties": {
++    "current": {
++      "type": "string",
++      "description": "current dotted SemVer string (e.g. '0.85.0', '1.131.0')",
++      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
++    },
++    "tier": {
++      "description": "the bump tier; null means 'no bump' and returns current unchanged",
++      "oneOf": [
++        {"enum": ["patch", "minor", "major"]},
++        {"type": "null"}
++      ]
++    }
++  }
++}
+diff --git a/plugins/sulis/instances/release-train/schemas/tools/changeset-next-version-output.schema.json b/plugins/sulis/instances/release-train/schemas/tools/changeset-next-version-output.schema.json
+new file mode 100644
+index 0000000..69c37e3
+--- /dev/null
++++ b/plugins/sulis/instances/release-train/schemas/tools/changeset-next-version-output.schema.json
+@@ -0,0 +1,8 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://sulis.co/release-train/tool/changeset-next-version/output/1.0.0",
++  "title": "_changeset.next_version — output",
++  "description": "The next dotted SemVer string after applying the tier. tier=null → input unchanged. patch: x.y.(z+1); minor: x.(y+1).0; major: (x+1).0.0.",
++  "type": "string",
++  "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
++}
+diff --git a/plugins/sulis/instances/release-train/schemas/tools/gh-pr-create-input.schema.json b/plugins/sulis/instances/release-train/schemas/tools/gh-pr-create-input.schema.json
+new file mode 100644
+index 0000000..19c738a
+--- /dev/null
++++ b/plugins/sulis/instances/release-train/schemas/tools/gh-pr-create-input.schema.json
+@@ -0,0 +1,34 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://sulis.co/release-train/tool/gh-pr-create/input/1.0.0",
++  "title": "gh-pr-create — input",
++  "description": "Input for `gh pr create` invocation — the most-used GitHub seam. Mirrors the gh CLI surface used by Step 6 (open-release-pr). Per ADR-003 Blue invariant: describes only the load-bearing fields the release-train workflow actually sets.",
++  "type": "object",
++  "required": ["title", "body", "base", "head"],
++  "additionalProperties": false,
++  "properties": {
++    "title": {
++      "type": "string",
++      "description": "PR title (e.g. 'release: sulis v0.86.0 (minor)')",
++      "minLength": 1
++    },
++    "body": {
++      "type": "string",
++      "description": "PR body — markdown, may be empty but key MUST be present"
++    },
++    "base": {
++      "type": "string",
++      "description": "target branch (typically 'main')",
++      "minLength": 1
++    },
++    "head": {
++      "type": "string",
++      "description": "source branch (typically 'release/auto' or 'release/sulis-vX.Y.Z')",
++      "minLength": 1
++    },
++    "draft": {
++      "type": "boolean",
++      "description": "open as draft; defaults to false"
++    }
++  }
++}
+diff --git a/plugins/sulis/instances/release-train/schemas/tools/gh-pr-create-output.schema.json b/plugins/sulis/instances/release-train/schemas/tools/gh-pr-create-output.schema.json
+new file mode 100644
+index 0000000..4c30787
+--- /dev/null
++++ b/plugins/sulis/instances/release-train/schemas/tools/gh-pr-create-output.schema.json
+@@ -0,0 +1,26 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://sulis.co/release-train/tool/gh-pr-create/output/1.0.0",
++  "title": "gh-pr-create — output",
++  "description": "Output: identifying coordinates of the opened PR. `gh pr create` prints the PR URL on success; the workflow extracts {number, url, head_sha}. Per ADR-003 Blue invariant: load-bearing identifiers only.",
++  "type": "object",
++  "required": ["url"],
++  "additionalProperties": false,
++  "properties": {
++    "url": {
++      "type": "string",
++      "format": "uri",
++      "description": "the opened PR's HTML URL — what `gh pr create` echoes on stdout"
++    },
++    "number": {
++      "type": "integer",
++      "minimum": 1,
++      "description": "the PR number (extracted from the URL tail)"
++    },
++    "head_sha": {
++      "type": "string",
++      "pattern": "^[0-9a-f]{7,40}$",
++      "description": "the commit SHA at the head of the PR's source branch"
++    }
++  }
++}
+diff --git a/plugins/sulis/instances/release-train/schemas/tools/gh-release-create-input.schema.json b/plugins/sulis/instances/release-train/schemas/tools/gh-release-create-input.schema.json
+new file mode 100644
+index 0000000..dd4cad8
+--- /dev/null
++++ b/plugins/sulis/instances/release-train/schemas/tools/gh-release-create-input.schema.json
+@@ -0,0 +1,28 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://sulis.co/release-train/tool/gh-release-create/input/1.0.0",
++  "title": "gh-release-create — input",
++  "description": "Input for `gh release create <tag> --title <title> --notes <notes>`. Step 14 (publish-github-release) — also the manual-fallback path for the `bot-tag-doesnt-trigger-release-prod` FailureMode (FR-008): when GITHUB_TOKEN's bot-tag does not fire release-prod, the founder runs `gh release create` manually.",
++  "type": "object",
++  "required": ["tag"],
++  "additionalProperties": false,
++  "properties": {
++    "tag": {
++      "type": "string",
++      "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
++      "description": "the existing tag to attach the release to; the workflow has already created + pushed it"
++    },
++    "title": {
++      "type": "string",
++      "description": "release title (e.g. 'sulis v0.86.0')"
++    },
++    "notes": {
++      "type": "string",
++      "description": "release notes body — markdown"
++    },
++    "generate_notes": {
++      "type": "boolean",
++      "description": "fall back to `gh release create --generate-notes` (GitHub auto-generates from commits since last tag); defaults to false"
++    }
++  }
++}
+diff --git a/plugins/sulis/instances/release-train/schemas/tools/gh-release-create-output.schema.json b/plugins/sulis/instances/release-train/schemas/tools/gh-release-create-output.schema.json
+new file mode 100644
+index 0000000..142893b
+--- /dev/null
++++ b/plugins/sulis/instances/release-train/schemas/tools/gh-release-create-output.schema.json
+@@ -0,0 +1,21 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://sulis.co/release-train/tool/gh-release-create/output/1.0.0",
++  "title": "gh-release-create — output",
++  "description": "Output: identifying coordinates of the published GitHub Release. `gh release create` prints the release URL on success.",
++  "type": "object",
++  "required": ["url"],
++  "additionalProperties": false,
++  "properties": {
++    "url": {
++      "type": "string",
++      "format": "uri",
++      "description": "the published release's HTML URL"
++    },
++    "tag": {
++      "type": "string",
++      "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
++      "description": "the tag the release is attached to"
++    }
++  }
++}
+diff --git a/plugins/sulis/instances/release-train/schemas/tools/git-tag-input.schema.json b/plugins/sulis/instances/release-train/schemas/tools/git-tag-input.schema.json
+new file mode 100644
+index 0000000..8d69d10
+--- /dev/null
++++ b/plugins/sulis/instances/release-train/schemas/tools/git-tag-input.schema.json
+@@ -0,0 +1,20 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://sulis.co/release-train/tool/git-tag/input/1.0.0",
++  "title": "git-tag — input",
++  "description": "Input for `git tag <tag> [-m <message>]`. Step 13 (tag-and-push) writes the version-bump artifact tag locally; the companion stub Tool git-push-tag pushes it to origin. The `bot-tag-doesnt-trigger-release-prod` FailureMode (FR-008) surfaces here: GITHUB_TOKEN-authored tags do not fire downstream workflows.",
++  "type": "object",
++  "required": ["tag"],
++  "additionalProperties": false,
++  "properties": {
++    "tag": {
++      "type": "string",
++      "description": "the tag name; release-train uses `v<dotted-semver>` (e.g. v1.131.0 for the marketplace series)",
++      "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
++    },
++    "message": {
++      "type": "string",
++      "description": "annotated-tag message; release-train emits 'release v<ver>'"
++    }
++  }
++}
+diff --git a/plugins/sulis/instances/release-train/schemas/tools/git-tag-output.schema.json b/plugins/sulis/instances/release-train/schemas/tools/git-tag-output.schema.json
+new file mode 100644
+index 0000000..f9638f6
+--- /dev/null
++++ b/plugins/sulis/instances/release-train/schemas/tools/git-tag-output.schema.json
+@@ -0,0 +1,16 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://sulis.co/release-train/tool/git-tag/output/1.0.0",
++  "title": "git-tag — output",
++  "description": "Output: the locally-created tag's name. `git tag` prints nothing on success; the workflow records the tag string for the subsequent push-tag + release-create Steps.",
++  "type": "object",
++  "required": ["tag"],
++  "additionalProperties": false,
++  "properties": {
++    "tag": {
++      "type": "string",
++      "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
++      "description": "the tag name that was created locally"
++    }
++  }
++}
+diff --git a/plugins/sulis/instances/release-train/tools.jsonld b/plugins/sulis/instances/release-train/tools.jsonld
+new file mode 100644
+index 0000000..880c1bf
+--- /dev/null
++++ b/plugins/sulis/instances/release-train/tools.jsonld
+@@ -0,0 +1,271 @@
++{
++  "@context": {
++    "@vocab": "https://sulis.co/dna/",
++    "dna": "https://sulis.co/dna/"
++  },
++  "@id": "dna:release-train:tools",
++  "@type": "tool-instances",
++  "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++  "_about": "Tool catalogue for the sulis-plugins-marketplace release-train Workflow per ADR-003 two-class fidelity strategy. 5 primary Tools (_changeset.cumulative_tier, _changeset.next_version, gh-pr-create, git-tag, gh-release-create) carry full inputs/outputs JSON Schemas at ./schemas/tools/ + populated implementation_detail + error_catalogue cross-refs into WP-004's failuremodes.jsonld. 12 stub Tools carry state=draft + minimal frontmatter (id/name/for_domain/kind/implementation_*/version/state/sys_status); per ADR-003 the drift detector treats state=draft as schema-validation-exempt. git-tag and git-push-tag are treated as a primary pair where git-tag carries the primary schemas and git-push-tag stays in the stub bucket. Tenant ULID is canonical for the marketplace tenant (deterministic recipe documented in failuremodes.jsonld's _about; derived from SHA256('tenant-name:sulis-plugins-marketplace') → Crockford base32). Schema: plugins/sulis/brain/compiled/foundation/tool.schema.json (vendored upstream sulis-brain Tool v1.1.0).",
++  "captured_on": "2026-06-01",
++
++  "tools": [
++    {
++      "id": "dna:tool:01KT0RTRA1CHT1ERCVM0000000",
++      "sys_status": "active",
++      "name": "_changeset.cumulative_tier",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "query",
++      "inputs_schema_ref": "schemas/tools/changeset-cumulative-tier-input.schema.json",
++      "outputs_schema_ref": "schemas/tools/changeset-cumulative-tier-output.schema.json",
++      "error_catalogue": [
++        "dna:failuremode:01KTRNPG3DAPH7BW0CAQ05C3PH"
++      ],
++      "implementation_kind": "python_import",
++      "implementation_detail": "{\"module\": \"_changeset\", \"function\": \"cumulative_tier\"}",
++      "version": "1.0.0",
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.95
++    },
++    {
++      "id": "dna:tool:01KT0RTRA1CHNXTVER00000000",
++      "sys_status": "active",
++      "name": "_changeset.next_version",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "query",
++      "inputs_schema_ref": "schemas/tools/changeset-next-version-input.schema.json",
++      "outputs_schema_ref": "schemas/tools/changeset-next-version-output.schema.json",
++      "error_catalogue": [
++        "dna:failuremode:01KTRNPG3DAPH7BW0CAQ05C3PH"
++      ],
++      "implementation_kind": "python_import",
++      "implementation_detail": "{\"module\": \"_changeset\", \"function\": \"next_version\"}",
++      "version": "1.0.0",
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.95
++    },
++    {
++      "id": "dna:tool:01KT0RTRA1GHPRCREAT0000000",
++      "sys_status": "active",
++      "name": "gh-pr-create",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "side-effect",
++      "inputs_schema_ref": "schemas/tools/gh-pr-create-input.schema.json",
++      "outputs_schema_ref": "schemas/tools/gh-pr-create-output.schema.json",
++      "error_catalogue": [],
++      "implementation_kind": "subprocess",
++      "implementation_detail": "{\"command\": \"gh\", \"args\": [\"pr\", \"create\"], \"env_keys\": [\"GH_TOKEN\", \"GITHUB_TOKEN\"]}",
++      "version": "1.0.0",
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.92
++    },
++    {
++      "id": "dna:tool:01KT0RTRA1G1TTAG0000000000",
++      "sys_status": "active",
++      "name": "git-tag",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "side-effect",
++      "inputs_schema_ref": "schemas/tools/git-tag-input.schema.json",
++      "outputs_schema_ref": "schemas/tools/git-tag-output.schema.json",
++      "error_catalogue": [
++        "dna:failuremode:01KTRGB53ME08DPVBZ03RTS359"
++      ],
++      "implementation_kind": "subprocess",
++      "implementation_detail": "{\"command\": \"git\", \"args\": [\"tag\"], \"env_keys\": []}",
++      "version": "1.0.0",
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.92
++    },
++    {
++      "id": "dna:tool:01KT0RTRA1GHRE1CREA0000000",
++      "sys_status": "active",
++      "name": "gh-release-create",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "side-effect",
++      "inputs_schema_ref": "schemas/tools/gh-release-create-input.schema.json",
++      "outputs_schema_ref": "schemas/tools/gh-release-create-output.schema.json",
++      "error_catalogue": [
++        "dna:failuremode:01KTRGB53ME08DPVBZ03RTS359"
++      ],
++      "implementation_kind": "subprocess",
++      "implementation_detail": "{\"command\": \"gh\", \"args\": [\"release\", \"create\"], \"env_keys\": [\"GH_TOKEN\", \"GITHUB_TOKEN\"]}",
++      "version": "1.0.0",
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.92
++    },
++
++    {
++      "id": "dna:tool:01KT0RTRA1CHREADCS00000000",
++      "sys_status": "active",
++      "name": "_changeset.read_changesets",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "query",
++      "inputs_schema_ref": "none://stub-pending-path-c",
++      "outputs_schema_ref": "none://stub-pending-path-c",
++      "implementation_kind": "python_import",
++      "implementation_detail": "{\"module\": \"_changeset\", \"function\": \"read_changesets\"}",
++      "version": "0.0.1",
++      "state": "draft",
++      "valid_from": "2026-06-01T00:00:00Z"
++    },
++    {
++      "id": "dna:tool:01KT0RTRA1CHCMPVER00000000",
++      "sys_status": "active",
++      "name": "_changeset.compare_version_files",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "query",
++      "inputs_schema_ref": "none://stub-pending-path-c",
++      "outputs_schema_ref": "none://stub-pending-path-c",
++      "implementation_kind": "python_import",
++      "implementation_detail": "{\"module\": \"_changeset\", \"function\": \"compare_version_files\"}",
++      "version": "0.0.1",
++      "state": "draft",
++      "valid_from": "2026-06-01T00:00:00Z"
++    },
++    {
++      "id": "dna:tool:01KT0RTRA1CHSVMMAR10000000",
++      "sys_status": "active",
++      "name": "_changeset.summarise",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "query",
++      "inputs_schema_ref": "none://stub-pending-path-c",
++      "outputs_schema_ref": "none://stub-pending-path-c",
++      "implementation_kind": "python_import",
++      "implementation_detail": "{\"module\": \"_changeset\", \"function\": \"summarise\"}",
++      "version": "0.0.1",
++      "state": "draft",
++      "valid_from": "2026-06-01T00:00:00Z"
++    },
++    {
++      "id": "dna:tool:01KT0RTRA1GHCHKSWAT0000000",
++      "sys_status": "active",
++      "name": "gh-pr-checks-watch",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "query",
++      "inputs_schema_ref": "none://stub-pending-path-c",
++      "outputs_schema_ref": "none://stub-pending-path-c",
++      "implementation_kind": "subprocess",
++      "implementation_detail": "{\"command\": \"gh\", \"args\": [\"pr\", \"checks\", \"--watch\"], \"env_keys\": [\"GH_TOKEN\", \"GITHUB_TOKEN\"]}",
++      "version": "0.0.1",
++      "state": "draft",
++      "valid_from": "2026-06-01T00:00:00Z"
++    },
++    {
++      "id": "dna:tool:01KT0RTRA1GHPRMERGA0000000",
++      "sys_status": "active",
++      "name": "gh-pr-mergeability",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "query",
++      "inputs_schema_ref": "none://stub-pending-path-c",
++      "outputs_schema_ref": "none://stub-pending-path-c",
++      "implementation_kind": "subprocess",
++      "implementation_detail": "{\"command\": \"gh\", \"args\": [\"pr\", \"view\", \"--json\", \"mergeable,mergeStateStatus\"], \"env_keys\": [\"GH_TOKEN\", \"GITHUB_TOKEN\"]}",
++      "version": "0.0.1",
++      "state": "draft",
++      "valid_from": "2026-06-01T00:00:00Z"
++    },
++    {
++      "id": "dna:tool:01KT0RTRA1GHPRMRG000000000",
++      "sys_status": "active",
++      "name": "gh-pr-merge",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "side-effect",
++      "inputs_schema_ref": "none://stub-pending-path-c",
++      "outputs_schema_ref": "none://stub-pending-path-c",
++      "implementation_kind": "subprocess",
++      "implementation_detail": "{\"command\": \"gh\", \"args\": [\"pr\", \"merge\", \"--squash\"], \"env_keys\": [\"GH_TOKEN\", \"GITHUB_TOKEN\"]}",
++      "version": "0.0.1",
++      "state": "draft",
++      "valid_from": "2026-06-01T00:00:00Z"
++    },
++    {
++      "id": "dna:tool:01KT0RTRA1G1TC0MM1T0000000",
++      "sys_status": "active",
++      "name": "git-commit",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "side-effect",
++      "inputs_schema_ref": "none://stub-pending-path-c",
++      "outputs_schema_ref": "none://stub-pending-path-c",
++      "implementation_kind": "subprocess",
++      "implementation_detail": "{\"command\": \"git\", \"args\": [\"commit\"], \"env_keys\": []}",
++      "version": "0.0.1",
++      "state": "draft",
++      "valid_from": "2026-06-01T00:00:00Z"
++    },
++    {
++      "id": "dna:tool:01KT0RTRA1G1TCMPBR00000000",
++      "sys_status": "active",
++      "name": "git-compare-branch-versions",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "query",
++      "inputs_schema_ref": "none://stub-pending-path-c",
++      "outputs_schema_ref": "none://stub-pending-path-c",
++      "implementation_kind": "subprocess",
++      "implementation_detail": "{\"command\": \"git\", \"args\": [\"diff\", \"--name-only\"], \"env_keys\": []}",
++      "version": "0.0.1",
++      "state": "draft",
++      "valid_from": "2026-06-01T00:00:00Z"
++    },
++    {
++      "id": "dna:tool:01KT0RTRA1VPDVRF11E0000000",
++      "sys_status": "active",
++      "name": "update-version-file",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "mutation",
++      "inputs_schema_ref": "none://stub-pending-path-c",
++      "outputs_schema_ref": "none://stub-pending-path-c",
++      "implementation_kind": "subprocess",
++      "implementation_detail": "{\"command\": \"sed\", \"args\": [\"-i\", \"\"], \"env_keys\": []}",
++      "version": "0.0.1",
++      "state": "draft",
++      "valid_from": "2026-06-01T00:00:00Z"
++    },
++    {
++      "id": "dna:tool:01KT0RTRA1PRPCHG10G0000000",
++      "sys_status": "active",
++      "name": "prepend-changelog",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "mutation",
++      "inputs_schema_ref": "none://stub-pending-path-c",
++      "outputs_schema_ref": "none://stub-pending-path-c",
++      "implementation_kind": "subprocess",
++      "implementation_detail": "{\"command\": \"bash\", \"args\": [\"-c\", \"prepend-changelog\"], \"env_keys\": []}",
++      "version": "0.0.1",
++      "state": "draft",
++      "valid_from": "2026-06-01T00:00:00Z"
++    },
++    {
++      "id": "dna:tool:01KT0RTRA1S1SEMTRE10000000",
++      "sys_status": "active",
++      "name": "sulis-emit-release",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "side-effect",
++      "inputs_schema_ref": "none://stub-pending-path-c",
++      "outputs_schema_ref": "none://stub-pending-path-c",
++      "implementation_kind": "subprocess",
++      "implementation_detail": "{\"command\": \"sulis-emit-release\", \"args\": [], \"env_keys\": []}",
++      "version": "0.0.1",
++      "state": "draft",
++      "valid_from": "2026-06-01T00:00:00Z"
++    },
++    {
++      "id": "dna:tool:01KT0RTRA1G1TPSHTAG0000000",
++      "sys_status": "active",
++      "name": "git-push-tag",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "side-effect",
++      "inputs_schema_ref": "none://stub-pending-path-c",
++      "outputs_schema_ref": "none://stub-pending-path-c",
++      "implementation_kind": "subprocess",
++      "implementation_detail": "{\"command\": \"git\", \"args\": [\"push\", \"origin\"], \"env_keys\": []}",
++      "version": "0.0.1",
++      "state": "draft",
++      "valid_from": "2026-06-01T00:00:00Z"
++    }
++  ]
++}
+diff --git a/plugins/sulis/scripts/tests/unit/test_tools_instance_valid.py b/plugins/sulis/scripts/tests/unit/test_tools_instance_valid.py
+new file mode 100644
+index 0000000..caeb4bd
+--- /dev/null
++++ b/plugins/sulis/scripts/tests/unit/test_tools_instance_valid.py
+@@ -0,0 +1,332 @@
++"""
++test_tools_instance_valid — WP-006
++
++Validates that `plugins/sulis/instances/release-train/tools.jsonld`:
++
++1. Parses as valid JSON-LD with the expected envelope shape.
++2. Declares the full release-train Tool catalogue (17 = 5 primary + 12 stub
++   per ADR-003).
++3. Each Tool validates against the foundation Tool JSON Schema
++   (`plugins/sulis/brain/compiled/foundation/tool.schema.json`, v1.1.0).
++4. The 5 primary Tools' `inputs_schema_ref` and `outputs_schema_ref` resolve
++   to real JSON Schema files (NOT `none://...` stub URIs) under
++   `plugins/sulis/instances/release-train/schemas/tools/`.
++5. The 12 stub Tools all carry `state: draft`.
++6. Every Tool's `error_catalogue` entries resolve to FailureMode IDs in
++   WP-004's `failuremodes.jsonld`.
++7. Each primary Tool's input schema accepts a representative sample payload
++   (CF-04: stubs include the happy-path example).
++
++These tests are deliberately deterministic + offline — no network, no LLM,
++no subprocess. Schemas come from the vendored brain/compiled directory; the
++instance comes from the release-train instances directory.
++"""
++
++from __future__ import annotations
++
++import json
++import re
++from pathlib import Path
++
++import pytest
++from jsonschema import Draft202012Validator
++
++
++_REPO_ROOT = Path(__file__).resolve().parents[5]
++_INSTANCE_PATH = (
++    _REPO_ROOT
++    / "plugins"
++    / "sulis"
++    / "instances"
++    / "release-train"
++    / "tools.jsonld"
++)
++_SCHEMA_PATH = (
++    _REPO_ROOT
++    / "plugins"
++    / "sulis"
++    / "brain"
++    / "compiled"
++    / "foundation"
++    / "tool.schema.json"
++)
++_TOOL_SCHEMAS_DIR = (
++    _REPO_ROOT
++    / "plugins"
++    / "sulis"
++    / "instances"
++    / "release-train"
++    / "schemas"
++    / "tools"
++)
++_FAILUREMODES_PATH = (
++    _REPO_ROOT
++    / "plugins"
++    / "sulis"
++    / "instances"
++    / "release-train"
++    / "failuremodes.jsonld"
++)
++
++# Primary Tool names (ADR-003 — fully populated with real input/output schemas).
++# git-tag + git-push-tag treated as one primary slot per WP-006 Contract;
++# git-tag is the primary entity, git-push-tag drops to stub.
++_PRIMARY_TOOL_NAMES = {
++    "_changeset.cumulative_tier",
++    "_changeset.next_version",
++    "gh-pr-create",
++    "git-tag",
++    "gh-release-create",
++}
++
++# Stub Tool names — minimal frontmatter, state=draft per ADR-003.
++_STUB_TOOL_NAMES = {
++    "_changeset.read_changesets",
++    "_changeset.compare_version_files",
++    "_changeset.summarise",
++    "gh-pr-checks-watch",
++    "gh-pr-mergeability",
++    "gh-pr-merge",
++    "git-commit",
++    "git-compare-branch-versions",
++    "update-version-file",
++    "prepend-changelog",
++    "sulis-emit-release",
++    "git-push-tag",
++}
++
++_EXPECTED_TOOL_COUNT = len(_PRIMARY_TOOL_NAMES) + len(_STUB_TOOL_NAMES)  # 17
++
++# A representative sample input payload per primary Tool, for the CF-04
++# stub-validation test. Keep these minimal — the schemas describe only the
++# load-bearing fields per ADR-003 (Blue refactor invariant).
++_PRIMARY_SAMPLE_INPUTS: dict[str, dict] = {
++    "_changeset.cumulative_tier": {
++        "changesets": [
++            {"tier": "patch", "primitive": "fix"},
++            {"tier": "minor", "primitive": "feat"},
++        ]
++    },
++    "_changeset.next_version": {
++        "current": "0.85.0",
++        "tier": "minor",
++    },
++    "gh-pr-create": {
++        "title": "release: sulis v0.86.0 (minor)",
++        "body": "Release PR body.",
++        "base": "main",
++        "head": "release/auto",
++    },
++    "git-tag": {
++        "tag": "v1.131.0",
++        "message": "release v1.131.0",
++    },
++    "gh-release-create": {
++        "tag": "v1.131.0",
++        "title": "sulis v0.86.0",
++        "notes": "auto-generated release notes",
++    },
++}
++
++
++@pytest.fixture(scope="module")
++def instance() -> dict:
++    """The parsed tools.jsonld envelope."""
++    assert _INSTANCE_PATH.exists(), (
++        f"tools.jsonld missing at {_INSTANCE_PATH}"
++    )
++    with _INSTANCE_PATH.open() as f:
++        return json.load(f)
++
++
++@pytest.fixture(scope="module")
++def tools(instance: dict) -> list[dict]:
++    """The list of Tool entries inside the envelope."""
++    return instance["tools"]
++
++
++@pytest.fixture(scope="module")
++def schema() -> dict:
++    """The vendored foundation Tool schema (v1.1.0)."""
++    assert _SCHEMA_PATH.exists(), (
++        f"foundation Tool schema missing at {_SCHEMA_PATH}; "
++        "expected vendored copy alongside actor/credential/tenant/failuremode/trigger"
++    )
++    with _SCHEMA_PATH.open() as f:
++        return json.load(f)
++
++
++@pytest.fixture(scope="module")
++def failuremode_ids() -> set[str]:
++    """The set of FailureMode dna:failuremode:<ulid> IDs authored in WP-004."""
++    assert _FAILUREMODES_PATH.exists(), (
++        f"failuremodes.jsonld missing at {_FAILUREMODES_PATH}; "
++        "WP-004 must be done before WP-006 (error_catalogue cross-ref)"
++    )
++    with _FAILUREMODES_PATH.open() as f:
++        fm_envelope = json.load(f)
++    return {fm["id"] for fm in fm_envelope["failuremodes"]}
++
++
++# ----- Test #1 — JSON-LD parses with expected envelope shape -----
++
++
++def test_tools_jsonld_parses(instance: dict) -> None:
++    """The file is well-formed JSON-LD with the expected envelope shape."""
++    assert "@context" in instance
++    assert "@id" in instance
++    assert "@type" in instance
++    assert instance["@type"] == "tool-instances"
++    assert "tools" in instance
++    assert isinstance(instance["tools"], list)
++
++
++# ----- Test #2 — 17 Tools present (5 primary + 12 stub) -----
++
++
++def test_all_tools_present(tools: list[dict]) -> None:
++    """WP-006 + ADR-003 Contract: 17 Tool instances by exact-name match."""
++    assert len(tools) == _EXPECTED_TOOL_COUNT, (
++        f"expected {_EXPECTED_TOOL_COUNT} Tools, found {len(tools)}"
++    )
++    names = {t["name"] for t in tools}
++    expected_names = _PRIMARY_TOOL_NAMES | _STUB_TOOL_NAMES
++    missing = expected_names - names
++    extra = names - expected_names
++    assert not missing, f"missing Tool names: {sorted(missing)}"
++    assert not extra, f"unexpected Tool names: {sorted(extra)}"
++
++
++# ----- Test #3 — Each Tool passes brain Tool schema -----
++
++
++def test_each_passes_brain_schema(tools: list[dict], schema: dict) -> None:
++    """Every Tool validates against the foundation Tool schema (v1.1.0)."""
++    validator = Draft202012Validator(schema)
++    errors_by_name: dict[str, list[str]] = {}
++    for t in tools:
++        errs = sorted(validator.iter_errors(t), key=lambda e: e.path)
++        if errs:
++            errors_by_name[t.get("name", "<unnamed>")] = [
++                f"{list(e.path)}: {e.message}" for e in errs
++            ]
++    assert not errors_by_name, (
++        f"schema validation failed for {len(errors_by_name)} Tool(s): "
++        f"{json.dumps(errors_by_name, indent=2)}"
++    )
++
++
++# ----- Test #4 — Primary Tools have real schema refs (NOT none://) -----
++
++
++def test_primary_tools_have_real_schema_refs(tools: list[dict]) -> None:
++    """5 primary Tools' inputs/outputs_schema_ref resolve to real .schema.json
++    files under plugins/sulis/instances/release-train/schemas/tools/.
++    """
++    by_name = {t["name"]: t for t in tools}
++    primaries = [by_name[n] for n in _PRIMARY_TOOL_NAMES]
++    unresolved: list[str] = []
++    for t in primaries:
++        for ref_field in ("inputs_schema_ref", "outputs_schema_ref"):
++            ref = t[ref_field]
++            assert not ref.startswith("none://"), (
++                f"primary Tool {t['name']} has stub {ref_field}={ref}; "
++                "primaries MUST point at a real schema per ADR-003"
++            )
++            # Refs are relative to the tools.jsonld file's directory.
++            ref_path = _INSTANCE_PATH.parent / ref
++            if not ref_path.exists():
++                unresolved.append(f"{t['name']}.{ref_field}={ref}")
++    assert not unresolved, (
++        f"unresolved schema refs for primary Tools: {unresolved}"
++    )
++
++
++# ----- Test #5 — Stub Tools state == draft -----
++
++
++def test_stub_tools_state_is_draft(tools: list[dict]) -> None:
++    """12 stub Tools per ADR-003 carry state=draft (drift-detector exempts
++    these from input/output schema validation).
++    """
++    by_name = {t["name"]: t for t in tools}
++    bad = []
++    for stub_name in _STUB_TOOL_NAMES:
++        t = by_name[stub_name]
++        if t.get("state") != "draft":
++            bad.append((stub_name, t.get("state")))
++    assert not bad, (
++        f"stub Tools not in state=draft: {bad}. "
++        f"Per ADR-003, all {len(_STUB_TOOL_NAMES)} stubs must be state=draft."
++    )
++
++
++# ----- Test #6 — error_catalogue refs resolve to WP-004 FailureModes -----
++
++
++def test_error_catalogue_refs_resolve(
++    tools: list[dict], failuremode_ids: set[str]
++) -> None:
++    """Every error_catalogue entry resolves to a FailureMode ID authored in
++    WP-004's failuremodes.jsonld.
++    """
++    dangling: list[str] = []
++    for t in tools:
++        for fm_ref in t.get("error_catalogue", []):
++            if fm_ref not in failuremode_ids:
++                dangling.append(f"{t['name']}: {fm_ref}")
++    assert not dangling, (
++        f"error_catalogue refs not found in WP-004 FailureModes: {dangling}. "
++        f"Available FailureMode IDs: {sorted(failuremode_ids)}"
++    )
++
++
++# ----- Test #7 — Primary Tool input schemas validate sample payload (CF-04) -----
++
++
++def test_primary_tool_input_schemas_validate(tools: list[dict]) -> None:
++    """For each primary Tool, the input schema accepts a representative
++    happy-path payload (CF-04 — stubs include the happy-path example).
++    """
++    by_name = {t["name"]: t for t in tools}
++    failures: list[str] = []
++    for primary_name in _PRIMARY_TOOL_NAMES:
++        t = by_name[primary_name]
++        schema_ref = t["inputs_schema_ref"]
++        schema_path = _INSTANCE_PATH.parent / schema_ref
++        assert schema_path.exists(), (
++            f"input schema for {primary_name} missing at {schema_path}"
++        )
++        with schema_path.open() as f:
++            input_schema = json.load(f)
++        sample = _PRIMARY_SAMPLE_INPUTS[primary_name]
++        validator = Draft202012Validator(input_schema)
++        errs = sorted(validator.iter_errors(sample), key=lambda e: e.path)
++        if errs:
++            failures.append(
++                f"{primary_name} sample input failed schema: "
++                + "; ".join(f"{list(e.path)}: {e.message}" for e in errs)
++            )
++    assert not failures, "primary Tool input schemas rejected sample payloads:\n" + "\n".join(failures)
++
++
++# ----- Blue invariant: kebab-case-ish tool names -----
++
++# Tool names accept _changeset.* dot-notation OR kebab. Pattern:
++# either dot-prefixed (_changeset.foo_bar) OR pure kebab (gh-pr-create).
++_DOT_NS_RE = re.compile(r"^[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*$")
++_KEBAB_RE = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)+$")
++
++
++def test_names_use_convention(tools: list[dict]) -> None:
++    """Tool names use kebab-case OR the _changeset.<snake> namespaced form.
++    Blue invariant — prevents naming drift as Tools accrete.
++    """
++    bad = []
++    for t in tools:
++        name = t["name"]
++        if not (_KEBAB_RE.match(name) or _DOT_NS_RE.match(name)):
++            bad.append(name)
++    assert not bad, (
++        f"Tool names violate convention (kebab-case OR _changeset.snake): {bad}"
++    )
