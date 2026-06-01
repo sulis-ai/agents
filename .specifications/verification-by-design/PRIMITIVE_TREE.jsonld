@@ -1,0 +1,294 @@
+{
+  "@context": {
+    "@vocab": "https://sulis.ai/primitive-tree/v1#",
+    "depends_on": { "@type": "@id" },
+    "addresses": { "@type": "@id" }
+  },
+  "@id": "spec://verification-by-design/primitive-tree",
+  "@type": "PrimitiveTree",
+  "spec": "verification-by-design",
+  "change_id": "CH-01KT2B",
+  "synthesised_at": "2026-06-01T00:00:00Z",
+  "nodes": [
+    {
+      "@id": "node:verification-plan-section",
+      "@type": "domain-entity",
+      "name": "Verification Plan section",
+      "definition": "A required section in every new SRD and TDD, and a required frontmatter field on every Work Package, recording how the change's user-observable behaviour will be verified end-to-end.",
+      "source": "user",
+      "health_status": "validated",
+      "leaf_category": "primitive-component",
+      "artifact_affinity": ["use-case", "process-flow"],
+      "depends_on": [
+        "node:verification-question-set",
+        "node:verification-adapter-taxonomy",
+        "node:verification-rubric-check"
+      ],
+      "attack_patterns": [
+        "What happens when the section is populated with placeholders?",
+        "What happens when the section references nonexistent infrastructure?",
+        "What happens when the section is bypassed by editing the skill prose?"
+      ]
+    },
+    {
+      "@id": "node:verification-question-set",
+      "@type": "domain-entity",
+      "name": "Canonical verification question set",
+      "definition": "The 20-question canonical list (4 foundational + 9 per-integration + 7 per-kind-adapter) every design phase asks. Lives at plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md as the single source of truth.",
+      "source": "user",
+      "health_status": "validated",
+      "leaf_category": "primitive-component",
+      "artifact_affinity": ["use-case", "data-flow"],
+      "depends_on": [],
+      "attack_patterns": [
+        "What happens when the set drifts between skills?",
+        "What happens when a skill inline-duplicates instead of citing?",
+        "What happens when a new question is added but downstream rubrics don't know?"
+      ]
+    },
+    {
+      "@id": "node:verification-adapter-taxonomy",
+      "@type": "policy",
+      "name": "Per-kind verification adapter taxonomy",
+      "definition": "The lookup table that maps each recognised kind: value (methodology / backend / frontend / async / infrastructure / documentation / contract) to exactly one verification adapter strategy.",
+      "source": "user",
+      "health_status": "validated",
+      "leaf_category": "primitive-component",
+      "artifact_affinity": ["business-rule"],
+      "depends_on": ["node:verification-question-set"],
+      "attack_patterns": [
+        "What happens when a new kind: value appears with no mapping?",
+        "What happens when two kinds claim the same adapter and drift?",
+        "What happens when the adapter is ambiguous about what counts as verification?"
+      ]
+    },
+    {
+      "@id": "node:verification-rubric-check",
+      "@type": "policy",
+      "name": "Verification rubric check",
+      "definition": "A rubric item enforced by the decompose-validation rubric and the requirements-validation skill that fails design completion when the Verification Plan section is missing, empty, contains placeholder content, references nonexistent infrastructure, or uses an unmapped kind.",
+      "source": "user",
+      "health_status": "validated",
+      "leaf_category": "primitive-component",
+      "artifact_affinity": ["business-rule", "nfr"],
+      "depends_on": [
+        "node:verification-plan-section",
+        "node:verification-question-set",
+        "node:verification-adapter-taxonomy"
+      ],
+      "attack_patterns": [
+        "What happens when an operator bypasses by editing skill prose?",
+        "What happens when grandfathered changes hit the rubric?",
+        "What happens when the rubric itself has a bug?"
+      ]
+    },
+    {
+      "@id": "node:infrastructure-need",
+      "@type": "domain-entity",
+      "name": "Infrastructure need",
+      "definition": "A piece of verification infrastructure that a Verification Plan identifies as required but not yet built (e.g., test OAuth accounts, recording mock for SendGrid, seed-data fixture pipeline). Recorded in the 'Infrastructure needs surfaced (deferred)' subsection.",
+      "source": "user",
+      "health_status": "validated",
+      "leaf_category": "primitive-component",
+      "artifact_affinity": ["use-case"],
+      "depends_on": ["node:verification-plan-section"],
+      "attack_patterns": [
+        "What happens when the same need is flagged by multiple changes?",
+        "What happens when a need is flagged but never converted to a follow-on?",
+        "What happens when an agent claims a need is already met but isn't?"
+      ]
+    },
+    {
+      "@id": "node:follow-on-auto-draft",
+      "@type": "process",
+      "name": "Follow-on change auto-draft",
+      "definition": "The slice-end review pattern that scans all deferred infrastructure needs across the slice and auto-drafts a follow-on change when the same need is flagged by 2+ designs. Singletons surface to the founder for explicit decision.",
+      "source": "user",
+      "health_status": "validated",
+      "leaf_category": "existing-impl",
+      "artifact_affinity": ["process-flow", "use-case"],
+      "depends_on": ["node:infrastructure-need"],
+      "attack_patterns": [
+        "What happens when slice-end review is skipped?",
+        "What happens when the scan is non-idempotent?",
+        "What happens when needs are recorded in a format the scan can't read?"
+      ]
+    },
+    {
+      "@id": "node:requirements-analyst-agent",
+      "@type": "integration",
+      "name": "requirements-analyst agent",
+      "definition": "The Sulis subagent dispatched by /sulis:specify. Updated by this change to ask the verification question set during Phase 3 (Convergent Specification) and to populate the Verification Plan section of the SRD it produces.",
+      "source": "codebase",
+      "health_status": "validated",
+      "leaf_category": "existing-impl",
+      "artifact_affinity": ["sequence", "use-case"],
+      "depends_on": ["node:verification-question-set"],
+      "attack_patterns": [
+        "What happens when the agent reads a stale version of the question set?",
+        "What happens when the agent's existing facilitation rules conflict with verification asking?"
+      ]
+    },
+    {
+      "@id": "node:engineering-architect-agent",
+      "@type": "integration",
+      "name": "engineering-architect agent",
+      "definition": "The Sulis subagent dispatched by /sulis:draft-architecture. Updated by this change to ask the verification-strategy questions (real-vs-mock, sandbox-vs-bypass, etc.) during TDD production and to populate the TDD's Verification Plan section with implementation-side concretions of the SRD's plan.",
+      "source": "codebase",
+      "health_status": "validated",
+      "leaf_category": "existing-impl",
+      "artifact_affinity": ["sequence", "use-case"],
+      "depends_on": ["node:verification-question-set", "node:verification-adapter-taxonomy"],
+      "attack_patterns": [
+        "What happens when SEA's TDD plan contradicts the SRD's plan?",
+        "What happens when SEA hallucinates infrastructure that doesn't exist?"
+      ]
+    },
+    {
+      "@id": "node:plan-work-skill",
+      "@type": "integration",
+      "name": "plan-work skill",
+      "definition": "The /sulis:plan-work skill that decomposes a TDD into atomic Work Packages. Updated to require each WP carry a verification: field in frontmatter naming the adapter and the test artifact (or deferred-to-follow-on with a follow-on identifier).",
+      "source": "codebase",
+      "health_status": "validated",
+      "leaf_category": "existing-impl",
+      "artifact_affinity": ["sequence", "use-case", "data-flow"],
+      "depends_on": ["node:verification-adapter-taxonomy"],
+      "attack_patterns": [
+        "What happens when a WP claims an adapter that doesn't fit the kind?",
+        "What happens when verification: is empty?"
+      ]
+    },
+    {
+      "@id": "node:behavioural-test-ledger",
+      "@type": "data-store",
+      "name": "Behavioural test ledger",
+      "definition": "The append-only record tracking each Verification Plan claim against the test artifact (or deferred-follow-on identifier) that satisfies it. Closes the loop between design-time promise and implementation-time evidence. Path: .specifications/{change}/verification-ledger.md (or equivalent specified by engineering-architect).",
+      "source": "user",
+      "health_status": "validated",
+      "leaf_category": "primitive-component",
+      "artifact_affinity": ["data-flow", "use-case"],
+      "depends_on": ["node:verification-plan-section", "node:plan-work-skill"],
+      "attack_patterns": [
+        "What happens when a claim has no test artifact and no deferred link?",
+        "What happens when the ledger format drifts?"
+      ]
+    },
+    {
+      "@id": "node:grandfathered-policy",
+      "@type": "policy",
+      "name": "Grandfathered-change policy",
+      "definition": "The rule that changes shipped before this methodology refinement are not retroactively required to produce a Verification Plan. Identified by their shipped-on date predating the merge date of this change. New changes from this refinement onwards do not qualify.",
+      "source": "user",
+      "health_status": "validated",
+      "leaf_category": "primitive-component",
+      "artifact_affinity": ["business-rule"],
+      "depends_on": ["node:verification-rubric-check"],
+      "attack_patterns": [
+        "What happens when an operator backdates a change to qualify for grandfathering?",
+        "What happens when a partially-shipped change crosses the boundary?"
+      ]
+    },
+    {
+      "@id": "node:trivial-change-carveout",
+      "@type": "policy",
+      "name": "Trivial-change carveout (CW-05)",
+      "definition": "The existing carveout permitting changes whose entire scope is a typo, comment fix, or no-behaviour-impact edit to populate the Verification Plan with 'n/a — trivial-change carveout' plus a one-line justification. The rubric accepts this populated form; it does not accept bare 'n/a'.",
+      "source": "codebase",
+      "health_status": "validated",
+      "leaf_category": "existing-impl",
+      "artifact_affinity": ["business-rule"],
+      "depends_on": ["node:verification-rubric-check"],
+      "attack_patterns": [
+        "What happens when an operator claims trivial for a non-trivial change?",
+        "What happens when the justification is itself trivial?"
+      ]
+    },
+    {
+      "@id": "node:dogfood-acceptance",
+      "@type": "policy",
+      "name": "Dogfood acceptance",
+      "definition": "The acceptance criterion that this change's own design artifacts (SRD, TDD, WPs) themselves include populated Verification Plans demonstrating the new question set being answered for a methodology change. The change ships only when it satisfies its own rubric.",
+      "source": "user",
+      "health_status": "validated",
+      "leaf_category": "primitive-component",
+      "artifact_affinity": ["business-rule", "use-case"],
+      "depends_on": ["node:verification-rubric-check", "node:verification-plan-section"],
+      "attack_patterns": [
+        "What happens when the change ships without dogfooding (rubric off in transition)?",
+        "What happens when the dogfood Verification Plan is itself a placeholder?"
+      ]
+    },
+    {
+      "@id": "node:decompose-validation-rubric",
+      "@type": "integration",
+      "name": "decompose-validation rubric (P1..P9 + P-VER)",
+      "definition": "The existing rubric reference at plugins/sulis/references/decompose-validation-rubric.md. Extended by this change to add a P-VER (or numbered P10) check that enforces the Verification Plan section's presence, populated content, and consistency with the canonical question set and adapter taxonomy.",
+      "source": "codebase",
+      "health_status": "validated",
+      "leaf_category": "existing-impl",
+      "artifact_affinity": ["business-rule"],
+      "depends_on": ["node:verification-plan-section"],
+      "attack_patterns": [
+        "What happens when the P-VER check is itself bypassed?",
+        "What happens when the rubric reference drifts from the skill that enforces it?"
+      ]
+    },
+    {
+      "@id": "node:slice-end-review",
+      "@type": "process",
+      "name": "Slice-end review pattern",
+      "definition": "The existing pattern (already in the marketplace methodology) that runs at the end of each delivery slice to scan for follow-on opportunities. Extended by this change to scan deferred infrastructure needs across the slice and auto-draft follow-on changes when needs are repeated.",
+      "source": "codebase",
+      "health_status": "validated",
+      "leaf_category": "existing-impl",
+      "artifact_affinity": ["process-flow"],
+      "depends_on": ["node:infrastructure-need", "node:follow-on-auto-draft"],
+      "attack_patterns": [
+        "What happens when slice-end review is skipped?",
+        "What happens when the scan needs metadata the deferred section doesn't provide?"
+      ]
+    }
+  ],
+  "edges": [
+    { "from": "node:verification-plan-section", "to": "node:verification-question-set", "type": "depends_on" },
+    { "from": "node:verification-plan-section", "to": "node:verification-adapter-taxonomy", "type": "depends_on" },
+    { "from": "node:verification-plan-section", "to": "node:verification-rubric-check", "type": "depends_on" },
+    { "from": "node:verification-adapter-taxonomy", "to": "node:verification-question-set", "type": "depends_on" },
+    { "from": "node:verification-rubric-check", "to": "node:verification-plan-section", "type": "depends_on" },
+    { "from": "node:verification-rubric-check", "to": "node:verification-question-set", "type": "depends_on" },
+    { "from": "node:verification-rubric-check", "to": "node:verification-adapter-taxonomy", "type": "depends_on" },
+    { "from": "node:infrastructure-need", "to": "node:verification-plan-section", "type": "depends_on" },
+    { "from": "node:follow-on-auto-draft", "to": "node:infrastructure-need", "type": "depends_on" },
+    { "from": "node:requirements-analyst-agent", "to": "node:verification-question-set", "type": "depends_on" },
+    { "from": "node:engineering-architect-agent", "to": "node:verification-question-set", "type": "depends_on" },
+    { "from": "node:engineering-architect-agent", "to": "node:verification-adapter-taxonomy", "type": "depends_on" },
+    { "from": "node:plan-work-skill", "to": "node:verification-adapter-taxonomy", "type": "depends_on" },
+    { "from": "node:behavioural-test-ledger", "to": "node:verification-plan-section", "type": "depends_on" },
+    { "from": "node:behavioural-test-ledger", "to": "node:plan-work-skill", "type": "depends_on" },
+    { "from": "node:grandfathered-policy", "to": "node:verification-rubric-check", "type": "depends_on" },
+    { "from": "node:trivial-change-carveout", "to": "node:verification-rubric-check", "type": "depends_on" },
+    { "from": "node:dogfood-acceptance", "to": "node:verification-rubric-check", "type": "depends_on" },
+    { "from": "node:dogfood-acceptance", "to": "node:verification-plan-section", "type": "depends_on" },
+    { "from": "node:decompose-validation-rubric", "to": "node:verification-plan-section", "type": "depends_on" },
+    { "from": "node:slice-end-review", "to": "node:infrastructure-need", "type": "depends_on" },
+    { "from": "node:slice-end-review", "to": "node:follow-on-auto-draft", "type": "depends_on" }
+  ],
+  "reconciliation": {
+    "domain_model_sources": [
+      "founder framing in dispatch brief (verbatim quotes on verification-as-design-question)",
+      "the 20 question set as written in the dispatch brief",
+      "the kind-to-adapter mapping in the dispatch brief (Q14-Q20)",
+      "Path A precedent: release-train + discovery shipped without verification, surfacing the gap"
+    ],
+    "code_model_sources": [
+      "plugins/sulis/agents/requirements-analyst.md — exists",
+      "plugins/sulis/agents/engineering-architect.md — exists",
+      "plugins/sulis/skills/plan-work — exists (skill, not agent)",
+      "plugins/sulis/references/decompose-validation-rubric.md — exists",
+      "plugins/sulis/references/standards/ — exists (CONTRACT_FIRST_STANDARD, CRITICAL_THINKING_STANDARD, etc.)",
+      "Slice-end review pattern — referenced in existing methodology"
+    ],
+    "scope": "design-side only. The infrastructure-side (real test auth, mock notifications, seed data, etc.) is explicitly deferred to follow-on changes triggered by the auto-draft mechanism."
+  }
+}
