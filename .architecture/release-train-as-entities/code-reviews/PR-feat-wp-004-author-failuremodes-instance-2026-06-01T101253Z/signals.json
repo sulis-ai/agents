@@ -1,0 +1,99 @@
+{
+  "review": {
+    "target": "feat/wp-004-author-failuremodes-instance",
+    "project": "release-train-as-entities",
+    "timestamp": "2026-06-01T101253Z",
+    "base_ref": "origin/change/create-release-train-as-entities",
+    "head_ref": "feat/wp-004-author-failuremodes-instance",
+    "diff_stats": {
+      "files_changed": 4,
+      "lines_added": 487,
+      "lines_removed": 0
+    }
+  },
+  "verdict": "PASS",
+  "build_verification": {
+    "errors_introduced": 0,
+    "commands_run": [
+      "uv run pytest tests/unit/test_failuremodes_instance_valid.py",
+      "python3 -m compileall plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py",
+      "python3 -c 'import json; json.load(open(failuremodes.jsonld))'",
+      "python3 plugins/sulis/scripts/sulis-route check"
+    ]
+  },
+  "pr_hygiene": {
+    "scope": {
+      "commit_type_spread": ["feat"],
+      "module_fan_out": 3,
+      "severity": "low",
+      "note": "Single primitive — Create kind=contract. All files inside the WP Contract scope."
+    },
+    "size": {
+      "lines_added": 487,
+      "lines_removed": 0,
+      "total": 487,
+      "files_changed": 4,
+      "generated_ratio": 0.27,
+      "lock_file_ratio": 0,
+      "severity": "low",
+      "note": "133 lines are vendored schema (mechanical), 173 lines are JSON-LD data, 175 lines are test code + journal. No prose/code overlap."
+    },
+    "safety": {
+      "migration_count": 0,
+      "schema_idl_count": 1,
+      "infra_files": 0,
+      "secret_pattern_hits": 0,
+      "severity": "low",
+      "note": "One JSON Schema vendored from upstream brain plugin (byte-identical to source); no new migrations, no infra, no secrets."
+    },
+    "completeness": {
+      "new_source_without_test": 0,
+      "new_test_files": 1,
+      "api_change_without_schema": false,
+      "severity": "low",
+      "note": "Data-only WP. The new JSON-LD instance has a dedicated test file with 6 tests covering parse/count/schema-validate/enum/lived-defects/naming."
+    }
+  },
+  "lenses": {
+    "architecture": {
+      "findings_count": 0,
+      "outcome": "nothing-surfaced",
+      "checks_run": [
+        "module-boundary scan (no new cross-layer imports)",
+        "resilience scan (no new HTTP/RPC/DB calls; pure file reads)",
+        "secrets scan (no credentials in diff)",
+        "observability scan (no new handlers/endpoints needing spans)",
+        "verification scan (data file backed by 6 unit tests including schema validation)"
+      ]
+    },
+    "security": {
+      "findings_count": 0,
+      "outcome": "nothing-surfaced",
+      "primitives_checked": ["SEC-01..07", "SC-01..04", "DAT-03"],
+      "scanners_unavailable": ["gitleaks", "trivy", "semgrep"],
+      "note": "Static data + test diff with no untrusted input surfaces. No new dependencies (jsonschema + pytest already declared in pyproject)."
+    },
+    "quality": {
+      "findings_count": 1,
+      "findings": [
+        {
+          "id": "Q-01",
+          "severity": "low",
+          "category": "contract-drift",
+          "file": "plugins/sulis/instances/release-train/failuremodes.jsonld",
+          "line_range": "all",
+          "title": "WP Contract table uses kind={operational,structural} + severity, but schema enum + schema-has-no-severity-field",
+          "evidence": "The WP Contract table lists kind=operational/structural and severity=low/medium/high/critical for each FailureMode. The foundation FailureMode schema has kind enum {timeout, dependency-unavailable, invalid-input, policy-violation, sanctions-hit, business-logic-error, infrastructure-failure, capacity-exceeded, authorisation-denied, other} and NO severity field at all (expected_frequency exists instead, enum {rare,occasional,frequent}).",
+          "recommendation": "Schema-canonical path taken: each FailureMode uses a schema-valid kind value chosen to best characterise the failure, and severity is dropped in favour of expected_frequency. The drift is documented in the journal's Step 1.5 approach summary and in the failuremodes.jsonld _about field. No fix needed in this WP. A follow-up housekeeping WP could update WP-004's Contract table to use schema-canonical vocabulary for posterity — but that's an editorial change to the WP file, not a code change.",
+          "draft_delta": null
+        }
+      ],
+      "jsx_scan": "N/A — no TSX/JSX files in diff",
+      "dead_surface": "none",
+      "test_coverage": "6 tests for 1 new data file + 1 vendored schema; all DoD checklist items covered",
+      "perf_patterns_cr10": "no anti-pattern matches — no loops with I/O, no N+1, no unbounded materialisation"
+    }
+  },
+  "auto_downgrades_fired": [],
+  "verdict_reasoning": "PASS: Build Verification empty, no critical/high in diff, all 3 lenses produced output, all files >50 lines read end-to-end (the executor authored them this session)."
+}

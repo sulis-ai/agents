@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/dna/schema/failuremode/1.0.0",
+  "title": "FailureMode",
+  "description": "a named pattern of failure that one or more Steps can encounter, with a defined recovery strategy. Reusable across steps \u2014 e.g. 'external-service-timeout' applies to every step that calls an external service; 'sanctions-hit' applies to every step that consults a sanctions list. Steps reference FailureModes via handles_failures.",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": [
+    "id",
+    "name",
+    "for_domain",
+    "kind",
+    "description",
+    "recovery_strategy",
+    "blocks_progress",
+    "state",
+    "sys_status"
+  ],
+  "properties": {
+    "sys_status": {
+      "enum": [
+        "active",
+        "archived",
+        "deleted",
+        "purged"
+      ]
+    },
+    "valid_from": {
+      "type": "string",
+      "format": "date-time",
+      "description": "business-truth window start"
+    },
+    "valid_to": {
+      "type": "string",
+      "format": "date-time",
+      "description": "business-truth window end"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "instance reliability score"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^dna:failuremode:[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "name": {
+      "type": "string",
+      "description": "e.g. 'external-service-timeout', 'sanctions-hit', 'demands-and-needs-missing', 'rate-limit-exceeded'"
+    },
+    "for_domain": {
+      "type": "string",
+      "pattern": "^dna:(tenant):[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "kind": {
+      "enum": [
+        "timeout",
+        "dependency-unavailable",
+        "invalid-input",
+        "policy-violation",
+        "sanctions-hit",
+        "business-logic-error",
+        "infrastructure-failure",
+        "capacity-exceeded",
+        "authorisation-denied",
+        "other"
+      ]
+    },
+    "description": {
+      "type": "string"
+    },
+    "recovery_strategy": {
+      "enum": [
+        "retry",
+        "compensate",
+        "escalate",
+        "abort",
+        "manual-review",
+        "fallback"
+      ]
+    },
+    "recovery_detail": {
+      "type": "string",
+      "description": "specifics: 'max 3 retries with exponential backoff 1s/4s/16s'; 'escalate to compliance@firm.com'; 'fallback to manual underwriting queue'"
+    },
+    "expected_frequency": {
+      "enum": [
+        "rare",
+        "occasional",
+        "frequent"
+      ]
+    },
+    "blocks_progress": {
+      "type": "boolean",
+      "description": "true if hitting this failure mode blocks further workflow progress until recovery completes; false for retry/fallback that don't block"
+    },
+    "state": {
+      "enum": [
+        "active",
+        "deprecated"
+      ]
+    }
+  },
+  "x-schema-org-extends": "custom"
+}
