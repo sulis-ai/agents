@@ -18,6 +18,34 @@ name: release-on-merge
 # Loop-guard: the job is SKIPPED when the head commit is the bot's own release
 # commit (message starts with "release: sulis"), so the push-back in the final
 # step does not re-trigger this workflow.
+#
+# ---------------------------------------------------------------------------
+# Canonical Step annotations (ADR-002 / WP-009).
+#
+# This workflow implements the *post-merge* portion of the canonical
+# release-train (defined at plugins/sulis/instances/release-train/steps.jsonld).
+# Each YAML step that implements a canonical Step carries an inline
+# `# canonical:step:<step-name>` comment immediately above its `- name:` line.
+# Steps that recover from a canonical FailureMode also carry a
+# `# canonical:failuremode:<failuremode-name>` annotation. The drift detector
+# (WP-007) reads these against the canonical instances and flags drift.
+#
+# Steps deliberately *absent* from this YAML (handled elsewhere):
+#   - preflight-cross-branch-drift  — happens in the /sulis:release-train
+#     skill before the release PR opens; release-on-merge fires only after
+#     merge, when cross-branch drift is no longer relevant.
+#   - open-release-pr               — performed by the founder / skill prior
+#     to this workflow firing; the trigger here is `on: push: branches:
+#     [main]`, i.e. the PR is already merged.
+#   - wait-for-checks-and-mergeability — branch protection gates the merge;
+#     the merge itself is proof of green checks + mergeability.
+#   - gate-founder-confirmation     — the founder's manual merge of the
+#     release PR on GitHub IS the confirmation (MUC-007).
+#   - squash-merge                  — performed by the founder via the GH
+#     UI; this workflow trigger fires *after* the merge.
+#   - publish-github-release        — performed by release-prod.yml, which
+#     fires on the v* tag push from Step 13 here.
+# ---------------------------------------------------------------------------
 on:
   push:
     branches: [main]
@@ -55,6 +83,7 @@ jobs:
 
       # 2. Check for pending changesets. None → nothing to release, exit 0.
       #    All later steps gate on steps.detect.outputs.skip != 'true'.
+      # canonical:step:detect-pending-changesets
       - name: Check for pending changesets
         id: detect
         run: |
@@ -72,6 +101,8 @@ jobs:
       # 3. VERSION_DRIFT guard (BEFORE any bump). plugin.json .version MUST equal
       #    the marketplace sulis-entry .version; a mismatch means a prior partial
       #    bump — abort rather than compound the drift.
+      # canonical:step:preflight-version-drift
+      # canonical:failuremode:version-drift-detected-pre-flight
       - name: VERSION_DRIFT guard
         if: steps.detect.outputs.skip != 'true'
         run: |
@@ -88,6 +119,7 @@ jobs:
       #    _changeset.cumulative_tier / next_version (ADR-004 alt-2 / EP-03) so
       #    the bash mirror can never diverge from the keystone. Emits new_plugin,
       #    new_meta, tier, and the old values as step outputs.
+      # canonical:step:compute-next-version
       - name: Compute next version
         id: compute
         if: steps.detect.outputs.skip != 'true'
@@ -118,20 +150,26 @@ jobs:
           PY
           echo "computed tier + next versions written to step outputs"
 
-      # 5. Assemble the CHANGELOG entry and prepend it to plugins/sulis/CHANGELOG.md.
+      # 5. Draft the CHANGELOG entry to a known temp path. Split from the
+      #    prepend step (Step 11) per ADR-002 atomicity: the canonical model
+      #    treats draft-pr-body-and-changelog (Step 5) and write-changelog-entry
+      #    (Step 11) as two atomic Steps in the post-merge pipeline, even
+      #    though they were historically one bash block. The fixed temp path
+      #    `/tmp/changelog-entry.md` carries the artifact across the two YAML
+      #    steps (GH Actions runner /tmp persists within a job).
       #    Header uses the PLUGIN version (ADR-003): "## v<new_plugin> — <date>".
       #    release-prod.yml's awk reads the FIRST `## ` section, so this header
       #    shape is what becomes the GitHub Release notes.
-      - name: Assemble CHANGELOG entry
+      # canonical:step:draft-pr-body-and-changelog
+      - name: Draft CHANGELOG entry
         if: steps.detect.outputs.skip != 'true'
         env:
           NEW_PLUGIN: ${{ steps.compute.outputs.new_plugin }}
           TIER_TITLE: ${{ steps.compute.outputs.tier_title }}
         run: |
           set -euo pipefail
-          CHANGELOG="plugins/sulis/CHANGELOG.md"
           DATE=$(date -u +%Y-%m-%d)
-          ENTRY=$(mktemp)
+          ENTRY="/tmp/changelog-entry.md"
           {
             echo "## v${NEW_PLUGIN} — ${DATE}"
             echo
@@ -158,6 +196,25 @@ jobs:
           PY
             echo
           } > "$ENTRY"
+          echo "drafted CHANGELOG entry to $ENTRY"
+
+      # 5b. Prepend the drafted entry to plugins/sulis/CHANGELOG.md. The
+      #     canonical Step 11 — write-changelog-entry — split from Step 5
+      #     above per ADR-002.
+      # canonical:step:write-changelog-entry
+      - name: Prepend CHANGELOG entry
+        if: steps.detect.outputs.skip != 'true'
+        env:
+          NEW_PLUGIN: ${{ steps.compute.outputs.new_plugin }}
+        run: |
+          set -euo pipefail
+          CHANGELOG="plugins/sulis/CHANGELOG.md"
+          DATE=$(date -u +%Y-%m-%d)
+          ENTRY="/tmp/changelog-entry.md"
+          if [ ! -f "$ENTRY" ]; then
+            echo "draft step did not produce $ENTRY"
+            exit 1
+          fi
           # Prepend the new section directly under the top-of-file title line.
           if [ -f "$CHANGELOG" ] && head -1 "$CHANGELOG" | grep -q '^# '; then
             TITLE=$(head -1 "$CHANGELOG")
@@ -179,6 +236,7 @@ jobs:
 
       # 6. Apply the bump — all THREE values at one tier (ADR-003). Explicit jq
       #    paths, one edit per line, no clever one-liners that hide the three edits.
+      # canonical:step:bump-version-files
       - name: Apply the version bump (three values, one tier)
         if: steps.detect.outputs.skip != 'true'
         env:
@@ -203,6 +261,7 @@ jobs:
       # 7. Post-bump verification (the in-workflow self-test). Re-read all three
       #    values; fail the workflow if ANY did not move to the expected version.
       #    A half-bump can never reach a tag.
+      # canonical:step:bump-version-files
       - name: Post-bump verification
         if: steps.detect.outputs.skip != 'true'
         env:
@@ -227,10 +286,12 @@ jobs:
           git rm .changesets/*.yaml
           echo "removed consumed changesets"
 
-      # 9. Commit as the bot, tag v<metadata.version>, push commit + tag.
-      #    The commit message prefix "release: sulis" is the loop-guard's gate
-      #    (job-level if: above) — keep the two in lockstep.
-      - name: Commit, tag, push
+      # 9a. Commit the bump as github-actions[bot] (Step 12 of the canonical
+      #     release-train). The commit message prefix "release: sulis" is the
+      #     loop-guard's gate (job-level `if:` above + the head_commit author
+      #     check) — keep the message + author in lockstep.
+      # canonical:step:commit-bump-as-bot
+      - name: Commit bump as bot
         if: steps.detect.outputs.skip != 'true'
         env:
           NEW_PLUGIN: ${{ steps.compute.outputs.new_plugin }}
@@ -248,6 +309,21 @@ jobs:
             .claude-plugin/marketplace.json \
             plugins/sulis/CHANGELOG.md
           git commit -m "release: sulis v${NEW_PLUGIN} (v${NEW_META})"
+          echo "committed: release: sulis v${NEW_PLUGIN} (v${NEW_META})"
+
+      # 9b. Tag v<NEW_META> and push commit + tag to origin (Step 13 of the
+      #     canonical release-train). The pushed tag triggers release-prod.yml.
+      #     Note: bot-pushed tags do NOT fire downstream workflow_run events
+      #     by GitHub Actions design — handled by Step 14 (publish-github-release)'s
+      #     bot-tag-doesnt-trigger-release-prod fallback path elsewhere.
+      # canonical:step:tag-and-push
+      - name: Tag and push
+        if: steps.detect.outputs.skip != 'true'
+        env:
+          NEW_PLUGIN: ${{ steps.compute.outputs.new_plugin }}
+          NEW_META: ${{ steps.compute.outputs.new_meta }}
+        run: |
+          set -euo pipefail
           git tag "v${NEW_META}"
           git push origin main
           git push origin "v${NEW_META}"
@@ -261,6 +337,7 @@ jobs:
       # Once Component-emission wires into wpx-train, the comprises list
       # will be populated from the brain's set of Components touched in
       # this release window.
+      # canonical:step:emit-release-entity
       - name: Emit Release entity (best-effort)
         if: steps.detect.outputs.skip != 'true'
         continue-on-error: true

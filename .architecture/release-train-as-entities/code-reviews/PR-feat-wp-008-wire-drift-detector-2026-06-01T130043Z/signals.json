@@ -1,0 +1,59 @@
+{
+  "ph_06_signal_table": {
+    "scope_PH-01": {
+      "commit_type_spread": ["feat"],
+      "module_fan_out": 2,
+      "severity": "low",
+      "note": "Single feat: scope — adds canonical-drift-check job + its structural test"
+    },
+    "size_PH-02": {
+      "lines_added": 219,
+      "lines_removed": 0,
+      "files_changed": 2,
+      "generated_ratio": 0.0,
+      "lock_file_ratio": 0.0,
+      "severity": "low",
+      "note": "219 lines total (44 YAML + 175 new test). 2 files. Bands: 201-500 / 1-5."
+    },
+    "safety_PH-03": {
+      "migration_count": 0,
+      "schema_idl_count": 0,
+      "infra_files": 1,
+      "secret_pattern_hits": 0,
+      "severity": "low",
+      "note": "Additive CI job; advisory mode (continue-on-error: true) so cannot newly block PRs"
+    },
+    "completeness_PH-04": {
+      "new_source_without_test": 0,
+      "api_change_without_schema": false,
+      "severity": "low",
+      "note": "Source + structural test ship together"
+    }
+  },
+  "build_verification_CR-01": {
+    "py_compile_clean": true,
+    "yaml_safe_load_clean": true,
+    "pytest_new_passed": 8,
+    "pytest_full_suite_passed": 1296,
+    "errors_introduced": 0
+  },
+  "findings_in_changes": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0
+  },
+  "findings_in_neighbours": {
+    "high": 0,
+    "medium": 0,
+    "low": 0
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "note": "Nothing surfaced. No new domain code, no infra reach-through, no new external calls, no secrets in diff."},
+    "security": {"findings": 0, "note": "Nothing surfaced. Action pins (actions/checkout@v4, astral-sh/setup-uv@v6) follow existing pattern. No credentials in diff."},
+    "quality": {"findings": 0, "note": "Build clean. Source+test ship together. No dead surface. No CR-10 hot-path matches (CI YAML config)."}
+  },
+  "verdict": "PASS",
+  "auto_downgrade_triggers": [],
+  "draft_deltas": 0
+}

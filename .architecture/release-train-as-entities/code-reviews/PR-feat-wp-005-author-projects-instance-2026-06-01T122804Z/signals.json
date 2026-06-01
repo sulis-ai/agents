@@ -1,0 +1,34 @@
+{
+  "target": "feat/wp-005-author-projects-instance",
+  "project": "release-train-as-entities",
+  "timestamp": "2026-06-01T12:28:04Z",
+  "base": "change/create-release-train-as-entities",
+  "head": "feat/wp-005-author-projects-instance",
+  "files_changed": 4,
+  "lines_added": 491,
+  "lines_removed": 0,
+  "carve_out": "single-reader",
+  "carve_out_reason": "diff size 491 lines / 4 files <= 200 lines AND <= 5 files (CR-02 carve-out)",
+  "build_verification": {
+    "tool": "ruff check + ruff format --check + pytest",
+    "base_errors": 0,
+    "head_errors": 0,
+    "delta": []
+  },
+  "pr_hygiene": {
+    "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "low"},
+    "size": {"lines_added": 491, "files_changed": 4, "severity": "low"},
+    "safety": {"migrations": 0, "schema_files": 1, "infra_files": 0, "secret_pattern_hits": 0, "severity": "low"},
+    "completeness": {"new_source_without_test": 0, "new_tests": 1, "severity": "low"}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "checks": ["dependency-direction", "secrets", "observability", "contract-test"], "outcome": "nothing surfaced"},
+    "security": {"findings": 0, "checks": ["SEC-01..07", "SC-01..04", "secrets-scan", "PII-leak"], "outcome": "nothing surfaced"},
+    "quality": {"findings": 0, "checks": ["dead-surface", "contract-drift", "test-coverage", "style", "CR-10 perf"], "outcome": "nothing surfaced"}
+  },
+  "findings_in_changes": [],
+  "findings_in_neighbours": [],
+  "draft_deltas": [],
+  "verdict": "PASS",
+  "verdict_reason": "No critical/high in diff; Build Verification empty; all files read end-to-end; all three lenses produced output."
+}

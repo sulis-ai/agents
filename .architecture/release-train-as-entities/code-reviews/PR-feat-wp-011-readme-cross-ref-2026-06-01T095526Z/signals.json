@@ -1,0 +1,56 @@
+{
+  "target": "feat/wp-011-readme-cross-ref",
+  "wp": "WP-011",
+  "project": "release-train-as-entities",
+  "timestamp": "2026-06-01T095526Z",
+  "diff_metrics": {
+    "lines_added": 26,
+    "lines_removed": 0,
+    "files_changed_committed": 1,
+    "files_added_uncommitted": 1,
+    "total_files_in_scope": 2
+  },
+  "ph_signals": {
+    "scope": {
+      "commit_type_spread": ["docs"],
+      "module_fan_out": 2,
+      "severity": "note",
+      "note": "single concern: README docs addition + co-located structural test"
+    },
+    "size": {
+      "lines_total": 26,
+      "files_changed": 2,
+      "generated_ratio": 0.0,
+      "lock_file_ratio": 0.0,
+      "severity": "note",
+      "note": "well within the 200-line / 5-file CR-02 carve-out"
+    },
+    "safety": {
+      "migration_count": 0,
+      "schema_idl_count": 0,
+      "infra_files": 0,
+      "secret_pattern_hits": 0,
+      "severity": "note",
+      "note": "docs + structural test only; no operational risk surface"
+    },
+    "completeness": {
+      "new_source_without_test": 0,
+      "api_change_without_schema": false,
+      "severity": "note",
+      "note": "the new test file IS the docs-prose verification (WP DoD has no runtime tests by design)"
+    }
+  },
+  "build_verification": {
+    "py_compile": "clean",
+    "pytest_new_file": "5 passed",
+    "pytest_full_unit_suite": "1189 passed",
+    "errors_introduced": 0
+  },
+  "lens_findings": {
+    "architecture": [],
+    "security": [],
+    "quality": []
+  },
+  "verdict": "PASS",
+  "auto_downgrade_triggers": []
+}

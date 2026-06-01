@@ -1,0 +1,22 @@
+train_id: "train-2026-06-01T115928Z"
+started_at: "2026-06-01T11:59:28Z"
+completed_at: "2026-06-01T12:21:06Z"
+outcome: "success"
+batch_size: 2
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-01T12:04:42Z"
+gate_findings_path: ".architecture/release-train-as-entities/code-reviews/PR-batch-train-2026-06-01T115928Z-2026-06-01T121956Z/REVIEW.md"
+bundle:
+  - wp: WP-001
+    branch: feat/wp-001-author-workflow-instance
+    pre_train_sha: 239f06091b2cfbe75b0032b4beeb8aeb6237c815
+    rebased_to_sha: 239f06091b2cfbe75b0032b4beeb8aeb6237c815
+    merge_sha_on_dev: d7f505ec1cf64892867992fcb655994304794503
+  - wp: WP-009
+    branch: feat/wp-009-add-canonical-annotations-to-yaml
+    pre_train_sha: 85e5320b8c0e59cb50677b20fd303e836848af60
+    rebased_to_sha: 78fd2c8a2f648dce4bbf193cb0d59ffa20877566
+    merge_sha_on_dev: f971a7c8b675f944de85822b8aba5511ad354238

@@ -1,0 +1,40 @@
+{
+  "@context": {
+    "@vocab": "https://sulis.co/dna/",
+    "dna": "https://sulis.co/dna/"
+  },
+  "@id": "dna:release-train:triggers",
+  "@type": "trigger-instances",
+  "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "_about": "Two Triggers initiate the release-train Workflow. One manual (founder runs /sulis:release-train against a marketplace plugin Project) and one event (release-on-merge.yml fires on push to main, with the CH-01KSZ1 loop-guard filter excluding github-actions[bot] author). The event Trigger is informational under Path A — the imperative bash actually responds to the GH-Actions event; the canonical entity records what fires for drift-detector validation + dry-run preview surface. Tenant ULID is canonical for the marketplace tenant — sourced from WP-004 (failuremodes.jsonld) which derives it deterministically from the tenant logical name (recipe documented in failuremodes.jsonld's _about); reused identically across every release-train canonical instance.",
+  "captured_on": "2026-06-01",
+
+  "triggers": [
+    {
+      "id": "dna:trigger:01KT0RTRA1NTRG1MAN00000000",
+      "sys_status": "active",
+      "name": "manual-release-train-invocation",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_workflow": "dna:workflow:01KT0RTRA1NWFW00000000000A",
+      "kind": "manual",
+      "condition": "Founder runs /sulis:release-train against a marketplace plugin Project (dry-run preview or live ship).",
+      "description": "Manual entry point — founder-initiated. Honours mechanism=human gate at Step 8 (founder confirmation). Mirrors the operator-manual-invoke pattern from sync-narrative-docs.",
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.92
+    },
+    {
+      "id": "dna:trigger:01KT0RTRA1NTRG2PRMRG00000A",
+      "sys_status": "active",
+      "name": "pull-request-merged-to-main",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_workflow": "dna:workflow:01KT0RTRA1NWFW00000000000A",
+      "kind": "event",
+      "condition": "event:pull_request.merged on main, filtered by author != github-actions[bot] (CH-01KSZ1 loop-guard fix) — i.e. a human-authored release PR has merged.",
+      "description": "Event entry point — release-on-merge.yml dispatches the bump-tag-publish tail of the Workflow. Under Path A this Trigger is informational; the GitHub Actions workflow is the imperative implementation, validated against this canonical via the drift detector (WP-007).",
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.9
+    }
+  ]
+}

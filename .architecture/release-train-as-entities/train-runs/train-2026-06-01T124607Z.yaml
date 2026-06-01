@@ -1,0 +1,17 @@
+train_id: "train-2026-06-01T124607Z"
+started_at: "2026-06-01T12:46:07Z"
+completed_at: "2026-06-01T12:53:40Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-01T12:51:17Z"
+gate_findings_path: ".architecture/release-train-as-entities/code-reviews/PR-batch-train-2026-06-01T124607Z-2026-06-01T125245Z/REVIEW.md"
+bundle:
+  - wp: WP-007
+    branch: feat/wp-007-build-drift-detector
+    pre_train_sha: 62d7a5bb173fd264832016af65d349eabaa9d015
+    rebased_to_sha: de6e1ae369e5cb25046b8465dfd00a0b2fd2ee5d
+    merge_sha_on_dev: e182531b6bb3d5db104c473fa83c51d33ec8c457

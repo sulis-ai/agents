@@ -331,6 +331,65 @@ If it was opened `--draft`, say so: "…opened as a draft so you can keep editin
 
 ---
 
+## Dry-run mode — walk the canonical (when the canonical is authored)
+
+When the release-train canonical lives at
+`plugins/sulis/instances/release-train/` (Workflow + Steps + Triggers +
+FailureModes + Tools authored as JSON-LD instances), the `--dry-run`
+preview can walk the canonical itself instead of describing the
+release purely from imperative YAML inspection. The founder gets a
+Step-by-Step narrative derived from the spec — what each Step would
+do, which FailureModes guard it, what the human-gate Step (open the
+PR + merge) requires — rather than re-reading bash.
+
+Per **ADR-001** (Path A — canonical-as-spec, imperative CI continues),
+the canonical walk runs at *dry-run time only*. The actual release
+machinery in `release-on-merge.yml` stays imperative and zero-token;
+the LLM-driven runner pays its token cost once per release decision,
+not per CI run. The drift detector (FR-015) is what keeps the
+imperative path faithful to the canonical between dry-runs.
+
+To invoke the canonical walk, dispatch the brain's `execute-workflow`
+agent against the canonical directory:
+
+```bash
+# Probe for the canonical directory first; fall back if absent.
+CANONICAL=plugins/sulis/instances/release-train
+if [ -d "$CANONICAL" ]; then
+  # Resolve the founder-Project (the marketplace plugin being released)
+  # and dispatch the brain agent. for_project binds the Project's
+  # state_contract variables so each Step's prose renders correctly.
+  /sulis-brain:execute-workflow "$CANONICAL"
+else
+  # Canonical absent (older marketplace fork, or canonical not yet
+  # authored). Skip the canonical walk and use the imperative-only
+  # preview above. No regression — the existing dry-run still works.
+  echo "Canonical absent — using imperative-only preview."
+fi
+```
+
+The agent reads `workflow.jsonld`, `steps.jsonld`, `triggers.jsonld`,
+`failuremodes.jsonld`, and `tools.jsonld`, walks the Steps in order,
+and produces a per-Step preview rendered from each Step's
+`agent_instructions` field. The non-dry-run (open-the-PR) path is
+unchanged — it continues to use the imperative flow described in
+section 5.
+
+**Token-cost envelope (NFR-001).** The canonical walk is the only
+token-consuming part of the release train; the imperative path
+remains zero-token. NFR-001 in the SRD sets the per-dry-run budget;
+exceeding the budget surfaces a warning to the founder so the cost
+shape is visible at invoke time. Step 5 (`draft-pr-body-and-changelog`)
+also declares its own per-Step token budget (NFR-010) and falls back
+to a deterministic CHANGELOG-from-template if it overruns.
+
+**Fallback.** If `plugins/sulis/instances/release-train/` doesn't
+exist (e.g. a marketplace fork that hasn't authored the canonical),
+the skill falls back to the imperative-only preview from section 5.
+No regression — every fork keeps a working dry-run.
+
+---
+
 ## Composition — where this sits in the release train
 
 The release train has three moving parts; this skill is the middle one, and it

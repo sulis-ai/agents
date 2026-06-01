@@ -1,0 +1,9 @@
+{
+  "name": "fixture-marketplace",
+  "owner": {"name": "Fixture"},
+  "metadata": {"version": "1.0.0", "description": "fixture"},
+  "plugins": [
+    {"name": "plugin-alpha", "source": "./plugins/plugin-alpha", "version": "1.0.0", "description": "alpha"},
+    {"name": "plugin-beta", "source": "./plugins/plugin-beta", "version": "1.0.0", "description": "beta"}
+  ]
+}

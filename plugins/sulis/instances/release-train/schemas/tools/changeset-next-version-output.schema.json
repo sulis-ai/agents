@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/release-train/tool/changeset-next-version/output/1.0.0",
+  "title": "_changeset.next_version — output",
+  "description": "The next dotted SemVer string after applying the tier. tier=null → input unchanged. patch: x.y.(z+1); minor: x.(y+1).0; major: (x+1).0.0.",
+  "type": "string",
+  "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+}

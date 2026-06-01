@@ -1,0 +1,98 @@
+{
+  "@context": {
+    "@vocab": "https://sulis.co/dna/",
+    "dna": "https://sulis.co/dna/"
+  },
+  "@id": "dna:release-train:projects",
+  "@type": "project-instances",
+  "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "_about": "The 4 marketplace plugin Projects (sulis, sulis-brain, plugin-builder, investor-coach) per ADR-004 — hand-authored worked example for fork-consumers per the SRD's Configuration Vocabulary section (FR-016). Each Project carries its Configuration Vocabulary fields (source as JSON-encoded {repo, path, primary_branch}, version_files in canonical order, branch_policy from the foundation v0.6.0 enum) and binds to the canonical release-train Workflow at dna:workflow:01KT0RTRA1NWFW00000000000A via release_workflow_ref. Two Projects (sulis-brain, plugin-builder) currently live in a different repo (sulis-ai/plugins); their version_files paths are recorded here for documentation per ADR-004 option (a) — duplication is intentional for v1 until cross-repo resolution lands in brain v0.7+ per DR-016. Tenant ULID dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM is the canonical sulis-plugins-marketplace tenant (derivation in failuremodes.jsonld _about). Schema: plugins/sulis/brain/compiled/foundation/project.schema.json (vendored upstream sulis-brain Project v1.0.0).",
+  "captured_on": "2026-06-01",
+
+  "projects": [
+    {
+      "id": "dna:project:01KT1JAT33YZGG2CBW5X1YKPD4",
+      "sys_status": "active",
+      "name": "sulis",
+      "belongs_to_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "type": "plugin",
+      "source": "{\"repo\":\"sulis-ai/agents\",\"path\":\"plugins/sulis\",\"primary_branch\":\"main\"}",
+      "version_files": [
+        "plugins/sulis/.claude-plugin/plugin.json",
+        ".claude-plugin/marketplace.json"
+      ],
+      "branch_policy": "gitflow-dev-main",
+      "belongs_to_product_ref": "sulis-plugins-marketplace",
+      "depends_on": [],
+      "consumed_by": [],
+      "release_workflow_ref": "dna:workflow:01KT0RTRA1NWFW00000000000A",
+      "description": "The Sulis AI engineering team plugin — /sulis:* skills, agents, and reference standards that run the marketplace's own release-train.",
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 1.0
+    },
+    {
+      "id": "dna:project:01KT1JAT33MFNG82MYZRFD6NF6",
+      "sys_status": "active",
+      "name": "sulis-brain",
+      "belongs_to_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "type": "plugin",
+      "source": "{\"repo\":\"sulis-ai/plugins\",\"path\":\"plugins/sulis-brain\",\"primary_branch\":\"main\"}",
+      "version_files": [
+        "plugins/sulis-brain/.claude-plugin/plugin.json",
+        ".claude-plugin/marketplace.json"
+      ],
+      "branch_policy": "gitflow-dev-main",
+      "belongs_to_product_ref": "sulis-plugins-marketplace",
+      "depends_on": [],
+      "consumed_by": [],
+      "release_workflow_ref": "dna:workflow:01KT0RTRA1NWFW00000000000A",
+      "description": "The foundation entity schemas + compiler — produces the JSON Schemas this marketplace vendors into plugins/sulis/brain/compiled/foundation/.",
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 1.0
+    },
+    {
+      "id": "dna:project:01KT1JAT334VFGZ45BP1CWS15K",
+      "sys_status": "active",
+      "name": "plugin-builder",
+      "belongs_to_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "type": "plugin",
+      "source": "{\"repo\":\"sulis-ai/plugins\",\"path\":\"plugins/plugin-builder\",\"primary_branch\":\"main\"}",
+      "version_files": [
+        "plugins/plugin-builder/.claude-plugin/plugin.json",
+        ".claude-plugin/marketplace.json"
+      ],
+      "branch_policy": "gitflow-dev-main",
+      "belongs_to_product_ref": "sulis-plugins-marketplace",
+      "depends_on": [],
+      "consumed_by": [],
+      "release_workflow_ref": "dna:workflow:01KT0RTRA1NWFW00000000000A",
+      "description": "The plugin-authoring coach + tools — guided flow for non-technical authors to scaffold and edit Claude Code plugins.",
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 1.0
+    },
+    {
+      "id": "dna:project:01KT1JAT33V4JKR9G2C3JPTVZD",
+      "sys_status": "active",
+      "name": "investor-coach",
+      "belongs_to_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "type": "plugin",
+      "source": "{\"repo\":\"sulis-ai/agents\",\"path\":\"plugins/investor-coach\",\"primary_branch\":\"main\"}",
+      "version_files": [
+        "plugins/investor-coach/.claude-plugin/plugin.json",
+        ".claude-plugin/marketplace.json"
+      ],
+      "branch_policy": "gitflow-dev-main",
+      "belongs_to_product_ref": "sulis-plugins-marketplace",
+      "depends_on": [],
+      "consumed_by": [],
+      "release_workflow_ref": "dna:workflow:01KT0RTRA1NWFW00000000000A",
+      "description": "The investor-deck coach — 9-phase facilitation that produces pitch artifacts, financial models, and a Reveal.js deck.",
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 1.0
+    }
+  ]
+}

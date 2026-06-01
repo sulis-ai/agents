@@ -1,0 +1,6 @@
+{
+  "branch": "feat/wp-004-author-failuremodes-instance",
+  "merge_sha": "c57c505",
+  "health_status": "skipped",
+  "smoke_verdict": "skipped"
+}

@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/dna/schema/project/1.0.0",
+  "title": "Project",
+  "description": "the release unit \u2014 the foundation-cross-cutting reification of the thing that gets tagged, versioned, and shipped. Scopes a Workflow's execution to a specific repo + path location with declared version files, branch policy, and dependency edges. A Project comprises one or more Components \u2014 PD-domain implementation units \u2014 and is released by a Workflow referenced via release_workflow_ref. Projects optionally link to an external Product via belongs_to_product_ref string until cross-artifact ref resolution lands in v0.7. Three scenarios it enables: monorepo with multiple Projects under different Products each with its own release Workflow scoped via source.path; multi-repo with multiple Projects each its own repo composing one Product; shared library where a Project library is consumed by Projects in other Products and dependency edges drive orchestration. Backstage Catalog Component / System, Nx project, Lerna package, Bazel package, Cargo workspace member all model this primitive \u2014 adopted as the convention per CP-01.",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": [
+    "id",
+    "name",
+    "belongs_to_tenant",
+    "type",
+    "source",
+    "version_files",
+    "branch_policy",
+    "state",
+    "sys_status"
+  ],
+  "properties": {
+    "sys_status": {
+      "enum": [
+        "active",
+        "archived",
+        "deleted",
+        "purged"
+      ]
+    },
+    "valid_from": {
+      "type": "string",
+      "format": "date-time",
+      "description": "business-truth window start"
+    },
+    "valid_to": {
+      "type": "string",
+      "format": "date-time",
+      "description": "business-truth window end"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "instance reliability score"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^dna:project:[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "belongs_to_tenant": {
+      "type": "string",
+      "pattern": "^dna:(tenant):[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "type": {
+      "enum": [
+        "application",
+        "library",
+        "service",
+        "plugin",
+        "website",
+        "model",
+        "brand-assets",
+        "other"
+      ]
+    },
+    "source": {
+      "type": "string",
+      "description": "JSON-encoded object with keys repo, path, primary_branch \u2014 see _v0_6_grammar_consideration for the future tagged-union shape",
+      "x-sensitive": true
+    },
+    "version_files": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "paths within source.path holding version strings"
+      },
+      "minItems": 1
+    },
+    "branch_policy": {
+      "enum": [
+        "trunk",
+        "gitflow-dev-main",
+        "gitlab-pre-prod",
+        "custom"
+      ]
+    },
+    "belongs_to_product_ref": {
+      "type": "string",
+      "description": "string ULID of an external Product \u2014 domain-specific; PD Product or future foundation Product. Foundation cannot type-ref domain entities; cross-artifact ref resolution lands in v0.7+"
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^dna:(project):[0-9A-HJKMNP-TV-Z]{26}$"
+      }
+    },
+    "consumed_by": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^dna:(project):[0-9A-HJKMNP-TV-Z]{26}$"
+      }
+    },
+    "release_workflow_ref": {
+      "type": "string",
+      "pattern": "^dna:(workflow):[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "description": {
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "provisional",
+        "active",
+        "archived",
+        "superseded",
+        "deprecated"
+      ]
+    },
+    "deprecated_for": {
+      "type": "string",
+      "pattern": "^dna:(project):[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "archived_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "x-schema-org-extends": "schema:SoftwareSourceCode"
+}

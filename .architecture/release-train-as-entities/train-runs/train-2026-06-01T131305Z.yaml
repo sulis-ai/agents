@@ -1,0 +1,17 @@
+train_id: "train-2026-06-01T131305Z"
+started_at: "2026-06-01T13:13:05Z"
+completed_at: "2026-06-01T13:14:30Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-01T13:13:14Z"
+gate_findings_path: ".architecture/release-train-as-entities/code-reviews/PR-batch-train-2026-06-01T131305Z-2026-06-01T131357Z/REVIEW.md"
+bundle:
+  - wp: WP-008
+    branch: feat/wp-008-wire-drift-detector-into-branch-ci
+    pre_train_sha: cb0225eed6ab1b4079474275cf45097bfccd1f3f
+    rebased_to_sha: cb0225eed6ab1b4079474275cf45097bfccd1f3f
+    merge_sha_on_dev: 58311bf387ce4bdc8999509e0e8881c928bc0475

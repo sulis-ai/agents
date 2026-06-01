@@ -1,0 +1,8 @@
+.architecture/release-train-as-entities/code-reviews/PR-feat-wp-002-author-steps-instance-2026-06-01T112503Z/REVIEW.md
+.architecture/release-train-as-entities/code-reviews/PR-feat-wp-002-author-steps-instance-2026-06-01T112503Z/signals.json
+.architecture/release-train-as-entities/code-reviews/PR-feat-wp-002-author-steps-instance-2026-06-01T112503Z/tool-outputs/diff-shortstat.txt
+.architecture/release-train-as-entities/code-reviews/PR-feat-wp-002-author-steps-instance-2026-06-01T112503Z/tool-outputs/diff-stat.txt
+.architecture/release-train-as-entities/work-packages/.executor-WP-002.md
+plugins/sulis/brain/compiled/foundation/step.schema.json
+plugins/sulis/instances/release-train/steps.jsonld
+plugins/sulis/scripts/tests/unit/test_steps_instance_valid.py
