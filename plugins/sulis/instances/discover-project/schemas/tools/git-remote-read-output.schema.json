@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/discover-project/tool/git-remote-read/output/1.0.0",
+  "title": "git-remote-read — output",
+  "description": "Output of the git-remote-read Tool — the structured detection result the read-repo-root Step passes to downstream Steps. is_git and has_remote drive the MUC-001 / MUC-006 branches.",
+  "type": "object",
+  "required": ["is_git", "has_remote"],
+  "additionalProperties": false,
+  "properties": {
+    "is_git": {
+      "type": "boolean",
+      "description": "true if `git rev-parse --show-toplevel` exited zero; false otherwise (drives MUC-001 abort path)."
+    },
+    "has_remote": {
+      "type": "boolean",
+      "description": "true if `git remote get-url origin` exited zero; false otherwise (drives MUC-006 abort path)."
+    },
+    "remote_url": {
+      "type": ["string", "null"],
+      "description": "The origin remote URL when has_remote=true; null otherwise."
+    },
+    "primary_branch": {
+      "type": ["string", "null"],
+      "description": "The current branch name from `git branch --show-current`; null when not on a branch (detached HEAD)."
+    },
+    "repo_root": {
+      "type": ["string", "null"],
+      "description": "Absolute path from `git rev-parse --show-toplevel` when is_git=true; null otherwise."
+    }
+  }
+}

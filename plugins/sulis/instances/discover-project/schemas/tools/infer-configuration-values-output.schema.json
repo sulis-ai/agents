@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/discover-project/tool/infer-configuration-values/output/1.0.0",
+  "title": "infer-configuration-values — output",
+  "description": "Output of the infer-configuration-values Tool — the inferences map plus the token-consumption counter. Every inferred value carries a confidence score so the Ask phase can prioritise low-confidence fields for the consumer's attention (MUC-004 confirm-or-override path).",
+  "type": "object",
+  "required": ["inferences", "tokens_consumed"],
+  "additionalProperties": false,
+  "properties": {
+    "inferences": {
+      "type": "object",
+      "description": "Map of Configuration-Vocabulary field name to {value, confidence}. Fields the LLM couldn't infer with non-zero confidence are absent — they route through the gather-ambiguous-fields Step.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["value", "confidence"],
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": "string",
+            "description": "The inferred string value (Configuration-Vocabulary fields are strings in v1; richer types are deferred)."
+          },
+          "confidence": {
+            "type": "number",
+            "description": "Inference confidence on [0.0, 1.0]. The Ask phase sorts fields ascending by confidence so the consumer reviews the least-confident inferences first.",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "tokens_consumed": {
+      "type": "integer",
+      "description": "Total tokens consumed by the LLM call (prompt + completion). The Step's postcondition asserts this is <= token_budget; over-budget consumption raises MUC-008 and is logged for v1.1 budget calibration.",
+      "minimum": 0
+    }
+  }
+}
