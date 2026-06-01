@@ -1,0 +1,12 @@
+What should we call this project?
+> payments-app
+
+Anything else worth knowing about this project? A short description
+helps when you're looking at it six months from now.
+[optional — press Enter to skip]
+> Internal payments backend; replaces the legacy Stripe wrapper.
+
+Who should I tag for code questions? Comma-separated handles or
+emails work.
+[optional — press Enter to skip]
+>

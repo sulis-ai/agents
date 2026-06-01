@@ -1,0 +1,20 @@
+where you publish releases has changed since last discovery.
+  Existing:  github-release
+  Proposed:  npm-publish
+Keep existing, or apply proposed?
+[k] keep existing · [p] apply proposed
+> p
+
+how often you ship has changed since last discovery.
+  Existing:  weekly
+  Proposed:  on-demand
+Keep existing, or apply proposed?
+[k] keep existing · [p] apply proposed
+> k
+
+how you run your tests has changed since last discovery.
+  Existing:  npm test
+  Proposed:  pnpm test
+Keep existing, or apply proposed?
+[k] keep existing · [p] apply proposed
+> p
