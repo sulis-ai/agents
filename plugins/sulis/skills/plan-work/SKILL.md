@@ -49,6 +49,9 @@ estimated_token_cost:
   output: 3k
 tdd_section: 3.4 (Adapters)
 adrs: [ADR-001]
+verification:
+  adapter: backend                              # MUST — one of the seven canonical kinds (see VERIFICATION_QUESTIONS.md)
+  artifact: tests/infrastructure/persistence/postgres-order-repository.test.ts::respects_5s_transaction_timeout
 ---
 
 ## Context
@@ -116,6 +119,53 @@ State invariants the contract must preserve:
 - Use `pg` driver (already in package.json from WP-001 setup).
 - The 5s transaction timeout is non-negotiable per NFR-04.
 ```
+
+### Required frontmatter field — `verification:` (MUST)
+
+Every WP frontmatter MUST carry a `verification:` field. The field is
+a structured YAML map in exactly one of three canonical shapes per
+`ADR-003` (the per-project ADR for the verification-by-design change;
+see e.g. `.architecture/{project}/adrs/ADR-003-per-wp-frontmatter-shape.md`)
+(see WP-Standard's `WP-04 Test plan` for the human-readable counterpart;
+the `verification:` field is the machine-readable seam between the WP
+and the behavioural test ledger per FR-015). The three shapes:
+
+1. **Concrete** — the common case. `adapter:` + `artifact:` (a stable
+   test-artifact reference, format per-adapter).
+
+   ```yaml
+   verification:
+     adapter: backend
+     artifact: tests/api/test_orders.py::test_post_creates_order
+   ```
+
+2. **Deferred** — `adapter:` + `deferred-to-follow-on:` carries the
+   canonical need identifier (FR-011). The slice-end review reads this
+   field to aggregate deferred infrastructure needs across the slice.
+
+   ```yaml
+   verification:
+     adapter: backend
+     deferred-to-follow-on: recording-mock-sendgrid
+   ```
+
+3. **Trivial carveout** — `na: true` with a `justification:` of at
+   least 30 substantive characters. The justification is the explicit
+   positive opt-out signal; bare `na: true` fails the rubric.
+
+   ```yaml
+   verification:
+     na: true
+     justification: "trivial-change carveout (CW-05): comment-only edit; no behaviour change"
+   ```
+
+The `adapter:` value MUST be one of the seven canonical kinds enumerated
+in
+[`VERIFICATION_QUESTIONS.md`](../../references/standards/VERIFICATION_QUESTIONS.md)
+(the canonical kind → adapter source). For multi-adapter WPs, an
+optional `additional-adapters:` array names the secondary adapters.
+Empty / missing / malformed `verification:` fields are rejected by
+P-VER failure mode 8.
 
 ---
 
@@ -241,6 +291,48 @@ These standards shape the WP set's *shape*, not just the content:
       flip an unsigned contract WP to `done`) — not just convention.
     - **Exempt:** single-kind non-visual WP sets, `--prototype` changes, and a
       frontend WP with a logged `visual_contract: exempt — <reason>`.
+
+4d. **Set the `verification:` field per WP (MUST).** For every WP
+    emitted, set the required `verification:` frontmatter field
+    documented in "What a Work Package Contains" above. The setter
+    procedure:
+
+    1. **Read the change's `kind:`** from the change record (e.g.
+       `.changes/{slug}.yaml`).
+    2. **Resolve the adapter** by looking up the kind → adapter row
+       in
+       [`VERIFICATION_QUESTIONS.md`](../../references/standards/VERIFICATION_QUESTIONS.md)
+       (the canonical kind → adapter source — never inline the
+       table; cite by path per NFR-004). For multi-adapter WPs,
+       set `adapter:` to the primary and list secondaries in an
+       optional `additional-adapters:` array.
+    3. **Choose the shape** per `ADR-003` (the per-project ADR; see
+       e.g. `.architecture/{project}/adrs/ADR-003-per-wp-frontmatter-shape.md`):
+       - **Shape 1 (concrete)** — the WP's behaviour has a real
+         test artifact that will exist by the WP's Definition of
+         Done. Set `adapter:` + `artifact:` (per-adapter format —
+         pytest nodeid for backend, spec ref for frontend, fixture
+         path for methodology, etc.).
+       - **Shape 2 (deferred)** — the WP ships pre-infrastructure;
+         the test cannot be written until a follow-on lands. Set
+         `adapter:` + `deferred-to-follow-on:` with the canonical
+         need identifier (FR-011). The slice-end deferred-needs
+         scan in
+         [`references/lifecycle.md`](../../references/lifecycle.md)
+         reads this field to aggregate needs across the slice and
+         auto-draft follow-ons (ADR-005).
+       - **Shape 3 (trivial carveout)** — `na: true` with a
+         `justification:` of ≥ 30 substantive characters explaining
+         why the WP has no behavioural test. Bare `na: true`
+         without justification fails P-VER failure mode 3.
+    4. **Reject malformed shapes.** The skill MUST NOT emit a WP
+       with an empty / missing / malformed `verification:` field —
+       P-VER failure mode 8 surfaces the regression at rubric
+       time, but the skill catches it at emission time.
+
+    The field is the machine-readable seam between the WP and the
+    behavioural test ledger at
+    `.specifications/{change}/verification-ledger.md` (FR-015).
 
 5. **Build the dependency graph** — for each WP, identify what must exist
    first (`dependsOn`) and what it unlocks (`blocks`). Note: REINFORCE-Test
@@ -435,6 +527,26 @@ These standards shape the WP set's *shape*, not just the content:
 > Adapters for ports are counted as Create. WP-004 (Stripe adapter for the
 > `PaymentGateway` port) is Create, not Wrap — see "Ports & Adapters vs
 > Wrappers" in `references/change-primitives.md`.
+
+## Adapter Distribution
+
+> Per-adapter count across the WP set — the canonical adapter values
+> live in
+> [`VERIFICATION_QUESTIONS.md`](../../references/standards/VERIFICATION_QUESTIONS.md)
+> (cite, never inline). Counts include `verification:` Shape 1
+> (concrete) and Shape 2 (deferred) WPs; Shape 3 (trivial carveout)
+> WPs are listed in the carveout-count row.
+
+| Adapter | Count | WPs |
+|---|---|---|
+| backend | N | WP-001, WP-003, … |
+| frontend | N | WP-XXX, … |
+| async | N | — |
+| contract | N | — |
+| infra | N | — |
+| docs | N | — |
+| methodology | N | — |
+| (carveout — `na: true`) | N | — |
 
 ## Wrap Audit
 
