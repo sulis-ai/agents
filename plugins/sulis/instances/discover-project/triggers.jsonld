@@ -1,0 +1,27 @@
+{
+  "@context": {
+    "@vocab": "https://sulis.co/dna/",
+    "dna": "https://sulis.co/dna/"
+  },
+  "@id": "dna:discover-project:triggers",
+  "@type": "trigger-instances",
+  "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "_about": "Single Trigger for the discover-project Workflow per ADR-004 (fail-fast on missing entity, no auto-route). v1 ships only the manual Trigger — the founder runs /sulis:discover-project explicitly. The candidate auto-suggest-on-missing-entity Trigger (FR-003) is deferred to v2 until real founder-experience evidence shows fail-fast is too costly; until then the principle of governance over mystification (release-train ADR-001) holds — one command, one effect, no surprise state changes. Tenant ULID is the canonical marketplace tenant; workflow ULID is byte-identical to workflow.jsonld and steps.jsonld.",
+  "captured_on": "2026-06-01",
+
+  "triggers": [
+    {
+      "id": "dna:trigger:01KT1WDSTRG1MANVA10000000A",
+      "sys_status": "active",
+      "name": "manual-discover-project-invocation",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_workflow": "dna:workflow:01KT1WDSCVRWFW00000000000A",
+      "kind": "manual",
+      "condition": "Operator runs `/sulis:discover-project` (with optional --update, --path, --source-repo flags) against a consumer repo.",
+      "description": "Manual entry point — founder-initiated. The only Trigger in v1 per ADR-004 (governance over mystification). When a non-discover-project command needs a Project entity and doesn't find one, it fails-fast with an explicit error telling the founder to run /sulis:discover-project first — no auto-routing. Flags: --update (per ADR-005, activates the per-field diff re-discovery flow); --path <sub-path> (per MUC-007, scope Detect to a sub-directory in a monorepo); --source-repo <org/name> (per MUC-006, override when no git remote is configured).",
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.95
+    }
+  ]
+}

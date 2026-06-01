@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/discover-project/tool/infer-configuration-values/input/1.0.0",
+  "title": "infer-configuration-values — input",
+  "description": "Input to the infer-configuration-values Tool — the only probabilistic Tool in the discover-project Workflow. Invoked by the propose-configuration-values Step (Infer phase) with the aggregated Detect-phase findings plus the token budget per NFR-002.",
+  "type": "object",
+  "required": ["detection_result", "token_budget"],
+  "additionalProperties": false,
+  "properties": {
+    "detection_result": {
+      "type": "object",
+      "description": "Aggregated payload from the Detect phase — typically {repo_root_detection, manifest_findings, ci_findings, repo_contract_findings}. Opaque to the schema (the Tool's prompt-composition logic shapes it for the LLM)."
+    },
+    "token_budget": {
+      "type": "integer",
+      "description": "Maximum tokens the LLM call may consume (NFR-002 default = 10000). Exceedance raises the token-budget-exceeded FailureMode (MUC-008) and the Workflow falls back to the Null adapter.",
+      "minimum": 1
+    }
+  }
+}

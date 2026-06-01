@@ -1,0 +1,17 @@
+train_id: "train-2026-06-01T184341Z"
+started_at: "2026-06-01T18:43:41Z"
+completed_at: "2026-06-01T18:49:17Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-01T18:48:49Z"
+gate_findings_path: ".architecture/discover-project/code-reviews/PR-batch-train-2026-06-01T184341Z-2026-06-01T184917Z/REVIEW.md"
+bundle:
+  - wp: WP-008
+    branch: feat/wp-008-discover-project-skill
+    pre_train_sha: d7f7bcf55917b4a5aba63aa1b740eea3faef24e4
+    rebased_to_sha: d7f7bcf55917b4a5aba63aa1b740eea3faef24e4
+    merge_sha_on_dev: bc607a7a8a99d957b0dbdaa1622b23f15f3bb0de

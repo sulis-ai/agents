@@ -1,0 +1,44 @@
+{
+  "pr_or_branch": "feat/wp-002-tenant-derivation-tool-v2",
+  "base": "change/create-discover-project",
+  "timestamp": "2026-06-01T173556Z",
+  "verdict": "PASS",
+  "scope": {
+    "lines_added": 371,
+    "lines_removed": 34,
+    "files_changed": 7,
+    "commit_types": ["feat"],
+    "module_fan_out": 2,
+    "severity": "low"
+  },
+  "size": {
+    "lines": 371,
+    "files": 7,
+    "band": "201-500 lines / 6-10 files",
+    "severity": "low"
+  },
+  "safety": {
+    "migration_count": 0,
+    "schema_idl_count": 2,
+    "lock_file_count": 0,
+    "infra_files": 0,
+    "secret_pattern_hits": 0,
+    "severity": "note"
+  },
+  "completeness": {
+    "new_source_without_test": 0,
+    "api_change_without_schema": false,
+    "severity": "note"
+  },
+  "build_verification": {
+    "ruff_check_errors": 0,
+    "ruff_format_diffs": 0,
+    "pytest_pass": 26,
+    "pytest_fail": 0
+  },
+  "lens_findings": {
+    "architecture": 0,
+    "security": 0,
+    "quality": 0
+  }
+}

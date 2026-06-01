@@ -1,0 +1,23 @@
+{
+  "@context": {
+    "@vocab": "https://sulis.co/dna/",
+    "dna": "https://sulis.co/dna/"
+  },
+  "@id": "dna:fixture:cross-tenant-projects",
+  "@type": "project-instances",
+  "for_tenant": "dna:tenant:CONSUMERTENANT0123456789AB",
+  "captured_on": "2026-06-01",
+  "projects": [
+    {
+      "id": "dna:project:01KT00000000000000000CTPRJ",
+      "sys_status": "active",
+      "name": "fixture-consumer-project",
+      "for_domain": "dna:tenant:CONSUMERTENANT0123456789AB",
+      "belongs_to_tenant": "dna:tenant:CONSUMERTENANT0123456789AB",
+      "release_workflow_ref": "dna:workflow:01KT00000000000000000DSCPA",
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.9
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/discover-project/tool/read-ci-workflows/output/1.0.0",
+  "title": "read-ci-workflows — output",
+  "description": "Typed enumeration of CI workflow files discovered under the repo root. Empty `workflows` list is a legitimate state — many consumers have no CI yet.",
+  "type": "object",
+  "required": ["workflows"],
+  "additionalProperties": false,
+  "properties": {
+    "workflows": {
+      "type": "array",
+      "description": "One entry per discovered workflow file. Sorted by path for deterministic ordering across re-runs (NFR-003).",
+      "items": {
+        "type": "object",
+        "required": ["path", "name", "triggers"],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Repo-relative path to the workflow file (e.g. `.github/workflows/branch-ci.yml`).",
+            "minLength": 1
+          },
+          "name": {
+            "type": ["string", "null"],
+            "description": "The workflow's declared `name:` field; null when absent."
+          },
+          "triggers": {
+            "type": "array",
+            "description": "List of declared `on:` trigger event names (e.g. ['push', 'pull_request']). Empty list if `on:` is absent or malformed.",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

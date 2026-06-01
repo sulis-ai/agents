@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/discover-project/tool/read-pyproject-toml/input/1.0.0",
+  "title": "read-pyproject-toml — input",
+  "description": "Input to the read-pyproject-toml Tool — invoked by the read-package-manifests Step.",
+  "type": "object",
+  "required": ["path"],
+  "additionalProperties": false,
+  "properties": {
+    "path": {
+      "type": "string",
+      "description": "Absolute or repo-relative path to a candidate pyproject.toml file. The Tool returns a typed null payload if the file is absent rather than erroring.",
+      "minLength": 1
+    }
+  }
+}

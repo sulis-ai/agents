@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/discover-project/tool/read-pyproject-toml/output/1.0.0",
+  "title": "read-pyproject-toml — output",
+  "description": "Typed extract of the load-bearing fields from a pyproject.toml file. Per the Blue invariant we describe only the fields the discover-project Workflow actually consumes.",
+  "type": "object",
+  "required": ["name", "version", "dependencies_count"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": ["string", "null"],
+      "description": "The [project] table's `name` field (PEP 621) or [tool.poetry] `name`; null if absent or the manifest does not exist."
+    },
+    "version": {
+      "type": ["string", "null"],
+      "description": "The [project] table's `version` field (PEP 621) or [tool.poetry] `version`; null if absent."
+    },
+    "dependencies_count": {
+      "type": "integer",
+      "description": "Total count of declared runtime dependencies across [project.dependencies] + [tool.poetry.dependencies]. Zero if absent.",
+      "minimum": 0
+    }
+  }
+}

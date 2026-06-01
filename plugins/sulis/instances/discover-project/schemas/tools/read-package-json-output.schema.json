@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/discover-project/tool/read-package-json/output/1.0.0",
+  "title": "read-package-json — output",
+  "description": "Typed extract of the load-bearing fields from a package.json file. Per the Blue invariant we describe only the fields the discover-project Workflow actually consumes (name, version, private, scripts_keys for the Infer Step's prompt context).",
+  "type": "object",
+  "required": ["name", "version", "private", "scripts_keys"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": ["string", "null"],
+      "description": "The package.json `name` field; null if absent or the manifest file does not exist."
+    },
+    "version": {
+      "type": ["string", "null"],
+      "description": "The package.json `version` field (typically semver); null if absent."
+    },
+    "private": {
+      "type": ["boolean", "null"],
+      "description": "The package.json `private` field; null if absent. Drives the deploy_target inference."
+    },
+    "scripts_keys": {
+      "type": "array",
+      "description": "Sorted list of the keys under `scripts` (not the values). Empty list if `scripts` is absent.",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    }
+  }
+}

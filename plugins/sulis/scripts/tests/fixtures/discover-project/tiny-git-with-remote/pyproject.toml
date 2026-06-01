@@ -1,0 +1,6 @@
+[project]
+name = "tiny-py"
+version = "0.1.0"
+
+[tool.poetry]
+# present so pyproject.toml parsing has something to find
