@@ -1,0 +1,57 @@
+{
+  "review_target": "change/extend-tighten-drift-gate",
+  "base": "f59fc36",
+  "head": "WORKING",
+  "timestamp": "2026-06-01T15:16:33Z",
+  "project": "tighten-drift-gate",
+  "diff_metrics": {
+    "files_changed": 9,
+    "lines_added": 350,
+    "lines_removed": 59,
+    "total_lines": 409
+  },
+  "pr_hygiene": {
+    "scope": {
+      "commit_type_spread": ["extend"],
+      "module_fan_out": 3,
+      "top_dirs": [".github", "plugins"],
+      "severity": "low"
+    },
+    "size": {
+      "lines_added": 350,
+      "lines_removed": 59,
+      "files_changed": 9,
+      "generated_ratio": 0.0,
+      "lock_file_ratio": 0.0,
+      "severity": "low"
+    },
+    "safety": {
+      "migration_count": 0,
+      "schema_idl_count": 0,
+      "infra_files": 2,
+      "secret_pattern_hits": 0,
+      "severity": "low",
+      "notes": "Two CI workflow files (.github/workflows/branch-ci.yml, release-on-merge.yml) modified — covered by structural unit test test_branch_ci_has_drift_check.py + verified by pyyaml safe_load + drift detector live-run."
+    },
+    "completeness": {
+      "new_source_without_test": 0,
+      "api_change_without_schema": false,
+      "severity": "low",
+      "notes": "All behaviour changes covered by 7 new unit test cases + 1 updated assertion."
+    }
+  },
+  "build_verification": {
+    "errors": [],
+    "tests_run": 1313,
+    "tests_passed": 1313,
+    "tests_failed": 0,
+    "scope": "plugins/sulis/scripts unit suite"
+  },
+  "lens_findings": {
+    "architecture": [],
+    "security": [],
+    "quality": []
+  },
+  "verdict": "PASS",
+  "verdict_reason": "Build Verification empty; no critical/high in diff; every changed file read end-to-end; all three lenses produced output; PR Hygiene clean across PH-01..PH-04."
+}

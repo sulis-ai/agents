@@ -103,6 +103,10 @@ def main(argv: list[str] | None = None) -> int:
             args.instance_dir, validate=args.validate_schemas
         )
         tools = reader.read_tools(args.instance_dir, validate=args.validate_schemas)
+        # Envelope-level by-design-absence list (tighten-drift-gate).
+        # Defaults to [] when the field is absent (back-compat with
+        # canonical instances authored before the field existed).
+        excluded_from_yaml = reader.read_excluded_from_yaml(args.instance_dir)
     except FileNotFoundError as e:
         return _emit({"ok": False, "error": f"canonical: {e}"}, 2)
     except ValueError as e:
@@ -117,7 +121,9 @@ def main(argv: list[str] | None = None) -> int:
         return _emit({"ok": False, "error": f"yaml: {e}"}, 2)
 
     # ─── Primary drift match (Step + FailureMode binding) ────────────────
-    report = matcher.match(steps, failuremodes, annotations)
+    report = matcher.match(
+        steps, failuremodes, annotations, excluded_from_yaml=excluded_from_yaml
+    )
 
     # ─── Cross-reference validations ─────────────────────────────────────
     missing_tool_refs = matcher.validate_tool_refs(steps, tools)

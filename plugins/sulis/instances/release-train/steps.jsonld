@@ -7,8 +7,16 @@
   "@type": "step-instances",
   "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
   "for_workflow": "dna:workflow:01KT0RTRA1NWFW00000000000A",
-  "_about": "Fifteen Steps for the sulis-plugins-marketplace release-train Workflow per TDD Form #2 (Steps table) and WP-002 Contract. Each Step declares the IDEF0 contract (input_artifacts + output_artifacts + mechanism) plus the Tool it invokes (tool_ref) and the FailureModes it can recover from (handles_failures). Steps 1-3 cover recon + drift pre-flight. Step 4 computes the next version (composite — uses cumulative_tier then next_version Tools). Step 5 is the only probabilistic Step (NFR-010 token budget encoded in mechanism_detail). Steps 6-7 open the release PR and wait for checks + mergeability. Step 8 is the founder-confirmation gate (mechanism=human, MUC-007). Steps 9-15 execute the ship phase. Schema: plugins/sulis/brain/compiled/foundation/step.schema.json (v1.2.0). Tenant + workflow ULIDs are deterministic and shared across every release-train canonical instance (see triggers.jsonld + failuremodes.jsonld _about for derivation). Step ordering is canonical (array position 0..14 = Step 1..15); for_workflow is an envelope-level relation per the brain Step schema (step→workflow modelled at the instance container, not per-Step).",
+  "_about": "Fifteen Steps for the sulis-plugins-marketplace release-train Workflow per TDD Form #2 (Steps table) and WP-002 Contract. Each Step declares the IDEF0 contract (input_artifacts + output_artifacts + mechanism) plus the Tool it invokes (tool_ref) and the FailureModes it can recover from (handles_failures). Steps 1-3 cover recon + drift pre-flight. Step 4 computes the next version (composite — uses cumulative_tier then next_version Tools). Step 5 is the only probabilistic Step (NFR-010 token budget encoded in mechanism_detail). Steps 6-7 open the release PR and wait for checks + mergeability. Step 8 is the founder-confirmation gate (mechanism=human, MUC-007). Steps 9-15 execute the ship phase. Schema: plugins/sulis/brain/compiled/foundation/step.schema.json (v1.2.0). Tenant + workflow ULIDs are deterministic and shared across every release-train canonical instance (see triggers.jsonld + failuremodes.jsonld _about for derivation). Step ordering is canonical (array position 0..14 = Step 1..15); for_workflow is an envelope-level relation per the brain Step schema (step→workflow modelled at the instance container, not per-Step). Envelope-level `excluded_from_yaml` declares Steps deliberately absent from release-on-merge.yml (handled by skill prose per MUC-007, the GitHub PR-merge UI, or the downstream release-prod.yml); the drift detector reads this list and treats those Step names as expected absences rather than drift. This encoding lives at the envelope (not per-Step) because the brain Step schema sets unevaluatedProperties:false and rejects new Step-level fields — extending the foundation schema is a cross-repo concern out of scope here.",
   "captured_on": "2026-06-01",
+  "excluded_from_yaml": [
+    "gate-founder-confirmation",
+    "open-release-pr",
+    "wait-for-checks-and-mergeability",
+    "publish-github-release",
+    "squash-merge",
+    "preflight-cross-branch-drift"
+  ],
 
   "steps": [
     {
