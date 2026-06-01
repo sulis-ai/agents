@@ -1,0 +1,45 @@
+{
+  "@context": {
+    "@vocab": "https://sulis.co/dna/",
+    "dna": "https://sulis.co/dna/"
+  },
+  "@id": "dna:fixture:discover-workflow",
+  "@type": "workflow-instances",
+  "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "captured_on": "2026-06-01",
+  "workflows": [
+    {
+      "id": "dna:workflow:01KT00000000000000000DSCPA",
+      "sys_status": "active",
+      "name": "fixture-discover-workflow",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "fixture-discover-workflow",
+      "type": "other",
+      "steps": [
+        "read-repo-root",
+        "infer-configuration",
+        "gather-ambiguous-fields",
+        "derive-tenant",
+        "derive-slug",
+        "atomic-mint",
+        "verify-drift",
+        "rollback-on-drift",
+        "surface-success"
+      ],
+      "initial_steps": ["read-repo-root"],
+      "transitions": [
+        "read-repo-root -> infer-configuration",
+        "infer-configuration -> gather-ambiguous-fields",
+        "gather-ambiguous-fields -> derive-tenant",
+        "derive-tenant -> derive-slug",
+        "derive-slug -> atomic-mint",
+        "atomic-mint -> verify-drift",
+        "verify-drift -> rollback-on-drift",
+        "verify-drift -> surface-success"
+      ],
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.9
+    }
+  ]
+}
