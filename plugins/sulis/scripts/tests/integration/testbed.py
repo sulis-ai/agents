@@ -258,6 +258,37 @@ class FakeGHClient:
                          check=False)
         return proc.returncode == 0 and bool(proc.stdout.strip())
 
+    def list_matching_branches(self, repo: str, pattern: str) -> list[dict]:
+        """Real-git-backed implementation of the GHClient method.
+
+        Uses ``git for-each-ref`` against the bare repo so existing integration
+        tests (which build out branches via the real-git fixture) see the same
+        shape RealGHClient would produce against origin.
+        """
+        self._record("list_matching_branches", repo, pattern)
+        if "list_matching_branches" in self.force_fail:
+            return []
+        # Pattern is like ``feat/wp-008-*`` → for-each-ref takes
+        # ``refs/heads/feat/wp-008-*`` and emits one line per match.
+        ref_pattern = f"refs/heads/{pattern}"
+        proc = self._git(
+            "for-each-ref",
+            "--format=%(refname:short)%09%(committerdate:iso8601-strict)",
+            ref_pattern,
+            check=False,
+        )
+        if proc.returncode != 0 or not proc.stdout.strip():
+            return []
+        results: list[dict] = []
+        for line in proc.stdout.strip().splitlines():
+            parts = line.split("\t", 1)
+            if not parts:
+                continue
+            name = parts[0]
+            committerdate = parts[1] if len(parts) > 1 else ""
+            results.append({"name": name, "committerdate": committerdate})
+        return results
+
     def clone(self, repo: str, dest: Path) -> tuple[int, str]:
         self._record("clone", repo, dest)
         self._maybe_raise("clone")

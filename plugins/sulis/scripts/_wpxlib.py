@@ -994,6 +994,22 @@ class GHClient(Protocol):
         """True if origin/{branch} exists. Best-effort; returns False on gh error."""
         ...
 
+    def list_matching_branches(self, repo: str, pattern: str) -> list[dict]:
+        """List origin branches whose names match ``pattern`` (e.g. ``feat/wp-008-*``).
+
+        Returns a list of ``{"name": str, "committerdate": ISO8601 str}`` dicts
+        — empty list when none match or gh errors (best-effort, matching the
+        ``branch_exists`` contract). Order is not guaranteed; callers that
+        want a specific order should sort by ``committerdate``.
+
+        Used by ``resolve_wp_branch`` to tolerate executor-side slug drift
+        (a WP file ``WP-NNN-long-slug.md`` whose pushed branch is
+        ``feat/wp-NNN-short-slug``). The shape is intentionally minimal —
+        we only need the branch name and a recency hint to disambiguate
+        when multiple candidates exist.
+        """
+        ...
+
     def clone(self, repo: str, dest: Path) -> tuple[int, str]:
         """Clone ``repo`` to ``dest`` via ``gh repo clone --depth 100``.
 
@@ -1108,6 +1124,49 @@ class RealGHClient:
             timeout=30,
         )
         return rc == 0 and bool(out.strip())
+
+    def list_matching_branches(self, repo: str, pattern: str) -> list[dict]:
+        # Translate the shell-glob pattern (``feat/wp-008-*``) into a
+        # ref-prefix lookup. The GitHub API's ``git/matching-refs`` endpoint
+        # accepts the literal prefix; the trailing ``*`` is implicit.
+        prefix = pattern.rstrip("*").rstrip("/")
+        rc, out, _err = _run(
+            ["gh", "api", f"repos/{repo}/git/matching-refs/heads/{prefix}",
+             "--paginate"],
+            timeout=30,
+        )
+        if rc != 0 or not out.strip():
+            return []
+        try:
+            refs = json.loads(out)
+        except json.JSONDecodeError:
+            return []
+        if not isinstance(refs, list):
+            return []
+        results: list[dict] = []
+        # Best-effort committer-date fetch per ref so callers can pick
+        # the most-recently-pushed match. We fetch the commit object for
+        # each SHA; the list is typically tiny (1-3 candidates per WP).
+        for ref in refs:
+            name = ref.get("ref", "").removeprefix("refs/heads/")
+            sha = ref.get("object", {}).get("sha")
+            committerdate = ""
+            if sha:
+                rc2, out2, _ = _run(
+                    ["gh", "api", f"repos/{repo}/git/commits/{sha}"],
+                    timeout=30,
+                )
+                if rc2 == 0 and out2.strip():
+                    try:
+                        commit = json.loads(out2)
+                        committerdate = (
+                            commit.get("committer", {}).get("date", "")
+                        )
+                    except json.JSONDecodeError:
+                        pass
+            if name:
+                results.append({"name": name, "committerdate": committerdate})
+        return results
 
     def clone(self, repo: str, dest: Path) -> tuple[int, str]:
         rc, _out, err = _run(
@@ -1814,6 +1873,103 @@ def _gh_branch_exists(repo: str, branch: str,
     return _resolve_gh(gh).branch_exists(repo, branch)
 
 
+def _gh_list_matching_branches(
+    repo: str, pattern: str, *, gh: GHClient | None = None,
+) -> list[dict]:
+    """List origin branches matching ``pattern`` (e.g. ``feat/wp-008-*``).
+
+    Shim over ``GHClient.list_matching_branches`` so callers can monkeypatch
+    this single function in tests (the same pattern used by
+    ``_gh_branch_exists`` and ``_gh_branch_ci_green``).
+    """
+    return _resolve_gh(gh).list_matching_branches(repo, pattern)
+
+
+def resolve_wp_branch(
+    wp_id: str,
+    repo: str,
+    wp_dir: Path,
+    *,
+    gh: GHClient | None = None,
+) -> str | None:
+    """Resolve the feat-branch on origin that belongs to ``wp_id``.
+
+    The historical contract (literal slug → branch name) breaks when the
+    executor pushes a branch with a SHORTER slug than the WP filename
+    expresses (an observed drift class — see the WP-008 / WP-010 / WP-011
+    cases from the release-train-as-entities run). This helper restores
+    eligibility on the READ side without forcing executors to use full slugs.
+
+    Resolution order:
+
+      1. **Slug-literal match.** If ``feat/wp-NNN-<slug-from-file>`` exists
+         on origin, return it. Byte-for-byte preservation of the
+         historical happy path.
+      2. **Fuzzy single match.** If exactly one ``feat/wp-NNN-*`` branch
+         exists on origin (NNN being ``wp_id`` minus the WP- prefix,
+         lowercased), return it. A warning is emitted to stderr naming
+         the WP, the expected literal, and the actual branch so the
+         operator can see the drift.
+      3. **Fuzzy multi-match.** Two or more ``feat/wp-NNN-*`` candidates →
+         most-recent-by-``committerdate`` wins. The same warning fires,
+         plus an explicit "ambiguous" note listing all candidates.
+      4. **Zero candidates.** Return ``None``. The caller falls through
+         to whatever "branch missing" handling it already had.
+
+    Returns the branch name (no leading ``refs/heads/``) or ``None``.
+    """
+    slug = _wp_slug_from_file(wp_dir, wp_id)
+    if slug is None:
+        # No WP file → caller already handles this case via its own
+        # "no WP file found" branch. Return None to be consistent.
+        return None
+
+    literal = _branch_name(wp_id, slug)
+    # Only forward ``gh`` when the caller explicitly supplied one; passing
+    # ``gh=None`` to the shims would break test monkeypatches that don't
+    # accept the kw-arg (the existing test_wpx_train_eligibility.py stubs
+    # use a 2-positional signature, and the shim's ``gh=None`` default
+    # already routes to the module singleton).
+    if gh is None:
+        if _gh_branch_exists(repo, literal):
+            return literal
+    else:
+        if _gh_branch_exists(repo, literal, gh=gh):
+            return literal
+
+    # Fuzzy lookup. Strip the WP- prefix and lowercase per _branch_name.
+    nnn = wp_id.lower().removeprefix("wp-")
+    pattern = f"feat/wp-{nnn}-*"
+    if gh is None:
+        matches = _gh_list_matching_branches(repo, pattern)
+    else:
+        matches = _gh_list_matching_branches(repo, pattern, gh=gh)
+    if not matches:
+        return None
+
+    # Pick most-recent by committerdate. Empty/missing dates sort first
+    # so any branch with a real date wins (the typical case is one
+    # branch with a date and zero without).
+    chosen = max(matches, key=lambda m: m.get("committerdate", ""))
+    chosen_name = chosen["name"]
+
+    if len(matches) == 1:
+        _log(
+            f"resolve_wp_branch: {wp_id} — expected '{literal}' on origin "
+            f"but found '{chosen_name}' (fuzzy match). Using '{chosen_name}'. "
+            f"Rename the WP file or the branch to silence this warning."
+        )
+    else:
+        names = ", ".join(m["name"] for m in matches)
+        _log(
+            f"resolve_wp_branch: {wp_id} — expected '{literal}' but found "
+            f"{len(matches)} candidates [{names}]; picked '{chosen_name}' "
+            f"(most recent by committerdate). Choice may be ambiguous; "
+            f"rename to disambiguate."
+        )
+    return chosen_name
+
+
 def _gh_branch_ci_green(repo: str, branch: str) -> bool:
     """True if the branch's most recent CI run is green / completed-success.
 
@@ -1909,7 +2065,9 @@ def find_eligible_branches(
     the founder the full picture.
     """
     overrides = overrides or TrainOverrides()
-    by_id = {wp.id: wp for wp in wps}
+    # by_id was historically a {wp.id: wp} index used for dep lookup; HD-008
+    # replaced that with effective_status (dict[str, str]) so by_id became
+    # dead. Removed (was F841 unused-variable lint flag).
     results: list[EligibilityResult] = []
 
     # HD-008 — compute effective status per WP up-front when paths is set,
@@ -1936,7 +2094,11 @@ def find_eligible_branches(
         is_held = wp.id in overrides.holds
         is_forced = wp.id in overrides.includes
 
-        # Derive branch
+        # Derive branch — resolve_wp_branch tolerates executor-side slug
+        # drift (literal match first; falls through to fuzzy ``feat/wp-NNN-*``
+        # on origin so a short-slug push still ships). When the WP file
+        # exists but no branch can be resolved, ``resolved`` is None and
+        # we surface "branch missing" identically to the historical path.
         slug = _wp_slug_from_file(wp_dir, wp.id)
         if slug is None:
             results.append(EligibilityResult(
@@ -1945,6 +2107,9 @@ def find_eligible_branches(
                 primitive=wp.primitive,
             ))
             continue
+        # Reported branch defaults to the slug-literal for messaging; the
+        # actual resolved branch (which may be fuzzy-matched) replaces it
+        # once we know we have a hit on origin.
         branch = _branch_name(wp.id, slug)
 
         if is_held:
@@ -1964,14 +2129,19 @@ def find_eligible_branches(
             ))
             continue
 
-        # Branch existence
-        if not _gh_branch_exists(repo, branch):
+        # Branch existence — fuzzy-tolerant. resolve_wp_branch returns
+        # the literal when it exists on origin, or a fuzzy ``feat/wp-NNN-*``
+        # match (single → use; multi → most-recent-by-committerdate with
+        # a warning), or None when no branch matches.
+        resolved = resolve_wp_branch(wp.id, repo, wp_dir)
+        if resolved is None:
             results.append(EligibilityResult(
                 wp=wp.id, branch=branch, eligible=False,
                 reason="status step-7-complete but origin branch missing",
                 primitive=wp.primitive,
             ))
             continue
+        branch = resolved
 
         # CI check — gated only in strict mode (v0.18.0+: bundled-tip CI
         # is the gate by default; per-WP CI is informational).
@@ -3358,11 +3528,10 @@ def compute_wp_status(
         return "step-7-shipping"
 
     # Case 3: step-7-complete — origin branch exists, no train signal.
-    slug = _wp_slug_from_file(paths.wp_dir, wp_id)
-    if slug is not None:
-        branch = _branch_name(wp_id, slug)
-        if _gh_branch_exists(repo, branch, gh=gh):
-            return "step-7-complete"
+    # Use resolve_wp_branch so a fuzzy-matched (short-slug) push counts
+    # as step-7-complete just the same as a literal-slug push.
+    if resolve_wp_branch(wp_id, repo, paths.wp_dir, gh=gh) is not None:
+        return "step-7-complete"
 
     # Case 4: fall-through — defer to the stored cell (operator intent).
     return stored_status if stored_status else "pending"
