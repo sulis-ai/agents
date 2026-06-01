@@ -296,6 +296,45 @@ These standards shape the WP set's *shape*, not just the content:
       INDEX time.)
     A failed cross-kind shape audit is **FAIL** at step 11 — re-decompose,
     don't paper over.
+7c. **Audit cross-WP identifiers (MUST).** For each WP in the proposed
+    set, scan its Contract section for **cross-WP shared identifiers**:
+    ULIDs (`01[A-Z0-9]{24}` Crockford-base32 shapes), identifier-shaped
+    strings (e.g. `dna:*:*`, `urn:*:*`), slugs that ≥2 WPs reference,
+    version literals, namespace names, or any token a sibling WP
+    Contract would also need to name. For each such identifier:
+
+    1. **If the identifier is already minted in an authoritative upstream
+       source** — a TDD "Canonical Identifiers" section, an
+       `ADR-NN-canonical-identifiers.md`, an existing instance file the
+       WP set references, or the SRD glossary — verify the WP cites the
+       upstream source by name/path. No action needed.
+    2. **If the identifier is invented inline in the WP Contract** —
+       that's a methodology defect. Parallel-dispatched executors will
+       each mint their own value and the values will diverge. Either:
+       - Author an `ADR-NN-canonical-identifiers.md` that mints the
+         identifier deterministically (document the recipe — e.g.,
+         `SHA256(name) → Crockford base32`) — and update every WP
+         Contract that references the identifier to cite the ADR.
+       - OR add a "Canonical Identifiers" section to the TDD that does
+         the same.
+
+       Halt decomposition; route back to `/sulis:draft-architecture` to
+       add the canonical source. Restart decompose-validate after the
+       upstream is in place.
+
+    **Why this matters.** Parallel-dispatched WPs that cross-reference a
+    shared identifier inherit drift if each WP's executor mints its own
+    value. CH-01KSZ4 (release-train-as-entities, wave 1) lived this:
+    WP-003 and WP-004 both minted a tenant ULID, but WP-004 used a
+    deterministic `SHA256(name) → Crockford-base32` recipe while WP-003
+    used a placeholder pattern. The calling session caught the
+    divergence at the post-train audit and reconciled WP-003's branch
+    by hand before downstream WPs (WP-001, WP-005, WP-006) inherited
+    the drift. Pre-canonicalisation in the design phase prevents the
+    recurrence. The mechanical analog of this audit lives in the
+    Decompose Validation Rubric as **Phase 8 — Cross-WP identifier
+    canonicalisation**.
+
 8. **Write WPs** — one file per WP, using the template above.
 9. **Write `INDEX.md`** — list all WPs, their statuses, primitive
    distribution, the dependency graph (as a markdown table and a Mermaid
@@ -311,7 +350,7 @@ These standards shape the WP set's *shape*, not just the content:
     validation report to
     `.architecture/{project}/work-packages/DECOMPOSE_VALIDATION.md`.
 
-    The rubric runs six phases mechanically where possible:
+    The rubric runs eight phases mechanically where possible:
     - **P1 Inventory completeness** — every WP has Context, Contract,
       DoD/RGB, Sequence, Token cost, Dependencies
     - **P2 Atomicity** — single responsibility per WP; touch surface
@@ -330,6 +369,15 @@ These standards shape the WP set's *shape*, not just the content:
     - **P6 Peer-collision risk** — no two WPs `Create` the same file
       (catches the `loader/__init__.py` collision class at breakdown
       time, before any executor dispatches)
+    - **P7 ServiceSpec compliance** — every service the design names
+      has a paired `service-specs/<name>.servicespec.yaml` manifest
+      that passes the Lovable Test (a fresh AI agent can build a
+      working integration against it with no human docs)
+    - **P8 Cross-WP identifier canonicalisation** — every cross-WP
+      shared identifier (ULID, slug, version literal, namespace)
+      resolves to an authoritative upstream source (TDD section, ADR,
+      or instance file). The mechanical analog of step 7c above;
+      anchor case CH-01KSZ4 release-train tenant-ULID divergence.
 
     Verdict is computed deterministically:
     - **PASS** — every MUST passes; no SHOULD failures

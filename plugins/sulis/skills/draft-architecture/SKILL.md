@@ -150,6 +150,7 @@ The TDD has a fixed structure. Each section maps to MECE-3 pillars. See
    - Chaos assertions per resiliency primitive
 6. **Trade-offs** — patterns chosen, alternatives rejected, with one-line reasons
 7. **Open questions** — anything the SRD does not specify that the architecture needs
+8. **Canonical Identifiers** *(if any cross-WP identifiers are foreseen)* — when the design foresees parallel WPs cross-referencing a shared identifier (ULID, slug, version literal, namespace, `dna:*:*` shape), pre-mint that identifier here OR author a paired `ADR-NN-canonical-identifiers.md`. Document the minting recipe (e.g. `SHA256(name) → Crockford base32`) so a future regenerate produces the same value. Without this, parallel-dispatched executors each invent their own value and they diverge — anchor case CH-01KSZ4 release-train wave-1 tenant ULID. `/sulis:plan-work` step 7c + Decompose Validation Rubric Phase 8 are the downstream gates that catch a missing canonical source.
 
 ### ADRs
 

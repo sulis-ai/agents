@@ -118,6 +118,7 @@ in plain English and returns control to the founder.
 | 5 Performance + non-functional reqs | ... | ... | ... |
 | 6 Peer-collision risk | ... | ... | ... |
 | 7 ServiceSpec compliance (Lovable Test) | ... | ... | ... |
+| 8 Cross-WP identifier canonicalisation | ... | ... | ... |
 
 ---
 
@@ -150,6 +151,7 @@ The validating agent attests:
 - [✓] **P5 Performance + non-functional.** Per-WP performance-constraint scan. <K> WPs in request-handler primitives without stated SLA.
 - [✓] **P6 Peer-collision risk.** Cross-WP file-create scan. <K> collision pairs detected.
 - [✓] **P7 ServiceSpec compliance.** <N> manifests parsed via `sulis-validate-servicespec`. Lovable Test: <K> manifests PASS, <M> PASS-WITH-RATIONALE, <B> FAIL. Aggregate MUST failures: <count>.
+- [✓] **P8 Cross-WP identifier canonicalisation.** <K> cross-WP shared identifiers extracted from WP Contracts. <M> resolve to an authoritative upstream source (TDD section / ADR / instance file). <N> inline identifiers flagged — see /sulis:plan-work step 7c for the remediation path.
 ```
 
 ---
@@ -318,6 +320,50 @@ gaps.
 
 ---
 
+## Phase 8 — Cross-WP identifier canonicalisation
+
+Parallel-dispatched WPs that cross-reference a shared identifier
+(ULID, slug, version literal, namespace, `dna:*:*` shape) MUST resolve
+that identifier through an authoritative upstream source — a TDD
+"Canonical Identifiers" section, an `ADR-NN-canonical-identifiers.md`,
+an existing instance file the WP set references, or the SRD glossary.
+Without an upstream source each executor invents its own value and the
+values diverge.
+
+Anchor case (`CH-01KSZ4`, release-train-as-entities wave 1): WP-003
+and WP-004 both minted a tenant ULID. WP-004 used a deterministic
+`SHA256(name) → Crockford-base32` recipe; WP-003 used a placeholder
+pattern. The calling session caught the divergence at the post-train
+audit and reconciled WP-003's branch by hand (commit `4360684 fix(release-train):
+canonicalise tenant ULID`) before downstream WPs inherited the drift.
+The mechanical analog of `/sulis:plan-work` step 7c lives here as
+Phase 8.
+
+| ID | Severity | Check | Pass criterion | Evidence |
+|---|---|---|---|---|
+| **8.01** | MUST | Every cross-WP shared identifier resolves to an authoritative upstream source | For each identifier appearing in ≥2 WP Contracts, find a citation to a TDD "Canonical Identifiers" section, an `ADR-NN-canonical-identifiers.md`, an existing instance file, or the SRD glossary | Contract grep + upstream-source grep |
+| **8.02** | MUST | No ULID-shape literal (`01[A-Z0-9]{24}` Crockford-base32) is invented inline in a WP Contract without an upstream source | Scan Contract sections for ULID-shape strings; cross-check each against the upstream-source set | Contract regex + source set membership |
+| **8.03** | MUST | No `dna:*:*` or `urn:*:*` identifier appears in ≥2 WP Contracts without an upstream source | Same shape, different prefix pattern | Contract regex + source set membership |
+| **8.04** | SHOULD | Each cross-WP shared identifier's upstream source documents its minting recipe (e.g., `SHA256(name) → Crockford base32`) — so a future regenerate produces the same value | Cross-check the upstream source for a "Recipe" / "Derivation" sub-section | Source-section parse |
+| **8.05** | SHOULD | Single-WP-scoped identifiers (only one WP references them) carry a `# canonical-source: <reference>` annotation OR are flagged inline as scope-local | Contract grep for annotation; cross-check identifier appears in only one WP | Contract + cross-reference set |
+| **8.06** | MAY | Composite WPs that fan out cross-kind dependencies declare the shared identifier set in the parent's Contract | Parent Contract section explicitly lists `shared_identifiers:` | Composite Contract parse |
+
+**Verdict semantics.** A Phase 8 MUST failure is a methodology defect
+in the WP set — halt decomposition; route back to
+`/sulis:draft-architecture` to add the canonical source (TDD section
+or ADR), then restart decompose-validate after the upstream is in
+place. A SHOULD failure with rationale (e.g., the upstream source is
+implicit from a stable third-party convention) is acceptable; rationale
+documented in the report's Recommended improvements section.
+
+**Pass-with-rationale.** An inline identifier MAY pass with rationale
+if the WP Contract carries a `# canonical-source: <reference>`
+annotation that names the upstream (even an external one, like an
+RFC ULID spec); the annotation is the explicit acknowledgement that
+the identifier is sourced, not invented.
+
+---
+
 ## Anti-patterns for the validation run itself
 
 The validating agent must NOT:
@@ -375,3 +421,4 @@ where two parallel WPs both created `apps/api/sulis/shared/workflows/loader/__in
 | Version | Date | Change |
 |---|---|---|
 | 0.1.0 | 2026-05-22 | Initial release. 6 phases. ~30 checks. Anchor case: platform-repo loader/__init__.py collision. |
+| 0.2.0 | 2026-06-01 | Added Phase 8 — Cross-WP identifier canonicalisation. Anchor case: CH-01KSZ4 release-train wave-1 tenant-ULID divergence between WP-003 and WP-004. Mechanical analog of `/sulis:plan-work` step 7c. |
