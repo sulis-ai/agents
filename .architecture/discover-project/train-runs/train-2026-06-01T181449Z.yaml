@@ -1,0 +1,27 @@
+train_id: "train-2026-06-01T181449Z"
+started_at: "2026-06-01T18:14:49Z"
+completed_at: "2026-06-01T18:20:52Z"
+outcome: "success"
+batch_size: 3
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-01T18:20:05Z"
+gate_findings_path: ".architecture/discover-project/code-reviews/PR-batch-train-2026-06-01T181449Z-2026-06-01T182052Z/REVIEW.md"
+bundle:
+  - wp: WP-003
+    branch: feat/wp-003-detect-phase
+    pre_train_sha: 2cc7cbfaf62471e5e5707cb42c0c25bc6cce75bd
+    rebased_to_sha: 2cc7cbfaf62471e5e5707cb42c0c25bc6cce75bd
+    merge_sha_on_dev: 4434376c59e22efaffe1341a01e82a9c5dbbb182
+  - wp: WP-004
+    branch: feat/wp-004-infer-phase
+    pre_train_sha: 09f1e713699b18b2f48da08e29089d91a3f653a0
+    rebased_to_sha: bf5ff02b9145e34eca6602312601752dc250482b
+    merge_sha_on_dev: 0441ab3b12b31053eabedae83e108d25555003cd
+  - wp: WP-006
+    branch: feat/wp-006-mint-phase
+    pre_train_sha: 3c8425829e309234f3cf3d7d98c4edb82809119c
+    rebased_to_sha: aac0968ba571a8886140af47a5ad76d64d5d09af
+    merge_sha_on_dev: a506c5b7fd4cb040c0287e99a0fe207563945bc9
