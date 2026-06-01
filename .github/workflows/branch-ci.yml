@@ -105,6 +105,12 @@ jobs:
         # fails the step → fails the job → fails branch-ci as a required
         # status check.
         run: |
+          # Paths are absolute (via $GITHUB_WORKSPACE) because
+          # `uv run --directory plugins/sulis/scripts` changes the working
+          # directory before the Python script runs — relative paths would
+          # resolve against `plugins/sulis/scripts/` and break. Bug surfaced
+          # as the first failure of the blocking drift gate landed in
+          # tighten-drift-gate. Refs CH-01KT1Z.
           uv run --directory plugins/sulis/scripts python check-canonical-drift.py \
-            --instance-dir plugins/sulis/instances/release-train \
-            --yaml-path .github/workflows/release-on-merge.yml
+            --instance-dir "$GITHUB_WORKSPACE/plugins/sulis/instances/release-train" \
+            --yaml-path "$GITHUB_WORKSPACE/.github/workflows/release-on-merge.yml"
