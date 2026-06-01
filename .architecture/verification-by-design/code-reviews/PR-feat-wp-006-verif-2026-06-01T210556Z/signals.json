@@ -1,0 +1,91 @@
+{
+  "pr": "feat/wp-006-verif",
+  "project": "verification-by-design",
+  "base": "change/extend-verification-by-design",
+  "kind": "docs",
+  "diff": {
+    "files_changed": 5,
+    "lines_added": 632,
+    "lines_removed": 3,
+    "note": "4 SKILL.md edits (markdown) + 1 new pytest unit test file"
+  },
+  "build_verification": {
+    "ruff_check": "pass",
+    "ruff_format": "pass",
+    "pytest": "29 passed",
+    "pr_introduced_errors": 0
+  },
+  "ph_06": {
+    "scope": {
+      "commit_type_spread": ["feat"],
+      "module_fan_out": 1,
+      "severity": "none"
+    },
+    "size": {
+      "lines_added": 632,
+      "lines_removed": 3,
+      "files_changed": 5,
+      "severity": "low",
+      "note": "Most additions are the 428-line test file + the 90-line Verification Plan template block (deliverables, not bloat)"
+    },
+    "safety": {
+      "migration_count": 0,
+      "schema_idl_count": 0,
+      "infra_files": 0,
+      "secret_pattern_hits": 0,
+      "severity": "none"
+    },
+    "completeness": {
+      "new_source_without_test": 0,
+      "api_change_without_schema": false,
+      "severity": "none",
+      "note": "The WP IS the test for the WP — test file ships in this PR"
+    }
+  },
+  "findings": {
+    "build_verification": [],
+    "in_changes": [
+      {
+        "id": "F-01",
+        "severity": "medium",
+        "lens": "quality",
+        "file": "plugins/sulis/skills/draft-architecture/SKILL.md",
+        "line": 35,
+        "rule": "broken markdown link",
+        "evidence": "[`ADR-001`](../../../.architecture/verification-by-design/adrs/ADR-001-section-name-verification-plan.md)",
+        "recommendation": "Use four levels up (../../../../) from plugins/sulis/skills/draft-architecture/ to reach repo root",
+        "status": "fixed inline during review"
+      },
+      {
+        "id": "F-02",
+        "severity": "medium",
+        "lens": "quality",
+        "file": "plugins/sulis/skills/requirements-validation/SKILL.md",
+        "line": 31,
+        "rule": "broken markdown link",
+        "evidence": "[`ADR-001`](../../../.architecture/verification-by-design/adrs/ADR-001-section-name-verification-plan.md)",
+        "recommendation": "Use four levels up (../../../../) from plugins/sulis/skills/requirements-validation/ to reach repo root",
+        "status": "fixed inline during review"
+      }
+    ],
+    "in_neighbours": [],
+    "watch_list": []
+  },
+  "verdict": "PASS",
+  "verdict_rationale": "All findings addressed inline; mechanical baseline clean; tests green; no critical/high in diff; full-file reads on all 5 changed files",
+  "lenses": {
+    "architecture": {"findings": 0, "note": "kind: docs — no architecture surface; all relative-path cross-refs verified to resolve"},
+    "security": {"findings": 0, "note": "no secret patterns in markdown / test file; no auth surface touched"},
+    "quality": {"findings": 2, "note": "2 broken markdown links found + fixed inline"}
+  },
+  "self_attestation": {
+    "CR-01_mechanical_baseline": "PASS — ruff check + ruff format + pytest all green",
+    "CR-02_dispatch_shape": "Single-reader — diff is 209 lines + 1 new test file (5 files); content is pure markdown / test code; sub-agent dispatch overhead exceeds value for this docs-kind WP",
+    "CR-03_full_file_reads": "All 4 changed SKILL.md files reviewed end-to-end; new test file reviewed end-to-end",
+    "CR-04_evidence_discipline": "All findings cite file:line + quoted text",
+    "CR-05_severity_rubric": "Applied — broken links rated medium (quality lens; not user-facing crash, but reader-trust impact)",
+    "CR-06_verdict_computed": "PASS — no critical/high remaining; all findings addressed inline; mechanical baseline empty",
+    "CR-07_lens_completion": "Architecture + security + quality each produced output",
+    "CR-09_pr_hygiene": "Scope/size/safety/completeness all green for this docs WP"
+  }
+}
