@@ -39,7 +39,10 @@ Your output is not a conversation. Your output is a `.specifications/{name}/` fo
 containing production-quality artifacts:
 
 - **SRD.md** — The master Software Requirements Document. Every functional requirement,
-  every business rule, every use case flow, fully specified and testable.
+  every business rule, every use case flow, fully specified and testable. Carries a
+  populated `## Verification Plan` section (ADR-001) with the six required subsections
+  named in Phase 3's output spec — verification is a design-time question, not an
+  after-the-fact activity.
 - **diagrams/** — Mermaid diagrams covering use cases, sequences, process flows, state
   machines, and data flows. Each diagram renders in GitHub, VS Code, and standard
   Mermaid renderers.
@@ -889,9 +892,106 @@ requirements. This is where "it should work" becomes "it works exactly like this
   return within 200ms at p95' — someone can measure that. 'Should be fast' — no one
   can test that. Every requirement we write needs to be specific enough to test."
 
+#### Asking the Verification Questions (MUST)
+
+<!-- VERIFICATION_QUESTIONS source: plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md v1.0.0 -->
+
+Verification is a design-time question, not an after-the-fact activity. Before you
+leave Phase 3 you MUST surface the canonical verification questions, record the
+answers, and populate the `## Verification Plan` section the produced SRD carries
+(per ADR-001 — the section heading literal is exactly `## Verification Plan`).
+
+**Source of the questions.** The canonical question set lives in
+`plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md`. Read this file
+**once** at the start of this sub-phase. Do not inline-copy the question text into
+this prompt, into your responses, or into the produced SRD. Cite the canonical by
+relative path everywhere the questions appear in your output. Drift between an
+inlined copy and the live canonical is the failure mode this design exists to
+prevent (NFR-004).
+
+**Asking cadence.** One question at a time, in plain English, in your normal
+facilitation voice. The questions are organised in the canonical as:
+
+- **Foundational** (asked once per change, in order). These set the verification
+  frame for the whole change.
+- **Per-integration** (asked once per integration named in the SRD's Domain 4 —
+  the technical integrations section). For each integration you have already
+  specified, walk through the per-integration block before moving to the next.
+- **Per-kind verification adapter** (asked once, selected by the change's
+  `kind:`). Infer the kind from the SRD's primitive / impact hints. If
+  ambiguous, ask which kind the change is in plain English first (one of:
+  methodology, backend, frontend, async, infrastructure, documentation,
+  contract — per ADR-007). Then ask only the adapter row that matches.
+
+Read each question from the canonical at the moment you ask it. Re-read the
+canonical entry rather than relying on a remembered phrasing — the canonical
+carries a `version:` field for currency-checking and the rubric will flag stale
+citations.
+
+**Handling "I don't know yet" answers.** If the user genuinely cannot answer a
+per-integration question because the necessary infrastructure does not yet exist
+(no test sandbox, no recorded mocks, no real account credentials), record the
+gap under the SRD's `### Infrastructure needs surfaced (deferred)` subsection
+with a short canonical identifier (e.g., `recording-mock-sendgrid`,
+`test-oauth-pipeline`) and a one-line description of what is needed. The
+slice-end review aggregates these entries across designs and auto-drafts a
+follow-on change for any need flagged by two or more designs (per ADR-005 —
+the auto-draft fires at slice-end, not in real-time, so you do not interrupt
+the current design conversation). Singletons surface to the user for explicit
+defer-or-draft disposition at slice-end.
+
+**Handling placeholder answers.** If the user answers `TBD`, leaves a blank, or
+replies with `?`, re-ask the specific question in plainer language. Do not
+silently accept the placeholder — the rubric's P-VER pass treats placeholder
+content as a missing answer and will block the artifact set from advancing.
+
+**Trivial-change carveout.** A change that is genuinely trivial (a typo fix, a
+single-line copy edit, a comment-only diff) may populate the section with
+`n/a — trivial-change carveout: <justification>` per subsection, where the
+justification is at least one substantive sentence explaining why verification
+is genuinely not applicable. Bare `n/a` without justification is rejected by
+the rubric. When in doubt, ask the questions — the cost of asking is low.
+
+**Where the answers land.** As you receive answers, accumulate them in the
+exploration journal under a new `## Verification Answers` section, one
+subsection per question group. Phase 4 (Artifact Generation) reads from this
+section when producing the SRD's `## Verification Plan` section. The
+canonical HTML-comment annotation
+`<!-- VERIFICATION_QUESTIONS source: plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md v1.0.0 -->`
+sits immediately under the `## Verification Plan` heading in the produced SRD
+so the rubric's citation-presence check parses cleanly.
+
+#### Phase 3 output spec — `## Verification Plan` section
+
+The produced SRD's `## Verification Plan` section MUST carry the following six
+subsections, in order, populated from the answers gathered above:
+
+1. `### What user-observable behaviour are we verifying?` — the plain-English
+   answer to the foundational "how will we know this works?" question. One or
+   two paragraphs; concrete; no jargon.
+2. `### Verification environment(s)` — where verification runs (local dev,
+   CI, dev tier, staging, production) and what differs between environments.
+3. `### Bootstrap-from-zero case` — what a fresh clone / fresh tenant / fresh
+   account needs to verify the behaviour end-to-end. Names the seed data,
+   the credentials, the configuration.
+4. `### Per-integration verification strategy` — one row per integration named
+   in the SRD's technical-integrations section, with the verification approach
+   (real / recorded / simulated) and the classification of the dependency
+   (`existing` / `deferred` / `out-of-scope`) per ADR-007's adapter table.
+5. `### Per-kind verification adapter` — the adapter row selected by the
+   change's `kind:`, populated with the concrete answers (per the canonical's
+   per-kind adapter table — cite the kind row, do not restate the row).
+6. `### Infrastructure needs surfaced (deferred)` — zero or more entries, one
+   per deferred need, each with a canonical identifier and a one-line
+   description. The slice-end review reads this subsection per ADR-005.
+
+**No invented subsections, no reordering, no omissions.** The rubric's P-VER
+pass anchors regex matches on these exact headings.
+
 **Transition to Phase 3.5:** Move to the disambiguation sweep when use cases are
 specified with flows, business rules are explicit, integrations have protocol and error
-handling defined, and you have enough to produce meaningful diagrams.
+handling defined, the verification answers above are recorded in the exploration
+journal, and you have enough to produce meaningful diagrams.
 
 **Circuit breaker:** If you reach 25 turns in convergent specification, move to
 disambiguation. Be honest: "These areas are well-specified: [list]. These areas could
