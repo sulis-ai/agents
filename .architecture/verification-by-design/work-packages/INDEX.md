@@ -105,7 +105,7 @@ of it. WP-008 is the terminal sink (everything blocks it).
 | WP-005 | Extend `plan-work/SKILL.md` — per-WP `verification:` field + slice-end deferred-needs auto-draft | extend | docs | done | WP-001, WP-002 | WP-008 | 5k / 4k | Form §plan-work (line 133); Form §slice-end (line 138); FR-005, FR-011, FR-012, FR-013, FR-015 |
 | WP-006 | Wire P-VER into `specify` / `draft-architecture` / `requirements-validation` skills + add Verification Plan template to `requirements-templates` | extend | docs | done | WP-001, WP-002, WP-003, WP-004 | WP-008 | 6k / 4k | Form §orchestrators (lines 134-137); FR-001, FR-002, FR-009 |
 | WP-007 | Author P-VER fixtures + tests (8 fail + 4 pass + idempotency) | create | backend | done | WP-002 | WP-008 | 4k / 8k | Proof §test classes 1-2 + 4 (lines 240-291) |
-| WP-008 | E2E methodology test (dispatch updated agents) + dogfood assertion (P-VER on this change's own artifacts) | create | backend | pending | WP-003, WP-004, WP-005, WP-006, WP-007 | — | 5k / 6k | Proof §test class 3 + 5; NFR-005 |
+| WP-008 | E2E methodology test (dispatch updated agents) + dogfood assertion (P-VER on this change's own artifacts) | create | backend | done | WP-003, WP-004, WP-005, WP-006, WP-007 | — | 5k / 6k | Proof §test class 3 + 5; NFR-005 |
 
 **Totals:** ~34k input + ~37k output ≈ 71k tokens for the full WP set.
 
