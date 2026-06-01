@@ -80,7 +80,7 @@ graph TD
 
 | ID | Title | Primitive | Kind | Status | Depends On | Blocks | Token (in/out) | TDD § |
 |---|---|---|---|---|---|---|---|---|
-| WP-001 | Author release-train Workflow instance | create | contract | pending | WP-002 | WP-005, WP-007, WP-010 | 3k / 2k | Form #1 |
+| WP-001 | Author release-train Workflow instance | create | contract | done | WP-002 | WP-005, WP-007, WP-010 | 3k / 2k | Form #1 |
 | WP-002 | Author 15 Step instances | create | contract | done | WP-004, WP-006 | WP-001, WP-007, WP-009, WP-010 | 6k / 8k | Form #2; Steps table |
 | WP-003 | Author 2 Trigger instances | create | contract | done | — | WP-007 | 1k / 1k | FR-007 |
 | WP-004 | Author 8 FailureMode instances | create | contract | done | — | WP-002, WP-006, WP-007, WP-009 | 2k / 3k | FR-008 |
@@ -88,7 +88,7 @@ graph TD
 | WP-006 | Author 17 Tool catalogue (5 primary + 12 stub) | create | contract | done | WP-004 | WP-002, WP-007 | 4k / 6k | FR-005, ADR-003 |
 | WP-007 | Build drift detector script + tests | create | backend | pending | WP-001..006 | WP-008 | 8k / 10k | FR-015, ADR-002 |
 | WP-008 | Wire drift detector into branch-ci.yml | extend | infra | pending | WP-007 | — | 2k / 1k | FR-015 |
-| WP-009 | Add canonical annotations to release-on-merge.yml | extend | infra | pending | WP-002, WP-004 | — | 3k / 1k | ADR-002, FR-012 |
+| WP-009 | Add canonical annotations to release-on-merge.yml | extend | infra | done | WP-002, WP-004 | — | 3k / 1k | ADR-002, FR-012 |
 | WP-010 | Extend `/sulis:release-train` for dry-run-walks-canonical | extend | docs | pending | WP-001, WP-002 | — | 4k / 2k | FR-011 |
 | WP-011 | Cross-reference Configuration Vocabulary in marketplace README | extend | docs | done | — | — | 2k / 1k | FR-016, UC-004 |
 

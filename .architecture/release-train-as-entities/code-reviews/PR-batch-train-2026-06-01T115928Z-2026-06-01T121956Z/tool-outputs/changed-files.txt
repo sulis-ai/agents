@@ -1,0 +1,7 @@
+.architecture/release-train-as-entities/work-packages/.executor-WP-001.md
+.architecture/release-train-as-entities/work-packages/.executor-WP-009.md
+.github/workflows/release-on-merge.yml
+plugins/sulis/brain/compiled/foundation/workflow.schema.json
+plugins/sulis/instances/release-train/workflow.jsonld
+plugins/sulis/scripts/tests/unit/test_release_on_merge_yaml_annotations.py
+plugins/sulis/scripts/tests/unit/test_workflow_instance_valid.py
