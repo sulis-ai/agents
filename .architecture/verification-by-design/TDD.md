@@ -561,9 +561,9 @@ That the methodology refinement actually changes how design happens, in
 four observable ways:
 
 1. **Running `/sulis:specify` on a fresh change produces an SRD whose
-   `## Verification Plan` section is populated** (not `TBD`, not
-   blank, not hallucinated, and citing
-   `VERIFICATION_QUESTIONS.md`).
+   `## Verification Plan` section is populated** (substantive content
+   in each subsection — no bare placeholder tokens, no blank lines, no
+   hallucinated infrastructure — and citing `VERIFICATION_QUESTIONS.md`).
 2. **Running `/sulis:draft-architecture` on that SRD produces a TDD
    whose Verification Plan section concretises the SRD's plan into
    implementation-side specifics** (test artifact paths, fixture
