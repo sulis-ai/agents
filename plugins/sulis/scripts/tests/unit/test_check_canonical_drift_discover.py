@@ -314,3 +314,55 @@ def test_drift_extra_annotation():
         if d["kind"] == "missing_in_canonical"
     ]
     assert "ghost-step" in extras
+
+
+# ─── n=2 dogfood acceptance — real SKILL.md vs real canonical ────────────
+
+
+def test_drift_detector_passes_against_skill_md():
+    """WP-008 dogfood acceptance — invoke the drift detector against the
+    real plugins/sulis/skills/discover-project/SKILL.md with the real
+    plugins/sulis/instances/discover-project canonical set; assert exit 0.
+
+    This is the load-bearing structural assertion for the whole change:
+    if it passes, Path A is proven for a second non-trivial workflow
+    whose imperative is markdown (per ADR-001 n=2). The
+    `release_workflow_ref` cross-tenant ref is allowlisted per ADR-002.
+    """
+    repo_root = _SCRIPTS_DIR.parent.parent.parent  # plugins/sulis/scripts -> root
+    instance_dir = (
+        repo_root / "plugins" / "sulis" / "instances" / "discover-project"
+    )
+    skill_md = (
+        repo_root
+        / "plugins"
+        / "sulis"
+        / "skills"
+        / "discover-project"
+        / "SKILL.md"
+    )
+    assert instance_dir.is_dir(), f"canonical instance dir missing: {instance_dir}"
+    assert skill_md.exists(), f"SKILL.md missing: {skill_md}"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(_CLI),
+            "--instance-dir",
+            str(instance_dir),
+            "--yaml-path",
+            str(skill_md),
+            "--cross-tenant-refs-allowed-for",
+            "release_workflow_ref",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, (
+        f"Drift detector failed against real SKILL.md; "
+        f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    )
+    envelope = json.loads(result.stdout)
+    assert envelope["ok"] is True
+    assert envelope["data"]["drift"] == []

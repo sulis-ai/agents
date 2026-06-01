@@ -1,0 +1,57 @@
+{
+  "timestamp": "2026-06-01T184026Z",
+  "target": "feat/wp-008-discover-project-skill-v2",
+  "base": "change/create-discover-project",
+  "wp": "WP-008",
+  "verdict": "PASS",
+  "build_verification": {
+    "errors_introduced": 0,
+    "ruff_exit": 0,
+    "pytest_pass_count": 25,
+    "drift_detector_exit": 0
+  },
+  "pr_hygiene": {
+    "scope": {
+      "severity": "low",
+      "commit_type_spread": ["docs"],
+      "module_fan_out_top_dirs": ["plugins"],
+      "note": "Single concern: WP-008 deliverable + its conformance tests"
+    },
+    "size": {
+      "severity": "low",
+      "lines_added_approx": 562,
+      "files_changed": 3,
+      "note": "562 LOC total — SKILL.md 261, test_discover_project_skill_conformance.py 249, test_check_canonical_drift_discover.py +52. Within 4-file band; size driven by SKILL.md prose + 11 conformance test bodies, none generated."
+    },
+    "safety": {
+      "severity": "low",
+      "migration_count": 0,
+      "schema_idl_count": 0,
+      "infra_files": 0,
+      "secret_pattern_hits": 0
+    },
+    "completeness": {
+      "severity": "low",
+      "new_source_without_test": 0,
+      "note": "WP-008 is kind: docs; the SKILL.md IS the deliverable. Conformance is exercised by the 11-test conformance file + 1 dogfood drift-detector test."
+    }
+  },
+  "findings_in_changes": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0
+  },
+  "findings_in_neighbours": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0
+  },
+  "draft_fixes": 0,
+  "lenses": {
+    "architecture": "nothing surfaced",
+    "security": "nothing surfaced",
+    "quality": "nothing surfaced"
+  }
+}

@@ -1,0 +1,10 @@
+     249 plugins/sulis/scripts/tests/unit/test_discover_project_skill_conformance.py
+     261 plugins/sulis/skills/discover-project/SKILL.md
+     510 total
+---unstaged modified diff---
+diff --git a/plugins/sulis/scripts/tests/unit/test_check_canonical_drift_discover.py b/plugins/sulis/scripts/tests/unit/test_check_canonical_drift_discover.py
+index f58c9e4..ab5019d 100644
+--- a/plugins/sulis/scripts/tests/unit/test_check_canonical_drift_discover.py
++++ b/plugins/sulis/scripts/tests/unit/test_check_canonical_drift_discover.py
+@@ -314,3 +314,55 @@ def test_drift_extra_annotation():
+(52 lines added per shortstat)
