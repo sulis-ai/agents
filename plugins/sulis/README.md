@@ -59,6 +59,32 @@ All other plugins carry the `sulis-` prefix. The unprefixed name marks this as
 the foundational front-door — the one a founder installs first; the one the
 others sit underneath.
 
+## Customising the release-train for your own marketplace fork
+
+The release-train Workflow is the per-Project release pipeline used by
+this marketplace. Its canonical specification lives at
+`plugins/sulis/instances/release-train/` — Workflow + Steps + Triggers +
+FailureModes + Projects + Tools as JSON-LD entity instances.
+
+If you fork this marketplace and want to use the release-train against
+your own plugins, you need to author a Project entity instance for each
+of your plugins. The Project entity declares your repo's source path,
+version files, branch policy, and the other variables the release-train
+consumes.
+
+**The authoritative reference for what a Project entity must contain is
+the SRD's "Configuration Vocabulary" section:** see
+[`.specifications/release-train-as-entities/SRD.md#configuration-vocabulary`](../../.specifications/release-train-as-entities/SRD.md#configuration-vocabulary).
+
+The marketplace's own Project instances at
+`plugins/sulis/instances/release-train/projects.jsonld` serve as worked
+examples — `sulis`, `sulis-brain`, `plugin-builder`, and `investor-coach`
+each demonstrate a typical fill pattern.
+
+**Future:** a `project-discovery` Workflow will automate this
+interactively. Until then, hand-author your Project instance using the
+Configuration Vocabulary as your template.
+
 ## History
 
 - **v0.2.0** (2026-05-23) — Canonical-plugin scope. Absorbed the concierge agent + journey skills from sulis-concierge (which is now a deprecation shim). Plugin description expanded from "meta-skills only" to "canonical front door".
