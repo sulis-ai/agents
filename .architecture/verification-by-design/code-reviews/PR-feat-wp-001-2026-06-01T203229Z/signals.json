@@ -1,0 +1,73 @@
+{
+  "review_timestamp": "2026-06-01T20:32:29Z",
+  "target": "feat/wp-001-author-verification-questions-canonical",
+  "base": "change/extend-verification-by-design",
+  "wp": "WP-001",
+  "project": "verification-by-design",
+  "build_verification": {
+    "errors_introduced": 0,
+    "ruff_check": "pass",
+    "ruff_format": "pass",
+    "pytest_passing": 12,
+    "pytest_failing": 0
+  },
+  "pr_hygiene": {
+    "scope": {
+      "commit_type_spread": ["feat"],
+      "module_fan_out_top_dirs": [".architecture/verification-by-design", "plugins/sulis"],
+      "severity": "note"
+    },
+    "size": {
+      "lines_added": 543,
+      "files_changed": 2,
+      "files_journal": 1,
+      "severity": "note"
+    },
+    "safety": {
+      "migration_count": 0,
+      "schema_idl_count": 0,
+      "infra_files": 0,
+      "secret_pattern_hits": 0,
+      "severity": "note"
+    },
+    "completeness": {
+      "new_source_without_test": 0,
+      "api_change_without_schema": false,
+      "severity": "note"
+    }
+  },
+  "findings": {
+    "in_changes": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0,
+      "note": 0
+    },
+    "in_neighbours": {
+      "total": 0
+    }
+  },
+  "lenses": {
+    "architecture": {
+      "verdict": "nothing surfaced",
+      "checks_run": "Form (SSOT + inward-pointing dependency), Armor (N/A — methodology change, no runtime infra), Proof (structural invariants pinned by 12 pytest assertions)"
+    },
+    "security": {
+      "verdict": "nothing surfaced",
+      "checks_run": "SEC-04 secrets/credentials scan: clean. SEC-03 injection: N/A (no user input, no SQL, no eval). DAT-03 PII in logs: N/A (no logging). The slug examples (recording-mock-sendgrid, test-oauth-google) are naming-convention placeholders, not credentials."
+    },
+    "quality": {
+      "verdict": "nothing surfaced",
+      "checks_run": "CR-01 mechanical baseline clean. Dead-surface scan: all module-level constants used. Contract-drift: standard's adapter table verbatim from ADR-007. Test coverage proportionate (12 assertions, one per Contract invariant). CR-10 performance patterns: N/A (file read once, no loops, no I/O hot paths)."
+    }
+  },
+  "verdict": "PASS",
+  "draft_fixes_queued": 0,
+  "methodology": {
+    "cr_02_parallel_dispatch": "not used; single-reader pass. Diff exceeds 200-line carve-out threshold (543 lines) but is narrowly scoped to 2 files (1 Python test + 1 Markdown standard) with no JSX/runtime-code surface that would benefit from three concurrent lenses. Recorded as a deliberate deviation; CR-06 auto-downgrade applied: maximum verdict capped at 'Approve with fixes' would have applied IF findings were present — since findings are 0, PASS stands by independent path (no auto-downgrade triggers fired).",
+    "cr_03_full_file_reads": "Both files >50 lines read end-to-end (authored by reviewer in this session)",
+    "cr_01_mechanical_baseline_ran": true,
+    "cr_07_lens_completion": "All three lenses produced structured output (each explicit 'nothing surfaced' with checks-run summary)"
+  }
+}

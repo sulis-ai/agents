@@ -1,0 +1,17 @@
+train_id: "train-2026-06-01T203702Z"
+started_at: "2026-06-01T20:37:02Z"
+completed_at: "2026-06-01T20:37:34Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-01T20:37:09Z"
+gate_findings_path: ".architecture/verification-by-design/code-reviews/PR-batch-train-2026-06-01T203702Z-2026-06-01T203734Z/REVIEW.md"
+bundle:
+  - wp: WP-001
+    branch: feat/wp-001-author-verification-questions-canonical
+    pre_train_sha: 956a9111bfea055be02879cac44dc86cb47ddf8c
+    rebased_to_sha: 956a9111bfea055be02879cac44dc86cb47ddf8c
+    merge_sha_on_dev: dbeebd293a2ac9c96b97a1f6f3b6f58500c3f3ba

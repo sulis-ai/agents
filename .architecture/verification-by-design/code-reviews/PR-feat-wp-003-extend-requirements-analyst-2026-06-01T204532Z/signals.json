@@ -1,0 +1,98 @@
+{
+  "review": {
+    "target": "feat/wp-003-extend-requirements-analyst",
+    "base": "origin/change/extend-verification-by-design",
+    "project": "verification-by-design",
+    "timestamp": "2026-06-01T20:45:32Z",
+    "diff_size": {
+      "lines_added": 102,
+      "lines_removed": 2,
+      "files_changed_tracked": 1,
+      "files_added_untracked": 1,
+      "total_files_in_scope": 2
+    },
+    "dispatch_shape": "single-reader (CR-02 carve-out justified: 124 lines / 2 files ≤ 200 / 5)"
+  },
+  "build_verification": {
+    "tools_run": ["ruff check", "ruff format --check", "pytest"],
+    "pr_introduced_errors": 0,
+    "full_suite_status": "1453 passed"
+  },
+  "pr_hygiene": {
+    "PH-01 Scope": {
+      "commit_type_spread": ["feat"],
+      "module_fan_out": 1,
+      "severity": "none"
+    },
+    "PH-02 Size": {
+      "lines_added": 102,
+      "lines_removed": 2,
+      "files_changed": 2,
+      "severity": "none (well within thresholds)"
+    },
+    "PH-03 Safety": {
+      "migration_count": 0,
+      "schema_idl_count": 0,
+      "infra_files": 0,
+      "secret_pattern_hits": 0,
+      "severity": "none"
+    },
+    "PH-04 Completeness": {
+      "new_source_without_test": 0,
+      "api_change_without_schema": false,
+      "severity": "none (test file written first, code follows — RGB discipline)"
+    },
+    "ph03_high_auto_downgrade_fired": false
+  },
+  "lenses": {
+    "architecture": {
+      "findings": [],
+      "checks_run": ["dependency-direction", "resilience-patterns-N/A-no-remote-calls", "secrets", "observability"],
+      "verdict_text": "nothing surfaced"
+    },
+    "security": {
+      "findings": [],
+      "primitives_checked": ["SEC-01..07", "SC-01..04", "DAT-03", "INF-04"],
+      "scanners_run": [],
+      "scanners_unavailable_reason": "no signal warrants scanners in a docs+structural-test diff",
+      "verdict_text": "nothing surfaced"
+    },
+    "quality": {
+      "build_verification_followup": [],
+      "jsx_ident_scan": "N/A (no TSX/JSX/Vue/Svelte files in diff)",
+      "dead_surface_findings": [],
+      "contract_drift_findings": [],
+      "test_coverage_observation": "Test file written first (RGB RED); covers all 5 Definition of Done > Red list items + 2 additional invariants (ADR cross-refs, ADR-001 literal section heading).",
+      "style_readability": [],
+      "cr10_performance_checks": {
+        "n_plus_one_db": "no match (no DB calls)",
+        "n_plus_one_rpc": "no match",
+        "n_plus_one_filesystem": "no match",
+        "o_n_squared": "no match",
+        "synchronous_waterfall": "no match",
+        "unbounded_materialisation": "no match",
+        "repeated_invariant_in_loop": "no match",
+        "wasted_db_roundtrips": "no match",
+        "string_concat_hot_loop": "no match",
+        "scan_heavy_filter_unindexed": "no match"
+      },
+      "verdict_text": "nothing surfaced"
+    }
+  },
+  "findings_in_changes": [],
+  "findings_in_neighbours": [],
+  "draft_hardening_deltas": [],
+  "verdict": "PASS",
+  "verdict_rationale": "No critical/high in diff. Build Verification empty (1453 tests green; lint + format clean). All 2 files in scope read end-to-end (markdown file 100 new LOC, test file 210 LOC). All three lenses produced output. No auto-downgrade triggers fired.",
+  "methodology_attestation": {
+    "CR-01": {"status": "ok", "note": "ruff check + ruff format clean; full unit-suite 1453 passed."},
+    "CR-02": {"status": "ok", "note": "Single-reader carve-out justified by diff size: 124 lines / 2 files (≤200 / ≤5)."},
+    "CR-03": {"status": "ok", "note": "Both in-scope files read end-to-end. Markdown extension is 100 LOC of new prose; test file is 210 LOC."},
+    "CR-04": {"status": "ok", "note": "No findings produced — nothing to evidence."},
+    "CR-05": {"status": "ok", "note": "Severity rubric considered against the empty finding set."},
+    "CR-06": {"status": "ok", "note": "Verdict computed: PASS. No auto-downgrade rule fired."},
+    "CR-07": {"status": "ok", "note": "Architecture: explicit nothing-surfaced. Security: explicit nothing-surfaced + primitives list. Quality: all seven outputs produced (jsx-scan N/A, performance N/A — recorded explicitly)."},
+    "CR-08": {"status": "ok", "note": "This self-attestation block is the CR-08 surface."},
+    "CR-09": {"status": "ok", "note": "PR Hygiene: all four primitives clean — single Conventional Commit type expected at Step 7, well-scoped file count + size, no migrations / schemas / infra, RGB discipline followed (test before code)."}
+  }
+}

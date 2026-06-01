@@ -1,0 +1,54 @@
+id: ARCH-verification-by-design
+status: designed              # draft → designed → decomposed → implemented → verified
+change_id: 01KT2BPBFESCCDY8F7Y5M8RN4R
+handle: CH-01KT2B
+slug: verification-by-design
+primitive: extend
+branch: change/extend-verification-by-design
+
+sourced_from:
+  srd: .specifications/verification-by-design/SRD.md
+  nfr: .specifications/verification-by-design/NFR.md
+  misuse: .specifications/verification-by-design/MISUSE_CASES.md
+  glossary: .specifications/verification-by-design/GLOSSARY.md
+  primitive_tree: .specifications/verification-by-design/PRIMITIVE_TREE.jsonld
+  handoff: .specifications/verification-by-design/HANDOFF_TO_SEA.md
+  completeness: .specifications/verification-by-design/COMPLETENESS_REPORT.md
+
+tier: M                       # sFPC=7, ASR=24 (capped) — see SIZING.md
+sizing: SIZING.md
+
+deliverables:
+  tdd: TDD.md
+  sizing: SIZING.md
+  adrs:
+    - adrs/ADR-001-section-name-verification-plan.md
+    - adrs/ADR-002-must-scope-from-merge-date.md
+    - adrs/ADR-003-per-wp-frontmatter-shape.md
+    - adrs/ADR-004-canonical-location-references-standards.md
+    - adrs/ADR-005-auto-draft-trigger-slice-end.md
+    - adrs/ADR-006-grandfathering-edit-policy.md
+    - adrs/ADR-007-seven-adapters-extension-via-methodology-change.md
+
+predicted_work_packages: 8
+  # see TDD.md "Work Package preview" — final count decided by /sulis:plan-work
+
+build_order:
+  # dependency-correct; final ordering produced by /sulis:plan-work
+  - WP-001       # keystone — VERIFICATION_QUESTIONS.md canonical (single source of truth)
+  - WP-002       # P-VER rubric extension (depends on WP-001)
+  - WP-003       # requirements-analyst agent prompt extension (depends on WP-001)
+  - WP-004       # engineering-architect agent prompt extension (depends on WP-001)
+  - WP-005       # plan-work skill verification-field enforcement (depends on WP-001, WP-002)
+  - WP-006       # specify + draft-architecture skill prose updates (depends on WP-003, WP-004)
+  - WP-007       # structural-assertions fixture test for P-VER (depends on WP-002)
+  - WP-008       # end-to-end methodology integration test (depends on all)
+
+constraints:
+  founder_facing: false
+  scope: design-side only — NFR-008
+  dogfood_acceptance: TDD must itself pass P-VER (NFR-005)
+
+cross_references:
+  external_adr_registry_highest: none      # no `.context/` for this change
+  new_adr_start_number: 1

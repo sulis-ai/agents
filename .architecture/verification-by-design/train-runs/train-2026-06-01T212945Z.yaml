@@ -1,0 +1,17 @@
+train_id: "train-2026-06-01T212945Z"
+started_at: "2026-06-01T21:29:45Z"
+completed_at: "2026-06-01T21:30:19Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-01T21:29:52Z"
+gate_findings_path: ".architecture/verification-by-design/code-reviews/PR-batch-train-2026-06-01T212945Z-2026-06-01T213019Z/REVIEW.md"
+bundle:
+  - wp: WP-008
+    branch: feat/wp-008-end-to-end-methodology-test-and-dogfood
+    pre_train_sha: fb9546581bf1c9885c5365ad5bd59c21cf56e9b9
+    rebased_to_sha: fb9546581bf1c9885c5365ad5bd59c21cf56e9b9
+    merge_sha_on_dev: fb4b26ffb3ae9bcac99fc1e8e227302e2b489254
