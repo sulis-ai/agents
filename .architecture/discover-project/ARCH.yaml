@@ -1,0 +1,47 @@
+id: ARCH-002
+title: discover-project — Path A n=2 dogfood (canonical Workflow + skill + drift conformance)
+status: designed
+sourced_from: ../../.specifications/discover-project/SRD.md
+created: 2026-06-01
+tier: L
+execution_path: A
+structural_template: ../../.architecture/release-train-as-entities/
+pillars:
+  form: partial   # Path A pattern inherited from release-train; new: 5-phase shape, derivation port, consumer/marketplace ownership boundary
+  armor: partial  # drift detector + token-budget infrastructure exist; new: atomic mint, LLM-unavailable degradation, cross-tenant drift semantics
+  proof: partial  # drift-test parity inherited; new: 4 consumer-repo fixtures + LLM-mock pattern + idempotent-cancellation test
+adrs:
+  - ADR-001 — Canonical-as-spec for discover-project (Path A n=2)
+  - ADR-002 — Consumer tenant ULID derivation recipe (SHA256 → Crockford base32)
+  - ADR-003 — Skill name — /sulis:discover-project (canonical drives imperative)
+  - ADR-004 — Auto-prompt on missing Project entity — fail-fast, no auto-route
+  - ADR-005 — Re-discovery semantics — per-field diff with explicit approval
+  - ADR-006 — Probabilistic-inference token budget — pin at 10k, instrument, revisit v1.1
+artifacts_produced:
+  - TDD.md
+  - SIZING.md
+  - ARCH.yaml
+  - adrs/ADR-001..ADR-006
+expected_workpackages: 8-10
+upstream_dependencies:
+  change: CH-01KSZ4 release-train-as-entities (canonical Path A pattern, drift detector, blocking-gate enforcement, foundation v0.6.0 schemas vendored)
+  drift_detector_commit: 7d666df extend: tighten-drift-gate (blocking-gate behaviour required for n=2 dogfood)
+  rubric_commit: f59fc36 extend: canonicalise-cross-wp-ids (P8 rubric enforced; canonical-identifiers section MUST appear in this TDD)
+brain_dependencies:
+  - sulis-brain v0.9.0 (foundation v0.6.0 schemas — Project, Workflow, Step, Trigger, FailureMode, Tool)
+  - The execute-workflow agent (only consumed by the LLM-walked Infer phase, not directly invoked by the skill)
+canonical_identifiers:
+  discover_project_workflow_ulid: dna:workflow:01KT1WDSCVRWFW00000000000A
+  marketplace_tenant_ulid: dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM
+  consumer_tenant_derivation_recipe: SHA256("tenant-name:" + <repo-org>/<repo-name>) → first 130 bits → Crockford base32 (26 chars; ULID first-char clamped to 0..7 per RFC)
+  step_ulid_namespace_prefix: dna:step:01KT1WDS...
+  failuremode_ulid_namespace_prefix: dna:failuremode:01KT1WFM...
+  tool_ulid_namespace_prefix: dna:tool:01KT1WTL...
+  trigger_ulid_namespace_prefix: dna:trigger:01KT1WTR...
+deferred_to_v2:
+  - Auto-suggest Trigger on missing Project entity (FR-003 optional v2 trigger; v1 is fail-fast per ADR-004)
+  - Migration from hand-authored Project entities to discovery-generated ones (SRD Out of Scope)
+  - Cross-tenant federation (post-v1; ontology work in sulis-brain)
+  - env-init sibling discovery family member (separate SRD when triggered)
+deferred_to_sibling:
+  - env-init Workflow (shares discovery primitives — separate change when triggered)
