@@ -62,3 +62,59 @@ jobs:
       - name: smoke — manifest parse + plugin layout
         run: |
           python3 -c "import json; m=json.load(open('.claude-plugin/marketplace.json')); assert m['plugins'], 'no plugins in marketplace'; print(f\"{len(m['plugins'])} plugins resolve\")"
+
+  # canonical:meta:drift-detector
+  # WP-008: wire the Path A drift detector (check-canonical-drift.py, built
+  # in WP-007) into branch-ci. Runs at PR time against the live canonical
+  # entity instances and release-on-merge.yml. Exits 0 (clean), 1 (drift),
+  # 2 (invocation error).
+  #
+  # ADVISORY MODE for v1 (continue-on-error: true): the wave-5b dogfood
+  # found 11 pre-existing reconciliation items (6 missing_in_yaml +
+  # 5 missing_failuremode_handling) which are mostly by-design absences
+  # (Steps 1-8 live in skill prose per MUC-007). Advisory mode surfaces
+  # drift in the run logs without blocking PR merges. The failed-step
+  # indicator remains visible in the GitHub UI so reviewers see drift.
+  #
+  # TO FLIP TO BLOCKING (once the 11 items are reconciled in a follow-on
+  # change): remove the `continue-on-error: true` line below. Branch
+  # protection on `dev` will then treat this check as required-passing
+  # alongside the existing branch-ci job.
+  canonical-drift-check:
+    name: Canonical-vs-implementation drift (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install UV
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install deps (uv sync --frozen)
+        working-directory: plugins/sulis/scripts
+        run: uv sync --frozen
+
+      - name: Run drift detector
+        # Stdlib-only at the script layer (the detector reads jsonld + yaml
+        # via deps already installed by uv sync above). Exit-1-on-drift is
+        # converted to a GitHub Actions warning annotation; the step exits 0
+        # so the check conclusion is success (advisory mode for v1).
+        #
+        # `continue-on-error: true` on the JOB lets the workflow continue
+        # past a failed step, but the check CONCLUSION is still recorded as
+        # "failure" — which the release-train's bundled-tip CI poll treats
+        # as a fail. Wrapping with `|| echo "::warning::..."` keeps drift
+        # visible (logs + GitHub annotation) while making the check green.
+        #
+        # When the 11 pre-existing reconciliation items (recorded in train
+        # train-2026-06-01T124607Z's bundle Watch List) are addressed in a
+        # follow-on change, drop the wrapper + remove `continue-on-error:
+        # true` to flip this to a true blocking gate.
+        run: |
+          uv run --directory plugins/sulis/scripts python check-canonical-drift.py \
+            --instance-dir plugins/sulis/instances/release-train \
+            --yaml-path .github/workflows/release-on-merge.yml \
+            || echo "::warning::Canonical-vs-implementation drift detected (advisory mode for v1; see job output above + the release-train change's train-2026-06-01T124607Z review bundle for the Watch List of pre-existing reconciliation items)"
