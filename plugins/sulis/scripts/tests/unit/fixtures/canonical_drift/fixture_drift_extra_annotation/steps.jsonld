@@ -1,0 +1,43 @@
+{
+  "@context": {
+    "@vocab": "https://sulis.co/dna/",
+    "dna": "https://sulis.co/dna/"
+  },
+  "@id": "dna:fixture:steps",
+  "@type": "step-instances",
+  "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_workflow": "dna:workflow:01KT00000000000000000000PA",
+  "captured_on": "2026-06-01",
+  "steps": [
+    {
+      "id": "dna:step:01KT00000000000000000STAPA",
+      "sys_status": "active",
+      "name": "step-alpha",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "fixture-workflow",
+      "input_artifacts": ["in-a"],
+      "output_artifacts": ["out-a"],
+      "mechanism": "deterministic",
+      "tool_ref": "dna:tool:01KT00000000000000000APXTZ",
+      "handles_failures": ["dna:failuremode:01KT0000000000000000FMAPHA"],
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.9
+    },
+    {
+      "id": "dna:step:01KT00000000000000000STBTA",
+      "sys_status": "active",
+      "name": "step-beta",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "fixture-workflow",
+      "input_artifacts": ["out-a"],
+      "output_artifacts": ["out-b"],
+      "mechanism": "deterministic",
+      "tool_ref": "dna:tool:01KT00000000000000000BTXTZ",
+      "handles_failures": [],
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.9
+    }
+  ]
+}

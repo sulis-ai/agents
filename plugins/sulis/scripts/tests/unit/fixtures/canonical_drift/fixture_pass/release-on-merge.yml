@@ -1,0 +1,15 @@
+name: fixture-pass-workflow
+on:
+  push:
+    branches: [main]
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      # canonical:step:step-alpha
+      # canonical:failuremode:fixture-failure-alpha
+      - name: "Step alpha"
+        run: echo "alpha"
+      # canonical:step:step-beta
+      - name: "Step beta"
+        run: echo "beta"
