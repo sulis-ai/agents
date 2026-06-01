@@ -1,0 +1,4 @@
+.architecture/release-train-as-entities/work-packages/.executor-WP-004.md
+plugins/sulis/brain/compiled/foundation/failuremode.schema.json
+plugins/sulis/instances/release-train/failuremodes.jsonld
+plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py
