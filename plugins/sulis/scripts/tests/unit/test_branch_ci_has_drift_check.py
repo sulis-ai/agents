@@ -1,4 +1,4 @@
-"""Structural assertion: branch-ci.yml wires the canonical drift-detector (WP-008).
+"""Structural assertion: branch-ci.yml wires the canonical drift-detector.
 
 Per FR-015 + ADR-001/002 the drift detector (`check-canonical-drift.py`,
 built in WP-007) is wired into `.github/workflows/branch-ci.yml` as a
@@ -10,21 +10,18 @@ job). The new job must:
   * invoke `check-canonical-drift.py` with the contracted
     `--instance-dir plugins/sulis/instances/release-train` and
     `--yaml-path .github/workflows/release-on-merge.yml` arguments;
-  * run in **advisory mode** for v1 (`continue-on-error: true`) — the
-    wave-5b dogfood found 11 pre-existing reconciliation items
-    (6 `missing_in_yaml` + 5 `missing_failuremode_handling`) that are
-    mostly by-design absences (Steps 1-8 live in skill prose per
-    MUC-007). Advisory mode surfaces drift in the run logs without
-    blocking PR merges. Future-toggle to blocking is a one-line YAML
-    change in a follow-on change once the 11 items are reconciled.
+  * run in **blocking mode** (tighten-drift-gate, WP-001): NO
+    `continue-on-error: true` on the job AND no `|| echo` /
+    `|| true` wrapper hiding the script's exit code. The detector
+    is now expected to exit 0 cleanly; the 11 pre-existing
+    reconciliation items the wave-5b dogfood surfaced have been
+    encoded (6 via `excluded_from_yaml` envelope signal +
+    1 genuine annotation added).
 
 CI YAML is not unit-testable the way Python is, so this is a
-structural assertion over the workflow text (read as YAML). PyYAML is
-listed in `plugins/sulis/scripts/pyproject.toml` so we can parse the
-file directly rather than relying on a brittle line-scan.
-
-This test FAILS RED against the pre-edit tree (the job does not yet
-exist) and PASSES once the job is added to branch-ci.yml.
+structural assertion over the workflow text (read as YAML + as
+raw text for the wrapper check). PyYAML is listed in
+`plugins/sulis/scripts/pyproject.toml`.
 
 Stdlib + pyyaml + pytest, Python 3.11-safe.
 """
@@ -93,25 +90,56 @@ def test_drift_check_job_runs_on_ubuntu():
     )
 
 
-def test_drift_check_job_is_advisory_for_v1():
-    """The job sets `continue-on-error: true` (advisory mode for v1).
+def test_drift_check_job_is_blocking():
+    """The job MUST NOT set `continue-on-error: true`.
 
-    The wave-5b dogfood found 11 pre-existing reconciliation items that
-    the canonical now makes visible. Advisory mode surfaces drift in
-    the run logs without blocking PR merges; flipping to blocking is a
-    one-line YAML change once those items are reconciled in a follow-on.
+    tighten-drift-gate (WP-001) flips the gate from advisory to blocking.
+    The 11 pre-existing reconciliation items the wave-5b dogfood surfaced
+    are now encoded: 6 are honoured via the `excluded_from_yaml` envelope
+    signal on steps.jsonld; the 1 genuine annotation gap was filled in
+    release-on-merge.yml. With those resolved, the detector exits 0 on
+    the live tree and the gate becomes a real blocking check.
 
-    This assertion is deliberately load-bearing: removing the toggle
-    silently (i.e. flipping to blocking without removing the 11 items
-    first) would block every PR build, which is the failure this WP
-    explicitly defends against.
+    This assertion is deliberately load-bearing: a silent
+    re-introduction of advisory mode would let drift accumulate again
+    invisibly. Failure of this test is the early signal.
     """
     doc = _load_workflow()
     job = doc.get("jobs", {}).get(_JOB_KEY)
     assert job is not None, f"job '{_JOB_KEY}' missing"
-    assert job.get("continue-on-error") is True, (
-        f"job '{_JOB_KEY}' must set continue-on-error: true for v1 "
-        f"(advisory mode); got {job.get('continue-on-error')!r}"
+    coe = job.get("continue-on-error")
+    assert coe is not True, (
+        f"job '{_JOB_KEY}' must NOT set continue-on-error: true "
+        f"(tighten-drift-gate flipped the check to blocking); got {coe!r}"
+    )
+
+
+def test_drift_check_job_does_not_wrap_script_with_warning_shim():
+    """The script's run: command must not be wrapped with `|| echo ...`
+    or `|| true` — both would mask the script's exit-1-on-drift contract.
+
+    The advisory wrapper added in WP-008
+    (`|| echo "::warning::Canonical-vs-implementation drift detected..."`)
+    is removed in tighten-drift-gate. The bare script exit code is what
+    GitHub Actions reads to mark the step (and the job, and branch-ci
+    as a whole) failed.
+    """
+    doc = _load_workflow()
+    job = doc.get("jobs", {}).get(_JOB_KEY)
+    assert job is not None, f"job '{_JOB_KEY}' missing"
+    steps = job.get("steps", [])
+    run_text = "\n".join(
+        step.get("run", "") for step in steps if isinstance(step, dict)
+    )
+    # The two forbidden shell-level shims that would mask exit-1.
+    assert "|| echo" not in run_text, (
+        f"job '{_JOB_KEY}' run: command contains '|| echo' wrapper "
+        "(masks the script's exit-1-on-drift contract); remove it to "
+        "complete the flip to blocking mode"
+    )
+    assert "|| true" not in run_text, (
+        f"job '{_JOB_KEY}' run: command contains '|| true' "
+        "(also masks exit-1); remove it"
     )
 
 

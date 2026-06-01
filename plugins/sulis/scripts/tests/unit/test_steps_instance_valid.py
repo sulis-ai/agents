@@ -23,6 +23,10 @@ Validates that `plugins/sulis/instances/release-train/steps.jsonld`:
    `mechanism_detail` token-budget payload per NFR-010.
 10. Step 8 (`gate-founder-confirmation`) has `mechanism: human`
     (the load-bearing founder gate; MUC-007).
+11. The envelope carries `excluded_from_yaml` naming the 6 Steps
+    that by design have no annotation in `release-on-merge.yml`
+    (WP-001 of tighten-drift-gate: drives the drift detector's
+    by-design-absence filter so blocking mode is achievable).
 
 These tests are deliberately deterministic + offline - no network,
 no LLM, no subprocess. Schemas come from the vendored
@@ -90,6 +94,21 @@ _EXPECTED_STEP_NAMES = [
     "emit-release-entity",  # 15
 ]
 _EXPECTED_STEP_COUNT = len(_EXPECTED_STEP_NAMES)  # 15
+
+# The 6 by-design absences from release-on-merge.yml. Five live in the
+# /sulis:release-train skill prose (MUC-007 boundary), one (squash-merge)
+# happens in the GitHub PR-merge UI. Encoded at envelope level because
+# the per-Step brain schema sets unevaluatedProperties:false and rejects
+# arbitrary new fields on Step objects; the envelope carries no such
+# constraint.
+_EXPECTED_EXCLUDED_FROM_YAML = {
+    "gate-founder-confirmation",  # mechanism=human (MUC-007 founder gate)
+    "open-release-pr",  # skill prose, before release-on-merge fires
+    "wait-for-checks-and-mergeability",  # skill prose; merge itself is proof
+    "publish-github-release",  # release-prod.yml fires on the v* tag, not here
+    "squash-merge",  # founder action in the GitHub UI
+    "preflight-cross-branch-drift",  # skill prose pre-PR-open
+}
 
 # Kebab-case pattern: lowercase, hyphen-separated, no leading digit.
 _KEBAB_RE = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)+$")
@@ -353,4 +372,43 @@ def test_io_artifact_names_consistent(steps: list[dict]) -> None:
     assert not collisions, (
         f"Output artifact name collisions (artifact, first-step, second-step): "
         f"{collisions}"
+    )
+
+
+# ----- Test #11 - envelope.excluded_from_yaml names the 6 by-design absences -----
+
+
+def test_envelope_excluded_from_yaml_names_six_by_design_absences(
+    instance: dict, steps: list[dict]
+) -> None:
+    """The steps.jsonld envelope carries `excluded_from_yaml`, a list of
+    Step names that the drift detector must NOT flag as missing_in_yaml.
+
+    These are Steps deliberately absent from release-on-merge.yml because
+    they live elsewhere — skill prose (MUC-007), the GitHub UI, or the
+    downstream release-prod.yml workflow. The list is the load-bearing
+    signal that lets the drift detector run in blocking mode without
+    false positives.
+
+    Each name in the list MUST resolve to a real Step in the steps array
+    (no dangling names; the list cannot drift out of sync with the Steps
+    it labels).
+    """
+    excluded = instance.get("excluded_from_yaml")
+    assert excluded is not None, (
+        "steps.jsonld envelope must declare 'excluded_from_yaml' — "
+        "the by-design-absence list the drift detector consumes"
+    )
+    assert isinstance(excluded, list), (
+        f"excluded_from_yaml must be a list; got {type(excluded).__name__}"
+    )
+    assert set(excluded) == _EXPECTED_EXCLUDED_FROM_YAML, (
+        f"excluded_from_yaml mismatch — got {sorted(excluded)}, "
+        f"expected {sorted(_EXPECTED_EXCLUDED_FROM_YAML)}"
+    )
+    # Every name resolves to an actual Step (no dangling pointers).
+    step_names = {s["name"] for s in steps}
+    dangling = [name for name in excluded if name not in step_names]
+    assert not dangling, (
+        f"excluded_from_yaml contains names not present in steps[]: {dangling}"
     )

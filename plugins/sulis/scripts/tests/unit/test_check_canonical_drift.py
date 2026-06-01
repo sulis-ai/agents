@@ -563,6 +563,150 @@ def test_cli_with_projects_and_marketplace(tmp_path):
     assert "project_not_in_marketplace" in kinds
 
 
+# ─── By-design absences (excluded_from_yaml signal) ──────────────────────
+
+
+def test_drift_matcher_skips_excluded_step_from_missing_in_yaml():
+    """A Step in excluded_from_yaml MUST NOT be reported as missing_in_yaml,
+    even when no `# canonical:step:<name>` annotation is present.
+
+    This is the load-bearing signal added by tighten-drift-gate that lets
+    the drift detector run in blocking CI mode without false positives —
+    Steps that live in skill prose or in GitHub-native flows (the
+    founder's PR-merge action, the downstream release-prod tag fire) are
+    expected absences, not drift.
+    """
+    steps = [
+        {
+            "name": "step-prose",
+            "tool_ref": "dna:tool:01KT00000000000000000APXTZ",
+            "handles_failures": [],
+        },
+        {
+            "name": "step-yaml",
+            "tool_ref": "dna:tool:01KT00000000000000000APXTZ",
+            "handles_failures": [],
+        },
+    ]
+    failuremodes: list[dict] = []
+    annotations: list = []  # NEITHER step is annotated in YAML
+    matcher = StrictDriftMatcher()
+    report = matcher.match(
+        steps, failuremodes, annotations, excluded_from_yaml=["step-prose"]
+    )
+    # step-prose is excluded; step-yaml is the only genuine drift.
+    assert report.missing_in_yaml == ["step-yaml"]
+    assert "step-prose" not in report.missing_in_yaml
+
+
+def test_drift_matcher_skips_failuremode_handling_for_excluded_step():
+    """A FailureMode listed in handles_failures of an excluded Step MUST
+    NOT be reported as missing_failuremode_handling.
+
+    Rationale: if the parent Step is itself by-design absent from YAML,
+    its FailureMode-handling annotations are also expected absences.
+    Otherwise the founder hits a Cataract of false positives whenever a
+    skill-prose Step lists a handles_failures (which several of them do).
+    """
+    fm = {
+        "id": "dna:failuremode:01KT00000000000000000FMXXX",
+        "name": "fm-fixture-prose",
+    }
+    steps = [
+        {
+            "name": "step-prose-with-failure",
+            "tool_ref": "dna:tool:01KT00000000000000000APXTZ",
+            "handles_failures": [fm["id"]],
+        }
+    ]
+    annotations: list = []  # Step absent + FailureMode unannotated
+    matcher = StrictDriftMatcher()
+    report = matcher.match(
+        steps, [fm], annotations, excluded_from_yaml=["step-prose-with-failure"]
+    )
+    assert report.missing_in_yaml == []
+    assert report.missing_failuremode_handling == []
+    assert report.all_passed is True
+
+
+def test_drift_matcher_still_flags_non_excluded_step_when_absent():
+    """Negative test: a Step NOT in excluded_from_yaml is still flagged
+    when missing from the YAML annotations. The drift detector's primary
+    function is preserved — by-design-absences are the exception, not
+    the rule.
+    """
+    steps = [
+        {
+            "name": "step-genuine-drift",
+            "tool_ref": "dna:tool:01KT00000000000000000APXTZ",
+            "handles_failures": [],
+        }
+    ]
+    annotations: list = []
+    matcher = StrictDriftMatcher()
+    report = matcher.match(steps, [], annotations, excluded_from_yaml=[])
+    assert report.missing_in_yaml == ["step-genuine-drift"]
+    assert report.all_passed is False
+
+
+def test_drift_matcher_match_excluded_default_is_empty_list():
+    """Backwards-compat: omitting excluded_from_yaml entirely behaves as
+    if it were the empty list (every Step is expected in YAML).
+
+    Existing callers (and the four fixture-based tests above) must
+    continue to work without modification.
+    """
+    steps = [{"name": "step-x", "handles_failures": []}]
+    annotations: list = []
+    matcher = StrictDriftMatcher()
+    report = matcher.match(steps, [], annotations)  # no excluded_from_yaml kwarg
+    assert report.missing_in_yaml == ["step-x"]
+
+
+def test_cli_respects_excluded_from_yaml_in_envelope(tmp_path):
+    """CLI integration: when the canonical steps.jsonld envelope declares
+    `excluded_from_yaml: [<name>]`, the live `check-canonical-drift.py`
+    invocation MUST NOT flag that name as missing_in_yaml.
+
+    Wires the envelope-level signal end-to-end: reader → matcher → CLI.
+    """
+    import shutil
+
+    # Start from the pass fixture and inject a Step that's NOT in YAML.
+    # Then mark it excluded — the CLI should still report clean.
+    fixture_src = _FIXTURES / "fixture_pass"
+    fixture_dst = tmp_path / "fx"
+    shutil.copytree(fixture_src, fixture_dst)
+
+    steps_doc = json.loads((fixture_dst / "steps.jsonld").read_text())
+    steps_doc["steps"].append(
+        {
+            "id": "dna:step:01KT00000000000000000SXPRS",
+            "sys_status": "active",
+            "name": "step-skill-prose",
+            "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+            "input_artifacts": ["x"],
+            "output_artifacts": ["y"],
+            "mechanism": "deterministic",
+            "state": "active",
+            "valid_from": "2026-06-01T00:00:00Z",
+        }
+    )
+    steps_doc["excluded_from_yaml"] = ["step-skill-prose"]
+    (fixture_dst / "steps.jsonld").write_text(json.dumps(steps_doc))
+
+    result = _run_cli(
+        "--instance-dir",
+        str(fixture_dst),
+        "--yaml-path",
+        str(fixture_dst / "release-on-merge.yml"),
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    parsed = json.loads(result.stdout)
+    assert parsed["ok"] is True, parsed
+    assert parsed["data"]["drift"] == []
+
+
 def test_canonical_drift_package_has_no_module_level_state():
     """No global mutable state at import time. Re-importing must be idempotent."""
     import _canonical_drift.matcher as m1

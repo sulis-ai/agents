@@ -161,6 +161,7 @@ jobs:
       #    release-prod.yml's awk reads the FIRST `## ` section, so this header
       #    shape is what becomes the GitHub Release notes.
       # canonical:step:draft-pr-body-and-changelog
+      # canonical:failuremode:probabilistic-step-token-budget-exceeded
       - name: Draft CHANGELOG entry
         if: steps.detect.outputs.skip != 'true'
         env:

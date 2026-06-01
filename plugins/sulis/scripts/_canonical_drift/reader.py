@@ -81,6 +81,40 @@ class JsonLdFileReader:
             self._validate_each(items, "trigger")
         return items
 
+    def read_excluded_from_yaml(self, instance_dir: Path) -> list[str]:
+        """Return the envelope-level `excluded_from_yaml` list from
+        steps.jsonld — Step names the drift detector should skip when
+        scanning for `missing_in_yaml` drift.
+
+        Returns the empty list when the field is absent (back-compat:
+        any canonical without the field is treated as "every Step is
+        expected in YAML"). No schema validation — this is an
+        envelope-level instance field, not part of the per-Step brain
+        Step schema (which sets unevaluatedProperties:false and would
+        otherwise reject novel fields).
+        """
+        path = instance_dir / "steps.jsonld"
+        if not path.exists():
+            raise FileNotFoundError(f"Canonical instance not found: {path}")
+        try:
+            doc = json.loads(path.read_text())
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Malformed JSON in {path}: {e}") from e
+        excluded = doc.get("excluded_from_yaml", [])
+        if not isinstance(excluded, list):
+            raise ValueError(
+                f"{path}: 'excluded_from_yaml' must be a list, "
+                f"got {type(excluded).__name__}"
+            )
+        # Every entry must be a string (Step name). Refuse silent corruption.
+        bad = [x for x in excluded if not isinstance(x, str)]
+        if bad:
+            raise ValueError(
+                f"{path}: 'excluded_from_yaml' entries must be strings; "
+                f"non-string entries: {bad}"
+            )
+        return excluded
+
     # ─── Internals ───────────────────────────────────────────────────────
 
     def _read_list(

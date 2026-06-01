@@ -69,22 +69,24 @@ jobs:
   # entity instances and release-on-merge.yml. Exits 0 (clean), 1 (drift),
   # 2 (invocation error).
   #
-  # ADVISORY MODE for v1 (continue-on-error: true): the wave-5b dogfood
-  # found 11 pre-existing reconciliation items (6 missing_in_yaml +
-  # 5 missing_failuremode_handling) which are mostly by-design absences
-  # (Steps 1-8 live in skill prose per MUC-007). Advisory mode surfaces
-  # drift in the run logs without blocking PR merges. The failed-step
-  # indicator remains visible in the GitHub UI so reviewers see drift.
-  #
-  # TO FLIP TO BLOCKING (once the 11 items are reconciled in a follow-on
-  # change): remove the `continue-on-error: true` line below. Branch
-  # protection on `dev` will then treat this check as required-passing
-  # alongside the existing branch-ci job.
+  # BLOCKING MODE (tighten-drift-gate, WP-001): the 11 pre-existing
+  # reconciliation items the wave-5b dogfood surfaced have been encoded.
+  # Six (gate-founder-confirmation, open-release-pr,
+  # wait-for-checks-and-mergeability, publish-github-release, squash-merge,
+  # preflight-cross-branch-drift) are honoured via the `excluded_from_yaml`
+  # envelope signal on steps.jsonld — they live in skill prose per MUC-007,
+  # the GitHub PR-merge UI, or the downstream release-prod.yml workflow.
+  # The five missing_failuremode_handling items either resolve when their
+  # parent Steps are excluded, or were filled with explicit annotations
+  # (probabilistic-step-token-budget-exceeded on Step 5
+  # draft-pr-body-and-changelog). The detector now exits 0 cleanly on the
+  # live tree, so the gate is a real blocking check. Branch protection on
+  # `dev` treats this as required-passing alongside the existing branch-ci
+  # job.
   canonical-drift-check:
-    name: Canonical-vs-implementation drift (advisory)
+    name: Canonical-vs-implementation drift
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -99,22 +101,10 @@ jobs:
 
       - name: Run drift detector
         # Stdlib-only at the script layer (the detector reads jsonld + yaml
-        # via deps already installed by uv sync above). Exit-1-on-drift is
-        # converted to a GitHub Actions warning annotation; the step exits 0
-        # so the check conclusion is success (advisory mode for v1).
-        #
-        # `continue-on-error: true` on the JOB lets the workflow continue
-        # past a failed step, but the check CONCLUSION is still recorded as
-        # "failure" — which the release-train's bundled-tip CI poll treats
-        # as a fail. Wrapping with `|| echo "::warning::..."` keeps drift
-        # visible (logs + GitHub annotation) while making the check green.
-        #
-        # When the 11 pre-existing reconciliation items (recorded in train
-        # train-2026-06-01T124607Z's bundle Watch List) are addressed in a
-        # follow-on change, drop the wrapper + remove `continue-on-error:
-        # true` to flip this to a true blocking gate.
+        # via deps already installed by uv sync above). Exit-1-on-drift now
+        # fails the step → fails the job → fails branch-ci as a required
+        # status check.
         run: |
           uv run --directory plugins/sulis/scripts python check-canonical-drift.py \
             --instance-dir plugins/sulis/instances/release-train \
-            --yaml-path .github/workflows/release-on-merge.yml \
-            || echo "::warning::Canonical-vs-implementation drift detected (advisory mode for v1; see job output above + the release-train change's train-2026-06-01T124607Z review bundle for the Watch List of pre-existing reconciliation items)"
+            --yaml-path .github/workflows/release-on-merge.yml
