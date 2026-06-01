@@ -1,0 +1,119 @@
+{
+  "@context": {
+    "@vocab": "https://sulis.co/dna/",
+    "dna": "https://sulis.co/dna/"
+  },
+  "@id": "dna:discover-project:tools",
+  "@type": "tool-instances",
+  "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "_about": "Tool catalogue for the discover-project Workflow. Six new typed Tools are listed in TDD §Canonical Identifiers — Tool ULIDs (one query per Detect Step + the deterministic tenant-derivation Tool + the probabilistic infer-configuration-values Tool). This file authors FIVE of them as full entities with primary input/output JSON Schemas at schemas/tools/ (per WP-001 Contract: 5 primary Tools × 2 schemas = 10 sub-schemas). The sixth Tool — derive-consumer-tenant — is reserved at the canonical ULID here via a _forward_declaration_ulid descriptor row; the full Tool entity + Python implementation + fixed test vectors are authored in WP-002. Two pre-existing Tools (entity-emitter, drift-detector) are declared via _reused_from rather than minting new ULIDs — they live in the marketplace's existing tool catalogue. Per ADR-003 (release-train two-class fidelity strategy applied here): the five Tools authored in this WP carry state=active + populated implementation_detail + error_catalogue cross-refs into failuremodes.jsonld. The descriptor rows (_reused_from / _forward_declaration_ulid) are NOT full Tool entities — they are excluded from brain-schema validation by the test_each_tool_passes_brain_schema filter on state=active. Tenant ULID is canonical for the marketplace tenant; ULIDs come byte-exact from TDD §Canonical Identifiers — Tool ULIDs.",
+  "captured_on": "2026-06-01",
+
+  "tools": [
+    {
+      "id": "dna:tool:01KT1WT101G1TREM0TEREAD000",
+      "sys_status": "active",
+      "name": "git-remote-read",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "kind": "query",
+      "inputs_schema_ref": "schemas/tools/git-remote-read-input.schema.json",
+      "outputs_schema_ref": "schemas/tools/git-remote-read-output.schema.json",
+      "error_catalogue": [
+        "dna:failuremode:01KT1WFM01N0NG1TD1R000000A",
+        "dna:failuremode:01KT1WFM06G1TN0REM0TE00000"
+      ],
+      "implementation_kind": "subprocess",
+      "implementation_detail": "{\"command\":\"git\",\"args\":[\"remote\",\"get-url\",\"origin\"],\"timeout_s\":5,\"env_keys\":[]}",
+      "version": "1.0.0",
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.93
+    },
+    {
+      "id": "dna:tool:01KT1WT102RDPKGJS0N000000A",
+      "sys_status": "active",
+      "name": "read-package-json",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "kind": "query",
+      "inputs_schema_ref": "schemas/tools/read-package-json-input.schema.json",
+      "outputs_schema_ref": "schemas/tools/read-package-json-output.schema.json",
+      "error_catalogue": [],
+      "implementation_kind": "python_import",
+      "implementation_detail": "{\"module\":\"_discovery.manifests\",\"function\":\"read_package_json\"}",
+      "version": "1.0.0",
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.9
+    },
+    {
+      "id": "dna:tool:01KT1WT103RDPYPR0JT0M10000",
+      "sys_status": "active",
+      "name": "read-pyproject-toml",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "kind": "query",
+      "inputs_schema_ref": "schemas/tools/read-pyproject-toml-input.schema.json",
+      "outputs_schema_ref": "schemas/tools/read-pyproject-toml-output.schema.json",
+      "error_catalogue": [],
+      "implementation_kind": "python_import",
+      "implementation_detail": "{\"module\":\"_discovery.manifests\",\"function\":\"read_pyproject_toml\"}",
+      "version": "1.0.0",
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.9
+    },
+    {
+      "id": "dna:tool:01KT1WT104RDC1WF000000000A",
+      "sys_status": "active",
+      "name": "read-ci-workflows",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "kind": "query",
+      "inputs_schema_ref": "schemas/tools/read-ci-workflows-input.schema.json",
+      "outputs_schema_ref": "schemas/tools/read-ci-workflows-output.schema.json",
+      "error_catalogue": [],
+      "implementation_kind": "python_import",
+      "implementation_detail": "{\"module\":\"_discovery.ci\",\"function\":\"read_ci_workflows\"}",
+      "version": "1.0.0",
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.9
+    },
+    {
+      "id": "dna:tool:01KT1WT1061NFERC0NF1G00000",
+      "sys_status": "active",
+      "name": "infer-configuration-values",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "kind": "side-effect",
+      "inputs_schema_ref": "schemas/tools/infer-configuration-values-input.schema.json",
+      "outputs_schema_ref": "schemas/tools/infer-configuration-values-output.schema.json",
+      "error_catalogue": [
+        "dna:failuremode:01KT1WFM08TKBDGTEXCEED0000"
+      ],
+      "implementation_kind": "python_import",
+      "implementation_detail": "{\"module\":\"_discovery.infer\",\"function\":\"infer_configuration\",\"token_budget_default\":10000}",
+      "version": "1.0.0",
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.85
+    },
+
+    {
+      "_reused_from": "WP-002 (derive-consumer-tenant Tool + Python implementation + fixed test vectors)",
+      "_forward_declaration_ulid": "dna:tool:01KT1WT105DER1VETENANT0000",
+      "name": "derive-consumer-tenant",
+      "_role": "Computes the consumer's tenant ULID deterministically via SHA256('tenant-name:<repo-org>/<repo-name>') → Crockford base32 (first-char clamp). Invoked by the write-project-entity Step (Mint phase) to populate belongs_to_tenant on the Project entity. The ULID is pre-canonicalised in TDD §Canonical Identifiers — Tool ULIDs (WP-001 reserves the ULID and the schema files at schemas/tools/derive-consumer-tenant-{input,output}.schema.json); WP-002 authors the full Tool entity + Python implementation + fixed test vectors. Cross-WP forward reference is captured here so the Step.tool_ref in write-project-entity resolves at parse time.",
+      "_invoked_by_steps": ["write-project-entity"]
+    },
+    {
+      "_reused_from": "marketplace tool catalogue (per feedback-log task #58)",
+      "name": "entity-emitter",
+      "_role": "Writes JSON-LD entity files conforming to the foundation Project schema. The load-bearing reuse — the Mint Step's atomic write delegates the entity composition + JSON-LD framing to this Tool. No new ULID minted in this WP; the existing Tool's ULID is the authoritative reference.",
+      "_invoked_by_steps": ["write-project-entity"]
+    },
+    {
+      "_reused_from": "plugins/sulis/scripts/check-canonical-drift.py (per commit 7d666df extend: tighten-drift-gate)",
+      "name": "drift-detector",
+      "_role": "Invoked from the Verify Step scoped to the just-minted Project entity. The same drift detector that gates release-train PRs; this WP reuses it as the post-mint verification primitive. No new ULID minted; WP-007 + WP-009 extend the detector with HTML-comment annotation parsing + the --cross-tenant-refs-allowed-for flag.",
+      "_invoked_by_steps": ["run-drift-detector-on-mint"]
+    }
+  ]
+}

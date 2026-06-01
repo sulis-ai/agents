@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/discover-project/tool/read-ci-workflows/input/1.0.0",
+  "title": "read-ci-workflows — input",
+  "description": "Input to the read-ci-workflows Tool — invoked by the read-ci-workflows Step.",
+  "type": "object",
+  "required": ["repo_root"],
+  "additionalProperties": false,
+  "properties": {
+    "repo_root": {
+      "type": "string",
+      "description": "Absolute path to the repository root. The Tool enumerates `.github/workflows/*.yml` and `.gitlab-ci.yml` under this root (or the --path sub-scope when set).",
+      "minLength": 1
+    }
+  }
+}

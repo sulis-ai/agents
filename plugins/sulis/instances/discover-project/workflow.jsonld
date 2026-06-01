@@ -1,0 +1,71 @@
+{
+  "@context": {
+    "@vocab": "https://sulis.co/dna/",
+    "dna": "https://sulis.co/dna/"
+  },
+  "@id": "dna:discover-project:workflow",
+  "@type": "workflow-instances",
+  "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "_about": "The apex canonical entity for the sulis-plugins-marketplace discover-project skill — the Workflow that mints a Project entity at a consumer repo's .sulis/projects/<slug>.jsonld. Five phases sequenced as 9 Steps (authored in steps.jsonld): Detect (read-repo-root → read-package-manifests → read-ci-workflows → read-repo-contract), Infer (propose-configuration-values — the only probabilistic Step, NFR-002 10k token budget), Ask (confirm-or-override-inferences → gather-ambiguous-fields), Mint (write-project-entity — atomic write per MUC-002), Verify (run-drift-detector-on-mint — roll back on drift per MUC-005). Per ADR-001 (Path A canonical-as-spec), this JSON-LD entity IS the specification of truth: the skill prose at plugins/sulis/skills/discover-project/SKILL.md (WP-008) conforms to it and the drift detector (WP-007 invocation + WP-009 extension) validates the conformance. Workflow ULID dna:workflow:01KT1WDSCVRWFW00000000000A is deterministic and reused across every discover-project canonical entity (Triggers, Steps — see triggers.jsonld and steps.jsonld for_workflow). Tenant ULID dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM is the marketplace tenant — sourced from release-train/failuremodes.jsonld _about (derivation: SHA256('tenant-name:sulis-plugins-marketplace') → Crockford base32 with first-char clamp); reused byte-identical. The consumer's Project entity (minted at the Mint Step) binds to its own consumer-derived tenant — the cross-tenant boundary is by design per ADR-002. Schema: plugins/sulis/brain/compiled/foundation/workflow.schema.json (vendored upstream sulis-brain Workflow v1.1.0).",
+  "captured_on": "2026-06-01",
+
+  "workflows": [
+    {
+      "id": "dna:workflow:01KT1WDSCVRWFW00000000000A",
+      "sys_status": "active",
+      "name": "discover-project",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "discover-project",
+      "description": "First-time setup workflow for a consumer repo joining the sulis marketplace: detect the repo (git remote, package manifests, CI configuration, repo contract) — infer Configuration-Vocabulary values via a bounded LLM call — ask the consumer to confirm or override every inferred value plus gather the ambiguous remainder — mint the Project entity at .sulis/projects/<slug>.jsonld via an atomic write — verify the mint by running the canonical drift detector scoped to the just-written entity, rolling back on any drift. Deterministic-with-probabilistic-phase: only the Infer Step uses an LLM; every other Step is pure deterministic logic. Fail-fast per ADR-004 — no auto-routing from other commands. Per-field diff re-discovery per ADR-005 (--update flag).",
+      "type": "onboarding",
+      "state_contract": [
+        "repo_root:string",
+        "is_git:bool",
+        "has_remote:bool",
+        "remote_url:string|null",
+        "primary_branch:string|null",
+        "manifest_findings:dict",
+        "ci_findings:dict",
+        "inferences:dict",
+        "consumer_overrides:dict",
+        "target_path:path",
+        "consumer_tenant_ulid:string",
+        "slug:string",
+        "final-outcome:enum[minted|rolled-back|aborted-non-git|aborted-no-remote|aborted-collision|aborted-existing|aborted-budget]"
+      ],
+      "steps": [
+        "read-repo-root",
+        "read-package-manifests",
+        "read-ci-workflows",
+        "read-repo-contract",
+        "propose-configuration-values",
+        "confirm-or-override-inferences",
+        "gather-ambiguous-fields",
+        "write-project-entity",
+        "run-drift-detector-on-mint"
+      ],
+      "initial_steps": ["read-repo-root"],
+      "terminal_steps": ["run-drift-detector-on-mint"],
+      "transitions": [
+        "read-repo-root -> read-package-manifests [if is_git AND has_remote]",
+        "read-repo-root -> [terminal:aborted-non-git] [if NOT is_git]",
+        "read-repo-root -> [terminal:aborted-no-remote] [if is_git AND NOT has_remote AND no --source-repo override]",
+        "read-package-manifests -> read-ci-workflows",
+        "read-ci-workflows -> read-repo-contract",
+        "read-repo-contract -> propose-configuration-values",
+        "propose-configuration-values -> confirm-or-override-inferences [if tokens_consumed <= 10000]",
+        "propose-configuration-values -> gather-ambiguous-fields [if tokens_consumed > 10000; degraded path MUC-008]",
+        "confirm-or-override-inferences -> gather-ambiguous-fields",
+        "gather-ambiguous-fields -> write-project-entity",
+        "write-project-entity -> run-drift-detector-on-mint [if write succeeded]",
+        "write-project-entity -> [terminal:aborted-existing] [if entity exists AND no --update]",
+        "write-project-entity -> [terminal:aborted-collision] [if --path omitted AND .sulis/projects/ non-empty; MUC-007]",
+        "run-drift-detector-on-mint -> [terminal:minted] [if drift_check pass]",
+        "run-drift-detector-on-mint -> [terminal:rolled-back] [if drift_check fail; MUC-005]"
+      ],
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.92
+    }
+  ]
+}
