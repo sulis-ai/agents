@@ -1,0 +1,9 @@
+{
+  "name": "tiny-app",
+  "version": "1.2.3",
+  "private": false,
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest"
+  }
+}
