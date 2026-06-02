@@ -1,0 +1,285 @@
+diff --git a/plugins/sulis/scripts/tests/unit/test_shim_template.py b/plugins/sulis/scripts/tests/unit/test_shim_template.py
+new file mode 100644
+index 0000000..022315f
+--- /dev/null
++++ b/plugins/sulis/scripts/tests/unit/test_shim_template.py
+@@ -0,0 +1,230 @@
++"""Structural tests for the canonical consumer shim template.
++
++WP-004 (comp-shim-template) — the consumer-side shim at
++`plugins/sulis/templates/shims/release-on-merge.yml` is the file
++downstream repos copy into their `.github/workflows/` to wire the
++reusable workflow (per TDD §4.2 and ADR-001).
++
++These tests guard the shape that WP-005 (n=1 dogfood) and WP-009
++(bootstrap-from-zero) bind against. They do NOT execute the workflow
++— that's the sandbox CI's job in WP-009. Here we assert:
++
++- The file exists at the contracted path.
++- It parses as YAML.
++- `on.push.branches` is exactly `[main]`.
++- Top-level `permissions` declares `contents: write` and
++  `pull-requests: write` (re-stated per TDD §5.8 — GitHub does not
++  inherit caller permissions into reusable workflows).
++- Exactly one job named `release` whose `uses:` references the
++  reusable workflow path and whose tag is the literal placeholder
++  `@sulis-v<MAJOR>.<MINOR>.<PATCH>` — not a real version (per the
++  WP's Definition of Done, consumers must make a conscious choice
++  when they copy the template).
++- `secrets: inherit` is present at the job level.
++- A `concurrency` block matching the reusable workflow's serialises
++  release runs (FR-004, MUC-005).
++- Header comments document the pin format and the `@dev` opt-in
++  alternative (ADR-001 + MUC-006).
++"""
++
++from __future__ import annotations
++
++import re
++from pathlib import Path
++
++import pytest
++import yaml
++
++_REPO_ROOT = Path(__file__).resolve().parents[5]
++_SHIM_PATH = (
++    _REPO_ROOT / "plugins" / "sulis" / "templates" / "shims" / "release-on-merge.yml"
++)
++_REUSABLE_WORKFLOW_PATH = (
++    "sulis-ai/agents/plugins/sulis/templates/workflows/release-on-merge.yml"
++)
++_PIN_PLACEHOLDER = "@sulis-v<MAJOR>.<MINOR>.<PATCH>"
++
++
++# ─── File presence + YAML well-formedness ─────────────────────────────────
++
++
++def test_shim_template_file_exists():
++    """The canonical shim lives at the contracted path (TDD §4.2)."""
++    assert _SHIM_PATH.is_file(), (
++        f"Canonical consumer shim missing at {_SHIM_PATH}. "
++        "WP-005 (n=1 dogfood) and WP-009 (bootstrap-from-zero) "
++        "both bind against this file."
++    )
++
++
++def test_shim_template_parses_as_yaml():
++    """The shim is well-formed YAML — substituted or not."""
++    raw = _SHIM_PATH.read_text(encoding="utf-8")
++    # Substitute the placeholder with a parseable SemVer for the YAML parser.
++    # The placeholder is the contract; the parser just needs *something* there
++    # in the `uses:` ref. We do NOT modify the file on disk.
++    substituted = raw.replace(_PIN_PLACEHOLDER, "@sulis-v0.0.0")
++    parsed = yaml.safe_load(substituted)
++    assert isinstance(parsed, dict), "shim must parse to a top-level mapping"
++
++
++# ─── Trigger surface ──────────────────────────────────────────────────────
++
++
++def test_shim_trigger_is_push_to_main():
++    """`on.push.branches: [main]` — the consumer's own merge to main fires it."""
++    raw = _SHIM_PATH.read_text(encoding="utf-8")
++    parsed = yaml.safe_load(raw.replace(_PIN_PLACEHOLDER, "@sulis-v0.0.0"))
++    # PyYAML parses bare `on:` as the boolean True (the Norway problem's
++    # cousin). Tolerate both keys.
++    trigger = parsed.get("on", parsed.get(True))
++    assert isinstance(trigger, dict), "on: must be a mapping"
++    push = trigger.get("push")
++    assert isinstance(push, dict), "on.push: must be a mapping"
++    assert push.get("branches") == ["main"], (
++        "on.push.branches must be exactly [main] — the consumer's own "
++        "merge to main is the trigger"
++    )
++
++
++# ─── Permissions surface (TDD §5.8) ───────────────────────────────────────
++
++
++def test_shim_top_level_permissions_declared():
++    """Top-level permissions: contents: write + pull-requests: write."""
++    raw = _SHIM_PATH.read_text(encoding="utf-8")
++    parsed = yaml.safe_load(raw.replace(_PIN_PLACEHOLDER, "@sulis-v0.0.0"))
++    perms = parsed.get("permissions")
++    assert isinstance(perms, dict), (
++        "top-level permissions: must be declared per TDD §5.8 — "
++        "the calling workflow's own context needs these"
++    )
++    assert perms.get("contents") == "write"
++    assert perms.get("pull-requests") == "write"
++
++
++def test_shim_job_level_permissions_declared():
++    """Job-level permissions re-declared — reusable workflows don't inherit."""
++    raw = _SHIM_PATH.read_text(encoding="utf-8")
++    parsed = yaml.safe_load(raw.replace(_PIN_PLACEHOLDER, "@sulis-v0.0.0"))
++    release = parsed["jobs"]["release"]
++    perms = release.get("permissions")
++    assert isinstance(perms, dict), (
++        "jobs.release.permissions must be re-declared at the job level — "
++        "GitHub does not inherit caller permissions into reusable workflows"
++    )
++    assert perms.get("contents") == "write"
++    assert perms.get("pull-requests") == "write"
++
++
++# ─── jobs.release.uses contract ───────────────────────────────────────────
++
++
++def test_shim_has_single_release_job():
++    """Exactly one job, named `release`."""
++    raw = _SHIM_PATH.read_text(encoding="utf-8")
++    parsed = yaml.safe_load(raw.replace(_PIN_PLACEHOLDER, "@sulis-v0.0.0"))
++    jobs = parsed.get("jobs")
++    assert isinstance(jobs, dict), "jobs: must be a mapping"
++    assert list(jobs.keys()) == ["release"], (
++        "shim must have exactly one job, named 'release'"
++    )
++
++
++def test_shim_uses_points_at_reusable_workflow():
++    """`jobs.release.uses` references the reusable workflow path."""
++    raw = _SHIM_PATH.read_text(encoding="utf-8")
++    # Inspect the raw text so we can match the literal placeholder before
++    # substitution — the placeholder string itself is the contract.
++    assert _REUSABLE_WORKFLOW_PATH in raw, (
++        f"shim must reference {_REUSABLE_WORKFLOW_PATH} via `uses:`"
++    )
++
++
++def test_shim_pin_is_literal_placeholder_not_a_real_version():
++    """The shipped template MUST carry the placeholder, not a real version.
++
++    Per WP-004 Definition of Done: consumers replace the placeholder with
++    the current Sulis plugin version when they copy the template. A
++    hardcoded real version would obscure that conscious choice.
++    """
++    raw = _SHIM_PATH.read_text(encoding="utf-8")
++    assert _PIN_PLACEHOLDER in raw, (
++        f"shim must contain the literal placeholder {_PIN_PLACEHOLDER!r} — "
++        "not a real version. Consumers replace this when they copy the file."
++    )
++    # And the active `uses:` line carries the placeholder.
++    uses_line = re.search(r"^\s*uses:\s*(\S+)", raw, re.MULTILINE)
++    assert uses_line is not None, "uses: line must be present"
++    assert _PIN_PLACEHOLDER in uses_line.group(1), (
++        f"the uses: ref must end with {_PIN_PLACEHOLDER}"
++    )
++    # And no real semver tag like @sulis-v0.86.0 sneaks in on the active uses: line.
++    real_semver = re.search(r"@sulis-v\d+\.\d+\.\d+", uses_line.group(1))
++    assert real_semver is None, (
++        f"active uses: line carries a real version {real_semver.group(0)!r} — "
++        "must be the placeholder so consumers make a conscious version choice"
++    )
++
++
++def test_shim_uses_secrets_inherit():
++    """`secrets: inherit` — GITHUB_TOKEN flows into the reusable workflow."""
++    raw = _SHIM_PATH.read_text(encoding="utf-8")
++    parsed = yaml.safe_load(raw.replace(_PIN_PLACEHOLDER, "@sulis-v0.0.0"))
++    release = parsed["jobs"]["release"]
++    assert release.get("secrets") == "inherit", (
++        "jobs.release.secrets must be 'inherit' so GITHUB_TOKEN flows "
++        "into the reusable workflow"
++    )
++
++
++# ─── Concurrency (FR-004, MUC-005) ────────────────────────────────────────
++
++
++def test_shim_concurrency_block_present():
++    """Top-level `concurrency` serialises overlapping releases."""
++    raw = _SHIM_PATH.read_text(encoding="utf-8")
++    parsed = yaml.safe_load(raw.replace(_PIN_PLACEHOLDER, "@sulis-v0.0.0"))
++    concurrency = parsed.get("concurrency")
++    assert isinstance(concurrency, dict), (
++        "concurrency: must be declared so two release PRs merged in "
++        "quick succession serialise (FR-004, MUC-005)"
++    )
++    assert concurrency.get("group"), "concurrency.group must be set"
++    # cancel-in-progress MUST be false — we never cancel a release mid-flight.
++    assert concurrency.get("cancel-in-progress") is False, (
++        "concurrency.cancel-in-progress must be false — never cancel a "
++        "release mid-flight"
++    )
++
++
++# ─── Header comments — pin discipline + opt-in documentation ──────────────
++
++
++def test_shim_header_documents_pin_discipline():
++    """The header comments name the SemVer pin discipline (ADR-001)."""
++    raw = _SHIM_PATH.read_text(encoding="utf-8")
++    # Comments live at the top of the file, before the first non-comment line.
++    header = []
++    for line in raw.splitlines():
++        if line.startswith("#") or line.strip() == "":
++            header.append(line)
++        else:
++            break
++    header_text = "\n".join(header).lower()
++    # Some signal that the pin format is documented.
++    assert "sulis-v" in header_text or "semver" in header_text, (
++        "shim header must document the SemVer pin format (ADR-001)"
++    )
++
++
++def test_shim_documents_dev_opt_in_alternative():
++    """The shim documents `@dev` as the opt-in always-track alternative."""
++    raw = _SHIM_PATH.read_text(encoding="utf-8")
++    # Per ADR-001 + MUC-006, the @dev alternative must be documented
++    # somewhere in the shim's comments. Lower-case the haystack so we
++    # tolerate `@dev`, `@DEV`, etc.
++    assert "@dev" in raw.lower(), (
++        "shim must document the @dev always-track opt-in alternative "
++        "(ADR-001, MUC-006)"
++    )
+diff --git a/plugins/sulis/templates/shims/release-on-merge.yml b/plugins/sulis/templates/shims/release-on-merge.yml
+new file mode 100644
+index 0000000..289f6af
+--- /dev/null
++++ b/plugins/sulis/templates/shims/release-on-merge.yml
+@@ -0,0 +1,43 @@
++# Canonical Sulis consumer shim — release-on-merge workflow.
++#
++# Copy this file into your repo at .github/workflows/release-on-merge.yml.
++# Replace the @sulis-v<MAJOR>.<MINOR>.<PATCH> placeholder below with the
++# current Sulis plugin version you want to pin to.
++#
++# Pin discipline (ADR-001): the default is a SemVer tag — @sulis-vN.M.K.
++# Breaking changes to the reusable workflow ship as a major plugin version
++# bump (per GIT-08). Tag-pinned consumers stay on the working version until
++# they bump the pin in their shim.
++#
++# Opt-in alternative: replace the tag with @dev to always-track HEAD of
++# the marketplace's dev branch. Breaking changes to the reusable workflow
++# are NOT communicated through changesets in that mode; it is the
++# consumer's risk to accept. Only use @dev in projects with strong test
++# coverage and active maintenance.
++#
++# See GIT-12 in plugins/sulis/references/git-workflow-standard.md for the
++# invariant this workflow upholds (dev's history stays append-only
++# relative to the release robot; every release fast-forwards dev to main
++# OR opens a back-integrate-labelled PR).
++
++name: Release on merge to main
++
++on:
++  push:
++    branches: [main]
++
++permissions:
++  contents: write       # bump commits, tag, push to main, fast-forward push to dev
++  pull-requests: write  # gh pr create / gh pr merge --auto for raced-path back-merge
++
++concurrency:
++  group: release-on-merge
++  cancel-in-progress: false
++
++jobs:
++  release:
++    uses: sulis-ai/agents/plugins/sulis/templates/workflows/release-on-merge.yml@sulis-v<MAJOR>.<MINOR>.<PATCH>
++    permissions:
++      contents: write
++      pull-requests: write
++    secrets: inherit
