@@ -1,7 +1,0 @@
-change_id: SHA-50efe0b
-primitive: fix
-tier: patch
-touches_plugin: false
-summary: |
-  drift-ci-paths
-created_at: 2026-06-01T16:11:20Z
