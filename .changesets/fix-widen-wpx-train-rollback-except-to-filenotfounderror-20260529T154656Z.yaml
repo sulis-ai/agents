@@ -1,0 +1,27 @@
+change_id: SHA-845d192
+primitive: fix
+tier: patch
+touches_plugin: true
+summary: |
+  widen wpx-train rollback except to FileNotFoundError
+  
+  ## Summary
+  - `_rollback_pre_merge_train_state` caught only `RuntimeError` after an
+  `exists()` check, but `read_train_state` raises `FileNotFoundError` if
+  the state file vanishes in the TOCTOU window — so that edge propagated
+  into `cmd_run`'s terminal error handlers.
+  - Fix: widen the catch to `(RuntimeError, FileNotFoundError)`; the
+  helper degrades cleanly (returns False, leaves state for inspection).
+  
+  ## Test plan
+  - [x] New `tests/unit/test_wpx_train_rollback_toctou.py` covers the
+  vanished-file + corrupt-JSON edges (RED before the fix)
+  - [x] Train-related suites green (190 passed)
+  
+  Closes #68
+  
+  🤖 Generated with [Claude Code](https://claude.com/claude-code)
+  
+  Co-authored-by: Iain Niven-Bowling <iain@nivbow.com>
+  Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+created_at: 2026-05-29T15:46:56Z

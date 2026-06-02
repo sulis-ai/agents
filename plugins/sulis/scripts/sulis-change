@@ -50,6 +50,7 @@ from _change_state import (  # noqa: E402
     write_change_record,
     write_change_stage,
 )
+from _changeset import tier_for_primitive, write_changeset  # noqa: E402
 from _terminal_launcher import launch_change_terminal  # noqa: E402
 from _wpxlib import (  # noqa: E402
     ALLOWED_CHANGE_PRIMITIVES,
@@ -187,6 +188,63 @@ def _compose_squash_message(primitive: str, slug: str, metadata: dict) -> str:
         body_parts.append(intent)
     body_parts.append("Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>")
     return subject + "\n\n" + "\n\n".join(body_parts)
+
+
+def _emit_changeset_for_ship(
+    *,
+    base_dir: Path,
+    metadata: dict,
+    touches_plugin: bool,
+) -> Path | None:
+    """Drop one `.changesets/*.yaml` for this ship, or None if tier is None.
+
+    The keystone of the changeset-based release train at the ship boundary
+    (the producer side of the `.changesets/` contract). Called from
+    `cmd_finish` between the squash-merge and the squash commit so the
+    changeset lands on `dev` in the SAME commit as the change itself.
+
+    Returns the written path on success, or None when the primitive maps
+    to no tier (admin / docs-only / unknown) — per `.changesets/README.md`
+    those changes write **no** changeset. Returning None is meaningful,
+    not an error.
+
+    Raises ValueError when the change manifest is missing `primitive` or
+    `change_id` — these are non-negotiable parts of the changeset YAML, and
+    a missing field is a contract breach worth surfacing (the caller turns
+    this into `emit_error` so the ship halts and the founder fixes the
+    metadata, rather than silently dropping an incomplete changeset).
+    """
+    primitive = metadata.get("primitive")
+    if not primitive:
+        raise ValueError(
+            "change manifest is missing `primitive` — cannot derive release "
+            "tier; ship cannot drop a changeset")
+    change_id = metadata.get("change_id")
+    if not change_id:
+        raise ValueError(
+            "change manifest is missing `change_id` — every changeset MUST "
+            "carry its parent change's id (`.changesets/README.md`)")
+
+    tier = tier_for_primitive(primitive)
+    if tier is None:
+        # admin / docs-only / unknown primitive → no changeset (the README
+        # contract; the release-train sees these via the dev↔main diff but
+        # they don't bump the version).
+        return None
+
+    slug = metadata.get("slug") or change_id
+    intent = str(metadata.get("intent") or "").strip()
+    summary = intent if intent else f"{primitive}: {slug}"
+
+    return write_changeset(
+        changesets_dir=base_dir / ".changesets",
+        change_id=change_id,
+        primitive=primitive,
+        tier=tier,
+        touches_plugin=touches_plugin,
+        summary=summary,
+        slug=slug,
+    )
 
 
 # Uncommitted paths under these prefixes are sulis-managed metadata, not
@@ -806,7 +864,36 @@ def cmd_finish(args: argparse.Namespace) -> None:
         if rc != 0:
             emit_error(f"git merge --squash {branch} failed: {err}")
 
-        # 3. Commit (only if there's anything staged) — Conventional-Commit
+        # 3. Drop the changeset (the producer side of .changesets/, ADR-002)
+        #    BEFORE the commit so it lands on `dev` in the same squash commit
+        #    as the change itself. Detect `touches_plugin` from the staged
+        #    diff; the helper short-circuits on tier=None (admin/docs-only).
+        rc, staged_paths, _ = _run(
+            ["git", "diff", "--cached", "--name-only"],
+            cwd=base_dir, timeout=10)
+        touches_plugin = any(
+            p.startswith("plugins/sulis/")
+            for p in staged_paths.splitlines() if p
+        )
+        try:
+            cs_path = _emit_changeset_for_ship(
+                base_dir=base_dir, metadata=metadata,
+                touches_plugin=touches_plugin,
+            )
+        except ValueError as exc:
+            emit_error(
+                f"cannot drop changeset for ship: {exc}",
+                context={"hint": "Fix the .changes/*.yaml manifest "
+                                 "(missing `primitive` or `change_id`), "
+                                 "then re-run `sulis-change finish --merge`."},
+            )
+        if cs_path is not None:
+            rc, _, err = _run(["git", "add", str(cs_path)],
+                              cwd=base_dir, timeout=10)
+            if rc != 0:
+                emit_error(f"git add {cs_path.name} failed: {err}")
+
+        # 4. Commit (only if there's anything staged) — Conventional-Commit
         #    message derived from the change (#56 Part 3).
         rc, status_out, _ = _run(["git", "status", "--porcelain"],
                                  cwd=base_dir, timeout=10)
