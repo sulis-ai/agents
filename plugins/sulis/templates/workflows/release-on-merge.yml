@@ -412,3 +412,149 @@ jobs:
           else
             echo "[brain-emit] scripts dir not present; skipping"
           fi
+
+      # ─────────────────────────────────────────────────────────────────
+      # WP-003 — Auto-back-merge block (EXPAND-Extend).
+      #
+      # After main has been bumped + tagged + pushed (Step 9b above), dev
+      # is left behind main on every release. These three steps close that
+      # gap by either fast-forwarding dev to main (the clean path, when dev
+      # hasn't moved since the release PR opened) or opening an auto-merging
+      # `back-integrate` PR (the raced path). They are the load-bearing
+      # piece of auto-back-merge-on-release (TDD §4.2; ADR-002/005/006).
+      #
+      # NO-FORCE-PUSH INVARIANT (TDD §5.2 / NFR-002 — load-bearing):
+      #   The ONLY push these steps make targeting dev is the bare
+      #   `git push origin main:dev` refspec, which git refuses unless it
+      #   is a strict fast-forward. No forced push of any kind appears in
+      #   this block — no force flag, no force-with-lease flag, no leading
+      #   plus-sign refspec form. Any rejection of the fast-forward (race,
+      #   branch protection, network) falls through to the PR-open path;
+      #   the workflow never escalates to a forced push.
+      #   `test_no_force_push_static.sh` + `test_back_merge_step.py` pin
+      #   this statically (they scan for the literal flag tokens, so this
+      #   comment deliberately avoids writing them).
+      #
+      # All GitHub expressions cross the shell boundary through `env:`
+      # ports (never inlined into the script body) so a release version or
+      # PR title carrying shell metacharacters can never inject (MUC
+      # defence; Blue criterion).
+      # ─────────────────────────────────────────────────────────────────
+
+      # 10. pin-read — recover the dev-sha-at-open pin that
+      #     /sulis:release-train wrote into the release PR body (ADR-005)
+      #     at PR-open time. The pin is read back via the commits/{SHA}/pulls
+      #     API (ADR-006). Missing or malformed pin → empty output, which
+      #     the decide+act step treats as the raced path (TDD §5.6 safe
+      #     default). `// ""` guards the null when the merge commit has no
+      #     associated PR (e.g. a direct push to main).
+      - name: Read dev-sha-at-open pin from release PR
+        id: pin
+        if: steps.detect.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          # GITHUB_REPOSITORY and GITHUB_SHA are auto-provided by the
+          # runner (both are controlled, non-injectable values — a repo
+          # slug and a commit SHA — so they are safe to use directly).
+          PR_BODY=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" --jq '.[0].body // ""' 2>/dev/null || echo "")
+          # Tight regex (ADR-006): the exact 40-hex pin in its HTML-comment
+          # wrapper. grep the wrapper first so a stray hex string in the
+          # release notes can never be mistaken for the pin.
+          # Canonical regex (TDD §3 / ADR-006): dev-sha-at-open: ([a-f0-9]{40}).
+          # The capture group documents the 40-hex SHA boundary; `grep -oE`
+          # prints the whole match, and awk lifts the second field (the SHA).
+          DEV_SHA_PIN=$(printf '%s\n' "$PR_BODY" | grep -oE 'dev-sha-at-open: ([a-f0-9]{40})' | head -n1 | awk '{print $2}')
+          echo "dev_sha_pin=${DEV_SHA_PIN}" >> "$GITHUB_OUTPUT"
+          if [ -z "$DEV_SHA_PIN" ]; then
+            echo "back-merge: pin absent or malformed; raced path will be taken"
+          else
+            echo "back-merge: pin read (${DEV_SHA_PIN})"
+          fi
+
+      # 11. decide+act — clean path (fast-forward) when the pin is non-empty
+      #     AND dev's current SHA byte-equals the pin; otherwise the raced
+      #     path (open a back-integrate PR + enable auto-merge, ADR-002). A
+      #     rejected fast-forward also falls through to the raced path.
+      #
+      #     Canonical strings (TDD §3; match drift_check.sh byte-for-byte —
+      #     WP-009 asserts parity): label `back-integrate`, title prefix
+      #     `chore: back-integrate main → dev`, base `dev`, head `main`.
+      - name: Fast-forward dev to main, or open raced-path back-integrate PR
+        id: backmerge
+        if: steps.detect.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEV_SHA_PIN: ${{ steps.pin.outputs.dev_sha_pin }}
+          NEW_META: ${{ steps.compute.outputs.new_meta }}
+        run: |
+          set -uo pipefail
+          git fetch origin dev main
+
+          CURRENT_DEV=$(git ls-remote origin dev | awk '{print $1}')
+
+          if [ -n "$DEV_SHA_PIN" ] && [ "$CURRENT_DEV" = "$DEV_SHA_PIN" ]; then
+            echo "back-merge: clean path, attempting fast-forward dev to main"
+            # Plain fast-forward push. git refuses this if main is not a
+            # strict descendant of dev — that is the no-force invariant in
+            # action (no forced push of any kind; TDD §5.2).
+            if git push origin main:dev; then
+              echo "back-merge: clean path, dev fast-forwarded to main"
+              echo "path=clean" >> "$GITHUB_OUTPUT"
+              exit 0
+            else
+              echo "back-merge: fast-forward push rejected; falling through to raced path"
+            fi
+          else
+            echo "back-merge: raced path (pin=${DEV_SHA_PIN:-<empty>}, current_dev=${CURRENT_DEV})"
+          fi
+
+          # Raced path — open the back-integrate PR and enable auto-merge
+          # (ADR-002). The PR being open is the success condition; CI-green
+          # then merges it asynchronously.
+          PR_TITLE="chore: back-integrate main → dev (post-release v${NEW_META})"
+          PR_BODY="Auto-opened by release-on-merge. Fast-forward of dev to main was not safe (a race during the release window, or the push was rejected). Auto-merge is enabled; CI green will merge."
+          PR_URL=$(gh pr create --base dev --head main --label back-integrate --title "$PR_TITLE" --body "$PR_BODY")
+          PR_NUM=$(printf '%s' "$PR_URL" | awk -F/ '{print $NF}')
+          gh pr merge "$PR_NUM" --auto --merge
+          echo "back-merge: raced path, PR #${PR_NUM} opened with auto-merge enabled"
+          echo "path=raced" >> "$GITHUB_OUTPUT"
+          echo "pr_number=${PR_NUM}" >> "$GITHUB_OUTPUT"
+
+      # 12. post-condition — assert atomicity (NFR-006 / TDD §5.3). Runs
+      #     with `if: always()` so the end-state is verified even if an
+      #     upstream step failed. Success iff dev == main (clean path
+      #     landed) OR a back-integrate PR is open OR one was recently
+      #     merged (raced path landed before this step ran). Otherwise the
+      #     workflow exits 1 with a log line naming the failure mode.
+      - name: Verify atomicity (NFR-006)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          git fetch origin dev main
+          DEV=$(git ls-remote origin dev | awk '{print $1}')
+          MAIN=$(git ls-remote origin main | awk '{print $1}')
+
+          if [ "$DEV" = "$MAIN" ]; then
+            echo "post-condition: dev == main (${DEV})"
+            exit 0
+          fi
+
+          OPEN_PR=$(gh pr list --base dev --label back-integrate --state open --json number --limit 1 --jq '.[0].number // empty')
+          if [ -n "$OPEN_PR" ]; then
+            echo "post-condition: back-integrate PR #${OPEN_PR} is open"
+            exit 0
+          fi
+
+          MERGED_PR=$(gh pr list --base dev --label back-integrate --state merged --limit 1 --json number --jq '.[0].number // empty')
+          if [ -n "$MERGED_PR" ]; then
+            echo "post-condition: back-integrate PR #${MERGED_PR} was merged"
+            exit 0
+          fi
+
+          echo "::error::post-condition failed: dev != main (${DEV} != ${MAIN}) AND no back-integrate PR is open or recently merged"
+          echo "::error::atomicity invariant violated (NFR-006). Manual recovery: see GIT-12 worked example 3."
+          exit 1

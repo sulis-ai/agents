@@ -1,9 +1,10 @@
-"""Byte-parity test for WP-002 (REORGANISE-Move).
+"""Byte-parity test for WP-002 (REORGANISE-Move), as extended by WP-003.
 
 Asserts that the plugin-side reusable workflow at
-`plugins/sulis/templates/workflows/release-on-merge.yml` has content
-byte-identical to the marketplace's `.github/workflows/release-on-merge.yml`
-EXCEPT for:
+`plugins/sulis/templates/workflows/release-on-merge.yml` carries the
+marketplace's `.github/workflows/release-on-merge.yml` content
+byte-identical *as a prefix* — i.e. WP-002's move was content-preserving
+for the shared portion — EXCEPT for:
 
   1. The top-level `on:` block — changes from `push: branches: [main]`
      to `workflow_call:` (TDD §4.2).
@@ -23,10 +24,21 @@ EXCEPT for:
      header comment (which begins with `# WP-003 — the ONE bump
      authority`).
 
-Every other byte in the file (job structure, step bodies, env vars,
-`if:` guards, concurrency, comments) MUST match the marketplace
-workflow character-for-character. That is the "byte parity modulo
-trigger" load-bearing characterisation for this REORGANISE-Move.
+Every byte the two files SHARE (job structure, the move-preserved step
+bodies, env vars, `if:` guards, concurrency, comments) MUST match the
+marketplace workflow character-for-character. That is the "byte parity
+modulo trigger" load-bearing characterisation for the REORGANISE-Move.
+
+WP-003 (EXPAND-Extend) appends a three-step auto-back-merge block
+(pin-read, decide+act, post-condition) to the END of the reusable
+workflow only — it edits none of the moved steps. The marketplace file
+is therefore a byte-for-byte PREFIX of the reusable file (after masking
+the three structural adjustments). The byte-parity assertion is relaxed
+to prefix-parity to admit this documented extension while still proving
+WP-002's move preserved every shared line. The appended block is
+delimited by the lead marker `# WP-003 — Auto-back-merge block`; the
+parity test asserts the marketplace content matches everything above
+that marker exactly, and that the marker introduces the only divergence.
 
 This test is the WP-002-specific cousin of the methodology-tier shell
 characterisation test at
@@ -158,30 +170,70 @@ def test_marketplace_workflow_exists() -> None:
     )
 
 
+# Lead marker of the WP-003 (EXPAND-Extend) back-merge block. Everything
+# above this marker in the reusable workflow is move-preserved content
+# shared with the marketplace file; everything from this marker down is
+# WP-003's documented extension.
+_WP003_BLOCK_MARKER = "# WP-003 — Auto-back-merge block"
+
+
+def _truncate_at_extension(masked_reusable: str) -> str:
+    """Return the reusable workflow's masked content up to (not
+    including) the WP-003 back-merge block, with any trailing blank
+    separator line trimmed. This is the portion that must byte-match
+    the marketplace workflow."""
+    lines = masked_reusable.splitlines(keepends=True)
+    for i, line in enumerate(lines):
+        if line.strip().startswith(_WP003_BLOCK_MARKER):
+            head = lines[:i]
+            # The marker sits inside a comment header (a box-rule
+            # `# ────…` divider line precedes it). Back up over the
+            # block's leading comment/divider lines and any blank
+            # separator — they all belong to the WP-003 extension, not
+            # the move-preserved prefix.
+            while head and (
+                head[-1].strip() == ""
+                or head[-1].lstrip().startswith("#")
+            ):
+                head.pop()
+            return "".join(head)
+    # Marker absent → no extension present; the whole file is the prefix.
+    return masked_reusable
+
+
 def test_reusable_workflow_byte_parity_modulo_trigger_name_permissions(
     marketplace_content: str, reusable_content: str
 ) -> None:
-    """The two files are byte-identical after masking the three
-    structural adjustments (on:, name:, permissions:)."""
-    marketplace_masked = _normalise(marketplace_content)
-    reusable_masked = _normalise(reusable_content)
+    """The marketplace workflow is a byte-for-byte PREFIX of the reusable
+    workflow after masking the three structural adjustments (on:, name:,
+    permissions:). WP-003 appends the back-merge block below the shared
+    prefix; everything above it must match the marketplace file exactly.
+    """
+    marketplace_masked = _normalise(marketplace_content).rstrip("\n")
+    reusable_prefix = _truncate_at_extension(_normalise(reusable_content)).rstrip("\n")
 
-    if marketplace_masked != reusable_masked:
-        # Find the first differing line for an actionable message.
+    assert _WP003_BLOCK_MARKER in reusable_content, (
+        "reusable workflow is missing the WP-003 back-merge block marker "
+        f"{_WP003_BLOCK_MARKER!r}; the extension must be clearly delimited "
+        "so the shared move-preserved prefix can be parity-checked."
+    )
+
+    if marketplace_masked != reusable_prefix:
         m_lines = marketplace_masked.splitlines()
-        r_lines = reusable_masked.splitlines()
+        r_lines = reusable_prefix.splitlines()
         for i, (m, r) in enumerate(zip(m_lines, r_lines)):
             if m != r:
                 pytest.fail(
-                    f"byte-parity differs at line {i + 1}:\n"
+                    f"prefix byte-parity differs at line {i + 1}:\n"
                     f"  marketplace: {m!r}\n"
                     f"  reusable:    {r!r}"
                 )
-        if len(m_lines) != len(r_lines):
-            pytest.fail(
-                f"byte-parity differs in line count: marketplace={len(m_lines)} "
-                f"reusable={len(r_lines)} (first {min(len(m_lines), len(r_lines))} lines matched)"
-            )
+        pytest.fail(
+            "prefix byte-parity differs in line count (shared prefix): "
+            f"marketplace={len(m_lines)} reusable-prefix={len(r_lines)} "
+            f"(first {min(len(m_lines), len(r_lines))} lines matched). "
+            "WP-003 must only APPEND below the marker, never edit moved steps."
+        )
 
 
 def test_reusable_workflow_uses_workflow_call_trigger(
