@@ -82,6 +82,27 @@ def run_scenario(
     )
 
 
+def run_bundle(
+    bundle: dict,
+    *,
+    target_base_url: str = "",
+    available_artifacts=frozenset(),
+    http=None,
+    run=None,
+) -> AcceptanceResult:
+    """Run a self-contained Scenario bundle — ``{scenario, workflow, steps[],
+    tools[]}`` — the input shape the `sulis-verify-acceptance` CLI loads. (Once
+    a Scenario-from-source emitter exists, the CLI will load these from the
+    brain graph instead; the bundle is the v1 input.)"""
+    steps_by_id = {s.get("@id"): s for s in (bundle.get("steps") or [])}
+    tools_by_id = {t.get("@id"): t for t in (bundle.get("tools") or [])}
+    return run_scenario(
+        bundle["scenario"], bundle["workflow"], steps_by_id, tools_by_id,
+        target_base_url=target_base_url, available_artifacts=available_artifacts,
+        http=http, run=run,
+    )
+
+
 _GLYPH = {"pass": "✓", "fail": "✗", "deferred": "⏸", "manual-pending": "◻"}
 
 
