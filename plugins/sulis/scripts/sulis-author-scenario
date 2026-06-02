@@ -1,0 +1,129 @@
+#!/usr/bin/env python3
+"""sulis-author-scenario — turn a plain-English journey spec into the Scenario graph.
+
+The `/sulis:specify` intake: the agent drafts a plain-English verification
+journey from the SRD's acceptance criteria, the founder edits it, and that
+journey-spec JSON is handed here. This assembles the IDEF0 graph underneath
+(Scenario + Workflow + Steps — see `_scenario_authoring`), writes the durable
+authored bundle (`--out`, travels with the change), and optionally emits the
+entities into the brain (`--emit`).
+
+Journey-spec JSON (stdin via --journey path):
+    {
+      "name": "A user can pay with a saved card",
+      "verifies": ["dna:requirement:<ulid>", ...],   # ≥1
+      "exercises": "dna:design:<ulid>",
+      "tenant": "dna:tenant:<ulid>",
+      "seed": "pay-with-saved-card",                  # stable → idempotent ULIDs
+      "steps": [
+        {"instruction": "Sign in as a user with a saved card",
+         "asserts": ["a session is established"]},
+        {"instruction": "Pay with the saved card",
+         "asserts": ["the response shows payment succeeded"]}
+      ]
+    }
+
+Envelope: {"ok": true, "data": {...}} / {"ok": false, "error": "..."}; exit 0/1.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+from _entity_adapter_local import LocalFileEntityAdapter  # noqa: E402
+from _entity_repository import EntityValidationError  # noqa: E402
+from _scenario_authoring import assemble_scenario_graph  # noqa: E402
+
+_REQUIRED = ("name", "verifies", "exercises", "tenant", "seed", "steps")
+
+
+def _resolve_repo_root(explicit: str | None) -> Path:
+    if explicit:
+        return Path(explicit).resolve()
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, check=True, timeout=10,
+        )
+        return Path(out.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        return Path.cwd()
+
+
+def _err(message: str) -> int:
+    print(json.dumps({"ok": False, "error": message}, indent=2))
+    return 1
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Author a Scenario graph from a plain-English journey.")
+    parser.add_argument("--journey", required=True, help="path to the journey-spec JSON")
+    parser.add_argument("--out", help="path to write the assembled scenarios.jsonld bundle")
+    parser.add_argument("--emit", action="store_true", help="also persist the entities into the brain")
+    parser.add_argument("--base-dir")
+    parser.add_argument("--repo-root")
+    args = parser.parse_args()
+
+    jpath = Path(args.journey).resolve()
+    if not jpath.exists():
+        return _err(f"journey spec not found: {jpath}")
+    try:
+        spec = json.loads(jpath.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, ValueError) as exc:
+        return _err(f"journey spec is not valid JSON: {exc}")
+
+    missing = [k for k in _REQUIRED if k not in spec]
+    if missing:
+        return _err(f"journey spec missing required keys: {missing}")
+
+    try:
+        bundle = assemble_scenario_graph(
+            name=spec["name"], verifies=spec["verifies"], exercises=spec["exercises"],
+            tenant=spec["tenant"], seed=spec["seed"], steps=spec["steps"],
+        )
+    except (ValueError, KeyError) as exc:
+        return _err(f"could not assemble the journey: {exc}")
+
+    out_path = Path(args.out).resolve() if args.out else jpath.with_suffix(".scenarios.jsonld")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(bundle, indent=2, sort_keys=True), encoding="utf-8")
+
+    emitted = {"scenario": 0, "workflow": 0, "step": 0}
+    if args.emit:
+        repo_root = _resolve_repo_root(args.repo_root)
+        base_dir = Path(args.base_dir).resolve() if args.base_dir else repo_root / ".brain" / "instances"
+        foundation = LocalFileEntityAdapter(base_dir=base_dir, domain="foundation")
+        product = LocalFileEntityAdapter(base_dir=base_dir, domain="product-development")
+        try:
+            for step in bundle["steps"]:
+                foundation.save("step", step); emitted["step"] += 1
+            for wf in bundle["workflows"]:
+                foundation.save("workflow", wf); emitted["workflow"] += 1
+            for sc in bundle["scenarios"]:
+                product.save("scenario", sc); emitted["scenario"] += 1
+        except EntityValidationError as exc:
+            return _err(f"assembled entity failed validation on emit: {exc}")
+
+    print(json.dumps({
+        "ok": True,
+        "data": {
+            "scenario_id": bundle["scenarios"][0]["id"],
+            "workflow_id": bundle["workflows"][0]["id"],
+            "step_count": len(bundle["steps"]),
+            "out": str(out_path),
+            "emitted": emitted if args.emit else None,
+        },
+    }, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

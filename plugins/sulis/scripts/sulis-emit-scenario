@@ -1,0 +1,24 @@
+#!/usr/bin/env python3
+"""sulis-emit-scenario — ingest authored scenarios.jsonld into the brain.
+
+Thin shim over the shared ingest CLI (`_emit_ingest_cli`). Link 4 (final) of
+the Scenario-graph chain — Scenario is a PRODUCT-DEVELOPMENT entity, so the
+domain defaults to `product-development` (not foundation). Real instances come
+from the `/sulis:specify` intake; this validates + persists them.
+
+Usage: sulis-emit-scenario --from-instances <path> [--base-dir D] [--domain D] [--repo-root D]
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+from _emit_ingest_cli import run_ingest_cli  # noqa: E402
+
+if __name__ == "__main__":
+    sys.exit(run_ingest_cli(entity_type="scenario", domain="product-development", list_key="scenarios"))

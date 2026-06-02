@@ -1,0 +1,12 @@
+change_id: FRSX20G0R97R39YTB622ZC6N0M
+primitive: create
+tier: minor
+touches_plugin: true
+summary: |
+  Scenario authoring + emit chain (testable-state). Ingest emitters for
+  Tool/Step/Workflow (foundation) + Scenario (product-development) on a shared
+  primitive; sulis-author-scenario turns a plain-English verification journey
+  into the IDEF0 Scenario+Workflow+Step graph and emits it; /sulis:specify deep
+  mode wires the founder-facing intake (draft from acceptance criteria → refine
+  → author + emit). Founder never sees IDEF0.
+created_at: 2026-06-02T18:21:22Z
