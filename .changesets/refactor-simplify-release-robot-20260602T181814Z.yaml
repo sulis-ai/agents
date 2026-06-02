@@ -1,7 +1,0 @@
-change_id: 01KT4KFTWS6HNRF7BTY4K1QQXW
-primitive: refactor
-tier: patch
-touches_plugin: true
-summary: |
-  Re-model the release-train Workflow to trunk-based (15→10 Steps): drop the dev→main promotion steps and orphaned PR-merge failure-guards; releases are now a bump+tag on main.
-created_at: 2026-06-02T18:18:14Z

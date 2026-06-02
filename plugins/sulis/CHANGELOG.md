@@ -1,3 +1,20 @@
+## v0.90.0 — 2026-06-02
+
+**Minor — release-train batch.**
+
+- Scenario authoring + emit chain (testable-state). Ingest emitters for
+  Tool/Step/Workflow (foundation) + Scenario (product-development) on a shared
+  primitive; sulis-author-scenario turns a plain-English verification journey
+  into the IDEF0 Scenario+Workflow+Step graph and emits it; /sulis:specify deep
+  mode wires the founder-facing intake (draft from acceptance criteria → refine
+  → author + emit). Founder never sees IDEF0.
+  Loop closed: sulis-verify-acceptance --scenario loads a Scenario + its
+  journey from the brain graph (no hand-built bundle) and runs it; the
+  change-ship acceptance gate runs the change's emitted scenarios from-graph.
+  Design placeholder resolved: the design stage re-points scenarios'
+  exercises to the real emitted Design (sulis-resolve-scenario-design).
+- Re-model the release-train Workflow to trunk-based (15→10 Steps): drop the dev→main promotion steps and orphaned PR-merge failure-guards; releases are now a bump+tag on main.
+
 ## v0.89.0 — 2026-06-02
 
 - **Testable-state Definition of Done** — `Scenario` verification entity + the

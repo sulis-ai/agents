@@ -4,7 +4,7 @@
     "name": "Iain"
   },
   "metadata": {
-    "version": "1.134.0",
+    "version": "1.135.0",
     "description": "Sulis AI helps non-technical founders build viable software end-to-end, with autonomous engineering handling the specification, design, build, review, and ship. See plugins/sulis/CHANGELOG.md for release detail."
   },
   "plugins": [
@@ -12,13 +12,13 @@
       "name": "investor-coach",
       "source": "./plugins/investor-coach",
       "version": "0.6.0",
-      "description": "Investor Deck Coach \u2014 facilitates Sequoia-style pitch deck creation through guided conversation, stage-aware (angel through Series B), with rigorous market research, financial modelling, adversarial investor-objection review, branded deck deliverables (PowerPoint + Reveal.js HTML), and rehearsal drill."
+      "description": "Investor Deck Coach — facilitates Sequoia-style pitch deck creation through guided conversation, stage-aware (angel through Series B), with rigorous market research, financial modelling, adversarial investor-objection review, branded deck deliverables (PowerPoint + Reveal.js HTML), and rehearsal drill."
     },
     {
       "name": "sulis",
       "source": "./plugins/sulis",
-      "version": "0.89.0",
-      "description": "Your AI engineering team in a plugin. Talk through what you want to build, and Sulis takes it end-to-end \u2014 gathering requirements, designing the architecture, writing and reviewing the code, and shipping it. Start with `claude --agent sulis`."
+      "version": "0.90.0",
+      "description": "Your AI engineering team in a plugin. Talk through what you want to build, and Sulis takes it end-to-end — gathering requirements, designing the architecture, writing and reviewing the code, and shipping it. Start with `claude --agent sulis`."
     }
   ]
 }
