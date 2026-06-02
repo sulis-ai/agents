@@ -1,5 +1,17 @@
-"""Regression: `release-on-merge.yml` carries `# canonical:step:<name>`
-annotations binding each implementing block to a canonical Step per ADR-002.
+"""Regression: the reusable `release-on-merge.yml` carries
+`# canonical:step:<name>` annotations binding each implementing block to a
+canonical Step per ADR-002.
+
+Subject relocation (WP-005, SUBSTITUTE-Replace): the canonical-step
+annotations and the loop-guard `if:` originally lived in the marketplace's
+`.github/workflows/release-on-merge.yml`. WP-002 moved that 280-line body
+into the plugin-distributed reusable workflow at
+`plugins/sulis/templates/workflows/release-on-merge.yml`; WP-003 extended
+it; WP-005 then replaced the marketplace file with a thin shim that calls
+the reusable workflow. The annotations + loop-guard now live in the
+reusable workflow, so these invariants are asserted there. (The shim
+itself carries no step bodies and no inline guard — the guard fires through
+the workflow_call indirection from the reusable workflow's job-level `if:`.)
 
 Symmetric to the broader drift detector (WP-007); these are the executor's
 local invariants — fast feedback at PR time, parsed against
@@ -36,18 +48,28 @@ import pytest
 import yaml
 
 
+_REUSABLE_REL = Path("plugins/sulis/templates/workflows/release-on-merge.yml")
+
+
 def _repo_root() -> Path:
-    """Find the marketplace repo root from the test file's location."""
+    """Find the marketplace repo root from the test file's location.
+
+    The anchor is the reusable workflow (the post-WP-005 home of the
+    canonical-step annotations + loop-guard), not the marketplace shim.
+    """
     here = Path(__file__).resolve()
     for ancestor in here.parents:
-        if (ancestor / ".github" / "workflows" / "release-on-merge.yml").is_file():
+        if (ancestor / _REUSABLE_REL).is_file():
             return ancestor
-    pytest.skip("release-on-merge.yml not found (not running in marketplace repo)")
+    pytest.skip(
+        "reusable release-on-merge.yml not found (not running in marketplace repo)"
+    )
     raise AssertionError("unreachable")  # for type checker
 
 
 def _release_on_merge_yaml() -> Path:
-    return _repo_root() / ".github" / "workflows" / "release-on-merge.yml"
+    """The reusable workflow — annotations + loop-guard live here post-WP-005."""
+    return _repo_root() / _REUSABLE_REL
 
 
 def _steps_jsonld() -> Path:
@@ -112,8 +134,11 @@ class TestReleaseOnMergeYamlParses:
         with _release_on_merge_yaml().open() as f:
             data = yaml.safe_load(f)
         assert isinstance(data, dict), "release-on-merge.yml: not a dict at root"
-        assert data.get("name") == "release-on-merge"
-        # `on:` parses as the keyword True in PyYAML (YAML 1.1 boolean alias).
+        # The reusable variant carries " (reusable)" in its name (WP-002).
+        assert str(data.get("name", "")).startswith("release-on-merge")
+        # The reusable workflow's trigger is `workflow_call:` (WP-002), which
+        # PyYAML keys under "on" (not the boolean True alias that the bare
+        # `on:`-with-mapping form produces for the marketplace shim).
         assert "on" in data or True in data
         assert "jobs" in data
 
