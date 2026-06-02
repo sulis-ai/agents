@@ -1,0 +1,347 @@
+diff --git a/plugins/sulis/scripts/tests/unit/test_branch_ci_has_drift_check.py b/plugins/sulis/scripts/tests/unit/test_branch_ci_has_drift_check.py
+index 26f8e08..16bb743 100644
+--- a/plugins/sulis/scripts/tests/unit/test_branch_ci_has_drift_check.py
++++ b/plugins/sulis/scripts/tests/unit/test_branch_ci_has_drift_check.py
+@@ -1,4 +1,4 @@
+-"""Structural assertion: branch-ci.yml wires the canonical drift-detector (WP-008).
++"""Structural assertion: branch-ci.yml wires the canonical drift-detector.
+ 
+ Per FR-015 + ADR-001/002 the drift detector (`check-canonical-drift.py`,
+ built in WP-007) is wired into `.github/workflows/branch-ci.yml` as a
+@@ -10,21 +10,18 @@ job). The new job must:
+   * invoke `check-canonical-drift.py` with the contracted
+     `--instance-dir plugins/sulis/instances/release-train` and
+     `--yaml-path .github/workflows/release-on-merge.yml` arguments;
+-  * run in **advisory mode** for v1 (`continue-on-error: true`) — the
+-    wave-5b dogfood found 11 pre-existing reconciliation items
+-    (6 `missing_in_yaml` + 5 `missing_failuremode_handling`) that are
+-    mostly by-design absences (Steps 1-8 live in skill prose per
+-    MUC-007). Advisory mode surfaces drift in the run logs without
+-    blocking PR merges. Future-toggle to blocking is a one-line YAML
+-    change in a follow-on change once the 11 items are reconciled.
++  * run in **blocking mode** (tighten-drift-gate, WP-001): NO
++    `continue-on-error: true` on the job AND no `|| echo` /
++    `|| true` wrapper hiding the script's exit code. The detector
++    is now expected to exit 0 cleanly; the 11 pre-existing
++    reconciliation items the wave-5b dogfood surfaced have been
++    encoded (6 via `excluded_from_yaml` envelope signal +
++    1 genuine annotation added).
+ 
+ CI YAML is not unit-testable the way Python is, so this is a
+-structural assertion over the workflow text (read as YAML). PyYAML is
+-listed in `plugins/sulis/scripts/pyproject.toml` so we can parse the
+-file directly rather than relying on a brittle line-scan.
+-
+-This test FAILS RED against the pre-edit tree (the job does not yet
+-exist) and PASSES once the job is added to branch-ci.yml.
++structural assertion over the workflow text (read as YAML + as
++raw text for the wrapper check). PyYAML is listed in
++`plugins/sulis/scripts/pyproject.toml`.
+ 
+ Stdlib + pyyaml + pytest, Python 3.11-safe.
+ """
+@@ -93,25 +90,56 @@ def test_drift_check_job_runs_on_ubuntu():
+     )
+ 
+ 
+-def test_drift_check_job_is_advisory_for_v1():
+-    """The job sets `continue-on-error: true` (advisory mode for v1).
++def test_drift_check_job_is_blocking():
++    """The job MUST NOT set `continue-on-error: true`.
++
++    tighten-drift-gate (WP-001) flips the gate from advisory to blocking.
++    The 11 pre-existing reconciliation items the wave-5b dogfood surfaced
++    are now encoded: 6 are honoured via the `excluded_from_yaml` envelope
++    signal on steps.jsonld; the 1 genuine annotation gap was filled in
++    release-on-merge.yml. With those resolved, the detector exits 0 on
++    the live tree and the gate becomes a real blocking check.
++
++    This assertion is deliberately load-bearing: a silent
++    re-introduction of advisory mode would let drift accumulate again
++    invisibly. Failure of this test is the early signal.
++    """
++    doc = _load_workflow()
++    job = doc.get("jobs", {}).get(_JOB_KEY)
++    assert job is not None, f"job '{_JOB_KEY}' missing"
++    coe = job.get("continue-on-error")
++    assert coe is not True, (
++        f"job '{_JOB_KEY}' must NOT set continue-on-error: true "
++        f"(tighten-drift-gate flipped the check to blocking); got {coe!r}"
++    )
++
+ 
+-    The wave-5b dogfood found 11 pre-existing reconciliation items that
+-    the canonical now makes visible. Advisory mode surfaces drift in
+-    the run logs without blocking PR merges; flipping to blocking is a
+-    one-line YAML change once those items are reconciled in a follow-on.
++def test_drift_check_job_does_not_wrap_script_with_warning_shim():
++    """The script's run: command must not be wrapped with `|| echo ...`
++    or `|| true` — both would mask the script's exit-1-on-drift contract.
+ 
+-    This assertion is deliberately load-bearing: removing the toggle
+-    silently (i.e. flipping to blocking without removing the 11 items
+-    first) would block every PR build, which is the failure this WP
+-    explicitly defends against.
++    The advisory wrapper added in WP-008
++    (`|| echo "::warning::Canonical-vs-implementation drift detected..."`)
++    is removed in tighten-drift-gate. The bare script exit code is what
++    GitHub Actions reads to mark the step (and the job, and branch-ci
++    as a whole) failed.
+     """
+     doc = _load_workflow()
+     job = doc.get("jobs", {}).get(_JOB_KEY)
+     assert job is not None, f"job '{_JOB_KEY}' missing"
+-    assert job.get("continue-on-error") is True, (
+-        f"job '{_JOB_KEY}' must set continue-on-error: true for v1 "
+-        f"(advisory mode); got {job.get('continue-on-error')!r}"
++    steps = job.get("steps", [])
++    run_text = "\n".join(
++        step.get("run", "") for step in steps if isinstance(step, dict)
++    )
++    # The two forbidden shell-level shims that would mask exit-1.
++    assert "|| echo" not in run_text, (
++        f"job '{_JOB_KEY}' run: command contains '|| echo' wrapper "
++        "(masks the script's exit-1-on-drift contract); remove it to "
++        "complete the flip to blocking mode"
++    )
++    assert "|| true" not in run_text, (
++        f"job '{_JOB_KEY}' run: command contains '|| true' "
++        "(also masks exit-1); remove it"
+     )
+ 
+ 
+diff --git a/plugins/sulis/scripts/tests/unit/test_check_canonical_drift.py b/plugins/sulis/scripts/tests/unit/test_check_canonical_drift.py
+index 7dfeca0..ed007ce 100644
+--- a/plugins/sulis/scripts/tests/unit/test_check_canonical_drift.py
++++ b/plugins/sulis/scripts/tests/unit/test_check_canonical_drift.py
+@@ -563,6 +563,150 @@ def test_cli_with_projects_and_marketplace(tmp_path):
+     assert "project_not_in_marketplace" in kinds
+ 
+ 
++# ─── By-design absences (excluded_from_yaml signal) ──────────────────────
++
++
++def test_drift_matcher_skips_excluded_step_from_missing_in_yaml():
++    """A Step in excluded_from_yaml MUST NOT be reported as missing_in_yaml,
++    even when no `# canonical:step:<name>` annotation is present.
++
++    This is the load-bearing signal added by tighten-drift-gate that lets
++    the drift detector run in blocking CI mode without false positives —
++    Steps that live in skill prose or in GitHub-native flows (the
++    founder's PR-merge action, the downstream release-prod tag fire) are
++    expected absences, not drift.
++    """
++    steps = [
++        {
++            "name": "step-prose",
++            "tool_ref": "dna:tool:01KT00000000000000000APXTZ",
++            "handles_failures": [],
++        },
++        {
++            "name": "step-yaml",
++            "tool_ref": "dna:tool:01KT00000000000000000APXTZ",
++            "handles_failures": [],
++        },
++    ]
++    failuremodes: list[dict] = []
++    annotations: list = []  # NEITHER step is annotated in YAML
++    matcher = StrictDriftMatcher()
++    report = matcher.match(
++        steps, failuremodes, annotations, excluded_from_yaml=["step-prose"]
++    )
++    # step-prose is excluded; step-yaml is the only genuine drift.
++    assert report.missing_in_yaml == ["step-yaml"]
++    assert "step-prose" not in report.missing_in_yaml
++
++
++def test_drift_matcher_skips_failuremode_handling_for_excluded_step():
++    """A FailureMode listed in handles_failures of an excluded Step MUST
++    NOT be reported as missing_failuremode_handling.
++
++    Rationale: if the parent Step is itself by-design absent from YAML,
++    its FailureMode-handling annotations are also expected absences.
++    Otherwise the founder hits a Cataract of false positives whenever a
++    skill-prose Step lists a handles_failures (which several of them do).
++    """
++    fm = {
++        "id": "dna:failuremode:01KT00000000000000000FMXXX",
++        "name": "fm-fixture-prose",
++    }
++    steps = [
++        {
++            "name": "step-prose-with-failure",
++            "tool_ref": "dna:tool:01KT00000000000000000APXTZ",
++            "handles_failures": [fm["id"]],
++        }
++    ]
++    annotations: list = []  # Step absent + FailureMode unannotated
++    matcher = StrictDriftMatcher()
++    report = matcher.match(
++        steps, [fm], annotations, excluded_from_yaml=["step-prose-with-failure"]
++    )
++    assert report.missing_in_yaml == []
++    assert report.missing_failuremode_handling == []
++    assert report.all_passed is True
++
++
++def test_drift_matcher_still_flags_non_excluded_step_when_absent():
++    """Negative test: a Step NOT in excluded_from_yaml is still flagged
++    when missing from the YAML annotations. The drift detector's primary
++    function is preserved — by-design-absences are the exception, not
++    the rule.
++    """
++    steps = [
++        {
++            "name": "step-genuine-drift",
++            "tool_ref": "dna:tool:01KT00000000000000000APXTZ",
++            "handles_failures": [],
++        }
++    ]
++    annotations: list = []
++    matcher = StrictDriftMatcher()
++    report = matcher.match(steps, [], annotations, excluded_from_yaml=[])
++    assert report.missing_in_yaml == ["step-genuine-drift"]
++    assert report.all_passed is False
++
++
++def test_drift_matcher_match_excluded_default_is_empty_list():
++    """Backwards-compat: omitting excluded_from_yaml entirely behaves as
++    if it were the empty list (every Step is expected in YAML).
++
++    Existing callers (and the four fixture-based tests above) must
++    continue to work without modification.
++    """
++    steps = [{"name": "step-x", "handles_failures": []}]
++    annotations: list = []
++    matcher = StrictDriftMatcher()
++    report = matcher.match(steps, [], annotations)  # no excluded_from_yaml kwarg
++    assert report.missing_in_yaml == ["step-x"]
++
++
++def test_cli_respects_excluded_from_yaml_in_envelope(tmp_path):
++    """CLI integration: when the canonical steps.jsonld envelope declares
++    `excluded_from_yaml: [<name>]`, the live `check-canonical-drift.py`
++    invocation MUST NOT flag that name as missing_in_yaml.
++
++    Wires the envelope-level signal end-to-end: reader → matcher → CLI.
++    """
++    import shutil
++
++    # Start from the pass fixture and inject a Step that's NOT in YAML.
++    # Then mark it excluded — the CLI should still report clean.
++    fixture_src = _FIXTURES / "fixture_pass"
++    fixture_dst = tmp_path / "fx"
++    shutil.copytree(fixture_src, fixture_dst)
++
++    steps_doc = json.loads((fixture_dst / "steps.jsonld").read_text())
++    steps_doc["steps"].append(
++        {
++            "id": "dna:step:01KT00000000000000000SXPRS",
++            "sys_status": "active",
++            "name": "step-skill-prose",
++            "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++            "input_artifacts": ["x"],
++            "output_artifacts": ["y"],
++            "mechanism": "deterministic",
++            "state": "active",
++            "valid_from": "2026-06-01T00:00:00Z",
++        }
++    )
++    steps_doc["excluded_from_yaml"] = ["step-skill-prose"]
++    (fixture_dst / "steps.jsonld").write_text(json.dumps(steps_doc))
++
++    result = _run_cli(
++        "--instance-dir",
++        str(fixture_dst),
++        "--yaml-path",
++        str(fixture_dst / "release-on-merge.yml"),
++    )
++    assert result.returncode == 0, result.stdout + result.stderr
++    parsed = json.loads(result.stdout)
++    assert parsed["ok"] is True, parsed
++    assert parsed["data"]["drift"] == []
++
++
+ def test_canonical_drift_package_has_no_module_level_state():
+     """No global mutable state at import time. Re-importing must be idempotent."""
+     import _canonical_drift.matcher as m1
+diff --git a/plugins/sulis/scripts/tests/unit/test_steps_instance_valid.py b/plugins/sulis/scripts/tests/unit/test_steps_instance_valid.py
+index 97a54bb..0f4ff3f 100644
+--- a/plugins/sulis/scripts/tests/unit/test_steps_instance_valid.py
++++ b/plugins/sulis/scripts/tests/unit/test_steps_instance_valid.py
+@@ -23,6 +23,10 @@ Validates that `plugins/sulis/instances/release-train/steps.jsonld`:
+    `mechanism_detail` token-budget payload per NFR-010.
+ 10. Step 8 (`gate-founder-confirmation`) has `mechanism: human`
+     (the load-bearing founder gate; MUC-007).
++11. The envelope carries `excluded_from_yaml` naming the 6 Steps
++    that by design have no annotation in `release-on-merge.yml`
++    (WP-001 of tighten-drift-gate: drives the drift detector's
++    by-design-absence filter so blocking mode is achievable).
+ 
+ These tests are deliberately deterministic + offline - no network,
+ no LLM, no subprocess. Schemas come from the vendored
+@@ -91,6 +95,21 @@ _EXPECTED_STEP_NAMES = [
+ ]
+ _EXPECTED_STEP_COUNT = len(_EXPECTED_STEP_NAMES)  # 15
+ 
++# The 6 by-design absences from release-on-merge.yml. Five live in the
++# /sulis:release-train skill prose (MUC-007 boundary), one (squash-merge)
++# happens in the GitHub PR-merge UI. Encoded at envelope level because
++# the per-Step brain schema sets unevaluatedProperties:false and rejects
++# arbitrary new fields on Step objects; the envelope carries no such
++# constraint.
++_EXPECTED_EXCLUDED_FROM_YAML = {
++    "gate-founder-confirmation",  # mechanism=human (MUC-007 founder gate)
++    "open-release-pr",  # skill prose, before release-on-merge fires
++    "wait-for-checks-and-mergeability",  # skill prose; merge itself is proof
++    "publish-github-release",  # release-prod.yml fires on the v* tag, not here
++    "squash-merge",  # founder action in the GitHub UI
++    "preflight-cross-branch-drift",  # skill prose pre-PR-open
++}
++
+ # Kebab-case pattern: lowercase, hyphen-separated, no leading digit.
+ _KEBAB_RE = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)+$")
+ 
+@@ -354,3 +373,42 @@ def test_io_artifact_names_consistent(steps: list[dict]) -> None:
+         f"Output artifact name collisions (artifact, first-step, second-step): "
+         f"{collisions}"
+     )
++
++
++# ----- Test #11 - envelope.excluded_from_yaml names the 6 by-design absences -----
++
++
++def test_envelope_excluded_from_yaml_names_six_by_design_absences(
++    instance: dict, steps: list[dict]
++) -> None:
++    """The steps.jsonld envelope carries `excluded_from_yaml`, a list of
++    Step names that the drift detector must NOT flag as missing_in_yaml.
++
++    These are Steps deliberately absent from release-on-merge.yml because
++    they live elsewhere — skill prose (MUC-007), the GitHub UI, or the
++    downstream release-prod.yml workflow. The list is the load-bearing
++    signal that lets the drift detector run in blocking mode without
++    false positives.
++
++    Each name in the list MUST resolve to a real Step in the steps array
++    (no dangling names; the list cannot drift out of sync with the Steps
++    it labels).
++    """
++    excluded = instance.get("excluded_from_yaml")
++    assert excluded is not None, (
++        "steps.jsonld envelope must declare 'excluded_from_yaml' — "
++        "the by-design-absence list the drift detector consumes"
++    )
++    assert isinstance(excluded, list), (
++        f"excluded_from_yaml must be a list; got {type(excluded).__name__}"
++    )
++    assert set(excluded) == _EXPECTED_EXCLUDED_FROM_YAML, (
++        f"excluded_from_yaml mismatch — got {sorted(excluded)}, "
++        f"expected {sorted(_EXPECTED_EXCLUDED_FROM_YAML)}"
++    )
++    # Every name resolves to an actual Step (no dangling pointers).
++    step_names = {s["name"] for s in steps}
++    dangling = [name for name in excluded if name not in step_names]
++    assert not dangling, (
++        f"excluded_from_yaml contains names not present in steps[]: {dangling}"
++    )

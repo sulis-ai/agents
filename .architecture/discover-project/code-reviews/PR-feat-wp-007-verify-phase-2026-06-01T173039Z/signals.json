@@ -1,0 +1,69 @@
+{
+  "target": "feat/wp-007-verify-phase",
+  "project": "discover-project",
+  "base": "origin/change/create-discover-project",
+  "head": "HEAD (staged)",
+  "timestamp": "2026-06-01T173039Z",
+  "diff_size": {
+    "lines_added": 487,
+    "lines_removed": 0,
+    "files_changed": 3
+  },
+  "ph_signals": {
+    "PH-01_scope": {
+      "commit_type_spread": ["feat"],
+      "module_fan_out": 1,
+      "top_dirs": ["plugins/sulis/scripts/_discovery", "plugins/sulis/scripts/tests/unit"],
+      "severity": "clean"
+    },
+    "PH-02_size": {
+      "lines_added": 487,
+      "lines_removed": 0,
+      "total": 487,
+      "files_changed": 3,
+      "severity": "medium",
+      "note": "501-1000 line band threshold not crossed; below CR-02 carve-out only on file count; lines exceed 200 → parallel-dispatch contemplated, single-reader justified for new-module no-neighbour diff"
+    },
+    "PH-03_safety": {
+      "migrations": 0,
+      "schemas": 0,
+      "infra_files": 0,
+      "secret_pattern_hits": 0,
+      "severity": "clean"
+    },
+    "PH-04_completeness": {
+      "new_source": 2,
+      "new_tests": 1,
+      "coverage_pct_new_files": 100.0,
+      "severity": "clean"
+    }
+  },
+  "cr_attestation": {
+    "CR-01_mechanical_baseline": "ran (ruff check, ruff format --check, py_compile, pytest+coverage)",
+    "CR-02_dispatch": "single-reader justified: 3 files, no neighbours (new package), focused scope",
+    "CR-03_full_file_reads": "complete (verifier.py 239 lines + test file 248 lines, both read end-to-end)",
+    "CR-04_evidence": "every finding cites file:line + quoted text",
+    "CR-05_severity_rubric": "applied: 0 critical, 0 high, 0 medium, 1 low (subprocess.run timeout — watch-list)",
+    "CR-06_verdict": "PASS (no auto-downgrade triggers fired)",
+    "CR-07_lens_completion": "architecture: nothing surfaced; security: nothing surfaced; quality: nothing surfaced",
+    "CR-08_self_attestation": "complete (this signals.json + REVIEW.md Methodology section)",
+    "CR-09_pr_hygiene": "PH-01 clean; PH-02 medium (size); PH-03 clean; PH-04 clean; no auto-downgrade trigger"
+  },
+  "lens_findings": {
+    "architecture": [],
+    "security": [],
+    "quality": []
+  },
+  "watch_list": [
+    {
+      "id": "WL-001",
+      "file": "plugins/sulis/scripts/_discovery/verifier.py",
+      "line": 145,
+      "observation": "subprocess.run has no explicit timeout=. Drift detector is local Python (<500ms per TDD §Performance); a wedged detector would hang the Verify phase indefinitely. Out-of-scope for WP-007 (no NFR specifies verify-time budget). Consider a defensive timeout in a future hardening pass.",
+      "severity": "low",
+      "delta": null
+    }
+  ],
+  "verdict": "PASS",
+  "draft_deltas_count": 0
+}

@@ -2046,6 +2046,84 @@ WPs only). Decision deferred until empirical evidence.
 
 ---
 
+## Slice-end deferred-needs scan (verification-by-design extension)
+
+The slice-end review (the founder-facing batched-disposition step the
+concierge runs at end-of-slice) carries a deferred-needs scan in
+addition to the security-finding auto-draft pattern above. The scan
+exists to close the design-side → infrastructure-side feedback loop:
+when a design defers verification because the supporting infrastructure
+does not yet exist, the deferred need MUST be visible at slice-end so
+the founder can decide whether to draft the follow-on now, defer
+further, or batch it into the next slice.
+
+**Scan inputs** (read at slice-end across every change in the slice):
+
+1. Each WP frontmatter's `verification:` field — when the field is in
+   Shape 2 (deferred), the `deferred-to-follow-on:` value is the
+   canonical need identifier per **FR-011**. This is the machine-
+   readable seam `/sulis:plan-work` sets per **ADR-003** (per-project
+   ADR; e.g. `.architecture/{project}/adrs/ADR-003-per-wp-frontmatter-shape.md`).
+2. Each SRD's "Infrastructure needs surfaced (deferred)" subsection —
+   the human-readable counterpart authored by the requirements
+   analyst.
+3. The behavioural test ledger at
+   `.specifications/{change}/verification-ledger.md` (**FR-015**) —
+   the cross-check input. Orphan rows (a claimed test artifact with
+   neither an actual artifact nor a `deferred-to-follow-on:`
+   identifier) are surfaced as ledger defects, separate from
+   deferred-needs.
+
+**Scan procedure** (per **ADR-005** — per-project ADR; e.g.
+`.architecture/{project}/adrs/ADR-005-auto-draft-trigger-slice-end.md`):
+
+1. **Tally** every deferred entry by canonical need identifier across
+   the slice. `recording-mock-sendgrid` flagged once by Change A
+   counts as 1; flagged again by Change B counts as 2.
+2. **For each identifier flagged by 2+ designs (the threshold per
+   **FR-012**) — auto-draft a follow-on change** at
+   `.specifications/{identifier}/HANDOFF_TO_SEA.md` (skeleton). The
+   auto-draft is **idempotent**: if a follow-on with the same canonical
+   need identifier already exists in `draft`, `designed`,
+   `decomposed`, or `in-progress` state, the scan skips it. The
+   threshold defaults to 2 ("at least two designs flagged it") because
+   that's the simplest signal distinguishing a real recurring need
+   from a singleton; reconfigurability is deferred per ADR-005.
+3. **For singletons (flagged by exactly one design) — surface to the
+   founder** as a one-line defer-or-draft prompt:
+
+   > *Change A's verification plan flagged 'recording-mock-sendgrid'
+   > as a needed piece of infrastructure. So far only this one design
+   > has flagged it. Defer further (wait to see if another design
+   > flags it next slice) or draft as a follow-on now?*
+
+   Founder responds per-need. *Defer further* re-enters next slice's
+   scan input. *Draft now* triggers the same auto-draft path as the
+   2+ case.
+4. **Cross-check the behavioural test ledger.** For each row in the
+   ledger that claims a test artifact: confirm either the artifact
+   resolves (file path exists; pytest nodeid runs) OR a matching
+   `deferred-to-follow-on:` entry exists. Orphan rows (neither
+   resolves nor deferred) are surfaced as ledger defects for founder
+   disposition — they are NOT auto-drafted (an orphan implies a
+   methodology drift, not a missing piece of infrastructure).
+
+**Why slice-end, not real-time** (per ADR-005): firing the auto-draft
+the moment a 2nd flag arrives would interrupt the current design
+conversation and require the agent adding the deferred entry to know
+the global tally across the slice — a wider read surface than the
+agent has. Batched at slice-end means the founder consumes auto-drafts
+as one decision-batch, idempotently.
+
+**Why this is co-located with the security-finding auto-draft pattern
+above:** both extensions surface follow-on opportunities to the founder
+for disposition at slice-end. One mechanism (slice-end review), two
+input streams (security findings + deferred needs). The auto-draft
+file conventions (skeleton + `disposition: pending-review` +
+founder-owned approval) are shared.
+
+---
+
 ## Step 12 — Mark done + worktree cleanup (calling session, not executor)
 
 **Important architectural change (v0.8.3+):** Step 12 is no longer

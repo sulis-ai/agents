@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/discover-project/tool/git-remote-read/input/1.0.0",
+  "title": "git-remote-read — input",
+  "description": "Input to the git-remote-read Tool — invoked by the read-repo-root Step of the discover-project Workflow. Describes only the load-bearing field per the Blue invariant (no over-specification).",
+  "type": "object",
+  "required": ["cwd"],
+  "additionalProperties": false,
+  "properties": {
+    "cwd": {
+      "type": "string",
+      "description": "Absolute path to the directory to probe — typically the consumer's repository root or the --path sub-scope.",
+      "minLength": 1
+    }
+  }
+}

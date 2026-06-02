@@ -1,0 +1,131 @@
+{
+  "review_id": "PR-feat-wp-003-author-triggers-instance-2026-06-01T101813Z",
+  "target": "feat/wp-003-author-triggers-instance",
+  "base": "change/create-release-train-as-entities",
+  "verdict": "PASS",
+  "auto_downgrade_triggers": [],
+  "diff_metrics": {
+    "files_changed": 4,
+    "lines_added": 291,
+    "lines_removed": 0,
+    "lines_net": 291,
+    "source_files_excluding_journal": 3,
+    "source_lines_excluding_journal": 234
+  },
+  "pr_hygiene": {
+    "PH-01_scope": {
+      "severity": "note",
+      "signals": {
+        "commit_type_spread": ["feat"],
+        "module_fan_out": 2,
+        "top_dirs": [".architecture", "plugins"]
+      }
+    },
+    "PH-02_size": {
+      "severity": "note",
+      "lines_added": 291,
+      "files_changed": 4,
+      "band": "small"
+    },
+    "PH-03_safety": {
+      "severity": "note",
+      "migration_count": 0,
+      "schema_idl_count": 1,
+      "schema_idl_files": ["plugins/sulis/brain/compiled/foundation/trigger.schema.json"],
+      "schema_idl_note": "vendored verbatim from upstream brain output; no schema authorship",
+      "infra_files": 0,
+      "lock_files": 0,
+      "secret_pattern_hits": 0
+    },
+    "PH-04_completeness": {
+      "severity": "note",
+      "new_source_without_test": 0,
+      "api_change_without_schema": false,
+      "test_file_count": 1,
+      "test_count": 3
+    }
+  },
+  "build_verification": {
+    "errors": [],
+    "checks_run": ["python -m py_compile", "json.load", "pytest unit suite (1187/1187 + 3/3 new)"],
+    "coverage_gaps": [
+      {
+        "type": "no-project-lint-config",
+        "note": "Repo has no ruff/mypy/black config; mechanical lint surrogate used: py_compile + json.load + pytest"
+      }
+    ]
+  },
+  "lenses": {
+    "architecture": {
+      "findings": [],
+      "checks_run": [
+        "domain-layer imports",
+        "module-level singletons",
+        "circular imports",
+        "cross-module reach-throughs",
+        "new external I/O without resilience",
+        "credentials in diff",
+        "observability for new handlers",
+        "PII/token leakage",
+        "ports without contract tests",
+        "adapter-mock-vs-real test discipline"
+      ],
+      "verdict": "nothing surfaced"
+    },
+    "security": {
+      "findings": [],
+      "primitives_checked": ["SEC-01", "SEC-02", "SEC-03", "SEC-04", "SEC-05", "SEC-06", "SEC-07", "SC-01", "INF-04", "DAT-03"],
+      "scanners_run": [],
+      "scanners_unavailable": ["gitleaks", "semgrep", "trivy"],
+      "scanner_skip_reason": "diff is data + a test; no executable surface with security-sensitive primitives; manual primitive checklist applied",
+      "verdict": "nothing surfaced"
+    },
+    "quality": {
+      "findings": [
+        {
+          "id": "F-01",
+          "severity": "low",
+          "category": "dead-surface",
+          "file": "plugins/sulis/scripts/tests/unit/test_triggers_instance_valid.py",
+          "line_range_initial": "25",
+          "evidence": "import pytest # unused at the symbol level in original draft",
+          "recommendation": "Either remove the import or introduce a pytest.* usage",
+          "status": "addressed-inline",
+          "fix_applied": "Replaced ad-hoc nested-loop assertion-formatting with pytest.fail; pytest import now has a purpose."
+        },
+        {
+          "id": "F-02",
+          "severity": "low",
+          "category": "style",
+          "file": "plugins/sulis/scripts/tests/unit/test_triggers_instance_valid.py",
+          "line_range_initial": "103-110",
+          "evidence": "for trg in [triggers[i]] nested-loop trick used to inline-bind name",
+          "recommendation": "Extract a helper or use a normal for-loop",
+          "status": "addressed-inline",
+          "fix_applied": "Refactored to an explicit for-loop with pytest.fail; reads naturally."
+        }
+      ],
+      "checks_run": [
+        "build-verification follow-up",
+        "JSX/template identifier scan (N/A — no JSX/TSX/Vue/Svelte)",
+        "dead-surface (1 finding F-01, fixed inline)",
+        "contract-drift (0 findings — all 8 required Trigger fields present; enums + ULID patterns conform)",
+        "test-coverage (3 tests for new contract — complete)",
+        "style (1 finding F-02, fixed inline)",
+        "CR-10 performance procedural checks (no anti-pattern matches)"
+      ],
+      "verdict": "addressed (2 low findings fixed inline; 0 outstanding)"
+    }
+  },
+  "code_review_standard_attestation": {
+    "CR-01_mechanical_baseline": "ran",
+    "CR-02_dispatch_shape": "single-reader (subagent constraint: Agent tool unavailable; documented in Methodology)",
+    "CR-03_full_file_reads": "all 3 files >50 lines (or relevant) read end-to-end",
+    "CR-04_evidence_discipline": "every finding cites file:line + evidence",
+    "CR-05_severity_rubric": "applied: 0 critical, 0 high, 0 medium, 2 low",
+    "CR-06_verdict": "PASS (no auto-downgrade triggers fired; 2 low findings addressed inline)",
+    "CR-07_lens_completion": "Architecture + Security + Quality all produced output (incl. explicit nothing-surfaced for arch + sec)",
+    "CR-08_self_attestation": "this entry",
+    "CR-09_pr_hygiene": "applied; all 4 primitives at note severity"
+  }
+}

@@ -41,3 +41,14 @@ dev = [
 # false` mode means it manages the venv + lockfile without ever trying to
 # build a wheel.
 package = false
+
+
+[tool.pytest.ini_options]
+# Custom markers used by the discover-project E2E suite (WP-010).
+# Registering them here suppresses pytest's PytestUnknownMarkWarning
+# and gives CI a stable selector when it wants to skip dogfood runs
+# (e.g., in offline environments without an LLM key):
+#     pytest -m "not dogfood"
+markers = [
+    "dogfood: end-to-end test that exercises the discover-project skill against the marketplace's own repo (the n=2 acceptance per ADR-001). May be skipped in offline CI via `-m 'not dogfood'`.",
+]

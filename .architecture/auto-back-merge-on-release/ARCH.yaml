@@ -1,0 +1,138 @@
+id: auto-back-merge-on-release
+status: designed
+sourced_from: .specifications/auto-back-merge-on-release/SPEC.yaml
+generated_at: 2026-06-02
+tier: M
+primitive: extend
+change_kind: extend
+
+artifacts:
+  sizing: SIZING.md
+  tdd: TDD.md
+  adrs:
+    - adrs/ADR-001-reusable-workflow-version-pinning.md
+    - adrs/ADR-002-raced-pr-auto-merge.md
+    - adrs/ADR-003-drift-check-in-both-skills.md
+    - adrs/ADR-004-git12-rule-placement.md
+    - adrs/ADR-005-pin-write-mechanism.md
+    - adrs/ADR-006-pin-read-mechanism.md
+
+sources:
+  srd: .specifications/auto-back-merge-on-release/SRD.md
+  nfr: .specifications/auto-back-merge-on-release/NFR.md
+  muc: .specifications/auto-back-merge-on-release/MISUSE_CASES.md
+  glossary: .specifications/auto-back-merge-on-release/GLOSSARY.md
+  primitive_tree: .specifications/auto-back-merge-on-release/PRIMITIVE_TREE.jsonld
+  diagrams: .specifications/auto-back-merge-on-release/diagrams/
+  handoff: .specifications/auto-back-merge-on-release/HANDOFF_TO_SEA.md
+
+components:
+  - id: comp-reusable-workflow
+    name: Reusable release-and-back-merge workflow
+    location: plugins/sulis/templates/workflows/release-on-merge.yml
+    primitive: extend
+    notes: |
+      The current ~280-line release-on-merge.yml content moves here, plus the
+      new back-merge step block (FR-002/FR-003) and the post-condition check
+      (FR-011). Declared as `on: workflow_call`.
+
+  - id: comp-marketplace-shim
+    name: Marketplace's own shim
+    location: .github/workflows/release-on-merge.yml
+    primitive: substitute-replace
+    notes: |
+      The marketplace's current 280-line workflow becomes a ~10-line shim that
+      `uses:` the reusable workflow. n=1 dogfood.
+
+  - id: comp-shim-template
+    name: Canonical consumer shim template
+    location: plugins/sulis/templates/shims/release-on-merge.yml
+    primitive: create
+    notes: Distributed via the plugin; consumers copy it once.
+
+  - id: comp-pin-writer
+    name: dev-sha-at-open pin writer in /sulis:release-train
+    location: plugins/sulis/skills/release-train/SKILL.md (Step 5)
+    primitive: extend
+    notes: |
+      Before `gh pr create`, run `git rev-parse origin/dev` and inject
+      `<!-- dev-sha-at-open: <SHA> -->` into the PR body file (ADR-005).
+
+  - id: comp-drift-helper
+    name: Dev-behind-main drift check helper
+    location: plugins/sulis/scripts/drift_check.sh
+    primitive: create
+    notes: |
+      A small shell helper (bash) called from two skills (release-train +
+      change start) and one CI step. ADR-003.
+
+  - id: comp-drift-check-rt
+    name: Drift check call site in /sulis:release-train
+    location: plugins/sulis/skills/release-train/SKILL.md (Step 1)
+    primitive: extend
+    notes: First action after path resolution. FR-009.
+
+  - id: comp-drift-check-cs
+    name: Drift check call site in /sulis:change start
+    location: plugins/sulis/skills/change/SKILL.md (start action preflight)
+    primitive: extend
+    notes: First action before branch creation. FR-010.
+
+  - id: comp-git12-rule
+    name: GIT-12 rule + worked examples
+    location: plugins/sulis/references/git-workflow-standard.md (appended after GIT-11)
+    primitive: extend
+    notes: |
+      Net-new section. Includes the invariant statement, the clean and raced
+      worked examples, and the manual recovery procedure (UC-005).
+
+decisions_summary:
+  - id: ADR-001
+    decision: |
+      Consumer shims pin to a SemVer plugin tag by default
+      (`@sulis-vN.M.K`). `@dev` always-track is documented as opt-in with
+      explicit risk language. Aligns with NFR-008 and MUC-006.
+  - id: ADR-002
+    decision: |
+      Back-merge PRs opened on the raced path enable auto-merge after CI
+      green. The PR is a recovery from a race the robot caused, not new
+      review-worthy work. FR-003.
+  - id: ADR-003
+    decision: |
+      Drift detection fires in BOTH `/sulis:release-train` and
+      `/sulis:change start`. Shared bash helper at
+      `plugins/sulis/scripts/drift_check.sh` (boring code, single source of
+      truth). FR-009 + FR-010.
+  - id: ADR-004
+    decision: |
+      GIT-12 is appended after GIT-11 in
+      `plugins/sulis/references/git-workflow-standard.md`. No doc
+      re-versioning; the standards file's calibration period continues
+      unchanged.
+  - id: ADR-005
+    decision: |
+      The pin is written as an HTML comment at the bottom of the release PR
+      body: `<!-- dev-sha-at-open: <40-char-SHA> -->`. Comments don't render
+      in the GitHub UI but survive `gh pr view --json body` extraction.
+  - id: ADR-006
+    decision: |
+      The workflow reads the pin via
+      `gh api repos/{owner}/{repo}/commits/${GITHUB_SHA}/pulls --jq '.[0].body'`
+      then regex-extracts `dev-sha-at-open: ([a-f0-9]{40})`. Missing or
+      malformed pin → fall through to PR path (safe default).
+
+work_package_signal:
+  estimated_count: 8
+  notes: |
+    See HANDOFF_TO_SEA "WP decomposition signal" — 8 atomic WPs cover the
+    work. WP-001 moves the existing YAML to the new location; WP-002
+    replaces the marketplace's own workflow with a shim; WP-003 adds the
+    back-merge step to the reusable workflow; WP-004/005 wire the pin
+    writer and drift check into release-train + change-start; WP-006
+    appends GIT-12; WP-007 writes the ADR set as artifacts (covered by
+    THIS deliverable); WP-008 adds the test suite.
+    The architecture stage produces the ADRs in `.architecture/.../adrs/`;
+    /sulis:plan-work decides whether to also emit a "ship the ADRs as
+    repo artifacts" WP.
+
+verification_plan_ref: TDD.md#verification-plan

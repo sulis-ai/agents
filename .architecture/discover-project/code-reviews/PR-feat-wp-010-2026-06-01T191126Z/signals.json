@@ -1,0 +1,58 @@
+{
+  "review_id": "PR-feat-wp-010-2026-06-01T191126Z",
+  "target": {
+    "branch": "feat/wp-010-e2e-fixtures-and-dogfood",
+    "base": "change/create-discover-project",
+    "base_sha": "bc607a7a8a99d957b0dbdaa1622b23f15f3bb0de"
+  },
+  "verdict": "Approve with fixes",
+  "resolution": "addressed-inline",
+  "findings_addressed_count": 1,
+  "findings_unresolved_count": 0,
+  "build_verification": {
+    "lint_errors_pr_introduced": 0,
+    "typecheck_errors_pr_introduced": 0,
+    "test_failures": 0,
+    "tests_passing": 1585
+  },
+  "pr_hygiene": {
+    "scope": {"severity": "low", "commit_types": ["feat"], "module_fan_out": 3},
+    "size": {"severity": "medium", "lines_added": 1700, "lines_removed": 10, "files_changed": 11, "justification": "test-heavy"},
+    "safety": {"severity": "clean", "migrations": 0, "schemas": 0, "infra": 0, "secrets": 0},
+    "completeness": {"severity": "clean", "new_source_without_test": 0}
+  },
+  "findings": {
+    "critical": [],
+    "high": [],
+    "medium": [
+      {
+        "id": "F-001",
+        "lens": "quality",
+        "file": "plugins/sulis/scripts/tests/integration/test_discover_e2e.py",
+        "line_start": 912,
+        "line_end": 926,
+        "summary": "Dogfood test appends to tracked file .architecture/discover-project/dogfood-tokens.txt on every run",
+        "recommendation": "Either gitignore the file or gate the append on an env var",
+        "draft_delta": null,
+        "by_design": true,
+        "wp_doD_reference": "WP-010 §Definition of Done — Green: Dogfood test records observed `tokens_consumed`"
+      }
+    ],
+    "low": []
+  },
+  "lens_completion": {
+    "architecture": {"findings": 0, "ran": true},
+    "security": {"findings": 0, "ran": true},
+    "quality": {"findings": 1, "ran": true}
+  },
+  "cr_attestation": {
+    "CR-01": "passed",
+    "CR-02": "single-reader (justified — diff homogeneity)",
+    "CR-03": "passed",
+    "CR-04": "passed",
+    "CR-05": "passed",
+    "CR-06": "passed",
+    "CR-07": "passed",
+    "CR-09": "passed"
+  }
+}

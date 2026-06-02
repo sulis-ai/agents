@@ -1,0 +1,7 @@
+# Placeholder so the directory survives git checkout.
+#
+# Fixture `empty/` represents a brand-new repo with no package
+# manifests and no CI workflows. The integration test calls
+# `_git_init` against the materialised copy to create a real `.git/`
+# dir at runtime; this `.gitkeep` exists only so the fixture path
+# resolves before that step.

@@ -1,0 +1,240 @@
+{
+  "@context": {
+    "@vocab": "https://sulis.co/dna/",
+    "dna": "https://sulis.co/dna/"
+  },
+  "@id": "dna:discover-project:steps",
+  "@type": "step-instances",
+  "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_workflow": "dna:workflow:01KT1WDSCVRWFW00000000000A",
+  "_about": "Nine Steps for the discover-project Workflow per TDD §Canonical Identifiers — Step ULIDs and §Form (5-phase decomposition). Each Step declares the IDEF0 contract (input_artifacts + output_artifacts + mechanism) plus the Tool it invokes (tool_ref) and the FailureModes it handles (handles_failures). Phase grouping is encoded in mechanism_detail (Detect/Infer/Ask/Mint/Verify) because the brain Step schema sets unevaluatedProperties:false and the foundation Step schema does not carry a per-Step phase field — extending the foundation schema is a cross-repo concern out of scope here, same pattern as release-train steps.jsonld. for_workflow lives at the envelope (not per-Step) for the same schema-constraint reason. Steps 1-4 are the Detect phase. Step 5 is the only probabilistic Step (mechanism=probabilistic, MUC-008 token-budget guard at 10k per NFR-002 + ADR-006). Steps 6-7 are the Ask phase (mechanism=human). Step 8 is the Mint phase atomic write (MUC-002 cancellation safety, MUC-003 existence check, MUC-007 monorepo collision check). Step 9 is the Verify phase scoped drift invocation (MUC-005 roll-back on failure). Tenant + workflow ULIDs are byte-identical to TDD §Canonical Identifiers and shared across every discover-project canonical instance.",
+  "captured_on": "2026-06-01",
+
+  "steps": [
+    {
+      "id": "dna:step:01KT1WDSST01RDREP0R00T000A",
+      "sys_status": "active",
+      "name": "read-repo-root",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "discover-project",
+      "input_artifacts": ["consuming-repo-cwd"],
+      "output_artifacts": ["repo-root-detection-result"],
+      "mechanism": "deterministic",
+      "mechanism_detail": "phase=Detect; invokes git-remote-read Tool against the current working directory and returns the structured {is_git, has_remote, remote_url, primary_branch, repo_root} payload.",
+      "tool_ref": "dna:tool:01KT1WT101G1TREM0TEREAD000",
+      "preconditions": ["consuming repo is the cwd"],
+      "postconditions": [
+        "{is_git, has_remote, remote_url, primary_branch, repo_root} structured result available to downstream Steps",
+        "non-git directory → raise non-git-directory FailureMode and terminate Workflow (MUC-001)",
+        "git but no remote AND no --source-repo override → raise git-no-remote FailureMode and terminate Workflow (MUC-006)"
+      ],
+      "agent_instructions": "Invoke git-remote-read Tool against the current working directory. On non-git directory → raise non-git-directory FailureMode (MUC-001). On .git/ but no remote AND no --source-repo override → raise git-no-remote FailureMode (MUC-006). Otherwise pass the structured result to downstream Steps.",
+      "criticality": "critical",
+      "handles_failures": [
+        "dna:failuremode:01KT1WFM01N0NG1TD1R000000A",
+        "dna:failuremode:01KT1WFM06G1TN0REM0TE00000"
+      ],
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.95
+    },
+    {
+      "id": "dna:step:01KT1WDSST02RDPKGMAN1FEST0",
+      "sys_status": "active",
+      "name": "read-package-manifests",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "discover-project",
+      "input_artifacts": ["repo-root-detection-result"],
+      "output_artifacts": ["package-manifest-findings"],
+      "mechanism": "deterministic",
+      "mechanism_detail": "phase=Detect; invokes read-package-json and read-pyproject-toml Tools against the repo root (or --path scope) and aggregates the structured payloads. Missing manifest files are non-errors (the consumer might not have one); the postcondition is the union of whatever was found.",
+      "tool_ref": "dna:tool:01KT1WT102RDPKGJS0N000000A",
+      "preconditions": ["Step 1 produced is_git=true"],
+      "postconditions": [
+        "manifest_findings dict carries {package_json: <shape>|null, pyproject_toml: <shape>|null} for the discovered manifests"
+      ],
+      "agent_instructions": "Probe for package.json at the repo root (or --path scope). If present, invoke read-package-json Tool to extract name/version/private/scripts_keys. Probe for pyproject.toml. If present, invoke read-pyproject-toml Tool to extract name/version/dependencies_count. Aggregate. Missing manifests are non-errors — produce a null entry for that key.",
+      "criticality": "important",
+      "handles_failures": [],
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.92
+    },
+    {
+      "id": "dna:step:01KT1WDSST03RDC1W0RKF10W00",
+      "sys_status": "active",
+      "name": "read-ci-workflows",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "discover-project",
+      "input_artifacts": ["repo-root-detection-result"],
+      "output_artifacts": ["ci-workflow-findings"],
+      "mechanism": "deterministic",
+      "mechanism_detail": "phase=Detect; invokes read-ci-workflows Tool to enumerate .github/workflows/*.yml and .gitlab-ci.yml under the repo root (or --path scope). Per-workflow shape: {path, name, triggers[]}.",
+      "tool_ref": "dna:tool:01KT1WT104RDC1WF000000000A",
+      "preconditions": ["Step 1 produced is_git=true"],
+      "postconditions": [
+        "ci_findings.workflows is a list (possibly empty) of {path, name, triggers}"
+      ],
+      "agent_instructions": "Invoke read-ci-workflows against the repo root. Empty list is a legitimate state — many consumers have no CI configured yet. Pass the list to downstream Steps.",
+      "criticality": "important",
+      "handles_failures": [],
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.92
+    },
+    {
+      "id": "dna:step:01KT1WDSST04RDREP0C0NTR00A",
+      "sys_status": "active",
+      "name": "read-repo-contract",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "discover-project",
+      "input_artifacts": ["repo-root-detection-result"],
+      "output_artifacts": ["repo-contract-findings"],
+      "mechanism": "deterministic",
+      "mechanism_detail": "phase=Detect; reuses the harness Read primitive (no new typed Tool) to read README.md, CONTRIBUTING.md, and any contract-adjacent docs. Findings feed the Infer Step's prompt as plain-text context.",
+      "preconditions": ["Step 1 produced is_git=true"],
+      "postconditions": [
+        "repo_contract_findings carries the text content (or null) of README + CONTRIBUTING + adjacent docs"
+      ],
+      "agent_instructions": "Read README.md and CONTRIBUTING.md if present. Pass the text content to the Infer Step's prompt. Missing files are non-errors.",
+      "criticality": "optional",
+      "handles_failures": [],
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.88
+    },
+    {
+      "id": "dna:step:01KT1WDSST05PR0P0SEC0NFG00",
+      "sys_status": "active",
+      "name": "propose-configuration-values",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "discover-project",
+      "input_artifacts": ["package-manifest-findings", "ci-workflow-findings", "repo-contract-findings"],
+      "output_artifacts": ["configuration-inferences"],
+      "mechanism": "probabilistic",
+      "mechanism_detail": "phase=Infer; invokes infer-configuration-values Tool (LLM-backed). Token budget is hard-capped at 10000 tokens (NFR-002, ADR-006). On budget exceedance the Tool raises token-budget-exceeded FailureMode (MUC-008); the Workflow falls back to a degraded Ask phase that prompts the consumer for every field directly (NullConfigurationInferrer adapter).",
+      "tool_ref": "dna:tool:01KT1WT1061NFERC0NF1G00000",
+      "preconditions": [
+        "Steps 2-4 produced detection findings",
+        "token_budget configured (default 10000 per NFR-002)"
+      ],
+      "postconditions": [
+        "inferences carries {<config-field>: {value, confidence}} for each field the LLM could infer with non-zero confidence",
+        "tokens_consumed <= 10000 OR token-budget-exceeded FailureMode raised"
+      ],
+      "agent_instructions": "Compose the Infer prompt from manifest_findings + ci_findings + repo_contract_findings. Invoke infer-configuration-values Tool with token_budget=10000. On success populate inferences. On budget exceedance raise token-budget-exceeded (MUC-008) — the Workflow then takes the degraded Ask path.",
+      "criticality": "critical",
+      "handles_failures": [
+        "dna:failuremode:01KT1WFM08TKBDGTEXCEED0000"
+      ],
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.85
+    },
+    {
+      "id": "dna:step:01KT1WDSST06C0NF1RM0VRD000",
+      "sys_status": "active",
+      "name": "confirm-or-override-inferences",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "discover-project",
+      "input_artifacts": ["configuration-inferences"],
+      "output_artifacts": ["consumer-confirmed-inferences"],
+      "mechanism": "human",
+      "mechanism_detail": "phase=Ask; surfaces every inferred value to the consumer with the confidence score and prompts for confirm-or-override. Per FR-011 + MUC-004, no inferred value reaches Mint without explicit consumer approval. The Ask UI shows: 'Inferred deploy_target = github-release. Confirm or override:' with single-keystroke confirm or typed override.",
+      "preconditions": ["Step 5 produced inferences (non-degraded path)"],
+      "postconditions": [
+        "every inferred field is either confirmed or overridden",
+        "consumer_overrides dict carries the final value for each inferred field"
+      ],
+      "agent_instructions": "For each inferred field, surface the value + confidence to the consumer. Capture confirm (accept inferred value) or override (typed new value). Update inferences in-place with the consumer-final value.",
+      "criticality": "critical",
+      "handles_failures": [
+        "dna:failuremode:01KT1WFM02CANCE1M1DF10W000",
+        "dna:failuremode:01KT1WFM041NFERREJECTED000"
+      ],
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.9
+    },
+    {
+      "id": "dna:step:01KT1WDSST07GATHERAMBF1000",
+      "sys_status": "active",
+      "name": "gather-ambiguous-fields",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "discover-project",
+      "input_artifacts": ["consumer-confirmed-inferences"],
+      "output_artifacts": ["complete-configuration-values"],
+      "mechanism": "human",
+      "mechanism_detail": "phase=Ask; for every Configuration-Vocabulary field the Infer Step couldn't propose (low-confidence or absent), prompt the consumer directly. This is also the degraded-path entry point when MUC-008 fires — the Null adapter routes here for every field.",
+      "preconditions": ["Step 6 confirmed-or-overrode all inferred fields"],
+      "postconditions": [
+        "every Configuration-Vocabulary field has a consumer-supplied value",
+        "Project entity is ready to mint (all required fields populated)"
+      ],
+      "agent_instructions": "For each ambiguous or unsupplied field, prompt the consumer with field-name + a brief explanation + an example value. Record the consumer's input. Continue until every required field is populated.",
+      "criticality": "critical",
+      "handles_failures": [
+        "dna:failuremode:01KT1WFM02CANCE1M1DF10W000"
+      ],
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.88
+    },
+    {
+      "id": "dna:step:01KT1WDSST08WR1TEPR0JEC000",
+      "sys_status": "active",
+      "name": "write-project-entity",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "discover-project",
+      "input_artifacts": ["complete-configuration-values"],
+      "output_artifacts": ["minted-project-entity-path"],
+      "mechanism": "deterministic",
+      "mechanism_detail": "phase=Mint; (a) derive the slug from --path (or repo basename); (b) compute the consumer tenant ULID via derive-consumer-tenant Tool; (c) refuse-if-exists check at target_path (MUC-003 + MUC-007); (d) write to <target>.tmp then atomic os.replace to <target> (MUC-002 cancellation safety); (e) any signal mid-write leaves only the .tmp file — the next discovery run sweeps stale .tmp files at startup.",
+      "tool_ref": "dna:tool:01KT1WT105DER1VETENANT0000",
+      "preconditions": [
+        "Step 7 produced a complete Configuration-Vocabulary",
+        ".sulis/projects/<slug>.jsonld does not exist OR --update flag set",
+        "if --path omitted: .sulis/projects/ is empty (MUC-007 collision check)"
+      ],
+      "postconditions": [
+        "Project entity persisted atomically at .sulis/projects/<slug>.jsonld",
+        "OR entity-already-exists FailureMode raised (MUC-003)",
+        "OR monorepo-sibling-collision FailureMode raised (MUC-007)"
+      ],
+      "agent_instructions": "Derive the slug per the canonical derivation function (basename of --path or repo root, lowercased + sanitised). Invoke derive-consumer-tenant Tool to compute belongs_to_tenant. Check target_path.exists() — refuse with MUC-003 unless --update. Check sibling collision per MUC-007. Compose the Project entity JSON-LD. Write to <target>.tmp. os.replace to <target>. The .tmp + atomic-replace pair is non-negotiable for cancellation safety.",
+      "criticality": "critical",
+      "handles_failures": [
+        "dna:failuremode:01KT1WFM02CANCE1M1DF10W000",
+        "dna:failuremode:01KT1WFM03ENT1TYEX1STS0000",
+        "dna:failuremode:01KT1WFM07M0N0REP0C0110000"
+      ],
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.93
+    },
+    {
+      "id": "dna:step:01KT1WDSST09RVNDR1FTDET000",
+      "sys_status": "active",
+      "name": "run-drift-detector-on-mint",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "discover-project",
+      "input_artifacts": ["minted-project-entity-path"],
+      "output_artifacts": ["mint-verification-verdict"],
+      "mechanism": "deterministic",
+      "mechanism_detail": "phase=Verify; invokes the canonical drift detector at plugins/sulis/scripts/check-canonical-drift.py with --scope .sulis/projects/<slug>.jsonld. Exit 0 = mint verified, Workflow terminates 'minted'. Exit non-zero = drift detected → roll back via unlink(target_path) and raise unknown-workflow-ulid FailureMode (MUC-005). The Project's release_workflow_ref must resolve against the marketplace's canonical Workflow ULIDs.",
+      "preconditions": ["Step 8 wrote a Project entity at target_path"],
+      "postconditions": [
+        "drift verdict is pass → Workflow terminates 'minted'",
+        "drift verdict is fail → target_path unlinked, MUC-005 raised, Workflow terminates 'rolled-back'"
+      ],
+      "agent_instructions": "Subprocess: python3 plugins/sulis/scripts/check-canonical-drift.py --scope .sulis/projects/<slug>.jsonld with 30-second timeout. Exit 0 → success path. Non-zero → unlink(target_path) (the inverse of Step 8's os.replace) and raise unknown-workflow-ulid (MUC-005) with the drift detector's stderr surfaced verbatim.",
+      "criticality": "critical",
+      "handles_failures": [
+        "dna:failuremode:01KT1WFM05VNKN0WNWFV11D000"
+      ],
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.92
+    }
+  ]
+}

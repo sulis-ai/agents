@@ -1,0 +1,16 @@
+## Release v9.9.9
+
+Auto-assembled by /sulis:release-train. This is a FIXTURE release-PR
+body used by the auto-back-merge test suite (WP-009) to exercise the
+pin-read path. The HTML comment at the bottom is the canonical
+`dev-sha-at-open` pin, written in the exact format
+`/sulis:release-train` Step 5 produces (ADR-005):
+
+  printf '\n\n<!-- dev-sha-at-open: %s -->\n' "$DEV_SHA"
+
+### Changes
+
+- feat: a thing
+- fix: another thing
+
+<!-- dev-sha-at-open: 0123456789abcdef0123456789abcdef01234567 -->

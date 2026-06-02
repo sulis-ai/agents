@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Shared `gh` stub for the auto-back-merge test suite (WP-009).
+#
+# Put this directory first on $PATH and `gh` resolves here. The stub
+# records every invocation to $GH_STUB_CALL_LOG (if set) and returns
+# canned responses driven by $STUB_MODE:
+#
+#   STUB_MODE=pr-open   → `gh pr list ...` returns one open back-integrate
+#                         PR (number 4242). Exercises the "PR is open"
+#                         branch of drift_check.sh's error message.
+#   STUB_MODE=no-pr     → `gh pr list ...` returns empty. Exercises the
+#                         "no PR open" recovery-message branch.
+#   (unset / other)     → empty PR list, PR-create returns a fake URL.
+#
+# Boring, deterministic, single source of stub logic — reused across
+# tests via a PATH prefix instead of copy-pasted into each test (WP-009
+# DoD Blue: "Stub gh lives in one place").
+
+if [ -n "${GH_STUB_CALL_LOG:-}" ]; then
+    echo "gh $*" >> "$GH_STUB_CALL_LOG"
+fi
+
+sub="${1:-} ${2:-}"
+case "$sub" in
+    "pr list")
+        case "${STUB_MODE:-}" in
+            pr-open)
+                # Mimic --json number,url --jq '.[0] | ...' style output.
+                # Callers vary their --jq; emit the common shapes.
+                echo "PR #4242: https://github.com/sulis-ai/agents/pull/4242"
+                ;;
+            *)
+                # no-pr / default: empty.
+                echo ""
+                ;;
+        esac
+        exit 0
+        ;;
+    "pr create")
+        echo "https://github.com/sulis-ai/agents/pull/4242"
+        exit 0
+        ;;
+    "pr merge")
+        exit 0
+        ;;
+    "api "*|"api")
+        # gh api ... — return an empty JSON-ish body by default.
+        echo ""
+        exit 0
+        ;;
+    *)
+        exit 0
+        ;;
+esac

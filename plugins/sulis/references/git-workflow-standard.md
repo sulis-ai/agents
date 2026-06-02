@@ -19,7 +19,7 @@ SemVer 2.0.0 for release tags. No `--no-verify`, no force-push to
 protected branches, no hook bypass.
 <!-- /summary -->
 
-> **Version:** 0.2.0
+> **Version:** 0.3.0
 > **Status:** Active — Calibration Period (90 days from 2026-05-16)
 > **Applies to:** All agents and projects in the Sulis AI marketplace,
 > and any downstream project an executor or orchestrator operates on.
@@ -899,6 +899,148 @@ Is production actively broken?"* If no, recommend the standard path.
 
 ---
 
+## GIT-12: Auto-back-merge on release (MUST)
+
+**The invariant.** dev's history is append-only relative to the release robot. Every release produces either a fast-forwarded `dev` (`dev`'s HEAD equals `main`'s HEAD) **or** an open `back-integrate`-labelled PR that will fast-forward `dev` to `main` once it merges. No release ever leaves `dev` silently behind `main`. The robot is the single authority for both bumping `main` and back-merging to `dev` — no manual back-integration in the normal path.
+
+### Why
+
+Before this rule was in place, three releases in a row left `dev`
+behind `main` and required hand-typed back-merges to recover:
+
+- `0e85c24` — `chore: back-integrate origin/main into dev` (first pass)
+- `8612834` — `chore: back-integrate origin/main into dev (second pass)`
+- `d93517c` — `chore: back-integrate origin/main into dev (third pass)`
+
+Each one was correct as a one-off fix and wrong as a recurring
+pattern. The release robot is the only thing that bumps `main`; it
+must also be the thing that catches `dev` up. Anything else is an
+operator-vigilance rule, and operator vigilance is exactly what
+failed three times running.
+
+### The mechanism — four moving parts
+
+1. **The reusable release workflow** at
+   `plugins/sulis/templates/workflows/release-on-merge.yml` carries
+   the bump-and-tag steps **and** a back-merge step block (read the
+   pin, decide whether to fast-forward or open a PR, verify the
+   post-condition).
+2. **The consumer shim** at `.github/workflows/release-on-merge.yml`
+   in each project that adopts the standard. The shim `uses:` the
+   reusable workflow at a SemVer plugin tag — so the consumer gets
+   the back-merge for free without copying YAML.
+3. **The pin.** `/sulis:release-train` writes a comment of the form
+   `<!-- dev-sha-at-open: <40-hex-SHA> -->` into the release PR body
+   when it opens the PR. This records the SHA `dev` was at when the
+   release window opened.
+4. **The drift gate.**
+   `plugins/sulis/scripts/drift_check.sh` is invoked at the entry to
+   `/sulis:release-train` and `/sulis:change start`. Both refuse to
+   proceed if the gate returns non-zero (i.e. `dev` is behind
+   `main`). Belt-and-braces against the back-merge mechanism being
+   temporarily unavailable.
+
+### Worked example 1 — clean path
+
+`dev` does not move between release-PR-open and release-PR-merge:
+
+1. A change ships to `dev`. Its changeset accumulates with the
+   others.
+2. Run `/sulis:release-train`. The skill writes
+   `<!-- dev-sha-at-open: abc123... -->` into the release PR body
+   and opens the PR. `dev`'s HEAD at this moment is `abc123...`.
+3. Review and merge the release PR.
+4. The reusable workflow fires. It reads the pin (`abc123...`) and
+   compares to `git ls-remote origin dev` (also `abc123...`). Equal
+   → fast-forward push: `git push origin main:dev`. Done.
+5. Post-condition: `dev` equals `main`. No back-integrate PR opened.
+
+### Worked example 2 — raced path
+
+`dev` gets a new commit between release-PR-open and
+release-PR-merge (e.g. a hotfix lands directly on `dev`):
+
+1. A change ships to `dev`. `dev`'s HEAD is `abc123...`.
+2. Run `/sulis:release-train`. The skill writes
+   `<!-- dev-sha-at-open: abc123... -->` into the release PR body
+   and opens the PR.
+3. A separate hotfix PR merges to `dev`. `dev`'s HEAD is now
+   `def456...`.
+4. Review and merge the release PR.
+5. The reusable workflow fires. It reads the pin (`abc123...`) and
+   compares to `git ls-remote origin dev` (now `def456...`). Not
+   equal → open a back-integrate PR with:
+    - base: dev
+    - head: main
+    - title: chore: back-integrate main → dev (post-release v<NEW>)
+    - label: back-integrate
+    - auto-merge enabled (merges on CI green)
+6. Post-condition: `dev` is not equal to `main`, but
+   `gh pr list --base dev --label back-integrate --state open`
+   returns exactly one PR. The invariant holds — every release
+   leaves either a caught-up `dev` or an open PR that will catch it
+   up.
+7. CI on the back-integrate PR goes green. The PR auto-merges. `dev`
+   fast-forwards to `main` on the merge.
+
+### Worked example 3 — manual recovery (UC-005)
+
+If the back-merge mechanism is temporarily unavailable (workflow
+removed, branch protection misconfigured, GitHub Actions outage),
+or if the rule was not yet in place when an earlier release ran
+(historical commits `0e85c24`, `8612834`, `d93517c`):
+
+1. `/sulis:release-train` or `/sulis:change start` surfaces the
+   drift via `drift_check.sh` and refuses to proceed.
+2. Manual recovery:
+
+    ```bash
+    git fetch origin
+    git checkout dev
+    git merge --ff-only origin/main || git merge origin/main
+    git push origin dev
+    ```
+
+3. The `--ff-only` attempt is the common case — `dev` is a strict
+   ancestor of `main`, so the fast-forward succeeds. The fall-
+   through to a merge commit handles the unusual case where `dev`
+   has commits not on `main` (usually means manual operator
+   activity happened on `dev` directly).
+4. Verify the result. Re-run the gate:
+
+    ```bash
+    plugins/sulis/scripts/drift_check.sh
+    ```
+
+   Exit code 0 means `dev` is caught up; the gate re-opens and the
+   skills resume operating.
+
+### Cross-references
+
+- **GIT-05 (Direct merge to `dev` on CI green)** — the only path
+  commits reach `dev` is direct merge from a feature branch. GIT-12
+  is the invariant that says those merges aren't undone by stale
+  back-integrations: every release either fast-forwards `dev` or
+  opens a PR that will.
+- **GIT-06 (`dev → main` promotion — the release train)** —
+  describes the promotion path. GIT-12 closes the loop by
+  guaranteeing `dev` catches up with `main` atomically after each
+  promotion. The robot that bumps `main` is the same robot that
+  back-merges to `dev`.
+- **GIT-09 (No hook bypass, no force-push)** — fully applies. The
+  back-merge mechanism never uses `--force` or `--force-with-lease`.
+  Rejection of a fast-forward push falls through to opening the
+  back-integrate PR, never to a force-push.
+
+### Compliance check at every change
+
+Every `/sulis:change start` invocation runs `drift_check.sh`. The
+gate refuses to start a new change branch off a stale `dev`. This
+is the developer-side enforcement of GIT-12 — the founder can
+never accidentally branch off a `dev` that's behind `main`.
+
+---
+
 ## Worked Examples
 
 ### Example 1 — feature WP, happy path
@@ -1113,3 +1255,4 @@ Acceptance Evidence` section.
 | 0.1.3 | 2026-05-18 | First-live-run gaps from WP-7 execution surface two clarifications. **GIT-04** new subsection "CI must run on feature branches (MUST)" — required status checks must fire on every feature-branch push, not only on dev/main pushes. Without feature-branch CI, the merge gate is post-merge and broken code can land before any CI catches it. Example trigger config covers all Conventional Commits prefix globs (feat/, fix/, chore/, etc.) per GIT-02. Plus new subsection "Local pre-commit fallback (SHOULD when feature-branch CI is absent)" — documents the substitute pattern for transitional projects with explicit guard-rails (journal record, recommendation surfaced to founder via concierge). Fallback is SHOULD, not MUST — projects must eventually wire feature-branch CI to satisfy GIT-04's MUST. **GIT-05** new anti-pattern subsection "git switch dev from a worktree" — explicit forbidden mental model (`git switch dev` fails when dev is checked out elsewhere, which is the normal state under parallel dispatch). Canonical merge paths named: host API for all cases (preferred); refspec push (`git push origin feat/wp-NNN:dev`) acceptable shortcut for single-commit branches only; multi-commit feature branches must use host API to satisfy GIT-04's linear-history requirement. Provenance: WP-7 executor improvised both patterns correctly under stress; this commit makes them canonical. | Standards team |
 | 0.1.4 | 2026-05-28 | False-green guardrail (issue #59). **GIT-04** new subsection "Confirm CI by reading the conclusion, not a shell exit code (MUST)" — confirming CI MUST read the conclusion explicitly (`gh run view <id> --json conclusion -q .conclusion`, expect `success`; or `gh pr checks --watch`, exit-status-correct). Two never-rules: NEVER trust a chained `; echo $?` after `gh run watch` (the echo's exit is always 0, not gh's); NEVER use `gh run watch` without `--exit-status` as a gate signal (it exits 0 on completion regardless of pass/fail). **GIT-05** merge-mechanics step 3 now cross-references the subsection — "green" means `conclusion == success`, never a bare exit 0. Provenance: a run-all session merged a foundation WP on a RED CI by trusting a hand-typed `gh run watch <id>; echo "exit: $?"`; 9 downstream WPs depended on it. Marketplace tooling (`wpx-train` / `wpx-pipeline`, `/sulis:change` ship) was already safe — this encodes the correct pattern as a citable guardrail so an improvised watch cannot reintroduce the bug. | Standards team |
 | 0.2.0 | 2026-05-28 | Changeset-based release train ([#66](https://github.com/sulis-ai/agents/issues/66)). **GIT-06** reworked: `dev → main` promotion is now a reviewed PR opened by `/sulis:release-train` from accumulated changesets, and the version bump is applied by the `release-on-merge.yml` GitHub Action (the single bump authority) on merge to `main` — a human no longer hand-picks or types a SemVer version for a normal release. Integration and release are decoupled via per-change changesets (ADR-001); the Action is the bump authority (ADR-004). **Summary** + **Provenance** updated; **Example 2** rewritten to the train flow. **GIT-08 (SemVer scheme) unchanged** — only *who/what* applies the version moves from a human to the Action. **GIT-11 (hot-fix path) unaffected** — a hot-fix is its own emergency release off `main` and keeps its own SemVer-patch tag step. **Carve-out:** the change that introduces the train ships through the OLD manual-bump flow ONE last time (the train isn't live yet); this row retires the manual bump from the *documented* flow going forward, not that change's own ship. The manual-bump *mechanism* (`promote-dev-to-main.yml`'s hand-typed `version` input) is retired at go-live — see `.architecture/release-train/wp-006-config/RUNBOOK.md`. (Header version bumped 0.1.0 → 0.2.0; the header had drifted behind the 0.1.x patch rows.) | Standards team |
+| 0.3.0 | 2026-06-02 | Auto-back-merge on release ([change: auto-back-merge-on-release](.architecture/auto-back-merge-on-release/)). **NEW GIT-12**: Releases auto-back-merge to `dev` (MUST) — every promotion of `dev → main` is followed by an automated back-merge to `dev`; the release robot is the single authority for both bumping `main` and back-merging to `dev`. Four moving parts: the reusable workflow (carries the bump + back-merge step block), the consumer shim (`uses:` the reusable workflow at a SemVer plugin tag), the pin (`<!-- dev-sha-at-open: <SHA> -->` HTML comment in the release PR body, written by `/sulis:release-train`), and the drift gate (`drift_check.sh`, invoked at the entry to `/sulis:release-train` and `/sulis:change start`). Three worked examples: clean path (fast-forward), raced path (back-integrate PR opened with auto-merge), manual recovery (UC-005 — `git merge origin/main && git push origin dev` when the mechanism is unavailable). Cross-references GIT-05, GIT-06, GIT-09. **MUST severity at ship** per ADR-004: every line of the rule is enforced programmatically (workflow post-condition, drift-gate exit code, no-force-push static grep) — the three executions before launch (one marketplace dogfood + two CI fixtures) ground the MUST. **Provenance:** three prior manual back-integrations on `dev` (commits `0e85c24`, `8612834`, `d93517c`) demonstrated the gap; without the rule, every release left `dev` silently behind `main`. Pure append after GIT-11 (ADR-004); existing GIT-NN sections unmodified. | Standards team |

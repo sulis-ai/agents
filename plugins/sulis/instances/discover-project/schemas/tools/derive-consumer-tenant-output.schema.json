@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/discover-project/tool/derive-consumer-tenant/output/1.0.0",
+  "title": "derive-consumer-tenant — output",
+  "description": "Output of the derive-consumer-tenant Tool — the deterministically-derived consumer-tenant ULID per ADR-002. The Mint phase uses this value to populate belongs_to_tenant on the Project entity it writes. The recipe applies prospectively to NEW consumer Projects only; the marketplace tenant ULID is grandfathered per ADR-002's Decision section.",
+  "type": "object",
+  "required": ["tenant_ulid"],
+  "additionalProperties": false,
+  "properties": {
+    "tenant_ulid": {
+      "type": "string",
+      "description": "Consumer-tenant ULID in 'dna:tenant:<26-char>' form. 26 chars from the Crockford base32 alphabet (excludes I, L, O, U); first body char in 0..7 per ULID-spec first-char clamp.",
+      "pattern": "^dna:tenant:[0-9A-HJKMNP-TV-Z]{26}$"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/release-train/tool/gh-release-create/output/1.0.0",
+  "title": "gh-release-create — output",
+  "description": "Output: identifying coordinates of the published GitHub Release. `gh release create` prints the release URL on success.",
+  "type": "object",
+  "required": ["url"],
+  "additionalProperties": false,
+  "properties": {
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "the published release's HTML URL"
+    },
+    "tag": {
+      "type": "string",
+      "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "the tag the release is attached to"
+    }
+  }
+}

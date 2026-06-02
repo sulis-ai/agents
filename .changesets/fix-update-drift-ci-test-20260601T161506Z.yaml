@@ -1,0 +1,7 @@
+change_id: SHA-4a021c2
+primitive: fix
+tier: patch
+touches_plugin: true
+summary: |
+  update-drift-ci-test
+created_at: 2026-06-01T16:15:06Z

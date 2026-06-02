@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/dna/schema/trigger/1.0.0",
+  "title": "Trigger",
+  "description": "what initiates a Workflow run \u2014 a timer firing, an event arriving, an entity entering or exiting a state, a manual invocation, or an external webhook. Carries the condition (CRON expression, event name, state predicate, etc.) and the target Workflow.",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": [
+    "id",
+    "name",
+    "for_domain",
+    "for_workflow",
+    "kind",
+    "condition",
+    "state",
+    "sys_status"
+  ],
+  "properties": {
+    "sys_status": {
+      "enum": [
+        "active",
+        "archived",
+        "deleted",
+        "purged"
+      ]
+    },
+    "valid_from": {
+      "type": "string",
+      "format": "date-time",
+      "description": "business-truth window start"
+    },
+    "valid_to": {
+      "type": "string",
+      "format": "date-time",
+      "description": "business-truth window end"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "instance reliability score"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^dna:trigger:[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "name": {
+      "type": "string",
+      "description": "e.g. 'renewal-90-days-before-expiry', 'sanctions-rescreen-monthly', 'incident-severity-1-alert'"
+    },
+    "for_domain": {
+      "type": "string",
+      "pattern": "^dna:(tenant):[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "for_workflow": {
+      "type": "string",
+      "pattern": "^dna:(workflow):[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "the Workflow this Trigger fires"
+    },
+    "kind": {
+      "enum": [
+        "timer",
+        "event",
+        "state-entry",
+        "state-exit",
+        "manual",
+        "external-webhook"
+      ]
+    },
+    "condition": {
+      "type": "string",
+      "description": "kind-specific \u2014 for timer: a CRON expression or RFC 5545 RRULE; for event: the event name; for state-entry or state-exit: an entity.state predicate; for manual: a user-facing label; for external-webhook: a URL pattern with auth"
+    },
+    "description": {
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "active",
+        "paused",
+        "disabled"
+      ]
+    }
+  },
+  "x-schema-org-extends": "schema:Action"
+}

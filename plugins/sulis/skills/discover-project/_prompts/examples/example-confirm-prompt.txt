@@ -1,0 +1,19 @@
+your main branch — proposed: main
+Keep that, or type a new value to override?
+[Enter] to keep · type a new value to override
+>
+
+where you publish releases — proposed: github-release
+Keep that, or type a new value to override?
+[Enter] to keep · type a new value to override
+> npm-publish
+
+how you cut releases — proposed: trunk-based
+Keep that, or type a new value to override?
+[Enter] to keep · type a new value to override
+>
+
+how often you ship — proposed: weekly
+Keep that, or type a new value to override?
+[Enter] to keep · type a new value to override
+>

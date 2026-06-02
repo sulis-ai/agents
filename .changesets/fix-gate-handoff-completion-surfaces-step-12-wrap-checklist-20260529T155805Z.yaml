@@ -1,0 +1,31 @@
+change_id: SHA-067cb1b
+primitive: fix
+tier: patch
+touches_plugin: true
+summary: |
+  gate-handoff completion surfaces Step-12 wrap checklist
+  
+  ## Summary
+  - In the `--enable-gate-handoff` flow, after `mark-gates-complete` the
+  shipped WPs stayed at `step-7-complete` with stranded worktrees +
+  branches — the batched path never ran the per-WP Step 12 wrap the legacy
+  path runs (the train doesn't own the executor worktrees). The calling
+  session cleaned up by hand across 6 train runs.
+  - `mark-gates-complete`'s clean-success envelope now carries a
+  `pending_step12` checklist (`{wp, branch}` per shipped WP) +
+  `next_action`; it stays a pure record read (no git ops).
+  - run-all SKILL.md gains an explicit **Step 12.6** that consumes the
+  checklist (`wpx-step12 wrap` + `git branch -D` per entry).
+  
+  ## Test plan
+  - [x] New `test_mark_gates_complete_emits_pending_step12_checklist` (RED
+  before the fix)
+  - [x] Full scripts suite green (967 passed)
+  
+  Closes #75
+  
+  🤖 Generated with [Claude Code](https://claude.com/claude-code)
+  
+  Co-authored-by: Iain Niven-Bowling <iain@nivbow.com>
+  Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+created_at: 2026-05-29T15:58:05Z

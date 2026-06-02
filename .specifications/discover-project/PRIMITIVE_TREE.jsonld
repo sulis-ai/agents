@@ -1,0 +1,389 @@
+{
+  "@context": {
+    "@vocab": "https://sulis.co/primitive-tree/",
+    "dna": "https://sulis.co/dna/"
+  },
+  "@id": "primitive-tree:discover-project",
+  "@type": "PrimitiveTree",
+  "for_change": "CH-01KT1W",
+  "for_specification": ".specifications/discover-project/",
+  "captured_on": "2026-06-01",
+  "scale_constraints": {
+    "max_depth": 5,
+    "max_fan_out": 7
+  },
+  "_about": "Structural decomposition of the discover-project Workflow. Existing nodes are inherited from release-train-as-entities (Project, Workflow, Step, Trigger, FailureMode, Tool — all foundation v0.6.0 primitives) and are shown as source=codebase. New nodes (DiscoveryRun, the five phases, the consumer-tenant derivation) are source=user (founder-supplied via the dispatch context). Every leaf carries a leaf_category per the Two-Model OODA Reconciliation rule.",
+
+  "nodes": [
+    {
+      "id": "node:discovery-workflow",
+      "name": "discover-project Workflow",
+      "type": "workflow",
+      "source": "user",
+      "health_status": "validated",
+      "definition": "Canonical Workflow entity that defines the 5-phase discovery process. ULID assigned by TDD per P8 rubric.",
+      "success_criterion": "Workflow.jsonld exists at plugins/sulis/instances/discover-project/workflow.jsonld, references the marketplace tenant, has Steps matching FR-002 phase shape.",
+      "depends_on": [
+        "node:project-entity",
+        "node:foundation-workflow-primitive",
+        "node:foundation-step-primitive",
+        "node:foundation-trigger-primitive",
+        "node:foundation-failuremode-primitive",
+        "node:foundation-tool-primitive"
+      ],
+      "artifactAffinity": ["use-case", "process-flow", "sequence-diagram"],
+      "leaf_category": null
+    },
+
+    {
+      "id": "node:detect-phase",
+      "name": "Detect phase",
+      "type": "action",
+      "source": "user",
+      "health_status": "validated",
+      "definition": "Deterministic phase that reads repo state (git remote, package manifests, CI workflows, repo-contract).",
+      "success_criterion": "Reads all required filesystem inputs without writes; produces structured output for the Infer phase.",
+      "depends_on": ["node:discovery-workflow", "node:tool-git-read", "node:tool-file-read"],
+      "artifactAffinity": ["use-case", "process-flow"],
+      "leaf_category": null
+    },
+
+    {
+      "id": "node:infer-phase",
+      "name": "Infer phase",
+      "type": "action",
+      "source": "user",
+      "health_status": "validated",
+      "definition": "The single probabilistic phase. Proposes values for ambiguous Configuration Vocabulary fields from Detect's outputs.",
+      "success_criterion": "Completes within NFR-002 token budget; produces a structured list of (field, inferred-value, confidence) triples; falls back per MUC-008 on budget exceedance.",
+      "depends_on": ["node:detect-phase", "node:llm-integration"],
+      "artifactAffinity": ["use-case", "process-flow", "sequence-diagram"],
+      "leaf_category": null
+    },
+
+    {
+      "id": "node:ask-phase",
+      "name": "Ask phase",
+      "type": "action",
+      "source": "user",
+      "health_status": "validated",
+      "definition": "Human-gated phase. Surfaces every inferred value for consumer confirmation/override; asks for fields the repo can't reveal.",
+      "success_criterion": "No inferred value reaches Mint without explicit consumer approval (FR-011); ambiguous fields are populated.",
+      "depends_on": ["node:infer-phase"],
+      "artifactAffinity": ["use-case", "process-flow"],
+      "leaf_category": null
+    },
+
+    {
+      "id": "node:mint-phase",
+      "name": "Mint phase",
+      "type": "action",
+      "source": "user",
+      "health_status": "validated",
+      "definition": "Deterministic phase that writes the Project entity to .sulis/projects/<slug>.jsonld atomically.",
+      "success_criterion": "Either the full entity persists or nothing does; no partial files survive a failure.",
+      "depends_on": ["node:ask-phase", "node:tool-entity-emitter", "node:project-entity"],
+      "artifactAffinity": ["use-case", "process-flow", "data-flow"],
+      "leaf_category": null
+    },
+
+    {
+      "id": "node:verify-phase",
+      "name": "Verify phase",
+      "type": "action",
+      "source": "user",
+      "health_status": "validated",
+      "definition": "Deterministic phase that invokes the canonical drift detector on the just-minted entity.",
+      "success_criterion": "Drift detector passes; Workflow ULID and tenant ULID references resolve.",
+      "depends_on": ["node:mint-phase", "node:tool-drift-detector"],
+      "artifactAffinity": ["use-case", "process-flow", "sequence-diagram"],
+      "leaf_category": null
+    },
+
+    {
+      "id": "node:project-entity",
+      "name": "Project entity (consumer-owned)",
+      "type": "domain-entity",
+      "source": "codebase",
+      "health_status": "validated",
+      "definition": "JSON-LD instance of the foundation v0.6.0 Project schema. Lives at .sulis/projects/<slug>.jsonld in the consuming repo.",
+      "success_criterion": "Conforms to plugins/sulis/brain/compiled/foundation/project.schema.json; carries all Configuration Vocabulary fields populated.",
+      "depends_on": ["node:foundation-project-primitive"],
+      "artifactAffinity": ["data-flow", "state-machine"],
+      "leaf_category": null
+    },
+
+    {
+      "id": "node:consumer-tenant",
+      "name": "Consumer tenant ULID",
+      "type": "domain-entity",
+      "source": "user",
+      "health_status": "testing",
+      "definition": "Tenant ULID for the consumer (distinct from the marketplace tenant). Derived per OQ-4 recipe.",
+      "success_criterion": "Deterministically derived from consumer repo URL; collision-resistant; publicly verifiable.",
+      "depends_on": [],
+      "artifactAffinity": ["data-flow"],
+      "leaf_category": null
+    },
+
+    {
+      "id": "node:skill-imperative",
+      "name": "discover-project skill (imperative)",
+      "type": "action",
+      "source": "user",
+      "health_status": "validated",
+      "definition": "The skill prose at plugins/sulis/skills/<resolved-name>/SKILL.md that conforms to the canonical Workflow.",
+      "success_criterion": "Passes drift detector; implements all five phases; surfaces all consumer prompts in plain language.",
+      "depends_on": ["node:discovery-workflow"],
+      "artifactAffinity": ["use-case", "process-flow"],
+      "leaf_category": null
+    },
+
+    {
+      "id": "node:git-integration",
+      "name": "Git integration",
+      "type": "integration",
+      "source": "codebase",
+      "health_status": "validated",
+      "definition": "Read access to the consuming repo's .git/ directory and remote configuration.",
+      "success_criterion": "Reads remote URL, primary branch, repo root; handles non-git and no-remote cases per MUC-001 and MUC-006.",
+      "depends_on": [],
+      "artifactAffinity": ["sequence-diagram", "data-flow"],
+      "leaf_category": "external-system"
+    },
+
+    {
+      "id": "node:filesystem-integration",
+      "name": "Filesystem integration",
+      "type": "integration",
+      "source": "codebase",
+      "health_status": "validated",
+      "definition": "Read access to package manifests, CI workflows, repo-contract; write access scoped to .sulis/projects/.",
+      "success_criterion": "Reads required files; writes only to the scoped entity path per NFR-004.",
+      "depends_on": [],
+      "artifactAffinity": ["sequence-diagram", "data-flow"],
+      "leaf_category": "existing-impl"
+    },
+
+    {
+      "id": "node:llm-integration",
+      "name": "LLM integration (for Infer phase)",
+      "type": "integration",
+      "source": "codebase",
+      "health_status": "validated",
+      "definition": "External LLM call from the probabilistic Infer phase.",
+      "success_criterion": "Completes within NFR-002 token budget; degrades to all-human-ask path per NFR-006 when unavailable.",
+      "depends_on": [],
+      "artifactAffinity": ["sequence-diagram"],
+      "leaf_category": "external-system"
+    },
+
+    {
+      "id": "node:tool-git-read",
+      "name": "Git-read Tool",
+      "type": "tool",
+      "source": "user",
+      "health_status": "testing",
+      "definition": "Typed deterministic Tool for reading git remote and branch state. May reuse existing tools from release-train.",
+      "success_criterion": "Schema defined; ULID assigned; bound to git-integration.",
+      "depends_on": ["node:git-integration"],
+      "artifactAffinity": ["sequence-diagram"],
+      "leaf_category": null
+    },
+
+    {
+      "id": "node:tool-file-read",
+      "name": "File-read Tool",
+      "type": "tool",
+      "source": "codebase",
+      "health_status": "validated",
+      "definition": "Typed deterministic Tool for reading package manifests + CI workflows. Reuses Read primitive.",
+      "success_criterion": "Reuses existing Read tool from the agent harness.",
+      "depends_on": ["node:filesystem-integration"],
+      "artifactAffinity": ["sequence-diagram"],
+      "leaf_category": "existing-impl"
+    },
+
+    {
+      "id": "node:tool-entity-emitter",
+      "name": "Entity-emitter Tool",
+      "type": "tool",
+      "source": "codebase",
+      "health_status": "validated",
+      "definition": "Typed deterministic Tool that writes JSON-LD entity files conforming to a given foundation schema.",
+      "success_criterion": "Reuses the existing entity-emitter skill (task #58 in feedback log) — well-validated in production.",
+      "depends_on": ["node:filesystem-integration"],
+      "artifactAffinity": ["sequence-diagram", "data-flow"],
+      "leaf_category": "existing-impl"
+    },
+
+    {
+      "id": "node:tool-drift-detector",
+      "name": "Drift-detector Tool",
+      "type": "tool",
+      "source": "codebase",
+      "health_status": "validated",
+      "definition": "Invokes the canonical drift detector. Same tool that release-train uses, scoped to a single entity.",
+      "success_criterion": "Reuses the blocking drift detector from `7d666df extend: tighten-drift-gate`.",
+      "depends_on": ["node:filesystem-integration"],
+      "artifactAffinity": ["sequence-diagram"],
+      "leaf_category": "existing-impl"
+    },
+
+    {
+      "id": "node:foundation-project-primitive",
+      "name": "Project (foundation primitive)",
+      "type": "domain-entity",
+      "source": "codebase",
+      "health_status": "validated",
+      "definition": "The foundation v0.6.0 Project schema at plugins/sulis/brain/compiled/foundation/project.schema.json.",
+      "success_criterion": "Schema is stable; release-train binds to it.",
+      "depends_on": [],
+      "artifactAffinity": ["data-flow"],
+      "leaf_category": "external-spec"
+    },
+
+    {
+      "id": "node:foundation-workflow-primitive",
+      "name": "Workflow (foundation primitive)",
+      "type": "domain-entity",
+      "source": "codebase",
+      "health_status": "validated",
+      "definition": "The foundation v0.6.0 Workflow schema.",
+      "success_criterion": "Schema stable; release-train binds to it.",
+      "depends_on": [],
+      "artifactAffinity": ["data-flow"],
+      "leaf_category": "external-spec"
+    },
+
+    {
+      "id": "node:foundation-step-primitive",
+      "name": "Step (foundation primitive)",
+      "type": "domain-entity",
+      "source": "codebase",
+      "health_status": "validated",
+      "definition": "The foundation v0.6.0 Step schema.",
+      "success_criterion": "Schema stable.",
+      "depends_on": [],
+      "artifactAffinity": ["data-flow"],
+      "leaf_category": "external-spec"
+    },
+
+    {
+      "id": "node:foundation-trigger-primitive",
+      "name": "Trigger (foundation primitive)",
+      "type": "domain-entity",
+      "source": "codebase",
+      "health_status": "validated",
+      "definition": "The foundation v0.6.0 Trigger schema.",
+      "success_criterion": "Schema stable.",
+      "depends_on": [],
+      "artifactAffinity": ["data-flow"],
+      "leaf_category": "external-spec"
+    },
+
+    {
+      "id": "node:foundation-failuremode-primitive",
+      "name": "FailureMode (foundation primitive)",
+      "type": "domain-entity",
+      "source": "codebase",
+      "health_status": "validated",
+      "definition": "FMEA-grounded recovery declaration entity from foundation v0.6.0.",
+      "success_criterion": "Schema stable.",
+      "depends_on": [],
+      "artifactAffinity": ["data-flow", "state-machine"],
+      "leaf_category": "external-spec"
+    },
+
+    {
+      "id": "node:foundation-tool-primitive",
+      "name": "Tool (foundation primitive)",
+      "type": "domain-entity",
+      "source": "codebase",
+      "health_status": "validated",
+      "definition": "Typed deterministic operation entity from foundation v0.6.0.",
+      "success_criterion": "Schema stable.",
+      "depends_on": [],
+      "artifactAffinity": ["data-flow"],
+      "leaf_category": "external-spec"
+    },
+
+    {
+      "id": "node:uc-001-first-time-setup",
+      "name": "UC-001 First-time setup",
+      "type": "use-case",
+      "source": "user",
+      "health_status": "validated",
+      "definition": "Consumer with no Project entity runs /sulis:discover-project, gets a working entity.",
+      "success_criterion": "All 5 phases complete; Project entity persists; drift verify passes.",
+      "depends_on": ["node:discovery-workflow", "node:skill-imperative", "node:project-entity"],
+      "artifactAffinity": ["use-case", "process-flow"],
+      "leaf_category": "primitive-component"
+    },
+
+    {
+      "id": "node:uc-002-re-discovery",
+      "name": "UC-002 Re-discovery",
+      "type": "use-case",
+      "source": "user",
+      "health_status": "validated",
+      "definition": "Consumer with an existing entity runs --update, produces per-field diff, approves changes.",
+      "success_criterion": "Diff produced; only approved fields written; unapproved fields preserved.",
+      "depends_on": ["node:discovery-workflow", "node:project-entity"],
+      "artifactAffinity": ["use-case", "process-flow"],
+      "leaf_category": "primitive-component"
+    },
+
+    {
+      "id": "node:uc-003-monorepo",
+      "name": "UC-003 Monorepo with multiple Projects",
+      "type": "use-case",
+      "source": "user",
+      "health_status": "validated",
+      "definition": "Consumer runs discovery with --path to mint a sibling Project in a monorepo.",
+      "success_criterion": "Scoped Detect; no overwrite of sibling Projects; unique slug.",
+      "depends_on": ["node:discovery-workflow", "node:project-entity"],
+      "artifactAffinity": ["use-case", "process-flow"],
+      "leaf_category": "primitive-component"
+    },
+
+    {
+      "id": "node:uc-004-non-git",
+      "name": "UC-004 Non-git directory error",
+      "type": "use-case",
+      "source": "user",
+      "health_status": "validated",
+      "definition": "Consumer runs discovery in a non-git directory; fails fast with clear error.",
+      "success_criterion": "Detect fails with explicit error; no entity written; non-zero exit.",
+      "depends_on": ["node:detect-phase", "node:git-integration"],
+      "artifactAffinity": ["use-case", "process-flow"],
+      "leaf_category": "primitive-component"
+    },
+
+    {
+      "id": "node:uc-005-cancel-mid-flow",
+      "name": "UC-005 Founder cancels mid-flow",
+      "type": "use-case",
+      "source": "user",
+      "health_status": "validated",
+      "definition": "Consumer cancels during Ask phase; no partial state persists.",
+      "success_criterion": "Atomic write semantics; idempotent re-run.",
+      "depends_on": ["node:mint-phase"],
+      "artifactAffinity": ["use-case", "state-machine"],
+      "leaf_category": "primitive-component"
+    },
+
+    {
+      "id": "node:uc-006-llm-correction",
+      "name": "UC-006 LLM-inference correction",
+      "type": "use-case",
+      "source": "user",
+      "health_status": "validated",
+      "definition": "LLM proposes an incorrect value; consumer overrides in Ask phase.",
+      "success_criterion": "Override recorded canonically before Mint; inferred value never persists without confirmation.",
+      "depends_on": ["node:infer-phase", "node:ask-phase"],
+      "artifactAffinity": ["use-case", "process-flow"],
+      "leaf_category": "primitive-component"
+    }
+  ]
+}

@@ -21,6 +21,20 @@ If no SRD specification exists, stop and tell the user — refer them to
 
 These standards shape the TDD + the new contract artifacts (step 3.5):
 
+<!-- VERIFICATION_QUESTIONS source: plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md v1.0.0 -->
+
+- `../../references/standards/VERIFICATION_QUESTIONS.md` — the canonical
+  20-question set (foundational Q1-Q4 + per-integration Q5-Q13 + per-kind
+  Q14-Q20) and the seven-row kind→adapter table. The TDD this skill
+  produces MUST carry a populated `## Verification Plan` section
+  (literal heading per ADR-001) with six subsections referencing
+  questions by ID, never inlining them. The engineering-architect agent
+  is the one that walks the questions; this skill is the orchestrator
+  that ensures the resulting TDD section is present and that **P-VER**
+  is invoked against the TDD before stage completion (FR-002, FR-009).
+  Cross-reference: [`ADR-001`](../../../../.architecture/verification-by-design/adrs/ADR-001-section-name-verification-plan.md)
+  fixes the section name; [`decompose-validation-rubric.md`](../../references/decompose-validation-rubric.md)
+  §Phase 9 hosts the P-VER check.
 - `../../references/standards/CONTRACT_FIRST_STANDARD.md` — the **data
   contract** seam discipline (two-axis model, three-category error model,
   stubs include error/empty cases, transport binding).
@@ -150,6 +164,8 @@ The TDD has a fixed structure. Each section maps to MECE-3 pillars. See
    - Chaos assertions per resiliency primitive
 6. **Trade-offs** — patterns chosen, alternatives rejected, with one-line reasons
 7. **Open questions** — anything the SRD does not specify that the architecture needs
+8. **Canonical Identifiers** *(if any cross-WP identifiers are foreseen)* — when the design foresees parallel WPs cross-referencing a shared identifier (ULID, slug, version literal, namespace, `dna:*:*` shape), pre-mint that identifier here OR author a paired `ADR-NN-canonical-identifiers.md`. Document the minting recipe (e.g. `SHA256(name) → Crockford base32`) so a future regenerate produces the same value. Without this, parallel-dispatched executors each invent their own value and they diverge — anchor case CH-01KSZ4 release-train wave-1 tenant ULID. `/sulis:plan-work` step 7c + Decompose Validation Rubric Phase 8 are the downstream gates that catch a missing canonical source.
+9. **`## Verification Plan`** *(MUST — verbatim heading per ADR-001)* — the design-time commitment to how this work will be verified. The six required subsections, in order: (1) "What user-observable behaviour are we verifying?" — populated from the foundational Q1-Q4; (2) "Verification environment(s)" — local / staging / ephemeral / production-shadow; (3) "Bootstrap-from-zero case" — what verification looks like before any data exists (the anchor failure mode for the release-train + discovery dogfood incidents that motivated this change); (4) "Per-integration verification strategy" — per-touched-integration verdict against Q5-Q13 (real / recorded / simulated / none-with-justification); (5) "Per-kind verification adapter" — the one-liner from the seven-row table in `references/standards/VERIFICATION_QUESTIONS.md` for this change's `kind:`; (6) "Infrastructure needs surfaced (deferred)" — entries that ADR-005's slice-end auto-draft picks up to create follow-on changes. The engineering-architect agent populates this section from the canonical's question set; this skill's Workflow step (after pillar coverage) invokes **P-VER** against the produced TDD before stage completion.
 
 ### ADRs
 
@@ -448,6 +464,35 @@ If extending or superseding, reference the existing ADR by path.}
     For services the design *modifies* rather than introduces: update the existing manifest in place; do not branch it. The manifest is single-source-of-truth across the lifecycle (design → implementation → registration → SDK / MCP / agent consumption), so divergence at any point is a bug.
 
     For services that are explicitly bridge handlers over an existing system (BYOS per SPEC-006), call this out in the manifest's metadata and produce the bridge-side contract in the same shape — the registration substrate is identical for BWS and BYOS.
+
+10.5. **Invoke P-VER on the produced TDD + WP set (MUST).** Once the TDD,
+    ADRs, and ServiceSpec manifests are written, run the P-VER rubric
+    check from
+    [`plugins/sulis/references/decompose-validation-rubric.md`](../../references/decompose-validation-rubric.md)
+    §Phase 9 against the produced artifacts. P-VER asserts: (a) the
+    TDD's `## Verification Plan` section is present per ADR-001's
+    literal heading; (b) all six required subsections per
+    [`VERIFICATION_QUESTIONS.md`](../../references/standards/VERIFICATION_QUESTIONS.md)
+    are populated with substantive content (the placeholder block-list
+    per MUC-001 — 30-char minimum); (c) every named integration
+    carries an `existing` / `deferred` / `out-of-scope` classification
+    (MUC-002 defence); (d) the canonical HTML-comment annotation
+    resolves to a live file at a current version (MUC-003 + MUC-004);
+    (e) the change's `kind:` value maps to an adapter row in the
+    seven-row table (MUC-007); and (f) every WP carries the
+    `verification:` frontmatter field per ADR-003.
+
+    **Failure semantics (FR-009).** A P-VER failure halts the design
+    pass and surfaces the failure-mode name + the missing piece. The
+    common failure modes during draft-architecture are: missing
+    Verification Plan section, placeholder content in a subsection,
+    unclassified integration. Fix in-line where possible (P-VER PASS
+    is the gate that lets `/sulis:plan-work` start). If the failure
+    points at an SRD↔TDD contradiction (e.g., the SRD specifies an
+    integration that the TDD did not surface), the engineering-architect
+    agent's responsibility is to surface the contradiction back to the
+    founder; this skill's responsibility is to render the contradiction
+    plainly.
 
 11. **Sizing self-check (MUST).** Before writing, review your draft against the tier targets:
     - Total TDD length > 1.5× tier target? → write a "Why is this big?" paragraph or refactor

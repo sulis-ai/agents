@@ -1,0 +1,4 @@
+plugins/sulis/scripts/_discovery/minter.py
+plugins/sulis/scripts/_discovery/slug.py
+plugins/sulis/scripts/tests/unit/test_discovery_minter.py
+plugins/sulis/scripts/tests/unit/test_discovery_slug.py

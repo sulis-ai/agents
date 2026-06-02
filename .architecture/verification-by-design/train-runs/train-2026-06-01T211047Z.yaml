@@ -1,0 +1,27 @@
+train_id: "train-2026-06-01T211047Z"
+started_at: "2026-06-01T21:10:47Z"
+completed_at: "2026-06-01T21:16:42Z"
+outcome: "success"
+batch_size: 3
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-01T21:16:03Z"
+gate_findings_path: ".architecture/verification-by-design/code-reviews/PR-batch-train-2026-06-01T211047Z-2026-06-01T211642Z/REVIEW.md"
+bundle:
+  - wp: WP-005
+    branch: feat/wp-005-extend-plan-work-skill-and-slice-end
+    pre_train_sha: 126926814b4e52e69676a95dc7df1be63465f1bb
+    rebased_to_sha: 126926814b4e52e69676a95dc7df1be63465f1bb
+    merge_sha_on_dev: b01aeef356035d160d6aadd73a171cec420fbc03
+  - wp: WP-006
+    branch: feat/wp-006-extend-specify-draft-architecture-validation-templates-skills
+    pre_train_sha: 110201e8827c23dbf74bdb2565baf7c81e49cc9b
+    rebased_to_sha: 6b50f4f716779bc88bfb09784f8fdcfbd1435685
+    merge_sha_on_dev: bb2c71e06d8e977292a42f8c2d9e6d5e08273ad6
+  - wp: WP-007
+    branch: feat/wp-007-author-p-ver-fixtures-and-tests
+    pre_train_sha: 857a3bb34a17f61f761fc7d3cce410eb29ed2b23
+    rebased_to_sha: b9ad9a44a84c1588e2589d8728e859701ae1444c
+    merge_sha_on_dev: a62c17267d79687cd715802fe911088fff5b72a1

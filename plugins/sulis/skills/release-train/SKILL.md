@@ -100,10 +100,42 @@ this skill, stop: call the helper instead.
 
 ### 1. Pre-flight — is there anything to release, and is it safe?
 
-Run four checks before computing anything. Any one of them can stop the run with
-a plain-English explanation.
+Run these checks before computing anything. Any one of them can stop the run with
+a plain-English explanation. The drift guard runs **first** — if production has
+moved ahead of `dev`, nothing else this skill computes is trustworthy.
 
-**a. GitHub access.** Confirm `gh` is authenticated:
+**a. Refuse to operate against a stale `dev`.** Before anything else, confirm
+production (`main`) hasn't drifted ahead of `dev`. A release computed against a
+stale `dev` would itself ship stale — so this is the very first thing checked.
+Run the shared drift helper; it does its own `git fetch origin` and compares the
+two branches:
+
+```bash
+if ! bash plugins/sulis/scripts/drift_check.sh; then
+  exit 1
+fi
+```
+
+The helper exits `0` and stays silent when `dev` is level with or ahead of
+production. If it exits non-zero, it has already printed a plain-English recovery
+message (either "there's an open back-integrate pull request — merge it, then
+re-run" or the manual step-by-step). **Stop the run** — do not proceed to reading
+changesets or computing the next version. Surface the helper's message and the
+recovery path:
+
+> *"I've stopped before drafting anything: production has moved ahead of `dev`,
+> so a release right now would ship stale work. {the helper's recovery message}.
+> Once `dev` is caught up, run `/sulis:release-train` again. (This is the
+> back-on-release safety net — the recovery procedure is the one written up under
+> GIT-12 in the git workflow standard.)"*
+
+This is a defence-in-depth guard: the release robot's own back-merge step is the
+primary protection, and this check catches the rare case where that step was
+bypassed or an earlier back-integrate pull request is still sitting open. The
+comparison logic lives once, in `plugins/sulis/scripts/drift_check.sh` — this
+skill only calls it, never re-implements the check.
+
+**b. GitHub access.** Confirm `gh` is authenticated:
 
 ```bash
 gh auth status
@@ -114,14 +146,14 @@ If it fails, stop and say so plainly with the fix (Rule 5):
 > *"I can't reach GitHub right now — `gh` isn't signed in. Run `gh auth login`,
 > then try `/sulis:release-train` again."*
 
-**b. Get the latest.** Make sure the comparison is against the real remote
+**c. Get the latest.** Make sure the comparison is against the real remote
 state:
 
 ```bash
 git fetch origin --quiet
 ```
 
-**c. Is there anything ahead of production?** Count what's on `dev` but not yet
+**d. Is there anything ahead of production?** Count what's on `dev` but not yet
 on `main`:
 
 ```bash
@@ -133,7 +165,7 @@ If `COMMITS_AHEAD` is `0`, there is **nothing to release** — stop cleanly:
 > *"Nothing to release — `dev` is already level with production. Ship some work
 > first (`/sulis:change ship …`), then come back."*
 
-**d. Is a release already in flight?** Check for an open `dev → main` pull
+**e. Is a release already in flight?** Check for an open `dev → main` pull
 request:
 
 ```bash
@@ -150,7 +182,7 @@ proceed (Rule 5 — explain + the choice):
 
 Wait for the founder's answer; do not auto-decide.
 
-**e. Version-drift guard.** The plugin version and the marketplace's copy of the
+**f. Version-drift guard.** The plugin version and the marketplace's copy of the
 sulis version must match *before* a release — a mismatch means a previous
 release only half-applied, and bumping on top would compound the error. Read
 both and compare:
@@ -308,6 +340,31 @@ show the exact command that *would* open it, and stop. Open **nothing**:
 > ```
 > *"*
 
+**Pin the dev SHA into the pull-request body (do this immediately before
+opening).** The release robot needs to know which `dev` commit this release was
+cut against, so that after the merge it can tell a clean release (advance `dev`
+to match production) from a raced one (open a catch-up pull request instead). It
+reads that commit from a single machine-readable line at the bottom of the
+pull-request body. Capture `dev`'s current commit and append it to the body file
+that's about to be opened — append-only, always last, so it's the line the robot
+reads (ADR-005):
+
+```bash
+DEV_SHA=$(git rev-parse origin/dev)
+printf '\n\n<!-- dev-sha-at-open: %s -->\n' "$DEV_SHA" >> /tmp/release-train-body-<timestamp>.md
+```
+
+`git rev-parse origin/dev` returns a 40-character commit hash; the line written
+is exactly `<!-- dev-sha-at-open: <hash> -->`, an HTML comment that stays
+invisible in the GitHub pull-request view but is recovered verbatim by the
+robot. Use `origin/dev` (not `HEAD` — after any release-prep step `HEAD` may not
+be on `dev`); the earlier drift check (Step 1a) already ran `git fetch origin`,
+so `origin/dev` is current. Capture it here, in the same breath as opening the
+pull request — not earlier — so the pinned commit is the one true at open time
+even if the founder spent a while reviewing the preview (ADR-005). Writing the
+pin *before* `gh pr create` means the pull request is never visible without it,
+so the robot can never see a release pull request that's missing its pin.
+
 **Without `--dry-run` (open it).** After the founder confirms (and after the
 mandatory major-callout confirmation if it's a major release), open the pull
 request and hand back the link:
@@ -328,6 +385,65 @@ the URL from stdout and report:
 
 If it was opened `--draft`, say so: "…opened as a draft so you can keep editing
 — mark it ready when it's good."
+
+---
+
+## Dry-run mode — walk the canonical (when the canonical is authored)
+
+When the release-train canonical lives at
+`plugins/sulis/instances/release-train/` (Workflow + Steps + Triggers +
+FailureModes + Tools authored as JSON-LD instances), the `--dry-run`
+preview can walk the canonical itself instead of describing the
+release purely from imperative YAML inspection. The founder gets a
+Step-by-Step narrative derived from the spec — what each Step would
+do, which FailureModes guard it, what the human-gate Step (open the
+PR + merge) requires — rather than re-reading bash.
+
+Per **ADR-001** (Path A — canonical-as-spec, imperative CI continues),
+the canonical walk runs at *dry-run time only*. The actual release
+machinery in `release-on-merge.yml` stays imperative and zero-token;
+the LLM-driven runner pays its token cost once per release decision,
+not per CI run. The drift detector (FR-015) is what keeps the
+imperative path faithful to the canonical between dry-runs.
+
+To invoke the canonical walk, dispatch the brain's `execute-workflow`
+agent against the canonical directory:
+
+```bash
+# Probe for the canonical directory first; fall back if absent.
+CANONICAL=plugins/sulis/instances/release-train
+if [ -d "$CANONICAL" ]; then
+  # Resolve the founder-Project (the marketplace plugin being released)
+  # and dispatch the brain agent. for_project binds the Project's
+  # state_contract variables so each Step's prose renders correctly.
+  /sulis-brain:execute-workflow "$CANONICAL"
+else
+  # Canonical absent (older marketplace fork, or canonical not yet
+  # authored). Skip the canonical walk and use the imperative-only
+  # preview above. No regression — the existing dry-run still works.
+  echo "Canonical absent — using imperative-only preview."
+fi
+```
+
+The agent reads `workflow.jsonld`, `steps.jsonld`, `triggers.jsonld`,
+`failuremodes.jsonld`, and `tools.jsonld`, walks the Steps in order,
+and produces a per-Step preview rendered from each Step's
+`agent_instructions` field. The non-dry-run (open-the-PR) path is
+unchanged — it continues to use the imperative flow described in
+section 5.
+
+**Token-cost envelope (NFR-001).** The canonical walk is the only
+token-consuming part of the release train; the imperative path
+remains zero-token. NFR-001 in the SRD sets the per-dry-run budget;
+exceeding the budget surfaces a warning to the founder so the cost
+shape is visible at invoke time. Step 5 (`draft-pr-body-and-changelog`)
+also declares its own per-Step token budget (NFR-010) and falls back
+to a deterministic CHANGELOG-from-template if it overruns.
+
+**Fallback.** If `plugins/sulis/instances/release-train/` doesn't
+exist (e.g. a marketplace fork that hasn't authored the canonical),
+the skill falls back to the imperative-only preview from section 5.
+No regression — every fork keeps a working dry-run.
 
 ---
 

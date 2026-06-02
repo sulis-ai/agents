@@ -1,0 +1,53 @@
+{
+  "timestamp": "2026-06-01T21:07:46Z",
+  "branch": "feat/wp-007-author-p-ver-fixtures-and-tests",
+  "base": "change/extend-verification-by-design",
+  "verdict": "Approve with fixes (inline-fixed; effective PASS)",
+  "build_verification": {
+    "errors": 0,
+    "tests_run": 29,
+    "tests_pass": 29,
+    "ruff_check": "clean",
+    "ruff_format": "clean"
+  },
+  "pr_hygiene": {
+    "scope": {"severity": "clean", "commit_type_spread": ["feat"], "module_fan_out": 1},
+    "size": {"severity": "medium", "lines_added": 1008, "lines_removed": 0, "files_changed": 46, "note": "inflated by fixture data; substantive code ~600 LOC"},
+    "safety": {"severity": "clean", "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0},
+    "completeness": {"severity": "clean", "new_source_without_test": 0, "note": "diff IS the test surface"}
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "lens": "quality",
+      "severity": "medium",
+      "status": "fixed-inline",
+      "file": "plugins/sulis/scripts/_p_ver_rubric.py",
+      "line_range": "17-19",
+      "category": "contract-drift",
+      "summary": "Docstring claimed ~100 LOC ceiling vs actual ~400 LOC"
+    },
+    {
+      "id": "F-02",
+      "lens": "quality",
+      "severity": "medium",
+      "status": "fixed-inline",
+      "file": "plugins/sulis/scripts/tests/unit/test_p_ver_rubric.py",
+      "line_range": "23-24",
+      "category": "contract-drift",
+      "summary": "Docstring documented fixture_helpers.py that does not exist (Blue extraction was skipped with journal rationale)"
+    }
+  ],
+  "hardening_deltas_drafted": 0,
+  "self_attestation": {
+    "CR-01": "pass",
+    "CR-02": "pass (carve-out — substantive code ~600 LOC)",
+    "CR-03": "pass",
+    "CR-04": "pass",
+    "CR-05": "pass",
+    "CR-06": "pass",
+    "CR-07": "pass",
+    "CR-08": "pass",
+    "CR-09": "pass"
+  }
+}

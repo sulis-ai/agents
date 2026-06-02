@@ -1,0 +1,45 @@
+{
+  "target": "feat/wp-006-mint-phase",
+  "base": "change/create-discover-project",
+  "timestamp": "2026-06-01T181034Z",
+  "diff": {
+    "files_changed": 4,
+    "lines_added": 680,
+    "lines_removed": 0,
+    "source_files": 2,
+    "test_files": 2
+  },
+  "build_verification": {
+    "ruff_check": "clean",
+    "ruff_format": "clean",
+    "mypy": "clean",
+    "pytest": "22 passed",
+    "coverage": {
+      "_discovery/minter.py": "94%",
+      "_discovery/slug.py": "100%",
+      "total": "95%"
+    },
+    "errors_introduced": 0
+  },
+  "pr_hygiene": {
+    "ph_01_scope": {"severity": "low", "commit_types": ["feat"], "modules_touched": 1},
+    "ph_02_size": {"severity": "medium", "lines_total": 680, "files_changed": 4, "notes": "60% is test code; production surface 272 LOC"},
+    "ph_03_safety": {"severity": "low", "migrations": 0, "schema_idl": 0, "infra": 0, "secret_patterns": 0},
+    "ph_04_completeness": {"severity": "low", "new_source_without_test": 0}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"critical": 0, "high": 0, "medium": 0, "low": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "status": "complete"},
+    "security": {"findings": 0, "status": "complete"},
+    "quality": {"findings": 0, "status": "complete"}
+  },
+  "cr10_performance": {
+    "matches": 0,
+    "notes": "no anti-pattern matches; mint is bounded by filesystem latency (≤50ms per TDD §Performance)"
+  },
+  "verdict": "PASS",
+  "auto_downgrade_triggers": []
+}

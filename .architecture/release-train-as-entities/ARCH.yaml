@@ -1,0 +1,39 @@
+id: ARCH-001
+title: Release-train as canonical entities — Path A design
+status: designed
+sourced_from: ../../.specifications/release-train-as-entities/SRD.md
+created: 2026-06-01
+tier: L
+execution_path: A
+structural_template: sulis-brain/.specifications/business-dna/instances/sync-narrative-docs/
+pillars:
+  form: partial   # template inherited; structural specifics new
+  armor: partial  # brain ships FailureMode; drift detector + budget are new
+  proof: full     # specified fresh (no prior pattern in repo)
+adrs:
+  - ADR-001 — Path A as v1 execution strategy
+  - ADR-002 — Inline canonical:step:<name> annotations for drift detection
+  - ADR-003 — Tool minting fidelity: primaries fully populated, rest stubbed
+  - ADR-004 — Hand-author Project instances; defer project-discovery
+artifacts_produced:
+  - TDD.md
+  - SIZING.md
+  - adrs/ADR-001..ADR-004
+expected_workpackages: 8-12
+brain_dependencies:
+  - sulis-brain v0.9.0
+  - foundation v0.6.0 (Project, Workflow.for_project, Tool, FailureMode, LifecycleRun v2.1.0, DerivedArtifact)
+  - DR-015 (execute-workflow agent)
+  - DR-016 (Project entity)
+  - DR-017 (Workflow.for_project)
+  - DR-018 (Tool.implementation_kind=workflow_dispatch)
+  - DR-020 (sync-narrative-docs template)
+deferred_to_v2:
+  - FR-010 — marketplace-release composition Workflow via workflow_dispatch
+  - FR-013 — LifecycleRun emission at imperative-Step boundaries
+  - FR-014 — run-record artifact
+  - NFR-004 — Replay via LifecycleRun
+  - NFR-005 — Failure isolation in composition
+  - DerivedArtifact adoption for CHANGELOG + Release-notes provenance
+deferred_to_sibling:
+  - project-discovery Workflow (triggered at n=2 or env-init lands)

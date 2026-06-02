@@ -1,0 +1,15 @@
+change_id: SHA-7a6d267
+primitive: fix
+tier: patch
+touches_plugin: true
+summary: |
+  liveness-checks-claude-process
+  
+  Closes #87 — session_is_live verifies a claude process is on the tty (ps
+  -t <tty> -o command=), not just any process, so a dead spawn (the #86
+  abort, or claude exited) no longer reports as live. Refines #32.
+  Regression-locked. sulis v0.83.0 / marketplace v1.128.0.
+  
+  Co-authored-by: Iain Niven-Bowling <iain@nivbow.com>
+  Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+created_at: 2026-05-29T13:17:00Z

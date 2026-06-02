@@ -1,0 +1,512 @@
+diff --git a/.architecture/release-train-as-entities/work-packages/.executor-WP-004.md b/.architecture/release-train-as-entities/work-packages/.executor-WP-004.md
+new file mode 100644
+index 0000000..e75a6fa
+--- /dev/null
++++ b/.architecture/release-train-as-entities/work-packages/.executor-WP-004.md
+@@ -0,0 +1,59 @@
++# Executor journal — WP-004
++
++> Started: 2026-06-01T10:05:30Z
++> Lifecycle step: 6.5
++> Status: in_progress
++
++## Pre-flight checks
++
++| Tool / Check | Status | Fallback |
++|---|---|---|
++| uv | present | — |
++| python3 | present | — |
++| gh CLI | present | — |
++| jsonschema | present | available via uv sync |
++
++## Plan
++
++**Approach.** Create primitive (kind=contract). Author 8 FailureMode instances at plugins/sulis/instances/release-train/failuremodes.jsonld validating against the foundation FailureMode JSON Schema, covering today's three lived defects (CH-01KSYZ YAML parse, CH-01KSZ1 loop-guard, GH-token tag trigger) plus 5 structural/operational defenses. Key reconciliation: the WP Contract uses kind='operational'/'structural' but the foundation schema enum is timeout/dependency-unavailable/invalid-input/policy-violation/business-logic-error/infrastructure-failure/capacity-exceeded/authorisation-denied/other — I will map per-FailureMode to schema-valid kinds and use the schema as canonical.
++
++| # | Item | Step | Status | Notes |
++|---:|---|---|---|---|
++| 1 | Write test_failuremodes_jsonld_parses in plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py | 2 (RED) | done | — |
++| 2 | Write test_8_failuremodes_present in plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py | 2 (RED) | done | — |
++| 3 | Write test_each_passes_brain_schema in plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py | 2 (RED) | done | — |
++| 4 | Write test_recovery_strategy_enum_valid in plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py | 2 (RED) | done | — |
++| 5 | Write test_lived_defects_represented — workflow-yaml-fails-to-parse + loop-guard-matches-founder-pr + bot-tag-doesnt-trigger-release-prod present by name | 2 (RED) | done | — |
++| 6 | Write test_names_kebab_case — every FailureMode name is kebab-case + describe-failure form (Blue invariant test, RGB-03) | 2 (RED) | done | — |
++| 7 | Vendor foundation FailureMode schema into plugins/sulis/brain/compiled/foundation/failuremode.schema.json (currently absent) | 3 (GREEN) | done | — |
++| 8 | Author plugins/sulis/instances/release-train/failuremodes.jsonld with 8 FailureMode instances per Contract + FR-008 | 3 (GREEN) | done | — |
++| 9 | Refactor: ensure FailureMode descriptions are uniformly structured (symptom + recovery action); verify naming + schema kind mapping | 4 (BLUE) | skipped | No 2-consumer duplication threshold fires — each FailureMode's description + recovery_detail is intrinsically unique to its symptom. Blue invariants (kebab-case + describe-failure form + schema-validity) are enforced by tests #4, #5, #6, #3 — invariants travel with the code, not extracted into a helper. |
++| 10 | Docs no-op — WP has no docs_to_update; failuremodes.jsonld IS the canonical spec; will skip Step 5 | 5 (DOCS) | skipped | No-op as expected. WP has no docs_to_update frontmatter. The failuremodes.jsonld file IS the canonical spec for the FailureMode catalogue; its _about field serves as inline documentation. Downstream WP-009 (annotations) and WP-007 (drift detector) will reference these entities, but they are separate WPs. |
++| 11 | Run pytest from plugins/sulis/scripts via uv; ensure no test failures | 6 (LINT) | done | — |
++| 12 | Run /code-review against local diff vs origin/change/create-release-train-as-entities (Step 6.5 gate) | 6.5 (CODE-REVIEW) | pending | — |
++| 13 | Commit (Conventional Commits feat scope) + push to origin | 7 (COMMIT) | pending | — |
++
++## Step trace
++
++| Step | Started | Completed | Outcome |
++|---:|---|---|---|
++| 1 | 2026-06-01T10:05:52Z | 2026-06-01T10:05:57Z | Worktree at ../wp-004-rt-worktree on feat/wp-004-author-failuremodes-instance; base SHA 794399209060daea30c45501a0a1507408145c8b on change/create-release-train-as-entities |
++| 1.5 | 2026-06-01T10:06:01Z | 2026-06-01T10:06:48Z | Plan seeded — 13 items across 7 phases; scope-guard clean (all file paths inside WP Contract); kind-enum reconciliation noted in approach |
++| 2 | 2026-06-01T10:06:58Z | 2026-06-01T10:08:00Z | 6 tests written in test_failuremodes_instance_valid.py; all 6 fail with expected 'failuremodes.jsonld missing' fixture setup error — RED confirmed |
++| 3 | 2026-06-01T10:08:06Z | 2026-06-01T10:11:44Z | 8 FailureMode instances authored at plugins/sulis/instances/release-train/failuremodes.jsonld; FailureMode schema vendored to plugins/sulis/brain/compiled/foundation/; all 6 new tests pass; full unit suite green (1190 passed) |
++| 4 | 2026-06-01T10:11:54Z | 2026-06-01T10:11:58Z | No refactor required — Blue invariants are encoded as RGB-03 test assertions (test_names_kebab_case + test_each_passes_brain_schema + test_recovery_strategy_enum_valid); no duplication threshold fires across the 8 FailureMode descriptions |
++| 5 | 2026-06-01T10:12:03Z | 2026-06-01T10:12:08Z | Docs no-op — WP-004 has no docs_to_update; failuremodes.jsonld is itself the spec, with _about field providing inline rationale |
++| 6 | 2026-06-01T10:12:12Z | 2026-06-01T10:12:35Z | Lint clean: manifest JSON validity (OK), python compileall (OK), JSON-LD parse (OK), schema parse (OK), sulis-route check (passed, no orphans/duplicates) |
++| 6.5 | 2026-06-01T10:12:40Z | (in flight) | — |
++
++## Self-heal attempts
++
++| Step | Attempt | Failure (1-line summary) | Root cause | Change applied | Outcome |
++|---:|---:|---|---|---|---|
++
++## Post-deploy verification
++
++(Not yet recorded — Step 11 fills this in.)
++
++## Notes
++
+diff --git a/plugins/sulis/brain/compiled/foundation/failuremode.schema.json b/plugins/sulis/brain/compiled/foundation/failuremode.schema.json
+new file mode 100644
+index 0000000..44116ef
+--- /dev/null
++++ b/plugins/sulis/brain/compiled/foundation/failuremode.schema.json
+@@ -0,0 +1,106 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://sulis.co/dna/schema/failuremode/1.0.0",
++  "title": "FailureMode",
++  "description": "a named pattern of failure that one or more Steps can encounter, with a defined recovery strategy. Reusable across steps \u2014 e.g. 'external-service-timeout' applies to every step that calls an external service; 'sanctions-hit' applies to every step that consults a sanctions list. Steps reference FailureModes via handles_failures.",
++  "type": "object",
++  "unevaluatedProperties": false,
++  "required": [
++    "id",
++    "name",
++    "for_domain",
++    "kind",
++    "description",
++    "recovery_strategy",
++    "blocks_progress",
++    "state",
++    "sys_status"
++  ],
++  "properties": {
++    "sys_status": {
++      "enum": [
++        "active",
++        "archived",
++        "deleted",
++        "purged"
++      ]
++    },
++    "valid_from": {
++      "type": "string",
++      "format": "date-time",
++      "description": "business-truth window start"
++    },
++    "valid_to": {
++      "type": "string",
++      "format": "date-time",
++      "description": "business-truth window end"
++    },
++    "confidence": {
++      "type": "number",
++      "minimum": 0,
++      "maximum": 1,
++      "description": "instance reliability score"
++    },
++    "id": {
++      "type": "string",
++      "pattern": "^dna:failuremode:[0-9A-HJKMNP-TV-Z]{26}$"
++    },
++    "name": {
++      "type": "string",
++      "description": "e.g. 'external-service-timeout', 'sanctions-hit', 'demands-and-needs-missing', 'rate-limit-exceeded'"
++    },
++    "for_domain": {
++      "type": "string",
++      "pattern": "^dna:(tenant):[0-9A-HJKMNP-TV-Z]{26}$"
++    },
++    "kind": {
++      "enum": [
++        "timeout",
++        "dependency-unavailable",
++        "invalid-input",
++        "policy-violation",
++        "sanctions-hit",
++        "business-logic-error",
++        "infrastructure-failure",
++        "capacity-exceeded",
++        "authorisation-denied",
++        "other"
++      ]
++    },
++    "description": {
++      "type": "string"
++    },
++    "recovery_strategy": {
++      "enum": [
++        "retry",
++        "compensate",
++        "escalate",
++        "abort",
++        "manual-review",
++        "fallback"
++      ]
++    },
++    "recovery_detail": {
++      "type": "string",
++      "description": "specifics: 'max 3 retries with exponential backoff 1s/4s/16s'; 'escalate to compliance@firm.com'; 'fallback to manual underwriting queue'"
++    },
++    "expected_frequency": {
++      "enum": [
++        "rare",
++        "occasional",
++        "frequent"
++      ]
++    },
++    "blocks_progress": {
++      "type": "boolean",
++      "description": "true if hitting this failure mode blocks further workflow progress until recovery completes; false for retry/fallback that don't block"
++    },
++    "state": {
++      "enum": [
++        "active",
++        "deprecated"
++      ]
++    }
++  },
++  "x-schema-org-extends": "custom"
++}
+\ No newline at end of file
+diff --git a/plugins/sulis/instances/release-train/failuremodes.jsonld b/plugins/sulis/instances/release-train/failuremodes.jsonld
+new file mode 100644
+index 0000000..506189f
+--- /dev/null
++++ b/plugins/sulis/instances/release-train/failuremodes.jsonld
+@@ -0,0 +1,134 @@
++{
++  "@context": {
++    "@vocab": "https://sulis.co/dna/",
++    "dna": "https://sulis.co/dna/"
++  },
++  "@id": "dna:release-train:failuremodes",
++  "@type": "failuremode-instances",
++  "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++  "_about": "Eight FailureModes for the sulis-plugins-marketplace release-train Workflow. Three encode today's lived defects (CH-01KSYZ workflow-yaml-fails-to-parse, CH-01KSZ1 loop-guard-matches-founder-pr, GH-token tag bot-tag-doesnt-trigger-release-prod); one encodes the cycle-tolerance back-edge (release-pr-conflicts-with-target-at-merge — back-integrated twice in the project's history); the remaining four cover standard CI/PR failure surfaces + NFR-010 token-budget defense. Schema: plugins/sulis/brain/compiled/foundation/failuremode.schema.json. Tenant ULID is deterministic — derived as SHA256('tenant-name:sulis-plugins-marketplace') mapped to Crockford base32 (first char clamped to 0 per ULID spec); reused by every release-train canonical instance.",
++  "captured_on": "2026-06-01",
++
++  "failuremodes": [
++    {
++      "id": "dna:failuremode:01KTR2MXE6EA5XASA0C33S30VR",
++      "sys_status": "active",
++      "name": "release-pr-conflicts-with-target-at-merge",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "business-logic-error",
++      "description": "The release PR is mergeable=CONFLICTING at the moment release-on-merge attempts to merge it — the source branch (typically a release/* or change/* branch) diverged from the target (main or dev) since the PR opened, because another PR landed between open and merge. Recovery: back-integrate the target into the source (git merge target → push), wait for CI to re-green, retry from the open-pr Step. This is the cycle-tolerance back-edge that makes the workflow cycle-tolerant (lived twice in the project's history — encoded explicitly so future Step-authors do not assume linear-history).",
++      "recovery_strategy": "escalate",
++      "recovery_detail": "Surface CONFLICTING state to the founder via the release-train skill output. Founder back-integrates target into source manually (git checkout source; git merge target; push), waits for CI, re-runs release-on-merge. Future automation may automate the back-integration when target has only fast-forwardable commits, but the v1 stance is escalate-to-founder.",
++      "expected_frequency": "occasional",
++      "blocks_progress": true,
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.9
++    },
++    {
++      "id": "dna:failuremode:01KTR5NAFM3BGKRJTV1RTJD2MY",
++      "sys_status": "active",
++      "name": "workflow-yaml-fails-to-parse",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "invalid-input",
++      "description": "release-on-merge.yml fails to parse — typically because an inline shell snippet contains an unescaped colon or a heredoc that conflicts with YAML's flow syntax. CH-01KSYZ regression: PR #130 silently skipped because the YAML at HEAD didn't parse; GitHub Actions silently no-ops on parse failure. Recovery: abort the dispatch + surface the YAML parse error to the founder so the malformed file can be reverted or fixed.",
++      "recovery_strategy": "abort",
++      "recovery_detail": "Drift detector + branch-ci.yml MUST run pyyaml safe-load against release-on-merge.yml on every PR and fail the build on parse failure. This is the second line of defense; the first is the founder-typed lint at edit time. On parse failure: PR cannot land until release-on-merge.yml parses.",
++      "expected_frequency": "rare",
++      "blocks_progress": true,
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.95
++    },
++    {
++      "id": "dna:failuremode:01KTRA7VTSP3E14MZ4S641NHQ5",
++      "sys_status": "active",
++      "name": "loop-guard-matches-founder-pr",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "policy-violation",
++      "description": "release-on-merge's loop-guard regex (designed to skip its own previously-created release PRs to prevent infinite release-of-release-of-release loops) over-matches and skips a founder-authored PR whose title or body happens to contain the loop-guard's trigger pattern. CH-01KSZ1 regression: PR #132 was a founder PR that title-matched the bot's release-PR prefix and got skipped. Recovery: tighten the loop-guard regex (require bot-author or release-branch-prefix match in addition to title-prefix); abort the current dispatch when guard would skip a non-bot-authored PR.",
++      "recovery_strategy": "abort",
++      "recovery_detail": "Loop-guard regex MUST require BOTH (a) title-prefix match AND (b) actor=='github-actions[bot]' OR head_ref starts with 'release/'. Single-condition matches no longer skip. Drift detector verifies release-on-merge.yml encodes the both-conditions check.",
++      "expected_frequency": "rare",
++      "blocks_progress": true,
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.95
++    },
++    {
++      "id": "dna:failuremode:01KTRGB53ME08DPVBZ03RTS359",
++      "sys_status": "active",
++      "name": "bot-tag-doesnt-trigger-release-prod",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "authorisation-denied",
++      "description": "release-on-merge creates a git tag (v*.*.*) using GITHUB_TOKEN, but GitHub Actions' default GITHUB_TOKEN is denied permission to trigger downstream workflows (release-prod.yml) when pushing tags. This is a documented GitHub Actions security boundary, not a bug: bot-created refs do not fire workflow events by design. Recovery: fall back to a manual `gh release create` step that the founder runs to create the actual release artifact, OR swap GITHUB_TOKEN for a PAT (deferred — secret-management implication).",
++      "recovery_strategy": "fallback",
++      "recovery_detail": "release-on-merge.yml emits the tag + a journal entry instructing the founder to run `gh release create v<ver> --generate-notes`. The /sulis:release-train skill surfaces the deferred step in its summary. Future automation: PAT-scoped secret + bot identity rotation (deferred to a separate WP; out of scope for the canonical encoding).",
++      "expected_frequency": "frequent",
++      "blocks_progress": false,
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.9
++    },
++    {
++      "id": "dna:failuremode:01KTRS9GWHVX05E9VGM235NNXH",
++      "sys_status": "active",
++      "name": "pr-checks-fail",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "business-logic-error",
++      "description": "Required branch-protection status checks on the release PR fail (typically branch-ci.yml: pytest, drift detector, lint). Recovery: abort the dispatch, surface the failing check to the founder, do not auto-retry — a failing check means real work failed and re-running without changing inputs will produce the same failure.",
++      "recovery_strategy": "abort",
++      "recovery_detail": "release-on-merge polls the PR's check-runs API; on any failed required check, exits with the failed-check name + a link to the CI run log. Founder fixes the underlying issue (or reverts the offending commit) and reopens the release PR.",
++      "expected_frequency": "occasional",
++      "blocks_progress": true,
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.92
++    },
++    {
++      "id": "dna:failuremode:01KTRSHACB8X8VWV6GSAFPMDMF",
++      "sys_status": "active",
++      "name": "pr-open-but-mergeability-stuck",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "infrastructure-failure",
++      "description": "Release PR is open with all required checks green, but GitHub's mergeability state stays at 'UNKNOWN' or 'BLOCKED' indefinitely — typically because of a transient GitHub API hiccup that didn't recompute mergeability, OR a branch-protection setting changed mid-flight. The founder walked away assuming merge would auto-trigger; release stalls silently. Recovery: escalate via monitoring (cron-style poll detects mergeable=UNKNOWN for >N minutes and notifies the founder).",
++      "recovery_strategy": "escalate",
++      "recovery_detail": "release-on-merge does not retry forever; if mergeability is unknown after 3 polls (~6 minutes), exit with explicit 'mergeability stuck' status + ask the founder to recompute manually (close+reopen the PR forces a recompute on GitHub's side). The monitoring rule SHOULD page on the persistent-unknown state.",
++      "expected_frequency": "rare",
++      "blocks_progress": true,
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.85
++    },
++    {
++      "id": "dna:failuremode:01KTRNPG3DAPH7BW0CAQ05C3PH",
++      "sys_status": "active",
++      "name": "version-drift-detected-pre-flight",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "policy-violation",
++      "description": "Pre-flight check finds plugin.json.version disagrees with the matching entry in .claude-plugin/marketplace.json's plugins[].version, OR with the corresponding changeset's claimed version-bump. Typical cause: prior half-bump (a previous release-train run bumped plugin.json but failed before marketplace.json got updated, leaving the two artifacts out of sync). Recovery: abort the release; surface the specific version disagreement to the founder; founder reconciles (either manually re-running the failed sync step or accepting the version that's already shipped and bumping the other).",
++      "recovery_strategy": "abort",
++      "recovery_detail": "Pre-flight Step compares (plugin.json.version, marketplace.json[plugin].version, latest-changeset.version-bump-target). Three-way disagreement → abort with a table of the three values. Two-way disagreement (most common: plugin.json ahead, marketplace.json behind) → abort and tell founder to run the sync step manually.",
++      "expected_frequency": "rare",
++      "blocks_progress": true,
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.9
++    },
++    {
++      "id": "dna:failuremode:01KTRNKJ9DQSRREVTRTR82H95H",
++      "sys_status": "active",
++      "name": "probabilistic-step-token-budget-exceeded",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "capacity-exceeded",
++      "description": "An LLM-mechanism Step (specifically Step 5 'compose-changelog', the only probabilistic step in the release-train workflow per NFR-010) consumes its token budget before producing usable output. The budget is hard-capped in the canonical Step's token_budget field. Recovery: fall back to the deterministic template path (assemble CHANGELOG from the changeset summaries directly, without LLM synthesis); the result is less narrative but always ships.",
++      "recovery_strategy": "fallback",
++      "recovery_detail": "/sulis-brain:execute-workflow's budget-tracker surfaces the overflow; the imperative path in release-on-merge.yml MUST detect the same condition (LLM response truncated or budget API returns exhausted) and substitute the deterministic CHANGELOG-from-template generator. The drift detector verifies BOTH paths exist in the YAML — LLM Step + deterministic fallback under the same Step's annotation block.",
++      "expected_frequency": "occasional",
++      "blocks_progress": false,
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.85
++    }
++  ]
++}
+diff --git a/plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py b/plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py
+new file mode 100644
+index 0000000..b8e2cc4
+--- /dev/null
++++ b/plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py
+@@ -0,0 +1,188 @@
++"""
++test_failuremodes_instance_valid — WP-004
++
++Validates that `plugins/sulis/instances/release-train/failuremodes.jsonld`:
++
++1. Parses as valid JSON-LD.
++2. Declares exactly 8 FailureMode instances.
++3. Each instance validates against the foundation FailureMode JSON Schema
++   (`plugins/sulis/brain/compiled/foundation/failuremode.schema.json`).
++4. `recovery_strategy` for every instance is in the canonical
++   {retry, compensate, escalate, abort, manual-review, fallback} enum.
++5. The three lived defects from FR-008 (CH-01KSYZ workflow-yaml-fails-to-parse,
++   CH-01KSZ1 loop-guard-matches-founder-pr, GH-token-tag bot-tag-doesnt-trigger-
++   release-prod) are present by name.
++6. Every `name` is kebab-case + describe-the-failure form (Blue invariant test,
++   RGB-03).
++
++These tests are deliberately deterministic + offline — no network, no LLM,
++no brain CLI subprocess. The schema is read from the local
++brain/compiled/foundation/ directory; the instance is read from the
++release-train instances directory.
++"""
++
++from __future__ import annotations
++
++import json
++import re
++from pathlib import Path
++
++import pytest
++from jsonschema import Draft202012Validator
++
++
++_REPO_ROOT = Path(__file__).resolve().parents[5]
++_INSTANCE_PATH = (
++    _REPO_ROOT
++    / "plugins"
++    / "sulis"
++    / "instances"
++    / "release-train"
++    / "failuremodes.jsonld"
++)
++_SCHEMA_PATH = (
++    _REPO_ROOT
++    / "plugins"
++    / "sulis"
++    / "brain"
++    / "compiled"
++    / "foundation"
++    / "failuremode.schema.json"
++)
++
++_VALID_RECOVERY_STRATEGIES = {
++    "retry",
++    "compensate",
++    "escalate",
++    "abort",
++    "manual-review",
++    "fallback",
++}
++
++# FR-008's three lived-defect FailureModes — MUST be present by exact name.
++_REQUIRED_LIVED_DEFECT_NAMES = {
++    "workflow-yaml-fails-to-parse",
++    "loop-guard-matches-founder-pr",
++    "bot-tag-doesnt-trigger-release-prod",
++}
++
++# kebab-case: lowercase letters, digits, hyphens; must start with a letter;
++# no consecutive hyphens; no trailing hyphen.
++_KEBAB_RE = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)+$")
++
++
++@pytest.fixture(scope="module")
++def instance() -> dict:
++    """The parsed failuremodes.jsonld envelope."""
++    assert _INSTANCE_PATH.exists(), (
++        f"failuremodes.jsonld missing at {_INSTANCE_PATH}"
++    )
++    with _INSTANCE_PATH.open() as f:
++        return json.load(f)
++
++
++@pytest.fixture(scope="module")
++def failuremodes(instance: dict) -> list[dict]:
++    """The list of FailureMode entries inside the envelope."""
++    return instance["failuremodes"]
++
++
++@pytest.fixture(scope="module")
++def schema() -> dict:
++    """The vendored foundation FailureMode schema."""
++    assert _SCHEMA_PATH.exists(), (
++        f"foundation FailureMode schema missing at {_SCHEMA_PATH}; "
++        "expected vendored copy alongside actor/credential/tenant schemas"
++    )
++    with _SCHEMA_PATH.open() as f:
++        return json.load(f)
++
++
++# ----- Test #1 — JSON-LD parses -----
++
++
++def test_failuremodes_jsonld_parses(instance: dict) -> None:
++    """The file is well-formed JSON with the expected envelope shape."""
++    assert "@context" in instance
++    assert "@id" in instance
++    assert "@type" in instance
++    assert instance["@type"] == "failuremode-instances"
++    assert "failuremodes" in instance
++    assert isinstance(instance["failuremodes"], list)
++
++
++# ----- Test #2 — 8 FailureModes present -----
++
++
++def test_8_failuremodes_present(failuremodes: list[dict]) -> None:
++    """WP-004 Contract: exactly 8 FailureMode instances."""
++    assert len(failuremodes) == 8, (
++        f"expected 8 FailureModes, found {len(failuremodes)}"
++    )
++
++
++# ----- Test #3 — each passes brain schema -----
++
++
++def test_each_passes_brain_schema(
++    failuremodes: list[dict], schema: dict
++) -> None:
++    """Every FailureMode validates against the foundation schema."""
++    validator = Draft202012Validator(schema)
++    errors_by_name: dict[str, list[str]] = {}
++    for fm in failuremodes:
++        errs = sorted(validator.iter_errors(fm), key=lambda e: e.path)
++        if errs:
++            errors_by_name[fm.get("name", "<unnamed>")] = [
++                f"{list(e.path)}: {e.message}" for e in errs
++            ]
++    assert not errors_by_name, (
++        f"schema validation failed for {len(errors_by_name)} FailureMode(s): "
++        f"{json.dumps(errors_by_name, indent=2)}"
++    )
++
++
++# ----- Test #4 — recovery_strategy enum valid -----
++
++
++def test_recovery_strategy_enum_valid(failuremodes: list[dict]) -> None:
++    """All recovery_strategy values are in the FR-009 enum."""
++    bad = [
++        (fm["name"], fm.get("recovery_strategy"))
++        for fm in failuremodes
++        if fm.get("recovery_strategy") not in _VALID_RECOVERY_STRATEGIES
++    ]
++    assert not bad, (
++        f"recovery_strategy out of FR-009 enum: {bad}. "
++        f"Valid: {sorted(_VALID_RECOVERY_STRATEGIES)}"
++    )
++
++
++# ----- Test #5 — FR-008 lived defects represented -----
++
++
++def test_lived_defects_represented(failuremodes: list[dict]) -> None:
++    """FR-008's three lived-defect FailureModes are present by exact name."""
++    names = {fm["name"] for fm in failuremodes}
++    missing = _REQUIRED_LIVED_DEFECT_NAMES - names
++    assert not missing, (
++        f"FR-008 lived defects missing from FailureMode catalogue: {missing}. "
++        f"Present names: {sorted(names)}"
++    )
++
++
++# ----- Test #6 — Blue invariant: kebab-case names -----
++
++
++def test_names_kebab_case(failuremodes: list[dict]) -> None:
++    """Every FailureMode name is kebab-case and reads as <symptom>-<context>.
++
++    This is the Blue refactor invariant from the WP DoD: prevents naming drift
++    when future FailureModes are added.
++    """
++    bad = [fm["name"] for fm in failuremodes if not _KEBAB_RE.match(fm["name"])]
++    assert not bad, (
++        f"non-kebab-case FailureMode names: {bad}. "
++        "Pattern: lowercase + digits + hyphens, must include at least one "
++        "hyphen, no consecutive hyphens, no trailing hyphen."
++    )

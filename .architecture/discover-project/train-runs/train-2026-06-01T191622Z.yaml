@@ -1,0 +1,17 @@
+train_id: "train-2026-06-01T191622Z"
+started_at: "2026-06-01T19:16:22Z"
+completed_at: "2026-06-01T19:16:56Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-01T19:16:30Z"
+gate_findings_path: ".architecture/discover-project/code-reviews/PR-batch-train-2026-06-01T191622Z-2026-06-01T191656Z/REVIEW.md"
+bundle:
+  - wp: WP-010
+    branch: feat/wp-010-e2e-fixtures-and-dogfood
+    pre_train_sha: 65d7736a4aa24313930d98da7342307b7ffbf619
+    rebased_to_sha: 65d7736a4aa24313930d98da7342307b7ffbf619
+    merge_sha_on_dev: ec07d6f75bdd54165b3c8ea01935f72793fcf254

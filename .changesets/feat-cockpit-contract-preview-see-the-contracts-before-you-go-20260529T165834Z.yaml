@@ -1,0 +1,42 @@
+change_id: SHA-0217683
+primitive: feat
+tier: minor
+touches_plugin: true
+summary: |
+  cockpit contract preview — see the contracts before you go
+  
+  Change CH-01KSSV · primitive: feat · 5 WPs
+  
+  Render each change's **data contract** (founder-legible,
+  ServiceSpec-first → OpenAPI → raw fallback; worked walkthrough,
+  what-it-does with who-can + real identifiers, form fields,
+  entities+states, rules, languages, journeys, what-changes, errors;
+  area-grouped; full picture auto-trimmed; technical detail behind a
+  toggle) and its **UI/visual contract** (reuses the design-system
+  VIEWER), surfaced as one-click "open data contract / open UI" links in
+  the cockpit — at the pre-dispatch review gate and on-demand. Generic
+  per-change resolution (nothing hard-wired; release-acceptance test walks
+  every change). Recreate-on-demand for tidied/shipped changes. Renders
+  from source-of-truth so the preview can't drift.
+  
+  ## Verification
+  - 5 WPs shipped through the train (rebase + bundled-tip CI +
+  squash-merge); WP-005 visual contract founder-signed-off.
+  - Renderer suite + cockpit suite (342) + cockpit-e2e all green on the
+  branch.
+  - Step 10.5 cross-WP code-review caught + fixed a shared-manifest
+  composition bug (two renderers wrote different files / clobbered);
+  composition test added.
+  - Step 11 per-WP security passes + a dedicated WP-003 serving-path
+  security pass: all PASS, advisories only.
+  
+  Events deliberately out of scope (contract doesn't carry them; would
+  break no-drift) — tracked separately.
+  
+  Closes #85
+  
+  ---------
+  
+  Co-authored-by: Iain Niven-Bowling <iain@nivbow.com>
+  Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+created_at: 2026-05-29T16:58:34Z

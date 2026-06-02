@@ -1,0 +1,3 @@
+.architecture/verification-by-design/work-packages/.executor-WP-001.md
+plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md
+plugins/sulis/scripts/tests/unit/test_verification_questions_standard.py

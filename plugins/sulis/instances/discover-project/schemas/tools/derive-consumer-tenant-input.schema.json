@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/discover-project/tool/derive-consumer-tenant/input/1.0.0",
+  "title": "derive-consumer-tenant — input",
+  "description": "Input to the derive-consumer-tenant Tool — invoked by the write-project-entity Step (Mint phase) of the discover-project Workflow. The single field repo_org_slash_name is the GitHub-shorthand form of source.repo (e.g., 'acme/payments-app'); the Tool's recipe prepends 'tenant-name:' internally per ADR-002.",
+  "type": "object",
+  "required": ["repo_org_slash_name"],
+  "additionalProperties": false,
+  "properties": {
+    "repo_org_slash_name": {
+      "type": "string",
+      "description": "GitHub-shorthand <org>/<name> form of the consumer's repository, derived from the origin remote URL by the upstream Detect phase. Single forward-slash separator; case-preserving (the recipe is byte-exact on the input string).",
+      "pattern": "^[^/\\s]+/[^/\\s]+$",
+      "minLength": 3
+    }
+  }
+}

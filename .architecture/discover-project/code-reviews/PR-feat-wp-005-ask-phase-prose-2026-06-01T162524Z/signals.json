@@ -1,0 +1,73 @@
+{
+  "pr_target": "feat/wp-005-ask-phase-prose",
+  "base": "change/create-discover-project",
+  "timestamp": "2026-06-01T16:25:24Z",
+  "diff": {
+    "lines_added": 585,
+    "lines_removed": 0,
+    "files_changed": 8,
+    "language_mix": ["markdown", "txt", "python"],
+    "carve_out_threshold_breached": true,
+    "carve_out_reason": "585 lines > 200 line limit triggers required parallel dispatch; however 7 of 8 files are prose/example .md/.txt with no executable code and 1 Python test file scoring is narrow (no production code introduced)"
+  },
+  "scope_ph01": {
+    "commit_type_spread": ["feat"],
+    "module_fan_out": 3,
+    "top_dirs": [".architecture/discover-project", "plugins/sulis/scripts", "plugins/sulis/skills"],
+    "severity": "low",
+    "note": "Single-purpose: WP-005 Ask-phase prose. The journal file is bookkeeping; the skills/_prompts/ files are the deliverable; the test file is the contract that pins them. One concern."
+  },
+  "size_ph02": {
+    "lines_added": 585,
+    "lines_removed": 0,
+    "files_changed": 8,
+    "generated_ratio": 0.0,
+    "lock_file_ratio": 0.0,
+    "severity": "medium",
+    "note": "501-1000 line band; 6-15 file band. Mitigation: 5 of 8 files are prose/example text (low risk per byte). One Python test file (252 lines) is the only executable surface."
+  },
+  "safety_ph03": {
+    "migration_count": 0,
+    "schema_idl_count": 0,
+    "infra_files": 0,
+    "secret_pattern_hits": 0,
+    "severity": "low",
+    "note": "Zero migrations, zero schema/IDL files, zero infra (Docker/k8s/CI workflow) files, zero secret patterns. No CR-06 auto-downgrade triggered."
+  },
+  "completeness_ph04": {
+    "new_source_without_test": 0,
+    "api_change_without_schema": false,
+    "severity": "low",
+    "note": "All new prose files have a test file (test_discover_project_prompts.py) that pins their structural invariants. The test file itself is its own contract — no test-for-the-test required."
+  },
+  "build_verification_cr01": {
+    "ruff_check": "passed",
+    "ruff_format": "passed",
+    "pytest_targeted": "9/9 passed",
+    "errors_introduced": 0
+  },
+  "lenses": {
+    "architecture": {
+      "findings": 0,
+      "result": "nothing surfaced",
+      "checks_run": ["new HTTP/RPC/DB calls (none in diff)", "new domain->infrastructure imports (none)", "new module singletons (none)", "new circular imports (none)", "new external calls without timeout (none)", "new credentials/secrets in diff (none)", "new spans/trace_id gaps (none — no runtime code)", "new ports without contract tests (none)"]
+    },
+    "security": {
+      "findings": 0,
+      "result": "nothing surfaced",
+      "checks_run": ["SEC-01 access control (no auth surface added)", "SEC-02..07 injection/XSS/SSRF/etc (no runtime surface)", "DAT-03 PII in logs (test never logs)", "secret pattern scan (zero hits)", "dependency CVEs (no new deps)"]
+    },
+    "quality": {
+      "findings": 0,
+      "result": "nothing surfaced",
+      "build_verification_followup": [],
+      "jsx_ident_scan": "n/a — no JSX/TSX in diff",
+      "dead_surface": "none — all imports + helpers used in tests",
+      "contract_drift": "n/a — no DTO/enum changes",
+      "test_coverage": "satisfied — test file pins 9 structural invariants on the prose deliverable",
+      "performance_cr10": "n/a — no loops with DB/RPC/FS calls; no O(N**2) patterns; the test reads 6 text files end-to-end (bounded; module-scope)",
+      "style": "ruff format + ruff check clean"
+    }
+  },
+  "verdict": "PASS"
+}

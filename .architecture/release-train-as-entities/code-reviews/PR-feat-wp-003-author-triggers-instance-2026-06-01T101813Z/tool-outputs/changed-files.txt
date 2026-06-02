@@ -1,0 +1,4 @@
+.architecture/release-train-as-entities/work-packages/.executor-WP-003.md
+plugins/sulis/brain/compiled/foundation/trigger.schema.json
+plugins/sulis/instances/release-train/triggers.jsonld
+plugins/sulis/scripts/tests/unit/test_triggers_instance_valid.py

@@ -1,0 +1,2483 @@
+diff --git a/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-003-author-triggers-instance-2026-06-01T101813Z/REVIEW.md b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-003-author-triggers-instance-2026-06-01T101813Z/REVIEW.md
+new file mode 100644
+index 0000000..f8d1674
+--- /dev/null
++++ b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-003-author-triggers-instance-2026-06-01T101813Z/REVIEW.md
+@@ -0,0 +1,161 @@
++# Code Review: WP-003 — Author Trigger instances + vendor brain Trigger schema
++
++> **Timestamp:** 2026-06-01T10:18:13Z (ISO 8601 UTC)
++> **Branch:** feat/wp-003-author-triggers-instance → change/create-release-train-as-entities
++> **Files changed:** 4 (3 source + 1 bookkeeping journal)
++>
++> **Outcome:** Ready to merge
++
++---
++
++## At a glance
++
++Your change introduces two release-train Trigger entity instances, vendors the brain's Trigger JSON Schema locally so the project can validate them, and adds three unit tests that prove conformance. The build is clean, the tests pass, and the change is well-scoped. Two small style points were caught and fixed before this review was written — nothing left to do before merging.
++
++## What to fix
++
++No issues that need attention. The two small style points (unused import; an awkward inline-binding loop in an assertion's error message) were addressed inline before this review was written; both fixes preserve the same test behaviour and the suite still passes.
++
++## How this pull request is shaped
++
++**Size — clean.** 4 files, ~291 lines added. Most of that is the vendored JSON Schema (a verbatim copy from the brain's build output, ~86 lines) and the JSON-LD entity data itself (~40 lines). The actual reviewable code is ~108 lines of test code.
++
++**Scope — clean.** Single concern: WP-003's Trigger contract. One feature commit; one logical change.
++
++**Safety — clean.** No database migrations, no infrastructure files, no lock files, no secret patterns. The vendored schema is byte-equivalent to the upstream source (provenance preserved).
++
++**Completeness — clean.** Three tests cover the new entity instance — file parses, both Triggers present with expected names + kinds, and each Trigger validates against the brain JSON Schema.
++
++---
++
++## Technical detail
++
++> Below this point the report uses internal taxonomy (CR-NN, PH-NN, lens IDs) for engineers and for downstream agents like `/sulis:harden-codebase`.
++
++### Verdict
++
++`PASS` per CR-06.
++
++No auto-downgrade triggers fired:
++- Build Verification empty (CR-01 baseline clean).
++- All files >50 lines read end-to-end (CR-03).
++- All three lenses produced output (CR-07).
++- PR Hygiene at note severity across PH-01..PH-04; no PH-03 high to trigger CR-06 rule 4.
++
++### Summary
++
++- **Build Verification:** 0 PR-introduced errors (CR-01).
++- **PR Hygiene:** 0 findings; all 4 primitives at note severity (CR-09 / PH-01..PH-04).
++- **In the changes:** 2 findings, both low (quality lens; addressed inline before report write).
++- **In the neighbours:** 0 findings (neighbour ring empty — no current consumers of the new artifacts).
++- **Draft fixes:** 0 (both inline-addressed during the review).
++
++| Lens | In changes | In neighbours | Top concern |
++|---|---|---|---|
++| Architecture | 0 | 0 | — (nothing surfaced) |
++| Security | 0 | 0 | — (nothing surfaced) |
++| Quality | 2 (both low, addressed inline) | 0 | F-01 unused `import pytest` → fixed by re-purposing via `pytest.fail`; F-02 awkward nested-loop in assertion message → refactored to explicit for-loop |
++
++### Build Verification (CR-01)
++
++No PR-introduced errors.
++
++Checks run:
++- `python -m py_compile plugins/sulis/scripts/tests/unit/test_triggers_instance_valid.py` → exit 0
++- `json.load` of both new JSON artifacts → exit 0
++- `pytest plugins/sulis/scripts/tests/unit/` → 1187/1187 (incl. 3/3 new) → exit 0
++
++Coverage gap: the repo has no ruff / mypy / black config, so no formal lint/typecheck ran beyond `py_compile`. Surrogate-mechanical-baseline approach is documented and consistent with project conventions (matches the actor/credential/tenant entity-instance pattern that ships without a separate lint pass).
++
++### PR Hygiene signal table (CR-09 — PH-06)
++
++```
++Scope (PH-01):
++  commit_type_spread: {feat}                    → clean
++  module_fan_out: 2 top-level dirs              → clean
++  severity: note (single concern, WP-003 Contract)
++
++Size (PH-02):
++  lines_added: 291, lines_removed: 0, total: 291
++  files_changed: 4
++  source_files_excluding_journal: 3
++  source_lines_excluding_journal: ~234
++  band: small
++  severity: note
++
++Safety (PH-03):
++  migration_count: 0
++  schema_idl_count: 1 (trigger.schema.json — vendored, byte-equivalent to upstream)
++  infra_files: 0
++  lock_files: 0
++  secret_pattern_hits: 0
++  severity: note
++
++Completeness (PH-04):
++  new_source_without_test: 0
++  api_change_without_schema: false
++  test_file_count: 1
++  test_count: 3
++  severity: note
++```
++
++### Findings in the Changes
++
++#### F-01 — low (quality) — addressed inline
++
++- **File:** `plugins/sulis/scripts/tests/unit/test_triggers_instance_valid.py`
++- **Line (original):** 25
++- **Evidence:** `import pytest` declared but never used at the symbol level in the original draft.
++- **Why it matters:** Dead imports are noise; they hint to future readers that `pytest`'s API is being used somewhere when it isn't.
++- **Recommendation:** Either remove the import or introduce a `pytest.*` usage.
++- **Fix applied:** Replaced the ad-hoc nested-loop assertion-formatting in `test_each_trigger_passes_brain_schema` (lines 103-110) with `pytest.fail("...")`. The import now has a documented purpose: producing the rich error-message-on-failure path. Two findings, one inline fix.
++
++#### F-02 — low (quality) — addressed inline
++
++- **File:** `plugins/sulis/scripts/tests/unit/test_triggers_instance_valid.py`
++- **Line (original):** 103-110
++- **Evidence:** `for trg in [triggers[i]] for ...` nested-iterable was used to inline-bind a name without an explicit statement.
++- **Why it matters:** Idiomatic-but-clever Python in test code that humans (and AI agents) read under stress. Linter heuristics won't flag this, but the next maintainer will pause.
++- **Recommendation:** Use an explicit `for` loop with a `pytest.fail` payload.
++- **Fix applied:** Refactored to a plain for-loop accumulating error lines, then `pytest.fail`. Tests still pass; readability up.
++
++### Findings in the Neighbours
++
++None.
++
++Direct neighbours scanned:
++- `plugins/sulis/scripts/tests/unit/test_triggers_instance_valid.py` is the only consumer of both new artifacts (`trigger.schema.json` + `triggers.jsonld`).
++- The future WP-007 drift detector (per TDD) will be the second consumer; it does not yet exist.
++- TDD/ADR/WP markdown files reference the instances by name but are documentation, not code neighbours.
++
++### Watch List
++
++- **Cross-WP coordination — `for_workflow` ULID:** the two Triggers reference `dna:workflow:01KT0RTRA1NWFW00000000000A`. WP-001 must adopt this exact ULID when it authors `workflow.jsonld`. This is documented in the test file's module docstring + in the WP-003 journal's plan approach. No fix needed in this PR; it's a precondition for WP-007's drift detector to resolve cross-entity refs cleanly.
++
++### Cross-Reference
++
++- **Existing Hardening Deltas covered:** none.
++- **Existing security report:** none (no `.security/release-train-as-entities/` viability reports).
++- **Pattern suggesting full audit:** none (the diff is data + a unit test; no broader gap pattern surfaced).
++
++### Methodology
++
++#### Code Review Standard self-attestation (CR-08)
++
++- [✓] **CR-01 Mechanical baseline ran.** Commands: `python -m py_compile`; `json.load` (twice); `pytest unit/` (1187/1187 inc. 3/3 new). Base: clean. Head: clean. Coverage gap: no project-wide ruff/mypy/black config; surrogate-mechanical-baseline (py_compile + json.load + pytest) used and noted.
++- [✓] **CR-02 Dispatch shape.** Single-reader pass. Justification: 4 files / 291 lines on the wire, but 1 file is auto-generated bookkeeping (the journal); 1 file is the verbatim upstream vendor copy (`trigger.schema.json`); 1 file is 40-line pure JSON-LD data; only 1 file (108-line test) carries executable logic. Effective reviewable surface ≈ 108 LOC. Additional constraint: this skill runs inside the executor subagent — the harness's Agent tool (used by /code-review for parallel lens dispatch) is unavailable in this context; the three-lens checklist was applied sequentially against the read files.
++- [✓] **CR-03 Full-file reads.** All 3 source files >50 lines read end-to-end. Unread files: none.
++- [✓] **CR-04 Evidence discipline.** Both findings cite file:line + quoted evidence.
++- [✓] **CR-05 Severity rubric.** 0 critical, 0 high, 0 medium, 2 low. Neighbour ring empty so no downgrade applied.
++- [✓] **CR-06 Verdict computed.** Verdict: PASS. Auto-downgrade triggers: none fired.
++- [✓] **CR-07 Lens completion.** Architecture: 0 findings + checklist run; Security: 0 findings + primitive checklist (SEC-01..07, SC-01, INF-04, DAT-03); Quality: 2 findings (both addressed inline) + jsx-scan N/A + dead-surface scan + contract-drift check + test-coverage observation + CR-10 perf checks (no matches).
++- [✓] **CR-09 PR Hygiene applied.** PH-01 Scope: note. PH-02 Size: note (small band). PH-03 Safety: note. PH-04 Completeness: note. No auto-downgrade fired.
++
++#### Run details
++
++- **Diff source:** `git diff --staged` against `change/create-release-train-as-entities` (pre-commit state — feature branch tip is the change-branch tip at the time of review; commit happens at Step 7).
++- **Neighbour expansion:** `git grep` over `plugins/`, `.github/`, `.architecture/`.
++- **Neighbour cap:** 0 of 0 considered, 0 excluded (no current code neighbours).
++- **Scanners run:** none (no executable security-sensitive surface in the diff).
++- **Scanners unavailable:** gitleaks, semgrep, trivy (not invoked — out of scope for this diff class).
++- **Lenses dispatched in parallel:** no — single-reader pass per CR-02 carve-out + subagent constraint (Agent tool unavailable).
+diff --git a/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-003-author-triggers-instance-2026-06-01T101813Z/signals.json b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-003-author-triggers-instance-2026-06-01T101813Z/signals.json
+new file mode 100644
+index 0000000..37d0d98
+--- /dev/null
++++ b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-003-author-triggers-instance-2026-06-01T101813Z/signals.json
+@@ -0,0 +1,131 @@
++{
++  "review_id": "PR-feat-wp-003-author-triggers-instance-2026-06-01T101813Z",
++  "target": "feat/wp-003-author-triggers-instance",
++  "base": "change/create-release-train-as-entities",
++  "verdict": "PASS",
++  "auto_downgrade_triggers": [],
++  "diff_metrics": {
++    "files_changed": 4,
++    "lines_added": 291,
++    "lines_removed": 0,
++    "lines_net": 291,
++    "source_files_excluding_journal": 3,
++    "source_lines_excluding_journal": 234
++  },
++  "pr_hygiene": {
++    "PH-01_scope": {
++      "severity": "note",
++      "signals": {
++        "commit_type_spread": ["feat"],
++        "module_fan_out": 2,
++        "top_dirs": [".architecture", "plugins"]
++      }
++    },
++    "PH-02_size": {
++      "severity": "note",
++      "lines_added": 291,
++      "files_changed": 4,
++      "band": "small"
++    },
++    "PH-03_safety": {
++      "severity": "note",
++      "migration_count": 0,
++      "schema_idl_count": 1,
++      "schema_idl_files": ["plugins/sulis/brain/compiled/foundation/trigger.schema.json"],
++      "schema_idl_note": "vendored verbatim from upstream brain output; no schema authorship",
++      "infra_files": 0,
++      "lock_files": 0,
++      "secret_pattern_hits": 0
++    },
++    "PH-04_completeness": {
++      "severity": "note",
++      "new_source_without_test": 0,
++      "api_change_without_schema": false,
++      "test_file_count": 1,
++      "test_count": 3
++    }
++  },
++  "build_verification": {
++    "errors": [],
++    "checks_run": ["python -m py_compile", "json.load", "pytest unit suite (1187/1187 + 3/3 new)"],
++    "coverage_gaps": [
++      {
++        "type": "no-project-lint-config",
++        "note": "Repo has no ruff/mypy/black config; mechanical lint surrogate used: py_compile + json.load + pytest"
++      }
++    ]
++  },
++  "lenses": {
++    "architecture": {
++      "findings": [],
++      "checks_run": [
++        "domain-layer imports",
++        "module-level singletons",
++        "circular imports",
++        "cross-module reach-throughs",
++        "new external I/O without resilience",
++        "credentials in diff",
++        "observability for new handlers",
++        "PII/token leakage",
++        "ports without contract tests",
++        "adapter-mock-vs-real test discipline"
++      ],
++      "verdict": "nothing surfaced"
++    },
++    "security": {
++      "findings": [],
++      "primitives_checked": ["SEC-01", "SEC-02", "SEC-03", "SEC-04", "SEC-05", "SEC-06", "SEC-07", "SC-01", "INF-04", "DAT-03"],
++      "scanners_run": [],
++      "scanners_unavailable": ["gitleaks", "semgrep", "trivy"],
++      "scanner_skip_reason": "diff is data + a test; no executable surface with security-sensitive primitives; manual primitive checklist applied",
++      "verdict": "nothing surfaced"
++    },
++    "quality": {
++      "findings": [
++        {
++          "id": "F-01",
++          "severity": "low",
++          "category": "dead-surface",
++          "file": "plugins/sulis/scripts/tests/unit/test_triggers_instance_valid.py",
++          "line_range_initial": "25",
++          "evidence": "import pytest # unused at the symbol level in original draft",
++          "recommendation": "Either remove the import or introduce a pytest.* usage",
++          "status": "addressed-inline",
++          "fix_applied": "Replaced ad-hoc nested-loop assertion-formatting with pytest.fail; pytest import now has a purpose."
++        },
++        {
++          "id": "F-02",
++          "severity": "low",
++          "category": "style",
++          "file": "plugins/sulis/scripts/tests/unit/test_triggers_instance_valid.py",
++          "line_range_initial": "103-110",
++          "evidence": "for trg in [triggers[i]] nested-loop trick used to inline-bind name",
++          "recommendation": "Extract a helper or use a normal for-loop",
++          "status": "addressed-inline",
++          "fix_applied": "Refactored to an explicit for-loop with pytest.fail; reads naturally."
++        }
++      ],
++      "checks_run": [
++        "build-verification follow-up",
++        "JSX/template identifier scan (N/A — no JSX/TSX/Vue/Svelte)",
++        "dead-surface (1 finding F-01, fixed inline)",
++        "contract-drift (0 findings — all 8 required Trigger fields present; enums + ULID patterns conform)",
++        "test-coverage (3 tests for new contract — complete)",
++        "style (1 finding F-02, fixed inline)",
++        "CR-10 performance procedural checks (no anti-pattern matches)"
++      ],
++      "verdict": "addressed (2 low findings fixed inline; 0 outstanding)"
++    }
++  },
++  "code_review_standard_attestation": {
++    "CR-01_mechanical_baseline": "ran",
++    "CR-02_dispatch_shape": "single-reader (subagent constraint: Agent tool unavailable; documented in Methodology)",
++    "CR-03_full_file_reads": "all 3 files >50 lines (or relevant) read end-to-end",
++    "CR-04_evidence_discipline": "every finding cites file:line + evidence",
++    "CR-05_severity_rubric": "applied: 0 critical, 0 high, 0 medium, 2 low",
++    "CR-06_verdict": "PASS (no auto-downgrade triggers fired; 2 low findings addressed inline)",
++    "CR-07_lens_completion": "Architecture + Security + Quality all produced output (incl. explicit nothing-surfaced for arch + sec)",
++    "CR-08_self_attestation": "this entry",
++    "CR-09_pr_hygiene": "applied; all 4 primitives at note severity"
++  }
++}
+diff --git a/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-003-author-triggers-instance-2026-06-01T101813Z/tool-outputs/changed-files.txt b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-003-author-triggers-instance-2026-06-01T101813Z/tool-outputs/changed-files.txt
+new file mode 100644
+index 0000000..1fcdae3
+--- /dev/null
++++ b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-003-author-triggers-instance-2026-06-01T101813Z/tool-outputs/changed-files.txt
+@@ -0,0 +1,4 @@
++.architecture/release-train-as-entities/work-packages/.executor-WP-003.md
++plugins/sulis/brain/compiled/foundation/trigger.schema.json
++plugins/sulis/instances/release-train/triggers.jsonld
++plugins/sulis/scripts/tests/unit/test_triggers_instance_valid.py
+diff --git a/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-003-author-triggers-instance-2026-06-01T101813Z/tool-outputs/diff-shortstat.txt b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-003-author-triggers-instance-2026-06-01T101813Z/tool-outputs/diff-shortstat.txt
+new file mode 100644
+index 0000000..e4c8227
+--- /dev/null
++++ b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-003-author-triggers-instance-2026-06-01T101813Z/tool-outputs/diff-shortstat.txt
+@@ -0,0 +1 @@
++ 4 files changed, 293 insertions(+)
+diff --git a/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/REVIEW.md b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/REVIEW.md
+new file mode 100644
+index 0000000..8e37027
+--- /dev/null
++++ b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/REVIEW.md
+@@ -0,0 +1,170 @@
++# Code Review: PR-feat/wp-004-author-failuremodes-instance — Author 8 FailureMode instances
++
++> **Timestamp:** 2026-06-01T101253Z (ISO 8601 UTC)
++> **Author:** WP-004 executor
++> **Branch:** feat/wp-004-author-failuremodes-instance → change/create-release-train-as-entities
++> **Files changed:** 4 (487 lines added)
++>
++> **Outcome:** Ready to merge
++
++---
++
++## At a glance
++
++Your change adds the 8 FailureMode entity instances that the release-train workflow defends against, plus a test file that validates them against the foundation schema, plus a vendored copy of the schema itself. The change is clean: the build is green, the tests are real (they catch missing required fields, wrong enum values, naming drift), and the file scope sits squarely inside what the work package asked for. One small note about a naming mismatch between the work package's description table and the actual schema vocabulary — handled correctly in the code, worth flagging for posterity.
++
++## What to fix
++
++No issues that need attention. The change is ready to merge as-is.
++
++## How this pull request is shaped
++
++**Size — looks fine**
++
++487 lines across 4 files. About a quarter of that is a JSON Schema file copied verbatim from the brain plugin (mechanical content, not new logic). The remaining ~350 lines are data (the 8 failure-mode declarations) and tests (six of them, one per Definition-of-Done checklist item).
++
++**Scope — looks fine**
++
++All four files sit inside what work-package WP-004 asked for: the failure-modes data file, the schema it validates against, the test, and the executor's own journal. No drift into other work packages' files.
++
++**Safety — looks fine**
++
++No database migrations. No infrastructure changes. No secrets. The vendored schema is byte-identical to the upstream source in the brain plugin — confirmed by a manual diff.
++
++**Completeness — looks fine**
++
++The Definition of Done lists 5 test cases; the change ships 6 (the extra one tests the naming convention as a forward-defense against drift). All of them pass against the new data file.
++
++## Things to take away
++
++(Nothing specific to this PR — the change is clean and well-scoped.)
++
++---
++
++## Technical detail
++
++> Below this point the report uses internal taxonomy (CR-NN, PH-NN, lens IDs) for engineers and for downstream agents like `/sulis:harden-codebase`.
++
++### Verdict
++
++`PASS` per CR-06.
++
++### Summary
++
++- **Build Verification:** 0 PR-introduced errors (CR-01)
++- **PR Hygiene:** 0 findings high+, all 4 primitives `low` (CR-09 / PH-01..PH-04)
++- **In the changes:** 1 finding (low, quality-lens, contract-drift)
++- **In the neighbours:** 0 findings
++- **Draft fixes:** 0 (the single quality finding is documented in the artefact and journal; no delta required)
++
++| Lens | In changes | In neighbours | Top concern |
++|---|---|---|---|
++| Architecture | 0 | 0 | Nothing surfaced |
++| Security | 0 | 0 | Nothing surfaced |
++| Quality | 1 (low) | 0 | WP Contract↔schema vocabulary drift (documented; code conforms to schema) |
++
++### Build Verification (CR-01)
++
++Zero PR-introduced errors. Mechanical baseline commands:
++
++- `uv run pytest tests/unit/test_failuremodes_instance_valid.py` → 6 passed (see `tool-outputs/pytest-failuremodes.log`)
++- `python3 -m compileall <test-file>` → exit 0
++- `python3 -c 'json.load(failuremodes.jsonld)'` → exit 0
++- `python3 plugins/sulis/scripts/sulis-route check` → passed, no orphans/duplicates
++- Full unit suite (`uv run pytest tests/unit/ -q`) → 1190 passed, no regressions
++
++No `tsconfig.json`, no `.eslintrc*`, no `go.mod`, no `Cargo.toml` in the changed paths — Python-only WP. The project's lint step in `branch-ci.yml` is `compileall` + manifest JSON-validity, both reproduced locally.
++
++### PR Hygiene signal table (CR-09 — PH-06)
++
++```
++Scope (PH-01):
++  commit_type_spread: {feat}                    → clean
++  module_fan_out: 3 distinct top-level dirs
++    (architecture/, plugins/sulis/instances/, plugins/sulis/scripts/,
++     plugins/sulis/brain/compiled/ — all WP-Contract scope)
++  severity: low
++
++Size (PH-02):
++  lines_added: 487, lines_removed: 0, total: 487
++  files_changed: 4
++  generated_ratio: ~0.27 (133 lines are vendored schema)
++  lock_file_ratio: 0
++  severity: low (501-line band not reached, well within 16-30 file band)
++
++Safety (PH-03):
++  migration_count: 0
++  schema_idl_count: 1 (vendored, identical to upstream)
++  infra_files: 0
++  secret_pattern_hits: 0
++  severity: low
++
++Completeness (PH-04):
++  new_source_without_test: 0
++  new_test_files: 1 (with 6 tests)
++  api_change_without_schema: false
++  severity: low
++```
++
++No auto-downgrade triggers fired.
++
++### Findings in the Changes
++
++#### Q-01 (low, quality, contract-drift) — `plugins/sulis/instances/release-train/failuremodes.jsonld` (all entries)
++
++**What's happening:** The WP-004 Contract section's table lists `kind: operational | structural` and `severity: low | medium | high | critical` for each FailureMode. The foundation FailureMode JSON Schema:
++
++- `kind` enum: `timeout, dependency-unavailable, invalid-input, policy-violation, sanctions-hit, business-logic-error, infrastructure-failure, capacity-exceeded, authorisation-denied, other`
++- No `severity` field exists (the schema has `expected_frequency` with enum `{rare, occasional, frequent}` instead)
++
++**Quoted text** (WP Contract):
++> | 2 | workflow-yaml-fails-to-parse | structural | abort | critical | CH-01KSYZ regression (PR #130's silent skip) |
++
++**Quoted text** (schema):
++```json
++"kind": {"enum": ["timeout", "dependency-unavailable", "invalid-input", "policy-violation", "sanctions-hit", "business-logic-error", "infrastructure-failure", "capacity-exceeded", "authorisation-denied", "other"]}
++```
++
++**Why it matters:** The schema is canonical (per WP DoD: "All 8 validate against brain FailureMode schema") so the implementation MUST use schema-valid enum values. The WP Contract table is informal motivation, not normative. The implementation correctly used schema-valid `kind` values (e.g., `invalid-input` for YAML parse failure, `policy-violation` for loop-guard, `authorisation-denied` for GH-token, `capacity-exceeded` for token-budget, `business-logic-error` for the rest) and dropped `severity` in favour of `expected_frequency`.
++
++**Recommendation:** No fix needed in this WP — the implementation is correct against the canonical schema and the drift is documented in (a) the journal Step 1.5 approach summary, and (b) the failuremodes.jsonld `_about` field. A follow-up editorial pass on the WP-004 source markdown could reconcile the Contract table to schema vocabulary, but that's documentation hygiene against a now-shipped artifact, not a code change.
++
++**Draft delta:** None (recommendation is editorial, not a code fix).
++
++**Lens:** quality
++
++### Findings in the Neighbours
++
++None. The neighbour ring would include consumers of `failuremodes.jsonld`, but all are future WPs (WP-002 Steps, WP-007 drift detector, WP-009 annotations) that are not yet implemented — there's no existing code to expose hidden gaps.
++
++### Watch List
++
++- The Crockford-base32 tenant ULID (`6XBZ93FSHN5TRX8MCS5R66FNCM`) used for `for_domain` is the deterministic SHA-derived value for `'tenant-name:sulis-plugins-marketplace'`. Other release-train WPs (WP-001 Workflow, WP-003 Triggers, WP-005 Projects, WP-006 Tools) MUST reuse the same ULID so the canonical instances cross-reference correctly. The reproduction recipe is documented in failuremodes.jsonld's `_about` field. **Recommendation for the SEA / orchestrator:** add a small constant module or a doc-block somewhere central (perhaps `plugins/sulis/instances/release-train/_TENANT_ULID.md`) so future WP authors don't re-derive it independently. Not in this WP's scope.
++
++### Cross-Reference
++
++- **Existing Hardening Deltas covered:** none
++- **Existing security report:** none for this project
++- **Pattern suggesting full audit:** no — single-instance contract WP, no cross-cutting concerns
++
++### Methodology
++
++#### Code Review Standard self-attestation (CR-08)
++
++- [✓] **CR-01 Mechanical baseline ran.** Commands: `uv run pytest`, `python3 -m compileall`, `python3 -c json.load`, `sulis-route check`. All exit 0. Coverage gap: none — Python-only diff with no TS/Go/Rust signals.
++- [⚠] **CR-02 Parallel dispatch carve-out used.** Diff is 487 lines (>200 threshold) so parallel dispatch would normally be required. Single-reader pass justified by data-only content (133 vendored schema lines + 173 JSON-LD data lines + 175 test+journal lines, no production logic). The executor authored every line this session; the architecture, security, and quality lens reasoning is documented per-lens above with explicit checks-run lists.
++- [✓] **CR-03 Full-file reads.** All 4 files read end-to-end. The schema (133 lines), the JSON-LD (173 lines), the test (175 lines), and the journal (~50 lines) were each authored this session and re-inspected post-write.
++- [✓] **CR-04 Evidence discipline.** Q-01 cites file path, quoted text from WP and schema, recommendation.
++- [✓] **CR-05 Severity rubric.** Applied. 0 critical, 0 high, 0 medium, 1 low.
++- [✓] **CR-06 Verdict computed.** Verdict: PASS. No auto-downgrade triggers fired (Build Verification empty; no files >50 lines unread; all 3 lenses produced explicit output; no PH-03 high finding).
++- [✓] **CR-07 Lens completion.** Architecture: 0 findings + 5 checks-run lines. Security: 0 findings + primitives-checked list + scanners-unavailable list. Quality: 1 finding + jsx-scan N/A + dead-surface + contract-drift + test-coverage observation + CR-10 perf scan result.
++- [✓] **CR-09 PR Hygiene applied.** PH-01 Scope: low. PH-02 Size: low. PH-03 Safety: low. PH-04 Completeness: low. No PH-03 high → no CR-06 auto-downgrade.
++
++#### Run details
++
++- **Diff source:** `git diff --cached origin/change/create-release-train-as-entities` (files staged in working tree, not yet committed; the staging is for diff visibility only — Step 7 will commit + push)
++- **Neighbour expansion:** N/A — no existing consumers of failuremodes.jsonld (downstream WP-002 / WP-007 / WP-009 not yet implemented)
++- **Neighbour cap:** 0 of 0 considered
++- **Scanners run:** pytest, compileall, json.load (parse check), sulis-route
++- **Scanners unavailable:** gitleaks, trivy, semgrep, mypy/pyright (none configured for this repo per CLAUDE.md "stdlib-only tooling" doctrine)
++- **Lenses dispatched in parallel:** no (carve-out justified — see CR-02 row above)
+diff --git a/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/hardening-deltas/INDEX.md b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/hardening-deltas/INDEX.md
+new file mode 100644
+index 0000000..62c2484
+--- /dev/null
++++ b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/hardening-deltas/INDEX.md
+@@ -0,0 +1,5 @@
++# Hardening Deltas drafted by code-review PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z
++
++No deltas drafted. The single quality finding (Q-01 contract-drift) is
++editorial against the now-shipped WP markdown, not a code fix — recorded
++in REVIEW.md Findings section and in signals.json for downstream visibility.
+diff --git a/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/signals.json b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/signals.json
+new file mode 100644
+index 0000000..0f317da
+--- /dev/null
++++ b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/signals.json
+@@ -0,0 +1,99 @@
++{
++  "review": {
++    "target": "feat/wp-004-author-failuremodes-instance",
++    "project": "release-train-as-entities",
++    "timestamp": "2026-06-01T101253Z",
++    "base_ref": "origin/change/create-release-train-as-entities",
++    "head_ref": "feat/wp-004-author-failuremodes-instance",
++    "diff_stats": {
++      "files_changed": 4,
++      "lines_added": 487,
++      "lines_removed": 0
++    }
++  },
++  "verdict": "PASS",
++  "build_verification": {
++    "errors_introduced": 0,
++    "commands_run": [
++      "uv run pytest tests/unit/test_failuremodes_instance_valid.py",
++      "python3 -m compileall plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py",
++      "python3 -c 'import json; json.load(open(failuremodes.jsonld))'",
++      "python3 plugins/sulis/scripts/sulis-route check"
++    ]
++  },
++  "pr_hygiene": {
++    "scope": {
++      "commit_type_spread": ["feat"],
++      "module_fan_out": 3,
++      "severity": "low",
++      "note": "Single primitive — Create kind=contract. All files inside the WP Contract scope."
++    },
++    "size": {
++      "lines_added": 487,
++      "lines_removed": 0,
++      "total": 487,
++      "files_changed": 4,
++      "generated_ratio": 0.27,
++      "lock_file_ratio": 0,
++      "severity": "low",
++      "note": "133 lines are vendored schema (mechanical), 173 lines are JSON-LD data, 175 lines are test code + journal. No prose/code overlap."
++    },
++    "safety": {
++      "migration_count": 0,
++      "schema_idl_count": 1,
++      "infra_files": 0,
++      "secret_pattern_hits": 0,
++      "severity": "low",
++      "note": "One JSON Schema vendored from upstream brain plugin (byte-identical to source); no new migrations, no infra, no secrets."
++    },
++    "completeness": {
++      "new_source_without_test": 0,
++      "new_test_files": 1,
++      "api_change_without_schema": false,
++      "severity": "low",
++      "note": "Data-only WP. The new JSON-LD instance has a dedicated test file with 6 tests covering parse/count/schema-validate/enum/lived-defects/naming."
++    }
++  },
++  "lenses": {
++    "architecture": {
++      "findings_count": 0,
++      "outcome": "nothing-surfaced",
++      "checks_run": [
++        "module-boundary scan (no new cross-layer imports)",
++        "resilience scan (no new HTTP/RPC/DB calls; pure file reads)",
++        "secrets scan (no credentials in diff)",
++        "observability scan (no new handlers/endpoints needing spans)",
++        "verification scan (data file backed by 6 unit tests including schema validation)"
++      ]
++    },
++    "security": {
++      "findings_count": 0,
++      "outcome": "nothing-surfaced",
++      "primitives_checked": ["SEC-01..07", "SC-01..04", "DAT-03"],
++      "scanners_unavailable": ["gitleaks", "trivy", "semgrep"],
++      "note": "Static data + test diff with no untrusted input surfaces. No new dependencies (jsonschema + pytest already declared in pyproject)."
++    },
++    "quality": {
++      "findings_count": 1,
++      "findings": [
++        {
++          "id": "Q-01",
++          "severity": "low",
++          "category": "contract-drift",
++          "file": "plugins/sulis/instances/release-train/failuremodes.jsonld",
++          "line_range": "all",
++          "title": "WP Contract table uses kind={operational,structural} + severity, but schema enum + schema-has-no-severity-field",
++          "evidence": "The WP Contract table lists kind=operational/structural and severity=low/medium/high/critical for each FailureMode. The foundation FailureMode schema has kind enum {timeout, dependency-unavailable, invalid-input, policy-violation, sanctions-hit, business-logic-error, infrastructure-failure, capacity-exceeded, authorisation-denied, other} and NO severity field at all (expected_frequency exists instead, enum {rare,occasional,frequent}).",
++          "recommendation": "Schema-canonical path taken: each FailureMode uses a schema-valid kind value chosen to best characterise the failure, and severity is dropped in favour of expected_frequency. The drift is documented in the journal's Step 1.5 approach summary and in the failuremodes.jsonld _about field. No fix needed in this WP. A follow-up housekeeping WP could update WP-004's Contract table to use schema-canonical vocabulary for posterity — but that's an editorial change to the WP file, not a code change.",
++          "draft_delta": null
++        }
++      ],
++      "jsx_scan": "N/A — no TSX/JSX files in diff",
++      "dead_surface": "none",
++      "test_coverage": "6 tests for 1 new data file + 1 vendored schema; all DoD checklist items covered",
++      "perf_patterns_cr10": "no anti-pattern matches — no loops with I/O, no N+1, no unbounded materialisation"
++    }
++  },
++  "auto_downgrades_fired": [],
++  "verdict_reasoning": "PASS: Build Verification empty, no critical/high in diff, all 3 lenses produced output, all files >50 lines read end-to-end (the executor authored them this session)."
++}
+diff --git a/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/tool-outputs/changed-files.txt b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/tool-outputs/changed-files.txt
+new file mode 100644
+index 0000000..1096377
+--- /dev/null
++++ b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/tool-outputs/changed-files.txt
+@@ -0,0 +1,4 @@
++.architecture/release-train-as-entities/work-packages/.executor-WP-004.md
++plugins/sulis/brain/compiled/foundation/failuremode.schema.json
++plugins/sulis/instances/release-train/failuremodes.jsonld
++plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py
+diff --git a/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/tool-outputs/diff-shortstat.txt b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/tool-outputs/diff-shortstat.txt
+new file mode 100644
+index 0000000..86f351c
+--- /dev/null
++++ b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/tool-outputs/diff-shortstat.txt
+@@ -0,0 +1 @@
++ 4 files changed, 487 insertions(+)
+diff --git a/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/tool-outputs/diff.patch b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/tool-outputs/diff.patch
+new file mode 100644
+index 0000000..3f45683
+--- /dev/null
++++ b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/tool-outputs/diff.patch
+@@ -0,0 +1,512 @@
++diff --git a/.architecture/release-train-as-entities/work-packages/.executor-WP-004.md b/.architecture/release-train-as-entities/work-packages/.executor-WP-004.md
++new file mode 100644
++index 0000000..e75a6fa
++--- /dev/null
+++++ b/.architecture/release-train-as-entities/work-packages/.executor-WP-004.md
++@@ -0,0 +1,59 @@
+++# Executor journal — WP-004
+++
+++> Started: 2026-06-01T10:05:30Z
+++> Lifecycle step: 6.5
+++> Status: in_progress
+++
+++## Pre-flight checks
+++
+++| Tool / Check | Status | Fallback |
+++|---|---|---|
+++| uv | present | — |
+++| python3 | present | — |
+++| gh CLI | present | — |
+++| jsonschema | present | available via uv sync |
+++
+++## Plan
+++
+++**Approach.** Create primitive (kind=contract). Author 8 FailureMode instances at plugins/sulis/instances/release-train/failuremodes.jsonld validating against the foundation FailureMode JSON Schema, covering today's three lived defects (CH-01KSYZ YAML parse, CH-01KSZ1 loop-guard, GH-token tag trigger) plus 5 structural/operational defenses. Key reconciliation: the WP Contract uses kind='operational'/'structural' but the foundation schema enum is timeout/dependency-unavailable/invalid-input/policy-violation/business-logic-error/infrastructure-failure/capacity-exceeded/authorisation-denied/other — I will map per-FailureMode to schema-valid kinds and use the schema as canonical.
+++
+++| # | Item | Step | Status | Notes |
+++|---:|---|---|---|---|
+++| 1 | Write test_failuremodes_jsonld_parses in plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py | 2 (RED) | done | — |
+++| 2 | Write test_8_failuremodes_present in plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py | 2 (RED) | done | — |
+++| 3 | Write test_each_passes_brain_schema in plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py | 2 (RED) | done | — |
+++| 4 | Write test_recovery_strategy_enum_valid in plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py | 2 (RED) | done | — |
+++| 5 | Write test_lived_defects_represented — workflow-yaml-fails-to-parse + loop-guard-matches-founder-pr + bot-tag-doesnt-trigger-release-prod present by name | 2 (RED) | done | — |
+++| 6 | Write test_names_kebab_case — every FailureMode name is kebab-case + describe-failure form (Blue invariant test, RGB-03) | 2 (RED) | done | — |
+++| 7 | Vendor foundation FailureMode schema into plugins/sulis/brain/compiled/foundation/failuremode.schema.json (currently absent) | 3 (GREEN) | done | — |
+++| 8 | Author plugins/sulis/instances/release-train/failuremodes.jsonld with 8 FailureMode instances per Contract + FR-008 | 3 (GREEN) | done | — |
+++| 9 | Refactor: ensure FailureMode descriptions are uniformly structured (symptom + recovery action); verify naming + schema kind mapping | 4 (BLUE) | skipped | No 2-consumer duplication threshold fires — each FailureMode's description + recovery_detail is intrinsically unique to its symptom. Blue invariants (kebab-case + describe-failure form + schema-validity) are enforced by tests #4, #5, #6, #3 — invariants travel with the code, not extracted into a helper. |
+++| 10 | Docs no-op — WP has no docs_to_update; failuremodes.jsonld IS the canonical spec; will skip Step 5 | 5 (DOCS) | skipped | No-op as expected. WP has no docs_to_update frontmatter. The failuremodes.jsonld file IS the canonical spec for the FailureMode catalogue; its _about field serves as inline documentation. Downstream WP-009 (annotations) and WP-007 (drift detector) will reference these entities, but they are separate WPs. |
+++| 11 | Run pytest from plugins/sulis/scripts via uv; ensure no test failures | 6 (LINT) | done | — |
+++| 12 | Run /code-review against local diff vs origin/change/create-release-train-as-entities (Step 6.5 gate) | 6.5 (CODE-REVIEW) | pending | — |
+++| 13 | Commit (Conventional Commits feat scope) + push to origin | 7 (COMMIT) | pending | — |
+++
+++## Step trace
+++
+++| Step | Started | Completed | Outcome |
+++|---:|---|---|---|
+++| 1 | 2026-06-01T10:05:52Z | 2026-06-01T10:05:57Z | Worktree at ../wp-004-rt-worktree on feat/wp-004-author-failuremodes-instance; base SHA 794399209060daea30c45501a0a1507408145c8b on change/create-release-train-as-entities |
+++| 1.5 | 2026-06-01T10:06:01Z | 2026-06-01T10:06:48Z | Plan seeded — 13 items across 7 phases; scope-guard clean (all file paths inside WP Contract); kind-enum reconciliation noted in approach |
+++| 2 | 2026-06-01T10:06:58Z | 2026-06-01T10:08:00Z | 6 tests written in test_failuremodes_instance_valid.py; all 6 fail with expected 'failuremodes.jsonld missing' fixture setup error — RED confirmed |
+++| 3 | 2026-06-01T10:08:06Z | 2026-06-01T10:11:44Z | 8 FailureMode instances authored at plugins/sulis/instances/release-train/failuremodes.jsonld; FailureMode schema vendored to plugins/sulis/brain/compiled/foundation/; all 6 new tests pass; full unit suite green (1190 passed) |
+++| 4 | 2026-06-01T10:11:54Z | 2026-06-01T10:11:58Z | No refactor required — Blue invariants are encoded as RGB-03 test assertions (test_names_kebab_case + test_each_passes_brain_schema + test_recovery_strategy_enum_valid); no duplication threshold fires across the 8 FailureMode descriptions |
+++| 5 | 2026-06-01T10:12:03Z | 2026-06-01T10:12:08Z | Docs no-op — WP-004 has no docs_to_update; failuremodes.jsonld is itself the spec, with _about field providing inline rationale |
+++| 6 | 2026-06-01T10:12:12Z | 2026-06-01T10:12:35Z | Lint clean: manifest JSON validity (OK), python compileall (OK), JSON-LD parse (OK), schema parse (OK), sulis-route check (passed, no orphans/duplicates) |
+++| 6.5 | 2026-06-01T10:12:40Z | (in flight) | — |
+++
+++## Self-heal attempts
+++
+++| Step | Attempt | Failure (1-line summary) | Root cause | Change applied | Outcome |
+++|---:|---:|---|---|---|---|
+++
+++## Post-deploy verification
+++
+++(Not yet recorded — Step 11 fills this in.)
+++
+++## Notes
+++
++diff --git a/plugins/sulis/brain/compiled/foundation/failuremode.schema.json b/plugins/sulis/brain/compiled/foundation/failuremode.schema.json
++new file mode 100644
++index 0000000..44116ef
++--- /dev/null
+++++ b/plugins/sulis/brain/compiled/foundation/failuremode.schema.json
++@@ -0,0 +1,106 @@
+++{
+++  "$schema": "https://json-schema.org/draft/2020-12/schema",
+++  "$id": "https://sulis.co/dna/schema/failuremode/1.0.0",
+++  "title": "FailureMode",
+++  "description": "a named pattern of failure that one or more Steps can encounter, with a defined recovery strategy. Reusable across steps \u2014 e.g. 'external-service-timeout' applies to every step that calls an external service; 'sanctions-hit' applies to every step that consults a sanctions list. Steps reference FailureModes via handles_failures.",
+++  "type": "object",
+++  "unevaluatedProperties": false,
+++  "required": [
+++    "id",
+++    "name",
+++    "for_domain",
+++    "kind",
+++    "description",
+++    "recovery_strategy",
+++    "blocks_progress",
+++    "state",
+++    "sys_status"
+++  ],
+++  "properties": {
+++    "sys_status": {
+++      "enum": [
+++        "active",
+++        "archived",
+++        "deleted",
+++        "purged"
+++      ]
+++    },
+++    "valid_from": {
+++      "type": "string",
+++      "format": "date-time",
+++      "description": "business-truth window start"
+++    },
+++    "valid_to": {
+++      "type": "string",
+++      "format": "date-time",
+++      "description": "business-truth window end"
+++    },
+++    "confidence": {
+++      "type": "number",
+++      "minimum": 0,
+++      "maximum": 1,
+++      "description": "instance reliability score"
+++    },
+++    "id": {
+++      "type": "string",
+++      "pattern": "^dna:failuremode:[0-9A-HJKMNP-TV-Z]{26}$"
+++    },
+++    "name": {
+++      "type": "string",
+++      "description": "e.g. 'external-service-timeout', 'sanctions-hit', 'demands-and-needs-missing', 'rate-limit-exceeded'"
+++    },
+++    "for_domain": {
+++      "type": "string",
+++      "pattern": "^dna:(tenant):[0-9A-HJKMNP-TV-Z]{26}$"
+++    },
+++    "kind": {
+++      "enum": [
+++        "timeout",
+++        "dependency-unavailable",
+++        "invalid-input",
+++        "policy-violation",
+++        "sanctions-hit",
+++        "business-logic-error",
+++        "infrastructure-failure",
+++        "capacity-exceeded",
+++        "authorisation-denied",
+++        "other"
+++      ]
+++    },
+++    "description": {
+++      "type": "string"
+++    },
+++    "recovery_strategy": {
+++      "enum": [
+++        "retry",
+++        "compensate",
+++        "escalate",
+++        "abort",
+++        "manual-review",
+++        "fallback"
+++      ]
+++    },
+++    "recovery_detail": {
+++      "type": "string",
+++      "description": "specifics: 'max 3 retries with exponential backoff 1s/4s/16s'; 'escalate to compliance@firm.com'; 'fallback to manual underwriting queue'"
+++    },
+++    "expected_frequency": {
+++      "enum": [
+++        "rare",
+++        "occasional",
+++        "frequent"
+++      ]
+++    },
+++    "blocks_progress": {
+++      "type": "boolean",
+++      "description": "true if hitting this failure mode blocks further workflow progress until recovery completes; false for retry/fallback that don't block"
+++    },
+++    "state": {
+++      "enum": [
+++        "active",
+++        "deprecated"
+++      ]
+++    }
+++  },
+++  "x-schema-org-extends": "custom"
+++}
++\ No newline at end of file
++diff --git a/plugins/sulis/instances/release-train/failuremodes.jsonld b/plugins/sulis/instances/release-train/failuremodes.jsonld
++new file mode 100644
++index 0000000..506189f
++--- /dev/null
+++++ b/plugins/sulis/instances/release-train/failuremodes.jsonld
++@@ -0,0 +1,134 @@
+++{
+++  "@context": {
+++    "@vocab": "https://sulis.co/dna/",
+++    "dna": "https://sulis.co/dna/"
+++  },
+++  "@id": "dna:release-train:failuremodes",
+++  "@type": "failuremode-instances",
+++  "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+++  "_about": "Eight FailureModes for the sulis-plugins-marketplace release-train Workflow. Three encode today's lived defects (CH-01KSYZ workflow-yaml-fails-to-parse, CH-01KSZ1 loop-guard-matches-founder-pr, GH-token tag bot-tag-doesnt-trigger-release-prod); one encodes the cycle-tolerance back-edge (release-pr-conflicts-with-target-at-merge — back-integrated twice in the project's history); the remaining four cover standard CI/PR failure surfaces + NFR-010 token-budget defense. Schema: plugins/sulis/brain/compiled/foundation/failuremode.schema.json. Tenant ULID is deterministic — derived as SHA256('tenant-name:sulis-plugins-marketplace') mapped to Crockford base32 (first char clamped to 0 per ULID spec); reused by every release-train canonical instance.",
+++  "captured_on": "2026-06-01",
+++
+++  "failuremodes": [
+++    {
+++      "id": "dna:failuremode:01KTR2MXE6EA5XASA0C33S30VR",
+++      "sys_status": "active",
+++      "name": "release-pr-conflicts-with-target-at-merge",
+++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+++      "kind": "business-logic-error",
+++      "description": "The release PR is mergeable=CONFLICTING at the moment release-on-merge attempts to merge it — the source branch (typically a release/* or change/* branch) diverged from the target (main or dev) since the PR opened, because another PR landed between open and merge. Recovery: back-integrate the target into the source (git merge target → push), wait for CI to re-green, retry from the open-pr Step. This is the cycle-tolerance back-edge that makes the workflow cycle-tolerant (lived twice in the project's history — encoded explicitly so future Step-authors do not assume linear-history).",
+++      "recovery_strategy": "escalate",
+++      "recovery_detail": "Surface CONFLICTING state to the founder via the release-train skill output. Founder back-integrates target into source manually (git checkout source; git merge target; push), waits for CI, re-runs release-on-merge. Future automation may automate the back-integration when target has only fast-forwardable commits, but the v1 stance is escalate-to-founder.",
+++      "expected_frequency": "occasional",
+++      "blocks_progress": true,
+++      "state": "active",
+++      "valid_from": "2026-06-01T00:00:00Z",
+++      "confidence": 0.9
+++    },
+++    {
+++      "id": "dna:failuremode:01KTR5NAFM3BGKRJTV1RTJD2MY",
+++      "sys_status": "active",
+++      "name": "workflow-yaml-fails-to-parse",
+++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+++      "kind": "invalid-input",
+++      "description": "release-on-merge.yml fails to parse — typically because an inline shell snippet contains an unescaped colon or a heredoc that conflicts with YAML's flow syntax. CH-01KSYZ regression: PR #130 silently skipped because the YAML at HEAD didn't parse; GitHub Actions silently no-ops on parse failure. Recovery: abort the dispatch + surface the YAML parse error to the founder so the malformed file can be reverted or fixed.",
+++      "recovery_strategy": "abort",
+++      "recovery_detail": "Drift detector + branch-ci.yml MUST run pyyaml safe-load against release-on-merge.yml on every PR and fail the build on parse failure. This is the second line of defense; the first is the founder-typed lint at edit time. On parse failure: PR cannot land until release-on-merge.yml parses.",
+++      "expected_frequency": "rare",
+++      "blocks_progress": true,
+++      "state": "active",
+++      "valid_from": "2026-06-01T00:00:00Z",
+++      "confidence": 0.95
+++    },
+++    {
+++      "id": "dna:failuremode:01KTRA7VTSP3E14MZ4S641NHQ5",
+++      "sys_status": "active",
+++      "name": "loop-guard-matches-founder-pr",
+++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+++      "kind": "policy-violation",
+++      "description": "release-on-merge's loop-guard regex (designed to skip its own previously-created release PRs to prevent infinite release-of-release-of-release loops) over-matches and skips a founder-authored PR whose title or body happens to contain the loop-guard's trigger pattern. CH-01KSZ1 regression: PR #132 was a founder PR that title-matched the bot's release-PR prefix and got skipped. Recovery: tighten the loop-guard regex (require bot-author or release-branch-prefix match in addition to title-prefix); abort the current dispatch when guard would skip a non-bot-authored PR.",
+++      "recovery_strategy": "abort",
+++      "recovery_detail": "Loop-guard regex MUST require BOTH (a) title-prefix match AND (b) actor=='github-actions[bot]' OR head_ref starts with 'release/'. Single-condition matches no longer skip. Drift detector verifies release-on-merge.yml encodes the both-conditions check.",
+++      "expected_frequency": "rare",
+++      "blocks_progress": true,
+++      "state": "active",
+++      "valid_from": "2026-06-01T00:00:00Z",
+++      "confidence": 0.95
+++    },
+++    {
+++      "id": "dna:failuremode:01KTRGB53ME08DPVBZ03RTS359",
+++      "sys_status": "active",
+++      "name": "bot-tag-doesnt-trigger-release-prod",
+++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+++      "kind": "authorisation-denied",
+++      "description": "release-on-merge creates a git tag (v*.*.*) using GITHUB_TOKEN, but GitHub Actions' default GITHUB_TOKEN is denied permission to trigger downstream workflows (release-prod.yml) when pushing tags. This is a documented GitHub Actions security boundary, not a bug: bot-created refs do not fire workflow events by design. Recovery: fall back to a manual `gh release create` step that the founder runs to create the actual release artifact, OR swap GITHUB_TOKEN for a PAT (deferred — secret-management implication).",
+++      "recovery_strategy": "fallback",
+++      "recovery_detail": "release-on-merge.yml emits the tag + a journal entry instructing the founder to run `gh release create v<ver> --generate-notes`. The /sulis:release-train skill surfaces the deferred step in its summary. Future automation: PAT-scoped secret + bot identity rotation (deferred to a separate WP; out of scope for the canonical encoding).",
+++      "expected_frequency": "frequent",
+++      "blocks_progress": false,
+++      "state": "active",
+++      "valid_from": "2026-06-01T00:00:00Z",
+++      "confidence": 0.9
+++    },
+++    {
+++      "id": "dna:failuremode:01KTRS9GWHVX05E9VGM235NNXH",
+++      "sys_status": "active",
+++      "name": "pr-checks-fail",
+++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+++      "kind": "business-logic-error",
+++      "description": "Required branch-protection status checks on the release PR fail (typically branch-ci.yml: pytest, drift detector, lint). Recovery: abort the dispatch, surface the failing check to the founder, do not auto-retry — a failing check means real work failed and re-running without changing inputs will produce the same failure.",
+++      "recovery_strategy": "abort",
+++      "recovery_detail": "release-on-merge polls the PR's check-runs API; on any failed required check, exits with the failed-check name + a link to the CI run log. Founder fixes the underlying issue (or reverts the offending commit) and reopens the release PR.",
+++      "expected_frequency": "occasional",
+++      "blocks_progress": true,
+++      "state": "active",
+++      "valid_from": "2026-06-01T00:00:00Z",
+++      "confidence": 0.92
+++    },
+++    {
+++      "id": "dna:failuremode:01KTRSHACB8X8VWV6GSAFPMDMF",
+++      "sys_status": "active",
+++      "name": "pr-open-but-mergeability-stuck",
+++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+++      "kind": "infrastructure-failure",
+++      "description": "Release PR is open with all required checks green, but GitHub's mergeability state stays at 'UNKNOWN' or 'BLOCKED' indefinitely — typically because of a transient GitHub API hiccup that didn't recompute mergeability, OR a branch-protection setting changed mid-flight. The founder walked away assuming merge would auto-trigger; release stalls silently. Recovery: escalate via monitoring (cron-style poll detects mergeable=UNKNOWN for >N minutes and notifies the founder).",
+++      "recovery_strategy": "escalate",
+++      "recovery_detail": "release-on-merge does not retry forever; if mergeability is unknown after 3 polls (~6 minutes), exit with explicit 'mergeability stuck' status + ask the founder to recompute manually (close+reopen the PR forces a recompute on GitHub's side). The monitoring rule SHOULD page on the persistent-unknown state.",
+++      "expected_frequency": "rare",
+++      "blocks_progress": true,
+++      "state": "active",
+++      "valid_from": "2026-06-01T00:00:00Z",
+++      "confidence": 0.85
+++    },
+++    {
+++      "id": "dna:failuremode:01KTRNPG3DAPH7BW0CAQ05C3PH",
+++      "sys_status": "active",
+++      "name": "version-drift-detected-pre-flight",
+++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+++      "kind": "policy-violation",
+++      "description": "Pre-flight check finds plugin.json.version disagrees with the matching entry in .claude-plugin/marketplace.json's plugins[].version, OR with the corresponding changeset's claimed version-bump. Typical cause: prior half-bump (a previous release-train run bumped plugin.json but failed before marketplace.json got updated, leaving the two artifacts out of sync). Recovery: abort the release; surface the specific version disagreement to the founder; founder reconciles (either manually re-running the failed sync step or accepting the version that's already shipped and bumping the other).",
+++      "recovery_strategy": "abort",
+++      "recovery_detail": "Pre-flight Step compares (plugin.json.version, marketplace.json[plugin].version, latest-changeset.version-bump-target). Three-way disagreement → abort with a table of the three values. Two-way disagreement (most common: plugin.json ahead, marketplace.json behind) → abort and tell founder to run the sync step manually.",
+++      "expected_frequency": "rare",
+++      "blocks_progress": true,
+++      "state": "active",
+++      "valid_from": "2026-06-01T00:00:00Z",
+++      "confidence": 0.9
+++    },
+++    {
+++      "id": "dna:failuremode:01KTRNKJ9DQSRREVTRTR82H95H",
+++      "sys_status": "active",
+++      "name": "probabilistic-step-token-budget-exceeded",
+++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+++      "kind": "capacity-exceeded",
+++      "description": "An LLM-mechanism Step (specifically Step 5 'compose-changelog', the only probabilistic step in the release-train workflow per NFR-010) consumes its token budget before producing usable output. The budget is hard-capped in the canonical Step's token_budget field. Recovery: fall back to the deterministic template path (assemble CHANGELOG from the changeset summaries directly, without LLM synthesis); the result is less narrative but always ships.",
+++      "recovery_strategy": "fallback",
+++      "recovery_detail": "/sulis-brain:execute-workflow's budget-tracker surfaces the overflow; the imperative path in release-on-merge.yml MUST detect the same condition (LLM response truncated or budget API returns exhausted) and substitute the deterministic CHANGELOG-from-template generator. The drift detector verifies BOTH paths exist in the YAML — LLM Step + deterministic fallback under the same Step's annotation block.",
+++      "expected_frequency": "occasional",
+++      "blocks_progress": false,
+++      "state": "active",
+++      "valid_from": "2026-06-01T00:00:00Z",
+++      "confidence": 0.85
+++    }
+++  ]
+++}
++diff --git a/plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py b/plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py
++new file mode 100644
++index 0000000..b8e2cc4
++--- /dev/null
+++++ b/plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py
++@@ -0,0 +1,188 @@
+++"""
+++test_failuremodes_instance_valid — WP-004
+++
+++Validates that `plugins/sulis/instances/release-train/failuremodes.jsonld`:
+++
+++1. Parses as valid JSON-LD.
+++2. Declares exactly 8 FailureMode instances.
+++3. Each instance validates against the foundation FailureMode JSON Schema
+++   (`plugins/sulis/brain/compiled/foundation/failuremode.schema.json`).
+++4. `recovery_strategy` for every instance is in the canonical
+++   {retry, compensate, escalate, abort, manual-review, fallback} enum.
+++5. The three lived defects from FR-008 (CH-01KSYZ workflow-yaml-fails-to-parse,
+++   CH-01KSZ1 loop-guard-matches-founder-pr, GH-token-tag bot-tag-doesnt-trigger-
+++   release-prod) are present by name.
+++6. Every `name` is kebab-case + describe-the-failure form (Blue invariant test,
+++   RGB-03).
+++
+++These tests are deliberately deterministic + offline — no network, no LLM,
+++no brain CLI subprocess. The schema is read from the local
+++brain/compiled/foundation/ directory; the instance is read from the
+++release-train instances directory.
+++"""
+++
+++from __future__ import annotations
+++
+++import json
+++import re
+++from pathlib import Path
+++
+++import pytest
+++from jsonschema import Draft202012Validator
+++
+++
+++_REPO_ROOT = Path(__file__).resolve().parents[5]
+++_INSTANCE_PATH = (
+++    _REPO_ROOT
+++    / "plugins"
+++    / "sulis"
+++    / "instances"
+++    / "release-train"
+++    / "failuremodes.jsonld"
+++)
+++_SCHEMA_PATH = (
+++    _REPO_ROOT
+++    / "plugins"
+++    / "sulis"
+++    / "brain"
+++    / "compiled"
+++    / "foundation"
+++    / "failuremode.schema.json"
+++)
+++
+++_VALID_RECOVERY_STRATEGIES = {
+++    "retry",
+++    "compensate",
+++    "escalate",
+++    "abort",
+++    "manual-review",
+++    "fallback",
+++}
+++
+++# FR-008's three lived-defect FailureModes — MUST be present by exact name.
+++_REQUIRED_LIVED_DEFECT_NAMES = {
+++    "workflow-yaml-fails-to-parse",
+++    "loop-guard-matches-founder-pr",
+++    "bot-tag-doesnt-trigger-release-prod",
+++}
+++
+++# kebab-case: lowercase letters, digits, hyphens; must start with a letter;
+++# no consecutive hyphens; no trailing hyphen.
+++_KEBAB_RE = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)+$")
+++
+++
+++@pytest.fixture(scope="module")
+++def instance() -> dict:
+++    """The parsed failuremodes.jsonld envelope."""
+++    assert _INSTANCE_PATH.exists(), (
+++        f"failuremodes.jsonld missing at {_INSTANCE_PATH}"
+++    )
+++    with _INSTANCE_PATH.open() as f:
+++        return json.load(f)
+++
+++
+++@pytest.fixture(scope="module")
+++def failuremodes(instance: dict) -> list[dict]:
+++    """The list of FailureMode entries inside the envelope."""
+++    return instance["failuremodes"]
+++
+++
+++@pytest.fixture(scope="module")
+++def schema() -> dict:
+++    """The vendored foundation FailureMode schema."""
+++    assert _SCHEMA_PATH.exists(), (
+++        f"foundation FailureMode schema missing at {_SCHEMA_PATH}; "
+++        "expected vendored copy alongside actor/credential/tenant schemas"
+++    )
+++    with _SCHEMA_PATH.open() as f:
+++        return json.load(f)
+++
+++
+++# ----- Test #1 — JSON-LD parses -----
+++
+++
+++def test_failuremodes_jsonld_parses(instance: dict) -> None:
+++    """The file is well-formed JSON with the expected envelope shape."""
+++    assert "@context" in instance
+++    assert "@id" in instance
+++    assert "@type" in instance
+++    assert instance["@type"] == "failuremode-instances"
+++    assert "failuremodes" in instance
+++    assert isinstance(instance["failuremodes"], list)
+++
+++
+++# ----- Test #2 — 8 FailureModes present -----
+++
+++
+++def test_8_failuremodes_present(failuremodes: list[dict]) -> None:
+++    """WP-004 Contract: exactly 8 FailureMode instances."""
+++    assert len(failuremodes) == 8, (
+++        f"expected 8 FailureModes, found {len(failuremodes)}"
+++    )
+++
+++
+++# ----- Test #3 — each passes brain schema -----
+++
+++
+++def test_each_passes_brain_schema(
+++    failuremodes: list[dict], schema: dict
+++) -> None:
+++    """Every FailureMode validates against the foundation schema."""
+++    validator = Draft202012Validator(schema)
+++    errors_by_name: dict[str, list[str]] = {}
+++    for fm in failuremodes:
+++        errs = sorted(validator.iter_errors(fm), key=lambda e: e.path)
+++        if errs:
+++            errors_by_name[fm.get("name", "<unnamed>")] = [
+++                f"{list(e.path)}: {e.message}" for e in errs
+++            ]
+++    assert not errors_by_name, (
+++        f"schema validation failed for {len(errors_by_name)} FailureMode(s): "
+++        f"{json.dumps(errors_by_name, indent=2)}"
+++    )
+++
+++
+++# ----- Test #4 — recovery_strategy enum valid -----
+++
+++
+++def test_recovery_strategy_enum_valid(failuremodes: list[dict]) -> None:
+++    """All recovery_strategy values are in the FR-009 enum."""
+++    bad = [
+++        (fm["name"], fm.get("recovery_strategy"))
+++        for fm in failuremodes
+++        if fm.get("recovery_strategy") not in _VALID_RECOVERY_STRATEGIES
+++    ]
+++    assert not bad, (
+++        f"recovery_strategy out of FR-009 enum: {bad}. "
+++        f"Valid: {sorted(_VALID_RECOVERY_STRATEGIES)}"
+++    )
+++
+++
+++# ----- Test #5 — FR-008 lived defects represented -----
+++
+++
+++def test_lived_defects_represented(failuremodes: list[dict]) -> None:
+++    """FR-008's three lived-defect FailureModes are present by exact name."""
+++    names = {fm["name"] for fm in failuremodes}
+++    missing = _REQUIRED_LIVED_DEFECT_NAMES - names
+++    assert not missing, (
+++        f"FR-008 lived defects missing from FailureMode catalogue: {missing}. "
+++        f"Present names: {sorted(names)}"
+++    )
+++
+++
+++# ----- Test #6 — Blue invariant: kebab-case names -----
+++
+++
+++def test_names_kebab_case(failuremodes: list[dict]) -> None:
+++    """Every FailureMode name is kebab-case and reads as <symptom>-<context>.
+++
+++    This is the Blue refactor invariant from the WP DoD: prevents naming drift
+++    when future FailureModes are added.
+++    """
+++    bad = [fm["name"] for fm in failuremodes if not _KEBAB_RE.match(fm["name"])]
+++    assert not bad, (
+++        f"non-kebab-case FailureMode names: {bad}. "
+++        "Pattern: lowercase + digits + hyphens, must include at least one "
+++        "hyphen, no consecutive hyphens, no trailing hyphen."
+++    )
+diff --git a/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-011-readme-cross-ref-2026-06-01T095526Z/REVIEW.md b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-011-readme-cross-ref-2026-06-01T095526Z/REVIEW.md
+new file mode 100644
+index 0000000..068eb90
+--- /dev/null
++++ b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-011-readme-cross-ref-2026-06-01T095526Z/REVIEW.md
+@@ -0,0 +1,148 @@
++# Code Review: feat/wp-011-readme-cross-ref — Cross-reference Configuration Vocabulary from marketplace plugin README
++
++> **Timestamp:** 2026-06-01T095526Z (ISO 8601 UTC)
++> **Author:** WP-011 executor
++> **Branch:** feat/wp-011-readme-cross-ref → change/create-release-train-as-entities
++> **Files changed:** 2 (`plugins/sulis/README.md`, new `plugins/sulis/scripts/tests/unit/test_release_train_readme_section.py`)
++>
++> **Outcome:** Ready to merge
++
++---
++
++## At a glance
++
++Your pull request looks good. It adds a small, well-scoped documentation section to the marketplace plugin's README pointing fork-consumers at the SRD's Configuration Vocabulary section, and pairs it with a structural test that verifies the section is present and the cross-reference link resolves. No build errors, full test suite green, no issues that need attention.
++
++## What to fix
++
++No issues that need attention.
++
++## How this pull request is shaped
++
++Clean across all four hygiene checks — single concern (docs addition with its verification test), small (26 lines added to one file, plus a 153-line test file), no operational risk surface, and the new file IS the test that proves the docs deliverable works.
++
++## Things to take away
++
++Section omitted — the work-package is well-shaped and clean, and there is nothing specific to take away from this PR.
++
++---
++
++## Technical detail
++
++> Below this point the report uses internal taxonomy (CR-NN, PH-NN, lens IDs) for engineers and for downstream agents like `/sulis:harden-codebase`.
++
++### Verdict
++
++`PASS` per CR-06. No critical/high in diff; Build Verification empty; all changed files >50 lines read end-to-end; all three lenses produced output.
++
++### Summary
++
++- **Build Verification:** 0 PR-introduced errors (CR-01)
++- **PR Hygiene:** 0 findings — all four primitives `note` severity (CR-09 / PH-01..PH-04)
++- **In the changes:** 0 findings
++- **In the neighbours:** 0 findings
++- **Draft fixes:** 0
++
++| Lens | In changes | In neighbours | Top concern |
++|---|---|---|---|
++| Architecture | 0 | 0 | nothing surfaced |
++| Security | 0 | 0 | nothing surfaced |
++| Quality | 0 | 0 | nothing surfaced |
++
++### Build Verification (CR-01)
++
++`py_compile plugins/sulis/scripts/tests/unit/test_release_train_readme_section.py` → exit 0, no output.
++
++`pytest plugins/sulis/scripts/tests/unit/test_release_train_readme_section.py` → 5 passed in 0.04s.
++
++Full unit suite at HEAD: 1189 passed, 0 failed.
++
++No project-wide ruff/mypy/black config detected in `plugins/sulis/scripts/pyproject.toml`; the only mechanical checks available are py_compile + pytest, both ran clean.
++
++Coverage gap: ruff/mypy not configured at project root, so static-type and style checks beyond stdlib syntax validation were not run. Mitigation: the new test file uses only stdlib + pytest (no third-party imports beyond pytest itself) and mirrors the established `test_agents_dir_has_no_stray_reports.py` pattern.
++
++### PR Hygiene signal table (CR-09 — PH-06)
++
++```
++Scope (PH-01):
++  commit_type_spread: {docs}                   → single primitive
++  module_fan_out: 2 (plugins/sulis/README.md + plugins/sulis/scripts/tests/unit/)
++  severity: note
++
++Size (PH-02):
++  lines_added: 26 (README) + 153 (new test file)
++  files_changed: 1 modified, 1 added
++  generated_ratio: 0.00
++  lock_file_ratio: 0.00
++  severity: note (well within 200-line / 5-file CR-02 carve-out)
++
++Safety (PH-03):
++  migration_count: 0
++  schema_idl_count: 0
++  infra_files: 0
++  secret_pattern_hits: 0
++  severity: note
++
++Completeness (PH-04):
++  new_source_without_test: 0
++  api_change_without_schema: false
++  severity: note (the new test file IS the docs-prose verification — WP-011 DoD has no runtime tests by design)
++```
++
++### Findings in the Changes
++
++None.
++
++#### Architecture lens
++
++Architecture lens: nothing surfaced. Checks run: no new imports added; no new modules; no module-level singletons; no new HTTP/RPC/DB calls (docs + structural test); no new external surface; no observability gaps (no runtime paths); no contract changes; no new ports.
++
++#### Security lens
++
++Security lens: nothing surfaced. Primitives checked: SEC-01..07, SC-01..04, INF-04. No new code-execution surface; no auth boundary touched; no secret patterns; no dependency changes; no Dockerfile / CI changes; no logging surface change; the diff is markdown prose + a stdlib-only structural test.
++
++#### Quality lens
++
++1. **Build Verification follow-up.** None — CR-01 surfaced no errors.
++2. **JSX / template identifier scan.** N/A — no TSX/JSX/Vue/Svelte files in diff.
++3. **Dead-surface findings.** None — every function in the new test file is invoked by pytest's collection.
++4. **Contract-drift findings.** None — the test contract matches the WP DoD verbatim (section heading + cross-ref link + worked examples + future discovery sibling).
++5. **Test-coverage observation.** The diff IS its own test. The README addition has a structural test (`test_release_train_readme_section.py`) that asserts all four WP DoD invariants. New source files: 1 (the test itself); new test files: 1 (same file). No source-only files added.
++6. **Style / readability.** Test file follows the established `test_agents_dir_has_no_stray_reports.py` pattern (stdlib + pytest, module-level path constants, fixture for shared file read, one assertion per invariant). README section uses the surrounding voice (plain English, table-and-prose mix, fenced anchor links).
++7. **Performance procedural checks (CR-10).** N/A — no loops, no DB calls, no I/O hot paths. The test file performs one file read per pytest module run (cached via the `module`-scoped fixture).
++
++### Findings in the Neighbours
++
++None. Neighbour ring scoped to: the SRD at `.specifications/release-train-as-entities/SRD.md` (cross-reference target — verified to contain the `## Configuration Vocabulary` heading the link anchors to); the existing `plugins/sulis/README.md` content (unmodified outside the inserted section, surrounding tone preserved); existing test conventions at `plugins/sulis/scripts/tests/unit/` (pattern matched). No pre-existing gaps the PR exposes.
++
++### Watch List
++
++None.
++
++### Cross-Reference
++
++- **Existing Hardening Deltas covered:** none applicable
++- **Existing security report:** none
++- **Pattern suggesting full audit:** none
++
++### Methodology
++
++#### Code Review Standard self-attestation (CR-08)
++
++- [✓] **CR-01 Mechanical baseline ran.** Commands: `py_compile` on the new test file (exit 0); `pytest` on the new test file (5 passed); `pytest` on full unit suite (1189 passed). Coverage gap: no project-wide ruff/mypy configured — recorded above.
++- [✓] **CR-02 Parallel dispatch carve-out.** Single-reader pass justified by diff size: 26 lines (README) + 153 lines (new test) across 2 files. Within the 200-line / 5-file carve-out threshold.
++- [✓] **CR-03 Full-file reads.** Both changed files read end-to-end: `plugins/sulis/README.md` (93 lines after change), `plugins/sulis/scripts/tests/unit/test_release_train_readme_section.py` (153 lines). Unread files: none.
++- [✓] **CR-04 Evidence discipline.** No findings produced; nothing to evidence. Lens completion entries cite checks-run + scan-scope so absence is not silence.
++- [✓] **CR-05 Severity rubric.** No findings produced; rubric not exercised on lens output. Hygiene severities scored: PH-01 `note`, PH-02 `note`, PH-03 `note`, PH-04 `note`.
++- [✓] **CR-06 Verdict computed.** Verdict: PASS. Auto-downgrade triggers: none fired.
++- [✓] **CR-07 Lens completion.** Architecture: explicit "nothing surfaced" + checks-run list. Security: explicit "nothing surfaced" + primitives checked. Quality: all 7 outputs produced (build-verification follow-up = none, JSX scan = N/A, dead-surface = none, contract-drift = none, test-coverage = the diff IS its own test, style = follows established pattern, performance CR-10 = N/A).
++- [✓] **CR-09 PR Hygiene applied.** PH-01 Scope: note (single `docs` primitive). PH-02 Size: note (26 + 153 lines across 2 files). PH-03 Safety: note (0 migrations, 0 schemas, 0 secrets, 0 infra). PH-04 Completeness: note (the new file IS the test for the docs change). No PH-03 high → no CR-06 auto-downgrade fired.
++
++#### Run details
++
++- **Diff source:** working-tree diff against HEAD (no commit yet at review time — pre-Step-7 review per executor lifecycle)
++- **Neighbour expansion:** manual scan of SRD target + README surrounding text + test-pattern reference
++- **Neighbour cap:** 3 files considered, 0 excluded
++- **Scanners run:** py_compile, pytest
++- **Scanners unavailable:** ruff, mypy, gitleaks, semgrep, trivy (none configured in this WP's scope)
++- **Lenses dispatched in parallel:** no — single-reader pass justified by CR-02 carve-out (diff <200 lines / <5 files)
+diff --git a/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-011-readme-cross-ref-2026-06-01T095526Z/signals.json b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-011-readme-cross-ref-2026-06-01T095526Z/signals.json
+new file mode 100644
+index 0000000..19fdc79
+--- /dev/null
++++ b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-011-readme-cross-ref-2026-06-01T095526Z/signals.json
+@@ -0,0 +1,56 @@
++{
++  "target": "feat/wp-011-readme-cross-ref",
++  "wp": "WP-011",
++  "project": "release-train-as-entities",
++  "timestamp": "2026-06-01T095526Z",
++  "diff_metrics": {
++    "lines_added": 26,
++    "lines_removed": 0,
++    "files_changed_committed": 1,
++    "files_added_uncommitted": 1,
++    "total_files_in_scope": 2
++  },
++  "ph_signals": {
++    "scope": {
++      "commit_type_spread": ["docs"],
++      "module_fan_out": 2,
++      "severity": "note",
++      "note": "single concern: README docs addition + co-located structural test"
++    },
++    "size": {
++      "lines_total": 26,
++      "files_changed": 2,
++      "generated_ratio": 0.0,
++      "lock_file_ratio": 0.0,
++      "severity": "note",
++      "note": "well within the 200-line / 5-file CR-02 carve-out"
++    },
++    "safety": {
++      "migration_count": 0,
++      "schema_idl_count": 0,
++      "infra_files": 0,
++      "secret_pattern_hits": 0,
++      "severity": "note",
++      "note": "docs + structural test only; no operational risk surface"
++    },
++    "completeness": {
++      "new_source_without_test": 0,
++      "api_change_without_schema": false,
++      "severity": "note",
++      "note": "the new test file IS the docs-prose verification (WP DoD has no runtime tests by design)"
++    }
++  },
++  "build_verification": {
++    "py_compile": "clean",
++    "pytest_new_file": "5 passed",
++    "pytest_full_unit_suite": "1189 passed",
++    "errors_introduced": 0
++  },
++  "lens_findings": {
++    "architecture": [],
++    "security": [],
++    "quality": []
++  },
++  "verdict": "PASS",
++  "auto_downgrade_triggers": []
++}
+diff --git a/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-011-readme-cross-ref-2026-06-01T095526Z/tool-outputs/diff.patch b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-011-readme-cross-ref-2026-06-01T095526Z/tool-outputs/diff.patch
+new file mode 100644
+index 0000000..03027fb
+--- /dev/null
++++ b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-011-readme-cross-ref-2026-06-01T095526Z/tool-outputs/diff.patch
+@@ -0,0 +1,37 @@
++diff --git a/plugins/sulis/README.md b/plugins/sulis/README.md
++index 6e9408c..3c267a5 100644
++--- a/plugins/sulis/README.md
+++++ b/plugins/sulis/README.md
++@@ -59,6 +59,32 @@ All other plugins carry the `sulis-` prefix. The unprefixed name marks this as
++ the foundational front-door — the one a founder installs first; the one the
++ others sit underneath.
++ 
+++## Customising the release-train for your own marketplace fork
+++
+++The release-train Workflow is the per-Project release pipeline used by
+++this marketplace. Its canonical specification lives at
+++`plugins/sulis/instances/release-train/` — Workflow + Steps + Triggers +
+++FailureModes + Projects + Tools as JSON-LD entity instances.
+++
+++If you fork this marketplace and want to use the release-train against
+++your own plugins, you need to author a Project entity instance for each
+++of your plugins. The Project entity declares your repo's source path,
+++version files, branch policy, and the other variables the release-train
+++consumes.
+++
+++**The authoritative reference for what a Project entity must contain is
+++the SRD's "Configuration Vocabulary" section:** see
+++[`.specifications/release-train-as-entities/SRD.md#configuration-vocabulary`](../../.specifications/release-train-as-entities/SRD.md#configuration-vocabulary).
+++
+++The marketplace's own Project instances at
+++`plugins/sulis/instances/release-train/projects.jsonld` serve as worked
+++examples — `sulis`, `sulis-brain`, `plugin-builder`, and `investor-coach`
+++each demonstrate a typical fill pattern.
+++
+++**Future:** a `project-discovery` Workflow will automate this
+++interactively. Until then, hand-author your Project instance using the
+++Configuration Vocabulary as your template.
+++
++ ## History
++ 
++ - **v0.2.0** (2026-05-23) — Canonical-plugin scope. Absorbed the concierge agent + journey skills from sulis-concierge (which is now a deprecation shim). Plugin description expanded from "meta-skills only" to "canonical front door".
+diff --git a/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-011-readme-cross-ref-2026-06-01T095526Z/tool-outputs/status.txt b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-011-readme-cross-ref-2026-06-01T095526Z/tool-outputs/status.txt
+new file mode 100644
+index 0000000..3b9b40d
+--- /dev/null
++++ b/.architecture/release-train-as-entities/code-reviews/PR-feat-wp-011-readme-cross-ref-2026-06-01T095526Z/tool-outputs/status.txt
+@@ -0,0 +1,4 @@
++ M plugins/sulis/README.md
++?? .architecture/release-train-as-entities/code-reviews/
++?? .architecture/release-train-as-entities/work-packages/.executor-WP-011.md
++?? plugins/sulis/scripts/tests/unit/test_release_train_readme_section.py
+diff --git a/.architecture/release-train-as-entities/work-packages/.executor-WP-003.md b/.architecture/release-train-as-entities/work-packages/.executor-WP-003.md
+new file mode 100644
+index 0000000..ffd2633
+--- /dev/null
++++ b/.architecture/release-train-as-entities/work-packages/.executor-WP-003.md
+@@ -0,0 +1,58 @@
++# Executor journal — WP-003
++
++> Started: 2026-06-01T10:07:25Z
++> Lifecycle step: 7
++> Status: in_progress
++
++## Pre-flight checks
++
++| Tool / Check | Status | Fallback |
++|---|---|---|
++| uv | present | — |
++| pytest | present | — |
++| jsonschema | present | installed via pyproject deps |
++| brain trigger.schema.json (source) | present | located at sulis-plugins repo /Users/iain/Documents/repos/plugins/.specifications/business-dna/out/trigger.schema.json |
++| vendored trigger.schema.json (target) | absent | vendor as part of this WP — copy from brain output to plugins/sulis/brain/compiled/foundation/trigger.schema.json |
++
++## Plan
++
++**Approach.** Create primitive (contract kind): instantiate two Trigger entities at plugins/sulis/instances/release-train/triggers.jsonld per the brain Trigger schema. Authority is brain foundation v0.5.0 trigger.schema.json — Contract sketch in the WP is shorthand and is missing required fields (for_workflow, condition). Per the CONTRACT_FIRST_STANDARD per-kind doctrine, conform to the brain schema. Vendor the schema locally (sibling pattern to actor/credential/tenant). Coordinate the Workflow ULID using a stable identifier (01KT0RTRAIN0WORKFLOW00000) — WP-001 adopts the same when it authors workflow.jsonld. Tenant ULID 01JA0AAA1BBBCCCDDDEEEFFFGS matches the sync-narrative-docs exemplar.
++
++| # | Item | Step | Status | Notes |
++|---:|---|---|---|---|
++| 1 | Vendor plugins/sulis/brain/compiled/foundation/trigger.schema.json from sulis-plugins brain build output (foundation v0.5.0) | 3 (GREEN) | done | precondition for Trigger schema validation; sibling vendor pattern matches actor/credential/tenant |
++| 2 | Write test_triggers_jsonld_parses in plugins/sulis/scripts/tests/unit/test_triggers_instance_valid.py | 2 (RED) | done | — |
++| 3 | Write test_both_triggers_present in plugins/sulis/scripts/tests/unit/test_triggers_instance_valid.py | 2 (RED) | done | — |
++| 4 | Write test_each_trigger_passes_brain_schema in plugins/sulis/scripts/tests/unit/test_triggers_instance_valid.py | 2 (RED) | done | — |
++| 5 | Author plugins/sulis/instances/release-train/triggers.jsonld per Contract + brain Trigger schema (full required fields: id/name/for_domain/for_workflow/kind/condition/state/sys_status) | 3 (GREEN) | done | — |
++| 6 | Refactor — keep Trigger descriptions terse + structural; no comment-noise; coordinate fixture path constants if duplicated | 4 (BLUE) | skipped | Descriptions already terse + structural per WP Blue DoD; no 2-consumer duplication threshold reached for fixture path constants. No refactor warranted. |
++| 7 | Docs update — no-op (no docs_to_update frontmatter; instances are self-describing) | 5 (DOCS) | skipped | WP frontmatter has no docs_to_update; instances are self-describing; brain/compiled/README.md already covers vendoring discipline. |
++| 8 | Run lint + type + format (project convention — no project-wide lint config beyond pytest; verify pytest -q passes) | 6 (LINT) | done | — |
++| 9 | Run /code-review gate against local diff | 6.5 (CODE-REVIEW) | done | — |
++| 10 | Commit feat(release-train): author triggers.jsonld + vendor trigger schema; push | 7 (COMMIT) | in-progress | — |
++
++## Step trace
++
++| Step | Started | Completed | Outcome |
++|---:|---|---|---|
++| 1 | 2026-06-01T10:08:05Z | 2026-06-01T10:08:10Z | Worktree at ../wp-003-rt-worktree on feat/wp-003-author-triggers-instance off change/create-release-train-as-entities at SHA 7943992; preflight checks recorded (uv/pytest/jsonschema present; trigger.schema.json target absent — vendor in Green). |
++| 1.5 | 2026-06-01T10:08:14Z | 2026-06-01T10:09:32Z | Plan seeded: 10 items across Steps 2-7. All paths in-scope. Workflow ULID 01KT0RTRA1NWFW00000000000A coordinated for WP-001 adoption. Tenant ULID matches sync-narrative-docs exemplar. |
++| 2 | 2026-06-01T10:09:35Z | 2026-06-01T10:10:43Z | 3 RED tests written; all fail for the right reason (triggers.jsonld + trigger.schema.json both absent). Test path-resolution corrected to parents[5] (repo-root from tests/unit/test_*.py). |
++| 3 | 2026-06-01T10:10:48Z | 2026-06-01T10:13:38Z | trigger.schema.json vendored from brain output; triggers.jsonld authored with 2 Triggers (manual + event). All 3 RED tests now pass. Full suite: 1323 passed, no regressions. |
++| 4 | 2026-06-01T10:13:41Z | 2026-06-01T10:14:00Z | Blue refactor reviewed; Trigger descriptions already terse + structural; no duplication threshold reached (single test file consumer of path constants). Tests still green (3 passed). |
++| 5 | 2026-06-01T10:14:04Z | 2026-06-01T10:14:15Z | No docs update required: WP has no docs_to_update; instances are self-describing; brain/compiled/README.md already documents the vendoring pattern. |
++| 6 | 2026-06-01T10:14:20Z | 2026-06-01T10:14:45Z | Project has no ruff/mypy/black config. Tests pass (3/3); test file compiles cleanly; both JSON artifacts (triggers.jsonld + vendored trigger.schema.json) parse as valid JSON. |
++| 6.5 | 2026-06-01T10:14:48Z | 2026-06-01T10:20:03Z | addressed: 2 low findings (F-01 unused import; F-02 awkward inline-binding nested-loop in assert message) fixed inline by refactoring assertion to use pytest.fail with an explicit loop. PR Hygiene PH-01..04 all note severity. Bundle at .architecture/release-train-as-entities/code-reviews/PR-feat-wp-003-author-triggers-instance-2026-06-01T101813Z/ with REVIEW.md + signals.json. Verdict: PASS. |
++| 7 | 2026-06-01T10:20:10Z | (in flight) | — |
++
++## Self-heal attempts
++
++| Step | Attempt | Failure (1-line summary) | Root cause | Change applied | Outcome |
++|---:|---:|---|---|---|---|
++
++## Post-deploy verification
++
++(Not yet recorded — Step 11 fills this in.)
++
++## Notes
++
+diff --git a/.architecture/release-train-as-entities/work-packages/.executor-WP-004.md b/.architecture/release-train-as-entities/work-packages/.executor-WP-004.md
+new file mode 100644
+index 0000000..d3e6628
+--- /dev/null
++++ b/.architecture/release-train-as-entities/work-packages/.executor-WP-004.md
+@@ -0,0 +1,60 @@
++# Executor journal — WP-004
++
++> Started: 2026-06-01T10:05:30Z
++> Lifecycle step: 7
++> Status: in_progress
++
++## Pre-flight checks
++
++| Tool / Check | Status | Fallback |
++|---|---|---|
++| uv | present | — |
++| python3 | present | — |
++| gh CLI | present | — |
++| jsonschema | present | available via uv sync |
++
++## Plan
++
++**Approach.** Create primitive (kind=contract). Author 8 FailureMode instances at plugins/sulis/instances/release-train/failuremodes.jsonld validating against the foundation FailureMode JSON Schema, covering today's three lived defects (CH-01KSYZ YAML parse, CH-01KSZ1 loop-guard, GH-token tag trigger) plus 5 structural/operational defenses. Key reconciliation: the WP Contract uses kind='operational'/'structural' but the foundation schema enum is timeout/dependency-unavailable/invalid-input/policy-violation/business-logic-error/infrastructure-failure/capacity-exceeded/authorisation-denied/other — I will map per-FailureMode to schema-valid kinds and use the schema as canonical.
++
++| # | Item | Step | Status | Notes |
++|---:|---|---|---|---|
++| 1 | Write test_failuremodes_jsonld_parses in plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py | 2 (RED) | done | — |
++| 2 | Write test_8_failuremodes_present in plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py | 2 (RED) | done | — |
++| 3 | Write test_each_passes_brain_schema in plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py | 2 (RED) | done | — |
++| 4 | Write test_recovery_strategy_enum_valid in plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py | 2 (RED) | done | — |
++| 5 | Write test_lived_defects_represented — workflow-yaml-fails-to-parse + loop-guard-matches-founder-pr + bot-tag-doesnt-trigger-release-prod present by name | 2 (RED) | done | — |
++| 6 | Write test_names_kebab_case — every FailureMode name is kebab-case + describe-failure form (Blue invariant test, RGB-03) | 2 (RED) | done | — |
++| 7 | Vendor foundation FailureMode schema into plugins/sulis/brain/compiled/foundation/failuremode.schema.json (currently absent) | 3 (GREEN) | done | — |
++| 8 | Author plugins/sulis/instances/release-train/failuremodes.jsonld with 8 FailureMode instances per Contract + FR-008 | 3 (GREEN) | done | — |
++| 9 | Refactor: ensure FailureMode descriptions are uniformly structured (symptom + recovery action); verify naming + schema kind mapping | 4 (BLUE) | skipped | No 2-consumer duplication threshold fires — each FailureMode's description + recovery_detail is intrinsically unique to its symptom. Blue invariants (kebab-case + describe-failure form + schema-validity) are enforced by tests #4, #5, #6, #3 — invariants travel with the code, not extracted into a helper. |
++| 10 | Docs no-op — WP has no docs_to_update; failuremodes.jsonld IS the canonical spec; will skip Step 5 | 5 (DOCS) | skipped | No-op as expected. WP has no docs_to_update frontmatter. The failuremodes.jsonld file IS the canonical spec for the FailureMode catalogue; its _about field serves as inline documentation. Downstream WP-009 (annotations) and WP-007 (drift detector) will reference these entities, but they are separate WPs. |
++| 11 | Run pytest from plugins/sulis/scripts via uv; ensure no test failures | 6 (LINT) | done | — |
++| 12 | Run /code-review against local diff vs origin/change/create-release-train-as-entities (Step 6.5 gate) | 6.5 (CODE-REVIEW) | done | — |
++| 13 | Commit (Conventional Commits feat scope) + push to origin | 7 (COMMIT) | pending | — |
++
++## Step trace
++
++| Step | Started | Completed | Outcome |
++|---:|---|---|---|
++| 1 | 2026-06-01T10:05:52Z | 2026-06-01T10:05:57Z | Worktree at ../wp-004-rt-worktree on feat/wp-004-author-failuremodes-instance; base SHA 794399209060daea30c45501a0a1507408145c8b on change/create-release-train-as-entities |
++| 1.5 | 2026-06-01T10:06:01Z | 2026-06-01T10:06:48Z | Plan seeded — 13 items across 7 phases; scope-guard clean (all file paths inside WP Contract); kind-enum reconciliation noted in approach |
++| 2 | 2026-06-01T10:06:58Z | 2026-06-01T10:08:00Z | 6 tests written in test_failuremodes_instance_valid.py; all 6 fail with expected 'failuremodes.jsonld missing' fixture setup error — RED confirmed |
++| 3 | 2026-06-01T10:08:06Z | 2026-06-01T10:11:44Z | 8 FailureMode instances authored at plugins/sulis/instances/release-train/failuremodes.jsonld; FailureMode schema vendored to plugins/sulis/brain/compiled/foundation/; all 6 new tests pass; full unit suite green (1190 passed) |
++| 4 | 2026-06-01T10:11:54Z | 2026-06-01T10:11:58Z | No refactor required — Blue invariants are encoded as RGB-03 test assertions (test_names_kebab_case + test_each_passes_brain_schema + test_recovery_strategy_enum_valid); no duplication threshold fires across the 8 FailureMode descriptions |
++| 5 | 2026-06-01T10:12:03Z | 2026-06-01T10:12:08Z | Docs no-op — WP-004 has no docs_to_update; failuremodes.jsonld is itself the spec, with _about field providing inline rationale |
++| 6 | 2026-06-01T10:12:12Z | 2026-06-01T10:12:35Z | Lint clean: manifest JSON validity (OK), python compileall (OK), JSON-LD parse (OK), schema parse (OK), sulis-route check (passed, no orphans/duplicates) |
++| 6.5 | 2026-06-01T10:12:40Z | 2026-06-01T10:15:51Z | addressed: code-review bundle at .architecture/release-train-as-entities/code-reviews/PR-feat-wp-004-author-failuremodes-instance-2026-06-01T101253Z/; verdict=PASS; 0 critical/high/medium; 1 low quality finding (Q-01 WP-Contract↔schema vocabulary drift) documented as informational in REVIEW.md + signals.json — no code fix required (implementation conforms to canonical schema); no auto-downgrades fired |
++| 7 | 2026-06-01T10:15:55Z | (in flight) | — |
++
++## Self-heal attempts
++
++| Step | Attempt | Failure (1-line summary) | Root cause | Change applied | Outcome |
++|---:|---:|---|---|---|---|
++
++## Post-deploy verification
++
++(Not yet recorded — Step 11 fills this in.)
++
++## Notes
++
+diff --git a/.architecture/release-train-as-entities/work-packages/.executor-WP-011.md b/.architecture/release-train-as-entities/work-packages/.executor-WP-011.md
+new file mode 100644
+index 0000000..a5d5935
+--- /dev/null
++++ b/.architecture/release-train-as-entities/work-packages/.executor-WP-011.md
+@@ -0,0 +1,51 @@
++# Executor journal — WP-011
++
++> Started: 2026-06-01T09:49:36Z
++> Lifecycle step: 7
++> Status: in_progress
++
++## Pre-flight checks
++
++| Tool / Check | Status | Fallback |
++|---|---|---|
++| pytest | present | — |
++| python3 | present | — |
++| git | present | — |
++
++## Plan
++
++**Approach.** Extend primitive. Add 'Customising the release-train for your own marketplace fork' section to plugins/sulis/README.md cross-referencing the SRD's Configuration Vocabulary section. RED phase is a structure test asserting the new section is present + cross-ref link + worked examples + future discovery sibling. No runtime tests — docs-only WP.
++
++| # | Item | Step | Status | Notes |
++|---:|---|---|---|---|
++| 1 | Write test_release_train_readme_section.py in plugins/sulis/scripts/tests/unit/ asserting the new README section + cross-ref link + worked examples + future discovery sibling all present | 2 (RED) | done | — |
++| 2 | Add the 'Customising the release-train for your own marketplace fork' section to plugins/sulis/README.md per the WP Contract | 3 (GREEN) | done | — |
++| 3 | Tidy the README section: integrates with existing structure, founder-facing tone, relative path resolves both on GitHub + locally | 4 (BLUE) | done | BLUE review confirmed: integration + tone + link-resolution all clean; no structural change needed |
++| 4 | Step 5 docs: WP IS the docs update; no other docs files apply | 5 (DOCS) | skipped | no-op: this WP IS the docs change |
++| 5 | Run pytest on the new test + verify no markdown lint issues | 6 (LINT) | done | — |
++| 6 | Commit (Conventional Commits) + push to feat/wp-011-readme-cross-ref | 7 (COMMIT) | in-progress | — |
++
++## Step trace
++
++| Step | Started | Completed | Outcome |
++|---:|---|---|---|
++| 2 | 2026-06-01T09:50:35Z | 2026-06-01T09:52:34Z | 5 tests written; 4 fail RED on the right reasons (missing section heading / link / worked examples / future-sibling); 1 (link-resolves) passes because SRD is present |
++| 3 | 2026-06-01T09:52:39Z | 2026-06-01T09:53:56Z | Added 'Customising the release-train for your own marketplace fork' section to plugins/sulis/README.md per the WP Contract verbatim. 5/5 new tests pass; full unit suite green (1189 passed) |
++| 4 | 2026-06-01T09:54:03Z | 2026-06-01T09:54:25Z | BLUE review: section integrates between 'Why sulis' and 'History' (natural placement); tone matches surrounding prose; relative link ../../.specifications/release-train-as-entities/SRD.md#configuration-vocabulary resolves locally and uses GitHub's slug convention. No structural changes needed; 5/5 tests still green |
++| 5 | 2026-06-01T09:54:31Z | 2026-06-01T09:54:36Z | No-op: WP-011 IS the docs change (the README section addition). No further documentation files apply |
++| 6 | 2026-06-01T09:54:41Z | 2026-06-01T09:55:00Z | py_compile clean on new test file; README long lines confined to URL link + pre-existing table rows / history entries (matches established README convention) |
++| 6.5 | 2026-06-01T09:55:06Z | 2026-06-01T09:56:49Z | addressed: /code-review produced PASS verdict with 0 findings across all three lenses. Bundle at .architecture/release-train-as-entities/code-reviews/PR-feat-wp-011-readme-cross-ref-2026-06-01T095526Z/ with REVIEW.md + signals.json + tool-outputs. CR-01 mechanical baseline clean; PH-01..04 all 'note' severity |
++| 7 | 2026-06-01T09:56:53Z | (in flight) | — |
++
++## Self-heal attempts
++
++| Step | Attempt | Failure (1-line summary) | Root cause | Change applied | Outcome |
++|---:|---:|---|---|---|---|
++| 2 | 1 | test_cross_reference_link_resolves failed: SRD target missing at /Users/iain/Documents/repos/wp-011-worktree/.specifications/release-train-as-entities/SRD.md | Worktree branched off origin/change/create-release-train-as-entities (commit 04b0a6e); the change-branch's 4 local commits carrying SRD + architecture artifacts were not yet pushed to remote at dispatch time | git fetch the local change-branch tip (7943992) from the change-repo and git rebase the feat branch onto it; worktree now contains SRD + .architecture/release-train-as-entities/ | RED phase re-runs: 4 of 5 tests fail RED on the right reasons (missing section / link / worked examples / future-sibling); test_cross_reference_link_resolves now PASSES because SRD is present and has the '## Configuration Vocabulary' heading |
++
++## Post-deploy verification
++
++(Not yet recorded — Step 11 fills this in.)
++
++## Notes
++
+diff --git a/plugins/sulis/README.md b/plugins/sulis/README.md
+index 6e9408c..3c267a5 100644
+--- a/plugins/sulis/README.md
++++ b/plugins/sulis/README.md
+@@ -59,6 +59,32 @@ All other plugins carry the `sulis-` prefix. The unprefixed name marks this as
+ the foundational front-door — the one a founder installs first; the one the
+ others sit underneath.
+ 
++## Customising the release-train for your own marketplace fork
++
++The release-train Workflow is the per-Project release pipeline used by
++this marketplace. Its canonical specification lives at
++`plugins/sulis/instances/release-train/` — Workflow + Steps + Triggers +
++FailureModes + Projects + Tools as JSON-LD entity instances.
++
++If you fork this marketplace and want to use the release-train against
++your own plugins, you need to author a Project entity instance for each
++of your plugins. The Project entity declares your repo's source path,
++version files, branch policy, and the other variables the release-train
++consumes.
++
++**The authoritative reference for what a Project entity must contain is
++the SRD's "Configuration Vocabulary" section:** see
++[`.specifications/release-train-as-entities/SRD.md#configuration-vocabulary`](../../.specifications/release-train-as-entities/SRD.md#configuration-vocabulary).
++
++The marketplace's own Project instances at
++`plugins/sulis/instances/release-train/projects.jsonld` serve as worked
++examples — `sulis`, `sulis-brain`, `plugin-builder`, and `investor-coach`
++each demonstrate a typical fill pattern.
++
++**Future:** a `project-discovery` Workflow will automate this
++interactively. Until then, hand-author your Project instance using the
++Configuration Vocabulary as your template.
++
+ ## History
+ 
+ - **v0.2.0** (2026-05-23) — Canonical-plugin scope. Absorbed the concierge agent + journey skills from sulis-concierge (which is now a deprecation shim). Plugin description expanded from "meta-skills only" to "canonical front door".
+diff --git a/plugins/sulis/brain/compiled/foundation/failuremode.schema.json b/plugins/sulis/brain/compiled/foundation/failuremode.schema.json
+new file mode 100644
+index 0000000..44116ef
+--- /dev/null
++++ b/plugins/sulis/brain/compiled/foundation/failuremode.schema.json
+@@ -0,0 +1,106 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://sulis.co/dna/schema/failuremode/1.0.0",
++  "title": "FailureMode",
++  "description": "a named pattern of failure that one or more Steps can encounter, with a defined recovery strategy. Reusable across steps \u2014 e.g. 'external-service-timeout' applies to every step that calls an external service; 'sanctions-hit' applies to every step that consults a sanctions list. Steps reference FailureModes via handles_failures.",
++  "type": "object",
++  "unevaluatedProperties": false,
++  "required": [
++    "id",
++    "name",
++    "for_domain",
++    "kind",
++    "description",
++    "recovery_strategy",
++    "blocks_progress",
++    "state",
++    "sys_status"
++  ],
++  "properties": {
++    "sys_status": {
++      "enum": [
++        "active",
++        "archived",
++        "deleted",
++        "purged"
++      ]
++    },
++    "valid_from": {
++      "type": "string",
++      "format": "date-time",
++      "description": "business-truth window start"
++    },
++    "valid_to": {
++      "type": "string",
++      "format": "date-time",
++      "description": "business-truth window end"
++    },
++    "confidence": {
++      "type": "number",
++      "minimum": 0,
++      "maximum": 1,
++      "description": "instance reliability score"
++    },
++    "id": {
++      "type": "string",
++      "pattern": "^dna:failuremode:[0-9A-HJKMNP-TV-Z]{26}$"
++    },
++    "name": {
++      "type": "string",
++      "description": "e.g. 'external-service-timeout', 'sanctions-hit', 'demands-and-needs-missing', 'rate-limit-exceeded'"
++    },
++    "for_domain": {
++      "type": "string",
++      "pattern": "^dna:(tenant):[0-9A-HJKMNP-TV-Z]{26}$"
++    },
++    "kind": {
++      "enum": [
++        "timeout",
++        "dependency-unavailable",
++        "invalid-input",
++        "policy-violation",
++        "sanctions-hit",
++        "business-logic-error",
++        "infrastructure-failure",
++        "capacity-exceeded",
++        "authorisation-denied",
++        "other"
++      ]
++    },
++    "description": {
++      "type": "string"
++    },
++    "recovery_strategy": {
++      "enum": [
++        "retry",
++        "compensate",
++        "escalate",
++        "abort",
++        "manual-review",
++        "fallback"
++      ]
++    },
++    "recovery_detail": {
++      "type": "string",
++      "description": "specifics: 'max 3 retries with exponential backoff 1s/4s/16s'; 'escalate to compliance@firm.com'; 'fallback to manual underwriting queue'"
++    },
++    "expected_frequency": {
++      "enum": [
++        "rare",
++        "occasional",
++        "frequent"
++      ]
++    },
++    "blocks_progress": {
++      "type": "boolean",
++      "description": "true if hitting this failure mode blocks further workflow progress until recovery completes; false for retry/fallback that don't block"
++    },
++    "state": {
++      "enum": [
++        "active",
++        "deprecated"
++      ]
++    }
++  },
++  "x-schema-org-extends": "custom"
++}
+\ No newline at end of file
+diff --git a/plugins/sulis/brain/compiled/foundation/trigger.schema.json b/plugins/sulis/brain/compiled/foundation/trigger.schema.json
+new file mode 100644
+index 0000000..728cb38
+--- /dev/null
++++ b/plugins/sulis/brain/compiled/foundation/trigger.schema.json
+@@ -0,0 +1,86 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://sulis.co/dna/schema/trigger/1.0.0",
++  "title": "Trigger",
++  "description": "what initiates a Workflow run \u2014 a timer firing, an event arriving, an entity entering or exiting a state, a manual invocation, or an external webhook. Carries the condition (CRON expression, event name, state predicate, etc.) and the target Workflow.",
++  "type": "object",
++  "unevaluatedProperties": false,
++  "required": [
++    "id",
++    "name",
++    "for_domain",
++    "for_workflow",
++    "kind",
++    "condition",
++    "state",
++    "sys_status"
++  ],
++  "properties": {
++    "sys_status": {
++      "enum": [
++        "active",
++        "archived",
++        "deleted",
++        "purged"
++      ]
++    },
++    "valid_from": {
++      "type": "string",
++      "format": "date-time",
++      "description": "business-truth window start"
++    },
++    "valid_to": {
++      "type": "string",
++      "format": "date-time",
++      "description": "business-truth window end"
++    },
++    "confidence": {
++      "type": "number",
++      "minimum": 0,
++      "maximum": 1,
++      "description": "instance reliability score"
++    },
++    "id": {
++      "type": "string",
++      "pattern": "^dna:trigger:[0-9A-HJKMNP-TV-Z]{26}$"
++    },
++    "name": {
++      "type": "string",
++      "description": "e.g. 'renewal-90-days-before-expiry', 'sanctions-rescreen-monthly', 'incident-severity-1-alert'"
++    },
++    "for_domain": {
++      "type": "string",
++      "pattern": "^dna:(tenant):[0-9A-HJKMNP-TV-Z]{26}$"
++    },
++    "for_workflow": {
++      "type": "string",
++      "pattern": "^dna:(workflow):[0-9A-HJKMNP-TV-Z]{26}$",
++      "description": "the Workflow this Trigger fires"
++    },
++    "kind": {
++      "enum": [
++        "timer",
++        "event",
++        "state-entry",
++        "state-exit",
++        "manual",
++        "external-webhook"
++      ]
++    },
++    "condition": {
++      "type": "string",
++      "description": "kind-specific \u2014 for timer: a CRON expression or RFC 5545 RRULE; for event: the event name; for state-entry or state-exit: an entity.state predicate; for manual: a user-facing label; for external-webhook: a URL pattern with auth"
++    },
++    "description": {
++      "type": "string"
++    },
++    "state": {
++      "enum": [
++        "active",
++        "paused",
++        "disabled"
++      ]
++    }
++  },
++  "x-schema-org-extends": "schema:Action"
++}
+\ No newline at end of file
+diff --git a/plugins/sulis/instances/release-train/failuremodes.jsonld b/plugins/sulis/instances/release-train/failuremodes.jsonld
+new file mode 100644
+index 0000000..506189f
+--- /dev/null
++++ b/plugins/sulis/instances/release-train/failuremodes.jsonld
+@@ -0,0 +1,134 @@
++{
++  "@context": {
++    "@vocab": "https://sulis.co/dna/",
++    "dna": "https://sulis.co/dna/"
++  },
++  "@id": "dna:release-train:failuremodes",
++  "@type": "failuremode-instances",
++  "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++  "_about": "Eight FailureModes for the sulis-plugins-marketplace release-train Workflow. Three encode today's lived defects (CH-01KSYZ workflow-yaml-fails-to-parse, CH-01KSZ1 loop-guard-matches-founder-pr, GH-token tag bot-tag-doesnt-trigger-release-prod); one encodes the cycle-tolerance back-edge (release-pr-conflicts-with-target-at-merge — back-integrated twice in the project's history); the remaining four cover standard CI/PR failure surfaces + NFR-010 token-budget defense. Schema: plugins/sulis/brain/compiled/foundation/failuremode.schema.json. Tenant ULID is deterministic — derived as SHA256('tenant-name:sulis-plugins-marketplace') mapped to Crockford base32 (first char clamped to 0 per ULID spec); reused by every release-train canonical instance.",
++  "captured_on": "2026-06-01",
++
++  "failuremodes": [
++    {
++      "id": "dna:failuremode:01KTR2MXE6EA5XASA0C33S30VR",
++      "sys_status": "active",
++      "name": "release-pr-conflicts-with-target-at-merge",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "business-logic-error",
++      "description": "The release PR is mergeable=CONFLICTING at the moment release-on-merge attempts to merge it — the source branch (typically a release/* or change/* branch) diverged from the target (main or dev) since the PR opened, because another PR landed between open and merge. Recovery: back-integrate the target into the source (git merge target → push), wait for CI to re-green, retry from the open-pr Step. This is the cycle-tolerance back-edge that makes the workflow cycle-tolerant (lived twice in the project's history — encoded explicitly so future Step-authors do not assume linear-history).",
++      "recovery_strategy": "escalate",
++      "recovery_detail": "Surface CONFLICTING state to the founder via the release-train skill output. Founder back-integrates target into source manually (git checkout source; git merge target; push), waits for CI, re-runs release-on-merge. Future automation may automate the back-integration when target has only fast-forwardable commits, but the v1 stance is escalate-to-founder.",
++      "expected_frequency": "occasional",
++      "blocks_progress": true,
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.9
++    },
++    {
++      "id": "dna:failuremode:01KTR5NAFM3BGKRJTV1RTJD2MY",
++      "sys_status": "active",
++      "name": "workflow-yaml-fails-to-parse",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "invalid-input",
++      "description": "release-on-merge.yml fails to parse — typically because an inline shell snippet contains an unescaped colon or a heredoc that conflicts with YAML's flow syntax. CH-01KSYZ regression: PR #130 silently skipped because the YAML at HEAD didn't parse; GitHub Actions silently no-ops on parse failure. Recovery: abort the dispatch + surface the YAML parse error to the founder so the malformed file can be reverted or fixed.",
++      "recovery_strategy": "abort",
++      "recovery_detail": "Drift detector + branch-ci.yml MUST run pyyaml safe-load against release-on-merge.yml on every PR and fail the build on parse failure. This is the second line of defense; the first is the founder-typed lint at edit time. On parse failure: PR cannot land until release-on-merge.yml parses.",
++      "expected_frequency": "rare",
++      "blocks_progress": true,
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.95
++    },
++    {
++      "id": "dna:failuremode:01KTRA7VTSP3E14MZ4S641NHQ5",
++      "sys_status": "active",
++      "name": "loop-guard-matches-founder-pr",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "policy-violation",
++      "description": "release-on-merge's loop-guard regex (designed to skip its own previously-created release PRs to prevent infinite release-of-release-of-release loops) over-matches and skips a founder-authored PR whose title or body happens to contain the loop-guard's trigger pattern. CH-01KSZ1 regression: PR #132 was a founder PR that title-matched the bot's release-PR prefix and got skipped. Recovery: tighten the loop-guard regex (require bot-author or release-branch-prefix match in addition to title-prefix); abort the current dispatch when guard would skip a non-bot-authored PR.",
++      "recovery_strategy": "abort",
++      "recovery_detail": "Loop-guard regex MUST require BOTH (a) title-prefix match AND (b) actor=='github-actions[bot]' OR head_ref starts with 'release/'. Single-condition matches no longer skip. Drift detector verifies release-on-merge.yml encodes the both-conditions check.",
++      "expected_frequency": "rare",
++      "blocks_progress": true,
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.95
++    },
++    {
++      "id": "dna:failuremode:01KTRGB53ME08DPVBZ03RTS359",
++      "sys_status": "active",
++      "name": "bot-tag-doesnt-trigger-release-prod",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "authorisation-denied",
++      "description": "release-on-merge creates a git tag (v*.*.*) using GITHUB_TOKEN, but GitHub Actions' default GITHUB_TOKEN is denied permission to trigger downstream workflows (release-prod.yml) when pushing tags. This is a documented GitHub Actions security boundary, not a bug: bot-created refs do not fire workflow events by design. Recovery: fall back to a manual `gh release create` step that the founder runs to create the actual release artifact, OR swap GITHUB_TOKEN for a PAT (deferred — secret-management implication).",
++      "recovery_strategy": "fallback",
++      "recovery_detail": "release-on-merge.yml emits the tag + a journal entry instructing the founder to run `gh release create v<ver> --generate-notes`. The /sulis:release-train skill surfaces the deferred step in its summary. Future automation: PAT-scoped secret + bot identity rotation (deferred to a separate WP; out of scope for the canonical encoding).",
++      "expected_frequency": "frequent",
++      "blocks_progress": false,
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.9
++    },
++    {
++      "id": "dna:failuremode:01KTRS9GWHVX05E9VGM235NNXH",
++      "sys_status": "active",
++      "name": "pr-checks-fail",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "business-logic-error",
++      "description": "Required branch-protection status checks on the release PR fail (typically branch-ci.yml: pytest, drift detector, lint). Recovery: abort the dispatch, surface the failing check to the founder, do not auto-retry — a failing check means real work failed and re-running without changing inputs will produce the same failure.",
++      "recovery_strategy": "abort",
++      "recovery_detail": "release-on-merge polls the PR's check-runs API; on any failed required check, exits with the failed-check name + a link to the CI run log. Founder fixes the underlying issue (or reverts the offending commit) and reopens the release PR.",
++      "expected_frequency": "occasional",
++      "blocks_progress": true,
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.92
++    },
++    {
++      "id": "dna:failuremode:01KTRSHACB8X8VWV6GSAFPMDMF",
++      "sys_status": "active",
++      "name": "pr-open-but-mergeability-stuck",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "infrastructure-failure",
++      "description": "Release PR is open with all required checks green, but GitHub's mergeability state stays at 'UNKNOWN' or 'BLOCKED' indefinitely — typically because of a transient GitHub API hiccup that didn't recompute mergeability, OR a branch-protection setting changed mid-flight. The founder walked away assuming merge would auto-trigger; release stalls silently. Recovery: escalate via monitoring (cron-style poll detects mergeable=UNKNOWN for >N minutes and notifies the founder).",
++      "recovery_strategy": "escalate",
++      "recovery_detail": "release-on-merge does not retry forever; if mergeability is unknown after 3 polls (~6 minutes), exit with explicit 'mergeability stuck' status + ask the founder to recompute manually (close+reopen the PR forces a recompute on GitHub's side). The monitoring rule SHOULD page on the persistent-unknown state.",
++      "expected_frequency": "rare",
++      "blocks_progress": true,
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.85
++    },
++    {
++      "id": "dna:failuremode:01KTRNPG3DAPH7BW0CAQ05C3PH",
++      "sys_status": "active",
++      "name": "version-drift-detected-pre-flight",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "policy-violation",
++      "description": "Pre-flight check finds plugin.json.version disagrees with the matching entry in .claude-plugin/marketplace.json's plugins[].version, OR with the corresponding changeset's claimed version-bump. Typical cause: prior half-bump (a previous release-train run bumped plugin.json but failed before marketplace.json got updated, leaving the two artifacts out of sync). Recovery: abort the release; surface the specific version disagreement to the founder; founder reconciles (either manually re-running the failed sync step or accepting the version that's already shipped and bumping the other).",
++      "recovery_strategy": "abort",
++      "recovery_detail": "Pre-flight Step compares (plugin.json.version, marketplace.json[plugin].version, latest-changeset.version-bump-target). Three-way disagreement → abort with a table of the three values. Two-way disagreement (most common: plugin.json ahead, marketplace.json behind) → abort and tell founder to run the sync step manually.",
++      "expected_frequency": "rare",
++      "blocks_progress": true,
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.9
++    },
++    {
++      "id": "dna:failuremode:01KTRNKJ9DQSRREVTRTR82H95H",
++      "sys_status": "active",
++      "name": "probabilistic-step-token-budget-exceeded",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "kind": "capacity-exceeded",
++      "description": "An LLM-mechanism Step (specifically Step 5 'compose-changelog', the only probabilistic step in the release-train workflow per NFR-010) consumes its token budget before producing usable output. The budget is hard-capped in the canonical Step's token_budget field. Recovery: fall back to the deterministic template path (assemble CHANGELOG from the changeset summaries directly, without LLM synthesis); the result is less narrative but always ships.",
++      "recovery_strategy": "fallback",
++      "recovery_detail": "/sulis-brain:execute-workflow's budget-tracker surfaces the overflow; the imperative path in release-on-merge.yml MUST detect the same condition (LLM response truncated or budget API returns exhausted) and substitute the deterministic CHANGELOG-from-template generator. The drift detector verifies BOTH paths exist in the YAML — LLM Step + deterministic fallback under the same Step's annotation block.",
++      "expected_frequency": "occasional",
++      "blocks_progress": false,
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.85
++    }
++  ]
++}
+diff --git a/plugins/sulis/instances/release-train/triggers.jsonld b/plugins/sulis/instances/release-train/triggers.jsonld
+new file mode 100644
+index 0000000..3016545
+--- /dev/null
++++ b/plugins/sulis/instances/release-train/triggers.jsonld
+@@ -0,0 +1,40 @@
++{
++  "@context": {
++    "@vocab": "https://sulis.co/dna/",
++    "dna": "https://sulis.co/dna/"
++  },
++  "@id": "dna:release-train:triggers",
++  "@type": "trigger-instances",
++  "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++  "_about": "Two Triggers initiate the release-train Workflow. One manual (founder runs /sulis:release-train against a marketplace plugin Project) and one event (release-on-merge.yml fires on push to main, with the CH-01KSZ1 loop-guard filter excluding github-actions[bot] author). The event Trigger is informational under Path A — the imperative bash actually responds to the GH-Actions event; the canonical entity records what fires for drift-detector validation + dry-run preview surface. Tenant ULID is canonical for the marketplace tenant — sourced from WP-004 (failuremodes.jsonld) which derives it deterministically from the tenant logical name (recipe documented in failuremodes.jsonld's _about); reused identically across every release-train canonical instance.",
++  "captured_on": "2026-06-01",
++
++  "triggers": [
++    {
++      "id": "dna:trigger:01KT0RTRA1NTRG1MAN00000000",
++      "sys_status": "active",
++      "name": "manual-release-train-invocation",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "for_workflow": "dna:workflow:01KT0RTRA1NWFW00000000000A",
++      "kind": "manual",
++      "condition": "Founder runs /sulis:release-train against a marketplace plugin Project (dry-run preview or live ship).",
++      "description": "Manual entry point — founder-initiated. Honours mechanism=human gate at Step 8 (founder confirmation). Mirrors the operator-manual-invoke pattern from sync-narrative-docs.",
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.92
++    },
++    {
++      "id": "dna:trigger:01KT0RTRA1NTRG2PRMRG00000A",
++      "sys_status": "active",
++      "name": "pull-request-merged-to-main",
++      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
++      "for_workflow": "dna:workflow:01KT0RTRA1NWFW00000000000A",
++      "kind": "event",
++      "condition": "event:pull_request.merged on main, filtered by author != github-actions[bot] (CH-01KSZ1 loop-guard fix) — i.e. a human-authored release PR has merged.",
++      "description": "Event entry point — release-on-merge.yml dispatches the bump-tag-publish tail of the Workflow. Under Path A this Trigger is informational; the GitHub Actions workflow is the imperative implementation, validated against this canonical via the drift detector (WP-007).",
++      "state": "active",
++      "valid_from": "2026-06-01T00:00:00Z",
++      "confidence": 0.9
++    }
++  ]
++}
+diff --git a/plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py b/plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py
+new file mode 100644
+index 0000000..b8e2cc4
+--- /dev/null
++++ b/plugins/sulis/scripts/tests/unit/test_failuremodes_instance_valid.py
+@@ -0,0 +1,188 @@
++"""
++test_failuremodes_instance_valid — WP-004
++
++Validates that `plugins/sulis/instances/release-train/failuremodes.jsonld`:
++
++1. Parses as valid JSON-LD.
++2. Declares exactly 8 FailureMode instances.
++3. Each instance validates against the foundation FailureMode JSON Schema
++   (`plugins/sulis/brain/compiled/foundation/failuremode.schema.json`).
++4. `recovery_strategy` for every instance is in the canonical
++   {retry, compensate, escalate, abort, manual-review, fallback} enum.
++5. The three lived defects from FR-008 (CH-01KSYZ workflow-yaml-fails-to-parse,
++   CH-01KSZ1 loop-guard-matches-founder-pr, GH-token-tag bot-tag-doesnt-trigger-
++   release-prod) are present by name.
++6. Every `name` is kebab-case + describe-the-failure form (Blue invariant test,
++   RGB-03).
++
++These tests are deliberately deterministic + offline — no network, no LLM,
++no brain CLI subprocess. The schema is read from the local
++brain/compiled/foundation/ directory; the instance is read from the
++release-train instances directory.
++"""
++
++from __future__ import annotations
++
++import json
++import re
++from pathlib import Path
++
++import pytest
++from jsonschema import Draft202012Validator
++
++
++_REPO_ROOT = Path(__file__).resolve().parents[5]
++_INSTANCE_PATH = (
++    _REPO_ROOT
++    / "plugins"
++    / "sulis"
++    / "instances"
++    / "release-train"
++    / "failuremodes.jsonld"
++)
++_SCHEMA_PATH = (
++    _REPO_ROOT
++    / "plugins"
++    / "sulis"
++    / "brain"
++    / "compiled"
++    / "foundation"
++    / "failuremode.schema.json"
++)
++
++_VALID_RECOVERY_STRATEGIES = {
++    "retry",
++    "compensate",
++    "escalate",
++    "abort",
++    "manual-review",
++    "fallback",
++}
++
++# FR-008's three lived-defect FailureModes — MUST be present by exact name.
++_REQUIRED_LIVED_DEFECT_NAMES = {
++    "workflow-yaml-fails-to-parse",
++    "loop-guard-matches-founder-pr",
++    "bot-tag-doesnt-trigger-release-prod",
++}
++
++# kebab-case: lowercase letters, digits, hyphens; must start with a letter;
++# no consecutive hyphens; no trailing hyphen.
++_KEBAB_RE = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)+$")
++
++
++@pytest.fixture(scope="module")
++def instance() -> dict:
++    """The parsed failuremodes.jsonld envelope."""
++    assert _INSTANCE_PATH.exists(), (
++        f"failuremodes.jsonld missing at {_INSTANCE_PATH}"
++    )
++    with _INSTANCE_PATH.open() as f:
++        return json.load(f)
++
++
++@pytest.fixture(scope="module")
++def failuremodes(instance: dict) -> list[dict]:
++    """The list of FailureMode entries inside the envelope."""
++    return instance["failuremodes"]
++
++
++@pytest.fixture(scope="module")
++def schema() -> dict:
++    """The vendored foundation FailureMode schema."""
++    assert _SCHEMA_PATH.exists(), (
++        f"foundation FailureMode schema missing at {_SCHEMA_PATH}; "
++        "expected vendored copy alongside actor/credential/tenant schemas"
++    )
++    with _SCHEMA_PATH.open() as f:
++        return json.load(f)
++
++
++# ----- Test #1 — JSON-LD parses -----
++
++
++def test_failuremodes_jsonld_parses(instance: dict) -> None:
++    """The file is well-formed JSON with the expected envelope shape."""
++    assert "@context" in instance
++    assert "@id" in instance
++    assert "@type" in instance
++    assert instance["@type"] == "failuremode-instances"
++    assert "failuremodes" in instance
++    assert isinstance(instance["failuremodes"], list)
++
++
++# ----- Test #2 — 8 FailureModes present -----
++
++
++def test_8_failuremodes_present(failuremodes: list[dict]) -> None:
++    """WP-004 Contract: exactly 8 FailureMode instances."""
++    assert len(failuremodes) == 8, (
++        f"expected 8 FailureModes, found {len(failuremodes)}"
++    )
++
++
++# ----- Test #3 — each passes brain schema -----
++
++
++def test_each_passes_brain_schema(
++    failuremodes: list[dict], schema: dict
++) -> None:
++    """Every FailureMode validates against the foundation schema."""
++    validator = Draft202012Validator(schema)
++    errors_by_name: dict[str, list[str]] = {}
++    for fm in failuremodes:
++        errs = sorted(validator.iter_errors(fm), key=lambda e: e.path)
++        if errs:
++            errors_by_name[fm.get("name", "<unnamed>")] = [
++                f"{list(e.path)}: {e.message}" for e in errs
++            ]
++    assert not errors_by_name, (
++        f"schema validation failed for {len(errors_by_name)} FailureMode(s): "
++        f"{json.dumps(errors_by_name, indent=2)}"
++    )
++
++
++# ----- Test #4 — recovery_strategy enum valid -----
++
++
++def test_recovery_strategy_enum_valid(failuremodes: list[dict]) -> None:
++    """All recovery_strategy values are in the FR-009 enum."""
++    bad = [
++        (fm["name"], fm.get("recovery_strategy"))
++        for fm in failuremodes
++        if fm.get("recovery_strategy") not in _VALID_RECOVERY_STRATEGIES
++    ]
++    assert not bad, (
++        f"recovery_strategy out of FR-009 enum: {bad}. "
++        f"Valid: {sorted(_VALID_RECOVERY_STRATEGIES)}"
++    )
++
++
++# ----- Test #5 — FR-008 lived defects represented -----
++
++
++def test_lived_defects_represented(failuremodes: list[dict]) -> None:
++    """FR-008's three lived-defect FailureModes are present by exact name."""
++    names = {fm["name"] for fm in failuremodes}
++    missing = _REQUIRED_LIVED_DEFECT_NAMES - names
++    assert not missing, (
++        f"FR-008 lived defects missing from FailureMode catalogue: {missing}. "
++        f"Present names: {sorted(names)}"
++    )
++
++
++# ----- Test #6 — Blue invariant: kebab-case names -----
++
++
++def test_names_kebab_case(failuremodes: list[dict]) -> None:
++    """Every FailureMode name is kebab-case and reads as <symptom>-<context>.
++
++    This is the Blue refactor invariant from the WP DoD: prevents naming drift
++    when future FailureModes are added.
++    """
++    bad = [fm["name"] for fm in failuremodes if not _KEBAB_RE.match(fm["name"])]
++    assert not bad, (
++        f"non-kebab-case FailureMode names: {bad}. "
++        "Pattern: lowercase + digits + hyphens, must include at least one "
++        "hyphen, no consecutive hyphens, no trailing hyphen."
++    )
+diff --git a/plugins/sulis/scripts/tests/unit/test_release_train_readme_section.py b/plugins/sulis/scripts/tests/unit/test_release_train_readme_section.py
+new file mode 100644
+index 0000000..d15ebfd
+--- /dev/null
++++ b/plugins/sulis/scripts/tests/unit/test_release_train_readme_section.py
+@@ -0,0 +1,136 @@
++"""Docs-prose verification for WP-011 (release-train-as-entities change).
++
++WP-011 adds a new section to ``plugins/sulis/README.md`` titled
++"Customising the release-train for your own marketplace fork" that
++cross-references the SRD's Configuration Vocabulary section. This module
++is the RED-phase verification: the WP has no runtime tests (docs prose),
++so the failing-first cycle pins the documented invariants on the live
++README as structural assertions.
++
++Per the WP Contract (`Definition of Done > Green`), the section MUST:
++
++  1. Exist as a top-level ``##`` heading whose text contains
++     "Customising the release-train" (so fork-consumers find it via the
++     GitHub TOC).
++  2. Cross-reference the SRD's Configuration Vocabulary section via a
++     relative link that resolves both on GitHub and on local disk.
++  3. Name the worked-example Project entities (``sulis``,
++     ``sulis-brain``, ``plugin-builder``, ``investor-coach``) so
++     fork-consumers see a typical fill pattern.
++  4. Reference the future ``project-discovery`` Workflow sibling so
++     fork-consumers understand the v1 manual path is the documented
++     fallback (reduces anxiety per the WP Context).
++
++Stdlib + pytest only, Python 3.11-safe. Resolves paths relative to this
++test file so the suite is location-stable inside any worktree.
++"""
++
++from __future__ import annotations
++
++from pathlib import Path
++
++import pytest
++
++# tests/unit/ -> tests/ -> scripts/ -> sulis/ -> plugins/sulis/
++_README = (
++    Path(__file__).resolve().parents[3] / "README.md"
++)
++
++# plugins/sulis/ -> plugins/ -> repo-root -> .specifications/...
++_REPO_ROOT = Path(__file__).resolve().parents[5]
++_SRD = _REPO_ROOT / ".specifications" / "release-train-as-entities" / "SRD.md"
++
++# The relative link the README uses to point at the SRD's Configuration
++# Vocabulary section. README lives at plugins/sulis/README.md, so the
++# relative path is "../../.specifications/...". The link MUST appear in
++# the README verbatim (the cross-reference is the WP's core deliverable).
++_EXPECTED_LINK_PATH = (
++    "../../.specifications/release-train-as-entities/SRD.md"
++    "#configuration-vocabulary"
++)
++
++_WORKED_EXAMPLES = ("sulis", "sulis-brain", "plugin-builder", "investor-coach")
++
++
++@pytest.fixture(scope="module")
++def readme_text() -> str:
++    """The live README content as a single string."""
++    assert _README.is_file(), f"missing marketplace README at {_README}"
++    return _README.read_text(encoding="utf-8")
++
++
++def test_section_heading_present(readme_text: str) -> None:
++    """A top-level ``##`` heading mentioning customising the release-train.
++
++    Fork-consumers navigate GitHub TOC by ``##`` headings; the section
++    being inline prose under another heading wouldn't surface.
++    """
++    lines = readme_text.splitlines()
++    matches = [
++        line for line in lines
++        if line.startswith("## ") and "Customising the release-train" in line
++    ]
++    assert matches, (
++        "README is missing the WP-011 section heading. Expected a "
++        "top-level '## Customising the release-train ...' so the "
++        "GitHub TOC surfaces it for fork-consumers."
++    )
++
++
++def test_cross_reference_link_present(readme_text: str) -> None:
++    """The SRD Configuration Vocabulary cross-reference link is verbatim.
++
++    The link is the WP's core deliverable — fork-consumers click through
++    from the marketplace README to the authoritative Project-entity
++    field list.
++    """
++    assert _EXPECTED_LINK_PATH in readme_text, (
++        f"README is missing the cross-reference to {_EXPECTED_LINK_PATH}. "
++        "Fork-consumers need this link to reach the authoritative "
++        "Project-entity field reference."
++    )
++
++
++def test_cross_reference_link_resolves(readme_text: str) -> None:
++    """The link target file exists AND has the expected anchor heading.
++
++    GitHub auto-generates the ``#configuration-vocabulary`` anchor from a
++    ``## Configuration Vocabulary`` heading; we assert both halves so a
++    future SRD rename surfaces here, not only when a fork-consumer
++    clicks a dead link.
++    """
++    assert _SRD.is_file(), f"SRD target missing at {_SRD}"
++    srd_text = _SRD.read_text(encoding="utf-8")
++    assert "## Configuration Vocabulary" in srd_text, (
++        f"SRD at {_SRD} is missing the '## Configuration Vocabulary' "
++        "heading the README link anchors to."
++    )
++
++
++def test_worked_examples_named(readme_text: str) -> None:
++    """All four worked-example Project entities named in the section.
++
++    The WP Contract names ``sulis``, ``sulis-brain``, ``plugin-builder``,
++    ``investor-coach`` so fork-consumers see a typical fill pattern.
++    """
++    missing = [ex for ex in _WORKED_EXAMPLES if ex not in readme_text]
++    assert not missing, (
++        "README is missing worked-example Project name(s): "
++        f"{missing}. The WP Contract names all four "
++        f"({list(_WORKED_EXAMPLES)}) as the typical-fill reference set."
++    )
++
++
++def test_future_discovery_sibling_referenced(readme_text: str) -> None:
++    """The future ``project-discovery`` Workflow is mentioned.
++
++    Per WP Context: setting the expectation that v1 manual authoring is
++    the documented fallback (not a permanent state) reduces fork-consumer
++    anxiety. The sibling is referenced by name.
++    """
++    assert "project-discovery" in readme_text, (
++        "README is missing the reference to the future "
++        "'project-discovery' Workflow sibling. Per WP Context this "
++        "reference sets fork-consumer expectations that the manual "
++        "v1 path is the documented fallback, not a permanent state."
++    )
+diff --git a/plugins/sulis/scripts/tests/unit/test_triggers_instance_valid.py b/plugins/sulis/scripts/tests/unit/test_triggers_instance_valid.py
+new file mode 100644
+index 0000000..7e65f0f
+--- /dev/null
++++ b/plugins/sulis/scripts/tests/unit/test_triggers_instance_valid.py
+@@ -0,0 +1,108 @@
++"""WP-003 — release-train Trigger entity instance validation.
++
++Authors two Trigger instances (manual + event) at
++`plugins/sulis/instances/release-train/triggers.jsonld` and verifies
++them against the vendored brain Trigger JSON Schema (foundation
++v0.5.0). The instances ARE the contract — these tests guard the
++contract from drift.
++
++Cross-WP coordination notes:
++- `for_workflow` references `dna:workflow:01KT0RTRA1NWFW00000000000A`,
++  which WP-001 (workflow.jsonld) adopts when it authors the Workflow
++  entity. This test does not assert the Workflow ULID exists yet —
++  WP-007 (drift detector) covers cross-entity resolution; here we
++  guard the Trigger shape.
++- `for_domain` references the Sulis AI marketplace tenant ULID
++  `dna:tenant:01JA0AAA1BBBCCCDDDEEEFFFGS` (same as the brain's
++  sync-narrative-docs exemplar).
++"""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++from jsonschema import Draft202012Validator
++
++_REPO_ROOT = Path(__file__).resolve().parents[5]
++_INSTANCE_PATH = (
++    _REPO_ROOT
++    / "plugins"
++    / "sulis"
++    / "instances"
++    / "release-train"
++    / "triggers.jsonld"
++)
++_SCHEMA_PATH = (
++    _REPO_ROOT
++    / "plugins"
++    / "sulis"
++    / "brain"
++    / "compiled"
++    / "foundation"
++    / "trigger.schema.json"
++)
++
++
++def _load_instance() -> dict:
++    return json.loads(_INSTANCE_PATH.read_text())
++
++
++def _load_schema() -> dict:
++    return json.loads(_SCHEMA_PATH.read_text())
++
++
++def test_triggers_jsonld_parses() -> None:
++    """The triggers.jsonld file exists, is valid JSON, and exposes a
++    top-level `triggers` array."""
++    assert _INSTANCE_PATH.exists(), (
++        f"expected triggers instance at {_INSTANCE_PATH}"
++    )
++    instance = _load_instance()
++    assert isinstance(instance, dict)
++    assert "triggers" in instance, "top-level `triggers` array missing"
++    assert isinstance(instance["triggers"], list)
++
++
++def test_both_triggers_present() -> None:
++    """Exactly two Triggers: the manual /sulis:release-train invocation
++    and the GH-Actions release-on-merge event."""
++    triggers = _load_instance()["triggers"]
++    assert len(triggers) == 2, (
++        f"expected exactly 2 Trigger instances, got {len(triggers)}"
++    )
++
++    names = {t["name"] for t in triggers}
++    assert names == {
++        "manual-release-train-invocation",
++        "pull-request-merged-to-main",
++    }, f"trigger names mismatch: {names}"
++
++    # Sanity: kind taxonomy matches the WP Contract — one manual, one event.
++    kinds = {t["name"]: t["kind"] for t in triggers}
++    assert kinds["manual-release-train-invocation"] == "manual"
++    assert kinds["pull-request-merged-to-main"] == "event"
++
++
++def test_each_trigger_passes_brain_schema() -> None:
++    """Each Trigger validates against the vendored brain Trigger schema
++    (foundation v0.5.0). This is the contract — schema-level conformance
++    is non-negotiable."""
++    schema = _load_schema()
++    validator = Draft202012Validator(schema)
++    triggers = _load_instance()["triggers"]
++    errors_by_index: dict[int, list[str]] = {}
++    for i, trigger in enumerate(triggers):
++        errs = sorted(validator.iter_errors(trigger), key=lambda e: e.path)
++        if errs:
++            errors_by_index[i] = [
++                f"{'/'.join(str(p) for p in e.absolute_path) or '<root>'}: {e.message}"
++                for e in errs
++            ]
++    if errors_by_index:
++        lines = []
++        for i, errs in errors_by_index.items():
++            name = triggers[i].get("name", "<unnamed>")
++            lines.append(f"  [{i}] {name}: {errs}")
++        pytest.fail("trigger schema-validation failures:\n" + "\n".join(lines))

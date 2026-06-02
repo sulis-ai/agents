@@ -1,0 +1,52 @@
+{
+  "target": "feat/wp-002-extend-rubric-with-p-ver",
+  "base": "change/extend-verification-by-design",
+  "timestamp": "2026-06-01T20:46:02Z",
+  "diff_stats": {
+    "files_changed": 2,
+    "lines_added": 457,
+    "lines_removed": 1
+  },
+  "ph_01_scope": {
+    "commit_type_spread": ["feat"],
+    "module_fan_out": ["plugins/sulis"],
+    "severity": "low",
+    "concern_count": 1
+  },
+  "ph_02_size": {
+    "lines_added": 457,
+    "lines_removed": 1,
+    "total": 458,
+    "files_changed": 2,
+    "generated_ratio": 0.0,
+    "lock_file_ratio": 0.0,
+    "severity": "low"
+  },
+  "ph_03_safety": {
+    "migration_count": 0,
+    "schema_idl_count": 0,
+    "infra_files": 0,
+    "secret_pattern_hits": 0,
+    "severity": "none"
+  },
+  "ph_04_completeness": {
+    "new_source_without_test": 0,
+    "api_change_without_schema": false,
+    "new_test_files": 1,
+    "severity": "none"
+  },
+  "auto_downgrade_triggers": [],
+  "build_verification": {
+    "errors": 0,
+    "tests_run": 29,
+    "tests_passed": 29,
+    "tests_failed": 0
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "status": "nothing-surfaced"},
+    "security": {"findings": 0, "status": "nothing-surfaced"},
+    "quality": {"findings": 0, "status": "nothing-surfaced"}
+  },
+  "verdict": "PASS",
+  "verdict_plain_english": "Ready to merge"
+}

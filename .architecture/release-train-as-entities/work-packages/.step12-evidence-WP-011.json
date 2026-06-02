@@ -1,0 +1,6 @@
+{
+  "branch": "feat/wp-011-cross-ref-configuration-vocabulary",
+  "merge_sha": "301dfbe",
+  "health_status": "skipped",
+  "smoke_verdict": "skipped"
+}

@@ -1,0 +1,72 @@
+{
+  "target": "feat/wp-003-detect-phase",
+  "base": "change/create-discover-project",
+  "timestamp": "2026-06-01T17:16:13Z",
+  "diff_stats": {
+    "lines_added": 689,
+    "lines_removed": 0,
+    "files_changed": 8,
+    "files_added": 8,
+    "files_modified": 0
+  },
+  "ph_signals": {
+    "scope": {
+      "commit_type_spread": ["feat"],
+      "module_fan_out": 1,
+      "severity": "note"
+    },
+    "size": {
+      "lines_added": 689,
+      "lines_removed": 0,
+      "files_changed": 8,
+      "severity": "note"
+    },
+    "safety": {
+      "migration_count": 0,
+      "schema_idl_count": 0,
+      "infra_files": 0,
+      "secret_pattern_hits": 0,
+      "severity": "note"
+    },
+    "completeness": {
+      "new_source_files": 1,
+      "new_test_files": 1,
+      "new_fixture_files": 6,
+      "new_source_without_test": 0,
+      "api_change_without_schema": false,
+      "severity": "note"
+    }
+  },
+  "build_verification": {
+    "errors_added": 0,
+    "ruff_clean": true,
+    "pytest_passes": "13/13",
+    "coverage_inspector_py": 0.92
+  },
+  "findings": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0,
+    "note": 0
+  },
+  "lens_results": {
+    "architecture": {
+      "findings_count": 0,
+      "checks_run": ["form/ports-adapters", "armor/timeout", "armor/secrets", "proof/contract-tests"],
+      "verdict": "nothing-surfaced"
+    },
+    "security": {
+      "findings_count": 0,
+      "checks_run": ["secrets-scan", "subprocess-injection", "yaml-safe-load", "shell-true"],
+      "verdict": "nothing-surfaced"
+    },
+    "quality": {
+      "findings_count": 0,
+      "checks_run": ["cr-01-followup", "dead-surface", "contract-drift", "test-coverage", "cr-10-performance"],
+      "verdict": "nothing-surfaced"
+    }
+  },
+  "verdict": "PASS",
+  "downgrades_fired": []
+}

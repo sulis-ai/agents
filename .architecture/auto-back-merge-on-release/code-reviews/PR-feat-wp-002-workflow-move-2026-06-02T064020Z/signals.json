@@ -1,0 +1,58 @@
+{
+  "target": "feat/wp-002-workflow-move",
+  "base": "change/extend-auto-back-merge-on-release",
+  "project": "auto-back-merge-on-release",
+  "timestamp": "2026-06-02T064020Z",
+  "diff": {
+    "lines_added": 1196,
+    "lines_removed": 0,
+    "files_changed": 6,
+    "novel_content_lines_estimate": 250,
+    "verbatim_move_lines_estimate": 760
+  },
+  "ph_signals": {
+    "scope": {
+      "commit_type_spread": ["pre-commit state (no commits on feature branch yet)"],
+      "module_fan_out_top_dirs": ["plugins/sulis/scripts", "plugins/sulis/templates"],
+      "severity": "note"
+    },
+    "size": {
+      "lines_added": 1196,
+      "lines_removed": 0,
+      "total": 1196,
+      "files_changed": 6,
+      "novel_content_lines": "~250 (the remaining ~950 lines are two near-identical 380-line YAMLs proven byte-equivalent by the characterisation test)",
+      "severity": "note"
+    },
+    "safety": {
+      "migration_count": 0,
+      "schema_idl_count": 0,
+      "infra_files": 0,
+      "secret_pattern_hits": 0,
+      "severity": "note",
+      "comment": "The new templates/workflows/release-on-merge.yml is workflow infrastructure but not yet consumed by any caller; the marketplace's own .github/workflows/release-on-merge.yml remains unchanged"
+    },
+    "completeness": {
+      "new_source_files": 1,
+      "new_test_files": 4,
+      "new_fixture_files": 1,
+      "api_change_without_schema": false,
+      "severity": "note"
+    },
+    "auto_downgrade_triggers": []
+  },
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "pytest_head_passed": 1562,
+    "pytest_head_failed": 0,
+    "yaml_parse_clean": true,
+    "bash_syntax_clean": true
+  },
+  "findings": {
+    "architecture": [],
+    "security": [],
+    "quality": []
+  },
+  "verdict": "PASS",
+  "verdict_reason": "Mechanical baseline clean; PR hygiene all note-level; three lenses each produced output with no findings in diff or neighbours; all files >50 lines read end-to-end."
+}

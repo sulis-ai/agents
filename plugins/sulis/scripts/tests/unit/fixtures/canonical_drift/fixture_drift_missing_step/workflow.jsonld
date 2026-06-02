@@ -1,0 +1,26 @@
+{
+  "@context": {
+    "@vocab": "https://sulis.co/dna/",
+    "dna": "https://sulis.co/dna/"
+  },
+  "@id": "dna:fixture:workflow",
+  "@type": "workflow-instances",
+  "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "captured_on": "2026-06-01",
+  "workflows": [
+    {
+      "id": "dna:workflow:01KT00000000000000000000PA",
+      "sys_status": "active",
+      "name": "fixture-workflow",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "fixture-workflow",
+      "type": "other",
+      "steps": ["step-alpha", "step-beta"],
+      "initial_steps": ["step-alpha"],
+      "transitions": ["step-alpha -> step-beta"],
+      "state": "active",
+      "valid_from": "2026-06-01T00:00:00Z",
+      "confidence": 0.9
+    }
+  ]
+}

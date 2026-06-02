@@ -1,0 +1,18 @@
+{
+  "pr": "feat/wp-007-build-drift-detector",
+  "project": "release-train-as-entities",
+  "timestamp": "2026-06-01T12:33:03Z",
+  "verdict": "PASS",
+  "build_verification": {"errors": 0, "ruff": "clean", "pytest": "42 passed"},
+  "diff_size": {"lines": 1807, "files": 31, "source_loc_excl_fixtures": 600},
+  "ph_signals": {
+    "scope": {"severity": "low", "commit_types": ["feat"], "module_fan_out_dirs": ["plugins/sulis/scripts/_canonical_drift", "plugins/sulis/scripts", "plugins/sulis/scripts/tests/unit", "plugins/sulis/scripts/tests/unit/fixtures/canonical_drift"]},
+    "size": {"severity": "medium", "raw_lines": 1807, "note": "1200+ lines are tiny test fixtures (24 files × ~30 LOC); source LOC is ~600 spread across 6 files."},
+    "safety": {"severity": "low", "migrations": 0, "infra": 0, "secrets": 0},
+    "completeness": {"severity": "low", "new_source": 6, "new_tests": 1, "tests_per_source_ratio": "42 tests / 600 source LOC"}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 1},
+    "in_neighbours": {"total": 0}
+  }
+}

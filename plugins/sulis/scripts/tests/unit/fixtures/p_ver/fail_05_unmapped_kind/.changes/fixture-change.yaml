@@ -1,0 +1,4 @@
+id: CH-FIX005
+slug: fail-05-unmapped-kind
+kind: data-migration
+started_at: 2026-06-01

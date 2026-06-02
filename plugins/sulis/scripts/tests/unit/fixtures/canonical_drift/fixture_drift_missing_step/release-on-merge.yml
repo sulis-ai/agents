@@ -1,0 +1,15 @@
+name: fixture-missing-step-workflow
+on:
+  push:
+    branches: [main]
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      # canonical:step:step-alpha
+      # canonical:failuremode:fixture-failure-alpha
+      - name: "Step alpha"
+        run: echo "alpha"
+      # NOTE: step-beta annotation deliberately omitted to drive a missing_in_yaml drift report.
+      - name: "Step beta"
+        run: echo "beta"

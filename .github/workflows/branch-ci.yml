@@ -62,3 +62,59 @@ jobs:
       - name: smoke — manifest parse + plugin layout
         run: |
           python3 -c "import json; m=json.load(open('.claude-plugin/marketplace.json')); assert m['plugins'], 'no plugins in marketplace'; print(f\"{len(m['plugins'])} plugins resolve\")"
+
+  # canonical:meta:drift-detector
+  # WP-008: wire the Path A drift detector (check-canonical-drift.py, built
+  # in WP-007) into branch-ci. Runs at PR time against the live canonical
+  # entity instances and release-on-merge.yml. Exits 0 (clean), 1 (drift),
+  # 2 (invocation error).
+  #
+  # BLOCKING MODE (tighten-drift-gate, WP-001): the 11 pre-existing
+  # reconciliation items the wave-5b dogfood surfaced have been encoded.
+  # Six (gate-founder-confirmation, open-release-pr,
+  # wait-for-checks-and-mergeability, publish-github-release, squash-merge,
+  # preflight-cross-branch-drift) are honoured via the `excluded_from_yaml`
+  # envelope signal on steps.jsonld — they live in skill prose per MUC-007,
+  # the GitHub PR-merge UI, or the downstream release-prod.yml workflow.
+  # The five missing_failuremode_handling items either resolve when their
+  # parent Steps are excluded, or were filled with explicit annotations
+  # (probabilistic-step-token-budget-exceeded on Step 5
+  # draft-pr-body-and-changelog). The detector now exits 0 cleanly on the
+  # live tree, so the gate is a real blocking check. Branch protection on
+  # `dev` treats this as required-passing alongside the existing branch-ci
+  # job.
+  canonical-drift-check:
+    name: Canonical-vs-implementation drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install UV
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install deps (uv sync --frozen)
+        working-directory: plugins/sulis/scripts
+        run: uv sync --frozen
+
+      - name: Run drift detector
+        # Stdlib-only at the script layer (the detector reads jsonld + yaml
+        # via deps already installed by uv sync above). Exit-1-on-drift now
+        # fails the step → fails the job → fails branch-ci as a required
+        # status check.
+        run: |
+          # Paths are absolute (via $GITHUB_WORKSPACE) because
+          # `uv run --directory plugins/sulis/scripts` changes the working
+          # directory before the Python script runs — relative paths would
+          # resolve against `plugins/sulis/scripts/` and break. Bug surfaced
+          # as the first failure of the blocking drift gate landed in
+          # tighten-drift-gate. Refs CH-01KT1Z.
+          # yaml-path points at the reusable workflow in the plugin — the
+          # annotated release implementation moved there (auto-back-merge
+          # change, WP-002); the marketplace .github/workflows/release-on-merge.yml
+          # is now a thin shim with no canonical:step annotations.
+          uv run --directory plugins/sulis/scripts python check-canonical-drift.py \
+            --instance-dir "$GITHUB_WORKSPACE/plugins/sulis/instances/release-train" \
+            --yaml-path "$GITHUB_WORKSPACE/plugins/sulis/templates/workflows/release-on-merge.yml"

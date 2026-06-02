@@ -1,0 +1,205 @@
+{
+  "@context": "https://sulis-ai.github.io/schema/primitive-tree/v1",
+  "@type": "PrimitiveTree",
+  "spec": "auto-back-merge-on-release",
+  "generated_at": "2026-06-02",
+  "scale_constraints": {
+    "max_depth": 5,
+    "max_fan_out": 7
+  },
+  "nodes": [
+    {
+      "id": "node-reusable-workflow",
+      "type": "integration",
+      "name": "Reusable release-and-back-merge workflow",
+      "definition": "GitHub Actions reusable workflow at plugins/sulis/templates/workflows/release-on-merge.yml that performs release-bump + back-integration as a single atomic unit. Inputs: none required (operates on the calling repo's git state via GITHUB_TOKEN).",
+      "success_criterion": "On push to caller's main, workflow bumps versions, tags, pushes to main, then either fast-forwards caller's dev to main OR opens a back-merge PR. Never force-pushes dev.",
+      "source": "user",
+      "health_status": "testing",
+      "leaf_category": "primitive-component",
+      "artifactAffinity": ["use-case", "sequence-diagram", "integration"],
+      "depends_on": [],
+      "attack_patterns": [
+        "What happens if the bot token can't push to dev (branch protection blocks direct push)?",
+        "What happens if dev is at a different SHA than when the release PR was opened?",
+        "What happens if a previous back-merge PR is still open?"
+      ]
+    },
+    {
+      "id": "node-consumer-shim",
+      "type": "integration",
+      "name": "Fork-consumer shim workflow",
+      "definition": "A ~10-line GitHub Actions workflow file at the consumer's .github/workflows/release-on-merge.yml that uses: the plugin's reusable workflow at a version-pinned reference.",
+      "success_criterion": "Consumer's release flow inherits back-merge behaviour transparently; deleting the shim opts out cleanly without breaking the consumer's repo.",
+      "source": "user",
+      "health_status": "testing",
+      "leaf_category": "primitive-component",
+      "artifactAffinity": ["use-case", "integration"],
+      "depends_on": ["node-reusable-workflow"],
+      "attack_patterns": [
+        "What happens if the consumer pins to a plugin version that no longer exists?",
+        "What happens if the consumer customises the shim and breaks the contract?"
+      ]
+    },
+    {
+      "id": "node-fast-forward-path",
+      "type": "action",
+      "name": "Fast-forward dev to main (clean release path)",
+      "definition": "After release commit + tag have been pushed to main, the workflow checks whether dev's current SHA matches the SHA recorded when the release PR was opened. If yes, perform `git push origin main:dev` (fast-forward) and emit a status log.",
+      "success_criterion": "Dev's HEAD equals main's HEAD; no merge commit created; idempotent if re-run.",
+      "source": "user",
+      "health_status": "testing",
+      "leaf_category": "primitive-component",
+      "artifactAffinity": ["use-case", "process-flow", "sequence-diagram"],
+      "depends_on": ["node-reusable-workflow"],
+      "attack_patterns": [
+        "What if dev has moved by even one commit since the release PR was opened?",
+        "What if `push origin main:dev` is rejected by branch protection (non-fast-forward)?"
+      ]
+    },
+    {
+      "id": "node-raced-pr-path",
+      "type": "action",
+      "name": "Open back-merge PR (raced release path)",
+      "definition": "When the fast-forward check fails (dev has moved), the workflow opens a PR with base=dev, head=main, title `chore: back-integrate main → dev (post-release vX.Y.Z)`, body referencing the release tag. Auto-merge enabled if CI green. Never force-pushes dev.",
+      "success_criterion": "A PR exists in `open` or `merged` state; dev's existing history is never overwritten; the PR closes the back-merge requirement once merged.",
+      "source": "user",
+      "health_status": "testing",
+      "leaf_category": "primitive-component",
+      "artifactAffinity": ["use-case", "process-flow", "sequence-diagram"],
+      "depends_on": ["node-reusable-workflow"],
+      "attack_patterns": [
+        "What if two back-merge PRs end up open at once (two releases close together)?",
+        "What if the PR's CI fails on the merge-resolution itself?"
+      ]
+    },
+    {
+      "id": "node-dev-sha-pin",
+      "type": "data-store",
+      "name": "Dev SHA snapshot at release-PR-open",
+      "definition": "The SHA of dev's HEAD at the moment the release PR was opened, recorded as a field in the release PR body (machine-readable line). The release robot reads this to detect raced state.",
+      "success_criterion": "The pin is queryable from the release PR; absence of the pin causes the workflow to default to the raced path (safe default).",
+      "source": "user",
+      "health_status": "testing",
+      "leaf_category": "primitive-component",
+      "artifactAffinity": ["data-flow", "use-case"],
+      "depends_on": [],
+      "attack_patterns": [
+        "What if the pin is missing or malformed?",
+        "What if someone tampers with the PR body to forge the pin?"
+      ]
+    },
+    {
+      "id": "node-drift-detection",
+      "type": "policy",
+      "name": "Drift detection in release-train and change-start",
+      "definition": "Both `/sulis:release-train` (before drafting a new release PR) and `/sulis:change start` (before creating a new change branch) run `git merge-base --is-ancestor origin/main origin/dev`. If main is NOT an ancestor of dev, refuse with a clear error pointing at the recovery procedure.",
+      "success_criterion": "The two skills refuse to operate on a drifted dev; the error message names the back-merge mechanism and the recovery procedure.",
+      "source": "user",
+      "health_status": "testing",
+      "leaf_category": "primitive-component",
+      "artifactAffinity": ["business-rule", "use-case", "process-flow"],
+      "depends_on": [],
+      "attack_patterns": [
+        "What if the user wants to override the check (e.g., during an incident)?",
+        "What if `git fetch` fails and the local refs are stale?"
+      ]
+    },
+    {
+      "id": "node-git12-standard",
+      "type": "policy",
+      "name": "GIT-12: Auto-back-merge on release (MUST)",
+      "definition": "A new rule appended to plugins/sulis/references/git-workflow-standard.md. States: every dev→main promotion MUST be followed by a back-integration of main to dev, performed by the release robot. Fast-forward when possible; PR when raced; never force-push dev.",
+      "success_criterion": "The rule is appended in front-loaded order (after GIT-11), worded as MUST, includes a worked example covering both clean and raced paths.",
+      "source": "user",
+      "health_status": "testing",
+      "leaf_category": "external-spec",
+      "artifactAffinity": ["business-rule"],
+      "depends_on": ["node-reusable-workflow"],
+      "attack_patterns": []
+    },
+    {
+      "id": "node-marketplace-self-shim",
+      "type": "integration",
+      "name": "Marketplace's own .github/workflows/release-on-merge.yml becomes a shim",
+      "definition": "The marketplace repo's current ~280-line release-on-merge.yml is migrated to a thin shim that calls the plugin's reusable workflow. The current logic moves IN to the plugin. The marketplace's own release flow is the n=1 dogfood.",
+      "success_criterion": "Marketplace's next release after this change runs through the shim → reusable-workflow path; no behaviour change in the release itself; back-integration happens automatically.",
+      "source": "user",
+      "health_status": "testing",
+      "leaf_category": "existing-impl",
+      "artifactAffinity": ["use-case", "integration"],
+      "depends_on": ["node-reusable-workflow", "node-consumer-shim"],
+      "attack_patterns": [
+        "What if the migration breaks an in-flight release?"
+      ]
+    },
+    {
+      "id": "node-back-integrate-commit",
+      "type": "domain-entity",
+      "name": "back-integration commit on dev",
+      "definition": "The commit appearing on dev after a successful back-integration. For the clean path, this is identically the commits already on main (no new commit). For the raced path, this is a merge commit with message `chore: back-integrate main → dev (post-release vX.Y.Z)` authored by github-actions[bot].",
+      "success_criterion": "Git history on dev shows clear lineage from main; `git log dev` after release shows main's release commit OR a merge commit referencing it.",
+      "source": "user",
+      "health_status": "testing",
+      "leaf_category": "primitive-component",
+      "artifactAffinity": ["use-case", "data-flow"],
+      "depends_on": ["node-fast-forward-path", "node-raced-pr-path"],
+      "attack_patterns": []
+    },
+    {
+      "id": "node-recovery-procedure",
+      "type": "policy",
+      "name": "Manual recovery procedure for pre-existing drift",
+      "definition": "A documented procedure for consumers already in the drifted state (mirroring the marketplace's three prior back-integration commits at 0e85c24, 8612834, d93517c). Lives in git-workflow-standard.md under GIT-12 worked examples. Steps: fetch, merge origin/main into dev with `--no-ff`, push.",
+      "success_criterion": "A new consumer in the drifted state can follow the procedure and recover without ambiguity.",
+      "source": "user",
+      "health_status": "testing",
+      "leaf_category": "external-spec",
+      "artifactAffinity": ["business-rule", "process-flow"],
+      "depends_on": ["node-git12-standard"],
+      "attack_patterns": []
+    },
+    {
+      "id": "node-github-actions",
+      "type": "integration",
+      "name": "GitHub Actions runtime",
+      "definition": "The GitHub-hosted CI/CD service that runs the reusable workflow. Bot identity is github-actions[bot]; auth is via GITHUB_TOKEN scoped by `permissions: contents: write, pull-requests: write`.",
+      "success_criterion": "Workflow runs to completion; bot can push fast-forward updates AND open PRs.",
+      "source": "codebase",
+      "health_status": "validated",
+      "leaf_category": "external-system",
+      "artifactAffinity": ["integration", "sequence-diagram"],
+      "depends_on": [],
+      "attack_patterns": []
+    },
+    {
+      "id": "node-branch-protection",
+      "type": "policy",
+      "name": "Branch protection on dev and main",
+      "definition": "GitHub branch protection rules. Configured by repo admin; outside the workflow's control. Must allow the github-actions[bot] role to push to main (for the release commit + tag) AND either to push fast-forward to dev OR to open PRs against dev.",
+      "success_criterion": "Workflow's push and PR-open operations succeed against the configured protection.",
+      "source": "codebase",
+      "health_status": "validated",
+      "leaf_category": "external-system",
+      "artifactAffinity": ["business-rule", "integration"],
+      "depends_on": [],
+      "attack_patterns": []
+    }
+  ],
+  "edges": [
+    {"from": "node-consumer-shim", "to": "node-reusable-workflow", "type": "depends-on"},
+    {"from": "node-fast-forward-path", "to": "node-reusable-workflow", "type": "part-of"},
+    {"from": "node-raced-pr-path", "to": "node-reusable-workflow", "type": "part-of"},
+    {"from": "node-fast-forward-path", "to": "node-dev-sha-pin", "type": "reads"},
+    {"from": "node-raced-pr-path", "to": "node-dev-sha-pin", "type": "reads"},
+    {"from": "node-back-integrate-commit", "to": "node-fast-forward-path", "type": "produced-by"},
+    {"from": "node-back-integrate-commit", "to": "node-raced-pr-path", "type": "produced-by"},
+    {"from": "node-marketplace-self-shim", "to": "node-reusable-workflow", "type": "uses"},
+    {"from": "node-marketplace-self-shim", "to": "node-consumer-shim", "type": "instance-of"},
+    {"from": "node-git12-standard", "to": "node-reusable-workflow", "type": "specifies"},
+    {"from": "node-recovery-procedure", "to": "node-git12-standard", "type": "part-of"},
+    {"from": "node-reusable-workflow", "to": "node-github-actions", "type": "runs-on"},
+    {"from": "node-reusable-workflow", "to": "node-branch-protection", "type": "constrained-by"},
+    {"from": "node-drift-detection", "to": "node-branch-protection", "type": "reads"}
+  ]
+}
