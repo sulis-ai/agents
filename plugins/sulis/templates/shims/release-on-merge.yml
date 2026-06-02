@@ -1,0 +1,43 @@
+# Canonical Sulis consumer shim — release-on-merge workflow.
+#
+# Copy this file into your repo at .github/workflows/release-on-merge.yml.
+# Replace the @sulis-v<MAJOR>.<MINOR>.<PATCH> placeholder below with the
+# current Sulis plugin version you want to pin to.
+#
+# Pin discipline (ADR-001): the default is a SemVer tag — @sulis-vN.M.K.
+# Breaking changes to the reusable workflow ship as a major plugin version
+# bump (per GIT-08). Tag-pinned consumers stay on the working version until
+# they bump the pin in their shim.
+#
+# Opt-in alternative: replace the tag with @dev to always-track HEAD of
+# the marketplace's dev branch. Breaking changes to the reusable workflow
+# are NOT communicated through changesets in that mode; it is the
+# consumer's risk to accept. Only use @dev in projects with strong test
+# coverage and active maintenance.
+#
+# See GIT-12 in plugins/sulis/references/git-workflow-standard.md for the
+# invariant this workflow upholds (dev's history stays append-only
+# relative to the release robot; every release fast-forwards dev to main
+# OR opens a back-integrate-labelled PR).
+
+name: Release on merge to main
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write       # bump commits, tag, push to main, fast-forward push to dev
+  pull-requests: write  # gh pr create / gh pr merge --auto for raced-path back-merge
+
+concurrency:
+  group: release-on-merge
+  cancel-in-progress: false
+
+jobs:
+  release:
+    uses: sulis-ai/agents/plugins/sulis/templates/workflows/release-on-merge.yml@sulis-v<MAJOR>.<MINOR>.<PATCH>
+    permissions:
+      contents: write
+      pull-requests: write
+    secrets: inherit
