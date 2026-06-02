@@ -1,0 +1,6 @@
+plugins/sulis/scripts/tests/fixtures/release-on-merge/pre-move-snapshot.yml
+plugins/sulis/scripts/tests/methodology/test_release_on_merge_yaml_unchanged_behaviour.sh
+plugins/sulis/scripts/tests/unit/test_concurrency_present.sh
+plugins/sulis/scripts/tests/unit/test_no_force_push_static.sh
+plugins/sulis/scripts/tests/unit/test_reusable_workflow_byte_parity.py
+plugins/sulis/templates/workflows/release-on-merge.yml
