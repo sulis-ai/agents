@@ -1,0 +1,19 @@
+{
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "checks": ["py_compile", "json-load", "yaml-safe-load", "routing-coverage-gate"]
+  },
+  "pr_hygiene": {
+    "scope": {"commit_type_spread": ["refactor"], "module_fan_out": 2, "severity": "low"},
+    "size": {"lines_added": 265, "lines_removed": 1308, "files_changed": 17, "severity": "medium-net-deletion"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 1, "secret_pattern_hits": 0, "severity": "low"},
+    "completeness": {"new_source_without_test": 0, "api_change_without_schema": false, "severity": "low", "note": "test+config-only diff; characterisation tests re-pinned to trunk shape + new trunk-shape/live-read-through tests added"}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "note": "no dangling step/transition/handles_failures refs; mirror<->template parity holds; transition graph strictly linear"},
+    "security": {"findings": 0, "note": "loop-guard conjunction intact (both actor checks joined by &&); loop-guard-matches-founder-pr + bot-tag-doesnt-trigger-release-prod FailureModes kept (CH-01KSZ1 #132 release-of-release-loop guard + downstream-trigger guard are load-bearing on a trunk)"},
+    "quality": {"findings": 0, "note": "drift gate exit 0 (schema-validated); both release-on-merge.yml files YAML safe-load; tests/unit/ green (1697 passed, 9 skipped); shell run.sh 15/0; no probabilistic step / no half-bricked release flow"}
+  },
+  "verdict": "PASS",
+  "auto_downgrades_fired": []
+}

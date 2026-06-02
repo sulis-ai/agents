@@ -7,15 +7,11 @@
   "@type": "step-instances",
   "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
   "for_workflow": "dna:workflow:01KT0RTRA1NWFW00000000000A",
-  "_about": "Fifteen Steps for the sulis-plugins-marketplace release-train Workflow per TDD Form #2 (Steps table) and WP-002 Contract. Each Step declares the IDEF0 contract (input_artifacts + output_artifacts + mechanism) plus the Tool it invokes (tool_ref) and the FailureModes it can recover from (handles_failures). Steps 1-3 cover recon + drift pre-flight. Step 4 computes the next version (composite — uses cumulative_tier then next_version Tools). Step 5 is the only probabilistic Step (NFR-010 token budget encoded in mechanism_detail). Steps 6-7 open the release PR and wait for checks + mergeability. Step 8 is the founder-confirmation gate (mechanism=human, MUC-007). Steps 9-15 execute the ship phase. Schema: plugins/sulis/brain/compiled/foundation/step.schema.json (v1.2.0). Tenant + workflow ULIDs are deterministic and shared across every release-train canonical instance (see triggers.jsonld + failuremodes.jsonld _about for derivation). Step ordering is canonical (array position 0..14 = Step 1..15); for_workflow is an envelope-level relation per the brain Step schema (step→workflow modelled at the instance container, not per-Step). Envelope-level `excluded_from_yaml` declares Steps deliberately absent from release-on-merge.yml (handled by skill prose per MUC-007, the GitHub PR-merge UI, or the downstream release-prod.yml); the drift detector reads this list and treats those Step names as expected absences rather than drift. This encoding lives at the envelope (not per-Step) because the brain Step schema sets unevaluatedProperties:false and rejects new Step-level fields — extending the foundation schema is a cross-repo concern out of scope here.",
+  "_about": "Ten Steps for the sulis-plugins-marketplace release-train Workflow, re-modelled to the trunk-based (main-only) shape (CH-01KT4K). The release is no longer a merge between branches — it is a bump + tag on the trunk. Each Step declares the IDEF0 contract (input_artifacts + output_artifacts + mechanism) plus the Tool it invokes (tool_ref) and the FailureModes it can recover from (handles_failures). Steps 1-2 cover recon + in-branch version-drift pre-flight (cross-branch ancestry drift no longer exists on a trunk). Step 3 computes the next version (composite — uses cumulative_tier then next_version Tools). Step 4 is the founder-confirmation gate (mechanism=human, MUC-007). Steps 5-10 execute the ship phase: bump version files, write the CHANGELOG entry, commit directly to main as the bot, tag + push, publish the GitHub Release, emit the Release entity. The five dev->main-PR Steps (preflight-cross-branch-drift, draft-pr-body-and-changelog, open-release-pr, wait-for-checks-and-mergeability, squash-merge) were deleted in the trunk re-model — there is no release PR. Schema: plugins/sulis/brain/compiled/foundation/step.schema.json (v1.2.0). Tenant + workflow ULIDs are deterministic and shared across every release-train canonical instance (see triggers.jsonld + failuremodes.jsonld _about for derivation). Step ordering is canonical (array position 0..9 = Step 1..10); for_workflow is an envelope-level relation per the brain Step schema (step→workflow modelled at the instance container, not per-Step). Envelope-level `excluded_from_yaml` declares Steps deliberately absent from release-on-merge.yml (gate-founder-confirmation = the founder's manual merge per MUC-007; publish-github-release = the downstream release-prod.yml on the v* tag); the drift detector reads this list and treats those Step names as expected absences rather than drift. This encoding lives at the envelope (not per-Step) because the brain Step schema sets unevaluatedProperties:false and rejects new Step-level fields — extending the foundation schema is a cross-repo concern out of scope here.",
   "captured_on": "2026-06-01",
   "excluded_from_yaml": [
     "gate-founder-confirmation",
-    "open-release-pr",
-    "wait-for-checks-and-mergeability",
-    "publish-github-release",
-    "squash-merge",
-    "preflight-cross-branch-drift"
+    "publish-github-release"
   ],
 
   "steps": [
@@ -34,7 +30,7 @@
         "pending-changesets is a list (possibly empty)",
         "if list is empty: terminal:no-changesets-to-release (workflow exits cleanly)"
       ],
-      "agent_instructions": "Read all `.changesets/*.yaml` files under the project's changeset directory via the _changeset.read_changesets Tool. Return the parsed list. An empty list is the legitimate no-release-needed terminal state — do not force a release when nothing is pending.",
+      "agent_instructions": "Read all `.changesets/*.yaml` files accumulated on **main** since the last release tag, under the project's changeset directory, via the _changeset.read_changesets Tool. On a trunk there is no release branch — the changesets live on main and the release bumps main in place. Return the parsed list. An empty list is the legitimate no-release-needed terminal state — do not force a release when nothing is pending.",
       "criticality": "critical",
       "handles_failures": [],
       "state": "active",
@@ -68,32 +64,6 @@
       "confidence": 0.9
     },
     {
-      "id": "dna:step:01KT0RTRA1ST03PF1XBRDFT000",
-      "sys_status": "active",
-      "name": "preflight-cross-branch-drift",
-      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
-      "for_process": "release-train",
-      "input_artifacts": ["version-files-agree", "release-branch-ref"],
-      "output_artifacts": ["cross-branch-versions-agree"],
-      "mechanism": "deterministic",
-      "tool_ref": "dna:tool:01KT0RTRA1G1TCMPBR00000000",
-      "preconditions": [
-        "Step 2 confirmed in-branch version-file agreement"
-      ],
-      "postconditions": [
-        "dev + main + release branch's version-file values agree on what shipping",
-        "or: version-drift-detected-pre-flight raised (cross-branch variant)"
-      ],
-      "agent_instructions": "Run git-compare-branch-versions across the relevant refs (typically dev / main / the release branch). Surface any cross-branch disagreement — typically dev ahead of main from a prior half-bump — as version-drift-detected-pre-flight with the per-branch table. Do not auto-reconcile; ask the founder.",
-      "criticality": "critical",
-      "handles_failures": [
-        "dna:failuremode:01KTRNPG3DAPH7BW0CAQ05C3PH"
-      ],
-      "state": "active",
-      "valid_from": "2026-06-01T00:00:00Z",
-      "confidence": 0.88
-    },
-    {
       "id": "dna:step:01KT0RTRA1ST04CMPNXTVER000",
       "sys_status": "active",
       "name": "compute-next-version",
@@ -104,7 +74,7 @@
       "mechanism": "deterministic",
       "tool_ref": "dna:tool:01KT0RTRA1CHT1ERCVM0000000",
       "preconditions": [
-        "pre-flight version-drift checks passed (Steps 2 + 3)"
+        "pre-flight version-drift check passed (Step 2)"
       ],
       "postconditions": [
         "cumulative-tier is one of {patch, minor, major}",
@@ -118,132 +88,26 @@
       "confidence": 0.92
     },
     {
-      "id": "dna:step:01KT0RTRA1ST05DRFPRBDCH100",
-      "sys_status": "active",
-      "name": "draft-pr-body-and-changelog",
-      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
-      "for_process": "release-train",
-      "input_artifacts": ["pending-changesets", "next-version", "cumulative-tier"],
-      "output_artifacts": ["pr-body-markdown", "changelog-entry-markdown"],
-      "mechanism": "probabilistic",
-      "mechanism_detail": "{\"token_budget\": {\"input\": 4000, \"output\": 2000}, \"fallback\": \"deterministic-template (assemble CHANGELOG from changeset summaries directly without LLM synthesis) on probabilistic-step-token-budget-exceeded\"}",
-      "tool_ref": "dna:tool:01KT0RTRA1CHSVMMAR10000000",
-      "preconditions": [
-        "Step 4 computed next-version and cumulative-tier"
-      ],
-      "postconditions": [
-        "pr-body-markdown contains the user-facing release narrative",
-        "changelog-entry-markdown contains the CHANGELOG.md prepend block",
-        "or: fallback path produced both via deterministic template (still ships)"
-      ],
-      "agent_instructions": "The only probabilistic Step in the release-train Workflow (NFR-010). Use _changeset.summarise to gather the changeset descriptions; an LLM call composes the release narrative within the token budget specified in mechanism_detail. On probabilistic-step-token-budget-exceeded, fall back to the deterministic template that assembles the CHANGELOG straight from the changeset summary fields — narrative quality degrades but the release still ships.",
-      "criticality": "important",
-      "handles_failures": [
-        "dna:failuremode:01KTRNKJ9DQSRREVTRTR82H95H"
-      ],
-      "state": "active",
-      "valid_from": "2026-06-01T00:00:00Z",
-      "confidence": 0.85
-    },
-    {
-      "id": "dna:step:01KT0RTRA1ST060PNRE1PR0000",
-      "sys_status": "active",
-      "name": "open-release-pr",
-      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
-      "for_process": "release-train",
-      "input_artifacts": ["pr-body-markdown", "release-branch-ref", "next-version"],
-      "output_artifacts": ["release-pr-number", "release-pr-url"],
-      "mechanism": "deterministic",
-      "tool_ref": "dna:tool:01KT0RTRA1GHPRCREAT0000000",
-      "preconditions": [
-        "Step 5 produced pr-body-markdown",
-        "release branch ref exists on origin"
-      ],
-      "postconditions": [
-        "release PR is open against the target branch (typically main)",
-        "PR carries the bot's identity in author + the loop-guard-honoured title prefix"
-      ],
-      "agent_instructions": "Open the release PR via gh-pr-create with the composed title (release: <plugin> v<next-version> (<cumulative-tier>)) and the pr-body-markdown produced in Step 5. Author identity MUST be github-actions[bot] so CH-01KSZ1's loop-guard correctly recognises this as the release-train's own PR on future cycles.",
-      "criticality": "critical",
-      "handles_failures": [],
-      "state": "active",
-      "valid_from": "2026-06-01T00:00:00Z",
-      "confidence": 0.9
-    },
-    {
-      "id": "dna:step:01KT0RTRA1ST07WCHKMERGEAB0",
-      "sys_status": "active",
-      "name": "wait-for-checks-and-mergeability",
-      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
-      "for_process": "release-train",
-      "input_artifacts": ["release-pr-number"],
-      "output_artifacts": ["pr-checks-green", "pr-mergeable-clean"],
-      "mechanism": "deterministic",
-      "tool_ref": "dna:tool:01KT0RTRA1GHCHKSWAT0000000",
-      "preconditions": [
-        "Step 6 produced an open release PR"
-      ],
-      "postconditions": [
-        "all required branch-protection checks are green",
-        "GitHub reports mergeable=MERGEABLE (not CONFLICTING, not UNKNOWN)",
-        "or: one of the three recovery FailureModes raised"
-      ],
-      "agent_instructions": "Poll the PR's check-runs API (gh-pr-checks-watch) until all required status checks pass, then poll mergeability (gh-pr-mergeability) until MERGEABLE. The three failure paths are the load-bearing recovery surface: (1) any required check fails → pr-checks-fail (abort + surface failing check + link); (2) mergeable=CONFLICTING → release-pr-conflicts-with-target-at-merge (escalate to founder for back-integrate); (3) mergeable=UNKNOWN after 3 polls (~6 minutes) → pr-open-but-mergeability-stuck (escalate).",
-      "criticality": "critical",
-      "handles_failures": [
-        "dna:failuremode:01KTRS9GWHVX05E9VGM235NNXH",
-        "dna:failuremode:01KTR2MXE6EA5XASA0C33S30VR",
-        "dna:failuremode:01KTRSHACB8X8VWV6GSAFPMDMF"
-      ],
-      "state": "active",
-      "valid_from": "2026-06-01T00:00:00Z",
-      "confidence": 0.88
-    },
-    {
       "id": "dna:step:01KT0RTRA1ST08GATFNDCNFM00",
       "sys_status": "active",
       "name": "gate-founder-confirmation",
       "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
       "for_process": "release-train",
-      "input_artifacts": ["pr-checks-green", "pr-mergeable-clean", "release-pr-url"],
+      "input_artifacts": ["next-version", "cumulative-tier"],
       "output_artifacts": ["founder-go-ahead"],
       "mechanism": "human",
       "preconditions": [
-        "PR is fully ready to merge (all checks green + mergeable clean)"
+        "Step 3 computed next-version and cumulative-tier (and the changelog narrative consolidated into the ship phase)"
       ],
       "postconditions": [
-        "founder has explicitly confirmed the release (e.g. merging the PR via the GitHub UI, or replying 'go' to the dry-run preview)"
+        "founder has explicitly confirmed the release (e.g. replying 'go' to the dry-run preview, or merging the per-feature PR into main that carries the changesets)"
       ],
-      "agent_instructions": "MUC-007 gate. The LLM dry-run path MUST NOT auto-execute the ship-phase Steps (9-15). Surface the release-pr-url + the next-version + the cumulative-tier + the changelog-entry-markdown to the founder and wait for an explicit go-ahead before any side-effecting Step runs. The imperative release-on-merge.yml path satisfies this Step by waiting for the founder to merge the PR on GitHub — the merge itself IS the confirmation.",
+      "agent_instructions": "MUC-007 gate. The LLM dry-run path MUST NOT auto-execute the ship-phase Steps (5-10). Surface the next-version + the cumulative-tier + the changelog preview (drafted in the ship phase from the pending changeset summaries) to the founder and wait for an explicit go-ahead before any side-effecting Step runs. On a trunk there is no release PR — the imperative release-on-merge.yml path treats the founder's merge of the changeset-carrying PR into main (which triggers the push-to-main workflow) as the confirmation.",
       "criticality": "critical",
       "handles_failures": [],
       "state": "active",
       "valid_from": "2026-06-01T00:00:00Z",
       "confidence": 0.95
-    },
-    {
-      "id": "dna:step:01KT0RTRA1ST09SQSHMERGE000",
-      "sys_status": "active",
-      "name": "squash-merge",
-      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
-      "for_process": "release-train",
-      "input_artifacts": ["founder-go-ahead", "release-pr-number"],
-      "output_artifacts": ["merged-commit-sha"],
-      "mechanism": "deterministic",
-      "tool_ref": "dna:tool:01KT0RTRA1GHPRMRG000000000",
-      "preconditions": [
-        "Step 8 confirmed founder-go-ahead"
-      ],
-      "postconditions": [
-        "release PR is squash-merged into the target branch (typically main)",
-        "merged-commit-sha is the new HEAD"
-      ],
-      "agent_instructions": "Squash-merge the release PR via gh-pr-merge with --squash --delete-branch. The squash collapses the release PR's commits into a single conventional-commit on the target branch — the changelog narrative comes from Step 5's pr-body, not from the squash subject.",
-      "criticality": "critical",
-      "handles_failures": [],
-      "state": "active",
-      "valid_from": "2026-06-01T00:00:00Z",
-      "confidence": 0.92
     },
     {
       "id": "dna:step:01KT0RTRA1ST10BMPVERF1S000",
@@ -256,7 +120,7 @@
       "mechanism": "deterministic",
       "tool_ref": "dna:tool:01KT0RTRA1VPDVRF11E0000000",
       "preconditions": [
-        "Step 9 produced a merged-commit-sha (release PR is in)"
+        "Step 4 confirmed founder-go-ahead (the ship phase may run directly on main)"
       ],
       "postconditions": [
         "every Project.version_files[] entry has version == next-version",
@@ -275,19 +139,19 @@
       "name": "write-changelog-entry",
       "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
       "for_process": "release-train",
-      "input_artifacts": ["changelog-entry-markdown", "next-version"],
-      "output_artifacts": ["changelog-updated"],
+      "input_artifacts": ["pending-changesets", "next-version", "cumulative-tier"],
+      "output_artifacts": ["changelog-updated", "changelog-entry-markdown"],
       "mechanism": "deterministic",
       "tool_ref": "dna:tool:01KT0RTRA1PRPCHG10G0000000",
       "preconditions": [
-        "Step 5 produced changelog-entry-markdown",
-        "Step 10 bumped version-files (so CHANGELOG header matches)"
+        "Step 5 bumped version-files (so the CHANGELOG header matches the new version)"
       ],
       "postconditions": [
-        "CHANGELOG.md has a new top-of-file section for next-version with the Step 5 narrative",
+        "CHANGELOG.md has a new top-of-file section for next-version assembled deterministically from the pending changeset summaries",
+        "changelog-entry-markdown holds that same section (for the GitHub Release body downstream)",
         "prior CHANGELOG content is preserved untouched"
       ],
-      "agent_instructions": "Prepend the changelog-entry-markdown from Step 5 to CHANGELOG.md via prepend-changelog. The CHANGELOG header section uses next-version as the heading. Preserve any existing content below the new section verbatim — no rewrites of old entries.",
+      "agent_instructions": "On the trunk this Step both drafts AND prepends the CHANGELOG entry (the old probabilistic draft-pr-body-and-changelog Step was deleted — there is no release PR body to compose). Assemble the entry deterministically from the pending changeset summaries (one bullet per changeset, sorted by filename for determinism) under a `## v<next-version> — <date>` header, then prepend it to CHANGELOG.md via prepend-changelog. The same markdown is exported as changelog-entry-markdown so the downstream GitHub Release body reads the top section. Preserve any existing content below the new section verbatim — no rewrites of old entries.",
       "criticality": "important",
       "handles_failures": [],
       "state": "active",
@@ -297,7 +161,7 @@
     {
       "id": "dna:step:01KT0RTRA1ST12CMTBMPB0T000",
       "sys_status": "active",
-      "name": "commit-bump-as-bot",
+      "name": "commit-bump-on-main",
       "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
       "for_process": "release-train",
       "input_artifacts": ["bumped-version-files", "changelog-updated", "next-version"],
@@ -305,14 +169,14 @@
       "mechanism": "deterministic",
       "tool_ref": "dna:tool:01KT0RTRA1G1TC0MM1T0000000",
       "preconditions": [
-        "Step 10 bumped version-files",
-        "Step 11 updated CHANGELOG.md"
+        "Step 5 bumped version-files",
+        "Step 6 updated CHANGELOG.md"
       ],
       "postconditions": [
-        "bump-commit-sha exists on the target branch with author=github-actions[bot]",
+        "bump-commit-sha exists directly on main with author=github-actions[bot]",
         "commit message follows Conventional Commits (e.g. chore(release): v<next-version>)"
       ],
-      "agent_instructions": "Commit the bumped version-files + updated CHANGELOG.md as a single Conventional Commit (chore(release): v<next-version>) with author identity set to github-actions[bot]. This is the bot-authored marker the loop-guard regex uses on subsequent cycles to skip its own commits — author identity is load-bearing.",
+      "agent_instructions": "Commit the bumped version-files + updated CHANGELOG.md as a single Conventional Commit (chore(release): v<next-version>) **directly to main** (no promotion PR — this is the trunk model). Author identity MUST be set to github-actions[bot]: it is the bot-authored marker the loop-guard regex uses on subsequent cycles to skip its own release commit and prevent the release-of-release loop (#132). Author identity is load-bearing.",
       "criticality": "critical",
       "handles_failures": [],
       "state": "active",
@@ -330,13 +194,13 @@
       "mechanism": "deterministic",
       "tool_ref": "dna:tool:01KT0RTRA1G1TTAG0000000000",
       "preconditions": [
-        "Step 12 produced bump-commit-sha"
+        "Step 7 produced bump-commit-sha"
       ],
       "postconditions": [
         "annotated tag v<next-version> points at bump-commit-sha",
         "tag is pushed to origin"
       ],
-      "agent_instructions": "Create an annotated git tag v<next-version> at bump-commit-sha via git-tag, then push it via git-push-tag. The push uses GITHUB_TOKEN — note that bot-pushed tags do NOT fire workflow_run events on downstream workflows (release-prod.yml); that's a known GitHub Actions security boundary handled by Step 14's bot-tag-doesnt-trigger-release-prod fallback, not here.",
+      "agent_instructions": "Create an annotated git tag v<next-version> at bump-commit-sha via git-tag, then push the commit + tag to main via git-push-tag. The push uses GITHUB_TOKEN — note that bot-pushed tags do NOT fire workflow_run events on downstream workflows (release-prod.yml); that's a known GitHub Actions security boundary handled by the publish-github-release Step's bot-tag-doesnt-trigger-release-prod fallback, not here.",
       "criticality": "critical",
       "handles_failures": [],
       "state": "active",
@@ -354,10 +218,10 @@
       "mechanism": "deterministic",
       "tool_ref": "dna:tool:01KT0RTRA1GHRE1CREA0000000",
       "preconditions": [
-        "Step 13 pushed release-tag-ref"
+        "Step 8 pushed release-tag-ref"
       ],
       "postconditions": [
-        "GitHub Release exists at release-tag-ref with the Step 5 narrative as body",
+        "GitHub Release exists at release-tag-ref with the write-changelog-entry narrative as body",
         "or: bot-tag-doesnt-trigger-release-prod FailureMode raised + founder ran gh release create manually"
       ],
       "agent_instructions": "Attempt automated gh-release-create against the release-tag-ref with the changelog-entry-markdown as the body. If GITHUB_TOKEN cannot trigger the downstream release-prod workflow (the documented GitHub Actions security boundary), surface bot-tag-doesnt-trigger-release-prod with the explicit founder fallback (`gh release create v<next-version> --generate-notes`) — the canonical recovery_strategy is fallback, not abort. The release still ships; only the automation cleanliness degrades.",
@@ -375,15 +239,15 @@
       "name": "emit-release-entity",
       "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
       "for_process": "release-train",
-      "input_artifacts": ["github-release-url", "next-version", "merged-commit-sha", "release-tag-ref"],
+      "input_artifacts": ["github-release-url", "next-version", "bump-commit-sha", "release-tag-ref"],
       "output_artifacts": ["release-entity-jsonld"],
       "mechanism": "deterministic",
       "tool_ref": "dna:tool:01KT0RTRA1S1SEMTRE10000000",
       "preconditions": [
-        "Step 14 produced github-release-url (or the founder-fallback equivalent)"
+        "Step 9 produced github-release-url (or the founder-fallback equivalent)"
       ],
       "postconditions": [
-        "a Release entity is emitted to the entity store with version=next-version, tag=release-tag-ref, commit=merged-commit-sha, url=github-release-url",
+        "a Release entity is emitted to the entity store with version=next-version, tag=release-tag-ref, commit=bump-commit-sha, url=github-release-url",
         "the release is queryable downstream via the brain (e.g. for changelog aggregation across plugins)"
       ],
       "agent_instructions": "Final Step. Emit a Release entity via sulis-emit-release with the full release metadata (version + tag + commit + url + cumulative-tier + project-name). This closes the loop — downstream consumers (analytics, founder dashboards, post-ship lessons capture) read the entity store rather than scraping GitHub.",

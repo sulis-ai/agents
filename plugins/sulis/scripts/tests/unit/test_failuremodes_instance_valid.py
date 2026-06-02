@@ -4,7 +4,8 @@ test_failuremodes_instance_valid — WP-004
 Validates that `plugins/sulis/instances/release-train/failuremodes.jsonld`:
 
 1. Parses as valid JSON-LD.
-2. Declares exactly 8 FailureMode instances.
+2. Declares exactly 4 FailureMode instances (trunk re-model, WP-001 of
+   CH-01KT4K — the 4 dev->main-PR FailureModes were deleted).
 3. Each instance validates against the foundation FailureMode JSON Schema
    (`plugins/sulis/brain/compiled/foundation/failuremode.schema.json`).
 4. `recovery_strategy` for every instance is in the canonical
@@ -111,14 +112,27 @@ def test_failuremodes_jsonld_parses(instance: dict) -> None:
     assert isinstance(instance["failuremodes"], list)
 
 
-# ----- Test #2 — 8 FailureModes present -----
+# ----- Test #2 — 4 FailureModes present (trunk re-model) -----
 
 
-def test_8_failuremodes_present(failuremodes: list[dict]) -> None:
-    """WP-004 Contract: exactly 8 FailureMode instances."""
-    assert len(failuremodes) == 8, (
-        f"expected 8 FailureModes, found {len(failuremodes)}"
+def test_4_failuremodes_present(failuremodes: list[dict]) -> None:
+    """Trunk re-model (WP-001, CH-01KT4K): exactly 4 FailureMode instances.
+    The 4 dev->main-PR FailureModes (pr-checks-fail,
+    release-pr-conflicts-with-target-at-merge, pr-open-but-mergeability-stuck,
+    probabilistic-step-token-budget-exceeded) were deleted as orphaned by the
+    5 deleted dev->main-PR Steps."""
+    assert len(failuremodes) == 4, (
+        f"expected 4 FailureModes, found {len(failuremodes)}"
     )
+    names = {fm["name"] for fm in failuremodes}
+    deleted = {
+        "pr-checks-fail",
+        "release-pr-conflicts-with-target-at-merge",
+        "pr-open-but-mergeability-stuck",
+        "probabilistic-step-token-budget-exceeded",
+    }
+    leaked = names & deleted
+    assert not leaked, f"deleted dev->main-PR FailureModes still present: {sorted(leaked)}"
 
 
 # ----- Test #3 — each passes brain schema -----
