@@ -1,5 +1,6 @@
 ---
 verification_required_from: ""    # ISO-8601 date; filled in by `sulis-change finish` at merge of CH-01KT2B (verification-by-design). Empty string means P-VER applies to every change for which it can resolve `started_at` (the NFR-005 dogfood gate); a filled value gates P-VER on changes whose `started_at` postdates it (the ADR-002 grandfather scope).
+platform_contract_required_from: ""    # ISO-8601 date; filled in by `sulis-change finish` at merge of the platform-contract-standard change. Empty string means P-PLAT applies to every change for which it can resolve `started_at`; a filled value gates P-PLAT on changes whose `started_at` postdates it (the ADR-006 grandfather scope, mirroring P-VER's verification_required_from).
 ---
 
 # Decompose Validation Rubric
@@ -14,7 +15,7 @@ SDK validation rubric pattern — explicit phases, severity convention,
 verdict computation, output report alongside `INDEX.md`.
 <!-- /summary -->
 
-> **Version:** 0.3.0
+> **Version:** 0.4.0
 > **Status:** Active — Calibration Period (90 days from 2026-05-22)
 > **Applies to:** `/sulis:plan-work` (SEA v0.19.0+). Designed to be invoked
 > automatically by the decompose skill at the end of its workflow.
@@ -124,6 +125,7 @@ in plain English and returns control to the founder.
 | 7 ServiceSpec compliance (Lovable Test) | ... | ... | ... |
 | 8 Cross-WP identifier canonicalisation | ... | ... | ... |
 | 9 P-VER (Verification Plan) | ... | ... | ... |
+| 10 P-PLAT (Platform Contract) | ... | ... | ... |
 
 ---
 
@@ -158,6 +160,7 @@ The validating agent attests:
 - [✓] **P7 ServiceSpec compliance.** <N> manifests parsed via `sulis-validate-servicespec`. Lovable Test: <K> manifests PASS, <M> PASS-WITH-RATIONALE, <B> FAIL. Aggregate MUST failures: <count>.
 - [✓] **P8 Cross-WP identifier canonicalisation.** <K> cross-WP shared identifiers extracted from WP Contracts. <M> resolve to an authoritative upstream source (TDD section / ADR / instance file). <N> inline identifiers flagged — see /sulis:plan-work step 7c for the remediation path.
 - [✓] **P9 P-VER (Verification Plan).** <N> artifacts checked (SRD + TDD + WP set). Section presence: <K> pass / <M> fail. Placeholder scan: <K> pass / <M> fail. Citation presence: <K> pass / <M> fail. Per-WP `verification:` field: <K> pass / <M> fail. Grandfather: <N> grandfathered changes skipped.
+- [✓] **P10 P-PLAT (Platform Contract).** <N> WPs scanned for `platform:` / `touch-class:`. Gated write/deploy touches: <K> with a referenced Platform Contract / <M> missing (MUST). Schema-invariant checks (10.03..10.06): <K> pass / <M> fail. Freshness (10.07, SHOULD): <N> claims past 180 days flagged. Grandfather: <N> changes started before `platform_contract_required_from` skipped.
 ```
 
 ---
@@ -501,6 +504,83 @@ grandfather verdict, never a stylistic preference.
 
 ---
 
+## Phase 10 — P-PLAT (Platform Contract)
+
+P-PLAT is the **mechanical enforcement leg** of the defence-in-depth
+platform-contract gate. The friendly front leg is the prose in the
+`specify` + `draft-architecture` skills (detect a gated third-party
+touch, ask for a contract). P-PLAT is the leg that cannot be talked
+past: a gated write/deploy third-party touch with no referenced
+Platform Contract fails P-PLAT **regardless of any prose edits** —
+the control for MUC-004 (a weakened prose gate must not be able to
+bypass the rubric). It mirrors P-VER's structure exactly (ADR-006);
+where P-VER cites a mechanism, P-PLAT references it rather than
+restating it.
+
+See [`../standards/PLATFORM_CONTRACT_STANDARD.md`](../standards/PLATFORM_CONTRACT_STANDARD.md)
+for the claim-entry schema (PC-01..08) every stored contract conforms
+to; P-PLAT enforces that schema on the contracts a WP set references.
+
+### Detection signal — the `platform:` / `touch-class:` WP-frontmatter field (OAQ-4)
+
+P-PLAT detects a gated third-party touch via an **explicit
+WP-frontmatter declaration**, not by scanning prose (brittle and
+MUC-004-adjacent). `plan-work` emits the field (see step 7d); P-PLAT
+is the authority on its meaning:
+
+```yaml
+platform: "<lowercase-hyphenated platform slug>"   # e.g. github-actions
+touch-class: "write | deploy | read-only"
+```
+
+- A WP set with **any** WP carrying `touch-class: write` or `deploy`
+  plus a `platform:` value MUST reference a Platform Contract at
+  `plugins/sulis/references/platform-contracts/<platform>.md`, or
+  P-PLAT fails.
+- `touch-class: read-only` → soft (advisory note, no fail) per
+  ADR-001.
+
+### Grandfather sub-phase (before any P-PLAT.NN check)
+
+Read the candidate change's `started_at` and compare against the
+`platform_contract_required_from` front-matter constant. A change
+started before the constant passes `PASS — grandfathered` (NFR-005).
+An empty constant (pre-merge / the dogfood window) runs all checks
+against live artifacts. This is the **same mechanism P-VER uses** —
+see Phase 9's grandfather sub-phase; P-PLAT does not restate it
+(ADR-006).
+
+### Failure-mode checks
+
+One row per contract-integrity control (TDD Armor table A-1..A-8),
+each with a deterministic pass criterion:
+
+| ID | Severity | Check | Pass criterion | MUC |
+|---|---|---|---|---|
+| **10.01** | MUST | Gated write/deploy touch ⇒ a referenced Platform Contract | WP-set scan: any `touch-class: write\|deploy` + `platform: X` ⇒ `platform-contracts/X.md` exists & is referenced | MUC-004 / FR-015 |
+| **10.02** | MUST | Contract carries a harness-run reference | Front-matter `harness-run:` (run id) non-empty | MUC-007 / A-8 |
+| **10.03** | MUST | Every `inferred: false` claim has source + quote + retrieval-date | Schema-invariant scan of the contract | MUC-001 / A-1 |
+| **10.04** | MUST | No `inferred: true` claim carries a `source` | Schema-invariant scan (an inferred claim is not source-backed) | MUC-006 / A-4 |
+| **10.05** | MUST | Every `load_bearing: true` claim has probe + probe-result (or a justified `deferred: <id>`) | Schema-invariant scan | MUC-005 / A-6 |
+| **10.06** | MUST | `probe-result: confirmed` ⇒ non-empty `probe-evidence` | Schema-invariant scan | MUC-005 / A-6 |
+| **10.07** | SHOULD | Claims within the freshness window (retrieval-date ≤ 180 days on reuse) | Date compare; advisory flag | MUC-003 / A-5 |
+
+### Verdict semantics
+
+Any P-PLAT **MUST** failure (10.01..10.06) collapses the verdict to
+GAPS_FOUND with the founder-readable remediation:
+
+> *"This change needs a Platform Contract for {platform} before it can
+> ship — at `plugins/sulis/references/platform-contracts/{platform}.md`.
+> I'll ground one against {platform}'s own docs."*
+
+**Pass-with-rationale** does not apply to P-PLAT, exactly as for
+P-VER — the six MUST checks are gates, not heuristics. The SHOULD
+check (10.07) is advisory: a stale-claim flag does not fail the
+verdict but is surfaced for re-grounding (ADR-006).
+
+---
+
 ## Anti-patterns for the validation run itself
 
 The validating agent must NOT:
@@ -560,3 +640,4 @@ where two parallel WPs both created `apps/api/sulis/shared/workflows/loader/__in
 | 0.1.0 | 2026-05-22 | Initial release. 6 phases. ~30 checks. Anchor case: platform-repo loader/__init__.py collision. |
 | 0.2.0 | 2026-06-01 | Added Phase 8 — Cross-WP identifier canonicalisation. Anchor case: CH-01KSZ4 release-train wave-1 tenant-ULID divergence between WP-003 and WP-004. Mechanical analog of `/sulis:plan-work` step 7c. |
 | 0.3.0 | <date filled at merge> | Added Phase 9 — P-VER (Verification Plan). 8 failure-mode checks (9.01..9.08) + grandfather sub-phase + `verification_required_from:` merge-date constant in front matter. Anchor cases: release-train + discovery dogfood — both shipped without end-to-end verification, surfacing two latent defects post-merge. (CH-01KT2B verification-by-design.) |
+| 0.4.0 | <date filled at merge> | Added Phase 10 — P-PLAT (Platform Contract). 7 checks (10.01..10.07) — 6 MUST schema/provenance gates + 1 SHOULD freshness flag — + grandfather sub-phase + `platform_contract_required_from:` merge-date constant. Detection via the `platform:` / `touch-class:` WP-frontmatter field (emitted by plan-work). Mechanical enforcement leg of the defence-in-depth platform-contract gate (prose front leg in specify + draft-architecture). Anchor case: the v0.87.0 release broke because a reusable workflow was placed in an unsupported location — a GitHub Actions platform behaviour we assumed instead of grounding (#137). (platform-contract-standard change; ADR-006.) |

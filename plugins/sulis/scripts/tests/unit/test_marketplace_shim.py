@@ -46,6 +46,9 @@ from pathlib import Path
 
 import yaml
 
+import pytest as _pt
+pytestmark = _pt.mark.skip(reason="auto-back-merge shim/reusable-delivery reverted in v0.87.0 emergency recovery (the monolithic release-on-merge.yml was restored); delivery redesign tracked in #137. Re-enable when the redesign re-lands a valid delivery mechanism.")
+
 # tests/unit/ -> tests/ -> scripts/ -> sulis/ -> plugins/ -> repo root
 _REPO_ROOT = Path(__file__).resolve().parents[5]
 _SHIM = _REPO_ROOT / ".github" / "workflows" / "release-on-merge.yml"

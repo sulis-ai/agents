@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+echo "SKIP: auto-back-merge indirection reverted in v0.87.0 recovery; redesign #137"
+exit 0
 # verifies: plugins/sulis/templates/workflows/release-on-merge.yml
 # verifies: .github/workflows/release-on-merge.yml
 #

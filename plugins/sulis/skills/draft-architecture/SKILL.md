@@ -393,9 +393,55 @@ If extending or superseding, reference the existing ADR by path.}
    founder-owned — if absent, STOP, surface as the first Open Question, and
    route to the design flow rather than inventing them.
 
-   **(c) Single-kind non-visual work + `--prototype` changes are exempt** from
-   this step (the gate honours a `prototype: true` WP and a logged
-   `visual_contract: exempt — <reason>`).
+   **(c) Platform contract (MUST for any gated third-party touch)** — per
+   [`PLATFORM_CONTRACT_STANDARD.md`](../../references/standards/PLATFORM_CONTRACT_STANDARD.md).
+   The fourth design-stage contract: where the data contract governs the
+   backend↔frontend seam and the visual contract governs the user-facing
+   surface, the **platform contract** governs the seam between this design and
+   a *third-party platform* it integrates with (GitHub Actions, Stripe, an
+   email provider, a cloud API). It is our outside-in, evidence-grounded record
+   of how that platform actually behaves — every rule bound to the platform's
+   own documentation, the load-bearing ones confirmed by a probe — so we
+   conform to the platform's real contract instead of assuming it and
+   discovering the gap at runtime (the failure that drove #137).
+
+   **Gate the touch by what it does to the platform (ADR-001):**
+   - **write / deploy touch → hard-gate.** Design does not proceed until a
+     Platform Contract covering the platform exists at
+     `plugins/sulis/references/platform-contracts/{platform}.md` (or is produced
+     now via the harness step below). The block is founder-readable — name the
+     platform and the file to produce, no internal IDs:
+     *"This change writes to {platform}. I need a Platform Contract for it first
+     — I'll ground one against {platform}'s own docs before we build."*
+   - **read-only touch → soft-recommend.** Note that a lightweight contract is
+     advisable; do not block.
+   - **escalation override:** a read-only touch that *informs a write/deploy
+     decision* may be escalated to hard-gated with a one-line note;
+     de-escalation requires a superseding ADR (ADR-001).
+
+   **Produce the contract by running the faithful-generation-harness — do NOT
+   hand-author it (FR-003 / ADR-004):**
+   1. Dispatch the harness via `/sulis-brain:execute-workflow` (the
+      `faithful-generation-harness` Workflow) against the platform's **official
+      documentation as the closed manifest**. The harness binds every generated
+      claim to a source, flags inferences, and refuses on ungrounded claims.
+   2. Land the harness's committed claim→source binding table **as the contract
+      body** — one binding becomes one claim entry; flagged inferences become
+      `inferred: true` entries — per the step→artifact mapping in ADR-004 (do
+      not restate the harness's internal steps here).
+   3. Record the harness-run reference (`run_id`) in the produced contract's
+      front matter (the provenance P-PLAT checks; A-8), and add the contract's
+      row to `platform-contracts/INDEX.md`.
+   4. **Cross-repo handling (OAQ-1 / ADR-004):** the harness is an `existing`
+      sibling-repo Workflow. If the sibling repo is unresolvable, **emit a
+      BLOCKER** — do **not** fall back to hand-authoring a contract. A
+      hand-authored contract would carry no grounded provenance and defeat the
+      whole mechanism.
+
+   **(d) Single-kind non-visual work + `--prototype` changes are exempt** from
+   the visual-contract step (the gate honours a `prototype: true` WP and a
+   logged `visual_contract: exempt — <reason>`). A change that touches **no**
+   third-party platform is likewise exempt from the platform-contract gate.
 
 4. **Select patterns** — for each NFR, pick patterns from `references/architecture-patterns.md`. Surface trade-offs explicitly. Skip pattern selection for any pillar marked "fully covered" in the sizing announcement; reference the authoritative source instead.
 5. **Translate misuse cases** — for each MUC in `MISUSE_CASES.md`, translate its `System Response (REQUIRED)` into one or more Armor-pillar primitives in the TDD. Cross-reference: every MUC ID must appear in the TDD's Armor section. See `references/hardening-deltas.md` for the MUC → delta/primitive translation pattern (the same translation applies to greenfield TDD entries).

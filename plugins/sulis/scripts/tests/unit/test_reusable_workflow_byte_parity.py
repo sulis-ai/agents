@@ -85,6 +85,7 @@ def test_marketplace_workflow_exists() -> None:
     )
 
 
+@pytest.mark.skip(reason="auto-back-merge shim/reusable-delivery reverted in v0.87.0 emergency recovery (the monolithic release-on-merge.yml was restored); delivery redesign tracked in #137. Re-enable when the redesign re-lands a valid delivery mechanism.")
 def test_marketplace_workflow_is_shim_delegating_to_reusable(
     marketplace_content: str,
 ) -> None:

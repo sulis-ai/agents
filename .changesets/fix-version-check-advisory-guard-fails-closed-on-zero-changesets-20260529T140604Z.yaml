@@ -1,0 +1,19 @@
+change_id: SHA-bbe9616
+primitive: fix
+tier: patch
+touches_plugin: false
+summary: |
+  version-check advisory guard fails closed on zero changesets
+  
+  GitHub's default run: shell is `bash -e -o pipefail`, so errexit is
+  injected by the runner even though the script never writes `set -e`
+  (the prior comment's premise was wrong). With zero changesets,
+  `ls .changesets/*.yaml` exits 2 on the no-match glob, tripping errexit
+  and aborting the step (exit 2) before the intended `exit 0` — turning
+  the deliberately-advisory guard into a hard failure on the exact case
+  it exists to warn-not-block.
+  
+  Count with `find` (exits 0 on no match inside an existing dir) so the
+  advisory guard stays advisory. Surfaced on the v1.129.0 dev->main PR,
+  which legitimately carries zero changesets.
+created_at: 2026-05-29T14:06:04Z

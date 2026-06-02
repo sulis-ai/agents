@@ -334,6 +334,34 @@ These standards shape the WP set's *shape*, not just the content:
     behavioural test ledger at
     `.specifications/{change}/verification-ledger.md` (FR-015).
 
+4e. **Set the `platform:` / `touch-class:` field when a WP touches a
+    third-party platform (MUST when applicable).** For every WP, triage:
+    *does this WP's scope touch a third-party platform* — a service outside
+    our own code (GitHub Actions, Stripe, an email provider, a cloud API)?
+
+    - **No third-party touch → omit both fields.** Absence is the signal for
+      "no gated touch"; P-PLAT reads a WP with neither key as not-applicable.
+    - **Touches a third party → set both keys** in the WP frontmatter:
+
+      ```yaml
+      platform: "<lowercase-hyphenated slug>"    # the platform the WP touches
+      touch-class: "write | deploy | read-only"  # per the ADR-001 gate posture
+      ```
+
+      Choose `touch-class:` by what the WP *does to* the platform — the same
+      axis [`PLATFORM_CONTRACT_STANDARD.md`](../../references/standards/PLATFORM_CONTRACT_STANDARD.md)
+      and ADR-001 gate on: `write` / `deploy` are hard-gated (a Platform
+      Contract is required), `read-only` is soft-recommended.
+
+    These two keys are the **detection signal** the decompose-validation
+    rubric's **Phase 10 — P-PLAT (Platform Contract)** reads to decide whether
+    the WP set requires a Platform Contract. P-PLAT owns the field's full
+    meaning and the fail condition (a `write`/`deploy` touch with no referenced
+    contract fails the rubric) — this skill only *emits* the field; it does not
+    restate P-PLAT's logic (cite, never inline; NFR-004). The founder-facing
+    rationale for tagging a WP uses plain language ("this piece talks to
+    {platform}"), not internal IDs.
+
 5. **Build the dependency graph** — for each WP, identify what must exist
    first (`dependsOn`) and what it unlocks (`blocks`). Note: REINFORCE-Test
    WPs are dependencies of any REORGANISE WPs that operate on the same
