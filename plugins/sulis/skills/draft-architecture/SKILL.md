@@ -438,7 +438,22 @@ If extending or superseding, reference the existing ADR by path.}
       hand-authored contract would carry no grounded provenance and defeat the
       whole mechanism.
 
-   **(d) Single-kind non-visual work + `--prototype` changes are exempt** from
+   **(d) Verification scenarios (MUST for any user-facing or behavioural
+   change)** — define the change's `Scenario` entities up front, as living
+   graph entities (NOT a change-dir file). A `Scenario` is a reusable,
+   founder-legible verification case: it **`verifies → Requirement[]`**,
+   **`exercises → Design`**, and **`journey → Workflow`** (a graph of IDEF0
+   `Step`s — e.g. *sign up → log in → see dashboard*). Each Step carries its
+   `mechanism` (`deterministic` → a command the runner runs; `human` → a manual
+   checklist item), `input_artifacts` (the needs/credentials — a missing one
+   becomes a `deferred:<need>` at run time), and `preconditions`/`postconditions`
+   (the asserts). These are the cases the testable-state DoD gate runs against a
+   standing app (`sulis-verify-acceptance`) so "done" means *the app is
+   testable*, not *merged*. Author them so a non-technical founder can read the
+   title + steps and run them. (A change with no user-facing or behavioural
+   surface — pure docs/infra — is exempt; log `scenarios: exempt — <reason>`.)
+
+   **(e) Single-kind non-visual work + `--prototype` changes are exempt** from
    the visual-contract step (the gate honours a `prototype: true` WP and a
    logged `visual_contract: exempt — <reason>`). A change that touches **no**
    third-party platform is likewise exempt from the platform-contract gate.
