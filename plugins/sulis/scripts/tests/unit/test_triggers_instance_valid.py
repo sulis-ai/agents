@@ -67,7 +67,9 @@ def test_triggers_jsonld_parses() -> None:
 
 def test_both_triggers_present() -> None:
     """Exactly two Triggers: the manual /sulis:release-train invocation
-    and the GH-Actions release-on-merge event."""
+    and the GH-Actions push-to-main event. On the trunk (WP-001, CH-01KT4K)
+    the event Trigger fires on push to main, not on a dev->main release-PR
+    merge — its name is push-to-main."""
     triggers = _load_instance()["triggers"]
     assert len(triggers) == 2, (
         f"expected exactly 2 Trigger instances, got {len(triggers)}"
@@ -76,13 +78,13 @@ def test_both_triggers_present() -> None:
     names = {t["name"] for t in triggers}
     assert names == {
         "manual-release-train-invocation",
-        "pull-request-merged-to-main",
+        "push-to-main",
     }, f"trigger names mismatch: {names}"
 
-    # Sanity: kind taxonomy matches the WP Contract — one manual, one event.
+    # Sanity: kind taxonomy matches — one manual, one event.
     kinds = {t["name"]: t["kind"] for t in triggers}
     assert kinds["manual-release-train-invocation"] == "manual"
-    assert kinds["pull-request-merged-to-main"] == "event"
+    assert kinds["push-to-main"] == "event"
 
 
 def test_each_trigger_passes_brain_schema() -> None:

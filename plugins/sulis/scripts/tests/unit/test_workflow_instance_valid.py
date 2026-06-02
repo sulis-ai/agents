@@ -14,8 +14,8 @@ Validates that `plugins/sulis/instances/release-train/workflow.jsonld`:
 4. Carries the canonical marketplace tenant ULID
    (dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM) on `for_domain` -
    cross-WP consistency with WP-002..006.
-5. The `steps[]` array contains every Step name authored in WP-002's
-   steps.jsonld, in canonical order (15 Steps).
+5. The `steps[]` array contains every Step name authored in
+   steps.jsonld, in canonical order (10 Steps — trunk re-model, WP-001).
 6. `initial_steps` is exactly ["detect-pending-changesets"] and
    `terminal_steps` includes "emit-release-entity" and
    "gate-founder-confirmation".
@@ -25,9 +25,9 @@ Validates that `plugins/sulis/instances/release-train/workflow.jsonld`:
 8. `state_contract` enumerates every variable declared in the WP
    Contract.
 9. `for_process` == "release-train" (cross-Step consistency).
-10. The back-edge cycle
-    `wait-for-checks-and-mergeability -> open-release-pr` is present
-    (JT-7 cycle-tolerance for PR-conflicts recovery).
+10. The transition graph is strictly linear — the JT-7 back-edge
+    (`wait-for-checks-and-mergeability -> open-release-pr`) and every
+    promotion/PR edge are GONE (trunk re-model, WP-001).
 
 Tests are deterministic + offline. Schemas come from the vendored
 brain/compiled directory; the instance comes from the release-train
@@ -68,24 +68,19 @@ _STEPS_PATH = (
 _CANONICAL_WORKFLOW_ULID = "dna:workflow:01KT0RTRA1NWFW00000000000A"
 _CANONICAL_TENANT_ULID = "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM"
 
-# The 15 Step names in canonical order (per WP-002 Contract table +
-# TDD Form #2 Steps table). The workflow.steps[] array MUST match.
+# The 10 kept Step names in canonical (linear) order (trunk re-model,
+# WP-001). The workflow.steps[] array MUST match.
 _EXPECTED_STEP_NAMES = [
     "detect-pending-changesets",  # 1
     "preflight-version-drift",  # 2
-    "preflight-cross-branch-drift",  # 3
-    "compute-next-version",  # 4
-    "draft-pr-body-and-changelog",  # 5
-    "open-release-pr",  # 6
-    "wait-for-checks-and-mergeability",  # 7
-    "gate-founder-confirmation",  # 8
-    "squash-merge",  # 9
-    "bump-version-files",  # 10
-    "write-changelog-entry",  # 11
-    "commit-bump-as-bot",  # 12
-    "tag-and-push",  # 13
-    "publish-github-release",  # 14
-    "emit-release-entity",  # 15
+    "compute-next-version",  # 3
+    "gate-founder-confirmation",  # 4
+    "bump-version-files",  # 5
+    "write-changelog-entry",  # 6
+    "commit-bump-on-main",  # 7
+    "tag-and-push",  # 8
+    "publish-github-release",  # 9
+    "emit-release-entity",  # 10
 ]
 
 # Permitted terminal verdicts referenced in transitions
@@ -246,8 +241,8 @@ def test_workflow_steps_list_matches_steps_jsonld(
     workflow: dict, step_names_from_steps_jsonld: list[str]
 ) -> None:
     """Workflow.steps[] MUST list every Step name authored in
-    WP-002's steps.jsonld, in canonical order (15 Steps). This is
-    the cross-reference the drift detector (WP-007) enforces.
+    steps.jsonld, in canonical order (10 Steps — trunk re-model). This
+    is the cross-reference the drift detector (WP-007) enforces.
     """
     actual = workflow.get("steps", [])
     assert actual == _EXPECTED_STEP_NAMES, (
@@ -366,24 +361,28 @@ def test_for_process_is_release_train(workflow: dict) -> None:
     )
 
 
-# ----- Test #10 - back-edge cycle present (JT-7) -----
+# ----- Test #10 - graph is strictly linear; no back-edge / promotion edges -----
 
 
-def test_back_edge_cycle_present_for_pr_conflicts(workflow: dict) -> None:
-    """The cycle-tolerance back-edge
-    `wait-for-checks-and-mergeability -> open-release-pr` MUST be
-    present (JT-7; PR-conflicts back-merge then retry from open-pr).
+def test_no_back_edge_or_promotion_edges(workflow: dict) -> None:
+    """Trunk re-model (WP-001): the JT-7 back-edge
+    (`wait-for-checks-and-mergeability -> open-release-pr`) and EVERY
+    promotion/PR transition are gone. No transition may reference any of
+    the 5 deleted dev->main-PR Steps. The path is strictly linear over
+    the 10 kept Steps (plus terminals).
     """
+    deleted = {
+        "preflight-cross-branch-drift",
+        "draft-pr-body-and-changelog",
+        "open-release-pr",
+        "wait-for-checks-and-mergeability",
+        "squash-merge",
+    }
     transitions = workflow.get("transitions", [])
-    matched = [
-        t
-        for t in transitions
-        if "wait-for-checks-and-mergeability" in t
-        and "open-release-pr" in t
-        and t.find("wait-for-checks-and-mergeability") < t.find("open-release-pr")
-    ]
-    assert matched, (
-        "missing back-edge "
-        "'wait-for-checks-and-mergeability -> open-release-pr' "
-        "for PR-conflicts cycle-tolerance (JT-7)"
+    joined = "\n".join(transitions)
+    leaked = [name for name in deleted if name in joined]
+    assert not leaked, (
+        f"transitions still reference deleted dev->main-PR Steps {leaked} — "
+        f"the JT-7 back-edge / promotion edges must be removed on the trunk.\n"
+        f"transitions:\n{joined}"
     )
