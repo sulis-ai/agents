@@ -111,6 +111,10 @@ jobs:
           # resolve against `plugins/sulis/scripts/` and break. Bug surfaced
           # as the first failure of the blocking drift gate landed in
           # tighten-drift-gate. Refs CH-01KT1Z.
+          # yaml-path points at the reusable workflow in the plugin — the
+          # annotated release implementation moved there (auto-back-merge
+          # change, WP-002); the marketplace .github/workflows/release-on-merge.yml
+          # is now a thin shim with no canonical:step annotations.
           uv run --directory plugins/sulis/scripts python check-canonical-drift.py \
             --instance-dir "$GITHUB_WORKSPACE/plugins/sulis/instances/release-train" \
-            --yaml-path "$GITHUB_WORKSPACE/.github/workflows/release-on-merge.yml"
+            --yaml-path "$GITHUB_WORKSPACE/plugins/sulis/templates/workflows/release-on-merge.yml"
