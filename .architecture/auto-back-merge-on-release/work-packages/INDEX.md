@@ -116,14 +116,14 @@ graph TD
 
 | ID | Title | Primitive | Group | Kind | Status | Depends On | Blocks | Token (in/out) | TDD § |
 |---|---|---|---|---|---|---|---|---|---|
-| WP-001 | Author `plugins/sulis/scripts/drift_check.sh` — the shared dev-behind-main drift helper | create | GENERATE | backend | pending | — | WP-006, WP-007, WP-009 | 2k / 2k | §4.2 comp-drift-helper; §5.5 |
-| WP-002 | Move `release-on-merge.yml` into the plugin as a reusable workflow (no back-merge yet) | refactor (Move) | REORGANISE | infra | pending | — | WP-003, WP-005, WP-009 | 3k / 3k | §4.2 comp-reusable-workflow; §5.1 |
+| WP-001 | Author `plugins/sulis/scripts/drift_check.sh` — the shared dev-behind-main drift helper | create | GENERATE | backend | done | — | WP-006, WP-007, WP-009 | 2k / 2k | §4.2 comp-drift-helper; §5.5 |
+| WP-002 | Move `release-on-merge.yml` into the plugin as a reusable workflow (no back-merge yet) | refactor (Move) | REORGANISE | infra | done | — | WP-003, WP-005, WP-009 | 3k / 3k | §4.2 comp-reusable-workflow; §5.1 |
 | WP-003 | Add the back-merge step block to the reusable workflow (pin-read + decide+act + post-condition) | extend | EXPAND | infra | pending | WP-002 | WP-005, WP-009 | 4k / 4k | §4.2; §5.2; §5.3; §5.6; §5.7 |
-| WP-004 | Author the canonical consumer shim template at `plugins/sulis/templates/shims/release-on-merge.yml` | create | GENERATE | infra | pending | — | WP-005, WP-009 | 2k / 2k | §4.2 comp-shim-template; §5.4; §5.8 |
+| WP-004 | Author the canonical consumer shim template at `plugins/sulis/templates/shims/release-on-merge.yml` | create | GENERATE | infra | done | — | WP-005, WP-009 | 2k / 2k | §4.2 comp-shim-template; §5.4; §5.8 |
 | WP-005 | Replace marketplace's `.github/workflows/release-on-merge.yml` with a shim (n=1 dogfood) | substitute-replace | SUBSTITUTE | infra | pending | WP-002, WP-003, WP-004 | WP-009 | 2k / 2k | §4.2 comp-marketplace-shim; §6.5; §9.1 |
 | WP-006 | Extend `/sulis:release-train` SKILL.md — drift-check preflight (Step 1) + `dev-sha-at-open` pin writer (Step 5) | extend | EXPAND | docs | pending | WP-001 | WP-009 | 3k / 3k | §4.2 comp-pin-writer + comp-drift-check-rt; §3; §5.5 |
 | WP-007 | Extend `/sulis:change start` preflight — invoke `drift_check.sh` before branch creation | extend | EXPAND | docs | pending | WP-001 | WP-009 | 2k / 2k | §4.2 comp-drift-check-cs; §5.5 |
-| WP-008 | Append GIT-12 — Auto-back-merge on release (MUST) — to `git-workflow-standard.md` | extend | EXPAND | docs | pending | — | WP-009 | 2k / 3k | §4.2 comp-git12-rule; §3; §6.6 |
+| WP-008 | Append GIT-12 — Auto-back-merge on release (MUST) — to `git-workflow-standard.md` | extend | EXPAND | docs | done | — | WP-009 | 2k / 3k | §4.2 comp-git12-rule; §3; §6.6 |
 | WP-009 | Author the full test suite — unit + regression + chaos + bootstrap-from-zero | create | GENERATE | backend | pending | WP-001, WP-003, WP-004, WP-005, WP-006, WP-007, WP-008 | — | 4k / 5k | §6 (Proof); §9 (Verification Plan) |
 
 **Totals:** ~24k input + ~26k output ≈ 50k tokens for the full WP set
