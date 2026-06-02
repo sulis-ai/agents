@@ -1,3 +1,18 @@
+## v0.89.0 — 2026-06-02
+
+- **Testable-state Definition of Done** — `Scenario` verification entity + the
+  `sulis-verify-acceptance` runner + the ship-stage acceptance gate. "Done" now
+  means the app is in a fully testable state (runs Scenarios against a standing
+  app), not just merged. Caught the agent-journey blocked-on-login failure class.
+- **Platform Contract standard** — outside-in, harness-grounded contracts for
+  third-party platforms; the GitHub Actions contract as the n=1 dogfood (#137).
+- **Worktree co-location** — change worktrees now live at
+  `~/.sulis/changes/{id}/worktree`, out of the user's working dirs.
+- **discover-project** — post-mint verify gate now runnable in consumer repos
+  (`--scope` mode + relative detector path) (#140).
+- **Brain** — `Scenario` entity minted + vendored; `requirement`/`decision`
+  gain bitemporal fields (evolution data-shape foundation).
+
 # Sulis — Changelog
 
 ## v0.88.0 — 2026-06-02

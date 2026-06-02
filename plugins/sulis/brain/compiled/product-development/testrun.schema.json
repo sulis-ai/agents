@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sulis.co/dna/schema/testrun/1.0.0",
+  "$id": "https://sulis.co/dna/schema/testrun/1.1.0",
   "title": "TestRun",
   "description": "the EVENT of running a test \u2014 an activity that produces a TestResult",
   "type": "object",
@@ -49,6 +49,10 @@
     },
     "harness": {
       "type": "string"
+    },
+    "of_scenario": {
+      "type": "string",
+      "pattern": "^dna:(scenario):[0-9A-HJKMNP-TV-Z]{26}$"
     }
   },
   "x-schema-org-extends": "schema:Action"

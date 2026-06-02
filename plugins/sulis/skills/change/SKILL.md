@@ -611,6 +611,34 @@ the founder always owns the proceed-anyway decision. Block-by-default
 applies only to verdict=fail (zero coverage), which is genuinely
 broken state.
 
+**4.9. Testable-state acceptance gate — run `sulis-verify-acceptance`
+(MUST for a user-facing / behavioural change).** A change that authored
+verification `Scenario`s at design (draft-architecture step 3.5 clause d)
+is not *done* until those Scenarios pass against a **standing app** — the
+real "done" is *the app is testable*, not *merged* (the failure this
+catches: agent-journey shipped, but you couldn't log in). Run each
+in-scope Scenario:
+
+```bash
+"$SCRIPTS_DIR/sulis-verify-acceptance" \
+  --bundle <scenario-bundle> --target local --repo-root . --json
+```
+
+(`local` now; the `deployed` leg once that target is reachable — both per
+the repo-contract `targets:` + `commands.standup`.) Read the gate verdict:
+
+- **pass** → every Scenario passed, or is deferred-with-need. Done is
+  honest. Log it.
+- **blocked** → a step failed, or a manual check is unconfirmed. **STOP** —
+  surface the founder-English gap (which Scenario, what's broken). Do not
+  call the change done.
+- **deferred-with-need** → a recorded gap (a credential / infra absent);
+  non-blocking, but surface the needs so they're visible.
+
+Advisory when it can't run (no Scenarios authored — pure docs/infra change;
+or no target URL yet): like 4.8, the founder owns proceed-anyway, and
+block-by-default applies only to a real `blocked`.
+
 **5. Squash-merge** (only after green + confirmation):
 
 ```bash
