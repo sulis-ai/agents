@@ -57,6 +57,55 @@ re-running the agent-journey change through the gate and confirming it is
 **blocked at done because login fails** (the failure that slipped through
 before). Drift fires on a mutated Step referent.
 
+## Technical implementation + dependencies (the runtime spine)
+
+Execution chain: `Scenario ──journey──▶ Workflow ──▶ ordered IDEF0 Steps`,
+each Step dispatched by **`Tool.implementation_kind`** to a concrete driver,
+run against a **target** (local | deployed), producing `TestRun` + `TestResult`.
+
+**Step → driver** (via the existing `Tool.implementation_kind` enum):
+
+| `implementation_kind` | driver | for | dep |
+|---|---|---|---|
+| `subprocess` | shell (Playwright spec, curl, seed) | UI flows, CLI | the command's runtime |
+| `http_call` | httpx | API steps | base URL + ServiceSpec |
+| `mcp_server`/`claude_code_tool`/`skill_invocation` | **agent-driven** (follows `agent_instructions` via browser/HTTP MCP) | login, UI-changing flows | the MCP/tool + creds |
+| `python_import` | in-proc function | assertions | — |
+| `workflow_dispatch` | sub-Workflow | composite journeys | — |
+| (mechanism `human`) | manual checklist item | un-automatable | a human |
+
+`mechanism` (`deterministic|human|mixed`) picks the spot on the
+scripted↔agent-driven spectrum — which is what lets a founder describe a
+journey in plain steps and have an **agent execute it**, not only a script.
+
+**Dependency stack — HAVE (reuse) vs NEED (build):**
+- HAVE: **Playwright** (cockpit/web/admin-ui), **httpx**, `Tool`/`Workflow`/`Step`
+  (dispatch + journey), `TestRun`/`TestResult` (+`Scenario`), the **platform
+  contracts** (how to reach each third party), repo-contract `commands:` slots.
+- NEED:
+  1. **App-standup recipe (local)** — `docker-compose up` / `npm run dev` / server
+     + DB. Extend repo-contract `commands:` with `standup` + `seed` slots. *(This
+     is the "local infra" — now a concrete contract field.)*
+  2. **Targets** — `targets: { local: <base-url>, deployed: <url> }` in
+     repo-contract, so the same Scenario runs both legs.
+  3. **Credentials / test accounts** — the brain `Credential` entity + a secrets
+     source; a Step's `input_artifacts` declares the need; missing → `deferred:<need>`.
+  4. **Integration access** — sandbox/test keys, grounded by the platform
+     contract; absent → `deferred:<need>`.
+  5. **The runner** `sulis-verify-acceptance` — walks Scenario→Steps, dispatches
+     each via `Tool.implementation_kind`, against the target.
+
+**The closure (why the model holds):** the dependency list IS the executable
+definition of "fully testable state." The runner can't run a Scenario unless the
+app stands up with auth+integrations+infra. deps resolved → real green/red;
+dep missing → `deferred:<need>` (recorded, never faked). "What does done require?"
+== "what must the runner resolve?" — the same list.
+
+**First slice (agent-journey login):** Scenario "new user signs up + logs in",
+journey = 3 Steps (`http_call` POST /signup → `subprocess`(Playwright) submit +
+assert session → `http_call` GET /dashboard → 200). Deps: Playwright (have) +
+local standup recipe + one test account. Local now; deployed leg defers-with-need.
+
 ## Discipline
 
 - TDD-first (RGB per WP); tests in `tests/unit/` (CI only runs that path —
