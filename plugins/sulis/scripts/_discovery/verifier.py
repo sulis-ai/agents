@@ -41,6 +41,7 @@ MUC-005 system response (quote-verbatim for operator surfaces):
 from __future__ import annotations
 
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -139,8 +140,11 @@ def _invoke_drift_detector(
         if cross_tenant_refs_allowed is not None
         else list(_DEFAULT_CROSS_TENANT_REFS_ALLOWED)
     )
+    # Use the running interpreter, not a bare "python3" — in a consumer venv
+    # "python3" may resolve to a different interpreter without jsonschema
+    # installed, which would fail the verify gate and roll back the mint.
     argv = [
-        "python3",
+        sys.executable,
         str(drift_detector_path),
         "--scope",
         str(entity_path),
