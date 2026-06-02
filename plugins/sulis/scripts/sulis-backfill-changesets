@@ -1,0 +1,386 @@
+#!/usr/bin/env python3
+"""sulis-backfill-changesets — one-off backfill for the `.changesets/` gap.
+
+The changeset emission was wired into `sulis-change finish --merge`
+AFTER 43+ commits had already landed on `dev` without a changeset. The
+release-train (which reads `.changesets/*.yaml` to compute the cumulative
+tier + next version) saw an empty pool and reported "no version bump"
+even though `dev` was carrying real feature work.
+
+This script walks `git log <from>..<to>` (default `origin/main..origin/dev`,
+no-merges) and emits one `.changesets/*.yaml` per Conventional-Commit
+subject it can map to a known primitive. Run it once from inside the
+worktree of the change that closes the gap; commit the resulting files
+as part of that change's squash.
+
+Behaviour:
+
+  - Parses the subject line for a Conventional-Commits prefix
+    (`fix:`, `feat:`, `create:`, `extend:`, `chore:`, etc — the full
+    `CHANGE_PRIMITIVES` + Conventional-Commits set from `_changeset.py`).
+    Both scoped (`fix(sulis): X`) and bare (`fix: X`) forms are accepted.
+  - Skips commits that don't match (raw `Merge branch …`, release-bot
+    `chore(release): vX.Y.Z`, force-push artifacts, etc).
+  - Idempotent: a commit whose changeset has already been written
+    (`change_id` matches an existing `.changesets/*.yaml`) is skipped.
+  - `touches_plugin` is derived from `git show --name-only <sha>` —
+    true iff any path in the commit's diff matches `plugins/sulis/`.
+  - `change_id` is extracted from a `(CH-NNNNNN)` parenthetical in the
+    subject when present; otherwise a stable derived id is synthesised
+    from the commit SHA (`SHA-<short>`) so the changeset still carries one.
+
+Output: a JSON summary on stdout in the standard sulis-* shape
+(`{"ok": true, "data": {"processed": N, "written": M, "skipped": K, …}}`).
+Use `--dry-run` to preview without writing.
+
+Specification: `.changesets/README.md` (the producer/consumer contract).
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+from _changeset import (  # noqa: E402
+    read_changesets,
+    tier_for_primitive,
+    write_changeset,
+)
+
+# Conventional-Commits subject: `type(scope)?: subject`. The `type` is
+# captured; the scope is allowed but discarded. The subject (after the
+# colon) becomes the slug.
+_CC_RE = re.compile(r"^(?P<type>[a-zA-Z]+)(?:\([^)]+\))?:\s*(?P<rest>.+)$")
+
+# Subjects we deliberately skip: bot release commits and merge commits.
+# `chore(release): vX.Y.Z` is the release-on-merge.yml signature; we never
+# emit a changeset for those (they ARE the consumer side of changesets).
+_SKIP_PATTERNS: tuple[re.Pattern, ...] = (
+    re.compile(r"^chore(?:\([^)]+\))?:\s*v\d+\.\d+\.\d+", re.IGNORECASE),
+    re.compile(r"^release(?:\([^)]+\))?:\s*", re.IGNORECASE),
+    re.compile(r"^Merge\b", re.IGNORECASE),
+    re.compile(r"^Revert\s+\"chore(?:\([^)]+\))?:\s*v", re.IGNORECASE),
+)
+
+# `CH-<alphanumeric>` handle anywhere in the subject. The handle is
+# typically inside a trailing parenthesis, but the paren content varies:
+#
+#   `... (CH-01KSZ1) (#133)`              — bare paren, paren-then-PR tail
+#   `... (Slice 1, CH-01KSWJ) (#113)`     — embedded inside a labelled paren
+#   `... (closes #112, CH-01KSWP) (#115)` — embedded with an issue ref too
+#   `... (n=2, CH-01KSWQ) (#116)`         — embedded with a numeric label
+#
+# A single permissive scan picks up all four shapes; we extract just the
+# CH-handle and discard the surrounding paren text from the slug.
+_CHANGE_HANDLE_RE = re.compile(r"(CH-[0-9A-Z]+)")
+# Trailing parens (PR tail `(#NNN)` and any paren containing a CH-handle).
+# Strip these from the slug so it stays clean.
+_TRAILING_PAREN_RE = re.compile(r"\s*\([^)]*\)\s*$")
+# A trailing `(#NNN)` PR-number tail specifically — to be sure we don't
+# leave one behind on subjects without a CH-handle.
+_PR_TAIL_RE = re.compile(r"\s*\(#\d+\)\s*$")
+
+
+def _parse_subject(subject: str) -> dict | None:
+    """Parse a commit subject into a changeset-derivable dict, or None.
+
+    Returns:
+        - None when the subject doesn't match Conventional-Commits, OR
+          matches a skip pattern (bot release, raw merge), OR the prefix
+          isn't a known primitive/Conventional-Commits type.
+        - `{primitive, slug, change_id (or None)}` on a match.
+    """
+    subject = subject.strip()
+    # Apply skip patterns BEFORE the CC regex — `chore(release):` would
+    # otherwise pass the CC regex with primitive=`chore`.
+    for skip in _SKIP_PATTERNS:
+        if skip.match(subject):
+            return None
+    m = _CC_RE.match(subject)
+    if not m:
+        return None
+    primitive = m.group("type").lower()
+    rest = m.group("rest").strip()
+    # Pull a `CH-NNNN` handle off the subject if present (it may be
+    # inside a trailing paren that contains other text).
+    handle_m = _CHANGE_HANDLE_RE.search(rest)
+    change_id = handle_m.group(1) if handle_m else None
+    # Strip trailing parens until none remain — the squash-merge tail
+    # can be `(CH-NNN) (#NNN)`, `(label, CH-NNN) (#NNN)`, etc. Two passes
+    # cover both the CH-handle paren and the `(#NNN)` PR tail.
+    while True:
+        new_rest = _TRAILING_PAREN_RE.sub("", rest).strip()
+        if new_rest == rest:
+            break
+        rest = new_rest
+    # Defensive: strip a `(#NNN)` PR-tail in case the trailing-paren
+    # heuristic left one behind on an unusual shape.
+    rest = _PR_TAIL_RE.sub("", rest).strip()
+    # The slug is derived from the remaining subject text. _changeset.
+    # write_changeset will sanitise it (lowercase, non-alnum→-, trim).
+    slug = rest
+    # Tier may be None for unknown primitives — we still return the parse,
+    # the caller checks `tier_for_primitive` and skips writes where None.
+    if tier_for_primitive(primitive) is None:
+        return None
+    return {
+        "primitive": primitive,
+        "slug": slug,
+        "change_id": change_id,
+    }
+
+
+def _git_log(repo_root: Path, from_ref: str, to_ref: str) -> list[dict]:
+    """Walk `git log <from>..<to>` (no merges), oldest first.
+
+    Returns a list of `{sha, short, ts, subject, body}` dicts. Uses a
+    distinctive record separator (\x1e) so subjects and bodies that
+    contain newlines round-trip cleanly through stdout parsing.
+    """
+    sep = "\x1e"  # ASCII Record Separator
+    field_sep = "\x1f"  # ASCII Unit Separator
+    fmt = field_sep.join(["%H", "%h", "%aI", "%s", "%b"]) + sep
+    rc = subprocess.run(
+        ["git", "log", "--no-merges", "--reverse",
+         f"--pretty=format:{fmt}",
+         f"{from_ref}..{to_ref}"],
+        cwd=repo_root, capture_output=True, text=True, timeout=60,
+    )
+    if rc.returncode != 0:
+        raise RuntimeError(
+            f"git log {from_ref}..{to_ref} failed: {rc.stderr.strip()}")
+    commits: list[dict] = []
+    for record in rc.stdout.split(sep):
+        record = record.strip("\n")
+        if not record:
+            continue
+        parts = record.split(field_sep, 4)
+        if len(parts) < 4:
+            continue
+        sha, short, ts, subject = parts[0], parts[1], parts[2], parts[3]
+        body = parts[4] if len(parts) > 4 else ""
+        commits.append({
+            "sha": sha,
+            "short": short,
+            "ts": ts,
+            "subject": subject,
+            "body": body,
+        })
+    return commits
+
+
+def _commit_touches_plugin(repo_root: Path, sha: str) -> bool:
+    """True iff the commit's diff includes any path under `plugins/sulis/`."""
+    rc = subprocess.run(
+        ["git", "show", "--name-only", "--pretty=format:", sha],
+        cwd=repo_root, capture_output=True, text=True, timeout=30,
+    )
+    if rc.returncode != 0:
+        return False
+    for line in rc.stdout.splitlines():
+        if line.strip().startswith("plugins/sulis/"):
+            return True
+    return False
+
+
+def _summary_for(parsed: dict, commit: dict) -> str:
+    """Compose the changeset summary from the parsed subject + commit body.
+
+    Strategy: the subject (minus prefix and handle) becomes the first
+    line; the body — if present and non-empty — joins underneath. This
+    keeps the founder-readable CHANGELOG entry coherent for the
+    back-catalogue.
+    """
+    lines: list[str] = []
+    if parsed["slug"]:
+        lines.append(parsed["slug"])
+    body = (commit.get("body") or "").strip()
+    if body:
+        # Drop trailers (Co-Authored-By, Signed-off-by) — they're CC
+        # metadata, not founder-readable content.
+        body_lines = []
+        for ln in body.splitlines():
+            stripped = ln.strip()
+            if stripped.startswith("Co-Authored-By:") or \
+                    stripped.startswith("Signed-off-by:"):
+                continue
+            body_lines.append(ln)
+        body_clean = "\n".join(body_lines).strip()
+        if body_clean:
+            lines.append("")
+            lines.append(body_clean)
+    return "\n".join(lines) if lines else parsed["primitive"]
+
+
+def _existing_change_ids(changesets_dir: Path) -> set[str]:
+    """Return the set of `change_id` values present in existing changesets."""
+    existing = set()
+    for record in read_changesets(changesets_dir):
+        cid = record.get("change_id")
+        if cid:
+            existing.add(str(cid))
+    return existing
+
+
+def _is_existing_change(candidate_id: str, existing: set[str]) -> bool:
+    """True iff `candidate_id` refers to a change already in `existing`.
+
+    Handles two equivalence shapes the back-catalogue uses:
+      - Exact match (e.g. `SHA-04b0a6e` against itself in a re-run).
+      - Prefix match for `CH-<NNNNN>` parentheticals against full ULIDs
+        (the founder writes `(CH-01KSWB)` in subject lines as a six-char
+        handle; the canonical changeset uses the full 26-char ULID
+        `01KSWBWMCFTVB52NGGVAAQBA7R`). Strip the `CH-` and check whether
+        any existing change_id starts with that prefix.
+    """
+    if candidate_id in existing:
+        return True
+    if candidate_id.startswith("CH-"):
+        prefix = candidate_id[len("CH-"):]
+        # The handle is a ULID prefix; ULIDs are Crockford base-32, so
+        # case is irrelevant. Existing change_ids are upper-case.
+        prefix_u = prefix.upper()
+        for existing_id in existing:
+            if existing_id.upper().startswith(prefix_u):
+                return True
+    return False
+
+
+def backfill(
+    *,
+    repo_root: Path,
+    from_ref: str,
+    to_ref: str,
+    dry_run: bool,
+) -> dict:
+    """Walk `git log <from>..<to>` and emit changesets. Returns a summary."""
+    repo_root = Path(repo_root).resolve()
+    commits = _git_log(repo_root, from_ref, to_ref)
+
+    cs_dir = repo_root / ".changesets"
+    existing = _existing_change_ids(cs_dir) if cs_dir.exists() else set()
+
+    processed = 0
+    written = 0
+    would_write = 0
+    skipped_unparseable = 0
+    skipped_already_exists = 0
+    written_paths: list[str] = []
+
+    for commit in commits:
+        processed += 1
+        parsed = _parse_subject(commit["subject"])
+        if parsed is None:
+            skipped_unparseable += 1
+            continue
+
+        # Synthesise a change_id when the subject didn't carry one.
+        change_id = parsed["change_id"] or f"SHA-{commit['short']}"
+        if _is_existing_change(change_id, existing):
+            skipped_already_exists += 1
+            continue
+
+        touches_plugin = _commit_touches_plugin(repo_root, commit["sha"])
+
+        # Parse the commit's authored timestamp into a UTC datetime.
+        try:
+            ts = datetime.fromisoformat(commit["ts"])
+            if ts.tzinfo is not None:
+                ts = ts.astimezone(timezone.utc).replace(tzinfo=timezone.utc)
+        except (ValueError, TypeError):
+            ts = datetime.now(timezone.utc)
+
+        summary = _summary_for(parsed, commit)
+
+        if dry_run:
+            would_write += 1
+            continue
+
+        tier = tier_for_primitive(parsed["primitive"])
+        # tier=None is already filtered by _parse_subject, but defensive:
+        if tier is None:
+            skipped_unparseable += 1
+            continue
+
+        path = write_changeset(
+            changesets_dir=cs_dir,
+            change_id=change_id,
+            primitive=parsed["primitive"],
+            tier=tier,
+            touches_plugin=touches_plugin,
+            summary=summary,
+            created_at=ts,
+            slug=parsed["slug"],
+        )
+        written += 1
+        written_paths.append(str(path.relative_to(repo_root)))
+        existing.add(change_id)
+
+    return {
+        "from": from_ref,
+        "to": to_ref,
+        "processed": processed,
+        "written": written,
+        "would_write": would_write,
+        "skipped": skipped_unparseable,
+        "skipped_unparseable": skipped_unparseable,
+        "skipped_already_exists": skipped_already_exists,
+        "dry_run": dry_run,
+        "written_paths": written_paths,
+    }
+
+
+def _parse_args(argv: list[str]) -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        prog="sulis-backfill-changesets",
+        description=(
+            "One-off backfill of `.changesets/*.yaml` for commits that "
+            "landed on dev before changeset emission was wired into "
+            "`sulis-change finish --merge`."
+        ),
+    )
+    p.add_argument("--from", dest="from_ref", default="origin/main",
+                   help="Base ref (default: origin/main).")
+    p.add_argument("--to", dest="to_ref", default="origin/dev",
+                   help="Head ref (default: origin/dev).")
+    p.add_argument("--repo-root", default=None,
+                   help="Repo root (default: cwd).")
+    p.add_argument("--dry-run", action="store_true",
+                   help="Report what would happen; write no files.")
+    return p.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(argv if argv is not None else sys.argv[1:])
+    repo_root = Path(args.repo_root or Path.cwd()).resolve()
+    if not (repo_root / ".git").exists():
+        print(json.dumps({
+            "ok": False,
+            "error": f"not a git repo: {repo_root}",
+        }, indent=2))
+        return 1
+    try:
+        summary = backfill(
+            repo_root=repo_root,
+            from_ref=args.from_ref,
+            to_ref=args.to_ref,
+            dry_run=args.dry_run,
+        )
+    except RuntimeError as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}, indent=2))
+        return 1
+    print(json.dumps({"ok": True, "data": summary}, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
