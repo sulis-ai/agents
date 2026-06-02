@@ -1,0 +1,58 @@
+{
+  "review_target": "feat/wp-001-drift-helper",
+  "project": "auto-back-merge-on-release",
+  "wp": "WP-001",
+  "timestamp_utc": "2026-06-02T063130Z",
+  "base": "change/extend-auto-back-merge-on-release",
+  "head": "feat/wp-001-drift-helper",
+  "diff": {
+    "files_changed": 8,
+    "lines_total": 385,
+    "kind": "backend",
+    "languages": ["bash", "markdown"]
+  },
+  "ph_signals": {
+    "scope": {
+      "commit_type_spread": ["feat"],
+      "module_fan_out": 1,
+      "severity": "low"
+    },
+    "size": {
+      "lines_added": 385,
+      "lines_removed": 0,
+      "files_changed": 8,
+      "generated_ratio": 0.0,
+      "lock_file_ratio": 0.0,
+      "severity": "low"
+    },
+    "safety": {
+      "migration_count": 0,
+      "schema_idl_count": 0,
+      "infra_files": 0,
+      "secret_pattern_hits": 0,
+      "severity": "low"
+    },
+    "completeness": {
+      "new_source_count": 3,
+      "new_test_count": 3,
+      "test_ratio": 1.0,
+      "severity": "low"
+    }
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "ran": true},
+    "security": {"findings": 0, "ran": true},
+    "quality": {"findings": 0, "ran": true}
+  },
+  "cr10": {
+    "matches": 0,
+    "patterns_scanned": 10
+  },
+  "build_verification": {
+    "errors": 0,
+    "tools_run": ["bash -n", "tests/run.sh"],
+    "shellcheck_available": false
+  },
+  "verdict": "PASS",
+  "auto_downgrade_triggers": []
+}

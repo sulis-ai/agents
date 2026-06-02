@@ -1,0 +1,60 @@
+{
+  "review_id": "PR-feat-wp-004-shim-template-2026-06-02T063018Z",
+  "wp": "WP-004",
+  "project": "auto-back-merge-on-release",
+  "target": "feat/wp-004-shim-template",
+  "base": "change/extend-auto-back-merge-on-release",
+  "timestamp": "2026-06-02T063018Z",
+  "verdict": "PASS",
+  "build_verification": {
+    "ran": true,
+    "head_errors": 0,
+    "head_new_errors": 0,
+    "coverage_gaps": [
+      {
+        "tool": "actionlint",
+        "reason": "absent on local environment; structural pytest covers shim shape; substituted YAML parse stands in for syntax check"
+      }
+    ]
+  },
+  "pr_hygiene": {
+    "scope": {"severity": "none", "commit_types": ["feat"], "module_fan_out": 2},
+    "size": {"severity": "none", "lines_added": 273, "lines_removed": 0, "files_changed": 2},
+    "safety": {"severity": "none", "migrations": 0, "schemas": 0, "infra_files": 1, "secret_hits": 0},
+    "completeness": {"severity": "none", "new_source_without_test": 0}
+  },
+  "findings": {
+    "in_changes": [],
+    "in_neighbours": [],
+    "watch_list": [
+      {
+        "id": "WL-001",
+        "title": "PyYAML on:->True quirk handled in test",
+        "severity": "note",
+        "action": "no-action; correct workaround for known PyYAML behaviour"
+      },
+      {
+        "id": "WL-002",
+        "title": "Pin placeholder regex does not match pre-release SemVer",
+        "severity": "note",
+        "action": "no-action; WP contractually specifies <MAJOR>.<MINOR>.<PATCH>"
+      }
+    ]
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "completed": true},
+    "security": {"findings": 0, "completed": true},
+    "quality": {"findings": 0, "completed": true}
+  },
+  "self_attestation": {
+    "cr_01": {"status": "pass", "note": "pytest + YAML parse; actionlint absent (preflight-recorded)"},
+    "cr_02": {"status": "pass", "note": "single-reader pass; 2 files, single concern"},
+    "cr_03": {"status": "pass", "note": "both files read end-to-end"},
+    "cr_04": {"status": "pass", "note": "no findings; no evidence required"},
+    "cr_05": {"status": "pass", "note": "rubric applied; 0 findings"},
+    "cr_06": {"status": "pass", "note": "verdict PASS; no auto-downgrades fired"},
+    "cr_07": {"status": "pass", "note": "all three lenses produced explicit completion output"},
+    "cr_09": {"status": "pass", "note": "PH-01..PH-04 all clean"}
+  },
+  "draft_deltas": []
+}

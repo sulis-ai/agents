@@ -1,0 +1,9 @@
+# The scripted git remotes are BUILT, not committed — running
+# `setup.sh` materialises them deterministically (WP-009 DoD Blue:
+# "Fixture local git remotes are reproducible"). Committing the bare
+# .git object stores would be fragile binary churn; the recipe in
+# setup.sh is the source of truth.
+repo-clean/origin.git/
+repo-drifted/origin.git/
+repo-clean/.work/
+repo-drifted/.work/
