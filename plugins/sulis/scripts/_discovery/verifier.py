@@ -53,9 +53,17 @@ _DEFAULT_CROSS_TENANT_REFS_ALLOWED: tuple[str, ...] = (
     "belongs_to_product_ref",
 )
 
-# Default location of the drift detector relative to the repo root.
-# Callers can override via ``drift_detector_path`` for test harnesses.
-_DEFAULT_DRIFT_DETECTOR = Path("plugins/sulis/scripts/check-canonical-drift.py")
+# Default location of the drift detector — resolved relative to THIS module's
+# file, not the current working directory. verifier.py lives at
+# ``plugins/sulis/scripts/_discovery/verifier.py``; the detector is its
+# sibling-one-up at ``plugins/sulis/scripts/check-canonical-drift.py``.
+# Resolving via ``__file__`` makes the path point at the installed plugin
+# location regardless of cwd — a cwd-relative path only resolved from inside
+# the marketplace repo, so every consumer-repo mint failed (the bug this WP
+# fixes). Callers can override via ``drift_detector_path`` for test harnesses.
+_DEFAULT_DRIFT_DETECTOR = (
+    Path(__file__).resolve().parent.parent / "check-canonical-drift.py"
+)
 
 # Exit code emitted by argparse on unrecognised flags.
 _UNRECOGNISED_FLAG_EXIT_CODE = 2

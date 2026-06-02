@@ -57,17 +57,35 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         description="Check that the imperative release-on-merge.yml conforms to "
         "the canonical release-train entity instances.",
     )
+    # --instance-dir / --yaml-path and --scope are two mutually-exclusive
+    # entry points. Neither group is marked required=True at the argparse
+    # level so the modes can coexist; a post-parse check (see _resolve_mode)
+    # enforces that exactly one mode is fully specified, preserving the
+    # historic "missing arg -> exit 2" contract.
     parser.add_argument(
         "--instance-dir",
         type=Path,
-        required=True,
-        help="Directory holding the canonical *.jsonld files (workflow, steps, …).",
+        default=None,
+        help="Directory holding the canonical *.jsonld files (workflow, steps, …). "
+        "Required for the conformance mode (with --yaml-path); omit for --scope.",
     )
     parser.add_argument(
         "--yaml-path",
         type=Path,
-        required=True,
-        help="Path to the imperative YAML (release-on-merge.yml) under scrutiny.",
+        default=None,
+        help="Path to the imperative YAML (release-on-merge.yml) under scrutiny. "
+        "Required for the conformance mode (with --instance-dir); omit for --scope.",
+    )
+    parser.add_argument(
+        "--scope",
+        type=Path,
+        default=None,
+        help="Path to a single Project-instances entity file (a "
+        "{'projects': [...]} bag, the discover-project mint output). "
+        "Schema-validates each contained Project against the vendored "
+        "project.schema.json and applies the --cross-tenant-refs-allowed-for "
+        "allowlist. Mutually exclusive with --instance-dir/--yaml-path; does "
+        "NOT require them. Exit 0 clean, 1 drift, 2 invocation error.",
     )
     parser.add_argument(
         "--marketplace-json",
@@ -102,6 +120,125 @@ def _emit(payload: dict, exit_code: int) -> int:
     return exit_code
 
 
+# ─── Single-entity scope mode (discover-project verify path) ─────────────
+
+# The vendored Project schema, resolved relative to THIS file so it works from
+# any cwd: check-canonical-drift.py lives at plugins/sulis/scripts/; the schema
+# is at plugins/sulis/brain/compiled/foundation/project.schema.json.
+_PROJECT_SCHEMA_PATH = (
+    _HERE.parent / "brain" / "compiled" / "foundation" / "project.schema.json"
+)
+
+# Project fields that hold a genuine cross-TENANT reference. In v1 the only
+# field on a minted consumer Project that crosses a tenant boundary is
+# `release_workflow_ref` (consumer Project → marketplace tenant's release
+# Workflow, per ADR-002). A reference on this field is NOT drift iff the field
+# name is allowlisted via --cross-tenant-refs-allowed-for (single source of
+# truth: `_canonical_drift.matcher.cross_tenant_ref_is_allowed`).
+#
+# `belongs_to_product_ref` is intentionally NOT here: per project.schema.json
+# it is an opaque external-Product string scoped within the consumer's own
+# tenant, not a tenant-boundary crossing — so it is never a cross-tenant
+# drift surface in single-entity scope.
+_CROSS_TENANT_REF_FIELDS = ("release_workflow_ref",)
+
+
+def _scope_drift_entries(
+    projects: list[dict],
+    *,
+    schema: dict,
+    cross_tenant_refs_allowed: list[str],
+) -> list[dict]:
+    """Return the drift entries for a single-entity --scope run.
+
+    Two drift surfaces, both producing structured `data.drift` entries:
+
+    - schema-validation failure on a contained Project (missing/invalid
+      required field) → `{"kind": "schema_invalid", ...}`;
+    - a cross-tenant reference on a field that is NOT allowlisted →
+      `{"kind": "cross_tenant_ref_not_allowed", ...}`.
+
+    Empty list ⇔ the entity is clean.
+    """
+    import jsonschema  # local import: only the scope path needs it
+
+    from _canonical_drift.matcher import cross_tenant_ref_is_allowed
+
+    drift: list[dict] = []
+    for project in projects:
+        name = project.get("name", project.get("id", "<unknown>"))
+
+        # Cross-tenant reference allowlist check — a release_workflow_ref (or
+        # belongs_to_product_ref) is present on a consumer Project and points
+        # at the marketplace tenant. Allowed iff the field is allowlisted.
+        for field_name in _CROSS_TENANT_REF_FIELDS:
+            if project.get(field_name) and not cross_tenant_ref_is_allowed(
+                field_name, cross_tenant_refs_allowed
+            ):
+                drift.append(
+                    {
+                        "kind": "cross_tenant_ref_not_allowed",
+                        "project": name,
+                        "field": field_name,
+                    }
+                )
+
+        # Schema validation — a Project missing a required field (or with an
+        # invalid one) is drift.
+        try:
+            jsonschema.validate(project, schema)
+        except jsonschema.ValidationError as e:
+            field_path = "/".join(str(p) for p in e.absolute_path) or "(root)"
+            drift.append(
+                {
+                    "kind": "schema_invalid",
+                    "project": name,
+                    "field": field_path,
+                    "message": e.message,
+                }
+            )
+    return drift
+
+
+def _run_scope_mode(args: argparse.Namespace) -> int:
+    """Validate ONE Project-instances entity file in single-entity scope.
+
+    This is the mode the discover-project verifier invokes after a mint. It
+    requires neither --instance-dir nor --yaml-path. Exit 0 (clean) / 1 (drift)
+    / 2 (invocation error), with the same `{"ok": bool, ...}` envelope shape as
+    the conformance mode.
+    """
+    try:
+        doc = json.loads(args.scope.read_text())
+    except FileNotFoundError as e:
+        return _emit({"ok": False, "error": f"scope: {e}"}, 2)
+    except json.JSONDecodeError as e:
+        return _emit({"ok": False, "error": f"scope: malformed entity: {e}"}, 2)
+
+    projects = doc.get("projects")
+    if not isinstance(projects, list):
+        return _emit(
+            {
+                "ok": False,
+                "error": "scope: entity has no 'projects' list "
+                "(expected a {'projects': [...]} bag)",
+            },
+            2,
+        )
+
+    try:
+        schema = json.loads(_PROJECT_SCHEMA_PATH.read_text())
+    except FileNotFoundError as e:
+        return _emit({"ok": False, "error": f"scope: project schema: {e}"}, 2)
+
+    drift = _scope_drift_entries(
+        projects,
+        schema=schema,
+        cross_tenant_refs_allowed=args.cross_tenant_refs_allowed_for,
+    )
+    return _emit({"ok": not drift, "data": {"drift": drift}}, 0 if not drift else 1)
+
+
 def main(argv: list[str] | None = None) -> int:
     """Composition root. Returns exit code per the contract above."""
     try:
@@ -113,6 +250,24 @@ def main(argv: list[str] | None = None) -> int:
             return 0  # --help path
         return _emit(
             {"ok": False, "error": "invocation: missing or malformed argument"},
+            2,
+        )
+
+    # ─── Mode selection ──────────────────────────────────────────────────
+    # Two mutually-exclusive entry points. --scope runs the single-entity
+    # path (discover-project verify) and requires neither --instance-dir nor
+    # --yaml-path; the conformance path requires both. The requiredness moved
+    # here (post-parse) from argparse so the modes coexist.
+    if args.scope is not None:
+        return _run_scope_mode(args)
+    if args.instance_dir is None or args.yaml_path is None:
+        return _emit(
+            {
+                "ok": False,
+                "error": "invocation: the conformance mode requires both "
+                "--instance-dir and --yaml-path (or use --scope for a single "
+                "entity)",
+            },
             2,
         )
 
