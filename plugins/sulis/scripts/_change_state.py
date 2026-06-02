@@ -82,6 +82,20 @@ def change_dir(change_id: str) -> Path:
     return changes_base() / change_id
 
 
+def change_worktree_dir(change_id: str) -> Path:
+    """The change's git worktree, co-located with its state under
+    ``{state_base}/changes/{change_id}/worktree/``.
+
+    This is the canonical home for a change's working tree (ADE worktree
+    relocation): everything about a change — its ``state.json``,
+    ``change.json``, ``CONTEXT.md``, and now its working tree — lives in one
+    directory, out of the user's working dirs (no more sibling
+    ``<repo>-change-<slug>/`` directories that confused both the user and
+    git tooling). The change is the unit; its worktree lives with it.
+    """
+    return change_dir(change_id) / "worktree"
+
+
 # Canonical ordered workflow stages. Order is meaningful (recon is first,
 # ship is last) and used by the dashboard to render progress.
 WORKFLOW_STAGES: tuple[str, ...] = (

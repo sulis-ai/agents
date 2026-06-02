@@ -4527,6 +4527,23 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
             if metadata.get("change_id") == change_id:
                 return metadata
 
+    # 2.5 Co-located worktree (ADE relocation): the worktree lives at
+    #     ~/.sulis/changes/{change_id}/worktree, so its committed manifest is
+    #     at .../worktree/.changes/{primitive}-{slug}.yaml. Read it directly by
+    #     change_id — this resolves a co-located change when driving from
+    #     anywhere (the main repo, an unrelated dir), without iterating siblings.
+    try:
+        from _change_state import change_worktree_dir  # lazy: avoid import coupling
+        co_changes = change_worktree_dir(change_id) / ".changes"
+        if co_changes.is_dir():
+            for meta_file in sorted(co_changes.glob("*.yaml")):
+                checked.append(str(meta_file))
+                metadata = read_change_metadata(meta_file)
+                if metadata.get("change_id") == change_id:
+                    return metadata
+    except Exception:
+        pass  # best-effort; fall through to sibling iteration
+
     # 3. Sibling worktree iteration (driving from the main repo; includes
     #    origin-only change branches via find_change_branches).
     for entry in find_change_branches(repo_root):
