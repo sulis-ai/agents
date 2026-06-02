@@ -23,6 +23,22 @@
         "purged"
       ]
     },
+    "valid_from": {
+      "type": "string",
+      "format": "date-time",
+      "description": "business-truth window start \u2014 when this fact became true in the world; null = since-forever"
+    },
+    "valid_to": {
+      "type": "string",
+      "format": "date-time",
+      "description": "business-truth window end \u2014 when this fact stopped being true; null = still valid"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "reliability score for this instance; 1.0 = certain, 0 = no confidence"
+    },
     "id": {
       "type": "string",
       "pattern": "^dna:requirement:[0-9A-HJKMNP-TV-Z]{26}$"

@@ -9,13 +9,22 @@ of Brain entities the marketplace persists.
 upstream when the entity ontology bumps. Source ontology:
 `sulis-ai/plugins/.specifications/business-dna/exemplars/{domain}.entities.jsonld`.
 
-Currently mirrored at the ontology's **v0.5.0** for product-development —
-**except** `scenario`, `testrun`, and `testresult`, which are surgically
-vendored from source **v0.9.0** (DR-028: the `Scenario` entity + its
-`of_scenario`/`scenario` re-point). These three are additive and standalone
-(no `$id` pins, only optional fields added), so the mixed-version vendor is
-safe. The full v0.5.0 → v0.9.0 catch-up (11 new entities + 4 versions of
-drift) is a separate, deliberate integration — tracked, not bundled here.
+Currently mirrored at the ontology's **v0.5.0** for product-development, with
+these entities surgically vendored from source **v0.9.0** (each additive +
+standalone — only optional fields added, no `$id`-breaking change — so the
+mixed-version vendor is safe):
+
+- `scenario` + `testrun`/`testresult` re-point (DR-028 — the `Scenario` entity).
+- `requirement` + `decision` — gain the bitemporal fields (`valid_from`/
+  `valid_to`/`confidence`), so the living entities can hold version history.
+  This is the data-shape foundation for change-as-transaction / evolution.
+
+**Still to catch up (breaking / structural — deliberately NOT bundled):**
+`lifecyclerun` v1.0.0 → **2.1.0** is BREAKING (`step_name` → required `step`
+ref) and needs the emitter (`_brain_emit_helper`) migrated in lockstep — that's
+the "LifecycleRun-as-transaction-node" change, coupled + needing a modelling
+call. Plus the 10 foundation-mirror entities the PD source now carries (the
+mirror-surface reconciliation). Tracked, not done here.
 
 Distribution mechanism (vendoring) is intentional first-slice pragmatism. A
 published package or git-submodule is the right longer-term answer; track that
