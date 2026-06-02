@@ -1,16 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sulis.co/dna/schema/testresult/1.1.0",
-  "title": "TestResult",
-  "description": "the verifying result a TestRun produced for one or more Requirements",
+  "$id": "https://sulis.co/dna/schema/scenario/1.0.0",
+  "title": "Scenario",
+  "description": "a living, reusable verification scenario \u2014 a named journey of steps that proves one or more Requirements against a Design",
   "type": "object",
   "unevaluatedProperties": false,
   "required": [
     "id",
-    "of_run",
+    "name",
     "verifies",
-    "type",
-    "outcome",
+    "exercises",
+    "journey",
+    "state",
     "sys_status"
   ],
   "properties": {
@@ -40,11 +41,13 @@
     },
     "id": {
       "type": "string",
-      "pattern": "^dna:testresult:[0-9A-HJKMNP-TV-Z]{26}$"
+      "pattern": "^dna:scenario:[0-9A-HJKMNP-TV-Z]{26}$"
     },
-    "of_run": {
-      "type": "string",
-      "pattern": "^dna:(testrun):[0-9A-HJKMNP-TV-Z]{26}$"
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
     },
     "verifies": {
       "type": "array",
@@ -54,31 +57,21 @@
       },
       "minItems": 1
     },
-    "type": {
-      "enum": [
-        "unit",
-        "integration",
-        "e2e",
-        "contract",
-        "security"
-      ]
-    },
-    "outcome": {
-      "enum": [
-        "pass",
-        "fail",
-        "skip"
-      ]
-    },
-    "evidence": {
+    "exercises": {
       "type": "string",
-      "description": "URI to artifact \u2014 may contain test PII",
-      "x-sensitive": true
+      "pattern": "^dna:(design):[0-9A-HJKMNP-TV-Z]{26}$"
     },
-    "scenario": {
+    "journey": {
       "type": "string",
-      "pattern": "^dna:(scenario):[0-9A-HJKMNP-TV-Z]{26}$"
+      "pattern": "^dna:(workflow):[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "state": {
+      "enum": [
+        "draft",
+        "active",
+        "deprecated"
+      ]
     }
   },
-  "x-schema-org-extends": "custom"
+  "x-schema-org-extends": "schema:HowTo"
 }
