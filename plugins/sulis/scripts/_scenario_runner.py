@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from _scenario_dispatch import execute_step
-from _scenario_runtime import resolve_journey
+from _scenario_runtime import _entity_id, resolve_journey
 
 # worst-wins ordering for folding step statuses into a scenario verdict
 _PRECEDENCE = ["fail", "unresolved", "deferred", "manual", "pass"]
@@ -75,8 +75,8 @@ def run_scenario(
 
     worst = _PRECEDENCE[worst_idx] if worst_idx < len(_PRECEDENCE) else "pass"
     return AcceptanceResult(
-        scenario_id=scenario.get("@id", ""),
-        scenario_name=scenario.get("name", scenario.get("@id", "")),
+        scenario_id=_entity_id(scenario),
+        scenario_name=scenario.get("name", _entity_id(scenario)),
         verdict=_VERDICT_LABEL.get(worst, "pass"),
         steps=step_rows,
     )

@@ -613,19 +613,26 @@ broken state.
 
 **4.9. Testable-state acceptance gate — run `sulis-verify-acceptance`
 (MUST for a user-facing / behavioural change).** A change that authored
-verification `Scenario`s at design (draft-architecture step 3.5 clause d)
-is not *done* until those Scenarios pass against a **standing app** — the
-real "done" is *the app is testable*, not *merged* (the failure this
-catches: agent-journey shipped, but you couldn't log in). Run each
-in-scope Scenario:
+verification `Scenario`s at specify (`/sulis:specify` deep mode) is not
+*done* until those Scenarios pass against a **standing app** — the real
+"done" is *the app is testable*, not *merged* (the failure this catches:
+agent-journey shipped, but you couldn't log in).
+
+Run each of the change's Scenarios **straight from the emitted brain graph**
+(no hand-built bundle): the authoring step wrote a durable
+`{worktree}/.changes/{primitive}-{slug}.scenarios.jsonld` and emitted the
+entities, so the scenario ids are right there. For each `scenarios[].id`:
 
 ```bash
 "$SCRIPTS_DIR/sulis-verify-acceptance" \
-  --bundle <scenario-bundle> --target local --repo-root . --json
+  --scenario <dna:scenario:…> --target local --repo-root . --json
 ```
 
-(`local` now; the `deployed` leg once that target is reachable — both per
-the repo-contract `targets:` + `commands.standup`.) Read the gate verdict:
+(`--scenario` loads the Scenario + its journey Workflow + Steps from the
+store; `--base-dir` defaults to `<repo-root>/.brain/instances`. The legacy
+`--bundle <file>` path still works for a hand-built bundle.) `local` now;
+the `deployed` leg once that target is reachable — both per the repo-contract
+`targets:` + `commands.standup`. Read the gate verdict:
 
 - **pass** → every Scenario passed, or is deferred-with-need. Done is
   honest. Log it.

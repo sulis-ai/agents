@@ -76,11 +76,19 @@ def assemble_scenario_graph(
     if not steps:
         raise ValueError("a scenario journey needs at least one step")
 
+    # Step names are the linkage the Workflow uses (workflow.steps holds
+    # Step.name slugs, not ULIDs) — and the flat brain store keys files by
+    # ULID, so reconstructing a journey from the store resolves those names
+    # back to Step entities. Names MUST therefore be globally unique, or a
+    # name lookup could match a different scenario's step. Namespace every
+    # name with a journey-stable prefix derived from the seed.
+    namespace = _ulid(f"{seed}:journey-namespace")[:8].lower()
+
     step_entities: list[dict] = []
     prev_output = ["test-target"]
     for i, beat in enumerate(steps):
         instruction = beat["instruction"]
-        slug = _slugify(instruction, index=i)
+        slug = f"{namespace}-{_slugify(instruction, index=i)}"
         output = [f"{slug}-result"]
         step: dict = {
             "id": f"dna:step:{_ulid(f'{seed}:step:{i}')}",

@@ -62,6 +62,25 @@ class TestAssembleStructure:
         # linear transitions: s0 -> s1
         assert wf["transitions"] == [f"{names[0]} -> {names[1]}"]
 
+    def test_step_names_are_globally_unique_namespaced(self) -> None:
+        # two journeys with identical step wording must NOT collide on step names
+        # (flat-store reconstruction resolves workflow.steps names → Step entities)
+        a = assemble_scenario_graph(
+            name="A", verifies=[_ref("requirement", "rqa")], exercises=_ref("design", "da"),
+            tenant=_TENANT, seed="journey-a",
+            steps=[{"instruction": "Sign in"}, {"instruction": "Pay"}],
+        )
+        b = assemble_scenario_graph(
+            name="B", verifies=[_ref("requirement", "rqb")], exercises=_ref("design", "db"),
+            tenant=_TENANT, seed="journey-b",
+            steps=[{"instruction": "Sign in"}, {"instruction": "Pay"}],
+        )
+        names_a = {s["name"] for s in a["steps"]}
+        names_b = {s["name"] for s in b["steps"]}
+        assert names_a.isdisjoint(names_b)
+        # and the workflow references its own namespaced names
+        assert a["workflows"][0]["steps"] == [s["name"] for s in a["steps"]]
+
     def test_verification_discriminator(self) -> None:
         g = _journey()
         wf = g["workflows"][0]
