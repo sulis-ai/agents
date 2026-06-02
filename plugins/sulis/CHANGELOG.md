@@ -1,5 +1,248 @@
 # Sulis — Changelog
 
+## v0.86.0 — 2026-05-31
+
+**Minor — release-train batch.**
+
+- Maintainer-side skill at .claude/skills/add-entity-emitter/ that
+  scaffolds the standard 5-piece entity-emission slice (vendored schema +
+  emitter + CLI + 2 test files) from the n=2 pattern (CH-01KSWB Decision,
+  CH-01KSWQ Requirement). 4-question flow + 4 unified templates. Maintainer
+  fills in the entity-specific compose function; the skill owns the rest.
+  Unblocks Component / Test / Release / Finding / Opportunity emissions
+  landing fast. No plugin changes; no code shipped to founders.
+- Phase A of wiring the entity-graph DoD: the brain-query read seam.
+  Library `_brain_query.py` + CLI `sulis-brain-query` provide typed
+  queries over `.brain/instances/`, parallel to the existing sulis-emit-*
+  write seam.
+  Composable predicates (where_field_equals, where_list_field_contains,
+  where_id_in) plus high-level queries the DoD-flow needs:
+  find_testresults_verifying / find_passing_testresults_verifying /
+  find_requirements. The load-bearing one is
+  find_passing_testresults_verifying — "this Requirement has no passing
+  test" is the verdict the gate uses to block ship. 15 new tests;
+  1249 passing total.
+- EntityRepository port + LocalFileEntityAdapter + first ADR→Decision
+  emission via the new sulis-emit-decision CLI. Marketplace-side
+  vertical slice of the Brain↔OS contract — validates v0.5 ontology
+  compiled schemas (vendored from sulis-ai/plugins dna-runner) against
+  real instances. Reject-on-invalid; rejected ADRs do not persist.
+  /sulis:draft-architecture step 9 now MUST emit the paired Decision.
+- Batch 2 of remaining entity emitters: Actor + Credential (foundation
+  cross-cutting) + Environment + LifecycleRun (product-development
+  operational primitives). All four are standalone — no required cross-
+  refs to entities not yet shipped — but Actor + LifecycleRun expose the
+  `dna:actor:<ulid>` seam future emitters (Component, Release,
+  Deployment, Incident) will reference for "who/what did this".
+  Schemas vendored from the canonical compiled output. End-to-end
+  smoke-test via the CLIs round-trips all five existing emitters
+  (Tenant → Actor → Credential → Environment → LifecycleRun) producing
+  validated JSON-LD per entity type. 25 new tests; 1164 passing total.
+- Batch 5 (final) of remaining entity emitters — the operations layer:
+  - Metric (DORA / SPACE / product observations, tied to Release or
+    Opportunity; ULID by observation moment so the same reading at the
+    same instant is the same record)
+  - Experiment (build-measure-learn unit: hypothesis + success Metric
+    + result; ULID by hypothesis + metric, so a re-run updates the
+    result in place)
+  - Incident (operational disruption event with severity + detected_at;
+    re-emit with resolved_at + mttr at close updates the same record
+    via deterministic ID)
+  - PostMortem (one per Incident; blameless by default; actions are
+    refs to corrective Requirement/Opportunity work)
+  This closes the 13-entity autonomous run — all PD + cross-cutting
+  entities from the Brain ontology are now emittable end-to-end via
+  CLIs, with deterministic IDs, cross-emitter ref coordination, and
+  full schema validation against the canonical compiled schemas.
+  28 new tests across the four entities (7 + 7 + 6 + 8). Full suite:
+  1234 passing.
+- Batch 3 of remaining entity emitters: Design (TDD.md →
+  satisfies-Requirement-list + decisions-ADR-list) + Component
+  (.sulis/components/{slug}.yaml → repo/path/version/license + implements
+  + dependencies) + Release (CLI-direct from release-train: version +
+  comprises[] + sbom). Wires up the PD build chain Design → Component →
+  Release end-to-end.
+  Cross-emitter ID coordination preserved: Design.satisfies references
+  use the same `req:{srd_path}:{fr_id}` seed Requirement-emission uses;
+  Design.decisions references use the same Decision-emission seed.
+  Component.implements accepts both design + requirement refs per the
+  schema. End-to-end smoke-test produces a connected graph
+  (Design with 3 requirement edges + 2 decision edges, then Component
+  separately, then Release referencing the Component). 20 new tests
+  (7+5+8); 1184 passing total.
+- Four new entity emitters in dependency order: Tenant (foundation) +
+  Product + Opportunity + Finding (product-development). Closes the
+  CH-01KSWQ synthetic-placeholder loop by cross-emitter ID coordination —
+  Opportunity now emits the SAME id that Requirement generates as its
+  synthetic source for the same SRD. Golden-thread integration test
+  exercises all six emitters together; the graph resolves end-to-end.
+  1003 tests passing (51 new + 952 prior).
+- Batch 4 of remaining entity emitters — verification + deploy events:
+  - TestRun (event of running tests; ULID by timestamp + harness + SUT)
+  - TestResult (per-requirement verifying outcome; outcome doesn't bind
+    ID, so a re-run that flips pass→fail updates in place — right model
+    for a self-correcting test-of-record)
+  - Deployment (Release × Environment cross-product; outcome doesn't
+    bind ID either — an in-progress→succeeded transition updates the
+    same record)
+  Closes the build→verify→ship trail: Requirement → TestResult → TestRun;
+  Release + Environment → Deployment. End-to-end smoke-test produces a
+  connected verification + deploy graph. 22 new tests (5+9+8); 1206
+  passing total.
+- Phase B of the verification-DoD wiring: a pytest plugin that emits
+  TestRun + TestResult entities to the brain on every pytest invocation,
+  driven by `@pytest.mark.verifies("FR-NN")` markers on tests.
+  Load-bearing contract: the marker's FR-NN string resolves to
+  `dna:requirement:<ulid>` using the SAME deterministic seed
+  Requirement-emission uses, so the verification graph self-connects
+  without any cross-emitter coordination. Pinned by the
+  TestRequirementIdCoordination test.
+  Determinism: outcome doesn't bind TestResult ID — a re-run with
+  flipped pass/fail updates the same record. Self-correcting
+  test-of-record.
+  Failure-soft: brain failures never fail pytest. 14 plugin tests
+  (pytester-based); 1290 passing total.
+- Second worked entity emission (n=2 after CH-01KSWB). Emits Requirement
+  entities from each FR-NN/NFR-NN block in an SRD via sulis-emit-requirements.
+  Deterministic ULIDs; synthetic Opportunity source placeholder (replaceable
+  when Opportunity emission lands). Vendored requirement.schema.json. With
+  n=2 the entity-emitter skill (.claude/skills/) is now buildable from
+  observed pattern diversity: one-vs-many entities per call, frontmatter-vs-
+  body extraction, cross-entity refs with placeholder. 952 tests passing.
+- Phase B.5 of the verification-DoD wiring: a production-like e2e
+  harness (`sulis-verify-environment`) that stands up a clean
+  workspace, drops in the marketplace surface, drives the full
+  pipeline (SRD → Requirements → marker-tagged tests → pytest with
+  brain-emit → brain graph query), and reports a structured
+  PASS/PARTIAL/FAIL verdict.
+  This is the foundation Phase C (the DoD gate, sulis-verify-
+  requirements) stands on. Before the gate can be trusted to block
+  ships, the pipeline that produces the graph it queries must be
+  proven to work end-to-end. That's what this harness does.
+  DoD semantics pinned: a Requirement is VERIFIED iff there exists at
+  least one passing TestResult whose `verifies[]` contains its id.
+  A failing test that claims FR-001 does NOT verify it.
+  `test_failing_test_does_not_count_as_verifying` locks the
+  semantics in.
+  7 e2e tests; CLI smoke confirms the default fixture run produces
+  status=partial (2 verified / 1 unverified) as designed; full suite
+  1297 passing.
+- Phase C of the verification-DoD wiring: `sulis-verify-requirements` —
+  the gate.
+  Reads an SRD, enumerates FR/NFR ids, resolves each to
+  `dna:requirement:<ulid>` (same deterministic seed as
+  Requirement-emission + the pytest plugin), queries the brain for
+  passing TestResults verifying each, returns PASS/PARTIAL/FAIL with
+  the uncovered Requirement list.
+  Exit codes structured for CI consumption: 0=pass, 1=partial,
+  2=fail, 3=gate-error. `--strict` collapses partial→2 for a binary
+  full-coverage check.
+  DoD semantic (the load-bearing one): only PASSING TestResults verify.
+  A claim-then-fail does NOT count. Pinned by
+  `test_failing_testresult_does_not_count_as_verifying`.
+  End-to-end demonstration: the harness produces a partial-cover
+  workspace; the gate independently arrives at the same verdict by
+  querying that workspace's brain. Same graph, different code paths,
+  same verdict — that's the symmetry that makes the gate trustworthy.
+  11 gate tests; full suite 1308 passing.
+- Brownfield wiring — entity emitters now fire automatically from the
+  existing substrate scripts + workflows at every natural lifecycle
+  moment. The brain graph populates as a side-effect of normal work.
+  New module: `_brain_emit_helper.py` — defensive wrapper around the
+  emitters; every helper returns `dict | None` (None = graceful
+  degradation; brain failures never unwind the host op).
+  Wired seams:
+    - sulis-change start         → LifecycleRun "change-started:..."
+    - sulis-change mark-shipped  → LifecycleRun "change-shipped:..."
+    - wpx-pipeline (per-WP)      → LifecycleRun "wpx-pipeline-success:WP-NNN"
+    - wpx-train (whole train)    → LifecycleRun "wpx-train-success:{id}"
+    - wpx-train (per WP shipped) → LifecycleRun "wp-shipped:WP-NNN"
+    - release-on-merge.yml       → Release entity at tag-cut
+  Spec-ingestion helpers also added (emit_requirements_from_srd /
+  emit_design_from_tdd / emit_decisions_from_adrs) — these are for the
+  next round (skill-prose wiring into SRD specify + SEA blueprint
+  skills) and don't fire on this commit's substrate wirings.
+  End-to-end smoke-test: a real `sulis-change start` invocation
+  produces a validated `dna:lifecyclerun:<ulid>.jsonld` under
+  `.brain/instances/`, without changing the existing CLI surface
+  (same JSON envelope, same exit code).
+  25 new tests (helper); 1276 passing total.
+- Design stage MUST emit a ServiceSpec manifest per service. Third
+  design-stage structured deliverable alongside visual (#45) and data
+  (#48) contracts. Format follows SPEC-006 (platform Service Registration);
+  entities referenced by id from vendored compiled schemas; Lovable Test
+  as the completeness bar. Methodology only — Slice 2 adds mechanical
+  validation, Slice 3 emits the entities block automatically from the
+  Brain compiler.
+- P7 ServiceSpec validator — the Lovable Test mechanised. Pair to
+  Slice 1: design must emit a manifest; Slice 2 enforces it must pass.
+  _servicespec_validator.py + sulis-validate-servicespec CLI + 33 new
+  tests + Phase 7 section in the decompose-validation rubric. Tolerant
+  of SPEC-006 casing variants; tightens when SPEC-006 commits its
+  final field shape. Names the pair-pattern explicitly: contract-level
+  mechanisms and their validators ship together going forward.
+- Phase D of the verification-DoD wiring: wire `sulis-verify-requirements`
+  into `change ship` as step 4.8 (between the changeset write and the
+  squash-merge).
+  Per-SRD aggregation across every SRD touched in the diff; the worst
+  verdict wins. Verdict policy: PASS → continue; PARTIAL → founder
+  ratifies; FAIL → block (zero passing verifiers, genuinely broken);
+  ERROR → log + proceed (advisory when the gate can't run). Skips
+  silently when no SRD is in the diff (lite/trivial changes).
+  The DoD is now mechanical end-to-end:
+    1. specify writes SRD → Requirements emit to brain
+    2. Tests carry @verifies markers; pytest plugin emits TestResults
+    3. verify-environment harness proves the pipeline e2e
+    4. verify-requirements gate queries the brain, returns the verdict
+    5. THIS change blocks a ship when verdict=fail
+  Full suite: 1308 passing.
+- Wire emitters into the SRD specify + SEA draft-architecture skills:
+  - specify (deep mode): emit Requirement entities from SRD.md FR/NFR
+    blocks via `sulis-emit-requirements --from-srd ...`
+  - draft-architecture: emit Design entity from TDD.md + Decision entity
+    per ADR file via `sulis-emit-design --from-tdd` + per-ADR
+    `sulis-emit-decision --from-adr`
+  Both calls are best-effort prose instructions to the agent; the CLI's
+  `{ok: false}` envelope handles failure. Pairs with CH-01KSYE which
+  wired emissions into the substrate scripts (sulis-change, wpx-pipeline,
+  wpx-train) + release workflow. Together: every existing artifact-
+  producing seam now populates the brain graph automatically.
+- Cockpit "see-the-contracts-before-you-go" preview: render each change's data contract (founder-legible, ServiceSpec-first) + UI/visual contract, surfaced as one-click links in the cockpit, as a pre-dispatch review gate + on-demand. Degrades gracefully; nothing hard-wired.
+- Fix release-on-merge loop-guard skipping founder-merged release PRs.
+  The previous guard pattern-matched on the message prefix
+  `release: sulis`, which matched BOTH the bot's auto-commits AND the
+  founder-merged release-train PR commits (because release-train PRs
+  are titled `release: sulis vX.Y.Z (minor)`). PR #132 was silently
+  skipped for exactly this reason — no v0.86.0 release was cut.
+  Switched the loop-guard to match by AUTHOR
+  (`github-actions[bot]`) instead of by message prefix. Founder-merged
+  release PRs now run the robot; the bot's own follow-up commits
+  don't re-trigger it.
+  Pair with CH-01KSYZ (YAML parse fix): two latent defects in the
+  same workflow surfaced on the same release attempt. Both now closed.
+- Fix YAML parse error in `.github/workflows/release-on-merge.yml`
+  that crashed the release robot silently on PR #130 merge. The
+  brain-emit Release step (CH-01KSYE) had a multi-line python3 -c
+  expression with lines starting at column 0 inside a `run: |`
+  literal block — terminating the YAML block early.
+  Collapsed to a single-line python -c with an explanatory NOTE
+  above. Added a regression test that walks
+  `.github/workflows/*.yml` and asserts every file is YAML-parseable
+  (pinned by running against main's broken file: fails; against the
+  fix: passes).
+  Unblocks the next release — when this lands on main, the robot
+  runs with the fixed YAML and cuts the v0.86.0 / v1.131.0 release
+  that PR #130's merge should have produced.
+  12 new tests; full suite 1320 passing.
+- Adopt UV + pyproject.toml + uv.lock as single source of truth for
+  Python deps. Closes #112 — replaces inline pip-install lists in CI
+  workflows with uv sync; mechanically prevents the missed-dep failure
+  class (jsonschema in CH-01KSWB, pyyaml in CH-01KSWM, would-have-been
+  a third). astral-sh/setup-uv@v6 replaces actions/setup-python.
+  wpx-* CLI tooling remains stdlib-only per the plugin contract; managed
+  deps scoped to the Brain↔OS seam. 932 tests pass locally via uv run
+  pytest. Pure tooling hygiene; no marketplace functionality changes.
+
 ## v0.85.0 — 2026-05-29
 
 **Minor — release-train batch.**
