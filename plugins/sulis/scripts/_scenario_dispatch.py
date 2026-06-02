@@ -1,6 +1,6 @@
 """Step dispatcher — execute ONE resolved Scenario step against a target.
 
-v1 implements two concrete drivers — `http_call` (httpx) and `subprocess`
+v1 implements two concrete drivers — `http_call` (stdlib urllib) and `subprocess`
 (shell) — and reports every other (agent-driven) kind as `deferred`
 (not-yet-implemented). A step whose `input_artifacts` (needs / credentials)
 are not in the available set defers with the missing need named — never a
@@ -12,13 +12,14 @@ step's `mechanism_detail` as a JSON blob:
   http_call → {"method","path","expect_status"}
   subprocess → {"cmd","expect_exit"}
 
-Stdlib (+ httpx only when the real default transport is used). Python 3.11-safe.
+Stdlib only. Python 3.11-safe.
 """
 
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 from _scenario_runtime import HUMAN_DRIVER, UNRESOLVED_DRIVER, ResolvedStep
 
@@ -35,9 +36,19 @@ class StepOutcome:
 
 
 def _default_http(method: str, url: str):
-    import httpx  # lazy — only when no transport injected
+    # Stdlib only (the marketplace tooling is stdlib-only by contract — no
+    # httpx dependency). A 4xx/5xx surfaces as a status_code, NOT an exception,
+    # so the dispatcher compares it to expect_status; a real connection error
+    # propagates and the caller marks the step failed.
+    import urllib.error
+    import urllib.request
 
-    return httpx.request(method, url, timeout=15)
+    req = urllib.request.Request(url, method=method)
+    try:
+        resp = urllib.request.urlopen(req, timeout=15)
+        return SimpleNamespace(status_code=getattr(resp, "status", resp.getcode()))
+    except urllib.error.HTTPError as exc:
+        return SimpleNamespace(status_code=exc.code)
 
 
 def _default_run(cmd: str):
