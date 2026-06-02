@@ -55,6 +55,9 @@ class ResolvedStep:
     preconditions: list = field(default_factory=list)
     postconditions: list = field(default_factory=list)
     agent_instructions: str = ""
+    # Driver-specific executable params (a JSON blob the dispatcher parses):
+    # http_call → {"method","path","expect_status"}; subprocess → {"cmd","expect_exit"}.
+    mechanism_detail: str = ""
 
 
 def driver_for_step(step: dict, tools_by_id: dict) -> str:
@@ -110,6 +113,7 @@ def resolve_journey(
                 preconditions=list(step.get("preconditions", []) or []),
                 postconditions=list(step.get("postconditions", []) or []),
                 agent_instructions=str(step.get("agent_instructions", "") or ""),
+                mechanism_detail=str(step.get("mechanism_detail", "") or ""),
             )
         )
     return resolved
