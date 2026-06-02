@@ -1,0 +1,7 @@
+change_id: SHA-177433c
+primitive: fix
+tier: patch
+touches_plugin: true
+summary: |
+  ship-writes-changeset
+created_at: 2026-06-02T04:11:26Z
