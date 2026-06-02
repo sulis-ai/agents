@@ -142,3 +142,21 @@ def assemble_scenario_graph(
     }
 
     return {"scenarios": [scenario], "workflows": [workflow], "steps": step_entities}
+
+
+def repoint_scenarios_exercises(bundle: dict, design_id: str) -> dict:
+    """Resolve the specify-time synthetic Design placeholder once the real
+    Design exists.
+
+    At `/sulis:specify` a scenario's ``exercises`` is a synthetic
+    ``dna:design:<ulid>`` placeholder (no Design entity exists yet). When the
+    design stage emits the change's real Design, this re-points every scenario
+    in the bundle at it — a change produces one Design that all its scenarios
+    exercise, so the mapping is unambiguous. Uses the REAL emitted id (not a
+    recomputation of the path-derived id), so it can't drift on a path-string
+    mismatch. Returns a new bundle; inputs are not mutated.
+    """
+    if not design_id:
+        raise ValueError("design_id is required to re-point scenarios")
+    scenarios = [{**s, "exercises": design_id} for s in (bundle.get("scenarios") or [])]
+    return {**bundle, "scenarios": scenarios}

@@ -615,6 +615,27 @@ If extending or superseding, reference the existing ADR by path.}
     the blueprint step from completing. Don't narrate the emissions to
     the founder (FE-09) — the brain simply stays current.
 
+15.5. **Resolve verification scenarios to the real Design (MUST when the
+    change authored scenarios at specify).** `/sulis:specify` writes each
+    scenario's `exercises` as a *synthetic Design placeholder* (no Design
+    existed yet). Now the real Design is emitted, so re-point them — capture
+    the Design id from the emit above (its envelope's `data.entities[].id`),
+    then for each of the change's durable scenario bundles
+    (`{worktree}/.changes/{primitive}-{slug}.scenarios.jsonld`):
+
+    ```bash
+    "$SCRIPTS_DIR/sulis-resolve-scenario-design" \
+      --scenarios "{worktree}/.changes/{primitive}-{slug}.scenarios.jsonld" \
+      --design "<dna:design:… from the emit above>" \
+      --emit --repo-root "$(git rev-parse --show-toplevel)"
+    ```
+
+    A change produces one Design that all its scenarios exercise, so
+    re-pointing every scenario in the bundle is unambiguous (it uses the REAL
+    emitted id, not a path-recomputed one, so it can't drift). Best-effort +
+    no narration (FE-09): skip silently if the change authored no scenarios
+    bundle (a non-user-facing change, or specify wrote none).
+
 After the blueprint is accepted, the user typically runs `/sulis:plan-work`
 next.
 

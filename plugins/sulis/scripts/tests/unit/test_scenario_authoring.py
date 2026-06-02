@@ -15,7 +15,11 @@ from pathlib import Path
 import pytest
 
 from _entity_adapter_local import LocalFileEntityAdapter
-from _scenario_authoring import _ulid, assemble_scenario_graph
+from _scenario_authoring import (
+    _ulid,
+    assemble_scenario_graph,
+    repoint_scenarios_exercises,
+)
 
 _TENANT = "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM"
 
@@ -95,6 +99,33 @@ class TestAssembleStructure:
         # founder-authored journeys default to human-run (tool_ref deferred)
         assert s0["mechanism"] == "human"
         assert "tool_ref" not in s0
+
+
+class TestRepointExercises:
+    def test_repoints_every_scenario_to_the_real_design(self) -> None:
+        g = _journey()
+        placeholder = g["scenarios"][0]["exercises"]
+        real_design = f"dna:design:{_ulid('real-checkout-design')}"
+        assert placeholder != real_design
+
+        out = repoint_scenarios_exercises(g, real_design)
+        assert all(s["exercises"] == real_design for s in out["scenarios"])
+        # workflows + steps untouched; inputs not mutated
+        assert out["workflows"] == g["workflows"]
+        assert g["scenarios"][0]["exercises"] == placeholder  # original unchanged
+
+    def test_repointed_scenario_still_validates(self, tmp_path: Path) -> None:
+        g = _journey()
+        real_design = f"dna:design:{_ulid('real-design')}"
+        out = repoint_scenarios_exercises(g, real_design)
+        adapter = LocalFileEntityAdapter(
+            base_dir=tmp_path / ".brain" / "instances", domain="product-development"
+        )
+        adapter.save("scenario", out["scenarios"][0])  # must not raise
+
+    def test_empty_design_raises(self) -> None:
+        with pytest.raises(ValueError):
+            repoint_scenarios_exercises(_journey(), "")
 
 
 class TestAssembledEntitiesValidate:
