@@ -325,6 +325,36 @@ owns this** — do not re-implement SRD facilitation here.
    this step (their verification posture lives in the three-field
    shape; the rubric's grandfather sub-phase applies).
 
+## Step 5 — flag any third-party platform touch (detect + ask; do NOT run the harness)
+
+While writing the spec, watch for a **gated third-party platform touch** —
+the change integrating with a platform outside our own code (GitHub Actions,
+Stripe, an email provider, a cloud API). If you spot one, note it in the spec
+and tell the founder, in plain English, that a **Platform Contract** will be
+needed at design time so we conform to that platform's real behaviour instead
+of assuming it (per
+[`PLATFORM_CONTRACT_STANDARD.md`](../../references/standards/PLATFORM_CONTRACT_STANDARD.md);
+the contract itself lives at
+`plugins/sulis/references/platform-contracts/{platform}.md`).
+
+Gate it by what the change does *to* the platform (ADR-001):
+
+- **write / deploy touch → hard-gate.** This is load-bearing: design can't
+  proceed safely until the platform's contract is grounded. Surface it now so
+  it's no surprise later — *"This change writes to {platform}; when we design
+  it I'll ground a Platform Contract against {platform}'s own docs first."*
+- **read-only touch → soft-recommend.** Note it's advisable; don't make it a
+  blocker.
+- **escalation:** a read-only touch that *informs a write/deploy decision* can
+  be escalated to hard-gated with a one-line note (de-escalation needs a
+  superseding ADR).
+
+`specify` only **detects and asks** — it records the platform touch in the
+spec so `design` inherits the signal. It does **not** run the
+faithful-generation-harness; that is `draft-architecture`'s job (ADR-004).
+Capture the touch in the spec's Constraints (standard) or "What to avoid"
+(lite) so the design stage's platform-contract gate fires.
+
 ## Output — where SPEC.md lands
 
 Write the change's spec next to its manifest, in the change worktree, using

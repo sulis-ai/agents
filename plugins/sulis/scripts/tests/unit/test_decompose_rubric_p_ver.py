@@ -100,14 +100,20 @@ def test_rubric_has_verification_required_from_field(
 
 
 def test_rubric_version_bumped_to_0_3_0(rubric_text: str) -> None:
-    """Version bumps v0.2.0 → v0.3.0 per the WP Contract."""
-    # The rubric's version line lives at the top of the file
-    # (``> **Version:** 0.3.0``) — match either the bare or backticked
-    # variant, with optional leading ``v``.
-    assert re.search(
-        r"\*\*Version:\*\*\s*v?0\.3\.0\b",
-        rubric_text,
-    ), "Expected `**Version:** 0.3.0` (or v0.3.0) header marker."
+    """Version is at least v0.3.0 — the release where Phase 9 (P-VER) landed.
+
+    The version header is a single monotonic marker, so a later phase
+    addition (e.g. Phase 10 — P-PLAT bumped it to 0.4.0) raises it further.
+    This guard is a floor, not an exact pin: it asserts the rubric is at or
+    past the version where P-VER exists, which is what it was protecting.
+    """
+    m = re.search(r"\*\*Version:\*\*\s*v?(\d+)\.(\d+)\.(\d+)\b", rubric_text)
+    assert m, "Expected a `**Version:** X.Y.Z` header marker."
+    version = tuple(int(g) for g in m.groups())
+    assert version >= (0, 3, 0), (
+        f"Rubric version {version} is below 0.3.0 — P-VER (Phase 9) must be "
+        "present from 0.3.0 onward."
+    )
 
 
 def test_phase_by_phase_table_has_p9_row(rubric_text: str) -> None:
