@@ -46,12 +46,12 @@ def test_ship_succeeds_when_base_checked_out_in_sibling_worktree(
     _run(["git", "worktree", "add", "-q", str(dev_holder), "dev"],
          cwd=local_git_repo)
 
-    # Start a change (branches off dev) + add a commit on it.
-    run_tool("sulis-change", "start",
-             "--repo-root", str(local_git_repo),
-             "--slug", "worktree-aware-ship", "--primitive", "feat")
-    change_wt = (local_git_repo.parent
-                 / f"{local_git_repo.name}-change-feat-worktree-aware-ship")
+    # Start a change (branches off dev) + add a commit on it. `start`
+    # returns the co-located worktree path; commit the work there.
+    start_result = run_tool("sulis-change", "start",
+                            "--repo-root", str(local_git_repo),
+                            "--slug", "worktree-aware-ship", "--primitive", "feat")
+    change_wt = Path(start_result.data["worktree_path"])
     (change_wt / "feature.txt").write_text("the feature\n")
     _run(["git", "add", "feature.txt"], cwd=change_wt)
     _run(["git", "commit", "-q", "-m", "feat: the feature"], cwd=change_wt)
@@ -75,12 +75,12 @@ def test_ship_succeeds_when_base_checked_out_in_sibling_worktree(
 def test_squash_commit_message_is_conventional(local_git_repo, run_tool):
     """The squash commit is `{primitive}: {slug}` + intent body + co-author,
     not the old hardcoded `feat(change/...): squash-merge change/...`."""
-    run_tool("sulis-change", "start",
-             "--repo-root", str(local_git_repo),
-             "--slug", "tidy-the-login-form", "--primitive", "fix",
-             "--intent", "Stop the login form double-submitting on Enter.")
-    change_wt = (local_git_repo.parent
-                 / f"{local_git_repo.name}-change-fix-tidy-the-login-form")
+    start_result = run_tool(
+        "sulis-change", "start",
+        "--repo-root", str(local_git_repo),
+        "--slug", "tidy-the-login-form", "--primitive", "fix",
+        "--intent", "Stop the login form double-submitting on Enter.")
+    change_wt = Path(start_result.data["worktree_path"])
     (change_wt / "login.txt").write_text("fixed\n")
     _run(["git", "add", "login.txt"], cwd=change_wt)
     _run(["git", "commit", "-q", "-m", "wip"], cwd=change_wt)
@@ -110,17 +110,17 @@ def test_recreate_restores_removed_worktree_on_branch(local_git_repo,
                      "--repo-root", str(local_git_repo),
                      "--slug", "recreate-me", "--primitive", "feat")
     handle = start.data["handle"]
-    change_wt = (local_git_repo.parent
-                 / f"{local_git_repo.name}-change-feat-recreate-me")
-    (change_wt / "work.txt").write_text("shipped work\n")
-    _run(["git", "add", "work.txt"], cwd=change_wt)
-    _run(["git", "commit", "-q", "-m", "feat: work"], cwd=change_wt)
+    # Commit the work in the worktree `start` created (co-located path).
+    start_wt = Path(start.data["worktree_path"])
+    (start_wt / "work.txt").write_text("shipped work\n")
+    _run(["git", "add", "work.txt"], cwd=start_wt)
+    _run(["git", "commit", "-q", "-m", "feat: work"], cwd=start_wt)
 
     ship = run_tool("sulis-change", "finish",
                     "--repo-root", str(local_git_repo),
                     "--slug", "recreate-me", "--primitive", "feat", "--merge")
     assert ship.data["archived"]["worktree_removed"] is True
-    assert not change_wt.exists()
+    assert not start_wt.exists()
 
     # Recreate by handle.
     rec = run_tool("sulis-change", "recreate",
@@ -128,6 +128,8 @@ def test_recreate_restores_removed_worktree_on_branch(local_git_repo,
     assert rec.ok, rec.stderr
     assert rec.data["recreated"] is True
     assert rec.data["detached"] is False  # on the kept branch
+    # `recreate` reports where it re-materialised the worktree.
+    change_wt = Path(rec.data["worktree"])
     assert change_wt.exists()
     assert (change_wt / ".git").exists()
     # It's on the change branch, with the shipped work present.
@@ -144,17 +146,17 @@ def test_recreate_detaches_at_shipped_sha_when_branch_gone(local_git_repo,
                      "--repo-root", str(local_git_repo),
                      "--slug", "pinned-state", "--primitive", "feat")
     handle = start.data["handle"]
-    change_wt = (local_git_repo.parent
-                 / f"{local_git_repo.name}-change-feat-pinned-state")
-    (change_wt / "pinned.txt").write_text("the pinned content\n")
-    _run(["git", "add", "pinned.txt"], cwd=change_wt)
-    _run(["git", "commit", "-q", "-m", "feat: pinned work"], cwd=change_wt)
+    # Commit the work in the worktree `start` created (co-located path).
+    start_wt = Path(start.data["worktree_path"])
+    (start_wt / "pinned.txt").write_text("the pinned content\n")
+    _run(["git", "add", "pinned.txt"], cwd=start_wt)
+    _run(["git", "commit", "-q", "-m", "feat: pinned work"], cwd=start_wt)
 
     ship = run_tool("sulis-change", "finish",
                     "--repo-root", str(local_git_repo),
                     "--slug", "pinned-state", "--primitive", "feat", "--merge")
     shipped_sha = ship.data["archived"]["shipped_sha"]
-    assert not change_wt.exists()
+    assert not start_wt.exists()
 
     # Now delete the local branch (simulating later cleanup) — the pinned
     # shipped_sha is the only handle on the exact shipped state.
@@ -166,6 +168,8 @@ def test_recreate_detaches_at_shipped_sha_when_branch_gone(local_git_repo,
     assert rec.data["recreated"] is True
     assert rec.data["detached"] is True
     assert rec.data["ref"] == shipped_sha
+    # `recreate` reports where it re-materialised the worktree.
+    change_wt = Path(rec.data["worktree"])
     assert change_wt.exists()
     # The exact shipped content is restored, at the pinned sha.
     assert (change_wt / "pinned.txt").read_text() == "the pinned content\n"
@@ -197,5 +201,6 @@ def test_start_does_not_double_primitive_in_branch(local_git_repo, run_tool):
     assert result.ok, result.stderr
     assert result.data["branch"] == "change/fix-the-login-bug"
     assert result.data["slug"] == "the-login-bug"
-    wt = local_git_repo.parent / f"{local_git_repo.name}-change-fix-the-login-bug"
+    # The worktree lives at the co-located path `start` returns.
+    wt = Path(result.data["worktree_path"])
     assert wt.exists()
