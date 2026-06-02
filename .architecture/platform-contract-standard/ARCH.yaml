@@ -1,0 +1,29 @@
+id: platform-contract-standard
+primitive: create
+status: decomposed        # draft → designed → decomposed → implemented → verified
+date: 2026-06-02
+sourced-from: .specifications/platform-contract-standard/
+kind: methodology
+secondary-adapters: [documentation, contract]
+tier: L                   # see SIZING.md
+cross-references:
+  - "github:issue/137"    # the need (founder framing)
+  - "github:issue/138"    # verification-by-design (consumes this contract's constraints)
+artifacts:
+  tdd: TDD.md
+  sizing: SIZING.md
+  adrs:
+    - adrs/ADR-001-gate-boundary.md
+    - adrs/ADR-002-storage-and-index.md
+    - adrs/ADR-003-freshness-mechanism.md
+    - adrs/ADR-004-harness-invocation-shape.md
+    - adrs/ADR-005-probe-mechanism.md
+    - adrs/ADR-006-pplat-rubric-placement.md
+load-bearing:
+  - harness-invocation-binding   # ADR-004
+  - github-actions-contract-grounding  # the n=1 dogfood
+deferred-needs:
+  - scratch-github-actions-probe-repo
+  - paid-private-repo-for-branch-protection-probe
+  - platform-contract-staleness-reprobe
+next-command: "/sulis:plan-work .architecture/platform-contract-standard/"
