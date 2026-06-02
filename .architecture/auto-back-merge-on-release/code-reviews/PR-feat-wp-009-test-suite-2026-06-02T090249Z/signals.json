@@ -1,0 +1,25 @@
+{
+  "pr": "feat/wp-009-test-suite",
+  "base": "change/extend-auto-back-merge-on-release",
+  "kind": "backend",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["test"], "severity": "low" },
+    "size": { "lines_added": 1569, "lines_removed": 37, "files_changed": 19, "severity": "medium-note", "note": "all test code + fixtures + docs; single logical unit (the test suite) per WP-009 DECOMPOSE_VALIDATION SHOULD-deviation rationale" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "low" },
+    "completeness": { "new_source_without_test": 0, "note": "this WP IS the tests; coverage verified by meta-revert", "severity": "low" }
+  },
+  "findings": {
+    "in_changes": [
+      { "id": "F-01", "severity": "low", "lens": "quality", "file": "plugins/sulis/scripts/tests/chaos/test_race_window.sh", "line": 74, "what": "STEP_RC=$? assigned but never used (dead variable; assertions read the call log, not the exit code)", "status": "fixed-inline", "resolution": "removed assignment; replaced with '|| true' + clarifying comment" },
+      { "id": "F-02", "severity": "low", "lens": "quality", "file": "plugins/sulis/scripts/tests/fixtures/drift_check/gh-stubs/gh", "what": "shared STUB_MODE-driven gh stub authored per DoD Blue but consumed by no test (dead surface)", "status": "fixed-inline", "resolution": "wired into new integration/test_drift_message_uses_shared_gh_stub.sh, which also adds coverage of drift_check.sh's previously-untested gh-dependent recovery-message branch (STUB_MODE=pr-open)" }
+    ],
+    "in_neighbours": [],
+    "watch_list": [
+      { "note": "fixtures/drift_check/setup.sh is referenced only from README, not invoked by a test — acceptable: it is the reproducibility recipe (DoD Blue) for the inline-built remotes, not a test dependency" }
+    ]
+  },
+  "verdict": "PASS",
+  "verdict_basis": "Build Verification empty; no critical/high; all files read end-to-end; both low findings addressed inline; full shell suite (18) + pytest unit gate (1618) green after fixes",
+  "draft_hardening_deltas": 0
+}

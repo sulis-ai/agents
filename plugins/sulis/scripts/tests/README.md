@@ -81,3 +81,102 @@ regressed.
    gh API responses. Use `local_git_repo` for git operations.
 5. Run `pytest plugins/sulis-execution/scripts/tests/ -v` and confirm
    green before commit.
+
+---
+
+# Auto-back-merge shell suite (WP-009)
+
+Alongside the pytest suite above, a **bash** test suite proves the
+auto-back-merge-on-release mechanism (the reusable workflow + shim +
+pin + drift gate + GIT-12). It is bash because the subjects are bash
+(`drift_check.sh`), YAML (the workflow), and SKILL.md prose — there is
+nothing Python to import, and the assertions are over file content +
+extracted workflow step bodies.
+
+## Layout
+
+```
+tests/
+├── run.sh                  # shell-test orchestrator (unit/integration/chaos/methodology)
+├── bootstrap_from_zero.sh  # fresh-consumer end-to-end (gated by BOOTSTRAP_ENABLED=1)
+├── DOGFOOD_ACCEPTANCE.md   # the n=1 post-ship observable (manual, not CI-executable)
+├── lib/
+│   └── abm_canonical.sh    # shared helper: sources canonical strings + chaos harness
+├── unit/                   # sub-second static + parity checks
+├── integration/            # local git-remote / shim-indirection / bootstrap-degradation
+├── chaos/                  # race-window simulation (decide+act under stubs)
+├── methodology/            # WP-002 move characterisation (reconciled in WP-009)
+└── fixtures/
+    ├── drift_check/        # setup.sh rebuilds repo-clean/ + repo-drifted/ remotes; gh-stubs/
+    └── release-on-merge/   # pre-move-snapshot.yml + release-pr-body-with-pin.txt
+```
+
+## Running
+
+```bash
+# All shell tests (exit 0 iff every test passes):
+bash plugins/sulis/scripts/tests/run.sh
+
+# A single test:
+bash plugins/sulis/scripts/tests/unit/test_canonical_strings_parity.sh
+
+# The fresh-consumer end-to-end (needs gh auth + sandbox-repo perms):
+BOOTSTRAP_ENABLED=1 SHIPPING_VERSION=0.3.0 \
+  bash plugins/sulis/scripts/tests/bootstrap_from_zero.sh
+```
+
+CI reads `run.sh`'s exit code, nothing else. Tests are bash-3.2-safe
+(they run on macOS `/bin/bash`).
+
+## The canonical-string discipline (the most important rule)
+
+The design's correctness rests on **four strings being identical
+across four files** — the `back-integrate` label, the
+`chore: back-integrate main → dev` title prefix, and the back-merge
+PR's `dev` base / `main` head — plus the `dev-sha-at-open` pin token.
+A one-character drift (e.g. `back_integrate` vs `back-integrate`)
+breaks the mechanism silently.
+
+So: **no test hand-writes a canonical string.** Every test sources the
+four strings from their single declaration — `drift_check.sh`'s
+`LABEL` / `TITLE_PREFIX` / `BASE_BRANCH` / `HEAD_BRANCH` constants —
+via `lib/abm_canonical.sh`:
+
+```bash
+. "$(dirname "$0")/../lib/abm_canonical.sh"
+abm_source_canonical_strings   # exports $ABM_LABEL, $ABM_TITLE_PREFIX, $ABM_BASE, $ABM_HEAD
+```
+
+`unit/test_canonical_strings_parity.sh` is the load-bearing enforcer:
+it asserts the four strings agree across `drift_check.sh`, the reusable
+workflow YAML, the release-train SKILL.md, and GIT-12. If a future WP
+edits one source without the others, that test fails loudly.
+
+## The load-bearing tests
+
+| Test | What it proves |
+|---|---|
+| `unit/test_canonical_strings_parity.sh` | The four canonical strings + pin token agree across all four sources (P8). |
+| `unit/test_pin_write_read_parity.sh` | The pin format `/sulis:release-train` writes round-trips through the workflow's read regex (the cross-WP seam). |
+| `unit/test_drift_detector_points_at_reusable.sh` | branch-ci's `--yaml-path` **argument** targets the annotated reusable workflow, not a comment substring and not the annotation-free shim. |
+| `integration/test_loop_guard_survives_indirection.sh` | The loop-guard `if:` lives in the reusable workflow and the shim forwards the push context + secrets through the `workflow_call` indirection. |
+| `integration/test_bootstrap_graceful_degradation.sh` | `drift_check.sh` degrades gracefully (controlled exit 1 + attributable message) on a fresh consumer with no `origin/main`. |
+| `chaos/test_race_window.sh` | When current dev ≠ pin, the **actual** decide+act step opens a `back-integrate` PR and never pushes dev / never uses `--force` at runtime (MUC-001). |
+| `chaos/test_missing_pin_falls_through.sh` | Absent/malformed pin → raced PR path (the safe default). |
+| `methodology/test_release_on_merge_yaml_unchanged_behaviour.sh` | The WP-002 move is faithful (moved block byte-equivalent to snapshot) and the back-merge block is exactly the three intended appended steps. |
+
+The chaos tests **execute the workflow's real step body** (extracted
+from the live YAML via `abm_extract_step_body`) under recording git/gh
+stubs (`abm_build_recording_stubs`) — so they exercise shipped code,
+not a re-typed copy.
+
+## Adding a shell test
+
+1. Put it under `unit/`, `integration/`, `chaos/`, or `methodology/`
+   as `test_*.sh`; `run.sh` discovers it automatically.
+2. Source `lib/abm_canonical.sh`; never inline a canonical string.
+3. Add a `# verifies: <production-file>` header naming what it pins.
+4. Do NOT use `set -e` — the tests check exit codes themselves; use
+   `set -u` + `set -o pipefail` and explicit `abm_fail` / `abm_pass`.
+5. Keep it bash-3.2-safe (no `mapfile`, no associative arrays).
+6. Run `bash plugins/sulis/scripts/tests/run.sh` and confirm green.
