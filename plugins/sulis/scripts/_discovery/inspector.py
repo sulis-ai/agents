@@ -175,16 +175,17 @@ class LocalFilesystemInspector:
         )
         repo_root = Path(toplevel.strip())
 
-        # primary branch — best-effort; missing branch (detached HEAD on a
-        # fresh repo with no commits, for example) is not fatal here.
-        try:
-            primary_branch: str | None = self._run_git(
-                ["git", "branch", "--show-current"],
-                cwd=path,
-                on_failure=None,
-            ).strip() or None
-        except subprocess.CalledProcessError:
-            primary_branch = None
+        # Repo DEFAULT branch (not the checked-out branch). A mint run from a
+        # feature branch must record the repo default (e.g. "main"), not the
+        # transient checkout — recording the feature branch was the bug this
+        # WP fixes. Standard resolution per CP (the established mechanism, not a
+        # bespoke heuristic):
+        #   git symbolic-ref refs/remotes/origin/HEAD  ->  "refs/remotes/origin/main"
+        # Strip the "refs/remotes/origin/" prefix to get the bare branch name.
+        # Best-effort (``on_failure=None``): origin/HEAD is unset when the
+        # remote was never fetched or ``git remote set-head`` never ran — fall
+        # back to "main" in that case.
+        primary_branch: str | None = self._default_branch(path)
 
         remote_url = self._run_git(
             ["git", "remote", "get-url", "origin"],
@@ -266,6 +267,33 @@ class LocalFilesystemInspector:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+    #: Prefix on ``git symbolic-ref refs/remotes/origin/HEAD`` output.
+    _ORIGIN_HEAD_PREFIX: Final[str] = "refs/remotes/origin/"
+
+    #: Fallback branch when the repo default can't be determined.
+    _DEFAULT_BRANCH_FALLBACK: Final[str] = "main"
+
+    def _default_branch(self, path: Path) -> str:
+        """Resolve the repo's default branch via ``origin/HEAD``.
+
+        Returns the bare branch name (e.g. ``"main"``). Falls back to
+        :attr:`_DEFAULT_BRANCH_FALLBACK` when ``origin/HEAD`` is unset or the
+        git call fails — both non-fatal (best-effort resolution).
+        """
+        try:
+            ref = self._run_git(
+                ["git", "symbolic-ref", "refs/remotes/origin/HEAD"],
+                cwd=path,
+                on_failure=None,
+            ).strip()
+        except subprocess.CalledProcessError:
+            return self._DEFAULT_BRANCH_FALLBACK
+        if ref.startswith(self._ORIGIN_HEAD_PREFIX):
+            branch = ref[len(self._ORIGIN_HEAD_PREFIX) :]
+            if branch:
+                return branch
+        return self._DEFAULT_BRANCH_FALLBACK
+
     def _run_git(
         self,
         argv: list[str],
