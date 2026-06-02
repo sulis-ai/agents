@@ -667,12 +667,15 @@ def test_list_empty_when_no_changes(local_git_repo, run_tool):
 
 def test_status_reports_sha_and_ahead_behind(local_git_repo, run_tool):
     """`sulis-change status` shows branch SHA, ahead/behind dev."""
-    run_tool("sulis-change", "start",
-             "--repo-root", str(local_git_repo),
-             "--slug", "status-test", "--primitive", "feat")
+    start_result = run_tool("sulis-change", "start",
+                            "--repo-root", str(local_git_repo),
+                            "--slug", "status-test", "--primitive", "feat")
 
-    # Add a commit on the change branch to make it "ahead of dev"
-    worktree_dest = local_git_repo.parent / f"{local_git_repo.name}-change-feat-status-test"
+    # Add a commit on the change branch to make it "ahead of dev".
+    # `start` creates the worktree at the co-located path
+    # (~/.sulis/changes/{id}/worktree) and returns it as `worktree_path`;
+    # use THAT rather than reconstructing the legacy sibling path.
+    worktree_dest = Path(start_result.data["worktree_path"])
     (worktree_dest / "marker.txt").write_text("change-branch work\n")
     _run(["git", "add", "marker.txt"], cwd=worktree_dest)
     _run(["git", "commit", "-m", "feat: status test commit"], cwd=worktree_dest)
@@ -705,8 +708,9 @@ def test_finish_merge_removes_worktree_keeps_branch_and_record(local_git_repo,
                             "--slug", "merge-test", "--primitive", "feat")
     change_id = start_result.data["change_id"]
 
-    worktree_dest = (local_git_repo.parent
-                     / f"{local_git_repo.name}-change-feat-merge-test")
+    # `start` returns the co-located worktree path; commit the shippable
+    # work there (not the legacy sibling path).
+    worktree_dest = Path(start_result.data["worktree_path"])
     (worktree_dest / "merged.txt").write_text("merged content\n")
     _run(["git", "add", "merged.txt"], cwd=worktree_dest)
     _run(["git", "commit", "-m", "feat: merge-test work"], cwd=worktree_dest)
@@ -743,11 +747,10 @@ def test_finish_merge_keeps_worktree_when_uncommitted_work_present(
     """The worktree is KEPT (never force-discarded) when genuine uncommitted
     work is present — #56 Part 2 safety. Only sulis-managed `.changes/`
     metadata is safe to discard; real founder WIP blocks removal."""
-    run_tool("sulis-change", "start",
-             "--repo-root", str(local_git_repo),
-             "--slug", "wip-test", "--primitive", "feat")
-    worktree_dest = (local_git_repo.parent
-                     / f"{local_git_repo.name}-change-feat-wip-test")
+    start_result = run_tool("sulis-change", "start",
+                            "--repo-root", str(local_git_repo),
+                            "--slug", "wip-test", "--primitive", "feat")
+    worktree_dest = Path(start_result.data["worktree_path"])
     # Commit the shippable work...
     (worktree_dest / "shipped.txt").write_text("done\n")
     _run(["git", "add", "shipped.txt"], cwd=worktree_dest)
@@ -833,12 +836,13 @@ def test_list_reads_the_records(local_git_repo, run_tool):
 
 def test_list_flags_record_whose_branch_is_gone(local_git_repo, run_tool):
     """A record whose branch was deleted is listed but branch_present=False."""
-    run_tool("sulis-change", "start",
-             "--repo-root", str(local_git_repo),
-             "--slug", "gone-branch", "--primitive", "feat")
+    start_result = run_tool("sulis-change", "start",
+                            "--repo-root", str(local_git_repo),
+                            "--slug", "gone-branch", "--primitive", "feat")
     # Delete the branch + worktree out from under the record (simulating a
-    # merged/pruned change whose local record still lingers).
-    worktree = local_git_repo.parent / f"{local_git_repo.name}-change-feat-gone-branch"
+    # merged/pruned change whose local record still lingers). The worktree
+    # lives at the co-located path `start` returns, not the legacy sibling.
+    worktree = Path(start_result.data["worktree_path"])
     subprocess.run(["git", "worktree", "remove", str(worktree), "--force"],
                    cwd=local_git_repo, check=True, capture_output=True)
     subprocess.run(["git", "branch", "-D", "change/feat-gone-branch"],

@@ -172,6 +172,21 @@ def _worktree_for_branch(repo_root: Path, branch_ref: str) -> Path | None:
     return None
 
 
+def _resolve_change_worktree(repo_root: Path, branch: str,
+                             primitive: str, slug: str) -> Path:
+    """Return where ``branch``'s worktree actually lives.
+
+    Single resolution path for every read/inspect command (status, recreate,
+    finish). Asks git where the branch is checked out — which honours the
+    co-located convention (``~/.sulis/changes/{id}/worktree``) AND legacy
+    sibling worktrees — and falls back to the legacy sibling path only when
+    the branch isn't checked out anywhere (the branch-gone edge case, where
+    the caller materialises a fresh worktree there).
+    """
+    return (_worktree_for_branch(repo_root, branch)
+            or change_worktree_path(repo_root, primitive, slug))
+
+
 def _compose_squash_message(primitive: str, slug: str, metadata: dict) -> str:
     """Conventional-Commit squash message (#56 Part 3).
 
@@ -789,13 +804,10 @@ def cmd_finish(args: argparse.Namespace) -> None:
     if rc != 0:
         emit_error(f"Change branch not found: {branch}")
 
-    # Resolve the worktree location-agnostically: ask git where the branch is
-    # actually checked out. This works for the co-located convention
-    # (~/.sulis/changes/{id}/worktree) AND legacy sibling worktrees, so finish
-    # never recomputes a stale sibling path. Falls back to the legacy sibling
-    # path only when the branch isn't checked out anywhere (edge case).
-    worktree_dest = (_worktree_for_branch(repo_root, branch)
-                     or change_worktree_path(repo_root, primitive, slug))
+    # Resolve the worktree location-agnostically (see _resolve_change_worktree):
+    # ask git where the branch is checked out so finish never recomputes a
+    # stale sibling path.
+    worktree_dest = _resolve_change_worktree(repo_root, branch, primitive, slug)
 
     # Read the change metadata ONCE, up front — before any worktree removal
     # (#56 Part 2 may remove the worktree on a happy ship, and the metadata
@@ -1028,7 +1040,7 @@ def cmd_status(args: argparse.Namespace) -> None:
     if rc != 0:
         emit_error(f"Change branch not found: {branch}")
 
-    worktree_dest = change_worktree_path(repo_root, primitive, slug)
+    worktree_dest = _resolve_change_worktree(repo_root, branch, primitive, slug)
     metadata = read_change_metadata(_metadata_path(worktree_dest, primitive, slug))
 
     # SHAs + ahead/behind
@@ -1694,7 +1706,11 @@ def cmd_recreate(args: argparse.Namespace) -> None:
                 record = r
                 break
 
-    worktree_dest = change_worktree_path(repo_root, primitive, slug)
+    # Resolve via git (see _resolve_change_worktree): if the branch is already
+    # checked out — at the co-located OR a legacy sibling path — recreate is a
+    # no-op. Only when git reports the branch checked out nowhere do we fall
+    # back to the legacy sibling path and materialise a fresh worktree below.
+    worktree_dest = _resolve_change_worktree(repo_root, branch, primitive, slug)
     if worktree_dest.exists():
         emit_ok(data={
             "recreated": False,
