@@ -16,8 +16,12 @@
     },
     {
       "name": "sulis",
-      "source": "./plugins/sulis",
-      "version": "0.87.0",
+      "source": {
+        "source": "github",
+        "repo": "sulis-ai/agents",
+        "ref": "main",
+        "path": "plugins/sulis"
+      },
       "description": "Your AI engineering team in a plugin. Talk through what you want to build, and Sulis takes it end-to-end — gathering requirements, designing the architecture, writing and reviewing the code, and shipping it. Start with `claude --agent sulis`."
     }
   ]
