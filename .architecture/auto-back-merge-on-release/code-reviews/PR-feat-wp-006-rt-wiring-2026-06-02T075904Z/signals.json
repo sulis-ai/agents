@@ -1,0 +1,38 @@
+{
+  "review": {
+    "target": "feat/wp-006-rt-wiring",
+    "base": "origin/change/extend-auto-back-merge-on-release",
+    "project": "auto-back-merge-on-release",
+    "timestamp": "2026-06-02T075904Z",
+    "verdict": "PASS"
+  },
+  "diff": {
+    "files_changed": 3,
+    "functional_files_changed": 2,
+    "lines_added": 401,
+    "lines_removed": 7,
+    "note": "1 of 3 files is the .executor-WP-006.md journal sidecar (not reviewable code)"
+  },
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "commands": [
+      "python3 -m py_compile tests/unit/test_release_train_drift_and_pin.py",
+      "uv run pytest tests/unit/test_release_train_drift_and_pin.py -q",
+      "bash -n (drift-guard + pin-write prose snippets)"
+    ]
+  },
+  "hygiene": {
+    "scope": {"severity": "none", "commit_type_spread": ["feat (single WP)"], "module_fan_out": 1},
+    "size": {"severity": "none", "lines": 401, "functional_lines": 71, "files": 3},
+    "safety": {"severity": "none", "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0},
+    "completeness": {"severity": "none", "new_source_without_test": 0, "tests_included": true}
+  },
+  "lenses": {
+    "architecture": {"findings_in_changes": 0, "findings_in_neighbours": 0},
+    "security": {"findings_in_changes": 0, "findings_in_neighbours": 0},
+    "quality": {"findings_in_changes": 0, "findings_in_neighbours": 0}
+  },
+  "findings": [],
+  "hardening_deltas": [],
+  "auto_downgrade_triggers": []
+}
