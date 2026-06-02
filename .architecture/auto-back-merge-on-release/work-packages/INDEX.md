@@ -124,7 +124,7 @@ graph TD
 | WP-006 | Extend `/sulis:release-train` SKILL.md — drift-check preflight (Step 1) + `dev-sha-at-open` pin writer (Step 5) | extend | EXPAND | docs | done | WP-001 | WP-009 | 3k / 3k | §4.2 comp-pin-writer + comp-drift-check-rt; §3; §5.5 |
 | WP-007 | Extend `/sulis:change start` preflight — invoke `drift_check.sh` before branch creation | extend | EXPAND | docs | done | WP-001 | WP-009 | 2k / 2k | §4.2 comp-drift-check-cs; §5.5 |
 | WP-008 | Append GIT-12 — Auto-back-merge on release (MUST) — to `git-workflow-standard.md` | extend | EXPAND | docs | done | — | WP-009 | 2k / 3k | §4.2 comp-git12-rule; §3; §6.6 |
-| WP-009 | Author the full test suite — unit + regression + chaos + bootstrap-from-zero | create | GENERATE | backend | pending | WP-001, WP-003, WP-004, WP-005, WP-006, WP-007, WP-008 | — | 4k / 5k | §6 (Proof); §9 (Verification Plan) |
+| WP-009 | Author the full test suite — unit + regression + chaos + bootstrap-from-zero | create | GENERATE | backend | done | WP-001, WP-003, WP-004, WP-005, WP-006, WP-007, WP-008 | — | 4k / 5k | §6 (Proof); §9 (Verification Plan) |
 
 **Totals:** ~24k input + ~26k output ≈ 50k tokens for the full WP set
 (comfortably under the 20k+12k budget noted in the change brief —
