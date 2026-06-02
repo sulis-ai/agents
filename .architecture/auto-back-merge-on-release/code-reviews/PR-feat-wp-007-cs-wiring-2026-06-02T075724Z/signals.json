@@ -1,0 +1,23 @@
+{
+  "pr": "feat/wp-007-cs-wiring",
+  "project": "auto-back-merge-on-release",
+  "timestamp": "2026-06-02T075724Z",
+  "base": "change/extend-auto-back-merge-on-release",
+  "head": "feat/wp-007-cs-wiring",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "dispatch": { "shape": "single-reader", "justification": "242 substantive diff lines across 2 files; within CR-02 carve-out (<=200 line/<=5 file ring)" },
+  "hygiene": {
+    "scope": { "severity": "low", "commit_type_spread": ["chore"], "module_fan_out": 1 },
+    "size": { "severity": "low", "lines_added": 212, "files_changed": 2 },
+    "safety": { "severity": "none", "migration_count": 0, "schema_idl_count": 0, "secret_pattern_hits": 0, "infra_files": 0 },
+    "completeness": { "severity": "none", "new_source_without_test": 0, "new_tests": 1 }
+  },
+  "lenses": {
+    "architecture": { "in_changes": 0, "in_neighbours": 0, "note": "nothing surfaced; single shared-helper call, no inlined logic, no new deps, L1/L2/L3 layering documented" },
+    "security": { "in_changes": 0, "in_neighbours": 0, "note": "nothing surfaced; trusted in-repo helper, literal path (no injection), DRIFT_ERR only interpolated via printf %s, no secrets" },
+    "quality": { "in_changes": 0, "in_neighbours": 0, "note": "build clean; test discriminator matches helper stderr; behaviour empirically verified; CR-10 no anti-pattern matches" }
+  },
+  "findings": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+  "draft_deltas": 0
+}

@@ -1,0 +1,2 @@
+snippet discrimination verified:
+  clean->proceed; drift->STOP exit1; tooling/fresh-repo->heads-up+continue

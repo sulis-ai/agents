@@ -116,14 +116,47 @@ fits, default to `feat` — never block on this.
 will recognise — derive it from the intent ("fix the login bug" →
 `fix-login-bug`) unless the founder gave one explicitly.
 
-**3. Echo the plan before acting (Rule 3).** One sentence, plain English,
+**3. Preflight — don't start work on a stale `dev` (FR-010, ADR-003, GIT-12).**
+This is the first thing that runs and it runs BEFORE any branch is cut.
+A new change branch taken off a `dev` that's behind `main` re-introduces
+stale content into the next release — so refuse to start until `dev` has
+caught up. Run the shared drift helper, which prints its own recovery
+instructions when it finds drift:
+
+```bash
+DRIFT_ERR="$(bash plugins/sulis/scripts/drift_check.sh 2>&1)"
+if [ $? -ne 0 ]; then
+  if printf '%s' "$DRIFT_ERR" | grep -q "dev is behind main"; then
+    # Definitive drift. STOP — cut no branch, write no change record.
+    printf '%s\n' "$DRIFT_ERR" >&2
+    exit 1
+  fi
+  # Tooling / fresh-repo error (no git, not a repo yet, no origin/main,
+  # or a failed fetch). Surface it as a heads-up but DO NOT block — a
+  # fresh clone with no upstream yet is not drift.
+  printf 'Heads-up: skipped the stale-dev check (%s). Continuing.\n' "$DRIFT_ERR" >&2
+fi
+```
+
+Only a definitive "`dev` is behind `main`" stops the skill — then no
+branch is cut and no change record is created, and the helper's message
+names the next step (wait for the open back-integrate PR to merge, or run
+the GIT-12 manual recovery). Any other non-zero result is a tooling or
+fresh-repo condition (the helper can't reach `origin/main`); that does not
+block — surface it and carry on. The helper owns the recovery wording; do
+not restate it here. This is the developer-side half of the same gate
+`/sulis:release-train` runs (single helper, two call sites). Per TDD §5.5
+L3: this is the developer entry-point's defence-in-depth layer — the
+release-train gate is L2, the workflow itself is L1.
+
+**4. Echo the plan before acting (Rule 3).** One sentence, plain English,
 before running anything:
 
 > *"I'll start a new piece of work called **fix the login bug**
 > (`fix-login-bug`), set up its own workspace, and open a fresh terminal
 > with me already focused on it. Here goes."*
 
-**4. Run the tool.** Substitute the resolved path:
+**5. Run the tool.** Substitute the resolved path:
 
 ```bash
 "$SCRIPTS_DIR/sulis-change" start \
@@ -139,7 +172,7 @@ recon `CONTEXT.md`, and launches a new terminal running
 `claude --agent sulis` bound to this change via the `SULIS_CHANGE_ID`
 environment variable.
 
-**5. Report (Rule 1 + Rule 2).** Parse the JSON on stdout. Lead with the
+**6. Report (Rule 1 + Rule 2).** Parse the JSON on stdout. Lead with the
 outcome; carry the handle in parentheses:
 
 > *"Started **fix the login bug** (`CH-01HQ8X`). A new terminal just
