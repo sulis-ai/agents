@@ -1,0 +1,6 @@
+{
+  "branch": "feat/wp-001-fix-discover-verify-scope",
+  "merge_sha": "f51a70fc37d4692fa1b8bc13408593967ddc33ae",
+  "health_status": "skipped (no --staging-url)",
+  "smoke_verdict": "PASS"
+}

@@ -41,6 +41,7 @@ MUC-005 system response (quote-verbatim for operator surfaces):
 from __future__ import annotations
 
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -53,9 +54,17 @@ _DEFAULT_CROSS_TENANT_REFS_ALLOWED: tuple[str, ...] = (
     "belongs_to_product_ref",
 )
 
-# Default location of the drift detector relative to the repo root.
-# Callers can override via ``drift_detector_path`` for test harnesses.
-_DEFAULT_DRIFT_DETECTOR = Path("plugins/sulis/scripts/check-canonical-drift.py")
+# Default location of the drift detector — resolved relative to THIS module's
+# file, not the current working directory. verifier.py lives at
+# ``plugins/sulis/scripts/_discovery/verifier.py``; the detector is its
+# sibling-one-up at ``plugins/sulis/scripts/check-canonical-drift.py``.
+# Resolving via ``__file__`` makes the path point at the installed plugin
+# location regardless of cwd — a cwd-relative path only resolved from inside
+# the marketplace repo, so every consumer-repo mint failed (the bug this WP
+# fixes). Callers can override via ``drift_detector_path`` for test harnesses.
+_DEFAULT_DRIFT_DETECTOR = (
+    Path(__file__).resolve().parent.parent / "check-canonical-drift.py"
+)
 
 # Exit code emitted by argparse on unrecognised flags.
 _UNRECOGNISED_FLAG_EXIT_CODE = 2
@@ -131,8 +140,11 @@ def _invoke_drift_detector(
         if cross_tenant_refs_allowed is not None
         else list(_DEFAULT_CROSS_TENANT_REFS_ALLOWED)
     )
+    # Use the running interpreter, not a bare "python3" — in a consumer venv
+    # "python3" may resolve to a different interpreter without jsonschema
+    # installed, which would fail the verify gate and roll back the mint.
     argv = [
-        "python3",
+        sys.executable,
         str(drift_detector_path),
         "--scope",
         str(entity_path),

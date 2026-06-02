@@ -191,6 +191,26 @@ def test_scope_arg_passed_to_detector(tmp_path, monkeypatch):
     assert argv[scope_idx + 1] == str(entity)
 
 
+def test_detector_invoked_with_running_interpreter(tmp_path, monkeypatch):
+    """argv[0] MUST be the running interpreter (sys.executable), not the literal
+    "python3". In a consumer venv, a bare "python3" may resolve to a different
+    interpreter without jsonschema installed — which would fail the verify gate
+    and roll back the mint: exactly the failure class this change exists to fix.
+    """
+    import sys
+
+    from _discovery.verifier import run_drift_check_on_entity
+
+    capture = _install_fake_subprocess_run(monkeypatch, returncode=0)
+    entity = _write_fake_entity(tmp_path)
+
+    run_drift_check_on_entity(entity)
+
+    argv = capture["argv"]
+    assert argv is not None
+    assert argv[0] == sys.executable
+
+
 def test_DriftVerifyFailed_carries_rolled_back_path(tmp_path, monkeypatch):
     """DriftVerifyFailed exposes .rolled_back_path equal to the deleted entity."""
     from _discovery.verifier import DriftVerifyFailed, verify_and_roll_back_on_failure

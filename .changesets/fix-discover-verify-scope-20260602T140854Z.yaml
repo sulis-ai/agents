@@ -1,0 +1,7 @@
+change_id: 01KT482WEYTTRA5E5ZJC6YFW0B
+primitive: fix
+tier: patch
+touches_plugin: true
+summary: |
+  Fix /sulis:discover-project verify gate that rolled back every mint in consumer repos: add a --scope single-entity mode to the drift checker, resolve the detector path relative to __file__, record primary_branch as the repo default, and pin the verify subprocess to sys.executable.
+created_at: 2026-06-02T14:08:54Z
