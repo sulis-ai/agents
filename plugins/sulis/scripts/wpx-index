@@ -357,6 +357,18 @@ def cmd_flip_status(args: argparse.Namespace) -> None:
             if id_idx < len(row) and row[id_idx].strip() == args.wp:
                 if status_idx < len(row):
                     actual = row[status_idx].strip()
+                    # #142 idempotence — when the row is already at the
+                    # target status, the flip is a no-op success regardless
+                    # of --expected. This makes wpx-step12 wrap (which
+                    # passes --to done --expected in_progress) safe to
+                    # replay after a partial earlier run.
+                    if actual == args.to:
+                        emit_ok(data={
+                            "wp": args.wp,
+                            "status": args.to,
+                            "already": True,
+                        })
+                        return
                     if args.expected and actual != args.expected:
                         emit_error(
                             f"WP {args.wp} status is '{actual}', "
