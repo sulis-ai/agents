@@ -1,9 +1,0 @@
-change_id: SHA-da73c69
-primitive: create
-tier: minor
-touches_plugin: true
-summary: |
-  release-train-as-entities
-  
-  Encode the sulis release-train + release-on-merge pipeline as canonical Workflow + Step + Trigger + FailureMode entities in the brain. Replace imperative YAML + skill prose with a declarative graph the agent can read, render, execute against, and gap-check structurally. First dogfood of the brain's workflow primitives on Sulis's own operational pipeline.
-created_at: 2026-06-01T13:26:40Z

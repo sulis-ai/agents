@@ -1,7 +1,0 @@
-change_id: 01KT46EY3AVZWR7VH46Y53BCE2
-primitive: create
-tier: minor
-touches_plugin: true
-summary: |
-  testable-state definition of done — Scenario-based verification engine + sulis-verify-acceptance runner + DoD gate (done = the app is testable, not merged)
-created_at: 2026-06-02T15:26:30Z

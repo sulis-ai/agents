@@ -1,7 +1,0 @@
-change_id: SHA-worktree-colocate
-primitive: refactor
-tier: patch
-touches_plugin: true
-summary: |
-  worktree-colocate — change worktrees live at ~/.sulis/changes/{id}/worktree (ADE relocation)
-created_at: 2026-06-02T12:41:56Z
