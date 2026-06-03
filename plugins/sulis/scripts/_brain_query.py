@@ -241,6 +241,72 @@ def read_as_of(
     return None  # no envelope for this entity id
 
 
+# ─── Central Tenant home: cross-repo current-version read (ADR-005) ─────
+
+
+def _current_open_window(envelope: dict) -> dict | None:
+    """The current OPEN window of a history envelope, or ``None``.
+
+    The current version is the last window whose ``valid_to`` is unset (an open
+    window — ``valid_to`` null or empty, == +∞). This is the read-side mirror of
+    the open-window invariant ``evolve_entity`` maintains on the write side: at
+    most one window is open at a time, and it is the last one. A bare snapshot
+    (no ``windows`` list) yields ``None`` — it has no open-window contract.
+    """
+    windows = envelope.get("windows")
+    if not isinstance(windows, list) or not windows:
+        return None
+    last = windows[-1]
+    return last if last.get("valid_to") in (None, "") else None
+
+
+def find_current_for_tenant(
+    *,
+    tenant_id: str,
+    entity_type: str,
+) -> list[dict]:
+    """Every CURRENT (open-window) entity of ``entity_type`` for ``tenant_id``,
+    read from the central Tenant home (ADR-005).
+
+    The cross-repo Tenant read: the central home
+    (``central_tenant_home(tenant_id)`` == ``~/.sulis/instances/{tenant_id}/``)
+    is the single subtree where every repo's living-entity emit for this Tenant
+    lands, so one walk of it returns the Tenant's whole current view across
+    repos — something no single repo-local ``.brain/instances`` tree can do.
+
+    Built entirely on the EXISTING ``iter_entities`` flat-file walk and the
+    open-window invariant — no new traversal code, no new adapter, no new query
+    class (the ADR-005 reuse proof is the ABSENCE of new persistence code). The
+    same walk serves the repo-local tree and the central home; only the
+    ``base_dir`` differs, and here it is resolved from the Tenant id.
+
+    Args:
+        tenant_id: the deterministic ``dna:tenant:<ulid>`` whose central home is
+            read. The home is resolved via ``central_tenant_home`` (which routes
+            through ``sulis_state_base()`` — honouring ``SULIS_STATE_DIR``).
+        entity_type: the living entity type to scope to (``product`` /
+            ``opportunity`` / ``project``) — selects the per-type subtree.
+
+    Returns:
+        One dict per entity that has an OPEN window — the current window body.
+        Entities whose latest window is closed (fully evolved past, no open
+        window) are excluded. Empty list when the home does not exist yet or
+        holds no open windows of ``entity_type``.
+    """
+    # Imported here (not at module top) to avoid a read-seam → emit-helper import
+    # cycle: the home resolver lives with the emit wiring; the read seam consumes
+    # it lazily. central_tenant_home is pure path arithmetic — no side effects.
+    from _brain_emit_helper import central_tenant_home
+
+    base_dir = central_tenant_home(tenant_id)
+    current: list[dict] = []
+    for envelope in iter_entities(base_dir, entity_type=entity_type):
+        window = _current_open_window(envelope)
+        if window is not None:
+            current.append(window)
+    return current
+
+
 # ─── Domain-specific high-level queries ────────────────────────────────
 
 

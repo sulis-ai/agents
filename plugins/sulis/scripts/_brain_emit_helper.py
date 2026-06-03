@@ -97,6 +97,43 @@ def _brain_base_dir(repo_root: Path) -> Path:
     return Path(repo_root) / ".brain" / "instances"
 
 
+def central_tenant_home(tenant_id: str) -> Path:
+    """The central, cross-repo Platform home for one Tenant's living entities.
+
+    Resolves the EXISTING convention ``~/.sulis/instances/{tenant_id}/`` —
+    documented verbatim in ``_tenant_emission.py``'s module docstring and the
+    "follow-up slice" it promised. This is the single cross-repo boundary: a
+    Tenant whose Product/Opportunity history spans many repos has ONE home to
+    read, keyed by the *deterministic* Tenant ULID (same Tenant name everywhere
+    → same ``dna:tenant:<ulid>`` → same path on disk — that is what makes the
+    namespace cross-repo).
+
+    ADR-005 is a **reuse, not build** decision: pointing the living-entity emit
+    ``base_dir`` here — ``LocalFileEntityAdapter(base_dir=central_tenant_home(...))``
+    — IS the cross-repo Platform home. No new backend, no new adapter, no new
+    query class; SQLite is deferred behind the same ``EntityRepository`` port.
+
+    The ``~/.sulis`` root is resolved through ``_change_state.sulis_state_base()``
+    — the ONE place that base is computed (honours ``SULIS_STATE_DIR`` for an
+    isolated store, else ``~/.sulis``). Routing through it rather than
+    hard-coding ``Path.home()`` keeps this home in lockstep with every other
+    reader/writer of the local store and lets tests point at a tmp dir.
+
+    Args:
+        tenant_id: the EXISTING deterministic ``dna:tenant:<ulid>`` id (reused,
+            not minted here — the recipe lives in ``_tenant_emission``). It is
+            the home's namespace component, used verbatim.
+
+    Returns:
+        The ``{sulis_state_base()}/instances/{tenant_id}/`` path. Not created
+        here — the file adapter creates the per-entity-type subtree on first
+        write, exactly as it does for the repo-local tree.
+    """
+    from _change_state import sulis_state_base
+
+    return sulis_state_base() / "instances" / tenant_id
+
+
 def _try_adapter(repo_root: Path, domain: str) -> Any:
     """Return a `LocalFileEntityAdapter` or None if the brain isn't usable.
 
