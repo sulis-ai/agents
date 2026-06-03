@@ -165,6 +165,13 @@ onto the three categories: **HTTP/REST** (OpenAPI; statuses), **MCP-over-stdio**
 JSON-on-stdout** (the wpx pattern; exit 0/1/2), **library** (in-process; no
 ProtocolError). Don't invent a bespoke transport when a conventional one fits.
 
+When the seam is an **MCP App** (an MCP server returning interactive UI to an AI
+client), the binding is the `ui://` resource (`text/html;profile=mcp-app`) + the
+**`ui/` JSON-RPC-over-`postMessage`** channel — the UI's actions are MCP tool
+calls, so they are contract operations (CF-03 error categories apply). See
+[`mcp-ui-surface-patterns.md`](../mcp-ui-surface-patterns.md) for the resource
+scheme, CSP allowlist, and sandbox model.
+
 ### CF-09 — Streaming contracts use a structured event schema · SHOULD
 
 For streaming operations, the contract is the **event schema** (the set of

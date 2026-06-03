@@ -348,6 +348,15 @@ If extending or superseding, reference the existing ADR by path.}
    it produces against (and as the fallback if `ux-designer` is unavailable, in
    which case produce it inline per the steps below and note the deviation).
 
+   **If the surface renders inside an AI client (MCP App / Artifact), write an
+   ADR for the rendering path (MUST).** Choosing Artifact vs MCP App vs MCP-UI
+   `externalUrl` is an **architecture** decision — driven by data-connection +
+   durability, not styling — so it belongs in an ADR, not buried in a WP. See
+   [`mcp-ui-surface-patterns.md`](../../references/mcp-ui-surface-patterns.md)
+   for the decision rule + the `ui://` contract shape. (Ephemeral Artifact for
+   in-session output with no live data; MCP App for a durable, data-connected,
+   reusable surface; `externalUrl` to embed an existing web app.)
+
    **(i) The contract record + mockup.** Cover the four layers' essentials:
    - **Identity** (referenced — not re-articulated here) — point at the
      project's identity artifacts; flag if missing.

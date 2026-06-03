@@ -40,6 +40,9 @@ context_sources:
   - path: .design/{project}/        # or the project's identity/design-instance artifacts
     required: false
     purpose: "The product's real design tokens + identity; the mockup binds to these, never invented hex"
+  - path: plugins/sulis/references/mcp-ui-surface-patterns.md
+    required: false
+    purpose: "When the surface renders inside an AI client (MCP App / Artifact / externalUrl) — the path decision + the ui:// contract shape + sandbox constraints"
 delegation: null
 routes_to: []
 ---
@@ -152,6 +155,13 @@ tokens reference actually loaded** (L-13: a mockup whose fonts don't load passed
 mockup's *structure* may reflect the Mobbin synthesis; its *visual identity*
 stays bound to the design instance. Note the perceptual delta vs the current
 surface so the founder can see what changes.
+
+**If the surface renders inside an AI client (MCP App / Artifact), pick the
+rendering path first — it's an architecture call, not styling.** See
+`../references/mcp-ui-surface-patterns.md`: Artifact (ephemeral, no live data)
+vs MCP App (`ui://` bundled HTML in a sandboxed iframe, data via the `ui/`
+postMessage channel) vs `externalUrl`. For an MCP App the mockup *is* the
+`ui://` bundle (sandboxed iframe), not a standalone page — design it as that.
 
 ### 5. Facilitate the founder sign-off (the gate)
 > Standards: COACHING_STANDARD.md (seven tenets), TONE_STANDARD.md, founder-english.md (FE-06), audience-adapted-framing-standard.md
