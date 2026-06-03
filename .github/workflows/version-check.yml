@@ -45,12 +45,12 @@ jobs:
           fetch-depth: 0
 
       # Resolve BASE for BOTH triggers:
-      #   * pull_request (the dev→main PR): the PR base is `main`'s tip,
+      #   * pull_request (a change → main PR): the PR base is `main`'s tip,
       #     supplied by the event payload. Diff base..HEAD captures
-      #     everything `dev` accumulated since `main`.
+      #     everything the change accumulated since `main`.
       #   * push to change/**: there is no PR base in the payload, so use
-      #     the merge-base of HEAD against the integration branch
-      #     (origin/dev, falling back to origin/main). Diff base..HEAD then
+      #     the merge-base of HEAD against the trunk (origin/main). Diff
+      #     base..HEAD then
       #     captures everything the change branch has accumulated since it
       #     forked — the right question for "does this change carry a
       #     changeset", not just the last push's delta.
@@ -71,9 +71,9 @@ jobs:
             BASE="$PR_BASE_SHA"
             echo "pull_request trigger: BASE = PR base sha ($BASE)"
           else
-            # push to change/** — merge-base against the integration branch.
+            # push to change/** — merge-base against the trunk.
             BASE=""
-            for ref in origin/dev origin/main; do
+            for ref in origin/main; do
               if git rev-parse --verify --quiet "$ref" >/dev/null; then
                 BASE=$(git merge-base "$ref" HEAD 2>/dev/null || true)
                 if [ -n "$BASE" ]; then

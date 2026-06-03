@@ -19,6 +19,21 @@ mixed-version vendor is safe):
   `valid_to`/`confidence`), so the living entities can hold version history.
   This is the data-shape foundation for change-as-transaction / evolution.
 
+**`brand-identity`** is vendored from sulis-brain **v0.15.0** (DR-030 — the
+domain's first compiled entities). Three schemas, vendored flat as
+`compiled/brand-identity/{entity}.schema.json` (matching foundation +
+product-development — schemas only; triples are not vendored here):
+
+- `brand` — the upstream identity anchor (id + name + `belongs_to_tenant` +
+  the discovery-lifecycle `state` + the nine soft element_schema_v0.3 elements:
+  voice/values/positioning/audience/offering/lexicon/claims/visual-identity/
+  distinctive-assets). schema.org `Brand`.
+- `design-system` — the realized W3C-DTCG token + asset artifact;
+  `realizes_identity → brand` (required, minItems 1); `tokens` is a DTCG object
+  OR a URI string; WCAG pairs; three-axis lifecycle. The `ux-designer` agent
+  emits one when it establishes a design language, and reads it when one exists.
+- `tenant` — the foundation mirror (so `Brand.belongs_to_tenant` resolves).
+
 **Still to catch up (breaking / structural — deliberately NOT bundled):**
 `lifecyclerun` v1.0.0 → **2.1.0** is BREAKING (`step_name` → required `step`
 ref) and needs the emitter (`_brain_emit_helper`) migrated in lockstep — that's
