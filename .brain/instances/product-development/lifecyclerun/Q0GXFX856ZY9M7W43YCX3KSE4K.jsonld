@@ -2,6 +2,7 @@
   "at": "2026-06-02T13:55:02Z",
   "id": "dna:lifecyclerun:Q0GXFX856ZY9M7W43YCX3KSE4K",
   "outcome": "completed",
-  "step_name": "wpx-pipeline-success:WP-001",
+  "run_id": "wpx-pipeline-success:WP-001",
+  "step": "dna:step:01KT61X5ST03VNC1ASS1F1ED0A",
   "sys_status": "active"
 }

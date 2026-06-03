@@ -1,0 +1,22 @@
+{
+  "pr": "feat/wp-006-instance-migration-script",
+  "verdict": "PASS",
+  "build_verification": {"pr_introduced_errors": 0},
+  "scope_ph01": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "none"},
+  "size_ph02": {"new_source_test_lines": 577, "files_changed": 6, "tracked_diff_lines": 53, "severity": "low"},
+  "safety_ph03": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "data_instances_migrated": 2, "severity": "none"},
+  "completeness_ph04": {"new_source": 1, "new_tests": 2, "new_source_without_test": 0, "severity": "none"},
+  "findings": {
+    "in_changes": [
+      {"id": "F-01", "severity": "low", "lens": "quality", "rule": "CR-10", "file": "plugins/sulis/scripts/migrate_lifecyclerun_v1_to_v2.py", "what": "validator adapter constructed per loop iteration in migrate_store (loop-invariant)", "status": "addressed-inline", "fix": "lru_cache(maxsize=1) on _validator()"},
+      {"id": "F-02", "severity": "low", "lens": "quality", "rule": "CR-07 dead-surface", "file": "plugins/sulis/scripts/migrate_lifecyclerun_v1_to_v2.py", "what": "unused 'sys' import", "status": "addressed-inline", "fix": "import removed"}
+    ],
+    "in_neighbours": []
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "note": "new one-shot script reuses the existing emitter resolver + adapter validator; no new dependency-direction, secrets, or resilience gaps"},
+    "security": {"findings": 0, "note": "no auth/injection/secrets surface; pure local-file data rewrite, reject-on-invalid before write"},
+    "quality": {"findings": 2, "note": "both low, both addressed inline; build floor clean; tests cover all behaviour incl. idempotency + reject-on-invalid + missing-store"}
+  },
+  "draft_deltas": 0
+}
