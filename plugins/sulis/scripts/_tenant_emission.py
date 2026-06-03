@@ -3,8 +3,11 @@
 Third worked entity emission (after Decision + Requirement). The Tenant is
 foundation-domain (cross-cutting per L13 promotion); every customer-namespace
 of marketplace work is bounded by one Tenant. The marketplace's local entity
-store is namespaced by Tenant ID (`~/.sulis/instances/{tenant_id}/...`),
-which a follow-up slice will wire after this emitter is live.
+store is namespaced by Tenant ID (`~/.sulis/instances/{tenant_id}/...`). That
+follow-up slice is now live (ADR-005): `_brain_emit_helper.central_tenant_home`
+resolves this home and the living-entity emit (`evolve_entity`) writes there via
+the existing `LocalFileEntityAdapter`, read back cross-repo by
+`_brain_query.find_current_for_tenant` — reuse, not a new store.
 
 Source format — `.sulis/tenant.yaml`:
 
