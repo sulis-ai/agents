@@ -29,6 +29,8 @@ import re
 from pathlib import Path
 from typing import Callable, Final, Iterator
 
+from _brain_labels import roadmap_sidecar_path
+
 
 _INSTANCE_FILE_GLOB: Final[str] = "*.jsonld"
 _ENTITY_ID_RE: Final = re.compile(r"^dna:[a-z]+:[0-9A-HJKMNP-TV-Z]{26}$")
@@ -211,3 +213,41 @@ def find_passing_testresults_verifying(
         r for r in find_testresults_verifying(base_dir, requirement_id, domain=domain)
         if r.get("outcome") == "pass"
     ]
+
+
+# ─── Roadmap sidecar — the member reader (ADR-001 / FR-07) ───────────────
+# The Roadmap flag is a per-repo sidecar label file, NOT a field on the
+# entity (the vendored schemas are ``unevaluatedProperties: false``; ADR-001).
+# This module is the single read seam (ADR-006). The on-disk shape (filename,
+# layout) is defined once in ``_brain_labels`` and shared with the writer
+# (``_brain_capture``).
+
+
+def roadmap_members(base_dir: Path) -> list[str]:
+    """Read the Roadmap sidecar → its member entity ids, sorted.
+
+    Reads ``<base_dir>/labels/roadmap.jsonld`` (ADR-001 shape
+    ``{"label": "roadmap", "members": [...]}``) and returns the member ids
+    sorted (diff-friendly, deterministic).
+
+    Best-effort (NFR-01): if the sidecar is missing OR malformed (not valid
+    JSON, or the wrong shape), returns ``[]`` and never raises — the same
+    degradation contract as the entity store (`iter_entities` skips corrupt
+    files silently).
+
+    Args:
+        base_dir: the ``.brain/`` root. The sidecar lives at
+            ``base_dir / "labels" / "roadmap.jsonld"``.
+
+    Returns:
+        Sorted list of member entity ids; ``[]`` when absent or malformed.
+    """
+    sidecar = roadmap_sidecar_path(base_dir)
+    try:
+        data = json.loads(sidecar.read_text())
+    except (json.JSONDecodeError, OSError):
+        return []
+    members = data.get("members", []) if isinstance(data, dict) else []
+    if not isinstance(members, list):
+        return []
+    return sorted(m for m in members if isinstance(m, str))
