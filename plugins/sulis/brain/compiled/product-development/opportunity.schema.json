@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sulis.co/dna/schema/opportunity/2.0.0",
+  "$id": "https://sulis.co/dna/schema/opportunity/2.1.0",
   "title": "Opportunity",
   "description": "a validated need or problem worth solving \u2014 for a specific Product within a Tenant",
   "type": "object",

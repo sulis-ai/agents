@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sulis.co/dna/schema/product/1.0.0",
+  "$id": "https://sulis.co/dna/schema/product/1.1.0",
   "title": "Product",
   "description": "the product-line a Tenant has built or is building. A Tenant has many Products (or one, for single-product businesses); each Product has its own Opportunities, Requirements, and Releases. The 'product' in product-development.",
   "type": "object",
