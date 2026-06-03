@@ -17,6 +17,13 @@ test):
       - outcome == "pass"
       - its `verifies` array contains the Requirement.id
 
+This rule is route-agnostic: a passing TestResult is a passing TestResult
+whether it came from a `@verifies`-tagged unit test or from a green Scenario
+run. The Scenario loop (`sulis-verify-acceptance --scenario`) deposits its own
+TestResult per run (see `_scenario_evidence.py`), so a requirement proven only
+by a green Scenario journey reads as covered here — closing the false-red where
+the gate saw the @verifies route but not the Scenario route.
+
 The gate enumerates FR-NN / NFR-NN ids from the SRD body, resolves each
 to `dna:requirement:<ulid>` using the SAME deterministic seed
 Requirement-emission uses (`requirement:{srd_path}:{fr_id}`), then for
