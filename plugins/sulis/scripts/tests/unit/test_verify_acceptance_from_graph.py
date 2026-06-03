@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from _brain_query import iter_entities
 from _entity_adapter_local import LocalFileEntityAdapter
 from _scenario_authoring import _ulid, assemble_scenario_graph
 
@@ -63,6 +64,41 @@ class TestVerifyAcceptanceFromGraph:
         assert env["scenario"] == "A signed-in user can pay with a saved card"
         assert env["verdict"] == "manual-pending"
         assert len(env["steps"]) == 2
+
+    def test_run_deposits_verification_evidence(self, tmp_path: Path, run_tool) -> None:
+        # A run leaves a TestRun + TestResult the requirement-coverage gate
+        # reads. The human journey resolves to manual-pending → a `skip`
+        # record (honest: not a pass, so not coverage — but the run is logged).
+        base = tmp_path / ".brain" / "instances"
+        scenario_id = _seed_store(base)
+        _write_contract(tmp_path)
+
+        result = run_tool(
+            "sulis-verify-acceptance", "--scenario", scenario_id,
+            "--base-dir", str(base), "--repo-root", str(tmp_path), "--json",
+        )
+        env = json.loads(result.stdout)
+        assert env["evidence"] is not None
+        assert env["evidence"]["outcome"] == "skip"
+
+        results = list(iter_entities(base, domain="product-development", entity_type="testresult"))
+        assert len(results) == 1
+        assert results[0]["scenario"] == scenario_id
+        assert results[0]["verifies"] == [f"dna:requirement:{_ulid('req-pay')}"]
+
+    def test_no_emit_evidence_suppresses_the_record(self, tmp_path: Path, run_tool) -> None:
+        base = tmp_path / ".brain" / "instances"
+        scenario_id = _seed_store(base)
+        _write_contract(tmp_path)
+
+        result = run_tool(
+            "sulis-verify-acceptance", "--scenario", scenario_id,
+            "--base-dir", str(base), "--repo-root", str(tmp_path), "--json",
+            "--no-emit-evidence",
+        )
+        env = json.loads(result.stdout)
+        assert env["evidence"] is None
+        assert list(iter_entities(base, domain="product-development", entity_type="testresult")) == []
 
     def test_missing_scenario_is_invocation_error(self, tmp_path: Path, run_tool) -> None:
         base = tmp_path / ".brain" / "instances"

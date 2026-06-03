@@ -539,13 +539,61 @@ does NOT bump any version** — the version is computed and applied once, for th
 whole batch, when `dev` is released to production. Read the `wrote` field of the
 JSON to know what to say in the ship report (step 7).
 
-**4.8. DoD verification gate — run `sulis-verify-requirements` (MUST when
-an SRD is touched).** The change's tests claim what they verify via
-`@pytest.mark.verifies("FR-NN")` markers; the pytest brain-emit plugin
-turns those claims into TestResult entities in `.brain/instances/`; this
-gate asks the brain whether every Requirement the change touched has at
-least one passing TestResult verifying it. If yes → ship. If not → the
-founder owns the call.
+**4.8. Testable-state acceptance gate — run `sulis-verify-acceptance`
+(MUST for a user-facing / behavioural change).** A change that authored
+verification `Scenario`s at specify (`/sulis:specify` deep mode) is not
+*done* until those Scenarios pass against a **standing app** — the real
+"done" is *the app is testable*, not *merged* (the failure this catches:
+agent-journey shipped, but you couldn't log in).
+
+**This runs BEFORE the DoD coverage gate (4.9) on purpose.** A green
+Scenario run is itself coverage evidence — `sulis-verify-acceptance`
+deposits a passing TestResult per Scenario (verifying that Scenario's
+Requirements) into `.brain/instances/`. Running it first means the
+Requirements proven *only* by a Scenario journey are already covered when
+4.9 reads the brain. Run acceptance first, then check coverage — never the
+other way round (the false-red where a Scenario-verified change failed the
+coverage gate because the Scenarios hadn't run yet).
+
+Run each of the change's Scenarios **straight from the emitted brain graph**
+(no hand-built bundle): the authoring step wrote a durable
+`{worktree}/.changes/{primitive}-{slug}.scenarios.jsonld` and emitted the
+entities, so the scenario ids are right there. For each `scenarios[].id`:
+
+```bash
+"$SCRIPTS_DIR/sulis-verify-acceptance" \
+  --scenario <dna:scenario:…> --target local --repo-root . --json
+```
+
+(`--scenario` loads the Scenario + its journey Workflow + Steps from the
+store; `--base-dir` defaults to `<repo-root>/.brain/instances`. The legacy
+`--bundle <file>` path still works for a hand-built bundle. A passing run
+deposits the TestRun/TestResult evidence the next gate reads — pass
+`--no-emit-evidence` only when you explicitly want a dry run.) `local` now;
+the `deployed` leg once that target is reachable — both per the repo-contract
+`targets:` + `commands.standup`. Read the gate verdict:
+
+- **pass** → every Scenario passed, or is deferred-with-need. Done is
+  honest. Log it.
+- **blocked** → a step failed, or a manual check is unconfirmed. **STOP** —
+  surface the founder-English gap (which Scenario, what's broken). Do not
+  call the change done.
+- **deferred-with-need** → a recorded gap (a credential / infra absent);
+  non-blocking, but surface the needs so they're visible.
+
+Advisory when it can't run (no Scenarios authored — pure docs/infra change;
+or no target URL yet): like 4.9, the founder owns proceed-anyway, and
+block-by-default applies only to a real `blocked`.
+
+**4.9. DoD verification gate — run `sulis-verify-requirements` (MUST when
+an SRD is touched).** This asks the brain whether every Requirement the
+change touched has at least one **passing TestResult** verifying it. That
+evidence arrives by **either route**: a `@pytest.mark.verifies("FR-NN")`
+unit test (the pytest brain-emit plugin turns the claim into a TestResult)
+*or* a green Scenario run from gate 4.8 above (which deposits its own
+TestResult). The gate doesn't care which route proved it — a passing
+TestResult is a passing TestResult. If covered → ship. If not → the founder
+owns the call.
 
 Detect: does this change touch any SRD?
 
@@ -578,26 +626,27 @@ done
 Verdict policy:
 
 - **WORST=pass** → log it ("DoD gate: every Requirement verified by a
-  passing test.") and continue to step 5.
+  passing test or Scenario.") and continue to step 5.
 - **WORST=partial** → some Requirements have NO passing verifier. The
   founder owns the call (mirrors the review-gate CONCERN pattern):
 
   > *"DoD gate: {N} of {M} Requirements aren't yet verified by a
-  > passing test: {fr_ids + titles, plain English, no IDs}. None of
-  > this is broken — these Requirements just don't have a test claim
-  > yet. Proceed with the merge anyway? (yes / no)"*
+  > passing test or Scenario: {fr_ids + titles, plain English, no IDs}.
+  > None of this is broken — these Requirements just don't have a
+  > passing proof yet. Proceed with the merge anyway? (yes / no)"*
 
 - **WORST=fail** → STOP. Zero Requirements have a passing verifier,
-  which means either no tests claim them OR every claim is currently
-  failing. Don't merge:
+  which means no test or Scenario claims them OR every claim is
+  currently failing. Don't merge:
 
-  > *"DoD gate: no Requirements have a passing test verifying them.
-  > That usually means tests aren't tagged with `@pytest.mark.verifies`
-  > yet, or the tests that DO claim Requirements are failing. I
-  > haven't merged. Either add `@verifies` to the tests that prove
-  > the Requirements, or run `sulis-verify-requirements --srd <path>`
-  > locally to see which ones are uncovered. Then
-  > `/sulis:change ship CH-XXXXXX` again."*
+  > *"DoD gate: no Requirements have a passing test or Scenario
+  > verifying them. That usually means the tests aren't tagged with
+  > `@pytest.mark.verifies` and the Scenarios that prove these
+  > Requirements haven't been run green yet (gate 4.8), or the proofs
+  > that DO claim them are failing. I haven't merged. Re-run the
+  > acceptance gate, add `@verifies` to the proving tests, or run
+  > `sulis-verify-requirements --srd <path>` locally to see which ones
+  > are uncovered. Then `/sulis:change ship CH-XXXXXX` again."*
 
 - **WORST=error** → log the gate failure but PROCEED with the merge
   (don't break ship on tooling issues; the gate is advisory when it
@@ -610,41 +659,6 @@ The gate is best-effort in the same way the review gate's CONCERN is:
 the founder always owns the proceed-anyway decision. Block-by-default
 applies only to verdict=fail (zero coverage), which is genuinely
 broken state.
-
-**4.9. Testable-state acceptance gate — run `sulis-verify-acceptance`
-(MUST for a user-facing / behavioural change).** A change that authored
-verification `Scenario`s at specify (`/sulis:specify` deep mode) is not
-*done* until those Scenarios pass against a **standing app** — the real
-"done" is *the app is testable*, not *merged* (the failure this catches:
-agent-journey shipped, but you couldn't log in).
-
-Run each of the change's Scenarios **straight from the emitted brain graph**
-(no hand-built bundle): the authoring step wrote a durable
-`{worktree}/.changes/{primitive}-{slug}.scenarios.jsonld` and emitted the
-entities, so the scenario ids are right there. For each `scenarios[].id`:
-
-```bash
-"$SCRIPTS_DIR/sulis-verify-acceptance" \
-  --scenario <dna:scenario:…> --target local --repo-root . --json
-```
-
-(`--scenario` loads the Scenario + its journey Workflow + Steps from the
-store; `--base-dir` defaults to `<repo-root>/.brain/instances`. The legacy
-`--bundle <file>` path still works for a hand-built bundle.) `local` now;
-the `deployed` leg once that target is reachable — both per the repo-contract
-`targets:` + `commands.standup`. Read the gate verdict:
-
-- **pass** → every Scenario passed, or is deferred-with-need. Done is
-  honest. Log it.
-- **blocked** → a step failed, or a manual check is unconfirmed. **STOP** —
-  surface the founder-English gap (which Scenario, what's broken). Do not
-  call the change done.
-- **deferred-with-need** → a recorded gap (a credential / infra absent);
-  non-blocking, but surface the needs so they're visible.
-
-Advisory when it can't run (no Scenarios authored — pure docs/infra change;
-or no target URL yet): like 4.8, the founder owns proceed-anyway, and
-block-by-default applies only to a real `blocked`.
 
 **5. Squash-merge** (only after green + confirmation):
 

@@ -33,6 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _acceptance_gate import format_gate_message, gate_decision  # noqa: E402
 from _run_contract import resolve_run_contract, target_url  # noqa: E402
 from _scenario_graph_load import JourneyNotFound, load_scenario_journey  # noqa: E402
+from _scenario_evidence import emit_scenario_evidence  # noqa: E402
 from _scenario_runner import (  # noqa: E402
     format_founder_summary,
     run_bundle,
@@ -71,6 +72,11 @@ def main(argv=None) -> int:
     p.add_argument("--available-artifacts", default="",
                    help="comma list of available needs/credentials (others defer)")
     p.add_argument("--json", action="store_true", help="emit the machine envelope")
+    p.add_argument("--no-emit-evidence", dest="emit_evidence", action="store_false",
+                   help="don't deposit a TestRun/TestResult for this run "
+                        "(--scenario mode only; default: emit so the "
+                        "requirement-coverage gate sees the Scenario route)")
+    p.set_defaults(emit_evidence=True)
     args = p.parse_args(argv)
 
     # Resolve the journey source: a hand-built bundle, or the emitted brain graph.
@@ -121,6 +127,21 @@ def main(argv=None) -> int:
         )
     decision = gate_decision([result])
 
+    # Deposit the verification evidence so the requirement-coverage gate sees
+    # the Scenario route. Best-effort: an emission failure NEVER changes the
+    # verdict or the exit code — a run that proved green stays green even if
+    # the brain store is unwritable. Only in --scenario mode (we have a
+    # scenario entity + a brain store to write to).
+    evidence = None
+    if loaded is not None and args.emit_evidence:
+        try:
+            evidence = emit_scenario_evidence(
+                base_dir=base_dir, scenario=loaded.scenario, verdict=result.verdict,
+            )
+        except Exception as exc:  # noqa: BLE001 — evidence is advisory, never fatal
+            print(f"⚠ Couldn't record this run's verification evidence: {exc}",
+                  file=sys.stderr)
+
     if args.json:
         print(json.dumps({
             "scenario": result.scenario_name,
@@ -129,6 +150,7 @@ def main(argv=None) -> int:
             "steps": result.steps,
             "deferred_needs": decision.deferred_needs,
             "blocking": decision.blocking,
+            "evidence": evidence,
         }, ensure_ascii=False))
     else:
         print(format_founder_summary(result))
