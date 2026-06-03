@@ -1,0 +1,60 @@
+id: ARCH-PPOE
+title: Product / Project / Opportunity — emitted + evolving, with the cross-repo Platform home built
+status: designed
+sourced_from: ../../.changes/feat-product-project-opportunity-evolution.SPEC.md
+recon: ../../.changes/feat-product-project-opportunity-evolution.RECON.md
+created: 2026-06-03
+tier: L
+execution_path: A          # canonical-as-spec where grammar/Workflow entities change; imperative emitters follow
+structural_template: ../../.architecture/discover-project/   # same Path-A house style + canonical-identifiers discipline
+
+pillars:
+  form: partial    # hexagonal seam (EntityRepository port + adapters + query seam) already exists; new: evolve helper layering, PROV grammar, store adapter, Project ownership move
+  armor: partial   # graceful-degradation + atomic-write + reject-on-invalid exist; new: migration atomicity, window invariants, store durability, event-entity append-only guard
+  proof: partial   # contract-test + drift-parity infra exist; new: store-adapter contract test, evolve characterisation test, PROV-emission test, v1->v2 migration test
+
+adrs:
+  - ADR-001 — LifecycleRun IS the prov:Activity; Step is its type; the v2 `step` ref points at a Step definition
+  - ADR-002 — PROV vocabulary added as W3C PROV-O Activity-generates-Entity (wasGeneratedBy / used); wasRevisionOf excluded
+  - ADR-003 — The evolve mechanism lives in a shared `_entity_evolve` helper behind the EntityRepository port
+  - ADR-004 — LifecycleRun v1.0.0 -> v2.1.0 lockstep migration (schema + helper + CLI + existing instances)
+  - ADR-005 — Platform store REUSES the existing file adapter pointed at the central `~/.sulis/instances/{tenant_id}/` Tenant home (reuse, not build); SQLite deferred to a later change behind the same port
+  - ADR-006 — Project home reconciliation — brain store is canonical; `.sulis/projects/<slug>.jsonld` becomes a human-facing mirror
+
+artifacts_produced:
+  - TDD.md
+  - SIZING.md
+  - ARCH.yaml
+  - adrs/ADR-001..ADR-006
+
+expected_workpackages: 12-16   # estimate only; /sulis:plan-work owns the real count
+
+non_goals:
+  - Ontology v0.7 cross-artifact ref resolution (belongs_to_product_ref stays a plain string)
+  - Retrofitting evolve onto event entities (Decision, LifecycleRun stay append-only)
+  - The founder-facing "see/steer your living product" UI (ADE/Platform tier, downstream)
+  - Re-creating the basic capture-path emit for Product/Opportunity (already in main)
+  - Standing up the SQLite global store (#30) — deferred to a later change; drop-in behind the same port
+
+build_order:
+  - 1-lifecyclerun-migration   # the PROV spine; everything hangs off the Activity
+  - 2-prov-grammar             # wasGeneratedBy / used vocabulary
+  - 3-evolve-mechanism         # shared helper: close-window / open-window / PROV-write
+  - 4-apply-evolve             # Product, Opportunity, Project become living
+  - 5-platform-store           # point living-entity emitters at the central Tenant-namespaced home (existing port + file adapter at ~/.sulis/instances/{tenant_id}/)
+  - 6-project-reconcile        # discover-project / minter land Project in the brain home
+
+upstream_dependencies:
+  in_main:
+    - CH-01KSWZ #118 — basic Product/Opportunity emit to .brain/instances (this change evolves + re-homes it)
+    - release-train-as-entities / discover-project — Path-A canonical-as-spec pattern + drift detector
+  brain:
+    - LifecycleRun schema v1.0.0 (the breaking-migration subject)
+    - foundation Step schema v1.2.0 (the v2 `step` ref target type)
+    - the 27 bitemporal-bearing living-entity schemas (fields present, no emitter writes them yet)
+
+key_seams_reused:
+  port: plugins/sulis/scripts/_entity_repository.py            # EntityRepository (save / find_by_id / validate)
+  write_adapter: plugins/sulis/scripts/_entity_adapter_local.py # LocalFileEntityAdapter
+  read_seam: plugins/sulis/scripts/_brain_query.py             # iter_entities (set-shaped reads)
+  emit_call_sites: plugins/sulis/scripts/_brain_emit_helper.py # graceful-degradation discipline
