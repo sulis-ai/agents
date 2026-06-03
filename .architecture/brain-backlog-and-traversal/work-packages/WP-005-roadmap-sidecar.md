@@ -94,3 +94,8 @@ Contract invariants:
 ## Notes
 - The shared shape constant is the single migration point if the Brain contract later grows first-class labels (ADR-001 consequence): the query seam is the one read point.
 - Keep `roadmap_members` in `_brain_query.py` so the read seam stays the only reader of on-disk layout (ADR-006 / the query-module single-read-point discipline).
+
+## Acceptance Evidence
+
+- Branch: feat/wp-005-roadmap-sidecar (deleted post-merge)
+- Completed: `2026-06-03T08:40:48Z` (Step 12 by calling session)

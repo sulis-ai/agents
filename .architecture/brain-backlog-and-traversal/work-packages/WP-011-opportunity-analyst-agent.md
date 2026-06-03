@@ -88,3 +88,8 @@ Behavioural contract (asserted by the pressure-test scenario journey, WP-013):
 ## Notes
 - ADR-004 is explicit: the analyst and capture share **no code path** — they share the entity. Keep the hand-off as a returned id, never a function call.
 - Consider authoring via `/sulis:add-agent` so the agent-authoring quality gates (body-density conformance, citation headers) run.
+
+## Acceptance Evidence
+
+- Branch: feat/wp-011-opportunity-analyst-agent (deleted post-merge)
+- Completed: `2026-06-03T08:40:48Z` (Step 12 by calling session)
