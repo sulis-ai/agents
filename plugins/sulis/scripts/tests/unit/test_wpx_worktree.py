@@ -40,9 +40,9 @@ def _commit_on_branch(repo: Path, branch: str, filename: str) -> str:
     return sha
 
 
-def test_create_defaults_to_origin_dev(local_git_repo, run_tool):
-    """No --base-branch → branches off origin/dev (the pre-L-04 behaviour,
-    pinned so the default path can't regress)."""
+def test_create_defaults_to_origin_main(local_git_repo, run_tool):
+    """No --base-branch → branches off origin/main (the trunk default, post
+    dev→main cutover; pinned so the default path can't regress)."""
     wt = local_git_repo.parent / "wp-001-wt"
     result = run_tool(
         "wpx-worktree", "create",
@@ -53,10 +53,10 @@ def test_create_defaults_to_origin_dev(local_git_repo, run_tool):
         "--repo-root", str(local_git_repo),
     )
     assert result.ok, f"create failed: {result.error}; stderr={result.stderr}"
-    assert result.data["base_branch"] == "dev"
-    assert result.data["base_ref"] == "origin/dev"
-    # Worktree HEAD == origin/dev SHA
-    assert _head_sha(wt, "HEAD") == _head_sha(local_git_repo, "origin/dev")
+    assert result.data["base_branch"] == "main"
+    assert result.data["base_ref"] == "origin/main"
+    # Worktree HEAD == origin/main SHA
+    assert _head_sha(wt, "HEAD") == _head_sha(local_git_repo, "origin/main")
 
 
 def test_create_off_local_change_branch(local_git_repo, run_tool):
