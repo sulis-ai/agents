@@ -1,7 +1,7 @@
 {
   "name": "sulis",
   "description": "Your AI engineering team in a plugin. Talk through what you want to build, and Sulis takes it end-to-end — gathering requirements, designing the architecture, writing and reviewing the code, and shipping it. Start with `claude --agent sulis`.",
-  "version": "0.90.0",
+  "version": "0.94.0",
   "author": {
     "name": "Iain"
   },

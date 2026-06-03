@@ -1,0 +1,7 @@
+change_id: SHA-vendor-scenario
+primitive: chore
+tier: patch
+touches_plugin: true
+summary: |
+  vendor the Scenario entity (source v0.9.0) into the marketplace brain — scenario.schema + testrun/testresult re-point
+created_at: 2026-06-02T14:40:27Z

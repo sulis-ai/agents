@@ -1,0 +1,28 @@
+change_id: SHA-affbbbc
+primitive: harden
+tier: minor
+touches_plugin: true
+summary: |
+  frontend local-verify builds workspace deps first
+  
+  ## Summary
+  - Executors ran `pnpm run typecheck` before building `workspace:*` deps
+  whose exports resolve to `./dist/*`; with `dist/` absent, `tsc` fails
+  fast on module resolution and never reaches the rest of the file —
+  masking real type errors as a false green (L-02).
+  - Adds **WPF-14 (MUST)** to `WP_FRONTEND_STANDARD.md`: build workspace
+  deps before local typecheck/test/lint, reproducing CI order.
+  Verification-gates section notes the dependency; version → 0.2.0.
+  
+  ## Test plan
+  - [x] Documentation-only standard amendment (no executable test);
+  verified WPF-14 + cross-refs + version history render correctly
+  - [x] branch-ci doc/reference checks
+  
+  Closes #78
+  
+  🤖 Generated with [Claude Code](https://claude.com/claude-code)
+  
+  Co-authored-by: Iain Niven-Bowling <iain@nivbow.com>
+  Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+created_at: 2026-05-29T16:03:22Z

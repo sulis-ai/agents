@@ -1,0 +1,7 @@
+change_id: SHA-vendor-bitemporal
+primitive: chore
+tier: patch
+touches_plugin: true
+summary: |
+  vendor requirement+decision bitemporal fields (evolution data-shape foundation)
+created_at: 2026-06-02T16:06:08Z

@@ -1,3 +1,67 @@
+## v0.94.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- New /sulis:retro skill — the session-grain retrospective. Run at session end:
+  surfaces friction and ROUTES every finding (surface→classify→route, not
+  journal). Four acts: extract-the-steers-first (the user's corrections — the
+  highest-signal, objective input), framework-friction, missing-context, the
+  open self-attack probe. Routes by consumer/type: trivial→fix; bug/gap→task;
+  recurring→watchlist (2-strikes→structural fix); lesson→capture-lessons;
+  missing decision-context→brain (idea-backlog as a Lesson-shaped slot until the
+  Lesson entity is minted); wrong default→candidate standard change. The
+  session-grain funnel that feeds capture-lessons (change), the watchlist
+  (pattern), and #69 (idea). Founder-facing, structural-not-personal, no
+  self-congratulation. Authored via add-skill (5 gates, Verdict PASS, STANDARD
+  tier). Queued: the Lesson brain entity + a Stop-hook auto-buffer (#73).
+
+## v0.93.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- MCP-UI surface patterns — new reference (mcp-ui-surface-patterns.md) for
+  driving custom interactive UI in an AI client. The load-bearing point:
+  choosing the rendering path is an ARCHITECTURE decision (data-connection +
+  durability), not styling — Artifact (ephemeral, no live data) vs MCP App
+  (ui:// bundled HTML in a sandboxed iframe, data over the ui/ postMessage
+  channel) vs MCP-UI externalUrl. Encodes the safe iframe-HTML assumption +
+  flags the two open uncertainties (Cowork parity, remoteDom). Cited from four
+  homes: ux-designer (surface type is part of the visual contract), draft-
+  architecture (the path choice is an ADR), WP_FRONTEND (WPF-15 — build
+  constraints: sandboxed iframe, ui/ channel, CSP allowlist, no-localStorage-in-
+  artifacts), CONTRACT_FIRST (CF-08 — the ui:// resource + ui/ channel as a
+  contract seam). Grounded in the cowork-custom-ui critical-thinking analysis +
+  the MCP Apps official spec.
+
+## v0.92.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- New ux-designer specialist agent — owns the visual contract end-to-end (the
+  #45 design-stage gate): inspiration probe, real-token HTML mockup,
+  accessibility, cognitive load, and the founder sign-off conversation. Also
+  owns visual design at the SYSTEM level: when no design system/language exists
+  it establishes one (Identity -> three-tier tokens) or asks the founder which
+  to use. draft-architecture (step 3.5b) now DISPATCHES it instead of producing
+  the visual contract inline; Sulis routes/delegation/roster wired to it.
+  Adds UXD-16 (Cognitive load, CL-01..06) to UX_VISUAL_DESIGN_STANDARD (0.2.0 ->
+  0.3.0) — the missing dimension, sourced from the platform cognitive-load.md;
+  confirms WCAG-AA (UXD-07) + agentic-interface (UXD-10) + design-lifecycle
+  IDC/DS conventions were already reconciled. Authored via add-agent (5 gates,
+  Verdict PASS); full suite 1747 green.
+
+## v0.91.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- Scope posture — full coherent go by default. New MUST principle in the Sulis
+  agent body + the specify/draft-architecture sizing steps: default to a solid
+  attempt at the full coherent scope; thin-slicing is the exception for
+  genuinely-too-big work, not the reflex. When slicing IS needed the agent owns
+  the cut — a phased plan (phase 1 a real meaningful go; deferred phases
+  captured to the backlog so nothing's lost), never handing the slicing to the
+  founder. Depth/tier sizes design rigour, not the scope delivered.
+
 ## v0.90.0 — 2026-06-02
 
 **Minor — release-train batch.**
