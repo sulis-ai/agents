@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:workflow:26CGZRRNCNBP1Z80CZBBFKW0QA",
+  "initial_steps": [
+    "7y6vxt0c-deposit-an-idea-its-why-is-matured-into-1"
+  ],
+  "name": "Capture journey \u2014 deposit an idea rooted in its why",
+  "state": "draft",
+  "steps": [
+    "7y6vxt0c-deposit-an-idea-its-why-is-matured-into-1",
+    "7y6vxt0c-read-the-captured-requirement-back-by-id-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "7y6vxt0c-read-the-captured-requirement-back-by-id-2"
+  ],
+  "transitions": [
+    "7y6vxt0c-deposit-an-idea-its-why-is-matured-into-1 -> 7y6vxt0c-read-the-captured-requirement-back-by-id-2"
+  ],
+  "type": "review"
+}

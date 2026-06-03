@@ -1,0 +1,12 @@
+{
+  "acceptance_criteria": [
+    "captured from idea; acceptance criteria to be elaborated"
+  ],
+  "id": "dna:requirement:147ZXS6RS6RS7M216ZY5C8KNAE",
+  "priority": "must",
+  "source": "dna:opportunity:KST8MDFYHQHM1W2E92VJ9RGDXK",
+  "state": "draft",
+  "statement": "capture-journey probe: the deposit path works end to end",
+  "sys_status": "active",
+  "verification_method": "test"
+}

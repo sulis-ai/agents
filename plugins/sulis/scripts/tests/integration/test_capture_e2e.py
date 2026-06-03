@@ -39,30 +39,26 @@ _WHAT = "Every captured idea is rooted in an Opportunity before it lands."
 # ─── fixtures ──────────────────────────────────────────────────────────────
 
 
-@pytest.fixture
-def repo_root(tmp_path: Path) -> Path:
-    """A tmp repo root carrying a minimal ``.sulis/repo-contract.yml``.
-
-    The CLI reads the ``repo:`` shorthand from this file to seed the canonical
-    tenant identity (ADR-002). A real shorthand here makes the chain joinable.
-    """
-    contract_dir = tmp_path / ".sulis"
-    contract_dir.mkdir(parents=True, exist_ok=True)
-    (contract_dir / "repo-contract.yml").write_text("repo: sulis-ai/agents\n")
-    return tmp_path
+# The temp-store + repo-contract trio is the shared brain-store fixture set in
+# ``conftest.py`` (extracted at the 2-consumer threshold — this suite +
+# test_scenarios_from_graph). Aliased here to the names these tests read. The
+# shared ``brain_repo_root`` also carries a ``targets.local`` placeholder, which
+# the capture CLI never reads (only the verify CLI does), so it's a no-op here.
 
 
 @pytest.fixture
-def base_dir(repo_root: Path) -> Path:
-    """The ``.brain/instances`` directory the adapters write under."""
-    return repo_root / ".brain" / "instances"
+def repo_root(brain_repo_root: Path) -> Path:
+    return brain_repo_root
 
 
 @pytest.fixture
-def brain_root(repo_root: Path) -> Path:
-    """The ``.brain/`` root (parent of ``instances``); the roadmap sidecar
-    lives under it at ``labels/roadmap.jsonld``."""
-    return repo_root / ".brain"
+def base_dir(brain_base_dir: Path) -> Path:
+    return brain_base_dir
+
+
+@pytest.fixture
+def brain_root(brain_label_root: Path) -> Path:
+    return brain_label_root
 
 
 def _run_cli(repo_root: Path, base_dir: Path, *args: str) -> subprocess.CompletedProcess:

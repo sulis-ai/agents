@@ -1,0 +1,32 @@
+{
+  "target": "feat/wp-013-dogfood-and-scenario-emission",
+  "base": "change/create-brain-backlog-and-traversal",
+  "timestamp": "2026-06-03T101934Z",
+  "verdict": "PASS",
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "preexisting_errors_in_touched_files": 2,
+    "preexisting_note": "E731 lambda-assignment at test_scenario_runner.py:59,114 — present on base, not introduced by this diff"
+  },
+  "pr_hygiene": {
+    "scope": {"severity": "none", "commit_type_spread": "single-concern (dogfood)"},
+    "size": {"severity": "none", "tracked_source_test_lines": 160, "new_test_file_lines": 480, "files_changed": 8},
+    "safety": {"severity": "none", "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0},
+    "completeness": {"severity": "none", "new_source_without_test": 0}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0, "note": 2},
+    "in_neighbours": {"critical": 0, "high": 0, "medium": 0, "low": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "notes": 1, "top": "test-target entry-seed literal duplicated across authoring + runner (documented 2-site; shared-constant deferred to avoid new module edge)"},
+    "security": {"findings": 0, "surfaced": false, "note": "no auth/injection/secrets surface; subprocess driver is pre-existing author-trust design"},
+    "quality": {"findings": 0, "notes": 1, "test_coverage": "new behaviour covered by 2 unit + 1 integration suite", "cr10_perf": "no anti-pattern matches", "note": "stray .coverage artifact removed"}
+  },
+  "draft_deltas": 0,
+  "auto_downgrade_triggers": [],
+  "watch_list": [
+    "test-target entry-seed literal duplicated (architecture, note)",
+    "subprocess journey cmd runs author-supplied shell (security, note, pre-existing design)"
+  ]
+}
