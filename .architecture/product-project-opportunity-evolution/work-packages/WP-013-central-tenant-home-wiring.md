@@ -7,7 +7,7 @@ primitive: reuse
 group: REUSE
 change_id: CH-01KT61
 sequence_id: WP-013
-dependsOn: [WP-004, WP-009, WP-010]
+dependsOn: [WP-002, WP-009, WP-010]
 blocks: [WP-014]
 estimated_token_cost:
   input: 4k
@@ -90,7 +90,7 @@ or query code beyond pointing `base_dir` and adding the Tenant-scoped read.
 
 ## Sequence
 
-- **dependsOn:** WP-009 (the central home stores the *windows* evolve produces; the window contract must exist first — ADR-005 build-order note); WP-004 and WP-010 (peer-collision serialisation — WP-013 edits `_brain_emit_helper.py` after WP-004's Step-resolution edit, and `_brain_query.py` after WP-010's `read_as_of` edit, so no two WPs modify either shared file in parallel — P6)
+- **dependsOn:** WP-009 (the central home stores the *windows* evolve produces; the window contract must exist first — ADR-005 build-order note); WP-002 and WP-010 (peer-collision serialisation — WP-013 edits `_brain_emit_helper.py` after WP-002's Step-resolution edit to that same file, and `_brain_query.py` after WP-010's `read_as_of` edit, so no two WPs modify either shared file in parallel — P6)
 - **blocks:** WP-014 (the reconciled Project home is whichever adapter the port has — the central-home wiring must exist)
 
 ## Estimated Token Cost

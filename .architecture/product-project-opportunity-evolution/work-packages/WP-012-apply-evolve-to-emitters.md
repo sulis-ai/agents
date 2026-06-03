@@ -24,11 +24,19 @@ verification:
 
 The apply-evolve refactor (ADR-003): the Product, Opportunity, and Project
 emitters move from a plain `repo.save(...)` to `evolve_entity(repo=..., ...)` so
-each change leaves a closed prior window + a new open window + a
-`was_generated_by` PROV edge. This turns the brain's evolution machinery **ON**
-for living entities for the first time. **REORGANISE-Refactor**, gated by the
-WP-011 characterisation test (EP-07 MUST: baseline pinned and green before this
-WP touches code).
+each change leaves a closed prior window + a new open window. This turns the
+brain's evolution machinery **ON** for living entities for the first time.
+**REORGANISE-Refactor**, gated by the WP-011 characterisation test (EP-07 MUST:
+baseline pinned and green before this WP touches code).
+
+**Provenance is conditional (corrected per ADR-002 / ADR-006):**
+- **Product + Opportunity** (`prov:Entity`) call `evolve_entity(..., generated_by=<run ref>)`
+  → the new window carries the `wasGeneratedBy` edge.
+- **Project** (`prov:Plan`) calls `evolve_entity(..., generated_by=None)`
+  → the new window moves but writes **NO** `wasGeneratedBy` edge. Project's
+  lineage is bitemporal + `state` + `deprecated_for`; `wasGeneratedBy` is a
+  type violation on a Plan. The run→Project link is the separately-deferred
+  `LifecycleRun.for_project` edge on the run (out of scope).
 
 # canonical-source: TDD.md §Form #5 — evolve_entity call sites
 
@@ -43,26 +51,28 @@ plugins/sulis/scripts/<project emitter module>   # the brain-store emit path
 ```
 
 Each emitter, at its persistence point, calls `evolve_entity` (WP-009) instead of
-`repo.save` for the living-entity write, passing the `was_generated_by`
-LifecycleRun ref for the run that produced the version. First emit opens one
-window; subsequent emits evolve. Graceful-degradation discipline preserved
-(emission stays best-effort — host operation never fails on emit failure).
+`repo.save` for the living-entity write. The Product + Opportunity emitters pass
+`generated_by=<LifecycleRun ref>` (the run that produced the version); the Project
+emitter passes `generated_by=None` (no provenance edge — `prov:Plan`). First emit
+opens one window; subsequent emits evolve. Graceful-degradation discipline
+preserved (emission stays best-effort — host operation never fails on emit
+failure).
 
 ## Definition of Done
 
 ### Red — Failing tests written
 
 - [ ] `tests/unit/test_emitters_evolve.py::test_product_emit_opens_window` — first Product emit → one open window
-- [ ] `::test_product_re_emit_evolves` — a changed Product emit closes prior + opens new with `was_generated_by`
-- [ ] `::test_opportunity_emit_evolves`
-- [ ] `::test_project_emit_evolves`
+- [ ] `::test_product_re_emit_evolves_with_prov` — a changed Product emit closes prior + opens new WITH `wasGeneratedBy`
+- [ ] `::test_opportunity_emit_evolves_with_prov` — Opportunity new window carries `wasGeneratedBy`
+- [ ] `::test_project_emit_evolves_WITHOUT_prov` — Project re-emit closes prior + opens new window but writes NO `wasGeneratedBy` edge (generated_by=None)
 - [ ] `::test_emit_failure_degrades_gracefully` — a failing evolve does not raise into the host operation
 - [ ] WP-011 characterisation tests still green where the observable contract is unchanged
 
 ### Green — Implementation makes tests pass
 
 - [ ] The 3 emitters call `evolve_entity` at their persistence point
-- [ ] `was_generated_by` wired from the producing LifecycleRun ref
+- [ ] Product + Opportunity wire `generated_by` from the producing LifecycleRun ref; Project passes `generated_by=None`
 - [ ] Graceful degradation preserved (best-effort emit)
 
 ### Blue — Refactor complete

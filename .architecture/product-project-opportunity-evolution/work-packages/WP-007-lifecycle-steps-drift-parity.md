@@ -62,7 +62,7 @@ and the v2.1.0 schema parity in its checked inventory.
 
 - **dependsOn:** WP-001 (the canonical to check), WP-002 (the schema to check parity against)
 - **blocks:** — (gate; nothing builds on it)
-- **Parallelisable with:** WP-003..WP-006 (all read WP-001/WP-002; independent code surfaces)
+- **Parallelisable with:** WP-005, WP-006 (all read WP-001/WP-002; independent code surfaces)
 
 ## Estimated Token Cost
 

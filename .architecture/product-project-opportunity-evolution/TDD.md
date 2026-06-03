@@ -33,10 +33,10 @@ time (SPEC Constraint): `docs/plugin-evolution-context-brief.md`,
 
 | ADR | Decision | Pillar driven |
 |---|---|---|
-| ADR-001 | LifecycleRun **is** the `prov:Activity`; Step is its type; v2 `step` ref points at a Step definition | Form (grammar shape) |
-| ADR-002 | PROV vocabulary = W3C PROV-O `wasGeneratedBy` / `used`; `wasRevisionOf` excluded | Form (grammar) + Armor (single PROV writer) |
-| ADR-003 | The evolve mechanism lives in a shared `_entity_evolve` helper **above** the port | Form + Armor (window invariants) |
-| ADR-004 | LifecycleRun v1.0.0 → v2.1.0 lockstep migration (schema + helper + CLI + instances) | Armor (migration atomicity) |
+| ADR-001 | LifecycleRun **is** the `prov:Activity`; it **instantiates** a Step (a `prov:Plan`) via `sulis:viaStep`; v2.1.0 `step` ref points at that Step. Project is ALSO a `prov:Plan` (excluded from provenance) | Form (grammar shape) |
+| ADR-002 | PROV edge **reuses the existing `prov_constraints` convention** (`wasGeneratedBy → lifecyclerun`, card `0..1`) on **Product + Opportunity ONLY** — NO snake_case wire field; Project + `wasRevisionOf` excluded; routed through the upstream mint | Form (grammar) + Armor (single PROV writer) |
+| ADR-003 | The evolve mechanism lives in a shared `_entity_evolve` helper **above** the port; provenance write is **conditional** (prov:Entity types only — Project gets windows but no `wasGeneratedBy`) | Form + Armor (window invariants) |
+| ADR-004 | LifecycleRun v1.0.0 → v2.1.0 **surgical RE-VENDOR** of the already-minted canonical schema (DR-009 + DR-013), lockstep/atomic with the emitter migration in ONE WP; `step_label` + `used`-on-run DROPPED | Armor (migration atomicity) |
 | ADR-005 | Platform store = the EXISTING file adapter pointed at the central `~/.sulis/instances/{tenant_id}/` Tenant home (reuse, not build); SQLite deferred to a later change behind the same port | Form + Armor (central-home read consistency) |
 | ADR-006 | Project home reconciliation — brain store canonical, `.sulis/projects/<slug>.jsonld` a human mirror | Form + Armor (path-safety preserved) |
 
@@ -62,11 +62,11 @@ re-minting. ULID character set: `0123456789ABCDEFGHJKMNPQRSTVWXYZ` (no I/L/O/U).
 
 | Schema | From | To | Why | Breaking? |
 |---|---|---|---|---|
-| `lifecyclerun` | 1.0.0 | **2.1.0** | major: `step_name`→`step` ref (ADR-001/004); minor: `+used` (ADR-002) | **YES** (ADR-004) |
-| `product` | 1.0.0 | 1.1.0 | additive `+was_generated_by` (ADR-002) | no |
-| `opportunity` | 1.0.0 | 1.1.0 | additive `+was_generated_by` (ADR-002) | no |
-| `project` (foundation) | 1.0.0 | 1.1.0 | additive `+was_generated_by` (ADR-002) | no |
-| `step` (foundation, referenced) | 1.2.0 | — | unchanged; the `step` ref target type | no |
+| `lifecyclerun` | 1.0.0 | **2.1.0** | **RE-VENDOR of already-minted canonical** (DR-009 `step_name`→`step` v2.0.0; DR-013 `+run_id/deterministic/inputs_ref/outputs_ref` v2.1.0). No `step_label`, no `used`-on-run | **YES** (ADR-004) |
+| `product` | 1.0.0 | 1.1.0 | additive `wasGeneratedBy` `prov_constraints` edge, card `0..1` (ADR-002) — **upstream-minted**, re-vendored | no |
+| `opportunity` | 2.0.0 | 2.1.0 | additive `wasGeneratedBy` `prov_constraints` edge, card `0..1` (ADR-002) — **upstream-minted**, re-vendored | no |
+| `project` (foundation) | 1.0.0 | **— (no change)** | Project is `prov:Plan`; `wasGeneratedBy` is a type violation. NO edit, NO bump (ADR-002, ADR-006) | no |
+| `step` (foundation, referenced) | 1.2.0 | — | unchanged; the `step` ref target type (a `prov:Plan`) | no |
 
 ### Canonical lifecycle Step instances (ADR-001/004 — definitions runs point at)
 
@@ -82,12 +82,14 @@ characters and 26 chars long):
 | `change-shipped` | `dna:step:01KT61X5ST02CHANGESH1PP00A` | a `sulis-change mark-shipped` completed | mixed |
 | `unclassified-lifecycle-step` | `dna:step:01KT61X5ST03VNC1ASS1F1ED0A` | the catch-all for free `step_name` strings with no known mapping | mixed |
 
-The `name→Step-ULID` resolution map (ADR-004) lives in `_lifecyclerun_emission`
-keyed by the known-name prefix (`change-started` / `change-shipped`); unknown
-names resolve to `unclassified-lifecycle-step` and preserve the original string
-in the additive `step_label` field. The map is the single source of truth for
-the events-known-name split; encoded as test-fixture pairs so a regenerate is
-byte-stable.
+The `name→Step-ULID` resolution map (ADR-004) lives in `_brain_emit_helper` /
+`_lifecyclerun_emission` (both edited atomically in WP-002) keyed by the
+known-name prefix (`change-started` / `change-shipped`); unknown names resolve to
+`unclassified-lifecycle-step`. The original free string, where trace grouping is
+needed, is carried by the **canonical `run_id` field** — **NOT** a `step_label`
+field, which does not exist in canonical v2.1.0 (DR-013 rejected payload-on-the-
+run-record). The map is the single source of truth for the events-known-name
+split; encoded as test-fixture pairs so a regenerate is byte-stable.
 
 ### Canonical-Identifiers Pre-canonicalisation Manifest
 
@@ -125,8 +127,8 @@ work is the *new* layering. The four seams below are **referenced, not restated*
 | # | Component | Lives at | Kind | ADR |
 |---|---|---|---|---|
 | 1 | Canonical lifecycle Step instances | `plugins/sulis/instances/lifecycle-steps/steps.jsonld` | JSON-LD (3 Steps) | 001/004 |
-| 2 | PROV grammar fields | the 4 schemas above (`+was_generated_by`, `+used`) + vendored compiled copies | JSON Schema | 002 |
-| 3 | LifecycleRun v2.1.0 schema + emitter | `lifecyclerun.schema.json` 2.1.0 + `_lifecyclerun_emission.py` (`step` + `step_label` + ID seed from step+timestamp) | JSON Schema + Python | 001/004 |
+| 2 | PROV edge (re-vendored) | `wasGeneratedBy` `prov_constraints` edge on **Product + Opportunity** vendored compiled copies (Project excluded) — **upstream-minted**, no snake_case field, no `_predicate_map` edit | JSON Schema (re-vendor) | 002 |
+| 3 | LifecycleRun v2.1.0 re-vendor + emitter (ATOMIC) | re-vendor canonical `lifecyclerun.schema.json` 2.1.0 + `_lifecyclerun_emission.py` + `_brain_emit_helper.py` (`step` ref; ID seed from step+timestamp; per-run detail → `run_id`, NOT `step_label`) — one atomic lockstep WP | JSON Schema + Python | 001/004 |
 | 4 | Instance migration script | `plugins/sulis/scripts/migrate_lifecyclerun_v1_to_v2.py` (or `sulis-emit-lifecyclerun --migrate`) | Python | 004 |
 | 5 | `_entity_evolve` helper | `plugins/sulis/scripts/_entity_evolve.py` — `evolve_entity(...)` + `_LIVING_ENTITY_TYPES` allowlist | Python (above the port) | 003 |
 | 6 | As-of-time read | new function on `_brain_query.py` — `(type, id, as_of) → window whose [valid_from, valid_to) contains as_of` | Python (read seam) | 003 |
@@ -135,26 +137,31 @@ work is the *new* layering. The four seams below are **referenced, not restated*
 | 9 | Project reconcile in minter | `_discovery/minter.py` — canonical `repo.save("project", …)` + `write_project_mirror(…)` | Python (refactor) | 006 |
 | 10 | discover-project Mint prose + canonical Workflow Step | `plugins/sulis/skills/discover-project/SKILL.md` + canonical instance | Markdown + JSON-LD | 006 |
 
-### The three-layer PROV shape (ADR-001) and the evolve flow (ADR-003)
+### The PROV shape (ADR-001) and the evolve flow (ADR-003)
 
 ```
-Step (definition / type)  ◀── step ───  LifecycleRun (the Activity / occurrence)
-                                               │  used →  input entity versions
-                                               │ wasGeneratedBy
-                                               ▼
-                            Product / Opportunity / Project (living Entity version)
-                                               │
+Step (the prov:Plan / the recipe)  ◀── step (sulis:viaStep) ───  LifecycleRun (the prov:Activity / the run that instantiated it)
+                                                                       │
+                                                                       │ wasGeneratedBy (prov_constraints edge, card 0..1)
+                                                                       ▼
+                                       Product / Opportunity (prov:Entity living version)   ← Project is prov:Plan: NO wasGeneratedBy
+                                                                       │
                           evolve_entity():  close prior window (valid_to)
-                                            open new window (valid_from + confidence
-                                                             + sys_status + was_generated_by)
+                                            open new window (valid_from + confidence + sys_status)
+                                              + (prov:Entity types only) the wasGeneratedBy edge
                                             persist BOTH via repo (the file adapter,
                                                                     repo-local OR central home)
 ```
 
 `evolve_entity` sits **above** the port (ADR-003), so it works unchanged against
-either adapter. The `_LIVING_ENTITY_TYPES` allowlist (Product / Opportunity /
-Project) is the single guard that keeps evolve **off** event entities (Decision /
-LifecycleRun stay append-only — non-goal honoured). The file adapter materialises
+either adapter. **Two orthogonal guards:** the `_LIVING_ENTITY_TYPES` allowlist
+(Product / Opportunity / Project) keeps evolve **off** event entities (Decision /
+LifecycleRun stay append-only) — all three living types get windows; the
+**provenance** write is a *separate* conditional (`generated_by is not None`) so
+Product/Opportunity get the `wasGeneratedBy` edge and **Project does not** (it is
+`prov:Plan` — the edge is a type violation; ADR-002, ADR-006). There is **no
+`used` edge written here** — canonical v2.1.0 LifecycleRun has no `used` field.
+The file adapter materialises
 the window pair in the single-file history-envelope idiom (ADR-003) — the same
 idiom whether the entity lives in the repo-local tree or the central Tenant home.
 A later SQLite adapter (ADR-005, deferred) would materialise windows in rows; that
@@ -164,12 +171,12 @@ is ADR-003's OAQ-1, deferred with the SQLite swap.
 
 | Build-order piece | Primitive | Group | Note |
 |---|---|---|---|
-| 1 lifecyclerun-migration | substitute-strangle (schema) + reinforce-test | substitute / reinforce | breaking swap; deprecated `--step-name` CLI alias; `removal_plan` target = next minor after consumers migrate |
-| 2 prov-grammar | expand-create | expand | additive schema fields |
-| 3 evolve-mechanism | expand-create | expand | new helper above the port; **not** a wrap |
-| 4 apply-evolve | reorganise-refactor + reinforce | reorganise | emitters move from `save` to `evolve_entity`; **characterisation test first** |
+| 1 lifecyclerun-revendor | substitute-strangle (re-vendor + emitter, ATOMIC) | substitute | re-vendor canonical v2.1.0 + emitter migration in ONE WP; deprecated `--step-name` CLI alias; `removal_plan` target = next minor after consumers migrate |
+| 2 prov-edge | substitute-strangle (re-vendor) | substitute | re-vendor the **upstream-minted** `wasGeneratedBy` `prov_constraints` edge on Product + Opportunity (Project excluded); **upstream-gated** |
+| 3 evolve-mechanism | expand-create | expand | new helper above the port; **not** a wrap; conditional prov-write |
+| 4 apply-evolve | reorganise-refactor + reinforce | reorganise | emitters move from `save` to `evolve_entity` (Product/Opp w/ prov; Project windows-only); **characterisation test first** |
 | 5 platform-store | reuse | (reuse) | **reuse** the existing file adapter at the central Tenant home — no new code (ADR-005); SQLite deferred |
-| 6 project-reconcile | reorganise-refactor | reorganise | minter refactor; **characterisation test first** (ADR-006) |
+| 6 project-reconcile | reorganise-refactor | reorganise | minter refactor (Project windows + supersedes, no prov); **characterisation test first** (ADR-006) |
 
 **Reuse before build.** ADR-005's Platform home is **reuse** — the existing
 `LocalFileEntityAdapter` pointed at the existing `~/.sulis/instances/{tenant_id}/`
@@ -197,11 +204,17 @@ and are reused**. The addressable Armor work is the four new guarantees below.
 
 ### PROV write discipline (ADR-002)
 
-A single writer per edge: `_entity_evolve` is the **only** writer of
-`was_generated_by`; `_lifecyclerun_emission` is the **only** writer of `used`.
-No other code writes PROV edges — this keeps the grammar's first PROV writes
-disciplined and auditable. `wasRevisionOf` is excluded and stays excluded
-(lineage is the bitemporal window chain + event `supersedes`).
+A single writer: `_entity_evolve` is the **only** writer of the `wasGeneratedBy`
+edge — and it writes it as the canonical `prov_constraints`-style edge (never a
+snake_case scalar), **conditionally**, only for `prov:Entity` types (Product,
+Opportunity). Project's evolve passes `generated_by=None` and writes no edge
+(`prov:Plan` — type violation). **There is no `used` edge written** — canonical
+v2.1.0 LifecycleRun has no `used` field (DR-013 settled its field-set with
+content-addressed `inputs_ref`/`outputs_ref`); modelling consumed inputs as ABox
+`prov:used` triples is a separate, later concern. `wasRevisionOf` is excluded and
+stays excluded (lineage is the bitemporal window chain + event `supersedes`).
+The grammar change itself (adding the edge) is **upstream-minted**, not authored
+here — this change consumes the re-vendored schemas.
 
 ### Graceful degradation (reused, unchanged)
 
@@ -232,9 +245,9 @@ below — one per ADR's load-bearing claim.
 | Test | Posture | Subject | ADR |
 |---|---|---|---|
 | **Central-home read/write test** | The existing `LocalFileEntityAdapter`, pointed at a temp `~/.sulis/instances/{tenant_id}/`-shaped `base_dir`, round-trips living-entity versions: save validates, the central-home read returns them, reject-on-invalid never persists. (The existing port contract test already covers the file adapter — no new-adapter contract test, because there is no new adapter.) | the existing file adapter at the central home | 005 |
-| **Evolve close/open-window characterisation test** | First-emission opens one window; second emission closes the prior (`valid_to` set) + opens a new one with `was_generated_by`; the prior+new windows abut exactly (prior `valid_to` == new `valid_from`); a byte-identical re-emit is a no-op (no new window); an attempt to evolve a `_LIVING_ENTITY_TYPES`-excluded type **raises** | `_entity_evolve.evolve_entity` | 003 |
-| **PROV-emission test** | An evolved entity version carries `was_generated_by` → a valid `dna:lifecyclerun:<ulid>` ref; the generating LifecycleRun carries `used` → the consumed input refs; the JSON-LD `@context` maps `was_generated_by`→`prov:wasGeneratedBy`, `used`→`prov:used`; **no** `wasRevisionOf` anywhere | the PROV edges on living entities + LifecycleRun | 002 |
-| **v1→v2 LifecycleRun migration test** | A v1 fixture (`step_name` string, no `step`) in → a v2.1.0 instance out (`step` ref resolved via the name map; original string preserved in `step_label`; `step_name` removed); re-validates against 2.1.0; idempotent on re-run (v2 in ⇒ skipped); an unmappable name resolves to `unclassified-lifecycle-step`; rejects-on-still-invalid (never writes an invalid instance) | `migrate_lifecyclerun_v1_to_v2` | 004 |
+| **Evolve close/open-window characterisation test** | First-emission opens one window; second emission closes the prior (`valid_to` set) + opens a new one; the prior+new windows abut exactly (prior `valid_to` == new `valid_from`); a byte-identical re-emit is a no-op (no new window); an attempt to evolve a `_LIVING_ENTITY_TYPES`-excluded type **raises** | `_entity_evolve.evolve_entity` | 003 |
+| **PROV-edge-emission test** | An evolved **Product/Opportunity** version (prov:Entity) carries the `wasGeneratedBy` edge → a valid `dna:lifecyclerun:<ulid>` ref, expressed via the `prov_constraints` convention (NOT a snake_case scalar); an evolved **Project** version (prov:Plan) carries **NO** `wasGeneratedBy` edge; the helper writes **no `used` field**; **no** `wasRevisionOf` anywhere | the `wasGeneratedBy` edge on Product/Opportunity (Project paired-negative) | 002 |
+| **re-vendor + v1→v2 LifecycleRun migration test** | The re-vendored schema is byte-faithful to canonical v2.1.0 (no `step_label`, no `used`); a v1 fixture (`step_name` string, no `step`) in → a v2.1.0 instance out (`step` ref resolved via the name map; **`step_name` dropped, NOT into a `step_label`**; per-run detail → `run_id` where needed); re-validates against 2.1.0; idempotent on re-run (v2 in ⇒ skipped); an unmappable name resolves to `unclassified-lifecycle-step`; rejects-on-still-invalid | re-vendored schema + `migrate_lifecyclerun_v1_to_v2` | 004 |
 | **Append-only event-entity guard test** | `evolve_entity(entity_type="decision", …)` and `…="lifecyclerun"` both **raise** (not on the allowlist); `save` of those types still works (append-only path intact) | `_LIVING_ENTITY_TYPES` guard | 003 |
 | **As-of-time read test** | Given three windows of one entity, `(type, id, as_of)` returns the window whose `[valid_from, valid_to)` contains `as_of`; `as_of` after the latest open window returns the open window; before the first returns None | the new `_brain_query` as-of function | 003 |
 | **Cross-repo Tenant read test** | `find_current_for_tenant(tenant, "product")` over the central `~/.sulis/instances/{tenant_id}/` home returns every open-window Product for that Tenant written there across repos; a read of a single repo-local tree cannot (asserts the central Tenant home is the reason this works) | the existing `_brain_query` walk over the central home | 005 |
@@ -260,17 +273,20 @@ is the spine the decomposition pass consumes — WPs are atomic within each piec
 ordering is the `dependsOn` graph below.
 
 ```
-1. lifecyclerun-migration   (the PROV spine — everything hangs off the Activity)
-        │  produces: v2.1.0 schema, canonical Steps, migrated emitter+CLI+instances
+1. lifecyclerun-revendor    (the PROV spine — RE-VENDOR canonical v2.1.0 + emitter, ATOMIC)
+        │  produces: re-vendored v2.1.0 schema, canonical Steps, migrated emitter+CLI+instances
         ▼
-2. prov-grammar             (wasGeneratedBy / used vocabulary)
-        │  depends on 1: `used` rides in the v2.1.0 bump; was_generated_by needs
-        │  a LifecycleRun ref shape to point at
+2. prov-edge                (wasGeneratedBy prov_constraints edge on Product + Opportunity)
+        │  depends on 1: the edge points at a LifecycleRun, whose v2.1.0 ref shape
+        │  must exist in the vendored tree first
+        │  UPSTREAM-GATED: the edge is added by the mint (accepted → recompiled →
+        │  re-vendored) before this in-repo re-vendor can land
         ▼
-3. evolve-mechanism         (shared _entity_evolve: close/open-window + PROV-write)
-        │  depends on 2: it WRITES was_generated_by, so the field must exist
+3. evolve-mechanism         (shared _entity_evolve: close/open-window + CONDITIONAL prov-write)
+        │  depends on 2: it WRITES the wasGeneratedBy edge for prov:Entity types,
+        │  so the edge must exist in the Product/Opportunity grammar
         ▼
-4. apply-evolve             (Product, Opportunity, Project become living)
+4. apply-evolve             (Product + Opportunity become living WITH prov; Project living WINDOWS-ONLY)
         │  depends on 3: emitters call evolve_entity; characterisation-test-first
         ▼
 5. platform-store           (point the emit base_dir at the central Tenant home —
@@ -287,17 +303,19 @@ ordering is the `dependsOn` graph below.
 
 | Piece | dependsOn | Primitive | Key contract surface |
 |---|---|---|---|
-| 1 lifecyclerun-migration | — | substitute-strangle + reinforce | `lifecyclerun` 2.1.0 schema; `step`+`step_label`; canonical Steps; name→ULID map; migration script |
-| 2 prov-grammar | 1 | expand-create | `+was_generated_by` (Product/Opportunity/Project 1.1.0); `+used` (LifecycleRun 2.1.0); `@context` term maps |
-| 3 evolve-mechanism | 2 | expand-create | `evolve_entity(...)`; `_LIVING_ENTITY_TYPES`; as-of-time read function |
-| 4 apply-evolve | 3 | reorganise-refactor + reinforce | Product/Opportunity/Project emitters call `evolve_entity`; **characterisation_test** required |
+| 1 lifecyclerun-revendor | — | substitute-strangle (ATOMIC) | RE-VENDOR canonical `lifecyclerun` 2.1.0 (`step`, NO `step_label`, NO `used`) + emitter core (compose + helper) in one WP; canonical Steps; name→ULID map; migration script |
+| 2 prov-edge | 1 | substitute-strangle (re-vendor) | re-vendor the **upstream-minted** `wasGeneratedBy` `prov_constraints` edge (Product 1.1.0 + Opportunity 2.1.0; **Project excluded**); NO snake_case field, NO `_predicate_map` edit; **upstream-gated** |
+| 3 evolve-mechanism | 2 | expand-create | `evolve_entity(...)` with **conditional** prov-write; `_LIVING_ENTITY_TYPES`; as-of-time read function |
+| 4 apply-evolve | 3 | reorganise-refactor + reinforce | Product/Opportunity emitters call `evolve_entity(generated_by=<ref>)`; Project emitter calls it with `generated_by=None` (windows-only); **characterisation_test** required |
 | 5 platform-store | 3 | reuse | point living-entity emit `base_dir` at `~/.sulis/instances/{tenant_id}/` (existing file adapter + existing Tenant ULID); `find_current_for_tenant` over the central home via the existing `_brain_query` walk; SQLite deferred |
-| 6 project-reconcile | 3, 4, 5 | reorganise-refactor | `minter.write_project_entity` → canonical `repo.save` + `write_project_mirror`; **characterisation_test** required; path-safety preserved |
+| 6 project-reconcile | 3, 4, 5 | reorganise-refactor | `minter.write_project_entity` → canonical `repo.save` + `write_project_mirror`; Project evolve = windows + supersedes, no prov; **characterisation_test** required; path-safety preserved |
 
 Pieces 1→2→3 are a strict chain. 4 and 5 both depend on 3 and can proceed in
-parallel after it. 6 is the join (depends on 3, 4, 5). `expected_workpackages:
-12-16` (ARCH.yaml) — `/sulis:plan-work` owns the real count and the Red-Green-Blue
-DoDs.
+parallel after it. 6 is the join (depends on 3, 4, 5). Piece 2 (and everything it
+gates: 3→6) is **upstream-blocked** on the `wasGeneratedBy` mint being accepted +
+recompiled + re-vendored; the pre-gate spine (piece 1) lands independently.
+`/sulis:plan-work` owns the real WP count (13 after the re-cut) and the
+Red-Green-Blue DoDs.
 
 ---
 
@@ -306,8 +324,8 @@ DoDs.
 | Decision | Chosen | Rejected | One-line reason |
 |---|---|---|---|
 | Where evolve lives | shared helper **above** the port | methods on the port; per-emitter logic | keeps the port per-instance; one shared primitive (ADR-003, EP-03) |
-| PROV idiom | W3C PROV-O `wasGeneratedBy` / `used` | `wasRevisionOf`; a side-file triple store | SPEC-fixed convention; lineage already in the bitemporal chain (ADR-002) |
-| LifecycleRun migration | one atomic lockstep slice + eager script | optional `step`; lazy-only; keep `step_name` | "no half-migrated state" (ADR-004) |
+| PROV idiom | reuse the existing `prov_constraints` `wasGeneratedBy` edge (Product/Opportunity only) | snake_case `was_generated_by` scalar; `wasRevisionOf`; a side-file triple store; the edge on Project | PROV not greenfield — convention already wired on 5 entities; Project is prov:Plan (type violation); lineage already in the bitemporal chain (ADR-002) |
+| LifecycleRun migration | **surgical re-vendor** of already-minted canonical v2.1.0 + emitter, one atomic WP + eager script | author a new shape with `step_label`/`used`; the wholesale `sync-from-canonical.sh`; optional `step`; keep `step_name` | re-vendor not author (DR-009 + DR-013 already minted it); "no half-migrated state"; respect the mixed-version vendor (ADR-004) |
 | Platform store home | **reuse** the existing file adapter at the central `~/.sulis/instances/{tenant_id}/` Tenant home | build a new SQLite backend now; multi-repo file walk | check-before-building: the central home + relocatable `base_dir` already exist; reuse beats build (ADR-005) |
 | SQLite backend (#30) | **deferred** to a later change, drop-in behind the same port | build it now | no query-scale need yet; the swap stays cheap because the port is the contract (ADR-005) |
 | Project home | brain store canonical + `.sulis/projects` mirror | `.sulis/projects` only; delete the mirror; sync job | one canonical writer, one derived mirror; safety discipline preserved (ADR-006) |
@@ -360,8 +378,8 @@ Tenant home.
 | Central Tenant home (existing file adapter, relocated `base_dir`) | **real temp-dir** `~/.sulis/instances/{tenant_id}/`-shaped home, existing `LocalFileEntityAdapter` | existing | concrete — `tests/unit/test_central_tenant_home.py::test_round_trip_central_home`, `::test_cross_repo_tenant_read`, `::test_atomic_write_durable` |
 | The `EntityRepository` port (file adapter) | **existing contract test** (already covers `LocalFileEntityAdapter`) | existing | concrete — `tests/unit/test_entity_repository_contract.py::test_contract[file]` (no `[sqlite]` parametrisation in this change — SQLite adapter deferred) |
 | Evolve helper above the port | **in-process**, real adapter | existing | concrete — `tests/unit/test_entity_evolve.py::test_close_open_window`, `::test_noop_idempotent`, `::test_refuses_event_entity` |
-| PROV emission | **in-process** schema-validated | existing | concrete — `tests/unit/test_prov_emission.py::test_was_generated_by_on_living`, `::test_used_on_lifecyclerun`, `::test_no_wasrevisionof` |
-| LifecycleRun v1→v2 migration | **real fixture-in / instance-out** | existing | concrete — `tests/unit/test_lifecyclerun_migration.py::test_v1_fixture_migrates`, `::test_idempotent`, `::test_unmappable_to_unclassified`, `::test_rejects_invalid` |
+| PROV edge emission (Product/Opportunity only) | **in-process** schema-validated; **upstream-gated** on the mint | existing (gated) | concrete — `tests/unit/test_prov_edge_schemas.py::test_was_generated_by_edge_on_product_and_opportunity`, `::test_project_schema_unchanged`, `tests/unit/test_entity_evolve.py::test_project_evolve_writes_NO_prov_edge`, `::test_no_wasrevisionof` |
+| LifecycleRun re-vendor + v1→v2 migration | **real fixture-in / instance-out** | existing | concrete — `tests/unit/test_lifecyclerun_schema_v2.py::test_revendored_schema_matches_canonical`, `tests/unit/test_lifecyclerun_migration.py::test_v1_fixture_migrates`, `::test_idempotent`, `::test_unmappable_to_unclassified`, `::test_rejects_invalid` |
 | Project reconcile (minter) | **characterisation-first**, real temp repo + real store | existing | concrete — `tests/unit/test_minter_reconcile.py::test_canonical_save_then_mirror`, `::test_path_safety_preserved`, `::test_muc003_refuses` |
 | Drift detector (Path A) | **existing detector**, fixture pass/drift | existing | concrete — `tests/unit/test_check_canonical_drift_lifecycle_steps.py` |
 
@@ -377,20 +395,32 @@ frontend); no `tests/methodology/` fixtures (not a methodology change).
 
 ### 6. Infrastructure needs surfaced (deferred)
 
-**None.** The central Tenant home needs no vendor mock, no test OAuth account, no
-seed-data service — it is a temp directory served by the existing file adapter.
-The canonical Step instances + vendored compiled schemas are committed fixtures,
-not deferred infrastructure. The deferred-need list aggregated at slice-end is
-empty for this change (§Canonical need identifiers above). The SQLite backend
-(#30) is deferred *engineering*, not deferred verification infrastructure.
+**No deferred verification infrastructure.** The central Tenant home needs no
+vendor mock, no test OAuth account, no seed-data service — it is a temp directory
+served by the existing file adapter. The canonical Step instances + vendored
+compiled schemas are committed fixtures. The deferred-need list aggregated at
+slice-end is empty for this change. The SQLite backend (#30) is deferred
+*engineering*, not deferred verification infrastructure.
+
+**One upstream PREREQUISITE (not a verification deferral):** the prov-edge WP
+(piece 2 / WP-008) cannot land until the `wasGeneratedBy` mint
+(`.specifications/business-dna/mint-requests/wasgeneratedby-provenance-edge-2026-06-03.md`)
+is accepted → walked → recompiled → re-vendored. Its test
+(`test_was_generated_by_edge_on_product_and_opportunity`) ships *with* WP-008 the
+moment that prerequisite clears — it is a gated-but-concrete test, not a
+deferred-to-follow-on need identifier. The pre-gate spine (piece 1) is verifiable
+immediately.
 
 ### Per-WP `verification:` frontmatter shape (for `/sulis:plan-work`)
 
 Every WP in this change ships **Shape 1 — concrete** (`adapter: backend` +
 `artifact: <pytest nodeid>`) — each WP lands with a real test the moment it
-merges. No Shape-2 (deferred) WPs. Shape-3 (trivial carveout) applies only to a
-mechanical vendored-schema-copy WP if `/sulis:plan-work` splits one out
-(`na: true` + justification ≥ 30 chars).
+merges. **WP-008 is Shape-1 concrete but starts `blocked`** on the upstream
+`wasGeneratedBy` mint (its test ships with it once the mint is re-vendored — a
+gated-but-concrete test, NOT a Shape-2 deferral). No Shape-2 (deferred-to-
+follow-on) WPs. Shape-3 (trivial carveout) applies only to a mechanical
+vendored-schema-copy WP if `/sulis:plan-work` splits one out (`na: true` +
+justification ≥ 30 chars).
 
 ---
 
@@ -401,22 +431,29 @@ See `SIZING.md` for the full sFPC + ASR breakdown. Highlights:
 - **Tier:** L (computed sFPC 17 / ASR 13 both mid-M; taken to L for crossing four bounded contexts + a hard migration chain). Confirmed, not overridden.
 - **TDD length:** within the tier-L target; the hexagonal seams are **referenced, not restated** (no Clean-Architecture re-derivation — `SIZING.md` Respect-Don't-Restate).
 - **ADRs produced:** 6 (ADR-001..006 — at the ARCH.yaml expected count; each records a decision affecting >1 component or locking a technology/grammar choice).
-- **Pillar coverage applied:** Form = PARTIAL (port/adapter/query seams inherited; new = evolve layering, PROV grammar, central-Tenant-home wiring (reuse, no new adapter), Project move); Armor = PARTIAL (graceful-degradation + atomic-write + reject-on-invalid inherited; new = migration atomicity, window invariants, central-home write durability, append-only guard); Proof = PARTIAL (contract-test + drift-parity infra inherited; new = central-home read/write test, evolve characterisation test, PROV-emission test, v1→v2 migration test).
+- **Pillar coverage applied:** Form = PARTIAL (port/adapter/query seams inherited; new = evolve layering, PROV edge re-vendor (convention reuse, not new grammar), central-Tenant-home wiring (reuse, no new adapter), Project move); Armor = PARTIAL (graceful-degradation + atomic-write + reject-on-invalid inherited; new = re-vendor+migration atomicity, window invariants, central-home write durability, append-only guard); Proof = PARTIAL (contract-test + drift-parity infra inherited; new = central-home read/write test, evolve characterisation test, prov-edge-emission test (Product/Opportunity only + Project paired-negative), re-vendor + v1→v2 migration test).
 - **Authoritative sources referenced:** the four existing seams (port / file adapter / query / emit helper), the four landed design docs, `discover-project` + `release-train-as-entities` TDDs (Path-A prior art), `CONTRACT_FIRST_STANDARD` (the `EntityRepository` Protocol IS the contract), `WP_BACKEND_STANDARD`, W3C PROV-O.
 - **Sections that referenced rather than restated:** the hexagonal seams, the drift-detector implementation, the Path-A rationale, the graceful-degradation discipline.
 - **Circuit breakers triggered:** none (TDD within target; ADR count at expected; no section restates an authoritative source).
 
-### Expected WP set (12-16 atomic WPs — `/sulis:plan-work` owns the real count)
+### Actual WP set (13 atomic WPs — produced by `/sulis:plan-work`, see `work-packages/INDEX.md`)
 
-| Build-order piece | Likely WPs | Primitive |
+> The pre-plan-work estimate (12-16) resolved to **13 WPs** after the
+> brain-governance re-cut. The defining shape changes vs the naïve estimate: the
+> LifecycleRun schema + the two emitter moves **collapse into one atomic re-vendor
+> WP** (lockstep mandate); the prov work is **a re-vendored `prov_constraints`
+> edge on Product + Opportunity only** (Project excluded, prov:Plan), **upstream-
+> gated on the mint**.
+
+| Build-order piece | WPs | Primitive |
 |---|---|---|
-| 1 lifecyclerun-migration | canonical-lifecycle-steps; lifecyclerun-2.1.0-schema; emitter-step-ref; brain-emit-helper-step-resolution; cli-step-arg; instance-migration-script; drift-parity | substitute-strangle + reinforce |
-| 2 prov-grammar | prov-fields-living-schemas; used-on-lifecyclerun; context-term-maps; vendored-compiled-copies | expand-create |
-| 3 evolve-mechanism | entity-evolve-helper; living-entity-allowlist; as-of-time-read | expand-create |
-| 4 apply-evolve | product-emitter-evolve; opportunity-emitter-evolve; project-emitter-evolve (each characterisation-first) | reorganise-refactor + reinforce |
-| 5 platform-store | central-tenant-home-wiring (point emit base_dir at ~/.sulis/instances/{tenant_id}/); cross-repo-tenant-read; central-home-read-write-test | reuse |
-| 6 project-reconcile | minter-canonical-plus-mirror (characterisation-first); discover-project-skill-mint-prose | reorganise-refactor |
+| 1 lifecyclerun-revendor | WP-001 canonical-lifecycle-steps; **WP-002 revendor-emitter-lockstep (ATOMIC — absorbs the old schema+compose+helper WPs)**; WP-005 cli-step-arg; WP-006 instance-migration-script; WP-007 drift-parity | substitute-strangle (atomic) |
+| 2 prov-edge (UPSTREAM-GATED) | WP-008 prov-edge-product-opportunity (re-vendor the upstream-minted `wasGeneratedBy` `prov_constraints` edge; Project excluded) | substitute-strangle (re-vendor) |
+| 3 evolve-mechanism | WP-009 entity-evolve-helper (conditional prov-write + allowlist); WP-010 as-of-time-read | expand-create + extend |
+| 4 apply-evolve | WP-011 emitter-characterisation-test; WP-012 apply-evolve (Product/Opp w/ prov; Project windows-only) | reinforce-test + reorganise-refactor |
+| 5 platform-store | WP-013 central-tenant-home-wiring | reuse |
+| 6 project-reconcile | WP-014 minter-characterisation-test; WP-015 minter-canonical-plus-mirror (Project windows + supersedes, no prov) | reinforce-test + reorganise-refactor |
 
-Recommend `/sulis:plan-work` to confirm this shape, pin the `dependsOn` graph
-from §Build Order, and add the Red-Green-Blue DoDs + the Shape-1 `verification:`
-frontmatter from §Verification Plan.
+The `dependsOn` graph, Red-Green-Blue DoDs, and Shape-1 `verification:`
+frontmatter are pinned in `work-packages/` (validated PASS — see
+`work-packages/DECOMPOSE_VALIDATION.md`).

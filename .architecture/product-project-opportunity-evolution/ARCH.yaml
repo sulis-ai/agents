@@ -9,17 +9,17 @@ execution_path: A          # canonical-as-spec where grammar/Workflow entities c
 structural_template: ../../.architecture/discover-project/   # same Path-A house style + canonical-identifiers discipline
 
 pillars:
-  form: partial    # hexagonal seam (EntityRepository port + adapters + query seam) already exists; new: evolve helper layering, PROV grammar, store adapter, Project ownership move
+  form: partial    # hexagonal seam (EntityRepository port + adapters + query seam) already exists; new: evolve helper layering, PROV edge (prov_constraints convention reuse, not new grammar), Project ownership move
   armor: partial   # graceful-degradation + atomic-write + reject-on-invalid exist; new: migration atomicity, window invariants, store durability, event-entity append-only guard
-  proof: partial   # contract-test + drift-parity infra exist; new: store-adapter contract test, evolve characterisation test, PROV-emission test, v1->v2 migration test
+  proof: partial   # contract-test + drift-parity infra exist; new: evolve characterisation test, PROV-edge-emission test (Product/Opportunity only), v1->v2 re-vendor + instance-migration test
 
 adrs:
-  - ADR-001 — LifecycleRun IS the prov:Activity; Step is its type; the v2 `step` ref points at a Step definition
-  - ADR-002 — PROV vocabulary added as W3C PROV-O Activity-generates-Entity (wasGeneratedBy / used); wasRevisionOf excluded
-  - ADR-003 — The evolve mechanism lives in a shared `_entity_evolve` helper behind the EntityRepository port
-  - ADR-004 — LifecycleRun v1.0.0 -> v2.1.0 lockstep migration (schema + helper + CLI + existing instances)
+  - ADR-001 — LifecycleRun IS the prov:Activity; it INSTANTIATES a Step (a prov:Plan) via sulis:viaStep; the v2.1.0 `step` ref points at that Step. Project is ALSO a prov:Plan (excluded from provenance)
+  - ADR-002 — PROV edge REUSES the existing `prov_constraints` convention (wasGeneratedBy → lifecyclerun, card 0..1) on Product + Opportunity ONLY; NO snake_case wire field; Project + wasRevisionOf excluded; routed through the upstream mint
+  - ADR-003 — The evolve mechanism lives in a shared `_entity_evolve` helper behind the EntityRepository port; provenance write is conditional (prov:Entity types only — Project gets windows but no wasGeneratedBy)
+  - ADR-004 — LifecycleRun v1.0.0 -> v2.1.0 SURGICAL RE-VENDOR of the already-minted canonical schema (DR-009 + DR-013), lockstep/atomic with the emitter migration in one WP; step_label + used-on-run DROPPED
   - ADR-005 — Platform store REUSES the existing file adapter pointed at the central `~/.sulis/instances/{tenant_id}/` Tenant home (reuse, not build); SQLite deferred to a later change behind the same port
-  - ADR-006 — Project home reconciliation — brain store is canonical; `.sulis/projects/<slug>.jsonld` becomes a human-facing mirror
+  - ADR-006 — Project home reconciliation — brain store is canonical; `.sulis/projects/<slug>.jsonld` is a human-facing mirror; Project provenance NOT applicable (prov:Plan); run→Project link deferred to LifecycleRun.for_project on the run
 
 artifacts_produced:
   - TDD.md
@@ -27,7 +27,7 @@ artifacts_produced:
   - ARCH.yaml
   - adrs/ADR-001..ADR-006
 
-expected_workpackages: 12-16   # estimate only; /sulis:plan-work owns the real count
+expected_workpackages: 13      # ACTUAL (re-cut from 15 after the 2026-06-03 brain-governance review); see work-packages/INDEX.md
 
 non_goals:
   - Ontology v0.7 cross-artifact ref resolution (belongs_to_product_ref stays a plain string)
@@ -37,21 +37,23 @@ non_goals:
   - Standing up the SQLite global store (#30) — deferred to a later change; drop-in behind the same port
 
 build_order:
-  - 1-lifecyclerun-migration   # the PROV spine; everything hangs off the Activity
-  - 2-prov-grammar             # wasGeneratedBy / used vocabulary
-  - 3-evolve-mechanism         # shared helper: close-window / open-window / PROV-write
-  - 4-apply-evolve             # Product, Opportunity, Project become living
-  - 5-platform-store           # point living-entity emitters at the central Tenant-namespaced home (existing port + file adapter at ~/.sulis/instances/{tenant_id}/)
-  - 6-project-reconcile        # discover-project / minter land Project in the brain home
+  - 1-lifecyclerun-revendor     # the PROV spine; SURGICAL re-vendor of canonical v2.1.0 + emitter migration, ONE atomic WP
+  - 2-prov-edge                 # wasGeneratedBy prov_constraints edge on Product + Opportunity (UPSTREAM-GATED on the mint)
+  - 3-evolve-mechanism          # shared helper: close-window / open-window / conditional PROV-write
+  - 4-apply-evolve              # Product, Opportunity (with prov), Project (windows only, no prov) become living
+  - 5-platform-store            # point living-entity emitters at the central Tenant-namespaced home (existing port + file adapter at ~/.sulis/instances/{tenant_id}/)
+  - 6-project-reconcile         # discover-project / minter land Project in the brain home
 
 upstream_dependencies:
   in_main:
     - CH-01KSWZ #118 — basic Product/Opportunity emit to .brain/instances (this change evolves + re-homes it)
     - release-train-as-entities / discover-project — Path-A canonical-as-spec pattern + drift detector
   brain:
-    - LifecycleRun schema v1.0.0 (the breaking-migration subject)
-    - foundation Step schema v1.2.0 (the v2 `step` ref target type)
-    - the 27 bitemporal-bearing living-entity schemas (fields present, no emitter writes them yet)
+    - LifecycleRun schema v2.1.0 ALREADY MINTED upstream (DR-009 step_name→step v2.0.0; DR-013 +4 optional fields v2.1.0) — this change RE-VENDORS the canonical compiled schema, does not author it
+    - foundation Step schema v1.2.0 (the v2.1.0 `step` ref target type — prov:Plan)
+    - wasGeneratedBy prov_constraints edge on Product (1.0.0→1.1.0) + Opportunity (2.0.0→2.1.0) — PROPOSED in mint-request wasGeneratedBy-provenance-edge-2026-06-03; the in-repo prov-edge WP is GATED on this mint being accepted → recompiled → re-vendored
+    - the bitemporal-bearing living-entity schemas (fields present, no emitter writes them yet)
+    - Project STAYS prov:Plan at schema_version 1.0.0 — NO brain edit (excluded from the mint; provenance not applicable)
 
 key_seams_reused:
   port: plugins/sulis/scripts/_entity_repository.py            # EntityRepository (save / find_by_id / validate)

@@ -8,7 +8,7 @@ group: GENERATE
 change_id: CH-01KT61
 sequence_id: WP-001
 dependsOn: []
-blocks: [WP-003, WP-004, WP-006, WP-007]
+blocks: [WP-002, WP-006, WP-007]
 estimated_token_cost:
   input: 4k
   output: 3k
@@ -22,11 +22,12 @@ verification:
 ## Context
 
 Authors the three canonical foundation **Step** instances the v2.1.0 LifecycleRun
-`step` ref points at (ADR-001: LifecycleRun IS the `prov:Activity`; Step is its
-type). These are the *reusable definitions* runs reference. Per Path A
-(canonical-as-spec), this file is the contract — the emitter (WP-003), the
-helper (WP-004), the CLI (WP-005), and the migration (WP-006) all resolve their
-`step` refs to ULIDs authored **here**, never minted inline.
+`step` ref points at (ADR-001: LifecycleRun IS the `prov:Activity`; a Step is a
+`prov:Plan`; the run *instantiates* the Step via `sulis:viaStep` — the run is not
+"typed by" the Step). These are the *reusable Plans* runs reference. Per Path A
+(canonical-as-spec), this file is the contract — the emitter core (WP-002), the
+CLI (WP-005), and the migration (WP-006) all resolve their `step` refs to ULIDs
+authored **here**, never minted inline.
 
 This WP is the head of the lifecyclerun-migration chain (build-order piece 1).
 
@@ -96,7 +97,7 @@ Identifiers schema table).
 ## Sequence
 
 - **dependsOn:** — (head of the lifecyclerun-migration chain)
-- **blocks:** WP-003 (emitter resolves `step` to these ULIDs), WP-004 (helper name→ULID map keys on these), WP-006 (migration maps `step_name` → these), WP-007 (drift parity reads this file). WP-005 (CLI) reaches these ULIDs transitively through WP-003/WP-004 — not a direct block.
+- **blocks:** WP-002 (the atomic re-vendor+emitter-core WP resolves `step` to these ULIDs and keys its name→ULID map on them), WP-006 (migration maps `step_name` → these), WP-007 (drift parity reads this file). WP-005 (CLI) reaches these ULIDs transitively through WP-002 — not a direct block.
 
 ## Estimated Token Cost
 

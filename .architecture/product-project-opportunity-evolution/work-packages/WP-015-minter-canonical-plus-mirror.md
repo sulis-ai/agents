@@ -65,7 +65,10 @@ def write_project_entity(...):
 
 Project is a living entity by now (WP-012) — a re-discovery of an existing Project
 is an `evolve_entity` call, not a fresh `save` (MUC-003 still refuses a duplicate
-*mint*; re-discovery evolves the existing one).
+*mint*; re-discovery evolves the existing one). That evolve covers **bitemporal
+windows + supersedes only** — it passes `generated_by=None` and writes **no**
+`wasGeneratedBy` edge (Project is `prov:Plan`; ADR-002, ADR-006). Project's
+lineage is the bitemporal window chain + `state` + `deprecated_for`.
 
 ## Definition of Done
 

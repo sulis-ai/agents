@@ -10,8 +10,12 @@ deciders: [iain]
 
 Scope item 3: when a living entity changes, the system must
 read-current-version → close the prior valid-window (`valid_to`) → open a new
-window (`valid_from` + `confidence` + `sys_status`) → record PROV
-`wasGeneratedBy` the generating Activity (+ `used` inputs).
+window (`valid_from` + `confidence` + `sys_status`) → **for `prov:Entity` living
+types (Product, Opportunity) only**, record the PROV `wasGeneratedBy` edge to the
+generating Activity (the LifecycleRun). **Project is also a living type (it gets
+windows) but is a `prov:Plan`, so it gets NO `wasGeneratedBy` write** — its
+provenance is not applicable (ADR-002, ADR-006). The provenance write is
+therefore *conditional*, gated by whether the caller supplies a `generated_by`.
 
 Today the emitters (`_product_emission`, `_opportunity_emission`, …) write a
 **current snapshot only** via `repo.save(...)`. `save` overwrites the file at
@@ -46,15 +50,22 @@ def evolve_entity(
     repo: EntityRepository,
     entity_type: str,
     next_version: dict,          # the new state the caller computed
-    generated_by: str | None,    # dna:lifecyclerun:<ulid> — the Activity (ADR-001)
-    used: list[str] | None = None,
+    generated_by: str | None,    # dna:lifecyclerun:<ulid> — the Activity (ADR-001);
+                                 # None for prov:Plan types (Project) — NO provenance write
     confidence: float | None = None,
     valid_from: str | None = None,   # defaults to now (UTC)
     now: str | None = None,          # injectable clock for tests
 ) -> dict:
     """Close the current open window for next_version['id'] (set valid_to),
-    open a new window on next_version (valid_from + confidence + sys_status
-    + was_generated_by), persist both. Returns the new open version.
+    open a new window on next_version (valid_from + confidence + sys_status),
+    persist both. Returns the new open version.
+
+    PROV: when `generated_by` is provided (prov:Entity types — Product,
+    Opportunity), the new window also records the `wasGeneratedBy` edge to that
+    LifecycleRun, written as the canonical `prov_constraints` edge (ADR-002).
+    When `generated_by` is None (prov:Plan types — Project), NO provenance edge
+    is written; only the bitemporal window moves. This is how Project is a living
+    entity (it gets windows) without carrying a type-violating wasGeneratedBy.
 
     First-emission case (no prior window): opens the first window only.
     No-op case (next_version byte-identical to current open window): returns
@@ -63,10 +74,14 @@ def evolve_entity(
     """
 ```
 
-`used` (the Activity's consumed inputs) is written onto the **LifecycleRun**,
-not the entity (PROV-O direction, ADR-002) — so the helper's `used` argument is
-passed through to the Activity-emission seam, not onto `next_version`. The
-helper's job for the entity is `was_generated_by` + the window fields.
+The helper's job for the entity is the window fields, plus — **only for
+`prov:Entity` types** — the `wasGeneratedBy` edge. There is **no `used`
+argument**: the canonical v2.1.0 LifecycleRun does not carry a `used` field
+(DR-013 settled its field-set with content-addressed `inputs_ref`/`outputs_ref`);
+modelling consumed inputs as ABox `prov:used` triples is a separate, later
+concern (ADR-002) and is not the evolve helper's responsibility. An earlier draft
+of this API carried a `used` parameter routed to the Activity-emission seam —
+that parameter is **removed**.
 
 ### History layout (the load-bearing sub-decision)
 
@@ -123,6 +138,11 @@ not on the list).
   function on the read seam (`_brain_query.py`): given (type, id, as_of) return
   the window whose `[valid_from, valid_to)` contains `as_of`.
 - A `_LIVING_ENTITY_TYPES` allowlist is the guard that keeps evolve off event
-  entities — a single source of truth for the events-vs-living split.
+  entities — a single source of truth for the events-vs-living split. The
+  allowlist admits **all three** living types (Product, Opportunity, Project):
+  all three get bitemporal windows. The **provenance** write is a *separate*
+  conditional, gated by `generated_by is not None`, so Product/Opportunity get
+  `wasGeneratedBy` and Project does not — the living-vs-events split and the
+  prov-Entity-vs-prov-Plan split are two orthogonal guards.
 - The history-envelope layout is additive to `LocalFileEntityAdapter`; the
   SQLite adapter (ADR-005) materialises the same windows as rows.

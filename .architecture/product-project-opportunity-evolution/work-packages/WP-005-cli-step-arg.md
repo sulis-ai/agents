@@ -7,7 +7,7 @@ primitive: substitute-strangle
 group: SUBSTITUTE
 change_id: CH-01KT61
 sequence_id: WP-005
-dependsOn: [WP-003, WP-004]
+dependsOn: [WP-002]
 blocks: []
 removal_plan:
   deprecated_surface: "the `--step-name` CLI flag (alias)"
@@ -25,10 +25,13 @@ verification:
 ## Context
 
 The `sulis-emit-lifecyclerun` CLI today exposes `--step-name`. Under v2 it
-exposes `--step` (which resolves to a canonical Step ref via WP-004's
+exposes `--step` (which resolves to a canonical Step ref via WP-002's
 `_resolve_step`), and keeps `--step-name` only as a **deprecated alias** that
-maps to `step_label` + the resolved `step` (ADR-004 step 5 — kept for one
-release of consumer back-compat, then removed per `removal_plan`).
+resolves the legacy string to a Step ref (unknown → `unclassified-lifecycle-step`)
+and, where trace grouping is needed, carries the original string in the canonical
+`run_id` field — **not** a `step_label` (which does not exist in canonical
+v2.1.0). Kept for one release of consumer back-compat, then removed per
+`removal_plan`.
 
 # canonical-source: TDD.md §Canonical Identifiers — name→Step-ULID map
 
@@ -45,16 +48,16 @@ plugins/sulis/scripts/sulis-emit-lifecyclerun
 | Flag | Behaviour |
 |---|---|
 | `--step <name-or-ref>` | resolves via `_resolve_step` → canonical Step ULID; the primary path |
-| `--step-name <string>` | **deprecated alias**: emits a deprecation notice to stderr, resolves the string via `_resolve_step` (→ `unclassified-lifecycle-step` if unknown), preserves the string in `step_label` |
+| `--step-name <string>` | **deprecated alias**: emits a deprecation notice to stderr, resolves the string via `_resolve_step` (→ `unclassified-lifecycle-step` if unknown); the original string is carried in `run_id` when trace grouping is needed (NOT a `step_label`) |
 
-Mutually exclusive: passing both is an error. Calls WP-003 `compose_lifecyclerun`.
+Mutually exclusive: passing both is an error. Calls WP-002's `compose_lifecyclerun`.
 
 ## Definition of Done
 
 ### Red — Failing tests written
 
 - [ ] `tests/unit/test_emit_lifecyclerun_cli_v2.py::test_step_flag_resolves` — `--step change-started` → canonical ULID in output
-- [ ] `tests/unit/test_emit_lifecyclerun_cli_v2.py::test_step_name_alias_warns_and_resolves` — `--step-name foo` emits deprecation notice, resolves to unclassified, preserves `foo` in `step_label`
+- [ ] `tests/unit/test_emit_lifecyclerun_cli_v2.py::test_step_name_alias_warns_and_resolves` — `--step-name foo` emits deprecation notice, resolves to unclassified; output carries NO `step_label` field
 - [ ] `tests/unit/test_emit_lifecyclerun_cli_v2.py::test_both_flags_is_error`
 - [ ] `tests/unit/test_emit_lifecyclerun_cli_v2.py::test_output_validates_v2`
 
@@ -65,12 +68,12 @@ Mutually exclusive: passing both is an error. Calls WP-003 `compose_lifecyclerun
 
 ### Blue — Refactor complete
 
-- [ ] CLI shares WP-004's `_resolve_step` — no second copy of the map
+- [ ] CLI shares WP-002's `_resolve_step` — no second copy of the map
 - [ ] `--help` text documents `--step` as primary, `--step-name` as deprecated
 
 ## Sequence
 
-- **dependsOn:** WP-003 (composer), WP-004 (`_resolve_step` + map)
+- **dependsOn:** WP-002 (the atomic re-vendor+emitter-core WP — `compose_lifecyclerun` v2 signature + `_resolve_step` + map all land there)
 - **blocks:** — (leaf of the emitter cluster)
 
 ## Estimated Token Cost

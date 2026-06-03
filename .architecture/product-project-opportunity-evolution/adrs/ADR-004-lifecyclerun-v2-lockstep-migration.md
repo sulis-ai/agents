@@ -1,126 +1,191 @@
 ---
 id: ADR-004
-title: LifecycleRun v1.0.0 -> v2.1.0 lockstep migration (schema + helper + CLI + existing instances)
+title: LifecycleRun v1.0.0 → v2.1.0 — surgically RE-VENDOR the already-minted canonical schema (do not author), lockstep/atomic with the emitter migration
 status: accepted
 date: 2026-06-03
+revised: 2026-06-03 — REWRITTEN against canonical. LifecycleRun v2.1.0 is ALREADY MINTED upstream (DR-009 did step_name→step as v2.0.0; DR-013 added run_id/deterministic/inputs_ref/outputs_ref as v2.1.0). The action is a SURGICAL RE-VENDOR of the canonical compiled schema — NOT authoring a new shape. step_label + used-on-run DROPPED. Re-vendor + emitter migration are one atomic WP.
 deciders: [iain]
 ---
 
 ## Context
 
-Scope item 1 + the BREAKING constraint: `lifecyclerun.schema.json` changes
-`step_name` (required string) to `step` (required ref `^dna:step:<ulid>$`).
-This is breaking — a v1.0.0 instance has no `step` field and a v2 validator
-rejects it; a v1 validator rejects a v2 instance. The SPEC mandates **no
-half-migrated state**: schema, `_brain_emit_helper`, `sulis-emit-lifecyclerun`,
-and existing on-disk instances move together.
+An earlier draft of this ADR treated the v2.1.0 LifecycleRun as a shape **this
+change authors** — and invented a `step_label` field and a `used`-on-the-run
+field to carry per-run detail. A brain-governance review corrected both against
+the canonical source:
 
-Verified blast radius (every site that reads/writes `step_name`):
+- **LifecycleRun v2.1.0 is ALREADY MINTED upstream.** Two Decision Records did
+  it: **DR-009** lifted process knowledge and did the breaking `step_name: text`
+  → `step: ref→step` swap (v1.0.0 → **v2.0.0**); **DR-013** added four optional
+  fields (`run_id`, `deterministic`, `inputs_ref`, `outputs_ref`) as the additive
+  minor (v2.0.0 → **v2.1.0**). The canonical compiled schema already exists at
+  `.specifications/business-dna/compiled/schemas/product-development/lifecyclerun.schema.json`.
+
+- **The invented v2.1.0 shape was WRONG and COLLIDES with the real version.**
+  The earlier draft's `step_label` + `used`-on-LifecycleRun do not exist in
+  canonical v2.1.0, and DR-013 explicitly rejected payload-on-the-run-record
+  (option 1: *"inline the payloads… rejected: the run record stays a small
+  audit-log row"*). Authoring a divergent "v2.1.0" would fork the vendored schema
+  from the canonical one at the same version number — the worst possible drift.
+
+The canonical v2.1.0 field-set, verified at
+`product-development.entities.jsonld:316–319`:
+
+```jsonc
+"field_spec": { "id": "id", "step": "ref→step", "at": "datetime",
+                "by_actor": "ref→actor", "outcome": "enum[completed|failed|in-progress|cancelled]",
+                "run_id": "text?", "deterministic": "bool?",
+                "inputs_ref": "text? x-sensitive", "outputs_ref": "text? x-sensitive" },
+"required": ["id", "step", "at", "outcome"],
+"prov_constraints": { "is_a": "prov:Activity",
+                      "wasAssociatedWith": { "range": "dna:entity:actor", "card": "0..*" },
+                      "step": { "range": "dna:entity:step", "card": "1..1", "_predicate": "sulis:viaStep" } }
+```
+
+No `step_label`. No `used`. The breaking change is still real (`step_name`
+required string → `step` required ref); only its **provenance** changes from
+"we author it" to "we re-vendor the already-minted canonical".
+
+Verified blast radius (every in-repo site that reads/writes `step_name`):
 
 | Site | What it does today |
 |---|---|
-| `lifecyclerun.schema.json` | `step_name` required string |
+| `plugins/sulis/brain/compiled/product-development/lifecyclerun.schema.json` | vendored at v1.0.0 (`step_name` required string) |
 | `_lifecyclerun_emission.py` | `compose_lifecyclerun(step_name=...)` builds the dict; ID seeded from `step_name` |
-| `_brain_emit_helper.py` | 3 helpers pass `step_name=f"...:{slug}"` strings |
+| `_brain_emit_helper.py` | 3 helpers pass `step_name=f"...:{slug}"` strings (lines 131, 163, 198) |
 | `sulis-emit-lifecyclerun` (CLI) | `--step-name` arg → `emit_lifecyclerun(step_name=...)` |
 | existing instances | 2 on-disk `.jsonld` files with `step_name`, no `step` |
 
-This ADR records *how* the lockstep is sequenced so the decomposition can build
-it as the **first** piece (the PROV spine, per the SPEC build-order note).
-
 ## Decision
 
-**One atomic migration, sequenced as a single dependency-ordered slice, with a
-data-migration script that runs as part of the same change — never leaving a
-mixed v1/v2 store.**
+**Surgically re-vendor the canonical compiled v2.1.0 LifecycleRun schema into
+`plugins/sulis/brain/compiled/product-development/lifecyclerun.schema.json`,
+and migrate the emitter (`_lifecyclerun_emission` + the three
+`_brain_emit_helper` helpers + the CLI) in LOCKSTEP — one atomic WP, never a
+loose schema commit ahead of the emitter.**
 
-### The version bump: 1.0.0 → **2.1.0**
+### Why a surgical re-vendor, not `sync-from-canonical.sh`
 
-Major bump (breaking `step` swap) and the minor digit carries the additive
-`used` PROV field from ADR-002 — so the single schema rev is `2.1.0`, matching
-the SPEC's stated target. The `$id` becomes
-`https://sulis.co/dna/schema/lifecyclerun/2.1.0`.
+The marketplace's vendored brain (`plugins/sulis/brain/compiled/`) is an
+**intentional mixed-version vendor** (see that directory's `README.md`):
+product-development is mirrored at ontology **v0.5.0**, with `scenario` /
+`testrun` / `requirement` / `decision` surgically vendored from **v0.9.0**
+because each is additive + standalone. The README explicitly tracks
+`lifecyclerun v1.0.0 → 2.1.0` as the breaking item *"deliberately NOT bundled"*,
+needing *"the emitter (`_brain_emit_helper`) migrated in lockstep"*.
+
+- The wholesale `scripts/sync-from-canonical.sh` targets the **separate
+  `sulis-brain` plugin** in the dna repo (a full vendor of all schemas at a
+  single ontology version) — **not** the marketplace's surgically mixed
+  `plugins/sulis/brain/compiled/` tree. Running it here would overwrite the
+  intentional mixed-version vendor and pull in unrelated breaking changes.
+- The correct move is a **surgical, single-file re-vendor**: copy the canonical
+  compiled `lifecyclerun.schema.json` (v2.1.0) over the vendored v1.0.0 copy,
+  respecting the README's mixed-version discipline. The schema is a clean drop-in
+  (the canonical compiled output already includes the bitemporal/`sys_status`
+  envelope fields the vendored copies carry, so no hand-merge is needed — diff
+  confirms only `step_name`→`step` + the four DR-013 optional fields change).
+
+### Lockstep / atomic with the emitter migration (the README mandate)
+
+The README mandates lockstep: the schema and `_brain_emit_helper` move together.
+Therefore the **re-vendor and the emitter migration are ONE work package**, not
+a schema commit followed later by an emitter commit. No intermediate state where
+the vendored schema is v2.1.0 but the emitter still composes `step_name` (every
+emit would reject-on-invalid), and none where the emitter composes `step` but the
+schema still requires `step_name`.
+
+Inside that one WP, the ordered moves are:
+
+```
+1. author the canonical lifecycle Step instances (definitions exist before anything refs them) — see ADR-001
+2. re-vendor: copy canonical compiled lifecyclerun.schema.json (v2.1.0) → plugins/sulis/brain/compiled/product-development/
+3. update _lifecyclerun_emission (compose_lifecyclerun: `step` ref, NOT step_name; ID seed from step+timestamp)
+4. update _brain_emit_helper (3 helpers resolve a Step ULID for `step`; per-run detail goes in run_id, not step_label)
+5. update sulis-emit-lifecyclerun CLI (--step resolves a Step; --step-name kept as a deprecated alias that resolves the legacy string to a Step)
+6. run the instance migration on .brain/instances (step_name → step)
+7. tests green throughout; suite green at the end
+```
+
+The WP carries a `removal_plan` for the two deprecated surfaces it introduces
+(the `--step-name` CLI alias; any transitional string-resolution path) with a
+target date.
 
 ### Step-ref resolution at the call sites
 
-Per ADR-001, the two operational Steps (`change-started`, `change-shipped`) get
-deterministic ULIDs pinned in the TDD Canonical Identifiers section. The helper
-functions resolve:
+Per ADR-001, the operational Steps (`change-started`, `change-shipped`, and a
+generic `unclassified-lifecycle-step` fallback) get deterministic ULIDs pinned in
+the TDD Canonical Identifiers section. The helpers resolve:
 
 - `emit_change_started_event` → `step = <change-started ULID>`
 - `emit_change_shipped_event` → `step = <change-shipped ULID>`
-- `emit_lifecycle_step_event(step_name=...)` (the general one) → resolves the
-  free string to a Step via a small **name→Step-ULID map** for known step
-  names, and for unknown names mints/points at a generic
-  `unclassified-lifecycle-step` Step (deterministic ULID). The per-run
-  `step_name` detail is preserved on the LifecycleRun in a new descriptive
-  field (`step_label`, additive) so no information is lost — the Step ref
-  carries the *type*, `step_label` carries the *instance specificity* that used
-  to live in `step_name`.
+- `emit_lifecycle_step_event(step_name=...)` (the general one) → resolves the free
+  string via a **name→Step-ULID map** for known names; unknown names resolve to
+  the generic `unclassified-lifecycle-step` Step.
 
-> The `change-started`/`change-shipped`/`unclassified-lifecycle-step` Steps are
-> authored as canonical foundation Step instances (a new
+The per-run specificity that used to live in the `step_name` string (e.g.
+`{primitive}:{slug}`) is carried by the LifecycleRun's **existing canonical**
+`run_id` field (the workflow-run trace identifier) — **not** by a new
+`step_label` field, which does not exist in canonical v2.1.0 and is dropped.
+
+> The `change-started` / `change-shipped` / `unclassified-lifecycle-step` Steps
+> are authored as canonical foundation Step instances (a new
 > `plugins/sulis/instances/lifecycle-steps/steps.jsonld` set), Path-A style,
-> with deterministic ULIDs. They are the reusable definitions the runs point at.
+> with deterministic ULIDs. They are the reusable Plans the runs instantiate.
 
 ### Existing-instance migration
 
-A one-shot migration script (`scripts/migrate_lifecyclerun_v1_to_v2.py`, or a
-subcommand) walks every `.brain/instances/*/lifecyclerun/*.jsonld`, and for
-each v1 instance:
+A one-shot migration script (`scripts/migrate_lifecyclerun_v1_to_v2.py`) walks
+every `.brain/instances/*/lifecyclerun/*.jsonld`, and for each v1 instance:
 
 1. maps `step_name` → the matching Step ULID (known names via the map; the
    harness instance's `faithful-generation-harness` → the
-   `unclassified-lifecycle-step` Step), moving the old string to `step_label`;
+   `unclassified-lifecycle-step` Step). The old `step_name` string is **dropped**
+   (not preserved into a `step_label` — there is no such field); where genuinely
+   needed, run-grouping is carried by `run_id`;
 2. removes `step_name`, adds `step`;
-3. re-validates against v2.1.0 before writing (reject-on-invalid — never write a
-   still-invalid instance);
+3. re-validates against the re-vendored v2.1.0 before writing
+   (reject-on-invalid — never write a still-invalid instance);
 4. is idempotent (a v2 instance is detected by presence of `step` and skipped).
 
 The migration runs against the marketplace's own `.brain/instances` in this
-change. Downstream consumer repos run it via the CLI/skill on next emit (or a
-`sulis-emit-lifecyclerun --migrate` flag) — but because emission is best-effort
-and graceful-degrading, a consumer that never migrates simply keeps its old v1
-files until they touch them; the marketplace's own store is fully migrated here.
-
-### Lockstep ordering inside the slice
-
-```
-1. author the canonical lifecycle Steps (definitions exist before anything refs them)
-2. bump schema to 2.1.0 (vendored compiled copy) + add `used`
-3. update _lifecyclerun_emission (compose_lifecyclerun: step + step_label; ID seed from step+timestamp)
-4. update _brain_emit_helper (3 helpers resolve Step refs)
-5. update sulis-emit-lifecyclerun CLI (--step resolves; --step-name kept as deprecated alias mapping to step_label + resolved step)
-6. run the instance migration on .brain/instances
-7. tests green at each step; suite green at the end
-```
-
-No commit in this sequence leaves the schema and the emitters disagreeing —
-the schema bump (2) and the emitter updates (3–5) land together in the slice;
-CI on the slice's PR is the gate.
+change (eager-for-our-own). Downstream consumer repos migrate lazily on next
+emit (graceful-degradation: a consumer that never migrates keeps its old v1 files
+until they touch them).
 
 ## Options Considered
 
-- **Make `step` optional to soften the break (rejected).** The SPEC says
-  required; an optional ref re-admits the untyped-activity problem ADR-001
-  closes. A clean break with a migration script is the boring, correct move.
+- **Author a new v2.1.0 shape with `step_label` + `used` (rejected — collides
+  with the real canonical v2.1.0).** The earlier draft. The invented fields are
+  not in canonical v2.1.0; DR-013 rejected payload-on-the-run-record. Authoring a
+  divergent schema at the same version number is the worst drift.
+- **Run the wholesale `sync-from-canonical.sh` (rejected — wrong target).** That
+  script vendors the *separate sulis-brain plugin* at a single ontology version;
+  it would overwrite the marketplace's intentional mixed-version vendor and pull
+  in unrelated breaking changes. The surgical single-file re-vendor respects the
+  README's mixed-version discipline.
+- **Split the re-vendor and the emitter migration into two WPs (rejected —
+  breaks the README's lockstep mandate).** Any ordering of two separate commits
+  leaves a window where schema and emitter disagree and every emit
+  reject-on-invalids. One atomic WP, gated by CI on its PR.
+- **Make `step` optional to soften the break (rejected).** Canonical requires it;
+  an optional ref re-admits the untyped-activity problem ADR-001 closes.
 - **Keep `step_name` alongside `step` for back-compat (rejected as permanent;
-  kept only as a deprecated CLI alias).** Two fields meaning the same thing is
-  the band-aid the SPEC's "no half-migrated state" forbids. `step_label` is
-  *not* a duplicate of `step` — it is the free-text per-run specificity, a
-  different concern, retained deliberately.
-- **Lazy per-instance migration only, no upfront script (rejected for the
-  marketplace's own store).** Would leave the marketplace store in mixed
-  v1/v2 state indefinitely — exactly the half-migrated state forbidden. Upfront
-  script for our own store; lazy is acceptable only for downstream consumers
-  whose stores we don't own.
+  kept only as a deprecated CLI alias with a `removal_plan`).** Two fields meaning
+  the same thing is the band-aid "no half-migrated state" forbids.
 
 ## Consequences
 
-- This is build-order piece 1 (the PROV spine). ADR-002's `used` field and the
-  PROV `@context` standardisation ride in the same schema rev.
-- New canonical Step instance set `plugins/sulis/instances/lifecycle-steps/`.
+- This is build-order piece 1 (the PROV spine), now a **re-vendor + emitter
+  lockstep**, delivered as **one atomic WP** (not a schema WP + an emitter WP).
+- The re-vendored schema is the canonical compiled v2.1.0 — `$id`
+  `https://sulis.co/dna/schema/lifecyclerun/2.1.0`, `step` required ref, the four
+  DR-013 optional fields present, **no `step_label`, no `used`**.
+- New canonical Step instance set `plugins/sulis/instances/lifecycle-steps/`
+  (`change-started`, `change-shipped`, `unclassified-lifecycle-step`).
 - New migration script + its test (a v1 fixture in, a v2 instance out, idempotent
   on re-run, rejects unmappable).
-- The drift detector / vendored-schema parity must be updated for the 2.1.0
-  compiled schema.
+- The drift detector / vendored-schema parity is updated for the re-vendored
+  v2.1.0 compiled schema. No `used` field and no `step_label` appear anywhere —
+  the vendored schema is byte-faithful to canonical v2.1.0 (modulo the standard
+  vendored envelope fields).

@@ -7,7 +7,7 @@ primitive: create
 group: GENERATE
 change_id: CH-01KT61
 sequence_id: WP-006
-dependsOn: [WP-001, WP-002, WP-003]
+dependsOn: [WP-001, WP-002]
 blocks: []
 estimated_token_cost:
   input: 4k
@@ -23,12 +23,14 @@ verification:
 
 The data-migration half of ADR-004 (no half-migrated state). A one-shot script
 walks every `.brain/instances/*/lifecyclerun/*.jsonld`; for each v1 instance it
-maps `step_name` → the matching Step ULID (via WP-004's map; unmappable →
-`unclassified-lifecycle-step`), moves the old string to `step_label`, removes
-`step_name`, adds `step`, **re-validates against v2.1.0 before writing**
-(reject-on-invalid), and is **idempotent** (presence of `step` ⇒ skip). Runs
-eager on the marketplace's own store in this change; lazy for downstream
-consumers (graceful degradation).
+maps `step_name` → the matching Step ULID (via WP-002's `_resolve_step`;
+unmappable → `unclassified-lifecycle-step`), **drops the old `step_name` string**
+(NOT into a `step_label` — there is no such field; where trace grouping is
+genuinely needed it is carried by `run_id`), removes `step_name`, adds `step`,
+**re-validates against the re-vendored v2.1.0 before writing** (reject-on-invalid),
+and is **idempotent** (presence of `step` ⇒ skip). Runs eager on the
+marketplace's own store in this change; lazy for downstream consumers (graceful
+degradation).
 
 # canonical-source: TDD.md §Canonical Identifiers — name→Step-ULID map
 
@@ -54,14 +56,14 @@ def migrate_instance(doc: dict) -> dict | None:
     Re-validates against the 2.1.0 schema; raises on still-invalid (never writes)."""
 ```
 
-Reuses WP-003 `compose_lifecyclerun` semantics for the v2 shape and WP-004's
+Reuses WP-002's `compose_lifecyclerun` semantics for the v2 shape and WP-002's
 `_resolve_step` for the name mapping (single source of truth — no second map).
 
 ## Definition of Done
 
 ### Red — Failing tests written
 
-- [ ] `tests/unit/test_lifecyclerun_migration.py::test_v1_fixture_migrates` — `step_name` string in → v2 with resolved `step`, original in `step_label`, no `step_name`
+- [ ] `tests/unit/test_lifecyclerun_migration.py::test_v1_fixture_migrates` — `step_name` string in → v2 with resolved `step`, NO `step_name`, NO `step_label` in output
 - [ ] `tests/unit/test_lifecyclerun_migration.py::test_idempotent` — a v2 instance in ⇒ skipped (returns None)
 - [ ] `tests/unit/test_lifecyclerun_migration.py::test_unmappable_to_unclassified` — `faithful-generation-harness` → `unclassified-lifecycle-step`
 - [ ] `tests/unit/test_lifecyclerun_migration.py::test_rejects_invalid` — a doc that can't be made valid raises; nothing written
@@ -75,13 +77,13 @@ Reuses WP-003 `compose_lifecyclerun` semantics for the v2 shape and WP-004's
 
 ### Blue — Refactor complete
 
-- [ ] Migration reuses `_resolve_step` (WP-004) — no duplicate mapping
-- [ ] Re-validation uses the same v2.1.0 schema (WP-002) the emitter targets — one validator
+- [ ] Migration reuses `_resolve_step` (WP-002) — no duplicate mapping
+- [ ] Re-validation uses the same re-vendored v2.1.0 schema (WP-002) the emitter targets — one validator
 - [ ] Script is safe to re-run (idempotency proven by test)
 
 ## Sequence
 
-- **dependsOn:** WP-001 (Step ULIDs), WP-002 (v2.1.0 schema to re-validate against), WP-003 (v2 instance shape)
+- **dependsOn:** WP-001 (Step ULIDs), WP-002 (re-vendored v2.1.0 schema to re-validate against + `_resolve_step` + v2 instance shape — all land in the one atomic WP)
 - **blocks:** — (terminal step of the migration chain; ADR-004 lockstep step 6)
 
 ## Estimated Token Cost
