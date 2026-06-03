@@ -210,6 +210,74 @@ def _collect_status_across_tables(text: str) -> dict[str, str]:
     return status_by_id
 
 
+def _rewrite_status_summary(text: str) -> str:
+    """Recompute counts in the `## Status Summary` table from current WP cells.
+
+    #143: flip-status updated the WP row but left the summary stale, so the
+    summary drifted from the row truth. The fix recomputes the summary
+    atomically with the row write.
+
+    Preserves the existing summary table's row order + status set (some
+    projects track a narrow set — pending/in_progress/done/blocked — others
+    extend); only the Count column is rewritten. Silently no-ops when no
+    summary section exists.
+    """
+    hd_re = re.compile(r"^##\s+Status\s+Summary\s*$", re.MULTILINE | re.IGNORECASE)
+    m_hd = hd_re.search(text)
+    if not m_hd:
+        return text
+    # Find the next | Status | Count |-headed table after the heading.
+    tbl_re = re.compile(
+        r"(^\|\s*Status\s*\|\s*Count\s*\|[^\n]*\n\|[^\n]+\n(?:\|[^\n]*\n)*)",
+        re.MULTILINE | re.IGNORECASE,
+    )
+    m_tbl = tbl_re.search(text, pos=m_hd.end())
+    if not m_tbl:
+        return text
+    table_text = m_tbl.group(1)
+    table = parse_md_table(table_text)
+    if not table.headers:
+        return text
+    # Locate Status / Count columns case-insensitively (allows extra columns
+    # like Notes after Count).
+    headers_lower = [h.strip().lower() for h in table.headers]
+    try:
+        status_idx = headers_lower.index("status")
+        count_idx = headers_lower.index("count")
+    except ValueError:
+        return text
+
+    # Recount across all WP sub-tables — the row cells are the source of truth.
+    counts: dict[str, int] = {}
+    for _, _, sub in _find_all_wp_tables(text):
+        sub_tbl = parse_md_table(sub)
+        sub_cols = resolve_wp_columns(sub_tbl.headers)
+        if "status" not in sub_cols:
+            continue
+        si = sub_cols["status"]
+        for row in sub_tbl.rows:
+            if si < len(row):
+                s = row[si].strip()
+                if s:
+                    counts[s] = counts.get(s, 0) + 1
+
+    # Update only the rows already present (preserve the project's chosen
+    # summary scope — don't append unseen statuses).
+    changed = False
+    for row in table.rows:
+        if status_idx >= len(row) or count_idx >= len(row):
+            continue
+        status = row[status_idx].strip()
+        new_count = str(counts.get(status, 0))
+        if row[count_idx].strip() != new_count:
+            row[count_idx] = new_count
+            changed = True
+    if not changed:
+        return text
+    new_table = table.render() + "\n"
+    return text[:m_tbl.start()] + new_table + text[m_tbl.end():]
+
+
 def _load_deps_from_frontmatter(
     args: argparse.Namespace, known_wps: set[str],
 ) -> dict[str, list[str]]:
@@ -367,6 +435,9 @@ def cmd_flip_status(args: argparse.Namespace) -> None:
         if found:
             new_table = table.render() + "\n"
             text = text[:start] + new_table + text[end:]
+            # #143: recompute the Status Summary atomically with the row
+            # write so the summary table doesn't drift from the cells.
+            text = _rewrite_status_summary(text)
             _write_index(args, text)
             emit_ok(data={"wp": args.wp, "status": args.to})
             return
