@@ -59,10 +59,14 @@ from _entity_repository import EntityRepository
 # Crockford base32 — same alphabet as ULID; no I/L/O/U.
 _CROCKFORD_ALPHABET: Final[str] = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
-# `**FR-NN: Title**` or `**NFR-NN: Title**` on a line of its own. The title
-# captures up to the closing `**` (greedy across the rest of the line).
+# `**FR-NN: Title**` or `**NFR-NN: Title**` heading. The title captures up
+# to the closing `**`; #170 — the line MAY carry inline body text after
+# the closing `**` (the canonical `**FR-NN: Title.** body` format). The
+# previous trailing `\s*$` anchored to end-of-line and silently dropped
+# every inline-body heading, leaving its FR unemitted (and therefore
+# absent from the verify gate too).
 _FR_HEADER_RE: Final = re.compile(
-    r"^\*\*((?:FR|NFR)-\d+(?:\.\d+)?):\s*(.+?)\*\*\s*$",
+    r"^\*\*((?:FR|NFR)-\d+(?:\.\d+)?):\s*(.+?)\*\*",
     re.MULTILINE,
 )
 
