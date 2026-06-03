@@ -276,6 +276,16 @@ These standards shape the WP set's *shape*, not just the content:
       `dependsOn` the backend WP. Both build in parallel (CF-05 parallel-
       not-sequential) — the consumer against a mock generated from the
       contract.
+    - **Shared producer-side artifacts: pin filename + merge semantics in
+      the contract WP (#107, CF-11 MUST).** When two or more producer WPs
+      emit into the same logical artifact (a manifest, registry, codegen
+      output), the contract WP declares the artifact's **filename, path,
+      schema, and merge semantics** as an explicit shared constant.
+      Producers reference the constant verbatim — they do NOT independently
+      choose a filename. Anchor case CH-01KSSV: WP-001 and WP-002 each
+      picked their own name (`CONTRACT.manifest.json` vs `manifest.json`),
+      one clobbered the other, the shared manifest split silently.
+      Decompose-validation rubric P6 check **6.06** enforces it.
     - **Emit an integration WP last.** `kind: composite` (or `kind: docs`
       with `produces: integration-check`) that `dependsOn` all the per-kind
       siblings and runs the conformance check (CF-07) — swap mock for real

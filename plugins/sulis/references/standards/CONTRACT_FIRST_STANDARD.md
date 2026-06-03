@@ -230,6 +230,34 @@ mechanically enforce the bar; hold it by hand until then. This is the
 third design-stage structured deliverable alongside the visual contract
 (#45) and the data contract (#48).
 
+### CF-11 — Shared producer-side artifacts are pinned in the contract WP · MUST
+
+When the decomposition has **two or more producer WPs** that emit into the
+**same logical artifact** — a manifest, registry, index, codegen output, or
+any file the producers compose — the artifact's identity (**filename, path,
+schema, and merge semantics**) MUST be pinned as an **explicit shared
+constant in the contract WP**, never independently chosen by each producer.
+
+Anchor case (#107, CH-01KSSV): two producer renderers (WP-001 data-contract,
+WP-002 UI-contract) were designed to share one manifest; they independently
+picked `CONTRACT.manifest.json` vs `manifest.json` and one clobbered the
+other instead of merging. The shared manifest split silently. Caught at
+Step 10.5 cross-WP review (the gate worked) and fixed.
+
+In practice the contract WP carries — in `Contract` or a dedicated
+`## Shared Artifacts` block — for each shared artifact:
+
+- a **constant** the producer WPs reference verbatim (`MANIFEST_PATH =
+  ".sulis/contracts/manifest.json"`, never re-spelled);
+- the **schema** (the JSON / YAML / TS shape the file conforms to);
+- the **merge semantics** (overwrite vs append vs structural-merge vs
+  per-key-merge, and the resolution rule on collision).
+
+Producer WPs `dependsOn` the contract WP (per CF-05) and import the
+constant; they do NOT re-declare the filename. The decompose-validation
+rubric P6 enforces this mechanically (check 6.06 — see
+`decompose-validation-rubric.md`).
+
 ---
 
 ## Tiers (scope the rigor to the case)
@@ -287,3 +315,4 @@ the in-repo reference implementation of the subprocess+JSON transport binding.
 | Version | Date | Changes |
 |---------|------|---------|
 | 0.1.0 | 2026-05-26 | Initial sulis-local definition. 9 requirements (CF-01..CF-09) on the two-axis + three-category-error backbone. Two tiers (lightweight internal seam / full published SDK). Sits between WP_BACKEND and WP_FRONTEND; amends WORK_PACKAGE_STANDARD cross-kind decomposition (parallel via contract dependency — to be reflected there). SHOULD-tier requirements (CF-08/09) carry 90-day calibration. |
+| 0.2.0 | 2026-06-03 | Added CF-11 (MUST) — shared producer-side artifacts must be pinned in the contract WP with filename + path + schema + merge semantics as an explicit shared constant; producer WPs reference the constant verbatim and never independently choose a filename. Mechanically enforced by decompose-validation rubric P6 check 6.06. Provenance: lesson #107 (anchor case CH-01KSSV — two producer WPs picked `CONTRACT.manifest.json` vs `manifest.json` and one clobbered the other). |
