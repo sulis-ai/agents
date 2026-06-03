@@ -1,0 +1,192 @@
+#!/usr/bin/env python3
+"""sulis-capture — the thin executable front door of the capture path.
+
+Companion to the `sulis-emit-*` write CLIs and `sulis-brain-query`. Where the
+emitters PUT document-shaped entities into `.brain/instances/`, this CLI takes
+a founder's *idea* — a why-string and an optional what-string typed in
+conversation — and roots it in the Brain graph through
+`_brain_capture.capture_idea` (ADR-003 / ADR-005).
+
+It does four boring things:
+
+1. Construct the **two** domain adapters the orchestrator needs — a
+   `foundation` adapter (where the Tenant lives) and a `product-development`
+   adapter (Product / Opportunity / Requirement) — both over the same
+   `.brain/instances` base-dir (ADR-002 two-domain construction).
+2. Resolve the repo shorthand (e.g. `sulis-ai/agents`) from
+   `.sulis/repo-contract.yml` so the bootstrapped Tenant joins the canonical
+   graph. Absent / unreadable contract → a plain-English `ok:false`, never a
+   crash.
+3. Call `capture_idea(...)`, passing `roadmap_base_dir` = the `.brain/` root
+   (the *parent* of the instances base-dir) so the Roadmap sidecar lands
+   beside `instances/`, not inside it.
+4. Translate the result — or a `CaptureError` / `EntityValidationError` /
+   any store failure — into the `{"ok": ...}` envelope.
+
+`main()` **never raises** (NFR-01): every failure becomes
+`{"ok": false, "error": "<plain message>"}` exit 1. `ok:true` →
+`{"ok": true, "data": {...}}` exit 0. The envelope shape, the `_ok`/`_err`
+helpers, and the `_resolve_repo_root` recipe are reused verbatim from the
+sibling CLIs (do not invent a new envelope).
+
+The `full` path's "run the opportunity-analyst first" guidance is the skill's
+job (WP-009); this CLI only accepts the resolved `--opportunity-id`.
+
+Stdlib only (+ pyyaml to read the contract, jsonschema via the adapter).
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+from _brain_capture import CaptureError, capture_idea  # noqa: E402
+from _entity_adapter_local import LocalFileEntityAdapter  # noqa: E402
+from _entity_repository import EntityValidationError  # noqa: E402
+
+
+# TODO(deferred): Extract the _resolve_repo_root / _ok / _err triple into a
+# shared _cli_env.py — it is now duplicated verbatim across sulis-capture,
+# sulis-emit-opportunity, sulis-brain-query, and _emit_ingest_cli.py (>2
+# consumers, the extraction threshold). Deferred here because the extraction
+# touches those sibling CLIs, all of which are OUTSIDE WP-006's Contract
+# scope (EP-07 Boy-Scout: don't unbounded-side-quest from this WP). The Blue
+# criterion of WP-006 directs this note rather than the cross-file edit.
+# RESOLVE_BY: own follow-on WP under the brain-backlog-and-traversal change.
+def _resolve_repo_root(explicit: str | None) -> Path:
+    if explicit:
+        return Path(explicit).resolve()
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, check=True, timeout=10,
+        )
+        return Path(out.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        return Path.cwd()
+
+
+def _ok(data: dict) -> int:
+    print(json.dumps({"ok": True, "data": data}, indent=2))
+    return 0
+
+
+def _err(message: str) -> int:
+    print(json.dumps({"ok": False, "error": message}, indent=2))
+    return 1
+
+
+def _resolve_repo_shorthand(repo_root: Path) -> str | None:
+    """Read the `repo:` shorthand from `.sulis/repo-contract.yml`.
+
+    Returns the shorthand (e.g. ``"sulis-ai/agents"``) or ``None`` when the
+    contract is absent, unreadable, or carries no `repo:` value. Mirrors the
+    defensive read in `sulis-verify-acceptance` — a missing contract degrades
+    to a plain-English `ok:false` at the call site, never a crash (NFR-01).
+    """
+    path = repo_root / ".sulis" / "repo-contract.yml"
+    if not path.is_file():
+        return None
+    try:
+        import yaml
+
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    repo = data.get("repo")
+    return repo if isinstance(repo, str) and repo.strip() else None
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Capture a founder's idea into the Brain graph (why-first).",
+    )
+    parser.add_argument(
+        "--why-intensity", required=True, choices=["quick", "full"],
+        help="quick = orchestrator roots the why; full = analyst already did",
+    )
+    parser.add_argument("--why", default="", help="the one-line why (quick path)")
+    parser.add_argument("--what", help="the requirement statement (optional)")
+    parser.add_argument(
+        "--opportunity-id",
+        help="dna:opportunity:<ulid> the analyst emitted (full path)",
+    )
+    parser.add_argument(
+        "--seed", required=True,
+        help="stable seed → deterministic ids (idempotence / dogfood / tests)",
+    )
+    parser.add_argument("--roadmap", action="store_true", help="mark on the Roadmap")
+    parser.add_argument(
+        "--base-dir",
+        help="brain instances dir (default: <repo-root>/.brain/instances)",
+    )
+    parser.add_argument("--repo-root", help="repo root holding .sulis/repo-contract.yml")
+    parser.add_argument(
+        "--schemas-dir",
+        help="compiled-schema dir for the adapters (default: vendored copy)",
+    )
+    args = parser.parse_args()
+
+    repo_root = _resolve_repo_root(args.repo_root)
+    base_dir = (
+        Path(args.base_dir).resolve()
+        if args.base_dir
+        else repo_root / ".brain" / "instances"
+    )
+    # The Roadmap sidecar lives beside `instances/` under the `.brain/` root —
+    # the PARENT of the instances base-dir (WP-004's roadmap_base_dir note).
+    roadmap_base_dir = base_dir.parent
+    schemas_dir = Path(args.schemas_dir).resolve() if args.schemas_dir else None
+
+    repo_org_slash_name = _resolve_repo_shorthand(repo_root)
+    if repo_org_slash_name is None:
+        return _err(
+            "could not read the repo shorthand from "
+            f"{repo_root / '.sulis' / 'repo-contract.yml'} — capture needs it to "
+            "root the idea under the right tenant. Add a 'repo: <org>/<name>' "
+            "line to the repo contract, or pass --repo-root pointing at one."
+        )
+
+    # Two-domain adapter construction (ADR-002): Tenant on foundation,
+    # Product / Opportunity / Requirement on product-development.
+    repo_foundation = LocalFileEntityAdapter(
+        base_dir=base_dir, domain="foundation", schemas_dir=schemas_dir,
+    )
+    repo_pd = LocalFileEntityAdapter(
+        base_dir=base_dir, domain="product-development", schemas_dir=schemas_dir,
+    )
+
+    try:
+        result = capture_idea(
+            repo_foundation=repo_foundation,
+            repo_pd=repo_pd,
+            repo_org_slash_name=repo_org_slash_name,
+            roadmap_base_dir=roadmap_base_dir,
+            why_intensity=args.why_intensity,
+            why=args.why,
+            what=args.what,
+            seed=args.seed,
+            opportunity_id=args.opportunity_id,
+            roadmap=args.roadmap,
+        )
+    except (CaptureError, EntityValidationError, FileNotFoundError) as exc:
+        # The orchestrator's degradation surface (NFR-01): every refusal /
+        # store-unavailable case is a plain-English ok:false, never a crash.
+        return _err(str(exc))
+    except Exception as exc:  # noqa: BLE001 — main() NEVER raises (NFR-01)
+        return _err(f"capture failed unexpectedly: {exc}")
+
+    return _ok(result)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
