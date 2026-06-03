@@ -185,6 +185,42 @@ say what happened and what to do next.
 
 ---
 
+### UXD-16 — Cognitive load (the burden the surface imposes) · MUST
+
+A surface MUST minimise the cognitive burden it imposes — the load is part of
+the contract with the user, not an afterthought. Sourced from the platform
+`cognitive-load.md` standard (CL-01..06):
+
+- **CL-01 Extraneous-load elimination (MUST).** Every element must serve the
+  user's task or comprehension; decorative / redundant / organisationally-
+  convenient-but-user-irrelevant elements are removed. Per-element test: *"does
+  this help the user complete their task or understand the content?"* — if no,
+  it's extraneous load.
+- **CL-02 Intrinsic-load management (MUST).** A surface where the user must hold
+  **> 5 simultaneous concepts/decisions** MUST use progressive disclosure /
+  staged steps / collapsible sections (working-memory ≈ 4±1).
+- **CL-04 Choice reduction (MUST).** ≤ **5 primary options** at any decision
+  point; secondary actions visually subordinate or progressively disclosed;
+  primary actions visually distinct from secondary.
+- **CL-05 Consistency expectation (MUST).** Similar elements behave consistently
+  within the product and follow platform conventions the audience already knows
+  (Jakob's Law) — don't make them relearn.
+- **CL-03 Germane-load optimisation (SHOULD).** Consistent patterns + meaningful
+  groupings + explicit relationships help the user build an accurate mental
+  model.
+- **CL-06 Three-question design review (SHOULD).** The visual-contract review
+  (and any design review) explicitly asks: (1) *is this complexity necessary?*
+  (intrinsic) (2) *does our presentation add unnecessary burden?* (extraneous)
+  (3) *does this help users build a mental model?* (germane). Visual review
+  alone misses load issues.
+
+> **Anti-pattern:** a settings screen with 12 equally-weighted controls (CL-04);
+> a wizard that shows all 9 fields at once instead of staging them (CL-02);
+> a dashboard whose decorative chrome competes with the one number that matters
+> (CL-01).
+
+---
+
 ## Layer 4 — Governance (cross-cutting)
 
 ### UXD-12 — Cross-artifact coherence · SHOULD
@@ -353,6 +389,9 @@ Consolidated from the reviewed design documents (2026-05-26):
 - platform `agentic-interface.md` v1.0.0 — the seven AI-surface principles
   (UXD-10), sourced to NN/g, Microsoft HAX (CHI 2019), Material Design 3,
   LangChain, ACM IUI.
+- platform `cognitive-load.md` (CL-01..06) — the cognitive-load dimension
+  (UXD-16), sourced to Sweller (1988), Miller (1956)/Cowan (2001), Hick (1952),
+  Iyengar & Lepper (2000), Nielsen heuristics, Jakob's Law.
 
 **Identity/brand values are excluded by design** (founder-owned carve-out).
 External platform standards' essentials are inlined for self-containment.
@@ -365,3 +404,4 @@ External platform standards' essentials are inlined for self-containment.
 |---------|------|---------|
 | 0.1.0 | 2026-05-26 | Initial 7-requirement draft (tokens, HIG, design-time WCAG, agentic UX, voice, responsive, design-before-build). |
 | 0.2.0 | 2026-05-26 | Deepened into "the contract with the user" across four layers (Identity / Visual / Experience / Governance), 14 requirements (UXD-01..14). Adds the identity layer (Golden Circle, substitution test, distinctive assets), measurable-parameters discipline, systematic visual evaluation (Rand criteria), ISO 9241-210 HCD, ethical EAST behavioural design, cross-artifact coherence, AI provenance, and the verification categories — grounded in the design-lifecycle studio standards + Sulis's own VISUAL_PRINCIPLES exemplar. SHOULD-tier items carry 90-day calibration. |
+| 0.3.0 | 2026-06-03 | Added UXD-16 (Cognitive load) — the missing dimension, sourced from the platform `cognitive-load.md` standard (CL-01..06: extraneous-load elimination, intrinsic-load via progressive disclosure ≤5 concepts, choice reduction ≤5 primary options, consistency expectation, germane-load, three-question review). Closes the gap where the standard covered identity/visual/experience/agentic but not the burden the surface imposes. Owned end-to-end by the new `ux-designer` specialist agent (which also covers design-system *establishment* when none exists). |
