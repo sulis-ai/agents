@@ -118,10 +118,10 @@ graph TD
 | WP-006 | sulis-capture CLI (JSON envelope) | create | done | WP-004 | WP-009, WP-013 | 8k / 3k | Form / Proof |
 | WP-007 | _brain_query extensions (views + states) | extend | done | WP-005 | WP-008 | 8k / 3k | ADR-006 |
 | WP-008 | sulis-brain-query CLI modes | extend | done | WP-007 | WP-010, WP-012, WP-013 | 7k / 3k | ADR-006 |
-| WP-009 | /sulis:capture skill | create | pending | WP-006 | WP-013 | 8k / 4k | FR-01/02/05 |
-| WP-010 | /sulis:backlog skill | create | pending | WP-008 | WP-013 | 7k / 4k | FR-07 |
+| WP-009 | /sulis:capture skill | create | done | WP-006 | WP-013 | 8k / 4k | FR-01/02/05 |
+| WP-010 | /sulis:backlog skill | create | done | WP-008 | WP-013 | 7k / 4k | FR-07 |
 | WP-011 | opportunity-analyst agent | create | done | WP-001 | WP-012, WP-013 | 12k / 6k | FR-11 |
-| WP-012 | Sulis-agent traverse + analyst wiring | refactor | pending | WP-008, WP-011 | WP-013 | 9k / 4k | FR-08 |
+| WP-012 | Sulis-agent traverse + analyst wiring | refactor | done | WP-008, WP-011 | WP-013 | 9k / 4k | FR-08 |
 | WP-013 | dogfood + scenario emission (LAST) | create | pending | WP-006, WP-008, WP-009, WP-010, WP-011, WP-012 | — | 14k / 5k | Proof scenarios |
 | WP-AUTO-001 | Auto-draft from SF-001 | Harden | auto-draft | WP-002 | — | ? | — |
 | WP-AUTO-002 | Auto-draft from SF-002 | Harden | auto-draft | WP-005 | — | ? | — |
