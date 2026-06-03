@@ -11,7 +11,6 @@ import pytest
 
 from _product_emission import compose_product_from_yaml, emit_product_from_yaml
 from _entity_adapter_local import LocalFileEntityAdapter
-from _entity_repository import EntityValidationError
 
 
 _TENANT_YAML = """
@@ -106,12 +105,32 @@ class TestEmitProduct:
         ulid = emitted[0]["id"].split(":")[-1]
         assert (tmp_path / ".brain" / "instances" / "product-development" / "product" / f"{ulid}.jsonld").exists()
 
-    def test_emission_fails_when_no_tenant_can_be_resolved(
+    def test_emission_degrades_gracefully_when_no_tenant_can_be_resolved(
         self, adapter: LocalFileEntityAdapter, tmp_path: Path
     ) -> None:
-        # Place product yaml without a sibling tenant.yaml
+        # Place product yaml without a sibling tenant.yaml — belongs_to_tenant
+        # cannot resolve, so the body fails reject-on-invalid at the port.
         product_path = tmp_path / "product-only.yaml"
         product_path.write_text(_PRODUCT_YAML)
 
-        with pytest.raises(EntityValidationError):
-            emit_product_from_yaml(product_path, adapter)
+        # WP-012: emission is now best-effort. It delegates to evolve_entity and
+        # swallows persistence/validation faults so the host operation never
+        # fails on an emit failure — the graceful-degradation discipline the WP
+        # Contract preserves. It returns the composed list and writes NO
+        # envelope for the invalid body (reject-on-invalid still blocks the
+        # write; only the raise into the host is swallowed).
+        emitted = emit_product_from_yaml(product_path, adapter)
+        assert len(emitted) == 1, "compose still returns the attempted body"
+        ulid = emitted[0]["id"].split(":")[-1]
+        envelope_path = (
+            tmp_path
+            / ".brain"
+            / "instances"
+            / "product-development"
+            / "product"
+            / f"{ulid}.jsonld"
+        )
+        assert not envelope_path.exists(), (
+            "an invalid body must not be persisted (reject-on-invalid still "
+            "blocks the write; only the raise is swallowed)"
+        )

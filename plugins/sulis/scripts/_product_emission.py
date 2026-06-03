@@ -35,6 +35,7 @@ from typing import Final
 
 import yaml
 
+from _entity_evolve import evolve_entity
 from _entity_repository import EntityRepository
 
 
@@ -143,9 +144,41 @@ def compose_product_from_yaml(
 def emit_product_from_yaml(
     yaml_path: Path,
     repo: EntityRepository,
+    *,
+    generated_by: str | None = None,
 ) -> list[dict]:
+    """Emit the Product(s) composed from ``yaml_path`` as a *living* entity.
+
+    Product is a ``prov:Entity`` living type (ADR-002/ADR-003): each emit
+    delegates to the shared bitemporal ``evolve_entity`` helper (WP-009) rather
+    than a plain ``repo.save`` — the first emit opens a window, a changed
+    re-emit closes the prior window and opens a new one, and a byte-identical
+    re-emit is a no-op. Window logic is NOT re-implemented here; the helper owns
+    it (EP-03).
+
+    Args:
+        generated_by: the producing LifecycleRun ref
+            (``dna:lifecyclerun:<ulid>``) threaded in from the emit context. When
+            supplied, the new window carries the conditional ``wasGeneratedBy``
+            PROV edge (Product is ``prov:Entity`` — the edge is well-typed). When
+            ``None``, the window still moves but no edge is written.
+
+    Emission stays best-effort (graceful-degradation discipline): a fault at the
+    persistence point is swallowed so the host operation never fails on an emit
+    failure. The composed list is always returned.
+    """
     yaml_text = Path(yaml_path).read_text(encoding="utf-8")
     products = compose_product_from_yaml(yaml_text, source_path=str(yaml_path))
     for product in products:
-        repo.save("product", product)
+        try:
+            evolve_entity(
+                repo=repo,
+                entity_type="product",
+                entity_id=product["id"],
+                new_fields=product,
+                generated_by=generated_by,
+            )
+        except Exception:
+            # Best-effort emit — never raise into the host operation.
+            continue
     return products
