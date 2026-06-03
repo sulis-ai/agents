@@ -27,7 +27,7 @@ from pathlib import Path
 import jsonschema
 import pytest
 
-from migrate_lifecyclerun_v1_to_v2 import migrate_instance
+from migrate_lifecyclerun_v1_to_v2 import migrate_instance, migrate_store
 
 
 # Canonical Step ULIDs (authored once in
@@ -195,3 +195,63 @@ class TestMigrateInstance:
         out = migrate_instance(src)
         assert out is not None
         assert out["run_id"] == "pre-existing-trace"
+
+
+# ─── migrate_store: atomic write durability (security CONCERN C-1) ────────────
+
+
+def _seed_store(base_dir: Path, doc: dict) -> Path:
+    """Write one v1 instance to {base_dir}/product-development/lifecyclerun/."""
+    runs_dir = base_dir / "product-development" / "lifecyclerun"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    path = runs_dir / "instance.jsonld"
+    path.write_text(json.dumps(doc, indent=2, sort_keys=True))
+    return path
+
+
+class TestMigrateStoreAtomicWrite:
+    """The migration rewrites stored history; like every sibling writer (the
+    minter's ``_atomic_write``, ``_entity_evolve._persist_envelope``) it MUST
+    write via tmp-then-rename, never an in-place ``write_text`` that can leave a
+    torn file on a mid-write crash."""
+
+    def test_no_tmp_left_on_success(self, tmp_path: Path) -> None:
+        base = tmp_path / "instances"
+        _seed_store(base, _minimal_v1())
+        summary = migrate_store(base)
+        assert summary["migrated"] == 1
+        runs_dir = base / "product-development" / "lifecyclerun"
+        leftovers = [p.name for p in runs_dir.iterdir() if p.name.endswith(".tmp")]
+        assert leftovers == [], f"no torn-write tmp files must remain: {leftovers}"
+
+    def test_output_is_valid_v2(self, tmp_path: Path) -> None:
+        base = tmp_path / "instances"
+        path = _seed_store(base, _minimal_v1())
+        migrate_store(base)
+        out = json.loads(path.read_text())
+        assert out["step"] == _STEP_CHANGE_STARTED
+        assert "step_name" not in out
+
+    def test_no_partial_file_on_mid_write_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A crash between writing the tmp and the rename leaves the ORIGINAL
+        file intact (the tmp+rename never half-overwrites the target) — mirrors
+        the minter's cancel-safety contract."""
+        base = tmp_path / "instances"
+        original_doc = _minimal_v1()
+        path = _seed_store(base, original_doc)
+        original_bytes = path.read_bytes()
+
+        # Simulate a crash at the rename step (after the tmp is written).
+        import migrate_lifecyclerun_v1_to_v2 as mod
+
+        def _boom(*_a, **_k):  # noqa: ANN002, ANN003
+            raise OSError("simulated crash during rename")
+
+        monkeypatch.setattr(mod.os, "replace", _boom)
+        with pytest.raises(OSError):
+            migrate_store(base)
+
+        # The original target file is untouched — no torn/partial write landed.
+        assert path.read_bytes() == original_bytes

@@ -5,9 +5,15 @@ foundation-domain (cross-cutting per L13 promotion); every customer-namespace
 of marketplace work is bounded by one Tenant. The marketplace's local entity
 store is namespaced by Tenant ID (`~/.sulis/instances/{tenant_id}/...`). That
 follow-up slice is now live (ADR-005): `_brain_emit_helper.central_tenant_home`
-resolves this home and the living-entity emit (`evolve_entity`) writes there via
-the existing `LocalFileEntityAdapter`, read back cross-repo by
-`_brain_query.find_current_for_tenant` — reuse, not a new store.
+resolves this home and `evolve_entity` writes there — read back cross-repo by
+`_brain_query.find_current_for_tenant` — via the existing
+`LocalFileEntityAdapter` (reuse, not a new store). Wiring status: this central
+home is *wired-but-not-yet-defaulted* for Product/Opportunity — the seam is
+proven by `test_central_tenant_home.py`, but the production emit CLIs
+(`sulis-emit-product` / `sulis-emit-opportunity`) still default `base_dir` to
+the repo-local `.brain/instances` (and nothing invokes them yet), so in
+production the central home is reached only by the minter (the Project entity,
+ADR-006). Flipping the CLI default is a follow-on slice.
 
 Source format — `.sulis/tenant.yaml`:
 

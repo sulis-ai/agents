@@ -52,6 +52,7 @@ from pathlib import Path
 from typing import Final, Protocol, runtime_checkable
 
 from _entity_repository import EntityRepository
+from _lifecyclerun_emission import _LIFECYCLERUN_ID_RE
 
 
 @runtime_checkable
@@ -205,6 +206,17 @@ def _open_window(body: dict, opened_at: str, generated_by: str | None) -> dict:
     window["valid_from"] = opened_at
     window["valid_to"] = None
     if generated_by is not None:
+        # Validate the ref shape BEFORE attaching it. The edge is written
+        # outside the schema-validated body (the compiled schema is
+        # `unevaluatedProperties: false`), so a malformed `generated_by` would
+        # otherwise slip into the persisted window unchecked. Reuse the single
+        # source of truth for the run-ref shape (`_lifecyclerun_emission`),
+        # never a loosely-duplicated pattern.
+        if not _LIFECYCLERUN_ID_RE.match(generated_by):
+            raise ValueError(
+                f"generated_by must match dna:lifecyclerun:<ulid>; "
+                f"got {generated_by!r}"
+            )
         window[_PROV_EDGE_KEY] = generated_by
     return window
 
@@ -270,6 +282,18 @@ def _persist_envelope(
     payload = json.dumps(envelope, indent=2, sort_keys=True)
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     tmp.write_text(payload)
+    # fsync the tmp BEFORE the rename so the renamed file's bytes are durable
+    # the instant it becomes visible — what makes the "survives a crash" claim
+    # (this docstring, and the module docstring) true, matching the minter's
+    # `_atomic_write`. Best-effort: on a filesystem/platform where fsync is
+    # unsupported it may raise; degrade gracefully (the atomic rename still
+    # holds; we lose only the durability guarantee that platform cannot provide
+    # anyway), consistent with the module's existing best-effort contract.
+    try:
+        with tmp.open("rb") as f:
+            os.fsync(f.fileno())
+    except OSError:
+        pass
     os.replace(tmp, path)
 
 

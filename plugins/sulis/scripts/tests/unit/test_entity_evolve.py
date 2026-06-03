@@ -59,8 +59,8 @@ class _NonFileBackedRepo:
         return None
 
 
-_RUN_ID = "dna:lifecyclerun:01JX0RUNRUNRUNRUNRUNRUNRUN"
-_RUN_ID_2 = "dna:lifecyclerun:01JX0RUNRUNRUNRUNRUNRUNRU2"
+_RUN_ID = "dna:lifecyclerun:01JX0RVNRVNRVNRVNRVNRVNRVN"
+_RUN_ID_2 = "dna:lifecyclerun:01JX0RVNRVNRVNRVNRVNRVNRV2"
 
 
 # ─── fixtures ───────────────────────────────────────────────────────────────
@@ -507,3 +507,135 @@ def _read_windows(
         f"history envelope must hold a `windows` list; got {type(windows)}"
     )
     return windows
+
+
+# ─── crash-safety: fsync before rename (health finding 2) ────────────────────
+
+
+class TestPersistEnvelopeFsyncsBeforeRename:
+    """``_persist_envelope`` docstring claims a committed window "survives a
+    crash" — to be true it must fsync the tmp file BEFORE the rename, matching
+    the minter's ``_atomic_write`` discipline. Assert the fsync happens, and
+    that it happens before the ``os.replace``."""
+
+    def test_fsync_called_before_replace(
+        self, adapter: LocalFileEntityAdapter, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import _entity_evolve as mod
+
+        calls: list[str] = []
+        real_fsync = mod.os.fsync
+        real_replace = mod.os.replace
+
+        def _spy_fsync(fd):  # noqa: ANN001, ANN202
+            calls.append("fsync")
+            return real_fsync(fd)
+
+        def _spy_replace(src, dst):  # noqa: ANN001, ANN202
+            calls.append("replace")
+            return real_replace(src, dst)
+
+        monkeypatch.setattr(mod.os, "fsync", _spy_fsync)
+        monkeypatch.setattr(mod.os, "replace", _spy_replace)
+
+        evolve_entity(
+            repo=adapter,
+            entity_type="product",
+            entity_id=_valid_product()["id"],
+            new_fields=_valid_product(),
+            generated_by=_RUN_ID,
+            at="2026-01-01T00:00:00Z",
+        )
+
+        assert "fsync" in calls, "the tmp file must be fsync'd for crash-safety"
+        assert calls.index("fsync") < calls.index("replace"), (
+            "fsync must happen BEFORE the rename so the renamed file is durable"
+        )
+
+    def test_fsync_failure_degrades_gracefully(
+        self, adapter: LocalFileEntityAdapter, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Best-effort contract: if fsync raises on some platform/filesystem, the
+        write still completes (the module's existing best-effort discipline)."""
+        import _entity_evolve as mod
+
+        def _boom_fsync(fd):  # noqa: ANN001, ANN202
+            raise OSError("fsync unsupported on this filesystem")
+
+        monkeypatch.setattr(mod.os, "fsync", _boom_fsync)
+
+        result = evolve_entity(
+            repo=adapter,
+            entity_type="product",
+            entity_id=_valid_product()["id"],
+            new_fields=_valid_product(),
+            generated_by=_RUN_ID,
+            at="2026-01-01T00:00:00Z",
+        )
+        # The window still landed despite the fsync failure.
+        assert result is not None
+        windows = _read_windows(adapter, "product", _valid_product()["id"])
+        assert len(windows) == 1
+
+
+# ─── generated_by ref validation in _open_window (health finding 3) ──────────
+
+
+class TestOpenWindowValidatesGeneratedBy:
+    """``_open_window`` attaches ``generated_by`` to the window post-validation;
+    a malformed ref must be rejected BEFORE it is attached (it must match the
+    ``dna:lifecyclerun:<ulid>`` shape — the same ref shape the LifecycleRun
+    emitter uses)."""
+
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            "dna:lifecyclerun:not-a-ulid",
+            "dna:lifecyclerun:01JX0",  # too short
+            "dna:product:01JX0AAAAAAAAAAAAAAAAAAAAA",  # wrong type
+            "../../etc/passwd",
+            "01JX0RVNRVNRVNRVNRVNRVNRVN",  # missing prefix
+        ],
+    )
+    def test_rejects_malformed_generated_by(
+        self, adapter: LocalFileEntityAdapter, bad: str
+    ) -> None:
+        with pytest.raises(ValueError):
+            evolve_entity(
+                repo=adapter,
+                entity_type="product",
+                entity_id=_valid_product()["id"],
+                new_fields=_valid_product(),
+                generated_by=bad,
+                at="2026-01-01T00:00:00Z",
+            )
+
+    def test_accepts_valid_generated_by(
+        self, adapter: LocalFileEntityAdapter
+    ) -> None:
+        window = evolve_entity(
+            repo=adapter,
+            entity_type="product",
+            entity_id=_valid_product()["id"],
+            new_fields=_valid_product(),
+            generated_by=_RUN_ID,
+            at="2026-01-01T00:00:00Z",
+        )
+        assert window is not None
+        assert window["wasGeneratedBy"] == _RUN_ID
+
+    def test_accepts_none_generated_by(
+        self, foundation_adapter: LocalFileEntityAdapter
+    ) -> None:
+        """``generated_by=None`` (prov:Plan — Project) is valid and writes no
+        edge — the validation guard must only fire on a non-None malformed ref."""
+        window = evolve_entity(
+            repo=foundation_adapter,
+            entity_type="project",
+            entity_id=_valid_project()["id"],
+            new_fields=_valid_project(),
+            generated_by=None,
+            at="2026-01-01T00:00:00Z",
+        )
+        assert window is not None
+        assert "wasGeneratedBy" not in window

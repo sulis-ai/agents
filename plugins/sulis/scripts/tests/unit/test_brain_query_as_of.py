@@ -36,7 +36,7 @@ from _entity_evolve import evolve_entity
 
 
 _PRODUCT_ID = "dna:product:01JX0AAAAAAAAAAAAAAAAAAAAA"
-_RUN_ID = "dna:lifecyclerun:01JX0RUNRUNRUNRUNRUNRUNRUN"
+_RUN_ID = "dna:lifecyclerun:01JX0RVNRVNRVNRVNRVNRVNRVN"
 
 
 # ─── direct-envelope seeding (precise window boundaries) ─────────────────────

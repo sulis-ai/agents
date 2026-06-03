@@ -58,7 +58,7 @@ from _product_emission import emit_product_from_yaml
 # The LifecycleRun id the emit context threads in via ``generated_by``. AFTER
 # WP-012 it lands on the current open window's ``wasGeneratedBy`` edge for the
 # prov:Entity types (Product / Opportunity).
-_RUN_ID = "dna:lifecyclerun:01JX0RUNRUNRUNRUNRUNRUNRUN"
+_RUN_ID = "dna:lifecyclerun:01JX0RVNRVNRVNRVNRVNRVNRVN"
 
 
 # ─── fixtures ───────────────────────────────────────────────────────────────

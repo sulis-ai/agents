@@ -28,6 +28,11 @@ from _entity_repository import EntityRepository
 _CROCKFORD: Final[str] = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _ACTOR_ID_RE: Final = re.compile(r"^dna:actor:[0-9A-HJKMNP-TV-Z]{26}$")
 _STEP_ID_RE: Final = re.compile(r"^dna:step:[0-9A-HJKMNP-TV-Z]{26}$")
+# The LifecycleRun self-ref shape (`dna:lifecyclerun:<26 Crockford>`) — the
+# single source of truth for a `wasGeneratedBy` / `run_id`-style ref to a run.
+# Consumers (e.g. `_entity_evolve._open_window` validating `generated_by`)
+# import this rather than re-deriving the pattern loosely.
+_LIFECYCLERUN_ID_RE: Final = re.compile(r"^dna:lifecyclerun:[0-9A-HJKMNP-TV-Z]{26}$")
 # `for_project` reuses the live Workflow.for_project ref shape verbatim
 # (foundation v0.5.0, predicate sulis:forProject) — a plain scope ref recording
 # which Project a run operated in, NOT a prov edge (ADR-007).

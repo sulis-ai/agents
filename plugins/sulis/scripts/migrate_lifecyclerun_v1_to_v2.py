@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Final
@@ -135,12 +136,39 @@ def migrate_store(
             continue
         if not dry_run:
             # `sort_keys=True` + `indent=2` matches the adapter's write shape,
-            # keeping git diffs stable.
-            path.write_text(json.dumps(out, indent=2, sort_keys=True))
+            # keeping git diffs stable. Written atomically (tmp + fsync +
+            # rename) — this mutates stored history, so it must match the
+            # durability discipline of every sibling writer (the minter's
+            # `_atomic_write`, `_entity_evolve._persist_envelope`): a crash
+            # mid-write must never leave a torn file in place of the original.
+            _atomic_write(path, json.dumps(out, indent=2, sort_keys=True))
         migrated += 1
         touched.append(str(path))
 
     return {"migrated": migrated, "skipped": skipped, "paths": touched}
+
+
+def _atomic_write(target_path: Path, payload: str) -> None:
+    """Write ``payload`` to a sibling tmp file, fsync it, then ``os.replace``
+    onto ``target_path``.
+
+    Mirrors the minter's ``_discovery/minter._atomic_write`` and
+    ``_entity_evolve._persist_envelope``: ``os.replace`` is atomic when source
+    and destination are on the same filesystem (guaranteed — the tmp sits in
+    the target's own directory). The fsync flushes the tmp's bytes to disk
+    BEFORE the rename, so the renamed file is durable the instant it becomes
+    visible at ``target_path``. A crash between the tmp write and the rename
+    leaves the ``.tmp`` file (and the ORIGINAL target untouched), never a
+    half-written target. The tmp name carries the pid, matching
+    ``_persist_envelope``, so concurrent runs never collide on the tmp.
+    """
+    tmp = target_path.with_name(f".{target_path.name}.{os.getpid()}.tmp")
+    tmp.write_text(payload)
+    # fsync the tmp file BEFORE the rename so the renamed file's data is
+    # durable when it becomes visible at the target path.
+    with tmp.open("rb") as f:
+        os.fsync(f.fileno())
+    os.replace(tmp, target_path)
 
 
 @lru_cache(maxsize=1)

@@ -34,6 +34,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import pytest
+
 from _brain_query import find_current_for_tenant
 from _brain_emit_helper import central_tenant_home
 from _entity_adapter_local import LocalFileEntityAdapter
@@ -42,7 +44,7 @@ from _tenant_emission import _deterministic_ulid_from
 
 
 _DOMAIN = "product-development"
-_RUN_ID = "dna:lifecyclerun:01JX0RUNRUNRUNRUNRUNRUNRUN"
+_RUN_ID = "dna:lifecyclerun:01JX0RVNRVNRVNRVNRVNRVNRVN"
 
 # A deterministic Tenant id (same recipe _tenant_emission uses) — the cross-repo
 # identity every repo naming this Tenant resolves to.
@@ -261,3 +263,37 @@ class TestAtomicWriteDurable:
         type_dir = central_tenant_home(_TENANT_ID) / _DOMAIN / "product"
         leftovers = [p.name for p in type_dir.iterdir() if p.name.endswith(".tmp")]
         assert leftovers == [], f"no torn-write tmp files must remain: {leftovers}"
+
+
+# ─── read-seam tenant_id validation (security ADVISORY A-1) ──────────────────
+
+
+class TestFindCurrentForTenantValidatesTenantId:
+    """``find_current_for_tenant`` joins ``tenant_id`` into the central-home path,
+    so the read seam MUST validate the id against the tenant-ULID shape BEFORE
+    deriving the path — the write path validates via schema; the read path must
+    too (no path traversal / no escape out of the central-home subtree)."""
+
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            "dna:tenant:../../etc/passwd",
+            "../../../etc",
+            "dna:tenant:not-a-ulid",
+            "dna:tenant:01JX0",  # too short
+            "dna:product:01JX0AAAAAAAAAAAAAAAAAAAAA",  # wrong type
+            "",
+            "dna:tenant:01JX0AAAAAAAAAAAAAAAAAAAAA/..",
+        ],
+    )
+    def test_rejects_malformed_tenant_id(self, bad: str) -> None:
+        with pytest.raises(ValueError):
+            find_current_for_tenant(tenant_id=bad, entity_type="product")
+
+    def test_accepts_valid_tenant_id(self) -> None:
+        # A well-formed tenant id is accepted and returns a list (empty when the
+        # home holds no open windows yet — the point is it does NOT raise).
+        result = find_current_for_tenant(
+            tenant_id=_TENANT_ID, entity_type="product"
+        )
+        assert result == []

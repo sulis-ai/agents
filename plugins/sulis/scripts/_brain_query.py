@@ -270,9 +270,17 @@ def find_current_for_tenant(
 
     The cross-repo Tenant read: the central home
     (``central_tenant_home(tenant_id)`` == ``~/.sulis/instances/{tenant_id}/``)
-    is the single subtree where every repo's living-entity emit for this Tenant
-    lands, so one walk of it returns the Tenant's whole current view across
-    repos — something no single repo-local ``.brain/instances`` tree can do.
+    is the single subtree a Tenant's living-entity emits are *designed* to land
+    in, so one walk of it returns the Tenant's whole current view across repos —
+    something no single repo-local ``.brain/instances`` tree can do.
+
+    Wiring status (ADR-005, reconciled): this central home is *wired-but-not-yet-
+    defaulted* for Product/Opportunity — the seam is proven by
+    ``test_central_tenant_home.py``, but the production emit CLIs still default
+    ``base_dir`` to the repo-local ``.brain/instances`` (nothing invokes them
+    yet), so in production the central home is reached only by the minter (the
+    Project entity, ADR-006). This read serves whatever a caller has written to
+    the home; flipping the Product/Opportunity CLI default is a follow-on slice.
 
     Built entirely on the EXISTING ``iter_entities`` flat-file walk and the
     open-window invariant — no new traversal code, no new adapter, no new query
@@ -293,6 +301,20 @@ def find_current_for_tenant(
         window) are excluded. Empty list when the home does not exist yet or
         holds no open windows of ``entity_type``.
     """
+    # Validate `tenant_id` against the tenant-ULID shape BEFORE deriving the
+    # path: this id is joined into the central-home filesystem path, so an
+    # unvalidated value (e.g. one bearing `..`) is a path-traversal seam. The
+    # write path validates via schema; the read path must validate here too.
+    # Reuse the single source of truth for the shape (`_tenant_emission`'s
+    # `_TENANT_ID_RE`) — no second pattern. Imported lazily, mirroring the
+    # `central_tenant_home` import below (read-seam → emit-side, no cycle).
+    from _tenant_emission import _TENANT_ID_RE
+
+    if not _TENANT_ID_RE.match(tenant_id):
+        raise ValueError(
+            f"tenant_id must match dna:tenant:<ulid>; got {tenant_id!r}"
+        )
+
     # Imported here (not at module top) to avoid a read-seam → emit-helper import
     # cycle: the home resolver lives with the emit wiring; the read seam consumes
     # it lazily. central_tenant_home is pure path arithmetic — no side effects.

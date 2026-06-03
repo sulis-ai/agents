@@ -149,3 +149,19 @@ query swaps for a real backend there" — *there*, not here.
   pointed at the central home — and will work unchanged again when a SQLite
   adapter replaces it later. The convergence the seam docstrings promised holds
   in both directions.
+
+> **Wiring status (reconciliation note, added post-Stage-4 review).** For
+> **Product** and **Opportunity**, the central-home `base_dir` is
+> *wired-but-not-yet-defaulted*: the relocatable seam is proven end-to-end by
+> `test_central_tenant_home.py` (write to a central-home-shaped `base_dir`, read
+> back cross-repo), but the production emit CLIs (`sulis-emit-product`,
+> `sulis-emit-opportunity`) still **default `base_dir` to the repo-local
+> `.brain/instances`**, and nothing in the lifecycle invokes them yet — so in
+> production today the central home is reached **only by the minter** (the
+> **Project** entity, via `_discovery/minter`'s canonical brain-store save,
+> ADR-006). Flipping the Product/Opportunity CLI default to the central home is
+> a follow-on slice; this ADR establishes the seam and the cross-repo read
+> proof, not the CLI default. The Decision wording above ("points the
+> living-entity emitters' `base_dir` at the central home") describes the seam
+> that is now reusable, not a defaulted production code path for
+> Product/Opportunity.
