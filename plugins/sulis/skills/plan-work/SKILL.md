@@ -460,9 +460,37 @@ These standards shape the WP set's *shape*, not just the content:
    distribution, the dependency graph (as a markdown table and a Mermaid
    `graph TD` diagram), the recommended implementation order (topological
    sort of the graph), and the wrap audit summary.
+
+   The **WP Table** MUST be a markdown table headed
+   `| ID | Title | Primitive | Status | Depends On | Blocks |` — never a
+   bullet list. The bullet-list shape is invisible to every wpx-* tool
+   (`flip-status`, `list-ready`, `lint`, etc.) and bricks run-all at
+   dispatch time (`Could not find WP table (no | ID | header)`).
+
+9.5. **Decompose-time INDEX shape gate (#103 — MUST).** After writing
+    `INDEX.md`, run `wpx-index lint` and treat a non-zero exit as a
+    BLOCKING gate failure of the decompose:
+
+    ```bash
+    "$WPX_DIR/wpx-index" lint --project {project}
+    ```
+
+    On non-zero exit the decompose is **NOT done**. Read the lint
+    error, fix the INDEX (typically: convert a bullet list to the
+    canonical table, or correct a column-order typo per
+    `## INDEX.md Structure` below), and re-run lint. Only proceed to
+    Step 10 (Report) when lint exits 0.
+
+    This catches the #103 class — a list-shape INDEX surfacing as a
+    cryptic "no | ID | header" error at run-all dispatch time, hours
+    after the architect finished. Failing at authoring time is
+    surgical; failing at run-all is a hard recovery.
+
 10. **Report** — total WP count, critical path length, parallelisation
     opportunity (how many WPs can be implemented simultaneously at peak),
-    primitive distribution, wrap audit result.
+    primitive distribution, wrap audit result, **and the Step 9.5 lint
+    result (always PASS on a clean decompose — the gate at 9.5 blocks
+    otherwise)**.
 
 11. **Validate** — apply the
     [Decompose Validation Rubric](../../references/decompose-validation-rubric.md)
