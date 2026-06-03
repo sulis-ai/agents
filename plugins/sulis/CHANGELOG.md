@@ -1,3 +1,15 @@
+## v0.91.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- Scope posture — full coherent go by default. New MUST principle in the Sulis
+  agent body + the specify/draft-architecture sizing steps: default to a solid
+  attempt at the full coherent scope; thin-slicing is the exception for
+  genuinely-too-big work, not the reflex. When slicing IS needed the agent owns
+  the cut — a phased plan (phase 1 a real meaningful go; deferred phases
+  captured to the backlog so nothing's lost), never handing the slicing to the
+  founder. Depth/tier sizes design rigour, not the scope delivered.
+
 ## v0.90.0 — 2026-06-02
 
 **Minor — release-train batch.**
