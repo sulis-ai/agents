@@ -8,7 +8,7 @@ group: SUBSTITUTE
 change_id: CH-01KT61
 sequence_id: WP-002
 dependsOn: [WP-001]
-blocks: [WP-005, WP-006, WP-007, WP-008, WP-013]
+blocks: [WP-005, WP-006, WP-007, WP-008, WP-013, WP-016]
 composite_of: [revendor-schema, migrate-_lifecyclerun_emission, migrate-_brain_emit_helper]
 removal_plan:
   deprecated_surface: "the v1.0.0 `step_name` property + any transitional name→Step string-resolution path"
@@ -161,7 +161,7 @@ All ULIDs are the WP-001 authored values (single source of truth; no inline mint
 ## Sequence
 
 - **dependsOn:** WP-001 (the Step ULIDs the `step` ref + resolution map point at)
-- **blocks:** WP-005 (CLI shares `_resolve_step` + targets the re-vendored schema), WP-006 (migration re-validates against the re-vendored schema + reuses `_resolve_step`), WP-007 (drift parity reads the re-vendored schema)
+- **blocks:** WP-005 (CLI shares `_resolve_step` + targets the re-vendored schema), WP-006 (migration re-validates against the re-vendored schema + reuses `_resolve_step`), WP-007 (drift parity reads the re-vendored schema), WP-008 (the prov edge points at the re-vendored LifecycleRun ref shape), WP-013 (the `_brain_emit_helper.py` base_dir edit follows WP-002's Step-resolution edit), WP-016 (the v2.2.0 `for_project` increment re-vendors over this WP's v2.1.0 file + extends its compose/emit helpers — ADR-007)
 - **Lockstep (ADR-004 + README mandate):** the re-vendor (step 1) and the emitter-core migration (steps 2–3) are atomic in this one WP — no intermediate commit where schema and emitter disagree.
 
 ## Estimated Token Cost

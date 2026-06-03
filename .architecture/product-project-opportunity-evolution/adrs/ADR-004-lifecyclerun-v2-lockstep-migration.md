@@ -5,6 +5,7 @@ status: accepted
 date: 2026-06-03
 revised: 2026-06-03 — REWRITTEN against canonical. LifecycleRun v2.1.0 is ALREADY MINTED upstream (DR-009 did step_name→step as v2.0.0; DR-013 added run_id/deterministic/inputs_ref/outputs_ref as v2.1.0). The action is a SURGICAL RE-VENDOR of the canonical compiled schema — NOT authoring a new shape. step_label + used-on-run DROPPED. Re-vendor + emitter migration are one atomic WP.
 deciders: [iain]
+note: 2026-06-03 — ADDED the two-stage re-vendor note (v2.1.0 now, v2.2.0 as a separate mint-gated increment adding for_project — see ADR-007). The "re-vendor not author" decision + the step_label/used drop are UNCHANGED; this WP's target stays v2.1.0 and stays buildable-now.
 ---
 
 ## Context
@@ -63,6 +64,31 @@ Verified blast radius (every in-repo site that reads/writes `step_name`):
 and migrate the emitter (`_lifecyclerun_emission` + the three
 `_brain_emit_helper` helpers + the CLI) in LOCKSTEP — one atomic WP, never a
 loose schema commit ahead of the emitter.**
+
+### Two-stage re-vendor: v2.1.0 now, v2.2.0 as a mint-gated increment (ADR-007)
+
+The LifecycleRun schema is re-vendored in **two stages**, on the same vendored
+file, sequentially:
+
+1. **v2.1.0 NOW (this WP, WP-002).** The already-minted canonical v2.1.0
+   (`step_name`→`step` from DR-009 + the four DR-013 optional fields). This needs
+   **no mint** and is **buildable immediately** — it is the breaking step-ref
+   spine everything else hangs off. **This WP's re-vendor target stays v2.1.0 and
+   is NOT newly mint-gated by the `for_project` work.**
+2. **v2.2.0 as a SEPARATE increment (WP-016, ADR-007).** A MINOR additive bump
+   adding one optional `for_project: ref→project (0..1)` property (run→Project
+   traceability). It is a **NEW upstream mint** (LifecycleRun 2.1.0 → 2.2.0, both
+   the PD canonical and its insurance mirror), authored in parallel. Its in-repo
+   re-vendor + emitter wiring `dependsOn` this WP's v2.1.0 re-vendor AND start
+   `blocked` on the `for_project` mint being accepted → recompiled → re-vendored
+   — the same gating shape WP-008 has on the `wasGeneratedBy` mint.
+
+v2.2.0 supersedes v2.1.0 on the vendored file as a clean additive drop-in (one
+optional property; pre-bump v2.1.0 instances validate unchanged under v2.2.0 — no
+instance migration for the increment). The "re-vendor not author" discipline and
+the `step_label`/`used` drop below apply identically to both stages: v2.2.0 is
+re-vendored from the upstream-minted canonical, never authored in-repo, and adds
+**no** `step_label` and **no** `used` — only the canonical `for_project` ref.
 
 ### Why a surgical re-vendor, not `sync-from-canonical.sh`
 
@@ -189,3 +215,9 @@ until they touch them).
   v2.1.0 compiled schema. No `used` field and no `step_label` appear anywhere —
   the vendored schema is byte-faithful to canonical v2.1.0 (modulo the standard
   vendored envelope fields).
+- **The v2.2.0 increment (ADR-007 / WP-016) lands separately and later**, gated on
+  its own mint. This WP (v2.1.0) is unaffected by that gate and lands with the
+  pre-gate spine. When v2.2.0 lands, it re-vendors over this WP's v2.1.0 file
+  (additive `for_project` only) and the drift parity is re-pointed at v2.2.0 — the
+  vendored schema stays byte-faithful to the upstream-recompiled canonical at
+  whichever version is current.

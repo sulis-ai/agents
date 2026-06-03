@@ -9,7 +9,7 @@ execution_path: A          # canonical-as-spec where grammar/Workflow entities c
 structural_template: ../../.architecture/discover-project/   # same Path-A house style + canonical-identifiers discipline
 
 pillars:
-  form: partial    # hexagonal seam (EntityRepository port + adapters + query seam) already exists; new: evolve helper layering, PROV edge (prov_constraints convention reuse, not new grammar), Project ownership move
+  form: partial    # hexagonal seam (EntityRepository port + adapters + query seam) already exists; new: evolve helper layering, PROV edge (prov_constraints convention reuse, not new grammar), Project ownership move, LifecycleRun.for_project plain ref (run→Project scope; reuses live Workflow.for_project shape)
   armor: partial   # graceful-degradation + atomic-write + reject-on-invalid exist; new: migration atomicity, window invariants, store durability, event-entity append-only guard
   proof: partial   # contract-test + drift-parity infra exist; new: evolve characterisation test, PROV-edge-emission test (Product/Opportunity only), v1->v2 re-vendor + instance-migration test
 
@@ -20,14 +20,15 @@ adrs:
   - ADR-004 — LifecycleRun v1.0.0 -> v2.1.0 SURGICAL RE-VENDOR of the already-minted canonical schema (DR-009 + DR-013), lockstep/atomic with the emitter migration in one WP; step_label + used-on-run DROPPED
   - ADR-005 — Platform store REUSES the existing file adapter pointed at the central `~/.sulis/instances/{tenant_id}/` Tenant home (reuse, not build); SQLite deferred to a later change behind the same port
   - ADR-006 — Project home reconciliation — brain store is canonical; `.sulis/projects/<slug>.jsonld` is a human-facing mirror; Project provenance NOT applicable (prov:Plan); run→Project link deferred to LifecycleRun.for_project on the run
+  - ADR-007 — LifecycleRun.for_project — run→Project traceability (founder-directed un-defer of ADR-001/006's deferred edge). A plain ref (NOT a prov edge; mirrors live Workflow.for_project), PD→foundation (NOT v0.7-gated), optional (meta/pre-Project runs), the RUN is the carrier (Project carries no edge — consistent with ADR-006). Closes Tenant→Product→Opportunity→Project for app/terminal change-start. A SEPARATE, mint-gated v2.2.0 increment ON TOP OF the buildable-now v2.1.0 spine
 
 artifacts_produced:
   - TDD.md
   - SIZING.md
   - ARCH.yaml
-  - adrs/ADR-001..ADR-006
+  - adrs/ADR-001..ADR-007
 
-expected_workpackages: 13      # ACTUAL (re-cut from 15 after the 2026-06-03 brain-governance review); see work-packages/INDEX.md
+expected_workpackages: 14      # 13 (re-cut from 15, 2026-06-03 brain-governance review) + 1 (WP-016, the for_project v2.2.0 increment); see work-packages/INDEX.md
 
 non_goals:
   - Ontology v0.7 cross-artifact ref resolution (belongs_to_product_ref stays a plain string)
@@ -37,8 +38,9 @@ non_goals:
   - Standing up the SQLite global store (#30) — deferred to a later change; drop-in behind the same port
 
 build_order:
-  - 1-lifecyclerun-revendor     # the PROV spine; SURGICAL re-vendor of canonical v2.1.0 + emitter migration, ONE atomic WP
-  - 2-prov-edge                 # wasGeneratedBy prov_constraints edge on Product + Opportunity (UPSTREAM-GATED on the mint)
+  - 1-lifecyclerun-revendor     # the PROV spine; SURGICAL re-vendor of canonical v2.1.0 + emitter migration, ONE atomic WP (buildable-now — NO mint)
+  - 1b-for-project-increment    # v2.2.0 additive: re-vendor lifecyclerun 2.2.0 + wire for_project at change-start (WP-016). dependsOn 1 (v2.1.0) + WP-013; UPSTREAM-GATED on the for_project mint. A SEPARATE increment — does NOT make piece 1 mint-gated (ADR-007)
+  - 2-prov-edge                 # wasGeneratedBy prov_constraints edge on Product + Opportunity (UPSTREAM-GATED on the wasGeneratedBy mint — a DIFFERENT mint from for_project)
   - 3-evolve-mechanism          # shared helper: close-window / open-window / conditional PROV-write
   - 4-apply-evolve              # Product, Opportunity (with prov), Project (windows only, no prov) become living
   - 5-platform-store            # point living-entity emitters at the central Tenant-namespaced home (existing port + file adapter at ~/.sulis/instances/{tenant_id}/)
@@ -51,9 +53,10 @@ upstream_dependencies:
   brain:
     - LifecycleRun schema v2.1.0 ALREADY MINTED upstream (DR-009 step_name→step v2.0.0; DR-013 +4 optional fields v2.1.0) — this change RE-VENDORS the canonical compiled schema, does not author it
     - foundation Step schema v1.2.0 (the v2.1.0 `step` ref target type — prov:Plan)
-    - wasGeneratedBy prov_constraints edge on Product (1.0.0→1.1.0) + Opportunity (2.0.0→2.1.0) — PROPOSED in mint-request wasGeneratedBy-provenance-edge-2026-06-03; the in-repo prov-edge WP is GATED on this mint being accepted → recompiled → re-vendored
+    - wasGeneratedBy prov_constraints edge on Product (1.0.0→1.1.0) + Opportunity (2.0.0→2.1.0) — PROPOSED in mint-request wasGeneratedBy-provenance-edge-2026-06-03; the in-repo prov-edge WP (WP-008) is GATED on this mint being accepted → recompiled → re-vendored
+    - LifecycleRun for_project edge (2.1.0→2.2.0, +1 optional `for_project: ref→project` property; PD canonical + insurance mirror) — PROPOSED in mint-request for-project-edge-2026-06-03; the in-repo v2.2.0 re-vendor WP (WP-016) is GATED on this mint being accepted → recompiled → re-vendored (SAME gating shape as WP-008; a SEPARATE, independent mint). `sulis:forProject` predicate + `ref→project` shape already resolve (live on Workflow.for_project); NOT v0.7-gated; NOT a prov edge
     - the bitemporal-bearing living-entity schemas (fields present, no emitter writes them yet)
-    - Project STAYS prov:Plan at schema_version 1.0.0 — NO brain edit (excluded from the mint; provenance not applicable)
+    - Project STAYS prov:Plan at schema_version 1.0.0 — NO brain edit (excluded from BOTH mints; provenance not applicable; the run carries for_project, Project carries no edge)
 
 key_seams_reused:
   port: plugins/sulis/scripts/_entity_repository.py            # EntityRepository (save / find_by_id / validate)

@@ -29,7 +29,7 @@ time (SPEC Constraint): `docs/plugin-evolution-context-brief.md`,
 `docs/trunk-based-release-workflow-remodel.md`,
 `docs/claude-code-plugin-distribution-brief.md`.
 
-### The six ADRs at a glance
+### The seven ADRs at a glance
 
 | ADR | Decision | Pillar driven |
 |---|---|---|
@@ -39,6 +39,7 @@ time (SPEC Constraint): `docs/plugin-evolution-context-brief.md`,
 | ADR-004 | LifecycleRun v1.0.0 → v2.1.0 **surgical RE-VENDOR** of the already-minted canonical schema (DR-009 + DR-013), lockstep/atomic with the emitter migration in ONE WP; `step_label` + `used`-on-run DROPPED | Armor (migration atomicity) |
 | ADR-005 | Platform store = the EXISTING file adapter pointed at the central `~/.sulis/instances/{tenant_id}/` Tenant home (reuse, not build); SQLite deferred to a later change behind the same port | Form + Armor (central-home read consistency) |
 | ADR-006 | Project home reconciliation — brain store canonical, `.sulis/projects/<slug>.jsonld` a human mirror | Form + Armor (path-safety preserved) |
+| ADR-007 | **LifecycleRun.for_project** — run→Project traceability (founder-directed un-defer of ADR-001/006's deferred edge). A **plain ref** on the run (mirrors live `Workflow.for_project`; **NOT** a prov edge), PD→foundation (**NOT** v0.7-gated), optional; the run is the carrier (Project carries no edge). A **separate, mint-gated v2.2.0 increment** ON TOP OF the buildable-now v2.1.0 spine | Form (grammar shape) + traceability |
 
 ### Non-goals (from ARCH.yaml — honoured throughout)
 
@@ -62,7 +63,8 @@ re-minting. ULID character set: `0123456789ABCDEFGHJKMNPQRSTVWXYZ` (no I/L/O/U).
 
 | Schema | From | To | Why | Breaking? |
 |---|---|---|---|---|
-| `lifecyclerun` | 1.0.0 | **2.1.0** | **RE-VENDOR of already-minted canonical** (DR-009 `step_name`→`step` v2.0.0; DR-013 `+run_id/deterministic/inputs_ref/outputs_ref` v2.1.0). No `step_label`, no `used`-on-run | **YES** (ADR-004) |
+| `lifecyclerun` | 1.0.0 | **2.1.0** | **RE-VENDOR of already-minted canonical** (DR-009 `step_name`→`step` v2.0.0; DR-013 `+run_id/deterministic/inputs_ref/outputs_ref` v2.1.0). No `step_label`, no `used`-on-run. **Buildable NOW (no mint) — WP-002** | **YES** (ADR-004) |
+| `lifecyclerun` | 2.1.0 | **2.2.0** | additive `+for_project: ref→project` (card `0..1`, predicate `sulis:forProject`) — run→Project traceability (ADR-007). A plain ref (NOT a prov edge; mirrors live `Workflow.for_project`), PD→foundation (NOT v0.7-gated). **Upstream-minted + mint-gated increment — WP-016** | no |
 | `product` | 1.0.0 | 1.1.0 | additive `wasGeneratedBy` `prov_constraints` edge, card `0..1` (ADR-002) — **upstream-minted**, re-vendored | no |
 | `opportunity` | 2.0.0 | 2.1.0 | additive `wasGeneratedBy` `prov_constraints` edge, card `0..1` (ADR-002) — **upstream-minted**, re-vendored | no |
 | `project` (foundation) | 1.0.0 | **— (no change)** | Project is `prov:Plan`; `wasGeneratedBy` is a type violation. NO edit, NO bump (ADR-002, ADR-006) | no |
@@ -128,7 +130,8 @@ work is the *new* layering. The four seams below are **referenced, not restated*
 |---|---|---|---|---|
 | 1 | Canonical lifecycle Step instances | `plugins/sulis/instances/lifecycle-steps/steps.jsonld` | JSON-LD (3 Steps) | 001/004 |
 | 2 | PROV edge (re-vendored) | `wasGeneratedBy` `prov_constraints` edge on **Product + Opportunity** vendored compiled copies (Project excluded) — **upstream-minted**, no snake_case field, no `_predicate_map` edit | JSON Schema (re-vendor) | 002 |
-| 3 | LifecycleRun v2.1.0 re-vendor + emitter (ATOMIC) | re-vendor canonical `lifecyclerun.schema.json` 2.1.0 + `_lifecyclerun_emission.py` + `_brain_emit_helper.py` (`step` ref; ID seed from step+timestamp; per-run detail → `run_id`, NOT `step_label`) — one atomic lockstep WP | JSON Schema + Python | 001/004 |
+| 3 | LifecycleRun v2.1.0 re-vendor + emitter (ATOMIC) | re-vendor canonical `lifecyclerun.schema.json` 2.1.0 + `_lifecyclerun_emission.py` + `_brain_emit_helper.py` (`step` ref; ID seed from step+timestamp; per-run detail → `run_id`, NOT `step_label`) — one atomic lockstep WP. **Buildable NOW (no mint)** | JSON Schema + Python | 001/004 |
+| 3b | LifecycleRun v2.2.0 `for_project` increment | re-vendor `lifecyclerun.schema.json` 2.2.0 (additive `+for_project` plain ref, mirrors live `Workflow.for_project`) + wire the change-start emit path (`emit_change_started_event` resolves the Project ULID → sets `for_project`; CLI `--for-project`) — a SEPARATE, **mint-gated** increment ON TOP OF #3's v2.1.0 spine. The run is the carrier (Project carries no edge); NOT a prov edge; NOT v0.7-gated | JSON Schema + Python | 004/007 |
 | 4 | Instance migration script | `plugins/sulis/scripts/migrate_lifecyclerun_v1_to_v2.py` (or `sulis-emit-lifecyclerun --migrate`) | Python | 004 |
 | 5 | `_entity_evolve` helper | `plugins/sulis/scripts/_entity_evolve.py` — `evolve_entity(...)` + `_LIVING_ENTITY_TYPES` allowlist | Python (above the port) | 003 |
 | 6 | As-of-time read | new function on `_brain_query.py` — `(type, id, as_of) → window whose [valid_from, valid_to) contains as_of` | Python (read seam) | 003 |
@@ -141,7 +144,9 @@ work is the *new* layering. The four seams below are **referenced, not restated*
 
 ```
 Step (the prov:Plan / the recipe)  ◀── step (sulis:viaStep) ───  LifecycleRun (the prov:Activity / the run that instantiated it)
-                                                                       │
+                                                                       │  │
+                                                                       │  └── for_project (sulis:forProject, plain ref, card 0..1) ──▶ Project (release-unit scope)
+                                                                       │      [v2.2.0 increment, ADR-007 — NOT a prov edge; the run carries it]
                                                                        │ wasGeneratedBy (prov_constraints edge, card 0..1)
                                                                        ▼
                                        Product / Opportunity (prov:Entity living version)   ← Project is prov:Plan: NO wasGeneratedBy
@@ -152,6 +157,19 @@ Step (the prov:Plan / the recipe)  ◀── step (sulis:viaStep) ───  Lif
                                             persist BOTH via repo (the file adapter,
                                                                     repo-local OR central home)
 ```
+
+**Run→Project traceability (ADR-007).** The LifecycleRun's optional `for_project`
+ref (v2.2.0) records *which Project a run operated in*, closing the full
+**Tenant → Product → Opportunity → Project** trace for an app-started or
+terminal-started change. It is the *scope* axis (which release-unit), orthogonal
+to `step` (which Plan) and `wasGeneratedBy` (which entity version the run
+generated). The edge lives **on the run**, pointing at the Project — Project
+itself carries no new edge (consistent with ADR-006's "Project carries no edge").
+It is a **plain ref** modelled exactly like the live `Workflow.for_project`
+(foundation v0.5.0), **NOT** a `prov_constraints` edge, and is **NOT** v0.7-gated
+(PD→foundation, live `sulis:forProject` predicate). It threads as a **separate,
+mint-gated v2.2.0 increment** (WP-016) ON TOP OF the buildable-now v2.1.0 re-vendor
+(WP-002) — the v2.1.0 step-ref spine is **not** made mint-gated by it.
 
 `evolve_entity` sits **above** the port (ADR-003), so it works unchanged against
 either adapter. **Two orthogonal guards:** the `_LIVING_ENTITY_TYPES` allowlist
@@ -171,8 +189,9 @@ is ADR-003's OAQ-1, deferred with the SQLite swap.
 
 | Build-order piece | Primitive | Group | Note |
 |---|---|---|---|
-| 1 lifecyclerun-revendor | substitute-strangle (re-vendor + emitter, ATOMIC) | substitute | re-vendor canonical v2.1.0 + emitter migration in ONE WP; deprecated `--step-name` CLI alias; `removal_plan` target = next minor after consumers migrate |
-| 2 prov-edge | substitute-strangle (re-vendor) | substitute | re-vendor the **upstream-minted** `wasGeneratedBy` `prov_constraints` edge on Product + Opportunity (Project excluded); **upstream-gated** |
+| 1 lifecyclerun-revendor | substitute-strangle (re-vendor + emitter, ATOMIC) | substitute | re-vendor canonical v2.1.0 + emitter migration in ONE WP; deprecated `--step-name` CLI alias; `removal_plan` target = next minor after consumers migrate. **Buildable NOW (no mint)** |
+| 1b for-project-increment | substitute-strangle (additive re-vendor) | substitute | re-vendor lifecyclerun **v2.2.0** (additive `+for_project` plain ref) + wire change-start emit (WP-016); **upstream-gated** on the for_project mint; additive MINOR (no instance migration); SEPARATE from piece 1 (does not gate it) |
+| 2 prov-edge | substitute-strangle (re-vendor) | substitute | re-vendor the **upstream-minted** `wasGeneratedBy` `prov_constraints` edge on Product + Opportunity (Project excluded); **upstream-gated** on a DIFFERENT mint |
 | 3 evolve-mechanism | expand-create | expand | new helper above the port; **not** a wrap; conditional prov-write |
 | 4 apply-evolve | reorganise-refactor + reinforce | reorganise | emitters move from `save` to `evolve_entity` (Product/Opp w/ prov; Project windows-only); **characterisation test first** |
 | 5 platform-store | reuse | (reuse) | **reuse** the existing file adapter at the central Tenant home — no new code (ADR-005); SQLite deferred |
@@ -303,8 +322,9 @@ ordering is the `dependsOn` graph below.
 
 | Piece | dependsOn | Primitive | Key contract surface |
 |---|---|---|---|
-| 1 lifecyclerun-revendor | — | substitute-strangle (ATOMIC) | RE-VENDOR canonical `lifecyclerun` 2.1.0 (`step`, NO `step_label`, NO `used`) + emitter core (compose + helper) in one WP; canonical Steps; name→ULID map; migration script |
-| 2 prov-edge | 1 | substitute-strangle (re-vendor) | re-vendor the **upstream-minted** `wasGeneratedBy` `prov_constraints` edge (Product 1.1.0 + Opportunity 2.1.0; **Project excluded**); NO snake_case field, NO `_predicate_map` edit; **upstream-gated** |
+| 1 lifecyclerun-revendor | — | substitute-strangle (ATOMIC) | RE-VENDOR canonical `lifecyclerun` 2.1.0 (`step`, NO `step_label`, NO `used`) + emitter core (compose + helper) in one WP; canonical Steps; name→ULID map; migration script. **Buildable NOW (no mint)** |
+| 1b for-project-increment | 1, 5 | substitute-strangle (additive re-vendor) | re-vendor `lifecyclerun` **2.2.0** (additive `+for_project` plain ref, mirrors live `Workflow.for_project`) + wire change-start emit (WP-016); **upstream-gated** on the for_project mint (a DIFFERENT mint from piece 2); serialises after piece 5 on `_brain_emit_helper.py` (P6) |
+| 2 prov-edge | 1 | substitute-strangle (re-vendor) | re-vendor the **upstream-minted** `wasGeneratedBy` `prov_constraints` edge (Product 1.1.0 + Opportunity 2.1.0; **Project excluded**); NO snake_case field, NO `_predicate_map` edit; **upstream-gated** on a DIFFERENT mint |
 | 3 evolve-mechanism | 2 | expand-create | `evolve_entity(...)` with **conditional** prov-write; `_LIVING_ENTITY_TYPES`; as-of-time read function |
 | 4 apply-evolve | 3 | reorganise-refactor + reinforce | Product/Opportunity emitters call `evolve_entity(generated_by=<ref>)`; Project emitter calls it with `generated_by=None` (windows-only); **characterisation_test** required |
 | 5 platform-store | 3 | reuse | point living-entity emit `base_dir` at `~/.sulis/instances/{tenant_id}/` (existing file adapter + existing Tenant ULID); `find_current_for_tenant` over the central home via the existing `_brain_query` walk; SQLite deferred |
@@ -314,8 +334,12 @@ Pieces 1→2→3 are a strict chain. 4 and 5 both depend on 3 and can proceed in
 parallel after it. 6 is the join (depends on 3, 4, 5). Piece 2 (and everything it
 gates: 3→6) is **upstream-blocked** on the `wasGeneratedBy` mint being accepted +
 recompiled + re-vendored; the pre-gate spine (piece 1) lands independently.
-`/sulis:plan-work` owns the real WP count (13 after the re-cut) and the
-Red-Green-Blue DoDs.
+**Piece 1b (WP-016, the `for_project` v2.2.0 increment) is a separate leaf** off
+piece 1 (the v2.1.0 spine) and piece 5 (WP-013, the `_brain_emit_helper.py`
+serialisation), **upstream-blocked on its own — independent — `for_project` mint.
+It does NOT gate piece 1, and piece 1 does NOT wait on it (ADR-007).**
+`/sulis:plan-work` owns the real WP count (14 after the for_project increment) and
+the Red-Green-Blue DoDs.
 
 ---
 
@@ -329,6 +353,7 @@ Red-Green-Blue DoDs.
 | Platform store home | **reuse** the existing file adapter at the central `~/.sulis/instances/{tenant_id}/` Tenant home | build a new SQLite backend now; multi-repo file walk | check-before-building: the central home + relocatable `base_dir` already exist; reuse beats build (ADR-005) |
 | SQLite backend (#30) | **deferred** to a later change, drop-in behind the same port | build it now | no query-scale need yet; the swap stays cheap because the port is the contract (ADR-005) |
 | Project home | brain store canonical + `.sulis/projects` mirror | `.sulis/projects` only; delete the mirror; sync job | one canonical writer, one derived mirror; safety discipline preserved (ADR-006) |
+| `for_project` run→Project link | plain ref **on the run** (mirrors live `Workflow.for_project`), v2.2.0 additive, mint-gated increment off the v2.1.0 spine | an edge on Project; a `prov_constraints` edge; folding into WP-002's v2.1.0; waiting for v0.7 | the run is the carrier (ADR-006); it's a scope ref not a prov assertion; folding in would make the v2.1.0 spine mint-gated; `sulis:forProject` resolves today (ADR-007) |
 | `belongs_to_product_ref` | stays a plain string | resolve to a live ref | ontology v0.7 resolution is a NON-GOAL |
 
 ---
@@ -379,6 +404,7 @@ Tenant home.
 | The `EntityRepository` port (file adapter) | **existing contract test** (already covers `LocalFileEntityAdapter`) | existing | concrete — `tests/unit/test_entity_repository_contract.py::test_contract[file]` (no `[sqlite]` parametrisation in this change — SQLite adapter deferred) |
 | Evolve helper above the port | **in-process**, real adapter | existing | concrete — `tests/unit/test_entity_evolve.py::test_close_open_window`, `::test_noop_idempotent`, `::test_refuses_event_entity` |
 | PROV edge emission (Product/Opportunity only) | **in-process** schema-validated; **upstream-gated** on the mint | existing (gated) | concrete — `tests/unit/test_prov_edge_schemas.py::test_was_generated_by_edge_on_product_and_opportunity`, `::test_project_schema_unchanged`, `tests/unit/test_entity_evolve.py::test_project_evolve_writes_NO_prov_edge`, `::test_no_wasrevisionof` |
+| `for_project` run→Project edge (LifecycleRun v2.2.0) | **in-process** schema-validated; **upstream-gated** on the for_project mint (a DIFFERENT mint) | existing (gated) | concrete — `tests/unit/test_lifecyclerun_for_project.py::test_change_start_run_carries_for_project`, `::test_change_start_omits_for_project_when_no_project`, `tests/unit/test_lifecyclerun_schema_v2_2.py::test_for_project_property_present_and_optional`, `::test_v2_1_instance_still_valid_under_2_2` |
 | LifecycleRun re-vendor + v1→v2 migration | **real fixture-in / instance-out** | existing | concrete — `tests/unit/test_lifecyclerun_schema_v2.py::test_revendored_schema_matches_canonical`, `tests/unit/test_lifecyclerun_migration.py::test_v1_fixture_migrates`, `::test_idempotent`, `::test_unmappable_to_unclassified`, `::test_rejects_invalid` |
 | Project reconcile (minter) | **characterisation-first**, real temp repo + real store | existing | concrete — `tests/unit/test_minter_reconcile.py::test_canonical_save_then_mirror`, `::test_path_safety_preserved`, `::test_muc003_refuses` |
 | Drift detector (Path A) | **existing detector**, fixture pass/drift | existing | concrete — `tests/unit/test_check_canonical_drift_lifecycle_steps.py` |
@@ -402,22 +428,30 @@ compiled schemas are committed fixtures. The deferred-need list aggregated at
 slice-end is empty for this change. The SQLite backend (#30) is deferred
 *engineering*, not deferred verification infrastructure.
 
-**One upstream PREREQUISITE (not a verification deferral):** the prov-edge WP
-(piece 2 / WP-008) cannot land until the `wasGeneratedBy` mint
-(`.specifications/business-dna/mint-requests/wasgeneratedby-provenance-edge-2026-06-03.md`)
-is accepted → walked → recompiled → re-vendored. Its test
-(`test_was_generated_by_edge_on_product_and_opportunity`) ships *with* WP-008 the
-moment that prerequisite clears — it is a gated-but-concrete test, not a
-deferred-to-follow-on need identifier. The pre-gate spine (piece 1) is verifiable
-immediately.
+**Two independent upstream PREREQUISITES (not verification deferrals):**
+
+1. The prov-edge WP (piece 2 / WP-008) cannot land until the `wasGeneratedBy` mint
+   (`.specifications/business-dna/mint-requests/wasgeneratedby-provenance-edge-2026-06-03.md`)
+   is accepted → walked → recompiled → re-vendored (Product 1.1.0 + Opportunity 2.1.0).
+2. The for_project increment WP (piece 1b / WP-016) cannot land until the
+   for_project mint
+   (`.specifications/business-dna/mint-requests/for-project-edge-2026-06-03.md`)
+   is accepted → walked → recompiled → re-vendored (LifecycleRun 2.2.0).
+
+Each WP's test ships *with* it the moment its prerequisite clears — gated-but-
+concrete tests, not deferred-to-follow-on need identifiers. The two mints are
+**independent** (different schemas, no ordering between them). The pre-gate spine
+(piece 1 — WP-001, WP-002, WP-005, WP-006, WP-007) is verifiable immediately and
+is **not** gated by either mint.
 
 ### Per-WP `verification:` frontmatter shape (for `/sulis:plan-work`)
 
 Every WP in this change ships **Shape 1 — concrete** (`adapter: backend` +
 `artifact: <pytest nodeid>`) — each WP lands with a real test the moment it
-merges. **WP-008 is Shape-1 concrete but starts `blocked`** on the upstream
-`wasGeneratedBy` mint (its test ships with it once the mint is re-vendored — a
-gated-but-concrete test, NOT a Shape-2 deferral). No Shape-2 (deferred-to-
+merges. **WP-008 and WP-016 are Shape-1 concrete but start `blocked`** on their
+respective upstream mints (the `wasGeneratedBy` mint for WP-008; the `for_project`
+mint for WP-016) — each test ships with its WP once that mint is re-vendored, a
+gated-but-concrete test, NOT a Shape-2 deferral. No Shape-2 (deferred-to-
 follow-on) WPs. Shape-3 (trivial carveout) applies only to a mechanical
 vendored-schema-copy WP if `/sulis:plan-work` splits one out (`na: true` +
 justification ≥ 30 chars).
@@ -430,24 +464,28 @@ See `SIZING.md` for the full sFPC + ASR breakdown. Highlights:
 
 - **Tier:** L (computed sFPC 17 / ASR 13 both mid-M; taken to L for crossing four bounded contexts + a hard migration chain). Confirmed, not overridden.
 - **TDD length:** within the tier-L target; the hexagonal seams are **referenced, not restated** (no Clean-Architecture re-derivation — `SIZING.md` Respect-Don't-Restate).
-- **ADRs produced:** 6 (ADR-001..006 — at the ARCH.yaml expected count; each records a decision affecting >1 component or locking a technology/grammar choice).
+- **ADRs produced:** 7 (ADR-001..007 — ADR-007 added for the founder-directed `for_project` un-defer; each records a decision affecting >1 component or locking a technology/grammar choice. ADR-007 extends ADR-001/006 rather than superseding — those two named `for_project` as the deferred home; ADR-007 un-defers it without reopening them).
 - **Pillar coverage applied:** Form = PARTIAL (port/adapter/query seams inherited; new = evolve layering, PROV edge re-vendor (convention reuse, not new grammar), central-Tenant-home wiring (reuse, no new adapter), Project move); Armor = PARTIAL (graceful-degradation + atomic-write + reject-on-invalid inherited; new = re-vendor+migration atomicity, window invariants, central-home write durability, append-only guard); Proof = PARTIAL (contract-test + drift-parity infra inherited; new = central-home read/write test, evolve characterisation test, prov-edge-emission test (Product/Opportunity only + Project paired-negative), re-vendor + v1→v2 migration test).
 - **Authoritative sources referenced:** the four existing seams (port / file adapter / query / emit helper), the four landed design docs, `discover-project` + `release-train-as-entities` TDDs (Path-A prior art), `CONTRACT_FIRST_STANDARD` (the `EntityRepository` Protocol IS the contract), `WP_BACKEND_STANDARD`, W3C PROV-O.
 - **Sections that referenced rather than restated:** the hexagonal seams, the drift-detector implementation, the Path-A rationale, the graceful-degradation discipline.
 - **Circuit breakers triggered:** none (TDD within target; ADR count at expected; no section restates an authoritative source).
 
-### Actual WP set (13 atomic WPs — produced by `/sulis:plan-work`, see `work-packages/INDEX.md`)
+### Actual WP set (14 atomic WPs — produced by `/sulis:plan-work`, see `work-packages/INDEX.md`)
 
-> The pre-plan-work estimate (12-16) resolved to **13 WPs** after the
-> brain-governance re-cut. The defining shape changes vs the naïve estimate: the
-> LifecycleRun schema + the two emitter moves **collapse into one atomic re-vendor
-> WP** (lockstep mandate); the prov work is **a re-vendored `prov_constraints`
-> edge on Product + Opportunity only** (Project excluded, prov:Plan), **upstream-
-> gated on the mint**.
+> The brain-governance re-cut resolved to **13 WPs**; the founder-directed
+> `for_project` increment adds **1** (WP-016) → **14**. The defining shape changes:
+> the LifecycleRun schema + the two emitter moves **collapse into one atomic
+> re-vendor WP** (lockstep mandate); the prov work is **a re-vendored
+> `prov_constraints` edge on Product + Opportunity only** (Project excluded,
+> prov:Plan), **upstream-gated on the `wasGeneratedBy` mint**; the `for_project`
+> work is **an additive v2.2.0 plain-ref increment** (run→Project scope; mirrors
+> live `Workflow.for_project`), **upstream-gated on a SEPARATE `for_project`
+> mint**, sitting ON TOP OF the buildable-now v2.1.0 spine (ADR-007).
 
 | Build-order piece | WPs | Primitive |
 |---|---|---|
 | 1 lifecyclerun-revendor | WP-001 canonical-lifecycle-steps; **WP-002 revendor-emitter-lockstep (ATOMIC — absorbs the old schema+compose+helper WPs)**; WP-005 cli-step-arg; WP-006 instance-migration-script; WP-007 drift-parity | substitute-strangle (atomic) |
+| 1b for-project-increment (UPSTREAM-GATED) | **WP-016 revendor-v2.2.0-for-project** (re-vendor lifecyclerun 2.2.0 additive `for_project` + wire change-start emit; depends on WP-002 + WP-013; blocked on the for_project mint) | substitute-strangle (additive re-vendor) |
 | 2 prov-edge (UPSTREAM-GATED) | WP-008 prov-edge-product-opportunity (re-vendor the upstream-minted `wasGeneratedBy` `prov_constraints` edge; Project excluded) | substitute-strangle (re-vendor) |
 | 3 evolve-mechanism | WP-009 entity-evolve-helper (conditional prov-write + allowlist); WP-010 as-of-time-read | expand-create + extend |
 | 4 apply-evolve | WP-011 emitter-characterisation-test; WP-012 apply-evolve (Product/Opp w/ prov; Project windows-only) | reinforce-test + reorganise-refactor |

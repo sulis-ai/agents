@@ -8,8 +8,8 @@
 
 | Axis | Value | Tier signal |
 |---|---|---|
-| sFPC (simplified function point count) | **17** | M (11–30) |
-| ASR (architecturally-significant requirements) | **13** | M (6–15) |
+| sFPC (simplified function point count) | **18** | M (11–30) |
+| ASR (architecturally-significant requirements) | **14** | M (6–15) |
 | Distinct subsystems touched | **4** (PROV grammar · evolve mechanism · Platform store · discovery/mint reconcile) | pushes to L |
 
 Both numeric axes land mid-M. Tier is taken to **L** because the change spans four
@@ -18,16 +18,23 @@ touches the brain ontology grammar (a cross-cutting contract), not one component
 This is the "take the higher tier when the change crosses multiple bounded contexts"
 rule from `right-sizing.md`.
 
+> **2026-06-03 for_project increment (founder-directed).** sFPC 17→**18** (+1 EI:
+> the `for_project` change-start emit op), ASR 13→**14** (+1 hard data constraint:
+> the additive v2.2.0 `for_project` ref-shape conformance, mint-gated). Tier stays
+> **L** — an additive optional property + one mint-gated emit-wiring WP does NOT
+> cross a new bounded context (it sits inside the existing PROV-grammar / emitter
+> concern). WP count 13→**14** (WP-016). See ADR-007.
+
 ### sFPC breakdown
 
 | Element | Count | Items |
 |---|---|---|
 | ILF (living/persistent entity types) | 6 | Product, Opportunity, Project, LifecycleRun, Step (referenced), PROV-Activity binding |
 | EIF (outbound integration) | 0 | none new — the cross-repo home REUSES the existing file adapter pointed at the central `~/.sulis/instances/{tenant_id}/` Tenant home; the SQLite backend (#30) is deferred to a later change (ADR-005) |
-| EI (mutating ops) | 7 | evolve-close-window, evolve-open-window, conditional wasGeneratedBy prov_constraints-edge-write (Product/Opportunity only), LifecycleRun v2.1.0 re-vendor+emit (one atomic op), v1→v2 instance migration, Project mint reconcile (windows only, no prov), central-Tenant-home write (existing adapter, relocated `base_dir`) |
+| EI (mutating ops) | 8 | evolve-close-window, evolve-open-window, conditional wasGeneratedBy prov_constraints-edge-write (Product/Opportunity only), LifecycleRun v2.1.0 re-vendor+emit (one atomic op), v1→v2 instance migration, Project mint reconcile (windows only, no prov), central-Tenant-home write (existing adapter, relocated `base_dir`), **for_project change-start emit (v2.2.0 increment — sets the run→Project ref; ADR-007)** |
 | EO (deriving ops) | 2 | as-of-time window query, cross-repo Tenant read |
 | EQ (retrieving ops) | 2 | read-current-version, find latest-open-window |
-| **sFPC** | **17** | |
+| **sFPC** | **18** | |
 
 ### ASR breakdown
 
@@ -36,8 +43,8 @@ rule from `right-sizing.md`.
 | NFR-derived | 7 | lockstep re-vendor+emitter atomicity (no half-migrated state — schema + emitter in one WP), graceful degradation preserved, bitemporal window invariants, PROV-O `prov_constraints` convention conformance (reuse not new grammar; wasGeneratedBy on prov:Entity types only), cross-repo read consistency, central-home write durability (existing file adapter atomic-write), deterministic ULID stability across migration |
 | Integration | 0 | none new — the cross-repo home REUSES the existing file adapter at the central Tenant home; SQLite backend deferred to a later change (ADR-005) |
 | MUC/policy | 3 | append-only protection for event entities, evolve-not-applied-to-events guard, path-safety preserved on Project reconcile |
-| Hard data constraint | 3 | BREAKING LifecycleRun schema migration (surgical re-vendor of canonical v2.1.0 — step_name→step), deterministic ULID derivation, valid-window non-overlap invariant |
-| **ASR** | **13** | |
+| Hard data constraint | 4 | BREAKING LifecycleRun schema migration (surgical re-vendor of canonical v2.1.0 — step_name→step), deterministic ULID derivation, valid-window non-overlap invariant, **additive v2.2.0 `for_project` ref-shape conformance (plain ref matching live Workflow.for_project; mint-gated; zero-migration MINOR)** |
+| **ASR** | **14** | |
 
 ## Per-pillar addressable scope
 

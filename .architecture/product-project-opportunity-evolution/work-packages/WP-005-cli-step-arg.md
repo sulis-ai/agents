@@ -8,7 +8,7 @@ group: SUBSTITUTE
 change_id: CH-01KT61
 sequence_id: WP-005
 dependsOn: [WP-002]
-blocks: []
+blocks: [WP-016]
 removal_plan:
   deprecated_surface: "the `--step-name` CLI flag (alias)"
   target: "removed in the next minor after downstream consumers migrate; tracked as a follow-on, kept this change for one-release back-compat"
@@ -74,7 +74,7 @@ Mutually exclusive: passing both is an error. Calls WP-002's `compose_lifecycler
 ## Sequence
 
 - **dependsOn:** WP-002 (the atomic re-vendor+emitter-core WP — `compose_lifecyclerun` v2 signature + `_resolve_step` + map all land there)
-- **blocks:** — (leaf of the emitter cluster)
+- **blocks:** WP-016 (peer-collision serialisation on `sulis-emit-lifecyclerun` — WP-016's `--for-project` arg edit lands after this WP's `--step`/`--step-name` CLI migration to the same entry, P6)
 
 ## Estimated Token Cost
 
