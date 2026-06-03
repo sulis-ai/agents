@@ -31,6 +31,21 @@ mixed-version vendor is safe):
   (both rejected upstream — DR-013). The three lifecycle Step ULIDs the `step`
   ref points at are authored once in
   `plugins/sulis/instances/lifecycle-steps/steps.jsonld` (WP-001).
+- `product` v1.0.0 → **1.1.0** and `opportunity` v2.0.0 → **2.1.0** —
+  RE-VENDORED (WP-008) to consume the upstream-minted `wasGeneratedBy`
+  provenance edge (the `wasGeneratedBy` mint, DR-031). Each gains an optional
+  `wasGeneratedBy → dna:entity:lifecyclerun` edge at card `0..1`, modelled
+  exactly like the five existing producers (Component/Release/Metric/
+  TestResult/PostMortem) via the `prov_constraints` mechanism — **not** a
+  snake_case wire field, no `@context` map, no `_predicate_map` edit (the
+  `prov:wasGeneratedBy` predicate already exists). The edge lives in the
+  **triples manifest**, not the JSON-Schema body, so the vendored schema
+  re-vendor is the `$id` bump only (the vendored tree is schema-only — triples
+  are not vendored for any entity). The `0..1` cardinality (vs the producers'
+  `1..1`) keeps pre-bump instances valid — a zero-migration additive MINOR.
+  **`project` is excluded** — it is a `prov:Plan` (an Entity→Activity edge is a
+  type violation), so it stays at v1.0.0, untouched. `wasRevisionOf` appears
+  nowhere (ADR-002).
 
 **Still to catch up (breaking / structural — deliberately NOT bundled):**
 the 10 foundation-mirror entities the PD source now carries (the mirror-surface

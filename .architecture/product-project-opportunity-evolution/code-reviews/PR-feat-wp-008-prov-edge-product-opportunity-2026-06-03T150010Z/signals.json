@@ -1,0 +1,27 @@
+{
+  "review": {
+    "target": "feat/wp-008-prov-edge-product-opportunity",
+    "base": "change/feat-product-project-opportunity-evolution",
+    "timestamp": "2026-06-03T150010Z",
+    "verdict": "PASS"
+  },
+  "build_verification": {
+    "errors_introduced": 0,
+    "commands": ["python3 -m py_compile plugins/sulis/scripts/tests/unit/test_prov_edge_schemas.py", "json.load on 2 re-vendored schemas"],
+    "coverage_gap": "no ruff/mypy/pyright configured for this stdlib-only plugin repo; CI gate is JSON-validity + py_compile, both run"
+  },
+  "pr_hygiene": {
+    "scope": {"commit_type_spread": ["feat"], "module_fan_out": 2, "severity": "none"},
+    "size": {"lines_added": 17, "lines_removed": 2, "files_changed": 4, "severity": "none"},
+    "safety": {"migration_count": 0, "schema_idl_count": 2, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none", "note": "2 vendored JSON-Schema files re-vendored (byte-faithful $id bump); no DB migration, no breaking IDL change (additive MINOR)"},
+    "completeness": {"new_source_without_test": 0, "new_tests": 1, "api_change_without_schema": false, "severity": "none", "note": "test-first: 7 DoD tests authored before the re-vendor"}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "note": "re-vendor of 2 compiled data files + 1 test + 1 doc paragraph; no domain/infra imports, no new module, no resilience surface"},
+    "security": {"findings": 0, "primitives_checked": ["SEC-06 secrets exposure"], "note": "no secret patterns in added lines; data-contract-only change"},
+    "quality": {"findings": 0, "build_verification": "clean", "test_coverage": "7 DoD tests, all green; 11 test cases incl parametrize", "dead_surface": "none", "contract_drift": "none", "perf_cr10": "no anti-pattern matches (tests load 1-2 small JSON files; no DB/RPC/FS-loop)"}
+  },
+  "findings": [],
+  "hardening_deltas": [],
+  "neighbours": {"files_considered": 0, "note": "the vendored schemas are consumed by validator/drift tests; full unit suite (1790 passed) re-run confirms no neighbour regression"}
+}
