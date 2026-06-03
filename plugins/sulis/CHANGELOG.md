@@ -1,3 +1,9 @@
+## v0.95.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- verify-requirements now recognises the Scenario route. A green Scenario run (sulis-verify-acceptance --scenario) deposits a passing TestResult verifying its Requirements, so a requirement proven only by a Scenario journey reads as covered — closing the false-red where the DoD gate saw the @verifies route but not the Scenario route. The ship flow runs the acceptance gate BEFORE the coverage gate (acceptance produces the evidence coverage consumes). TestRun/TestResult gain scenario back-links; ids are deterministic per-scenario so a regressed scenario overwrites its record (no stale pass).
+
 ## v0.94.0 — 2026-06-03
 
 **Minor — release-train batch.**
