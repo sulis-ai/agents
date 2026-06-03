@@ -1,3 +1,9 @@
+## v0.97.3 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- Decommission the two-branch (dev/main) machinery left over from the trunk cutover. Deleted drift_check.sh + the dead drift/GIT-12 test suite + promote-dev-to-main.yml; severed the dev/back-merge constants from abm_canonical.sh (kept path helpers for the trunk tests); repointed wpx-arrival-check repo-contract rules to the trunk (RC-01 default=main + main-only existence, RC-02 protection on main, RC-03 merge-queue on main, RC-04 required workflow release-on-merge); rewrote git-workflow-standard GIT-01 to single-trunk, reframed GIT-06 to release-on-trunk, RETIRED GIT-12, bumped 0.3.0→0.4.0. Net -1026 lines. dev branch deletion is the separate final step.
+
 ## v0.97.2 — 2026-06-03
 
 **Patch — release-train batch.**
