@@ -1,3 +1,20 @@
+## v0.92.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- New ux-designer specialist agent — owns the visual contract end-to-end (the
+  #45 design-stage gate): inspiration probe, real-token HTML mockup,
+  accessibility, cognitive load, and the founder sign-off conversation. Also
+  owns visual design at the SYSTEM level: when no design system/language exists
+  it establishes one (Identity -> three-tier tokens) or asks the founder which
+  to use. draft-architecture (step 3.5b) now DISPATCHES it instead of producing
+  the visual contract inline; Sulis routes/delegation/roster wired to it.
+  Adds UXD-16 (Cognitive load, CL-01..06) to UX_VISUAL_DESIGN_STANDARD (0.2.0 ->
+  0.3.0) — the missing dimension, sourced from the platform cognitive-load.md;
+  confirms WCAG-AA (UXD-07) + agentic-interface (UXD-10) + design-lifecycle
+  IDC/DS conventions were already reconciled. Authored via add-agent (5 gates,
+  Verdict PASS); full suite 1747 green.
+
 ## v0.91.0 — 2026-06-03
 
 **Minor — release-train batch.**
