@@ -30,10 +30,28 @@ def _run(cmd: list[str], cwd: Path | None = None) -> tuple[int, str, str]:
     return proc.returncode, proc.stdout, proc.stderr
 
 
+def _normalise_base_branch(raw: str) -> str:
+    """Strip `origin/` or `refs/heads/` prefixes so both spellings resolve.
+
+    #105: callers (executors, run-all batches, manual scripts) reasonably
+    spell the same ref three ways — `dev`, `origin/dev`, or `refs/heads/dev`.
+    Without normalisation the prefixed forms double-prefix to
+    `origin/origin/dev` at the `base_ref = f"origin/{base_branch}"` step.
+    """
+    bb = raw.strip()
+    for prefix in ("refs/heads/", "origin/"):
+        if bb.startswith(prefix):
+            bb = bb[len(prefix):]
+            break
+    return bb
+
+
 def cmd_create(args: argparse.Namespace) -> None:
     paths = paths_from_args(args)
     worktree_path = Path(args.worktree_path).resolve()
-    base_branch = getattr(args, "base_branch", None) or "dev"
+    base_branch = _normalise_base_branch(
+        getattr(args, "base_branch", None) or "dev"
+    )
 
     if worktree_path.exists():
         emit_error(f"Worktree path already exists: {worktree_path}")
