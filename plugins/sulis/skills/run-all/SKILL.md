@@ -346,12 +346,46 @@ loop:
     7. Mark each picked WP status: in_progress in INDEX with
        timestamp.
 
+    7.5. **Pin ONE base ref for the whole batch (#106 — MUST).**
+       Parallel executors that resolve their own `--base-branch` will
+       drift: one ends up off the local `change/*` tip, another off
+       `origin/dev` after a fetch — the calling session then has to
+       reconcile bases + back-integrate by hand before the train. Pick
+       the base ref **once, here**, and pass it verbatim to every
+       executor in the wave so all worktrees branch off the same SHA:
+
+       ```bash
+       CURRENT_BRANCH=$(git -C <repo-root> branch --show-current)
+       if [[ "$CURRENT_BRANCH" == change/* ]]; then
+           # Shipping into a change — use the change branch (LOCAL ref,
+           # since the change branch may not exist on origin yet).
+           BATCH_BASE_BRANCH="$CURRENT_BRANCH"
+       else
+           # Shipping direct to dev — fetch origin/dev once so every
+           # executor branches off the same fresh tip.
+           git -C <repo-root> fetch origin dev
+           BATCH_BASE_BRANCH="dev"
+       fi
+       BATCH_BASE_SHA=$(git -C <repo-root> rev-parse "$BATCH_BASE_BRANCH")
+       ```
+
+       Substitute `<BATCH_BASE_BRANCH>` into every executor brief in
+       Step 8 below — every Agent prompt MUST include
+       `--base-branch <BATCH_BASE_BRANCH>` on its `wpx-worktree create`
+       call. Capture `<BATCH_BASE_SHA>` for the drift gate at Step 12.5
+       so any in-batch drift is detected before the train pass.
+
     8. Dispatch ALL picked WPs in a SINGLE message containing
        multiple Agent tool_use blocks — Claude Code runs them
        concurrently. The Agent `description` is rendered on the
        founder's screen — it MUST be founder-English (the plain
        translation of the WP's title), NEVER a raw WP ID or
        "Ship WP-NNN". See "Founder progress discipline" below.
+
+       **Every executor prompt in this dispatch MUST include
+       `--base-branch <BATCH_BASE_BRANCH>` on its `wpx-worktree create`
+       call (per Step 7.5 #106).** Don't let executors resolve their
+       own base independently — that's the divergence the pin closes.
 
        Agent({
          subagent_type: "sulis:executor",

@@ -74,10 +74,18 @@ def cmd_append_evidence(args: argparse.Namespace) -> None:
 
     existing_text = wp_path.read_text(encoding="utf-8")
     if "## Acceptance Evidence" in existing_text:
-        emit_error(
-            f"WP file already has ## Acceptance Evidence section. "
-            f"Use --force to overwrite (not implemented)."
-        )
+        # #142 idempotence — wpx-step12 wrap may be retried after a Step 12.2
+        # flip-status mismatch (e.g. the WP was at 'pending' on the first
+        # attempt). On replay, the evidence block is already present; treat
+        # this as a success no-op so the wrap retry lands cleanly instead of
+        # bombing at Step 12.1. The first-write evidence is preserved (a
+        # second block would double the audit trail without adding signal).
+        emit_ok(data={
+            "wp": args.wp,
+            "path": str(wp_path),
+            "already_present": True,
+        })
+        return
     new_text = existing_text.rstrip() + "\n" + "\n".join(block)
     wp_path.write_text(new_text, encoding="utf-8")
     emit_ok(data={"wp": args.wp, "path": str(wp_path)})
