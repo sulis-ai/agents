@@ -116,38 +116,21 @@ fits, default to `feat` — never block on this.
 will recognise — derive it from the intent ("fix the login bug" →
 `fix-login-bug`) unless the founder gave one explicitly.
 
-**3. Preflight — don't start work on a stale `dev` (FR-010, ADR-003, GIT-12).**
-This is the first thing that runs and it runs BEFORE any branch is cut.
-A new change branch taken off a `dev` that's behind `main` re-introduces
-stale content into the next release — so refuse to start until `dev` has
-caught up. Run the shared drift helper, which prints its own recovery
-instructions when it finds drift:
+**3. Preflight — cut the change branch off the latest `main` (FR-010, ADR-003).**
+On the trunk model there is one integration line — `main` — so the only
+staleness that matters is a *local* `main` lagging `origin/main`. The branch
+is always cut off the freshest `origin/main`; `sulis-change start` fetches
+`origin/main` before branching, so there is nothing to gate here — a fresh
+clone, a behind-by-N local, and an up-to-date local all resolve to the same
+freshly-fetched base.
 
 ```bash
-DRIFT_ERR="$(bash plugins/sulis/scripts/drift_check.sh 2>&1)"
-if [ $? -ne 0 ]; then
-  if printf '%s' "$DRIFT_ERR" | grep -q "dev is behind main"; then
-    # Definitive drift. STOP — cut no branch, write no change record.
-    printf '%s\n' "$DRIFT_ERR" >&2
-    exit 1
-  fi
-  # Tooling / fresh-repo error (no git, not a repo yet, no origin/main,
-  # or a failed fetch). Surface it as a heads-up but DO NOT block — a
-  # fresh clone with no upstream yet is not drift.
-  printf 'Heads-up: skipped the stale-dev check (%s). Continuing.\n' "$DRIFT_ERR" >&2
-fi
+git fetch origin main -q 2>/dev/null || true   # best-effort; branch is cut off origin/main
 ```
 
-Only a definitive "`dev` is behind `main`" stops the skill — then no
-branch is cut and no change record is created, and the helper's message
-names the next step (wait for the open back-integrate PR to merge, or run
-the GIT-12 manual recovery). Any other non-zero result is a tooling or
-fresh-repo condition (the helper can't reach `origin/main`); that does not
-block — surface it and carry on. The helper owns the recovery wording; do
-not restate it here. This is the developer-side half of the same gate
-`/sulis:release-train` runs (single helper, two call sites). Per TDD §5.5
-L3: this is the developer entry-point's defence-in-depth layer — the
-release-train gate is L2, the workflow itself is L1.
+(The old `dev`-behind-`main` drift gate — `drift_check.sh` + the GIT-12
+auto-back-merge invariant — was retired with the two-branch model. There is
+no `dev` to fall behind, so there is no drift to detect.)
 
 **4. Echo the plan before acting (Rule 3).** One sentence, plain English,
 before running anything:
@@ -286,15 +269,16 @@ say so plainly and offer `list`:
 
 ### `ship <CH-handle>` — the solo landing flow
 
-Land a finished change into the shared `dev` line. **Destructive +
+Land a finished change into `main` — the trunk. **Destructive +
 external blast radius** — this is the one subcommand that changes shared
 state, so echo-before-act AND prompt-before-destroy both apply (Rule 3).
 
 This repo's profile is **solo** (`contribution_model: solo`): no merge
-queue, no deploy. Ship = open a PR to `dev`, wait for the branch checks to
-pass, squash-merge, sync `dev`. **Ship lands on `dev` ONLY — never
-`main`.** Promotion to `main` is a separate, explicit founder act and is
-out of scope here.
+queue, no deploy. Ship = open a PR to `main`, wait for the branch checks to
+pass, squash-merge, sync local `main`. On the trunk model `main` IS the
+integration line; **cutting a release** (the version bump + tag from the
+accumulated changesets) is the separate, explicit step — `/sulis:release-train`
+— not part of ship.
 
 **1. Resolve the change** (same as `focus`). Get its branch + slug +
 primitive. If the handle doesn't match, say so and offer `list`.
@@ -304,8 +288,8 @@ primitive. If the handle doesn't match, say so and offer `list`.
 exact branch and the irreversible step BEFORE doing it, and require an
 explicit yes:
 
-> *"This will merge **fix the login bug** (`change/fix-login-bug`) into the
-> shared `dev` line. The merge itself can't be casually undone. Afterwards
+> *"This will merge **fix the login bug** (`change/fix-login-bug`) into
+> `main` (the trunk). The merge itself can't be casually undone. Afterwards
 > I'll tidy away the workspace (you don't need it once it's shipped), but
 > the branch + the full history stay as an audit trail you can retrace in
 > the cockpit — and I can re-open the exact workspace any time with
@@ -316,11 +300,11 @@ Do not proceed without an affirmative. If the founder's phrasing was
 ambiguous ("get rid of this", "clear it"), do NOT treat it as ship — ask
 what they mean.
 
-**3. Push the branch and open the PR to `dev`:**
+**3. Push the branch and open the PR to `main`:**
 
 ```bash
 git push -u origin change/fix-login-bug
-gh pr create --base dev --head change/fix-login-bug \
+gh pr create --base main --head change/fix-login-bug \
   --title "fix: fix the login bug" \
   --body "Change CH-01HQ8X · primitive: fix · Closes #42"
 ```
@@ -373,7 +357,7 @@ review gate are all unchanged.
 
 ```bash
 PROTECTION=$("$SCRIPTS_DIR/wpx-preflight" protection-status \
-  --repo <org/repo> --branch dev)
+  --repo <org/repo> --branch main)
 ```
 
 Read `data.protection` from the JSON it emits:
@@ -422,8 +406,8 @@ trivial:* before invoking the review, parse the diff size against
 `origin/dev`:
 
 ```bash
-git fetch origin dev -q
-SHORTSTAT=$(git diff --shortstat origin/dev...HEAD)
+git fetch origin main -q
+SHORTSTAT=$(git diff --shortstat origin/main...HEAD)
 # e.g. " 1 file changed, 5 insertions(+), 0 deletions(-)"
 FILES=$(echo "$SHORTSTAT" | grep -oE '[0-9]+ files? changed' | grep -oE '[0-9]+')
 INS=$(echo "$SHORTSTAT" | grep -oE '[0-9]+ insertions?\(\+\)' | grep -oE '[0-9]+')
@@ -504,8 +488,8 @@ does (don't re-derive it), then:
 
 ```bash
 # Does this change touch what people install? (the sulis plugin tree)
-git fetch origin dev -q
-TOUCHES_PLUGIN=$( [ -n "$(git diff --name-only origin/dev...HEAD -- plugins/sulis/)" ] \
+git fetch origin main -q
+TOUCHES_PLUGIN=$( [ -n "$(git diff --name-only origin/main...HEAD -- plugins/sulis/)" ] \
   && echo True || echo False )
 
 # Record the release note. The size is read from the change's primitive;
@@ -598,8 +582,8 @@ owns the call.
 Detect: does this change touch any SRD?
 
 ```bash
-git fetch origin dev -q
-SRDS_TOUCHED=$(git diff --name-only origin/dev...HEAD \
+git fetch origin main -q
+SRDS_TOUCHED=$(git diff --name-only origin/main...HEAD \
   | grep -E '^\.specifications/.+/SRD\.md$' || true)
 ```
 
@@ -670,14 +654,14 @@ gh pr merge change/fix-login-bug --squash --delete-branch
 no longer needs). The **local** branch stays — it's the audit trail. (The
 local worktree is tidied away in step 6.)
 
-Then sync local `dev` — **in whichever worktree holds it** (never `git
-checkout dev` inside a change worktree; in the multi-worktree model `dev`
+Then sync local `main` — **in whichever worktree holds it** (never `git
+checkout main` inside a change worktree; in the multi-worktree model `main`
 may be checked out elsewhere and git forbids the same branch in two
 worktrees):
 
 ```bash
-git -C "$(git worktree list --porcelain | awk '/^worktree /{p=$2} /^branch refs\/heads\/dev$/{print p}')" pull origin dev 2>/dev/null \
-  || { git checkout dev && git pull origin dev; }
+git -C "$(git worktree list --porcelain | awk '/^worktree /{p=$2} /^branch refs\/heads\/main$/{print p}')" pull origin main 2>/dev/null \
+  || { git checkout main && git pull origin main; }
 ```
 
 **6. Mark the change as shipped, and tidy the workspace (#38/#56).** Flips
@@ -694,13 +678,13 @@ session is bound or if there's uncommitted work). The branch + record stay;
 **7. Report** (include the lessons captured at step 4.6 and the release note
 recorded at step 4.7, if any):
 
-> *"Shipped **fix the login bug** (`CH-01HQ8X`) into `dev`. Recorded this as a
+> *"Shipped **fix the login bug** (`CH-01HQ8X`) into `main`. Recorded this as a
 > `minor` release note, and captured 2 lessons along the way (issues #60-61).
 > I've tidied away the workspace, but the full history is preserved as an audit
 > trail you can retrace in the cockpit (under 'Shipped') — and I can re-open the
-> exact workspace any time with `recreate`. When you're ready to release
-> everything on `dev` to production, that's a separate, deliberate step — just
-> ask."*
+> exact workspace any time with `recreate`. When you're ready to cut a release
+> (the version bump + tag from everything accumulated on `main`), that's a
+> separate, deliberate step — just ask."*
 
 State the release note as a fact, never as a question. When step 4.7 wrote one,
 name its size (*"Recorded this as a `minor` release note."*); when it wrote none
