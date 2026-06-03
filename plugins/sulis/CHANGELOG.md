@@ -1,3 +1,9 @@
+## v0.97.4 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- CI workflows repointed to the trunk: deploy-staging fires on push to main (was dev); branch-ci pull_request targets main (was dev); version-check resolves its diff base against origin/main only (dropped the origin/dev preference). Completes the two-branch decommission — no workflow references dev. Unblocks lossless deletion of the dev branch.
+
 ## v0.97.3 — 2026-06-03
 
 **Patch — release-train batch.**
