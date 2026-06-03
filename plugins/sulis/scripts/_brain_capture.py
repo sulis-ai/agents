@@ -41,11 +41,14 @@ the bootstrap stays unit-testable against a temp ``.brain/instances``.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable
 
 import yaml
 
+from _brain_labels import ROADMAP_LABEL, roadmap_sidecar_path
 from _discovery.tenant import Sha256CrockfordTenantDeriver
 from _entity_repository import EntityRepository
 from _product_emission import compose_product_from_yaml
@@ -178,3 +181,51 @@ def _compose_bootstrap_product(product_name: str, tenant_id: str) -> dict:
             f"bootstrap product compose produced nothing for name={product_name!r}"
         )
     return products[0]
+
+
+# ─── Roadmap sidecar — the writer (ADR-001 / FR-05) ──────────────────────
+# The Roadmap flag is a per-repo sidecar label file, NOT a field on the
+# entity: the vendored schemas are ``unevaluatedProperties: false``, so a
+# ``roadmap`` property would fail validation at the adapter boundary
+# (ADR-001). The on-disk shape (filename, label, layout) is defined once in
+# ``_brain_labels`` and shared with the reader (``_brain_query``).
+
+
+def roadmap_add(base_dir: Path, member_ids: list[str]) -> None:
+    """Add entity ids to the Roadmap sidecar's ``members`` (set semantics).
+
+    Appends ``member_ids`` to ``<base_dir>/labels/roadmap.jsonld`` —
+    deduplicating (set semantics) and writing the members sorted, so the
+    file is diff-friendly and deterministic (ADR-001). The file and its
+    parent directory are created on first call.
+
+    Idempotent (NFR-04): re-adding an already-present id is a no-op. Tolerant
+    of corruption (ADR-001 "Armor" row): if the existing sidecar is malformed
+    (not valid JSON, or the wrong shape), it is rewritten cleanly rather than
+    failing — the sidecar is marketplace-local convention, not a vendored
+    entity, so the latest write is authoritative.
+
+    Args:
+        base_dir: the ``.brain/`` root. The sidecar lives at
+            ``base_dir / "labels" / "roadmap.jsonld"``.
+        member_ids: entity ids (``dna:<type>:<ulid>``) to mark Roadmap.
+    """
+    sidecar = roadmap_sidecar_path(base_dir)
+
+    existing: set[str] = set()
+    if sidecar.exists():
+        try:
+            data = json.loads(sidecar.read_text())
+            members = data.get("members", []) if isinstance(data, dict) else []
+            if isinstance(members, list):
+                existing = {m for m in members if isinstance(m, str)}
+        except (json.JSONDecodeError, OSError):
+            # Malformed sidecar — rewrite cleanly (ADR-001 tolerant write).
+            existing = set()
+
+    merged = sorted(existing | set(member_ids))
+
+    sidecar.parent.mkdir(parents=True, exist_ok=True)
+    sidecar.write_text(
+        json.dumps({"label": ROADMAP_LABEL, "members": merged}, indent=2) + "\n"
+    )
