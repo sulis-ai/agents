@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sulis.co/dna/schema/design-system/1.0.0",
+  "title": "DesignSystem",
+  "description": "the realized, versioned token + asset artifact that makes a Brand's identity tangible \u2014 W3C-DTCG tokens, WCAG colour pairs, distinctive-asset files. The downstream realization of a Brand.",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": [
+    "id",
+    "name",
+    "state",
+    "realizes_identity",
+    "tokens",
+    "sys_status"
+  ],
+  "properties": {
+    "sys_status": {
+      "enum": [
+        "active",
+        "archived",
+        "deleted",
+        "purged"
+      ]
+    },
+    "valid_from": {
+      "type": "string",
+      "format": "date-time",
+      "description": "business-truth window start \u2014 when this fact became true in the world; null = since-forever"
+    },
+    "valid_to": {
+      "type": "string",
+      "format": "date-time",
+      "description": "business-truth window end \u2014 when this fact stopped being true; null = still valid"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "reliability score for this instance; 1.0 = certain, 0 = no confidence"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^dna:design\\-system:[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "name": {
+      "type": "string",
+      "description": "the design system's name, e.g. 'Honest UDLS'"
+    },
+    "state": {
+      "enum": [
+        "draft",
+        "reviewed",
+        "accepted"
+      ],
+      "description": "mirrors PD Design \u2014 a DesignSystem is a designed artifact a solution Design conforms to"
+    },
+    "realizes_identity": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^dna:(brand):[0-9A-HJKMNP-TV-Z]{26}$",
+        "description": "THE chain edge \u2014 the Brands whose voice/values/positioning/visual-identity this system makes tangible; required, minItems 1. A DesignSystem with no Brand to realize is the dangling-ref defect L3 forbids."
+      },
+      "minItems": 1
+    },
+    "tokens": {
+      "type": [
+        "object",
+        "string"
+      ],
+      "description": "W3C DTCG token tree inline OR a string URI to a DTCG token file \u2014 URI by default, inline permitted"
+    },
+    "token_tiers": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "global",
+          "alias",
+          "component"
+        ],
+        "description": "which tiers the instance populates"
+      },
+      "minItems": 1
+    },
+    "modes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "mode dimensions resolved \u2014 theme/density/platform/locale/motion/contrast"
+      }
+    },
+    "accessibility_target": {
+      "enum": [
+        "AA",
+        "AAA"
+      ],
+      "description": "WCAG target; default AA"
+    },
+    "wcag_pairs_verified": {
+      "type": "boolean",
+      "description": "deterministic gate result: every Tier-2 colour pairing meets the target ratio"
+    },
+    "distinctive_assets": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "URIs to logo/wordmark FILES \u2014 the realized form of Brand.distinctive_assets prose"
+      }
+    },
+    "version": {
+      "type": "string",
+      "description": "the system's own published SemVer version \u2014 distinct from the bitemporal valid_from/to and the lifecycle state: the three-axis lifecycle"
+    }
+  },
+  "x-schema-org-extends": "custom"
+}

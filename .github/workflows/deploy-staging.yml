@@ -1,13 +1,13 @@
 name: deploy-staging
-# RC-04 / RC-13: fires on push to dev (after the queue merges a batch).
-# Marketplace profile: there is no deploy target — the dev branch IS the
+# RC-04 / RC-13: fires on push to main (the trunk) after a change lands.
+# Marketplace profile: there is no deploy target — the main branch IS the
 # installable surface (consumers point extraKnownMarketplaces at the repo).
 # "Deploy" maps to validating that the merged batch produces a coherent,
 # installable marketplace. No deploy token needed (deviation from RC-06 deploy
 # secrets — see .sulis/repo-contract.yml deploy_target: none).
 on:
   push:
-    branches: [dev]
+    branches: [main]
 concurrency:
   group: deploy-staging
   cancel-in-progress: false

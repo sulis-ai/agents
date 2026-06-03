@@ -107,7 +107,7 @@ def test_already_merged_branch_skips_merge_step(
         },
         # dev SHA same as branch SHA (branch already merged)
         {
-            "match": "git/refs/heads/dev",
+            "match": "git/refs/heads/main",
             "stdout": json.dumps({"object": {"sha": "abc123"}}),
         },
         # compare: identical
@@ -167,7 +167,7 @@ def test_explicit_skip_ci_poll_works(
         # We don't add a check-runs response; if pipeline hits it, the
         # mock returns exit 1 and the test would fail.
         {
-            "match": "git/refs/heads/dev",
+            "match": "git/refs/heads/main",
             "stdout": json.dumps({"object": {"sha": "abc123"}}),
         },
         {
@@ -204,7 +204,7 @@ def test_auto_skip_when_no_branch_ci(
     # No .github/workflows directory in the worktree
     mock_gh([
         {
-            "match": "git/refs/heads/dev",
+            "match": "git/refs/heads/main",
             "stdout": json.dumps({"object": {"sha": "abc123"}}),
         },
         {
@@ -268,7 +268,7 @@ jobs:
 """)
 
     mock_gh([
-        {"match": "git/refs/heads/dev", "stdout": json.dumps({"object": {"sha": "abc123"}})},
+        {"match": "git/refs/heads/main", "stdout": json.dumps({"object": {"sha": "abc123"}})},
         {"match": "compare", "stdout": json.dumps({"status": "identical"})},
         {"match": "run list", "stdout": json.dumps([{
             "databaseId": 1, "status": "completed",
@@ -315,7 +315,7 @@ def test_health_path_auto_detected_from_smoke_cmd(
             "check_runs": [{"name": "ci", "status": "completed",
                             "conclusion": "success"}],
         })},
-        {"match": "git/refs/heads/dev", "stdout": json.dumps({"object": {"sha": "abc123"}})},
+        {"match": "git/refs/heads/main", "stdout": json.dumps({"object": {"sha": "abc123"}})},
         {"match": "compare", "stdout": json.dumps({"status": "identical"})},
         {"match": "run list", "stdout": json.dumps([{
             "databaseId": 999, "status": "completed",
@@ -370,7 +370,7 @@ def test_health_path_falls_back_to_root_when_smoke_cmd_has_no_url(
             "check_runs": [{"name": "ci", "status": "completed",
                             "conclusion": "success"}],
         })},
-        {"match": "git/refs/heads/dev", "stdout": json.dumps({"object": {"sha": "abc123"}})},
+        {"match": "git/refs/heads/main", "stdout": json.dumps({"object": {"sha": "abc123"}})},
         {"match": "compare", "stdout": json.dumps({"status": "identical"})},
         {"match": "run list", "stdout": json.dumps([{
             "databaseId": 1, "status": "completed",
@@ -417,7 +417,7 @@ def test_health_path_explicit_flag_wins(
             "check_runs": [{"name": "ci", "status": "completed",
                             "conclusion": "success"}],
         })},
-        {"match": "git/refs/heads/dev", "stdout": json.dumps({"object": {"sha": "abc123"}})},
+        {"match": "git/refs/heads/main", "stdout": json.dumps({"object": {"sha": "abc123"}})},
         {"match": "compare", "stdout": json.dumps({"status": "identical"})},
         {"match": "run list", "stdout": json.dumps([{
             "databaseId": 1, "status": "completed",
@@ -472,7 +472,7 @@ jobs:
 """)
 
     mock_gh([
-        {"match": "git/refs/heads/dev", "stdout": json.dumps({"object": {"sha": "abc123"}})},
+        {"match": "git/refs/heads/main", "stdout": json.dumps({"object": {"sha": "abc123"}})},
         {"match": "compare", "stdout": json.dumps({"status": "identical"})},
         {"match": "run list", "stdout": json.dumps([{
             "databaseId": 1, "status": "completed",
@@ -524,7 +524,7 @@ def test_published_artifact_skips_deploy_and_succeeds(
         "profile: published-artifact\ncontribution_model: solo\ndeploy_target: none\n",
     )
     mock_gh([
-        {"match": "git/refs/heads/dev", "stdout": json.dumps({"object": {"sha": "abc123"}})},
+        {"match": "git/refs/heads/main", "stdout": json.dumps({"object": {"sha": "abc123"}})},
         {"match": "compare", "stdout": json.dumps({"status": "identical"})},
         # Deliberately NO "run list" mock — a deploy poll here would fail.
     ])
@@ -546,7 +546,7 @@ def test_deployable_without_deploy_workflow_is_a_blocker(
     skip deploy — the contract preserved for repos that DO deploy."""
     # No .sulis/repo-contract.yml → strict deployable default.
     mock_gh([
-        {"match": "git/refs/heads/dev", "stdout": json.dumps({"object": {"sha": "abc123"}})},
+        {"match": "git/refs/heads/main", "stdout": json.dumps({"object": {"sha": "abc123"}})},
         {"match": "compare", "stdout": json.dumps({"status": "identical"})},
     ])
     result = run_tool(
