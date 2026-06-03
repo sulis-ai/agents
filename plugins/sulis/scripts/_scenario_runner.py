@@ -57,15 +57,30 @@ def run_scenario(
     http=None,
     run=None,
 ) -> AcceptanceResult:
-    """Resolve + execute a Scenario's journey; return the aggregated result."""
+    """Resolve + execute a Scenario's journey; return the aggregated result.
+
+    Journey-internal data-flow: an artifact a step lists in ``input_artifacts``
+    that an *earlier* step in the same journey produced (its
+    ``output_artifacts``) — or the ``test-target`` entry seed — is inherently
+    available; it isn't an external need. Only artifacts that are neither
+    caller-supplied (``available_artifacts``) nor journey-produced defer a step
+    (``_scenario_dispatch``). Without this, every multi-step authored journey
+    would defer on its own data-flow chain.
+    """
     resolved = resolve_journey(scenario, workflow, steps_by_id, tools_by_id)
     step_rows: list = []
     worst_idx = len(_PRECEDENCE)  # start more-benign than "pass"
+    # The journey's own produced/seed artifacts, accumulated as we go. The
+    # authoring assembler seeds the first step from ``test-target`` (the entry
+    # point), so it's available to that first step.
+    produced: set = {"test-target"}
     for rs in resolved:
         outcome = execute_step(
             rs, base_url=target_base_url,
-            available_artifacts=available_artifacts, http=http, run=run,
+            available_artifacts=frozenset(available_artifacts) | produced,
+            http=http, run=run,
         )
+        produced.update(rs.output_artifacts)
         step_rows.append({
             "name": rs.name, "status": outcome.status,
             "detail": outcome.detail, "need": outcome.need,

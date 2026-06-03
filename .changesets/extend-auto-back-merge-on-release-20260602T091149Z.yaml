@@ -1,0 +1,7 @@
+change_id: SHA-b9a91bb
+primitive: extend
+tier: minor
+touches_plugin: true
+summary: |
+  auto-back-merge-on-release
+created_at: 2026-06-02T09:11:49Z

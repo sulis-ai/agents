@@ -4682,3 +4682,103 @@ def back_integrate_change_branch(
         "dev_ref": dev_ref,
         "error": stderr.strip() or "git merge returned non-zero with no conflict files",
     }
+
+
+def ff_local_change_branch_from_origin(
+    repo_root: Path,
+    change_branch: str,
+    *,
+    fetch_first: bool = True,
+) -> dict:
+    """Fast-forward the change worktree's HEAD to `origin/<change_branch>`.
+
+    #141: after wpx-pipeline squash-merges a WP into the change branch via
+    the GitHub API, the squash commit lands on `origin/<change_branch>` but
+    the LOCAL change worktree (where the calling session and subsequent
+    agents read files from) is still at the pre-merge SHA. The next agent
+    (e.g. the Step 11 security-review) reads stale files and reports a false
+    "CANNOT REVIEW" verdict. Fast-forwarding the worktree here closes that
+    gap before any post-pipeline agent dispatches.
+
+    Caller MUST invoke this from inside the change worktree (HEAD ==
+    change branch).
+
+    Returns:
+    - {"status": "already_current", "change_branch": ...}
+    - {"status": "fast_forwarded", "change_branch": ..., "advanced_commits": N}
+    - {"status": "fetch_failed", "error": "..."}
+    - {"status": "ff_not_possible", "error": "..."}  # local diverged
+    - {"status": "internal_error", "error": "..."}
+
+    The caller is expected to handle each status:
+    - "already_current" / "fast_forwarded" → proceed
+    - "fetch_failed" / "ff_not_possible" → log + continue (defence in depth:
+      the next Step 0 will retry); the merge already landed on origin.
+    - "internal_error" → log + continue (same rationale).
+    """
+    repo_root = Path(repo_root).resolve()
+    origin_ref = f"origin/{change_branch}"
+
+    # Step 1: fetch the change branch from origin so the local tracking ref
+    # carries any merge commits pushed there since.
+    if fetch_first:
+        rc, _, stderr = _run(
+            ["git", "fetch", "origin", change_branch],
+            cwd=repo_root,
+            timeout=60,
+        )
+        if rc != 0:
+            return {
+                "status": "fetch_failed",
+                "change_branch": change_branch,
+                "error": stderr.strip() or "git fetch returned non-zero",
+            }
+
+    # Step 2: is origin/<change_branch> already an ancestor of HEAD? Then
+    # the local worktree is at or ahead of origin — nothing to do.
+    rc, _, _ = _run(
+        ["git", "merge-base", "--is-ancestor", origin_ref, "HEAD"],
+        cwd=repo_root,
+        timeout=10,
+    )
+    if rc == 0:
+        return {
+            "status": "already_current",
+            "change_branch": change_branch,
+        }
+
+    # Step 3: count how many commits we're about to advance (informational).
+    rc_count, count_out, _ = _run(
+        ["git", "rev-list", "--count", f"HEAD..{origin_ref}"],
+        cwd=repo_root,
+        timeout=10,
+    )
+    advanced_commits = (
+        int(count_out.strip())
+        if rc_count == 0 and count_out.strip().isdigit()
+        else 0
+    )
+
+    # Step 4: fast-forward. --ff-only refuses to create a merge commit, so
+    # local divergence is surfaced explicitly rather than silently merged.
+    rc, _, stderr = _run(
+        ["git", "merge", "--ff-only", origin_ref],
+        cwd=repo_root,
+        timeout=60,
+    )
+    if rc == 0:
+        return {
+            "status": "fast_forwarded",
+            "change_branch": change_branch,
+            "advanced_commits": advanced_commits,
+        }
+
+    # Step 5: --ff-only refused → local has diverged from origin.
+    return {
+        "status": "ff_not_possible",
+        "change_branch": change_branch,
+        "error": (
+            stderr.strip()
+            or "git merge --ff-only refused; local change branch has diverged"
+        ),
+    }

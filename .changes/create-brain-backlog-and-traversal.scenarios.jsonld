@@ -1,0 +1,181 @@
+{
+  "scenarios": [
+    {
+      "exercises": "dna:design:00000000000000000000000000",
+      "id": "dna:scenario:N3M3794XQE67YS5M45YAB6Q75P",
+      "journey": "dna:workflow:26CGZRRNCNBP1Z80CZBBFKW0QA",
+      "name": "Capture journey \u2014 deposit an idea rooted in its why",
+      "state": "draft",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:ZW14SZB4V7KY7RXP2QWSBWAF6S"
+      ]
+    },
+    {
+      "exercises": "dna:design:00000000000000000000000000",
+      "id": "dna:scenario:RF6A2NMRPRTM3TGNY48YXWGK02",
+      "journey": "dna:workflow:PF3SF9NSAWBVCCP395KCZDWYWX",
+      "name": "Traverse journey \u2014 ask what is open, deferred, on the roadmap",
+      "state": "draft",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:3NACHBC9WWFEGS7X7HM4CY5BCT"
+      ]
+    }
+  ],
+  "workflows": [
+    {
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:workflow:26CGZRRNCNBP1Z80CZBBFKW0QA",
+      "initial_steps": [
+        "7y6vxt0c-deposit-an-idea-its-why-is-matured-into-1"
+      ],
+      "name": "Capture journey \u2014 deposit an idea rooted in its why",
+      "state": "draft",
+      "steps": [
+        "7y6vxt0c-deposit-an-idea-its-why-is-matured-into-1",
+        "7y6vxt0c-read-the-captured-requirement-back-by-id-2"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "7y6vxt0c-read-the-captured-requirement-back-by-id-2"
+      ],
+      "transitions": [
+        "7y6vxt0c-deposit-an-idea-its-why-is-matured-into-1 -> 7y6vxt0c-read-the-captured-requirement-back-by-id-2"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:workflow:PF3SF9NSAWBVCCP395KCZDWYWX",
+      "initial_steps": [
+        "y7mjgwe8-ask-the-brain-what-is-open-1"
+      ],
+      "name": "Traverse journey \u2014 ask what is open, deferred, on the roadmap",
+      "state": "draft",
+      "steps": [
+        "y7mjgwe8-ask-the-brain-what-is-open-1",
+        "y7mjgwe8-ask-the-brain-what-is-on-the-roadmap-2",
+        "y7mjgwe8-ask-the-brain-what-is-done-3"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "y7mjgwe8-ask-the-brain-what-is-done-3"
+      ],
+      "transitions": [
+        "y7mjgwe8-ask-the-brain-what-is-open-1 -> y7mjgwe8-ask-the-brain-what-is-on-the-roadmap-2",
+        "y7mjgwe8-ask-the-brain-what-is-on-the-roadmap-2 -> y7mjgwe8-ask-the-brain-what-is-done-3"
+      ],
+      "type": "review"
+    }
+  ],
+  "steps": [
+    {
+      "agent_instructions": "Deposit an idea: its why is matured into an Opportunity and its what becomes a draft Requirement rooted in that why.",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:JG0QJ617RBMT03Q6G8P355HW00",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "deterministic",
+      "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/sulis-capture --repo-root . --base-dir .brain/instances --why-intensity full --opportunity-id dna:opportunity:KST8MDFYHQHM1W2E92VJ9RGDXK --what 'capture-journey probe: the deposit path works end to end' --seed dogfood-capture-journey-probe\", \"expect_exit\": 0}",
+      "name": "7y6vxt0c-deposit-an-idea-its-why-is-matured-into-1",
+      "output_artifacts": [
+        "7y6vxt0c-deposit-an-idea-its-why-is-matured-into-1-result"
+      ],
+      "postconditions": [
+        "an Opportunity and a draft Requirement sourced from it land, chain whole"
+      ],
+      "state": "draft",
+      "sys_status": "active",
+      "tool_ref": "dna:tool:XV1303ZB30B7ZBVBPSQG3FC194"
+    },
+    {
+      "agent_instructions": "Read the captured Requirement back by id; the chain is whole.",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:YCX64Q8KRJJJS5703RG58HTX8M",
+      "input_artifacts": [
+        "7y6vxt0c-deposit-an-idea-its-why-is-matured-into-1-result"
+      ],
+      "mechanism": "deterministic",
+      "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/sulis-brain-query --base-dir .brain/instances --by-id dna:requirement:ZW14SZB4V7KY7RXP2QWSBWAF6S\", \"expect_exit\": 0}",
+      "name": "7y6vxt0c-read-the-captured-requirement-back-by-id-2",
+      "output_artifacts": [
+        "7y6vxt0c-read-the-captured-requirement-back-by-id-2-result"
+      ],
+      "postconditions": [
+        "the Requirement resolves with a source pointing at the Opportunity"
+      ],
+      "state": "draft",
+      "sys_status": "active",
+      "tool_ref": "dna:tool:XV1303ZB30B7ZBVBPSQG3FC194"
+    },
+    {
+      "agent_instructions": "Ask the brain what is open.",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:CGNKQCAPCSZGJ5W33HZ89WYXKP",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "deterministic",
+      "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/sulis-brain-query --base-dir .brain/instances --open\", \"expect_exit\": 0}",
+      "name": "y7mjgwe8-ask-the-brain-what-is-open-1",
+      "output_artifacts": [
+        "y7mjgwe8-ask-the-brain-what-is-open-1-result"
+      ],
+      "postconditions": [
+        "open ideas come back off the brain graph"
+      ],
+      "state": "draft",
+      "sys_status": "active",
+      "tool_ref": "dna:tool:SZXB74VETJFTQXFX1B93YFPKZ0"
+    },
+    {
+      "agent_instructions": "Ask the brain what is on the roadmap.",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:3WG3VN6361CECRX4DFSY9XMWM8",
+      "input_artifacts": [
+        "y7mjgwe8-ask-the-brain-what-is-open-1-result"
+      ],
+      "mechanism": "deterministic",
+      "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/sulis-brain-query --base-dir .brain/instances --roadmap\", \"expect_exit\": 0}",
+      "name": "y7mjgwe8-ask-the-brain-what-is-on-the-roadmap-2",
+      "output_artifacts": [
+        "y7mjgwe8-ask-the-brain-what-is-on-the-roadmap-2-result"
+      ],
+      "postconditions": [
+        "roadmap members come back off the brain graph"
+      ],
+      "state": "draft",
+      "sys_status": "active",
+      "tool_ref": "dna:tool:SZXB74VETJFTQXFX1B93YFPKZ0"
+    },
+    {
+      "agent_instructions": "Ask the brain what is done.",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:PD5D94DNS1D2H0Y67B7GG9H4X9",
+      "input_artifacts": [
+        "y7mjgwe8-ask-the-brain-what-is-on-the-roadmap-2-result"
+      ],
+      "mechanism": "deterministic",
+      "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/sulis-brain-query --base-dir .brain/instances --done\", \"expect_exit\": 0}",
+      "name": "y7mjgwe8-ask-the-brain-what-is-done-3",
+      "output_artifacts": [
+        "y7mjgwe8-ask-the-brain-what-is-done-3-result"
+      ],
+      "postconditions": [
+        "done ideas come back off the brain graph"
+      ],
+      "state": "draft",
+      "sys_status": "active",
+      "tool_ref": "dna:tool:SZXB74VETJFTQXFX1B93YFPKZ0"
+    }
+  ]
+}

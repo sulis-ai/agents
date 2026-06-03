@@ -91,6 +91,22 @@ Given the user invokes `/sulis:run-wp WP-NNN`:
    (optional; one of `haiku | sonnet | opus`), include the `model`
    parameter in the Agent call. Otherwise omit `model` (the executor
    inherits the calling session's model — typically Opus).
+4. **Flip INDEX status `pending → in_progress` BEFORE invoking the
+   Agent (#142).** The run-all loop relies on the executor to do this
+   at Step 1; the single-WP path historically didn't, so the eventual
+   Step 12.2 (`wpx-step12 wrap` → `flip-status --expected in_progress`)
+   failed at ship-time on a still-`pending` WP. Doing it here makes the
+   single-WP path symmetric with run-all:
+
+   ```bash
+   "$WPX_DIR/wpx-index" flip-status \
+     --wp WP-NNN --project <slug> --repo-root <repo> \
+     --to in_progress --expected pending
+   ```
+
+   The flip is **idempotent** (#142): a WP already at `in_progress` (or
+   `done` on a replay) returns success without rewriting the row. Run
+   it unconditionally — no pre-check needed.
 
 ```
 Agent({

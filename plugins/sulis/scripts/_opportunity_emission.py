@@ -93,6 +93,38 @@ def _extract_summary(body: str) -> str | None:
     return re.sub(r"\s+", " ", section_body).strip()
 
 
+def _opportunity_dict(
+    *,
+    opportunity_id: str,
+    for_product: str,
+    job_statement: str,
+    state: str,
+    evidence: list[str] | None = None,
+    impact: str | None = None,
+) -> dict:
+    """Single home for the Opportunity field/default shape.
+
+    Both compose paths (from-SRD, from-idea) assemble the same five required
+    keys (`id`, `for_product`, `job_statement`, `state`, `sys_status`) plus
+    the optional `evidence`/`impact`. Centralising the shape here keeps the
+    two paths byte-identical for the same fields and keeps the
+    `unevaluatedProperties:false` discipline (optionals omitted, never null)
+    in one place. `job_statement` is flattened to a single line.
+    """
+    opportunity: dict = {
+        "id": opportunity_id,
+        "for_product": for_product,
+        "job_statement": re.sub(r"\s+", " ", job_statement).strip(),
+        "state": state,
+        "sys_status": "active",
+    }
+    if evidence is not None:
+        opportunity["evidence"] = evidence
+    if impact is not None:
+        opportunity["impact"] = impact
+    return opportunity
+
+
 def compose_opportunity_from_srd(
     srd_text: str,
     *,
@@ -124,19 +156,57 @@ def compose_opportunity_from_srd(
             f"product-from-srd:{srd_path}"
         )
 
-    opportunity: dict = {
-        "id": _opportunity_id_for_srd(srd_path),
-        "for_product": for_product,
-        "job_statement": summary,
-        "state": "hypothesis",
-        "sys_status": "active",
-    }
-    # Optional: capture the SRD title as `evidence` if frontmatter has it.
+    # Optional: capture the SRD title as `impact` if frontmatter has it.
     title = frontmatter.get("title") if isinstance(frontmatter, dict) else None
-    if isinstance(title, str) and title.strip():
-        opportunity["impact"] = title.strip()
+    impact = title.strip() if isinstance(title, str) and title.strip() else None
 
+    opportunity = _opportunity_dict(
+        opportunity_id=_opportunity_id_for_srd(srd_path),
+        for_product=for_product,
+        job_statement=summary,
+        state="hypothesis",
+        impact=impact,
+    )
     return [opportunity]
+
+
+def compose_opportunity_from_idea(
+    *,
+    job_statement: str,
+    for_product: str,
+    seed: str,
+    state: str = "hypothesis",
+    evidence: str | None = None,
+    impact: str | None = None,
+) -> dict:
+    """Pure transform: idea fields → Opportunity entity dict. No I/O.
+
+    The single-idea capture sibling to `compose_opportunity_from_srd`
+    (ADR-005): capture has no source document — just a why-string typed in
+    conversation — so the SRD parser would have nothing to parse. This feeds
+    the same ID-derivation and dict-shape discipline a different front end.
+
+    ID = ``dna:opportunity:`` + ``_deterministic_ulid_from`` over the
+    ``opportunity-from-idea:`` namespace, distinct from the from-SRD path's
+    ``opportunity-from-srd:`` namespace so the two never collide on the same
+    string (NFR-04: same seed ⇒ same id ⇒ overwrite-in-place, no duplicate).
+
+    Optional fields are omitted from the dict when ``None`` (not set to
+    ``null``), keeping ``unevaluatedProperties:false`` clean (ADR-005). The
+    schema types ``evidence`` as an array of strings, so a provided string is
+    wrapped to a single-element list; ``impact`` is a plain string.
+    """
+    return _opportunity_dict(
+        opportunity_id="dna:opportunity:"
+        + _deterministic_ulid_from(f"opportunity-from-idea:{seed}"),
+        for_product=for_product,
+        job_statement=job_statement,
+        state=state,
+        # Schema types `evidence` as an array of strings; wrap the single
+        # captured string.
+        evidence=[evidence] if evidence is not None else None,
+        impact=impact,
+    )
 
 
 def emit_opportunity_from_srd(

@@ -1,0 +1,21 @@
+train_id: "train-2026-06-03T085607Z"
+started_at: "2026-06-03T08:56:07Z"
+completed_at: "2026-06-03T09:05:13Z"
+outcome: "success"
+batch_size: 2
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-03T09:01:19Z"
+bundle:
+  - wp: WP-004
+    branch: feat/wp-004-capture-idea-orchestrator
+    pre_train_sha: d7c701c20bde4e2999b3b60c9c7926233522b3ca
+    rebased_to_sha: d7c701c20bde4e2999b3b60c9c7926233522b3ca
+    merge_sha_on_dev: 1c1d17d0927dda35a1c43c572844b83f8235b54d
+  - wp: WP-007
+    branch: feat/wp-007-query-seam-extensions
+    pre_train_sha: 259880a3076e91c6e1ce2de91be5af0da18cf747
+    rebased_to_sha: 2aa81e2410749454d347e26c6e4a1f1397e1d9aa
+    merge_sha_on_dev: 5eb243a466e4cf61c7f29bdca24ba5d9645cb260

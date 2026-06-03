@@ -1,0 +1,24 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:workflow:PF3SF9NSAWBVCCP395KCZDWYWX",
+  "initial_steps": [
+    "y7mjgwe8-ask-the-brain-what-is-open-1"
+  ],
+  "name": "Traverse journey \u2014 ask what is open, deferred, on the roadmap",
+  "state": "draft",
+  "steps": [
+    "y7mjgwe8-ask-the-brain-what-is-open-1",
+    "y7mjgwe8-ask-the-brain-what-is-on-the-roadmap-2",
+    "y7mjgwe8-ask-the-brain-what-is-done-3"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "y7mjgwe8-ask-the-brain-what-is-done-3"
+  ],
+  "transitions": [
+    "y7mjgwe8-ask-the-brain-what-is-open-1 -> y7mjgwe8-ask-the-brain-what-is-on-the-roadmap-2",
+    "y7mjgwe8-ask-the-brain-what-is-on-the-roadmap-2 -> y7mjgwe8-ask-the-brain-what-is-done-3"
+  ],
+  "type": "review"
+}

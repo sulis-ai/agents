@@ -1,0 +1,21 @@
+train_id: "train-2026-06-03T083146Z"
+started_at: "2026-06-03T08:31:46Z"
+completed_at: "2026-06-03T08:40:31Z"
+outcome: "success"
+batch_size: 2
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-03T08:36:59Z"
+bundle:
+  - wp: WP-005
+    branch: feat/wp-005-roadmap-sidecar
+    pre_train_sha: 31263c2b99359a61abdb9e87bdfe0db048d6043b
+    rebased_to_sha: 31263c2b99359a61abdb9e87bdfe0db048d6043b
+    merge_sha_on_dev: 3bccd664a380b100a209d56e536d02a4f0c7ede4
+  - wp: WP-011
+    branch: feat/wp-011-opportunity-analyst-agent
+    pre_train_sha: 418741b75fb4cd0960315daaa21b578e01e9a681
+    rebased_to_sha: cf7af94dac30673138aab6d05f83a64ad002fa21
+    merge_sha_on_dev: c6281bc0b6e6bbcced42ff8326a48d2381cea658

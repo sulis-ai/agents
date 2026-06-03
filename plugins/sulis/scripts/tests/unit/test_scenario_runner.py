@@ -69,6 +69,38 @@ def test_missing_need_verdict_deferred_and_surfaces_need():
     assert any("stripe-test-key" in (s.get("need") or "") for s in res.steps)
 
 
+def test_journey_internal_dataflow_is_available_not_deferred():
+    """An input_artifact produced by an earlier step in the same journey is
+    available to a later step — the journey's own data-flow chain, not an
+    external need. Without this, every multi-step authored journey defers on
+    its own chaining (the authoring assembler links step N+1's input to step
+    N's output). The ``test-target`` entry seed is available to the first step.
+    """
+    first = _http_step("a", "/signup", 200,
+                       input_artifacts=["test-target"],
+                       output_artifacts=["session"])
+    second = _http_step("b", "/dashboard", 200,
+                        input_artifacts=["session"],  # produced by `first`
+                        output_artifacts=["dash-result"])
+    res = _run([first, second],
+               http=lambda m, u: SimpleNamespace(status_code=200),
+               available_artifacts=frozenset())  # nothing supplied externally
+    assert res.verdict == "pass", res.steps
+    assert all(s["status"] == "pass" for s in res.steps)
+
+
+def test_external_need_still_defers_even_with_dataflow():
+    """A genuinely-external need (never produced by any step) still defers —
+    the data-flow shortcut doesn't fake green for real missing credentials."""
+    step = _http_step("a", "/charge", 200,
+                      input_artifacts=["test-target", "secret:stripe-key"],
+                      output_artifacts=["charge-result"])
+    res = _run([step], http=lambda m, u: SimpleNamespace(status_code=200),
+               available_artifacts=frozenset())
+    assert res.verdict == "deferred"
+    assert any("stripe-key" in (s.get("need") or "") for s in res.steps)
+
+
 def test_human_step_verdict_manual_pending():
     steps = [_http_step("a", "/signup", 200),
              {"@id": "h", "name": "eyeball welcome email", "mechanism": "human"}]

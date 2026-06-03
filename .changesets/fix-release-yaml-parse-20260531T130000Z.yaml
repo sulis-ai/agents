@@ -1,0 +1,23 @@
+change_id: 01KSYZWHP6Y7DR398F8QZDNN6H
+primitive: fix
+tier: patch
+touches_plugin: true
+summary: |
+  Fix YAML parse error in `.github/workflows/release-on-merge.yml`
+  that crashed the release robot silently on PR #130 merge. The
+  brain-emit Release step (CH-01KSYE) had a multi-line python3 -c
+  expression with lines starting at column 0 inside a `run: |`
+  literal block — terminating the YAML block early.
+
+  Collapsed to a single-line python -c with an explanatory NOTE
+  above. Added a regression test that walks
+  `.github/workflows/*.yml` and asserts every file is YAML-parseable
+  (pinned by running against main's broken file: fails; against the
+  fix: passes).
+
+  Unblocks the next release — when this lands on main, the robot
+  runs with the fixed YAML and cuts the v0.86.0 / v1.131.0 release
+  that PR #130's merge should have produced.
+
+  12 new tests; full suite 1320 passing.
+created_at: 2026-05-31T13:00:00Z

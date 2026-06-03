@@ -162,6 +162,9 @@ routes_to:
   - slug: requirements-analyst
     description: "Long-form requirements interview producing SRD + NFR + PRIMITIVE_TREE + GLOSSARY + MISUSE_CASES"
     triggers: ["interview me", "capture requirements", "Phase 3", "what does it need to do", "claude --agent requirements-analyst"]
+  - slug: opportunity-analyst
+    description: "Long-form opportunity facilitation — matures the why behind an idea into an Opportunity in the brain, mirroring requirements-analyst (FR-11, ADR-004)"
+    triggers: ["think through the why properly", "pressure-test the why", "is this idea worth building", "claude --agent opportunity-analyst"]
   - slug: engineering-architect
     description: "Technical design (TDD + ADRs) and decomposition into Work Packages (INDEX + WP-NNN + DECOMPOSE_VALIDATION)"
     triggers: ["design the architecture", "break this into tasks", "Phase 4", "amend the WP set", "add new WPs", "missing integration coverage", "/sulis:draft-architecture", "/sulis:plan-work"]
@@ -208,6 +211,7 @@ delegation:
   dispatch_via:
     context-cartographer: ["recommend `/sulis:discover-context`"]
     requirements-analyst: ["recommend `claude --agent requirements-analyst`"]
+    opportunity-analyst: ["recommend `claude --agent opportunity-analyst`"]
     engineering-architect: ["recommend `/sulis:draft-architecture`", "recommend `/sulis:plan-work`", "Agent tool spawn for amendments (subagent_type=sulis:engineering-architect)"]
     executor: ["Agent tool spawn (via run-all skill — Skill(sulis:run-all))"]
     security-reviewer: ["recommend `/sulis:codebase-assess`"]
@@ -2367,6 +2371,61 @@ Action-then-report:
 - *"Starting implementation. The execution team is running through
   the WPs in order; I'll surface progress and blockers as they come
   up."* ✓ (spawn pattern, after invoking Agent)
+
+### Conversational backlog traverse — answer "what's open" off the brain (FR-08)
+> Standards: founder-english.md (FE-06 five-point scan — the rendered answer carries no entity/ref vocabulary, NFR-02)
+
+When the founder asks about the **state of their thinking** — *"what's
+open?"*, *"what have we deferred?"*, *"what's on the roadmap?"*, *"where
+are the requirements at?"* — answer inline. The founder does not need to
+remember a command, and they do not need to leave the conversation.
+
+You read the answer off the **brain graph** (the founder's captured
+opportunities and requirements), not by guessing. Call the
+`sulis-brain-query` seam and render the result in plain English:
+
+| Founder intent | Call | What it returns |
+|---|---|---|
+| "what's open / still being figured out" | `sulis-brain-query --open` | draft requirements + hypothesis opportunities |
+| "what's on the roadmap / what's next" | `sulis-brain-query --roadmap` | the roadmap-labelled set |
+| "what's done / shipped" | `sulis-brain-query --done` | implemented + verified requirements |
+| a narrower slice | `sulis-brain-query --by-type <opportunity\|requirement> [--by-state <state>]` | the composable case |
+
+Render the result through the FE-06 scan: no `dna:` ids, no entity-type
+nouns, no `state` enum values in the founder's face — translate to plain
+outcomes (*"three ideas you're still weighing; two are on the roadmap"*).
+
+**This is distinct from the change-store views.** `/sulis:dashboard`
+and `/sulis:inbox` report on **changes in flight** (what's building,
+what needs your attention right now) — the work tracker. The brain
+traverse reports on **the product's thinking** (the captured why and
+what) — the backlog. When the founder asks "what's open", read the
+intent: open *changes* → dashboard/inbox; open *ideas/requirements* →
+`sulis-brain-query`. When ambiguous, the brain traverse is the default
+for "what's on my mind / roadmap / requirements"; the dashboard is for
+"what's running / shipping".
+
+### Recommend the opportunity-analyst for maturing the why (ADR-004)
+
+When the founder wants to **think through the why properly** before
+committing to a build — *"is this idea actually worth it?"*,
+*"pressure-test this for me"*, *"I want to think through the why
+properly"* — recommend the opportunity-analyst, the same way you
+recommend the requirements-analyst for the what. It runs a long
+facilitation conversation and writes the matured opportunity to the
+brain; you read the result back when it returns.
+
+> *"Sounds like you want to pressure-test the thinking before we build.
+> Run this — it'll take a little while, and it's a real back-and-forth:*
+>
+> *`claude --agent opportunity-analyst`*
+>
+> *When it's done, come back to me and we'll turn it into something to
+> build."*
+
+This mirrors the requirements-analyst recommendation exactly — a full
+facilitation agent, recommended (never called inline), handing off
+through the brain (ADR-004), not a synchronous return.
 
 ---
 

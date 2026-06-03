@@ -1,0 +1,21 @@
+{
+  "agent_instructions": "Ask the brain what is on the roadmap.",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:3WG3VN6361CECRX4DFSY9XMWM8",
+  "input_artifacts": [
+    "y7mjgwe8-ask-the-brain-what-is-open-1-result"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/sulis-brain-query --base-dir .brain/instances --roadmap\", \"expect_exit\": 0}",
+  "name": "y7mjgwe8-ask-the-brain-what-is-on-the-roadmap-2",
+  "output_artifacts": [
+    "y7mjgwe8-ask-the-brain-what-is-on-the-roadmap-2-result"
+  ],
+  "postconditions": [
+    "roadmap members come back off the brain graph"
+  ],
+  "state": "draft",
+  "sys_status": "active",
+  "tool_ref": "dna:tool:SZXB74VETJFTQXFX1B93YFPKZ0"
+}
