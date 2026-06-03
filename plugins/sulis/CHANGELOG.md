@@ -1,3 +1,20 @@
+## v0.94.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- New /sulis:retro skill — the session-grain retrospective. Run at session end:
+  surfaces friction and ROUTES every finding (surface→classify→route, not
+  journal). Four acts: extract-the-steers-first (the user's corrections — the
+  highest-signal, objective input), framework-friction, missing-context, the
+  open self-attack probe. Routes by consumer/type: trivial→fix; bug/gap→task;
+  recurring→watchlist (2-strikes→structural fix); lesson→capture-lessons;
+  missing decision-context→brain (idea-backlog as a Lesson-shaped slot until the
+  Lesson entity is minted); wrong default→candidate standard change. The
+  session-grain funnel that feeds capture-lessons (change), the watchlist
+  (pattern), and #69 (idea). Founder-facing, structural-not-personal, no
+  self-congratulation. Authored via add-skill (5 gates, Verdict PASS, STANDARD
+  tier). Queued: the Lesson brain entity + a Stop-hook auto-buffer (#73).
+
 ## v0.93.0 — 2026-06-03
 
 **Minor — release-train batch.**
