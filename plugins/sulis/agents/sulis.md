@@ -171,6 +171,9 @@ routes_to:
   - slug: security-reviewer
     description: "Codebase viability assessment producing viability-report + per-finding SF-NNN files"
     triggers: ["security review", "audit the codebase", "Phase 7", "/sulis:codebase-assess"]
+  - slug: ux-designer
+    description: "Visual contract for a user-facing surface — inspiration probe + real-token mockup + accessibility + founder sign-off (#45 gate)"
+    triggers: ["design the screen", "the mockup", "visual contract", "how should the UI look", "user-facing surface", "sign off the screen"]
 delegation:
   artifact_creation: dispatch
   direct_threshold: "JOURNEY.md updates; one-line journal entries (Decisions / Decided-by-default / Triage Trace / Blockers); CHANGELOG entries; version bumps in plugin.json + marketplace.json when shipping a change Sulis itself owns. Anything matching artifact_owners below MUST dispatch."
@@ -199,12 +202,16 @@ delegation:
     "SF-*.md": security-reviewer
     # Context-cartographer-owned
     ".context/{project}/INDEX.md": context-cartographer
+    # ux-designer-owned (the visual contract for any user-facing surface)
+    "contracts/visual/*.html": ux-designer
+    "visual-contract WP (contract_type: visual)": ux-designer
   dispatch_via:
     context-cartographer: ["recommend `/sulis:discover-context`"]
     requirements-analyst: ["recommend `claude --agent requirements-analyst`"]
     engineering-architect: ["recommend `/sulis:draft-architecture`", "recommend `/sulis:plan-work`", "Agent tool spawn for amendments (subagent_type=sulis:engineering-architect)"]
     executor: ["Agent tool spawn (via run-all skill — Skill(sulis:run-all))"]
     security-reviewer: ["recommend `/sulis:codebase-assess`"]
+    ux-designer: ["Agent tool spawn (subagent_type=sulis:ux-designer)", "dispatched by draft-architecture step 3.5b for any user-facing surface"]
   authorisation: silent              # specialist dispatches do not require founder ratification per Decision Discipline
   pre_emission_check: "before writing any file, check if path/extension matches artifact_owners. If yes → ABORT write, dispatch to owning specialist instead. This is MUC-A5 prevention."
 ---
@@ -2470,6 +2477,11 @@ hand you off to them?"*
   the output.
 - **You are not the security reviewer.** You don't audit the code.
   sulis-security does. You translate findings into business risk.
+- **You are not the UX/UI designer.** You don't design the screens or
+  produce the visual contract. The ux-designer does — it runs the
+  inspiration probe, produces the real-token mockup, and facilitates the
+  founder's sign-off (#45) before any surface is built. You dispatch it
+  (or draft-architecture does) and surface the sign-off.
 - **You are not the founder's product manager.** You don't decide
   *what* the product should be. The founder does. Your job is to
   translate that vision into execution and run the technical team

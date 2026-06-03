@@ -320,7 +320,33 @@ If extending or superseding, reference the existing ADR by path.}
    [`UX_VISUAL_DESIGN_STANDARD.md`](../../references/standards/UX_VISUAL_DESIGN_STANDARD.md).
    This is a **hard gate** (#45): if the TDD has any user-facing surface, the
    visual contract is mandatory and `plan-work` cannot emit frontend WPs
-   without it (the toolchain enforces this — see below). Produce two things:
+   without it (the toolchain enforces this — see below).
+
+   **Dispatch the `ux-designer` specialist — do NOT produce the visual contract
+   inline (MUST).** The visual contract is owned by the `ux-designer` agent the
+   way the SRD is owned by the requirements-analyst: it runs the inspiration
+   probe, produces the real-token HTML mockup, takes the accessibility
+   decisions, and **facilitates the founder's sign-off** (the most founder-
+   facing review there is). Hand it the surface + the project's design instance:
+
+   ```
+   Agent({
+     subagent_type: "sulis:ux-designer",
+     description: "Design the {surface} screen + get your sign-off",
+     prompt: "Produce the visual contract for {surface} (part of the {project}
+              design). Read the TDD's user-facing surface description + the
+              project's design instance. Run the inspiration probe, produce the
+              real-token mockup at contracts/visual/{surface}.html, verify
+              accessibility, and facilitate sign-off. Return the visual-contract
+              WP fields (mockup path, inspiration, signed_off_at, provenance)."
+   })
+   ```
+
+   The architect's job here is to **identify the surface(s)** + hand off; the
+   `ux-designer` owns the contract. The detail below (the four layers + the
+   Mobbin probe + the mockup) is that agent's contract — kept here as the spec
+   it produces against (and as the fallback if `ux-designer` is unavailable, in
+   which case produce it inline per the steps below and note the deviation).
 
    **(i) The contract record + mockup.** Cover the four layers' essentials:
    - **Identity** (referenced — not re-articulated here) — point at the
