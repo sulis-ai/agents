@@ -255,7 +255,11 @@ def _compose_entity(
             "primary_branch": primary_branch,
         }),
         "version_files": composed_fields.get("version_files", []),
-        "branch_policy": composed_fields.get("branch_policy", "trunk-based"),
+        # `trunk` is the compiled foundation Project schema's enum value (the
+        # canonical save validates against it post-reconcile, ADR-006); the
+        # earlier `"trunk-based"` label never validated while Project lived only
+        # in `.sulis/projects/`. The minter normalises the legacy label too.
+        "branch_policy": composed_fields.get("branch_policy", "trunk"),
         "belongs_to_product_ref": composed_fields.get(
             "belongs_to_product_ref", "unspecified",
         ),

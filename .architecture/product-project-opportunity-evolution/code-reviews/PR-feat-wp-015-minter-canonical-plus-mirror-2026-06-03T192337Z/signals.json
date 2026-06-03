@@ -1,0 +1,18 @@
+{
+  "pr": "feat/wp-015-minter-canonical-plus-mirror",
+  "base": "change/feat-product-project-opportunity-evolution",
+  "verdict": "PASS",
+  "build_verification": {"pr_introduced_errors": 0, "tool": "ruff check + pytest", "typechecker": "none configured (per plugin contract)"},
+  "scope": {"files_changed": 5, "lines_added": 288, "lines_removed": 33, "commit_type_spread": ["refactor"], "severity": "low"},
+  "size": {"total_lines": 321, "files_changed": 5, "severity": "low", "note": "majority is the new test file + docstrings; single logical concern"},
+  "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+  "completeness": {"new_source_without_test": 0, "new_tests": 1, "api_change_without_schema": false, "severity": "none"},
+  "lenses": {
+    "architecture": {"findings": 0, "note": "canonical write routed through EntityRepository port (correct dependency direction); reuses central_tenant_home + LocalFileEntityAdapter (ADR-005 reuse); graceful degradation preserved; no new untimed external call (local FS)"},
+    "security": {"findings": 0, "primitives_checked": ["SEC-secrets", "SEC-injection", "DAT-03-logging"], "note": "no secrets/injection/eval/shell; degradation log interpolates only target_path (non-sensitive); x-sensitive source field carried opaque, not logged"},
+    "quality": {"findings": 0, "cr10_perf": "no anti-pattern matches (the _save_canonical loop iterates the composed Projects (N=1 per mint), each a distinct entity save — not an N+1 query-in-loop)", "test_coverage": "comprehensive: new test_minter_reconcile.py (10 tests) + characterisation baseline preserved + e2e updated", "contract_drift": "branch_policy 'trunk-based' was pre-existing drift (impl emitted a non-schema enum value); THIS WP fixes it via _compose_entity default + canonical normalisation"}
+  },
+  "findings_in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+  "findings_in_neighbours": {"count": 0},
+  "draft_hardening_deltas": 0
+}
