@@ -188,6 +188,35 @@ def cli_main(parser: argparse.ArgumentParser, handlers: dict) -> None:
 _FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
 
 
+# #104 — historical drift: SEA authored snake-case `depends_on` while every
+# wpx/execution reader uses camel-case `dependsOn`. Alias snake → camel at
+# parse time so the dep set surfaces regardless of which spelling the
+# author used. List form (`depends-on`) covered for symmetry.
+_FRONTMATTER_KEY_ALIASES: dict[str, str] = {
+    "depends_on": "dependsOn",
+    "depends-on": "dependsOn",
+}
+
+
+def _alias_frontmatter_key(key: str) -> str:
+    return _FRONTMATTER_KEY_ALIASES.get(key, key)
+
+
+_FM_INLINE_COMMENT_RE = re.compile(r"\s+#(?:\s.*)?$")
+
+
+def _strip_frontmatter_inline_comment(s: str) -> str:
+    """Strip a trailing YAML-style inline ``# comment``.
+
+    A comment starts with whitespace + ``#`` and either ends the line
+    immediately OR is followed by whitespace + the comment text. A ``#``
+    glued to a value with no leading whitespace stays intact, and a
+    ``#`` immediately followed by a non-space token (e.g. ``Honest #1``
+    or ``id: WP-#1``) stays intact — only YAML-form comments are stripped.
+    """
+    return _FM_INLINE_COMMENT_RE.sub("", s).rstrip()
+
+
 def parse_frontmatter(text: str) -> tuple[dict[str, str | list[str]], str]:
     """Parse a Markdown file's YAML-like frontmatter.
 
@@ -197,6 +226,9 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str | list[str]], str]:
         - item1
         - item2
       key: [a, b, c]      (inline list)
+
+    Snake-case `depends_on` and `depends-on` alias to `dependsOn` (#104).
+    Trailing inline `# comment`s are stripped from values + list items.
 
     Returns (frontmatter_dict, body_after_frontmatter).
     """
@@ -212,8 +244,8 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str | list[str]], str]:
         if not line or line.startswith("#"):
             continue
         if current_list_key is not None and line.startswith("  - "):
-            # Continue list
-            item = line[4:].strip().strip("'\"")
+            # Continue list — strip inline comment before unquoting.
+            item = _strip_frontmatter_inline_comment(line[4:]).strip().strip("'\"")
             assert isinstance(fm[current_list_key], list)
             fm[current_list_key].append(item)  # type: ignore[union-attr]
             continue
@@ -222,16 +254,20 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str | list[str]], str]:
         if ":" not in line:
             continue
         key, _, rest = line.partition(":")
-        key = key.strip()
-        rest = rest.strip()
+        key = _alias_frontmatter_key(key.strip())
+        rest = _strip_frontmatter_inline_comment(rest.strip())
         if rest == "":
             # Start of a list
             fm[key] = []
             current_list_key = key
         elif rest.startswith("[") and rest.endswith("]"):
-            # Inline list
+            # Inline list — strip per-item inline comments too.
             inner = rest[1:-1]
-            items = [i.strip().strip("'\"") for i in inner.split(",") if i.strip()]
+            items = [
+                _strip_frontmatter_inline_comment(i).strip().strip("'\"")
+                for i in inner.split(",")
+                if i.strip()
+            ]
             fm[key] = items
         else:
             # Scalar
@@ -3543,8 +3579,14 @@ def revert_train_on_dev(
     bundle: list[dict],
     reason: str,
     train_id: str,
+    base_branch: str = "main",
 ) -> tuple[bool, str]:
-    """Revert all merged WPs in the bundle in reverse order, push to dev.
+    """Revert all merged WPs in the bundle in reverse order, push to the trunk.
+
+    `base_branch` is the integration line the merges landed on (the trunk,
+    `main`, by default; pass the change branch when reverting a change-bounded
+    train). The function name keeps the historical `_on_dev` suffix for
+    call-site stability; the operation targets `base_branch`.
 
     Produces a single wrapper commit
     `revert(train-{ts}): rollback {WPs} — {reason}` on `dev`.
@@ -3556,15 +3598,15 @@ def revert_train_on_dev(
     if not merged:
         return True, "no merged WPs to revert"
 
-    # Checkout dev, fetch latest
-    rc, _, err = _run(["git", "fetch", "origin", "dev"], cwd=clone_dir,
+    # Checkout the trunk, fetch latest
+    rc, _, err = _run(["git", "fetch", "origin", base_branch], cwd=clone_dir,
                      timeout=60)
     if rc != 0:
-        return False, f"git fetch dev failed: {err}"
-    rc, _, err = _run(["git", "checkout", "-B", "dev", "origin/dev"],
+        return False, f"git fetch {base_branch} failed: {err}"
+    rc, _, err = _run(["git", "checkout", "-B", base_branch, f"origin/{base_branch}"],
                      cwd=clone_dir, timeout=30)
     if rc != 0:
-        return False, f"git checkout dev failed: {err}"
+        return False, f"git checkout {base_branch} failed: {err}"
 
     # Revert each merge SHA in reverse order; --no-commit to stage all
     # changes into a single wrapper commit
@@ -3586,10 +3628,10 @@ def revert_train_on_dev(
     rc, _, err = _run(["git", "commit", "-m", msg], cwd=clone_dir, timeout=30)
     if rc != 0:
         return False, f"git commit (revert wrapper) failed: {err}"
-    rc, _, err = _run(["git", "push", "origin", "dev"], cwd=clone_dir,
+    rc, _, err = _run(["git", "push", "origin", base_branch], cwd=clone_dir,
                      timeout=60)
     if rc != 0:
-        return False, f"git push dev (revert) failed: {err}"
+        return False, f"git push {base_branch} (revert) failed: {err}"
     return True, f"reverted {len(merged)} merges under wrapper commit"
 
 
@@ -3968,7 +4010,7 @@ def git_worktree_remove(repo_root: Path, dest: Path,
 
 
 def detect_adopt_state(repo_root: Path,
-                      remote_ref: str = "origin/dev") -> dict:
+                      remote_ref: str = "origin/main") -> dict:
     """Inspect the current repo state for `sulis-change adopt`.
 
     Returns a dict:
@@ -4570,7 +4612,7 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
 def back_integrate_change_branch(
     repo_root: Path,
     change_branch: str,
-    dev_ref: str = "origin/dev",
+    dev_ref: str = "origin/main",
     *,
     fetch_first: bool = True,
 ) -> dict:
