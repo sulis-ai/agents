@@ -78,13 +78,13 @@ def _head_sha(repo_root: Path) -> str:
     return out.strip() if rc == 0 and out.strip() else "(unknown)"
 
 
-def _base_sha(repo_root: Path, base_ref: str = "dev") -> str:
+def _base_sha(repo_root: Path, base_ref: str = "main") -> str:
     """Return the short SHA of the base ref, or '(unknown)'."""
     rc, out, _ = _run(["git", "rev-parse", "--short", base_ref], cwd=repo_root, timeout=10)
     return out.strip() if rc == 0 and out.strip() else "(unknown)"
 
 
-def _ahead_behind(repo_root: Path, base_ref: str = "dev") -> tuple[int, int]:
+def _ahead_behind(repo_root: Path, base_ref: str = "main") -> tuple[int, int]:
     """Return (ahead, behind) commit counts of HEAD relative to base_ref."""
     rc, out, _ = _run(
         ["git", "rev-list", "--left-right", "--count", f"{base_ref}...HEAD"],
@@ -394,7 +394,7 @@ def write_change_context(
     logs a warning rather than raising — a recon-write failure must not crash
     the caller's ``sulis-change start`` spawn path.
     """
-    base_ref = metadata.get("base_branch") or "dev"
+    base_ref = metadata.get("base_branch") or "main"
     git_state = {
         "head_sha": _head_sha(repo_root),
         "base_sha": _base_sha(repo_root, base_ref),

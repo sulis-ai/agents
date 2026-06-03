@@ -403,7 +403,7 @@ critical findings block the merge rather than land on `dev`.
 
 *CW-05 size carve-out — skip review when the change is genuinely
 trivial:* before invoking the review, parse the diff size against
-`origin/dev`:
+`origin/main`:
 
 ```bash
 git fetch origin main -q
@@ -713,7 +713,7 @@ import json
 r = back_integrate_change_branch(
     repo_root=Path('/abs/path/to/worktree'),
     change_branch='change/fix-login-bug',
-    dev_ref='origin/dev',
+    dev_ref='origin/main',
 )
 print(json.dumps(r))
 "
@@ -800,7 +800,7 @@ yes** (MUC-F3 — never act on vague phrasing like "get rid of this"):
 
 Do not proceed without an affirmative. If the founder is currently *in* the
 change's workspace, the tool refuses (you can't nuke the change you're on) —
-relay that and tell them to switch away first (`git checkout dev`).
+relay that and tell them to switch away first (`git checkout main`).
 
 **4. Delete (only after an explicit yes):**
 
@@ -898,10 +898,10 @@ them the dashboard updates on its own as work progresses, and point them at
   file movement (`transfer_worktree_changes`), never the shared stash stack.
   If you ever need to park transient state, make a throwaway WIP commit —
   don't reach for `git stash`.
-- **Never `git checkout dev` inside a change worktree (issue #56).** A change
+- **Never `git checkout main` inside a change worktree (issue #56).** A change
   worktree only ever holds its OWN `change/*` branch. In the multi-worktree
   model `dev` is checked out elsewhere and git forbids the same branch in two
-  worktrees — `git checkout dev` returns *"fatal: 'dev' is already checked
+  worktrees — `git checkout main` returns *"fatal: 'main' is already checked
   out"*. To sync `dev`, operate in whatever worktree holds it (`git worktree
   list --porcelain`). `sulis-change finish --merge` already does this for you.
 - **Ship removes the worktree but keeps the branch — that's intended (issue

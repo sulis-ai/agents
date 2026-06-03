@@ -46,7 +46,7 @@ reads recorded state, it never waits or polls.
 Exit codes: 0 = ok (green / unknown / pending), 2 = failed (PRE-01).
 
 Usage:
-    wpx-preflight dev-clean --repo owner/name [--branch dev]
+    wpx-preflight dev-clean --repo owner/name [--branch main]
 """
 
 from __future__ import annotations
@@ -163,16 +163,16 @@ def main() -> int:
         "dev-clean",
         help="Is the base branch HEAD CI-green before a wave dispatches?")
     dc.add_argument("--repo", required=True, help="owner/name")
-    dc.add_argument("--branch", default="dev",
-                    help="base branch to read CI for (default: dev)")
+    dc.add_argument("--branch", default="main",
+                    help="base branch to read CI for (default: main)")
 
     ps = sub.add_parser(
         "protection-status",
         help="Is branch protection in force, unavailable on a free plan, or "
              "unconfigured? Informational — never blocks.")
     ps.add_argument("--repo", required=True, help="owner/name")
-    ps.add_argument("--branch", default="dev",
-                    help="branch to probe protection for (default: dev)")
+    ps.add_argument("--branch", default="main",
+                    help="branch to probe protection for (default: main)")
 
     args = parser.parse_args()
 
