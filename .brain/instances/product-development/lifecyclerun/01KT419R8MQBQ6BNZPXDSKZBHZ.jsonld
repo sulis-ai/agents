@@ -1,41 +1,10 @@
 {
-  "@context": {
-    "@vocab": "https://sulis.co/dna/",
-    "dna": "https://sulis.co/dna/",
-    "prov": "http://www.w3.org/ns/prov#"
-  },
-  "@id": "dna:lifecyclerun:01KT419R8MQBQ6BNZPXDSKZBHZ",
-  "@type": "lifecyclerun",
-  "id": "dna:lifecyclerun:01KT419R8MQBQ6BNZPXDSKZBHZ",
-  "step_name": "faithful-generation-harness",
   "at": "2026-06-02T00:00:00Z",
-  "outcome": "completed",
-  "sys_status": "active",
-  "valid_from": "2026-06-02T00:00:00Z",
   "confidence": 0.88,
-  "_run_id": "01KT419R8MQBQ6BNZPXDSKZBHZ",
-  "_workflow": "dna:workflow:01KT3GM8ZF8PC7RJSGSE5JE7QQ",
-  "_trigger": "dna:trigger:01KT3GM8ZFWBJP98QFPN24B7QJ",
-  "_generation_goal": "Bound claim->source table for a GitHub Actions Platform Contract (n=1 dogfood of platform-contract-standard).",
-  "_final_verdict": "partial-unattributed",
-  "_deterministic": false,
-  "_inputs_ref": "closed-manifest: 3 GitHub-docs sources (reusing-workflows, trigger-a-workflow, about-protected-branches) re-retrieved 2026-06-02 + 3 probe entries",
-  "_outputs_ref": ".brain/instances/product-development/lifecyclerun/01KT419R8MQBQ6BNZPXDSKZBHZ.journal.md",
-  "_step_runs": [
-    {"step": "observe-manifest", "outcome": "completed", "deterministic": false},
-    {"step": "orient-select-relevant", "outcome": "completed", "deterministic": false},
-    {"step": "decide-commit-bindings", "outcome": "completed", "deterministic": false},
-    {"step": "act-generate-from-bindings", "outcome": "completed", "deterministic": false},
-    {"step": "self-critique-grounding", "outcome": "completed", "deterministic": false}
-  ],
-  "_bindings": [
-    {"claim": "rule-1 reusable-workflow-location", "variable_id": "src-reusable-workflow-location", "load_bearing": true, "grounded": true},
-    {"claim": "rule-2 bot-token-no-downstream-trigger", "variable_id": "src-bot-token-no-trigger", "load_bearing": true, "grounded": true}
-  ],
-  "_gaps": [
-    {"claim": "rule-3 branch-protection-on-private-free-plan", "reason": "no docs source supports the private-free-plan claim as of 2026-06-02; the only related verbatim (src-branch-restriction-org) is org-scoped and does not cover it", "load_bearing": false, "recorded_as": "inference", "probe_deferred": "paid-private-repo-for-branch-protection-probe"}
-  ],
-  "_false_citation_detected": false,
-  "_revision_count": 0,
-  "_self_critique": "Ablation+meaning-check confirmed rule-2 'new workflow run' qualifier preserved; REFUSED to bind rule-3 to org-scoped src-branch-restriction-org (fabricated-provenance refusal upheld)."
+  "id": "dna:lifecyclerun:01KT419R8MQBQ6BNZPXDSKZBHZ",
+  "outcome": "completed",
+  "run_id": "faithful-generation-harness",
+  "step": "dna:step:01KT61X5ST03VNC1ASS1F1ED0A",
+  "sys_status": "active",
+  "valid_from": "2026-06-02T00:00:00Z"
 }

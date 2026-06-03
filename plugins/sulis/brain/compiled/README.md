@@ -30,7 +30,12 @@ mixed-version vendor is safe):
   carried now lives in `run_id`; there is no `step_label` and no `used` field
   (both rejected upstream — DR-013). The three lifecycle Step ULIDs the `step`
   ref points at are authored once in
-  `plugins/sulis/instances/lifecycle-steps/steps.jsonld` (WP-001).
+  `plugins/sulis/instances/lifecycle-steps/steps.jsonld` (WP-001). The
+  pre-existing on-disk v1 instances are migrated to this shape by the one-shot
+  `plugins/sulis/scripts/migrate_lifecyclerun_v1_to_v2.py` (WP-006) —
+  idempotent, reject-on-invalid, run eager on the marketplace's own
+  `.brain/instances` in this change; downstream consumers migrate lazily on
+  next emit.
 - `product` v1.0.0 → **1.1.0** and `opportunity` v2.0.0 → **2.1.0** —
   RE-VENDORED (WP-008) to consume the upstream-minted `wasGeneratedBy`
   provenance edge (the `wasGeneratedBy` mint, DR-031). Each gains an optional
