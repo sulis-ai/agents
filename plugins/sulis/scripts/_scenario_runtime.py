@@ -58,6 +58,7 @@ class ResolvedStep:
     mechanism: str
     tool_ref: str | None = None
     input_artifacts: list = field(default_factory=list)
+    output_artifacts: list = field(default_factory=list)
     controls: list = field(default_factory=list)
     preconditions: list = field(default_factory=list)
     postconditions: list = field(default_factory=list)
@@ -116,6 +117,7 @@ def resolve_journey(
                 mechanism=str(step.get("mechanism", "")),
                 tool_ref=step.get("tool_ref"),
                 input_artifacts=list(step.get("input_artifacts", []) or []),
+                output_artifacts=list(step.get("output_artifacts", []) or []),
                 controls=list(step.get("controls", []) or []),
                 preconditions=list(step.get("preconditions", []) or []),
                 postconditions=list(step.get("postconditions", []) or []),

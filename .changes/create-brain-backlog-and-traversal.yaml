@@ -1,0 +1,20 @@
+change_id: "01KT60QGXQDF3Q3QPXQ354N5Q0"
+handle: "CH-01KT60"
+slug: "brain-backlog-and-traversal"
+primitive: "create"
+intent: "Make the brain a living backlog + memory the founder can deposit into and interrogate — so ideas/requirements raised in conversation survive scope-narrowing instead of getting lost, and so the Sulis agent can traverse the graph to answer 'what's open / deferred / the state of work'. TWO PAIRED PIECES.
+
+(1) CAPTURE PATH: a lightweight way to project a scoped-out idea into the brain as a PROPOSED/deferred Requirement (or Opportunity — an idea is often a 'why' before it's a requirement), state:proposed, durable + recoverable. This generalises the existing emit-wiring (capture-as-you-go, not only at full-SRD). Today Requirements ONLY emit from /sulis:specify deep mode; an idea raised + rightly scoped out has nowhere to land. Also wire the currently-ORPHANED emitters sulis-emit-opportunity + sulis-emit-product (they exist, nothing calls them, so Requirement.source->dna:opportunity and Opportunity.for_product->dna:product dangle against entities never emitted). Single-repo: the per-repo .brain/instances store is the right home now.
+
+(2) TRAVERSE/SURFACE: wire the EXISTING query seam (plugins/sulis/scripts/_brain_query.py + sulis-brain-query — find_entities, find_requirements, filter by state, ref-traversal like find_testresults_verifying) to the Sulis agent + a skill, so it can answer 'what open requirements exist / what's deferred / state of the requirements' OFF THE BRAIN GRAPH. The capability exists but NOTHING in skills/agent calls it. Distinct from /sulis:dashboard + /sulis:inbox which read the change-store, not the brain entities.
+
+BRAIN-CONSULT CONFIRMATIONS (this session): Project = the multi-repo anchor (one Product -> many Projects via belongs_to_product_ref; depends_on/consumed_by = inter-repo graph; project.schema.json:5 states it). Product + Opportunity are Tenant-scoped / CROSS-REPO — their true home is the Platform-tier central store (tasks #51 Storage Service / #30 global store); single-repo per-repo emission is a fine near-term stopgap. belongs_to_product_ref is a plain string, unresolved until ontology v0.7 (upstream). EVOLUTION (#67) is designed-but-OFF for everyone (bitemporal fields exist, no emitter writes history yet; blocked on LifecycleRun v2.1.0) — keep it SEPARATE from this change.
+
+LADDER FRAMING: this is the brain-as-living-memory spine; the ADE 'what needs attention' explorer sits on it; the Platform tier later swaps the flat-file query for a real backend (the _brain_query docstring anticipates this).
+
+MANDATE: scope a THIN first slice (capture + minimal traverse) that actually ships AND road-tests through the new testable-state scenario loop (specify authors plain-English verification journeys -> emitted -> design resolves the Design placeholder -> verify-acceptance --scenario runs from-graph; shipped in v0.90.0 / PR #154). Dogfood opportunity: the FIRST ideas captured via the new path are THESE TWO ideas themselves (the capture path + the brain-traversal command), projected in as proposed requirements so they aren't lost. Read: plugins/sulis/scripts/_brain_query.py, sulis-brain-query, sulis-emit-{requirements,opportunity,product}, plugins/sulis/docs/scenario-authoring-source-design.md."
+branch: "change/create-brain-backlog-and-traversal"
+worktree_path: "/Users/iain/.sulis/changes/01KT60QGXQDF3Q3QPXQ354N5Q0/worktree"
+base_branch: "main"
+base_sha: "50eb6d09ae69c45add6ba7d8f6ada7fe3cc46795"
+started_at: "2026-06-03T05:54:02Z"

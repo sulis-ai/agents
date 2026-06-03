@@ -1,0 +1,11 @@
+{
+  "exercises": "dna:design:00000000000000000000000000",
+  "id": "dna:scenario:N3M3794XQE67YS5M45YAB6Q75P",
+  "journey": "dna:workflow:26CGZRRNCNBP1Z80CZBBFKW0QA",
+  "name": "Capture journey \u2014 deposit an idea rooted in its why",
+  "state": "draft",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:ZW14SZB4V7KY7RXP2QWSBWAF6S"
+  ]
+}

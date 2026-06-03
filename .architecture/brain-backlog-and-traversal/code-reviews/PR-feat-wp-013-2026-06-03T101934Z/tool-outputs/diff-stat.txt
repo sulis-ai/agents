@@ -1,0 +1,8 @@
+ .../sulis/docs/scenario-authoring-source-design.md | 27 +++++++++++++
+ plugins/sulis/scripts/_scenario_authoring.py       | 31 ++++++++++++++-
+ plugins/sulis/scripts/_scenario_runner.py          | 19 +++++++++-
+ plugins/sulis/scripts/_scenario_runtime.py         |  2 +
+ .../sulis/scripts/tests/integration/conftest.py    | 44 ++++++++++++++++++++++
+ .../scripts/tests/integration/test_capture_e2e.py  | 30 +++++++--------
+ .../scripts/tests/unit/test_scenario_runner.py     | 32 ++++++++++++++++
+ 7 files changed, 164 insertions(+), 21 deletions(-)
