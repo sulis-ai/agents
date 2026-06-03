@@ -29,7 +29,6 @@ ABM_REPO_ROOT="$(cd "$_ABM_LIB_DIR/../../../../.." && pwd)"
 
 # Canonical-source file paths. Every test references production code
 # through these — a path drift surfaces as a missing-file failure.
-ABM_DRIFT_CHECK="$ABM_REPO_ROOT/plugins/sulis/scripts/drift_check.sh"
 ABM_REUSABLE_WORKFLOW="$ABM_REPO_ROOT/plugins/sulis/templates/workflows/release-on-merge.yml"
 ABM_SHIM_TEMPLATE="$ABM_REPO_ROOT/plugins/sulis/templates/shims/release-on-merge.yml"
 ABM_MARKETPLACE_SHIM="$ABM_REPO_ROOT/.github/workflows/release-on-merge.yml"
@@ -37,35 +36,13 @@ ABM_RELEASE_TRAIN_SKILL="$ABM_REPO_ROOT/plugins/sulis/skills/release-train/SKILL
 ABM_GIT12_DOC="$ABM_REPO_ROOT/plugins/sulis/references/git-workflow-standard.md"
 ABM_BRANCH_CI="$ABM_REPO_ROOT/.github/workflows/branch-ci.yml"
 
-# ---------------------------------------------------------------------
-# Source the four canonical strings from drift_check.sh — the single
-# source of truth (TDD §3). DRIFT_CHECK_SOURCED_ONLY=1 tells the helper
-# to declare constants without running the check.
-# ---------------------------------------------------------------------
-abm_source_canonical_strings() {
-    if [ ! -f "$ABM_DRIFT_CHECK" ]; then
-        echo "abm_canonical: drift_check.sh missing at $ABM_DRIFT_CHECK" >&2
-        return 1
-    fi
-    # Source in this shell so the constants are exported to the caller.
-    DRIFT_CHECK_SOURCED_ONLY=1
-    export DRIFT_CHECK_SOURCED_ONLY
-    # shellcheck disable=SC1090
-    . "$ABM_DRIFT_CHECK"
-    # Re-export under ABM_-prefixed names so tests never touch the raw
-    # constant names (avoids accidental shadowing).
-    ABM_LABEL="$LABEL"
-    ABM_TITLE_PREFIX="$TITLE_PREFIX"
-    ABM_BASE="$BASE_BRANCH"
-    ABM_HEAD="$HEAD_BRANCH"
-}
-
-# The canonical pin regex (ADR-006 / TDD §3). The workflow's pin-read
-# step uses exactly this pattern; this is the single place the test
-# suite repeats it.
-ABM_PIN_REGEX='dev-sha-at-open: ([a-f0-9]{40})'
-# The pin token (the searchable prefix without the SHA capture).
-ABM_PIN_TOKEN='dev-sha-at-open'
+# (Removed with the trunk cutover: `abm_source_canonical_strings` +
+# the dev/main/back-integrate constants + the `dev-sha-at-open` pin regex.
+# Those served the two-branch dev→main drift gate (drift_check.sh) and the
+# GIT-12 auto-back-merge invariant, both decommissioned — there is no `dev`
+# to fall behind on a trunk. The path helpers above + the generic
+# helpers below remain for the kept canonical-drift / reusable-workflow /
+# loop-guard tests.)
 
 # Convenience: print a PASS line and exit 0 (tests call at the end).
 abm_pass() {
