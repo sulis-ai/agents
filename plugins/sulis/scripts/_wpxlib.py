@@ -188,6 +188,35 @@ def cli_main(parser: argparse.ArgumentParser, handlers: dict) -> None:
 _FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
 
 
+# #104 — historical drift: SEA authored snake-case `depends_on` while every
+# wpx/execution reader uses camel-case `dependsOn`. Alias snake → camel at
+# parse time so the dep set surfaces regardless of which spelling the
+# author used. List form (`depends-on`) covered for symmetry.
+_FRONTMATTER_KEY_ALIASES: dict[str, str] = {
+    "depends_on": "dependsOn",
+    "depends-on": "dependsOn",
+}
+
+
+def _alias_frontmatter_key(key: str) -> str:
+    return _FRONTMATTER_KEY_ALIASES.get(key, key)
+
+
+_FM_INLINE_COMMENT_RE = re.compile(r"\s+#(?:\s.*)?$")
+
+
+def _strip_frontmatter_inline_comment(s: str) -> str:
+    """Strip a trailing YAML-style inline ``# comment``.
+
+    A comment starts with whitespace + ``#`` and either ends the line
+    immediately OR is followed by whitespace + the comment text. A ``#``
+    glued to a value with no leading whitespace stays intact, and a
+    ``#`` immediately followed by a non-space token (e.g. ``Honest #1``
+    or ``id: WP-#1``) stays intact — only YAML-form comments are stripped.
+    """
+    return _FM_INLINE_COMMENT_RE.sub("", s).rstrip()
+
+
 def parse_frontmatter(text: str) -> tuple[dict[str, str | list[str]], str]:
     """Parse a Markdown file's YAML-like frontmatter.
 
@@ -197,6 +226,9 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str | list[str]], str]:
         - item1
         - item2
       key: [a, b, c]      (inline list)
+
+    Snake-case `depends_on` and `depends-on` alias to `dependsOn` (#104).
+    Trailing inline `# comment`s are stripped from values + list items.
 
     Returns (frontmatter_dict, body_after_frontmatter).
     """
@@ -212,8 +244,8 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str | list[str]], str]:
         if not line or line.startswith("#"):
             continue
         if current_list_key is not None and line.startswith("  - "):
-            # Continue list
-            item = line[4:].strip().strip("'\"")
+            # Continue list — strip inline comment before unquoting.
+            item = _strip_frontmatter_inline_comment(line[4:]).strip().strip("'\"")
             assert isinstance(fm[current_list_key], list)
             fm[current_list_key].append(item)  # type: ignore[union-attr]
             continue
@@ -222,16 +254,20 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str | list[str]], str]:
         if ":" not in line:
             continue
         key, _, rest = line.partition(":")
-        key = key.strip()
-        rest = rest.strip()
+        key = _alias_frontmatter_key(key.strip())
+        rest = _strip_frontmatter_inline_comment(rest.strip())
         if rest == "":
             # Start of a list
             fm[key] = []
             current_list_key = key
         elif rest.startswith("[") and rest.endswith("]"):
-            # Inline list
+            # Inline list — strip per-item inline comments too.
             inner = rest[1:-1]
-            items = [i.strip().strip("'\"") for i in inner.split(",") if i.strip()]
+            items = [
+                _strip_frontmatter_inline_comment(i).strip().strip("'\"")
+                for i in inner.split(",")
+                if i.strip()
+            ]
             fm[key] = items
         else:
             # Scalar
