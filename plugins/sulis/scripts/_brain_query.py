@@ -158,6 +158,89 @@ def where_id_in(ids: set | list) -> Callable[[dict], bool]:
     return _pred
 
 
+# ─── As-of-time window read (bitemporal; ADR-003) ──────────────────────
+
+
+def _window_contains(window: dict, as_of: str) -> bool:
+    """Whether `as_of` falls inside this window's half-open interval.
+
+    The interval is ``[valid_from, valid_to)`` — the lower bound is
+    **inclusive**, the upper bound **exclusive**. An open window
+    (``valid_to`` null or empty) is treated as ``valid_to == +∞``, so any
+    `as_of` at or after ``valid_from`` is contained.
+
+    The half-open shape is what makes abutting windows partition time without
+    overlap: when window N closes at the same instant window N+1 opens
+    (``N.valid_to == N+1.valid_from`` — exactly how ``evolve_entity`` chains
+    them), that shared instant belongs to N+1 alone. ISO-8601 UTC timestamps
+    are lexicographically ordered, so string comparison is the correct (and
+    boring) ordering — no datetime parse needed.
+    """
+    if as_of < window.get("valid_from", ""):
+        return False
+    valid_to = window.get("valid_to")
+    if not valid_to:
+        # Open window (``valid_to`` null or empty) — no upper bound (+∞).
+        # ``not valid_to`` covers both sentinels (None and "") and narrows
+        # ``valid_to`` to a non-empty string for the comparison below.
+        return True
+    return as_of < valid_to
+
+
+def read_as_of(
+    *,
+    entity_type: str,
+    entity_id: str,
+    as_of: str,
+    base_dir: Path,
+) -> dict | None:
+    """Return the window whose ``[valid_from, valid_to)`` contains `as_of`.
+
+    The read side of the bitemporal window chain (ADR-003): `evolve_entity`
+    writes the history envelope (an ordered ``windows`` list, one file per
+    entity id); this answers *"which version was true at `as_of`?"*.
+
+    Half-open interval semantics: ``valid_from <= as_of < valid_to``. An open
+    window has ``valid_to == None`` (treated as +∞), so an `as_of` after the
+    latest window opens returns that open window. An `as_of` before the first
+    window's ``valid_from`` returns ``None`` (the entity did not exist yet).
+    The boundary is half-open, so ``as_of == valid_to`` of window N returns
+    window N+1, not N — the single source of the boundary rule is
+    ``_window_contains``.
+
+    Reuses the existing ``iter_entities`` flat-file walk — no new traversal
+    code. The signature carries no ``domain``: the walk spans every domain, so
+    a Product/Opportunity (``product-development``) and a Project
+    (``foundation``) are found the same way.
+
+    Args:
+        entity_type: the living entity type (``product`` / ``opportunity`` /
+            ``project``) — selects the per-type subtree of the walk.
+        entity_id: the stable ``dna:{entity_type}:{ulid}`` id whose history
+            envelope is queried.
+        as_of: an ISO-8601 UTC timestamp. Compared lexicographically against
+            the window bounds (ISO-8601 UTC sorts correctly as strings).
+        base_dir: the ``.brain/instances/`` root — repo-local OR the central
+            Tenant home (ADR-005). The same function serves both; the walk is
+            identical. A non-existent ``base_dir`` yields no entities → ``None``.
+
+    Returns:
+        The matching window dict, or ``None`` when no window contains `as_of`
+        (entity unknown, or `as_of` before its first window).
+    """
+    for envelope in iter_entities(base_dir, entity_type=entity_type):
+        if envelope.get("id") != entity_id:
+            continue
+        windows = envelope.get("windows")
+        if not isinstance(windows, list):
+            return None
+        for window in windows:
+            if _window_contains(window, as_of):
+                return window
+        return None  # envelope found, but no window contains as_of
+    return None  # no envelope for this entity id
+
+
 # ─── Domain-specific high-level queries ────────────────────────────────
 
 
@@ -208,6 +291,7 @@ def find_passing_testresults_verifying(
 ) -> list[dict]:
     """All TestResults verifying `requirement_id` with outcome=pass."""
     return [
-        r for r in find_testresults_verifying(base_dir, requirement_id, domain=domain)
+        r
+        for r in find_testresults_verifying(base_dir, requirement_id, domain=domain)
         if r.get("outcome") == "pass"
     ]
