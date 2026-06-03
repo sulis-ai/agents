@@ -96,3 +96,8 @@ Contract invariants:
 
 ## Notes
 - The `source` validation is the load-bearing line: it is the code-level enforcement of "no orphan requirements" — the requirement physically cannot be composed without a real opportunity ref.
+
+## Acceptance Evidence
+
+- Branch: feat/wp-002-compose-requirement-from-idea (deleted post-merge)
+- Completed: `2026-06-03T08:12:40Z` (Step 12 by calling session)

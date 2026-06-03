@@ -110,9 +110,9 @@ graph TD
 
 | ID | Title | Primitive | Status | Depends On | Blocks | Token (in/out) | TDD § |
 |---|---|---|---|---|---|---|---|
-| WP-001 | compose_opportunity_from_idea | extend | step-7-complete | — | WP-004, WP-011 | 6k / 2k | Form inventory |
-| WP-002 | compose_requirement_from_idea | extend | step-7-complete | — | WP-004 | 6k / 2k | Form inventory |
-| WP-003 | bootstrap_backing_chain (Tenant+Product) | create | step-7-complete | — | WP-004, WP-005 | 9k / 4k | ADR-002 |
+| WP-001 | compose_opportunity_from_idea | extend | done | — | WP-004, WP-011 | 6k / 2k | Form inventory |
+| WP-002 | compose_requirement_from_idea | extend | done | — | WP-004 | 6k / 2k | Form inventory |
+| WP-003 | bootstrap_backing_chain (Tenant+Product) | create | done | — | WP-004, WP-005 | 9k / 4k | ADR-002 |
 | WP-004 | capture_idea orchestrator (quick+full gate) | create | pending | WP-001, WP-002, WP-003, WP-005 | WP-006 | 12k / 4k | Form dep picture |
 | WP-005 | roadmap sidecar reader + writer | create | pending | WP-003 | WP-004, WP-007 | 5k / 3k | ADR-001 |
 | WP-006 | sulis-capture CLI (JSON envelope) | create | pending | WP-004 | WP-009, WP-013 | 8k / 3k | Form / Proof |
@@ -123,6 +123,7 @@ graph TD
 | WP-011 | opportunity-analyst agent | create | pending | WP-001 | WP-012, WP-013 | 12k / 6k | FR-11 |
 | WP-012 | Sulis-agent traverse + analyst wiring | refactor | pending | WP-008, WP-011 | WP-013 | 9k / 4k | FR-08 |
 | WP-013 | dogfood + scenario emission (LAST) | create | pending | WP-006, WP-008, WP-009, WP-010, WP-011, WP-012 | — | 14k / 5k | Proof scenarios |
+| WP-AUTO-001 | Auto-draft from SF-001 | Harden | auto-draft | WP-002 | — | ? | — |
 
 ## Recommended Implementation Order
 

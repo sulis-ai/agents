@@ -109,3 +109,8 @@ Contract invariants:
 ## Notes
 - At the merge SHA `.brain/instances/foundation/` is absent, so the first real run *will* mint the Tenant via the canonical deriver — this is correct (ADR-002 "Adopted: reuse-first, else mint via the canonical deriver").
 - `repo_org_slash_name` is read from `.sulis/repo-contract.yml` by the orchestrator (WP-004) and passed in — keep this helper pure of git/file discovery so it stays unit-testable.
+
+## Acceptance Evidence
+
+- Branch: feat/wp-003-bootstrap-backing-chain (deleted post-merge)
+- Completed: `2026-06-03T08:12:40Z` (Step 12 by calling session)

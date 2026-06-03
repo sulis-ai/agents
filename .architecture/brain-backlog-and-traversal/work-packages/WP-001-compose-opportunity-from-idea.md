@@ -99,3 +99,8 @@ Contract invariants:
 
 ## Notes
 - Per ADR-005, optional `evidence`/`impact` stay unset on the quick path; the analyst (ADR-004) populates them on the full path. Keep them optional.
+
+## Acceptance Evidence
+
+- Branch: feat/wp-001-compose-opportunity-from-idea (deleted post-merge)
+- Completed: `2026-06-03T08:12:40Z` (Step 12 by calling session)
