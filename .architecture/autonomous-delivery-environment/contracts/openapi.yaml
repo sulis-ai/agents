@@ -1,0 +1,317 @@
+openapi: 3.1.0
+info:
+  title: Sulis app — data seam (CH-01KT50 new + changed endpoints)
+  version: 0.1.0
+  description: >
+    The single API boundary ("the seam") the Sulis app reaches all its data
+    through. This document covers ONLY the endpoints added or changed by the
+    drive-a-change slice. Existing read endpoints (tree, file, diff,
+    transcript, contract) are unchanged and documented by the cockpit MVP.
+    All endpoints bind to 127.0.0.1 only (NFR-SEC-01). Every endpoint is
+    read-only EXCEPT POST /api/changes/{id}/chat, the one sanctioned write
+    path (ADR-003).
+servers:
+  - url: http://127.0.0.1:4317
+    description: Local Sulis app server (loopback only)
+
+paths:
+  /api/changes:
+    get:
+      summary: List in-flight changes for the board (CHANGED — adds stage grouping inputs)
+      description: >
+        Returns every change with stage + liveness, sorted most-recent-first.
+        The board groups these into stage columns client-side. Shipped
+        changes are returned but the board does not render them as in-flight
+        cards (FR-15). FR-01, FR-02, FR-15.
+      responses:
+        "200":
+          description: The full change list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Change" }
+
+  /api/changes/{id}/status:
+    get:
+      summary: Plain-English read-time status for a change (NEW)
+      description: >
+        Computes, at read time, a human-readable "what's happening" status
+        from the change's state + journal/conversation. Not a stored periodic
+        checkpoint (the periodic beat is out of scope). FR-05.
+      parameters: [ { $ref: "#/components/parameters/ChangeId" } ]
+      responses:
+        "200":
+          description: The computed status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChangeStatus" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/changes/{id}/brain:
+    get:
+      summary: The change's brain entities + workflows, grouped by kind (NEW)
+      description: >
+        Lists the entities and workflows the agent created for this change,
+        grouped by kind, read-only, each with enough content for a readable
+        detail view. Reached through the seam, never the filesystem (NFR-ARCH-01).
+        FR-06, FR-07.
+      parameters: [ { $ref: "#/components/parameters/ChangeId" } ]
+      responses:
+        "200":
+          description: Grouped brain entities (empty groups omitted).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BrainView" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/search:
+    get:
+      summary: Search + filter changes by content, stage, and needs-attention (NEW)
+      description: >
+        Searches change CONTENT (conversation + created entities/artifacts),
+        not just handle/intent/stage (FR-10). Optional stage filter (FR-11)
+        and needs-attention filter (FR-12: blocked OR waiting-on-decision OR
+        agent-stopped-mid-reply; idle-but-fine is NOT flagged). All filters
+        narrow the same board. Read-only.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+          description: Free-text matched against change content.
+        - name: stage
+          in: query
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: array
+            items: { $ref: "#/components/schemas/WorkflowStage" }
+          description: Zero or more stages to filter to.
+        - name: needsAttention
+          in: query
+          required: false
+          schema: { type: boolean }
+          description: When true, only changes that need attention.
+      responses:
+        "200":
+          description: Matching changes (same shape as the board list).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                properties:
+                  results:
+                    type: array
+                    items: { $ref: "#/components/schemas/Change" }
+
+  /api/changes/{id}/chat:
+    post:
+      summary: Send a message to a change's agent and stream the reply (NEW — the one write path)
+      description: >
+        THE single sanctioned write/act path (ADR-003). Resolves a session
+        for the named change WITHOUT asking the founder to choose: use the
+        live session, else resume the last one from its transcript (FR-24),
+        else spawn a fresh one grounded in saved context (FR-25). Positively
+        binds the resolved session to the named change before delivering any
+        byte (FR-21 / NFR-SEC-02). At most one in-flight per change (FR-20).
+        The reply streams back as Server-Sent Events (ADR-001). On a broken
+        stream the partial is preserved and marked interrupted (FR-22). The
+        completed exchange joins the change's existing conversation (FR-18,
+        NFR-DATA-01). No message bodies are logged (NFR-SEC-03).
+      parameters: [ { $ref: "#/components/parameters/ChangeId" } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+                  description: The founder's prompt for this change's agent.
+      responses:
+        "200":
+          description: >
+            The reply stream. An SSE event stream; events are `state`,
+            `chunk`, `complete`, and `error` (see ChatStreamEvent). The
+            connection stays open until the reply ends or breaks.
+          content:
+            text/event-stream:
+              schema: { $ref: "#/components/schemas/ChatStreamEvent" }
+        "409":
+          description: A reply is already streaming for this change (SESSION_BUSY, FR-20).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: >
+            The resolved session does not belong to the named change
+            (SESSION_CHANGE_MISMATCH, FR-21 / NFR-SEC-02). Zero bytes delivered.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502":
+          description: >
+            Could not resume or spawn a session at all (SESSION_UNREACHABLE,
+            FR-19). The message is NOT shown as delivered (FR-N3).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+components:
+  parameters:
+    ChangeId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      description: The change id or handle.
+
+  responses:
+    NotFound:
+      description: No such change.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    WorkflowStage:
+      type: string
+      enum: [recon, specify, design, implement, review, ship, shipped]
+
+    Liveness:
+      oneOf:
+        - type: object
+          required: [status, pid]
+          properties:
+            status: { const: running }
+            pid: { type: integer }
+        - type: object
+          required: [status]
+          properties:
+            status: { const: not-running }
+        - type: object
+          required: [status, reason]
+          properties:
+            status: { const: unknown }
+            reason: { type: string }
+
+    Change:
+      type: object
+      description: One change card on the board (unchanged shape from MVP).
+      required: [changeId, handle, slug, primitive, branch, worktreePath, intent, baseBranch, baseSha, createdAt, updatedAt, stage, liveness]
+      properties:
+        changeId: { type: string }
+        handle: { type: string }
+        slug: { type: string }
+        primitive: { type: string }
+        branch: { type: string }
+        worktreePath: { type: string }
+        intent: { type: string }
+        baseBranch: { type: string }
+        baseSha: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        stage: { $ref: "#/components/schemas/WorkflowStage" }
+        liveness: { $ref: "#/components/schemas/Liveness" }
+
+    ChangeStatus:
+      type: object
+      description: Read-time plain-English status (FR-05).
+      required: [changeId, stage, headline, needsAttention]
+      properties:
+        changeId: { type: string }
+        stage: { $ref: "#/components/schemas/WorkflowStage" }
+        headline:
+          type: string
+          description: One human-readable sentence/short paragraph of what's happening.
+        needsAttention:
+          type: object
+          description: Why this change does/doesn't need attention (FR-12).
+          required: [flagged]
+          properties:
+            flagged: { type: boolean }
+            reason:
+              type: [string, "null"]
+              enum: [blocked, waiting-on-decision, stopped-mid-reply, null]
+
+    BrainEntity:
+      type: object
+      required: [id, kind, title]
+      properties:
+        id: { type: string, description: "e.g. dna:requirement:<ulid>" }
+        kind: { type: string, description: "requirement | workflow | design | decision | …" }
+        title: { type: string }
+        detail:
+          type: object
+          additionalProperties: true
+          description: The readable fields/content for the detail view (FR-07).
+
+    BrainGroup:
+      type: object
+      required: [kind, items]
+      properties:
+        kind: { type: string }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/BrainEntity" }
+
+    BrainView:
+      type: object
+      required: [changeId, groups]
+      properties:
+        changeId: { type: string }
+        groups:
+          type: array
+          description: Entities grouped by kind; empty when no brain yet (FR-06 empty case).
+          items: { $ref: "#/components/schemas/BrainGroup" }
+
+    ChatStreamEvent:
+      description: One SSE event in the reply stream (ADR-001).
+      oneOf:
+        - type: object
+          required: [type, state]
+          properties:
+            type: { const: state }
+            state:
+              type: string
+              enum: [ready, resuming, spawning, replying, complete, interrupted, failed]
+              description: Session lifecycle for the founder (FR-23).
+        - type: object
+          required: [type, text]
+          properties:
+            type: { const: chunk }
+            text: { type: string, description: A reply token/delta (FR-17). }
+        - type: object
+          required: [type]
+          properties:
+            type: { const: complete }
+            resumed:
+              type: boolean
+              description: True when the change was resumed (FR-26 honest indication).
+        - type: object
+          required: [type, code]
+          properties:
+            type: { const: error }
+            code:
+              type: string
+              enum: [SESSION_UNREACHABLE, SESSION_CHANGE_MISMATCH, SESSION_BUSY]
+            message: { type: string }
+
+    Error:
+      type: object
+      required: [error, code]
+      description: The existing typed error envelope, with chat codes added.
+      properties:
+        error: { type: string }
+        code:
+          type: string
+          enum:
+            - NOT_FOUND
+            - SESSION_BUSY
+            - SESSION_CHANGE_MISMATCH
+            - SESSION_UNREACHABLE

@@ -1,0 +1,21 @@
+id: autonomous-delivery-environment
+handle: CH-01KT50
+change_id: 01KT500K2JTE2EGW6TPPQ4D4VN
+status: decomposed
+sourced_from: .changes/create-autonomous-delivery-environment.SPEC.md
+spec_dir: .specifications/autonomous-delivery-environment
+branch: change/create-autonomous-delivery-environment
+tier: L
+extends_app: apps/cockpit
+adrs:
+  - ADR-001-sse-for-chat-stream
+  - ADR-002-session-bridge-port-resume-spawn
+  - ADR-003-chat-is-the-single-sanctioned-write-path
+  - ADR-004-session-to-change-binding-guard
+  - ADR-005-one-coherent-surface-board-thread-shell
+contracts:
+  data: contracts/openapi.yaml
+  data_guide: contracts/DATA-CONTRACT-GUIDE.md
+  visual: contracts/visual/sulis-app.contract.md   # SIGNED — supersedes the rough mockups/ stand-in
+work_packages: work-packages/INDEX.md
+work_package_count: 16

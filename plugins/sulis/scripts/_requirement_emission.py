@@ -43,10 +43,12 @@ from _entity_repository import EntityRepository
 # Crockford base32 — same alphabet as ULID; no I/L/O/U.
 _CROCKFORD_ALPHABET: Final[str] = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
-# `**FR-NN: Title**` or `**NFR-NN: Title**` on a line of its own. The title
-# captures up to the closing `**` (greedy across the rest of the line).
+# `**FR-NN: Title**` / `**FR-NN — Title**` (or NFR-NN) on a line of its own.
+# The separator may be a colon, em-dash, en-dash, or hyphen — the requirements
+# house style uses ` — ` — and the id allows an optional leading `N` for the
+# negative-requirement scheme (FR-N1). Title captures up to the closing `**`.
 _FR_HEADER_RE: Final = re.compile(
-    r"^\*\*((?:FR|NFR)-\d+(?:\.\d+)?):\s*(.+?)\*\*\s*$",
+    r"^\*\*((?:FR|NFR)-N?\d+(?:\.\d+)?)\s*[:—–-]\s*(.+?)\*\*\s*$",
     re.MULTILINE,
 )
 

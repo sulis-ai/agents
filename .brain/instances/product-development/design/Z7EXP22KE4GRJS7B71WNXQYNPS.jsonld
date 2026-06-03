@@ -1,0 +1,37 @@
+{
+  "decisions": [
+    "dna:decision:2KSWRZQ7RTP7KJSDKPNRYJRZAF",
+    "dna:decision:BXYZP6QKN9T312GXY81S69KY5M",
+    "dna:decision:F16668BTMNERZ4Q3R4Y4P509Y2",
+    "dna:decision:V1B3X71QJ1S5BMPHE0SEN9DVW8",
+    "dna:decision:74Y1NMSGMX1C24DCF3G0E1JQ5A"
+  ],
+  "id": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+  "interface_contracts": [
+    ".architecture/autonomous-delivery-environment/contracts/openapi.yaml"
+  ],
+  "satisfies": [
+    "dna:requirement:9R2XARQ5XBRW48P5RRJKB84M9P",
+    "dna:requirement:KPJKYCA9FN57K2W8YKKH0X9RYY",
+    "dna:requirement:7XWE01KJFNM7F86NWY6EGCSNG2",
+    "dna:requirement:5FZ6W2FJGS6A12E2051QZZEDV2",
+    "dna:requirement:JNGKB2AJC3B9CPVMJEF96VQ8CQ",
+    "dna:requirement:PTQDFPMFK0X7V6XQAY6EPFFCZQ",
+    "dna:requirement:7QMCG7C8YVP707903C42T7E9YR",
+    "dna:requirement:SDHBYTDBTPH7XBTW5E2Y3M6VW8",
+    "dna:requirement:NPSKKX2V07XRZ8M9WZWDK6736Z",
+    "dna:requirement:A983B8VM7DKGW710622WNW87J3",
+    "dna:requirement:2NMMAS7A8C65CZ3YE6ACA4WC8N",
+    "dna:requirement:AWQ77CWBZ7N4KVKWENP9W7H2KC",
+    "dna:requirement:SWKWY7JW9VAER0WT68AR6Y699J",
+    "dna:requirement:9SC45EDNEZ8F4PTF08T1E4050S",
+    "dna:requirement:XE2W4QM0WJXT2JZ4W0D7XFH8DY"
+  ],
+  "state": "draft",
+  "sys_status": "active",
+  "views": [
+    "context",
+    "container",
+    "component"
+  ]
+}

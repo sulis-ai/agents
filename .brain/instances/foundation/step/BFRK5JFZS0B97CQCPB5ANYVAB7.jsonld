@@ -1,0 +1,21 @@
+{
+  "agent_instructions": "Send a message to a change whose agent is not currently running.",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:BFRK5JFZS0B97CQCPB5ANYVAB7",
+  "input_artifacts": [
+    "ggh0aqmx-open-a-change-whose-agent-is-currently-r-1-result"
+  ],
+  "mechanism": "human",
+  "name": "ggh0aqmx-send-a-message-to-a-change-whose-agent-i-2",
+  "output_artifacts": [
+    "ggh0aqmx-send-a-message-to-a-change-whose-agent-i-2-result"
+  ],
+  "postconditions": [
+    "the change's previous session resumes, or a fresh one starts having first read the change",
+    "a reply comes back without the user choosing resume-or-start",
+    "a step that was unfinished at the prior close is re-run, not reported as already done"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

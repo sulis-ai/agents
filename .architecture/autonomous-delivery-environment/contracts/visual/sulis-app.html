@@ -1,0 +1,1418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sulis app — visual contract (CH-01KT50) · calm, blue/teal accent, light + dark</title>
+<!--
+  ============================================================================
+  VISUAL CONTRACT  ·  Sulis app surface  ·  CH-01KT50  ·  SEVENTH PASS
+  ============================================================================
+  AUTHORITATIVE visual contract for founder sign-off (#45 gate, ADR-005).
+
+  SEVENTH PASS — folds in a real Mobbin inspiration probe
+  (_mobbin-context.md, structure-only per UXD-15) plus two founder refinements,
+  on top of the pass-5/6 base (fragment token system, file explorer, simplified
+  states). The Mobbin-grounded changes:
+    • BOARD — each stage COLUMN HEADER now carries its colour as a small DOT +
+      name + count on neutral columns (GitHub Projects pattern). The dot is the
+      only colour; columns + cards stay neutral. This is how stages "just use
+      colours" — the dot is decorative reinforcement of position + name (1.4.1).
+    • THREAD — upgraded from chat-bubbles-only to the Replit/Lovable/v0/Gemini
+      pattern: inline TOOL-ACTION LOG lines (Edited …, Created …, Ran tests —
+      28 passed) interleaved with the chat (SHOW THE WORK, AI-01); CHECKPOINT /
+      ROLLBACK cards (the founder's checkpoint-as-lineage idea); a clear
+      "Paused — waiting for you" state; and a right-hand panel that toggles
+      PREVIEW · FILES · BRAIN, one at a time (CL-02), replacing the 2-tab rail.
+    • The founder's own messages stay a NEUTRAL muted bubble (not brand).
+  REFINEMENT B — STATE INDICATORS simplified to a clean COLOURED DOT + a dark
+  text LABEL; the per-state SVG shape-glyphs are removed from the markup. The
+  visible label carries WCAG 1.4.1 (never colour-alone); in compact spots the
+  bare dot has an accessible name + is never the sole cue. Dots re-verified >=3:1.
+  Visuals stay ours (UXD-15: only Mobbin STRUCTURE transfers).
+
+  BASE (pass 5/6) — re-grounded to the founder's on-point experience fragments
+  (product/experience/fragments/the-morning-calm, the-living-demo,
+  the-org-heatmap). Those fragments carry the REAL Sulis token system in their
+  :root — this surface now binds to it verbatim, not the stale cockpit tokens
+  and not the sunset-saturated set of the prior passes.
+
+  THE FOUR CORRECTIONS APPLIED:
+    1. GOLD RETIRED FROM THE UI. The warm gold (#F0A830 / #C9A962) is no longer
+       used as an accent across cards, chrome or controls. The SUNSET MARK stays
+       as the logo identity, top-left. The working UI accent is now BLUE
+       (--primary #2563EB, the primary action) and TEAL (--accent #2D7D90, the
+       "this is live / current" touch). Brand colours are used sparingly; the
+       bluer palette carries any accent.
+    2. NEUTRAL USER MESSAGE BUBBLE. Researched chat convention: distinguish the
+       sender by ALIGNMENT first, colour second — and that colour should be a
+       NEUTRAL surface, never a brand fill. The founder's own messages sit in a
+       neutral muted bubble (--bg-muted + a subtle border), right-aligned. The
+       agent's messages are plain card bubbles, left-aligned. Neither is painted
+       teal/blue/gold.
+    3. ROOMIER CARDS. The board follows the fragments' calm rhythm: generous
+       card padding (16px), comfortable gaps (12px), 4px radius. The board
+       COLUMNS SCROLL vertically rather than cramming every card into one
+       viewport; the grid is responsive. Room to breathe.
+    4. STATUS INDICATORS keep the dot/icon + dark-neutral-label pattern, now on
+       the fragments' functional RAG tint+border scales (tint bg + matching
+       border + dark text + coloured icon).
+
+  BINDING (UXD: bind, never invent): every colour below is lifted from the
+  fragments' DESIGN_TOKENS v4.2.0 :root (the on-point Sulis system). The only
+  derived value is --attn-icon (#B45309, amber-700, a standard Tailwind step):
+  the fragments' light --warning #F59E0B is a large-area / decorative token and
+  does NOT clear 3:1 as a small status glyph, so the small needs-attention icon
+  uses the darker amber. Everything else is verbatim.
+
+  THE MARK (never fabricated): actual geometry from the Sulis sunset mark
+  (circle r=228 sw=36 + the River-Avon S-curve), sunset gradient on light,
+  reversed warm-paper on dark. The mark is the ONLY place the sunset appears.
+
+  FONTS (L-13): Inter + JetBrains Mono load from Google Fonts (the fragments'
+  exact stack); the founder signs off on what they SEE.
+
+  THEMES: light and dark both shown, via a data-theme attribute per panel.
+
+  STANDARDS DEMONSTRATED INLINE:
+    [A11Y]  WCAG 2.1 AA — visible :focus-visible ring, colour-independent status
+            (icon + dark-neutral label), AA token pairs re-verified on the
+            blue/teal + neutral pairs, keyboard model, semantic markup + ARIA.
+    [AI-02] dual-mode input: suggestion chips + free text + slash commands.
+    [AI-03] human-in-the-loop: start/pause/stop + consent gate.
+    [AI-07] AI content labelled with honest-confidence vocabulary.
+    [CL]    cognitive load: <=5 primary options; progressive disclosure.
+  Build target: Alpine.js + Tailwind — class/markup structure kept consistent
+  with utility-first component composition.
+  ============================================================================
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+/* ============================================================================
+   TOKENS — lifted verbatim from the experience fragments' DESIGN_TOKENS v4.2.0.
+   Exposed as explicit [data-theme] scopes so light + dark show on one page.
+   (In the build these resolve from prefers-color-scheme / the theme toggle.)
+   ============================================================================ */
+:root{
+  --font:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','SF Mono','Monaco',monospace;
+  --radius:4px;
+  --pill:9999px;
+  --control-height:44px;
+}
+
+/* ---- LIGHT (the fragments' default) ---- */
+[data-theme="light"]{
+  --primary:#2563EB;
+  --accent:#2D7D90;
+  --brand-gold:#C9A962;     /* retained as a token; NOT used in the UI */
+  --brand-depth:#1E3A5F;
+  --positive:#16A34A;
+  --destructive:#DC2626;
+  --warning:#F59E0B;        /* large-area / decorative only (summary bar) */
+  --attn-icon:#B45309;      /* derived: amber-700, the small status glyph (>=3:1) */
+
+  --bg:#FAF9F7;
+  --bg-card:#FFFFFF;
+  --bg-muted:#F4F3F0;
+  --text:#1C1C1C;
+  --text-secondary:#525252;
+  --text-muted:#7A7770;
+  --border:#E5E2DC;
+  --border-light:#F4F3F0;
+  --input:#D8D4CB;
+
+  --bg-positive:#F0FDF4;  --bg-positive-border:#BBF7D0;
+  --bg-destructive:#FEF2F2; --bg-destructive-border:#FECACA;
+  --bg-warning:#FFFBEB;   --bg-warning-border:#FDE68A;
+  --bg-accent:color-mix(in srgb,#2D7D90 5%,#FFFFFF);
+  --bg-accent-border:color-mix(in srgb,#2D7D90 15%,#E5E2DC);
+
+  --primary-fg:#FFFFFF;
+  --accent-fg:#FFFFFF;
+  --ring:#2563EB;
+  --shadow:0 1px 2px rgba(28,28,28,.05);
+  --skel-a:#F1EEE8; --skel-b:#E6E2DA;
+  /* stage-dot hues (board column headers) — each clears >=3:1 on the muted
+     column; the dot is decorative reinforcement of position + name (1.4.1). */
+  --stage-recon:#8B7355; --stage-specify:#6366F1; --stage-design:#2D7D90;
+  --stage-implement:#2563EB; --stage-review:#9333EA; --stage-ship:#15803D;
+  color-scheme:light;
+}
+
+/* ---- DARK (the fragments' dark block) ---- */
+[data-theme="dark"]{
+  --primary:#60A5FA;
+  --accent:#339BAB;
+  --brand-gold:#DFC480;
+  --brand-depth:#A3B3CB;
+  --positive:#4ADE80;
+  --destructive:#F87171;
+  --warning:#FBBF24;
+  --attn-icon:#FBBF24;      /* dark amber clears 3:1 on its tint — use the token */
+
+  --bg:#0a0a0a;
+  --bg-card:#141414;
+  --bg-muted:#171717;
+  --text:#fafafa;
+  --text-secondary:#a3a3a3;
+  --text-muted:#737373;
+  --border:#2e2e2e;
+  --border-light:#1f1f1f;
+  --input:#3a3a3a;
+
+  --bg-positive:#052e16;  --bg-positive-border:#14532d;
+  --bg-destructive:#450a0a; --bg-destructive-border:#7f1d1d;
+  --bg-warning:#451a03;   --bg-warning-border:#78350f;
+  --bg-accent:color-mix(in srgb,#339BAB 8%,#141414);
+  --bg-accent-border:color-mix(in srgb,#339BAB 20%,#2e2e2e);
+
+  --primary-fg:#0a0a0a;
+  --accent-fg:#0a0a0a;
+  --ring:#60A5FA;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+  --skel-a:#1c1c1c; --skel-b:#262626;
+  /* stage-dot hues — lifted to lighter steps for the dark column; each >=3:1 */
+  --stage-recon:#8B7355; --stage-specify:#818CF8; --stage-design:#339BAB;
+  --stage-implement:#60A5FA; --stage-review:#C084FC; --stage-ship:#4ADE80;
+  color-scheme:dark;
+}
+
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:#EDEAE3;color:#1C1C1C;
+  font-family:var(--font);font-weight:400;font-size:14px;line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+:focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:var(--radius)}
+/* native-chrome reset — kills the OS default button bevel ("win95"); styled
+   classes below layer on top via higher specificity. */
+button{appearance:none;-webkit-appearance:none;background:none;border:0;margin:0;padding:0;font:inherit;color:inherit;line-height:inherit;text-align:inherit}
+button,[role="button"],[tabindex],a{cursor:pointer}
+
+/* ---- document scaffold (NOT the product) ---- */
+.dochead{max-width:1240px;margin:0 auto;padding:48px 24px 8px}
+.dochead h1{font-weight:600;font-size:28px;color:#1C1C1C;margin-bottom:12px;letter-spacing:-.02em}
+.dochead p{color:#525252;font-size:15px;font-weight:400;max-width:76ch;line-height:1.7}
+.dochead .markrow{display:flex;align-items:center;gap:12px;margin-top:22px}
+.dochead .markrow svg{width:30px;height:30px}
+.dochead .markrow span{font-size:13px;color:#7A7770}
+.themetag{display:inline-flex;align-items:center;gap:9px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#7A7770;margin:44px auto 0;max-width:1240px;padding:0 24px}
+.themetag::before{content:"";width:24px;height:1px;background:#C9C5BC}
+.section-label{font-weight:500;font-size:15px;color:#3a3a38;padding:28px 24px 12px;max-width:1240px;margin:0 auto}
+.section-label small{display:block;font-size:12px;margin-top:4px;color:#8A867D;font-weight:400}
+.scope{max-width:1240px;margin:0 auto;padding:0 24px}
+
+/* ============================================================================
+   APP SHELL — the fragments' calm rhythm
+   ============================================================================ */
+.shell{display:grid;grid-template-columns:240px 1fr;height:760px;background:var(--bg);color:var(--text);
+       font-family:var(--font);border-radius:10px;overflow:hidden;border:1px solid var(--border);box-shadow:0 1px 3px rgba(28,28,28,.06)}
+.sidebar{background:var(--bg-card);border-right:1px solid var(--border);padding:18px 12px;overflow:auto}
+.brandrow{display:flex;align-items:center;gap:11px;padding:4px 8px 22px}
+.brandrow .mark{width:26px;height:26px;display:block;flex:none}
+.brandname{font-weight:600;font-size:18px;letter-spacing:-.01em;color:var(--text)}
+.sidebar h4{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin:20px 8px 8px;font-weight:600}
+.navitem{display:flex;align-items:center;gap:9px;padding:9px 8px;border-radius:var(--radius);color:var(--text-secondary);font-weight:400;font-size:13px;border:1px solid transparent;text-decoration:none}
+.navitem:hover{background:var(--bg-muted);color:var(--text)}
+.navitem.active{background:var(--bg-muted);color:var(--text);font-weight:500}
+.navitem .lname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- liveness status — SIMPLIFIED (sixth pass): a clean COLOURED DOT + a dark
+   neutral TEXT LABEL. The decorative shape-glyphs are retired; colour does the
+   work and the visible LABEL satisfies WCAG 1.4.1 (never colour-alone). The dot
+   colours clear >=3:1 as non-text graphics. Any compact spot showing a bare dot
+   (e.g. the sidebar) gives it an accessible name (aria-label/title) AND a
+   labelled version exists nearby. ---- */
+.live{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary);font-weight:500}
+.live .g{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none;background:var(--text-muted)}
+.live.running .g{background:var(--positive)}
+/* idle + unknown share the neutral text-muted dot (>=3:1 on card); the two
+   states stay distinct by their WORD ("not running" vs "unknown"), never by the
+   dot alone — colour does not separate them, so no colour-discrimination burden. */
+.live.idle .g{background:var(--text-muted)}
+.live.unknown .g{background:var(--text-muted)}
+
+.main{overflow:auto}
+.viewhead{padding:24px 24px 6px}
+.viewtitle{font-weight:600;font-size:22px;letter-spacing:-.02em;color:var(--text)}
+.viewsub{color:var(--text-secondary);font-size:13px;margin-top:4px}
+
+/* ---- toolbar (<=5 controls) [CL-04] — neutral ---- */
+.toolbar{display:flex;gap:10px;align-items:center;padding:18px 24px;flex-wrap:wrap}
+.search{flex:1;min-width:240px;display:flex;align-items:center;gap:9px;background:var(--bg-card);border:1px solid var(--input);border-radius:var(--radius);padding:10px 12px}
+.search:focus-within{border-color:var(--ring);box-shadow:0 0 0 2px color-mix(in srgb,var(--ring) 22%,transparent)}
+.search svg{width:15px;height:15px;color:var(--text-muted);flex:none}
+.search input{border:0;outline:0;flex:1;font-family:var(--font);font-size:13px;background:transparent;color:var(--text)}
+.search input::placeholder{color:var(--text-muted)}
+.search .hint{color:var(--text-muted);font-size:11px;white-space:nowrap}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-card);font-size:12px;font-weight:500;color:var(--text-secondary);font-family:var(--font)}
+.chip svg{width:13px;height:13px}
+.chip:hover{background:var(--bg-muted)}
+.chip.on{background:var(--bg-muted);border-color:var(--input);color:var(--text)}
+
+/* ============================================================================
+   STAGE BOARD — neutral columns; roomy cards; columns SCROLL.
+   stages read by label + icon + position. Only the CURRENT column takes a
+   single teal hairline; only the OPEN card takes the teal edge.
+   ============================================================================ */
+.board{display:grid;grid-template-columns:repeat(6,minmax(180px,1fr));gap:16px;padding:4px 24px 30px;align-items:start}
+@media (max-width:1100px){.board{grid-template-columns:repeat(3,minmax(200px,1fr))}}
+@media (max-width:680px){.board{grid-template-columns:repeat(2,minmax(160px,1fr))}}
+.col{background:var(--bg-muted);border:1px solid var(--border-light);border-radius:var(--radius);
+     border-top:2px solid var(--border);display:flex;flex-direction:column;max-height:560px}
+.col.current{border-top-color:var(--accent)}
+.colhead{display:flex;align-items:center;gap:8px;padding:14px 14px;border-bottom:1px solid var(--border)}
+/* MOBBIN-GROUNDED (GitHub Projects pattern, _mobbin-context.md §Board): each
+   stage column header carries its colour as a small DOT + the stage name + a
+   count. The dot is the ONLY colour on an otherwise-neutral board — it answers
+   "just use colours" for stages without painting the columns or cards. A per-
+   stage hue here is decorative reinforcement: the stage is also carried by the
+   column's left-to-right POSITION + its name, so colour is never the sole cue
+   (WCAG 1.4.1). Each dot clears >=3:1 on the muted column. */
+.colhead .sdot{width:10px;height:10px;border-radius:50%;flex:none;background:var(--text-muted)}
+.colhead.s-recon .sdot{background:var(--stage-recon)}
+.colhead.s-specify .sdot{background:var(--stage-specify)}
+.colhead.s-design .sdot{background:var(--stage-design)}
+.colhead.s-implement .sdot{background:var(--stage-implement)}
+.colhead.s-review .sdot{background:var(--stage-review)}
+.colhead.s-ship .sdot{background:var(--stage-ship)}
+.colname{font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;flex:1;color:var(--text-secondary)}
+.colcount{font-size:11px;color:var(--text-muted);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--pill);padding:1px 8px;font-weight:500}
+/* the list scrolls within the column rather than cramming everything in view */
+.collist{padding:12px;display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+.col-empty{padding:20px 12px;font-size:12px;color:var(--text-muted);text-align:center}
+/* roomy card — 16px padding, generous rhythm */
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.card:hover{border-color:var(--input)}
+.card.is-open{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.card .handle{font-family:var(--mono);font-size:11px;color:var(--text-muted)}
+.card .intent{font-size:13px;font-weight:500;margin:8px 0 14px;line-height:1.45;color:var(--text)}
+.cardfoot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+/* needs-attention — SIMPLIFIED (sixth pass): tint bg + matching border + a small
+   amber DOT (>=3:1, the derived --attn-icon) + a worded DARK label. The decorative
+   shape-glyphs (clock / cross) are retired; the worded reason carries the meaning. */
+.attn-flag{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:500;color:var(--text-secondary);background:var(--bg-warning);border:1px solid var(--bg-warning-border);border-radius:var(--pill);padding:3px 9px}
+.attn-flag .d{width:7px;height:7px;border-radius:50%;background:var(--attn-icon);flex:none}
+
+/* skeleton (loading) */
+.sk{background:linear-gradient(90deg,var(--skel-a) 25%,var(--skel-b) 37%,var(--skel-a) 63%);background-size:400% 100%;animation:shimmer 1.4s ease infinite;border-radius:var(--radius)}
+@keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+.sk-card{height:86px}
+.sk-line{height:9px;margin:8px 0}
+
+/* empty + error states */
+.state{display:flex;flex-direction:column;align-items:center;text-align:center;gap:13px;padding:56px 24px;color:var(--text-muted)}
+.state .ic{width:32px;height:32px;color:var(--border);stroke-width:1.25}
+.state h3{font-weight:600;font-size:18px;color:var(--text)}
+.state p{font-size:13px;max-width:430px;line-height:1.7;color:var(--text-secondary)}
+.state code{font-family:var(--mono);font-size:12px;background:var(--bg-muted);border:1px solid var(--border);border-radius:var(--radius);padding:2px 7px;color:var(--text)}
+.btn{display:inline-flex;align-items:center;gap:7px;border-radius:var(--radius);font-weight:500;font-size:13px;border:1px solid transparent;padding:11px 18px;font-family:var(--font)}
+.btn-primary{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
+.btn-primary:hover{filter:brightness(.94)}
+.btn-outline{background:var(--bg-card);color:var(--text);border-color:var(--border)}
+.btn-outline:hover{background:var(--bg-muted)}
+.btn svg{width:14px;height:14px}
+.state.error .ic{color:var(--destructive)}
+/* error banner — tint + border + coloured ICON + dark text */
+.errbar{display:flex;gap:10px;align-items:flex-start;background:var(--bg-destructive);border:1px solid var(--bg-destructive-border);border-radius:var(--radius);padding:12px 14px;font-size:13px;color:var(--text);margin:0 24px 16px}
+.errbar svg{width:16px;height:16px;flex:none;margin-top:1px;color:var(--destructive)}
+.errbar b{color:var(--text)}
+
+/* ============================================================================
+   THREAD VIEW
+   ============================================================================ */
+.thread{display:grid;grid-template-columns:1.2fr .8fr;height:100%}
+.threadmain{display:flex;flex-direction:column;border-right:1px solid var(--border);min-width:0}
+.threadhead{padding:22px 24px 18px;border-bottom:1px solid var(--border)}
+.threadhead .handle{font-family:var(--mono);font-size:11px;color:var(--text-muted)}
+.threadhead h2{font-weight:600;font-size:20px;margin:6px 0 20px;letter-spacing:-.02em;color:var(--text)}
+
+/* stage track — current marked by size + fill + the single teal dot + label */
+.track{display:flex;align-items:flex-start;margin-bottom:20px}
+.step{flex:1;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);position:relative;padding-top:22px;font-weight:500}
+.step::before{content:"";position:absolute;top:3px;left:50%;width:10px;height:10px;border-radius:50%;background:var(--input);transform:translateX(-50%);z-index:2;border:2px solid var(--bg)}
+.step::after{content:"";position:absolute;top:8px;left:50%;width:100%;height:1px;background:var(--border);z-index:1}
+.step:last-child::after{display:none}
+/* done = neutral filled dot + check glyph + darker label (reads by glyph, no colour needed) */
+.step.done{color:var(--text-secondary)}
+.step.done::before{background:var(--text-secondary)}
+.step.done::after{background:var(--input)}
+.step.done .glyph{position:absolute;top:1px;left:50%;transform:translateX(-50%);z-index:3;color:var(--bg-card);width:8px;height:8px;stroke-width:3}
+/* current = the single teal touch on this view */
+.step.current{color:var(--accent);font-weight:600}
+.step.current::before{background:var(--accent);width:13px;height:13px;top:2px;box-shadow:0 0 0 3px var(--bg-accent)}
+.step.current .nowtag{display:block;font-size:8px;color:var(--accent);font-weight:600;margin-top:3px}
+
+/* status read-out — labelled AI, honest confidence [AI-07] — neutral chrome */
+.status{background:var(--bg-muted);border:1px solid var(--border-light);border-radius:var(--radius);padding:15px 16px}
+.status .lbl{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em}
+.status .lbl svg{width:12px;height:12px}
+.status p{font-size:13px;line-height:1.6;color:var(--text)}
+.status .prov{margin-top:10px;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+/* confidence — tint + border + coloured ICON + dark label */
+.conf{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:500;border-radius:var(--pill);padding:2px 9px;color:var(--text-secondary)}
+.conf svg{width:10px;height:10px;flex:none}
+.conf.high{background:var(--bg-positive);border:1px solid var(--bg-positive-border)}
+.conf.high svg{color:var(--positive)}
+.conf.medium{background:var(--bg-warning);border:1px solid var(--bg-warning-border)}
+.conf.medium svg{color:var(--attn-icon)}
+
+/* conversation — NEUTRAL bubbles. user = muted surface + subtle border, right;
+   agent = plain card, left. Distinct by alignment + neutral surface, NOT brand. */
+.convo{flex:1;overflow:auto;padding:22px 24px;display:flex;flex-direction:column;gap:16px}
+.msg{max-width:86%}
+.msg.user{align-self:flex-end}
+.who{font-size:10px;color:var(--text-muted);margin:0 4px 5px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.msg.user .who{text-align:right}
+.bubble{padding:12px 15px;border-radius:10px;font-size:13px;line-height:1.6}
+.msg.user .bubble{background:var(--bg-muted);border:1px solid var(--border);color:var(--text);border-bottom-right-radius:3px}
+.msg.agent .bubble{background:var(--bg-card);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:3px}
+.streaming .bubble{border-color:var(--input)}
+/* the streaming caret is the one tiny teal pulse — "the agent is alive right now" */
+.caret{display:inline-block;width:6px;height:14px;background:var(--accent);vertical-align:text-bottom;margin-left:2px;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+.sysnote{align-self:center;display:inline-flex;align-items:center;gap:7px;font-size:11px;color:var(--text-muted);background:var(--bg-muted);border:1px solid var(--border);border-radius:var(--pill);padding:5px 13px}
+.sysnote svg{width:12px;height:12px}
+
+/* ============================================================================
+   THREAD UPGRADE (seventh pass) — Mobbin-grounded on Replit Agent / Lovable /
+   v0 / Gemini (_mobbin-context.md §Agent thread). The conversation now SHOWS
+   THE WORK (agentic AI-01), not just chat:
+     • INLINE TOOL-ACTION LOG LINES interleaved with the bubbles — quiet, mono,
+       secondary-text, visually distinct from chat (a verb + the thing touched).
+     • CHECKPOINT / ROLLBACK cards — a periodic "Checkpoint — {plain-English}"
+       with a "Roll back to here" affordance (the founder's checkpoint-as-
+       lineage idea; the read-time status lives here).
+     • A "Paused — waiting for you" state when the agent needs the founder.
+   Visuals stay ours (fragments' tokens); only the STRUCTURE transfers (UXD-15).
+   ============================================================================ */
+
+/* inline tool-action log line — the work, shown. mono, secondary, a leading
+   verb-icon; deliberately NOT a bubble so it reads as "the agent did a thing". */
+.toolline{display:flex;align-items:flex-start;gap:9px;padding:2px 4px;font-family:var(--mono);font-size:11.5px;color:var(--text-secondary);line-height:1.5}
+.toolline .tk{width:14px;height:14px;flex:none;color:var(--text-muted);margin-top:2px}
+.toolline .tk svg{width:14px;height:14px}
+.toolline .tt{min-width:0}
+.toolline .verb{color:var(--text-muted);font-weight:500}
+.toolline .obj{color:var(--text)}
+.toolline .res{display:inline-flex;align-items:center;gap:4px;margin-left:6px;font-size:10.5px;color:var(--text-secondary)}
+.toolline .res .d{width:7px;height:7px;border-radius:50%;background:var(--positive);flex:none}
+.toolgroup{display:flex;flex-direction:column;gap:4px;padding:4px 0;border-left:2px solid var(--border-light);margin-left:6px;padding-left:12px}
+
+/* checkpoint / rollback card — the lineage marker in the stream */
+.checkpoint{align-self:stretch;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);display:flex;align-items:center;gap:12px;padding:12px 14px}
+.checkpoint .ck{width:26px;height:26px;border-radius:50%;flex:none;display:inline-flex;align-items:center;justify-content:center;background:var(--bg-accent);border:1px solid var(--bg-accent-border);color:var(--accent)}
+.checkpoint .ck svg{width:14px;height:14px}
+.checkpoint .cbody{flex:1;min-width:0}
+.checkpoint .cbody .ct{font-size:12px;font-weight:600;color:var(--text)}
+.checkpoint .cbody .cm{font-size:11px;color:var(--text-muted);margin-top:2px}
+.checkpoint .rollback{display:inline-flex;align-items:center;gap:5px;flex:none;border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius);padding:7px 11px;font-size:11px;font-weight:500;color:var(--text);font-family:var(--font)}
+.checkpoint .rollback:hover{background:var(--bg-muted)}
+.checkpoint .rollback svg{width:12px;height:12px}
+
+/* "Paused — waiting for you" — a calm, clearly-different run state (AI-03) */
+.pausednote{align-self:stretch;display:flex;align-items:center;gap:10px;background:var(--bg-warning);border:1px solid var(--bg-warning-border);border-radius:var(--radius);padding:11px 14px;font-size:12px;color:var(--text)}
+.pausednote .pd{width:9px;height:9px;border-radius:50%;background:var(--attn-icon);flex:none}
+.pausednote svg{width:15px;height:15px;flex:none;color:var(--attn-icon)}
+.pausednote b{font-weight:600}
+.runbar.paused{background:var(--bg-warning);border-top-color:var(--bg-warning-border)}
+.runbar.paused .lbl{color:var(--text)}
+.runbar .resume{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--primary);background:var(--primary);color:var(--primary-fg);border-radius:var(--radius);padding:7px 14px;font-size:11px;font-weight:600;font-family:var(--font)}
+.runbar .resume:hover{filter:brightness(.94)}
+.runbar .resume svg{width:12px;height:12px}
+
+/* [AI-03] run-control strip: start/pause/stop — neutral */
+.runbar{display:flex;align-items:center;gap:10px;padding:11px 24px;border-top:1px solid var(--border-light);background:var(--bg-muted)}
+.runbar .lbl{font-size:11px;color:var(--text-muted);font-weight:500;display:flex;align-items:center;gap:7px;flex:1}
+.runbar .lbl svg{width:14px;height:14px}
+.iconbtn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius);padding:7px 12px;font-size:11px;font-weight:500;color:var(--text);font-family:var(--font)}
+.iconbtn:hover{background:var(--bg-muted)}
+.iconbtn svg{width:12px;height:12px}
+.iconbtn.stop{color:var(--destructive);border-color:var(--bg-destructive-border)}
+.iconbtn.stop:hover{background:var(--bg-destructive)}
+
+/* [AI-03] consent gate — neutral card; the go-ahead is the primary (blue) action */
+.gate{margin:0 24px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card)}
+.gate .ghead{display:flex;align-items:center;gap:8px;padding:13px 16px;background:var(--bg-muted);border-bottom:1px solid var(--border);font-size:12px;font-weight:600;color:var(--text)}
+.gate .ghead svg{width:14px;height:14px;color:var(--text-muted)}
+.gate .gbody{padding:15px 16px;font-size:13px;line-height:1.6;color:var(--text)}
+.gate .gbody .what{font-weight:600;margin-bottom:5px}
+.gate .gbody .files{font-family:var(--mono);font-size:11px;color:var(--text-muted);margin-top:8px}
+.gate .gactions{display:flex;gap:9px;padding:0 16px 15px}
+.gate .gactions .btn{padding:10px 18px;font-size:12px}
+
+/* composer dock — [AI-02] chips + free text + slash hint — Send is the primary (blue) action */
+.composer-wrap{border-top:1px solid var(--border);background:var(--bg-card)}
+.chips{display:flex;gap:8px;padding:13px 16px 0;flex-wrap:wrap}
+.sugchip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:var(--text-secondary);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:7px 12px;font-family:var(--font)}
+.sugchip:hover{border-color:var(--accent);color:var(--accent)}
+.sugchip svg{width:11px;height:11px}
+.composer{padding:13px 16px 14px;display:flex;gap:10px;align-items:flex-end}
+.composer .field{flex:1}
+.composer textarea{width:100%;resize:none;border:1px solid var(--input);border-radius:var(--radius);padding:12px 13px;font-family:var(--font);font-size:13px;min-height:44px;outline:0;color:var(--text);background:var(--bg-card)}
+.composer textarea:focus{border-color:var(--ring);box-shadow:0 0 0 2px color-mix(in srgb,var(--ring) 22%,transparent)}
+.composer .slashhint{font-size:11px;color:var(--text-muted);margin-top:7px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.composer .slashhint kbd{font-family:var(--mono);font-size:10px;background:var(--bg-muted);border:1px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--text)}
+.send{background:var(--primary);color:var(--primary-fg);border:0;border-radius:var(--radius);padding:12px 22px;font-weight:600;font-size:13px;font-family:var(--font);min-height:44px}
+.send:hover{filter:brightness(.94)}
+.composer.busy .send{background:var(--bg-muted);color:var(--text-muted);cursor:not-allowed}
+.composer.busy textarea{background:var(--bg-muted)}
+.busynote{font-size:11px;color:var(--text-muted);padding:0 16px 13px;display:flex;align-items:center;gap:6px}
+.busynote svg{width:12px;height:12px}
+
+/* right rail — ONE section at a time [CL-02]; active tab underline is teal */
+.rail{display:flex;flex-direction:column;min-width:0;overflow:hidden;background:var(--bg)}
+.railtabs{display:flex;gap:2px;padding:14px 16px 0;border-bottom:1px solid var(--border)}
+.railtab{display:inline-flex;align-items:center;gap:6px;padding:10px 13px;font-size:12px;font-weight:500;color:var(--text-muted);border:0;border-bottom:2px solid transparent;background:none;font-family:var(--font)}
+.railtab svg{width:13px;height:13px}
+.railtab:hover{color:var(--text)}
+.railtab.active{color:var(--text);border-bottom-color:var(--accent)}
+.railbody{padding:18px;overflow:auto;flex:1}
+.bgroup{margin-bottom:22px}
+.bgroup h5{display:flex;align-items:center;gap:6px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px;font-weight:600}
+.bgroup h5 svg{width:12px;height:12px}
+.bitem{border:1px solid var(--border);border-radius:var(--radius);padding:12px 13px;margin-bottom:9px;background:var(--bg-card)}
+.bitem:hover{border-color:var(--input)}
+.bitem .bt{font-size:13px;font-weight:500;line-height:1.4;color:var(--text)}
+.bitem .bk{font-family:var(--mono);font-size:10px;color:var(--text-muted);margin-top:4px}
+
+/* file preview */
+.previewbar{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--border);border-bottom:0;border-radius:var(--radius) var(--radius) 0 0;padding:10px 12px;background:var(--bg-muted)}
+.previewbar .fn{font-family:var(--mono);font-size:12px;display:flex;align-items:center;gap:7px;color:var(--text)}
+.previewbar .fn svg{width:13px;height:13px;color:var(--text-muted)}
+.toggle{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.toggle button{padding:6px 12px;font-size:11px;font-weight:500;color:var(--text-muted);background:var(--bg-card);border:0;font-family:var(--font)}
+.toggle button.on{background:var(--text);color:var(--bg-card)}
+.rendered{border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);padding:22px;background:var(--bg-card)}
+.rendered h1{font-weight:600;font-size:20px;margin-bottom:10px;letter-spacing:-.02em;color:var(--text)}
+.rendered h2{font-size:15px;font-weight:600;margin:16px 0 7px;color:var(--text)}
+.rendered p{font-size:13px;color:var(--text-secondary);margin-bottom:9px;line-height:1.7}
+.rendered ul{margin:0 0 9px 18px;font-size:13px;line-height:1.7;color:var(--text-secondary)}
+.raw{border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);padding:16px;background:var(--bg-muted);font-family:var(--mono);font-size:12px;line-height:1.65;color:var(--text);white-space:pre-wrap}
+
+/* ============================================================================
+   FILE EXPLORER (sixth pass) — a real worktree browser, grounded in the
+   VS Code / Cursor / GitHub source-control conventions, worded for the founder:
+     • a FULL FILE TREE (folders expand/collapse) — VS Code Explorer pattern
+     • a "Changed files" view (changed since the change started) with founder-
+       legible markers: new / edited / removed (the M/A/D convention reworded)
+       + a count + a tree<->list toggle — VS Code Source Control pattern
+     • a PREVIEW PANE: docs rendered (rendered<->raw kept); code read-only mono;
+       a changed file shows a DIFF — additions/removals legible WITHOUT colour
+       (a +/- gutter marker, not red/green alone) — GitHub diff convention.
+   Calm fragment style; light + dark from the same markup.
+   ============================================================================ */
+.explorer{display:grid;grid-template-columns:280px 1fr;height:100%;min-height:0}
+.exptree{border-right:1px solid var(--border);display:flex;flex-direction:column;min-width:0;background:var(--bg-card)}
+.exphead{display:flex;align-items:center;gap:8px;padding:14px 14px 12px;border-bottom:1px solid var(--border)}
+.exphead .et{font-size:12px;font-weight:600;color:var(--text);flex:1}
+.exphead svg{width:14px;height:14px;color:var(--text-muted)}
+/* the All files <-> Changed only segmented toggle (<=2 options) */
+.expmode{display:flex;gap:2px;padding:12px 12px 0}
+.expmode button{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 10px;font-size:11px;font-weight:500;color:var(--text-muted);background:var(--bg-muted);border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font)}
+.expmode button .ct{font-family:var(--mono);font-size:10px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--pill);padding:0 6px;color:var(--text-secondary)}
+.expmode button.on{background:var(--bg-card);color:var(--text);border-color:var(--input)}
+.expmode button svg{width:12px;height:12px}
+/* the changed-view sub-row: tree <-> list, and the count summary */
+.expsub{display:flex;align-items:center;gap:8px;padding:10px 12px 4px;font-size:10px;color:var(--text-muted)}
+.expsub .sum{flex:1;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.viewtog{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.viewtog button{padding:4px 9px;font-size:10px;font-weight:500;color:var(--text-muted);background:var(--bg-muted);border:0;font-family:var(--font);display:inline-flex;align-items:center;gap:4px}
+.viewtog button svg{width:11px;height:11px}
+.viewtog button.on{background:var(--text);color:var(--bg-card)}
+/* the tree body */
+.treebody{overflow:auto;flex:1;padding:8px 6px 12px}
+.tnode{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:var(--radius);font-size:12px;color:var(--text-secondary);border:1px solid transparent;white-space:nowrap}
+.tnode:hover{background:var(--bg-muted);color:var(--text)}
+.tnode.sel{background:var(--bg-accent);border-color:var(--bg-accent-border);color:var(--text);font-weight:500}
+.tnode .tw{width:12px;height:12px;flex:none;color:var(--text-muted);display:inline-flex;align-items:center;justify-content:center}
+.tnode .tw svg{width:12px;height:12px}
+.tnode .ti{width:14px;height:14px;flex:none;color:var(--text-muted)}
+.tnode.folder .ti{color:var(--accent)}
+.tnode .tn{flex:1;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono);font-size:11.5px}
+.tchildren{margin-left:14px;border-left:1px solid var(--border-light);padding-left:2px}
+/* changed-file status marker — a LETTER chip + a worded label; colour is a
+   secondary cue, never the sole one (the letter A/E/R + the word carry it). */
+.cstat{display:inline-flex;align-items:center;gap:4px;flex:none;font-size:9px;font-weight:600;letter-spacing:.02em}
+.cstat .mk{width:15px;height:15px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;font-weight:700;border:1px solid}
+.cstat.new .mk{background:var(--bg-positive);border-color:var(--bg-positive-border);color:var(--positive)}
+.cstat.edited .mk{background:var(--bg-warning);border-color:var(--bg-warning-border);color:var(--attn-icon)}
+.cstat.removed .mk{background:var(--bg-destructive);border-color:var(--bg-destructive-border);color:var(--destructive)}
+.cstat .cw{color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em}
+/* changed-view LIST layout — flat rows, path + status + word */
+.clist{padding:6px 8px 12px;overflow:auto;flex:1}
+.crow{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:var(--radius);border:1px solid transparent}
+.crow:hover{background:var(--bg-muted)}
+.crow.sel{background:var(--bg-accent);border-color:var(--bg-accent-border)}
+.crow .cp{flex:1;min-width:0;font-family:var(--mono);font-size:11.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crow .cp .dir{color:var(--text-muted)}
+/* the PREVIEW PANE in the explorer */
+.exppane{display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+.exppane .previewbar{border-radius:0;border-left:0;border-right:0;border-top:0}
+.exppanebody{overflow:auto;flex:1;padding:0}
+.exppanebody .rendered,.exppanebody .raw{border:0;border-radius:0;min-height:100%}
+.codeview{border:0;border-radius:0;padding:16px 0;background:var(--bg-card);font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--text);min-height:100%}
+.codeview .ln{display:flex}
+.codeview .ln .no{flex:none;width:42px;text-align:right;padding-right:14px;color:var(--text-muted);user-select:none}
+.codeview .ln .tx{white-space:pre-wrap;padding-right:16px}
+/* DIFF view — +/- gutter glyph carries add/remove WITHOUT colour; the tint is a
+   redundant secondary cue (GitHub convention, colour-independent). */
+.diffmeta{display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(--bg-muted);border-bottom:1px solid var(--border);font-size:11px;color:var(--text-secondary)}
+.diffmeta .add,.diffmeta .rm{display:inline-flex;align-items:center;gap:5px;font-weight:600}
+.diffmeta .s{font-family:var(--mono)}
+.diff{font-family:var(--mono);font-size:12px;line-height:1.7;background:var(--bg-card);min-height:100%}
+.diff .dl{display:flex;border-left:3px solid transparent}
+.diff .dl .sign{flex:none;width:26px;text-align:center;color:var(--text-muted);user-select:none;font-weight:700}
+.diff .dl .dx{white-space:pre-wrap;padding-right:16px;color:var(--text)}
+.diff .dl.add{background:var(--bg-positive);border-left-color:var(--positive)}
+.diff .dl.add .sign{color:var(--positive)}
+.diff .dl.rm{background:var(--bg-destructive);border-left-color:var(--destructive)}
+.diff .dl.rm .sign{color:var(--destructive)}
+.diff .dl.ctx .sign{color:var(--text-muted)}
+.diff .hunk{padding:5px 12px;background:var(--bg-muted);color:var(--text-muted);font-size:11px;border-top:1px solid var(--border-light);border-bottom:1px solid var(--border-light)}
+/* explorer empty state (no file picked) */
+.exp-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;height:100%;color:var(--text-muted);padding:40px}
+.exp-empty svg{width:30px;height:30px;color:var(--border);stroke-width:1.25}
+.exp-empty p{font-size:12px;max-width:320px;line-height:1.6;color:var(--text-secondary)}
+
+/* sunset spinner — the mark's ring in motion; the ONE sanctioned sunset moment */
+.spinner{width:16px;height:16px;display:block;flex:none}
+.spinner .track{opacity:.18}
+.spinner .sweep{transform-origin:256px 256px;animation:sulis-spin .9s linear infinite}
+@keyframes sulis-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.spinner .sweep{animation:none}}
+</style>
+</head>
+<body>
+
+<div class="dochead">
+  <h1>Sulis app — visual contract</h1>
+  <p>The Sulis cockpit, redrawn on your own experience fragments — the same calm
+  rhythm as <strong>the-morning-calm</strong>, with the RAG status pattern from
+  <strong>the-org-heatmap</strong>. Warm paper, stone and near-black do the work,
+  in Inter with room to breathe. The brand is worn lightly: the real sunset mark
+  sits top-left as the logo, and when an accent is needed the surface leans on the
+  <strong>bluer palette</strong> — blue for the main action, a single teal touch
+  for "this is the live thing." The gold is kept for the logo only, not splashed
+  across the screen. Your own messages sit in a quiet neutral bubble, not a
+  coloured one. The same surface is shown in <strong>light</strong> and
+  <strong>dark</strong>. The parts make one experience: the board you land on —
+  each stage column now carrying its colour as a <strong>small dot in the header</strong>;
+  a change opened as a thread that <strong>shows the agent's work</strong> (the files
+  it edits, the tests it runs) interleaved with the chat, with <strong>checkpoints</strong>
+  you can roll back to and a clear <strong>paused state</strong> when it needs you; a
+  right-hand panel that flips between <strong>Preview, Files and Brain</strong>, one at a
+  time; the go-ahead step before anything consequential; a full <strong>Files explorer</strong>
+  (browse the whole change's folders, or flip to just what changed — each file marked
+  new, edited or removed — and see the exact diff), search, and the three states every
+  screen must have (loading, empty, something-went-wrong). State markers are now simply a
+  <strong>coloured dot plus a word</strong> — no busy shapes. The layout structure is
+  grounded in well-shipped tools (GitHub Projects, Replit Agent, Lovable, VS Code); every
+  colour and font stays yours.</p>
+  <div class="markrow">
+    <svg viewBox="0 0 512 512" role="img" aria-label="Sulis mark"><defs><linearGradient id="sg-doc" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-doc"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-doc)" mask="url(#mm-doc)"/></svg>
+    <span>The sunset mark stays — this is where the brand lives. Everything else leans blue/teal.</span>
+  </div>
+</div>
+
+<!-- ============================================================ LIGHT ============================================================ -->
+<div class="themetag">Light theme</div>
+
+<!-- ===================== PANEL 1 — THE BOARD (light) ===================== -->
+<div class="section-label">The board you land on <small>every change in flight, in the stage it has reached — recon to ship, left to right. Columns scroll; cards have room.</small></div>
+<div class="scope" data-theme="light">
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brandrow">
+      <svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-l1" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-l1"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-l1)" mask="url(#mm-l1)"/></svg>
+      <div class="brandname">Sulis</div>
+    </div>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      <span class="lname">Board</span>
+    </a>
+    <h4>In flight</h4>
+    <a class="navitem" tabindex="0" href="#"><span class="live running" role="img" aria-label="running" title="running"><span class="g" aria-hidden="true"></span></span><span class="lname">add-checkout-flow</span></a>
+    <a class="navitem" tabindex="0" href="#"><span class="live idle" role="img" aria-label="not running" title="not running"><span class="g" aria-hidden="true"></span></span><span class="lname">fix-login-redirect</span></a>
+    <a class="navitem" tabindex="0" href="#"><span class="live unknown" role="img" aria-label="unknown" title="unknown"><span class="g" aria-hidden="true"></span></span><span class="lname">map-billing-module</span></a>
+    <h4>Shipped</h4>
+    <a class="navitem" tabindex="0" href="#" style="opacity:.55"><span class="lname">cockpit-contract-preview</span></a>
+  </aside>
+
+  <main class="main">
+    <div class="viewhead">
+      <div class="viewtitle">Your work, at a glance</div>
+      <div class="viewsub">Every change in flight, in the stage it has reached. Pick one to open it.</div>
+    </div>
+
+    <div class="toolbar" role="search">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" aria-label="Search inside your changes" placeholder="Search inside your changes — conversations and created items, not just titles" />
+        <span class="hint">searches content</span>
+      </div>
+      <button class="chip on" aria-pressed="true">All stages</button>
+      <button class="chip" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>Stage</button>
+      <button class="chip" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.29 3.86 1.82 18a1 1 0 0 0 .86 1.5h18.64a1 1 0 0 0 .86-1.5L13.71 3.86a1 1 0 0 0-1.72 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Needs attention</button>
+    </div>
+
+    <div class="board">
+      <div class="col">
+        <div class="colhead s-recon"><span class="sdot" aria-hidden="true"></span><span class="colname">Recon</span><span class="colcount">1</span></div>
+        <div class="collist">
+          <div class="card" tabindex="0"><div class="handle">map-billing-module</div><div class="intent">Map the billing module before the rework</div><div class="cardfoot"><span class="live unknown" role="img" aria-label="unknown" title="unknown"><span class="g" aria-hidden="true"></span>unknown</span></div></div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="colhead s-specify"><span class="sdot" aria-hidden="true"></span><span class="colname">Specify</span><span class="colcount">1</span></div>
+        <div class="collist">
+          <div class="card" tabindex="0"><div class="handle">password-reset-email</div><div class="intent">Password reset by email link</div><div class="cardfoot"><span class="live idle" role="img" aria-label="not running" title="not running"><span class="g" aria-hidden="true"></span>not running</span><span class="attn-flag"><span class="d" aria-hidden="true"></span>waiting on you</span></div></div>
+        </div>
+      </div>
+      <div class="col current">
+        <div class="colhead s-design"><span class="sdot" aria-hidden="true"></span><span class="colname">Design</span><span class="colcount">1</span></div>
+        <div class="collist">
+          <div class="card is-open" tabindex="0"><div class="handle">drive-a-change</div><div class="intent">Drive a change from the app (this one)</div><div class="cardfoot"><span class="live running" role="img" aria-label="running" title="running"><span class="g" aria-hidden="true"></span>running</span></div></div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="colhead s-implement"><span class="sdot" aria-hidden="true"></span><span class="colname">Implement</span><span class="colcount">2</span></div>
+        <div class="collist">
+          <div class="card" tabindex="0"><div class="handle">add-checkout-flow</div><div class="intent">Add checkout flow with saved cards</div><div class="cardfoot"><span class="live running" role="img" aria-label="running" title="running"><span class="g" aria-hidden="true"></span>running</span></div></div>
+          <div class="card" tabindex="0"><div class="handle">fix-login-redirect</div><div class="intent">Fix login redirect loop</div><div class="cardfoot"><span class="live idle" role="img" aria-label="not running" title="not running"><span class="g" aria-hidden="true"></span>not running</span><span class="attn-flag"><span class="d" aria-hidden="true"></span>stopped mid-reply</span></div></div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="colhead s-review"><span class="sdot" aria-hidden="true"></span><span class="colname">Review</span><span class="colcount">0</span></div>
+        <div class="collist"><div class="col-empty">Nothing here yet</div></div>
+      </div>
+      <div class="col">
+        <div class="colhead s-ship"><span class="sdot" aria-hidden="true"></span><span class="colname">Ship</span><span class="colcount">1</span></div>
+        <div class="collist">
+          <div class="card" tabindex="0"><div class="handle">weekly-digest-email</div><div class="intent">Weekly digest email</div><div class="cardfoot"><span class="live idle" role="img" aria-label="not running" title="not running"><span class="g" aria-hidden="true"></span>not running</span></div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ===================== PANEL 2 — BOARD LOADING (light) ===================== -->
+<div class="section-label">State 1 of 3 — Loading <small>shown briefly on first open; the same skeleton everywhere so no corner feels half-built</small></div>
+<div class="scope" data-theme="light">
+<div class="shell" style="height:340px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-l2" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-l2"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-l2)" mask="url(#mm-l2)"/></svg><div class="brandname">Sulis</div></div>
+    <div class="sk sk-line" style="width:60%"></div><div class="sk sk-line" style="width:80%"></div><div class="sk sk-line" style="width:70%"></div>
+  </aside>
+  <main class="main">
+    <div class="viewhead"><div class="viewtitle">Your work, at a glance</div></div>
+    <div class="board" aria-busy="true" aria-label="Loading changes">
+      <div class="col"><div class="colhead"><span class="colname">Recon</span></div><div class="collist"><div class="sk sk-card"></div></div></div>
+      <div class="col"><div class="colhead"><span class="colname">Specify</span></div><div class="collist"><div class="sk sk-card"></div></div></div>
+      <div class="col"><div class="colhead"><span class="colname">Design</span></div><div class="collist"><div class="sk sk-card"></div><div class="sk sk-card"></div></div></div>
+      <div class="col"><div class="colhead"><span class="colname">Implement</span></div><div class="collist"><div class="sk sk-card"></div></div></div>
+      <div class="col"><div class="colhead"><span class="colname">Review</span></div><div class="collist"></div></div>
+      <div class="col"><div class="colhead"><span class="colname">Ship</span></div><div class="collist"><div class="sk sk-card"></div></div></div>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ===================== PANEL 3 — BOARD EMPTY (light) ===================== -->
+<div class="section-label">State 2 of 3 — Empty <small>no changes in flight yet → how to start one</small></div>
+<div class="scope" data-theme="light">
+<div class="shell" style="height:320px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-l3" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-l3"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-l3)" mask="url(#mm-l3)"/></svg><div class="brandname">Sulis</div></div>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span class="lname">Board</span></a>
+  </aside>
+  <main class="main">
+    <div class="state">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      <h3>No changes in flight</h3>
+      <p>When you start a change, it appears here as a card and moves left-to-right through the stages as the work progresses. Start one from your terminal with <code>sulis change new</code>, then come back — it will be waiting in <b>Recon</b>.</p>
+      <button class="btn btn-outline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>How starting a change works</button>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ===================== PANEL 4 — THREAD + LIVE CHAT (light) ===================== -->
+<div class="section-label">A change, opened — progress, the live conversation, the context rail <small>chat is the one place you can DRIVE; everything else stays read-only. Your messages sit in a neutral bubble.</small></div>
+<div class="scope" data-theme="light">
+<div class="shell" style="height:840px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-l4" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-l4"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-l4)" mask="url(#mm-l4)"/></svg><div class="brandname">Sulis</div></div>
+    <a class="navitem" tabindex="0" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span class="lname">Board</span></a>
+    <h4>In flight</h4>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><span class="live running" role="img" aria-label="running" title="running"><span class="g" aria-hidden="true"></span></span><span class="lname">drive-a-change</span></a>
+    <a class="navitem" tabindex="0" href="#"><span class="live running" role="img" aria-label="running" title="running"><span class="g" aria-hidden="true"></span></span><span class="lname">add-checkout-flow</span></a>
+    <a class="navitem" tabindex="0" href="#"><span class="live idle" role="img" aria-label="not running" title="not running"><span class="g" aria-hidden="true"></span></span><span class="lname">fix-login-redirect</span></a>
+  </aside>
+
+  <div class="main" style="padding:0;overflow:hidden">
+    <div class="thread">
+      <div class="threadmain">
+        <div class="threadhead">
+          <div class="handle">drive-a-change · create</div>
+          <h2>Drive a change from the app</h2>
+          <div class="track" role="img" aria-label="Stage 3 of 6: Design is current; Recon and Specify are done">
+            <div class="step done">Recon<svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="step done">Specify<svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="step current">Design<span class="nowtag">now</span></div>
+            <div class="step">Implement</div>
+            <div class="step">Review</div>
+            <div class="step">Ship</div>
+          </div>
+          <div class="status">
+            <div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>What's happening</div>
+            <p>The design pass is underway. The technical blueprint and both contracts — the data contract and this visual one — are drafted and waiting for your sign-off before building starts.</p>
+            <div class="prov">
+              <span>Read from this change's notes just now</span>
+              <span class="conf high"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>Clear signal</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="convo">
+          <div class="sysnote"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>This change was resumed — picking up from where it left off, with its full memory</div>
+          <div class="msg user"><div class="who">You</div><div class="bubble">Can you make the board land on stage columns, left to right?</div></div>
+          <div class="msg agent"><div class="who">Agent</div><div class="bubble">Yes — the board now reads recon → specify → design → implement → review → ship, with each change as a card in its stage's column. I'll wire it up and run the tests.</div></div>
+          <!-- inline tool-action log: the WORK, shown (AI-01) — quiet mono lines, not chat bubbles -->
+          <div class="toolgroup" role="group" aria-label="Work the agent did">
+            <div class="toolline"><span class="tk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span><span class="tt"><span class="verb">Edited</span> <span class="obj">src/components/board.tsx</span></span></div>
+            <div class="toolline"><span class="tk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span><span class="tt"><span class="verb">Created</span> <span class="obj">src/components/stage-column.tsx</span></span></div>
+            <div class="toolline"><span class="tk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></span><span class="tt"><span class="verb">Ran tests</span><span class="res"><span class="d" aria-hidden="true"></span>28 passed</span></span></div>
+          </div>
+          <div class="msg agent"><div class="who">Agent</div><div class="bubble">Done — the board lands on the six stage columns and the tests are green. Want shipped changes shown there too, or kept in the archive?</div></div>
+          <div class="msg user"><div class="who">You</div><div class="bubble">Keep shipped in the archive. Now add the live chat dock.</div></div>
+          <!-- checkpoint / rollback card: the founder's checkpoint-as-lineage idea — a saved point you can return to -->
+          <div class="checkpoint">
+            <span class="ck" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg></span>
+            <div class="cbody">
+              <div class="ct">Checkpoint — the stage-column board, tested</div>
+              <div class="cm">Saved just now · everything up to here is in place</div>
+            </div>
+            <button class="rollback" aria-label="Roll back to this checkpoint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>Roll back to here</button>
+          </div>
+          <div class="toolgroup" role="group" aria-label="Work the agent is doing">
+            <div class="toolline"><span class="tk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span><span class="tt"><span class="verb">Created</span> <span class="obj">src/components/composer.tsx</span></span></div>
+          </div>
+          <div class="msg agent streaming"><div class="who">Agent</div><div class="bubble">Adding the chat composer as a dock at the bottom of every thread, so sending a message is always one glance from reading the change<span class="caret" aria-hidden="true"></span></div></div>
+        </div>
+
+        <div class="runbar">
+          <span class="lbl"><svg class="spinner" viewBox="0 0 512 512" role="img" aria-label="Agent replying"><defs><linearGradient id="spin-l4" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient></defs><circle class="track" cx="256" cy="256" r="228" fill="none" stroke="url(#spin-l4)" stroke-width="36"/><circle class="sweep" cx="256" cy="256" r="228" fill="none" stroke="url(#spin-l4)" stroke-width="36" stroke-linecap="round" stroke-dasharray="430 1003" pathLength="1433"/></svg>Agent is replying…</span>
+          <button class="iconbtn" aria-label="Pause the agent"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>Pause</button>
+          <button class="iconbtn stop" aria-label="Stop the agent"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>Stop</button>
+        </div>
+
+        <div class="composer-wrap">
+          <div class="chips">
+            <button class="sugchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>Sign off on the design</button>
+            <button class="sugchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>What's left before build?</button>
+            <button class="sugchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Adjust the board layout</button>
+          </div>
+          <div class="composer busy">
+            <div class="field">
+              <textarea aria-label="Message this change's agent" placeholder="Message this change's agent…  —  type / for commands">Now wire the brain view on the right.</textarea>
+              <div class="slashhint"><kbd>/</kbd> for commands — <kbd>/sign-off</kbd> · <kbd>/files</kbd> · <kbd>/status</kbd> &nbsp;·&nbsp; <kbd>Enter</kbd> to send, <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line</div>
+            </div>
+            <button class="send" disabled>Send</button>
+          </div>
+          <div class="busynote"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>One message at a time — you can send again the moment this reply finishes.</div>
+        </div>
+      </div>
+
+      <div class="rail">
+        <!-- Mobbin-grounded artifact panel (Lovable/v0/Gemini): ONE tab active at
+             a time — Preview (rendered doc) · Files (the explorer) · Brain
+             (entities/workflows). Progressive disclosure (CL-02). -->
+        <div class="railtabs" role="tablist" aria-label="Change context">
+          <button class="railtab" role="tab" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>Preview</button>
+          <button class="railtab" role="tab" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Files</button>
+          <button class="railtab active" role="tab" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3 3 3 0 0 0-3 3 3 3 0 0 0 0 6 3 3 0 0 0 3 3 3 3 0 0 0 6 0 3 3 0 0 0 3-3 3 3 0 0 0 0-6 3 3 0 0 0-3-3 3 3 0 0 0-3-3z"/></svg>Brain</button>
+        </div>
+        <div class="railbody" role="tabpanel" aria-label="Brain — what the agent has created">
+          <div class="bgroup">
+            <h5><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Requirements · 6</h5>
+            <div class="bitem" tabindex="0"><div class="bt">Board lists changes in stage columns</div><div class="bk">requirement · FR-01</div></div>
+            <div class="bitem" tabindex="0"><div class="bt">Send a message to a change's agent</div><div class="bk">requirement · FR-16</div></div>
+            <div class="bitem" tabindex="0"><div class="bt">The reply streams back live</div><div class="bk">requirement · FR-17</div></div>
+          </div>
+          <div class="bgroup">
+            <h5><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>Workflows · 6</h5>
+            <div class="bitem" tabindex="0"><div class="bt">Talk to the agent about a change</div><div class="bk">workflow · 6 steps</div></div>
+            <div class="bitem" tabindex="0"><div class="bt">Find a change</div><div class="bk">workflow · 3 steps</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===================== PANEL 5 — CONSENT GATE (light) ===================== -->
+<div class="section-label">When the agent wants to do something consequential — a visible go-ahead <small>your typed message = consent to deliver it; but writing / shipping / starting a process asks first</small></div>
+<div class="scope" data-theme="light">
+<div class="shell" style="height:440px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-l5" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-l5"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-l5)" mask="url(#mm-l5)"/></svg><div class="brandname">Sulis</div></div>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><span class="live running" role="img" aria-label="running" title="running"><span class="g" aria-hidden="true"></span></span><span class="lname">drive-a-change</span></a>
+  </aside>
+  <div class="main" style="padding:20px 0">
+    <div class="convo" style="height:auto">
+      <div class="msg agent"><div class="who">Agent</div><div class="bubble">The visual contract looks right and you've approved it. I'm ready to lock it in and move this change to <b>Implement</b>.</div></div>
+    </div>
+    <div class="gate">
+      <div class="ghead"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 5c0 1.66 4 3 9 3s9-1.34 9-3-4-3-9-3-9 1.34-9 3"/></svg>Needs your go-ahead before it happens</div>
+      <div class="gbody">
+        <div class="what">Lock the visual contract and move this change to Implement</div>
+        This marks the design signed-off and lets building start. It writes to the change's record and updates two files.
+        <div class="files">contracts/visual/sulis-app.html · the change's stage</div>
+      </div>
+      <div class="gactions">
+        <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>Go ahead</button>
+        <button class="btn btn-outline">Not yet</button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===================== PANEL 5a — PAUSED, WAITING FOR YOU (light) ===================== -->
+<div class="section-label">When the agent needs you — a clear "paused, waiting for you" state <small>the agent stops and says why; nothing happens until you reply. Resume is one click. (Mobbin: Replit Agent's paused state.)</small></div>
+<div class="scope" data-theme="light">
+<div class="shell" style="height:470px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-l5a" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-l5a"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-l5a)" mask="url(#mm-l5a)"/></svg><div class="brandname">Sulis</div></div>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><span class="live idle" role="img" aria-label="not running" title="not running"><span class="g" aria-hidden="true"></span></span><span class="lname">drive-a-change</span></a>
+  </aside>
+  <div class="main" style="padding:0;overflow:hidden">
+    <div class="threadmain" style="border-right:0;height:100%">
+      <div class="convo">
+        <div class="msg agent"><div class="who">Agent</div><div class="bubble">Before I create the checkout component I need one decision from you: should saved cards be on by default, or off until the customer opts in?</div></div>
+        <div class="toolgroup" role="group" aria-label="Work the agent did">
+          <div class="toolline"><span class="tk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span><span class="tt"><span class="verb">Drafted</span> <span class="obj">contracts/data/checkout.md</span></span></div>
+        </div>
+        <div class="pausednote">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>
+          <div><b>Paused — waiting for you.</b> The agent has stopped and won't go further until you reply. Nothing has been changed while it waits.</div>
+        </div>
+      </div>
+      <div class="runbar paused">
+        <span class="lbl"><span class="pd" aria-hidden="true"></span>Paused — waiting for your reply</span>
+        <button class="resume"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4"/></svg>Resume</button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===================== PANEL 6 — FILES: RENDERED + RAW (light) ===================== -->
+<div class="section-label">The same change, "Files" section — a document read the way it's meant to look <small>one click flips rendered ↔ raw source; reuses the app's existing renderer</small></div>
+<div class="scope" data-theme="light">
+<div class="shell" style="height:490px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-l6" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-l6"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-l6)" mask="url(#mm-l6)"/></svg><div class="brandname">Sulis</div></div>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><span class="live running" role="img" aria-label="running" title="running"><span class="g" aria-hidden="true"></span></span><span class="lname">drive-a-change</span></a>
+  </aside>
+  <div class="main" style="padding:0;overflow:hidden">
+    <div class="thread">
+      <div class="threadmain">
+        <div class="threadhead"><div class="handle">drive-a-change · create</div><h2 style="margin-bottom:0">The conversation continues here</h2></div>
+        <div class="convo"><div class="msg agent"><div class="who">Agent</div><div class="bubble">Opened the requirements document on the right. Toggle <b>Raw</b> if you want the exact source.</div></div></div>
+      </div>
+      <div class="rail">
+        <div class="railtabs" role="tablist" aria-label="Change context">
+          <button class="railtab active" role="tab" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>Preview</button>
+          <button class="railtab" role="tab" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Files</button>
+          <button class="railtab" role="tab" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3 3 3 0 0 0-3 3 3 3 0 0 0 0 6 3 3 0 0 0 3 3 3 3 0 0 0 6 0 3 3 0 0 0 3-3 3 3 0 0 0 0-6 3 3 0 0 0-3-3 3 3 0 0 0-3-3z"/></svg>Brain</button>
+        </div>
+        <div class="railbody" role="tabpanel" aria-label="Preview — the document rendered">
+          <div class="previewbar">
+            <span class="fn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>SRD.md</span>
+            <span class="toggle" role="group" aria-label="View as"><button class="on" aria-pressed="true">Rendered</button><button aria-pressed="false">Raw</button></span>
+          </div>
+          <div class="rendered">
+            <h1>Drive a change from the app</h1>
+            <p>Today the Sulis app is a read-only window onto your in-flight work. This change turns it into a cockpit you can steer from.</p>
+            <h2>Six things get added</h2>
+            <ul><li>A board you land on</li><li>Plain-English progress inside a change</li><li>The brain, in plain sight</li><li>Rendered previews</li><li>Search and filter</li><li>Two-way chat — the big one</li></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===================== PANEL 6a — FILE EXPLORER: FULL TREE + CODE PREVIEW (light) ===================== -->
+<div class="section-label">The Files explorer — browse the whole change <small>the full folder tree on the left (open and close folders to navigate everything); pick a file to read it on the right. Documents render; code is read-only.</small></div>
+<div class="scope" data-theme="light">
+<div class="shell" style="height:560px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-l6a" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-l6a"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-l6a)" mask="url(#mm-l6a)"/></svg><div class="brandname">Sulis</div></div>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><span class="live running" role="img" aria-label="running" title="running"><span class="g"></span></span><span class="lname">drive-a-change</span></a>
+  </aside>
+  <main class="main" style="padding:0;overflow:hidden">
+    <div class="explorer">
+      <div class="exptree">
+        <div class="exphead">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <span class="et">Files in this change</span>
+        </div>
+        <div class="expmode" role="tablist" aria-label="Which files to show">
+          <button class="on" role="tab" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7l-2-2H5a2 2 0 0 0-2 2z"/></svg>All files</button>
+          <button role="tab" aria-selected="false">Changed files <span class="ct">7</span></button>
+        </div>
+        <div class="treebody" role="tree" aria-label="Change file tree">
+          <div class="tnode folder" role="treeitem" aria-expanded="true" tabindex="0"><span class="tw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7l-2-2H5a2 2 0 0 0-2 2z"/></svg><span class="tn">drive-a-change</span></div>
+          <div class="tchildren">
+            <div class="tnode folder" role="treeitem" aria-expanded="true" tabindex="0"><span class="tw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7l-2-2H5a2 2 0 0 0-2 2z"/></svg><span class="tn">src</span></div>
+            <div class="tchildren">
+              <div class="tnode folder" role="treeitem" aria-expanded="false" tabindex="0"><span class="tw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></span><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7l-2-2H5a2 2 0 0 0-2 2z"/></svg><span class="tn">components</span></div>
+              <div class="tnode sel" role="treeitem" aria-selected="true" tabindex="0"><span class="tw"></span><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="tn">board.tsx</span></div>
+              <div class="tnode" role="treeitem" tabindex="0"><span class="tw"></span><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="tn">thread.tsx</span></div>
+            </div>
+            <div class="tnode folder" role="treeitem" aria-expanded="false" tabindex="0"><span class="tw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></span><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7l-2-2H5a2 2 0 0 0-2 2z"/></svg><span class="tn">.architecture</span></div>
+            <div class="tnode" role="treeitem" tabindex="0"><span class="tw"></span><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="tn">README.md</span></div>
+            <div class="tnode" role="treeitem" tabindex="0"><span class="tw"></span><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="tn">package.json</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="exppane">
+        <div class="previewbar">
+          <span class="fn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>src/components/board.tsx</span>
+          <span style="font-size:11px;color:var(--text-muted)">read-only</span>
+        </div>
+        <div class="exppanebody">
+          <div class="codeview" aria-label="board.tsx, read-only">
+            <div class="ln"><span class="no">1</span><span class="tx">export function Board({ changes }: BoardProps) {</span></div>
+            <div class="ln"><span class="no">2</span><span class="tx">  const stages = useStages();</span></div>
+            <div class="ln"><span class="no">3</span><span class="tx">  return (</span></div>
+            <div class="ln"><span class="no">4</span><span class="tx">    &lt;div className="board"&gt;</span></div>
+            <div class="ln"><span class="no">5</span><span class="tx">      {stages.map((s) =&gt; (</span></div>
+            <div class="ln"><span class="no">6</span><span class="tx">        &lt;StageColumn key={s.id} stage={s} /&gt;</span></div>
+            <div class="ln"><span class="no">7</span><span class="tx">      ))}</span></div>
+            <div class="ln"><span class="no">8</span><span class="tx">    &lt;/div&gt;</span></div>
+            <div class="ln"><span class="no">9</span><span class="tx">  );</span></div>
+            <div class="ln"><span class="no">10</span><span class="tx">}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ===================== PANEL 6b — FILE EXPLORER: CHANGED ONLY + DIFF (light) ===================== -->
+<div class="section-label">The Files explorer — just what changed, with a diff <small>flip to "Changed files" to see only what this change touched since it started — each marked new, edited or removed. Pick one to see exactly what changed.</small></div>
+<div class="scope" data-theme="light">
+<div class="shell" style="height:560px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-l6b" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-l6b"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-l6b)" mask="url(#mm-l6b)"/></svg><div class="brandname">Sulis</div></div>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><span class="live running" role="img" aria-label="running" title="running"><span class="g"></span></span><span class="lname">drive-a-change</span></a>
+  </aside>
+  <main class="main" style="padding:0;overflow:hidden">
+    <div class="explorer">
+      <div class="exptree">
+        <div class="exphead">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <span class="et">Files in this change</span>
+        </div>
+        <div class="expmode" role="tablist" aria-label="Which files to show">
+          <button role="tab" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7l-2-2H5a2 2 0 0 0-2 2z"/></svg>All files</button>
+          <button class="on" role="tab" aria-selected="true">Changed files <span class="ct">7</span></button>
+        </div>
+        <div class="expsub">
+          <span class="sum">7 changed since this change started</span>
+          <span class="viewtog" role="group" aria-label="Show changed files as">
+            <button aria-pressed="false" title="Show as a folder tree"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7l-2-2H5a2 2 0 0 0-2 2z"/></svg>Tree</button>
+            <button class="on" aria-pressed="true" title="Show as a flat list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>List</button>
+          </span>
+        </div>
+        <div class="clist" role="list" aria-label="Changed files">
+          <div class="crow sel" role="listitem" tabindex="0"><span class="cp"><span class="dir">src/components/</span>board.tsx</span><span class="cstat edited"><span class="mk" aria-hidden="true">E</span><span class="cw">edited</span></span></div>
+          <div class="crow" role="listitem" tabindex="0"><span class="cp"><span class="dir">src/components/</span>thread.tsx</span><span class="cstat new"><span class="mk" aria-hidden="true">N</span><span class="cw">new</span></span></div>
+          <div class="crow" role="listitem" tabindex="0"><span class="cp"><span class="dir">src/components/</span>file-explorer.tsx</span><span class="cstat new"><span class="mk" aria-hidden="true">N</span><span class="cw">new</span></span></div>
+          <div class="crow" role="listitem" tabindex="0"><span class="cp"><span class="dir">src/</span>tokens.css</span><span class="cstat edited"><span class="mk" aria-hidden="true">E</span><span class="cw">edited</span></span></div>
+          <div class="crow" role="listitem" tabindex="0"><span class="cp"><span class="dir">.architecture/…/</span>SRD.md</span><span class="cstat edited"><span class="mk" aria-hidden="true">E</span><span class="cw">edited</span></span></div>
+          <div class="crow" role="listitem" tabindex="0"><span class="cp"><span class="dir">src/</span>legacy-viewer.tsx</span><span class="cstat removed"><span class="mk" aria-hidden="true">R</span><span class="cw">removed</span></span></div>
+          <div class="crow" role="listitem" tabindex="0"><span class="cp"><span class="dir">src/</span>README.md</span><span class="cstat edited"><span class="mk" aria-hidden="true">E</span><span class="cw">edited</span></span></div>
+        </div>
+      </div>
+      <div class="exppane">
+        <div class="previewbar">
+          <span class="fn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>src/components/board.tsx</span>
+          <span class="cstat edited"><span class="mk" aria-hidden="true">E</span><span class="cw">edited</span></span>
+        </div>
+        <div class="exppanebody">
+          <div class="diffmeta" aria-label="3 lines added, 1 line removed">
+            <span>What changed since this change started</span>
+            <span class="add"><span class="s">+3</span> added</span>
+            <span class="rm"><span class="s">−1</span> removed</span>
+          </div>
+          <div class="diff" aria-label="Changes to board.tsx">
+            <div class="hunk">Around line 3</div>
+            <div class="dl ctx"><span class="sign">&nbsp;</span><span class="dx">  const stages = useStages();</span></div>
+            <div class="dl rm"><span class="sign">−</span><span class="dx">  return &lt;div className="grid"&gt;{stages}&lt;/div&gt;;</span></div>
+            <div class="dl add"><span class="sign">+</span><span class="dx">  return (</span></div>
+            <div class="dl add"><span class="sign">+</span><span class="dx">    &lt;div className="board"&gt;</span></div>
+            <div class="dl add"><span class="sign">+</span><span class="dx">      {stages.map((s) =&gt; &lt;StageColumn key={s.id} stage={s} /&gt;)}</span></div>
+            <div class="dl ctx"><span class="sign">&nbsp;</span><span class="dx">    &lt;/div&gt;</span></div>
+            <div class="dl ctx"><span class="sign">&nbsp;</span><span class="dx">  );</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ===================== PANEL 7 — SERVER-DOWN ERROR (light) ===================== -->
+<div class="section-label">State 3 of 3 — Something's wrong <small>e.g. the local app server isn't running; never a silent blank screen</small></div>
+<div class="scope" data-theme="light">
+<div class="shell" style="height:340px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-l7" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-l7"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-l7)" mask="url(#mm-l7)"/></svg><div class="brandname">Sulis</div></div>
+  </aside>
+  <main class="main">
+    <div class="errbar" role="alert">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <div><b>Couldn't reach the Sulis app server.</b> It looks like the local server isn't running.</div>
+    </div>
+    <div class="state error">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <h3>The app can't talk to its server</h3>
+      <p>Start it from your terminal with <code>sulis app</code>, then retry. Your changes and conversations are safe — nothing was lost.</p>
+      <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Retry</button>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ============================================================ DARK ============================================================ -->
+<div class="themetag">Dark theme</div>
+
+<!-- ===================== PANEL 8 — THE BOARD (dark) ===================== -->
+<div class="section-label">The board you land on — dark <small>same surface, the reversed (warm-paper) mark on the dark chrome per the brand usage guidelines</small></div>
+<div class="scope" data-theme="dark">
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brandrow">
+      <svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><circle cx="256" cy="256" r="228" fill="none" stroke="#fafafa" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="#fafafa" stroke-width="36" fill="none" stroke-linecap="round"/></svg>
+      <div class="brandname">Sulis</div>
+    </div>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span class="lname">Board</span></a>
+    <h4>In flight</h4>
+    <a class="navitem" tabindex="0" href="#"><span class="live running" role="img" aria-label="running" title="running"><span class="g" aria-hidden="true"></span></span><span class="lname">add-checkout-flow</span></a>
+    <a class="navitem" tabindex="0" href="#"><span class="live idle" role="img" aria-label="not running" title="not running"><span class="g" aria-hidden="true"></span></span><span class="lname">fix-login-redirect</span></a>
+    <a class="navitem" tabindex="0" href="#"><span class="live unknown" role="img" aria-label="unknown" title="unknown"><span class="g" aria-hidden="true"></span></span><span class="lname">map-billing-module</span></a>
+    <h4>Shipped</h4>
+    <a class="navitem" tabindex="0" href="#" style="opacity:.55"><span class="lname">cockpit-contract-preview</span></a>
+  </aside>
+
+  <main class="main">
+    <div class="viewhead">
+      <div class="viewtitle">Your work, at a glance</div>
+      <div class="viewsub">Every change in flight, in the stage it has reached. Pick one to open it.</div>
+    </div>
+    <div class="toolbar" role="search">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" aria-label="Search inside your changes" placeholder="Search inside your changes — conversations and created items, not just titles" />
+        <span class="hint">searches content</span>
+      </div>
+      <button class="chip on" aria-pressed="true">All stages</button>
+      <button class="chip" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>Stage</button>
+      <button class="chip" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.29 3.86 1.82 18a1 1 0 0 0 .86 1.5h18.64a1 1 0 0 0 .86-1.5L13.71 3.86a1 1 0 0 0-1.72 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Needs attention</button>
+    </div>
+
+    <div class="board">
+      <div class="col"><div class="colhead s-recon"><span class="sdot" aria-hidden="true"></span><span class="colname">Recon</span><span class="colcount">1</span></div><div class="collist"><div class="card" tabindex="0"><div class="handle">map-billing-module</div><div class="intent">Map the billing module before the rework</div><div class="cardfoot"><span class="live unknown" role="img" aria-label="unknown" title="unknown"><span class="g" aria-hidden="true"></span>unknown</span></div></div></div></div>
+      <div class="col"><div class="colhead s-specify"><span class="sdot" aria-hidden="true"></span><span class="colname">Specify</span><span class="colcount">1</span></div><div class="collist"><div class="card" tabindex="0"><div class="handle">password-reset-email</div><div class="intent">Password reset by email link</div><div class="cardfoot"><span class="live idle" role="img" aria-label="not running" title="not running"><span class="g" aria-hidden="true"></span>not running</span><span class="attn-flag"><span class="d" aria-hidden="true"></span>waiting on you</span></div></div></div></div>
+      <div class="col current"><div class="colhead s-design"><span class="sdot" aria-hidden="true"></span><span class="colname">Design</span><span class="colcount">1</span></div><div class="collist"><div class="card is-open" tabindex="0"><div class="handle">drive-a-change</div><div class="intent">Drive a change from the app (this one)</div><div class="cardfoot"><span class="live running" role="img" aria-label="running" title="running"><span class="g" aria-hidden="true"></span>running</span></div></div></div></div>
+      <div class="col"><div class="colhead s-implement"><span class="sdot" aria-hidden="true"></span><span class="colname">Implement</span><span class="colcount">2</span></div><div class="collist"><div class="card" tabindex="0"><div class="handle">add-checkout-flow</div><div class="intent">Add checkout flow with saved cards</div><div class="cardfoot"><span class="live running" role="img" aria-label="running" title="running"><span class="g" aria-hidden="true"></span>running</span></div></div><div class="card" tabindex="0"><div class="handle">fix-login-redirect</div><div class="intent">Fix login redirect loop</div><div class="cardfoot"><span class="live idle" role="img" aria-label="not running" title="not running"><span class="g" aria-hidden="true"></span>not running</span><span class="attn-flag"><span class="d" aria-hidden="true"></span>stopped mid-reply</span></div></div></div></div>
+      <div class="col"><div class="colhead s-review"><span class="sdot" aria-hidden="true"></span><span class="colname">Review</span><span class="colcount">0</span></div><div class="collist"><div class="col-empty">Nothing here yet</div></div></div>
+      <div class="col"><div class="colhead s-ship"><span class="sdot" aria-hidden="true"></span><span class="colname">Ship</span><span class="colcount">1</span></div><div class="collist"><div class="card" tabindex="0"><div class="handle">weekly-digest-email</div><div class="intent">Weekly digest email</div><div class="cardfoot"><span class="live idle" role="img" aria-label="not running" title="not running"><span class="g" aria-hidden="true"></span>not running</span></div></div></div></div>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ===================== PANEL 9 — THREAD + LIVE CHAT (dark) ===================== -->
+<div class="section-label">A change, opened — dark <small>the live conversation, run-controls and consent step all carry through to dark; your messages still neutral</small></div>
+<div class="scope" data-theme="dark">
+<div class="shell" style="height:840px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><circle cx="256" cy="256" r="228" fill="none" stroke="#fafafa" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="#fafafa" stroke-width="36" fill="none" stroke-linecap="round"/></svg><div class="brandname">Sulis</div></div>
+    <a class="navitem" tabindex="0" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span class="lname">Board</span></a>
+    <h4>In flight</h4>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><span class="live running" role="img" aria-label="running" title="running"><span class="g" aria-hidden="true"></span></span><span class="lname">drive-a-change</span></a>
+    <a class="navitem" tabindex="0" href="#"><span class="live running" role="img" aria-label="running" title="running"><span class="g" aria-hidden="true"></span></span><span class="lname">add-checkout-flow</span></a>
+  </aside>
+
+  <div class="main" style="padding:0;overflow:hidden">
+    <div class="thread">
+      <div class="threadmain">
+        <div class="threadhead">
+          <div class="handle">drive-a-change · create</div>
+          <h2>Drive a change from the app</h2>
+          <div class="track" role="img" aria-label="Stage 3 of 6: Design is current; Recon and Specify are done">
+            <div class="step done">Recon<svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="step done">Specify<svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="step current">Design<span class="nowtag">now</span></div>
+            <div class="step">Implement</div><div class="step">Review</div><div class="step">Ship</div>
+          </div>
+          <div class="status">
+            <div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>What's happening</div>
+            <p>The design pass is underway. The technical blueprint and both contracts — the data contract and this visual one — are drafted and waiting for your sign-off before building starts.</p>
+            <div class="prov"><span>Read from this change's notes just now</span><span class="conf high"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>Clear signal</span></div>
+          </div>
+        </div>
+        <div class="convo">
+          <div class="sysnote"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>This change was resumed — picking up from where it left off, with its full memory</div>
+          <div class="msg user"><div class="who">You</div><div class="bubble">Can you make the board land on stage columns, left to right?</div></div>
+          <div class="msg agent"><div class="who">Agent</div><div class="bubble">Yes — the board now reads recon → specify → design → implement → review → ship, with each change as a card in its stage's column. I'll wire it up and run the tests.</div></div>
+          <!-- inline tool-action log: the WORK, shown (AI-01) — quiet mono lines, not chat bubbles -->
+          <div class="toolgroup" role="group" aria-label="Work the agent did">
+            <div class="toolline"><span class="tk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span><span class="tt"><span class="verb">Edited</span> <span class="obj">src/components/board.tsx</span></span></div>
+            <div class="toolline"><span class="tk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span><span class="tt"><span class="verb">Created</span> <span class="obj">src/components/stage-column.tsx</span></span></div>
+            <div class="toolline"><span class="tk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></span><span class="tt"><span class="verb">Ran tests</span><span class="res"><span class="d" aria-hidden="true"></span>28 passed</span></span></div>
+          </div>
+          <div class="msg agent"><div class="who">Agent</div><div class="bubble">Done — the board lands on the six stage columns and the tests are green. Want shipped changes shown there too, or kept in the archive?</div></div>
+          <div class="msg user"><div class="who">You</div><div class="bubble">Keep shipped in the archive. Now add the live chat dock.</div></div>
+          <!-- checkpoint / rollback card: the founder's checkpoint-as-lineage idea — a saved point you can return to -->
+          <div class="checkpoint">
+            <span class="ck" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg></span>
+            <div class="cbody">
+              <div class="ct">Checkpoint — the stage-column board, tested</div>
+              <div class="cm">Saved just now · everything up to here is in place</div>
+            </div>
+            <button class="rollback" aria-label="Roll back to this checkpoint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>Roll back to here</button>
+          </div>
+          <div class="toolgroup" role="group" aria-label="Work the agent is doing">
+            <div class="toolline"><span class="tk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span><span class="tt"><span class="verb">Created</span> <span class="obj">src/components/composer.tsx</span></span></div>
+          </div>
+          <div class="msg agent streaming"><div class="who">Agent</div><div class="bubble">Adding the chat composer as a dock at the bottom of every thread, so sending a message is always one glance from reading the change<span class="caret" aria-hidden="true"></span></div></div>
+        </div>
+        <div class="runbar">
+          <span class="lbl"><svg class="spinner" viewBox="0 0 512 512" role="img" aria-label="Agent replying"><defs><linearGradient id="spin-d9" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#6B3654"/><stop offset="40%" stop-color="#D45A3C"/><stop offset="70%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient></defs><circle class="track" cx="256" cy="256" r="228" fill="none" stroke="url(#spin-d9)" stroke-width="36"/><circle class="sweep" cx="256" cy="256" r="228" fill="none" stroke="url(#spin-d9)" stroke-width="36" stroke-linecap="round" stroke-dasharray="430 1003" pathLength="1433"/></svg>Agent is replying…</span>
+          <button class="iconbtn" aria-label="Pause the agent"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>Pause</button>
+          <button class="iconbtn stop" aria-label="Stop the agent"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>Stop</button>
+        </div>
+        <div class="composer-wrap">
+          <div class="chips">
+            <button class="sugchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>Sign off on the design</button>
+            <button class="sugchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>What's left before build?</button>
+            <button class="sugchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Adjust the board layout</button>
+          </div>
+          <div class="composer busy">
+            <div class="field">
+              <textarea aria-label="Message this change's agent" placeholder="Message this change's agent…  —  type / for commands">Now wire the brain view on the right.</textarea>
+              <div class="slashhint"><kbd>/</kbd> for commands — <kbd>/sign-off</kbd> · <kbd>/files</kbd> · <kbd>/status</kbd> &nbsp;·&nbsp; <kbd>Enter</kbd> to send, <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line</div>
+            </div>
+            <button class="send" disabled>Send</button>
+          </div>
+          <div class="busynote"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>One message at a time — you can send again the moment this reply finishes.</div>
+        </div>
+      </div>
+      <div class="rail">
+        <!-- Mobbin-grounded artifact panel (Lovable/v0/Gemini): ONE tab active at
+             a time — Preview (rendered doc) · Files (the explorer) · Brain
+             (entities/workflows). Progressive disclosure (CL-02). -->
+        <div class="railtabs" role="tablist" aria-label="Change context">
+          <button class="railtab" role="tab" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>Preview</button>
+          <button class="railtab" role="tab" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Files</button>
+          <button class="railtab active" role="tab" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3 3 3 0 0 0-3 3 3 3 0 0 0 0 6 3 3 0 0 0 3 3 3 3 0 0 0 6 0 3 3 0 0 0 3-3 3 3 0 0 0 0-6 3 3 0 0 0-3-3 3 3 0 0 0-3-3z"/></svg>Brain</button>
+        </div>
+        <div class="railbody" role="tabpanel" aria-label="Brain — what the agent has created">
+          <div class="bgroup">
+            <h5><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Requirements · 6</h5>
+            <div class="bitem" tabindex="0"><div class="bt">Board lists changes in stage columns</div><div class="bk">requirement · FR-01</div></div>
+            <div class="bitem" tabindex="0"><div class="bt">Send a message to a change's agent</div><div class="bk">requirement · FR-16</div></div>
+            <div class="bitem" tabindex="0"><div class="bt">The reply streams back live</div><div class="bk">requirement · FR-17</div></div>
+          </div>
+          <div class="bgroup">
+            <h5><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>Workflows · 6</h5>
+            <div class="bitem" tabindex="0"><div class="bt">Talk to the agent about a change</div><div class="bk">workflow · 6 steps</div></div>
+            <div class="bitem" tabindex="0"><div class="bt">Find a change</div><div class="bk">workflow · 3 steps</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===================== PANEL 10 — CONSENT GATE (dark) ===================== -->
+<div class="section-label">The go-ahead step — dark <small>two options exactly: go ahead, or not yet</small></div>
+<div class="scope" data-theme="dark">
+<div class="shell" style="height:440px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><circle cx="256" cy="256" r="228" fill="none" stroke="#fafafa" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="#fafafa" stroke-width="36" fill="none" stroke-linecap="round"/></svg><div class="brandname">Sulis</div></div>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><span class="live running" role="img" aria-label="running" title="running"><span class="g" aria-hidden="true"></span></span><span class="lname">drive-a-change</span></a>
+  </aside>
+  <div class="main" style="padding:20px 0">
+    <div class="convo" style="height:auto">
+      <div class="msg agent"><div class="who">Agent</div><div class="bubble">The visual contract looks right and you've approved it. I'm ready to lock it in and move this change to <b>Implement</b>.</div></div>
+    </div>
+    <div class="gate">
+      <div class="ghead"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 5c0 1.66 4 3 9 3s9-1.34 9-3-4-3-9-3-9 1.34-9 3"/></svg>Needs your go-ahead before it happens</div>
+      <div class="gbody">
+        <div class="what">Lock the visual contract and move this change to Implement</div>
+        This marks the design signed-off and lets building start. It writes to the change's record and updates two files.
+        <div class="files">contracts/visual/sulis-app.html · the change's stage</div>
+      </div>
+      <div class="gactions">
+        <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>Go ahead</button>
+        <button class="btn btn-outline">Not yet</button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===================== PANEL 11 — FILES + ERROR (dark) ===================== -->
+<div class="section-label">File preview and the something-went-wrong state — dark <small>rendered ↔ raw toggle; and the never-a-blank-screen error</small></div>
+<div class="scope" data-theme="dark">
+<div class="shell" style="height:490px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><circle cx="256" cy="256" r="228" fill="none" stroke="#fafafa" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="#fafafa" stroke-width="36" fill="none" stroke-linecap="round"/></svg><div class="brandname">Sulis</div></div>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><span class="live running" role="img" aria-label="running" title="running"><span class="g" aria-hidden="true"></span></span><span class="lname">drive-a-change</span></a>
+  </aside>
+  <div class="main" style="padding:0;overflow:hidden">
+    <div class="thread">
+      <div class="threadmain">
+        <div class="threadhead"><div class="handle">drive-a-change · create</div><h2 style="margin-bottom:0">The conversation continues here</h2></div>
+        <div class="convo"><div class="msg agent"><div class="who">Agent</div><div class="bubble">Opened the requirements document on the right. Toggle <b>Raw</b> if you want the exact source.</div></div></div>
+      </div>
+      <div class="rail">
+        <div class="railtabs" role="tablist" aria-label="Change context">
+          <button class="railtab active" role="tab" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>Preview</button>
+          <button class="railtab" role="tab" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Files</button>
+          <button class="railtab" role="tab" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3 3 3 0 0 0-3 3 3 3 0 0 0 0 6 3 3 0 0 0 3 3 3 3 0 0 0 6 0 3 3 0 0 0 3-3 3 3 0 0 0 0-6 3 3 0 0 0-3-3 3 3 0 0 0-3-3z"/></svg>Brain</button>
+        </div>
+        <div class="railbody" role="tabpanel" aria-label="Preview — the document source">
+          <div class="previewbar">
+            <span class="fn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>SRD.md</span>
+            <span class="toggle" role="group" aria-label="View as"><button aria-pressed="false">Rendered</button><button class="on" aria-pressed="true">Raw</button></span>
+          </div>
+          <div class="raw"># Drive a change from the app
+
+Today the Sulis app is a read-only window onto your
+in-flight work. This change turns it into a cockpit
+you can steer from.
+
+## Six things get added
+- A board you land on
+- Plain-English progress inside a change
+- The brain, in plain sight
+- Rendered previews
+- Search and filter
+- Two-way chat — the big one</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section-label">Something's wrong — dark <small>never a silent blank screen, on dark too</small></div>
+<div class="scope" data-theme="dark">
+<div class="shell" style="height:340px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><circle cx="256" cy="256" r="228" fill="none" stroke="#fafafa" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="#fafafa" stroke-width="36" fill="none" stroke-linecap="round"/></svg><div class="brandname">Sulis</div></div>
+  </aside>
+  <main class="main">
+    <div class="errbar" role="alert">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <div><b>Couldn't reach the Sulis app server.</b> It looks like the local server isn't running.</div>
+    </div>
+    <div class="state error">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <h3>The app can't talk to its server</h3>
+      <p>Start it from your terminal with <code>sulis app</code>, then retry. Your changes and conversations are safe — nothing was lost.</p>
+      <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Retry</button>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ===================== PANEL 12 — FILE EXPLORER: CHANGED ONLY + DIFF (dark) ===================== -->
+<div class="section-label">The Files explorer — dark <small>the same worktree browser in dark: changed files marked new / edited / removed, and the diff reads by the +/− gutter, not colour alone</small></div>
+<div class="scope" data-theme="dark">
+<div class="shell" style="height:560px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><circle cx="256" cy="256" r="228" fill="none" stroke="#fafafa" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="#fafafa" stroke-width="36" fill="none" stroke-linecap="round"/></svg><div class="brandname">Sulis</div></div>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><span class="live running" role="img" aria-label="running" title="running"><span class="g"></span></span><span class="lname">drive-a-change</span></a>
+  </aside>
+  <main class="main" style="padding:0;overflow:hidden">
+    <div class="explorer">
+      <div class="exptree">
+        <div class="exphead">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <span class="et">Files in this change</span>
+        </div>
+        <div class="expmode" role="tablist" aria-label="Which files to show">
+          <button role="tab" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7l-2-2H5a2 2 0 0 0-2 2z"/></svg>All files</button>
+          <button class="on" role="tab" aria-selected="true">Changed files <span class="ct">7</span></button>
+        </div>
+        <div class="expsub">
+          <span class="sum">7 changed since this change started</span>
+          <span class="viewtog" role="group" aria-label="Show changed files as">
+            <button class="on" aria-pressed="true" title="Show as a folder tree"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7l-2-2H5a2 2 0 0 0-2 2z"/></svg>Tree</button>
+            <button aria-pressed="false" title="Show as a flat list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>List</button>
+          </span>
+        </div>
+        <!-- changed view, shown here as a TREE: only folders containing changed files appear -->
+        <div class="treebody" role="tree" aria-label="Changed files, as a tree">
+          <div class="tnode folder" role="treeitem" aria-expanded="true" tabindex="0"><span class="tw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7l-2-2H5a2 2 0 0 0-2 2z"/></svg><span class="tn">src</span></div>
+          <div class="tchildren">
+            <div class="tnode folder" role="treeitem" aria-expanded="true" tabindex="0"><span class="tw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7l-2-2H5a2 2 0 0 0-2 2z"/></svg><span class="tn">components</span></div>
+            <div class="tchildren">
+              <div class="tnode sel" role="treeitem" aria-selected="true" tabindex="0"><span class="tw"></span><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="tn">board.tsx</span><span class="cstat edited"><span class="mk" aria-hidden="true">E</span><span class="cw">edited</span></span></div>
+              <div class="tnode" role="treeitem" tabindex="0"><span class="tw"></span><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="tn">thread.tsx</span><span class="cstat new"><span class="mk" aria-hidden="true">N</span><span class="cw">new</span></span></div>
+              <div class="tnode" role="treeitem" tabindex="0"><span class="tw"></span><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="tn">file-explorer.tsx</span><span class="cstat new"><span class="mk" aria-hidden="true">N</span><span class="cw">new</span></span></div>
+            </div>
+            <div class="tnode" role="treeitem" tabindex="0"><span class="tw"></span><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="tn">legacy-viewer.tsx</span><span class="cstat removed"><span class="mk" aria-hidden="true">R</span><span class="cw">removed</span></span></div>
+          </div>
+        </div>
+      </div>
+      <div class="exppane">
+        <div class="previewbar">
+          <span class="fn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>src/components/board.tsx</span>
+          <span class="cstat edited"><span class="mk" aria-hidden="true">E</span><span class="cw">edited</span></span>
+        </div>
+        <div class="exppanebody">
+          <div class="diffmeta" aria-label="3 lines added, 1 line removed">
+            <span>What changed since this change started</span>
+            <span class="add"><span class="s">+3</span> added</span>
+            <span class="rm"><span class="s">−1</span> removed</span>
+          </div>
+          <div class="diff" aria-label="Changes to board.tsx">
+            <div class="hunk">Around line 3</div>
+            <div class="dl ctx"><span class="sign">&nbsp;</span><span class="dx">  const stages = useStages();</span></div>
+            <div class="dl rm"><span class="sign">−</span><span class="dx">  return &lt;div className="grid"&gt;{stages}&lt;/div&gt;;</span></div>
+            <div class="dl add"><span class="sign">+</span><span class="dx">  return (</span></div>
+            <div class="dl add"><span class="sign">+</span><span class="dx">    &lt;div className="board"&gt;</span></div>
+            <div class="dl add"><span class="sign">+</span><span class="dx">      {stages.map((s) =&gt; &lt;StageColumn key={s.id} stage={s} /&gt;)}</span></div>
+            <div class="dl ctx"><span class="sign">&nbsp;</span><span class="dx">    &lt;/div&gt;</span></div>
+            <div class="dl ctx"><span class="sign">&nbsp;</span><span class="dx">  );</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+
+</body>
+</html>

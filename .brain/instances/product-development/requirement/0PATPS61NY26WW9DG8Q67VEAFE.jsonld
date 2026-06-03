@@ -1,0 +1,13 @@
+{
+  "acceptance_criteria": [
+    "see SRD body"
+  ],
+  "id": "dna:requirement:0PATPS61NY26WW9DG8Q67VEAFE",
+  "priority": "must",
+  "rationale": "Extracted from FR-09 of /Users/iain/.sulis/changes/01KT500K2JTE2EGW6TPPQ4D4VN/worktree/.specifications/autonomous-delivery-environment/SRD.md. The `source` ref is a synthetic Opportunity placeholder generated from the SRD path; replace when Opportunity emission lands (queued follow-on slice). Defaults applied for SRD-absent fields: priority=must, verification_method=test, state=draft.",
+  "source": "dna:opportunity:BG8E0H5JPPWEK3G3B26T3H087A",
+  "state": "draft",
+  "statement": "Rendered/source toggle. Any rendered preview SHALL offer a toggle to the raw source, and back. - *Acceptance:* From a rendered `.md`, one action shows the raw text; the reverse action restores the rendered view. > Where the existing design-system VIEWER / contract-preview renderers already fit > (HTML, contract artifacts), the app SHALL reuse them rather than build a new > renderer (EP-03; reuses the `design-system` skill VIEWER and the > `wpx-render-contract` path already in the app)",
+  "sys_status": "active",
+  "verification_method": "test"
+}
