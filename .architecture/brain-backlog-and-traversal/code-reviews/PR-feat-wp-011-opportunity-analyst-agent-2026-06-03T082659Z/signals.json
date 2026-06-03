@@ -1,0 +1,11 @@
+{
+  "pr": "feat/wp-011-opportunity-analyst-agent",
+  "base": "origin/change/create-brain-backlog-and-traversal",
+  "scope": {"commit_type_spread": ["feat"], "module_fan_out": 2, "severity": "none"},
+  "size": {"lines_added": 429, "lines_removed": 0, "files_changed": 2, "generated_ratio": 0.0, "severity": "low"},
+  "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+  "completeness": {"new_source_without_test": 0, "api_change_without_schema": false, "severity": "none"},
+  "build_verification": {"errors": 0},
+  "findings": {"changes": {"critical": 0, "high": 0, "medium": 0, "low": 0}, "neighbours": {"total": 0}},
+  "verdict": "PASS"
+}
