@@ -39,6 +39,27 @@ from _scenario_runner import (  # noqa: E402
     run_bundle,
     run_scenario,
 )
+from _scenario_runtime import driver_for_step  # noqa: E402  (#171)
+
+
+def _journey_needs_target_url(
+    steps_by_id: dict, tools_by_id: dict, ordered_step_ids: list,
+) -> bool:
+    """True iff any step in the ordered journey resolves to ``http_call``.
+
+    #171 — a scenario whose every step is a subprocess (or human, or no-op)
+    needs no HTTP target URL. Before, the acceptance gate refused to run on
+    a no-app repo (plugin / library / published-artifact) with no
+    ``targets.local`` even when the journey never dereferenced one. Only
+    require the URL when at least one step's driver is ``http_call``.
+    """
+    for sid in ordered_step_ids:
+        step = steps_by_id.get(sid)
+        if step is None:
+            continue
+        if driver_for_step(step, tools_by_id) == "http_call":
+            return True
+    return False
 
 
 def _read_repo_contract(repo_root: str) -> dict:
@@ -104,9 +125,21 @@ def main(argv=None) -> int:
                 file=sys.stderr,
             )
 
+    # Resolve the journey's step/tool lookup tables BEFORE the target-URL
+    # check so we can ask whether the journey actually needs one (#171).
+    if bundle is not None:
+        steps_by_id = {s.get("@id"): s for s in (bundle.get("steps") or [])}
+        tools_by_id = {t.get("@id"): t for t in (bundle.get("tools") or [])}
+        ordered_step_ids = (bundle.get("workflow") or {}).get("steps", []) or []
+    else:
+        steps_by_id = loaded.steps_by_name
+        tools_by_id = loaded.tools_by_id
+        ordered_step_ids = (loaded.workflow or {}).get("steps", []) or []
+    needs_url = _journey_needs_target_url(steps_by_id, tools_by_id, ordered_step_ids)
+
     rc = resolve_run_contract(_read_repo_contract(args.repo_root))
     base = target_url(rc, args.target)
-    if not base:
+    if needs_url and not base:
         print(
             f"No '{args.target}' target URL in the repo-contract "
             f"(targets.{args.target}). Add it (and a commands.standup recipe), "
@@ -114,6 +147,9 @@ def main(argv=None) -> int:
             file=sys.stderr,
         )
         return 2
+    # When no step needs an HTTP target, the runner is happy with an empty
+    # base URL — subprocess and human drivers never dereference it.
+    base = base or ""
 
     available = frozenset(
         a.strip() for a in args.available_artifacts.split(",") if a.strip()
