@@ -54,7 +54,7 @@ fixes themselves change the codebase shape).
 | `--repo <org/repo>` | Yes | Git repository (e.g., `sulis-ai/platform`) for context |
 | `--wps WP-A,WP-B,...` | No | Explicit list of WPs to backfill; bypasses the auto-scan. Use for ad-hoc backfill of a known WP set. |
 | `--max-remediation <N>` | No | Hard cap on remediation WPs drafted per iteration. Default `10`. |
-| `--since-sha <sha>` | No | Limit scan to WPs merged after `<sha>` on dev. Default: all. |
+| `--since-sha <sha>` | No | Limit scan to WPs merged after `<sha>` on main. Default: all. |
 
 ## How to invoke
 

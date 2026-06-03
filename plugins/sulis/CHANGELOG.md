@@ -1,3 +1,9 @@
+## v0.97.5 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- Skills + scripts audit: repoint residual dev references to the trunk that the cutover missed. Scripts (runtime-breaking now that dev is deleted): wpx-train + wpx-pipeline + _change_context base-branch defaults dev→main; revert_train_on_dev (the train rollback path) parameterised to base_branch=main; back_integrate_change_branch + wpx-preflight defaults dev→main; wpx-pipeline log strings. Skills: resolve-lessons (rebase change branches onto main, was back-integrate dev), run-all (BASE_BRANCH else-default + founder messages + fetch-base + review prompts), run-wp, backfill-gates/code-review. Tests reconciled to the trunk base. release-train SKILL.md rewrite is a separate follow-up (broken-but-superseded by the auto-robot).
+
 ## v0.97.4 — 2026-06-03
 
 **Patch — release-train batch.**

@@ -155,8 +155,8 @@ For each wave, for each lesson in it (parallel within a wave):
    issue (#34 trailer rule — one keyword per issue).
 6. `sulis-change mark-shipped`.
 
-**Between waves**, back-integrate dev into any remaining change branches
-so later lessons build off the latest.
+**Between waves**, rebase any remaining change branches onto the latest
+`main` (the trunk) so later lessons build off the latest.
 
 ### Step 7 — Batch-report (AAF-06)
 
