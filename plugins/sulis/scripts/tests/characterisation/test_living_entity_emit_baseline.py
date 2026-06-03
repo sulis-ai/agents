@@ -1,39 +1,45 @@
-"""Characterisation tests pinning the CURRENT living-entity emit behaviour
-(WP-011) — the safety net for the WP-012 apply-evolve refactor.
+"""Characterisation tests for the living-entity emit paths — UPDATED by WP-012
+(apply-evolve) to the POST-refactor behaviour.
 
-Per the Characterisation-Tests-Before-Refactor MUST (CLAUDE.md EP-07 +
-ADR-003 §4 apply-evolve): before WP-012 moves the Product / Opportunity /
-Project emit paths from a plain ``repo.save(...)`` / atomic-write to
-``evolve_entity(...)``, this test FIRST captures what those emit paths do
-*today*. It is "Red" only in the written-first sense — it goes GREEN against
-**unchanged** code, which is exactly the EP-07 confirm-passes step. WP-012's
-refactor must keep these golden assertions true (where the observable contract
-is unchanged) and extend them (where evolve adds bitemporal windows).
+History (EP-07 characterisation discipline): WP-011 first authored this file to
+pin the *pre-refactor* current-snapshot behaviour (the safety net) and confirmed
+it green against unchanged code. WP-012 then performed the refactor and, per the
+Characterisation-Tests-Before-Refactor MUST, UPDATES the golden assertions here
+in lockstep with the behaviour change — keeping the load-bearing emit fields
+pinned (what must NOT change) and re-pointing the window / provenance assertions
+to the new, correct shape (what the refactor deliberately adds). The diff between
+the WP-011 baseline and this file IS the documented proof the behaviour change is
+intentional and matches ADR-002 / ADR-003 / ADR-006.
 
-What is pinned today — the three living-entity emit paths:
+What changed at WP-012:
 
-  1. **Product** (``_product_emission``): ``compose_*`` builds a current-
-     snapshot dict; ``emit_*`` writes it via ``repo.save("product", ...)``
-     through ``LocalFileEntityAdapter``. One file at
-     ``{base}/product-development/product/{ulid}.jsonld``. **No** bitemporal
-     window chain (no ``valid_to``, no window list) and **no**
-     ``wasGeneratedBy`` edge — evolution is OFF today (ADR-003 §Context).
+  1. **Product** (``_product_emission``) — NOW a *living* ``prov:Entity``. The
+     emit delegates to ``evolve_entity`` instead of ``repo.save``: the on-disk
+     file is a history *envelope* (``{"windows": [...]}``); the current open
+     window carries ``valid_from`` (``valid_to`` null while open), the
+     load-bearing current-state fields (id / name / belongs_to_tenant / state /
+     sys_status), and — when the emit context supplies the producing LifecycleRun
+     ref via ``generated_by`` — the conditional ``wasGeneratedBy`` edge.
 
-  2. **Opportunity** (``_opportunity_emission``): same shape — a current
-     snapshot via ``repo.save("opportunity", ...)``. No windows, no prov.
+  2. **Opportunity** (``_opportunity_emission``) — same: a history envelope
+     whose open window carries the load-bearing fields + the conditional
+     ``wasGeneratedBy`` (``prov:Entity``).
 
   3. **Project** (``_discovery._compose_entity`` + ``minter.write_project_entity``):
-     mints a ``project-instances`` *bag* (NOT through the EntityRepository
-     adapter — a different, atomic-file write path) at
-     ``.sulis/projects/{slug}.jsonld``. The inner project dict already carries
-     a single ``valid_from`` + ``confidence`` snapshot, but **no** ``valid_to``,
-     **no** window list, and **no** ``wasGeneratedBy`` — the supersedes /
-     window chain WP-012 + WP-015 add is NOT here yet.
+     **UNCHANGED at WP-012.** Project's mint still writes a ``project-instances``
+     *bag* atomically at ``.sulis/projects/{slug}.jsonld``, NOT through the
+     EntityRepository port — so the WP-012 evolve refactor does not touch it.
+     Routing Project through the port (so ``evolve_entity`` applies) is the
+     ADR-006 reconciliation owned by **WP-015** (gated by WP-014's minter
+     characterisation test). The Project baseline below therefore still pins the
+     CURRENT single-snapshot bag: ``valid_from`` + ``confidence`` but NO
+     ``valid_to`` window-close and NO ``wasGeneratedBy`` (Project is
+     ``prov:Plan`` — it never carries a prov edge, even after WP-015; it gains
+     windows + supersedes only). See ADR-006.
 
 These run against a **real** ``LocalFileEntityAdapter`` over a temp dir, and a
 **real** atomic ``write_project_entity`` over a temp dir (MEA-09 — no mocks at
-the store seam). Each test documents the observable contract it pins so WP-012
-knows what must survive the refactor.
+the store seam).
 """
 
 from __future__ import annotations
@@ -49,10 +55,9 @@ from _entity_adapter_local import LocalFileEntityAdapter
 from _opportunity_emission import emit_opportunity_from_srd
 from _product_emission import emit_product_from_yaml
 
-# A LifecycleRun id that, AFTER the WP-012 refactor, will become the
-# ``generated_by`` argument and produce a ``wasGeneratedBy`` edge on
-# Product / Opportunity. Today it is unused by the emitters — pinning its
-# ABSENCE is the point.
+# The LifecycleRun id the emit context threads in via ``generated_by``. AFTER
+# WP-012 it lands on the current open window's ``wasGeneratedBy`` edge for the
+# prov:Entity types (Product / Opportunity).
 _RUN_ID = "dna:lifecyclerun:01JX0RUNRUNRUNRUNRUNRUNRUN"
 
 
@@ -69,27 +74,40 @@ def adapter(tmp_path: Path) -> LocalFileEntityAdapter:
     )
 
 
-def _read_saved(adapter: LocalFileEntityAdapter, entity_type: str, eid: str) -> dict:
-    """Read the raw on-disk JSON the adapter wrote — the observable output."""
+def _read_current_window(
+    adapter: LocalFileEntityAdapter, entity_type: str, eid: str
+) -> dict:
+    """Read the current OPEN window from the on-disk history envelope.
+
+    Post-WP-012 the living emit writes a history envelope
+    (``{"windows": [...]}``) via ``evolve_entity``; the current state is the
+    last window (the only one with ``valid_to`` null). This is the observable
+    output the characterisation now pins.
+    """
     path = adapter.instance_path(entity_type, eid)
     assert path.exists(), f"emitter must have written {entity_type} at {path}"
-    return json.loads(path.read_text())
+    envelope = json.loads(path.read_text())
+    windows = envelope.get("windows")
+    assert isinstance(windows, list) and windows, (
+        f"evolved {entity_type} must persist a non-empty history envelope; "
+        f"got {envelope!r} — the emit is not delegating to evolve_entity"
+    )
+    return windows[-1]
 
 
 # ─── 1 · Product baseline ────────────────────────────────────────────────────
 
 
 class TestProductEmitBaseline:
-    """Pins: ``_product_emission`` composes a current-snapshot Product dict and
-    writes it via ``repo.save("product", ...)`` to one file — NO bitemporal
-    window chain and NO ``wasGeneratedBy`` edge today.
-
-    WP-012 contract: after the refactor, the same load-bearing fields
-    (id / name / belongs_to_tenant / state / sys_status) must still be the
-    current state, and a ``wasGeneratedBy`` edge + a window chain are ADDED.
+    """Pins the POST-WP-012 Product emit: ``_product_emission`` delegates to
+    ``evolve_entity``, persisting a history envelope whose current OPEN window
+    carries the load-bearing current-state fields (id / name /
+    belongs_to_tenant / state / sys_status), an open ``valid_from`` window, and
+    — when ``generated_by`` is supplied — the conditional ``wasGeneratedBy``
+    edge (Product is ``prov:Entity``).
     """
 
-    def test_current_save_behaviour_pinned(
+    def test_product_emit_writes_open_window_with_prov(
         self, adapter: LocalFileEntityAdapter, tmp_path: Path
     ) -> None:
         product_yaml = tmp_path / ".sulis" / "products" / "acme-billing.yaml"
@@ -103,37 +121,37 @@ class TestProductEmitBaseline:
             encoding="utf-8",
         )
 
-        emitted = emit_product_from_yaml(product_yaml, adapter)
+        emitted = emit_product_from_yaml(
+            product_yaml, adapter, generated_by=_RUN_ID
+        )
 
-        # The emitter returns exactly the one composed dict it saved.
+        # The emitter returns exactly the one composed dict it emitted.
         assert len(emitted) == 1
         product = emitted[0]
         eid = product["id"]
 
-        # The on-disk file is the observable contract WP-012 must preserve.
-        saved = _read_saved(adapter, "product", eid)
+        # The on-disk history envelope's current open window is the observable
+        # contract. Load-bearing current-state fields must survive the refactor.
+        window = _read_current_window(adapter, "product", eid)
+        assert window["id"] == eid
+        assert window["id"].startswith("dna:product:")
+        assert window["name"] == "Acme Billing"
+        assert window["belongs_to_tenant"] == "dna:tenant:01JX0TTTTTTTTTTTTTTTTTTTTT"
+        assert window["state"] == "active"
+        assert window["sys_status"] == "active"
 
-        # Load-bearing fields — the current snapshot WP-012 must keep current.
-        assert saved["id"] == eid
-        assert saved["id"].startswith("dna:product:")
-        assert saved["name"] == "Acme Billing"
-        assert saved["belongs_to_tenant"] == "dna:tenant:01JX0TTTTTTTTTTTTTTTTTTTTT"
-        assert saved["state"] == "active"
-        assert saved["sys_status"] == "active"
-
-        # CURRENT-SNAPSHOT-ONLY pin: today there is NO bitemporal window chain
-        # and NO provenance edge. WP-012 ADDS these — so their ABSENCE is the
-        # baseline the refactor changes deliberately.
-        assert "valid_to" not in saved, (
-            "today's Product snapshot does not close a window (no valid_to) — "
-            "WP-012's evolve_entity introduces the window chain"
+        # POST-REFACTOR: the window is OPEN (valid_from set, valid_to null) and
+        # carries the conditional wasGeneratedBy edge to the producing run.
+        assert window.get("valid_from"), "an opened window carries valid_from"
+        assert window.get("valid_to") in (None, ""), (
+            "the sole/current window must be open (valid_to null)"
         )
-        assert "wasGeneratedBy" not in saved and "prov_constraints" not in saved, (
-            "today's Product emit writes NO wasGeneratedBy edge — WP-012 adds "
-            "the CONDITIONAL prov edge for this prov:Entity type"
+        assert window.get("wasGeneratedBy") == _RUN_ID, (
+            "Product is prov:Entity — when generated_by is supplied the window "
+            "records the canonical wasGeneratedBy edge"
         )
-        assert _RUN_ID not in json.dumps(saved), (
-            "the LifecycleRun is not referenced by today's emit — pinned absent"
+        assert "was_generated_by" not in window, (
+            "no snake_case scalar — the canonical edge is camelCase wasGeneratedBy"
         )
 
 
@@ -141,12 +159,13 @@ class TestProductEmitBaseline:
 
 
 class TestOpportunityEmitBaseline:
-    """Pins: ``_opportunity_emission`` composes a current-snapshot Opportunity
-    dict from an SRD's ``## Summary`` and writes it via
-    ``repo.save("opportunity", ...)`` — NO window chain, NO prov edge today.
+    """Pins the POST-WP-012 Opportunity emit: ``_opportunity_emission``
+    delegates to ``evolve_entity``, persisting a history envelope whose current
+    open window carries the load-bearing fields + the conditional
+    ``wasGeneratedBy`` edge (Opportunity is ``prov:Entity``).
     """
 
-    def test_opportunity_emit_baseline(
+    def test_opportunity_emit_writes_open_window_with_prov(
         self, adapter: LocalFileEntityAdapter, tmp_path: Path
     ) -> None:
         srd = tmp_path / "SRD.md"
@@ -162,31 +181,29 @@ class TestOpportunityEmitBaseline:
             encoding="utf-8",
         )
 
-        emitted = emit_opportunity_from_srd(srd, adapter)
+        emitted = emit_opportunity_from_srd(srd, adapter, generated_by=_RUN_ID)
 
         assert len(emitted) == 1
         opp = emitted[0]
         eid = opp["id"]
 
-        saved = _read_saved(adapter, "opportunity", eid)
+        window = _read_current_window(adapter, "opportunity", eid)
 
-        # Load-bearing fields of the current snapshot.
-        assert saved["id"] == eid
-        assert saved["id"].startswith("dna:opportunity:")
-        assert saved["for_product"].startswith("dna:product:")
-        assert saved["job_statement"] == (
+        # Load-bearing fields of the current state (now carried on the window).
+        assert window["id"] == eid
+        assert window["id"].startswith("dna:opportunity:")
+        assert window["for_product"].startswith("dna:product:")
+        assert window["job_statement"] == (
             "When I close the books I want one number so I can file fast."
         )
-        assert saved["state"] == "hypothesis"
-        assert saved["sys_status"] == "active"
+        assert window["state"] == "hypothesis"
+        assert window["sys_status"] == "active"
 
-        # CURRENT-SNAPSHOT-ONLY pin — same as Product.
-        assert "valid_to" not in saved, (
-            "today's Opportunity snapshot does not close a window — WP-012 adds it"
-        )
-        assert "wasGeneratedBy" not in saved and "prov_constraints" not in saved, (
-            "today's Opportunity emit writes NO wasGeneratedBy edge — WP-012 adds "
-            "the CONDITIONAL prov edge for this prov:Entity type"
+        # POST-REFACTOR: open window + conditional prov edge (same as Product).
+        assert window.get("valid_from"), "an opened window carries valid_from"
+        assert window.get("valid_to") in (None, ""), "the window must be open"
+        assert window.get("wasGeneratedBy") == _RUN_ID, (
+            "Opportunity is prov:Entity — the window records wasGeneratedBy"
         )
 
 

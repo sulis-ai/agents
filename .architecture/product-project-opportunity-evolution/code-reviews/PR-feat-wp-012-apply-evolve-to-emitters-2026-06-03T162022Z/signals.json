@@ -1,0 +1,16 @@
+{
+  "pr": "feat/wp-012-apply-evolve-to-emitters",
+  "build_verification": {"pr_introduced_errors": 0, "ruff_check": "pass", "py_compile": "pass", "suite": "1844 passed, 9 skipped"},
+  "scope_PH01": {"commit_type_spread": ["refactor"], "module_fan_out": 1, "severity": "low"},
+  "size_PH02": {"lines_added": 250, "lines_removed": 102, "files_changed": 7, "severity": "low"},
+  "safety_PH03": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+  "completeness_PH04": {"new_source_without_test": 0, "new_tests": 1, "api_change_without_schema": false, "severity": "none"},
+  "lenses": {
+    "architecture": {"in_changes": 0, "in_neighbours": 0, "note": "evolve delegation clean; no dependency inversion; resilience pattern matches established _safely convention"},
+    "security": {"in_changes": 0, "in_neighbours": 0, "note": "no secrets/auth/injection/deps/network surface"},
+    "quality": {"in_changes": 1, "in_neighbours": 0, "note": "1 low/awareness: silent except-swallow matches codebase convention"}
+  },
+  "findings": {"critical": 0, "high": 0, "medium": 0, "low": 1},
+  "verdict": "PASS",
+  "auto_downgrade_triggers": []
+}

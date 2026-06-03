@@ -97,3 +97,33 @@ failure).
 - REORGANISE-Refactor on internal code — **not** a wrap. The emitters are edited
   in place to delegate to the shared primitive; no translation layer is added.
 - Characterisation-test-first is the gate; WP-011 is the `dependsOn` that enforces it.
+
+### Scope note — Project emit-path application is deferred to WP-015 (executor, WP-012)
+
+WP-012 applied evolve to the **Product** and **Opportunity** emitters in full:
+`emit_product_from_yaml` / `emit_opportunity_from_srd` now delegate to
+`evolve_entity(generated_by=<LifecycleRun ref>)` (the conditional
+`wasGeneratedBy` edge fires for these `prov:Entity` types), preserving
+graceful degradation (best-effort emit).
+
+The **Project** emit path was **not** swapped to `evolve_entity` in this WP, by
+design. Today Project does not persist through the `EntityRepository` port — it
+mints a `project-instances` bag atomically via
+`_discovery/minter.write_project_entity` into `.sulis/projects/{slug}.jsonld`.
+`evolve_entity(repo=...)` requires a file-backed `EntityRepository` (it reads
+the current open window via the port and writes the history envelope through
+`instance_path`); the Project mint has no such `repo`. Routing Project through
+the port so evolve applies is the **ADR-006 home-reconciliation**, which is
+explicitly owned by **WP-015** and gated by **WP-014**'s minter characterisation
+test (neither built yet). Overreaching into that here would do WP-015's
+minter/`.sulis`-mirror reconciliation without its characterisation gate — a
+REORGANISE MUST violation.
+
+What WP-012 *does* lock in for Project: the windows-only / **no-prov** contract
+(`generated_by=None` → window moves, no `wasGeneratedBy` edge), pinned at the
+`evolve_entity` seam in `tests/unit/test_emitters_evolve.py`
+(`TestProjectEvolvesWithoutProv`) so the semantics Project inherits at WP-015 are
+unambiguous. The Project characterisation baseline
+(`tests/characterisation/test_living_entity_emit_baseline.py::TestProjectEmitBaseline`)
+is left UNCHANGED — it still pins the current single-snapshot bag behaviour,
+which WP-015 will then evolve under its own characterisation gate.

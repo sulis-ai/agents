@@ -34,6 +34,7 @@ import re
 from pathlib import Path
 from typing import Final
 
+from _entity_evolve import evolve_entity
 from _entity_repository import EntityRepository
 from _wpxlib import parse_frontmatter
 
@@ -142,11 +143,41 @@ def compose_opportunity_from_srd(
 def emit_opportunity_from_srd(
     srd_path: Path,
     repo: EntityRepository,
+    *,
+    generated_by: str | None = None,
 ) -> list[dict]:
+    """Emit the Opportunity composed from ``srd_path`` as a *living* entity.
+
+    Opportunity is a ``prov:Entity`` living type (ADR-002/ADR-003): each emit
+    delegates to the shared bitemporal ``evolve_entity`` helper (WP-009) rather
+    than a plain ``repo.save`` — first emit opens a window, a changed re-emit
+    closes the prior and opens a new one, a byte-identical re-emit is a no-op.
+    The window logic is the helper's (EP-03), not re-implemented here.
+
+    Args:
+        generated_by: the producing LifecycleRun ref
+            (``dna:lifecyclerun:<ulid>``) from the emit context. When supplied,
+            the new window carries the conditional ``wasGeneratedBy`` PROV edge
+            (Opportunity is ``prov:Entity`` — the edge is well-typed). ``None``
+            moves the window without an edge.
+
+    Emission stays best-effort: a fault at the persistence point is swallowed so
+    the host operation never fails on an emit failure.
+    """
     srd_text = Path(srd_path).read_text(encoding="utf-8")
     opportunities = compose_opportunity_from_srd(
         srd_text, srd_path=str(srd_path)
     )
     for opp in opportunities:
-        repo.save("opportunity", opp)
+        try:
+            evolve_entity(
+                repo=repo,
+                entity_type="opportunity",
+                entity_id=opp["id"],
+                new_fields=opp,
+                generated_by=generated_by,
+            )
+        except Exception:
+            # Best-effort emit — never raise into the host operation.
+            continue
     return opportunities
