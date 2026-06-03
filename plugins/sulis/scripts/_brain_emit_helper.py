@@ -38,7 +38,9 @@ The host script logs but does NOT fail when None comes back.
 
 from __future__ import annotations
 
+import json
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Final
@@ -84,6 +86,55 @@ def _brain_emit_enabled() -> bool:
     """
     val = os.environ.get("SULIS_BRAIN_EMIT", "1").strip().lower()
     return val not in ("0", "false", "no", "off")
+
+
+# ─── Project resolution (repo → for_project ref) ────────────────────────
+#
+# A change-start LifecycleRun records which Project (release-unit / repo) it ran
+# in, via the optional `for_project` ref (ADR-007, v2.2.0+). The Project entity
+# is minted to `<repo_root>/.sulis/projects/<slug>.jsonld` (the discover-project
+# minter, WP-011/WP-014). We READ that bag here to resolve the ULID — there is
+# no separate resolver helper to reuse (the minter only writes), so this is the
+# minimal in-scope reader. `for_project` is OPTIONAL: a repo with no Project bag
+# (a meta-run, a pre-discovery repo) resolves to None and the field is omitted —
+# never an error (graceful degradation, ADR-007 §4).
+
+_PROJECT_ID_RE: Final = re.compile(r"^dna:project:[0-9A-HJKMNP-TV-Z]{26}$")
+
+
+def _resolve_project_ulid(repo_root: Path) -> str | None:
+    """Resolve the active Project ULID for `repo_root`, or None.
+
+    Reads `<repo_root>/.sulis/projects/*.jsonld` — the minter's output bags,
+    each a `project-instances` doc carrying a `projects` array. Returns the
+    `id` of the first `active` Project found (a single-Project repo is the
+    common case). Any failure (no bag, malformed JSON, no valid ref) returns
+    None so the emit degrades gracefully rather than failing.
+    """
+    projects_dir = Path(repo_root) / ".sulis" / "projects"
+    if not projects_dir.is_dir():
+        return None
+    try:
+        bags = sorted(projects_dir.glob("*.jsonld"))
+    except OSError:
+        return None
+    for bag in bags:
+        try:
+            doc = json.loads(bag.read_text())
+        except (OSError, ValueError):
+            continue
+        projects = doc.get("projects")
+        if not isinstance(projects, list):
+            continue
+        for project in projects:
+            if not isinstance(project, dict):
+                continue
+            if project.get("sys_status") not in (None, "active"):
+                continue
+            pid = project.get("id")
+            if isinstance(pid, str) and _PROJECT_ID_RE.match(pid):
+                return pid
+    return None
 
 
 def _brain_base_dir(repo_root: Path) -> Path:
@@ -193,6 +244,9 @@ def emit_change_started_event(
         from _lifecyclerun_emission import emit_lifecyclerun
     except Exception:
         return None
+    # Resolve the Project this run operated in (ADR-007). Optional — a repo with
+    # no discovered Project omits the field; resolution never fails the emit.
+    for_project = _resolve_project_ulid(repo_root)
     return _safely(
         emit_lifecyclerun,
         repo=adapter,
@@ -200,6 +254,7 @@ def emit_change_started_event(
         run_id=f"change-started:{primitive}:{slug}",
         outcome="completed",
         at=datetime.now(timezone.utc).isoformat(),
+        for_project=for_project,
     )
 
 
