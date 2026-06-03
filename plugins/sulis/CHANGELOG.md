@@ -1,3 +1,17 @@
+## v0.97.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- Vendor the brand-identity domain (Brand + DesignSystem + Tenant mirror,
+  sulis-brain v0.15.0 / DR-030) into plugins/sulis/brain/compiled/brand-identity/,
+  and wire the ux-designer agent to it: Section 0 now READs an existing
+  DesignSystem instance (binding the mockup to its real DTCG tokens) and EMITs a
+  Brand + DesignSystem when it establishes a design language. Adds two emit shims
+  (sulis-emit-brand, sulis-emit-design-system) over the generic ingest, with the
+  UXD-04 primitive/semantic/component -> DTCG global/alias/component tier mapping
+  baked into the agent body. CI-locked by 3 new emitter tests (valid Brand, valid
+  DesignSystem-realizing-Brand, and missing-realizes_identity rejects).
+
 ## v0.96.0 — 2026-06-03
 
 **Minor — release-train batch.**
