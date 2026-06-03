@@ -18,13 +18,23 @@ mixed-version vendor is safe):
 - `requirement` + `decision` — gain the bitemporal fields (`valid_from`/
   `valid_to`/`confidence`), so the living entities can hold version history.
   This is the data-shape foundation for change-as-transaction / evolution.
+- `lifecyclerun` v1.0.0 → **2.2.0** — RE-VENDORED (WP-002) in lockstep with the
+  emitter. This is the BREAKING `step_name` (free string) → required `step`
+  (a `dna:step:<ulid>` ref) swap from DR-009, PLUS the DR-013 optional fields
+  (`run_id`/`deterministic`/`inputs_ref`/`outputs_ref`) and the optional
+  `for_project` ref (the `for_project` mint, DR-032). The re-vendor and the
+  emitter migration (`_lifecyclerun_emission` + the three `_brain_emit_helper`
+  lifecycle helpers + the `sulis-emit-lifecyclerun` CLI default path) land in
+  **one atomic change** (ADR-004), so no instance is ever emitted in a shape the
+  vendored schema rejects. The per-run specificity the old `step_name` string
+  carried now lives in `run_id`; there is no `step_label` and no `used` field
+  (both rejected upstream — DR-013). The three lifecycle Step ULIDs the `step`
+  ref points at are authored once in
+  `plugins/sulis/instances/lifecycle-steps/steps.jsonld` (WP-001).
 
 **Still to catch up (breaking / structural — deliberately NOT bundled):**
-`lifecyclerun` v1.0.0 → **2.1.0** is BREAKING (`step_name` → required `step`
-ref) and needs the emitter (`_brain_emit_helper`) migrated in lockstep — that's
-the "LifecycleRun-as-transaction-node" change, coupled + needing a modelling
-call. Plus the 10 foundation-mirror entities the PD source now carries (the
-mirror-surface reconciliation). Tracked, not done here.
+the 10 foundation-mirror entities the PD source now carries (the mirror-surface
+reconciliation). Tracked, not done here.
 
 Distribution mechanism (vendoring) is intentional first-slice pragmatism. A
 published package or git-submodule is the right longer-term answer; track that

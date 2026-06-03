@@ -1,0 +1,19 @@
+{
+  "target": "feat/wp-002-lifecyclerun-revendor-emitter-lockstep",
+  "base": "origin/change/feat-product-project-opportunity-evolution",
+  "verdict": "PASS",
+  "build_verification": {"pr_introduced_errors": 0, "ruff": "clean", "py_compile": "clean", "pytest": "1939 passed, 9 skipped"},
+  "hygiene": {
+    "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "clean"},
+    "size": {"lines_added": 161, "lines_removed": 41, "files_changed": 11, "severity": "clean"},
+    "safety": {"migration_count": 0, "schema_idl_count": 1, "infra_files": 0, "secret_pattern_hits": 0, "severity": "note", "note": "1 vendored JSON Schema re-vendored (lifecyclerun 1.0.0->2.2.0); migrated in lockstep with emitter per ADR-004; no instance reject-on-invalid window"},
+    "completeness": {"new_source_without_test": 0, "new_test_files": 4, "api_change_without_schema": false, "severity": "clean"}
+  },
+  "findings": {"changes": {"critical": 0, "high": 0, "medium": 0, "low": 0}, "neighbours": {"total": 0}},
+  "lenses": {
+    "architecture": "nothing surfaced",
+    "security": "nothing surfaced",
+    "quality": "nothing surfaced"
+  },
+  "draft_fixes": 0
+}
