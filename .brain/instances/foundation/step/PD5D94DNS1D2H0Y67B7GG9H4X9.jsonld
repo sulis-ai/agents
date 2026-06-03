@@ -1,0 +1,21 @@
+{
+  "agent_instructions": "Ask the brain what is done.",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:PD5D94DNS1D2H0Y67B7GG9H4X9",
+  "input_artifacts": [
+    "y7mjgwe8-ask-the-brain-what-is-on-the-roadmap-2-result"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/sulis-brain-query --base-dir .brain/instances --done\", \"expect_exit\": 0}",
+  "name": "y7mjgwe8-ask-the-brain-what-is-done-3",
+  "output_artifacts": [
+    "y7mjgwe8-ask-the-brain-what-is-done-3-result"
+  ],
+  "postconditions": [
+    "done ideas come back off the brain graph"
+  ],
+  "state": "draft",
+  "sys_status": "active",
+  "tool_ref": "dna:tool:SZXB74VETJFTQXFX1B93YFPKZ0"
+}

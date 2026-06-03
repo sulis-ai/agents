@@ -83,6 +83,33 @@ markdown mini-language. A verification journey is authored as the same shape:
 3. **Bundle-from-graph.** Point the testable-state engine at the emitted graph
    instead of hand-built bundle JSON (the loop-close the runner anticipates).
 
+## Status update — the from-graph loop now runs GREEN end-to-end
+
+The brain-backlog-and-traversal change's dogfood (WP-013) is the **first
+consumer** to author → emit → run a multi-step journey *from the emitted graph*
+to a `pass` verdict (item 3 above, closed). Two wiring gaps surfaced and were
+closed in the shipped authoring loop (no new machinery — existing schema fields
+and runtime the helper simply wasn't forwarding):
+
+- **`mechanism_detail` is carried through `assemble_scenario_graph`.** A
+  journey beat may now declare `mechanism_detail` (the driver's JSON params:
+  `subprocess → {"cmd","expect_exit"}`, `http_call → {"method","path",
+  "expect_status"}`). The runtime already read it off the stored Step; the
+  assembler now persists it, so an automated step actually executes. Without a
+  `tool_ref` + `mechanism_detail`, a beat defaults to `mechanism: human` →
+  `manual-pending` (a blocking gate verdict, never green).
+- **Journey-internal data-flow is available, not an external need.** `Step.
+  input_artifacts` mixes two things: the IDEF0 data-flow chain (the previous
+  beat's output, plus the `test-target` entry seed) and any genuinely-external
+  need (a credential). The runner (`_scenario_runner.run_scenario`) now treats
+  an input produced by an earlier step in the same journey (or the entry seed)
+  as available; only a never-produced external need defers a step. Before this,
+  every multi-step authored journey deferred on its own chain.
+
+The canonical worked example is the change's durable bundle at
+`.changes/create-brain-backlog-and-traversal.scenarios.jsonld` (two journeys:
+capture + traverse), runnable with `sulis-verify-acceptance --scenario <id>`.
+
 ## Open question for the founder
 
 - **Intake surface:** is the verification journey authored inside
