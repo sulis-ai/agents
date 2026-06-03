@@ -28,6 +28,10 @@ from _entity_repository import EntityRepository
 _CROCKFORD: Final[str] = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _ACTOR_ID_RE: Final = re.compile(r"^dna:actor:[0-9A-HJKMNP-TV-Z]{26}$")
 _STEP_ID_RE: Final = re.compile(r"^dna:step:[0-9A-HJKMNP-TV-Z]{26}$")
+# `for_project` reuses the live Workflow.for_project ref shape verbatim
+# (foundation v0.5.0, predicate sulis:forProject) — a plain scope ref recording
+# which Project a run operated in, NOT a prov edge (ADR-007).
+_PROJECT_ID_RE: Final = re.compile(r"^dna:project:[0-9A-HJKMNP-TV-Z]{26}$")
 _VALID_OUTCOMES: Final[set[str]] = {"completed", "failed", "in-progress", "cancelled"}
 
 
@@ -47,6 +51,7 @@ def compose_lifecyclerun(
     at: str | None = None,
     by_actor: str = "",
     run_id: str | None = None,
+    for_project: str | None = None,
 ) -> dict:
     """Compose a v2 LifecycleRun payload.
 
@@ -60,6 +65,11 @@ def compose_lifecyclerun(
             specificity (e.g. `{primitive}:{slug}`) that the legacy `step_name`
             string used to hold. Emitted only when provided, so the
             `unevaluatedProperties: false` schema stays clean.
+        for_project: optional `dna:project:<ulid>` ref — the Project
+            (release-unit / repo) this run operated in (ADR-007, v2.2.0+). A
+            plain scope ref mirroring `Workflow.for_project`, NOT a prov edge.
+            Emitted only when provided; a meta / pre-Project run omits it.
+            Rejected if a non-empty value is not a valid Project ref.
     """
     if outcome not in _VALID_OUTCOMES:
         raise ValueError(f"lifecyclerun outcome must be one of {sorted(_VALID_OUTCOMES)}; got {outcome!r}")
@@ -69,6 +79,8 @@ def compose_lifecyclerun(
         raise ValueError(f"lifecyclerun step must be a valid dna:step:<ulid> ref; got {step!r}")
     if by_actor and not _ACTOR_ID_RE.match(by_actor):
         raise ValueError(f"by_actor must be a valid dna:actor:<ulid>; got {by_actor!r}")
+    if for_project and not _PROJECT_ID_RE.match(for_project):
+        raise ValueError(f"for_project must be a valid dna:project:<ulid> ref; got {for_project!r}")
 
     timestamp = at or datetime.now(timezone.utc).isoformat()
     run: dict = {
@@ -82,6 +94,8 @@ def compose_lifecyclerun(
         run["by_actor"] = by_actor
     if run_id:
         run["run_id"] = run_id
+    if for_project:
+        run["for_project"] = for_project
     return run
 
 
@@ -93,9 +107,11 @@ def emit_lifecyclerun(
     at: str | None = None,
     by_actor: str = "",
     run_id: str | None = None,
+    for_project: str | None = None,
 ) -> dict:
     run = compose_lifecyclerun(
-        step=step, outcome=outcome, at=at, by_actor=by_actor, run_id=run_id
+        step=step, outcome=outcome, at=at, by_actor=by_actor,
+        run_id=run_id, for_project=for_project,
     )
     repo.save("lifecyclerun", run)
     return run

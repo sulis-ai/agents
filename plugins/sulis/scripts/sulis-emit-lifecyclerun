@@ -12,6 +12,7 @@ Usage:
                             [--at <iso-timestamp>]
                             [--by-actor dna:actor:<ulid>]
                             [--run-id <trace-id>]
+                            [--for-project dna:project:<ulid>]
                             [--base-dir <dir>] [--domain <domain>] [--repo-root <dir>]
 
 `--step` (the primary path) takes a **name-or-ref**:
@@ -110,6 +111,12 @@ def main() -> int:
     parser.add_argument("--at", default=None, help="ISO timestamp (default: now UTC)")
     parser.add_argument("--by-actor", default="", help="optional dna:actor:<ulid>")
     parser.add_argument("--run-id", default=None, help="optional workflow-run trace id")
+    parser.add_argument(
+        "--for-project",
+        default=None,
+        help="optional dna:project:<ulid> — the Project (release-unit) this run "
+        "operated in; omitted when absent (ADR-007)",
+    )
     parser.add_argument("--base-dir")
     parser.add_argument("--domain", default="product-development")
     parser.add_argument("--repo-root")
@@ -149,6 +156,7 @@ def main() -> int:
             at=args.at,
             by_actor=args.by_actor,
             run_id=run_id,
+            for_project=args.for_project,
         )
     except ValueError as exc:
         return _err(str(exc))

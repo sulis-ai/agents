@@ -35,7 +35,13 @@ mixed-version vendor is safe):
   `plugins/sulis/scripts/migrate_lifecyclerun_v1_to_v2.py` (WP-006) —
   idempotent, reject-on-invalid, run eager on the marketplace's own
   `.brain/instances` in this change; downstream consumers migrate lazily on
-  next emit.
+  next emit. The optional `for_project` ref is then WIRED at change-start
+  (WP-016, ADR-007): `emit_change_started_event` resolves the running repo's
+  Project ULID from `<repo_root>/.sulis/projects/*.jsonld` and sets
+  `for_project` to it (or omits it for a meta / pre-Project repo — the ref is
+  optional and never fails the emit); the `sulis-emit-lifecyclerun` CLI exposes
+  the same via `--for-project`. It is a plain scope ref mirroring the live
+  `Workflow.for_project`, NOT a `prov_constraints` edge.
 - `product` v1.0.0 → **1.1.0** and `opportunity` v2.0.0 → **2.1.0** —
   RE-VENDORED (WP-008) to consume the upstream-minted `wasGeneratedBy`
   provenance edge (the `wasGeneratedBy` mint, DR-031). Each gains an optional
