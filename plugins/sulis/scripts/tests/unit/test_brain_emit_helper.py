@@ -15,7 +15,6 @@ matters: it always sees `dict | None`.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
@@ -67,7 +66,8 @@ class TestChangeStartedEvent:
             slug="fix-login-bug", primitive="fix",
         )
         assert result is not None
-        assert result["step_name"] == "change-started:fix:fix-login-bug"
+        assert result["step"] == "dna:step:01KT61X5ST01CHANGESTART00A"
+        assert result.get("run_id") == "change-started:fix:fix-login-bug"
         assert result["outcome"] == "completed"
         # Persisted to disk
         ulid = result["id"].split(":")[-1]
@@ -102,7 +102,8 @@ class TestChangeShippedEvent:
             shipped_sha="abc1234",
         )
         assert result is not None
-        assert result["step_name"] == "change-shipped:fix:fix-login-bug"
+        assert result["step"] == "dna:step:01KT61X5ST02CHANGESH1PP00A"
+        assert result.get("run_id") == "change-shipped:fix:fix-login-bug"
         assert result["outcome"] == "completed"
 
 
@@ -116,7 +117,8 @@ class TestLifecycleStepEvent:
             tmp_path, step_name="wpx-pipeline-success:WP-012", outcome="completed",
         )
         assert result is not None
-        assert result["step_name"] == "wpx-pipeline-success:WP-012"
+        assert result["step"] == "dna:step:01KT61X5ST03VNC1ASS1F1ED0A"
+        assert result.get("run_id") == "wpx-pipeline-success:WP-012"
         assert result["outcome"] == "completed"
 
     def test_bad_outcome_returns_none(

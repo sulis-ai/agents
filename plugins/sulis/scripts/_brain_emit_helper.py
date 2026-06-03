@@ -24,7 +24,7 @@ Why a separate helper:
 
 3. **Substrate-level naming.** Each function names the LIFECYCLE EVENT,
    not the entity type. `emit_change_started_event(...)` reads at the
-   call site; `emit_lifecyclerun(step_name=f"change-started:{slug}", ...)`
+   call site; `emit_lifecyclerun(step=<change-started Step ULID>, ...)`
    does not.
 
 Every helper returns `dict | None`:
@@ -41,7 +41,38 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
+
+
+# ─── Step resolution (name → canonical Step ULID) ───────────────────────
+#
+# A LifecycleRun's `step` ref points at a canonical Step (a prov:Plan). The
+# three operational Steps are authored ONCE in
+# `plugins/sulis/instances/lifecycle-steps/steps.jsonld` (WP-001) with
+# deterministic ULIDs; these are the single source of truth, copied here —
+# never re-minted (ADR-001/ADR-004). The per-run specificity that the old free
+# `step_name` string carried is preserved in the run's `run_id`, NOT in a
+# `step_label` (which does not exist in canonical v2).
+
+_STEP_CHANGE_STARTED: Final[str] = "dna:step:01KT61X5ST01CHANGESTART00A"
+_STEP_CHANGE_SHIPPED: Final[str] = "dna:step:01KT61X5ST02CHANGESH1PP00A"
+_STEP_UNCLASSIFIED: Final[str] = "dna:step:01KT61X5ST03VNC1ASS1F1ED0A"
+
+_NAME_TO_STEP_ULID: Final[dict[str, str]] = {
+    "change-started": _STEP_CHANGE_STARTED,
+    "change-shipped": _STEP_CHANGE_SHIPPED,
+}
+
+
+def _resolve_step(name: str) -> str:
+    """Return the canonical Step ULID for a known lifecycle name.
+
+    Unknown names resolve to the `unclassified-lifecycle-step` Step so every
+    run points at a real Step ref rather than an inline-minted one. The
+    original free `name`, where trace grouping is needed, is carried by the
+    run's `run_id` field — not by a `step_label` (which does not exist).
+    """
+    return _NAME_TO_STEP_ULID.get(name, _STEP_UNCLASSIFIED)
 
 
 def _brain_emit_enabled() -> bool:
@@ -128,7 +159,8 @@ def emit_change_started_event(
     return _safely(
         emit_lifecyclerun,
         repo=adapter,
-        step_name=f"change-started:{primitive}:{slug}",
+        step=_resolve_step("change-started"),
+        run_id=f"change-started:{primitive}:{slug}",
         outcome="completed",
         at=datetime.now(timezone.utc).isoformat(),
     )
@@ -160,7 +192,8 @@ def emit_change_shipped_event(
     return _safely(
         emit_lifecyclerun,
         repo=adapter,
-        step_name=f"change-shipped:{primitive}:{slug}",
+        step=_resolve_step("change-shipped"),
+        run_id=f"change-shipped:{primitive}:{slug}",
         outcome="completed",
         at=datetime.now(timezone.utc).isoformat(),
     )
@@ -181,6 +214,12 @@ def emit_lifecycle_step_event(
     human-readable string that uniquely names the event class
     (e.g. `"wpx-pipeline-success:WP-012"`).
 
+    Under v2 the free `step_name` is resolved to a canonical Step ULID for
+    the run's `step` ref (known names map to their Step; everything else
+    falls back to the `unclassified-lifecycle-step` Step). The original
+    `step_name` string is carried into `run_id` for trace grouping — it is
+    not lost, and it does not go into a `step_label` (which does not exist).
+
     Outcome MUST be one of: completed / failed / in-progress / cancelled.
     """
     if not _brain_emit_enabled():
@@ -195,7 +234,8 @@ def emit_lifecycle_step_event(
     return _safely(
         emit_lifecyclerun,
         repo=adapter,
-        step_name=step_name,
+        step=_resolve_step(step_name),
+        run_id=step_name,
         outcome=outcome,
         at=at or datetime.now(timezone.utc).isoformat(),
     )

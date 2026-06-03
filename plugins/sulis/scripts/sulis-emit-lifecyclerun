@@ -7,11 +7,16 @@ step). The entity records that the step happened, when, the outcome, and
 optionally who/what ran it.
 
 Usage:
-    sulis-emit-lifecyclerun --step-name "run-all Step 7"
+    sulis-emit-lifecyclerun --step dna:step:<ulid>
                             --outcome <completed|failed|in-progress|cancelled>
                             [--at <iso-timestamp>]
                             [--by-actor dna:actor:<ulid>]
+                            [--run-id <trace-id>]
                             [--base-dir <dir>] [--domain <domain>] [--repo-root <dir>]
+
+The `--step` value is a canonical Step ULID ref (a `dna:step:<ulid>`) — the
+Step (prov:Plan) this run instantiated. Per-run specificity goes in `--run-id`.
+(The deprecated `--step-name` free-string alias is added by WP-005.)
 
 Defaults:
     --at      current UTC ISO timestamp
@@ -60,10 +65,11 @@ def _err(message: str) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Emit a LifecycleRun event entity (PD).")
-    parser.add_argument("--step-name", required=True)
+    parser.add_argument("--step", required=True, help="canonical Step ULID ref (dna:step:<ulid>)")
     parser.add_argument("--outcome", required=True)
     parser.add_argument("--at", default=None, help="ISO timestamp (default: now UTC)")
     parser.add_argument("--by-actor", default="", help="optional dna:actor:<ulid>")
+    parser.add_argument("--run-id", default=None, help="optional workflow-run trace id")
     parser.add_argument("--base-dir")
     parser.add_argument("--domain", default="product-development")
     parser.add_argument("--repo-root")
@@ -80,10 +86,11 @@ def main() -> int:
     try:
         run = emit_lifecyclerun(
             repo=adapter,
-            step_name=args.step_name,
+            step=args.step,
             outcome=args.outcome,
             at=args.at,
             by_actor=args.by_actor,
+            run_id=args.run_id,
         )
     except ValueError as exc:
         return _err(str(exc))
