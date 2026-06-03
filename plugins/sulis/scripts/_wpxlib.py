@@ -1216,7 +1216,7 @@ def _gh_ref_sha(repo: str, ref: str,
     return _resolve_gh(gh).ref_sha(repo, ref)
 
 
-def _gh_branch_already_merged(repo: str, branch: str, base: str = "dev",
+def _gh_branch_already_merged(repo: str, branch: str, base: str = "main",
                               *, gh: GHClient | None = None) -> tuple[bool, str]:
     """Check whether `branch` is already fully merged into `base`.
 
@@ -1357,7 +1357,7 @@ def _poll_ci(repo: str, branch: str, interval: int, cap: int) -> str:
 
 def _rebase_on_dev(repo: str, branch: str, worktree: Path,
                    dev_sha_at_creation: str,
-                   base_branch: str = "dev") -> tuple[bool, str]:
+                   base_branch: str = "main") -> tuple[bool, str]:
     """If base_branch advanced past dev_sha_at_creation, rebase. Return (rebased, new_sha).
 
     `base_branch` parameterises the rebase target — defaults to "dev" for
@@ -1387,7 +1387,7 @@ def _rebase_on_dev(repo: str, branch: str, worktree: Path,
 
 
 def _merge_squash(repo: str, branch: str, wp: str,
-                  base_branch: str = "dev",
+                  base_branch: str = "main",
                   *, gh: GHClient | None = None) -> str:
     """Squash-merge branch into base_branch. Return merge SHA on base_branch.
 
@@ -2018,7 +2018,7 @@ def find_eligible_branches(
     strict_ci: bool = False,
     *,
     paths: "WpxPaths | None" = None,
-    base_branch: str = "dev",
+    base_branch: str = "main",
 ) -> list[EligibilityResult]:
     """Discover which WPs are eligible for the next train.
 
@@ -2365,7 +2365,7 @@ def rebase_branch_in_clone(
     clone_dir: Path,
     branch: str,
     onto: str,
-    base_branch: str = "dev",
+    base_branch: str = "main",
 ) -> str:
     """Within an existing clone: fetch, checkout, rebase, push --force-with-lease.
 
@@ -3288,7 +3288,7 @@ def compute_culprit_heuristic(
     return best_wp
 
 
-def is_sha_on_branch(repo: str, sha: str, branch: str = "dev",
+def is_sha_on_branch(repo: str, sha: str, branch: str = "main",
                      *, gh: GHClient | None = None) -> bool:
     """Check whether `sha` is reachable from origin/<branch>.
 
@@ -3460,7 +3460,7 @@ def compute_wp_status(
     wp_id: str,
     paths: "WpxPaths",
     repo: str,
-    base_branch: str = "dev",
+    base_branch: str = "main",
     *,
     gh: GHClient | None = None,
     stored_status: str | None = None,
@@ -3920,7 +3920,7 @@ def read_change_metadata(metadata_path: Path) -> dict:
 
 
 def git_worktree_add(repo_root: Path, branch: str, dest: Path,
-                     base_ref: str = "dev") -> tuple[bool, str]:
+                     base_ref: str = "main") -> tuple[bool, str]:
     """Create a worktree at `dest` for a new branch off `base_ref`.
 
     If the branch already exists, the worktree is added on the existing

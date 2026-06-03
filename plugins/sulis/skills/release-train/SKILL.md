@@ -104,36 +104,11 @@ Run these checks before computing anything. Any one of them can stop the run wit
 a plain-English explanation. The drift guard runs **first** — if production has
 moved ahead of `dev`, nothing else this skill computes is trustworthy.
 
-**a. Refuse to operate against a stale `dev`.** Before anything else, confirm
-production (`main`) hasn't drifted ahead of `dev`. A release computed against a
-stale `dev` would itself ship stale — so this is the very first thing checked.
-Run the shared drift helper; it does its own `git fetch origin` and compares the
-two branches:
-
-```bash
-if ! bash plugins/sulis/scripts/drift_check.sh; then
-  exit 1
-fi
-```
-
-The helper exits `0` and stays silent when `dev` is level with or ahead of
-production. If it exits non-zero, it has already printed a plain-English recovery
-message (either "there's an open back-integrate pull request — merge it, then
-re-run" or the manual step-by-step). **Stop the run** — do not proceed to reading
-changesets or computing the next version. Surface the helper's message and the
-recovery path:
-
-> *"I've stopped before drafting anything: production has moved ahead of `dev`,
-> so a release right now would ship stale work. {the helper's recovery message}.
-> Once `dev` is caught up, run `/sulis:release-train` again. (This is the
-> back-on-release safety net — the recovery procedure is the one written up under
-> GIT-12 in the git workflow standard.)"*
-
-This is a defence-in-depth guard: the release robot's own back-merge step is the
-primary protection, and this check catches the rare case where that step was
-bypassed or an earlier back-integrate pull request is still sitting open. The
-comparison logic lives once, in `plugins/sulis/scripts/drift_check.sh` — this
-skill only calls it, never re-implements the check.
+**a. (retired)** The old "refuse to operate against a stale `dev`" drift gate
+(`drift_check.sh` + the GIT-12 back-merge invariant) was removed with the
+two-branch model. On the trunk there is one line — `main` — so there is no
+`dev`-vs-`main` drift to guard against. A release is a bump + tag on `main`,
+computed from the changesets already on `main`.
 
 **b. GitHub access.** Confirm `gh` is authenticated:
 

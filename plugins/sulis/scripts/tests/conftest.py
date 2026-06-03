@@ -401,6 +401,14 @@ def local_git_repo(tmp_path):
         ["git", "push", "-q", "-u", "origin", "dev"],
         cwd=repo, check=True,
     )
+    # Trunk model: `main` is the integration line + default base. Create it
+    # alongside `dev` (kept so tests exercising explicit `--base-branch dev`
+    # still resolve a real ref) and push both.
+    subprocess.run(["git", "branch", "main", "dev"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "push", "-q", "-u", "origin", "main"],
+        cwd=repo, check=True,
+    )
     return repo
 
 
