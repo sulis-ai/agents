@@ -144,9 +144,11 @@ def compose_findings_from_register(
     text = Path(register_path).read_text(encoding="utf-8")
     findings: list[dict] = []
     for line in text.splitlines():
-        # Recognise table rows by the `| SF-NNN |` cell pattern.
+        # Recognise table rows by the `| SF-xxxx |` cell pattern. The SF id is
+        # hex (derived from the finding signature); `[0-9a-f]+` also matches
+        # legacy decimal ids (SF-001), so pre-existing registers still parse.
         match = re.match(
-            r"^\|\s*SF-\d+\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]*?)\s*\|\s*([^|]+?)\s*\|",
+            r"^\|\s*SF-[0-9a-f]+\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]*?)\s*\|\s*([^|]+?)\s*\|",
             line,
         )
         if not match:

@@ -3579,8 +3579,14 @@ def revert_train_on_dev(
     bundle: list[dict],
     reason: str,
     train_id: str,
+    base_branch: str = "main",
 ) -> tuple[bool, str]:
-    """Revert all merged WPs in the bundle in reverse order, push to dev.
+    """Revert all merged WPs in the bundle in reverse order, push to the trunk.
+
+    `base_branch` is the integration line the merges landed on (the trunk,
+    `main`, by default; pass the change branch when reverting a change-bounded
+    train). The function name keeps the historical `_on_dev` suffix for
+    call-site stability; the operation targets `base_branch`.
 
     Produces a single wrapper commit
     `revert(train-{ts}): rollback {WPs} — {reason}` on `dev`.
@@ -3592,15 +3598,15 @@ def revert_train_on_dev(
     if not merged:
         return True, "no merged WPs to revert"
 
-    # Checkout dev, fetch latest
-    rc, _, err = _run(["git", "fetch", "origin", "dev"], cwd=clone_dir,
+    # Checkout the trunk, fetch latest
+    rc, _, err = _run(["git", "fetch", "origin", base_branch], cwd=clone_dir,
                      timeout=60)
     if rc != 0:
-        return False, f"git fetch dev failed: {err}"
-    rc, _, err = _run(["git", "checkout", "-B", "dev", "origin/dev"],
+        return False, f"git fetch {base_branch} failed: {err}"
+    rc, _, err = _run(["git", "checkout", "-B", base_branch, f"origin/{base_branch}"],
                      cwd=clone_dir, timeout=30)
     if rc != 0:
-        return False, f"git checkout dev failed: {err}"
+        return False, f"git checkout {base_branch} failed: {err}"
 
     # Revert each merge SHA in reverse order; --no-commit to stage all
     # changes into a single wrapper commit
@@ -3622,10 +3628,10 @@ def revert_train_on_dev(
     rc, _, err = _run(["git", "commit", "-m", msg], cwd=clone_dir, timeout=30)
     if rc != 0:
         return False, f"git commit (revert wrapper) failed: {err}"
-    rc, _, err = _run(["git", "push", "origin", "dev"], cwd=clone_dir,
+    rc, _, err = _run(["git", "push", "origin", base_branch], cwd=clone_dir,
                      timeout=60)
     if rc != 0:
-        return False, f"git push dev (revert) failed: {err}"
+        return False, f"git push {base_branch} (revert) failed: {err}"
     return True, f"reverted {len(merged)} merges under wrapper commit"
 
 
@@ -4004,7 +4010,7 @@ def git_worktree_remove(repo_root: Path, dest: Path,
 
 
 def detect_adopt_state(repo_root: Path,
-                      remote_ref: str = "origin/dev") -> dict:
+                      remote_ref: str = "origin/main") -> dict:
     """Inspect the current repo state for `sulis-change adopt`.
 
     Returns a dict:
@@ -4606,7 +4612,7 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
 def back_integrate_change_branch(
     repo_root: Path,
     change_branch: str,
-    dev_ref: str = "origin/dev",
+    dev_ref: str = "origin/main",
     *,
     fetch_first: bool = True,
 ) -> dict:

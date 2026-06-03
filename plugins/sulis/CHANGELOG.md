@@ -1,3 +1,47 @@
+## v0.97.5 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- Skills + scripts audit: repoint residual dev references to the trunk that the cutover missed. Scripts (runtime-breaking now that dev is deleted): wpx-train + wpx-pipeline + _change_context base-branch defaults dev→main; revert_train_on_dev (the train rollback path) parameterised to base_branch=main; back_integrate_change_branch + wpx-preflight defaults dev→main; wpx-pipeline log strings. Skills: resolve-lessons (rebase change branches onto main, was back-integrate dev), run-all (BASE_BRANCH else-default + founder messages + fetch-base + review prompts), run-wp, backfill-gates/code-review. Tests reconciled to the trunk base. release-train SKILL.md rewrite is a separate follow-up (broken-but-superseded by the auto-robot).
+
+## v0.97.4 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- CI workflows repointed to the trunk: deploy-staging fires on push to main (was dev); branch-ci pull_request targets main (was dev); version-check resolves its diff base against origin/main only (dropped the origin/dev preference). Completes the two-branch decommission — no workflow references dev. Unblocks lossless deletion of the dev branch.
+
+## v0.97.3 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- Decommission the two-branch (dev/main) machinery left over from the trunk cutover. Deleted drift_check.sh + the dead drift/GIT-12 test suite + promote-dev-to-main.yml; severed the dev/back-merge constants from abm_canonical.sh (kept path helpers for the trunk tests); repointed wpx-arrival-check repo-contract rules to the trunk (RC-01 default=main + main-only existence, RC-02 protection on main, RC-03 merge-queue on main, RC-04 required workflow release-on-merge); rewrote git-workflow-standard GIT-01 to single-trunk, reframed GIT-06 to release-on-trunk, RETIRED GIT-12, bumped 0.3.0→0.4.0. Net -1026 lines. dev branch deletion is the separate final step.
+
+## v0.97.2 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- Sulis agent: add The Outcome Test — one unifying principle (the founder measures the outcome they can use, not the artifact you produced) that consolidates three repeat watchlist strikes (#81 done-against-wrong-gate, #173 deferred-the-wanted-slice, #174 menu-instead-of-demonstrate). Placed at the turn-end chokepoint + wired as self-check step 8 so it fires mechanically; DoD generalised from CI-gate to capability-exercisable; GATHER now routes a confused founder to PROCEED-and-show; Scope Posture phase-1 must reach the usable capability. Consolidation not accretion (+52 lines).
+
+## v0.97.1 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- wpx-findings: SF + WP-AUTO ids now derive from the finding signature hash (SF-{sig[:8]} / WP-AUTO-{sig[:8]}) instead of a racy max(existing)+1 counter. Collision-free under parallel run-all security reviews, dedup-unified (same finding always → same id), 1:1-traceable SF↔WP-AUTO. Regexes widened decimal→hex (back-compatible: legacy SF-001 still parses). First fix in the multi-agent numbering strategy; the plugins-repo DR/L counters are the paired change.
+
+## v0.97.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- Vendor the brand-identity domain (Brand + DesignSystem + Tenant mirror,
+  sulis-brain v0.15.0 / DR-030) into plugins/sulis/brain/compiled/brand-identity/,
+  and wire the ux-designer agent to it: Section 0 now READs an existing
+  DesignSystem instance (binding the mockup to its real DTCG tokens) and EMITs a
+  Brand + DesignSystem when it establishes a design language. Adds two emit shims
+  (sulis-emit-brand, sulis-emit-design-system) over the generic ingest, with the
+  UXD-04 primitive/semantic/component -> DTCG global/alias/component tier mapping
+  baked into the agent body. CI-locked by 3 new emitter tests (valid Brand, valid
+  DesignSystem-realizing-Brand, and missing-realizes_identity rejects).
+
 ## v0.96.0 — 2026-06-03
 
 **Minor — release-train batch.**

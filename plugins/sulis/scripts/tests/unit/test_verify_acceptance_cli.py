@@ -97,3 +97,64 @@ def test_cli_errors_on_missing_target(tmp_path):
     )
     assert r.returncode == 2
     assert "target" in r.stderr.lower()
+
+
+# #171 — subprocess-only scenarios on a no-app repo
+_SUBPROCESS_BUNDLE = {
+    "scenario": {"@id": "dna:scenario:cli", "name": "cli check", "journey": "wf"},
+    "workflow": {"@id": "wf", "steps": ["s1", "s2"]},
+    "tools": [{"@id": "dna:tool:sub", "implementation_kind": "subprocess"}],
+    "steps": [
+        {"@id": "s1", "name": "true cmd", "mechanism": "deterministic",
+         "tool_ref": "dna:tool:sub",
+         "mechanism_detail": json.dumps({"cmd": "true", "expect_exit": 0})},
+        {"@id": "s2", "name": "echo ok", "mechanism": "deterministic",
+         "tool_ref": "dna:tool:sub",
+         "mechanism_detail": json.dumps({"cmd": "echo ok", "expect_exit": 0})},
+    ],
+}
+
+
+def test_cli_passes_on_subprocess_only_scenario_without_local_target(tmp_path):
+    """#171 — a scenario whose every step is a subprocess-mechanism step
+    needs no HTTP target URL. The gate must run on a no-app repo (no
+    `targets.local`) instead of refusing with the misleading 'No local
+    target URL' error."""
+    bundle = tmp_path / "subprocess-bundle.json"
+    bundle.write_text(json.dumps(_SUBPROCESS_BUNDLE), encoding="utf-8")
+    # No `targets.local` — only `profile: x` (a no-app repo: published-artifact,
+    # plugin, library, etc.).
+    (tmp_path / ".sulis").mkdir()
+    (tmp_path / ".sulis" / "repo-contract.yml").write_text(
+        "profile: published-artifact\n", encoding="utf-8")
+
+    r = subprocess.run(
+        [sys.executable, str(_SCRIPT), "--bundle", str(bundle),
+         "--target", "local", "--repo-root", str(tmp_path), "--json"],
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 0, (
+        f"subprocess-only scenario must pass without targets.local; "
+        f"returncode={r.returncode}, stderr={r.stderr!r}"
+    )
+    env = json.loads(r.stdout)
+    assert env["verdict"] == "pass" and env["gate"] == "pass", env
+
+
+def test_cli_still_errors_on_missing_target_when_http_step_present(tmp_path):
+    """Regression — keep the existing 'missing target URL' guard for the
+    case the lesson left untouched: at least one step needs an HTTP URL."""
+    bundle = tmp_path / "mixed-bundle.json"
+    # Borrow the existing _BUNDLE (two http_call steps) to prove the guard
+    # still fires when an http step is present.
+    bundle.write_text(json.dumps(_BUNDLE), encoding="utf-8")
+    (tmp_path / ".sulis").mkdir()
+    (tmp_path / ".sulis" / "repo-contract.yml").write_text(
+        "profile: published-artifact\n", encoding="utf-8")
+    r = subprocess.run(
+        [sys.executable, str(_SCRIPT), "--bundle", str(bundle),
+         "--target", "local", "--repo-root", str(tmp_path)],
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 2
+    assert "target" in r.stderr.lower()
