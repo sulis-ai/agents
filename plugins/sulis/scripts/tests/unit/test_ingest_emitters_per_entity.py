@@ -90,3 +90,84 @@ def test_emits_scenario_fixture_under_product_development(
     rel = first.relative_to(tmp_path)
     assert rel.parts[:4] == (".brain", "instances", "product-development", "scenario")
     assert first.exists()
+
+
+# --- brand-identity emitters (DR-030; phase-1b — vendored Brand + DesignSystem) ---
+
+_BRAND_ID = f"dna:brand:{_ulid('brand-acme')}"
+
+
+def _valid_brand() -> dict:
+    # Brand is a thin anchor: id + name + discovery-lifecycle state + soft elements.
+    return {
+        "id": _BRAND_ID,
+        "sys_status": "active",
+        "name": "Acme",
+        "state": "Articulated",
+        "voice": {
+            "what_it_is": "warm, precise, plain",
+            "what_its_not": [{"not": "hype", "example_not": "'revolutionary, world-class'"}],
+        },
+    }
+
+
+def _valid_design_system() -> dict:
+    # DesignSystem realizes the Brand; tokens are W3C-DTCG; tiers use the DTCG enum
+    # (global|alias|component — NOT the UXD-04 primitive/semantic names).
+    return {
+        "id": f"dna:design-system:{_ulid('ds-acme')}",
+        "sys_status": "active",
+        "name": "Acme DS",
+        "state": "draft",
+        "realizes_identity": [_BRAND_ID],
+        "tokens": {"color": {"brand": {"$value": "#3366FF", "$type": "color"}}},
+        "token_tiers": ["global", "alias", "component"],
+        "accessibility_target": "AA",
+    }
+
+
+def test_emits_brand_fixture_under_brand_identity(tmp_path, run_tool) -> None:
+    src = tmp_path / "brands.jsonld"
+    src.write_text(json.dumps({"brands": [_valid_brand()]}))
+    result = run_tool(
+        "sulis-emit-brand", "--from-instances", str(src),
+        "--base-dir", str(tmp_path / ".brain" / "instances"),
+        "--repo-root", str(tmp_path),
+    )
+    assert result.ok, f"stderr: {result.stderr!r}"
+    assert result.data["count"] == 1
+    first = Path(result.data["entities"][0]["path"])
+    rel = first.relative_to(tmp_path)
+    assert rel.parts[:4] == (".brain", "instances", "brand-identity", "brand")
+    assert first.exists()
+
+
+def test_emits_design_system_fixture_realizing_a_brand(tmp_path, run_tool) -> None:
+    src = tmp_path / "design-systems.jsonld"
+    src.write_text(json.dumps({"design-systems": [_valid_design_system()]}))
+    result = run_tool(
+        "sulis-emit-design-system", "--from-instances", str(src),
+        "--base-dir", str(tmp_path / ".brain" / "instances"),
+        "--repo-root", str(tmp_path),
+    )
+    assert result.ok, f"stderr: {result.stderr!r}"
+    assert result.data["count"] == 1
+    first = Path(result.data["entities"][0]["path"])
+    rel = first.relative_to(tmp_path)
+    assert rel.parts[:4] == (".brain", "instances", "brand-identity", "design-system")
+    assert first.exists()
+
+
+def test_design_system_without_realizes_identity_is_rejected(tmp_path, run_tool) -> None:
+    """The load-bearing edge: a DesignSystem with no Brand to realize must NOT persist."""
+    bad = _valid_design_system()
+    del bad["realizes_identity"]
+    src = tmp_path / "design-systems-bad.jsonld"
+    src.write_text(json.dumps({"design-systems": [bad]}))
+    result = run_tool(
+        "sulis-emit-design-system", "--from-instances", str(src),
+        "--base-dir", str(tmp_path / ".brain" / "instances"),
+        "--repo-root", str(tmp_path),
+    )
+    assert not result.ok, "schema must reject a DesignSystem missing realizes_identity"
+    assert "realizes_identity" in (result.stdout + result.stderr)
