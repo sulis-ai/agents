@@ -273,6 +273,15 @@ If extending or superseding, reference the existing ADR by path.}
    write `.architecture/{project}/SIZING.md` per the schema in
    `references/right-sizing.md`.
 
+   **Scope posture (MUST — see the Sulis body "Scope Posture").** The tier
+   sizes *how much design rigour* the work warrants — it does **not** license
+   shrinking the *scope delivered*. Default to designing the **full coherent
+   scope** of what's asked; a large tier means "design it properly," not
+   "deliver less." The "smaller first version" above is a *founder-initiated*
+   redirect, never the agent's reflex. If the scope is genuinely too big to
+   hold in one go, **you** propose a phased plan (phase 1 a real go; the rest
+   captured to the backlog) — never hand the slicing to the founder.
+
    (Operator-facing invocations — `--raw` / `/sulis:jargon on` — may still see
    the full sFPC/ASR proposal; founder-mode gets the plain size sentence.)
 3.5. **Define the contracts (MUST when cross-kind or user-facing).** Before
@@ -311,7 +320,42 @@ If extending or superseding, reference the existing ADR by path.}
    [`UX_VISUAL_DESIGN_STANDARD.md`](../../references/standards/UX_VISUAL_DESIGN_STANDARD.md).
    This is a **hard gate** (#45): if the TDD has any user-facing surface, the
    visual contract is mandatory and `plan-work` cannot emit frontend WPs
-   without it (the toolchain enforces this — see below). Produce two things:
+   without it (the toolchain enforces this — see below).
+
+   **Dispatch the `ux-designer` specialist — do NOT produce the visual contract
+   inline (MUST).** The visual contract is owned by the `ux-designer` agent the
+   way the SRD is owned by the requirements-analyst: it runs the inspiration
+   probe, produces the real-token HTML mockup, takes the accessibility
+   decisions, and **facilitates the founder's sign-off** (the most founder-
+   facing review there is). Hand it the surface + the project's design instance:
+
+   ```
+   Agent({
+     subagent_type: "sulis:ux-designer",
+     description: "Design the {surface} screen + get your sign-off",
+     prompt: "Produce the visual contract for {surface} (part of the {project}
+              design). Read the TDD's user-facing surface description + the
+              project's design instance. Run the inspiration probe, produce the
+              real-token mockup at contracts/visual/{surface}.html, verify
+              accessibility, and facilitate sign-off. Return the visual-contract
+              WP fields (mockup path, inspiration, signed_off_at, provenance)."
+   })
+   ```
+
+   The architect's job here is to **identify the surface(s)** + hand off; the
+   `ux-designer` owns the contract. The detail below (the four layers + the
+   Mobbin probe + the mockup) is that agent's contract — kept here as the spec
+   it produces against (and as the fallback if `ux-designer` is unavailable, in
+   which case produce it inline per the steps below and note the deviation).
+
+   **If the surface renders inside an AI client (MCP App / Artifact), write an
+   ADR for the rendering path (MUST).** Choosing Artifact vs MCP App vs MCP-UI
+   `externalUrl` is an **architecture** decision — driven by data-connection +
+   durability, not styling — so it belongs in an ADR, not buried in a WP. See
+   [`mcp-ui-surface-patterns.md`](../../references/mcp-ui-surface-patterns.md)
+   for the decision rule + the `ui://` contract shape. (Ephemeral Artifact for
+   in-session output with no live data; MCP App for a durable, data-connected,
+   reusable surface; `externalUrl` to embed an existing web app.)
 
    **(i) The contract record + mockup.** Cover the four layers' essentials:
    - **Identity** (referenced — not re-articulated here) — point at the
@@ -614,6 +658,27 @@ If extending or superseding, reference the existing ADR by path.}
     persisted on disk; brain emission is a side-effect and never blocks
     the blueprint step from completing. Don't narrate the emissions to
     the founder (FE-09) — the brain simply stays current.
+
+15.5. **Resolve verification scenarios to the real Design (MUST when the
+    change authored scenarios at specify).** `/sulis:specify` writes each
+    scenario's `exercises` as a *synthetic Design placeholder* (no Design
+    existed yet). Now the real Design is emitted, so re-point them — capture
+    the Design id from the emit above (its envelope's `data.entities[].id`),
+    then for each of the change's durable scenario bundles
+    (`{worktree}/.changes/{primitive}-{slug}.scenarios.jsonld`):
+
+    ```bash
+    "$SCRIPTS_DIR/sulis-resolve-scenario-design" \
+      --scenarios "{worktree}/.changes/{primitive}-{slug}.scenarios.jsonld" \
+      --design "<dna:design:… from the emit above>" \
+      --emit --repo-root "$(git rev-parse --show-toplevel)"
+    ```
+
+    A change produces one Design that all its scenarios exercise, so
+    re-pointing every scenario in the bundle is unambiguous (it uses the REAL
+    emitted id, not a path-recomputed one, so it can't drift). Best-effort +
+    no narration (FE-09): skip silently if the change authored no scenarios
+    bundle (a non-user-facing change, or specify wrote none).
 
 After the blueprint is accepted, the user typically runs `/sulis:plan-work`
 next.

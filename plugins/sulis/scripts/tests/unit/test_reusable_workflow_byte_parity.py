@@ -140,15 +140,16 @@ def test_reusable_workflow_uses_workflow_call_trigger(
     ), "reusable workflow must not use `on: push:` trigger"
 
 
-def test_reusable_workflow_declares_pull_requests_permission(
+def test_reusable_workflow_declares_only_contents_permission(
     reusable_content: str,
 ) -> None:
-    """Per TDD §5.8: reusable workflow re-declares permissions at the
-    job level and adds `pull-requests: write` (forward-looking for
-    WP-003's gh pr create / gh pr merge --auto). The bare
-    `contents: write` that the marketplace file carries is not
-    sufficient — GitHub does not inherit caller permissions into
-    reusable workflows.
+    """Per TDD §5.8 the reusable workflow re-declares permissions at the
+    job level (GitHub does not inherit caller permissions into reusable
+    workflows). On the trunk (WP-001, CH-01KT4K) it needs ONLY
+    `contents: write` — the bump commit + tag + push to main. The former
+    `pull-requests: write` (added forward-looking for the back-merge
+    gh-pr machinery) was removed when the back-merge block was deleted;
+    a trunk release opens no PR.
     """
     # Trailing comments after the write keyword are permitted (the
     # source workflow's commenting style carries inline annotations
@@ -158,15 +159,21 @@ def test_reusable_workflow_declares_pull_requests_permission(
     assert re.search(
         r"^    permissions:\n"
         r"(?:      .*\n)*"
-        r"      pull-requests:[ \t]+write[ \t]*(?:#[^\n]*)?\n",
-        reusable_content,
-        flags=re.MULTILINE,
-    ), "reusable workflow must declare `pull-requests: write` at job level"
-
-    assert re.search(
-        r"^    permissions:\n"
-        r"(?:      .*\n)*"
         r"      contents:[ \t]+write[ \t]*(?:#[^\n]*)?\n",
         reusable_content,
         flags=re.MULTILINE,
     ), "reusable workflow must declare `contents: write` at job level"
+
+    # The trunk re-model removed the pull-requests:write PERMISSION (no PR is
+    # opened). Match only a permission-declaration line (6-space indent under
+    # the permissions: block), so an explanatory comment that merely names the
+    # removed permission doesn't trip the guard.
+    assert not re.search(
+        r"^      pull-requests:[ \t]+\w",
+        reusable_content,
+        flags=re.MULTILINE,
+    ), (
+        "reusable workflow must NOT declare a pull-requests permission on the "
+        "trunk — the back-merge gh-pr machinery (the only consumer of it) was "
+        "deleted in the trunk re-model (CH-01KT4K)"
+    )

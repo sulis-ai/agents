@@ -1,11 +1,12 @@
 """
-test_steps_instance_valid - WP-002
+test_steps_instance_valid - WP-002, re-pinned to the trunk shape by
+WP-001 (CH-01KT4K, simplify-release-robot).
 
 Validates that `plugins/sulis/instances/release-train/steps.jsonld`:
 
 1. Parses as valid JSON-LD with the expected envelope shape.
-2. Declares exactly 15 Step instances (per WP-002 Contract table +
-   TDD Form #2).
+2. Declares exactly 10 Step instances (trunk re-model — the 5
+   dev->main-PR Steps deleted).
 3. Each Step validates against the vendored foundation Step JSON
    Schema (v1.2.0) at
    `plugins/sulis/brain/compiled/foundation/step.schema.json`.
@@ -19,14 +20,16 @@ Validates that `plugins/sulis/instances/release-train/steps.jsonld`:
    (cross-WP consistency with WP-003 + WP-004 + WP-006).
 8. Every Step's `for_workflow` is the canonical workflow ULID
    (cross-WP consistency with WP-003).
-9. Step 5 (`draft-pr-body-and-changelog`) carries a
-   `mechanism_detail` token-budget payload per NFR-010.
-10. Step 8 (`gate-founder-confirmation`) has `mechanism: human`
-    (the load-bearing founder gate; MUC-007).
-11. The envelope carries `excluded_from_yaml` naming the 6 Steps
+9. `gate-founder-confirmation` has `mechanism: human` (the
+   load-bearing founder gate; MUC-007).
+10. The envelope carries `excluded_from_yaml` naming the 2 Steps
     that by design have no annotation in `release-on-merge.yml`
-    (WP-001 of tighten-drift-gate: drives the drift detector's
-    by-design-absence filter so blocking mode is achievable).
+    (gate-founder-confirmation + publish-github-release).
+
+Trunk re-model (WP-001): the probabilistic draft-pr-body-and-changelog
+Step (the old Step 5 / NFR-010 token-budget surface) was deleted — there
+is no probabilistic Step on the trunk; changelog drafting consolidates
+into write-changelog-entry.
 
 These tests are deliberately deterministic + offline - no network,
 no LLM, no subprocess. Schemas come from the vendored
@@ -74,40 +77,36 @@ _FAILUREMODES_PATH = (
 _CANONICAL_TENANT_ULID = "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM"
 _CANONICAL_WORKFLOW_ULID = "dna:workflow:01KT0RTRA1NWFW00000000000A"
 
-# The 15 Step names in canonical order (per WP-002 Contract table +
-# TDD Form #2 Steps table).
+# The 10 kept Step names in canonical (linear) order (trunk re-model,
+# WP-001). The 5 dev->main-PR Steps (preflight-cross-branch-drift,
+# draft-pr-body-and-changelog, open-release-pr,
+# wait-for-checks-and-mergeability, squash-merge) were deleted;
+# commit-bump-as-bot became commit-bump-on-main (commits directly to main).
 _EXPECTED_STEP_NAMES = [
     "detect-pending-changesets",  # 1
     "preflight-version-drift",  # 2
-    "preflight-cross-branch-drift",  # 3
-    "compute-next-version",  # 4
-    "draft-pr-body-and-changelog",  # 5 - probabilistic; NFR-010 budget
-    "open-release-pr",  # 6
-    "wait-for-checks-and-mergeability",  # 7
-    "gate-founder-confirmation",  # 8 - mechanism=human (MUC-007)
-    "squash-merge",  # 9
-    "bump-version-files",  # 10
-    "write-changelog-entry",  # 11
-    "commit-bump-as-bot",  # 12
-    "tag-and-push",  # 13
-    "publish-github-release",  # 14
-    "emit-release-entity",  # 15
+    "compute-next-version",  # 3
+    "gate-founder-confirmation",  # 4 - mechanism=human (MUC-007)
+    "bump-version-files",  # 5
+    "write-changelog-entry",  # 6
+    "commit-bump-on-main",  # 7 - commits directly to main (no promotion PR)
+    "tag-and-push",  # 8
+    "publish-github-release",  # 9
+    "emit-release-entity",  # 10
 ]
-_EXPECTED_STEP_COUNT = len(_EXPECTED_STEP_NAMES)  # 15
+_EXPECTED_STEP_COUNT = len(_EXPECTED_STEP_NAMES)  # 10
 
-# The 6 by-design absences from release-on-merge.yml. Five live in the
-# /sulis:release-train skill prose (MUC-007 boundary), one (squash-merge)
-# happens in the GitHub PR-merge UI. Encoded at envelope level because
-# the per-Step brain schema sets unevaluatedProperties:false and rejects
-# arbitrary new fields on Step objects; the envelope carries no such
-# constraint.
+# The 2 by-design absences from release-on-merge.yml after the trunk
+# re-model. Both are real Steps that are deliberately unannotated in the
+# imperative: gate-founder-confirmation is the founder's manual merge
+# (MUC-007); publish-github-release fires from the downstream
+# release-prod.yml on the v* tag, not from this workflow. Encoded at
+# envelope level because the per-Step brain schema sets
+# unevaluatedProperties:false and rejects arbitrary new fields on Step
+# objects; the envelope carries no such constraint.
 _EXPECTED_EXCLUDED_FROM_YAML = {
     "gate-founder-confirmation",  # mechanism=human (MUC-007 founder gate)
-    "open-release-pr",  # skill prose, before release-on-merge fires
-    "wait-for-checks-and-mergeability",  # skill prose; merge itself is proof
     "publish-github-release",  # release-prod.yml fires on the v* tag, not here
-    "squash-merge",  # founder action in the GitHub UI
-    "preflight-cross-branch-drift",  # skill prose pre-PR-open
 }
 
 # Kebab-case pattern: lowercase, hyphen-separated, no leading digit.
@@ -184,13 +183,11 @@ def test_steps_jsonld_parses(instance: dict) -> None:
     assert isinstance(instance["steps"], list)
 
 
-# ----- Test #2 - exactly 15 Step instances by exact-name match -----
+# ----- Test #2 - exactly 10 Step instances by exact-name match -----
 
 
-def test_all_15_steps_present(steps: list[dict]) -> None:
-    """WP-002 + TDD Form #2 Contract: 15 Step instances by
-    exact-name match.
-    """
+def test_all_steps_present(steps: list[dict]) -> None:
+    """Trunk re-model (WP-001): 10 Step instances by exact-name match."""
     assert len(steps) == _EXPECTED_STEP_COUNT, (
         f"expected {_EXPECTED_STEP_COUNT} Steps, found {len(steps)}"
     )
@@ -305,51 +302,47 @@ def test_tenant_and_workflow_ulids_canonical(instance: dict, steps: list[dict]) 
     )
 
 
-# ----- Test #8 - Step 5 carries NFR-010 token budget -----
+# ----- Test #8 - no probabilistic Step survives on the trunk -----
 
 
-def test_step5_carries_token_budget(steps: list[dict]) -> None:
-    """Step 5 (draft-pr-body-and-changelog) is the only probabilistic
-    Step per NFR-010 and MUST carry a mechanism_detail token-budget
-    payload bounding LLM cost.
+def test_no_probabilistic_step_on_trunk(steps: list[dict]) -> None:
+    """The only probabilistic Step (draft-pr-body-and-changelog,
+    the NFR-010 token-budget surface) was deleted in the trunk re-model
+    (WP-001). No surviving Step is probabilistic; changelog drafting
+    consolidates into the deterministic write-changelog-entry Step.
     """
     by_name = {s["name"]: s for s in steps}
-    step5 = by_name["draft-pr-body-and-changelog"]
-    assert step5.get("mechanism") in ("probabilistic", "mixed"), (
-        f"Step 5 mechanism should be probabilistic/mixed; got {step5.get('mechanism')}"
+    assert "draft-pr-body-and-changelog" not in by_name, (
+        "the probabilistic draft-pr-body-and-changelog Step must be deleted "
+        "on the trunk"
     )
-    detail = step5.get("mechanism_detail")
-    assert detail, "Step 5 must carry mechanism_detail with NFR-010 token budget"
-    # mechanism_detail is stored as a JSON-encoded string per schema
-    # (string type) so it round-trips through json.loads.
-    parsed = json.loads(detail)
-    budget = parsed.get("token_budget")
-    assert budget is not None, f"Step 5 mechanism_detail missing token_budget: {parsed}"
-    assert "input" in budget and "output" in budget, (
-        f"Step 5 token_budget missing input/output: {budget}"
+    probabilistic = [
+        s["name"] for s in steps if s.get("mechanism") in ("probabilistic", "mixed")
+    ]
+    assert not probabilistic, (
+        f"no probabilistic Step should remain on the trunk; found {probabilistic}"
     )
-    assert isinstance(budget["input"], int) and budget["input"] > 0
-    assert isinstance(budget["output"], int) and budget["output"] > 0
 
 
-# ----- Test #9 - Step 8 mechanism=human (founder gate) -----
+# ----- Test #9 - gate-founder-confirmation mechanism=human (founder gate) -----
 
 
-def test_step8_is_human_mechanism(steps: list[dict]) -> None:
-    """Step 8 (gate-founder-confirmation) MUST have mechanism=human.
-    This is the load-bearing founder-confirmation gate from MUC-007 -
-    the LLM dry-run path respects this and refuses to auto-execute
-    the ship-phase Steps without the founder's go-ahead.
+def test_founder_gate_is_human_mechanism(steps: list[dict]) -> None:
+    """gate-founder-confirmation MUST have mechanism=human. This is the
+    load-bearing founder-confirmation gate from MUC-007 - the LLM dry-run
+    path respects this and refuses to auto-execute the ship-phase Steps
+    without the founder's go-ahead.
     """
     by_name = {s["name"]: s for s in steps}
-    step8 = by_name["gate-founder-confirmation"]
-    assert step8.get("mechanism") == "human", (
-        f"Step 8 mechanism must be 'human'; got {step8.get('mechanism')}"
+    gate = by_name["gate-founder-confirmation"]
+    assert gate.get("mechanism") == "human", (
+        f"gate-founder-confirmation mechanism must be 'human'; "
+        f"got {gate.get('mechanism')}"
     )
     # mechanism=human Steps SHOULD NOT carry a tool_ref (per brain
     # semantics: human steps are not Tool invocations).
-    assert "tool_ref" not in step8 or step8["tool_ref"] is None, (
-        "Step 8 (human) should not carry a tool_ref"
+    assert "tool_ref" not in gate or gate["tool_ref"] is None, (
+        "gate-founder-confirmation (human) should not carry a tool_ref"
     )
 
 
@@ -357,7 +350,7 @@ def test_step8_is_human_mechanism(steps: list[dict]) -> None:
 
 
 def test_io_artifact_names_consistent(steps: list[dict]) -> None:
-    """Output artifact names across all 15 Steps are unique by name
+    """Output artifact names across all Steps are unique by name
     (state_contract Blue invariant - no two Steps produce an artifact
     of the same name with different meaning).
     """
@@ -375,18 +368,19 @@ def test_io_artifact_names_consistent(steps: list[dict]) -> None:
     )
 
 
-# ----- Test #11 - envelope.excluded_from_yaml names the 6 by-design absences -----
+# ----- Test #11 - envelope.excluded_from_yaml names the 2 by-design absences -----
 
 
-def test_envelope_excluded_from_yaml_names_six_by_design_absences(
+def test_envelope_excluded_from_yaml_names_by_design_absences(
     instance: dict, steps: list[dict]
 ) -> None:
     """The steps.jsonld envelope carries `excluded_from_yaml`, a list of
     Step names that the drift detector must NOT flag as missing_in_yaml.
 
-    These are Steps deliberately absent from release-on-merge.yml because
-    they live elsewhere — skill prose (MUC-007), the GitHub UI, or the
-    downstream release-prod.yml workflow. The list is the load-bearing
+    On the trunk these are the 2 real-but-unannotated Steps:
+    gate-founder-confirmation (the founder's manual merge, MUC-007) and
+    publish-github-release (fires from the downstream release-prod.yml on
+    the v* tag, not from this workflow). The list is the load-bearing
     signal that lets the drift detector run in blocking mode without
     false positives.
 

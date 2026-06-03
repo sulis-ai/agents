@@ -15,14 +15,14 @@ name: release-on-merge (reusable)
 # `.github/workflows/release-on-merge.yml` — the move is content-
 # preserving. Three structural adjustments from the marketplace
 # variant (TDD §4.2 / §5.8):
-#   1. `on:` becomes `workflow_call:` (no inputs at this WP; WP-003
-#      may add inputs as part of the back-merge feature work).
+#   1. `on:` becomes `workflow_call:` (no inputs).
 #   2. `name:` carries " (reusable)" so the GitHub UI can distinguish
 #      the plugin-side run from a direct push trigger.
 #   3. `permissions:` is re-declared at job level. GitHub does not
-#      inherit caller permissions into reusable workflows (TDD §5.8);
-#      `pull-requests: write` is added forward-looking for WP-003's
-#      gh pr create / gh pr merge --auto.
+#      inherit caller permissions into reusable workflows (TDD §5.8).
+#      Only `contents: write` is needed on the trunk (bump commit + tag
+#      + push to main); the former back-merge `pull-requests: write` and
+#      its gh-pr machinery were removed in the trunk re-model (CH-01KT4K).
 #
 # Everything else — the job's `if:` loop-guard, every step body, env
 # vars, comments, `concurrency:` directive — is byte-identical to the
@@ -62,21 +62,21 @@ name: release-on-merge (reusable)
 # `# canonical:failuremode:<failuremode-name>` annotation. The drift detector
 # (WP-007) reads these against the canonical instances and flags drift.
 #
-# Steps deliberately *absent* from this YAML (handled elsewhere):
-#   - preflight-cross-branch-drift  — happens in the /sulis:release-train
-#     skill before the release PR opens; release-on-merge fires only after
-#     merge, when cross-branch drift is no longer relevant.
-#   - open-release-pr               — performed by the founder / skill prior
-#     to this workflow firing; the trigger here is `on: push: branches:
-#     [main]`, i.e. the PR is already merged.
-#   - wait-for-checks-and-mergeability — branch protection gates the merge;
-#     the merge itself is proof of green checks + mergeability.
-#   - gate-founder-confirmation     — the founder's manual merge of the
-#     release PR on GitHub IS the confirmation (MUC-007).
-#   - squash-merge                  — performed by the founder via the GH
-#     UI; this workflow trigger fires *after* the merge.
-#   - publish-github-release        — performed by release-prod.yml, which
-#     fires on the v* tag push from Step 13 here.
+# Steps deliberately *absent* from this YAML (handled elsewhere). After the
+# trunk re-model (CH-01KT4K) the canonical has 10 Steps and exactly TWO are
+# by-design absent from the imperative (mirrored in
+# steps.jsonld:excluded_from_yaml):
+#   - gate-founder-confirmation     — on the trunk the founder's merge of the
+#     per-feature PR into main (which triggers `on: push: branches: [main]`)
+#     IS the confirmation (MUC-007).
+#   - publish-github-release        — performed by the downstream
+#     release-prod.yml, which fires on the v* tag push from the Tag and push
+#     step here.
+#
+# The five former dev->main-PR Steps (preflight-cross-branch-drift,
+# draft-pr-body-and-changelog, open-release-pr, wait-for-checks-and-mergeability,
+# squash-merge) were deleted from the canonical in the trunk re-model — there
+# is no release PR, so they are gone rather than merely absent.
 # ---------------------------------------------------------------------------
 on:
   workflow_call:
@@ -106,8 +106,7 @@ jobs:
     permissions:
       # Re-declared at job level (TDD §5.8 — GitHub does not
       # inherit caller permissions into reusable workflows).
-      contents: write       # bump commits, tag, push to main (and future fast-forward push to dev in WP-003)
-      pull-requests: write  # future gh pr create / gh pr merge --auto (WP-003)
+      contents: write       # bump commit, tag, push to main (trunk re-model — CH-01KT4K)
     steps:
       # 1. Full-history checkout so we can commit + tag + push back to main.
       - uses: actions/checkout@v4
@@ -184,18 +183,19 @@ jobs:
           PY
           echo "computed tier + next versions written to step outputs"
 
-      # 5. Draft the CHANGELOG entry to a known temp path. Split from the
-      #    prepend step (Step 11) per ADR-002 atomicity: the canonical model
-      #    treats draft-pr-body-and-changelog (Step 5) and write-changelog-entry
-      #    (Step 11) as two atomic Steps in the post-merge pipeline, even
-      #    though they were historically one bash block. The fixed temp path
-      #    `/tmp/changelog-entry.md` carries the artifact across the two YAML
-      #    steps (GH Actions runner /tmp persists within a job).
-      #    Header uses the PLUGIN version (ADR-003): "## v<new_plugin> — <date>".
-      #    release-prod.yml's awk reads the FIRST `## ` section, so this header
-      #    shape is what becomes the GitHub Release notes.
-      # canonical:step:draft-pr-body-and-changelog
-      # canonical:failuremode:probabilistic-step-token-budget-exceeded
+      # 5. Draft the CHANGELOG entry to a known temp path, then (in 5b) prepend
+      #    it. On the trunk these two bash steps together implement the single
+      #    canonical write-changelog-entry Step: the probabilistic
+      #    draft-pr-body-and-changelog Step was deleted in the trunk re-model
+      #    (CH-01KT4K) — there is no release PR body to compose, and changelog
+      #    drafting is deterministic (one bullet per changeset summary). Both
+      #    bash steps therefore carry the `write-changelog-entry` annotation.
+      #    The fixed temp path `/tmp/changelog-entry.md` carries the artifact
+      #    across the two YAML steps (GH Actions runner /tmp persists within a
+      #    job). Header uses the PLUGIN version (ADR-003): "## v<new_plugin> —
+      #    <date>". release-prod.yml's awk reads the FIRST `## ` section, so
+      #    this header shape is what becomes the GitHub Release notes.
+      # canonical:step:write-changelog-entry
       - name: Draft CHANGELOG entry
         if: steps.detect.outputs.skip != 'true'
         env:
@@ -233,9 +233,10 @@ jobs:
           } > "$ENTRY"
           echo "drafted CHANGELOG entry to $ENTRY"
 
-      # 5b. Prepend the drafted entry to plugins/sulis/CHANGELOG.md. The
-      #     canonical Step 11 — write-changelog-entry — split from Step 5
-      #     above per ADR-002.
+      # 5b. Prepend the drafted entry to plugins/sulis/CHANGELOG.md. Together
+      #     with step 5 above this implements the canonical write-changelog-entry
+      #     Step (the trunk re-model folded the old draft-pr-body-and-changelog
+      #     Step into write-changelog-entry — CH-01KT4K).
       # canonical:step:write-changelog-entry
       - name: Prepend CHANGELOG entry
         if: steps.detect.outputs.skip != 'true'
@@ -321,11 +322,13 @@ jobs:
           git rm .changesets/*.yaml
           echo "removed consumed changesets"
 
-      # 9a. Commit the bump as github-actions[bot] (Step 12 of the canonical
-      #     release-train). The commit message prefix "release: sulis" is the
-      #     loop-guard's gate (job-level `if:` above + the head_commit author
-      #     check) — keep the message + author in lockstep.
-      # canonical:step:commit-bump-as-bot
+      # 9a. Commit the bump directly to main as github-actions[bot] (the
+      #     canonical commit-bump-on-main Step — trunk re-model, CH-01KT4K; no
+      #     promotion PR). The commit message prefix "release: sulis" plus the
+      #     bot author identity are the loop-guard's gate (job-level `if:` above
+      #     + the head_commit author check) — keep the message + author in
+      #     lockstep.
+      # canonical:step:commit-bump-on-main
       - name: Commit bump as bot
         if: steps.detect.outputs.skip != 'true'
         env:
@@ -412,149 +415,3 @@ jobs:
           else
             echo "[brain-emit] scripts dir not present; skipping"
           fi
-
-      # ─────────────────────────────────────────────────────────────────
-      # WP-003 — Auto-back-merge block (EXPAND-Extend).
-      #
-      # After main has been bumped + tagged + pushed (Step 9b above), dev
-      # is left behind main on every release. These three steps close that
-      # gap by either fast-forwarding dev to main (the clean path, when dev
-      # hasn't moved since the release PR opened) or opening an auto-merging
-      # `back-integrate` PR (the raced path). They are the load-bearing
-      # piece of auto-back-merge-on-release (TDD §4.2; ADR-002/005/006).
-      #
-      # NO-FORCE-PUSH INVARIANT (TDD §5.2 / NFR-002 — load-bearing):
-      #   The ONLY push these steps make targeting dev is the bare
-      #   `git push origin main:dev` refspec, which git refuses unless it
-      #   is a strict fast-forward. No forced push of any kind appears in
-      #   this block — no force flag, no force-with-lease flag, no leading
-      #   plus-sign refspec form. Any rejection of the fast-forward (race,
-      #   branch protection, network) falls through to the PR-open path;
-      #   the workflow never escalates to a forced push.
-      #   `test_no_force_push_static.sh` + `test_back_merge_step.py` pin
-      #   this statically (they scan for the literal flag tokens, so this
-      #   comment deliberately avoids writing them).
-      #
-      # All GitHub expressions cross the shell boundary through `env:`
-      # ports (never inlined into the script body) so a release version or
-      # PR title carrying shell metacharacters can never inject (MUC
-      # defence; Blue criterion).
-      # ─────────────────────────────────────────────────────────────────
-
-      # 10. pin-read — recover the dev-sha-at-open pin that
-      #     /sulis:release-train wrote into the release PR body (ADR-005)
-      #     at PR-open time. The pin is read back via the commits/{SHA}/pulls
-      #     API (ADR-006). Missing or malformed pin → empty output, which
-      #     the decide+act step treats as the raced path (TDD §5.6 safe
-      #     default). `// ""` guards the null when the merge commit has no
-      #     associated PR (e.g. a direct push to main).
-      - name: Read dev-sha-at-open pin from release PR
-        id: pin
-        if: steps.detect.outputs.skip != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -uo pipefail
-          # GITHUB_REPOSITORY and GITHUB_SHA are auto-provided by the
-          # runner (both are controlled, non-injectable values — a repo
-          # slug and a commit SHA — so they are safe to use directly).
-          PR_BODY=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" --jq '.[0].body // ""' 2>/dev/null || echo "")
-          # Tight regex (ADR-006): the exact 40-hex pin in its HTML-comment
-          # wrapper. grep the wrapper first so a stray hex string in the
-          # release notes can never be mistaken for the pin.
-          # Canonical regex (TDD §3 / ADR-006): dev-sha-at-open: ([a-f0-9]{40}).
-          # The capture group documents the 40-hex SHA boundary; `grep -oE`
-          # prints the whole match, and awk lifts the second field (the SHA).
-          DEV_SHA_PIN=$(printf '%s\n' "$PR_BODY" | grep -oE 'dev-sha-at-open: ([a-f0-9]{40})' | head -n1 | awk '{print $2}')
-          echo "dev_sha_pin=${DEV_SHA_PIN}" >> "$GITHUB_OUTPUT"
-          if [ -z "$DEV_SHA_PIN" ]; then
-            echo "back-merge: pin absent or malformed; raced path will be taken"
-          else
-            echo "back-merge: pin read (${DEV_SHA_PIN})"
-          fi
-
-      # 11. decide+act — clean path (fast-forward) when the pin is non-empty
-      #     AND dev's current SHA byte-equals the pin; otherwise the raced
-      #     path (open a back-integrate PR + enable auto-merge, ADR-002). A
-      #     rejected fast-forward also falls through to the raced path.
-      #
-      #     Canonical strings (TDD §3; match drift_check.sh byte-for-byte —
-      #     WP-009 asserts parity): label `back-integrate`, title prefix
-      #     `chore: back-integrate main → dev`, base `dev`, head `main`.
-      - name: Fast-forward dev to main, or open raced-path back-integrate PR
-        id: backmerge
-        if: steps.detect.outputs.skip != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DEV_SHA_PIN: ${{ steps.pin.outputs.dev_sha_pin }}
-          NEW_META: ${{ steps.compute.outputs.new_meta }}
-        run: |
-          set -uo pipefail
-          git fetch origin dev main
-
-          CURRENT_DEV=$(git ls-remote origin dev | awk '{print $1}')
-
-          if [ -n "$DEV_SHA_PIN" ] && [ "$CURRENT_DEV" = "$DEV_SHA_PIN" ]; then
-            echo "back-merge: clean path, attempting fast-forward dev to main"
-            # Plain fast-forward push. git refuses this if main is not a
-            # strict descendant of dev — that is the no-force invariant in
-            # action (no forced push of any kind; TDD §5.2).
-            if git push origin main:dev; then
-              echo "back-merge: clean path, dev fast-forwarded to main"
-              echo "path=clean" >> "$GITHUB_OUTPUT"
-              exit 0
-            else
-              echo "back-merge: fast-forward push rejected; falling through to raced path"
-            fi
-          else
-            echo "back-merge: raced path (pin=${DEV_SHA_PIN:-<empty>}, current_dev=${CURRENT_DEV})"
-          fi
-
-          # Raced path — open the back-integrate PR and enable auto-merge
-          # (ADR-002). The PR being open is the success condition; CI-green
-          # then merges it asynchronously.
-          PR_TITLE="chore: back-integrate main → dev (post-release v${NEW_META})"
-          PR_BODY="Auto-opened by release-on-merge. Fast-forward of dev to main was not safe (a race during the release window, or the push was rejected). Auto-merge is enabled; CI green will merge."
-          PR_URL=$(gh pr create --base dev --head main --label back-integrate --title "$PR_TITLE" --body "$PR_BODY")
-          PR_NUM=$(printf '%s' "$PR_URL" | awk -F/ '{print $NF}')
-          gh pr merge "$PR_NUM" --auto --merge
-          echo "back-merge: raced path, PR #${PR_NUM} opened with auto-merge enabled"
-          echo "path=raced" >> "$GITHUB_OUTPUT"
-          echo "pr_number=${PR_NUM}" >> "$GITHUB_OUTPUT"
-
-      # 12. post-condition — assert atomicity (NFR-006 / TDD §5.3). Runs
-      #     with `if: always()` so the end-state is verified even if an
-      #     upstream step failed. Success iff dev == main (clean path
-      #     landed) OR a back-integrate PR is open OR one was recently
-      #     merged (raced path landed before this step ran). Otherwise the
-      #     workflow exits 1 with a log line naming the failure mode.
-      - name: Verify atomicity (NFR-006)
-        if: always()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -uo pipefail
-          git fetch origin dev main
-          DEV=$(git ls-remote origin dev | awk '{print $1}')
-          MAIN=$(git ls-remote origin main | awk '{print $1}')
-
-          if [ "$DEV" = "$MAIN" ]; then
-            echo "post-condition: dev == main (${DEV})"
-            exit 0
-          fi
-
-          OPEN_PR=$(gh pr list --base dev --label back-integrate --state open --json number --limit 1 --jq '.[0].number // empty')
-          if [ -n "$OPEN_PR" ]; then
-            echo "post-condition: back-integrate PR #${OPEN_PR} is open"
-            exit 0
-          fi
-
-          MERGED_PR=$(gh pr list --base dev --label back-integrate --state merged --limit 1 --json number --jq '.[0].number // empty')
-          if [ -n "$MERGED_PR" ]; then
-            echo "post-condition: back-integrate PR #${MERGED_PR} was merged"
-            exit 0
-          fi
-
-          echo "::error::post-condition failed: dev != main (${DEV} != ${MAIN}) AND no back-integrate PR is open or recently merged"
-          echo "::error::atomicity invariant violated (NFR-006). Manual recovery: see GIT-12 worked example 3."
-          exit 1

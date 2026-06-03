@@ -26,12 +26,12 @@
     {
       "id": "dna:trigger:01KT0RTRA1NTRG2PRMRG00000A",
       "sys_status": "active",
-      "name": "pull-request-merged-to-main",
+      "name": "push-to-main",
       "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
       "for_workflow": "dna:workflow:01KT0RTRA1NWFW00000000000A",
       "kind": "event",
-      "condition": "event:pull_request.merged on main, filtered by author != github-actions[bot] (CH-01KSZ1 loop-guard fix) — i.e. a human-authored release PR has merged.",
-      "description": "Event entry point — release-on-merge.yml dispatches the bump-tag-publish tail of the Workflow. Under Path A this Trigger is informational; the GitHub Actions workflow is the imperative implementation, validated against this canonical via the drift detector (WP-007).",
+      "condition": "event:push on main (or a release cadence), filtered by author != github-actions[bot] (CH-01KSZ1 loop-guard fix) — i.e. a human-authored change has landed on the trunk and pending changesets exist.",
+      "description": "Event entry point — on the trunk the release fires when changes are pushed to main (the per-feature PR merge into main, or a scheduled cadence), not when a dev->main release PR is opened. release-on-merge.yml dispatches the bump-tag-publish tail of the Workflow directly on main. Under Path A this Trigger is informational; the GitHub Actions workflow is the imperative implementation, validated against this canonical via the drift detector.",
       "state": "active",
       "valid_from": "2026-06-01T00:00:00Z",
       "confidence": 0.9

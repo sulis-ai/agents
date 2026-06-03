@@ -1,0 +1,23 @@
+#!/usr/bin/env python3
+"""sulis-emit-tool — ingest authored tools.jsonld into the brain (foundation).
+
+Thin shim over the shared ingest CLI (`_emit_ingest_cli`). The Tool entries in
+an authored tools.jsonld are already complete entities (real ULIDs +
+implementation_kind + io schema refs); this validates + persists them.
+
+Usage: sulis-emit-tool --from-instances <path> [--base-dir D] [--domain D] [--repo-root D]
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+from _emit_ingest_cli import run_ingest_cli  # noqa: E402
+
+if __name__ == "__main__":
+    sys.exit(run_ingest_cli(entity_type="tool", domain="foundation", list_key="tools"))

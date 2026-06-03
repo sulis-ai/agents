@@ -41,6 +41,13 @@ HUMAN_DRIVER = "human"
 UNRESOLVED_DRIVER = "unresolved"
 
 
+def _entity_id(entity: dict) -> str:
+    """An entity's identity, tolerant of both conventions: brain-store entities
+    use ``id`` (the canonical ULID ref); the v1 hand-built bundles use the
+    JSON-LD ``@id``. Prefer ``id``, fall back to ``@id``, else empty."""
+    return str(entity.get("id") or entity.get("@id") or "")
+
+
 @dataclass
 class ResolvedStep:
     """One journey step, resolved to its driver + carrying its IDEF0 fields."""
@@ -103,7 +110,7 @@ def resolve_journey(
             continue
         resolved.append(
             ResolvedStep(
-                step_id=step.get("@id", sid),
+                step_id=_entity_id(step) or sid,
                 name=step.get("name", sid),
                 driver=driver_for_step(step, tools_by_id),
                 mechanism=str(step.get("mechanism", "")),

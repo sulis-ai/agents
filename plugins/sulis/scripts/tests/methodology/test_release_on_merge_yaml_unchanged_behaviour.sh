@@ -28,11 +28,24 @@
 #   1. The reusable workflow's first len(snapshot.steps) steps are
 #      byte-equivalent to the snapshot (the MOVE is still faithful —
 #      no silent reformatting of the moved bump/tag/push block).
-#   2. The reusable workflow has EXACTLY the snapshot's steps PLUS the
-#      three named back-merge steps appended after them — no more, no
-#      fewer, in that order (the delta is exactly the intended one).
+#   2. The reusable workflow has EXACTLY the snapshot's steps and NOTHING
+#      appended after them — the delta is now empty.
 #   3. The job-level `if:` loop-guard is unchanged (preserved across
 #      both the move and the append).
+#
+# ----------------------------------------------------------------------
+# WP-001 RECONCILIATION (CH-01KT4K — simplify-release-robot, trunk re-model).
+#
+# The trunk re-model DELETED the three WP-003 back-merge steps from the
+# reusable workflow: on a trunk there is no dev to back-merge main into, so
+# the pin-read / fast-forward-or-raced-PR / verify-atomicity block is dead
+# machinery. The intended delta over the snapshot is therefore now EMPTY —
+# the reusable workflow IS exactly the 12-step moved block (the CHANGELOG
+# draft step was re-annotated under write-changelog-entry, a comment-only
+# change that leaves the parsed step bodies byte-identical to the snapshot).
+# Assertion 2's EXPECTED_APPENDED drops to []. The byte-fidelity of the
+# moved block (assertion 1) + the loop-guard preservation (assertion 3) are
+# unchanged.
 # ----------------------------------------------------------------------
 
 set -euo pipefail
@@ -67,14 +80,10 @@ with open(snapshot_path) as f:
 reusable_steps = reusable["jobs"]["release"]["steps"]
 snapshot_steps = snapshot["jobs"]["release"]["steps"]
 
-# The three back-merge steps WP-003 intentionally appended. Identified by
-# name (the canonical-string CONTENT of these steps is asserted by
-# WP-009's parity + chaos tests, not here).
-EXPECTED_APPENDED = [
-    "Read dev-sha-at-open pin from release PR",
-    "Fast-forward dev to main, or open raced-path back-integrate PR",
-    "Verify atomicity (NFR-006)",
-]
+# The trunk re-model (WP-001) DELETED the three WP-003 back-merge steps —
+# they are dead machinery on a trunk (no dev to back-merge into). The
+# intended delta over the snapshot is now empty.
+EXPECTED_APPENDED = []
 
 n = len(snapshot_steps)
 
@@ -98,8 +107,9 @@ appended = reusable_steps[n:]
 appended_names = [s.get("name") for s in appended if isinstance(s, dict)]
 if appended_names != EXPECTED_APPENDED:
     print(
-        "FAIL: the appended back-merge block is not exactly the three "
-        "expected steps (in order).\n"
+        "FAIL: the reusable workflow has unexpected steps appended after the "
+        "moved block. On the trunk (WP-001) the delta must be EMPTY — the "
+        "back-merge block was deleted.\n"
         f"  expected: {EXPECTED_APPENDED}\n"
         f"  actual:   {appended_names}",
         file=sys.stderr,

@@ -3,9 +3,14 @@
 standing app, and report plain green/red.
 
 The founder-runnable front door to the testable-state gate. Given a Scenario
-bundle (its journey Workflow + Steps + Tools) and a target (local | deployed),
-it stands the journey's steps against the app and reports whether each passed —
-in plain English a non-technical founder reads — plus a machine envelope.
+and a target (local | deployed), it stands the journey's steps against the app
+and reports whether each passed — in plain English a non-technical founder
+reads — plus a machine envelope.
+
+Two journey sources: a hand-built `--bundle` JSON (the v1 input), or, with
+`--scenario <id>`, loaded straight from the emitted brain graph (the Scenario
+authored at `/sulis:specify` + emitted by `sulis-author-scenario`) — closing
+the author → emit → run loop with no hand-built file.
 
 Exit code: 0 = gate passes (every Scenario passed, or deferred-with-need);
 1 = blocked (a step failed, or a manual check is unconfirmed); 2 = invocation
@@ -27,7 +32,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _acceptance_gate import format_gate_message, gate_decision  # noqa: E402
 from _run_contract import resolve_run_contract, target_url  # noqa: E402
-from _scenario_runner import format_founder_summary, run_bundle  # noqa: E402
+from _scenario_graph_load import JourneyNotFound, load_scenario_journey  # noqa: E402
+from _scenario_runner import (  # noqa: E402
+    format_founder_summary,
+    run_bundle,
+    run_scenario,
+)
 
 
 def _read_repo_contract(repo_root: str) -> dict:
@@ -47,8 +57,13 @@ def main(argv=None) -> int:
         prog="sulis-verify-acceptance",
         description="Run a change's verification Scenarios against a standing app.",
     )
-    p.add_argument("--bundle", required=True,
-                   help="JSON bundle: {scenario, workflow, steps[], tools[]}")
+    src = p.add_mutually_exclusive_group(required=True)
+    src.add_argument("--bundle",
+                     help="JSON bundle: {scenario, workflow, steps[], tools[]} (v1 input)")
+    src.add_argument("--scenario",
+                     help="scenario id to load from the brain graph (--from-graph mode)")
+    p.add_argument("--base-dir",
+                   help="brain store dir for --scenario (default {repo-root}/.brain/instances)")
     p.add_argument("--target", default="local", choices=["local", "deployed"],
                    help="which leg to run against (default: local)")
     p.add_argument("--repo-root", default=".",
@@ -58,11 +73,30 @@ def main(argv=None) -> int:
     p.add_argument("--json", action="store_true", help="emit the machine envelope")
     args = p.parse_args(argv)
 
-    try:
-        bundle = json.loads(Path(args.bundle).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        print(f"Couldn't read the Scenario bundle: {exc}", file=sys.stderr)
-        return 2
+    # Resolve the journey source: a hand-built bundle, or the emitted brain graph.
+    bundle = None
+    loaded = None
+    if args.bundle:
+        try:
+            bundle = json.loads(Path(args.bundle).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"Couldn't read the Scenario bundle: {exc}", file=sys.stderr)
+            return 2
+    else:
+        base_dir = Path(args.base_dir) if args.base_dir else Path(args.repo_root) / ".brain" / "instances"
+        try:
+            loaded = load_scenario_journey(base_dir, args.scenario)
+        except JourneyNotFound as exc:
+            print(f"Couldn't load the Scenario from the brain graph: {exc}", file=sys.stderr)
+            return 2
+        if loaded.missing_steps:
+            # drift: a journey step referenced by the workflow isn't in the store.
+            # Surface it (it also runs as 'unresolved' → the verdict won't fake green).
+            print(
+                "⚠ This journey references steps that aren't in the brain store "
+                f"(out of date): {', '.join(loaded.missing_steps)}",
+                file=sys.stderr,
+            )
 
     rc = resolve_run_contract(_read_repo_contract(args.repo_root))
     base = target_url(rc, args.target)
@@ -78,7 +112,13 @@ def main(argv=None) -> int:
     available = frozenset(
         a.strip() for a in args.available_artifacts.split(",") if a.strip()
     )
-    result = run_bundle(bundle, target_base_url=base, available_artifacts=available)
+    if bundle is not None:
+        result = run_bundle(bundle, target_base_url=base, available_artifacts=available)
+    else:
+        result = run_scenario(
+            loaded.scenario, loaded.workflow, loaded.steps_by_name, loaded.tools_by_id,
+            target_base_url=base, available_artifacts=available,
+        )
     decision = gate_decision([result])
 
     if args.json:

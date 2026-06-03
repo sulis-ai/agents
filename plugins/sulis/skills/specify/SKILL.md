@@ -232,6 +232,15 @@ deeper") — the override never needs pre-asking.
 - The classifier defaults to standard on uncertainty; that default is the
   agent's to apply, not the founder's to confirm.
 
+**Depth ≠ scope (MUST — see the Sulis body "Scope Posture").** The depth
+(lite / standard / deep) sizes *how much specifying effort* the work
+warrants — it does **not** shrink the *scope of what gets built*. Spec the
+**full coherent scope** of what's asked; don't reflexively narrow it to a
+"thin first slice." If the scope is genuinely too big to hold in one go,
+**you** propose a phased plan (phase 1 a real, meaningful go; the deferred
+phases captured to the backlog so they're not lost) — never hand the
+slicing decision to the founder.
+
 Never *interrogate* the founder to ratify the computed depth. (Genuine scope
 questions discovered *while writing* the spec — what a feature should do, who
 it's for — are different: those are founder-owned, ask them per AAF-01.)
@@ -562,10 +571,70 @@ full SRD with FR/NFR blocks), skip the emission — there are no
 Requirement entities to extract. The SPEC.md is the founder-facing
 shorthand; the brain only gets the structured FR/NFR form.
 
+## Author the verification journey (deep mode — the testable-state intake)
+
+A spec isn't truly done when the requirements are written — it's done when
+there are **verification scenarios the founder can run** to prove the work.
+After the requirements are emitted (deep mode), draft those scenarios *with*
+the founder and land them as living Scenario entities.
+
+This is founder-facing: the founder authors and reads a **plain-English
+journey**. They never see Workflows, Steps, IDEF0, or `tool_ref` —
+`sulis-author-scenario` assembles that graph underneath (FE-09).
+
+1. **Draft from acceptance criteria.** For each major use case / acceptance
+   criterion, propose one scenario: a name + a numbered journey of plain-English
+   steps (what the user does), each with what they should *see* ("see the
+   payment-succeeded confirmation"). Draft from the SRD's acceptance criteria so
+   the founder starts from something concrete, not a blank page.
+
+2. **Refine with the founder, one at a time.** Read each journey back in plain
+   English; let them add / cut / reword steps. COACHING tone (questions over
+   statements). Never expose mechanism vocabulary.
+
+3. **Assemble + emit** each agreed scenario via a journey-spec JSON:
+
+   ```bash
+   "$SCRIPTS_DIR/sulis-author-scenario" \
+     --journey /tmp/journey-N.json \
+     --out "{worktree_path}/.changes/{primitive}-{slug}.scenarios.jsonld" \
+     --emit --repo-root "$(git rev-parse --show-toplevel)"
+   ```
+
+   The journey-spec fields:
+   - `name` — the scenario name.
+   - `verifies` — the Requirement ids for the FRs this scenario proves. These
+     are deterministic: `dna:requirement:<ULID>` where the ULID derives from
+     `requirement:{srd_path}:{FR-id}` (the same derivation the requirements emit
+     used in the step above — reuse those exact ids).
+   - `exercises` — a **synthetic Design placeholder** (deterministic from the
+     change, e.g. seed `design-placeholder:{slug}`). There's no Design entity at
+     specify time; this resolves when the design stage emits the real Design —
+     the same synthetic-placeholder convention as the Requirement→Opportunity
+     ref. Record the placeholder nature in the change notes.
+   - `tenant` — the project's tenant ref.
+   - `seed` — a stable string (e.g. `"{slug}:{scenario-name}"`) so re-authoring
+     is idempotent.
+   - `steps` — `[{ "instruction": "...", "asserts": ["..."] }, ...]` from the
+     founder-edited journey.
+
+   `--emit` persists the Scenario + its Workflow + Steps as long-living brain
+   entities; `--out` writes the durable authored bundle that travels with the
+   change branch (so the scenarios evolve with the change, not lost in it).
+
+Best-effort + no mechanism narration (FE-09): the founder hears *"I've written
+N verification scenarios you'll be able to run to check this works"* — never the
+entities. Skip for lite/standard modes (no Requirement entities to verify
+against).
+
 ## See also
 
 - `../../scripts/_specify_classifier.py` — the depth classifier
   (`classify_depth`, `paths_touch_founder_surface`, `proposal_sentence`).
+- `../../scripts/sulis-author-scenario` — assembles a plain-English journey
+  into a Scenario + Workflow + Steps graph and emits it (the testable-state
+  intake); `../../scripts/_scenario_authoring.py` is its assembler.
+- `../../docs/scenario-authoring-source-design.md` — the design this realises.
 - `../../scripts/sulis-change` — `stage` stamps the workflow position read by
   `/sulis:dashboard`.
 - `../../scripts/_wpxlib.py` — `resolve_current_change()` (SULIS_CHANGE_ID →

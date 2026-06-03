@@ -6,25 +6,10 @@
   "@id": "dna:release-train:failuremodes",
   "@type": "failuremode-instances",
   "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
-  "_about": "Eight FailureModes for the sulis-plugins-marketplace release-train Workflow. Three encode today's lived defects (CH-01KSYZ workflow-yaml-fails-to-parse, CH-01KSZ1 loop-guard-matches-founder-pr, GH-token tag bot-tag-doesnt-trigger-release-prod); one encodes the cycle-tolerance back-edge (release-pr-conflicts-with-target-at-merge — back-integrated twice in the project's history); the remaining four cover standard CI/PR failure surfaces + NFR-010 token-budget defense. Schema: plugins/sulis/brain/compiled/foundation/failuremode.schema.json. Tenant ULID is deterministic — derived as SHA256('tenant-name:sulis-plugins-marketplace') mapped to Crockford base32 (first char clamped to 0 per ULID spec); reused by every release-train canonical instance.",
+  "_about": "Four FailureModes for the sulis-plugins-marketplace release-train Workflow, after the trunk re-model (CH-01KT4K). Three encode today's lived defects (CH-01KSYZ workflow-yaml-fails-to-parse, CH-01KSZ1 loop-guard-matches-founder-pr, GH-token tag bot-tag-doesnt-trigger-release-prod); one (version-drift-detected-pre-flight) guards the in-branch version-file agreement check. The four dev->main-PR FailureModes (pr-checks-fail, release-pr-conflicts-with-target-at-merge, pr-open-but-mergeability-stuck, probabilistic-step-token-budget-exceeded) were deleted — they were orphaned when the five dev->main-PR Steps were removed (there is no release PR to fail checks / conflict / stick, and no probabilistic Step on the trunk). The loop-guard + bot-tag FailureModes are KEPT and load-bearing on a trunk: deleting them re-introduces the release-of-release loop (#132) and the downstream-trigger bug. Schema: plugins/sulis/brain/compiled/foundation/failuremode.schema.json. Tenant ULID is deterministic — derived as SHA256('tenant-name:sulis-plugins-marketplace') mapped to Crockford base32 (first char clamped to 0 per ULID spec); reused by every release-train canonical instance.",
   "captured_on": "2026-06-01",
 
   "failuremodes": [
-    {
-      "id": "dna:failuremode:01KTR2MXE6EA5XASA0C33S30VR",
-      "sys_status": "active",
-      "name": "release-pr-conflicts-with-target-at-merge",
-      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
-      "kind": "business-logic-error",
-      "description": "The release PR is mergeable=CONFLICTING at the moment release-on-merge attempts to merge it — the source branch (typically a release/* or change/* branch) diverged from the target (main or dev) since the PR opened, because another PR landed between open and merge. Recovery: back-integrate the target into the source (git merge target → push), wait for CI to re-green, retry from the open-pr Step. This is the cycle-tolerance back-edge that makes the workflow cycle-tolerant (lived twice in the project's history — encoded explicitly so future Step-authors do not assume linear-history).",
-      "recovery_strategy": "escalate",
-      "recovery_detail": "Surface CONFLICTING state to the founder via the release-train skill output. Founder back-integrates target into source manually (git checkout source; git merge target; push), waits for CI, re-runs release-on-merge. Future automation may automate the back-integration when target has only fast-forwardable commits, but the v1 stance is escalate-to-founder.",
-      "expected_frequency": "occasional",
-      "blocks_progress": true,
-      "state": "active",
-      "valid_from": "2026-06-01T00:00:00Z",
-      "confidence": 0.9
-    },
     {
       "id": "dna:failuremode:01KTR5NAFM3BGKRJTV1RTJD2MY",
       "sys_status": "active",
@@ -71,36 +56,6 @@
       "confidence": 0.9
     },
     {
-      "id": "dna:failuremode:01KTRS9GWHVX05E9VGM235NNXH",
-      "sys_status": "active",
-      "name": "pr-checks-fail",
-      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
-      "kind": "business-logic-error",
-      "description": "Required branch-protection status checks on the release PR fail (typically branch-ci.yml: pytest, drift detector, lint). Recovery: abort the dispatch, surface the failing check to the founder, do not auto-retry — a failing check means real work failed and re-running without changing inputs will produce the same failure.",
-      "recovery_strategy": "abort",
-      "recovery_detail": "release-on-merge polls the PR's check-runs API; on any failed required check, exits with the failed-check name + a link to the CI run log. Founder fixes the underlying issue (or reverts the offending commit) and reopens the release PR.",
-      "expected_frequency": "occasional",
-      "blocks_progress": true,
-      "state": "active",
-      "valid_from": "2026-06-01T00:00:00Z",
-      "confidence": 0.92
-    },
-    {
-      "id": "dna:failuremode:01KTRSHACB8X8VWV6GSAFPMDMF",
-      "sys_status": "active",
-      "name": "pr-open-but-mergeability-stuck",
-      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
-      "kind": "infrastructure-failure",
-      "description": "Release PR is open with all required checks green, but GitHub's mergeability state stays at 'UNKNOWN' or 'BLOCKED' indefinitely — typically because of a transient GitHub API hiccup that didn't recompute mergeability, OR a branch-protection setting changed mid-flight. The founder walked away assuming merge would auto-trigger; release stalls silently. Recovery: escalate via monitoring (cron-style poll detects mergeable=UNKNOWN for >N minutes and notifies the founder).",
-      "recovery_strategy": "escalate",
-      "recovery_detail": "release-on-merge does not retry forever; if mergeability is unknown after 3 polls (~6 minutes), exit with explicit 'mergeability stuck' status + ask the founder to recompute manually (close+reopen the PR forces a recompute on GitHub's side). The monitoring rule SHOULD page on the persistent-unknown state.",
-      "expected_frequency": "rare",
-      "blocks_progress": true,
-      "state": "active",
-      "valid_from": "2026-06-01T00:00:00Z",
-      "confidence": 0.85
-    },
-    {
       "id": "dna:failuremode:01KTRNPG3DAPH7BW0CAQ05C3PH",
       "sys_status": "active",
       "name": "version-drift-detected-pre-flight",
@@ -114,21 +69,6 @@
       "state": "active",
       "valid_from": "2026-06-01T00:00:00Z",
       "confidence": 0.9
-    },
-    {
-      "id": "dna:failuremode:01KTRNKJ9DQSRREVTRTR82H95H",
-      "sys_status": "active",
-      "name": "probabilistic-step-token-budget-exceeded",
-      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
-      "kind": "capacity-exceeded",
-      "description": "An LLM-mechanism Step (specifically Step 5 'compose-changelog', the only probabilistic step in the release-train workflow per NFR-010) consumes its token budget before producing usable output. The budget is hard-capped in the canonical Step's token_budget field. Recovery: fall back to the deterministic template path (assemble CHANGELOG from the changeset summaries directly, without LLM synthesis); the result is less narrative but always ships.",
-      "recovery_strategy": "fallback",
-      "recovery_detail": "/sulis-brain:execute-workflow's budget-tracker surfaces the overflow; the imperative path in release-on-merge.yml MUST detect the same condition (LLM response truncated or budget API returns exhausted) and substitute the deterministic CHANGELOG-from-template generator. The drift detector verifies BOTH paths exist in the YAML — LLM Step + deterministic fallback under the same Step's annotation block.",
-      "expected_frequency": "occasional",
-      "blocks_progress": false,
-      "state": "active",
-      "valid_from": "2026-06-01T00:00:00Z",
-      "confidence": 0.85
     }
   ]
 }

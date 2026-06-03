@@ -95,14 +95,14 @@ def _failuremodes_jsonld() -> Path:
 
 
 def _canonical_step_names() -> set[str]:
-    """The 15 canonical Step names from WP-002's steps.jsonld."""
+    """The canonical Step names from steps.jsonld (10 on the trunk)."""
     with _steps_jsonld().open() as f:
         data = json.load(f)
     return {step["name"] for step in data["steps"]}
 
 
 def _canonical_failuremode_names() -> set[str]:
-    """The 8 canonical FailureMode names from WP-004's failuremodes.jsonld."""
+    """The canonical FailureMode names from failuremodes.jsonld (4 on the trunk)."""
     with _failuremodes_jsonld().open() as f:
         data = json.load(f)
     return {fm["name"] for fm in data["failuremodes"]}
