@@ -54,6 +54,13 @@ verification:
   artifact: tests/infrastructure/persistence/postgres-order-repository.test.ts::respects_5s_transaction_timeout
 ---
 
+**Key spelling — MUST use camelCase (#104).** The dependency key is
+`dependsOn`, **never** `depends_on` (snake) or `depends-on` (kebab). The
+parser aliases snake/kebab to camel as a defensive net, but the canonical
+spelling the readers and human reviewers expect is `dependsOn`. Inline
+`# comments` after a value are tolerated (stripped at parse time); a `#`
+glued to a value (e.g. `title: Honest #1`) stays intact.
+
 ## Context
 
 What part of the architecture this WP touches. One paragraph. Link to the
