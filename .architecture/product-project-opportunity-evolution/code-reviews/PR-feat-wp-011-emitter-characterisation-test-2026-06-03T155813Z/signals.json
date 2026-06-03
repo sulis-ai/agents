@@ -1,0 +1,31 @@
+{
+  "pr": "feat/wp-011-emitter-characterisation-test",
+  "timestamp": "2026-06-03T155813Z",
+  "base": "change/feat-product-project-opportunity-evolution",
+  "verdict": "PASS",
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "linter": "ruff",
+    "linter_result": "All checks passed!",
+    "typechecker": null,
+    "typechecker_reason": "no mypy/pyright configured by the project — no type gate",
+    "tests": "3 passed (file); 1994 passed / 9 skipped (full suite)"
+  },
+  "hygiene": {
+    "scope": {"severity": "none", "commit_types": ["test"], "module_fan_out": 1},
+    "size": {"severity": "none", "lines_added": 264, "lines_removed": 0, "files_changed": 2},
+    "safety": {"severity": "none", "migration_count": 0, "schema_idl_count": 0, "secret_pattern_hits": 0, "infra_files": 0},
+    "completeness": {"severity": "none", "new_source_without_test": 0}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"critical": 0, "high": 0, "medium": 0, "low": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "surfaced": false},
+    "security": {"findings": 0, "surfaced": false},
+    "quality": {"findings": 0, "surfaced": false}
+  },
+  "draft_fixes": 0,
+  "auto_downgrade_triggers": []
+}
