@@ -59,8 +59,13 @@ from _requirement_emission import _deterministic_ulid_from
 # The same regex Requirement-emission uses to find FR/NFR headers in the
 # SRD body. Kept local-and-narrow to avoid coupling to the emitter's
 # whole module structure — we just need to enumerate ids.
+#
+# #170 — the closing `**` is the heading terminator; the line MAY carry
+# inline body text after it (the canonical `**FR-NN: Title.** body`
+# format). The previous trailing `\s*$` anchored to end-of-line and
+# silently dropped every inline-body heading.
 _FR_HEADER_RE: re.Pattern[str] = re.compile(
-    r"^\*\*((?:FR|NFR)-\d+(?:\.\d+)?):\s*(.+?)\*\*\s*$",
+    r"^\*\*((?:FR|NFR)-\d+(?:\.\d+)?):\s*(.+?)\*\*",
     re.MULTILINE,
 )
 

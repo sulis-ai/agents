@@ -109,6 +109,47 @@ class TestEnumerateFrIds:
         pairs = enumerate_fr_ids(text)
         assert pairs == [("FR-001.2", "Sub-feature")]
 
+    def test_inline_body_canonical_format(self) -> None:
+        """#170 — the canonical SRD heading is `**FR-NN: Title.** body` with
+        the body on the SAME line as the closing `**`. The regex must enumerate
+        all blocks, not just the ones where the heading sits alone on its line.
+        """
+        text = """\
+# SRD
+
+**FR-01: First requirement.** Body text inline.
+
+**FR-02: Second requirement.** More body text inline.
+
+**FR-03: Third requirement.** Yet more inline body.
+
+**NFR-01: Latency.** Bounded.
+"""
+        pairs = enumerate_fr_ids(text)
+        ids = [p[0] for p in pairs]
+        assert ids == ["FR-01", "FR-02", "FR-03", "NFR-01"], (
+            f"inline-body canonical format must enumerate ALL FR/NFR blocks; "
+            f"got {ids}. Anchoring the regex to end-of-line ($) after the "
+            f"closing `**` drops every inline-body heading silently."
+        )
+
+    def test_mixed_inline_and_standalone_headings(self) -> None:
+        """A real-world SRD mixes both shapes — heading-on-its-own-line and
+        heading-with-inline-body. Both must enumerate."""
+        text = """\
+**FR-01: Standalone**
+
+Body underneath.
+
+**FR-02: Inline body.** Body on the same line.
+
+**FR-03: Also standalone**
+
+More underneath.
+"""
+        ids = [p[0] for p in enumerate_fr_ids(text)]
+        assert ids == ["FR-01", "FR-02", "FR-03"]
+
 
 # ─── Verdict shapes ────────────────────────────────────────────────────
 
