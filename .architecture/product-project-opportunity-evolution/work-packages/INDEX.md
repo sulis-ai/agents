@@ -237,20 +237,20 @@ WP-008 the prov-edge schema replacement) — each a deprecate-then-replace with 
 
 | ID | Title | Primitive | Kind | Status | Depends On | Blocks | Token (in/out) | TDD § |
 |---|---|---|---|---|---|---|---|---|
-| WP-001 | Author canonical lifecycle Step instances (prov:Plan defs) | create | contract | pending | — | WP-002, WP-006, WP-007 | 4k / 3k | Form #1; Canonical Identifiers |
-| WP-002 | RE-VENDOR canonical lifecyclerun v2.1.0 + migrate emitter core (ATOMIC lockstep) | substitute-strangle | contract | pending | WP-001 | WP-005, WP-006, WP-007, WP-008, WP-013, WP-016 | 5k / 5k | Form #3; ADR-001, ADR-004 |
-| WP-005 | Migrate sulis-emit-lifecyclerun CLI to --step (--step-name deprecated alias) | substitute-strangle | backend | pending | WP-002 | WP-016 | 2k / 2k | Form #3; ADR-004 |
-| WP-006 | Build migrate_lifecyclerun_v1_to_v2 + migrate marketplace store | create | backend | pending | WP-001, WP-002 | — | 4k / 4k | Form #4; ADR-004 |
-| WP-007 | Wire lifecycle-steps canonical into the drift detector | extend | backend | pending | WP-001, WP-002 | — | 3k / 2k | Proof §Drift-detector parity |
-| WP-008 | Re-vendor the upstream-minted wasGeneratedBy prov_constraints edge on Product + Opportunity | substitute-strangle | contract | pending | WP-002 | WP-009 | 3k / 2k | Form #2; ADR-002 |
-| WP-009 | Build _entity_evolve — close/open-window + CONDITIONAL wasGeneratedBy + allowlist | create | backend | pending | WP-008 | WP-010, WP-011, WP-012, WP-013 | 4k / 5k | Form #5; ADR-002, ADR-003 |
-| WP-010 | Add as-of-time window read to _brain_query | extend | backend | pending | WP-009 | WP-013 | 3k / 3k | Form #6; ADR-003 |
-| WP-011 | Characterisation test pinning current living-entity emit behaviour | test | backend | pending | WP-009 | WP-012 | 3k / 3k | Form §Change-primitive (4 apply-evolve) |
-| WP-012 | Refactor Product/Opp (w/ prov) + Project (windows-only) emitters to call evolve_entity | refactor | backend | pending | WP-009, WP-011 | WP-014 | 4k / 4k | Form §Change-primitive (4); ADR-003 |
-| WP-013 | Point living-entity emit base_dir at central Tenant home + prove cross-repo read | reuse | backend | pending | WP-002, WP-009, WP-010 | WP-014, WP-016 | 4k / 4k | Form #7, #8; ADR-005 |
-| WP-014 | Characterisation test pinning minter path-safety + MUC-003 | test | backend | pending | WP-012, WP-013 | WP-015 | 3k / 3k | Form §Change-primitive (6 project-reconcile) |
-| WP-015 | Refactor minter to canonical save + mirror (Project windows+supersedes, no prov); update prose | refactor | backend | pending | WP-014 | — | 4k / 4k | Form #9, #10; ADR-006 |
-| WP-016 | Re-vendor LifecycleRun v2.2.0 (additive for_project ref) + wire for_project at change-start | substitute-strangle | contract | pending | WP-002, WP-005, WP-013 | — | 3k / 3k | Form #3b; ADR-004, ADR-007 |
+| WP-001 | Author canonical lifecycle Step instances (prov:Plan defs) | create | contract | done | — | WP-002, WP-006, WP-007 | 4k / 3k | Form #1; Canonical Identifiers |
+| WP-002 | RE-VENDOR canonical lifecyclerun v2.1.0 + migrate emitter core (ATOMIC lockstep) | substitute-strangle | contract | done | WP-001 | WP-005, WP-006, WP-007, WP-008, WP-013, WP-016 | 5k / 5k | Form #3; ADR-001, ADR-004 |
+| WP-005 | Migrate sulis-emit-lifecyclerun CLI to --step (--step-name deprecated alias) | substitute-strangle | backend | done | WP-002 | WP-016 | 2k / 2k | Form #3; ADR-004 |
+| WP-006 | Build migrate_lifecyclerun_v1_to_v2 + migrate marketplace store | create | backend | done | WP-001, WP-002 | — | 4k / 4k | Form #4; ADR-004 |
+| WP-007 | Wire lifecycle-steps canonical into the drift detector | extend | backend | done | WP-001, WP-002 | — | 3k / 2k | Proof §Drift-detector parity |
+| WP-008 | Re-vendor the upstream-minted wasGeneratedBy prov_constraints edge on Product + Opportunity | substitute-strangle | contract | done | WP-002 | WP-009 | 3k / 2k | Form #2; ADR-002 |
+| WP-009 | Build _entity_evolve — close/open-window + CONDITIONAL wasGeneratedBy + allowlist | create | backend | done | WP-008 | WP-010, WP-011, WP-012, WP-013 | 4k / 5k | Form #5; ADR-002, ADR-003 |
+| WP-010 | Add as-of-time window read to _brain_query | extend | backend | done | WP-009 | WP-013 | 3k / 3k | Form #6; ADR-003 |
+| WP-011 | Characterisation test pinning current living-entity emit behaviour | test | backend | done | WP-009 | WP-012 | 3k / 3k | Form §Change-primitive (4 apply-evolve) |
+| WP-012 | Refactor Product/Opp (w/ prov) + Project (windows-only) emitters to call evolve_entity | refactor | backend | done | WP-009, WP-011 | WP-014 | 4k / 4k | Form §Change-primitive (4); ADR-003 |
+| WP-013 | Point living-entity emit base_dir at central Tenant home + prove cross-repo read | reuse | backend | done | WP-002, WP-009, WP-010 | WP-014, WP-016 | 4k / 4k | Form #7, #8; ADR-005 |
+| WP-014 | Characterisation test pinning minter path-safety + MUC-003 | test | backend | done | WP-012, WP-013 | WP-015 | 3k / 3k | Form §Change-primitive (6 project-reconcile) |
+| WP-015 | Refactor minter to canonical save + mirror (Project windows+supersedes, no prov); update prose | refactor | backend | done | WP-014 | — | 4k / 4k | Form #9, #10; ADR-006 |
+| WP-016 | Re-vendor LifecycleRun v2.2.0 (additive for_project ref) + wire for_project at change-start | substitute-strangle | contract | done | WP-002, WP-005, WP-013 | — | 3k / 3k | Form #3b; ADR-004, ADR-007 |
 
 **Totals:** ~49k input + ~47k output ≈ 96k tokens for the full WP set (the for_project
 increment adds ~6k; still below the pre-rework ~99k — the 3→1 collapse removed
