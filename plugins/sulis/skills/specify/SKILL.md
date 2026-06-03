@@ -232,6 +232,15 @@ deeper") — the override never needs pre-asking.
 - The classifier defaults to standard on uncertainty; that default is the
   agent's to apply, not the founder's to confirm.
 
+**Depth ≠ scope (MUST — see the Sulis body "Scope Posture").** The depth
+(lite / standard / deep) sizes *how much specifying effort* the work
+warrants — it does **not** shrink the *scope of what gets built*. Spec the
+**full coherent scope** of what's asked; don't reflexively narrow it to a
+"thin first slice." If the scope is genuinely too big to hold in one go,
+**you** propose a phased plan (phase 1 a real, meaningful go; the deferred
+phases captured to the backlog so they're not lost) — never hand the
+slicing decision to the founder.
+
 Never *interrogate* the founder to ratify the computed depth. (Genuine scope
 questions discovered *while writing* the spec — what a feature should do, who
 it's for — are different: those are founder-owned, ask them per AAF-01.)

@@ -273,6 +273,15 @@ If extending or superseding, reference the existing ADR by path.}
    write `.architecture/{project}/SIZING.md` per the schema in
    `references/right-sizing.md`.
 
+   **Scope posture (MUST — see the Sulis body "Scope Posture").** The tier
+   sizes *how much design rigour* the work warrants — it does **not** license
+   shrinking the *scope delivered*. Default to designing the **full coherent
+   scope** of what's asked; a large tier means "design it properly," not
+   "deliver less." The "smaller first version" above is a *founder-initiated*
+   redirect, never the agent's reflex. If the scope is genuinely too big to
+   hold in one go, **you** propose a phased plan (phase 1 a real go; the rest
+   captured to the backlog) — never hand the slicing to the founder.
+
    (Operator-facing invocations — `--raw` / `/sulis:jargon on` — may still see
    the full sFPC/ASR proposal; founder-mode gets the plain size sentence.)
 3.5. **Define the contracts (MUST when cross-kind or user-facing).** Before
