@@ -1,3 +1,21 @@
+## v0.93.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- MCP-UI surface patterns — new reference (mcp-ui-surface-patterns.md) for
+  driving custom interactive UI in an AI client. The load-bearing point:
+  choosing the rendering path is an ARCHITECTURE decision (data-connection +
+  durability), not styling — Artifact (ephemeral, no live data) vs MCP App
+  (ui:// bundled HTML in a sandboxed iframe, data over the ui/ postMessage
+  channel) vs MCP-UI externalUrl. Encodes the safe iframe-HTML assumption +
+  flags the two open uncertainties (Cowork parity, remoteDom). Cited from four
+  homes: ux-designer (surface type is part of the visual contract), draft-
+  architecture (the path choice is an ADR), WP_FRONTEND (WPF-15 — build
+  constraints: sandboxed iframe, ui/ channel, CSP allowlist, no-localStorage-in-
+  artifacts), CONTRACT_FIRST (CF-08 — the ui:// resource + ui/ channel as a
+  contract seam). Grounded in the cowork-custom-ui critical-thinking analysis +
+  the MCP Apps official spec.
+
 ## v0.92.0 — 2026-06-03
 
 **Minor — release-train batch.**
