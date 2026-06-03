@@ -40,38 +40,37 @@ def _signature(severity: str, summary: str, file_path: str) -> str:
     return hashlib.sha1(raw).hexdigest()[:12]  # noqa: S324
 
 
-def _next_sf_id(paths) -> str:
-    """Allocate next SF-NNN ID by scanning the register."""
-    paths.security_dir.mkdir(parents=True, exist_ok=True)
-    paths.findings_dir.mkdir(parents=True, exist_ok=True)
-    if not paths.findings_register.exists():
-        return "SF-001"
-    text = paths.findings_register.read_text(encoding="utf-8")
-    existing = re.findall(r"SF-(\d{3,})", text)
-    if not existing:
-        return "SF-001"
-    next_n = max(int(x) for x in existing) + 1
-    return f"SF-{next_n:03d}"
+def _sf_id_for_signature(signature: str) -> str:
+    """The SF ID is DERIVED from the finding signature, not a counter.
+
+    The old `max(existing)+1` allocator raced under parallel run-all
+    security reviews — two distinct first-findings each became SF-001
+    (the same class of cross-agent collision as DR-030 / L-43). Deriving
+    the id from the already-computed signature hash is collision-free by
+    construction (different findings → different signatures → different
+    ids), idempotent for a re-seen finding (same signature → same id, so
+    dedup falls out for free), and needs no shared-state scan.
+    """
+    return f"SF-{signature[:8]}"
 
 
-def _next_auto_wp_id(paths) -> str:
-    """Allocate next WP-AUTO-NNN ID."""
-    paths.wp_dir.mkdir(parents=True, exist_ok=True)
-    existing = [
-        re.match(r"WP-AUTO-(\d{3,})", p.name)
-        for p in paths.wp_dir.glob("WP-AUTO-*.md")
-    ]
-    nums = [int(m.group(1)) for m in existing if m]
-    next_n = max(nums) + 1 if nums else 1
-    return f"WP-AUTO-{next_n:03d}"
+def _auto_wp_id_for_signature(signature: str) -> str:
+    """The auto-draft WP shares its source finding's signature suffix —
+    1:1 with the SF, collision-free, and traceable at a glance."""
+    return f"WP-AUTO-{signature[:8]}"
 
 
 def _find_existing_signature(paths, signature: str) -> str | None:
-    """If register already has a finding with this signature, return its SF ID."""
+    """If register already has a finding with this signature, return its SF ID.
+
+    The SF-id pattern is hex (`SF-[0-9a-f]+`, derived from the signature);
+    `\\d`-only would miss the new ids. Hex also matches legacy decimal ids
+    (SF-001), so this stays backward-compatible with pre-existing registers.
+    """
     if not paths.findings_register.exists():
         return None
     text = paths.findings_register.read_text(encoding="utf-8")
-    pattern = re.compile(rf"\|\s*(SF-\d{{3,}})\s*\|[^|]*\|[^|]*\|[^|]*\|\s*{re.escape(signature)}\s*\|")
+    pattern = re.compile(rf"\|\s*(SF-[0-9a-f]{{3,}})\s*\|[^|]*\|[^|]*\|[^|]*\|\s*{re.escape(signature)}\s*\|")
     match = pattern.search(text)
     return match.group(1) if match else None
 
@@ -92,9 +91,14 @@ def cmd_register(args: argparse.Namespace) -> None:
             "signature": signature,
         })
 
-    # New finding
-    sf_id = _next_sf_id(paths)
-    auto_wp_id = _next_auto_wp_id(paths)
+    # New finding — IDs derived from the signature (collision-free; see
+    # _sf_id_for_signature). Ensure the dirs exist (the old allocators did
+    # this as a side effect of their scan).
+    paths.security_dir.mkdir(parents=True, exist_ok=True)
+    paths.findings_dir.mkdir(parents=True, exist_ok=True)
+    paths.wp_dir.mkdir(parents=True, exist_ok=True)
+    sf_id = _sf_id_for_signature(signature)
+    auto_wp_id = _auto_wp_id_for_signature(signature)
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Build SF file

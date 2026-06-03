@@ -1,0 +1,12 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "id": "dna:tool:XV1303ZB30B7ZBVBPSQG3FC194",
+  "implementation_kind": "subprocess",
+  "inputs_schema_ref": "n/a",
+  "kind": "hybrid",
+  "name": "capture-cli",
+  "outputs_schema_ref": "n/a",
+  "state": "active",
+  "sys_status": "active",
+  "version": "1.0.0"
+}

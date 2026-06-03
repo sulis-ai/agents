@@ -1,0 +1,19 @@
+id: ARCH-brain-backlog-and-traversal
+change: CH-01KT60
+primitive: create
+status: decomposed
+sourced_from: .specifications/brain-backlog-and-traversal/SRD.md
+spec: .changes/create-brain-backlog-and-traversal.SPEC.md
+founder_facing: false
+tier: M
+pillars:
+  form: referenced        # rides existing ports (EntityRepository, _brain_query)
+  armor: light            # no network; NFR-01 graceful degradation is the concern
+  proof: covered          # rides the testable-state scenario loop + pytest
+adrs:
+  - ADR-001-roadmap-label-storage-sidecar
+  - ADR-002-backing-chain-bootstrap-and-tenant-identity
+  - ADR-003-quick-vs-full-why-rooting-branch
+  - ADR-004-opportunity-analyst-invocation-from-capture
+  - ADR-005-capture-intake-single-idea-not-from-srd
+  - ADR-006-query-seam-extension-shape

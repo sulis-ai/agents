@@ -46,21 +46,21 @@ def _write_workflows(repo_root: Path, names: list[str]) -> None:
         (wf / f"{n}.yml").write_text(f"name: {n}\non: push\n")
 
 
-def _gh_base(*, queue_present: bool, default_branch: str = "dev",
+def _gh_base(*, queue_present: bool, default_branch: str = "main",
              environments: list[str] | None = None) -> list[dict]:
-    """Conformant gh responses. Most-specific match first.
+    """Conformant gh responses (trunk model). Most-specific match first.
 
-    queue_present toggles whether the dev rules include a merge_queue rule.
+    queue_present toggles whether the main (trunk) rules include a
+    merge_queue rule. Index 1 is the protection entry (some tests override
+    it by position).
     """
     envs = environments if environments is not None else ["staging", "production"]
     rules = [{"type": "merge_queue"}] if queue_present else []
     return [
-        {"match": "rules/branches/dev", "stdout": json.dumps(rules)},
-        {"match": "branches/dev/protection", "stdout": json.dumps({
+        {"match": "rules/branches/main", "stdout": json.dumps(rules)},
+        {"match": "branches/main/protection", "stdout": json.dumps({
             "required_status_checks": {"contexts": ["branch-ci"]},
         })},
-        {"match": "branches/main/protection", "stdout": json.dumps({})},
-        {"match": "branches/dev", "stdout": json.dumps({"name": "dev"})},
         {"match": "branches/main", "stdout": json.dumps({"name": "main"})},
         {"match": "/environments", "stdout": json.dumps({
             "environments": [{"name": e} for e in envs],
@@ -80,7 +80,7 @@ def _run(run_tool, repo_root: Path):
 
 
 SINGLE_WF = ["branch-ci", "merge-queue-ci", "deploy-staging",
-             "health-and-smoke", "promote-dev-to-main", "release-prod"]
+             "health-and-smoke", "release-on-merge", "release-prod"]
 
 
 # ─── RC-02 deadlock fix ─────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ def test_rc02_fails_if_merge_queue_ci_is_a_classic_required_check(tmp_path, run_
     _write_contract(tmp_path, "profile: deployable-web-app\ncontribution_model: team\n")
     _write_workflows(tmp_path, SINGLE_WF)
     responses = _gh_base(queue_present=True)
-    responses[1] = {"match": "branches/dev/protection", "stdout": json.dumps({
+    responses[1] = {"match": "branches/main/protection", "stdout": json.dumps({
         "required_status_checks": {"contexts": ["branch-ci", "merge-queue-ci"]},
     })}
     mock_gh(responses)
@@ -128,11 +128,11 @@ def test_rc02_genuine_missing_protection_still_errors(tmp_path, run_tool, mock_g
     configured (rc!=0, NO 'Upgrade to GitHub Pro' body) still hard-errors
     RC-02. Pins the behaviour the refactor must preserve."""
     _write_contract(tmp_path, "profile: published-artifact\ncontribution_model: solo\n")
-    _write_workflows(tmp_path, ["branch-ci", "promote-dev-to-main",
+    _write_workflows(tmp_path, ["branch-ci", "release-on-merge",
                                 "deploy-staging", "health-and-smoke", "release-prod"])
     (tmp_path / ".github" / "CODEOWNERS").write_text("* @iainn\n")
     responses = _gh_base(queue_present=False)
-    responses[1] = {"match": "branches/dev/protection", "exit_code": 1,
+    responses[1] = {"match": "branches/main/protection", "exit_code": 1,
                     "stderr": "gh: Not Found (HTTP 404)"}
     mock_gh(responses)
 
@@ -147,11 +147,11 @@ def test_rc02_freeplan_403_is_not_a_hard_error(tmp_path, run_tool, mock_gh):
     hard RC-02 error — it is reported as a warning-eligible
     unprotected-free-plan condition (a warning, surfaced for WP-004)."""
     _write_contract(tmp_path, "profile: published-artifact\ncontribution_model: solo\n")
-    _write_workflows(tmp_path, ["branch-ci", "promote-dev-to-main",
+    _write_workflows(tmp_path, ["branch-ci", "release-on-merge",
                                 "deploy-staging", "health-and-smoke", "release-prod"])
     (tmp_path / ".github" / "CODEOWNERS").write_text("* @iainn\n")
     responses = _gh_base(queue_present=False)
-    responses[1] = {"match": "branches/dev/protection", "exit_code": 1,
+    responses[1] = {"match": "branches/main/protection", "exit_code": 1,
         "stderr": ("gh: Upgrade to GitHub Pro or make this repository public "
                    "to enable this feature. (HTTP 403)")}
     # main/protection probe also 403 on a free-plan repo:
@@ -177,7 +177,7 @@ def test_rc02_freeplan_403_is_not_a_hard_error(tmp_path, run_tool, mock_gh):
 def test_rc03_solo_requires_queue_absent(tmp_path, run_tool, mock_gh):
     """solo → merge queue MUST be absent. Queue present = error."""
     _write_contract(tmp_path, "profile: published-artifact\ncontribution_model: solo\n")
-    _write_workflows(tmp_path, ["branch-ci", "promote-dev-to-main",
+    _write_workflows(tmp_path, ["branch-ci", "release-on-merge",
                                 "deploy-staging", "health-and-smoke", "release-prod"])
     (tmp_path / ".github" / "CODEOWNERS").write_text("* @iainn\n")
     mock_gh(_gh_base(queue_present=True))  # queue present — wrong for solo
@@ -191,7 +191,7 @@ def test_rc03_solo_requires_queue_absent(tmp_path, run_tool, mock_gh):
 def test_rc03_solo_passes_with_no_queue(tmp_path, run_tool, mock_gh):
     """solo + no queue = RC-03 clean."""
     _write_contract(tmp_path, "profile: published-artifact\ncontribution_model: solo\n")
-    _write_workflows(tmp_path, ["branch-ci", "promote-dev-to-main",
+    _write_workflows(tmp_path, ["branch-ci", "release-on-merge",
                                 "deploy-staging", "health-and-smoke", "release-prod"])
     (tmp_path / ".github" / "CODEOWNERS").write_text("* @iainn\n")
     mock_gh(_gh_base(queue_present=False))
@@ -226,7 +226,7 @@ def test_published_solo_repo_passes(tmp_path, run_tool, mock_gh):
     """
     _write_contract(tmp_path, "profile: published-artifact\ncontribution_model: solo\n")
     # note: no merge-queue-ci.yml (solo doesn't need it)
-    _write_workflows(tmp_path, ["branch-ci", "promote-dev-to-main",
+    _write_workflows(tmp_path, ["branch-ci", "release-on-merge",
                                 "deploy-staging", "health-and-smoke", "release-prod"])
     (tmp_path / ".github" / "CODEOWNERS").write_text("* @iainn\n")
     mock_gh(_gh_base(queue_present=False))
@@ -243,7 +243,7 @@ def test_published_solo_repo_passes(tmp_path, run_tool, mock_gh):
 def test_published_solo_does_not_require_merge_queue_ci_workflow(tmp_path, run_tool, mock_gh):
     """solo → merge-queue-ci.yml is not a required workflow file."""
     _write_contract(tmp_path, "profile: published-artifact\ncontribution_model: solo\n")
-    _write_workflows(tmp_path, ["branch-ci", "promote-dev-to-main",
+    _write_workflows(tmp_path, ["branch-ci", "release-on-merge",
                                 "deploy-staging", "health-and-smoke", "release-prod"])
     (tmp_path / ".github" / "CODEOWNERS").write_text("* @iainn\n")
     mock_gh(_gh_base(queue_present=False))
@@ -277,7 +277,7 @@ def test_default_profile_is_deployable_team_strict(tmp_path, run_tool, mock_gh):
 def test_published_missing_env_is_warn_not_error(tmp_path, run_tool, mock_gh):
     """published-artifact: missing environment is WARN, not error."""
     _write_contract(tmp_path, "profile: published-artifact\ncontribution_model: solo\n")
-    _write_workflows(tmp_path, ["branch-ci", "promote-dev-to-main",
+    _write_workflows(tmp_path, ["branch-ci", "release-on-merge",
                                 "deploy-staging", "health-and-smoke", "release-prod"])
     (tmp_path / ".github" / "CODEOWNERS").write_text("* @iainn\n")
     mock_gh(_gh_base(queue_present=False, environments=[]))
@@ -308,7 +308,7 @@ def test_multi_artifact_deployable_keeps_strict_set(tmp_path, run_tool, mock_gh)
         "  - name: sdk\n    type: published-artifact\n"
     ))
     # deliberately MISSING deploy-api-staging.yml to prove it's required
-    _write_workflows(tmp_path, ["branch-ci", "merge-queue-ci", "promote-dev-to-main",
+    _write_workflows(tmp_path, ["branch-ci", "merge-queue-ci", "release-on-merge",
                                 "health-api-staging", "release-api-prod", "publish-sdk"])
     (tmp_path / ".github" / "CODEOWNERS").write_text("* @iainn\n")
     mock_gh(_gh_base(queue_present=True))
@@ -339,11 +339,12 @@ def test_profile_and_artifacts_both_present_is_error(tmp_path, run_tool, mock_gh
 # ─── invariant rules still enforced ─────────────────────────────────────────
 
 
-def test_missing_dev_branch_still_fails_rc01(tmp_path, run_tool, mock_gh):
+def test_missing_main_branch_still_fails_rc01(tmp_path, run_tool, mock_gh):
+    """Trunk model: the one integration line (`main`) missing → RC-01 error."""
     _write_contract(tmp_path, "profile: published-artifact\ncontribution_model: solo\n")
-    _write_workflows(tmp_path, ["branch-ci", "promote-dev-to-main"])
+    _write_workflows(tmp_path, ["branch-ci", "release-on-merge"])
     responses = _gh_base(queue_present=False)
-    responses.insert(0, {"match": "branches/dev", "exit_code": 1, "stderr": "Not Found"})
+    responses.insert(0, {"match": "branches/main", "exit_code": 1, "stderr": "Not Found"})
     mock_gh(responses)
 
     result = _run(run_tool, tmp_path)
@@ -355,7 +356,7 @@ def test_missing_dev_branch_still_fails_rc01(tmp_path, run_tool, mock_gh):
 
 def test_missing_codeowners_is_warning(tmp_path, run_tool, mock_gh):
     _write_contract(tmp_path, "profile: published-artifact\ncontribution_model: solo\n")
-    _write_workflows(tmp_path, ["branch-ci", "promote-dev-to-main",
+    _write_workflows(tmp_path, ["branch-ci", "release-on-merge",
                                 "deploy-staging", "health-and-smoke", "release-prod"])
     mock_gh(_gh_base(queue_present=False))
 

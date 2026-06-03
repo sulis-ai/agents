@@ -12,8 +12,11 @@ The fixture-tree builder lives in the shared helper `_route_fixtures.py`
 (extracted in the Blue phase for WP-005/006/007 reuse — EP-02; TDD §10.3).
 """
 
+from pathlib import Path
+
 from unit._route_fixtures import build_fixture_tree, write_file
 
+from _route_frontmatter import parse_frontmatter
 from _route_inventory import (
     InventoryEntry,
     Route,
@@ -22,6 +25,55 @@ from _route_inventory import (
     discover,
     route_set,
 )
+
+# tests/unit/ -> tests/ -> scripts/ -> sulis/ -> plugins/ -> repo root
+_REPO_ROOT = Path(__file__).resolve().parents[5]
+_SULIS_AGENT = _REPO_ROOT / "plugins" / "sulis" / "agents" / "sulis.md"
+
+# The existing dispatch_via rows the orchestrator MUST keep routing through —
+# the routing inventory that predates the WP-012 (FR-08) additive edit. These
+# are the specialists enumerated in the live `delegation.dispatch_via` block.
+# Snapshotting them here is the characterisation (EP-07 / WORK_PACKAGE_STANDARD
+# REORGANISE rule): the FR-08 edit is licensed only against proof that it
+# preserves every one of these.
+_EXISTING_DISPATCH_SPECIALISTS = (
+    "context-cartographer",
+    "requirements-analyst",
+    "engineering-architect",
+    "executor",
+    "security-reviewer",
+)
+
+# The existing artifact_owners mappings (path/extension -> owning specialist).
+# Each is asserted present verbatim so a silent rewrite of the ownership map
+# (the MUC-A5 prevention surface) surfaces here as a failure.
+_EXISTING_ARTIFACT_OWNERS = (
+    ('"SRD.md": requirements-analyst'),
+    ('"NFR.md": requirements-analyst'),
+    ('"PRIMITIVE_TREE.jsonld": requirements-analyst'),
+    ('"GLOSSARY.md": requirements-analyst'),
+    ('"MISUSE_CASES.md": requirements-analyst'),
+    ('"TDD.md": engineering-architect'),
+    ('"ADR-*.md": engineering-architect'),
+    ('"WP-*.md": engineering-architect'),
+    ('"INDEX.md": engineering-architect'),
+    ('"DECOMPOSE_VALIDATION.md": engineering-architect'),
+    ('"viability-report-*.md": security-reviewer'),
+    ('"SF-*.md": security-reviewer'),
+    ('".context/{project}/INDEX.md": context-cartographer'),
+)
+
+
+def _read_sulis_frontmatter() -> tuple[dict, str, str]:
+    """Read the live orchestrator agent, returning (mapping, body, raw_text).
+
+    Reads the REAL `plugins/sulis/agents/sulis.md` (not a fixture) — the
+    characterisation must pin the live routing the FR-08 edit touches, MEA-09
+    / TDD §10.2 (real adapter, not a mock).
+    """
+    raw_text = _SULIS_AGENT.read_text(encoding="utf-8")
+    mapping, body = parse_frontmatter(raw_text)
+    return mapping, body, raw_text
 
 
 # --- R3: inventory lists everything in the tree ----------------------------
@@ -253,3 +305,47 @@ def test_value_objects_are_frozen_and_hashable():
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         e.name = "y"  # type: ignore[misc]
+
+
+# --- WP-012 characterisation: existing routing preserved (REORGANISE) -------
+
+
+def test_existing_dispatch_routes_preserved():
+    """Characterisation (WP-012, EP-07): the live `sulis.md` carries every
+    existing `dispatch_via` specialist, the existing `routes_to` specialist
+    set, and every existing `artifact_owners` mapping.
+
+    This pins the routing the FR-08 additive edit touches. It MUST pass against
+    the UNEDITED agent (proving the baseline) and MUST still pass after the edit
+    (proving the edit was additive, not a rewrite). A regression — any existing
+    specialist dropped from `dispatch_via`, any artifact-owner mapping changed —
+    surfaces here, which is the point of a characterisation test.
+    """
+    mapping, _body, raw_text = _read_sulis_frontmatter()
+
+    # 1. routes_to is still the structured list-of-mappings the discovery layer
+    #    reads, and every existing specialist slug still resolves.
+    routes_to = mapping.get("routes_to")
+    assert isinstance(routes_to, list), "routes_to must remain a list of mappings"
+    route_slugs = {item.get("slug") for item in routes_to if isinstance(item, dict)}
+    for specialist in _EXISTING_DISPATCH_SPECIALISTS:
+        assert specialist in route_slugs, (
+            f"routes_to lost the {specialist!r} routing row"
+        )
+
+    # 2. Every existing dispatch_via row is still present (verbatim recommend
+    #    shape). The `delegation:` block is a nested mapping outside the
+    #    discovery reader's closed shape set, so we assert against the raw
+    #    frontmatter text — the snapshot the WP names.
+    assert "dispatch_via:" in raw_text
+    assert "recommend `/sulis:discover-context`" in raw_text  # context-cartographer
+    assert "recommend `claude --agent requirements-analyst`" in raw_text
+    assert "recommend `/sulis:draft-architecture`" in raw_text  # engineering-architect
+    assert "recommend `/sulis:plan-work`" in raw_text  # engineering-architect
+    assert "Skill(sulis:run-all)" in raw_text  # executor
+    assert "recommend `/sulis:codebase-assess`" in raw_text  # security-reviewer
+
+    # 3. Every existing artifact_owners mapping is unchanged.
+    assert "artifact_owners:" in raw_text
+    for owner_row in _EXISTING_ARTIFACT_OWNERS:
+        assert owner_row in raw_text, f"artifact_owners lost: {owner_row!r}"

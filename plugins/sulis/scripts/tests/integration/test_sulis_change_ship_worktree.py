@@ -33,20 +33,21 @@ def _git(cwd, *args) -> str:
 
 def test_ship_succeeds_when_base_checked_out_in_sibling_worktree(
         local_git_repo, run_tool):
-    """The exact #56 repro: `dev` lives in a sibling worktree, not repo_root.
+    """The exact #56 repro: the trunk `main` lives in a sibling worktree, not
+    repo_root.
 
-    The old ship path did `git checkout dev` in repo_root, which git refuses
-    when dev is checked out elsewhere ('fatal: dev is already checked out').
+    The old ship path did `git checkout main` in repo_root, which git refuses
+    when main is checked out elsewhere ('fatal: main is already checked out').
     The worktree-aware path performs the squash-merge in whatever worktree
-    holds dev instead.
+    holds the base branch instead.
     """
-    # Move repo_root OFF dev so dev is free to live in a sibling worktree.
+    # Move repo_root OFF main so main is free to live in a sibling worktree.
     _run(["git", "checkout", "-q", "-b", "parking"], cwd=local_git_repo)
-    dev_holder = local_git_repo.parent / f"{local_git_repo.name}-dev-holder"
-    _run(["git", "worktree", "add", "-q", str(dev_holder), "dev"],
+    main_holder = local_git_repo.parent / f"{local_git_repo.name}-main-holder"
+    _run(["git", "worktree", "add", "-q", str(main_holder), "main"],
          cwd=local_git_repo)
 
-    # Start a change (branches off dev) + add a commit on it. `start`
+    # Start a change (branches off main) + add a commit on it. `start`
     # returns the co-located worktree path; commit the work there.
     start_result = run_tool("sulis-change", "start",
                             "--repo-root", str(local_git_repo),
@@ -63,10 +64,10 @@ def test_ship_succeeds_when_base_checked_out_in_sibling_worktree(
                       "--merge")
     assert result.ok, f"ship failed (the #56 regression): {result.stderr}"
     assert result.data["outcome"]["mode"] == "merge"
-    # The merge ran in the dev-holding worktree, not repo_root.
-    assert result.data["outcome"]["merged_in"] == str(dev_holder)
-    # The work landed on dev (verify in the holder).
-    assert (dev_holder / "feature.txt").exists()
+    # The merge ran in the main-holding worktree, not repo_root.
+    assert result.data["outcome"]["merged_in"] == str(main_holder)
+    # The work landed on main (verify in the holder).
+    assert (main_holder / "feature.txt").exists()
 
 
 # ─── Part 3: Conventional-Commit squash message ───────────────────────────
@@ -91,7 +92,7 @@ def test_squash_commit_message_is_conventional(local_git_repo, run_tool):
                       "--merge")
     assert result.ok, result.stderr
 
-    msg = _git(local_git_repo, "log", "-1", "--format=%B", "dev")
+    msg = _git(local_git_repo, "log", "-1", "--format=%B", "main")
     assert msg.splitlines()[0] == "fix: tidy-the-login-form"
     assert "Stop the login form double-submitting on Enter." in msg
     assert "Co-Authored-By: Claude Opus 4.7" in msg

@@ -115,10 +115,10 @@ def test_start_degrades_gracefully_with_no_remote(tmp_path, run_tool):
     The push is an enhancement, not a new precondition — an offline / no-remote
     repo must still get its local branch + worktree.
     """
-    # A real git repo on a dev branch, but with NO origin remote configured.
+    # A real git repo on the trunk (main), but with NO origin remote configured.
     repo = tmp_path / "_no_remote_repo"
     repo.mkdir()
-    _run(["git", "init", "-q", "-b", "dev"], cwd=repo)
+    _run(["git", "init", "-q", "-b", "main"], cwd=repo)
     _run(["git", "config", "user.email", "test@example.com"], cwd=repo)
     _run(["git", "config", "user.name", "Test"], cwd=repo)
     (repo / "README.md").write_text("# no remote\n")
@@ -806,7 +806,7 @@ def test_start_writes_change_record(local_git_repo, run_tool):
     assert record["primitive"] == "create"
     assert record["branch"] == "change/create-record-test"
     assert record["intent"] == "build the thing"
-    assert record["base_branch"] == "dev"
+    assert record["base_branch"] == "main"
     assert record["stage"] == "recon"
     assert record["created_at"].endswith("Z")
 

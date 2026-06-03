@@ -46,6 +46,7 @@ from _wpxlib import (  # noqa: E402
     _run_smoke,
     add_common_args,
     back_integrate_change_branch,
+    ff_local_change_branch_from_origin,
     cli_main,
     deploy_is_applicable,
     emit_internal_error,
@@ -194,6 +195,45 @@ def cmd_run(args: argparse.Namespace) -> None:
             merge_sha = _merge_squash(repo, args.branch, args.wp,
                                       base_branch=base_branch)
         result["merge_sha"] = merge_sha
+
+        # Step 8d: #141 fast-forward the LOCAL change worktree from
+        # origin/<change_branch>. _merge_squash lands the squash commit on
+        # origin via the GitHub API, but the local worktree (where this
+        # session and the next agent — e.g. Step 11 security-review — read
+        # files) is still at the pre-merge SHA. Without this FF the next
+        # agent reads stale files and returns a false "CANNOT REVIEW"
+        # verdict (CH-01KT48 trigger). Skip on the already-merged path
+        # (the merge happened in a prior run; local state is the founder's
+        # to reconcile) and skip when not shipping into a change branch.
+        if (
+            args.change_worktree_path
+            and base_branch.startswith("change/")
+            and not result.get("merge_already_complete")
+        ):
+            ff = ff_local_change_branch_from_origin(
+                Path(args.change_worktree_path), base_branch,
+            )
+            result["step_8d_local_ff"] = ff["status"]
+            if ff["status"] == "fast_forwarded":
+                _log(
+                    f"Step 8d: fast-forwarded {base_branch} by "
+                    f"{ff.get('advanced_commits', '?')} commit(s) so post-"
+                    f"merge agents read fresh files"
+                )
+            elif ff["status"] == "already_current":
+                _log(f"Step 8d: {base_branch} already current with origin (no FF needed)")
+            else:
+                # Non-fatal: the merge already landed on origin, defence in
+                # depth at next Step 0 reconciles. Log loudly so the
+                # session can spot stale-tree symptoms.
+                _log(
+                    f"WARNING: Step 8d local FF returned {ff['status']!r}: "
+                    f"{ff.get('error', '')}. The squash-merge already landed "
+                    f"on origin/{base_branch}; subsequent agents reading the "
+                    f"local worktree may see pre-merge files until reconciled."
+                )
+        else:
+            result["step_8d_local_ff"] = "skipped"
 
         # Step 12.5: post-WP back-integration (Phase 5 #3 — change-as-primitive
         # build). Per lifecycle.md Step 12.5 + CW-04 auto back-integration:

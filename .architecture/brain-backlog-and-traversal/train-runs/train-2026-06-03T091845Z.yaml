@@ -1,0 +1,21 @@
+train_id: "train-2026-06-03T091845Z"
+started_at: "2026-06-03T09:18:45Z"
+completed_at: "2026-06-03T09:28:08Z"
+outcome: "success"
+batch_size: 2
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-03T09:23:58Z"
+bundle:
+  - wp: WP-006
+    branch: feat/wp-006-sulis-capture-cli
+    pre_train_sha: d700d0e5d269380d480a75cf1c15f1a30a9df535
+    rebased_to_sha: d700d0e5d269380d480a75cf1c15f1a30a9df535
+    merge_sha_on_dev: 26db956c5a53df82c0286049ecff27c717f8ca47
+  - wp: WP-008
+    branch: feat/wp-008-brain-query-cli-modes
+    pre_train_sha: c8f852dc2b16c4e765660660821df701ac4a0d72
+    rebased_to_sha: 93f0180a9dd1f46aa48ef1773eb566127cb0dc5d
+    merge_sha_on_dev: f21abcc50f91b7118ea3b30be48e5358f94b34c7

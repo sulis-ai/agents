@@ -40,9 +40,9 @@ def _commit_on_branch(repo: Path, branch: str, filename: str) -> str:
     return sha
 
 
-def test_create_defaults_to_origin_dev(local_git_repo, run_tool):
-    """No --base-branch → branches off origin/dev (the pre-L-04 behaviour,
-    pinned so the default path can't regress)."""
+def test_create_defaults_to_origin_main(local_git_repo, run_tool):
+    """No --base-branch → branches off origin/main (the trunk default, post
+    dev→main cutover; pinned so the default path can't regress)."""
     wt = local_git_repo.parent / "wp-001-wt"
     result = run_tool(
         "wpx-worktree", "create",
@@ -53,10 +53,10 @@ def test_create_defaults_to_origin_dev(local_git_repo, run_tool):
         "--repo-root", str(local_git_repo),
     )
     assert result.ok, f"create failed: {result.error}; stderr={result.stderr}"
-    assert result.data["base_branch"] == "dev"
-    assert result.data["base_ref"] == "origin/dev"
-    # Worktree HEAD == origin/dev SHA
-    assert _head_sha(wt, "HEAD") == _head_sha(local_git_repo, "origin/dev")
+    assert result.data["base_branch"] == "main"
+    assert result.data["base_ref"] == "origin/main"
+    # Worktree HEAD == origin/main SHA
+    assert _head_sha(wt, "HEAD") == _head_sha(local_git_repo, "origin/main")
 
 
 def test_create_off_local_change_branch(local_git_repo, run_tool):
@@ -86,3 +86,51 @@ def test_create_off_local_change_branch(local_git_repo, run_tool):
     assert result.data["base_ref"] == "change/create-foo-bar"  # local, not origin/
     assert result.data["dev_sha_at_creation"] == change_sha
     assert _head_sha(wt, "HEAD") == change_sha
+
+
+def test_create_normalises_origin_prefix(local_git_repo, run_tool):
+    """#105 — `--base-branch origin/dev` must resolve identically to `dev`.
+
+    Before the fix: `base_ref = f"origin/{base_branch}"` produced the literal
+    `origin/origin/dev`, so `git fetch origin origin/dev` failed (no such ref
+    on remote) AND the local fallback `refs/heads/origin/dev` didn't exist,
+    yielding 'base branch not found' — even though `origin/dev` is the obvious
+    spelling for the same ref. Both spellings must work.
+    """
+    wt = local_git_repo.parent / "wp-003-wt"
+    result = run_tool(
+        "wpx-worktree", "create",
+        "--wp", "WP-003",
+        "--project", "p",
+        "--branch", "feat/wp-003-z",
+        "--worktree-path", str(wt),
+        "--base-branch", "origin/dev",
+        "--repo-root", str(local_git_repo),
+    )
+    assert result.ok, f"create failed: {result.error}; stderr={result.stderr}"
+    # Normalised to the bare branch name + the canonical origin/<base> ref
+    assert result.data["base_branch"] == "dev"
+    assert result.data["base_ref"] == "origin/dev"
+    assert _head_sha(wt, "HEAD") == _head_sha(local_git_repo, "origin/dev")
+
+
+def test_create_normalises_refs_heads_prefix(local_git_repo, run_tool):
+    """#105 (defensive) — `--base-branch refs/heads/dev` must also normalise.
+
+    A caller scripting against `git for-each-ref` may pass the full ref name;
+    treat it identically to bare `dev`.
+    """
+    wt = local_git_repo.parent / "wp-004-wt"
+    result = run_tool(
+        "wpx-worktree", "create",
+        "--wp", "WP-004",
+        "--project", "p",
+        "--branch", "feat/wp-004-w",
+        "--worktree-path", str(wt),
+        "--base-branch", "refs/heads/dev",
+        "--repo-root", str(local_git_repo),
+    )
+    assert result.ok, f"create failed: {result.error}; stderr={result.stderr}"
+    assert result.data["base_branch"] == "dev"
+    assert result.data["base_ref"] == "origin/dev"
+    assert _head_sha(wt, "HEAD") == _head_sha(local_git_repo, "origin/dev")

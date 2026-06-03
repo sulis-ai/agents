@@ -1,0 +1,24 @@
+{
+  "pr": "feat/wp-005-roadmap-sidecar",
+  "base": "change/create-brain-backlog-and-traversal",
+  "timestamp": "2026-06-03T082818Z",
+  "verdict": "PASS",
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "ruff_check": "clean",
+    "mypy_pr_introduced": 0,
+    "mypy_preexisting": ["yaml import-untyped (import yaml present at BASE in _brain_capture.py)"]
+  },
+  "hygiene": {
+    "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "none"},
+    "size": {"lines_added": 265, "files_changed": 4, "severity": "low"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+    "completeness": {"new_source_without_test": 1, "test_files_added": 1, "severity": "none", "note": "_brain_labels.py is a constants/helper module exercised transitively by test_roadmap_sidecar.py via roadmap_add/roadmap_members"}
+  },
+  "lenses": {
+    "architecture": {"in_changes": 0, "in_neighbours": 0},
+    "security": {"in_changes": 0, "in_neighbours": 0},
+    "quality": {"in_changes": 0, "in_neighbours": 0}
+  },
+  "draft_fixes": 0
+}

@@ -1,0 +1,26 @@
+train_id: "train-2026-06-03T071635Z"
+started_at: "2026-06-03T07:16:35Z"
+completed_at: "2026-06-03T08:12:13Z"
+outcome: "success"
+batch_size: 3
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-03T07:22:31Z"
+bundle:
+  - wp: WP-001
+    branch: feat/wp-001-compose-opportunity-from-idea
+    pre_train_sha: 4b6b5f5223484ec7a8fb36c730c9df62f2e87cd6
+    rebased_to_sha: 4b6b5f5223484ec7a8fb36c730c9df62f2e87cd6
+    merge_sha_on_dev: 444024a1ec3493bfb5c8716ad07e7c93fd0cd13c
+  - wp: WP-002
+    branch: feat/wp-002-compose-requirement-from-idea
+    pre_train_sha: 10266a5bc0c7447bd372977157cbe79c8be2b35b
+    rebased_to_sha: 90481c25056ff2fba3b6deb67092ebf01598fb53
+    merge_sha_on_dev: 5167a7c8d93042eac28ab33145e85b337c5242b5
+  - wp: WP-003
+    branch: feat/wp-003-bootstrap-backing-chain
+    pre_train_sha: 0ede091e4bd0b3e5477253b7223470754a067e9b
+    rebased_to_sha: 2cc209d5ae9b8f1f9e13cc9cdee89154c5d63a2f
+    merge_sha_on_dev: 967519a2369f726b42420398907b30f5ab9e6966
