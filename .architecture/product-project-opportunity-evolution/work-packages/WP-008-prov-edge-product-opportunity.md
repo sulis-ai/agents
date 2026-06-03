@@ -1,7 +1,7 @@
 ---
 id: WP-008
 title: Consume the upstream-minted `wasGeneratedBy` prov_constraints edge on Product + Opportunity (re-vendor bumped schemas); Project excluded
-status: blocked
+status: pending
 blocked_reason: UPSTREAM — gated on the mint-request `wasGeneratedBy-provenance-edge-2026-06-03` being accepted → a mint walk recompiling → the bumped Product 1.1.0 + Opportunity 2.1.0 schemas re-vendored into canonical compiled output. The in-repo re-vendor cannot land until that upstream artifact exists.
 kind: contract
 primitive: substitute-strangle

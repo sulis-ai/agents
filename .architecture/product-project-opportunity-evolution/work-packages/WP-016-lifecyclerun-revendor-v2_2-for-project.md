@@ -1,7 +1,7 @@
 ---
 id: WP-016
 title: Re-vendor LifecycleRun v2.2.0 (additive for_project ref) + wire for_project at change-start
-status: blocked
+status: pending
 blocked_reason: UPSTREAM — gated on the mint-request `for-project-edge-2026-06-03` (LifecycleRun 2.1.0 → 2.2.0, +1 optional `for_project: ref→project` property) being accepted → a mint walk recompiling → the bumped v2.2.0 schema (PD canonical + insurance mirror) re-vendored into canonical compiled output. The in-repo re-vendor + emitter wiring cannot land until that upstream artifact exists. SAME gating shape as WP-008's `wasGeneratedBy` gate.
 kind: contract
 primitive: substitute-strangle

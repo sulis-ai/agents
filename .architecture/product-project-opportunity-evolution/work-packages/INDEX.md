@@ -39,8 +39,8 @@ WP IDs 003 and 004 are intentionally retired (absorbed into WP-002, recorded in 
 
 | Status | Count |
 |---|---|
-| pending | 12 |
-| blocked (upstream gate) | 2 (WP-008 — wasGeneratedBy mint; WP-016 — for_project mint) |
+| pending | 14 |
+| blocked (upstream gate) | 0 (both mints walked + re-vendored: DR-031 wasGeneratedBy, DR-032 for_project) |
 | in_progress | 0 |
 | done | 0 |
 
@@ -242,7 +242,7 @@ WP-008 the prov-edge schema replacement) — each a deprecate-then-replace with 
 | WP-005 | Migrate sulis-emit-lifecyclerun CLI to --step (--step-name deprecated alias) | substitute-strangle | backend | pending | WP-002 | WP-016 | 2k / 2k | Form #3; ADR-004 |
 | WP-006 | Build migrate_lifecyclerun_v1_to_v2 + migrate marketplace store | create | backend | pending | WP-001, WP-002 | — | 4k / 4k | Form #4; ADR-004 |
 | WP-007 | Wire lifecycle-steps canonical into the drift detector | extend | backend | pending | WP-001, WP-002 | — | 3k / 2k | Proof §Drift-detector parity |
-| WP-008 | Re-vendor the upstream-minted wasGeneratedBy prov_constraints edge on Product + Opportunity | substitute-strangle | contract | **blocked (upstream mint)** | WP-002 | WP-009 | 3k / 2k | Form #2; ADR-002 |
+| WP-008 | Re-vendor the upstream-minted wasGeneratedBy prov_constraints edge on Product + Opportunity | substitute-strangle | contract | pending | WP-002 | WP-009 | 3k / 2k | Form #2; ADR-002 |
 | WP-009 | Build _entity_evolve — close/open-window + CONDITIONAL wasGeneratedBy + allowlist | create | backend | pending | WP-008 | WP-010, WP-011, WP-012, WP-013 | 4k / 5k | Form #5; ADR-002, ADR-003 |
 | WP-010 | Add as-of-time window read to _brain_query | extend | backend | pending | WP-009 | WP-013 | 3k / 3k | Form #6; ADR-003 |
 | WP-011 | Characterisation test pinning current living-entity emit behaviour | test | backend | pending | WP-009 | WP-012 | 3k / 3k | Form §Change-primitive (4 apply-evolve) |
@@ -250,7 +250,7 @@ WP-008 the prov-edge schema replacement) — each a deprecate-then-replace with 
 | WP-013 | Point living-entity emit base_dir at central Tenant home + prove cross-repo read | reuse | backend | pending | WP-002, WP-009, WP-010 | WP-014, WP-016 | 4k / 4k | Form #7, #8; ADR-005 |
 | WP-014 | Characterisation test pinning minter path-safety + MUC-003 | test | backend | pending | WP-012, WP-013 | WP-015 | 3k / 3k | Form §Change-primitive (6 project-reconcile) |
 | WP-015 | Refactor minter to canonical save + mirror (Project windows+supersedes, no prov); update prose | refactor | backend | pending | WP-014 | — | 4k / 4k | Form #9, #10; ADR-006 |
-| WP-016 | Re-vendor LifecycleRun v2.2.0 (additive for_project ref) + wire for_project at change-start | substitute-strangle | contract | **blocked (for_project mint)** | WP-002, WP-005, WP-013 | — | 3k / 3k | Form #3b; ADR-004, ADR-007 |
+| WP-016 | Re-vendor LifecycleRun v2.2.0 (additive for_project ref) + wire for_project at change-start | substitute-strangle | contract | pending | WP-002, WP-005, WP-013 | — | 3k / 3k | Form #3b; ADR-004, ADR-007 |
 
 **Totals:** ~49k input + ~47k output ≈ 96k tokens for the full WP set (the for_project
 increment adds ~6k; still below the pre-rework ~99k — the 3→1 collapse removed
