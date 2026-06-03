@@ -1,0 +1,59 @@
+{
+  "@context": {
+    "@vocab": "https://sulis.co/dna/",
+    "dna": "https://sulis.co/dna/"
+  },
+  "@id": "dna:lifecycle-steps:steps",
+  "@type": "step-instances",
+  "for_tenant": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "_about": "The three canonical lifecycle Step definitions a LifecycleRun points at when it records a unit of work being opened or shipped. Each is a reusable recipe (a prov:Plan, per ADR-001): the run is the activity that happened, the Step is the named kind of work it carried out. change-started marks a sulis-change start completing; change-shipped marks a sulis-change mark-shipped completing; unclassified-lifecycle-step is the catch-all when a run names a step we don't yet recognise. The run links to its Step via the sulis:viaStep relation. These three ULIDs are authored here once and copied — never re-minted — by the runs and the migration that reference them, so they stay byte-stable. mechanism is mixed because each lifecycle moment is part automated command, part human or agent decision. for_process=lifecycle and the tenant ULID are byte-identical to the canonical identifiers pinned in the requirements document and shared across every reference. The founder-readable note lives here at the envelope, not per-Step, because the foundation Step schema (v1.2.0) sets unevaluatedProperties:false and rejects a per-Step note field — the same pattern the release-train and discover-project Step sets follow.",
+  "captured_on": "2026-06-03",
+
+  "steps": [
+    {
+      "id": "dna:step:01KT61X5ST01CHANGESTART00A",
+      "sys_status": "active",
+      "name": "change-started",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "lifecycle",
+      "input_artifacts": ["change-start-request"],
+      "output_artifacts": ["opened-unit-of-work"],
+      "mechanism": "mixed",
+      "mechanism_detail": "The definition of a change-start lifecycle activity: a sulis-change start completed and a unit of work was opened. LifecycleRuns that record a change being opened point their step ref here (sulis:viaStep). The per-run specificity (primitive, slug) the old free step_name string carried is carried by the run's run_id / inputs_ref fields, not by this Plan.",
+      "criticality": "important",
+      "handles_failures": [],
+      "state": "active",
+      "valid_from": "2026-06-03T00:00:00Z"
+    },
+    {
+      "id": "dna:step:01KT61X5ST02CHANGESH1PP00A",
+      "sys_status": "active",
+      "name": "change-shipped",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "lifecycle",
+      "input_artifacts": ["change-ship-request"],
+      "output_artifacts": ["shipped-unit-of-work"],
+      "mechanism": "mixed",
+      "mechanism_detail": "The definition of a change-ship lifecycle activity: a sulis-change mark-shipped completed and a unit of work landed. LifecycleRuns that record a change shipping point their step ref here (sulis:viaStep). Per-run detail is carried by the run's run_id / outputs_ref fields, not by this Plan.",
+      "criticality": "important",
+      "handles_failures": [],
+      "state": "active",
+      "valid_from": "2026-06-03T00:00:00Z"
+    },
+    {
+      "id": "dna:step:01KT61X5ST03VNC1ASS1F1ED0A",
+      "sys_status": "active",
+      "name": "unclassified-lifecycle-step",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "lifecycle",
+      "input_artifacts": ["unmapped-step-name"],
+      "output_artifacts": ["unclassified-lifecycle-record"],
+      "mechanism": "mixed",
+      "mechanism_detail": "The catch-all definition for a free step_name string with no known mapping. The emitter's name-to-Step resolution falls back here when a run names a step that isn't change-started or change-shipped, so every run resolves to a real Step rather than an inline-minted one. The original free string, where trace grouping is needed, is carried by the run's run_id field.",
+      "criticality": "optional",
+      "handles_failures": [],
+      "state": "active",
+      "valid_from": "2026-06-03T00:00:00Z"
+    }
+  ]
+}
