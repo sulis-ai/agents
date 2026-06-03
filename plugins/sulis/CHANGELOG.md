@@ -1,3 +1,9 @@
+## v0.97.1 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- wpx-findings: SF + WP-AUTO ids now derive from the finding signature hash (SF-{sig[:8]} / WP-AUTO-{sig[:8]}) instead of a racy max(existing)+1 counter. Collision-free under parallel run-all security reviews, dedup-unified (same finding always → same id), 1:1-traceable SF↔WP-AUTO. Regexes widened decimal→hex (back-compatible: legacy SF-001 still parses). First fix in the multi-agent numbering strategy; the plugins-repo DR/L counters are the paired change.
+
 ## v0.97.0 — 2026-06-03
 
 **Minor — release-train batch.**
