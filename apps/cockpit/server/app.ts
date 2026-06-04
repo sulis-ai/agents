@@ -34,6 +34,7 @@ import { createDiffRouter } from "./routes/diff";
 import { createTranscriptRouter } from "./routes/transcript";
 import { createContractRouter } from "./routes/contract";
 import { createStatusRouter } from "./routes/status";
+import { createBrainRouter } from "./routes/brain";
 
 import { errorMiddleware } from "./middleware/errors";
 import { requestLogMiddleware } from "./middleware/request-log";
@@ -183,6 +184,17 @@ export function createApp(deps: CreateAppDeps): Application {
       changeStore: deps.changeStore,
       sulisStateDir: deps.sulisStateDir,
       claudeProjectsDir: deps.claudeProjectsDir,
+    }),
+  );
+
+  // WP-006 — read-time brain view (FR-06/07). GET-only; reads the change
+  // worktree's `.brain/instances` tree, groups entities by kind (empty
+  // groups omitted), and returns a BrainView. Composes existing reads —
+  // no new port; reading it starts no `claude` process (FR-N4).
+  app.use(
+    "/api/changes/:id/brain",
+    createBrainRouter({
+      changeStore: deps.changeStore,
     }),
   );
 

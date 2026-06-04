@@ -51,19 +51,20 @@ bound to `127.0.0.1:5174` by default (TDD §5, ADR-001/002/003). The route
 handlers are thin — they delegate to the lib functions (WP-005..WP-009)
 and the ports (the change-store reader, WP-003; the `SessionBridge`, WP-005).
 
-| Method + path                                | Purpose                                                       | Wire shape           |
-| -------------------------------------------- | ------------------------------------------------------------- | -------------------- |
-| `GET /api/changes`                           | List every change with liveness.                              | `Change[]`           |
-| `GET /api/changes/:id`                       | One change + the resolved transcript file paths.              | `ChangeDetail`       |
-| `GET /api/changes/:id/status`                | Read-time plain-English status + needs-attention flag, computed on each read from the record + transcript + liveness (never a stored post). | `ChangeStatus`       |
-| `GET /api/changes/:id/tree?path=...`         | One level of the worktree's folder tree. Default = root.      | `TreeNode[]`         |
-| `GET /api/changes/:id/file?path=...`         | Current contents of a file in the worktree (1 MiB cap).       | `FileContents`       |
-| `GET /api/changes/:id/diff?path=...`         | Base (at `baseSha`) + current contents for Monaco's DiffEditor. | `FileDiff`         |
-| `GET /api/changes/:id/transcript`            | Chronologically-merged chat messages from the change's transcripts. | `TranscriptMessage[]` |
-| `GET /api/changes/:id/contract`              | Whether the change's rendered contracts are reachable + what they are. | `ContractAvailability` |
-| `GET /api/changes/:id/contract/data`         | Serves the rendered `CONTRACT.html` (the data-contract preview). | `text/html`        |
-| `GET /api/changes/:id/contract/ui`           | Serves the rendered `UI.html`, or a typed JSON note when the change has no UI contract (never a broken link). | `text/html` or `{ uiContract, note }` |
-| `POST /api/changes/:id/chat`                 | **The one write/act path (WP-005).** Delivers a message to the change's agent (resume-or-spawn) and streams the reply as SSE. Refuses with `SESSION_BUSY` (409), `SESSION_CHANGE_MISMATCH` (422, zero bytes), or `SESSION_UNREACHABLE` (502, not delivered). | SSE `ChatStreamEvent` (`state` → `chunk*` → `complete`) |
+| Method + path                        | Purpose                                                                                                                                                                                                                                                             | Wire shape                                              |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `GET /api/changes`                   | List every change with liveness.                                                                                                                                                                                                                                    | `Change[]`                                              |
+| `GET /api/changes/:id`               | One change + the resolved transcript file paths.                                                                                                                                                                                                                    | `ChangeDetail`                                          |
+| `GET /api/changes/:id/status`        | Read-time plain-English status + needs-attention flag, computed on each read from the record + transcript + liveness (never a stored post).                                                                                                                         | `ChangeStatus`                                          |
+| `GET /api/changes/:id/brain`         | The entities the agent created for the change (requirements, designs, decisions, workflows…), grouped by kind off the worktree's `.brain/instances` tree; empty groups omitted; a change with none returns `{ groups: [] }` (WP-006). Reading it starts no process. | `BrainView`                                             |
+| `GET /api/changes/:id/tree?path=...` | One level of the worktree's folder tree. Default = root.                                                                                                                                                                                                            | `TreeNode[]`                                            |
+| `GET /api/changes/:id/file?path=...` | Current contents of a file in the worktree (1 MiB cap).                                                                                                                                                                                                             | `FileContents`                                          |
+| `GET /api/changes/:id/diff?path=...` | Base (at `baseSha`) + current contents for Monaco's DiffEditor.                                                                                                                                                                                                     | `FileDiff`                                              |
+| `GET /api/changes/:id/transcript`    | Chronologically-merged chat messages from the change's transcripts.                                                                                                                                                                                                 | `TranscriptMessage[]`                                   |
+| `GET /api/changes/:id/contract`      | Whether the change's rendered contracts are reachable + what they are.                                                                                                                                                                                              | `ContractAvailability`                                  |
+| `GET /api/changes/:id/contract/data` | Serves the rendered `CONTRACT.html` (the data-contract preview).                                                                                                                                                                                                    | `text/html`                                             |
+| `GET /api/changes/:id/contract/ui`   | Serves the rendered `UI.html`, or a typed JSON note when the change has no UI contract (never a broken link).                                                                                                                                                       | `text/html` or `{ uiContract, note }`                   |
+| `POST /api/changes/:id/chat`         | **The one write/act path (WP-005).** Delivers a message to the change's agent (resume-or-spawn) and streams the reply as SSE. Refuses with `SESSION_BUSY` (409), `SESSION_CHANGE_MISMATCH` (422, zero bytes), or `SESSION_UNREACHABLE` (502, not delivered).        | SSE `ChatStreamEvent` (`state` → `chunk*` → `complete`) |
 
 ### Two-way chat relay (WP-005)
 
@@ -108,7 +109,7 @@ rejects a leading `-` to foreclose argparse flag-confusion).
 
 - **Design-time (pre-dispatch review gate):** after `decompose` and
   before `run-all` dispatch, `plugins/sulis/scripts/wpx-render-review-gate
-  --worktree <path>` renders the in-flight change's `CONTRACT.html` +
+--worktree <path>` renders the in-flight change's `CONTRACT.html` +
   `UI.html` so the founder can eyeball them before anything is built on
   the contract. It is a thin orchestrator over the two renderers
   (subprocess discipline: argv array, `shell=false`, bounded timeout).
@@ -122,6 +123,36 @@ uiContract }` (the links read this to decide what to show) or
 `{ status: "unavailable", note }` (a shipped change that couldn't be
 reached). `/contract/data` and `/contract/ui` add `CONTRACT_UNAVAILABLE`
 (404) and `CONTRACT_NOT_RENDERED` (404) to the `code` set below.
+
+### Brain + rendered previews (WP-006)
+
+Two read surfaces let the founder **see what the agent created** and
+**read a document the way it's meant to look**, both inside the thread
+(ADR-005):
+
+- **Brain (`GET /api/changes/:id/brain`).** `lib/readBrain.ts` walks the
+  change worktree's `.brain/instances/<domain>/<kind>/<ULID>.jsonld`
+  tree, parses each entity, groups them **by kind** (the same kind under
+  different domains collapses into one group), omits empty groups, and
+  returns a `BrainView`. A change with no brain returns `{ groups: [] }`.
+  It is fail-soft: an absent `.brain` is the empty case, and a single
+  malformed entity file is skipped rather than sinking the read. Each
+  `BrainEntity` carries a resolved `title` (from `title` → `name` →
+  `decision`/`intent` → the id) plus the full parsed object as `detail`
+  for the readable detail view. The `<BrainView>` component renders the
+  groups with a count and an openable per-item detail; an empty brain
+  shows a plain note. Reading it starts **no** `claude` process — it
+  composes existing reads, no new port.
+
+- **Rendered previews (the Files section).** `<RenderedPreview>` shows a
+  renderable document **rendered** with a one-click Rendered ↔ Raw
+  toggle: `.md`/`.markdown` via the in-repo `lib/renderMarkdown.ts` (a
+  small, dependency-free, **safe** renderer — it HTML-escapes all source
+  before emitting any of its bounded tag subset, and drops non-http(s)/
+  mailto link schemes, so a document can never inject script), and
+  `.html`/`.htm` inside a **sandboxed, script-free iframe**. A code file
+  is not renderable — it stays read-only source in the existing Monaco
+  viewer (`<MonacoFile>`, reused; EP-03), with no toggle.
 
 Non-2xx responses use a single envelope:
 
@@ -139,7 +170,7 @@ client renders contextual messages from `code`.
 The server is GET-only by construction **except the one sanctioned chat
 relay** (`routes/chat.ts`) and its `SessionBridge` adapter
 (`adapters/StreamJsonSessionBridge.ts`). The
-`tests/read-only-inventory.test.ts` gate fails the build if any *other* file
+`tests/read-only-inventory.test.ts` gate fails the build if any _other_ file
 introduces a `.post / .put / .patch / .delete` handler, a filesystem-mutating
 call, a mutating git verb, a non-zero process signal, **or a process start**
 (the WP-005/ADR-003 rule). The allow-list is a file-path + rule pairing, not a

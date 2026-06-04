@@ -30,6 +30,7 @@ import { Chat } from "../components/Chat";
 import { Composer } from "../components/Composer";
 import { FilesPanel } from "../components/FilesPanel";
 import { ContractLinks } from "../components/ContractLinks";
+import { BrainSection } from "../components/BrainSection";
 import styles from "../styles/Thread.module.css";
 
 export function ThreadView() {
@@ -108,6 +109,19 @@ export function ThreadView() {
       >
         <h2 className={styles.sectionTitle}>Files</h2>
         <FilesPanel changeId={id} />
+      </section>
+
+      {/* WP-006 — the Brain section: the entities the agent created for this
+          change, grouped by kind with a readable detail per item (FR-06/07).
+          Shares the thread's working-area section model (CL-02) — read its
+          route ships in this slice. */}
+      <section
+        className={styles.section}
+        data-testid="section-brain"
+        aria-label="Brain"
+      >
+        <h2 className={styles.sectionTitle}>Brain</h2>
+        <BrainSection changeId={id} />
       </section>
     </section>
   );

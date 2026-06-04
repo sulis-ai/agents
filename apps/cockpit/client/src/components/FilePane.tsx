@@ -31,8 +31,8 @@ import { FileBinaryState } from "./FileBinaryState";
 import { FileTruncatedState } from "./FileTruncatedState";
 import { DiffUnavailableState } from "./DiffUnavailableState";
 import { NoBaseShaState } from "./NoBaseShaState";
-import { MonacoFile } from "./MonacoFile";
 import { MonacoDiff } from "./MonacoDiff";
+import { RenderedPreview } from "./RenderedPreview";
 import styles from "../styles/FilesPanel.module.css";
 
 interface Props {
@@ -127,11 +127,15 @@ export function FilePane({ changeId }: Props) {
     ) : file.truncated ? (
       <FileTruncatedState absolutePath={file.absolutePath} />
     ) : (
-      <Suspense
-        fallback={<p className={styles.fileMessage}>Loading viewer...</p>}
-      >
-        <MonacoFile content={file.content ?? ""} language={file.language} />
-      </Suspense>
+      // WP-006 — renderable docs (.md/.html) show RENDERED with a
+      // rendered/raw toggle; code stays read-only source (RenderedPreview
+      // delegates to <MonacoFile>, the existing viewer — EP-03). The Suspense
+      // boundary for the lazy Monaco bundle lives inside RenderedPreview.
+      <RenderedPreview
+        path={selected}
+        content={file.content ?? ""}
+        language={file.language}
+      />
     );
   }
 
