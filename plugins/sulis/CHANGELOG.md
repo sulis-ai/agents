@@ -1,3 +1,9 @@
+## v0.107.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- the Working Set: an agent-triggered skill (/sulis:working-set) + helper that keeps current thinking (problem/solution/decisions, and the why — rejected alternatives + rationale) in a small live file that is read at the start of every turn and carries across session boundaries. The fix for long-session drift; the staging area that crystallizes into Opportunity/Design/Decision.
+
 ## v0.106.0 — 2026-06-04
 
 **Minor — release-train batch.**
