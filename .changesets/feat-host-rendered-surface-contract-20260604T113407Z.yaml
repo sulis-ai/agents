@@ -1,0 +1,7 @@
+change_id: W71FBY8514YEDY2M0K4P2KF91F
+primitive: feat
+tier: minor
+touches_plugin: true
+summary: |
+  host-rendered surface contract: a surface a host renders for us (MCP App / OpenAI App / figma-plugin / browser-extension) is not done when its HTML merely serves — it must be bound on both sides + observed in the real host + legible (friendly name, one-line description, icon — not a technical name alone). Closes the recurring looks-built-but-not-wired failure (the Cowork MCP App that narrated tool data as text). Extends mcp-ui-surface-patterns + CONTRACT_FIRST CF-08 + the design/audit journey-walk; no new standard.
+created_at: 2026-06-04T11:34:07Z

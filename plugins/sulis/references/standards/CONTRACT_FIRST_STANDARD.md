@@ -165,12 +165,24 @@ onto the three categories: **HTTP/REST** (OpenAPI; statuses), **MCP-over-stdio**
 JSON-on-stdout** (the wpx pattern; exit 0/1/2), **library** (in-process; no
 ProtocolError). Don't invent a bespoke transport when a conventional one fits.
 
-When the seam is an **MCP App** (an MCP server returning interactive UI to an AI
-client), the binding is the `ui://` resource (`text/html;profile=mcp-app`) + the
-**`ui/` JSON-RPC-over-`postMessage`** channel — the UI's actions are MCP tool
-calls, so they are contract operations (CF-03 error categories apply). See
-[`mcp-ui-surface-patterns.md`](../mcp-ui-surface-patterns.md) for the resource
-scheme, CSP allowlist, and sandbox model.
+When the seam is a **host-rendered surface** (an MCP App / OpenAI App /
+figma-plugin / browser-extension — a UI a host you don't control renders via a
+protocol handshake), the binding is the host-render resource (for MCP-Apps: the
+`ui://` resource served with the host's accepted MIME — `text/html;profile=mcp-app`,
+or `text/html+skybridge` / `text/html+mcp` for the OpenAI/Skybridge adapter) +
+the host runtime channel (for MCP-Apps: `ui/` JSON-RPC-over-`postMessage`, e.g.
+the ext-apps `app.connect`/`ontoolresult`/`callServerTool`/`openLink`). The UI's
+actions are tool calls, so they are contract operations (CF-03 error categories
+apply). **This binding is MUST when building such a surface** (not merely SHOULD): the
+recurring failure is serving the surface's HTML *unbound* — no `_meta.ui`
+binding, no client runtime — so the host narrates tool data as text. Its CF-07
+conformance check is specifically **a real-host round-trip**: the surface
+observed rendering in the actual host (or human-attested via
+`sulis-attest-scenario`), never a green test against a mock. See
+[`mcp-ui-surface-patterns.md`](../mcp-ui-surface-patterns.md) § "Done = wired +
+legible" for the full gate (binding both sides + real-host round-trip + the
+legibility metadata: `title` + one-line `description` + `icon`, not a technical
+`name` alone), the resource scheme, CSP allowlist, and sandbox model.
 
 ### CF-09 — Streaming contracts use a structured event schema · SHOULD
 
@@ -316,3 +328,4 @@ the in-repo reference implementation of the subprocess+JSON transport binding.
 |---------|------|---------|
 | 0.1.0 | 2026-05-26 | Initial sulis-local definition. 9 requirements (CF-01..CF-09) on the two-axis + three-category-error backbone. Two tiers (lightweight internal seam / full published SDK). Sits between WP_BACKEND and WP_FRONTEND; amends WORK_PACKAGE_STANDARD cross-kind decomposition (parallel via contract dependency — to be reflected there). SHOULD-tier requirements (CF-08/09) carry 90-day calibration. |
 | 0.2.0 | 2026-06-03 | Added CF-11 (MUST) — shared producer-side artifacts must be pinned in the contract WP with filename + path + schema + merge semantics as an explicit shared constant; producer WPs reference the constant verbatim and never independently choose a filename. Mechanically enforced by decompose-validation rubric P6 check 6.06. Provenance: lesson #107 (anchor case CH-01KSSV — two producer WPs picked `CONTRACT.manifest.json` vs `manifest.json` and one clobbered the other). |
+| 0.3.0 | 2026-06-04 | CF-08 host-rendered surface clause promoted from SHOULD to **MUST-when-building**, generalised beyond MCP-Apps (OpenAI Apps SDK / figma-plugin / browser-extension are instances), MIME widened to the host's accepted value (`text/html+skybridge` / `text/html+mcp` alongside `text/html;profile=mcp-app`), and its CF-07 conformance check named as **the real-host round-trip** (observed or human-attested, never a mock). Provenance: host-rendered-surface critical-thinking analysis (2026-06-04, spiral-converged) — a Cowork MCP App shipped "built" with its HTML serving but unbound (`_meta.ui` + client runtime absent), so the host narrated tool data as text. Companion edits: `mcp-ui-surface-patterns.md` § "Done = wired + legible" (the fail-closed gate) + the design/audit journey-walk's sharper "exists" for host-rendered hops. |
