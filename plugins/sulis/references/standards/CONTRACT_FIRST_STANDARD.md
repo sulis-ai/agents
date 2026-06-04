@@ -157,6 +157,34 @@ wired" (WPB-09) **at the seam**.
 > step that proves the real producer matches the contract the consumer built
 > against.
 
+### CF-07.5 — The `interaction` contract type (founder-facing flows) · SHOULD
+
+Alongside the **data** contract (the schema layer, CF-02) and the **visual**
+contract (`contract_type: visual`, tokens + mockup; `WORK_PACKAGE_STANDARD.md`
+WP-08.5), a third contract flavour governs **founder-facing multi-step flows**:
+the **interaction** contract — a `kind: contract` WP with
+`contract_type: interaction`. Where the data contract's conformance is "the
+producer matches the schema" (CF-07) and the visual contract's is "the founder
+signed off the mockup", the **interaction** contract's conformance is **"the
+flow was exercised end-to-end over stub adapters"** — evidenced
+`agent-observed` or `human-attested` and gated at the done-transition by
+`wpx-index`, exactly as the data and visual conformance checks gate their own
+seams.
+
+**Phase 1 is SHOULD strength.** A founder-facing capability spanning a
+multi-step flow SHOULD emit an interaction contract; the runtime done-gate
+applies to any WP that opts in by declaring `contract_type: interaction`.
+Making it MUST for *all* founder-facing work — enforced at write-time — is the
+**Phase 2** flip and is **out of scope** here (ADR-002). The schema layer
+(CF-02) + three-category errors (CF-03) remain the floor; the interaction
+contract adds the *was-this-flow-actually-walked* check on top, for the seams
+where a single schema-conformance pass doesn't prove the user can complete the
+journey.
+
+> **Anti-pattern:** shipping a multi-step founder-facing flow whose only proof
+> is that each step's data contract conforms in isolation — with no evidence
+> the steps compose into a flow the user can actually walk end-to-end.
+
 ### CF-08 — Explicit, conventional transport binding · SHOULD
 
 Choose the transport per the established binding and map its native errors
