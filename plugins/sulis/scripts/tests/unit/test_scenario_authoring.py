@@ -69,15 +69,18 @@ class TestAssembleStructure:
     def test_step_names_are_globally_unique_namespaced(self) -> None:
         # two journeys with identical step wording must NOT collide on step names
         # (flat-store reconstruction resolves workflow.steps names → Step entities)
+        # name-uniqueness is orthogonal to verifiability — opt out of the gate
         a = assemble_scenario_graph(
             name="A", verifies=[_ref("requirement", "rqa")], exercises=_ref("design", "da"),
             tenant=_TENANT, seed="journey-a",
             steps=[{"instruction": "Sign in"}, {"instruction": "Pay"}],
+            require_verifiable=False,
         )
         b = assemble_scenario_graph(
             name="B", verifies=[_ref("requirement", "rqb")], exercises=_ref("design", "db"),
             tenant=_TENANT, seed="journey-b",
             steps=[{"instruction": "Sign in"}, {"instruction": "Pay"}],
+            require_verifiable=False,
         )
         names_a = {s["name"] for s in a["steps"]}
         names_b = {s["name"] for s in b["steps"]}
@@ -99,6 +102,55 @@ class TestAssembleStructure:
         # founder-authored journeys default to human-run (tool_ref deferred)
         assert s0["mechanism"] == "human"
         assert "tool_ref" not in s0
+
+
+class TestVerifiabilityGate:
+    """Journey-rigor #5 — a verification journey must be verifiable.
+
+    A journey with no observable check is a description of clicks; it can report
+    green while the feature is broken (the green-but-broken-login class). The
+    gate is on by default at authoring time.
+    """
+
+    def test_journey_with_no_checks_is_rejected(self) -> None:
+        with pytest.raises(ValueError, match="observable check"):
+            assemble_scenario_graph(
+                name="no checks", verifies=[_ref("requirement", "r")],
+                exercises=_ref("design", "d"), tenant=_TENANT, seed="nc",
+                steps=[{"instruction": "Sign in"}, {"instruction": "Land somewhere"}],
+            )
+
+    def test_unobservable_outcome_is_rejected(self) -> None:
+        # has a check mid-journey, but the OUTCOME (final step) isn't observable
+        with pytest.raises(ValueError, match="outcome"):
+            assemble_scenario_graph(
+                name="blind outcome", verifies=[_ref("requirement", "r")],
+                exercises=_ref("design", "d"), tenant=_TENANT, seed="bo",
+                steps=[
+                    {"instruction": "Sign in", "asserts": ["a session is established"]},
+                    {"instruction": "Do the thing"},  # no assert on the outcome
+                ],
+            )
+
+    def test_verifiable_journey_passes(self) -> None:
+        g = assemble_scenario_graph(
+            name="verifiable", verifies=[_ref("requirement", "r")],
+            exercises=_ref("design", "d"), tenant=_TENANT, seed="ok",
+            steps=[
+                {"instruction": "Sign in", "asserts": ["a session is established"]},
+                {"instruction": "See the dashboard", "asserts": ["the dashboard is shown"]},
+            ],
+        )
+        assert g["steps"][-1]["postconditions"] == ["the dashboard is shown"]
+
+    def test_opt_out_allows_checkless_journey(self) -> None:
+        # the escape hatch for structural tests orthogonal to verifiability
+        g = assemble_scenario_graph(
+            name="structural", verifies=[_ref("requirement", "r")],
+            exercises=_ref("design", "d"), tenant=_TENANT, seed="so",
+            steps=[{"instruction": "Sign in"}], require_verifiable=False,
+        )
+        assert len(g["steps"]) == 1
 
 
 class TestRepointExercises:
