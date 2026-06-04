@@ -220,9 +220,17 @@ export function spawnClaudeBridge(
   argv: string[],
   cwd: string,
 ): BridgeChildHandle {
+  // stdin is IGNORED (mapped to /dev/null) — the prompt is passed via `-p`,
+  // so the child needs NO stdin. If stdin were left open/inherited, the real
+  // `claude` waits and logs `Warning: no stdin data received in 3s, proceeding
+  // without it` — a 3 s dead stall before any output, which (combined with the
+  // model wake) pushed first output past the startup watchdog ⇒ false
+  // `unreachable` on every live chat. Closing stdin gives an immediate EOF so
+  // first output lands well inside the budget (WP-005 fix-forward). stderr is
+  // PIPED (not ignored) so the child's diagnostics stay observable.
   const child = spawn("claude", argv, {
     cwd,
-    stdio: ["ignore", "pipe", "ignore"],
+    stdio: ["ignore", "pipe", "pipe"],
   });
   return {
     process: child,

@@ -88,7 +88,11 @@ export function buildProductionApp() {
       });
     },
     spawnBridge: spawnClaudeBridge,
-    startupTimeoutMs: CONFIG.gitTimeoutMs,
+    // The bridge's startup-to-first-output budget is its OWN config — a cold
+    // headless `claude` legitimately takes ~5–9 s to first output, well past a
+    // git operation's 5 s. Reusing gitTimeoutMs killed the agent right as it
+    // woke ⇒ false `unreachable` on every live chat (WP-005 fix-forward).
+    startupTimeoutMs: CONFIG.chatBridgeStartupTimeoutMs,
   });
 
   return createApp({

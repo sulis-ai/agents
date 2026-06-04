@@ -14,6 +14,23 @@ import os from "node:os";
 import { COCKPIT_HOST, getServerPort } from "../shared/dev-ports";
 
 /**
+ * Parse a positive-integer env override, falling back to `fallback` when the
+ * value is absent, empty, non-numeric, or non-positive. Keeps a typo in an
+ * override from silently zeroing a timeout (which would defeat the watchdog).
+ */
+function parsePositiveIntEnv(
+  raw: string | undefined,
+  fallback: number,
+): number {
+  if (raw === undefined || raw.trim().length === 0) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
+/**
  * Server config — frozen. The bind address is hard-coded. The port,
  * client origin, sulis state dir, claude projects dir, file-size cap,
  * and git-subprocess timeout are read from env at module-load time
@@ -35,6 +52,21 @@ export const CONFIG = Object.freeze({
   fileMaxBytes: 1024 * 1024,
   /** 5 s — the WP-008 git timeout. (TDD §13.6) */
   gitTimeoutMs: 5_000,
+  /**
+   * WP-005 — startup budget for the chat bridge child (the headless
+   * `claude` session), from spawn to its FIRST stream-json output. A cold
+   * headless `claude -p --output-format stream-json --include-partial-messages`
+   * legitimately takes ~5–9 s to first output (measured live: ~3.5 s
+   * time-to-first-token + model wake). That far exceeds a git operation's
+   * budget, so this is its OWN config — NEVER reuse `gitTimeoutMs`, whose 5 s
+   * would kill the agent right as it wakes ⇒ false `unreachable` on every
+   * live chat. Overridable via CHAT_BRIDGE_STARTUP_TIMEOUT_MS. Default 60 s
+   * gives generous headroom; the idle/inter-output budget is separate.
+   */
+  chatBridgeStartupTimeoutMs: parsePositiveIntEnv(
+    process.env.CHAT_BRIDGE_STARTUP_TIMEOUT_MS,
+    60_000,
+  ),
 } as const);
 
 export type ServerConfig = typeof CONFIG;
