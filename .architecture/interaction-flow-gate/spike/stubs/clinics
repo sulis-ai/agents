@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Stub `clinics` adapter for the interaction-flow-gate spike (CH-01KT9H /
+# WP-004). Mirrors the gh-stubs precedent at
+# plugins/sulis/scripts/tests/fixtures/drift_check/gh-stubs/gh.
+#
+# Put this directory first on $PATH (the spike test makes it the SOLE PATH
+# entry, so no live `clinics`/Capsule/HubSpot binary is reachable) and
+# `clinics <step>` resolves here. The stub:
+#
+#   * records every invocation to $CLINICS_STUB_CALL_LOG (if set), one
+#     `clinics <args>` line per call — this log is the falsifiable
+#     `agent-observed` attestation the gate later trusts (ADR-001);
+#   * returns a canned response for each of the six clinics-scheme flow
+#     steps, driven by $STUB_MODE:
+#
+#       STUB_MODE=happy   → every step returns its canned success payload
+#                           (the end-to-end exercise the spike records).
+#       (unset / other)   → same happy payloads; the switch exists so a
+#                           future variant flow (e.g. a declined indication)
+#                           can be exercised without copy-pasting the shim.
+#
+# Boring, deterministic, offline, single source of stub logic — reused via a
+# PATH prefix instead of copy-pasted into the test (mirrors gh-stubs).
+
+if [ -n "${CLINICS_STUB_CALL_LOG:-}" ]; then
+    echo "clinics $*" >> "$CLINICS_STUB_CALL_LOG"
+fi
+
+step="${1:-}"
+case "$step" in
+    process-documents)
+        echo '{"documents": 3, "status": "ingested"}'
+        ;;
+    find-business)
+        echo '{"candidates": [{"id": "biz-001", "name": "Acme Clinic"}]}'
+        ;;
+    look-up-business)
+        echo '{"id": "biz-001", "name": "Acme Clinic", "record": "full"}'
+        ;;
+    score-risk)
+        echo '{"rag": "amber", "score": 62}'
+        ;;
+    rate-quote)
+        echo '{"premium": 1240, "currency": "GBP"}'
+        ;;
+    push-indication)
+        # Operator-confirmed in the real connector; the stub records the
+        # push without contacting HubSpot.
+        echo '{"pushed": true, "target": "hubspot-stub"}'
+        ;;
+    *)
+        echo "clinics stub: unknown step ${step:-<none>}" >&2
+        exit 2
+        ;;
+esac
+exit 0

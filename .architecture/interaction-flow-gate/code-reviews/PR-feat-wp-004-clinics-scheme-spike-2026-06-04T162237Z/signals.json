@@ -1,0 +1,16 @@
+{
+  "pr": "feat/wp-004-clinics-scheme-spike",
+  "project": "interaction-flow-gate",
+  "verdict": "PASS",
+  "build_verification": {"pr_introduced_errors": 0},
+  "scope_ph01": {"commit_type_spread": ["feat"], "module_fan_out": 2, "severity": "none"},
+  "size_ph02": {"lines_added": 427, "lines_removed": 0, "files_changed": 5, "code_files": 1, "severity": "none"},
+  "safety_ph03": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+  "completeness_ph04": {"new_source_without_test": 0, "note": "the diff IS the test + its fixtures; no untested new source", "severity": "none"},
+  "lenses": {
+    "architecture": {"findings": 0, "note": "no production code; stub-as-adapter follows gh-stubs precedent; no domain->infra import"},
+    "security": {"findings": 0, "note": "subprocess uses list args (no shell=True); stub echoes canned JSON, no injection/secrets/network"},
+    "quality": {"findings": 0, "note": "full coverage of new behaviour; no dead surface; flow steps aligned across test/stub/card; no CR-10 anti-patterns"}
+  },
+  "draft_deltas": 0
+}
