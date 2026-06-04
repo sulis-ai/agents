@@ -52,8 +52,13 @@ export function AdvancedView({ change }: Props) {
       return;
     setStopping(p.pid);
     await stopLinkedProcess(change.changeId, p.pid);
-    setStopping(null);
     void query.refetch();
+    // The server escalates SIGTERM→SIGKILL after a grace period; refetch again
+    // once that's had time to land so the row disappears promptly.
+    setTimeout(() => {
+      setStopping(null);
+      void query.refetch();
+    }, 1600);
   }
 
   return (

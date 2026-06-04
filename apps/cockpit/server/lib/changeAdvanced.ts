@@ -169,15 +169,28 @@ export async function listChangeProcesses(
   }
 }
 
-/** Stop a process by pid. Guarded: never the server's own pid, never pid ≤ 1. */
+/** Stop a process by pid. Guarded: never the server's own pid, never pid ≤ 1.
+ *
+ * Sends SIGTERM, then escalates to SIGKILL after a short grace period if the
+ * process is still alive — stale node/vite dev servers routinely ignore
+ * SIGTERM, so a polite-only stop silently does nothing (the bug this fixes). */
 export function stopProcess(pid: number): { ok: boolean; error?: string } {
   if (!Number.isInteger(pid) || pid <= 1) return { ok: false, error: "Invalid process." };
   if (pid === process.pid)
     return { ok: false, error: "Refusing to stop the app's own server." };
   try {
     process.kill(pid, "SIGTERM");
-    return { ok: true };
   } catch (e) {
     return { ok: false, error: String(e).slice(0, 120) };
   }
+  // Escalate to SIGKILL if it's still there after a grace period.
+  setTimeout(() => {
+    try {
+      process.kill(pid, 0); // existence check — throws ESRCH if already gone
+      process.kill(pid, "SIGKILL");
+    } catch {
+      /* already exited — nothing to do */
+    }
+  }, 1200);
+  return { ok: true };
 }
