@@ -12,8 +12,15 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* The list scrolls within the column rather than every card cramming into
+   * one viewport (matches the SIGNED contract's calm board: columns scroll,
+   * the board doesn't sprawl). */
+  max-height: 560px;
   background: var(--muted);
   border: 1px solid var(--border-muted);
+  /* a quiet 2px top hairline gives each column a calm "header band" edge,
+   * exactly as the signed board panel (.col border-top:2px solid border). */
+  border-top: 2px solid var(--border);
   border-radius: var(--radius-container);
 }
 
@@ -40,7 +47,9 @@
   font-weight: var(--weight-label);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--foreground);
+  /* secondary (not full-strength) text — the calm signed treatment: the
+   * column name is a quiet label, the dot carries the only colour. */
+  color: var(--muted-foreground);
 }
 
 .colcount {

@@ -30,7 +30,12 @@ export function ChangeCard({ change, pidKind }: ChangeCardProps) {
         <span className={styles.handle}>{change.handle}</span>
         <StageBadge stage={change.stage} />
       </div>
-      <p className={styles.intent}>{change.intent}</p>
+      {/* Intent is clamped to 2 lines in CSS so the card stays a calm fixed
+       * shape; the full text stays reachable via the title tooltip and the
+       * card aria-label above. */}
+      <p className={styles.intent} title={change.intent}>
+        {change.intent}
+      </p>
       <div className={styles.footerRow}>
         <span className={styles.slug}>{change.slug}</span>
         <span className={styles.livenessGroup}>

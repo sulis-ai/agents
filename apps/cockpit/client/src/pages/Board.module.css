@@ -57,6 +57,9 @@
 .skeletonCol {
   background: var(--muted);
   border: 1px solid var(--border-muted);
+  /* mirror the real column's 2px top hairline so the layout doesn't jump
+   * when data replaces the skeleton. */
+  border-top: 2px solid var(--border);
   border-radius: var(--radius-container);
   padding: 12px;
 }
