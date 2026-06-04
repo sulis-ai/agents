@@ -10,11 +10,11 @@
 
 | | Value |
 |---|---|
-| **sFPC** (simplified function point count) | 12 (new surface) |
-| **ASR count** (architecturally-significant requirements) | 26 |
-| **Computed tier** | **L** (driven by ASR) |
-| **Confirmed tier** | L |
-| **Bounded contexts** | 1 (the Sulis app reaching one data seam) |
+| **sFPC** (simplified function point count) | 12 original + ~7 expanded ≈ 19 (new surface) |
+| **ASR count** (architecturally-significant requirements) | 26 original + ~12 expanded ≈ 38 |
+| **Computed tier** | **L** (driven by ASR; still below the XL threshold) |
+| **Confirmed tier** | L (re-confirmed after the concierge / discovery / multi-product expansion) |
+| **Bounded contexts** | 1 (the Sulis app reaching one data seam; the expansion rides the existing seam + bridge) |
 
 ### sFPC derivation (new surface only)
 
@@ -38,6 +38,27 @@ feature count — it is the safety surface around the first write path
 (session binding, resume/spawn isolation, no-silent-loss, partial-reply
 preservation, no-fabricated-completion). That is why ASR drives the tier
 to L while sFPC alone would read M.
+
+### ASR delta — expanded scope (concierge / discovery / multi-product)
+
+The expansion adds ~12 ASRs and ~7 sFPC, keeping the change tier-L (not XL —
+still one bounded context, all riding the existing seam + bridge):
+
+- **6 NFR-DISC policies** (bounded search, idempotent mint, validated-emitter
+  writes, confirm gate, concierge containment, durable config) — each a
+  cross-cutting safety policy on the two new consequential acts.
+- **6 negative requirements** (FR-N6..N11) — confirm-before-consequential,
+  bounded search, concierge-coordinates-only, all-activity-in-a-change,
+  no-dangling-repo-config, no-partial-config.
+- **4 new integrations** — the headless discovery agent (reuses the bridge),
+  the discovery skills, repo find-or-create (`git`), and the
+  Project→Product server-side roll-up.
+
+The expansion is weighted by **reuse**: the bridge (ADR-002), the discovery
+skills, the spine emitters, the classifier, and the confirm discipline all
+already exist — the new work is orchestration + Product-scoping, not new
+infrastructure. 4 new ADRs (006–009) record the reuse decisions and the one
+founder-owned call (repo-create location).
 
 ## Per-pillar addressable scope
 

@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "With a product set up, say what you want to do (e.g. add a password-reset flow).",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:C1SQ78MRMVW12B4ZEFN8W6W8A1",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "n5hbzs53-with-a-product-set-up-say-what-you-want-1",
+  "output_artifacts": [
+    "n5hbzs53-with-a-product-set-up-say-what-you-want-1-result"
+  ],
+  "postconditions": [
+    "it becomes a started change against the right repo",
+    "the repo is fetched first if it isn't on the machine"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

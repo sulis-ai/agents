@@ -18,6 +18,7 @@ acceptance_criteria:
   - "Each card shows handle, intent, stage, liveness (reuses ChangeCard, StageBadge, LivenessDot — EP-03 restyle, not rebuild) (FR-02)"
   - "Shipped changes do NOT appear as in-flight cards in the six columns (FR-15)"
   - "Empty board shows the empty state guiding how to start a change (FR-03); loading skeleton + error+retry reuse the one state-pattern set (ADR-005)"
+  - "The board is scoped to the ACTIVE Product: it reads only the active Product's changes (server-side roll-up via WP-018) and never shows another Product's change (FR-37, ADR-009); single-Product Tenant is the trivial case; it hosts the product switcher (WP-024)"
   - "Surface consumes tokens.css only (no raw hex); tokens.css regenerated to the signed neutral-dominant + single-accent set first; matches the SIGNED visual contract (WP-002)"
 test_plan:
   unit: []
@@ -42,7 +43,8 @@ addresses_findings: []
 invalidated_by: { activity: null, result: null }
 
 status: pending
-depends_on: [WP-001, WP-002]    # contract types + SIGNED visual contract (#45 gate)
+depends_on: [WP-001, WP-002, WP-018]    # contract types + SIGNED visual contract (#45 gate) + active-Product scope (server-side roll-up, ADR-009)
+# AMENDED (expanded scope): now reads the ACTIVE Product (FR-37, ADR-009); hosts the product switcher (WP-024).
 
 child_wps: []
 kinds: null
@@ -77,9 +79,12 @@ catalogue MUST).
 
 ## How
 
-Group the existing `useChangesWithLiveness` data by stage client-side (the API is
-unchanged — `GET /api/changes`). Shipped filtered out of the six columns (FR-15).
-Consume `tokens.css` only.
+Group the existing `useChangesWithLiveness` data by stage client-side. **Amended
+for the expanded scope:** `GET /api/changes` is now scoped to the **active
+Product** server-side (WP-018, ADR-009) — the client receives only that
+Product's changes and never filters cross-Product data itself (the seam owns
+scope). The board hosts the product switcher (WP-024). Shipped filtered out of
+the six columns (FR-15). Consume `tokens.css` only.
 
 ## Tests
 

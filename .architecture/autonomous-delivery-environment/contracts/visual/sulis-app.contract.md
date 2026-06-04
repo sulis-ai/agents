@@ -6,8 +6,8 @@ contract_type: visual
 surface: sulis-app
 mockup: contracts/visual/sulis-app.html
 inspiration: contracts/visual/_mobbin-context.md   # inspiration: Mobbin (real probe, web; structure-only per UXD-15)
-signed_off_at:                         # RE-OPENED (seventh pass) — null pending founder re-confirmation after the Mobbin-grounded board/thread upgrade + the two refinements.
-provenance: draft                      # RE-OPENED: folded in the Mobbin probe (board dot-columns; thread now shows the agent's work + checkpoints + a Preview/Files/Brain panel) and the two founder refinements (proper file explorer; state markers simplified to a coloured dot + word). Back to draft until the founder re-confirms.
+signed_off_at: 2026-06-04T08:18:04Z    # founder signed off on the FULL surface — cockpit (per-product board + switcher, thread, brain, previews, search), two-way chat, AND the new concierge / conversational-setup / multi-product surfaces. Locked: repo create = local-only by default; one product per setup conversation; neutral two-letter product tile. The #45 gate is passed.
+provenance: production-approved        # founder-approved (DS-07): AI-generated → human-reviewed → production-approved.
 supersedes: ../mockups/SULIS-APP-surface.mockup.html   # the architect's rough stand-in
 ```
 
@@ -16,7 +16,157 @@ token system, one state/empty/error pattern set, shown in **both light and dark*
 
 ---
 
-## Seventh pass — the Mobbin probe + two founder refinements (current)
+## Eighth pass — the NEW surfaces: concierge, conversational setup, product switcher, per-product board (current)
+
+This pass adds the four user-facing surfaces of scope **#7** (the chat concierge
+/ onboarding) and **#8** (multi-product) on top of the existing signed base —
+everything from passes 5–7 (the fragment token system, the board, the thread,
+the file explorer, the simplified dot+label states) is **kept unchanged**; these
+are *additions*, bound to the same design instance. Every colour and font is the
+same fragment-token system; no new colour is invented. A **second Mobbin probe**
+(`_mobbin-context.md` §New surfaces) grounds the *structure* of each; UXD-15
+applied strictly — only layout/ordering/interaction beats transfer, no palette
+or screenshot.
+
+### The four new surfaces (Mobbin-grounded; visuals stay ours)
+
+1. **Conversational setup / onboarding** (panels 13–16, light; FR-27/28/35/36,
+   UC-07). When nothing is set up yet, the concierge runs setup as a **guided
+   conversation, not a form** (a form can't pick from an empty graph). Step 1
+   *"which product?"* → step 2 *"where's the code?"* with the **find-or-create
+   branch**: **connect an existing repo** (pick from a list **or** paste a URL)
+   **or create a new one** (name + private/public/local). Grounded in the
+   **Vercel / Replit / Render / GitHub** "import existing (list/URL) OR create
+   new" split — wrapped in chat, one step at a time (CL-02). Creating a repo is
+   **confirmed first** via the reused consent gate (FR-N6/N10): the concierge
+   shows a plain-English **proposal recap** (product · new repo · project) then
+   asks *go ahead / not yet*. End state: a **"your product is set up"** screen →
+   the board appears, with the durable config saved.
+
+2. **Concierge front door** (panel 17, light; 19, dark; FR-27/33/34, UC-09/10).
+   The chat that finds changes, reports status, answers read-only, onboards, and
+   starts changes — **coordinates only, never does the work itself**. Two
+   concierge-specific structures: a **read-only answer card** that surfaces the
+   found change(s) and **points** at the card (with an honest *"I only looked —
+   nothing was changed"* chip — FR-N8), and the **investigation → change
+   spin-up** card: an investigation **visibly creates a change to hold it**
+   (after confirm), never runs inline (FR-N9). **Reuses the existing chat
+   composer** (suggestion chips + slash commands + free text) verbatim. Grounded
+   in the **Replit-agent** thread + **⌘K command-palette** (Fibery) references.
+
+3. **Product switcher** (in every board/concierge sidebar; FR-38, UC-11). A
+   **top-left active-Product control** (a neutral monogram tile + product name +
+   chevron) opening a menu that lists the **Tenant's Products** (with the active
+   one ticked + an in-flight count) and **"set up a new product"**. Grounded in
+   **Fibery / Zeplin / Dovetail / Jira**'s workspace switcher. Switching
+   **re-scopes the board + search/filters** to the chosen Product.
+
+4. **Per-product board** (panel 1, refreshed, light; panel 18, dark; FR-01/37).
+   The board now shows **only the active Product's** in-flight changes — a
+   **scope line** under the title names what's shown (*"Showing Acme Checkout · 5
+   in flight"*), the search placeholder is product-scoped, and the switcher sits
+   in the header. The dark panel 18 shows a **different** active product
+   (Helpdesk) to demonstrate the re-scope. This **supersedes the
+   single-implicit-product board** of the original #1.
+
+### Mobbin grounding (second probe — structure only, UXD-15)
+
+| New surface | Mobbin structural reference (`_mobbin-context.md`) | What transferred |
+|---|---|---|
+| Conversational setup | Vercel / Replit / Render / GitHub import-or-create | the find-or-create branch; repo-list rows + "paste URL"; name + private/public for create-new |
+| Concierge front door | Replit Agent thread; Fibery ⌘K palette | conversation + inline action cards; ask-and-point shape |
+| Product switcher | Fibery / Zeplin / Dovetail / Jira workspace switcher | top-left active-workspace control + menu + "new" + scoped views |
+| Per-product board | (re-uses the existing GitHub-Projects board) | scoped to one product; switcher in header |
+
+No Mobbin palette, type stack, or screenshot was adopted — every colour/font is
+the fragment-token system the surface already binds to.
+
+### AA contrast — re-run on the NEW elements (both themes)
+
+*New label / text pairs (must clear 4.5:1):*
+
+| Pairing | Light | Dark | Verdict |
+|---|---|---|---|
+| product-name (`--text`) on bg-card | 17.04:1 | 17.65:1 | ✓ |
+| product avatar monogram (`--text-secondary`) on bg-muted | 7.04:1 | 7.11:1 | ✓ |
+| scope-line product name (`--text-secondary`) on card | 7.81:1 | 7.30:1 | ✓ |
+| found-change intent (`--text`) on card | 17.04:1 | 17.65:1 | ✓ |
+| found-change stage label (`--text-secondary`) on card | 7.81:1 | 7.30:1 | ✓ |
+| branch-option body (`--text-secondary`) on card | 7.81:1 | 7.30:1 | ✓ |
+| repo-row name (`--text`) on card | 17.04:1 | 17.65:1 | ✓ |
+| "connect" / "selected" label (`--accent`) on card | 4.72:1 | 5.63:1 | ✓ |
+| read-only honesty chip (`--text-secondary`) on bg-muted | 7.04:1 | 7.11:1 | ✓ |
+| proposal value (`--text`) on accent tint | 15.88:1 | 14.21:1 | ✓ |
+
+*New non-text indicators (must clear 3:1, WCAG 1.4.11):*
+
+| Indicator | Light | Dark | Verdict |
+|---|---|---|---|
+| switcher active-tick (`--accent`) on card | 4.72:1 | 5.63:1 | ✓ |
+| found-change stage dot — recon | 4.49:1 | 4.11:1 | ✓ |
+| found-change stage dot — specify | 4.47:1 | 6.18:1 | ✓ |
+| found-change stage dot — implement | 5.17:1 | 7.25:1 | ✓ |
+| spin-up recon dot (`--stage-recon`) on accent tint | 4.49:1 | 4.11:1 | ✓ |
+| branch-option selected icon (`--accent`) on tint | 4.42:1 | 5.13:1 | ✓ |
+
+> The found-change **stage dots** are *decorative reinforcement* — the stage is
+> also carried by its **worded label** beside the dot, so colour is never the
+> sole cue (WCAG 1.4.1). They clear 3:1 out of discipline. The read-only chip
+> was lifted from `--text-muted` to **`--text-secondary`** so the honesty label
+> is a full-contrast label (7.04:1), not a sub-4.5 muted hint.
+
+**Verdict: PASS — every new label/text pair clears 4.5:1 (lowest 4.72:1, the
+accent "connect" label) and every new coloured dot/icon clears 3:1 (lowest
+4.11:1), in both light and dark.** The new surfaces introduce **no new colour**;
+they re-use the already-verified fragment tokens, so the pass-5/7 verifications
+stand unchanged.
+
+### DS-03 systematic visual-identity evaluation (re-run for the new surfaces)
+
+1. **Distinctiveness (dim 1)** — PASS. The new surfaces wear the brand the same
+   way as the rest: the **sunset mark** anchors the onboarding hero and the
+   concierge greeting and the "set up" success screen; the one sanctioned
+   sunset-spinner is the *only* motion (the change spinning up). The product
+   switcher's avatar is a **neutral monogram tile**, deliberately *not*
+   brand-coloured, so the switcher reads as chrome, not decoration.
+2. **Adaptability (dim 3)** — PASS, demonstrated. Every new surface renders in
+   both light and dark from one set of markup by swapping the `data-theme`
+   scope (panels 13–17 light; 18–19 dark) — no structural change.
+3. **Production viability (dim 5)** — PASS. The concierge / setup conversation
+   **re-uses the shipped chat composer, bubble, consent-gate, and state
+   components** (EP-03 — extend, don't rebuild); the switcher is a standard
+   menu/dropdown; the per-product board is the existing board scoped by a
+   product id. No new dependency.
+6. **Convention-distinction balance (dim 6)** — PASS. Conventions kept where the
+   audience expects them: the import-or-create split is the proven SaaS-onboarding
+   shape (Vercel/Replit/Render), the workspace switcher is the proven multi-tenant
+   shape (Fibery/Jira), the slash-command composer is the proven agent-chat shape
+   (Jakob's Law / CL-05). Distinction stays small and on-brand (the mark + the
+   single blue/teal accent).
+
+(4 of 6 dimensions documented; DS-03 requires ≥3.)
+
+### CL-06 three-question review (for the new surfaces)
+
+1. **Necessary complexity?** Yes, and minimised. Onboarding *is* multi-step
+   (which product → where's the code → confirm), but the design shows **one step
+   at a time** (CL-02) and the find-or-create branch is exactly **two** tiles
+   (CL-04, ≤5). The concierge's answer is a single card that points; the
+   investigation hand-off is one card with one decision. The switcher menu lists
+   only the Tenant's products + one "new" action.
+2. **Presentation add burden?** No — it lowers it. The conversation removes the
+   "fill in this empty form against an empty graph" dead-end; the proposal recap
+   means the founder reads *what will happen* before confirming (no surprise
+   writes); the read-only chip removes the worry "did asking change anything?";
+   the scope line removes the "whose changes am I looking at?" question.
+3. **Build a mental model?** Yes. The setup conversation teaches *"a product has
+   code behind it"*; the concierge teaches *"asking is safe; doing is a change"*
+   (the containment rule made visible); the switcher + scope line teach *"the
+   board is one product at a time."*
+
+---
+
+## Seventh pass — the Mobbin probe + two founder refinements (retained)
 
 A real **Mobbin inspiration probe** was run from the main session (web platform)
 and recorded in [`_mobbin-context.md`](./_mobbin-context.md) — it supersedes the
@@ -334,18 +484,27 @@ was applied to every place a status appears: the **session liveness** dot
 
 ---
 
-## What the mockup shows (eleven panels — light then dark)
+## What the mockup shows (nineteen panels — light then dark)
 
-**Light (panels 1–7):** the board; board-loading (skeleton); board-empty;
-the thread + live chat (stage track, plain-English status, streaming
+**Light (panels 1–7, 13–17):** the **per-product board** (panel 1, now with the
+product switcher shown open + a scope line); board-loading (skeleton);
+board-empty; the thread + live chat (stage track, plain-English status, streaming
 conversation, pause/stop run-controls, the docked composer with chips + free
 text + slash commands, the brain/files rail showing one section at a time); the
-consent gate; files rendered + raw; the server-down error.
+consent gate; the paused state; files rendered + raw; the file explorer (tree +
+diff); the server-down error. **New (this pass):** conversational setup step 1
+*which product?* (13); step 2 *where's the code? — find-or-create* (14);
+create-new + proposal + confirm gate (15); *you're set up* end state (16); the
+**concierge front door** — read-only find/status answer + investigation→change
+spin-up (17).
 
-**Dark (panels 8–11+):** the board, the thread + live chat, the consent gate,
-files-raw + the error — same markup, re-skinned from the dark token set (deep
-near-black surfaces, gold as the single accent, warm-paper text, the reversed
-mark). Proves the surface works in both modes from one set of markup.
+**Dark (panels 8–12, 18–19):** the board, the thread + live chat, the consent
+gate, files-raw + the error, the file explorer — same markup, re-skinned from
+the dark token set (deep near-black surfaces, warm-paper text, the reversed
+mark). **New (this pass):** the **per-product board + open switcher**, scoped to
+a *different* product (Helpdesk) to show the re-scope (18); the **concierge front
+door** — needs-attention answer + start-a-change spin-up (19). Proves the new
+surfaces work in both modes from one set of markup.
 
 ---
 
@@ -557,11 +716,24 @@ call** — see the gaps list in the hand-back.
 ## Provenance
 
 `provenance: draft` (RE-OPENED, DS-07). The contract is re-opened for the
-**seventh pass**: a real Mobbin probe was folded in (structure-only, UXD-15) —
-board stage-dot column headers, and a thread that shows the agent's work +
-checkpoints + a Preview/Files/Brain panel — plus the two founder refinements (a
-proper Files explorer, carried from pass 6; state markers simplified to a
-coloured dot + a word). Provenance is `draft` and `signed_off_at` is **null**
-again. It does **not** re-advance to `production-approved` until the founder
-re-confirms they're happy — the #45 gate. The re-confirmation is facilitated
-separately, never set here.
+**eighth pass**: the four **new user-facing surfaces** of scope #7 (the chat
+concierge + conversational onboarding) and #8 (the product switcher +
+per-product board) were designed and added, grounded in a second Mobbin probe
+(structure-only, UXD-15) and bound to the same fragment-token design instance
+(no new colour). Provenance is `draft` and `signed_off_at` is **null**. It does
+**not** advance to `production-approved` until the founder signs off — the #45
+gate. The sign-off is facilitated separately, never set here.
+
+### Founder-owned gaps surfaced by this pass (do not block the design; safe defaults shown in the mockup)
+
+These are genuinely founder-owned product calls — the mockup shows a safe
+default for each, but the founder may want to decide:
+- **Where a created repo lives** — local-only vs a hosted remote (GitHub etc.).
+  The create-new step shows **Private / Public / Local only** with *Private* as
+  the default selection; which is right is the founder's call (already named as
+  an open question in the SRD's verification plan).
+- **One product or several discovered at once** — onboarding here mints **one**
+  product; whether discovery may propose several at once is founder-owned (also
+  named in the SRD).
+- **The product avatar** — shown as a neutral two-letter monogram. If the
+  founder wants product logos/colours instead, that's an identity call for them.

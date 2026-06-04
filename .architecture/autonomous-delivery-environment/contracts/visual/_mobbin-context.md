@@ -57,3 +57,34 @@
 3. **Explorer:** VS Code/Codespaces tree + a "Changed" source-control view +
    rendered/raw/diff preview (Lovable/v0 read-only + preview).
 4. **Sender differentiation:** subtle/neutral (OpenAI/Gemini), never brand colour.
+
+## New surfaces — second probe (scope #7 concierge/onboarding + #8 multi-product)
+
+### Conversational setup / connect-or-create a repo
+- **Vercel** (03666e2e) — "Let's build something new": **Import Git Repository**
+  (select namespace + search; Install GitHub app) **OR** Clone Template. The
+  canonical import-or-template split.
+- **Replit** (0ce51e8a) — "Create a new App": tabs *Create with Agent / Choose
+  Template / **Import from GitHub*** (My Repositories list + From URL) +
+  public/private.
+- **Render** (6362a411) — "Connect a repository": repo list with **Connect**
+  buttons + GitHub/GitLab/Bitbucket account connect + a Public Git URL option.
+- **GitHub** (a373a95d) — "Import your project": clone URL + owner/name +
+  public/private + Begin import (the **create-new** branch model).
+- **v0** (fb3fd3fe) — Project Settings → Integrations → "Sign in with GitHub".
+- **Takeaway:** the find-or-create branch is a proven shape — *connect existing
+  (pick from list OR paste URL)* vs *create new (name + private/local)*. Sulis
+  wraps it in the concierge conversation; underlying choices stay the same.
+
+### Product / workspace switcher (multi-product, #8)
+- **Fibery** (6a3f8982) — top-left workspace switcher (`Jsmobbin ▾`) + left-nav
+  Spaces/Products; also a **⌘K command palette** ("Type to start search") — a
+  concierge-navigation reference.
+- **Zeplin** (c0da49ef) — workspace header switcher + projects grid + Create.
+- **Dovetail** (7374d9ba) — account menu → "Switch workspaces"; workspace home
+  with project cards; a "New → Project / Connect integrations" menu.
+- **Jira** (a4c9f96b) — a scoped **Project dropdown** (recent + show-full-list)
+  in the toolbar that scopes the view.
+- **Takeaway:** top-left **active-Product switcher** (name + dropdown listing the
+  Tenant's Products + "set up a new product"); switching re-scopes the board +
+  the per-product views. The board is per-Product.

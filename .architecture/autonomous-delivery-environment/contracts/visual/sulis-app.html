@@ -580,6 +580,157 @@ button,[role="button"],[tabindex],a{cursor:pointer}
 .exp-empty svg{width:30px;height:30px;color:var(--border);stroke-width:1.25}
 .exp-empty p{font-size:12px;max-width:320px;line-height:1.6;color:var(--text-secondary)}
 
+/* ============================================================================
+   NEW SURFACES (eighth pass) — concierge front door · conversational setup ·
+   product switcher · per-product board. Mobbin-grounded (_mobbin-context.md
+   §New surfaces — second probe): structure transfers, visuals stay ours
+   (UXD-15). All bound to the same fragment tokens — no new colour invented.
+   ============================================================================ */
+
+/* ---- PRODUCT SWITCHER (multi-product, FR-38) — a top-left active-Product
+   control: name + chevron, opening a menu of the Tenant's Products + "set up a
+   new product". Grounded in Fibery/Zeplin/Dovetail/Jira's workspace switcher.
+   Switching re-scopes the board + search/filters. It lives in the SIDEBAR's
+   brand row area, above the nav, so the active product is always in view. ---- */
+.pswitch{position:relative;margin:2px 4px 14px}
+.pswitch .pstrigger{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);text-align:left}
+.pswitch .pstrigger:hover{background:var(--bg-muted);border-color:var(--input)}
+.pswitch .pstrigger[aria-expanded="true"]{border-color:var(--input);background:var(--bg-muted)}
+/* the product avatar — a neutral monogram tile, NOT brand-coloured */
+.pavatar{width:26px;height:26px;border-radius:var(--radius);flex:none;display:inline-flex;align-items:center;justify-content:center;background:var(--bg-muted);border:1px solid var(--border);font-weight:700;font-size:12px;color:var(--text-secondary);font-family:var(--font)}
+.pswitch .pstrigger:hover .pavatar{background:var(--bg-card)}
+.pswitch .pmeta{flex:1;min-width:0}
+.pswitch .plabel{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);font-weight:600}
+.pswitch .pname{font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3}
+.pswitch .pchev{width:15px;height:15px;flex:none;color:var(--text-muted)}
+/* the open menu — the Tenant's Products + the active mark + "set up a new one" */
+.pmenu{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:30;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 24px rgba(28,28,28,.12);padding:6px;overflow:hidden}
+[data-theme="dark"] .pmenu{box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.pmenu .pmlabel{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);font-weight:600;padding:8px 9px 5px}
+.pmenu .pmitem{display:flex;align-items:center;gap:9px;width:100%;padding:9px 9px;border-radius:var(--radius);text-align:left;color:var(--text-secondary);font-size:13px;border:1px solid transparent}
+.pmenu .pmitem:hover{background:var(--bg-muted);color:var(--text)}
+.pmenu .pmitem.active{background:var(--bg-muted);color:var(--text);font-weight:500}
+.pmenu .pmitem .pmname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pmenu .pmitem .pmcheck{width:15px;height:15px;flex:none;color:var(--accent)}
+.pmenu .pmcount{font-size:11px;color:var(--text-muted);font-family:var(--mono)}
+.pmenu .pmsep{height:1px;background:var(--border-light);margin:6px 4px}
+.pmenu .pmnew{display:flex;align-items:center;gap:9px;width:100%;padding:9px 9px;border-radius:var(--radius);text-align:left;color:var(--text);font-size:13px;font-weight:500;border:1px solid transparent}
+.pmenu .pmnew:hover{background:var(--bg-muted)}
+.pmenu .pmnew svg{width:15px;height:15px;flex:none;color:var(--text-muted)}
+/* product scope strip on the board view-head — names what the board is showing */
+.scopeline{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--text-muted);margin-top:6px}
+.scopeline .pavatar{width:18px;height:18px;font-size:9px}
+.scopeline b{color:var(--text-secondary);font-weight:600}
+
+/* ---- CONVERSATIONAL SETUP / ONBOARDING (UC-07, FR-27/28/35/36) — a GUIDED
+   CONVERSATION, not a raw form. The concierge asks which product, then where the
+   code is, then offers the find-or-create branch. Mobbin-grounded on the
+   Vercel/Replit/Render "import existing (list/URL) OR create new" split
+   (_mobbin-context §Conversational setup) — but wrapped in the chat. The
+   choice surfaces appear as INLINE CARDS in the conversation stream, so the
+   founder reads one step at a time (CL-02 progressive disclosure). ---- */
+/* a wider, centred conversation for the front door (no right rail) */
+.frontdoor{display:flex;flex-direction:column;height:100%;min-width:0}
+.fdscroll{flex:1;overflow:auto;padding:26px 0}
+.fdwrap{max-width:660px;margin:0 auto;padding:0 24px;display:flex;flex-direction:column;gap:18px}
+/* the concierge greeting header — calm, brand worn lightly via the mark */
+.fdhero{display:flex;align-items:flex-start;gap:13px;padding:4px 0 6px}
+.fdhero .hmark{width:30px;height:30px;flex:none}
+.fdhero h2{font-size:18px;font-weight:600;color:var(--text);letter-spacing:-.01em}
+.fdhero p{font-size:13px;color:var(--text-secondary);margin-top:3px;line-height:1.6}
+
+/* an inline CHOICE CARD in the conversation — a step the founder answers. It
+   reuses the bubble idiom but is a panel with options (<=5, CL-04). */
+.choicecard{align-self:stretch;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);overflow:hidden}
+.choicecard .cchead{padding:13px 16px;border-bottom:1px solid var(--border-light);font-size:13px;font-weight:600;color:var(--text)}
+.choicecard .ccsub{font-weight:400;color:var(--text-secondary);font-size:12px;margin-top:3px}
+.choicecard .ccbody{padding:14px 16px}
+/* the two-way branch — connect existing OR create new — as two pickable tiles */
+.branch{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:620px){.branch{grid-template-columns:1fr}}
+.branchopt{display:flex;flex-direction:column;gap:7px;text-align:left;padding:15px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card)}
+.branchopt:hover{border-color:var(--input);background:var(--bg-muted)}
+.branchopt.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:var(--bg-accent)}
+.branchopt .boic{width:26px;height:26px;border-radius:var(--radius);display:inline-flex;align-items:center;justify-content:center;background:var(--bg-muted);border:1px solid var(--border);color:var(--text-secondary)}
+.branchopt.sel .boic{background:var(--bg-card);border-color:var(--bg-accent-border);color:var(--accent)}
+.branchopt .boic svg{width:15px;height:15px}
+.branchopt .bot{font-size:13px;font-weight:600;color:var(--text)}
+.branchopt .bod{font-size:12px;color:var(--text-secondary);line-height:1.5}
+/* a list of existing repos to connect (Replit "My Repositories" / Render list) */
+.repolist{display:flex;flex-direction:column;gap:7px;margin-top:4px}
+.repobtn{display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);text-align:left}
+.repobtn:hover{border-color:var(--input);background:var(--bg-muted)}
+.repobtn.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.repobtn .rgit{width:16px;height:16px;flex:none;color:var(--text-muted)}
+.repobtn .rmeta{flex:1;min-width:0}
+.repobtn .rname{font-family:var(--mono);font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.repobtn .rsub{font-size:11px;color:var(--text-muted);margin-top:1px;display:flex;align-items:center;gap:7px}
+.repobtn .rpriv{display:inline-flex;align-items:center;gap:3px}
+.repobtn .rpriv svg{width:10px;height:10px}
+.repobtn .rconnect{flex:none;font-size:11px;font-weight:600;color:var(--accent);display:inline-flex;align-items:center;gap:4px}
+.repobtn .rconnect svg{width:13px;height:13px}
+/* the "or paste a URL" / "name a new repo" field row — reuses input styling */
+.fieldrow{display:flex;gap:9px;align-items:center;margin-top:11px}
+.fieldrow .lead{font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;flex:none}
+.urlfield{flex:1;display:flex;align-items:center;gap:8px;background:var(--bg-card);border:1px solid var(--input);border-radius:var(--radius);padding:10px 12px}
+.urlfield:focus-within{border-color:var(--ring);box-shadow:0 0 0 2px color-mix(in srgb,var(--ring) 22%,transparent)}
+.urlfield svg{width:14px;height:14px;color:var(--text-muted);flex:none}
+.urlfield input{border:0;outline:0;flex:1;font-family:var(--mono);font-size:12px;background:transparent;color:var(--text)}
+.urlfield input::placeholder{color:var(--text-muted);font-family:var(--font)}
+/* the create-new sub-form: a name + a private/local toggle (GitHub import model) */
+.newrepo{display:flex;flex-direction:column;gap:11px;margin-top:4px}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;align-self:flex-start}
+.seg button{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;font-size:12px;font-weight:500;color:var(--text-muted);background:var(--bg-card);border:0;border-right:1px solid var(--border);font-family:var(--font)}
+.seg button:last-child{border-right:0}
+.seg button svg{width:12px;height:12px}
+.seg button.on{background:var(--text);color:var(--bg-card)}
+/* a quiet proposal recap (what the agent will create) before the confirm gate */
+.proposal{border:1px solid var(--bg-accent-border);background:var(--bg-accent);border-radius:var(--radius);padding:13px 15px}
+.proposal .pt{font-size:12px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:7px;margin-bottom:8px}
+.proposal .pt svg{width:14px;height:14px;color:var(--accent)}
+.proposal dl{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:12px}
+.proposal dt{color:var(--text-muted)}
+.proposal dd{color:var(--text);font-family:var(--mono);font-size:11.5px}
+/* the success "you're set up" end state */
+.setupdone{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding:30px 24px}
+.setupdone .sdmark{width:40px;height:40px}
+.setupdone h3{font-size:18px;font-weight:600;color:var(--text)}
+.setupdone p{font-size:13px;color:var(--text-secondary);max-width:430px;line-height:1.7}
+
+/* ---- CONCIERGE FRONT DOOR (UC-09/10, FR-27/33/34) — the chat that finds
+   changes, reports status, answers (read-only), onboards + starts changes. It
+   reuses the composer (chips + slash) and the bubble idiom. Two concierge-only
+   structures: a READ-ONLY ANSWER CARD that links to found changes (it points,
+   doesn't act), and the INVESTIGATION → CHANGE handoff card (an investigation
+   visibly SPINS UP A CHANGE to hold it, never runs inline — FR-N9). Grounded in
+   the Replit-agent reference + ⌘K command-palette (Fibery). ---- */
+/* a read-only answer that surfaces found change(s) — each links to its card */
+.answercard{align-self:stretch;display:flex;flex-direction:column;gap:8px}
+.foundchange{display:flex;align-items:center;gap:11px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);text-align:left}
+.foundchange:hover{border-color:var(--input);background:var(--bg-muted)}
+.foundchange .fcstage{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;color:var(--text-secondary)}
+.foundchange .fcstage .sdot{width:9px;height:9px;border-radius:50%;flex:none}
+.foundchange .fcbody{flex:1;min-width:0}
+.foundchange .fch{font-family:var(--mono);font-size:11px;color:var(--text-muted)}
+.foundchange .fci{font-size:13px;font-weight:500;color:var(--text);margin-top:2px}
+.foundchange .fcgo{flex:none;width:15px;height:15px;color:var(--text-muted)}
+/* the "read-only" honesty chip on a concierge answer (it looked, didn't touch) */
+.readonly-tag{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:var(--text-secondary);background:var(--bg-muted);border:1px solid var(--border);border-radius:var(--pill);padding:3px 9px;align-self:flex-start}
+.readonly-tag svg{width:11px;height:11px}
+/* the investigation → change spin-up card: real activity is CONTAINED in a
+   change. Shows the change being created (after confirm), not work done inline. */
+.spinup{align-self:stretch;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);overflow:hidden}
+.spinup .suhead{display:flex;align-items:center;gap:9px;padding:12px 15px;background:var(--bg-muted);border-bottom:1px solid var(--border);font-size:12px;font-weight:600;color:var(--text)}
+.spinup .suhead svg{width:14px;height:14px;color:var(--text-muted)}
+.spinup .subody{padding:14px 15px;font-size:13px;color:var(--text);line-height:1.6}
+.spinup .sucard{display:flex;align-items:center;gap:11px;margin-top:11px;padding:12px 13px;border:1px solid var(--bg-accent-border);background:var(--bg-accent);border-radius:var(--radius)}
+.spinup .sucard .suspin{flex:none}
+.spinup .sucard .sutext{flex:1;min-width:0}
+.spinup .sucard .suh{font-family:var(--mono);font-size:11px;color:var(--text-muted)}
+.spinup .sucard .sui{font-size:13px;font-weight:500;color:var(--text);margin-top:2px}
+.spinup .sucard .sustage{flex:none;display:inline-flex;align-items:center;gap:5px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;color:var(--text-secondary)}
+.spinup .sucard .sustage .sdot{width:9px;height:9px;border-radius:50%;background:var(--stage-recon);flex:none}
+
 /* sunset spinner — the mark's ring in motion; the ONE sanctioned sunset moment */
 .spinner{width:16px;height:16px;display:block;flex:none}
 .spinner .track{opacity:.18}
@@ -623,8 +774,8 @@ button,[role="button"],[tabindex],a{cursor:pointer}
 <!-- ============================================================ LIGHT ============================================================ -->
 <div class="themetag">Light theme</div>
 
-<!-- ===================== PANEL 1 — THE BOARD (light) ===================== -->
-<div class="section-label">The board you land on <small>every change in flight, in the stage it has reached — recon to ship, left to right. Columns scroll; cards have room.</small></div>
+<!-- ===================== PANEL 1 — THE BOARD, PER-PRODUCT (light) ===================== -->
+<div class="section-label">The board you land on — now per-product <small>the active product's changes only, in the stage each has reached — recon to ship, left to right. The product switcher (top-left, shown open) re-scopes the board. Columns scroll; cards have room.</small></div>
 <div class="scope" data-theme="light">
 <div class="shell">
   <aside class="sidebar">
@@ -632,11 +783,33 @@ button,[role="button"],[tabindex],a{cursor:pointer}
       <svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-l1" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-l1"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-l1)" mask="url(#mm-l1)"/></svg>
       <div class="brandname">Sulis</div>
     </div>
+    <!-- PRODUCT SWITCHER (FR-38) — the active Product, top-left; OPEN here to
+         show the menu listing the Tenant's Products + "set up a new product".
+         Switching re-scopes the board + search/filters. -->
+    <div class="pswitch">
+      <button class="pstrigger" aria-haspopup="menu" aria-expanded="true">
+        <span class="pavatar" aria-hidden="true">AC</span>
+        <span class="pmeta"><span class="plabel">Product</span><span class="pname">Acme Checkout</span></span>
+        <svg class="pchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="pmenu" role="menu" aria-label="Switch product">
+        <div class="pmlabel">Your products</div>
+        <button class="pmitem active" role="menuitemradio" aria-checked="true"><span class="pavatar" aria-hidden="true">AC</span><span class="pmname">Acme Checkout</span><span class="pmcount">5</span><svg class="pmcheck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></button>
+        <button class="pmitem" role="menuitemradio" aria-checked="false"><span class="pavatar" aria-hidden="true">HD</span><span class="pmname">Helpdesk</span><span class="pmcount">2</span></button>
+        <button class="pmitem" role="menuitemradio" aria-checked="false"><span class="pavatar" aria-hidden="true">MS</span><span class="pmname">Marketing Site</span><span class="pmcount">0</span></button>
+        <div class="pmsep" role="separator"></div>
+        <button class="pmnew" role="menuitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Set up a new product</button>
+      </div>
+    </div>
     <a class="navitem active" tabindex="0" href="#" aria-current="page">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
       <span class="lname">Board</span>
     </a>
-    <h4>In flight</h4>
+    <a class="navitem" tabindex="0" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span class="lname">Concierge</span>
+    </a>
+    <h4>In flight · Acme Checkout</h4>
     <a class="navitem" tabindex="0" href="#"><span class="live running" role="img" aria-label="running" title="running"><span class="g" aria-hidden="true"></span></span><span class="lname">add-checkout-flow</span></a>
     <a class="navitem" tabindex="0" href="#"><span class="live idle" role="img" aria-label="not running" title="not running"><span class="g" aria-hidden="true"></span></span><span class="lname">fix-login-redirect</span></a>
     <a class="navitem" tabindex="0" href="#"><span class="live unknown" role="img" aria-label="unknown" title="unknown"><span class="g" aria-hidden="true"></span></span><span class="lname">map-billing-module</span></a>
@@ -648,12 +821,13 @@ button,[role="button"],[tabindex],a{cursor:pointer}
     <div class="viewhead">
       <div class="viewtitle">Your work, at a glance</div>
       <div class="viewsub">Every change in flight, in the stage it has reached. Pick one to open it.</div>
+      <div class="scopeline"><span class="pavatar" aria-hidden="true">AC</span>Showing <b>Acme Checkout</b> · 5 in flight — switch product top-left to see another</div>
     </div>
 
     <div class="toolbar" role="search">
       <div class="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" aria-label="Search inside your changes" placeholder="Search inside your changes — conversations and created items, not just titles" />
+        <input type="text" aria-label="Search inside this product's changes" placeholder="Search inside Acme Checkout's changes — conversations and created items, not just titles" />
         <span class="hint">searches content</span>
       </div>
       <button class="chip on" aria-pressed="true">All stages</button>
@@ -1098,6 +1272,257 @@ button,[role="button"],[tabindex],a{cursor:pointer}
 </div>
 </div>
 
+<!-- ===================== PANEL 13 — CONVERSATIONAL SETUP: which product? (light) ===================== -->
+<div class="section-label">First open, nothing set up yet — the concierge sets you up in a conversation <small>not a form (a form can't pick from an empty graph). Step 1: which product are you working on? Grounded in the guided-setup pattern (Vercel/Replit), wrapped in chat.</small></div>
+<div class="scope" data-theme="light">
+<div class="shell" style="height:560px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-l13" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-l13"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-l13)" mask="url(#mm-l13)"/></svg><div class="brandname">Sulis</div></div>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="lname">Set up</span></a>
+  </aside>
+  <div class="main" style="padding:0;overflow:hidden">
+    <div class="frontdoor">
+      <div class="fdscroll">
+        <div class="fdwrap">
+          <div class="fdhero">
+            <svg class="hmark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-h13" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-h13"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-h13)" mask="url(#mm-h13)"/></svg>
+            <div><h2>Let's get you set up</h2><p>There's nothing here yet, so I'll set things up with you — a couple of quick questions, then your board is ready. Nothing is created until you say so.</p></div>
+          </div>
+          <div class="msg agent"><div class="who">Concierge</div><div class="bubble">First — what's the product you're working on? You can tell me its name, or pick one if it sounds familiar.</div></div>
+          <div class="msg user"><div class="who">You</div><div class="bubble">It's called Acme Checkout — our payments flow.</div></div>
+          <div class="msg agent"><div class="who">Concierge</div><div class="bubble">Got it — <b>Acme Checkout</b>. Next I need to know where its code lives.</div></div>
+        </div>
+      </div>
+      <div class="composer-wrap">
+        <div class="chips">
+          <button class="sugchip">Acme Checkout</button>
+          <button class="sugchip">Helpdesk</button>
+          <button class="sugchip">Something else…</button>
+        </div>
+        <div class="composer">
+          <div class="field">
+            <textarea aria-label="Tell the concierge your product" placeholder="Tell me your product's name…  —  type / for commands"></textarea>
+            <div class="slashhint"><kbd>/</kbd> for commands &nbsp;·&nbsp; <kbd>Enter</kbd> to send, <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line</div>
+          </div>
+          <button class="send">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===================== PANEL 14 — CONVERSATIONAL SETUP: where's the code? find-or-create (light) ===================== -->
+<div class="section-label">Step 2 — where's the code? Connect an existing repo, or create a new one <small>the find-or-create branch, in the conversation (Vercel/Replit/Render: import existing — list or URL — OR create new). One step at a time (CL-02).</small></div>
+<div class="scope" data-theme="light">
+<div class="shell" style="height:680px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-l14" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-l14"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-l14)" mask="url(#mm-l14)"/></svg><div class="brandname">Sulis</div></div>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="lname">Set up</span></a>
+  </aside>
+  <div class="main" style="padding:0;overflow:hidden">
+    <div class="frontdoor">
+      <div class="fdscroll">
+        <div class="fdwrap">
+          <div class="msg agent"><div class="who">Concierge</div><div class="bubble">Where does Acme Checkout's code live? If you already have a repo I'll connect it; if you don't, I can create one for you (I'll ask before I do).</div></div>
+          <!-- the two-way branch — connect existing OR create new -->
+          <div class="choicecard">
+            <div class="cchead">Connect your code<div class="ccsub">Pick the one that fits — you can change it later.</div></div>
+            <div class="ccbody">
+              <div class="branch">
+                <button class="branchopt sel" aria-pressed="true">
+                  <span class="boic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg></span>
+                  <span class="bot">Connect an existing repo</span>
+                  <span class="bod">Pick from your repos, or paste a link to one.</span>
+                </button>
+                <button class="branchopt" aria-pressed="false">
+                  <span class="boic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+                  <span class="bot">Create a new repo</span>
+                  <span class="bod">No code yet? I'll make one for you (after you confirm).</span>
+                </button>
+              </div>
+              <!-- the selected branch: connect existing — list of repos + paste a URL -->
+              <div class="repolist" aria-label="Your repositories">
+                <button class="repobtn sel">
+                  <svg class="rgit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+                  <span class="rmeta"><span class="rname">acme-co/checkout</span><span class="rsub"><span class="rpriv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Private</span> · updated 2 days ago</span></span>
+                  <span class="rconnect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>Selected</span>
+                </button>
+                <button class="repobtn">
+                  <svg class="rgit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+                  <span class="rmeta"><span class="rname">acme-co/checkout-legacy</span><span class="rsub"><span class="rpriv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Private</span> · updated 6 months ago</span></span>
+                  <span class="rconnect">Connect</span>
+                </button>
+                <button class="repobtn">
+                  <svg class="rgit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+                  <span class="rmeta"><span class="rname">acme-co/marketing-site</span><span class="rsub">Public · updated yesterday</span></span>
+                  <span class="rconnect">Connect</span>
+                </button>
+              </div>
+              <div class="fieldrow">
+                <span class="lead">or paste</span>
+                <span class="urlfield"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><input type="text" aria-label="Paste a repository link" placeholder="https://github.com/acme-co/checkout" /></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="composer-wrap">
+        <div class="composer">
+          <div class="field">
+            <textarea aria-label="Reply to the concierge" placeholder="…or just tell me where it is in plain English"></textarea>
+            <div class="slashhint"><kbd>Enter</kbd> to send, <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line</div>
+          </div>
+          <button class="send">Use this repo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===================== PANEL 15 — CONVERSATIONAL SETUP: create-new + proposal + confirm gate (light) ===================== -->
+<div class="section-label">If you have no repo — create one (name + private/local), confirmed first <small>creating a repo is consequential, so the concierge proposes it and asks before doing it (FR-N6/N10). Then a "you're set up" end state → the board appears.</small></div>
+<div class="scope" data-theme="light">
+<div class="shell" style="height:640px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-l15" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-l15"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-l15)" mask="url(#mm-l15)"/></svg><div class="brandname">Sulis</div></div>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="lname">Set up</span></a>
+  </aside>
+  <div class="main" style="padding:0;overflow:hidden">
+    <div class="frontdoor">
+      <div class="fdscroll">
+        <div class="fdwrap">
+          <div class="msg user"><div class="who">You</div><div class="bubble">I don't have a repo yet — can you make one?</div></div>
+          <div class="msg agent"><div class="who">Concierge</div><div class="bubble">Of course. Give it a name and choose whether it's private or just on your machine for now — then I'll show you exactly what I'll create before I do anything.</div></div>
+          <div class="choicecard">
+            <div class="cchead">Create a new repo</div>
+            <div class="ccbody">
+              <div class="newrepo">
+                <div class="urlfield" style="border-color:var(--input)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 3h18v18H3z" opacity="0"/><path d="M6 3v12a3 3 0 0 0 3 3h6"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="6" r="3"/></svg><input type="text" aria-label="New repository name" value="acme-checkout" /></div>
+                <div class="seg" role="group" aria-label="Repository visibility">
+                  <button class="on" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Private</button>
+                  <button aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>Public</button>
+                  <button aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Local only</button>
+                </div>
+              </div>
+              <!-- the proposal recap, then the confirm gate (reused .gate) -->
+              <div class="proposal" style="margin-top:14px">
+                <div class="pt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>Here's what I'll set up</div>
+                <dl>
+                  <dt>Product</dt><dd>Acme Checkout</dd>
+                  <dt>New repo</dt><dd>acme-checkout · private</dd>
+                  <dt>Project</dt><dd>acme-checkout (main)</dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+          <div class="gate" style="margin:0">
+            <div class="ghead"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 5c0 1.66 4 3 9 3s9-1.34 9-3-4-3-9-3-9 1.34-9 3"/></svg>Needs your go-ahead before it happens</div>
+            <div class="gbody">
+              <div class="what">Create the repo and save your product</div>
+              This makes a new private repo and saves Acme Checkout so it's ready next time — nothing is created until you say go.
+            </div>
+            <div class="gactions">
+              <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>Go ahead</button>
+              <button class="btn btn-outline">Not yet</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===================== PANEL 16 — SETUP DONE → the board appears (light) ===================== -->
+<div class="section-label">End state — "your product is set up" → the board appears <small>the durable Product + Project config is saved; next time you just open the app and say "make a change on Acme Checkout". (UC-07 postcondition.)</small></div>
+<div class="scope" data-theme="light">
+<div class="shell" style="height:330px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-l16" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-l16"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-l16)" mask="url(#mm-l16)"/></svg><div class="brandname">Sulis</div></div>
+    <div class="pswitch"><button class="pstrigger" aria-haspopup="menu" aria-expanded="false"><span class="pavatar" aria-hidden="true">AC</span><span class="pmeta"><span class="plabel">Product</span><span class="pname">Acme Checkout</span></span><svg class="pchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button></div>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span class="lname">Board</span></a>
+  </aside>
+  <main class="main">
+    <div class="setupdone">
+      <svg class="sdmark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-sd16" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-sd16"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-sd16)" mask="url(#mm-sd16)"/></svg>
+      <h3>Acme Checkout is set up</h3>
+      <p>Your product and its code are saved — I won't have to ask again. Your board is ready; it's empty for now. Just tell me what you'd like to work on and I'll start it for you.</p>
+      <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Go to the board</button>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ===================== PANEL 17 — CONCIERGE FRONT DOOR: find / status / investigate→change (light) ===================== -->
+<div class="section-label">The concierge front door — find changes, get status, ask, and start work <small>it coordinates only; it answers read-only, and any real activity (even an investigation) visibly spins up a change to hold it (FR-N8/N9). Reuses the chat composer.</small></div>
+<div class="scope" data-theme="light">
+<div class="shell" style="height:760px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-l17" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-l17"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-l17)" mask="url(#mm-l17)"/></svg><div class="brandname">Sulis</div></div>
+    <div class="pswitch"><button class="pstrigger" aria-haspopup="menu" aria-expanded="false"><span class="pavatar" aria-hidden="true">AC</span><span class="pmeta"><span class="plabel">Product</span><span class="pname">Acme Checkout</span></span><svg class="pchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button></div>
+    <a class="navitem" tabindex="0" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span class="lname">Board</span></a>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="lname">Concierge</span></a>
+  </aside>
+  <div class="main" style="padding:0;overflow:hidden">
+    <div class="frontdoor">
+      <div class="fdscroll">
+        <div class="fdwrap">
+          <div class="fdhero">
+            <svg class="hmark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><defs><linearGradient id="sg-h17" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient><mask id="mm-h17"><circle cx="256" cy="256" r="228" fill="none" stroke="white" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="white" stroke-width="36" fill="none" stroke-linecap="round"/></mask></defs><rect width="512" height="512" fill="url(#sg-h17)" mask="url(#mm-h17)"/></svg>
+            <div><h2>What can I help with?</h2><p>I can find a change, tell you where something's up to, answer questions about your work, or start something new. I don't do the work myself — I set it up and hand it to a change.</p></div>
+          </div>
+          <!-- read-only Q&A: find a change, points to its card (no writes) -->
+          <div class="msg user"><div class="who">You</div><div class="bubble">Find the change about the hanging login page — where's it up to?</div></div>
+          <div class="msg agent"><div class="who">Concierge</div><div class="bubble">Found it. Here's the change and where it's at:</div></div>
+          <div class="answercard">
+            <button class="foundchange">
+              <span class="fcstage"><span class="sdot" style="background:var(--stage-implement)" aria-hidden="true"></span>Implement</span>
+              <span class="fcbody"><span class="fch">fix-login-redirect</span><span class="fci">Fix login redirect loop · stopped mid-reply, needs you</span></span>
+              <svg class="fcgo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <span class="readonly-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>I only looked — nothing was changed</span>
+          </div>
+          <!-- investigation → change containment (FR-N9): spins up a change, never inline -->
+          <div class="msg user"><div class="who">You</div><div class="bubble">Can you look into why sign-ups dropped last week?</div></div>
+          <div class="msg agent"><div class="who">Concierge</div><div class="bubble">That's a piece of work, so I'll give it its own change to live in — that way it's tracked, self-contained, and can turn straight into a fix if it needs to. Here's what I'll start:</div></div>
+          <div class="spinup">
+            <div class="suhead"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Starting a change to hold this investigation</div>
+            <div class="subody">
+              I won't dig into it here in the chat — investigations get their own change so nothing is lost. On your go-ahead it lands on the board at Recon, and the looking-into happens inside it.
+              <div class="sucard">
+                <svg class="spinner suspin" viewBox="0 0 512 512" role="img" aria-label="Starting"><defs><linearGradient id="spin-l17" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#1E2A4A"/><stop offset="25%" stop-color="#6B3654"/><stop offset="50%" stop-color="#D45A3C"/><stop offset="75%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient></defs><circle class="track" cx="256" cy="256" r="228" fill="none" stroke="url(#spin-l17)" stroke-width="36"/><circle class="sweep" cx="256" cy="256" r="228" fill="none" stroke="url(#spin-l17)" stroke-width="36" stroke-linecap="round" stroke-dasharray="430 1003" pathLength="1433"/></svg>
+                <span class="sutext"><span class="suh">investigate-signup-drop · investigate</span><span class="sui">Look into the sign-up drop last week</span></span>
+                <span class="sustage"><span class="sdot" aria-hidden="true"></span>Recon</span>
+              </div>
+            </div>
+            <div class="gactions" style="display:flex;gap:9px;padding:0 15px 15px">
+              <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>Start this change</button>
+              <button class="btn btn-outline">Not now</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="composer-wrap">
+        <div class="chips">
+          <button class="sugchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.29 3.86 1.82 18a1 1 0 0 0 .86 1.5h18.64a1 1 0 0 0 .86-1.5L13.71 3.86a1 1 0 0 0-1.72 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>What needs my attention?</button>
+          <button class="sugchip">What have I got in flight?</button>
+          <button class="sugchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Start something new</button>
+        </div>
+        <div class="composer">
+          <div class="field">
+            <textarea aria-label="Ask the concierge" placeholder="Ask me anything, or tell me what to start…  —  type / for commands"></textarea>
+            <div class="slashhint"><kbd>/</kbd> for commands — <kbd>/find</kbd> · <kbd>/status</kbd> · <kbd>/start</kbd> &nbsp;·&nbsp; <kbd>Enter</kbd> to send</div>
+          </div>
+          <button class="send">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
 <!-- ============================================================ DARK ============================================================ -->
 <div class="themetag">Dark theme</div>
 
@@ -1411,6 +1836,115 @@ you can steer from.
       </div>
     </div>
   </main>
+</div>
+</div>
+
+<!-- ===================== PANEL 18 — PER-PRODUCT BOARD + SWITCHER OPEN (dark) ===================== -->
+<div class="section-label">The per-product board + product switcher — dark <small>the switcher (top-left, shown open) lists the products and re-scopes the board; same surface, dark token set</small></div>
+<div class="scope" data-theme="dark">
+<div class="shell" style="height:520px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><circle cx="256" cy="256" r="228" fill="none" stroke="#fafafa" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="#fafafa" stroke-width="36" fill="none" stroke-linecap="round"/></svg><div class="brandname">Sulis</div></div>
+    <div class="pswitch">
+      <button class="pstrigger" aria-haspopup="menu" aria-expanded="true"><span class="pavatar" aria-hidden="true">HD</span><span class="pmeta"><span class="plabel">Product</span><span class="pname">Helpdesk</span></span><svg class="pchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
+      <div class="pmenu" role="menu" aria-label="Switch product">
+        <div class="pmlabel">Your products</div>
+        <button class="pmitem" role="menuitemradio" aria-checked="false"><span class="pavatar" aria-hidden="true">AC</span><span class="pmname">Acme Checkout</span><span class="pmcount">5</span></button>
+        <button class="pmitem active" role="menuitemradio" aria-checked="true"><span class="pavatar" aria-hidden="true">HD</span><span class="pmname">Helpdesk</span><span class="pmcount">2</span><svg class="pmcheck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></button>
+        <button class="pmitem" role="menuitemradio" aria-checked="false"><span class="pavatar" aria-hidden="true">MS</span><span class="pmname">Marketing Site</span><span class="pmcount">0</span></button>
+        <div class="pmsep" role="separator"></div>
+        <button class="pmnew" role="menuitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Set up a new product</button>
+      </div>
+    </div>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span class="lname">Board</span></a>
+    <a class="navitem" tabindex="0" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="lname">Concierge</span></a>
+    <h4>In flight · Helpdesk</h4>
+    <a class="navitem" tabindex="0" href="#"><span class="live running" role="img" aria-label="running" title="running"><span class="g" aria-hidden="true"></span></span><span class="lname">triage-spam-filter</span></a>
+    <a class="navitem" tabindex="0" href="#"><span class="live idle" role="img" aria-label="not running" title="not running"><span class="g" aria-hidden="true"></span></span><span class="lname">canned-replies</span></a>
+  </aside>
+  <main class="main">
+    <div class="viewhead">
+      <div class="viewtitle">Your work, at a glance</div>
+      <div class="scopeline"><span class="pavatar" aria-hidden="true">HD</span>Showing <b>Helpdesk</b> · 2 in flight — switch product top-left to see another</div>
+    </div>
+    <div class="board">
+      <div class="col"><div class="colhead s-recon"><span class="sdot" aria-hidden="true"></span><span class="colname">Recon</span><span class="colcount">0</span></div><div class="collist"><div class="col-empty">Nothing here yet</div></div></div>
+      <div class="col"><div class="colhead s-specify"><span class="sdot" aria-hidden="true"></span><span class="colname">Specify</span><span class="colcount">1</span></div><div class="collist"><div class="card" tabindex="0"><div class="handle">canned-replies</div><div class="intent">Saved replies for common tickets</div><div class="cardfoot"><span class="live idle" role="img" aria-label="not running" title="not running"><span class="g" aria-hidden="true"></span>not running</span></div></div></div></div>
+      <div class="col"><div class="colhead s-design"><span class="sdot" aria-hidden="true"></span><span class="colname">Design</span><span class="colcount">0</span></div><div class="collist"><div class="col-empty">Nothing here yet</div></div></div>
+      <div class="col"><div class="colhead s-implement"><span class="sdot" aria-hidden="true"></span><span class="colname">Implement</span><span class="colcount">1</span></div><div class="collist"><div class="card" tabindex="0"><div class="handle">triage-spam-filter</div><div class="intent">Auto-triage spam tickets</div><div class="cardfoot"><span class="live running" role="img" aria-label="running" title="running"><span class="g" aria-hidden="true"></span>running</span></div></div></div></div>
+      <div class="col"><div class="colhead s-review"><span class="sdot" aria-hidden="true"></span><span class="colname">Review</span><span class="colcount">0</span></div><div class="collist"><div class="col-empty">Nothing here yet</div></div></div>
+      <div class="col"><div class="colhead s-ship"><span class="sdot" aria-hidden="true"></span><span class="colname">Ship</span><span class="colcount">0</span></div><div class="collist"><div class="col-empty">Nothing here yet</div></div></div>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ===================== PANEL 19 — CONCIERGE FRONT DOOR (dark) ===================== -->
+<div class="section-label">The concierge front door — dark <small>read-only answers that point to a change, and an investigation spinning up its own change; same surface, dark token set</small></div>
+<div class="scope" data-theme="dark">
+<div class="shell" style="height:680px">
+  <aside class="sidebar">
+    <div class="brandrow"><svg class="mark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><circle cx="256" cy="256" r="228" fill="none" stroke="#fafafa" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="#fafafa" stroke-width="36" fill="none" stroke-linecap="round"/></svg><div class="brandname">Sulis</div></div>
+    <div class="pswitch"><button class="pstrigger" aria-haspopup="menu" aria-expanded="false"><span class="pavatar" aria-hidden="true">AC</span><span class="pmeta"><span class="plabel">Product</span><span class="pname">Acme Checkout</span></span><svg class="pchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button></div>
+    <a class="navitem" tabindex="0" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span class="lname">Board</span></a>
+    <a class="navitem active" tabindex="0" href="#" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="lname">Concierge</span></a>
+  </aside>
+  <div class="main" style="padding:0;overflow:hidden">
+    <div class="frontdoor">
+      <div class="fdscroll">
+        <div class="fdwrap">
+          <div class="fdhero">
+            <svg class="hmark" viewBox="0 0 512 512" role="img" aria-label="Sulis"><circle cx="256" cy="256" r="228" fill="none" stroke="#fafafa" stroke-width="36"/><path d="M 30.7,256 C 115.2,256 140.8,179.2 204.8,174.1 C 243.2,169.0 256,184.3 268.8,204.8 C 294.4,250.9 307.2,337.9 358.4,337.9 C 396.8,337.9 422.4,268.8 481.3,256" stroke="#fafafa" stroke-width="36" fill="none" stroke-linecap="round"/></svg>
+            <div><h2>What can I help with?</h2><p>Find a change, check where something's up to, ask about your work, or start something new. I coordinate — I hand the doing to a change.</p></div>
+          </div>
+          <div class="msg user"><div class="who">You</div><div class="bubble">What needs my attention on Acme Checkout?</div></div>
+          <div class="msg agent"><div class="who">Concierge</div><div class="bubble">Two changes are waiting on you:</div></div>
+          <div class="answercard">
+            <button class="foundchange">
+              <span class="fcstage"><span class="sdot" style="background:var(--stage-specify)" aria-hidden="true"></span>Specify</span>
+              <span class="fcbody"><span class="fch">password-reset-email</span><span class="fci">Password reset by email link · waiting on a decision from you</span></span>
+              <svg class="fcgo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <button class="foundchange">
+              <span class="fcstage"><span class="sdot" style="background:var(--stage-implement)" aria-hidden="true"></span>Implement</span>
+              <span class="fcbody"><span class="fch">fix-login-redirect</span><span class="fci">Fix login redirect loop · stopped mid-reply</span></span>
+              <svg class="fcgo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <span class="readonly-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>I only looked — nothing was changed</span>
+          </div>
+          <div class="msg user"><div class="who">You</div><div class="bubble">Start a change to add Apple Pay to checkout.</div></div>
+          <div class="msg agent"><div class="who">Concierge</div><div class="bubble">I'll start that as its own change against Acme Checkout. Here's what I'll create — say go and it lands on the board at Recon:</div></div>
+          <div class="spinup">
+            <div class="suhead"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Starting a change</div>
+            <div class="subody">
+              <div class="sucard">
+                <svg class="spinner suspin" viewBox="0 0 512 512" role="img" aria-label="Starting"><defs><linearGradient id="spin-d19" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0%" stop-color="#6B3654"/><stop offset="40%" stop-color="#D45A3C"/><stop offset="70%" stop-color="#E8834A"/><stop offset="100%" stop-color="#F0A830"/></linearGradient></defs><circle class="track" cx="256" cy="256" r="228" fill="none" stroke="url(#spin-d19)" stroke-width="36"/><circle class="sweep" cx="256" cy="256" r="228" fill="none" stroke="url(#spin-d19)" stroke-width="36" stroke-linecap="round" stroke-dasharray="430 1003" pathLength="1433"/></svg>
+                <span class="sutext"><span class="suh">add-apple-pay · create</span><span class="sui">Add Apple Pay to checkout</span></span>
+                <span class="sustage"><span class="sdot" aria-hidden="true"></span>Recon</span>
+              </div>
+            </div>
+            <div class="gactions" style="display:flex;gap:9px;padding:0 15px 15px">
+              <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>Start this change</button>
+              <button class="btn btn-outline">Not now</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="composer-wrap">
+        <div class="chips">
+          <button class="sugchip">What have I got in flight?</button>
+          <button class="sugchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Start something new</button>
+        </div>
+        <div class="composer">
+          <div class="field">
+            <textarea aria-label="Ask the concierge" placeholder="Ask me anything, or tell me what to start…  —  type / for commands"></textarea>
+            <div class="slashhint"><kbd>/</kbd> for commands — <kbd>/find</kbd> · <kbd>/status</kbd> · <kbd>/start</kbd> &nbsp;·&nbsp; <kbd>Enter</kbd> to send</div>
+          </div>
+          <button class="send">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 </div>
 

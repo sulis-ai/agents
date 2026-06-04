@@ -17,6 +17,7 @@ acceptance_criteria:
   - "Search by content narrows the board to changes matching conversation/artifact text (FR-10), driven by GET /api/search"
   - "Stage filter narrows to selected stage(s) (FR-11); needs-attention filter shows only blocked/waiting-on-decision/stopped-mid-reply (FR-12)"
   - "Filters compose; clearing them restores the full board; consumes tokens.css only; matches the SIGNED visual contract (WP-002)"
+  - "Search + stage + needs-attention all operate WITHIN the active Product's change set (server-side scope via WP-018, ADR-009) — a filter can never surface another Product's change (FR-37)"
 test_plan:
   unit: []
   integration:
@@ -40,7 +41,8 @@ addresses_findings: []
 invalidated_by: { activity: null, result: null }
 
 status: pending
-depends_on: [WP-001, WP-002, WP-005, WP-011]   # search route + the board to narrow
+depends_on: [WP-001, WP-002, WP-005, WP-011, WP-018]   # search route + the board to narrow + active-Product scope (ADR-009)
+# AMENDED (expanded scope): filters operate within the ACTIVE Product's change set (FR-37, server-side scope via WP-018).
 
 child_wps: []
 kinds: null
@@ -69,8 +71,11 @@ and narrow the *same* board — there is no separate results screen.
 
 ## How
 
-Consume WP-005's search endpoint. Filter chips use the neutral-inverse active
-state from the visual contract (no brand fill). Consume `tokens.css` only.
+Consume WP-005's search endpoint. **Amended for the expanded scope:** the search
++ filters operate within the **active Product's** change set — `GET /api/search`
+is Product-scoped server-side (WP-018, ADR-009), so a filter can never surface
+another Product's change. Filter chips use the neutral-inverse active state from
+the visual contract (no brand fill). Consume `tokens.css` only.
 
 ## Tests
 

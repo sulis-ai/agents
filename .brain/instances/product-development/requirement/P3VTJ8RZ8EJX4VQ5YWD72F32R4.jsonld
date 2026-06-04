@@ -1,0 +1,13 @@
+{
+  "acceptance_criteria": [
+    "see SRD body"
+  ],
+  "id": "dna:requirement:P3VTJ8RZ8EJX4VQ5YWD72F32R4",
+  "priority": "must",
+  "rationale": "Extracted from FR-N11 of /Users/iain/.sulis/changes/01KT500K2JTE2EGW6TPPQ4D4VN/worktree/.specifications/autonomous-delivery-environment/SRD.md. The `source` ref is a synthetic Opportunity placeholder generated from the SRD path; replace when Opportunity emission lands (queued follow-on slice). Defaults applied for SRD-absent fields: priority=must, verification_method=test, state=draft.",
+  "source": "dna:opportunity:BG8E0H5JPPWEK3G3B26T3H087A",
+  "state": "draft",
+  "statement": "Onboarding MUST NOT persist a partial or unconfirmed Product/Project config.. The Product/Project config (including `Project.source`) MUST be persisted **only** after the founder confirms and the repo is found-or-created and reachable. A declined or abandoned onboarding MUST leave the graph unchanged; a config MUST NOT be half-written (e.g. a Product without its Project's `source`). - *Acceptance:* A declined onboarding leaves the graph unchanged; a test asserts that any persisted Product has a Project with a populated, reachable `source` (no half-written config is observable on the next session)",
+  "sys_status": "active",
+  "verification_method": "test"
+}

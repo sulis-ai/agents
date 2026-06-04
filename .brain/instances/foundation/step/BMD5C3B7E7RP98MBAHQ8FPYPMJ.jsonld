@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Ask the concierge to look into something (e.g. why checkout is slow).",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:BMD5C3B7E7RP98MBAHQ8FPYPMJ",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "56zjtxqz-ask-the-concierge-to-look-into-something-1",
+  "output_artifacts": [
+    "56zjtxqz-ask-the-concierge-to-look-into-something-1-result"
+  ],
+  "postconditions": [
+    "it creates a change to hold the investigation rather than poking around in the chat",
+    "the exploring happens inside that change, captured"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

@@ -77,6 +77,68 @@
         "dna:requirement:BH3DEVG3Y5C0MT95S252ZRC75B",
         "dna:requirement:4CD6D4P1F75S5J8DWVY84AVA03"
       ]
+    },
+    {
+      "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+      "id": "dna:scenario:G9V6QGPERX1Y3DWQ2BXJ201WW4",
+      "journey": "dna:workflow:7TY3701DKFDKYAJZ21YTYWTN52",
+      "name": "Set up a product just by talking",
+      "state": "draft",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:M4DSBEM3TFHN3J5JY12MZ52ZF1",
+        "dna:requirement:AYGSMRN96PT1G0RH1M3DQZP588",
+        "dna:requirement:QXFMGQTRP8QHE7BR82YFY8J7YK",
+        "dna:requirement:X0Z853C9A6ZCR25F5F2H86J8A0"
+      ]
+    },
+    {
+      "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+      "id": "dna:scenario:K97R26J92J912SWVAVWE2B5C17",
+      "journey": "dna:workflow:T25HR0BVH4TNP7BS5G9FBYHRZH",
+      "name": "Start work by saying what you want",
+      "state": "draft",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:KXMT8ZDKGPQHAS8HGF3031QSNP",
+        "dna:requirement:F43H2MFVGAXR4Y3BYS73QW89BS"
+      ]
+    },
+    {
+      "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+      "id": "dna:scenario:BXA4FVDX2CKBT3XNWB47PJFYQY",
+      "journey": "dna:workflow:T0EHRZVSXN7K3C2K7ZTJM3R6WZ",
+      "name": "Ask the concierge about your world",
+      "state": "draft",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:1YVQ922F7BM2WZDRZQP0MFN2NT",
+        "dna:requirement:NDVEVYDQAAPZ52NSQ0HS4Z5EAV"
+      ]
+    },
+    {
+      "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+      "id": "dna:scenario:9H2Z4JQMYRMS50659BKJRHZSX4",
+      "journey": "dna:workflow:5HGJZ641VKKGCFXSBQVG1Z6FQN",
+      "name": "An investigation becomes a change",
+      "state": "draft",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:NFZZQ0TG3ERDBNK5G0WBP5BYHP",
+        "dna:requirement:QBABG4P5FTXRVJBCNX2QTKGXXQ"
+      ]
+    },
+    {
+      "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+      "id": "dna:scenario:WWTP6MD7A19JS09Z2VSGQ848WY",
+      "journey": "dna:workflow:T4VDCCCR65XFPXHTNC2RWY5DCK",
+      "name": "Switch product and the board re-scopes",
+      "state": "draft",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:KSCHGX0DEVJTB874BCQRXW7KA8",
+        "dna:requirement:08QYK0Z87YGJZ7MWGVHMDZ7GQE"
+      ]
     }
   ],
   "steps": [
@@ -352,6 +414,183 @@
       ],
       "state": "draft",
       "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Open Sulis with nothing set up and say what product you're working on.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:9P4ATDEQ88MD3S8J9K2MDY1REV",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "518jnqev-open-sulis-with-nothing-set-up-and-say-w-1",
+      "output_artifacts": [
+        "518jnqev-open-sulis-with-nothing-set-up-and-say-w-1-result"
+      ],
+      "postconditions": [
+        "the agent asks where the code lives"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Tell it you don't have a repo yet (or point it at your folders).",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:KWFGVM4GDRPJBAXW7H6JR8SZY0",
+      "input_artifacts": [
+        "518jnqev-open-sulis-with-nothing-set-up-and-say-w-1-result"
+      ],
+      "mechanism": "human",
+      "name": "518jnqev-tell-it-you-don-t-have-a-repo-yet-or-poi-2",
+      "output_artifacts": [
+        "518jnqev-tell-it-you-don-t-have-a-repo-yet-or-poi-2-result"
+      ],
+      "postconditions": [
+        "if none, it offers to create a repo and asks you to confirm first",
+        "if folders exist, it finds and configures them"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Confirm what it found.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:ED4R1DV7V2YP6WWNH280EFN9JK",
+      "input_artifacts": [
+        "518jnqev-tell-it-you-don-t-have-a-repo-yet-or-poi-2-result"
+      ],
+      "mechanism": "human",
+      "name": "518jnqev-confirm-what-it-found-3",
+      "output_artifacts": [
+        "518jnqev-confirm-what-it-found-3-result"
+      ],
+      "postconditions": [
+        "your Product and Project are created only after you confirm",
+        "the setup is saved so next time needs no repeat"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "With a product set up, say what you want to do (e.g. add a password-reset flow).",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:C1SQ78MRMVW12B4ZEFN8W6W8A1",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "n5hbzs53-with-a-product-set-up-say-what-you-want-1",
+      "output_artifacts": [
+        "n5hbzs53-with-a-product-set-up-say-what-you-want-1-result"
+      ],
+      "postconditions": [
+        "it becomes a started change against the right repo",
+        "the repo is fetched first if it isn't on the machine"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Look at the board.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:MS6FCPV1NJHTPVJW92PZWWJ3VC",
+      "input_artifacts": [
+        "n5hbzs53-with-a-product-set-up-say-what-you-want-1-result"
+      ],
+      "mechanism": "human",
+      "name": "n5hbzs53-look-at-the-board-2",
+      "output_artifacts": [
+        "n5hbzs53-look-at-the-board-2-result"
+      ],
+      "postconditions": [
+        "the new change is there at the first stage"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Ask the chat what's in flight or where a change is up to.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:VNPF5RZ8X13B0RMHTP7GTH2CEE",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "z624c1zy-ask-the-chat-what-s-in-flight-or-where-a-1",
+      "output_artifacts": [
+        "z624c1zy-ask-the-chat-what-s-in-flight-or-where-a-1-result"
+      ],
+      "postconditions": [
+        "it answers from your changes and brain",
+        "nothing is changed \u2014 the answer is read-only"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Ask the concierge to look into something (e.g. why checkout is slow).",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:BMD5C3B7E7RP98MBAHQ8FPYPMJ",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "56zjtxqz-ask-the-concierge-to-look-into-something-1",
+      "output_artifacts": [
+        "56zjtxqz-ask-the-concierge-to-look-into-something-1-result"
+      ],
+      "postconditions": [
+        "it creates a change to hold the investigation rather than poking around in the chat",
+        "the exploring happens inside that change, captured"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "With more than one product, open the board.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:VZM9FK8S5K9CYV38HNNX03FFNM",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "fbe7b1nz-with-more-than-one-product-open-the-boar-1",
+      "output_artifacts": [
+        "fbe7b1nz-with-more-than-one-product-open-the-boar-1-result"
+      ],
+      "postconditions": [
+        "it shows only the active product's in-flight changes"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Switch to another product.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:64116R38DS2BX2Z64KC10YSGZN",
+      "input_artifacts": [
+        "fbe7b1nz-with-more-than-one-product-open-the-boar-1-result"
+      ],
+      "mechanism": "human",
+      "name": "fbe7b1nz-switch-to-another-product-2",
+      "output_artifacts": [
+        "fbe7b1nz-switch-to-another-product-2-result"
+      ],
+      "postconditions": [
+        "the board (and search/filters) re-scope to that product",
+        "no other product's changes are shown"
+      ],
+      "state": "draft",
+      "sys_status": "active"
     }
   ],
   "workflows": [
@@ -488,6 +727,116 @@
       ],
       "transitions": [
         "3jttwd8f-open-a-change-s-what-s-been-created-view-1 -> 3jttwd8f-click-one-of-the-created-items-2"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:workflow:7TY3701DKFDKYAJZ21YTYWTN52",
+      "initial_steps": [
+        "518jnqev-open-sulis-with-nothing-set-up-and-say-w-1"
+      ],
+      "name": "Set up a product just by talking",
+      "state": "draft",
+      "steps": [
+        "518jnqev-open-sulis-with-nothing-set-up-and-say-w-1",
+        "518jnqev-tell-it-you-don-t-have-a-repo-yet-or-poi-2",
+        "518jnqev-confirm-what-it-found-3"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "518jnqev-confirm-what-it-found-3"
+      ],
+      "transitions": [
+        "518jnqev-open-sulis-with-nothing-set-up-and-say-w-1 -> 518jnqev-tell-it-you-don-t-have-a-repo-yet-or-poi-2",
+        "518jnqev-tell-it-you-don-t-have-a-repo-yet-or-poi-2 -> 518jnqev-confirm-what-it-found-3"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:workflow:T25HR0BVH4TNP7BS5G9FBYHRZH",
+      "initial_steps": [
+        "n5hbzs53-with-a-product-set-up-say-what-you-want-1"
+      ],
+      "name": "Start work by saying what you want",
+      "state": "draft",
+      "steps": [
+        "n5hbzs53-with-a-product-set-up-say-what-you-want-1",
+        "n5hbzs53-look-at-the-board-2"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "n5hbzs53-look-at-the-board-2"
+      ],
+      "transitions": [
+        "n5hbzs53-with-a-product-set-up-say-what-you-want-1 -> n5hbzs53-look-at-the-board-2"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:workflow:T0EHRZVSXN7K3C2K7ZTJM3R6WZ",
+      "initial_steps": [
+        "z624c1zy-ask-the-chat-what-s-in-flight-or-where-a-1"
+      ],
+      "name": "Ask the concierge about your world",
+      "state": "draft",
+      "steps": [
+        "z624c1zy-ask-the-chat-what-s-in-flight-or-where-a-1"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "z624c1zy-ask-the-chat-what-s-in-flight-or-where-a-1"
+      ],
+      "transitions": [
+        "z624c1zy-ask-the-chat-what-s-in-flight-or-where-a-1 -> end"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:workflow:5HGJZ641VKKGCFXSBQVG1Z6FQN",
+      "initial_steps": [
+        "56zjtxqz-ask-the-concierge-to-look-into-something-1"
+      ],
+      "name": "An investigation becomes a change",
+      "state": "draft",
+      "steps": [
+        "56zjtxqz-ask-the-concierge-to-look-into-something-1"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "56zjtxqz-ask-the-concierge-to-look-into-something-1"
+      ],
+      "transitions": [
+        "56zjtxqz-ask-the-concierge-to-look-into-something-1 -> end"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:workflow:T4VDCCCR65XFPXHTNC2RWY5DCK",
+      "initial_steps": [
+        "fbe7b1nz-with-more-than-one-product-open-the-boar-1"
+      ],
+      "name": "Switch product and the board re-scopes",
+      "state": "draft",
+      "steps": [
+        "fbe7b1nz-with-more-than-one-product-open-the-boar-1",
+        "fbe7b1nz-switch-to-another-product-2"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "fbe7b1nz-switch-to-another-product-2"
+      ],
+      "transitions": [
+        "fbe7b1nz-with-more-than-one-product-open-the-boar-1 -> fbe7b1nz-switch-to-another-product-2"
       ],
       "type": "review"
     }

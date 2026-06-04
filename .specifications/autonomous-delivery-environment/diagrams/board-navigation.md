@@ -2,12 +2,18 @@
 
 This shows how the founder gets from the landing board into a single change's
 thread, and what each view reads. Every arrow that fetches data goes through the
-one API boundary (the seam) — never the filesystem directly.
+one API boundary (the seam) — never the filesystem directly. The board is **scoped to
+one active Product** (FR-37); a **product switcher** (FR-38) changes which Product is
+active and re-scopes the board.
 
 ```mermaid
-%% Board → thread navigation: the founder's path from landing to a single change.
+%% Board → thread navigation: the founder's path from landing to a single change (per active Product).
 flowchart TD
-    A([Founder opens the app]) --> B[Board: changes as cards in stage columns]
+    A([Founder opens the app]) --> A1[Product switcher: active Product marked<br/>FR-38]
+    A1 --> A2{Switch Product?}
+    A2 -->|Yes| A3[Re-scope to chosen Product<br/>board + per-product views FR-37 / FR-38]
+    A2 -->|No| B
+    A3 --> B[Board: active Product's changes as cards in stage columns<br/>FR-37]
     B --> C{Any changes in flight?}
     C -->|No| D[Empty state: how to start a change]
     C -->|Yes| E[Cards show handle, intent, stage, liveness]

@@ -86,6 +86,66 @@ check (NFR-SEC-02) before any prompt is delivered.
 
 ---
 
+## Security & safety (chat-driven discovery + setup)
+
+> The discovery agent reads directories, writes entities, and starts changes — all
+> consequential. It sits in the same "agent-driven, founder-confirms" model as the
+> chat. It rides the existing stream bridge (FR-27) and reuses the existing discovery
+> skills + spine emitters; it introduces no new bespoke write mechanism.
+
+**NFR-DISC-01 — Directory search is bounded to the founder's chosen area**
+The discovery agent SHALL read only within the area the founder explicitly chooses,
+and SHALL NOT traverse outside it (no whole-disk, home-directory-wholesale, or
+parent/sibling roaming).
+- *Measure:* A search-scope test confirms reads stay under the chosen root; an
+  attempt to access a path outside the chosen area is refused/not performed.
+
+**NFR-DISC-02 — Discovery is idempotent (no duplicate-entity minting)**
+Re-running discovery against an area whose Tenant / Product / Project is already
+minted SHALL NOT create duplicate entities; the existing entity is surfaced/reused.
+- *Measure:* A dedupe test runs onboarding twice against the same area and asserts the
+  entity count does not increase on the second run.
+
+**NFR-DISC-03 — Entity writes go through the validated spine emitters**
+All onboarding entity creation SHALL go through the schema-validated spine emitters
+(Tenant / Product / Project); no onboarding path writes an entity file directly.
+- *Measure:* A test asserts minted entities pass the emitters' schema validation and
+  that no onboarding code path bypasses the emitter to write an entity file.
+
+**NFR-DISC-04 — Confirm-before-consequential gate**
+Minting an entity and starting a change SHALL each require explicit founder
+confirmation before the act; a read-and-propose turn requires no confirmation, but a
+create/start act does.
+- *Measure:* A gate test confirms no entity is minted and no change started without an
+  explicit confirmation; a declined proposal leaves the graph unchanged.
+
+**NFR-DISC-05 — The concierge coordinates only; real activity is contained in a change**
+The concierge SHALL have exactly two direct consequential write paths — minting the
+setup entities (FR-28) and starting a change (FR-29), both behind the confirm gate
+(NFR-DISC-04). Its navigation / status / Q&A help SHALL be read-only over the seam. No
+concierge code path SHALL edit code, write to a worktree, run a build, mutate the
+change store or brain, or carry out investigation inline; all such real activity SHALL
+run inside a started change's own session, not in the concierge turn (FR-N8, FR-N9).
+- *Measure:* The read-only guarantee gate (`check-read-only.sh`) treats the concierge
+  the same as every other surface: the only sanctioned write paths reachable from it
+  are the FR-28 mint and the FR-29 change start; any other mutation, worktree write,
+  build/run, or process start from a concierge path fails the gate. A test asserts an
+  investigation request creates a change rather than doing the work inline.
+
+**NFR-DISC-06 — The Product/Project config is durable across sessions**
+The Tenant / Product / Project config that onboarding persists (including each
+`Project.source = {repo, path, primary_branch}`) SHALL survive the end of the
+onboarding session and be readable by a later app session, so that starting a change
+on a known Product needs no repeat setup. The config SHALL live in the existing
+change-store/graph model — onboarding adds no separate config store (consistent with
+NFR-DATA-01).
+- *Measure:* A persistence test mints a Product/Project in one session, then in a
+  **fresh** session reads back the same Tenant/Product/Project with `Project.source`
+  populated and starts a change against it — with no re-discovery; no new config store
+  is introduced.
+
+---
+
 ## Reliability (two-way chat)
 
 **NFR-REL-01 — No silent message loss**

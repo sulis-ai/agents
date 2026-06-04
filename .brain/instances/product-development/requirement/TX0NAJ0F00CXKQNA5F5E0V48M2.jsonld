@@ -1,0 +1,13 @@
+{
+  "acceptance_criteria": [
+    "see SRD body"
+  ],
+  "id": "dna:requirement:TX0NAJ0F00CXKQNA5F5E0V48M2",
+  "priority": "must",
+  "rationale": "Extracted from FR-N1 of /Users/iain/.sulis/changes/01KT500K2JTE2EGW6TPPQ4D4VN/worktree/.specifications/autonomous-delivery-environment/SRD.md. The `source` ref is a synthetic Opportunity placeholder generated from the SRD path; replace when Opportunity emission lands (queued follow-on slice). Defaults applied for SRD-absent fields: priority=must, verification_method=test, state=draft.",
+  "source": "dna:opportunity:BG8E0H5JPPWEK3G3B26T3H087A",
+  "state": "draft",
+  "statement": "Read-only surfaces stay read-only.. Adding chat MUST NOT make any other surface writable. The board, thread, brain view, file/diff viewer, and contract previews remain strictly read \u2014 they send nothing to and mutate nothing about a session, the worktree, the change store, or the brain. - *Acceptance:* The existing read-only guarantee gate (`apps/cockpit/scripts/check-read-only.sh`) is updated so the **only** sanctioned write path is the chat relay; every other route still fails the gate if it gains a mutation. (See NFR-ARCH-02.)",
+  "sys_status": "active",
+  "verification_method": "test"
+}

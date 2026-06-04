@@ -7,7 +7,7 @@
   "rationale": "Extracted from FR-03 of /Users/iain/.sulis/changes/01KT500K2JTE2EGW6TPPQ4D4VN/worktree/.specifications/autonomous-delivery-environment/SRD.md. The `source` ref is a synthetic Opportunity placeholder generated from the SRD path; replace when Opportunity emission lands (queued follow-on slice). Defaults applied for SRD-absent fields: priority=must, verification_method=test, state=draft.",
   "source": "dna:opportunity:BG8E0H5JPPWEK3G3B26T3H087A",
   "state": "draft",
-  "statement": "Empty board guides starting a change. When there are no in-flight changes, the board SHALL show an empty state that tells the founder, in plain English, how to start a change. - *Acceptance:* With zero changes, the board renders the empty-state guidance and no card grid",
+  "statement": "Empty board (for the active Product) guides starting a change. When the **active Product** has no in-flight changes, the board SHALL show an empty state that tells the founder, in plain English, how to start a change. - *Acceptance:* With the active Product holding zero in-flight changes, the board renders the empty-state guidance and no card grid \u2014 even if other Products have changes",
   "sys_status": "active",
   "verification_method": "test"
 }
