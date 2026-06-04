@@ -557,17 +557,26 @@ deposits the TestRun/TestResult evidence the next gate reads — pass
 the `deployed` leg once that target is reachable — both per the repo-contract
 `targets:` + `commands.standup`. Read the gate verdict:
 
-- **pass** → every Scenario passed, or is deferred-with-need. Done is
-  honest. Log it.
-- **blocked** → a step failed, or a manual check is unconfirmed. **STOP** —
-  surface the founder-English gap (which Scenario, what's broken). Do not
-  call the change done.
-- **deferred-with-need** → a recorded gap (a credential / infra absent);
-  non-blocking, but surface the needs so they're visible.
+**Observed-or-blocked (the default — the gate now refuses deferred-as-done).**
+A user-facing outcome is done only when it was actually *observed* green:
 
-Advisory when it can't run (no Scenarios authored — pure docs/infra change;
-or no target URL yet): like 4.9, the founder owns proceed-anyway, and
-block-by-default applies only to a real `blocked`.
+- **pass** → every Scenario was driven and passed. Done is honest. Log it.
+- **blocked** → a step failed, a manual check is unconfirmed, **OR a Scenario
+  was `deferred` (the real outcome was never driven — a credential / infra /
+  third-party hop absent).** **STOP** — surface the founder-English gap (which
+  Scenario, what wasn't driven, the exact need). Do not call the change done.
+  *"I couldn't verify it" reads as blocked, never done* — this is the lesson
+  from four login attempts that shipped green-but-never-signed-in.
+
+The **conscious escape**: if a `deferred` is genuinely acceptable — a
+*non-user-facing* Scenario whose infra leg is unavailable in this run — re-run
+with `--allow-deferred`, which lets that deferral pass as a recorded gap. This
+is a deliberate, logged choice (surface it to the founder), never the default.
+
+Advisory when it can't run at all (no Scenarios authored — pure docs/infra
+change; or no target URL for an http journey): like 4.9, the founder owns
+proceed-anyway. But a `deferred` is no longer a quiet pass — it blocks unless
+`--allow-deferred` is consciously chosen.
 
 **4.9. DoD verification gate — run `sulis-verify-requirements` (MUST when
 an SRD is touched).** This asks the brain whether every Requirement the
