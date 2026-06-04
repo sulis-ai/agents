@@ -14,10 +14,20 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { axe } from "jest-axe";
 
 import { Composer } from "../components/Composer";
 import type { ChatStreamEvent } from "../../../shared/api-types";
+
+// useChatStream now invalidates the transcript/summaries queries on complete,
+// so the Composer needs a QueryClient in the tree.
+function renderComposer(ui: React.ReactElement) {
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+}
 
 function fakeStream(events: ChatStreamEvent[], opts: { hang?: boolean } = {}) {
   return vi.fn(
@@ -39,9 +49,17 @@ const HAPPY: ChatStreamEvent[] = [
   { type: "complete", resumed: false },
 ];
 
+// Mid-reply (no "complete"): the dock transient shows WHILE replying, then
+// hands off to the conversation on complete — the live-render tests use this.
+const MIDSTREAM: ChatStreamEvent[] = [
+  { type: "state", state: "replying" },
+  { type: "chunk", text: "On it — " },
+  { type: "chunk", text: "wiring the brain view." },
+];
+
 describe("<Composer /> — the docked write surface (signed contract)", () => {
   it("renders the send box with the slash + Enter/Shift hint (AI-02)", () => {
-    render(<Composer changeId="01CHAT" streamChat={fakeStream([])} />);
+    renderComposer(<Composer changeId="01CHAT" streamChat={fakeStream([])} />);
     expect(
       screen.getByLabelText(/message this change's agent/i),
     ).toBeInTheDocument();
@@ -50,13 +68,13 @@ describe("<Composer /> — the docked write surface (signed contract)", () => {
   });
 
   it("offers suggestion chips (AI-02 dual-mode input)", () => {
-    render(<Composer changeId="01CHAT" streamChat={fakeStream([])} />);
+    renderComposer(<Composer changeId="01CHAT" streamChat={fakeStream([])} />);
     const chips = screen.getAllByTestId("suggestion-chip");
     expect(chips.length).toBeGreaterThan(0);
   });
 
   it("sends on Enter and renders the founder's own message in a neutral bubble", async () => {
-    render(<Composer changeId="01CHAT" streamChat={fakeStream(HAPPY)} />);
+    renderComposer(<Composer changeId="01CHAT" streamChat={fakeStream(MIDSTREAM)} />);
     const box = screen.getByLabelText(/message this change's agent/i);
     fireEvent.change(box, { target: { value: "Now wire the brain view." } });
     fireEvent.keyDown(box, { key: "Enter", shiftKey: false });
@@ -70,7 +88,7 @@ describe("<Composer /> — the docked write surface (signed contract)", () => {
 
   it("does NOT send on Shift+Enter (newline instead)", () => {
     const stream = fakeStream(HAPPY);
-    render(<Composer changeId="01CHAT" streamChat={stream} />);
+    renderComposer(<Composer changeId="01CHAT" streamChat={stream} />);
     const box = screen.getByLabelText(/message this change's agent/i);
     fireEvent.change(box, { target: { value: "line one" } });
     fireEvent.keyDown(box, { key: "Enter", shiftKey: true });
@@ -78,7 +96,7 @@ describe("<Composer /> — the docked write surface (signed contract)", () => {
   });
 
   it("renders the streamed reply live and joins it on complete (FR-17/18)", async () => {
-    render(<Composer changeId="01CHAT" streamChat={fakeStream(HAPPY)} />);
+    renderComposer(<Composer changeId="01CHAT" streamChat={fakeStream(MIDSTREAM)} />);
     const box = screen.getByLabelText(/message this change's agent/i);
     fireEvent.change(box, { target: { value: "hi" } });
     fireEvent.keyDown(box, { key: "Enter" });
@@ -91,8 +109,7 @@ describe("<Composer /> — the docked write surface (signed contract)", () => {
   });
 
   it("shows pause/stop run-controls while the agent is replying (AI-03)", async () => {
-    render(
-      <Composer
+    renderComposer(<Composer
         changeId="01CHAT"
         streamChat={fakeStream(HAPPY, { hang: true })}
       />,
@@ -109,8 +126,7 @@ describe("<Composer /> — the docked write surface (signed contract)", () => {
   });
 
   it("disables send while THIS change is streaming (FR-20 one-in-flight)", async () => {
-    render(
-      <Composer
+    renderComposer(<Composer
         changeId="01CHAT"
         streamChat={fakeStream(HAPPY, { hang: true })}
       />,
@@ -124,8 +140,7 @@ describe("<Composer /> — the docked write surface (signed contract)", () => {
   });
 
   it("reflects plain-English lifecycle states (FR-23): waking-the-change-up on resume", async () => {
-    render(
-      <Composer
+    renderComposer(<Composer
         changeId="01CHAT"
         streamChat={fakeStream([
           { type: "state", state: "resuming" },
@@ -146,8 +161,7 @@ describe("<Composer /> — the docked write surface (signed contract)", () => {
   });
 
   it("shows 'reply was interrupted' + preserves the partial on a mid-stream break (FR-22)", async () => {
-    render(
-      <Composer
+    renderComposer(<Composer
         changeId="01CHAT"
         streamChat={fakeStream([
           { type: "state", state: "replying" },
@@ -168,8 +182,7 @@ describe("<Composer /> — the docked write surface (signed contract)", () => {
   });
 
   it("shows a clear failure and does NOT show delivered when unreachable (FR-19)", async () => {
-    render(
-      <Composer
+    renderComposer(<Composer
         changeId="01CHAT"
         streamChat={fakeStream([
           {
@@ -191,8 +204,7 @@ describe("<Composer /> — the docked write surface (signed contract)", () => {
   });
 
   it("has no axe a11y violations in its idle state (WPF-06 / UXD-07)", async () => {
-    const { container } = render(
-      <Composer changeId="01CHAT" streamChat={fakeStream([])} />,
+    const { container } = renderComposer(<Composer changeId="01CHAT" streamChat={fakeStream([])} />,
     );
     expect(await axe(container)).toHaveNoViolations();
   });

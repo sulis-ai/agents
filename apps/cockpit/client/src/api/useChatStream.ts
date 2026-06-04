@@ -10,6 +10,7 @@
 // Composer are testable without a network.
 
 import { useCallback, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import type { ChatStreamEvent, ChatErrorCode } from "../../../shared/api-types";
 import { streamChat as defaultStreamChat, type StreamChatFn } from "./client";
@@ -49,6 +50,17 @@ export function useChatStream(
   options: UseChatStreamOptions = {},
 ): ChatStreamState {
   const stream = options.streamChat ?? defaultStreamChat;
+  const queryClient = useQueryClient();
+
+  // When a reply lands (or breaks), pull the conversation + summaries fresh so
+  // the new turn appears in the main thread WITHOUT a manual refresh — the gap
+  // that made the chat feel non-live.
+  const refreshConversation = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["transcript", changeId] });
+    void queryClient.invalidateQueries({
+      queryKey: ["turn-summaries", changeId],
+    });
+  }, [queryClient, changeId]);
 
   const [state, setState] = useState<ChatLifecycle>("ready");
   const [replyText, setReplyText] = useState("");
@@ -65,8 +77,11 @@ export function useChatStream(
         if (event.state === "resuming") setState("resuming");
         else if (event.state === "spawning") setState("spawning");
         else if (event.state === "replying") setState("replying");
-        else if (event.state === "interrupted") setState("interrupted");
-        else if (event.state === "failed") setState("failed");
+        else if (event.state === "interrupted") {
+          setState("interrupted");
+          // A broken stream may still have written a partial turn — show it.
+          refreshConversation();
+        } else if (event.state === "failed") setState("failed");
         break;
       case "chunk":
         setReplyText((prev) => prev + event.text);
@@ -74,6 +89,9 @@ export function useChatStream(
       case "complete":
         setResumed(event.resumed);
         setState("ready");
+        // The completed turn is now in the change's transcript — refresh the
+        // conversation so it appears in the main thread automatically.
+        refreshConversation();
         break;
       case "error":
         setErrorCode(event.code);
@@ -81,7 +99,7 @@ export function useChatStream(
         setState("failed");
         break;
     }
-  }, []);
+  }, [refreshConversation]);
 
   const send = useCallback(
     async (prompt: string) => {

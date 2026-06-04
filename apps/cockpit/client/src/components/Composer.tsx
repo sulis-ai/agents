@@ -69,6 +69,11 @@ export function Composer({ changeId, streamChat }: Props) {
   const taRef = useRef<HTMLTextAreaElement>(null);
 
   const busy = chat.isStreaming;
+  // A send is "active" while it's in flight, interrupted, or failed. On a clean
+  // complete (state → ready) the dock's transient bubbles hand off to the main
+  // conversation (which the hook refreshes), so we hide them here to avoid
+  // showing the reply twice.
+  const active = chat.state !== "ready";
 
   // Grow the textarea to fit its content (capped), the way Slack's draft does.
   const autosize = () => {
@@ -102,8 +107,9 @@ export function Composer({ changeId, streamChat }: Props) {
 
   return (
     <div className={styles.composerDock} data-testid="composer">
-      {/* The live in-flight turn (the full transcript lives in <Chat />). */}
-      {lastSent !== null && (
+      {/* The live in-flight turn — shown in the dock only WHILE the send is
+          active; on a clean complete it hands off to the main conversation. */}
+      {lastSent !== null && active && (
         <div className={styles.composerInner}>
           <div
             className={styles.userMessage}
@@ -115,7 +121,7 @@ export function Composer({ changeId, streamChat }: Props) {
         </div>
       )}
 
-      {showReply && (
+      {showReply && active && (
         <div className={styles.composerInner}>
           <div className={styles.agentReply} data-testid="agent-reply">
             {chat.replyText}
