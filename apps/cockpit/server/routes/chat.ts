@@ -40,10 +40,8 @@ import {
   buildConciergeContext,
   type ConciergeRoute,
 } from "../lib/concierge/conciergeRead";
-import {
-  OnboardingOrchestrator,
-  type AttemptRepo,
-} from "../lib/discovery/onboardingOrchestrator";
+import { OnboardingOrchestrator } from "../lib/discovery/onboardingOrchestrator";
+import type { SpineMinter } from "../ports/SpineMinter";
 import {
   readProducts,
   IMPLICIT_PRODUCT_ID,
@@ -510,11 +508,14 @@ function finishConcierge(
 // so onboarding adds NO new file-level write exception (WP-010 AC#3 / ADR-006);
 // the read-only gate's rule-5 allow-list is unchanged.
 //
-// It rides the SAME bridge as the chat (no second bridge, FR-27): the agent
-// runs the discover-* skills and the validated spine emitters INSIDE its
-// session, so the orchestrator performs no fs write and starts no process. The
-// server-side orchestrator owns only the safety plumbing — scope bound, confirm
-// gate, repo find-or-create, idempotency, all-or-nothing.
+// It rides the SAME bridge as the chat (no second bridge, FR-27) for the
+// CONVERSATION (search / clarify / propose — the agent runs the discover-*
+// skills). The consequential MINT + `git init`, however, are DETERMINISTIC
+// SERVER actions behind the SpineMinter port (ADR-007 amended): the
+// agent-delegated mint proved slow + unreliable (167s, minted nothing live).
+// The orchestrator owns only the safety plumbing — scope bound, confirm gate,
+// repo find-or-create, idempotency, all-or-nothing — and starts no process
+// itself; the SpineMinter adapter is the one sanctioned emitter-invocation site.
 //
 // One discovery session at a time (one Product per conversation, founder-
 // locked): a single in-flight lock yields 409 SESSION_BUSY on a second
@@ -533,12 +534,15 @@ export interface OnboardingLogLine {
 
 export interface OnboardingRouterDeps {
   sessionBridge: SessionBridge;
+  /**
+   * The deterministic server-side mint + repo find-or-create (ADR-007 amended).
+   * The MINT + `git init` go through this port, not the bridge agent.
+   */
+  spineMinter: SpineMinter;
   /** ~/.sulis (or a test override) — the idempotency probe reads Products here. */
   sulisStateDir: string;
   /** The permitted search root the chosen area must be inside (FR-N7). */
   permittedRoot: string;
-  /** The (agent-performed) repo find-or-create; injected for the failing test. */
-  attemptRepo?: AttemptRepo;
   /** One-line-per-act structured log (no area/prompt/reply). Default no-op. */
   onboardingLogSink?: (line: OnboardingLogLine) => void;
 }
@@ -555,6 +559,7 @@ export function createOnboardingRouter(deps: OnboardingRouterDeps): Router {
   // propose→confirm turns (one Product per conversation, founder-locked).
   const orchestrator = new OnboardingOrchestrator({
     sessionBridge: deps.sessionBridge,
+    spineMinter: deps.spineMinter,
     permittedRoot: deps.permittedRoot,
     newToken: () => randomToken(),
     listProductIds: async () => {
@@ -565,7 +570,6 @@ export function createOnboardingRouter(deps: OnboardingRouterDeps): Router {
         .map((p) => p.productId)
         .filter((id) => id !== IMPLICIT_PRODUCT_ID);
     },
-    ...(deps.attemptRepo ? { attemptRepo: deps.attemptRepo } : {}),
   });
 
   router.use(jsonBody());

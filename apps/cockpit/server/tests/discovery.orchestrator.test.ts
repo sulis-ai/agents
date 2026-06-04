@@ -1,14 +1,18 @@
-// WP-010 — onboarding orchestrator tests (ADR-007; FR-27/31/32/N6/N11).
+// WP-010 — onboarding orchestrator tests (ADR-007 amended; FR-27/31/32/N6/N11).
 //
-// The orchestrator sequences SEARCH → ASK → PROPOSE → CONFIRM → MINT over the
-// SAME bridge as the chat (FR-27). It REIMPLEMENTS nothing (ADR-007): search
-// delegates to the bridge (which runs the discover-* skills), mint delegates to
-// the bridge (which runs the validated spine emitters). The orchestrator owns
-// the confirm gate + the idempotency probe + the scope bound + the
-// all-or-nothing persistence — never a freehand fs-walk or entity write.
+// The orchestrator sequences SEARCH → ASK → PROPOSE → CONFIRM → MINT. The
+// CONVERSATION (search / ask / propose) delegates to the SAME bridge as the
+// chat (FR-27, which runs the discover-* skills). The consequential MINT +
+// `git init` are DETERMINISTIC SERVER actions behind the SpineMinter port
+// (ADR-007 amended): the agent-delegated mint proved slow + unreliable (167s,
+// minted nothing live). The orchestrator owns the confirm gate + idempotency
+// probe + scope bound + all-or-nothing — never a freehand fs-walk or entity
+// write, and never a process start of its own.
 //
-// These tests drive a RecordedSessionBridge so the full round-trip is exercised
-// in CI without a live agent (the live mint is the BLOCK-and-hand-to-founder).
+// These tests drive a scripted bridge (for the conversation) + a fake
+// SpineMinter (for the act) so the full round-trip is exercised in CI without a
+// live agent or real emitters (the live mint is the BLOCK-and-hand-to-founder;
+// the real-emitter mint is pinned by discovery.mint-real.test.ts).
 
 import { describe, it, expect } from "vitest";
 
@@ -22,6 +26,13 @@ import type {
   RelayOutcome,
   SessionResolution,
 } from "../ports/SessionBridge";
+import type {
+  SpineMinter,
+  MintInput,
+  MintResult,
+  FindOrCreateRepoInput,
+} from "../ports/SpineMinter";
+import type { RepoOutcome } from "../lib/discovery/repoFindOrCreate";
 import type { OnboardingStreamEvent } from "../../shared/api-types";
 
 const CHOSEN_AREA = "/founder/code/acme-checkout";
@@ -51,6 +62,43 @@ function scriptedBridge(chunks: string[]): SessionBridge & { prompts: string[] }
   };
 }
 
+/** A fake SpineMinter that records calls + returns scripted outcomes. */
+function fakeMinter(
+  opts: {
+    repoOutcome?: RepoOutcome;
+    mint?: MintResult;
+  } = {},
+): SpineMinter & { mints: MintInput[]; repos: FindOrCreateRepoInput[] } {
+  const mints: MintInput[] = [];
+  const repos: FindOrCreateRepoInput[] = [];
+  return {
+    mints,
+    repos,
+    async findOrCreateRepo(input: FindOrCreateRepoInput): Promise<RepoOutcome> {
+      repos.push(input);
+      return (
+        opts.repoOutcome ?? {
+          outcome: "reachable",
+          repo: input.chosenArea,
+          path: input.chosenArea,
+          primaryBranch: "main",
+        }
+      );
+    },
+    async mint(input: MintInput): Promise<MintResult> {
+      mints.push(input);
+      return (
+        opts.mint ?? {
+          ok: true,
+          tenant: input.tenantName,
+          product: { productId: "dna:product:fake", name: input.productName },
+          project: { projectId: "dna:project:fake", source: input.source },
+        }
+      );
+    },
+  };
+}
+
 /** Collect the orchestrator's emitted onboarding events for a turn. */
 async function run(
   orch: OnboardingOrchestrator,
@@ -64,10 +112,12 @@ async function run(
 /** Deps with a deterministic token factory + an empty graph (worldIsEmpty). */
 function deps(
   bridge: SessionBridge,
+  minter: SpineMinter,
   overrides: Partial<OnboardingDeps> = {},
 ): OnboardingDeps {
   return {
     sessionBridge: bridge,
+    spineMinter: minter,
     // The idempotency probe: returns the already-minted product ids.
     listProductIds: async () => [],
     permittedRoot: "/founder/code",
@@ -79,11 +129,12 @@ function deps(
 describe("OnboardingOrchestrator — sequence search → ask → propose → confirm → mint", () => {
   it("a SEARCH turn drives the bridge (delegation) and ends in a PROPOSAL, minting nothing", async () => {
     const bridge = scriptedBridge(["Looking in your folder… ", "found a Node app."]);
-    const orch = new OnboardingOrchestrator(deps(bridge));
+    const minter = fakeMinter();
+    const orch = new OnboardingOrchestrator(deps(bridge, minter));
 
     const events = await run(orch, { phase: "search", chosenArea: CHOSEN_AREA });
 
-    // It delegated to the bridge (orchestration, ADR-007).
+    // It delegated the CONVERSATION to the bridge (orchestration, ADR-007).
     expect((bridge as { prompts: string[] }).prompts.length).toBe(1);
     // It streamed agent text…
     expect(events.some((e) => e.type === "chunk")).toBe(true);
@@ -91,14 +142,17 @@ describe("OnboardingOrchestrator — sequence search → ask → propose → con
     const proposal = events.find((e) => e.type === "proposal");
     expect(proposal).toBeDefined();
     expect(events.some((e) => e.type === "minted")).toBe(false);
+    // A read/propose turn mints NOTHING — the minter is never called.
+    expect(minter.mints.length).toBe(0);
     if (proposal && proposal.type === "proposal") {
       expect(proposal.proposal.confirmToken).toBe("tok-fixed-1");
     }
   });
 
-  it("a CONFIRM turn with the live token MINTS via the bridge and emits `minted`", async () => {
-    const bridge = scriptedBridge(["minting…"]);
-    const orch = new OnboardingOrchestrator(deps(bridge));
+  it("a CONFIRM turn with the live token MINTS via the SpineMinter (deterministic) and emits `minted`", async () => {
+    const bridge = scriptedBridge(["thinking…"]);
+    const minter = fakeMinter();
+    const orch = new OnboardingOrchestrator(deps(bridge, minter));
 
     // First propose to establish the live token.
     await run(orch, { phase: "search", chosenArea: CHOSEN_AREA });
@@ -111,15 +165,22 @@ describe("OnboardingOrchestrator — sequence search → ask → propose → con
 
     const minted = events.find((e) => e.type === "minted");
     expect(minted).toBeDefined();
-    // The mint went THROUGH the bridge (emitter delegation) — 2 relays total
-    // (search + confirm-mint), never a direct entity write.
-    expect((bridge as { prompts: string[] }).prompts.length).toBe(2);
+    // The mint went through the DETERMINISTIC minter, not a second bridge relay:
+    // the bridge was relayed only for the search CONVERSATION (1 prompt).
+    expect((bridge as { prompts: string[] }).prompts.length).toBe(1);
+    expect(minter.repos.length).toBe(1);
+    expect(minter.mints.length).toBe(1);
+    // The minted Project carries the source from the resolved repo (FR-36).
+    if (minted && minted.type === "minted") {
+      expect(minted.minted.projects?.[0]?.source?.repo).toBe(CHOSEN_AREA);
+    }
   });
 
   it("idempotent: an already-minted product is SURFACED (alreadyMinted), not duplicated (FR-31)", async () => {
     const bridge = scriptedBridge(["found acme."]);
+    const minter = fakeMinter();
     const orch = new OnboardingOrchestrator(
-      deps(bridge, { listProductIds: async () => ["dna:product:existing"] }),
+      deps(bridge, minter, { listProductIds: async () => ["dna:product:existing"] }),
     );
 
     const events = await run(orch, { phase: "search", chosenArea: CHOSEN_AREA });
@@ -132,12 +193,8 @@ describe("OnboardingOrchestrator — sequence search → ask → propose → con
 
   it("a CONFIRM whose repo create FAILS leaves the graph unchanged (all-or-nothing) and emits REPO_CREATE_FAILED", async () => {
     const bridge = scriptedBridge(["attempting create"]);
-    const orch = new OnboardingOrchestrator(
-      deps(bridge, {
-        // The injected repo-outcome resolver reports a failed create.
-        attemptRepo: async () => ({ outcome: "create-failed" }),
-      }),
-    );
+    const minter = fakeMinter({ repoOutcome: { outcome: "create-failed" } });
+    const orch = new OnboardingOrchestrator(deps(bridge, minter));
 
     await run(orch, { phase: "search", chosenArea: CHOSEN_AREA });
     const events = await run(orch, {
@@ -149,7 +206,28 @@ describe("OnboardingOrchestrator — sequence search → ask → propose → con
     const err = events.find((e) => e.type === "error");
     expect(err).toBeDefined();
     if (err && err.type === "error") expect(err.code).toBe("REPO_CREATE_FAILED");
-    // NO mint happened.
+    // NO mint happened — the repo step failed before the mint.
+    expect(events.some((e) => e.type === "minted")).toBe(false);
+    expect(minter.mints.length).toBe(0);
+  });
+
+  it("a CONFIRM whose MINT FAILS leaves the graph unchanged (all-or-nothing) and emits MINT_FAILED", async () => {
+    const bridge = scriptedBridge(["minting"]);
+    const minter = fakeMinter({
+      mint: { ok: false, code: "MINT_FAILED", message: "emit failed" },
+    });
+    const orch = new OnboardingOrchestrator(deps(bridge, minter));
+
+    await run(orch, { phase: "search", chosenArea: CHOSEN_AREA });
+    const events = await run(orch, {
+      phase: "confirm",
+      confirmToken: "tok-fixed-1",
+      repoChoice: { mode: "find" },
+    });
+
+    const err = events.find((e) => e.type === "error");
+    expect(err).toBeDefined();
+    if (err && err.type === "error") expect(err.code).toBe("MINT_FAILED");
     expect(events.some((e) => e.type === "minted")).toBe(false);
   });
 });

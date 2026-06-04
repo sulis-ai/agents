@@ -31,10 +31,49 @@ import type {
   RelaySink,
   RelayOutcome,
 } from "../ports/SessionBridge";
+import type {
+  SpineMinter,
+  MintInput,
+  MintResult,
+  FindOrCreateRepoInput,
+} from "../ports/SpineMinter";
+import type { RepoOutcome } from "../lib/discovery/repoFindOrCreate";
 import type { OnboardingStreamEvent } from "../../shared/api-types";
 
 const PERMITTED_ROOT = "/founder/code";
 const CHOSEN_AREA = "/founder/code/acme-checkout";
+
+/**
+ * A fake SpineMinter so the route is driven WITHOUT real emitters / a live
+ * agent (the real-emitter mint is pinned by discovery.mint-real.test.ts). It
+ * echoes the resolved source so the FR-36 source-persistence assertion holds.
+ */
+function fakeMinter(
+  opts: { repoOutcome?: RepoOutcome; mint?: MintResult } = {},
+): SpineMinter {
+  return {
+    async findOrCreateRepo(input: FindOrCreateRepoInput): Promise<RepoOutcome> {
+      return (
+        opts.repoOutcome ?? {
+          outcome: "reachable",
+          repo: input.chosenArea,
+          path: input.chosenArea,
+          primaryBranch: "main",
+        }
+      );
+    },
+    async mint(input: MintInput): Promise<MintResult> {
+      return (
+        opts.mint ?? {
+          ok: true,
+          tenant: input.tenantName,
+          product: { productId: "dna:product:fake", name: input.productName },
+          project: { projectId: "dna:project:fake", source: input.source },
+        }
+      );
+    },
+  };
+}
 
 /** A SessionBridge whose relay the test programs. */
 class ProgrammableBridge implements SessionBridge {
@@ -65,10 +104,11 @@ class ProgrammableBridge implements SessionBridge {
   }
 }
 
-function appWith(bridge: SessionBridge) {
+function appWith(bridge: SessionBridge, minter: SpineMinter = fakeMinter()) {
   return createApp({
     changeStore: new FakeChangeStoreReader([]),
     sessionBridge: bridge,
+    onboardingSpineMinter: minter,
     sulisStateDir: "/tmp/unused-state-empty", // empty brain ⇒ worldIsEmpty
     claudeProjectsDir: "/tmp/unused-projects",
     onboardingPermittedRoot: PERMITTED_ROOT,
@@ -176,11 +216,11 @@ describe("POST /api/onboarding/session — confirm gate (FR-N6) + all-or-nothing
     const app = createApp({
       changeStore: new FakeChangeStoreReader([]),
       sessionBridge: new ProgrammableBridge(),
+      // Inject a minter whose repo find-or-create fails the create.
+      onboardingSpineMinter: fakeMinter({ repoOutcome: { outcome: "create-failed" } }),
       sulisStateDir: "/tmp/unused-state-empty",
       claudeProjectsDir: "/tmp/unused-projects",
       onboardingPermittedRoot: PERMITTED_ROOT,
-      // Inject a repo attempt that fails the create.
-      onboardingAttemptRepo: async () => ({ outcome: "create-failed" }),
     });
     const proposeRes = await request(app)
       .post("/api/onboarding/session")

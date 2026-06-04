@@ -34,7 +34,11 @@ import {
   type ConciergeLogLine,
   type OnboardingLogLine,
 } from "./routes/chat";
-import type { AttemptRepo } from "./lib/discovery/onboardingOrchestrator";
+import type { SpineMinter } from "./ports/SpineMinter";
+import {
+  SpineEmitterMinter,
+  resolveEmitterScriptsDir,
+} from "./adapters/SpineEmitterMinter";
 
 import { createChangesRouter } from "./routes/changes";
 import { createChangeDetailRouter } from "./routes/change-detail";
@@ -87,12 +91,13 @@ export interface CreateAppDeps {
    */
   onboardingPermittedRoot?: string;
   /**
-   * WP-010 — the (agent-performed) repo find-or-create. Production lets the
-   * default reachable outcome stand (the agent does the `git init` over the
-   * bridge); tests inject a failing variant to exercise the no-dangling-config
-   * rule (FR-N10/N11).
+   * WP-010 (fix-forward) — the deterministic server-side mint + repo
+   * find-or-create (ADR-007 amended). Production defaults to the real
+   * `SpineEmitterMinter` (invokes the validated spine emitters + `git init`
+   * directly); tests inject a fake to exercise success / all-or-nothing
+   * (FR-N11) / idempotency (FR-31) without a live agent.
    */
-  onboardingAttemptRepo?: AttemptRepo;
+  onboardingSpineMinter?: SpineMinter;
   /**
    * WP-010 — where the onboarding one-structured-line-per-act log goes
    * (NFR-SEC-03: never the chosen area, prompt, or reply). Defaults to no-op.
@@ -161,21 +166,26 @@ export function createApp(deps: CreateAppDeps): Application {
       }),
     );
 
-    // WP-010 — the cold-start onboarding route (ADR-007/008). The SECOND
+    // WP-010 — the cold-start onboarding route (ADR-007 amended/008). The SECOND
     // confirm-gated ACT path, registered in the SAME sanctioned relay file
     // (routes/chat.ts) so no NEW file gains a write verb (ADR-006). It rides the
-    // SAME bridge (FR-27); the agent runs the discover-* skills + the validated
-    // spine emitters inside its session. Mounted only when a bridge is wired
-    // (else onboarding degrades to unavailable — read surfaces unaffected).
+    // SAME bridge (FR-27) for the CONVERSATION; the MINT + `git init` are
+    // deterministic server actions behind the SpineMinter port (production
+    // defaults to the real SpineEmitterMinter — the one sanctioned emitter-
+    // invocation site). Mounted only when a bridge is wired (else onboarding
+    // degrades to unavailable — read surfaces unaffected).
     app.use(
       "/api/onboarding",
       createOnboardingRouter({
         sessionBridge: deps.sessionBridge,
+        spineMinter:
+          deps.onboardingSpineMinter ??
+          new SpineEmitterMinter({
+            scriptsDir: resolveEmitterScriptsDir(),
+            sulisStateDir: deps.sulisStateDir,
+          }),
         sulisStateDir: deps.sulisStateDir,
         permittedRoot: deps.onboardingPermittedRoot ?? homedir(),
-        ...(deps.onboardingAttemptRepo
-          ? { attemptRepo: deps.onboardingAttemptRepo }
-          : {}),
         ...(deps.onboardingLogSink
           ? { onboardingLogSink: deps.onboardingLogSink }
           : {}),

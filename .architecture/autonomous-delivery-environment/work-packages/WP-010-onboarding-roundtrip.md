@@ -138,6 +138,28 @@ skills, the validated spine emitters) — it reimplements nothing (ADR-007).
 
 Author scenario G and run it from-graph on top of the live observation.
 
+## Fix-forward (2026-06-04) — the mint is server-side deterministic
+
+Driving the confirm→mint LIVE against a sandbox brain with a real `claude`
+bridge surfaced that the **mint minted nothing**: the request ran 167s, returned
+200, and the agent only narrated "let me locate the emitters" — no
+Tenant/Product/Project landed. The recorded-bridge test passed because it
+*stubbed* the bridge (it proved a prompt was relayed, not that a graph was
+minted).
+
+The fix (ADR-007 amended): the bridge AGENT keeps the **conversation** (search /
+clarify / propose, read-only); the **mint** + repo `git init` move to a
+deterministic SERVER action behind a new `SpineMinter` port. Its adapter
+(`SpineEmitterMinter`) invokes the validated spine-emitter CLIs
+(`sulis-emit-tenant` / `-product`) + a schema-validated Project emit directly
+via `child_process` into the active `SULIS_STATE_DIR` brain — all-or-nothing
+(staged, promoted only on full success), idempotent (deterministic ULIDs). It is
+the cockpit's second sanctioned process-start / write site (read-only gate
+allow-listed by path). A new integration test
+(`server/tests/discovery.mint-real.test.ts`) drives a confirm against a temp
+state dir and asserts REAL entities land with `Project.source` persisted — the
+thing that failed live.
+
 ## Rollback
 
 All-or-nothing + emitter-only means no half-written graph or dangling config

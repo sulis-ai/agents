@@ -1,13 +1,17 @@
-// WP-010 — emitter-only mint tests (FR-32 / NFR-DISC-03; ADR-007).
+// WP-010 — emitter-only mint tests (FR-32 / NFR-DISC-03; ADR-007 amended).
 //
 // THE Form-pillar guarantee: every entity is minted ONLY through the validated
-// spine emitters, which run INSIDE the agent session over the bridge. The
-// orchestrator NEVER writes an entity file directly. We prove this two ways:
-//   1. behaviourally — a mint turn relays a mint prompt to the bridge and emits
-//      `minted` only after the bridge completes (no out-of-band write);
+// spine emitters. After the fix-forward, that mint is a DETERMINISTIC SERVER
+// action behind the SpineMinter port (not an agent turn over the bridge — the
+// agent-delegated mint proved slow + unreliable, minting nothing live). The
+// orchestrator NEVER writes an entity file directly and NEVER starts a process
+// itself. We prove this two ways:
+//   1. behaviourally — a confirm turn mints via the SpineMinter port (not via a
+//      second bridge relay) and emits `minted` only after the minter succeeds;
 //   2. statically — the orchestrator module imports no fs-write API and starts
-//      no process (the read-only gate also proves this repo-wide; here we pin
-//      the orchestrator specifically).
+//      no process (the validated emitters live behind the SpineMinter adapter,
+//      which is the one allow-listed process-start/write site — proven by the
+//      read-only gate; here we pin the orchestrator specifically).
 
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -23,11 +27,19 @@ import type {
   RelayOutcome,
   SessionResolution,
 } from "../ports/SessionBridge";
+import type {
+  SpineMinter,
+  MintInput,
+  MintResult,
+  FindOrCreateRepoInput,
+} from "../ports/SpineMinter";
+import type { RepoOutcome } from "../lib/discovery/repoFindOrCreate";
 import type { OnboardingStreamEvent } from "../../shared/api-types";
 
 const CHOSEN_AREA = "/founder/code/acme-checkout";
 
-function bridgeRecordingMint(): SessionBridge & { mintRelayed: boolean } {
+/** A bridge that records whether it was relayed a MINT prompt (it must not be). */
+function conversationBridge(): SessionBridge & { mintRelayed: boolean } {
   const state = { mintRelayed: false };
   return {
     get mintRelayed() {
@@ -41,7 +53,11 @@ function bridgeRecordingMint(): SessionBridge & { mintRelayed: boolean } {
       prompt: string,
       sink: RelaySink,
     ): Promise<RelayOutcome> {
-      if (/mint|emit|create the/i.test(prompt)) state.mintRelayed = true;
+      // The bridge is the CONVERSATION seam only — a mint prompt here is the
+      // old (removed) agent-delegated mint and would be a regression.
+      if (/mint the tenant|spine emitters|emit-tenant/i.test(prompt)) {
+        state.mintRelayed = true;
+      }
       sink.emit({ type: "state", state: "replying" });
       sink.emit({ type: "chunk", text: "ok" });
       sink.emit({ type: "complete", resumed: false });
@@ -50,19 +66,48 @@ function bridgeRecordingMint(): SessionBridge & { mintRelayed: boolean } {
   } as SessionBridge & { mintRelayed: boolean };
 }
 
-function deps(bridge: SessionBridge): OnboardingDeps {
+/** A fake SpineMinter that records that the deterministic mint was invoked. */
+function recordingMinter(): SpineMinter & { minted: boolean } {
+  const state = { minted: false };
+  return {
+    get minted() {
+      return state.minted;
+    },
+    async findOrCreateRepo(input: FindOrCreateRepoInput): Promise<RepoOutcome> {
+      return {
+        outcome: "reachable",
+        repo: input.chosenArea,
+        path: input.chosenArea,
+        primaryBranch: "main",
+      };
+    },
+    async mint(input: MintInput): Promise<MintResult> {
+      state.minted = true;
+      return {
+        ok: true,
+        tenant: input.tenantName,
+        product: { productId: "dna:product:fake", name: input.productName },
+        project: { projectId: "dna:project:fake", source: input.source },
+      };
+    },
+  } as SpineMinter & { minted: boolean };
+}
+
+function deps(bridge: SessionBridge, minter: SpineMinter): OnboardingDeps {
   return {
     sessionBridge: bridge,
+    spineMinter: minter,
     listProductIds: async () => [],
     permittedRoot: "/founder/code",
     newToken: () => "tok-1",
   };
 }
 
-describe("onboarding mints ONLY through the bridge/emitter seam (FR-32)", () => {
-  it("the mint is relayed to the bridge — the orchestrator performs no out-of-band write", async () => {
-    const bridge = bridgeRecordingMint();
-    const orch = new OnboardingOrchestrator(deps(bridge));
+describe("onboarding mints ONLY through the validated spine emitters (FR-32)", () => {
+  it("the mint runs through the deterministic SpineMinter — NOT a bridge mint prompt", async () => {
+    const bridge = conversationBridge();
+    const minter = recordingMinter();
+    const orch = new OnboardingOrchestrator(deps(bridge, minter));
     const events: OnboardingStreamEvent[] = [];
 
     await orch.turn(
@@ -78,8 +123,10 @@ describe("onboarding mints ONLY through the bridge/emitter seam (FR-32)", () => 
       { emit: (e) => events.push(e) },
     );
 
-    // The mint went THROUGH the bridge (the emitter runs inside the session).
-    expect((bridge as { mintRelayed: boolean }).mintRelayed).toBe(true);
+    // The mint went through the deterministic minter (the emitters live behind
+    // it), NOT through a bridge mint prompt (the removed fragile path).
+    expect((minter as { minted: boolean }).minted).toBe(true);
+    expect((bridge as { mintRelayed: boolean }).mintRelayed).toBe(false);
     expect(events.some((e) => e.type === "minted")).toBe(true);
   });
 

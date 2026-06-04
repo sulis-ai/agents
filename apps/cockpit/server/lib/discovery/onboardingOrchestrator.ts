@@ -1,9 +1,14 @@
-// WP-010 — onboarding orchestrator (ADR-007/008; FR-27/31/32/35/36/N6/N7/N10/N11).
+// WP-010 — onboarding orchestrator (ADR-007 amended/008; FR-27/31/32/35/36/N6/N7/N10/N11).
 //
-// The thin orchestration layer for cold-start onboarding. It REIMPLEMENTS
-// nothing (ADR-007): search + mint are delegated to the agent over the SAME
-// bridge as the chat (FR-27), which runs the existing discover-* skills and the
-// validated spine emitters. The orchestrator owns ONLY the safety plumbing:
+// The thin orchestration layer for cold-start onboarding. The CONVERSATION
+// (search / clarify / propose) is delegated to the agent over the SAME bridge
+// as the chat (FR-27), which runs the existing discover-* skills — read-only.
+// The consequential MINT + `git init`, however, are DETERMINISTIC SERVER
+// actions behind the SpineMinter port (ADR-007 amended): the original
+// agent-delegated mint hunted for + ran the emitters inside a headless
+// `claude -p` and proved slow + unreliable (167s, minted nothing live). The
+// orchestrator still owns ONLY the safety plumbing and starts no process
+// itself — the SpineMinter adapter is the one that invokes the emitters:
 //
 //   - SCOPE BOUND (FR-N7): the chosen area must be inside the permitted root;
 //     a `..`-escape or an out-of-root area is refused with
@@ -37,27 +42,24 @@ import type {
   RelaySink,
   ChatStreamEvent,
 } from "../../ports/SessionBridge";
+import type { SpineMinter } from "../../ports/SpineMinter";
 import { evaluateConfirmGate, type LiveProposal } from "./confirmGate";
-import {
-  planRepo,
-  resolveRepoSource,
-  type RepoOutcome,
-} from "./repoFindOrCreate";
+import { planRepo, resolveRepoSource } from "./repoFindOrCreate";
 
 /** Where the orchestrator streams its onboarding events. */
 export interface OnboardingSink {
   emit(event: OnboardingStreamEvent): void;
 }
 
-/** The (agent-performed) repo find-or-create attempt, injected for tests. */
-export type AttemptRepo = (
-  request: OnboardingRequest,
-  chosenArea: string,
-) => Promise<RepoOutcome>;
-
 export interface OnboardingDeps {
-  /** The SAME bridge the chat rides (FR-27) — search + mint delegate to it. */
+  /** The SAME bridge the chat rides (FR-27) — the CONVERSATION delegates to it. */
   sessionBridge: SessionBridge;
+  /**
+   * The deterministic server-side mint + repo find-or-create (ADR-007 amended).
+   * The MINT + `git init` go through THIS port, not the bridge agent — so the
+   * act is reliable and fast. The orchestrator starts no process itself.
+   */
+  spineMinter: SpineMinter;
   /**
    * The idempotency probe (FR-31): the Product ids already minted in the graph.
    * Production composes `readProducts`; tests inject a list.
@@ -67,12 +69,6 @@ export interface OnboardingDeps {
   permittedRoot: string;
   /** A fresh confirm token per proposal. Injected for deterministic tests. */
   newToken: () => string;
-  /**
-   * The (agent-performed) repo find-or-create. Defaults to a reachable outcome
-   * grounded in the chosen area; tests inject a failing variant to exercise the
-   * no-dangling-config rule (FR-N10/N11).
-   */
-  attemptRepo?: AttemptRepo;
 }
 
 /** The discovery session the orchestrator drives (NOT a change id). */
@@ -236,11 +232,13 @@ export class OnboardingOrchestrator {
 
     // REPO FIND-OR-CREATE (FR-35) — the act the founder confirmed. The chosen
     // area is the one carried from the search turn (the confirm request doesn't
-    // repeat it). The agent performs the find/`git init`; we interpret the
-    // outcome (no-dangling-config).
+    // repeat it). The SpineMinter performs the find / deterministic `git init`;
+    // the pure module interprets the outcome (no-dangling-config).
     const plan = planRepo(request.repoChoice, { chosenArea: this.chosenArea });
-    const attempt = this.deps.attemptRepo ?? defaultAttemptRepo;
-    const outcome = await attempt(request, this.chosenArea);
+    const outcome = await this.deps.spineMinter.findOrCreateRepo({
+      chosenArea: this.chosenArea,
+      ...(request.repoChoice ? { repoChoice: request.repoChoice } : {}),
+    });
     const resolved = resolveRepoSource(plan, outcome);
 
     if (!resolved.ok) {
@@ -255,10 +253,29 @@ export class OnboardingOrchestrator {
       return;
     }
 
-    // MINT (FR-32) — delegate to the bridge so every entity is written through
-    // the validated spine emitters (no freehand entity write).
+    // MINT (FR-32) — deterministic, server-side. The SpineMinter invokes the
+    // validated spine emitters DIRECTLY (no freehand entity write, no fragile
+    // agent-delegated mint). All-or-nothing: a failed mint persists nothing.
     sink.emit({ type: "state", state: "minting" });
-    await this.relay(buildMintPrompt(this.proposedProduct, resolved.source), sink);
+    const minted = await this.deps.spineMinter.mint({
+      tenantName: "Your workspace",
+      productName: this.proposedProduct,
+      projectName: slugify(this.proposedProduct),
+      chosenArea: this.chosenArea,
+      source: resolved.source,
+    });
+
+    if (!minted.ok) {
+      // ALL-OR-NOTHING (FR-N11): the mint failed — the graph is unchanged. The
+      // live proposal stays so the founder can retry without re-searching.
+      sink.emit({ type: "state", state: "failed" });
+      sink.emit({
+        type: "error",
+        code: "MINT_FAILED",
+        message: minted.message,
+      });
+      return;
+    }
 
     // The act completed — clear the live proposal so a stale re-confirm can't
     // mint twice (idempotency + one-product-per-conversation, founder-locked).
@@ -267,12 +284,9 @@ export class OnboardingOrchestrator {
     sink.emit({
       type: "minted",
       minted: {
-        tenant: "Your workspace",
-        product: {
-          productId: "dna:product:pending",
-          name: this.proposedProduct,
-        },
-        projects: [{ projectId: "dna:project:pending", source: resolved.source }],
+        tenant: minted.tenant,
+        product: minted.product,
+        projects: [{ projectId: minted.project.projectId, source: minted.project.source }],
       },
     });
     sink.emit({ type: "state", state: "complete" });
@@ -290,14 +304,6 @@ export class OnboardingOrchestrator {
     await this.deps.sessionBridge.relay(DISCOVERY_SESSION, prompt, chatSink);
   }
 }
-
-/** The default reachable outcome — the find/create succeeded in the chosen area. */
-const defaultAttemptRepo: AttemptRepo = async (request, chosenArea) => ({
-  outcome: "reachable",
-  repo: chosenArea,
-  path: "",
-  primaryBranch: "main",
-});
 
 /** A provisional ProjectSource shown in the proposal (pre-confirm). */
 function provisionalSource(chosenArea: string): ProjectSource {
@@ -326,13 +332,6 @@ function buildSearchPrompt(request: OnboardingRequest): string {
     return `The founder answered: ${request.message ?? ""}. Continue discovery.`;
   }
   return `Run discovery in the chosen area only: ${request.chosenArea ?? ""}. Use the discover-project / discover-context / codebase-mapping skills; do not traverse outside it.`;
-}
-
-/** Build the mint prompt the agent runs (delegates to the spine emitters). */
-function buildMintPrompt(product: string, source: ProjectSource): string {
-  return `The founder confirmed. Mint the Tenant/Product/Project for "${product}" via the validated spine emitters (sulis-emit-tenant/-product/-project). Persist Project.source = ${JSON.stringify(
-    source,
-  )}.`;
 }
 
 /** Normalise a path: resolve `.`/`..` segments + collapse separators. */
