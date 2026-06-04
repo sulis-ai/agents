@@ -1,3 +1,9 @@
+## v0.102.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- plan-work scenario-coverage gate: every journey scenario is observed-green, planned, or recorded out-of-scope — a not-green journey scenario with no WP blocks the decompose (check ALL, build some). Closes the half-built-round-trip hole behind green-but-broken login.
+
 ## v0.101.0 — 2026-06-04
 
 **Minor — release-train batch.**
