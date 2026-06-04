@@ -1,3 +1,9 @@
+## v0.106.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- Interaction-flow done-gate: block a founder-facing capability from being marked done until its multi-step flow is exercised end-to-end over stub adapters (agent-observed or human-attested). Adds contract_type: interaction, mirrors the visual-contract gate, documents its home in WP decomposition (SHOULD), and spikes it on the clinics-scheme flow. Structural fix for watch #200 (built-but-not-clickable).
+
 ## v0.105.0 — 2026-06-04
 
 **Minor — release-train batch.**
