@@ -21,6 +21,16 @@
 //     we pin it two ways: (a) a source-hygiene assertion on the spawn stdio
 //     config, and (b) a behavioural proof against a real fake `claude` on PATH
 //     that records whether its stdin reached EOF immediately.
+//
+//   Bug 3 — `--verbose` missing from the argv. The real CLI REQUIRES it
+//     whenever `--print` (`-p`) is combined with `--output-format stream-json`:
+//     without it `claude` exits immediately with `Error: When using --print,
+//     --output-format=stream-json requires --verbose` ⇒ every live chat died at
+//     spawn as SESSION_UNREACHABLE. The recorded-fixture suite stubs the child
+//     and never runs the real CLI's flag validation, so it could not catch a
+//     CLI-flag bug. Fix: add `--verbose` to the base argv. We pin it at the
+//     `buildArgv` layer — the one place the real-CLI flag contract IS unit
+//     observable — for BOTH a fresh spawn and a resumable session.
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
@@ -36,7 +46,11 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { CONFIG } from "../config";
-import { spawnClaudeBridge } from "../adapters/StreamJsonSessionBridge";
+import {
+  spawnClaudeBridge,
+  buildArgv,
+} from "../adapters/StreamJsonSessionBridge";
+import type { SessionResolution } from "../ports/SessionBridge";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SERVER_DIR = join(HERE, "..");
@@ -61,7 +75,9 @@ describe("WP-005 bug 1 — chat-bridge startup budget is NOT gitTimeoutMs", () =
     // The contract suite injects startupTimeoutMs directly, so only this
     // assertion proves the prod adapter receives the dedicated budget.
     const src = await readFile(join(SERVER_DIR, "index.ts"), "utf8");
-    expect(src).toMatch(/startupTimeoutMs:\s*CONFIG\.chatBridgeStartupTimeoutMs/);
+    expect(src).toMatch(
+      /startupTimeoutMs:\s*CONFIG\.chatBridgeStartupTimeoutMs/,
+    );
     expect(src).not.toMatch(/startupTimeoutMs:\s*CONFIG\.gitTimeoutMs/);
   });
 });
@@ -144,5 +160,43 @@ describe("WP-005 bug 2 — spawnClaudeBridge closes/ignores the child stdin", ()
       // margin that still fails loudly if stdin is ever left open again.
       expect(blockedMs).toBeLessThan(500);
     });
+  });
+});
+
+// ─── Bug 3: the argv carries --verbose (required by the real CLI) ───────────
+describe("WP-005 bug 3 — buildArgv includes --verbose (real-CLI contract)", () => {
+  // The real `claude` rejects `--print` + `--output-format stream-json`
+  // WITHOUT `--verbose`, exiting at spawn ⇒ SESSION_UNREACHABLE. The recorded
+  // fixture stubs the child and never runs the CLI's flag validation, so this
+  // is pinned at the argv layer — the one place the contract is observable.
+  const fresh: SessionResolution = {
+    kind: "fresh",
+    session: { changeId: "c-1", cwd: "/tmp/c-1" },
+  };
+  const resumable: SessionResolution = {
+    kind: "resumable",
+    session: { changeId: "c-1", cwd: "/tmp/c-1", lastSessionRef: "sess-abc" },
+  };
+
+  it("a fresh spawn includes --verbose alongside -p + stream-json + partials", () => {
+    const argv = buildArgv("ping", fresh);
+    expect(argv).toContain("--verbose");
+    expect(argv).toContain("-p");
+    // --output-format must be immediately followed by stream-json.
+    expect(argv).toContain("--output-format");
+    expect(argv[argv.indexOf("--output-format") + 1]).toBe("stream-json");
+    expect(argv).toContain("--include-partial-messages");
+  });
+
+  it("a resumable session includes --verbose alongside -p + stream-json + partials", () => {
+    const argv = buildArgv("ping", resumable);
+    expect(argv).toContain("--verbose");
+    expect(argv).toContain("-p");
+    expect(argv).toContain("--output-format");
+    expect(argv[argv.indexOf("--output-format") + 1]).toBe("stream-json");
+    expect(argv).toContain("--include-partial-messages");
+    // Resume is still wired (the fix-forward must not drop the resume ref).
+    expect(argv).toContain("--resume");
+    expect(argv[argv.indexOf("--resume") + 1]).toBe("sess-abc");
   });
 });

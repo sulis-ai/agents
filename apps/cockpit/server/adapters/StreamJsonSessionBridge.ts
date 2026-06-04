@@ -187,14 +187,29 @@ export class StreamJsonSessionBridge implements SessionBridge {
  * resumable session adds `--resume <ref>` (or `--continue` when no explicit
  * ref); a fresh/live session spawns without resume. The prompt is passed via
  * `-p` (headless print mode), NEVER an interactive TUI.
+ *
+ * `--verbose` is REQUIRED by the real CLI whenever `--print` (`-p`) is combined
+ * with `--output-format stream-json`: without it `claude` rejects the invocation
+ * at spawn with `Error: When using --print, --output-format=stream-json
+ * requires --verbose` and exits immediately ⇒ every live chat died as
+ * SESSION_UNREACHABLE. The recorded-fixture suite stubs the child and never runs
+ * the real CLI's flag validation, so it could not catch this; the unit
+ * assertion on `buildArgv` (below, in the test file) pins the contract at the
+ * argv layer where it IS observable. Exported for that reason (WP-005
+ * fix-forward).
  */
-function buildArgv(prompt: string, resolution: SessionResolution): string[] {
+export function buildArgv(
+  prompt: string,
+  resolution: SessionResolution,
+): string[] {
   const base = [
     "-p",
     prompt,
     "--output-format",
     "stream-json",
     "--include-partial-messages",
+    // REQUIRED with --print + --output-format stream-json (see fn doc above).
+    "--verbose",
   ];
   if (resolution.kind === "resumable") {
     const ref = resolution.session.lastSessionRef;
