@@ -57,9 +57,20 @@ specific class of mutation is absent from the active source tree.
      Why: liveness is observation-only (ADR-005); signal 0 probes without
      affecting the target. Any other signal would terminate/interrupt it.
 
-  5. HTTP mutation verbs on the Express app
-     Forbids: app.post / app.put / app.patch / app.delete in server/.
-     Why: the cockpit exposes GET endpoints only; the surface is read-only.
+  2b. Process start outside the sanctioned bridge (WP-005, ADR-003)
+     Forbids: spawn / spawnSync / execFile / execFileSync of ANY child
+     EXCEPT in server/adapters/StreamJsonSessionBridge.ts (the one session
+     process-start site) and server/lib/gitShow.ts (read-only `git show`).
+     Why: resume/spawn launches a `claude` session — the most consequential
+     side effect in the app. It is confined to one audited adapter; loading
+     any read surface starts no process (NFR-SEC-05).
+
+  5. HTTP mutation verbs on the Express app/router
+     Forbids: app/router .post / .put / .patch / .delete in server/ EXCEPT
+     in server/routes/chat.ts (the ONE sanctioned write path — the chat
+     relay, ADR-001/003). Every other route is GET-only.
+     Why: the cockpit is read-only everywhere except the one explicitly-
+     audited write seam.
 
   6. Non-loopback bind
      Forbids: "0.0.0.0" or any bind/listen address other than 127.0.0.1 in
@@ -121,8 +132,14 @@ report() {
   fi
 }
 
+# WP-005 (ADR-003) — the ONE sanctioned write path is the chat relay; the ONE
+# sanctioned process-start site is the SessionBridge prod adapter. These two
+# files are allow-listed BY PATH; every other file must still be clean.
+RELAY_ROUTE_REL="server/routes/chat.ts"
+BRIDGE_ADAPTER_REL="server/adapters/StreamJsonSessionBridge.ts"
+
 # Accumulate per-rule hits across all files.
-declare -a fs_hits=() git_spawn_hits=() git_verb_hits=() kill_hits=() http_hits=() bind_hits=()
+declare -a fs_hits=() git_spawn_hits=() git_verb_hits=() kill_hits=() http_hits=() bind_hits=() proc_hits=()
 
 for f in "${SOURCE_FILES[@]}"; do
   rel="${f#"$ROOT"/}"
@@ -149,6 +166,36 @@ for f in "${SOURCE_FILES[@]}"; do
       || true)
   fi
 
+  # 2b. WP-005 (ADR-003 NEW rule) — process start (spawn/exec of ANY child)
+  #     outside the sanctioned set. This makes "the bridge is the only thing
+  #     that starts a SESSION" a runnable check: resume/spawn launches a
+  #     `claude` session (the most consequential side effect), so any process
+  #     start outside the audited set is flagged.
+  #
+  #     The sanctioned set (path allow-list — each is a single, audited site):
+  #       - StreamJsonSessionBridge.ts — the ONE session process-start (NEW).
+  #       - gitShow.ts                 — read-only `git show` (MVP, rule 2).
+  #       - SulisChangeStoreReader.ts  — read-only `sulis-list-changes` helper.
+  #       - SulisChangeRecreator.ts    — the recreate-on-demand CLI (RecreateRunner
+  #                                       port; an explicitly-invoked read/recreate,
+  #                                       MVP ADR-004 — never in-process server work).
+  #     The guarantee this rule adds: NO NEW file may start a process; a future
+  #     route or lib that sprouts a spawn fails the gate.
+  case "$rel" in
+    "$BRIDGE_ADAPTER_REL" | \
+    server/lib/gitShow.ts | \
+    server/adapters/SulisChangeStoreReader.ts | \
+    server/adapters/SulisChangeRecreator.ts)
+      ;; # sanctioned process-start site — skip
+    *)
+      while IFS= read -r line; do
+        [ -n "$line" ] && proc_hits+=("$rel: $line")
+      done < <(printf '%s\n' "$stripped" | grep -nE \
+        '\b(spawn|spawnSync|execFile|execFileSync)[[:space:]]*\(' \
+        || true)
+      ;;
+  esac
+
   # 3. Mutating git verbs as quoted argv tokens
   while IFS= read -r line; do
     [ -n "$line" ] && git_verb_hits+=("$rel: $line")
@@ -166,11 +213,17 @@ for f in "${SOURCE_FILES[@]}"; do
   # 5 + 6 are server-only.
   case "$rel" in
     server/*)
-      while IFS= read -r line; do
-        [ -n "$line" ] && http_hits+=("$rel: $line")
-      done < <(printf '%s\n' "$stripped" | grep -nE \
-        '\bapp\.(post|put|patch|delete)[[:space:]]*\(' \
-        || true)
+      # The mutation-verb rule now catches BOTH `app.post` and `router.post`
+      # (and put/patch/delete) — except in the ONE sanctioned relay file, which
+      # may register exactly one write route (ADR-003). Every other server file
+      # must stay GET-only.
+      if [ "$rel" != "$RELAY_ROUTE_REL" ]; then
+        while IFS= read -r line; do
+          [ -n "$line" ] && http_hits+=("$rel: $line")
+        done < <(printf '%s\n' "$stripped" | grep -nE \
+          '\b(app|router)\.(post|put|patch|delete)[[:space:]]*\(' \
+          || true)
+      fi
 
       while IFS= read -r line; do
         [ -n "$line" ] && bind_hits+=("$rel: $line")
@@ -183,6 +236,7 @@ done
 
 report "filesystem write API"        "${fs_hits[@]+"${fs_hits[@]}"}"
 report "git spawn outside gitShow.ts" "${git_spawn_hits[@]+"${git_spawn_hits[@]}"}"
+report "process start outside the sanctioned bridge" "${proc_hits[@]+"${proc_hits[@]}"}"
 report "mutating git verb token"      "${git_verb_hits[@]+"${git_verb_hits[@]}"}"
 report "non-zero process signal"      "${kill_hits[@]+"${kill_hits[@]}"}"
 report "HTTP mutation verb"           "${http_hits[@]+"${http_hits[@]}"}"

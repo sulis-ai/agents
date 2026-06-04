@@ -5,8 +5,14 @@ have in flight. It reads what's already on disk — your change store,
 your worktrees, your Claude Code session transcripts — and renders
 them as a thread-centric review tool.
 
-It is **strictly read-only**. It writes nothing, it sends nothing to
-any running Claude session, and it binds to `127.0.0.1` only.
+It is read-only **everywhere except one explicitly-audited seam**: the
+chat relay (`POST /api/changes/:id/chat`, WP-005) is the single sanctioned
+write/act path — it delivers a message to a change's agent and streams the
+reply back (resume-or-spawn; ADR-001/002/003). Every other route is GET-only
+and provably so; the read-only gate allow-lists exactly the relay (one write
+verb) and the `SessionBridge` adapter (one process start), and fails the
+build on any mutation or process start anywhere else. It binds to
+`127.0.0.1` only.
 
 This README covers the workspace shape, the dev-run flow, and the
 HTTP surface that ships with WP-001 + WP-010. The React components
@@ -39,10 +45,11 @@ configurable.
 
 ## The HTTP surface
 
-GET endpoints, JSON only (plus two HTML-serving contract endpoints),
-all bound to `127.0.0.1:5174` by default (TDD §5, ADR-002, ADR-003).
-The route handlers are thin — they delegate to the lib functions
-(WP-005..WP-009) and the change-store port (WP-003).
+GET endpoints, JSON only (plus two HTML-serving contract endpoints and
+**one** sanctioned write path — the chat relay, which streams SSE), all
+bound to `127.0.0.1:5174` by default (TDD §5, ADR-001/002/003). The route
+handlers are thin — they delegate to the lib functions (WP-005..WP-009)
+and the ports (the change-store reader, WP-003; the `SessionBridge`, WP-005).
 
 | Method + path                                | Purpose                                                       | Wire shape           |
 | -------------------------------------------- | ------------------------------------------------------------- | -------------------- |
@@ -56,6 +63,26 @@ The route handlers are thin — they delegate to the lib functions
 | `GET /api/changes/:id/contract`              | Whether the change's rendered contracts are reachable + what they are. | `ContractAvailability` |
 | `GET /api/changes/:id/contract/data`         | Serves the rendered `CONTRACT.html` (the data-contract preview). | `text/html`        |
 | `GET /api/changes/:id/contract/ui`           | Serves the rendered `UI.html`, or a typed JSON note when the change has no UI contract (never a broken link). | `text/html` or `{ uiContract, note }` |
+| `POST /api/changes/:id/chat`                 | **The one write/act path (WP-005).** Delivers a message to the change's agent (resume-or-spawn) and streams the reply as SSE. Refuses with `SESSION_BUSY` (409), `SESSION_CHANGE_MISMATCH` (422, zero bytes), or `SESSION_UNREACHABLE` (502, not delivered). | SSE `ChatStreamEvent` (`state` → `chunk*` → `complete`) |
+
+### Two-way chat relay (WP-005)
+
+`POST /api/changes/:id/chat` is the app's first and only write/act path. The
+pipeline order is load-bearing (TDD §3.1): acquire the per-change
+one-in-flight lock → resolve the session (live / resumable / fresh,
+side-effect-free) → **bind** the session to the change (fail-closed; ADR-004)
+→ act + stream SSE → release. Resume restarts the change's session from its
+persisted transcript; spawn seeds a fresh one grounded in the change's saved
+context; neither synthesises a completion, and an incomplete-at-close step is
+re-run honestly (FR-26/N5). The founder never chooses resume vs spawn.
+
+The `SessionBridge` port (`ports/SessionBridge.ts`) has two adapters: the
+production `StreamJsonSessionBridge` (drives headless `claude -p
+--output-format stream-json`) and the test `RecordedSessionBridge` (replays a
+recorded real stream-json session — `tests/fixtures/recording-bridge-claude-session.json`
+— so send → stream → resume → spawn → mid-step run in CI **without a live
+agent**). The full live round-trip is verified on the founder machine (it
+needs a real `claude`).
 
 ### Contract preview (WP-003)
 
@@ -105,14 +132,20 @@ Non-2xx responses use a single envelope:
 `code` values: `NOT_FOUND` (404), `PATH_OUTSIDE_WORKTREE` /
 `NOT_A_DIRECTORY` / `IS_A_DIRECTORY` / `GIT_ERROR` / `BAD_REQUEST`
 (400), `NO_BASE_SHA` (422), `TIMEOUT` (504), `METHOD_NOT_ALLOWED`
-(405), `INTERNAL_ERROR` (500). The client renders contextual messages
-from `code`.
+(405), `INTERNAL_ERROR` (500), and the chat-relay codes `SESSION_BUSY`
+(409), `SESSION_CHANGE_MISMATCH` (422), `SESSION_UNREACHABLE` (502). The
+client renders contextual messages from `code`.
 
-The server is GET-only by construction. The `tests/read-only-inventory.test.ts`
-gate fails the build if any future change introduces a `.post / .put
-/ .patch / .delete` handler, a filesystem-mutating call, a mutating
-git verb, or a non-zero process signal (TDD §13.7 — "guarantee, not
-convention").
+The server is GET-only by construction **except the one sanctioned chat
+relay** (`routes/chat.ts`) and its `SessionBridge` adapter
+(`adapters/StreamJsonSessionBridge.ts`). The
+`tests/read-only-inventory.test.ts` gate fails the build if any *other* file
+introduces a `.post / .put / .patch / .delete` handler, a filesystem-mutating
+call, a mutating git verb, a non-zero process signal, **or a process start**
+(the WP-005/ADR-003 rule). The allow-list is a file-path + rule pairing, not a
+blanket waiver — the relay may register one write route, the bridge may start
+one process, nothing else may do either (TDD §13.7 / ADR-003 — "guarantee,
+not convention").
 
 ## Testing
 
@@ -172,9 +205,9 @@ apps/cockpit/
 │   ├── index.ts            # bootstrap — binds 127.0.0.1:5174
 │   ├── app.ts              # createApp(deps) Express factory (testable)
 │   ├── config.ts           # CONFIG — bindAddress is hard-coded
-│   ├── ports/              # ChangeStoreReader (extractability seam) + RecreateRunner (recreate-on-demand seam, WP-004)
-│   ├── adapters/           # SulisChangeStoreReader (Python helper bridge); SulisChangeRecreator + FakeRecreateRunner (recreate-on-demand, WP-004)
-│   ├── routes/             # six GET handlers + shared shims
+│   ├── ports/              # ChangeStoreReader + RecreateRunner (WP-004) + SessionBridge (the chat seam, WP-005)
+│   ├── adapters/           # SulisChangeStoreReader (Python helper bridge); SulisChangeRecreator + FakeRecreateRunner (WP-004); StreamJsonSessionBridge (prod) + RecordedSessionBridge (recorded fixture) (WP-005)
+│   ├── routes/             # GET read handlers + the one chat relay (POST, SSE) + shared shims
 │   ├── middleware/         # request-log + typed-error → JSON mapper
 │   ├── lib/                # domain logic — no framework imports
 │   └── tests/

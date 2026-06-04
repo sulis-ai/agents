@@ -23,6 +23,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { SulisChangeStoreReader } from "./adapters/SulisChangeStoreReader";
+import {
+  StreamJsonSessionBridge,
+  spawnClaudeBridge,
+} from "./adapters/StreamJsonSessionBridge";
+import { resolveSessionFor } from "./lib/resolveSession";
+import type { SessionResolution } from "./ports/SessionBridge";
 import { CONFIG } from "./config";
 import { createApp } from "./app";
 
@@ -60,8 +66,40 @@ export function buildProductionApp() {
     sulisStateDir: CONFIG.sulisStateDir,
     timeoutMs: CONFIG.gitTimeoutMs,
   });
+
+  // WP-005 — the production SessionBridge (ADR-002). Its `resolve` looks up the
+  // change's worktree (the cwd the session runs in + the binding identity) via
+  // the change store, then composes the side-effect-free liveness + transcript
+  // reads (FR-N4). The real `claude` process start is confined to
+  // `spawnClaudeBridge` inside the adapter — the one sanctioned process-start
+  // site (ADR-003). The real round-trip is the founder-machine observation.
+  const sessionBridge = new StreamJsonSessionBridge({
+    resolve: async (changeId): Promise<SessionResolution> => {
+      const record = await changeStore.readChangeRecord(changeId);
+      if (record === null) {
+        // Unknown change → fresh with no usable worktree; the relay's
+        // requireChange already 404s before relay, so this is defensive.
+        return { kind: "fresh", session: { changeId, cwd: "" } };
+      }
+      return resolveSessionFor(changeId, {
+        sulisStateDir: CONFIG.sulisStateDir,
+        claudeProjectsDir: CONFIG.claudeProjectsDir,
+        worktreePath: record.worktreePath,
+      });
+    },
+    spawnBridge: spawnClaudeBridge,
+    startupTimeoutMs: CONFIG.gitTimeoutMs,
+  });
+
   return createApp({
     changeStore,
+    sessionBridge,
+    // The relay's one-structured-line-per-send log (NFR-SEC-03: never the body
+    // or reply). Routed through the dev-runner heartbeat console; no bodies.
+    chatLogSink: (line) => {
+      // eslint-disable-next-line no-console -- intentional: structured relay log
+      console.log(JSON.stringify({ at: "chat-relay", ...line }));
+    },
     sulisStateDir: CONFIG.sulisStateDir,
     claudeProjectsDir: CONFIG.claudeProjectsDir,
     fileMaxBytes: CONFIG.fileMaxBytes,

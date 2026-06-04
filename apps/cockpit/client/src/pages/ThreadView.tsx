@@ -27,6 +27,7 @@ import { ThreadHeader } from "../components/ThreadHeader";
 import { StageTrack } from "../components/StageTrack";
 import { StatusHeader } from "../components/StatusHeader";
 import { Chat } from "../components/Chat";
+import { Composer } from "../components/Composer";
 import { FilesPanel } from "../components/FilesPanel";
 import { ContractLinks } from "../components/ContractLinks";
 import styles from "../styles/Thread.module.css";
@@ -94,6 +95,10 @@ export function ThreadView() {
       >
         <h2 className={styles.sectionTitle}>Conversation</h2>
         <Chat changeId={id} />
+        {/* WP-005 — the chat composer docked at the bottom of the thread: the
+            app's one write/act path (ADR-003). Sending a message is always one
+            glance from reading the change (signed contract). */}
+        <Composer changeId={id} />
       </section>
 
       <section

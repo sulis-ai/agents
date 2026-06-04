@@ -47,13 +47,37 @@ const SCANNED_DIRS = [
   "ports",
 ];
 
-// Mutation HTTP verbs registered on an Express app/router.
+// Mutation HTTP verbs registered on an Express app/router. Scoped to the
+// `app.`/`router.` receiver so unrelated method calls (e.g. `Set.delete`,
+// `Map.delete`) are not false-positives — parity with the shell gate's rule 5.
 const MUTATION_VERB_PATTERNS = [
-  /\.post\s*\(/,
-  /\.put\s*\(/,
-  /\.patch\s*\(/,
-  /\.delete\s*\(/,
+  /\b(app|router)\.post\s*\(/,
+  /\b(app|router)\.put\s*\(/,
+  /\b(app|router)\.patch\s*\(/,
+  /\b(app|router)\.delete\s*\(/,
 ];
+
+// WP-005 (ADR-003) — the chat relay is the ONE sanctioned write path; the
+// SessionBridge prod adapter is the ONE sanctioned process-start site. These
+// two files are allow-listed by PATH; every other file must still be clean.
+// The relay registers a mutation verb (`router.post`); the bridge calls
+// `spawn` (the process start). Anything else with either shape is a violation.
+const RELAY_ROUTE_BASENAME = "chat.ts";
+const BRIDGE_ADAPTER_BASENAME = "StreamJsonSessionBridge.ts";
+
+// Process-start shapes — spawn/exec of a child process. Forbidden everywhere
+// except the allow-listed bridge adapter (the new ADR-003 process-start rule).
+const PROCESS_START_PATTERNS = [
+  /\bspawn\s*\(/,
+  /\bspawnSync\s*\(/,
+  /\bexecFile\s*\(/,
+  /\bexecFileSync\s*\(/,
+];
+
+function basename(file: string): string {
+  const parts = file.split("/");
+  return parts[parts.length - 1] ?? file;
+}
 
 // Filesystem mutation tokens. `mkdir` is intentionally permitted (no
 // content written; only used by some helpers' test fixtures, never in
@@ -178,11 +202,13 @@ function stripComments(src: string): string {
 }
 
 describe("read-only inventory (TDD §13.7)", () => {
-  it("registers no POST / PUT / PATCH / DELETE routes", async () => {
+  it("registers no POST / PUT / PATCH / DELETE routes — except the one sanctioned relay (ADR-003)", async () => {
     const files = await collectSourceFiles();
     expect(files.length).toBeGreaterThan(0);
     const offenders: string[] = [];
     for (const f of files) {
+      // The chat relay (routes/chat.ts) is the ONE allow-listed write path.
+      if (basename(f) === RELAY_ROUTE_BASENAME) continue;
       const src = stripComments(await readSource(f));
       for (const pat of MUTATION_VERB_PATTERNS) {
         if (pat.test(src)) {
@@ -191,6 +217,37 @@ describe("read-only inventory (TDD §13.7)", () => {
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it("starts no child process — except the one sanctioned SessionBridge adapter (ADR-003 new rule)", async () => {
+    const files = await collectSourceFiles();
+    const offenders: string[] = [];
+    const starters: string[] = [];
+    for (const f of files) {
+      const src = stripComments(await readSource(f));
+      const startsProcess = PROCESS_START_PATTERNS.some((p) => p.test(src));
+      if (!startsProcess) continue;
+      starters.push(basename(f));
+      // The sanctioned process-start set (path allow-list; parity with the
+      // shell gate's rule 2b): the ONE session bridge (NEW), plus the existing
+      // audited read/recreate subprocess sites (gitShow's `git show`, the
+      // change-store list helper, the recreate-on-demand CLI). Every OTHER file
+      // that starts a process is a violation — the new ADR-003 guarantee.
+      const SANCTIONED_PROCESS_STARTERS = new Set([
+        BRIDGE_ADAPTER_BASENAME,
+        "gitShow.ts",
+        "SulisChangeStoreReader.ts",
+        "SulisChangeRecreator.ts",
+      ]);
+      if (SANCTIONED_PROCESS_STARTERS.has(basename(f))) {
+        continue;
+      }
+      offenders.push(`${f} :: process start outside the sanctioned bridge`);
+    }
+    expect(offenders, JSON.stringify(offenders)).toEqual([]);
+    // Positive assertion: the sanctioned bridge IS present and IS the only
+    // session process-start site (a relay with no bridge is half-built).
+    expect(starters).toContain(BRIDGE_ADAPTER_BASENAME);
   });
 
   it("calls no filesystem-mutating APIs", async () => {

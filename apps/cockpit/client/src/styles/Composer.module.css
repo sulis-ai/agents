@@ -1,0 +1,252 @@
+/* WP-005 — Composer (the docked chat write surface). Built to the SIGNED
+ * visual contract (sulis-app.html, panel 4). Tokens only — no raw hex
+ * (WPF-07 / UXD-04). The accent (teal) marks "the live thing" (the streaming
+ * caret); the primary (blue) is the one filled action (Send). The founder's
+ * own message is a NEUTRAL bubble (alignment, not a brand fill). */
+
+.composerWrap {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+  padding-top: 8px;
+}
+
+/* The founder's own message — neutral muted bubble, right-aligned (signed
+ * contract: distinguish by alignment + neutral surface, never a brand fill). */
+.userMessage {
+  align-self: flex-end;
+  max-width: 80%;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  padding: 10px 13px;
+  font-size: 13px;
+  color: var(--foreground);
+  white-space: pre-wrap;
+}
+
+/* The streamed agent reply — a plain card bubble, left-aligned. */
+.agentReply {
+  align-self: flex-start;
+  max-width: 85%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  padding: 10px 13px;
+  font-size: 13px;
+  color: var(--foreground);
+  white-space: pre-wrap;
+}
+
+/* The one tiny teal pulse — "the agent is alive right now" (signed contract). */
+.caret {
+  display: inline-block;
+  width: 6px;
+  height: 14px;
+  background: var(--accent);
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  animation: composerBlink 1s steps(2) infinite;
+}
+
+@keyframes composerBlink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none;
+  }
+}
+
+/* Honest "resumed" note (FR-26) — a quiet, full-contrast line. */
+.resumedNote {
+  align-self: flex-start;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  padding: 2px 4px;
+}
+
+/* Mid-stream break (FR-22) — warning tint + worded note (colour never alone). */
+.interruptedNote {
+  align-self: stretch;
+  background: var(--bg-warning);
+  border: 1px solid var(--bg-warning-border);
+  border-radius: var(--radius-container);
+  padding: 9px 12px;
+  font-size: 12px;
+  color: var(--foreground);
+}
+
+/* Clear failure (FR-19) — destructive tint + worded note. */
+.chatError {
+  align-self: stretch;
+  background: var(--bg-destructive);
+  border: 1px solid var(--bg-destructive-border);
+  border-radius: var(--radius-container);
+  padding: 9px 12px;
+  font-size: 12px;
+  color: var(--foreground);
+}
+
+/* Run-control strip (AI-03) — neutral; Pause/Stop while replying. */
+.runbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 4px;
+  border-top: 1px solid var(--border-muted);
+}
+
+.runLabel {
+  flex: 1;
+  font-size: 11px;
+  font-weight: var(--weight-label);
+  color: var(--muted-foreground);
+}
+
+.iconbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  border-radius: var(--radius-interactive);
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.iconbtn:hover {
+  background: var(--muted);
+}
+
+.stop {
+  color: var(--destructive);
+  border-color: var(--bg-destructive-border);
+}
+
+.stop:hover {
+  background: var(--bg-destructive);
+}
+
+/* Suggestion chips (AI-02) — neutral outline; accent on hover. */
+.chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sugchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-interactive);
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+.sugchip:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sugchip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* The composer row — free text + Send (the one filled blue action). */
+.composer {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.field {
+  flex: 1;
+}
+
+.textarea {
+  width: 100%;
+  resize: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-interactive);
+  padding: 12px 13px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  min-height: 44px;
+  outline: 0;
+  color: var(--foreground);
+  background: var(--card);
+}
+
+.textarea:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 22%, transparent);
+}
+
+.textarea:disabled {
+  background: var(--muted);
+}
+
+.slashhint {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 7px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.slashhint kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--foreground);
+}
+
+.send {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: 0;
+  border-radius: var(--radius-interactive);
+  padding: 12px 22px;
+  font-weight: 600;
+  font-size: 13px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.send:hover:not(:disabled) {
+  filter: brightness(0.94);
+}
+
+.busy .send,
+.send:disabled {
+  background: var(--muted);
+  color: var(--muted-foreground);
+  cursor: not-allowed;
+}
+
+.busynote {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  padding: 2px 4px;
+}

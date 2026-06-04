@@ -88,6 +88,67 @@ describe("read-only inventory gate script (TDD §13.7, ADR-003)", () => {
     }
   });
 
+  // WP-005 (ADR-003) — the gate now allow-lists exactly the chat relay's
+  // app.post and the SessionBridge adapter's process start, and adds a rule
+  // flagging a process start anywhere else.
+  it("allows app.post ONLY in the sanctioned chat relay file", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "routes"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      // The relay file may register one mutation route.
+      await writeFile(
+        join(sandbox, "server", "routes", "chat.ts"),
+        "export const reg = (app: any) => app.post('/api/changes/:id/chat', () => {});\n",
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status, res.stdout + res.stderr).toBe(0);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("flags a process start OUTSIDE the sanctioned bridge adapter", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "lib"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "lib", "sneaky.ts"),
+        'import { spawn } from "node:child_process";\n' +
+          'export const go = () => spawn("claude", ["-p"]);\n',
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status).toBe(1);
+      expect(res.stdout).toMatch(/VIOLATION \[process start outside the sanctioned bridge\]/);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("allows the process start INSIDE the sanctioned bridge adapter", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "adapters"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "adapters", "StreamJsonSessionBridge.ts"),
+        'import { spawn } from "node:child_process";\n' +
+          'export const go = () => spawn("claude", ["-p"]);\n',
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status, res.stdout + res.stderr).toBe(0);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
   it("ignores forbidden tokens that appear only inside comments", async () => {
     const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
     try {

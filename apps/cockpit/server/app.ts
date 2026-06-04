@@ -22,6 +22,9 @@ import cors from "cors";
 
 import type { ChangeStoreReader } from "./ports/ChangeStoreReader";
 import type { RecreateRunner } from "./ports/RecreateRunner";
+import type { SessionBridge } from "./ports/SessionBridge";
+import { InFlightLock } from "./lib/inFlightLock";
+import { createChatRouter, type ChatLogLine } from "./routes/chat";
 
 import { createChangesRouter } from "./routes/changes";
 import { createChangeDetailRouter } from "./routes/change-detail";
@@ -44,6 +47,20 @@ export interface CreateAppDeps {
    * serves, but a tidied one degrades to a plain "unavailable" note.
    */
   recreateRunner?: RecreateRunner;
+  /**
+   * WP-005 — the SessionBridge for the chat relay (ADR-002). The one new
+   * write/act path. Optional: when absent, the relay route is NOT mounted and
+   * chat degrades to unavailable (read surfaces unaffected — the rollback
+   * shape). Production wires `StreamJsonSessionBridge`; tests inject a
+   * recorded/programmable bridge.
+   */
+  sessionBridge?: SessionBridge;
+  /**
+   * WP-005 — where the relay's one-structured-line-per-send log goes
+   * (NFR-SEC-03: never the body or reply). Defaults to a no-op; tests capture
+   * it. Production points it at the request-log discipline.
+   */
+  chatLogSink?: (line: ChatLogLine) => void;
   sulisStateDir: string;
   claudeProjectsDir: string;
   /** Optional override for the 1 MiB file cap (tests + future tuning). */
@@ -57,16 +74,42 @@ export interface CreateAppDeps {
 export function createApp(deps: CreateAppDeps): Application {
   const app = express();
 
-  // 1. CORS — single allowed origin.
+  // 1. CORS — single allowed origin. POST is allowed for the ONE sanctioned
+  //    write path (the chat relay, ADR-001/003); every other route is GET-only
+  //    and the read-only gate proves no other mutation verb exists.
   app.use(
     cors({
       origin: deps.clientOrigin ?? "http://127.0.0.1:5173",
-      methods: ["GET", "OPTIONS"],
+      methods: ["GET", "POST", "OPTIONS"],
     }),
   );
 
   // 2. Per-request logging (no bodies, no headers).
   app.use(requestLogMiddleware);
+
+  // WP-005 — JSON body parsing for the relay's prompt payload. Scoped to the
+  // chat route only (mounted with the parser) so read routes never parse a
+  // body. The chat relay is the single sanctioned write path (ADR-003); it is
+  // mounted only when a SessionBridge is provided (else chat degrades to
+  // unavailable — the rollback shape; read surfaces unaffected).
+  if (deps.sessionBridge) {
+    const inFlightLock = new InFlightLock();
+    // Mounted at the LITERAL `/api/changes` prefix (not a parametric mount):
+    // the router matches `/:id/chat` internally. A parametric `app.use` mount
+    // (`/api/changes/:id/chat`) mis-matches a POST over a real HTTP socket
+    // under Express 5 / path-to-regexp v8 (supertest's in-process inject
+    // tolerated it; a live server returned 405). The literal-prefix mount is
+    // the same shape the GET `changes` router uses and is unambiguous.
+    app.use(
+      "/api/changes",
+      createChatRouter({
+        changeStore: deps.changeStore,
+        sessionBridge: deps.sessionBridge,
+        inFlightLock,
+        chatLogSink: deps.chatLogSink,
+      }),
+    );
+  }
 
   // 3. Routes. Each router is mounted under the URL prefix and its
   //    handlers are GET-only (the read-only-inventory test enforces).
