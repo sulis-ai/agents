@@ -55,6 +55,7 @@ import { createTreeRouter } from "./routes/tree";
 import { createFileRouter } from "./routes/file";
 import { createDiffRouter } from "./routes/diff";
 import { createTranscriptRouter } from "./routes/transcript";
+import { createTurnSummariesRouter } from "./routes/turnSummaries";
 import { createContractRouter } from "./routes/contract";
 import { createStatusRouter } from "./routes/status";
 import { createBrainRouter } from "./routes/brain";
@@ -298,6 +299,15 @@ export function createApp(deps: CreateAppDeps): Application {
   app.use(
     "/api/changes/:id/transcript",
     createTranscriptRouter({
+      changeStore: deps.changeStore,
+      claudeProjectsDir: deps.claudeProjectsDir,
+    }),
+  );
+
+  // chat-B2 — per-turn 2–3 sentence summaries (Haiku, cached, non-blocking).
+  app.use(
+    "/api/changes/:id/turn-summaries",
+    createTurnSummariesRouter({
       changeStore: deps.changeStore,
       claudeProjectsDir: deps.claudeProjectsDir,
     }),

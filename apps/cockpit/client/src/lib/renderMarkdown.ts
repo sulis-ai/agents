@@ -83,6 +83,16 @@ function unescapeForSchemeCheck(s: string): string {
 type ListKind = "ul" | "ol";
 
 /**
+ * Inline-only markdown → safe HTML (no block/paragraph wrapping) — for short
+ * single-run text like a turn summary's trailing sentences. Same audited
+ * escape boundary as renderMarkdown: every byte is escaped before any tag is
+ * produced, so the output is safe as innerHTML.
+ */
+export function renderInlineMarkdown(src: string): string {
+  return renderInline(escapeHtml(src));
+}
+
+/**
  * Render a markdown string to a safe HTML fragment. The output is suitable
  * for assignment as innerHTML because every byte of input passed through
  * escapeHtml() before any tag was produced.

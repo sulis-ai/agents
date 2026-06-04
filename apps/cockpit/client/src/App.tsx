@@ -1,17 +1,21 @@
-// WP-011 — Routes definition + app root.
+// Routes definition + app root.
 //
 // AppRoutes is exported separately so tests can mount it inside a
 // MemoryRouter; <App /> wraps it in BrowserRouter for production use.
 //
-// Route shape per WP Contract:
-//   /                → <Board>          (inside <Shell>) — WP-003 stage board
-//   /c/:changeId     → <ThreadView>     (inside <Shell>)
-//   /concierge       → <ConciergePage>  (inside <Shell>) — WP-009 front door
-//   /*               → <NotFound>       (inside <Shell>)
+// Route shape:
+//   /                → <Board>          (inside <WorkspaceShell>) — the stage board
+//   /c/:changeId     → <ThreadView>     (inside <WorkspaceShell>) — a change, in its own tab
+//   /concierge       → <ConciergePage>  (inside <WorkspaceShell>) — the front door
+//   /*               → <NotFound>       (inside <WorkspaceShell>)
+//
+// Chat-redesign (chat-B2): the persistent left Sidebar is replaced by the
+// WorkspaceShell's top bar (product switcher + a tab per open change).
 
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { ActiveProductProvider } from "./api/activeProduct";
-import { Shell } from "./layouts/Shell";
+import { OpenTabsProvider } from "./api/openTabs";
+import { WorkspaceShell } from "./layouts/WorkspaceShell";
 import { Board } from "./pages/Board";
 import { ThreadView } from "./pages/ThreadView";
 import { ConciergePage } from "./pages/ConciergePage";
@@ -22,13 +26,13 @@ import { NotFound } from "./pages/NotFound";
 export function AppRoutes() {
   return (
     <Routes>
-      <Route element={<Shell />}>
+      <Route element={<WorkspaceShell />}>
         <Route path="/" element={<Board />} />
         <Route path="/c/:changeId" element={<ThreadView />} />
         <Route path="/concierge" element={<ConciergePage />} />
-        {/* WP-010 — the cold-start onboarding surface (UC-07). */}
+        {/* The cold-start onboarding surface (UC-07). */}
         <Route path="/onboarding" element={<OnboardingPage />} />
-        {/* WP-011 — start-from-intent (UC-08) + investigation→change (UC-10). */}
+        {/* start-from-intent (UC-08) + investigation→change (UC-10). */}
         <Route path="/start" element={<StartFromIntentPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>
@@ -38,13 +42,15 @@ export function AppRoutes() {
 
 export function App() {
   return (
-    // WP-008 — the active-Product UI scope wraps the whole app so the sidebar
-    // switcher and the board share one scope; switching re-scopes the board +
-    // per-product views (FR-37/38, ADR-009).
+    // The active-Product UI scope wraps the whole app so the product switcher
+    // and the board share one scope; switching re-scopes the board (ADR-009).
+    // OpenTabsProvider holds which changes have an open tab (chat-B2).
     <ActiveProductProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <OpenTabsProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </OpenTabsProvider>
     </ActiveProductProvider>
   );
 }

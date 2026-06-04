@@ -106,16 +106,18 @@ describe("<Sidebar>", () => {
   });
 
   it("highlights the currently-routed change", async () => {
+    // Rows lead with the human change name now (the handle moved to the
+    // accessible label), so distinguish the rows by slug and assert on it.
     const changes: Change[] = [
-      makeChange({ changeId: "01AAA", handle: "CH-01AAA" }),
-      makeChange({ changeId: "01BBB", handle: "CH-01BBB" }),
+      makeChange({ changeId: "01AAA", handle: "CH-01AAA", slug: "alpha-change" }),
+      makeChange({ changeId: "01BBB", handle: "CH-01BBB", slug: "bravo-change" }),
     ];
     mockSidebarFetch(changes);
     const { getAllByTestId } = renderSidebar(["/c/01BBB"]);
     const items = await waitFor(() => getAllByTestId("sidebar-item"));
     const active = items.filter((el) => el.getAttribute("data-active") === "true");
     expect(active).toHaveLength(1);
-    expect(active[0]!.textContent).toContain("CH-01BBB");
+    expect(active[0]!.textContent?.toLowerCase()).toContain("bravo");
   });
 
   it("clicking an item navigates to /c/:changeId", async () => {

@@ -78,4 +78,21 @@
   --weight-heading: 300;
   --weight-label: 500;
 
+  /* Compatibility aliases — components authored against the experience-fragments
+   * token vocabulary (--bg-card / --bg-muted / --text / --radius / --font …)
+   * map onto the cockpit's defined v4.2.0 tokens. Without these the referencing
+   * components (e.g. ProductSwitcher) resolved to nothing → transparent menu /
+   * unstyled surfaces. (CH-01KT50 integration fix; see task #4.) */
+  --bg-card: var(--card);
+  --bg-muted: var(--muted);
+  --border-light: var(--border-muted);
+  --font: var(--font-sans);
+  --radius: var(--radius-container);
+  --text: var(--foreground);
+  --text-secondary: #525252;
+  --text-muted: var(--muted-foreground);
+
+  /* Float shadow for the docked composer + raised cards (chat-B2). */
+  --shadow-float: 0 6px 20px rgba(23, 23, 23, 0.08);
+
 }

@@ -1,0 +1,133 @@
+/* Chat-redesign (chat-B2 signed contract) — tabbed workspace shell.
+ *
+ * Replaces the persistent left Sidebar with a top bar: the product switcher
+ * + a tab strip (Board + each open change as a closable tab). The active
+ * surface renders full-width below. A change opens in its own tab and owns
+ * the screen (its own change-scoped nav lives inside ThreadView). */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  color: var(--foreground);
+  background: var(--background);
+}
+
+.topbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 0 12px;
+  height: 48px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+/* The product switcher sits at the far left, vertically centred. */
+.brand {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding-right: 4px;
+  border-right: 1px solid var(--border-muted);
+  margin-right: 4px;
+}
+
+.tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+/* A tab — Board or an open change. Bottom-border highlight when active. */
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  max-width: 220px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+.tabActive {
+  color: var(--foreground);
+  font-weight: var(--weight-label);
+  border-bottom-color: var(--accent);
+}
+
+.tabIcon {
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+.tabLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Stage dot on a change tab — one shared stage palette (matches the board
+ * and the stage track). Colour is reinforcement; the tab label carries the
+ * name, so it is never the sole cue. */
+.tabDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--border);
+}
+.tabDot[data-stage="recon"] { background: var(--stage-recon); }
+.tabDot[data-stage="specify"] { background: var(--stage-specify); }
+.tabDot[data-stage="design"] { background: var(--stage-design); }
+.tabDot[data-stage="implement"] { background: var(--stage-implement); }
+.tabDot[data-stage="review"] { background: var(--stage-review); }
+.tabDot[data-stage="ship"] { background: var(--stage-ship); }
+
+/* Close affordance — appears on hover/active; a real focusable button. */
+.tabClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  border-radius: var(--radius-interactive);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.tabClose:hover {
+  background: var(--border);
+  color: var(--foreground);
+}
+.tabClose svg {
+  width: 12px;
+  height: 12px;
+}
+
+.main {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}

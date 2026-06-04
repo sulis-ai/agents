@@ -13,7 +13,7 @@ import type { ChangeStatus } from "../../../shared/api-types";
 import styles from "./StatusHeader.module.css";
 
 /** Worded reasons — the founder reads the word, never a colour. */
-const REASON_WORD: Record<
+export const REASON_WORD: Record<
   NonNullable<ChangeStatus["needsAttention"]["reason"]>,
   string
 > = {

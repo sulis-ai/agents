@@ -23,6 +23,40 @@ interface Props {
   view: BrainViewModel;
 }
 
+/* Founder-English labels for the Brain (CH-01KT50 copy fix). The brain
+ * stores machine kinds ("requirement") and some entities carry slug-shaped
+ * titles ("abdwxt9d-email-link-path-…-2"); a non-technical founder should
+ * read words, not identifiers. */
+
+/** "requirement" → "Requirement"; "work-flow" → "Work flow". */
+function humaniseKind(kind: string): string {
+  const words = kind.replace(/[-_]+/g, " ").trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : kind;
+}
+
+/** Plural group heading: "requirement" → "Requirements". */
+function pluraliseKind(kind: string): string {
+  const one = humaniseKind(kind);
+  return /s$/i.test(one) ? one : `${one}s`;
+}
+
+/**
+ * A readable title. Titles that already read as a sentence (contain a
+ * space) are kept verbatim. A slug-shaped title is prettified: drop a
+ * leading hash-ish token and a trailing "-<n>", turn separators into
+ * spaces, capitalise. Never shows a raw identifier as the headline.
+ */
+function prettifyTitle(title: string): string {
+  if (/\s/.test(title)) return title;
+  const cleaned = title
+    .replace(/^[a-z0-9]{6,12}-/i, "") // leading graph/change hash token
+    .replace(/-\d+$/, "") // trailing positional suffix
+    .replace(/[-_]+/g, " ")
+    .trim();
+  if (!cleaned) return title;
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
 export function BrainView({ view }: Props) {
   if (view.groups.length === 0) {
     return (
@@ -53,7 +87,7 @@ export function BrainView({ view }: Props) {
           data-kind={group.kind}
         >
           <h5 className={styles.groupHead}>
-            <span className={styles.kind}>{group.kind}</span>
+            <span className={styles.kind}>{pluraliseKind(group.kind)}</span>
             <span
               className={styles.count}
               aria-label={`${group.items.length} items`}
@@ -82,8 +116,8 @@ function BrainItem({ item }: { item: BrainEntity }) {
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
-        <span className={styles.title}>{item.title}</span>
-        <span className={styles.itemKind}>{item.kind}</span>
+        <span className={styles.title}>{prettifyTitle(item.title)}</span>
+        <span className={styles.itemKind}>{humaniseKind(item.kind)}</span>
       </button>
       {open && (
         <dl className={styles.detail} data-testid="brain-detail">

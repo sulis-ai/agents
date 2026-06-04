@@ -55,18 +55,18 @@ describe("App routes", () => {
   it("renders the Board at /", () => {
     renderAt("/");
     expect(screen.getByTestId("page-board")).toBeInTheDocument();
-    expect(screen.getByTestId("shell-sidebar")).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-topbar")).toBeInTheDocument();
   });
 
   it("renders ThreadView at /c/:changeId", () => {
     renderAt("/c/CH-01KSJA");
     expect(screen.getByTestId("page-thread")).toBeInTheDocument();
-    expect(screen.getByTestId("shell-sidebar")).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-topbar")).toBeInTheDocument();
   });
 
   it("renders NotFound for an unknown path", () => {
     renderAt("/garbage");
     expect(screen.getByTestId("page-not-found")).toBeInTheDocument();
-    expect(screen.getByTestId("shell-sidebar")).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-topbar")).toBeInTheDocument();
   });
 });

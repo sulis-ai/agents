@@ -1,30 +1,17 @@
-// WP-004 — <ThreadView /> tests (REORGANISE-Refactor → coherent shell).
+// <ThreadView /> tests — the change workspace (chat-B2 signed contract).
 //
-// The thread is re-homed from disconnected tabs (Chat | Files) to the
-// ONE coherent reading order per ADR-005:
+// The change owns the screen inside its tab: a change-scoped LEFT NAV
+// (<ChangeNav>: name + vertical stage track + view switches) + a full-width
+// MAIN area rendering the selected view. Conversation is the default; Files /
+// Brain / Preview swap the main area (one at a time).
 //
-//   stage track + plain-English status  (top, the "where am I")
-//   ───────────────────────────────────
-//   Conversation · Brain · Files        (named sections, not tabs)
-//   chat composer dock                  (persistent at the bottom)
-//
-// What the prior tab-era characterisation pinned and is PRESERVED here:
-//   - the header renders the change handle + stage,
-//   - a 404 from useChange renders the gone-or-moved message without
-//     crashing the surface,
-//   - the loading state renders.
-//
-// What is NEW (the refactor's behaviour, FR-04/05/12):
-//   - the stage track marks the change's current stage (done/now/pending),
-//   - the status header shows the read-time headline from /status,
-//   - the needs-attention badge renders when the status flags it,
-//   - the working area is named sections (Conversation/Brain/Files), the
-//     chat composer is always present (docked) rather than behind a tab.
-//
-// References: WP-004 Contract (coherent shell), ADR-005, TDD §6/§6.2.
+// Preserved: the header info (name/stage) renders; a 404 renders the
+// gone-or-moved message without crashing; the loading state renders.
+// New: the vertical stage track marks the current stage; the status headline
+// + needs-attention badge show; switching views swaps the main area.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThreadView } from "../pages/ThreadView";
@@ -80,7 +67,6 @@ const sampleStatus: ChangeStatus = {
   needsAttention: { flagged: false, reason: null },
 };
 
-/** Mock fetch for the change + status + transcript reads the thread makes. */
 function mockFetch(opts: {
   change?: { status: number; body: unknown };
   status?: { status: number; body: unknown };
@@ -95,12 +81,12 @@ function mockFetch(opts: {
       const s = opts.status ?? { status: 200, body: sampleStatus };
       return Promise.resolve(jsonResponse(s.status, s.body));
     }
-    // transcript / brain / anything else — empty so children don't error.
+    // transcript / files / brain / anything else — empty so children don't error.
     return Promise.resolve(jsonResponse(200, []));
   });
 }
 
-describe("<ThreadView /> — coherent shell (WP-004)", () => {
+describe("<ThreadView /> — change workspace (chat-B2)", () => {
   beforeEach(() => {
     vi.spyOn(globalThis, "fetch").mockReset();
   });
@@ -108,28 +94,24 @@ describe("<ThreadView /> — coherent shell (WP-004)", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the header with the change handle (preserved from the tab era)", async () => {
+  it("renders the change-scoped left nav with the change name", async () => {
     mockFetch({});
     renderAt("/c/abc");
     await waitFor(() =>
-      expect(screen.getByTestId("thread-header")).toBeInTheDocument(),
+      expect(screen.getByTestId("change-nav")).toBeInTheDocument(),
     );
-    expect(screen.getByTestId("thread-header").textContent).toContain(
-      "CH-01ABC",
+    expect(screen.getByTestId("change-nav").textContent).toContain(
+      "ship the thing",
     );
   });
 
-  it("renders the stage track at the top with the change's current stage marked (FR-04)", async () => {
+  it("marks the change's current stage in the vertical stage track (FR-04)", async () => {
     mockFetch({});
     renderAt("/c/abc");
-    await waitFor(() =>
-      expect(screen.getByTestId("stage-track")).toBeInTheDocument(),
-    );
-    const steps = screen.getAllByTestId("stage-step");
-    const implement = steps.find(
-      (s) => s.getAttribute("data-stage") === "implement",
-    )!;
-    expect(implement.getAttribute("data-state")).toBe("now");
+    const nav = await screen.findByTestId("change-nav");
+    const now = nav.querySelector('[data-stage="implement"]');
+    expect(now).not.toBeNull();
+    expect(now!.getAttribute("data-state")).toBe("now");
   });
 
   it("renders the read-time plain-English status headline (FR-05)", async () => {
@@ -161,19 +143,24 @@ describe("<ThreadView /> — coherent shell (WP-004)", () => {
     ).toMatch(/waiting on you/);
   });
 
-  it("renders the working area as named sections, not tabs (Conversation/Brain/Files)", async () => {
+  it("defaults to the Conversation view; switching the left nav swaps the main area", async () => {
     mockFetch({});
     renderAt("/c/abc");
     await waitFor(() =>
-      expect(screen.getByTestId("thread-header")).toBeInTheDocument(),
+      expect(screen.getByTestId("change-nav")).toBeInTheDocument(),
     );
-    // Named sections present together — no single-tab-at-a-time gating.
+    // Conversation is the default view.
     expect(screen.getByTestId("section-conversation")).toBeInTheDocument();
+    expect(screen.queryByTestId("section-files")).not.toBeInTheDocument();
+    expect(screen.getByTestId("view-conversation")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    // Switching to Files swaps the main area — one view at a time.
+    fireEvent.click(screen.getByTestId("view-files"));
     expect(screen.getByTestId("section-files")).toBeInTheDocument();
-    // The old tab rail is gone.
-    expect(
-      screen.queryByRole("tab", { name: /files/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("section-conversation")).not.toBeInTheDocument();
   });
 
   it("shows the 'gone or moved' message when useChange returns 404 (preserved)", async () => {
@@ -182,13 +169,9 @@ describe("<ThreadView /> — coherent shell (WP-004)", () => {
     await waitFor(() =>
       expect(screen.getByTestId("thread-gone-or-moved")).toBeInTheDocument(),
     );
-    expect(
-      screen.getByText(/This change is gone or moved/i),
-    ).toBeInTheDocument();
   });
 
   it("renders a loading state while the change is in flight (one state-pattern set)", async () => {
-    // Never resolve the change fetch — keep it loading.
     vi.spyOn(globalThis, "fetch").mockImplementation(
       () => new Promise(() => {}),
     );

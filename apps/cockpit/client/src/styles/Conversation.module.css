@@ -1,0 +1,243 @@
+/* Chat-redesign (chat-B2 signed contract) — the Turn-Cards conversation.
+ * User messages are neutral bubbles; each agent turn is one card (headline +
+ * prose + a folded list of steps). Lifted from the signed mockup to tokens. */
+
+.day {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.day::before,
+.day::after {
+  content: "";
+  height: 1px;
+  background: var(--border-muted);
+  flex: 1;
+}
+
+/* ── user message — neutral bubble, right-aligned ───────────────────────── */
+.msgUser {
+  margin: 0 0 18px auto;
+  max-width: 78%;
+}
+.who {
+  font-size: 10px;
+  color: var(--muted-foreground);
+  margin: 0 2px 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  text-align: right;
+}
+.say {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 10px 10px 3px 10px;
+  padding: 11px 15px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--foreground);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.userTime {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin: 5px 2px 0;
+  text-align: right;
+}
+
+/* ── turn card — one per agent turn ─────────────────────────────────────── */
+.turn {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  margin: 0 0 18px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(23, 23, 23, 0.04);
+}
+.thead {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 15px 18px 12px;
+}
+.av {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  flex: none;
+  background: conic-gradient(from 200deg, #c9a962, #1e3a5f, #2d7d90, #c9a962);
+  margin-top: 1px;
+}
+.hl {
+  flex: 1;
+  min-width: 0;
+}
+/* the 2–3 sentence summary — readable body text, the scannable default.
+ * First sentence bold (.summaryLead); the rest renders markdown (.summaryRest). */
+.summary {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--foreground);
+}
+.summaryLead {
+  font-weight: 700;
+  color: var(--foreground);
+}
+.summaryRest code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--bg-muted);
+  border: 1px solid var(--border-muted);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+.summaryRest a {
+  color: var(--accent);
+}
+
+/* "Show the full reply" toggle — a quiet inline control */
+.fullToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: var(--weight-label);
+  color: var(--accent);
+}
+.fullToggle:hover {
+  text-decoration: underline;
+}
+.fchev {
+  width: 13px;
+  height: 13px;
+}
+
+/* the full reply prose, revealed on expand */
+.fullsaid {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-muted);
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+/* markdown children inside the full reply */
+.fullsaid p { margin: 0 0 8px; }
+.fullsaid p:last-child { margin-bottom: 0; }
+.fullsaid ul,
+.fullsaid ol { margin: 0 0 8px; padding-left: 20px; }
+.fullsaid li { margin: 2px 0; }
+.fullsaid strong { color: var(--foreground); font-weight: 600; }
+.fullsaid a { color: var(--accent); }
+.fullsaid code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--bg-muted);
+  border: 1px solid var(--border-muted);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+.fullsaid pre {
+  background: var(--bg-muted);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-container);
+  padding: 10px 12px;
+  overflow-x: auto;
+  font-size: 12px;
+}
+.fullsaid pre code { border: 0; background: none; padding: 0; }
+
+.turnTime {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 8px;
+}
+
+/* collapsed "N steps" disclosure */
+.stepsToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 18px 13px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-button);
+  background: var(--bg-muted);
+  font-size: 12px;
+  font-weight: var(--weight-label);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+.stepsToggle:hover {
+  background: var(--card);
+  border-color: var(--input);
+  color: var(--foreground);
+}
+.stepsToggle .n {
+  font-weight: 700;
+  color: var(--foreground);
+}
+.stepsToggle .chev {
+  width: 14px;
+  height: 14px;
+  color: var(--muted-foreground);
+}
+
+/* expanded steps */
+.steps {
+  margin: 0 18px 15px;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-container);
+  background: var(--bg-muted);
+}
+.srow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 13px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-muted);
+}
+.srow:last-child {
+  border-bottom: 0;
+}
+.srow .si {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--muted-foreground);
+}
+.srow .obj {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--foreground);
+  background: var(--card);
+  border: 1px solid var(--border-muted);
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+
+.empty {
+  color: var(--muted-foreground);
+  font-size: 14px;
+  text-align: center;
+  padding: 40px 16px;
+}

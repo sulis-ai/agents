@@ -1,18 +1,23 @@
 /* WP-014 — Files panel styles (tree + viewer + toolbar). */
 
+/* Stacked, not side-by-side: the panel lives in the thread's 384px context
+ * rail, where two columns (280px tree + pane) don't fit and force the rail
+ * wider (the page-shift jank). Tree on top (capped, scrolls), viewer below.
+ * (CH-01KT50 rail fit.) */
 .filesPanel {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   min-height: 0;
   height: 100%;
 }
 
-/* ---- File tree (left column) ---- */
+/* ---- File tree (top section) ---- */
 
 .fileTree {
-  flex: 0 0 280px;
+  flex: 0 0 auto;
+  max-height: 40%;
   overflow-y: auto;
-  border-right: 1px solid var(--border, var(--foreground));
+  border-bottom: 1px solid var(--border);
   padding: 8px 0;
 }
 

@@ -121,6 +121,10 @@ describe("StreamJsonSessionBridge — process-start discipline", () => {
     expect(capturedArgs).toContain("--output-format");
     expect(capturedArgs).toContain("stream-json");
     expect(capturedArgs.join(" ")).toMatch(/--resume|--continue/);
+    // #15: the resumed headless process must carry the terminal session's
+    // permission bypass — without it, every Edit/Write hangs (no TTY to
+    // answer the default prompt). Pin it so the fix can't silently regress.
+    expect(capturedArgs).toContain("--dangerously-skip-permissions");
   });
 
   it("constructs a spawn (no --resume) for a fresh session", async () => {

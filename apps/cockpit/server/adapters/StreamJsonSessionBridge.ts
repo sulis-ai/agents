@@ -210,6 +210,18 @@ export function buildArgv(
     "--include-partial-messages",
     // REQUIRED with --print + --output-format stream-json (see fn doc above).
     "--verbose",
+    // Match the permission posture of the terminal session this resumes.
+    // The change-spawn launches the interactive session with
+    // `claude --dangerously-skip-permissions` (see ~/.sulis/changes/<id>/
+    // launch.sh); the web chat resumes the SAME conversation but as a
+    // SEPARATE, headless process — and permissions are per-process, set by
+    // launch flags, NOT carried over by --resume. Without this flag the
+    // resumed process falls back to Claude's default (prompt-before-write),
+    // and a headless process has no TTY to answer the prompt — so every
+    // Edit/Write hangs forever. Safe: the change runs in an isolated
+    // worktree on its own branch; nothing reaches the founder's project
+    // until review + ship. (Founder-authorised; #15.)
+    "--dangerously-skip-permissions",
   ];
   if (resolution.kind === "resumable") {
     const ref = resolution.session.lastSessionRef;
