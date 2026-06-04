@@ -35,6 +35,7 @@ import { createTranscriptRouter } from "./routes/transcript";
 import { createContractRouter } from "./routes/contract";
 import { createStatusRouter } from "./routes/status";
 import { createBrainRouter } from "./routes/brain";
+import { createSearchRouter } from "./routes/search";
 
 import { errorMiddleware } from "./middleware/errors";
 import { requestLogMiddleware } from "./middleware/request-log";
@@ -195,6 +196,21 @@ export function createApp(deps: CreateAppDeps): Application {
     "/api/changes/:id/brain",
     createBrainRouter({
       changeStore: deps.changeStore,
+    }),
+  );
+
+  // WP-007 — search + filter (FR-10/11/12). GET-only; searches the active
+  // Product's change CONTENT (conversation + created entities — not just
+  // labels), filters by stage and needs-attention, and returns the same
+  // row shape as the board list (`{ results: Change[] }`). All filters
+  // narrow the SAME board (ADR-005). Composes existing reads — no new
+  // port; reading it starts no `claude` process (FR-N4).
+  app.use(
+    "/api/search",
+    createSearchRouter({
+      changeStore: deps.changeStore,
+      sulisStateDir: deps.sulisStateDir,
+      claudeProjectsDir: deps.claudeProjectsDir,
     }),
   );
 

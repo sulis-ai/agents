@@ -57,6 +57,7 @@ and the ports (the change-store reader, WP-003; the `SessionBridge`, WP-005).
 | `GET /api/changes/:id`               | One change + the resolved transcript file paths.                                                                                                                                                                                                                    | `ChangeDetail`                                          |
 | `GET /api/changes/:id/status`        | Read-time plain-English status + needs-attention flag, computed on each read from the record + transcript + liveness (never a stored post).                                                                                                                         | `ChangeStatus`                                          |
 | `GET /api/changes/:id/brain`         | The entities the agent created for the change (requirements, designs, decisions, workflows…), grouped by kind off the worktree's `.brain/instances` tree; empty groups omitted; a change with none returns `{ groups: [] }` (WP-006). Reading it starts no process. | `BrainView`                                             |
+| `GET /api/search?q=&stage=&needsAttention=` | Search + filter the active Product's changes by **content** (conversation + created entities — not just titles, FR-10), by `stage` (repeatable param → array, FR-11), and by `needsAttention` (blocked / waiting-on-decision / stopped-mid-reply; idle-but-fine is NOT flagged — FR-12, reuses `needsAttention`). Filters compose; same row shape as the board list. Reading it starts no process (WP-007). | `{ results: Change[] }`                                 |
 | `GET /api/changes/:id/tree?path=...` | One level of the worktree's folder tree. Default = root.                                                                                                                                                                                                            | `TreeNode[]`                                            |
 | `GET /api/changes/:id/file?path=...` | Current contents of a file in the worktree (1 MiB cap).                                                                                                                                                                                                             | `FileContents`                                          |
 | `GET /api/changes/:id/diff?path=...` | Base (at `baseSha`) + current contents for Monaco's DiffEditor.                                                                                                                                                                                                     | `FileDiff`                                              |
@@ -153,6 +154,34 @@ Two read surfaces let the founder **see what the agent created** and
   `.html`/`.htm` inside a **sandboxed, script-free iframe**. A code file
   is not renderable — it stays read-only source in the existing Monaco
   viewer (`<MonacoFile>`, reused; EP-03), with no toggle.
+
+### Search + filter (WP-007)
+
+The board's one toolbar lets the founder **narrow the same board** —
+there is no separate results screen (ADR-005):
+
+- **Route (`GET /api/search`).** `routes/search.ts` lists the active
+  Product's changes (`scopeChangesToActiveProduct`; trivial single-Product
+  case = all), then for each gathers its **searchable content** and its
+  **attention verdict** via the shared `lib/gatherChangeStatus.ts` (the
+  same read-time context the `status` route uses — the FR-12 attention
+  verdict is computed in ONE place, reusing `lib/needsAttention.ts`). The
+  content scan (`lib/gatherChangeContent.ts`) folds the record's labels +
+  the **conversation text** + the **created-entity text** into one string,
+  so a term that appears only in a change's conversation or in something
+  the agent created still matches (FR-10) — not just titles. The pure
+  `lib/searchChanges.ts` filter then applies `q` (content), `stage[]`
+  (FR-11, repeatable param → array), and `needsAttention` (FR-12) with AND
+  semantics; survivors are shaped to the same `Change` row shape as the
+  board list. GET-only; reading it starts **no** `claude` process.
+
+- **Toolbar (`<SearchBar>` in `<Board>`).** The board owns the filter
+  state; the toolbar is a controlled `role="search"` component with the
+  content-search box, the six stage chips, and the needs-attention chip
+  (the SIGNED visual contract). The `useSearch` hook fetches `/api/search`
+  only when a filter is active; otherwise the board shows the full
+  active-Product list. Clearing every filter restores the full board.
+  Consumes `tokens.css` only.
 
 Non-2xx responses use a single envelope:
 

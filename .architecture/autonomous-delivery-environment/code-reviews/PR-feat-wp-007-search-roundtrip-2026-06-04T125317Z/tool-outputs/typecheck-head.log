@@ -1,0 +1,1 @@
+typecheck HEAD: clean (tsc --noEmit -p server && -p client)

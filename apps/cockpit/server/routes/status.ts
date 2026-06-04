@@ -16,11 +16,7 @@ import { Router } from "express";
 // eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (TDD §9 permits; the rule's `../../*` pattern is intended to block escapes out of apps/cockpit/, which `import/no-restricted-paths` already enforces correctly)
 import type { ChangeStatus } from "../../shared/api-types";
 import type { ChangeStoreReader } from "../ports/ChangeStoreReader";
-import { locateTranscripts } from "../lib/locateTranscripts";
-import { parseTranscripts } from "../lib/parseTranscripts";
-import { probeLiveness } from "../lib/probeLiveness";
-import { detectOpenBlocker } from "../lib/detectOpenBlocker";
-import { computeStatus } from "../lib/computeStatus";
+import { gatherChangeStatus } from "../lib/gatherChangeStatus";
 
 import { asyncHandler } from "./_async";
 import { requireChange } from "./_change-lookup";
@@ -39,19 +35,11 @@ export function createStatusRouter(deps: StatusRouterDeps): Router {
       const { id } = req.params as { id: string };
       const record = await requireChange(deps.changeStore, id);
 
-      const [liveness, transcriptPaths, hasOpenBlocker] = await Promise.all([
-        probeLiveness(deps.sulisStateDir, id),
-        locateTranscripts(record.worktreePath, deps.claudeProjectsDir),
-        detectOpenBlocker(record.worktreePath),
-      ]);
-      const transcript = await parseTranscripts(transcriptPaths);
+      // Gather the read-time context via the shared helper (also used by the
+      // search route) — the FR-12 attention verdict is computed in ONE place.
+      const { status } = await gatherChangeStatus(deps, record);
 
-      const body: ChangeStatus = computeStatus({
-        record,
-        transcript,
-        liveness,
-        hasOpenBlocker,
-      });
+      const body: ChangeStatus = status;
       res.json(body);
     }),
   );
