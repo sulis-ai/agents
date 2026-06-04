@@ -32,6 +32,8 @@ import type {
   ConciergeStreamEvent,
   OnboardingRequest,
   OnboardingStreamEvent,
+  StartFromIntentRequest,
+  StartFromIntentStreamEvent,
 } from "../../shared/api-types";
 import { checkSessionBinding } from "../lib/sessionBinding";
 import { InFlightLock } from "../lib/inFlightLock";
@@ -41,6 +43,11 @@ import {
   type ConciergeRoute,
 } from "../lib/concierge/conciergeRead";
 import { OnboardingOrchestrator } from "../lib/discovery/onboardingOrchestrator";
+import {
+  StartFromIntentOrchestrator,
+  type ResolvedProject,
+} from "../lib/discovery/startFromIntent";
+import type { StartChangeRunner } from "../ports/StartChangeRunner";
 import type { SpineMinter } from "../ports/SpineMinter";
 import {
   readProducts,
@@ -293,7 +300,11 @@ function openSseHeaders(res: import("express").Response): void {
  */
 function writeSseFrame(
   res: import("express").Response,
-  event: ChatStreamEvent | ConciergeStreamEvent | OnboardingStreamEvent,
+  event:
+    | ChatStreamEvent
+    | ConciergeStreamEvent
+    | OnboardingStreamEvent
+    | StartFromIntentStreamEvent,
 ): void {
   res.write(`data: ${JSON.stringify(event)}\n\n`);
 }
@@ -640,6 +651,138 @@ async function handleOnboarding(
     log({
       phase,
       outcome: sawError ? "refused" : sawMinted ? "minted" : "proposed",
+      ...(sawError ? { code: sawError } : {}),
+    });
+    res.end();
+  } finally {
+    handle.release();
+  }
+}
+
+// ─── WP-011 — the start-from-intent route (FR-29/30/34; FR-N6/N9; ADR-006/007) ─
+//
+// Say what you want → (confirm) → a change starts at Recon. The THIRD confirm-
+// gated ACT path in the cockpit, registered HERE — in the ONE already-sanctioned
+// write-verb file (ADR-003) — so start-from-intent adds NO new file-level write
+// exception (WP-011 AC / ADR-006); the read-only gate's allow-list stays
+// {chat.ts}.
+//
+// The classify is a DETERMINISTIC server step (the change-primitives vocabulary,
+// FR-29). The consequential change-start is a DETERMINISTIC SERVER action behind
+// the StartChangeRunner port (the WP-010 lesson: never delegate the act to the
+// bridge agent — that ran 167s and created nothing). The orchestrator owns the
+// safety plumbing — confirm gate, local-first clone, all-or-nothing — and starts
+// no process itself; the SulisChangeStarter adapter is the one sanctioned site.
+//
+// One discovery session at a time: a single in-flight lock yields 409
+// SESSION_BUSY on a second concurrent start, and a single orchestrator instance
+// carries the live proposal across the propose → confirm turns.
+//
+// One structured act-log line per consequential act — never the intent text
+// (NFR-SEC-03).
+
+/** A structured start-from-intent log line — no intent text (NFR-SEC-03). */
+export interface StartChangeLogLine {
+  phase: StartFromIntentRequest["phase"];
+  outcome: "proposed" | "started" | "refused";
+  primitive?: string;
+  code?: string;
+}
+
+export interface StartChangeRouterDeps {
+  /** The SAME bridge the chat rides (FR-27) — present so the route mounts. */
+  sessionBridge: SessionBridge;
+  /** The deterministic server-side change-start (ADR-007). */
+  startChangeRunner: StartChangeRunner;
+  /** Resolve a productId → its Project repo (or null when unknown). */
+  resolveProject: (productId: string) => Promise<ResolvedProject | null>;
+  /** One-line-per-act structured log (no intent text). Default no-op. */
+  startChangeLogSink?: (line: StartChangeLogLine) => void;
+}
+
+/** The sentinel session id (NOT a change id). */
+const START_LOCK_KEY = "start-from-intent";
+
+export function createStartChangeRouter(deps: StartChangeRouterDeps): Router {
+  const router = Router({ mergeParams: true });
+  const log = deps.startChangeLogSink ?? (() => {});
+  const lock = new InFlightLock();
+
+  // One orchestrator instance per process carries the live proposal across the
+  // propose → confirm turns.
+  const orchestrator = new StartFromIntentOrchestrator({
+    startChangeRunner: deps.startChangeRunner,
+    resolveProject: deps.resolveProject,
+    newToken: () => randomToken(),
+  });
+
+  router.use(jsonBody());
+
+  // Registered at the LITERAL `/start-from-intent` path; mounted under
+  // `/api/changes` in app.ts (a literal-prefix mount, mirroring the chat relay).
+  router.post("/start-from-intent", (req, res, next) => {
+    void handleStartChange(req, res, orchestrator, lock, log).catch(next);
+  });
+
+  return router;
+}
+
+async function handleStartChange(
+  req: import("express").Request,
+  res: import("express").Response,
+  orchestrator: StartFromIntentOrchestrator,
+  lock: InFlightLock,
+  log: (line: StartChangeLogLine) => void,
+): Promise<void> {
+  const body = req.body as StartFromIntentRequest;
+  const phase = body?.phase;
+
+  // A missing/invalid phase is a 400.
+  if (phase !== "propose" && phase !== "confirm") {
+    res.status(400).json({ error: "a valid phase is required", code: "BAD_REQUEST" });
+    return;
+  }
+
+  // One start at a time. A second concurrent session is refused with 409.
+  const handle = lock.acquire(START_LOCK_KEY);
+  if (handle === null) {
+    log({ phase, outcome: "refused", code: "SESSION_BUSY" });
+    res.status(409).json({
+      error: "I'm already starting something — one at a time.",
+      code: "SESSION_BUSY",
+    });
+    return;
+  }
+
+  try {
+    // PRE-STREAM refusals (parity with the onboarding/chat lazy-open pattern):
+    // an ambiguous intent, a stale confirm, or an unreachable repo returns a
+    // clean JSON status — never a 200 stream with an error frame (FR-29/30/N6).
+    const refusal = await orchestrator.precheck(body);
+    if (refusal) {
+      log({ phase, outcome: "refused", code: refusal.code });
+      res.status(refusal.status).json({ error: refusal.message, code: refusal.code });
+      return;
+    }
+
+    openSseHeaders(res);
+    let sawStarted = false;
+    let sawError: string | undefined;
+    let startedPrimitive: string | undefined;
+    await orchestrator.turn(body, {
+      emit: (event: StartFromIntentStreamEvent) => {
+        if (event.type === "started") {
+          sawStarted = true;
+          startedPrimitive = event.started.primitive;
+        }
+        if (event.type === "error") sawError = event.code;
+        writeSseFrame(res, event);
+      },
+    });
+    log({
+      phase,
+      outcome: sawError ? "refused" : sawStarted ? "started" : "proposed",
+      ...(startedPrimitive ? { primitive: startedPrimitive } : {}),
       ...(sawError ? { code: sawError } : {}),
     });
     res.end();

@@ -52,6 +52,7 @@ import type {
   FindOrCreateRepoInput,
 } from "../ports/SpineMinter";
 import type { RepoOutcome } from "../lib/discovery/repoFindOrCreate";
+import { resolvePluginScriptsDir } from "./resolvePluginScripts";
 // eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (TDD §9 permits)
 import type { Product } from "../../shared/api-types";
 
@@ -304,61 +305,15 @@ function spineHelperDir(): string {
 }
 
 /**
- * Resolve the spine-emitter scripts dir, mirroring index.ts's helper
- * resolution. Order:
- *   1. `SULIS_EMITTER_SCRIPTS_DIR` env override (tests / CI);
- *   2. the in-repo `plugins/sulis/scripts` (a marketplace checkout);
- *   3. the latest installed plugin cache
- *      (`~/.claude/plugins/cache/.../sulis/<version>/scripts`).
- * Returns the first dir that actually holds `sulis-emit-tenant`, else "".
+ * Resolve the spine-emitter scripts dir. Delegates the env-override → in-repo →
+ * latest-plugin-cache search to the shared `resolvePluginScriptsDir` (the
+ * 2-consumer primitive shared with SulisChangeStarter, WP-011 Blue refactor),
+ * keyed on `sulis-emit-tenant`. Honours `SULIS_EMITTER_SCRIPTS_DIR`. Returns ""
+ * when no dir holds the emitter.
  */
 export function resolveEmitterScriptsDir(): string {
-  const override = process.env.SULIS_EMITTER_SCRIPTS_DIR;
-  if (override && existsSync(path.join(override, "sulis-emit-tenant"))) {
-    return override;
-  }
-
-  // In-repo (marketplace checkout): apps/cockpit/server/adapters → repo root.
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  const repoRoot = path.resolve(here, "..", "..", "..", "..");
-  const inRepo = path.join(repoRoot, "plugins", "sulis", "scripts");
-  if (existsSync(path.join(inRepo, "sulis-emit-tenant"))) return inRepo;
-
-  // Installed plugin cache — pick the latest version dir that has the emitter.
-  const home = process.env.HOME ?? "";
-  if (home) {
-    const cacheRoot = path.join(home, ".claude", "plugins", "cache");
-    const found = latestPluginScriptsDir(cacheRoot);
-    if (found) return found;
-  }
-
-  return "";
-}
-
-/** Find the newest `.../sulis/<version>/scripts` dir holding sulis-emit-tenant. */
-function latestPluginScriptsDir(cacheRoot: string): string | null {
-  if (!existsSync(cacheRoot)) return null;
-  const candidates: string[] = [];
-  // Layout: <cacheRoot>/<marketplace>/sulis/<version>/scripts/sulis-emit-tenant
-  for (const marketplace of safeReaddir(cacheRoot)) {
-    const sulisDir = path.join(cacheRoot, marketplace, "sulis");
-    for (const version of safeReaddir(sulisDir)) {
-      const scripts = path.join(sulisDir, version, "scripts");
-      if (existsSync(path.join(scripts, "sulis-emit-tenant"))) {
-        candidates.push(scripts);
-      }
-    }
-  }
-  if (candidates.length === 0) return null;
-  // Newest version string last (lexical sort is adequate for semver-ish dirs).
-  candidates.sort();
-  return candidates[candidates.length - 1] ?? null;
-}
-
-function safeReaddir(dir: string): string[] {
-  try {
-    return readdirSync(dir);
-  } catch {
-    return [];
-  }
+  return resolvePluginScriptsDir({
+    scriptName: "sulis-emit-tenant",
+    envOverride: process.env.SULIS_EMITTER_SCRIPTS_DIR,
+  });
 }

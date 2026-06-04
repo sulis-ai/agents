@@ -199,6 +199,13 @@ for f in "${SOURCE_FILES[@]}"; do
   #                                       gated + all-or-nothing; the mint moved
   #                                       server-side because the agent-delegated
   #                                       mint was slow + unreliable (minted nothing).
+  #       - SulisChangeStarter.ts      — the deterministic start-from-intent
+  #                                       change-start (WP-011, ADR-007): execFiles
+  #                                       `sulis-change start` + `git clone` on a
+  #                                       confirmed start turn. Confirm-gated +
+  #                                       all-or-nothing; server-side for the SAME
+  #                                       reason as the mint (the agent-delegated
+  #                                       act was slow + created nothing).
   #     The guarantee this rule adds: NO NEW file may start a process; a future
   #     route or lib that sprouts a spawn fails the gate.
   case "$rel" in
@@ -206,7 +213,8 @@ for f in "${SOURCE_FILES[@]}"; do
     server/lib/gitShow.ts | \
     server/adapters/SulisChangeStoreReader.ts | \
     server/adapters/SulisChangeRecreator.ts | \
-    server/adapters/SpineEmitterMinter.ts)
+    server/adapters/SpineEmitterMinter.ts | \
+    server/adapters/SulisChangeStarter.ts)
       ;; # sanctioned process-start site — skip
     *)
       while IFS= read -r line; do

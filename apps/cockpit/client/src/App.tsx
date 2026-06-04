@@ -16,6 +16,7 @@ import { Board } from "./pages/Board";
 import { ThreadView } from "./pages/ThreadView";
 import { ConciergePage } from "./pages/ConciergePage";
 import { OnboardingPage } from "./pages/OnboardingPage";
+import { StartFromIntentPage } from "./pages/StartFromIntentPage";
 import { NotFound } from "./pages/NotFound";
 
 export function AppRoutes() {
@@ -27,6 +28,8 @@ export function AppRoutes() {
         <Route path="/concierge" element={<ConciergePage />} />
         {/* WP-010 — the cold-start onboarding surface (UC-07). */}
         <Route path="/onboarding" element={<OnboardingPage />} />
+        {/* WP-011 — start-from-intent (UC-08) + investigation→change (UC-10). */}
+        <Route path="/start" element={<StartFromIntentPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

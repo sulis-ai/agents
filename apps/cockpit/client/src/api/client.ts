@@ -24,6 +24,8 @@ import type {
   ConciergeStreamEvent,
   OnboardingRequest,
   OnboardingStreamEvent,
+  StartFromIntentRequest,
+  StartFromIntentStreamEvent,
 } from "../../../shared/api-types";
 
 /**
@@ -257,4 +259,57 @@ export const streamOnboarding: StreamOnboardingFn = async (request, onEvent) => 
 
   if (!res.body) return;
   await readSseStream<OnboardingStreamEvent>(res.body, onEvent);
+};
+
+// ─── WP-011 — the start-from-intent funnel (start a change; FR-29/30/34) ─────
+//
+// `streamStartFromIntent` POSTs ONE start-from-intent turn to
+// /api/changes/start-from-intent and reads the SSE stream, invoking `onEvent`
+// per `StartFromIntentStreamEvent`. It lives HERE alongside the other SSE
+// callers so it stays inside the client inventory gate's `fetch` allow-list
+// (only api/client.ts). The change-start act is confirm-gated server-side
+// (FR-N6); the funnel just carries the turn. A pre-stream refusal (ambiguous /
+// stale / unreachable / busy) arrives as a non-2xx JSON status, mapped to a
+// single `error` event so the hook has ONE event shape to project (parity with
+// the chat / concierge / onboarding funnels).
+
+/** The signature StartFromIntent / useStartFromIntent inject (testable). */
+export type StreamStartFromIntentFn = (
+  request: StartFromIntentRequest,
+  onEvent: (event: StartFromIntentStreamEvent) => void,
+) => Promise<void>;
+
+function asStartErrorCode(
+  code: string | null,
+): Extract<StartFromIntentStreamEvent, { type: "error" }>["code"] {
+  if (
+    code === "INTENT_AMBIGUOUS" ||
+    code === "START_CONFIRM_STALE" ||
+    code === "REPO_UNREACHABLE" ||
+    code === "SESSION_BUSY" ||
+    code === "SESSION_UNREACHABLE"
+  ) {
+    return code;
+  }
+  return "SESSION_UNREACHABLE";
+}
+
+export const streamStartFromIntent: StreamStartFromIntentFn = async (
+  request,
+  onEvent,
+) => {
+  const res = await fetch("/api/changes/start-from-intent", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+
+  if (!res.ok) {
+    const { code, message } = await readErrorBody(res);
+    onEvent({ type: "error", code: asStartErrorCode(code), message });
+    return;
+  }
+
+  if (!res.body) return;
+  await readSseStream<StartFromIntentStreamEvent>(res.body, onEvent);
 };

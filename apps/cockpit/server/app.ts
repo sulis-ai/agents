@@ -30,15 +30,24 @@ import {
   createChatRouter,
   createConciergeRouter,
   createOnboardingRouter,
+  createStartChangeRouter,
   type ChatLogLine,
   type ConciergeLogLine,
   type OnboardingLogLine,
+  type StartChangeLogLine,
 } from "./routes/chat";
 import type { SpineMinter } from "./ports/SpineMinter";
 import {
   SpineEmitterMinter,
   resolveEmitterScriptsDir,
 } from "./adapters/SpineEmitterMinter";
+import type { StartChangeRunner } from "./ports/StartChangeRunner";
+import {
+  SulisChangeStarter,
+  resolveSulisChangeScript,
+} from "./adapters/SulisChangeStarter";
+import type { ResolvedProject } from "./lib/discovery/startFromIntent";
+import { resolveProjectRepo } from "./lib/products/resolveProjectRepo";
 
 import { createChangesRouter } from "./routes/changes";
 import { createChangeDetailRouter } from "./routes/change-detail";
@@ -103,6 +112,25 @@ export interface CreateAppDeps {
    * (NFR-SEC-03: never the chosen area, prompt, or reply). Defaults to no-op.
    */
   onboardingLogSink?: (line: OnboardingLogLine) => void;
+  /**
+   * WP-011 (fix-forward applied) — the deterministic server-side change-start
+   * (ADR-007). Production defaults to the real `SulisChangeStarter` (execFiles
+   * `sulis-change start` + `git clone` directly — the WP-010 lesson: never
+   * delegate the act to the bridge agent). Tests inject a fake to exercise
+   * propose/confirm/clone/all-or-nothing without a real `sulis-change`.
+   */
+  startChangeRunner?: StartChangeRunner;
+  /**
+   * WP-011 — resolve a productId → its Project repo (FR-29). Production reads
+   * the brain's Project entities (`resolveProjectRepo`); tests inject a seam so
+   * the integration test needs no on-disk brain.
+   */
+  startResolveProject?: (productId: string) => Promise<ResolvedProject | null>;
+  /**
+   * WP-011 — where the start-from-intent one-line-per-act log goes (NFR-SEC-03:
+   * never the intent text). Defaults to no-op.
+   */
+  startChangeLogSink?: (line: StartChangeLogLine) => void;
   sulisStateDir: string;
   claudeProjectsDir: string;
   /** Optional override for the 1 MiB file cap (tests + future tuning). */
@@ -188,6 +216,37 @@ export function createApp(deps: CreateAppDeps): Application {
         permittedRoot: deps.onboardingPermittedRoot ?? homedir(),
         ...(deps.onboardingLogSink
           ? { onboardingLogSink: deps.onboardingLogSink }
+          : {}),
+      }),
+    );
+
+    // WP-011 — the start-from-intent route (ADR-006/007). The THIRD confirm-
+    // gated ACT path, registered in the SAME sanctioned relay file
+    // (routes/chat.ts) so no NEW file gains a write verb. The classify is a
+    // deterministic server step; the change-start is a deterministic SERVER
+    // action behind the StartChangeRunner port (production defaults to the real
+    // SulisChangeStarter — execFiles `sulis-change start` + `git clone`, the
+    // WP-010 lesson applied). Mounted at the LITERAL `/api/changes` prefix (the
+    // router matches `/start-from-intent` internally — a parametric mount
+    // mis-matches a POST over a real socket, the chat-relay lesson). Mounted
+    // only when a bridge is wired (else start-from-intent degrades to
+    // unavailable — read surfaces unaffected).
+    app.use(
+      "/api/changes",
+      createStartChangeRouter({
+        sessionBridge: deps.sessionBridge,
+        startChangeRunner:
+          deps.startChangeRunner ??
+          new SulisChangeStarter({
+            scriptPath: resolveSulisChangeScript(),
+            sulisStateDir: deps.sulisStateDir,
+          }),
+        resolveProject:
+          deps.startResolveProject ??
+          ((productId: string) =>
+            resolveProjectRepo({ sulisStateDir: deps.sulisStateDir, productId })),
+        ...(deps.startChangeLogSink
+          ? { startChangeLogSink: deps.startChangeLogSink }
           : {}),
       }),
     );

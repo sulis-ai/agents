@@ -70,6 +70,13 @@ const BRIDGE_ADAPTER_BASENAME = "StreamJsonSessionBridge.ts";
 // `git init`, writes the emitter config yaml + stages entities). Allow-listed
 // BY PATH — parity with the chat relay's write-verb exception (ADR-003).
 const SPINE_MINTER_BASENAME = "SpineEmitterMinter.ts";
+// WP-011 — the deterministic server-side change-start's confirm-gated ACT path.
+// It execFiles `sulis-change start` + `git clone` directly (the WP-010 lesson:
+// never delegate the consequential act to the bridge agent). It is the THIRD
+// sanctioned process-start site, allow-listed BY PATH — parity with the bridge
+// + mint adapters. It registers NO new write-verb file: the route lives in
+// chat.ts (the one sanctioned relay file, ADR-006).
+const STARTER_BASENAME = "SulisChangeStarter.ts";
 
 // Process-start shapes — spawn/exec of a child process. Forbidden everywhere
 // except the allow-listed bridge adapter (the new ADR-003 process-start rule).
@@ -245,6 +252,7 @@ describe("read-only inventory (TDD §13.7)", () => {
         "SulisChangeStoreReader.ts",
         "SulisChangeRecreator.ts",
         SPINE_MINTER_BASENAME,
+        STARTER_BASENAME,
       ]);
       if (SANCTIONED_PROCESS_STARTERS.has(basename(f))) {
         continue;
@@ -327,5 +335,43 @@ describe("read-only inventory (TDD §13.7)", () => {
     expect(PROCESS_START_PATTERNS.some((p) => p.test(src))).toBe(false);
     expect(FS_MUTATION_PATTERNS.some((p) => p.test(src))).toBe(false);
     expect(MUTATION_VERB_PATTERNS.some((p) => p.test(src))).toBe(false);
+  });
+
+  // WP-011 (ADR-006) — start-from-intent's consequential act reaches consequence
+  // ONLY through the sanctioned `sulis-change start` path (the new
+  // SulisChangeStarter adapter). It must add NO new write-verb file: the route
+  // lives in chat.ts (the one sanctioned relay), and the orchestration lib stays
+  // process-free (the adapter is the one audited process-start site).
+  it("adds NO new write-verb file for start-from-intent — the allow-list stays {chat.ts} (ADR-006)", async () => {
+    const files = await collectSourceFiles();
+    const writeVerbFiles: string[] = [];
+    for (const f of files) {
+      const src = stripComments(await readSource(f));
+      if (MUTATION_VERB_PATTERNS.some((p) => p.test(src))) {
+        writeVerbFiles.push(basename(f));
+      }
+    }
+    // Still exactly one file registers a write verb: the sanctioned relay (which
+    // now also hosts the start-from-intent POST so no NEW file gains a verb).
+    expect(writeVerbFiles).toEqual([RELAY_ROUTE_BASENAME]);
+  });
+
+  it("the start-from-intent orchestration lib starts no process and writes nothing (the act is the adapter's)", async () => {
+    const startLib = join(serverRoot, "lib", "discovery", "startFromIntent.ts");
+    const src = stripComments(await readSource(startLib));
+    expect(PROCESS_START_PATTERNS.some((p) => p.test(src))).toBe(false);
+    expect(FS_MUTATION_PATTERNS.some((p) => p.test(src))).toBe(false);
+    expect(MUTATION_VERB_PATTERNS.some((p) => p.test(src))).toBe(false);
+  });
+
+  it("the SulisChangeStarter adapter IS the only new process-start site (deterministic server-side act)", async () => {
+    const files = await collectSourceFiles();
+    const starter = files.find((f) => basename(f) === STARTER_BASENAME);
+    expect(starter, "SulisChangeStarter.ts must exist (the deterministic act)").toBeDefined();
+    if (starter) {
+      const src = stripComments(await readSource(starter));
+      // It DOES start a process (that is its sanctioned job).
+      expect(PROCESS_START_PATTERNS.some((p) => p.test(src))).toBe(true);
+    }
   });
 });

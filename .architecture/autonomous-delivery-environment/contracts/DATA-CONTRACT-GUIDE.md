@@ -33,7 +33,8 @@ the safety line for this whole change.
 | **Seeing your products** | "List my products and mark the one I'm looking at." | No — read only |
 | **Asking the concierge a question** | "Find the change about the login page / where's the payments change up to? / what needs my attention?" | No — read only (it looks things up and tells you) |
 | **Getting set up the first time (onboarding)** | "Look in this folder, figure out my product and where my code is, and — once I say yes — create my product and project." | **Yes — but only after you confirm** |
-| **Starting work from something you typed** | "I want to fix the hanging login page — turn that into a new piece of work." | **Yes — but only after you confirm** |
+| **Starting work from something you typed** | "I want to fix the hanging login page — turn that into a new piece of work." It works out what kind of change it is and a short name, shows you, and starts it only when you say yes (landing at the first step, Recon). If the code isn't on this machine yet, it fetches a copy first; if it can't, it tells you and starts nothing. | **Yes — but only after you confirm** |
+| **Asking it to look into something** | "Look into why checkout is slow." It doesn't go poking around on the spot — it creates a proper piece of work to look into it, exactly like any other change, so the investigation has a home. | **Yes — but only after you confirm** |
 
 ## What "needs attention" means (so we agree on it)
 
