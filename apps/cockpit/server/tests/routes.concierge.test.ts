@@ -170,6 +170,68 @@ describe("POST /api/concierge/query — consequential intent ROUTES, never acts 
   });
 });
 
+// ─── Fix-forward: investigation is CONTAINED, never streamed inline (FR-N9) ───
+//
+// The live failure: "Can you look into why the deploy keeps failing?" streamed
+// an INLINE investigation (the bridge started reading repos) before any route
+// hint. The contract is that a consequential intent must NOT reach the inline
+// read-only bridge AT ALL — the bridge relay is short-circuited and only the
+// confirm-gated `route` offer is emitted. We assert relayCalls === 0 so the
+// recorded fixture can never mask classifier drift.
+
+describe("POST /api/concierge/query — consequential intent is CONTAINED (no inline relay, FR-N9)", () => {
+  const INVESTIGATION_QUESTIONS = [
+    "look into why sign-ups dropped last week",
+    "Can you look into why the deploy keeps failing?",
+    "investigate the slow checkout",
+    "why is the deploy failing?",
+    "find out why customers are churning",
+    "diagnose the timeout on the dashboard",
+  ];
+
+  it.each(INVESTIGATION_QUESTIONS)(
+    "routes to start-from-intent WITHOUT calling the bridge: %s",
+    async (question) => {
+      const bridge = new ProgrammableBridge();
+      const app = appWith(bridge);
+      const res = await request(app)
+        .post("/api/concierge/query")
+        .send({ question });
+
+      expect(res.status).toBe(200);
+      expect(res.text).toContain('"route":"start-from-intent"');
+      // The whole point: the inline investigation bridge is NEVER called for a
+      // consequential intent. Investigation is contained in a change, not run
+      // loose in the concierge (FR-N9).
+      expect(bridge.relayCalls).toBe(0);
+    },
+  );
+
+  it("a read-only question STILL streams via the bridge (relay called once)", async () => {
+    const bridge = new ProgrammableBridge();
+    const app = appWith(bridge);
+    const res = await request(app)
+      .post("/api/concierge/query")
+      .send({ question: "what needs my attention?" });
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('"route":null');
+    expect(bridge.relayCalls).toBe(1);
+  });
+
+  it("an empty-world set-up request is also contained (no inline relay)", async () => {
+    const bridge = new ProgrammableBridge();
+    const app = appWith(bridge, []); // empty world
+    const res = await request(app)
+      .post("/api/concierge/query")
+      .send({ question: "set me up" });
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('"route":"onboarding"');
+    expect(bridge.relayCalls).toBe(0);
+  });
+});
+
 describe("POST /api/concierge/query — failure (FR-19/N3) + containment (FR-N8)", () => {
   it("502 SESSION_UNREACHABLE when the bridge can't be reached", async () => {
     const bridge = new ProgrammableBridge(async () => ({

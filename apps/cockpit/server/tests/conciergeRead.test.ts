@@ -96,6 +96,71 @@ describe("detectRoute — consequential intent routes, read-only Q&A does not (F
   });
 });
 
+// ─── Fix-forward: deterministic investigation-intent table (FR-N9) ───────────
+//
+// The live concierge let investigation phrasings slip to the inline-answer path
+// because detection was LLM-classified. These tables PIN the deterministic
+// pre-classifier so investigation-phrased requests ALWAYS route (never inline)
+// and genuine read-only questions ALWAYS stay inline (route null). Both live
+// examples that drove this fix are included verbatim.
+
+describe("detectRoute — investigation phrasings ALWAYS route (FR-N9, deterministic)", () => {
+  const INVESTIGATION_PHRASINGS = [
+    // ── the two live examples that drove the fix ──
+    "Look into why sign-ups dropped last week.",
+    "Can you look into why the deploy keeps failing?",
+    // ── the common investigation patterns the founder named ──
+    "investigate the slow checkout",
+    "dig into the failing payment webhook",
+    "diagnose the timeout on the dashboard",
+    "debug the broken email digest",
+    "find out why the build is red",
+    "figure out why customers are churning",
+    "what's the root cause of the 500s?",
+    "what's going wrong with the signup flow?",
+    "whats going wrong with billing",
+    // ── "why is/are/does/do … <symptom>" interrogatives ──
+    "why is the deploy failing?",
+    "why are sign-ups dropping?",
+    "why does checkout keep erroring?",
+    "why do payments fail intermittently?",
+    "why is the dashboard so slow?",
+    "why is login broken?",
+    // ── case-insensitivity / leading punctuation ──
+    "INVESTIGATE the flaky test suite",
+    "  Dig into the latency spike  ",
+  ];
+
+  it.each(INVESTIGATION_PHRASINGS)(
+    "routes to start-from-intent (never inline): %s",
+    (phrasing) => {
+      expect(detectRoute(phrasing)).toBe("start-from-intent");
+    },
+  );
+});
+
+describe("detectRoute — genuine read-only questions STAY inline (route null)", () => {
+  const READ_ONLY_QUESTIONS = [
+    "what needs my attention?",
+    "what have I got in flight?",
+    "where's the checkout change up to?",
+    "which change was the login fix in?",
+    "find the change about the hanging login page",
+    "how many changes are in Implement?",
+    "show me the changes in review",
+    "what's the status of the billing change?",
+    "what is this?",
+    // A noun that merely CONTAINS a symptom word must not trip the symptom
+    // interrogative (no leading "why … fail" pattern → read-only).
+    "which change fixed the failing webhook?",
+    "where did the slow checkout investigation end up?",
+  ];
+
+  it.each(READ_ONLY_QUESTIONS)("stays inline (route null): %s", (question) => {
+    expect(detectRoute(question)).toBeNull();
+  });
+});
+
 describe("buildConciergeContext — read-only composition over the seam (FR-33/N8)", () => {
   it("composes the change list into a read-only context summary", async () => {
     const reader = new FakeChangeStoreReader([

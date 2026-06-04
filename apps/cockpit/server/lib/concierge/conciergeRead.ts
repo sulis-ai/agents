@@ -46,12 +46,25 @@ export interface DetectRouteOptions {
 // inside a read-only question ("the login fix") never trips a route. Matched as
 // whole words/phrases via a word-boundary regex.
 const CONSEQUENTIAL_PHRASES = [
+  // ── INVESTIGATION (FR-N9 — investigation is a change, never inline) ──
   "investigate",
   "look into",
   "looking into",
   "dig into",
   "digging into",
+  "diagnose",
+  "debug",
+  "troubleshoot",
+  "find out why",
+  "figure out why",
+  "work out why",
+  "look at why",
+  "root cause",
+  "what's going wrong",
+  "whats going wrong",
+  "what is going wrong",
   "explore",
+  // ── START-WORK ──
   "start a change",
   "start something",
   "start work",
@@ -73,6 +86,15 @@ const CONSEQUENTIAL_PHRASES = [
   "add a",
   "add support for",
 ];
+
+// INVESTIGATION interrogative: "why is/are/was/were/does/do/did <X> …
+// <symptom>" — a symptom-shaped question is an investigation (route it), not a
+// read-only status lookup. The symptom vocabulary is the failure/degradation
+// surface the founder named. Anchored to LEAD the sentence so a read-only
+// question that merely mentions a symptom noun ("which change fixed the failing
+// webhook?") is NOT caught. Case-insensitive (input is lower-cased first).
+const SYMPTOM_INTERROGATIVE =
+  /^\s*why\s+(?:is|are|was|were|does|do|did)\b.*\b(?:fail|fails|failing|failed|break|breaks|breaking|broke|broken|slow|slower|drop|drops|dropping|dropped|error|errors|erroring|errored|crash|crashes|crashing|crashed|hang|hangs|hanging|timeout|timing out|timed out|down|red|flaky)\b/;
 
 // SET-UP phrases → onboarding, but ONLY when the world is empty (UC-09→UC-07).
 const SETUP_PHRASES = [
@@ -131,7 +153,11 @@ export function detectRoute(
     return "onboarding";
   }
 
-  if (matchesAny(q, CONSEQUENTIAL_PHRASES) || leadsWithImperative(q)) {
+  if (
+    matchesAny(q, CONSEQUENTIAL_PHRASES) ||
+    SYMPTOM_INTERROGATIVE.test(q) ||
+    leadsWithImperative(q)
+  ) {
     return "start-from-intent";
   }
 

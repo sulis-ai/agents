@@ -1,0 +1,25 @@
+{
+  "review": {
+    "target": "feat/wp-009-concierge-ask-roundtrip (fix-forward working tree)",
+    "timestamp": "2026-06-04T141501Z",
+    "base": "fc0b4e0",
+    "diff": { "files_changed": 5, "lines_added": 170, "lines_removed": 4 },
+    "dispatch": "single-reader (justified: 170 lines / 5 source+test files, within CR-02 carve-out of <=200 lines and <=5 files)"
+  },
+  "build_verification": { "pr_introduced_errors": 0 },
+  "pr_hygiene": {
+    "scope": { "commit_type_spread": ["fix"], "module_fan_out": 1, "severity": "none" },
+    "size": { "lines_total": 174, "files_changed": 5, "severity": "none" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none" },
+    "completeness": { "new_source_without_test": 0, "api_change_without_schema": false, "severity": "none" }
+  },
+  "lenses": {
+    "architecture": { "in_changes": 0, "in_neighbours": 0, "note": "nothing surfaced; short-circuit reuses existing openSseHeaders/writeSseFrame; no new dependency-direction violation, singleton, or circular import" },
+    "security": { "in_changes": 0, "in_neighbours": 0, "note": "nothing surfaced; no new write/spawn/io verb; read-only gate clean (135 files); change REDUCES LLM-reached surface (containment); SYMPTOM_INTERROGATIVE regex bounded (anchored ^, no nested quantifier — no ReDoS)" },
+    "quality": { "in_changes": 0, "in_neighbours": 0, "note": "nothing surfaced; both behaviours pinned by deterministic table tests; no dead surface; no contract drift; CR-10 perf clean (no loops/IO added)" }
+  },
+  "findings": [],
+  "draft_deltas": [],
+  "verdict": "PASS",
+  "auto_downgrade_triggers": []
+}

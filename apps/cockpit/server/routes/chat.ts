@@ -363,6 +363,21 @@ async function handleConcierge(
   });
   const route = detectRoute(question, { worldIsEmpty: context.worldIsEmpty });
 
+  // CONTAINMENT (FR-N9): a consequential intent (investigate / start-work /
+  // empty-world set-up) is NEVER answered inline. We short-circuit BEFORE the
+  // bridge so the inline read-only relay is never started — the investigation
+  // is contained in a change, not run loose in the concierge. The route hint is
+  // surfaced as a confirm-gated OFFER by the front door (the concierge does not
+  // act). The deterministic detectRoute pre-classifier is the gate; the bridge
+  // is reached ONLY for a read-only (route === null) question.
+  if (route !== null) {
+    openSseHeaders(res);
+    writeSseFrame(res, { type: "complete", route });
+    log({ outcome: "completed", route });
+    res.end();
+    return;
+  }
+
   // Stream the read-only answer. We open the SSE response lazily so a bridge
   // that never starts (zero bytes) returns a clean 502 JSON status instead of a
   // 200 stream (FR-19/N3) — parity with the chat relay.
