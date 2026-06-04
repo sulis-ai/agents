@@ -108,23 +108,6 @@ describe("<Composer /> — the docked write surface (signed contract)", () => {
     );
   });
 
-  it("shows pause/stop run-controls while the agent is replying (AI-03)", async () => {
-    renderComposer(<Composer
-        changeId="01CHAT"
-        streamChat={fakeStream(HAPPY, { hang: true })}
-      />,
-    );
-    const box = screen.getByLabelText(/message this change's agent/i);
-    fireEvent.change(box, { target: { value: "hi" } });
-    fireEvent.keyDown(box, { key: "Enter" });
-
-    await waitFor(() =>
-      expect(screen.getByTestId("run-controls")).toBeInTheDocument(),
-    );
-    expect(screen.getByLabelText(/pause the agent/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/stop the agent/i)).toBeInTheDocument();
-  });
-
   it("disables send while THIS change is streaming (FR-20 one-in-flight)", async () => {
     renderComposer(<Composer
         changeId="01CHAT"

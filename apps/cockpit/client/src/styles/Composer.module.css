@@ -84,49 +84,6 @@
   color: var(--foreground);
 }
 
-/* The working status chip — sits just above the composer, in reach. */
-.statuschip {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 14px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-button);
-  font-size: 12px;
-  color: var(--text-secondary);
-  width: fit-content;
-  box-shadow: 0 1px 2px rgba(23, 23, 23, 0.04);
-}
-.statuschip .wd {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--positive);
-  flex: none;
-}
-.statuschip b {
-  font-weight: 600;
-  color: var(--foreground);
-}
-.ctl {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-container);
-  padding: 5px 10px;
-  font-size: 11px;
-  font-weight: var(--weight-label);
-  color: var(--foreground);
-  background: var(--bg-muted);
-  cursor: pointer;
-}
-.ctl svg { width: 13px; height: 13px; }
-.ctl:hover { background: var(--card); }
-.ctl.stop { color: var(--destructive); border-color: var(--bg-destructive-border); }
-.ctl.stop:hover { background: var(--bg-destructive); }
-
 /* suggestion chips — subtle, above the box. */
 .chips {
   display: flex;

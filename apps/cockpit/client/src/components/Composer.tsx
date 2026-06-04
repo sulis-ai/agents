@@ -19,8 +19,6 @@
 
 import { useRef, useState, type KeyboardEvent } from "react";
 import {
-  PauseIcon,
-  StopIcon,
   PaperAirplaneIcon,
   ArrowsPointingOutIcon,
   ArrowsPointingInIcon,
@@ -42,22 +40,6 @@ const SUGGESTION_CHIPS = [
   "What's left before build?",
   "Adjust the board layout",
 ];
-
-/** Map a lifecycle state to a plain-English status line (FR-23). */
-function statusLabel(
-  state: ReturnType<typeof useChatStream>["state"],
-): string | null {
-  switch (state) {
-    case "resuming":
-      return "Waking the change up…";
-    case "spawning":
-      return "Starting this change up…";
-    case "replying":
-      return "Agent is replying…";
-    default:
-      return null;
-  }
-}
 
 export function Composer({ changeId, streamChat }: Props) {
   const chat = useChatStream(changeId, streamChat ? { streamChat } : {});
@@ -99,7 +81,6 @@ export function Composer({ changeId, streamChat }: Props) {
     }
   };
 
-  const replyState = statusLabel(chat.state);
   const showReply =
     chat.replyText.length > 0 ||
     chat.state === "replying" ||
@@ -152,31 +133,6 @@ export function Composer({ changeId, streamChat }: Props) {
           <div className={styles.chatError} data-testid="chat-error" role="alert">
             Couldn't reach this change.{" "}
             {chat.errorMessage ?? "The message was not delivered — try again."}
-          </div>
-        )}
-
-        {/* The working status chip (AI-03) — pause/stop while replying. */}
-        {busy && (
-          <div className={styles.statuschip} data-testid="run-controls">
-            <span className={styles.wd} aria-hidden="true" />
-            <b>Working</b>
-            {replyState && <span> · {replyState}</span>}
-            <button
-              type="button"
-              className={styles.ctl}
-              aria-label="Pause the agent"
-            >
-              <PauseIcon aria-hidden="true" />
-              Pause
-            </button>
-            <button
-              type="button"
-              className={`${styles.ctl} ${styles.stop}`}
-              aria-label="Stop the agent"
-            >
-              <StopIcon aria-hidden="true" />
-              Stop
-            </button>
           </div>
         )}
 
