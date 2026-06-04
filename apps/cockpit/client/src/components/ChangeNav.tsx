@@ -11,12 +11,18 @@ import {
   DocumentTextIcon,
   CubeTransparentIcon,
   EyeIcon,
+  Cog6ToothIcon,
 } from "@heroicons/react/24/outline";
 import type { Change, WorkflowStage } from "../../../shared/api-types";
 import { stageLabel } from "./StageBadge";
 import styles from "../styles/ChangeWorkspace.module.css";
 
-export type ChangeView = "conversation" | "files" | "brain" | "preview";
+export type ChangeView =
+  | "conversation"
+  | "files"
+  | "brain"
+  | "preview"
+  | "advanced";
 
 const TRACK_STAGES: Exclude<WorkflowStage, "shipped">[] = [
   "recon",
@@ -33,6 +39,7 @@ const VIEWS: { id: ChangeView; label: string; Icon: typeof EyeIcon }[] = [
   { id: "files", label: "Files", Icon: DocumentTextIcon },
   { id: "brain", label: "Brain", Icon: CubeTransparentIcon },
   { id: "preview", label: "Preview", Icon: EyeIcon },
+  { id: "advanced", label: "Advanced", Icon: Cog6ToothIcon },
 ];
 
 interface Props {

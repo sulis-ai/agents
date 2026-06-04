@@ -1,0 +1,136 @@
+// Chat-redesign follow-on — the "Advanced" (operator) view's data + actions.
+//
+// Surfaces the operational substrate of a change: the branch's GitHub link,
+// and the OS processes linked to the change (the agent session, dev/preview
+// servers, the web-chat process). Plus the two side-effect actions: reveal a
+// folder in the OS file manager, and stop a process.
+//
+// None of this writes the repo. Reveal/ps/git-remote are read-only-ish OS
+// calls; stop is guarded (never the server's own pid).
+
+import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
+import { promisify } from "node:util";
+
+const exec = promisify(execFile);
+
+export interface LinkedProcess {
+  pid: number;
+  kind: "session" | "agent" | "server" | "node" | "other";
+  label: string;
+  command: string;
+  cwd: string | null;
+}
+
+/** The GitHub branch URL for a worktree's origin, or null if not GitHub. */
+export async function branchUrl(
+  worktreePath: string,
+  branch: string,
+): Promise<string | null> {
+  try {
+    const { stdout } = await exec(
+      "git",
+      ["-C", worktreePath, "remote", "get-url", "origin"],
+      { timeout: 5000 },
+    );
+    // git@github.com:owner/repo.git  |  https://github.com/owner/repo(.git)
+    const m = stdout
+      .trim()
+      .match(/github\.com[:/]([^/]+)\/(.+?)(?:\.git)?$/i);
+    if (!m) return null;
+    return `https://github.com/${m[1]}/${m[2]}/tree/${encodeURIComponent(branch)}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Reveal a path in the OS file manager (Finder / Explorer / xdg-open). */
+export async function revealInFileManager(
+  path: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!path || !existsSync(path)) return { ok: false, error: "Folder not found." };
+  try {
+    if (process.platform === "darwin") {
+      await exec("open", ["-R", path], { timeout: 5000 });
+    } else if (process.platform === "win32") {
+      // explorer exits non-zero even on success; fire and forget.
+      exec("explorer", [path]).catch(() => {});
+    } else {
+      await exec("xdg-open", [path], { timeout: 5000 });
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e).slice(0, 160) };
+  }
+}
+
+/** Classify a process command into a plain-English kind + label. */
+export function classifyProcess(command: string): {
+  kind: LinkedProcess["kind"];
+  label: string;
+} {
+  if (/claude\b[^\n]*--agent\s+sulis/.test(command))
+    return { kind: "session", label: "Agent session (your terminal)" };
+  if (/claude\b[^\n]*(--resume|--continue|\s-p\b)/.test(command))
+    return { kind: "agent", label: "Agent (web chat / background)" };
+  if (/\bvite\b/.test(command))
+    return { kind: "server", label: "Preview server (the web app)" };
+  if (/tsx\b[^\n]*server\/index/.test(command))
+    return { kind: "server", label: "App server" };
+  if (/npm\b[^\n]*run[^\n]*dev|concurrently/.test(command))
+    return { kind: "server", label: "Dev server" };
+  if (/claude\b/.test(command))
+    return { kind: "agent", label: "Claude process" };
+  if (/\bnode\b/.test(command)) return { kind: "node", label: "Node process" };
+  return { kind: "other", label: "Process" };
+}
+
+/**
+ * Processes linked to this change — matched by the change id or the worktree
+ * path appearing in the process's command/env (`ps -axeww` appends the env,
+ * which carries SULIS_CHANGE_ID + PWD). Best-effort; returns [] on any error.
+ */
+export async function listChangeProcesses(
+  changeId: string,
+  worktreePath: string,
+): Promise<LinkedProcess[]> {
+  try {
+    const { stdout } = await exec("ps", ["-axeww", "-o", "pid=,command="], {
+      timeout: 8000,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    const selfPid = process.pid;
+    const seen = new Set<number>();
+    const out: LinkedProcess[] = [];
+    for (const line of stdout.split("\n")) {
+      if (!line.trim()) continue;
+      if (!line.includes(changeId) && !line.includes(worktreePath)) continue;
+      const m = line.match(/^\s*(\d+)\s+(.*)$/);
+      if (!m) continue;
+      const pid = Number(m[1]);
+      if (pid === selfPid || seen.has(pid)) continue;
+      seen.add(pid);
+      const cwd = line.match(/\bPWD=([^\s]+)/)?.[1] ?? null;
+      // Strip the env tail (KEY=value tokens ps appends) for a clean display.
+      const command = m[2].replace(/\s+[A-Z_][A-Z0-9_]*=[^\s]*/g, "").trim();
+      const { kind, label } = classifyProcess(command);
+      out.push({ pid, kind, label, command: command.slice(0, 200), cwd });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+/** Stop a process by pid. Guarded: never the server's own pid, never pid ≤ 1. */
+export function stopProcess(pid: number): { ok: boolean; error?: string } {
+  if (!Number.isInteger(pid) || pid <= 1) return { ok: false, error: "Invalid process." };
+  if (pid === process.pid)
+    return { ok: false, error: "Refusing to stop the app's own server." };
+  try {
+    process.kill(pid, "SIGTERM");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e).slice(0, 120) };
+  }
+}

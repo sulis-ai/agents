@@ -56,6 +56,7 @@ import { createFileRouter } from "./routes/file";
 import { createDiffRouter } from "./routes/diff";
 import { createTranscriptRouter } from "./routes/transcript";
 import { createTurnSummariesRouter } from "./routes/turnSummaries";
+import { createAdvancedRouter } from "./routes/advanced";
 import { createContractRouter } from "./routes/contract";
 import { createStatusRouter } from "./routes/status";
 import { createBrainRouter } from "./routes/brain";
@@ -311,6 +312,12 @@ export function createApp(deps: CreateAppDeps): Application {
       changeStore: deps.changeStore,
       claudeProjectsDir: deps.claudeProjectsDir,
     }),
+  );
+
+  // Advanced (operator) view — branch link, linked processes, reveal + stop.
+  app.use(
+    "/api/changes/:id",
+    createAdvancedRouter({ changeStore: deps.changeStore }),
   );
 
   // WP-003 — contract-preview endpoints. GET-only; serves the rendered

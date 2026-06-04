@@ -25,6 +25,7 @@ import { Composer } from "../components/Composer";
 import { FilesPanel } from "../components/FilesPanel";
 import { ContractLinks } from "../components/ContractLinks";
 import { BrainSection } from "../components/BrainSection";
+import { AdvancedView } from "../components/AdvancedView";
 import { REASON_WORD } from "../components/StatusHeader";
 import ws from "../styles/ChangeWorkspace.module.css";
 
@@ -131,6 +132,16 @@ export function ThreadView() {
             <div className={ws.scroll}>
               <div className={ws.measure}>
                 <ContractLinks change={change} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {view === "advanced" && (
+          <div className={ws.viewfill} data-testid="section-advanced">
+            <div className={ws.scroll}>
+              <div className={ws.measure}>
+                <AdvancedView change={change} />
               </div>
             </div>
           </div>

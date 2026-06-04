@@ -1,0 +1,136 @@
+/* Advanced (operator) view — change workspace, branch, linked processes. */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--card);
+  overflow: hidden;
+}
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: var(--muted-foreground);
+}
+.sectionHead .ic {
+  width: 15px;
+  height: 15px;
+  color: var(--muted-foreground);
+}
+.body {
+  padding: 14px;
+}
+
+/* a labelled value row (working dir, branch) */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.value {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  border-radius: var(--radius-container);
+  padding: 6px 11px;
+  font-size: 12px;
+  font-weight: var(--weight-label);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover {
+  background: var(--bg-muted);
+}
+.btn .ic {
+  width: 14px;
+  height: 14px;
+  color: var(--muted-foreground);
+}
+.btnPrimary {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+  color: var(--accent);
+}
+.btnPrimary .ic {
+  color: var(--accent);
+}
+.btnDanger {
+  color: var(--destructive);
+  border-color: var(--bg-destructive-border);
+}
+.btnDanger:hover {
+  background: var(--bg-destructive);
+}
+
+/* process list */
+.proc {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--border-muted);
+}
+.proc:last-child {
+  border-bottom: 0;
+}
+.procMain {
+  flex: 1;
+  min-width: 0;
+}
+.procLabel {
+  font-size: 13px;
+  font-weight: var(--weight-label);
+  color: var(--foreground);
+}
+.procMeta {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.empty {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  padding: 4px 0;
+}
+.note {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 10px;
+  line-height: 1.5;
+}
