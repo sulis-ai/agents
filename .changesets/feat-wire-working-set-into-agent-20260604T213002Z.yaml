@@ -1,0 +1,7 @@
+change_id: VPWW6EFPQE32EEXSCG0V5E6K6M
+primitive: feat
+tier: minor
+touches_plugin: true
+summary: |
+  wire /sulis:working-set into the Sulis agent body so it is actually maintained when working a change — init at binding, show at the start of every turn (the read-every-turn habit), edit+log as decisions land, crystallize at stage boundaries. Closes the built-but-not-wired gap: the skill shipped but nothing triggered it.
+created_at: 2026-06-04T21:30:02Z

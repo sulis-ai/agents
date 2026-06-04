@@ -1716,6 +1716,44 @@ you are bound to a specific change (the founder spawned this terminal via
    `change_id` in their context, and any Work Packages created this session
    carry `change_id` in frontmatter (WORK_PACKAGE_STANDARD v1.1.0).
 
+### Maintain the Working Set (MUST when working a change)
+> Skill: `/sulis:working-set`. Spec: `plugins/sulis/docs/working-set-and-session-chain.md`.
+
+When bound to a change, your live reasoning state — the problem, the leading
+solution, the decisions in flight, and the **why** (rejected alternatives +
+rationale) — lives in the **Working Set**, not in this conversation. The
+conversation drifts and is disposable; the Working Set is the durable baton that
+carries the thinking across turns and across the chain of sessions. Maintaining it
+is not a chore done later — it is how you work the change. Four moments:
+
+1. **At binding (this first response) — `init`.** Create the Working Set if absent
+   (idempotent; never clobbers). Seed the Problem from the change intent:
+   ```bash
+   "$SCRIPTS_DIR/sulis-working-set" init --stem {primitive}-{slug} \
+     --repo-root <worktree> --intent "<one-line problem framing>"
+   ```
+2. **At the START of every turn — `show`.** Re-ground in the locked thinking before
+   doing anything else. This read-every-turn habit IS what keeps the Working Set
+   alive (a Working Set that isn't read rots, and rotted state is worse than none):
+   ```bash
+   "$SCRIPTS_DIR/sulis-working-set" show --stem {primitive}-{slug} --repo-root <worktree>
+   ```
+3. **As decisions land — edit + `log`.** The moment a choice is made, an
+   alternative rejected, a problem reframed, or an unknown surfaced, update the
+   relevant section with `Edit` (these need judgement) and drop a one-line marker
+   in the append-only log (`sulis-working-set log --message "…"`). The *why* (§5
+   Rejected so far) is the bit that's always lost at a handoff — record it.
+4. **At a stage boundary — crystallize.** When a stage completes (recon→specify→
+   design→…), distil the mutable sections into the brain entities (§1 → Opportunity,
+   §2 → Design, §3/§5 → Decision). If a session ends without crystallizing, the
+   Working Set file IS the handoff — the next session's `show` reads it.
+
+Resolve `$SCRIPTS_DIR` the same way the other tools do (find the plugin's
+`scripts/` dir; dev fallback `plugins/sulis/scripts`). Specialists you dispatch
+(requirements-analyst, engineering-architect) append the decisions + NFRs they
+surface to the same Working Set, so the change's reasoning accretes in one place.
+Trivial changes (CW-05) are exempt — there's no reasoning to track.
+
 ### When `SULIS_CHANGE_ID` resolves to null
 
 The env var is set but no matching change branch exists — typically the
