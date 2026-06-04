@@ -1,3 +1,9 @@
+## v0.104.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- a human can drive a blocked journey to real green: sulis-attest-scenario records a first-hand walk of the flow (a browser login, a real-card checkout) as a real human-attested TestResult the coverage gate reads. Closes the journey-rigor loop — a blocked manual journey now has an honest, recorded path to verified, never a fake pass.
+
 ## v0.103.0 — 2026-06-04
 
 **Minor — release-train batch.**
