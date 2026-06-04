@@ -1,0 +1,7 @@
+change_id: N6WE772X4F9QWV3V7JHMNWYCWN
+primitive: feat
+tier: minor
+touches_plugin: true
+summary: |
+  discover-brand translator (foundation): the load-bearing bridge that turns a design generator TOKEN_MAP into authored Brand + DesignSystem records the emitters ingest. A URL scrape produces a full DTCG DesignSystem + a PARTIAL Brand (visual_identity only, state=Researched) — the judged identity (voice/values/positioning) is left absent for the founder to articulate, never invented. E2E-tested: translator output flows through the real sulis-emit-brand/design-system into the brain, link surviving the round-trip. The full self-contained URL→brand skill (generator-into-plugin + SKILL.md front door) is the remaining build on this core.
+created_at: 2026-06-04T08:26:31Z
