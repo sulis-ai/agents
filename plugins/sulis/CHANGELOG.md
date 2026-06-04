@@ -1,3 +1,9 @@
+## v0.108.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- wire /sulis:working-set into the Sulis agent body so it is actually maintained when working a change — init at binding, show at the start of every turn (the read-every-turn habit), edit+log as decisions land, crystallize at stage boundaries. Closes the built-but-not-wired gap: the skill shipped but nothing triggered it.
+
 ## v0.107.0 — 2026-06-04
 
 **Minor — release-train batch.**
