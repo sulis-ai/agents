@@ -1,3 +1,9 @@
+## v0.101.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- Journey-rigor #3 (the main upstream fix): a walk-the-journey step at design. draft-architecture step 8.5 + audit step 2.5 now require, for any user-facing/behavioural change, walking each verification Scenarios journey OUTSIDE-IN hop-by-hop against the actual code — every hop must point at a component that EXISTS or is a planned WP, else it is a GAP that BLOCKS design completion (plan-work does not start). Pulls the journeys COMPLETE scenario set (find_scenarios_for_journey, #84) so ALL are checked even when only some are built — classified covered/already-green/GAP/out-of-scope. Catches the consumption-half-never-built failure (four green-but-broken login attempts) at design, not after deploys. The mechanical form of Outside-In (OI prose) + Work-Backwards. Pinned by a structural test.
+
 ## v0.100.0 — 2026-06-04
 
 **Minor — release-train batch.**
