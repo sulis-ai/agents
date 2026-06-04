@@ -1,0 +1,7 @@
+change_id: 57ZPSD2A91ZKTH1SWPPQMYFC90
+primitive: feat
+tier: minor
+touches_plugin: true
+summary: |
+  plan-work scenario-coverage gate: every journey scenario is observed-green, planned, or recorded out-of-scope — a not-green journey scenario with no WP blocks the decompose (check ALL, build some). Closes the half-built-round-trip hole behind green-but-broken login.
+created_at: 2026-06-04T09:43:15Z
