@@ -5,14 +5,16 @@ have in flight. It reads what's already on disk — your change store,
 your worktrees, your Claude Code session transcripts — and renders
 them as a thread-centric review tool.
 
-It is read-only **everywhere except one explicitly-audited seam**: the
-chat relay (`POST /api/changes/:id/chat`, WP-005) is the single sanctioned
-write/act path — it delivers a message to a change's agent and streams the
-reply back (resume-or-spawn; ADR-001/002/003). Every other route is GET-only
-and provably so; the read-only gate allow-lists exactly the relay (one write
-verb) and the `SessionBridge` adapter (one process start), and fails the
-build on any mutation or process start anywhere else. It binds to
-`127.0.0.1` only.
+It is read-only **everywhere except one explicitly-audited file**:
+`server/routes/chat.ts`. That file holds every confirm-gated act path — the
+chat relay (`POST /api/changes/:id/chat`, WP-005) and the cold-start
+onboarding route (`POST /api/onboarding/session`, WP-010) — so the consequential
+seam is one audited place, never scattered (ADR-003/006/007). The agent itself
+runs the discovery skills and the validated spine emitters inside its session;
+the server starts no extra process. Every other route is GET-only and provably
+so; the read-only gate allow-lists exactly that one relay file (its write verbs)
+and the `SessionBridge` adapter (one process start), and fails the build on any
+mutation or process start anywhere else. It binds to `127.0.0.1` only.
 
 This README covers the workspace shape, the dev-run flow, and the
 HTTP surface that ships with WP-001 + WP-010. The React components
@@ -68,6 +70,7 @@ and the ports (the change-store reader, WP-003; the `SessionBridge`, WP-005).
 | `GET /api/changes/:id/contract/ui`   | Serves the rendered `UI.html`, or a typed JSON note when the change has no UI contract (never a broken link).                                                                                                                                                       | `text/html` or `{ uiContract, note }`                   |
 | `POST /api/changes/:id/chat`         | **The one write/act path (WP-005).** Delivers a message to the change's agent (resume-or-spawn) and streams the reply as SSE. Refuses with `SESSION_BUSY` (409), `SESSION_CHANGE_MISMATCH` (422, zero bytes), or `SESSION_UNREACHABLE` (502, not delivered).        | SSE `ChatStreamEvent` (`state` → `chunk*` → `complete`) |
 | `POST /api/concierge/query`          | **The concierge front door (WP-009, read-only).** Answers plain-English nav / status / Q&A over the change store + brain, streaming SSE; it rides the SAME bridge as the chat (no second bridge, ADR-006) and performs ZERO writes/mints/starts (FR-N8). Intent is classified by a DETERMINISTIC pre-classifier (`detectRoute`), not the LLM: when intent is consequential (investigate / start-work / empty-world set-up) the inline bridge is **short-circuited entirely** — `complete` carries a `route` hint and the concierge OFFERS the confirm-gated next step, never investigates inline (FR-N9 — investigation is contained in a change, never run loose). The bridge is reached ONLY for a genuine read-only question (`route === null`). 502 `SESSION_UNREACHABLE` if the bridge can't be reached. | SSE `ConciergeStreamEvent` (`state` → `chunk*` → `complete{route}`) |
+| `POST /api/onboarding/session`       | **Cold-start onboarding (WP-010, confirm-gated act).** One turn in the setup conversation for an EMPTY graph (UC-07): `phase: "search"` runs discovery in the founder's CHOSEN area only (bounded — `chosenArea` outside the permitted root ⇒ 422 `DISCOVERY_SCOPE_VIOLATION`, FR-N7); `phase: "ask"` answers a clarifying question; `phase: "confirm"` (with the live `confirmToken`) performs the ACT — repo find-or-create (local-only `git init` by default, ADR-008) then mint via the validated spine emitters. Streams SSE `state` → `chunk*` → `proposal` (awaiting confirm) → `minted`. Idempotent (an already-minted entity is surfaced, not duplicated, FR-31); all-or-nothing (a stale confirm ⇒ 422 `DISCOVERY_CONFIRM_STALE`; a failed create ⇒ `REPO_CREATE_FAILED` with NO dangling config, FR-N10/N11); one Product per conversation (409 `SESSION_BUSY` on a second concurrent session, founder-locked). Registered in `chat.ts` so it adds no new write-gate exception (ADR-006). | SSE `OnboardingStreamEvent` (`state` → `chunk*` → `proposal` → `minted`) |
 
 ### Two-way chat relay (WP-005)
 
@@ -196,9 +199,11 @@ Non-2xx responses use a single envelope:
 `code` values: `NOT_FOUND` (404), `PATH_OUTSIDE_WORKTREE` /
 `NOT_A_DIRECTORY` / `IS_A_DIRECTORY` / `GIT_ERROR` / `BAD_REQUEST`
 (400), `NO_BASE_SHA` (422), `TIMEOUT` (504), `METHOD_NOT_ALLOWED`
-(405), `INTERNAL_ERROR` (500), and the chat-relay codes `SESSION_BUSY`
-(409), `SESSION_CHANGE_MISMATCH` (422), `SESSION_UNREACHABLE` (502). The
-client renders contextual messages from `code`.
+(405), `INTERNAL_ERROR` (500), the chat-relay codes `SESSION_BUSY`
+(409), `SESSION_CHANGE_MISMATCH` (422), `SESSION_UNREACHABLE` (502), and the
+onboarding codes `DISCOVERY_SCOPE_VIOLATION` (422), `DISCOVERY_CONFIRM_STALE`
+(422), `REPO_CREATE_FAILED` (in-stream). The client renders contextual
+messages from `code`.
 
 The server is GET-only by construction **except the one sanctioned chat
 relay** (`routes/chat.ts`) and its `SessionBridge` adapter
@@ -213,6 +218,62 @@ not convention"). The concierge query (`POST /api/concierge/query`, WP-009) is
 read-only and adds **no new** gate exception: it is registered inside the SAME
 sanctioned relay file (`routes/chat.ts`) and rides the SAME bridge, so the
 write-verb allow-list stays exactly `{chat.ts}` (asserted by the gate, ADR-006).
+The cold-start onboarding route (`POST /api/onboarding/session`, WP-010) is the
+SECOND act path and follows the same rule: it is registered inside that SAME
+file and rides the SAME bridge, so the allow-list is unchanged.
+
+### Cold-start onboarding (WP-010)
+
+When the graph is empty, a form is useless — there's nothing to pick — so setup
+is a **conversation that creates the graph** (UC-07, ADR-007). The surface lives
+at `/onboarding` (reached from the concierge's confirm-gated offer, or the
+product switcher's "Set up a new product").
+
+- **Orchestrator (`lib/discovery/onboardingOrchestrator.ts`).** Sequences
+  `search → ask → propose → confirm → mint` over the SAME bridge as the chat
+  (FR-27). It reimplements nothing (ADR-007): discovery delegates to the agent
+  (which runs the `discover-project` / `discover-context` / `codebase-mapping`
+  skills), and the mint delegates to the agent (which runs the validated spine
+  emitters). The orchestrator owns only the safety plumbing — scope bound,
+  confirm gate, repo find-or-create, idempotency, all-or-nothing. It performs
+  no fs write and starts no process.
+- **Confirm gate (`lib/discovery/confirmGate.ts`).** A pure module — the
+  `sessionBinding` sibling. A read/propose turn mints nothing; only a
+  token-matched `confirm` opens the gate. A stale/mismatched token is refused
+  (`DISCOVERY_CONFIRM_STALE`).
+- **Repo find-or-create (`lib/discovery/repoFindOrCreate.ts`).** A pure decision
+  module. The **create-location default is local-only** `git init` (ADR-008,
+  founder-locked) — no network, nothing published; hosted-remote (GitHub) is a
+  separately-confirmed opt-in, never the default. A failed create yields
+  `REPO_CREATE_FAILED` and persists NO `Project.source` (no dangling config,
+  FR-N10/N11).
+- **UI (`components/OnboardingChat.tsx`).** Reuses the chat composer idiom + the
+  SSE funnel (EP-03): choose an area → answer → see the plain-English PROPOSAL →
+  confirm. Find-vs-create is explicit with **local-only pre-selected**; the
+  Product icon is a **neutral two-letter tile** (reusing `ProductSwitcher`'s
+  `monogram`, no logo upload this slice — founder-locked); on success the
+  "your product is set up" end state appears and the board takes over.
+
+**Drive it locally (headless, recorded — CI-observable):** boot `npm run dev`,
+then POST to `/api/onboarding/session`:
+
+```bash
+# 1. search the chosen area (bounded; mints nothing — streams a proposal)
+curl -N -X POST localhost:5173/api/onboarding/session \
+  -H 'content-type: application/json' \
+  -d '{"phase":"search","chosenArea":"/abs/path/to/your/code"}'
+# → SSE: state(searching) … chunk* … state(proposing) … proposal{confirmToken,…}
+
+# 2. confirm with the token from the proposal (the ACT — repo + mint)
+curl -N -X POST localhost:5173/api/onboarding/session \
+  -H 'content-type: application/json' \
+  -d '{"phase":"confirm","confirmToken":"<from-the-proposal>","repoChoice":{"mode":"find"}}'
+# → SSE: state(confirming) … state(minting) … chunk* … minted{product,projects} … state(complete)
+```
+
+The **live** path (a real `claude` running the discover-* skills + the spine
+emitters + a real `git init`) is the BLOCK-and-hand-to-founder observation; in
+CI the round-trip is exercised against a programmable/recorded bridge.
 
 ## Testing
 
@@ -274,7 +335,7 @@ apps/cockpit/
 │   ├── config.ts           # CONFIG — bindAddress is hard-coded
 │   ├── ports/              # ChangeStoreReader + RecreateRunner (WP-004) + SessionBridge (the chat seam, WP-005)
 │   ├── adapters/           # SulisChangeStoreReader (Python helper bridge); SulisChangeRecreator + FakeRecreateRunner (WP-004); StreamJsonSessionBridge (prod) + RecordedSessionBridge (recorded fixture) (WP-005)
-│   ├── routes/             # GET read handlers + the one chat relay (POST, SSE) + the read-only concierge query (POST, SSE — same file, WP-009) + shared shims
+│   ├── routes/             # GET read handlers + chat relay + concierge query + cold-start onboarding (all POST/SSE in the ONE sanctioned file chat.ts — WP-005/009/010)
 │   ├── middleware/         # request-log + typed-error → JSON mapper
 │   ├── lib/                # domain logic — no framework imports
 │   └── tests/

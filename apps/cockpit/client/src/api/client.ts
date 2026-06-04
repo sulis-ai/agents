@@ -22,6 +22,8 @@ import type {
   ChatStreamEvent,
   ChatErrorCode,
   ConciergeStreamEvent,
+  OnboardingRequest,
+  OnboardingStreamEvent,
 } from "../../../shared/api-types";
 
 /**
@@ -206,4 +208,53 @@ export const streamConciergeQuery: StreamConciergeFn = async (
 
   if (!res.body) return;
   await readSseStream<ConciergeStreamEvent>(res.body, onEvent);
+};
+
+// ─── WP-010 — the onboarding funnel (cold-start mint; ADR-007/008) ───────────
+//
+// `streamOnboarding` POSTs ONE onboarding turn to /api/onboarding/session and
+// reads the SSE stream, invoking `onEvent` per `OnboardingStreamEvent`. It
+// lives HERE alongside the other two SSE callers so it stays inside the client
+// inventory gate's `fetch` allow-list (only api/client.ts). The act is
+// confirm-gated server-side (FR-N6); the funnel just carries the turn. A
+// pre-stream refusal (scope violation / stale confirm / busy) arrives as a
+// non-2xx JSON status, mapped to a single `error` event so the hook has ONE
+// event shape to project (parity with the chat/concierge funnels).
+
+/** The signature OnboardingChat / useOnboarding inject (testable). */
+export type StreamOnboardingFn = (
+  request: OnboardingRequest,
+  onEvent: (event: OnboardingStreamEvent) => void,
+) => Promise<void>;
+
+function asOnboardingErrorCode(
+  code: string | null,
+): Extract<OnboardingStreamEvent, { type: "error" }>["code"] {
+  if (
+    code === "DISCOVERY_SCOPE_VIOLATION" ||
+    code === "DISCOVERY_CONFIRM_STALE" ||
+    code === "REPO_CREATE_FAILED" ||
+    code === "SESSION_BUSY" ||
+    code === "SESSION_UNREACHABLE"
+  ) {
+    return code;
+  }
+  return "SESSION_UNREACHABLE";
+}
+
+export const streamOnboarding: StreamOnboardingFn = async (request, onEvent) => {
+  const res = await fetch("/api/onboarding/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+
+  if (!res.ok) {
+    const { code, message } = await readErrorBody(res);
+    onEvent({ type: "error", code: asOnboardingErrorCode(code), message });
+    return;
+  }
+
+  if (!res.body) return;
+  await readSseStream<OnboardingStreamEvent>(res.body, onEvent);
 };
