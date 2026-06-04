@@ -9,11 +9,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "./client";
 
+export interface TurnSummaries {
+  /** turnKey -> generated summary. */
+  summaries: Record<string, string>;
+  /** turnKeys currently being generated (for the "summarising…" cue). */
+  generating: string[];
+}
+
 export function useTurnSummaries(changeId: string) {
   return useQuery({
     queryKey: ["turn-summaries", changeId],
     queryFn: () =>
-      apiGet<Record<string, string>>(`/api/changes/${changeId}/turn-summaries`),
+      apiGet<TurnSummaries>(`/api/changes/${changeId}/turn-summaries`),
     enabled: changeId.length > 0,
     // Background generation fills in over a few cycles; poll to pick it up.
     refetchInterval: 5000,

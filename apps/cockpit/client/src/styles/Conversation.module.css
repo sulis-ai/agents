@@ -167,6 +167,32 @@
   font-size: 11px;
   color: var(--muted-foreground);
   margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* live "summarising…" cue while a clean Haiku summary is being generated */
+.summarising {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent);
+  font-weight: var(--weight-label);
+}
+.summarisingDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: summarisingPulse 1.2s ease-in-out infinite;
+}
+@keyframes summarisingPulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .summarisingDot { animation: none; }
 }
 
 /* collapsed "N steps" disclosure */

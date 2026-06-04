@@ -26,9 +26,11 @@ describe("getTurnSummaries (chat-B2)", () => {
     const SUMMARY = "Shipped the thing. It now works end to end.";
     const generate = vi.fn(async () => SUMMARY);
 
-    // First read: nothing cached yet → empty map, but generation is enqueued.
+    // First read: nothing cached yet → empty map, but generation is enqueued
+    // and the turn shows as "generating".
     const first = await getTurnSummaries(messages, { generate });
-    expect(first.t1).toBeUndefined();
+    expect(first.summaries.t1).toBeUndefined();
+    expect(first.generating).toContain("t1");
 
     // Background generation runs; wait for it.
     await vi.waitFor(() => expect(generate).toHaveBeenCalledTimes(1));
@@ -36,7 +38,8 @@ describe("getTurnSummaries (chat-B2)", () => {
 
     // Later read: the generated summary is served from cache, keyed by turn.
     const second = await getTurnSummaries(messages, { generate });
-    expect(second.t1).toBe(SUMMARY);
+    expect(second.summaries.t1).toBe(SUMMARY);
+    expect(second.generating).not.toContain("t1");
   });
 
   it("does not enqueue a turn that's already generated (computed once)", async () => {
@@ -61,7 +64,8 @@ describe("getTurnSummaries (chat-B2)", () => {
     ];
     const generate = vi.fn(async () => "x");
     const out = await getTurnSummaries(messages, { generate });
-    expect(out).toEqual({});
+    expect(out.summaries).toEqual({});
+    expect(out.generating).toEqual([]);
     expect(generate).not.toHaveBeenCalled();
   });
 });

@@ -147,15 +147,24 @@ export interface TurnSummariesOpts {
   enqueueCap?: number;
 }
 
+export interface TurnSummariesResult {
+  /** turnKey -> generated summary (cached). */
+  summaries: Record<string, string>;
+  /** turnKeys currently being generated (for the "summarising…" cue). */
+  generating: string[];
+}
+
 /**
- * The summaries available NOW (`{ turnKey -> summary }`), plus a kicked-off
- * background generation pass for the most-recent uncached turns. Never awaits
- * generation — returns immediately so the request stays fast.
+ * The summaries available NOW, the turns currently being generated, and a
+ * kicked-off background pass for the most-recent uncached turns. Never awaits
+ * generation — returns immediately so the request stays fast. The `generating`
+ * list lets the client show a live "summarising…" cue that then swaps to the
+ * real summary on the next poll.
  */
 export async function getTurnSummaries(
   messages: TranscriptMessage[],
   opts: TurnSummariesOpts = {},
-): Promise<Record<string, string>> {
+): Promise<TurnSummariesResult> {
   const gen = opts.generate ?? haikuSummarise;
   const cap = opts.enqueueCap ?? ENQUEUE_CAP;
 
@@ -163,15 +172,17 @@ export async function getTurnSummaries(
     (i): i is TurnItem => i.type === "turn" && i.said.trim().length > 0,
   );
 
-  const result: Record<string, string> = {};
-  const uncached: Array<{ hash: string; said: string }> = [];
+  const summaries: Record<string, string> = {};
+  const turnHashes: Array<{ key: string; hash: string; said: string }> = [];
 
   for (const t of turns) {
     const hash = hashSaid(t.said);
+    turnHashes.push({ key: t.key, hash, said: t.said });
     const cached = await readCache(hash);
-    if (cached) result[t.key] = cached;
-    else uncached.push({ hash, said: t.said });
+    if (cached) summaries[t.key] = cached;
   }
+
+  const uncached = turnHashes.filter((th) => !(th.key in summaries));
 
   // Queue the most-recent uncached turns (end of the list = newest first seen).
   for (const u of uncached.slice(-cap)) {
@@ -181,5 +192,9 @@ export async function getTurnSummaries(
   }
   pump();
 
-  return result;
+  const generating = turnHashes
+    .filter((th) => !(th.key in summaries) && inFlight.has(th.hash))
+    .map((th) => th.key);
+
+  return { summaries, generating };
 }

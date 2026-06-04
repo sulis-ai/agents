@@ -85,7 +85,8 @@ export function Chat({ changeId }: Props) {
           <TurnCard
             key={item.key}
             turn={item}
-            summary={summaries.data?.[item.key]}
+            summary={summaries.data?.summaries?.[item.key]}
+            generating={summaries.data?.generating?.includes(item.key) ?? false}
           />
         ),
       )}

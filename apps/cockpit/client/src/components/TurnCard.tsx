@@ -46,9 +46,12 @@ interface Props {
   /** The generated (Haiku) 2–3 sentence summary; falls back to the first
    *  few sentences of the agent's prose while it isn't ready. */
   summary?: string;
+  /** True while a clean summary is being generated for this turn (shows a
+   *  live "summarising…" cue on top of the fallback). */
+  generating?: boolean;
 }
 
-export function TurnCard({ turn, summary }: Props) {
+export function TurnCard({ turn, summary, generating }: Props) {
   const [stepsOpen, setStepsOpen] = useState(false);
   const [fullOpen, setFullOpen] = useState(false);
 
@@ -108,6 +111,12 @@ export function TurnCard({ turn, summary }: Props) {
 
           <div className={styles.turnTime}>
             {formatRelativeTime(turn.timestamp)}
+            {generating && (
+              <span className={styles.summarising} data-testid="turn-summarising">
+                <span className={styles.summarisingDot} aria-hidden="true" />
+                summarising…
+              </span>
+            )}
           </div>
         </div>
       </div>
