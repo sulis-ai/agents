@@ -98,6 +98,11 @@ def main(argv=None) -> int:
                         "(--scenario mode only; default: emit so the "
                         "requirement-coverage gate sees the Scenario route)")
     p.set_defaults(emit_evidence=True)
+    p.add_argument("--allow-deferred", action="store_true",
+                   help="allow a `deferred` Scenario (real outcome not driven) to "
+                        "PASS rather than BLOCK. Default OFF: observed-or-blocked. "
+                        "Use ONLY for a consciously non-user-facing Scenario where a "
+                        "recorded, non-blocking gap is the honest call.")
     args = p.parse_args(argv)
 
     # Resolve the journey source: a hand-built bundle, or the emitted brain graph.
@@ -161,7 +166,7 @@ def main(argv=None) -> int:
             loaded.scenario, loaded.workflow, loaded.steps_by_name, loaded.tools_by_id,
             target_base_url=base, available_artifacts=available,
         )
-    decision = gate_decision([result])
+    decision = gate_decision([result], require_observed=not args.allow_deferred)
 
     # Deposit the verification evidence so the requirement-coverage gate sees
     # the Scenario route. Best-effort: an emission failure NEVER changes the
