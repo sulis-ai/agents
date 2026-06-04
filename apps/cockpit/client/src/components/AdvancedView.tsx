@@ -12,7 +12,6 @@ import {
   ClipboardDocumentIcon,
   ArrowTopRightOnSquareIcon,
   CpuChipIcon,
-  CommandLineIcon,
   StopIcon,
 } from "@heroicons/react/20/solid";
 import type { Change } from "../../../shared/api-types";
@@ -31,6 +30,12 @@ interface Props {
 function copy(text: string) {
   void navigator.clipboard?.writeText(text);
 }
+
+const HEALTH_WORD: Record<LinkedProcess["health"], string> = {
+  running: "active",
+  orphaned: "orphaned",
+  defunct: "defunct",
+};
 
 export function AdvancedView({ change }: Props) {
   const query = useAdvanced(change.changeId);
@@ -137,13 +142,32 @@ export function AdvancedView({ change }: Props) {
             </div>
           ) : (
             processes.map((p) => (
-              <div className={styles.proc} key={p.pid} data-testid="linked-process">
+              <div
+                className={styles.proc}
+                key={p.pid}
+                data-testid="linked-process"
+                data-health={p.health}
+              >
                 <div className={styles.procMain}>
-                  <div className={styles.procLabel}>{p.label}</div>
+                  <div className={styles.procTop}>
+                    <span className={styles.procLabel}>{p.label}</span>
+                    <span
+                      className={`${styles.badge} ${
+                        p.health === "orphaned"
+                          ? styles.badgeOrphaned
+                          : p.health === "defunct"
+                            ? styles.badgeDefunct
+                            : styles.badgeRunning
+                      }`}
+                    >
+                      {HEALTH_WORD[p.health]}
+                    </span>
+                  </div>
                   <div className={styles.procMeta}>
                     PID {p.pid}
                     {p.cwd ? ` · ${p.cwd}` : ""}
                   </div>
+                  {p.hint && <div className={styles.procHint}>{p.hint}</div>}
                 </div>
                 <div className={styles.actions}>
                   {p.cwd && (
@@ -156,29 +180,31 @@ export function AdvancedView({ change }: Props) {
                       Reveal folder
                     </button>
                   )}
-                  <button
-                    type="button"
-                    className={`${styles.btn} ${styles.btnDanger}`}
-                    disabled={stopping === p.pid}
-                    onClick={() => void onStop(p)}
-                  >
-                    <StopIcon className={styles.ic} aria-hidden="true" />
-                    {stopping === p.pid ? "Stopping…" : "Stop"}
-                  </button>
+                  {p.health === "defunct" ? (
+                    <span className={styles.clears}>clears itself</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className={`${styles.btn} ${styles.btnDanger}`}
+                      disabled={stopping === p.pid}
+                      onClick={() => void onStop(p)}
+                    >
+                      <StopIcon className={styles.ic} aria-hidden="true" />
+                      {stopping === p.pid ? "Stopping…" : "Stop"}
+                    </button>
+                  )}
                 </div>
               </div>
             ))
           )}
           <p className={styles.note}>
-            <CommandLineIcon
-              className={styles.ic}
-              aria-hidden="true"
-              style={{ verticalAlign: "-2px", marginRight: 4 }}
-            />
             These are the processes the app can see running for this change — the
-            agent session, the preview server, and any background work. Reveal a
-            folder or stop a stray one. (Bringing a terminal window to the front
-            isn't something a browser can do.)
+            agent session, the preview server, and any background work.
+            <strong> Orphaned</strong> means the launcher is gone (likely a
+            leftover, safe to stop); <strong>defunct</strong> is a finished
+            process that clears itself. Reveal a folder or stop a stray one.
+            (Bringing a terminal window to the front isn't something a browser
+            can do.)
           </p>
         </div>
       </section>

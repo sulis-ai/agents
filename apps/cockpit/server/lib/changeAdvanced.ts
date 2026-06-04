@@ -14,12 +14,45 @@ import { promisify } from "node:util";
 
 const exec = promisify(execFile);
 
+export type ProcessHealth = "running" | "orphaned" | "defunct";
+
 export interface LinkedProcess {
   pid: number;
+  ppid: number;
+  /** Raw process state (ps STAT): R running, S sleeping, Z zombie, … */
+  state: string;
   kind: "session" | "agent" | "server" | "node" | "other";
   label: string;
   command: string;
   cwd: string | null;
+  health: ProcessHealth;
+  /** Plain-English "what's needed" hint (empty for healthy/active ones). */
+  hint: string;
+}
+
+/**
+ * Derive a process's health from its ps state + parent pid:
+ *   - defunct: a zombie (state Z) — already exited, waiting to be reaped;
+ *     it can't be stopped and clears on its own.
+ *   - orphaned: parent is init/launchd (ppid 1) — its launcher is gone, so
+ *     it's very likely a stray left over from a closed terminal/old run.
+ *   - running: a live process with a real parent.
+ */
+export function processHealth(
+  state: string,
+  ppid: number,
+): { health: ProcessHealth; hint: string } {
+  if (state.startsWith("Z"))
+    return {
+      health: "defunct",
+      hint: "Defunct (zombie) — already exited; it clears on its own, nothing to do.",
+    };
+  if (ppid === 1)
+    return {
+      health: "orphaned",
+      hint: "Orphaned — its launcher is gone, so it's likely a leftover and safe to stop.",
+    };
+  return { health: "running", hint: "" };
 }
 
 /** The GitHub branch URL for a worktree's origin, or null if not GitHub. */
@@ -95,26 +128,40 @@ export async function listChangeProcesses(
   worktreePath: string,
 ): Promise<LinkedProcess[]> {
   try {
-    const { stdout } = await exec("ps", ["-axeww", "-o", "pid=,command="], {
-      timeout: 8000,
-      maxBuffer: 16 * 1024 * 1024,
-    });
+    const { stdout } = await exec(
+      "ps",
+      ["-axeww", "-o", "pid=,ppid=,stat=,command="],
+      { timeout: 8000, maxBuffer: 16 * 1024 * 1024 },
+    );
     const selfPid = process.pid;
     const seen = new Set<number>();
     const out: LinkedProcess[] = [];
     for (const line of stdout.split("\n")) {
       if (!line.trim()) continue;
       if (!line.includes(changeId) && !line.includes(worktreePath)) continue;
-      const m = line.match(/^\s*(\d+)\s+(.*)$/);
+      const m = line.match(/^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/);
       if (!m) continue;
       const pid = Number(m[1]);
       if (pid === selfPid || seen.has(pid)) continue;
       seen.add(pid);
+      const ppid = Number(m[2]);
+      const state = m[3]!;
       const cwd = line.match(/\bPWD=([^\s]+)/)?.[1] ?? null;
       // Strip the env tail (KEY=value tokens ps appends) for a clean display.
-      const command = m[2].replace(/\s+[A-Z_][A-Z0-9_]*=[^\s]*/g, "").trim();
+      const command = m[4].replace(/\s+[A-Z_][A-Z0-9_]*=[^\s]*/g, "").trim();
       const { kind, label } = classifyProcess(command);
-      out.push({ pid, kind, label, command: command.slice(0, 200), cwd });
+      const { health, hint } = processHealth(state, ppid);
+      out.push({
+        pid,
+        ppid,
+        state,
+        kind,
+        label,
+        command: command.slice(0, 200),
+        cwd,
+        health,
+        hint,
+      });
     }
     return out;
   } catch {

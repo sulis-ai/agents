@@ -3,7 +3,25 @@
 // exercised live; here we pin the classification + the destructive guard.
 
 import { describe, it, expect } from "vitest";
-import { classifyProcess, stopProcess } from "../lib/changeAdvanced";
+import {
+  classifyProcess,
+  stopProcess,
+  processHealth,
+} from "../lib/changeAdvanced";
+
+describe("processHealth", () => {
+  it("flags a zombie (state Z) as defunct", () => {
+    expect(processHealth("Z", 500).health).toBe("defunct");
+  });
+  it("flags a process whose parent is init (ppid 1) as orphaned", () => {
+    expect(processHealth("S", 1).health).toBe("orphaned");
+  });
+  it("treats a live process with a real parent as running", () => {
+    const r = processHealth("S", 4242);
+    expect(r.health).toBe("running");
+    expect(r.hint).toBe("");
+  });
+});
 
 describe("classifyProcess", () => {
   it("recognises the terminal agent session", () => {

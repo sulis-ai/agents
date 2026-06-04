@@ -7,12 +7,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "./client";
 
+export type ProcessHealth = "running" | "orphaned" | "defunct";
+
 export interface LinkedProcess {
   pid: number;
+  ppid: number;
+  state: string;
   kind: "session" | "agent" | "server" | "node" | "other";
   label: string;
   command: string;
   cwd: string | null;
+  health: ProcessHealth;
+  hint: string;
 }
 
 export interface AdvancedData {

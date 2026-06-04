@@ -109,10 +109,52 @@
   flex: 1;
   min-width: 0;
 }
+.procTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .procLabel {
   font-size: 13px;
   font-weight: var(--weight-label);
   color: var(--foreground);
+}
+
+/* health badge — active / orphaned / defunct */
+.badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 7px;
+  border-radius: var(--radius-badge);
+  border: 1px solid var(--border);
+}
+.badgeRunning {
+  color: var(--positive);
+  background: var(--bg-positive);
+  border-color: var(--bg-positive-border);
+}
+.badgeOrphaned {
+  color: var(--warning-foreground);
+  background: var(--bg-warning);
+  border-color: var(--bg-warning-border);
+}
+.badgeDefunct {
+  color: var(--muted-foreground);
+  background: var(--bg-muted);
+  border-color: var(--border-muted);
+}
+.procHint {
+  font-size: 11.5px;
+  color: var(--muted-foreground);
+  margin-top: 3px;
+}
+.clears {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  font-style: italic;
+  padding: 0 6px;
 }
 .procMeta {
   font-size: 11px;
