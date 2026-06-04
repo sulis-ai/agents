@@ -1,0 +1,7 @@
+change_id: GS4KM5BF63CXECNYZSNSREZT0G
+primitive: feat
+tier: minor
+touches_plugin: true
+summary: |
+  Journey-rigor #2 (enabler): enumerate a journeys full scenario set + per-scenario verification state. Three _brain_query helpers — find_scenarios_for_journey(workflow_id), find_scenarios_verifying(requirement_id), find_passing_testresults_for_scenario(scenario_id) (the is-this-scenario-green check via the TestResult.scenario back-link). Built on the existing iter_entities + predicate primitives; no new traversal. This is the substrate the journey-walk (#85) + scenario-coverage check (#86) call to check ALL scenarios in a journey even when building only some.
+created_at: 2026-06-04T09:16:50Z
