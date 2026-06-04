@@ -1,0 +1,50 @@
+/* WP-004 — StatusHeader styles.
+ *
+ * Matches the SIGNED visual contract (sulis-app.html, thread status block):
+ * the plain-English headline as full-strength text, with a needs-attention
+ * pill on a warning tint when flagged. The pill = light --bg-warning tint
+ * + thin --bg-warning-border + an amber --warning dot + a DARK text label —
+ * never coloured text on a saturated fill (the contract's status-label
+ * readability fix). The word carries the meaning; the dot is decorative
+ * reinforcement (WCAG 1.4.1). Consumes tokens.css only — no raw hex. */
+
+.wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0 16px;
+}
+
+.headline {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--foreground);
+}
+
+.attention {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 4px 12px;
+  border-radius: var(--radius-badge);
+  background: var(--bg-warning);
+  border: 1px solid var(--bg-warning-border);
+}
+
+.attnDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--warning);
+}
+
+.attnWord {
+  font-size: 12px;
+  font-weight: 600;
+  /* Dark neutral label on the tint — the readability-fix rule. */
+  color: var(--foreground);
+}
