@@ -1,0 +1,16 @@
+id: interaction-flow-gate
+change_id: 01KT9HJMZC4731H0TAVW1E5QCD
+handle: CH-01KT9H
+primitive: gate
+status: decomposed
+sourced_from: .changes/gate-interaction-flow-gate.SPEC.md
+tier: S
+mirrors: "#45 / UXD-14 visual-contract done-gate"
+adrs:
+  - ADR-001-interaction-evidence-frontmatter-shape
+  - ADR-002-phase1-omits-write-time-decomposition-gate
+  - ADR-003-stub-adapter-evidence-not-asserted-at-gate
+phase_2_out_of_scope: >
+  Making the interaction contract mandatory for ALL founder-facing work
+  (the decomposition-rule MUST flip) is Phase 2 and explicitly out of this
+  change. Captured in the change task backlog.
