@@ -533,6 +533,79 @@ def visual_contract_signed_off(fm: dict) -> str | None:
     return None
 
 
+# ─── Interaction-flow gate (CH-01KT9H / ADR-001) ────────────────────────────
+#
+# Sibling of the visual-contract gate above. Same two seams (recognition
+# predicate + runtime done-gate predicate), reused verbatim in shape. The one
+# genuinely-new contract is the evidence frontmatter (ADR-001): an interaction
+# contract carries TWO valid evidence sources (agent-observed | human-attested)
+# rather than the visual gate's single `production-approved` track, so the
+# controlled token compares against a frozenset of two rather than a literal —
+# the only structural difference from `visual_contract_signed_off`. The token
+# set and the messages differ, so no helper is force-extracted (Boy-Scout-
+# scoped non-extraction; the two predicates stay legible side-by-side).
+
+
+def is_interaction_contract_wp(fm: dict) -> bool:
+    """True if a WP's frontmatter marks it as the interaction-contract WP
+    (``kind: contract`` + ``contract_type: interaction``). Sibling of
+    :func:`is_visual_contract_wp`."""
+    return (
+        str(fm.get("kind", "")).strip().lower() == "contract"
+        and str(fm.get("contract_type", "")).strip().lower() == "interaction"
+    )
+
+
+# The two valid evidence sources for an exercised interaction flow (ADR-001).
+_INTERACTION_EVIDENCE_SOURCES: frozenset[str] = frozenset(
+    {"agent-observed", "human-attested"}
+)
+
+
+def interaction_flow_exercised(fm: dict) -> str | None:
+    """Return None if an interaction-contract WP's frontmatter shows its flow
+    was exercised end-to-end over stub adapters, else a founder-readable error
+    (the runtime half of the CH-01KT9H gate, wired at the interaction-contract
+    WP's done-transition). Mirrors :func:`visual_contract_signed_off`.
+
+    Exercised = (ADR-001) a non-empty ``exercised_at`` timestamp AND
+    ``exercised_by`` ∈ {``agent-observed``, ``human-attested``}
+    (case-insensitive) AND a non-empty ``exercised_attestation``. Requiring the
+    attestation keeps the evidence falsifiable — a bare timestamp with no record
+    of *who/what* exercised the flow must NOT satisfy the gate. The gate trusts
+    the record and does not re-run the flow (ADR-003).
+    """
+    exercised_at = str(fm.get("exercised_at", "") or "").strip()
+    exercised_by = str(fm.get("exercised_by", "") or "").strip().lower()
+    attestation = str(fm.get("exercised_attestation", "") or "").strip()
+    if not exercised_at:
+        return (
+            "interaction flow not exercised — `exercised_at` is empty. The flow "
+            "must be exercised end-to-end over stub adapters before this "
+            "contract WP can reach `done` (CH-01KT9H / ADR-001)."
+        )
+    if not exercised_by:
+        return (
+            "interaction flow not exercised — `exercised_by` is empty. Record "
+            "the evidence source: `agent-observed` or `human-attested` "
+            "(ADR-001)."
+        )
+    if exercised_by not in _INTERACTION_EVIDENCE_SOURCES:
+        return (
+            f"interaction `exercised_by` is {exercised_by!r}, not a valid "
+            f"evidence source — must be `agent-observed` or `human-attested` "
+            f"(ADR-001)."
+        )
+    if not attestation:
+        return (
+            "interaction flow not exercised — `exercised_attestation` is empty. "
+            "Name who/what exercised the flow (an agent run points at its "
+            "transcript; a human names themselves), so the evidence is "
+            "falsifiable (ADR-001)."
+        )
+    return None
+
+
 # ─── Data-contract structural check (#48 / CF-05 / WP-08.5) ──────────────
 #
 # The symmetric partner to the visual-contract gate, but GRAPH-level: whether a
