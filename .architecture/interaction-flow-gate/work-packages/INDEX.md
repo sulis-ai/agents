@@ -13,9 +13,9 @@ max_parallel: 2
 
 | ID | Title | Primitive | Status | Depends On | Blocks | Token | TDD § |
 |---|---|---|---|---|---|---|---|
-| WP-001 | Interaction-flow gate predicate + recognition (`_wpxlib.py`) | create | in_progress | — | WP-002, WP-004 | ~6k/~3k | §2,§4 |
+| WP-001 | Interaction-flow gate predicate + recognition (`_wpxlib.py`) | create | done | — | WP-002, WP-004 | ~6k/~3k | §2,§4 |
 | WP-002 | Enforce interaction gate at flip-to-done (`wpx-index`) | extend | pending | WP-001 | WP-004 | ~7k/~3k | §2,§4 |
-| WP-003 | Document interaction contract's home in decomposition (SHOULD) | document | in_progress | — | — | ~5k/~2k | §5 |
+| WP-003 | Document interaction contract's home in decomposition (SHOULD) | document | done | — | — | ~5k/~2k | §5 |
 | WP-004 | Clinics-scheme spike — block → exercise-over-stubs → release | create | pending | WP-002 | — | ~9k/~5k | §3,§4 |
 
 ## Status Summary
@@ -23,8 +23,8 @@ max_parallel: 2
 | Status | Count |
 |---|---|
 | pending | 2 |
-| in_progress | 2 |
-| done | 0 |
+| in_progress | 0 |
+| done | 2 |
 | blocked | 0 |
 
 ## Dependency graph
