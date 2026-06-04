@@ -1,3 +1,9 @@
+## v0.99.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- Journey-rigor #1: the acceptance gate is now observed-or-blocked. A deferred Scenario (the real outcome never driven) BLOCKS done by default instead of passing as a recorded gap — closing the hole behind four login attempts that shipped green/merged while no human ever signed in. gate_decision gains require_observed=True (default); deferred → blocking + the need surfaced + the escape named. The conscious opt-out is sulis-verify-acceptance --allow-deferred (require_observed=False) for genuinely non-user-facing scenarios. The change-ship gate 4.8 prose rewritten to teach observed-or-blocked. Gives the Outcome Test (v0.97.2 prose) its first mechanical teeth.
+
 ## v0.98.0 — 2026-06-04
 
 **Minor — release-train batch.**
