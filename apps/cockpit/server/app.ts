@@ -36,6 +36,7 @@ import { createContractRouter } from "./routes/contract";
 import { createStatusRouter } from "./routes/status";
 import { createBrainRouter } from "./routes/brain";
 import { createSearchRouter } from "./routes/search";
+import { createProductsRouter } from "./routes/products";
 
 import { errorMiddleware } from "./middleware/errors";
 import { requestLogMiddleware } from "./middleware/request-log";
@@ -211,6 +212,20 @@ export function createApp(deps: CreateAppDeps): Application {
       changeStore: deps.changeStore,
       sulisStateDir: deps.sulisStateDir,
       claudeProjectsDir: deps.claudeProjectsDir,
+    }),
+  );
+
+  // WP-008 — multi-product list + switch (FR-38, ADR-009). GET-only; lists
+  // the Tenant's Products with the active one marked (single-Product Tenant
+  // = the trivial case, one Product shown active). The active Product is the
+  // optional `?product=<id>` value — the stateless all-GET scope variant
+  // (ADR-009), so there is NO POST /api/products/active and the read-only
+  // gate needs no scope-selection classification.
+  app.use(
+    "/api/products",
+    createProductsRouter({
+      changeStore: deps.changeStore,
+      sulisStateDir: deps.sulisStateDir,
     }),
   );
 

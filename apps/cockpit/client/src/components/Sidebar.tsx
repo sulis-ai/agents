@@ -16,20 +16,44 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useChangesWithLiveness } from "../api/useChangesWithLiveness";
+import { useProducts } from "../api/useProducts";
+import { useActiveProduct } from "../api/activeProduct";
+import { ProductSwitcher } from "./ProductSwitcher";
 import { SidebarItem } from "./SidebarItem";
 import styles from "./Sidebar.module.css";
 
 export function Sidebar() {
   const { changeId: activeChangeId } = useParams<{ changeId: string }>();
-  const query = useChangesWithLiveness();
+  // WP-008 — the product switcher sits top-left in the sidebar's brand row,
+  // above the nav, so the active Product is always in view (FR-38, ADR-009).
+  // Switching re-scopes the board + per-product views via the active-Product
+  // context; the sidebar's own change list follows the same active Product.
+  // The single-Product Tenant is the trivial case (one Product, shown active
+  // — synthesised server-side).
+  const { activeProductId, setActiveProductId } = useActiveProduct();
+  const products = useProducts();
+  const query = useChangesWithLiveness(activeProductId);
   const [shippedOpen, setShippedOpen] = useState(false);
 
   const all = query.isSuccess ? query.data : [];
   const active = all.filter((c) => c.stage !== "shipped");
   const shipped = all.filter((c) => c.stage === "shipped");
+  // The switcher reflects the server-resolved active Product until the founder
+  // picks another (which updates the context scope the board/sidebar fetch on).
+  const productList = products.isSuccess ? products.data.products : [];
+  const serverActiveProductId = products.isSuccess
+    ? products.data.activeProductId
+    : null;
 
   return (
     <aside className={styles.sidebar} data-testid="shell-sidebar">
+      {productList.length > 0 && (
+        <ProductSwitcher
+          products={productList}
+          activeProductId={activeProductId ?? serverActiveProductId}
+          onSelect={setActiveProductId}
+        />
+      )}
       <h2 className={styles.heading}>Changes</h2>
       {query.isLoading && <p className={styles.placeholder}>Loading…</p>}
       {query.isError && (

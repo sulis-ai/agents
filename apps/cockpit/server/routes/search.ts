@@ -24,7 +24,6 @@ import { Router } from "express";
 // eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (TDD §9 permits; the rule's `../../*` pattern is intended to block escapes out of apps/cockpit/, which `import/no-restricted-paths` already enforces correctly)
 import type { Change, WorkflowStage } from "../../shared/api-types";
 import type { ChangeStoreReader, ChangeStoreRecord } from "../ports/ChangeStoreReader";
-import { scopeChangesToActiveProduct } from "../lib/scopeChangesToActiveProduct";
 import { probeLiveness } from "../lib/probeLiveness";
 import { readBrain } from "../lib/readBrain";
 import { gatherChangeStatus } from "../lib/gatherChangeStatus";
@@ -33,6 +32,7 @@ import { searchChanges, type SearchableChange } from "../lib/searchChanges";
 
 import { asyncHandler } from "./_async";
 import { toWireChange } from "./_change-lookup";
+import { listScopedChanges, readProductQuery } from "./_product-scope";
 
 export interface SearchRouterDeps {
   changeStore: ChangeStoreReader;
@@ -60,11 +60,16 @@ export function createSearchRouter(deps: SearchRouterDeps): Router {
       const stage = parseStages(req.query.stage);
       const needsAttention = req.query.needsAttention === "true";
 
-      const allRecords = await deps.changeStore.listAllChanges();
       // The seam owns Product scope (ADR-009): search never surfaces another
-      // Product's change. Trivial single-Product case = all (WP-008 promotes
-      // this to the full roll-up).
-      const records = scopeChangesToActiveProduct(allRecords);
+      // Product's change. The full change→Project→Product roll-up scopes to
+      // the active Product (the `?product=` value) BEFORE the content filter
+      // runs, so a filter can never surface another Product's change (FR-37).
+      // Single-Product Tenant = the trivial case (every change in scope).
+      const records = await listScopedChanges(
+        deps.changeStore,
+        deps.sulisStateDir,
+        readProductQuery(req.query.product),
+      );
 
       const items: SearchableChange[] = await Promise.all(
         records.map((record) => assembleSearchable(deps, record)),

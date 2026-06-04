@@ -1,11 +1,14 @@
 // WP-010 — GET /api/changes.
 // WP-003 — scoped to the active Product server-side (ADR-009, FR-37).
+// WP-008 — promoted to the full change→Project→Product roll-up: the optional
+//   `?product=<id>` selects the active Product (the stateless all-GET scope
+//   variant, ADR-009); the seam returns only that Product's changes. The
+//   single-Product Tenant remains the trivial case (every change in scope).
 //
 // Returns the active Product's in-flight change set, each row enriched
-// with liveness. Thin handler: list records → scope to active Product →
-// probe liveness per record → shape into the wire `Change[]`. For this
-// slice the single-Product Tenant is the trivial case, so the scope helper
-// returns every change; the shape is unchanged.
+// with liveness. Thin handler: list records → scope to the active Product
+// (server-side roll-up, the shared _product-scope helper) → probe liveness
+// per record → shape into the wire `Change[]`.
 
 import { Router } from "express";
 
@@ -13,10 +16,10 @@ import { Router } from "express";
 import type { Change } from "../../shared/api-types";
 import type { ChangeStoreReader } from "../ports/ChangeStoreReader";
 import { probeLiveness } from "../lib/probeLiveness";
-import { scopeChangesToActiveProduct } from "../lib/scopeChangesToActiveProduct";
 
 import { asyncHandler } from "./_async";
 import { toWireChange } from "./_change-lookup";
+import { listScopedChanges, readProductQuery } from "./_product-scope";
 
 export interface ChangesRouterDeps {
   changeStore: ChangeStoreReader;
@@ -27,11 +30,16 @@ export function createChangesRouter(deps: ChangesRouterDeps): Router {
   const router = Router();
   router.get(
     "/",
-    asyncHandler(async (_req, res) => {
-      const allRecords = await deps.changeStore.listAllChanges();
+    asyncHandler(async (req, res) => {
       // The seam owns Product scope (ADR-009): the client never receives
-      // another Product's changes. Trivial single-Product case = all.
-      const records = scopeChangesToActiveProduct(allRecords);
+      // another Product's changes. The single-Product Tenant is the trivial
+      // case (every change in scope); the full roll-up scopes to the active
+      // Product when two or more exist.
+      const records = await listScopedChanges(
+        deps.changeStore,
+        deps.sulisStateDir,
+        readProductQuery(req.query.product),
+      );
       const enriched: Change[] = await Promise.all(
         records.map(async (record) => {
           const liveness = await probeLiveness(

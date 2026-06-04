@@ -9,6 +9,7 @@
 //   /*               → <NotFound>    (inside <Shell>)
 
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { ActiveProductProvider } from "./api/activeProduct";
 import { Shell } from "./layouts/Shell";
 import { Board } from "./pages/Board";
 import { ThreadView } from "./pages/ThreadView";
@@ -28,8 +29,13 @@ export function AppRoutes() {
 
 export function App() {
   return (
-    <BrowserRouter>
-      <AppRoutes />
-    </BrowserRouter>
+    // WP-008 — the active-Product UI scope wraps the whole app so the sidebar
+    // switcher and the board share one scope; switching re-scopes the board +
+    // per-product views (FR-37/38, ADR-009).
+    <ActiveProductProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </ActiveProductProvider>
   );
 }
