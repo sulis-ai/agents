@@ -545,6 +545,56 @@ If extending or superseding, reference the existing ADR by path.}
    f. **Report the sweep result in the TDD's "Open Questions" or "Design Decisions" section.** Even when no collisions were found, the report demonstrates the check ran: "Reserved-Vocabulary Sweep: {N} proposed abstracts checked against {M} reserved words; no collisions found."
 
 8. **Draft TDD** — write `TDD.md` following the template. Use GLOSSARY.md's preferred terms exactly. Apply Respect-Don't-Restate throughout.
+
+8.5. **Walk the journey (MUST for any user-facing / behavioural change).**
+   Before the design is "done" and hands off to `plan-work`, walk each
+   verification `Scenario`'s journey **outside-in, hop-by-hop, against the
+   actual code + the TDD you just drafted.** This is the design-stage forcing
+   function that catches "a hop of the round-trip was never built" *here*, not
+   after deploys — the failure mode behind four green-but-broken login
+   attempts (the consumption half of the journey didn't exist). It is the
+   mechanical form of Outside-In (OI) + Work-Backwards: the design isn't
+   complete until the *whole* user round-trip is built-or-planned.
+
+   **(a) Pull the journey's COMPLETE scenario set — not just what you're
+   building.** A journey is a `Workflow`; each `Scenario` carries
+   `journey → dna:workflow:<ulid>`. Enumerate the full set:
+
+   ```
+   python3 -c "import sys; sys.path.insert(0,'<SCRIPTS_DIR>'); \
+     from _brain_query import find_scenarios_for_journey; \
+     print([s['id'] for s in find_scenarios_for_journey('<base-dir>', '<journey-workflow-id>')])"
+   ```
+
+   (`find_scenarios_for_journey` / `find_scenarios_verifying` —
+   `plugins/sulis/scripts/_brain_query.py`.)
+
+   **(b) For each Scenario, walk its journey Steps in order** — the user's
+   first action → every hop → the final observable result (e.g. *click sign-in
+   → redirect → callback → token → session → stay-signed-in → an authenticated
+   call returning real data*). For **every hop**, name the component that
+   handles it and assert it **exists** — cite the file + function in the
+   codebase, OR a TDD component / WP-to-be that will build it. A hop with
+   neither an existing component nor a planned one is a **GAP**.
+
+   **(c) Classify every scenario in the set** (so ALL are checked even when
+   only some are built): **covered-this-change** (its gaps become WPs) /
+   **already-green** (confirm via `find_passing_testresults_for_scenario(<id>)`
+   — a passing TestResult back-links it) / **GAP → WP** / **explicitly
+   out-of-scope (RECORDED, never silently dropped)**.
+
+   **(d) Write the walk to TDD.md** as a `## Journey Walk` section: per
+   scenario, a hop-by-hop table `hop | component (path) | status
+   (exists / planned-WP / GAP)`, plus the scenario-set classification.
+
+   **(e) GATE (MUST).** The design is not complete — `plan-work` does not
+   start — until *every hop of every in-scope Scenario* is **exists** or
+   **planned-WP**, and every journey scenario is classified. A bare `GAP`
+   (a hop neither built nor planned) blocks design completion; turn it into a
+   planned WP or an explicit, recorded out-of-scope decision. (Pure docs/infra
+   change with no user-facing surface: exempt — log `journey-walk: exempt —
+   <reason>`, mirroring the scenario-authoring exemption in step 3d.)
+
 9. **Extract ADRs** — for each non-trivial decision in the TDD, factor it out into an ADR file. The TDD references the ADR by ID. **Before writing each ADR**, check the External ADR Registry — if an existing ADR covers the same decision, reference it instead. New ADR numbering starts at one past the registry's highest. Do not write ADRs to fill a quota.
 
     **After writing each ADR file (MUST)**, emit the paired Decision entity through the Brain↔OS port:
