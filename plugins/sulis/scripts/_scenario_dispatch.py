@@ -6,6 +6,16 @@ v1 implements two concrete drivers — `http_call` (stdlib urllib) and `subproce
 are not in the available set defers with the missing need named — never a
 silent pass. `mechanism: human` steps surface as `manual` checklist items.
 
+UI / browser flows. A browser journey (a login, a checkout) is authored as a
+`mechanism: human` step today, so it surfaces as `manual` → the scenario verdict
+is `manual-pending` → journey-rigor #1 BLOCKS it (never a silent green). The
+human then drives the real flow and records the observation via
+`sulis-attest-scenario` (journey-rigor #6), which deposits a real
+`harness="human-attested"` TestResult the coverage gate reads. The *automated*
+browser driver (Playwright / CDP — the machine half of "drives the real flow")
+is the NAMED FOLLOW-ON, not silently dropped: until it lands, a browser step is
+a deferred/manual handoff to the human attester, never a faked automated pass.
+
 Transports (`http`, `run`) are injected for unit-purity; the runner (WP-004)
 wires the real httpx + subprocess. The driver-specific params live in the
 step's `mechanism_detail` as a JSON blob:

@@ -568,6 +568,32 @@ A user-facing outcome is done only when it was actually *observed* green:
   *"I couldn't verify it" reads as blocked, never done* — this is the lesson
   from four login attempts that shipped green-but-never-signed-in.
 
+The **human-handoff path (journey-rigor #6).** A `manual-pending` block means
+the journey can't be machine-driven in this run — a browser login, a checkout
+with a real card, anything whose only honest check is a person looking at the
+screen. That's not a dead end: the founder (or you, with them) **drives the real
+flow by hand** and records what they saw, turning the block into genuine green.
+
+1. Show the checklist — what to do, what to look for, per step:
+   ```bash
+   "$SCRIPTS_DIR/sulis-attest-scenario" --scenario <scenario-id> \
+     --repo-root "$REPO_ROOT" --list
+   ```
+2. The founder runs the flow, then records the outcome:
+   ```bash
+   "$SCRIPTS_DIR/sulis-attest-scenario" --scenario <scenario-id> \
+     --repo-root "$REPO_ROOT" --attester "<who ran it>" --all-observed
+   ```
+   (or per-check `--observed "…"` / `--not-observed "…"` for a partial run).
+
+A pass deposits a **real** TestResult stamped `harness="human-attested"` — the
+same evidence the gate reads from an automated run, honest about who observed it.
+Any unobserved check records a fail and the scenario stays blocked. This is the
+opposite of waving it through: it forces a person to look at the real thing and
+keeps the record. (The *automated* browser driver is the named follow-on; until
+it lands, the human is the verifier-of-last-resort and this is how their
+observation becomes evidence the gate trusts.)
+
 The **conscious escape**: if a `deferred` is genuinely acceptable — a
 *non-user-facing* Scenario whose infra leg is unavailable in this run — re-run
 with `--allow-deferred`, which lets that deferral pass as a recorded gap. This
