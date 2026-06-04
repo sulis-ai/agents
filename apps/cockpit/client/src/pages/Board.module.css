@@ -1,0 +1,98 @@
+/* WP-003 — Board page styles (was Dashboard).
+ *
+ * The six-stage-column board matching the SIGNED visual contract
+ * (sulis-app.html, board panel): a responsive 6→3→2 column grid of
+ * neutral stage columns. Consumes tokens.css only — no raw hex. Reuses
+ * the page header + error treatment shape the Dashboard established. */
+
+.page {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 24px;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: var(--weight-heading);
+  margin: 0;
+  color: var(--foreground);
+}
+
+/* The stage-column grid: six columns, responsive down to three then two
+ * (matches the signed contract's board grid). Columns align to the top so
+ * a tall column doesn't stretch its neighbours. */
+.board {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(180px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .board {
+    grid-template-columns: repeat(3, minmax(200px, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .board {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+}
+
+/* Loading skeleton — one placeholder column per stage, mirroring the
+ * board grid so the layout doesn't jump when data arrives. */
+.skeletonCol {
+  background: var(--muted);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-container);
+  padding: 12px;
+}
+
+.skeletonHead {
+  height: 16px;
+  width: 60%;
+  background: var(--border-muted);
+  border-radius: var(--radius-interactive);
+  margin-bottom: 12px;
+}
+
+.skeletonCard {
+  height: 88px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+}
+
+.errorBox {
+  border: 1px solid var(--bg-destructive-border);
+  background: var(--bg-destructive);
+  color: var(--destructive);
+  padding: 16px;
+  border-radius: var(--radius-container);
+}
+
+.errorHeading {
+  font-size: 14px;
+  font-weight: var(--weight-label);
+  margin: 0 0 4px;
+  color: var(--foreground);
+}
+
+.errorMessage {
+  font-size: 13px;
+  margin: 0 0 12px;
+  color: var(--muted-foreground);
+}

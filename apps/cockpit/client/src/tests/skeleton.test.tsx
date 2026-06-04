@@ -2,9 +2,9 @@
 //
 // Replaces WP-001's "cockpit booting" placeholder assertion now that
 // WP-011 has landed the real Router + Shell + TanStack Query wiring.
-// We assert <App /> mounts without throwing AND the dashboard route
-// renders inside the persistent Shell. Detailed route + layout
-// behaviour lives in routing.test.tsx + Shell.test.tsx.
+// We assert <App /> mounts without throwing AND the board route (WP-003,
+// was the dashboard) renders inside the persistent Shell. Detailed route +
+// layout behaviour lives in routing.test.tsx + Shell.test.tsx.
 
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -24,7 +24,7 @@ describe("App smoke", () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    expect(screen.getByTestId("page-dashboard")).toBeInTheDocument();
+    expect(screen.getByTestId("page-board")).toBeInTheDocument();
     expect(screen.getByTestId("shell-sidebar")).toBeInTheDocument();
   });
 });

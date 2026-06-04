@@ -1,7 +1,7 @@
 // WP-011 — Routing test.
 //
 // Asserts the three routes per the WP Contract:
-//   /              → <Dashboard> placeholder
+//   /              → <Board>      (WP-003 stage-column board; was Dashboard)
 //   /c/:changeId   → <ThreadView> placeholder
 //   /garbage       → <NotFound>
 //
@@ -52,9 +52,9 @@ describe("App routes", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders Dashboard at /", () => {
+  it("renders the Board at /", () => {
     renderAt("/");
-    expect(screen.getByTestId("page-dashboard")).toBeInTheDocument();
+    expect(screen.getByTestId("page-board")).toBeInTheDocument();
     expect(screen.getByTestId("shell-sidebar")).toBeInTheDocument();
   });
 

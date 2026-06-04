@@ -148,8 +148,9 @@ bash apps/cockpit/scripts/check-read-only.sh --explain
 
 The end-to-end smoke under `apps/cockpit/e2e/` boots both halves of the
 cockpit against a seeded fixture and drives a real browser through the
-founder walkthrough (dashboard → chat → files → file viewer → copy path →
-diff toggle), plus the empty-state. It needs a browser the first time:
+founder walkthrough (stage-column board → chat → files → file viewer →
+copy path → diff toggle), plus the empty-state. It needs a browser the
+first time:
 
 ```bash
 npx playwright install chromium   # one-time, downloads the browser
@@ -182,7 +183,7 @@ apps/cockpit/
 │   ├── src/
 │   │   ├── main.tsx        # React mount point
 │   │   ├── App.tsx         # placeholder root
-│   │   ├── pages/          # dashboard, thread view (WP-012/013)
+│   │   ├── pages/          # board (stage columns, WP-003), thread view (WP-013)
 │   │   ├── components/     # shells, panels (WP-011/013/014)
 │   │   ├── api/            # TanStack Query hooks (WP-011)
 │   │   └── tests/

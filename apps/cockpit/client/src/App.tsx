@@ -4,13 +4,13 @@
 // MemoryRouter; <App /> wraps it in BrowserRouter for production use.
 //
 // Route shape per WP Contract:
-//   /                → <Dashboard>   (inside <Shell>)
+//   /                → <Board>       (inside <Shell>) — WP-003 stage board
 //   /c/:changeId     → <ThreadView>  (inside <Shell>)
 //   /*               → <NotFound>    (inside <Shell>)
 
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Shell } from "./layouts/Shell";
-import { Dashboard } from "./pages/Dashboard";
+import { Board } from "./pages/Board";
 import { ThreadView } from "./pages/ThreadView";
 import { NotFound } from "./pages/NotFound";
 
@@ -18,7 +18,7 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route element={<Shell />}>
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/" element={<Board />} />
         <Route path="/c/:changeId" element={<ThreadView />} />
         <Route path="*" element={<NotFound />} />
       </Route>
