@@ -37,9 +37,14 @@ export function hasActiveFilter(args: SearchArgs): boolean {
   );
 }
 
-/** Build `/api/search?…` with repeated `stage` params (the FR-11 array). */
-function buildSearchPath(args: SearchArgs): string {
+/**
+ * Build `/api/search?…` with repeated `stage` params (the FR-11 array). WP-008:
+ * when a Product is active the search is scoped to it (`?product=<id>`, ADR-009)
+ * so a filter can never surface another Product's change (FR-37).
+ */
+function buildSearchPath(args: SearchArgs, activeProductId: string | null): string {
   const params = new URLSearchParams();
+  if (activeProductId) params.set("product", activeProductId);
   const q = args.q.trim();
   if (q.length > 0) params.set("q", q);
   for (const stage of args.stages) params.append("stage", stage);
@@ -48,11 +53,19 @@ function buildSearchPath(args: SearchArgs): string {
   return qs.length > 0 ? `/api/search?${qs}` : "/api/search";
 }
 
-export function useSearch(args: SearchArgs) {
+export function useSearch(args: SearchArgs, activeProductId: string | null = null) {
   return useQuery({
-    queryKey: ["search", args.q.trim(), [...args.stages].sort(), args.needsAttention],
+    queryKey: [
+      "search",
+      activeProductId,
+      args.q.trim(),
+      [...args.stages].sort(),
+      args.needsAttention,
+    ],
     queryFn: () =>
-      apiGet<{ results: Change[] }>(buildSearchPath(args)).then((r) => r.results),
+      apiGet<{ results: Change[] }>(buildSearchPath(args, activeProductId)).then(
+        (r) => r.results,
+      ),
     enabled: hasActiveFilter(args),
   });
 }

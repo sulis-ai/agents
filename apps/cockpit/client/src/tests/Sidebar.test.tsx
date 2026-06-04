@@ -45,6 +45,33 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
+// WP-008 — the Sidebar now also fetches GET /api/products (for the switcher).
+// A URL-aware mock returns a ProductList for that endpoint and the supplied
+// change list for GET /api/changes — so the existing change-list assertions
+// stay valid while the product switcher has data to render.
+function mockSidebarFetch(changes: Change[]) {
+  return vi
+    .spyOn(globalThis, "fetch")
+    .mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/products")) {
+        return Promise.resolve(
+          jsonResponse(200, {
+            products: [
+              {
+                productId: "dna:product:implicit-single",
+                name: "Your product",
+                active: true,
+              },
+            ],
+            activeProductId: "dna:product:implicit-single",
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse(200, changes));
+    });
+}
+
 function renderSidebar(initialEntries: string[]) {
   return render(
     <QueryClientProvider client={freshClient()}>
@@ -71,9 +98,7 @@ describe("<Sidebar>", () => {
       makeChange({ changeId: "01AAA", handle: "CH-01AAA" }),
       makeChange({ changeId: "01BBB", handle: "CH-01BBB" }),
     ];
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse(200, changes),
-    );
+    mockSidebarFetch(changes);
     const { getAllByTestId } = renderSidebar(["/"]);
     await waitFor(() =>
       expect(getAllByTestId("sidebar-item")).toHaveLength(2),
@@ -85,9 +110,7 @@ describe("<Sidebar>", () => {
       makeChange({ changeId: "01AAA", handle: "CH-01AAA" }),
       makeChange({ changeId: "01BBB", handle: "CH-01BBB" }),
     ];
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse(200, changes),
-    );
+    mockSidebarFetch(changes);
     const { getAllByTestId } = renderSidebar(["/c/01BBB"]);
     const items = await waitFor(() => getAllByTestId("sidebar-item"));
     const active = items.filter((el) => el.getAttribute("data-active") === "true");
@@ -99,9 +122,7 @@ describe("<Sidebar>", () => {
     const changes: Change[] = [
       makeChange({ changeId: "01XYZ", handle: "CH-01XYZ" }),
     ];
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse(200, changes),
-    );
+    mockSidebarFetch(changes);
     const { getAllByTestId, getByRole } = renderSidebar(["/"]);
     await waitFor(() => expect(getAllByTestId("sidebar-item")).toHaveLength(1));
     const link = getByRole("link", { name: /CH-01XYZ/i });
@@ -109,7 +130,7 @@ describe("<Sidebar>", () => {
   });
 
   it("shows a quiet placeholder when there are zero changes", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, []));
+    mockSidebarFetch([]);
     const { getByText } = renderSidebar(["/"]);
     await waitFor(() =>
       expect(getByText(/no changes yet/i)).toBeInTheDocument(),
@@ -124,7 +145,7 @@ describe("<Sidebar>", () => {
       const changes: Change[] = [
         makeChange({ changeId: "01AAA", handle: "CH-01AAA", stage: "implement" }),
       ];
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, changes));
+      mockSidebarFetch(changes);
       const { queryByTestId, getAllByTestId } = renderSidebar(["/"]);
       await waitFor(() => expect(getAllByTestId("sidebar-item")).toHaveLength(1));
       expect(queryByTestId("sidebar-shipped")).toBeNull();
@@ -136,7 +157,7 @@ describe("<Sidebar>", () => {
         makeChange({ changeId: "01BBB", handle: "CH-01BBB", stage: "shipped" }),
         makeChange({ changeId: "01CCC", handle: "CH-01CCC", stage: "shipped" }),
       ];
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, changes));
+      mockSidebarFetch(changes);
       const { getByTestId, queryByTestId } = renderSidebar(["/"]);
       // Active section renders the one non-shipped change immediately.
       await waitFor(() => expect(getByTestId("sidebar-active")).toBeInTheDocument());
@@ -151,7 +172,7 @@ describe("<Sidebar>", () => {
       const changes: Change[] = [
         makeChange({ changeId: "01BBB", handle: "CH-01BBB", stage: "shipped" }),
       ];
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, changes));
+      mockSidebarFetch(changes);
       const { getByTestId, queryByTestId } = renderSidebar(["/"]);
       const toggle = await waitFor(() => getByTestId("sidebar-shipped-toggle"));
       expect(queryByTestId("sidebar-shipped-items")).toBeNull();

@@ -19,7 +19,6 @@
 // seam discipline as the status/transcript reads; the read-only gate
 // proves no mutation here).
 
-import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 // eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (TDD §9 permits; the rule's `../../*` pattern is intended to block escapes out of apps/cockpit/, which `import/no-restricted-paths` already enforces correctly)
@@ -28,6 +27,7 @@ import type {
   BrainGroup,
   BrainView,
 } from "../../shared/api-types";
+import { listDirs, listEntityFiles, readJsonldEntity } from "./brainFs";
 
 /** The conventional brain layout under a change worktree. */
 const BRAIN_INSTANCES = [".brain", "instances"];
@@ -74,45 +74,18 @@ export async function readBrain(
   return { changeId, groups };
 }
 
-/** Directory entries that are themselves directories; [] if the dir is absent. */
-async function listDirs(dir: string): Promise<string[]> {
-  try {
-    const entries = await readdir(dir, { withFileTypes: true });
-    return entries.filter((e) => e.isDirectory()).map((e) => e.name);
-  } catch {
-    return [];
-  }
-}
-
-/** `.jsonld` files in a kind directory; [] if absent. Skips `.journal.md` etc. */
-async function listEntityFiles(dir: string): Promise<string[]> {
-  try {
-    const entries = await readdir(dir, { withFileTypes: true });
-    return entries
-      .filter((e) => e.isFile() && e.name.endsWith(".jsonld"))
-      .map((e) => e.name);
-  } catch {
-    return [];
-  }
-}
-
 /**
  * Parse one entity file into a BrainEntity. Returns null (skip) when the
  * file is missing or not valid JSON — a malformed file must not sink the
- * whole brain read.
+ * whole brain read. The raw parse + fail-soft is the shared brainFs
+ * primitive; this adds the BrainEntity shaping (id + title + detail).
  */
 async function readEntity(
   path: string,
   kind: string,
 ): Promise<BrainEntity | null> {
-  let parsed: Record<string, unknown>;
-  try {
-    const raw = await readFile(path, "utf8");
-    parsed = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-  if (parsed === null || typeof parsed !== "object") return null;
+  const parsed = await readJsonldEntity(path);
+  if (parsed === null) return null;
 
   const id = typeof parsed.id === "string" ? parsed.id : `dna:${kind}:unknown`;
   return {

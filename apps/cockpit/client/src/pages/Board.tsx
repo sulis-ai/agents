@@ -35,6 +35,7 @@ import { EmptyState } from "../components/EmptyState";
 import { RefreshButton } from "../components/RefreshButton";
 import { SearchBar } from "../components/SearchBar";
 import { StageColumn } from "../components/StageColumn";
+import { useActiveProduct } from "../api/activeProduct";
 import { BOARD_STAGES, groupChangesByStage } from "../lib/groupChangesByStage";
 import styles from "./Board.module.css";
 
@@ -44,11 +45,16 @@ export function Board() {
   const [stages, setStages] = useState<WorkflowStage[]>([]);
   const [needsAttention, setNeedsAttention] = useState(false);
 
+  // WP-008 — the board (and its filters) are scoped to the active Product
+  // (FR-37/38, ADR-009): the active-Product id threads into both reads as
+  // `?product=`, so switching Products re-scopes the SAME board (ADR-005).
+  const { activeProductId } = useActiveProduct();
+
   const searchArgs = { q: query, stages, needsAttention };
   const filtering = hasActiveFilter(searchArgs);
 
-  const fullList = useChangesWithLiveness();
-  const search = useSearch(searchArgs);
+  const fullList = useChangesWithLiveness(activeProductId);
+  const search = useSearch(searchArgs, activeProductId);
 
   // The active query: search when filtering, the full list otherwise. The
   // results render in the SAME stage-column board (ADR-005).
