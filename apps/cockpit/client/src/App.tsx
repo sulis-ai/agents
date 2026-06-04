@@ -15,6 +15,7 @@ import { Shell } from "./layouts/Shell";
 import { Board } from "./pages/Board";
 import { ThreadView } from "./pages/ThreadView";
 import { ConciergePage } from "./pages/ConciergePage";
+import { OnboardingPage } from "./pages/OnboardingPage";
 import { NotFound } from "./pages/NotFound";
 
 export function AppRoutes() {
@@ -24,6 +25,8 @@ export function AppRoutes() {
         <Route path="/" element={<Board />} />
         <Route path="/c/:changeId" element={<ThreadView />} />
         <Route path="/concierge" element={<ConciergePage />} />
+        {/* WP-010 — the cold-start onboarding surface (UC-07). */}
+        <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

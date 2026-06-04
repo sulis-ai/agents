@@ -46,6 +46,32 @@ and no freehand entity write.**
   schema-validated spine emitters. No onboarding path writes an entity file
   directly. This is a Form-pillar guarantee: the brain is only ever written
   through the emitter port.
+
+  **Amendment (2026-06-04, WP-010 fix-forward) — the mint is server-side
+  deterministic, not agent-delegated.** The original decision had the bridge
+  AGENT run the emitters inside its `claude -p` session. Driven live against a
+  real sandbox brain, that path minted NOTHING: a confirm ran 167s, returned
+  200, and the agent merely narrated "let me locate the emitters" — no Tenant /
+  Product / Project landed. Delegating a deterministic CLI invocation to a
+  headless agent whose cwd is the founder's chosen area is slow, fragile, and —
+  observed — unreliable. So the split is now explicit:
+  - the bridge AGENT owns the **conversation** only — search / clarify /
+    propose (read-only);
+  - the **mint** (and the repo `git init`) is a deterministic SERVER action
+    behind a new `SpineMinter` port. Its adapter (`SpineEmitterMinter`)
+    invokes the validated spine-emitter CLIs (`sulis-emit-tenant` /
+    `sulis-emit-product`) + a schema-validated Project emit DIRECTLY via
+    `child_process`, resolving the emitter script dir the same way the cockpit
+    already resolves its bundled helpers (plugin-cache / in-repo fallback) —
+    never relying on the agent to find them.
+
+  The Form-pillar guarantee is UNCHANGED: entities are still written ONLY
+  through the validated emitters (no freehand entity write). What moved is the
+  *invoker* of those emitters — from the agent to the server. The cockpit's
+  read-only gate gains exactly one new allow-listed site
+  (`server/adapters/SpineEmitterMinter.ts`) for the emitter spawn + the config
+  yaml / staging writes, the same single-audited-site discipline as the chat
+  relay (ADR-003 / ADR-006).
 - **Idempotency (FR-31 / NFR-DISC-02):** before minting, onboarding asks the
   emitters / graph whether the Tenant / Product / Project already exists and
   surfaces the existing entity rather than creating a duplicate.
@@ -84,9 +110,17 @@ and no freehand entity write.**
 - Verified in CI against recorded fixtures (`recording-bridge-discovery-session`,
   `fixture-project-directory`) without a live agent — search-scope (FR-N7),
   dedupe (FR-31), validated-emitter writes (FR-32), confirm gate (FR-N6), and
-  all-or-nothing persistence (FR-N11) all assert against fixtures. The full
-  live path (real agent, real mint) is verified manually on the founder
-  machine.
+  all-or-nothing persistence (FR-N11) all assert against fixtures.
+- **The mint is verified for REAL in CI** (WP-010 fix-forward amendment): an
+  integration test drives a confirm against a TEMP `SULIS_STATE_DIR` with the
+  real `SpineEmitterMinter` + the vendored emitter CLIs and asserts a real
+  Tenant + Product + Project `.jsonld` land in the temp brain, readable by the
+  cockpit's own `readProducts`, with `Project.source` persisted (FR-36),
+  all-or-nothing on an emit failure (FR-N11), and idempotent re-mint (FR-31).
+  This closes the gap the recorded-bridge stub left open (it proved a prompt
+  was relayed, not that a graph was minted). The CONVERSATION's full live path
+  (real agent search/propose) remains the BLOCK-and-hand-to-founder
+  observation on the founder machine.
 - The durable-config round-trip (FR-36) verifies from the existing
   change-store fixtures: mint in one test-session, read back `Project.source`
   in a fresh session, start a change with no re-discovery.

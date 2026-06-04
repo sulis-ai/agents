@@ -64,6 +64,12 @@ const MUTATION_VERB_PATTERNS = [
 // `spawn` (the process start). Anything else with either shape is a violation.
 const RELAY_ROUTE_BASENAME = "chat.ts";
 const BRIDGE_ADAPTER_BASENAME = "StreamJsonSessionBridge.ts";
+// WP-010 fix-forward (ADR-007 amended) — the deterministic cold-start mint's
+// confirm-gated ACT path. It is the SECOND sanctioned process-start AND the
+// sanctioned filesystem-write site (invokes the validated spine emitters +
+// `git init`, writes the emitter config yaml + stages entities). Allow-listed
+// BY PATH — parity with the chat relay's write-verb exception (ADR-003).
+const SPINE_MINTER_BASENAME = "SpineEmitterMinter.ts";
 
 // Process-start shapes — spawn/exec of a child process. Forbidden everywhere
 // except the allow-listed bridge adapter (the new ADR-003 process-start rule).
@@ -238,6 +244,7 @@ describe("read-only inventory (TDD §13.7)", () => {
         "gitShow.ts",
         "SulisChangeStoreReader.ts",
         "SulisChangeRecreator.ts",
+        SPINE_MINTER_BASENAME,
       ]);
       if (SANCTIONED_PROCESS_STARTERS.has(basename(f))) {
         continue;
@@ -250,10 +257,14 @@ describe("read-only inventory (TDD §13.7)", () => {
     expect(starters).toContain(BRIDGE_ADAPTER_BASENAME);
   });
 
-  it("calls no filesystem-mutating APIs", async () => {
+  it("calls no filesystem-mutating APIs — except the one sanctioned mint adapter (ADR-007 amended)", async () => {
     const files = await collectSourceFiles();
     const offenders: string[] = [];
     for (const f of files) {
+      // The SpineEmitterMinter (WP-010 fix-forward) is the cold-start mint's
+      // confirm-gated ACT path — allow-listed BY PATH, the same single-audited-
+      // site discipline as the chat relay's write-verb exception.
+      if (basename(f) === SPINE_MINTER_BASENAME) continue;
       const src = stripComments(await readSource(f));
       for (const pat of FS_MUTATION_PATTERNS) {
         if (pat.test(src)) {

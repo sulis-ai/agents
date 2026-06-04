@@ -1,0 +1,745 @@
+=== NEW: apps/cockpit/server/adapters/SpineEmitterMinter.ts ===
+// WP-010 (fix-forward) — SpineEmitterMinter: the deterministic server-side mint.
+//
+// ADR-007 amended: the onboarding MINT and `git init` are deterministic SERVER
+// actions, not agent turns. The original confirm→mint delegated the mint to the
+// bridge AGENT (a headless `claude -p` that had to hunt for + run the spine
+// emitters); live it ran 167s and minted NOTHING. This adapter invokes the
+// validated spine-emitter CLIs (`sulis-emit-tenant` / `-product`) + a
+// schema-validated Project emit + `git init` DIRECTLY via child_process —
+// reliable, fast, and observable.
+//
+// This is the SECOND sanctioned process-start site in the cockpit (after the
+// SessionBridge prod adapter). The read-only gate's per-file process-start rule
+// (2b) allow-lists THIS file by path; every other file stays process-free,
+// including the onboarding orchestrator (which depends only on the SpineMinter
+// port). Entities are written ONLY through the validated adapter (FR-32): no
+// freehand entity write — the emitters + emit-project.py validate against the
+// vendored schema and reject-on-invalid.
+//
+// ALL-OR-NOTHING (FR-N11): the three entity emits write into a STAGING brain
+// (a temp instances dir); only after all three succeed are the staged entity
+// files moved into the real `<sulisStateDir>/.brain/instances`. A failure at
+// any step discards the staging dir, so the live graph is left exactly as it
+// was — no Product without its Project's source, no dangling Tenant.
+//
+// IDEMPOTENT (FR-31): the emitters derive deterministic ULIDs from the entity
+// names, so a re-mint of the same names overwrites in place and never grows the
+// entity count.
+//
+// Process discipline (mirrors SulisChangeStoreReader): execFile with a string[]
+// argv (never a shell string), shell:false, a bounded timeout, and a typed
+// failure on non-zero exit / timeout.
+
+import { execFile } from "node:child_process";
+import {
+  mkdtempSync,
+  mkdirSync,
+  rmSync,
+  writeFileSync,
+  existsSync,
+  readdirSync,
+  renameSync,
+  copyFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import type {
+  SpineMinter,
+  MintInput,
+  MintResult,
+  FindOrCreateRepoInput,
+} from "../ports/SpineMinter";
+import type { RepoOutcome } from "../lib/discovery/repoFindOrCreate";
+// eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (TDD §9 permits)
+import type { Product } from "../../shared/api-types";
+
+/** The bounded budget for one emitter / git call (a cold python is well under). */
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+export interface SpineEmitterMinterOptions {
+  /** The spine-emitter scripts dir (resolveEmitterScriptsDir by default). */
+  scriptsDir: string;
+  /** The active state dir — entities land under `<sulisStateDir>/.brain/instances`. */
+  sulisStateDir: string;
+  /** Per-call timeout (ms). Defaults to 30s. */
+  timeoutMs?: number;
+}
+
+/** One captured exec result. */
+interface ExecResult {
+  ok: boolean;
+  stdout: string;
+  stderr: string;
+}
+
+export class SpineEmitterMinter implements SpineMinter {
+  private readonly scriptsDir: string;
+  private readonly sulisStateDir: string;
+  private readonly timeoutMs: number;
+
+  constructor(opts: SpineEmitterMinterOptions) {
+    this.scriptsDir = opts.scriptsDir;
+    this.sulisStateDir = opts.sulisStateDir;
+    this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  }
+
+  /**
+   * Find-or-create the repo (FR-35). FIND configures an existing repo (no
+   * creation); CREATE runs a real local-only `git init` in the chosen area
+   * (ADR-008 founder-locked default). Hosted-remote create is not performed
+   * here (a separately-confirmed path); it surfaces as unreachable so the
+   * pure module persists no config.
+   */
+  async findOrCreateRepo(input: FindOrCreateRepoInput): Promise<RepoOutcome> {
+    const area = input.chosenArea;
+    const mode = input.repoChoice?.mode ?? "find";
+
+    if (mode === "create") {
+      const target = input.repoChoice?.createTarget ?? "local";
+      if (target !== "local") {
+        // Hosted-remote is not the deterministic server path (founder-locked
+        // default is local-only). Report unreachable ⇒ no dangling config.
+        return { outcome: "unreachable" };
+      }
+      mkdirSync(area, { recursive: true });
+      const init = await this.exec("git", ["init", "--initial-branch=main"], area);
+      if (!init.ok || !existsSync(path.join(area, ".git"))) {
+        return { outcome: "create-failed" };
+      }
+      return { outcome: "reachable", repo: area, path: area, primaryBranch: "main" };
+    }
+
+    // FIND — the chosen area must exist to be configured.
+    if (!existsSync(area)) return { outcome: "unreachable" };
+    return { outcome: "reachable", repo: area, path: area, primaryBranch: "main" };
+  }
+
+  /**
+   * Mint Tenant / Product / Project through the validated emitters into the
+   * active brain (FR-32). All-or-nothing (FR-N11) via a staging brain; the
+   * staged entities are moved into the real brain only on full success.
+   */
+  async mint(input: MintInput): Promise<MintResult> {
+    const tenantName = input.tenantName.trim() || "Your workspace";
+    const productName = input.productName.trim() || "Your product";
+    const projectName = (input.projectName || "").trim() || slugify(productName);
+
+    // A temp repo-config dir holds the tenant/product yaml the emitters read.
+    // It is sibling-resolved (.sulis/tenant.yaml next to .sulis/products/x.yaml)
+    // so the product emitter resolves belongs_to_tenant.
+    const configDir = mkdtempSync(path.join(tmpdir(), "spine-cfg-"));
+    // The STAGING brain — all three emits write here first (all-or-nothing).
+    const stageDir = mkdtempSync(path.join(tmpdir(), "spine-stage-"));
+    const stageInstances = path.join(stageDir, ".brain", "instances");
+
+    try {
+      const sulisDir = path.join(configDir, ".sulis");
+      const productsDir = path.join(sulisDir, "products");
+      mkdirSync(productsDir, { recursive: true });
+      const tenantYaml = path.join(sulisDir, "tenant.yaml");
+      const productYaml = path.join(productsDir, `${slugify(productName)}.yaml`);
+      writeFileSync(tenantYaml, `name: ${yamlScalar(tenantName)}\n`);
+      writeFileSync(productYaml, `name: ${yamlScalar(productName)}\n`);
+
+      // 1. Tenant.
+      const tenant = await this.runEmitter("sulis-emit-tenant", [
+        "--from-yaml", tenantYaml,
+        "--base-dir", stageInstances,
+        "--repo-root", configDir,
+      ]);
+      if (!tenant.ok) return mintFail(`tenant emit failed: ${tenant.stderr.trim()}`);
+      const tenantId = firstEntityId(tenant.stdout);
+      if (!tenantId) return mintFail("tenant emit returned no id");
+
+      // 2. Product (resolves belongs_to_tenant from the sibling tenant.yaml).
+      const product = await this.runEmitter("sulis-emit-product", [
+        "--from-yaml", productYaml,
+        "--base-dir", stageInstances,
+        "--repo-root", configDir,
+      ]);
+      if (!product.ok) return mintFail(`product emit failed: ${product.stderr.trim()}`);
+      const productId = firstEntityId(product.stdout);
+      if (!productId) return mintFail("product emit returned no id");
+
+      // 3. Project (validated emit; carries source + belongs_to_product_ref).
+      const sourceJson = JSON.stringify(input.source);
+      const projectScript = path.join(spineHelperDir(), "emit-project.py");
+      const project = await this.exec(
+        "python3",
+        [
+          projectScript,
+          "--scripts-dir", this.scriptsDir,
+          "--base-dir", stageInstances,
+          "--tenant-id", tenantId,
+          "--product-id", productId,
+          "--name", projectName,
+          "--source-json", sourceJson,
+        ],
+        configDir,
+      );
+      if (!project.ok) return mintFail(`project emit failed: ${project.stderr.trim()}`);
+      const projectId = firstEntityId(project.stdout);
+      if (!projectId) return mintFail("project emit returned no id");
+
+      // ALL succeeded — promote the staged entities into the real brain.
+      const realInstances = path.join(this.sulisStateDir, ".brain", "instances");
+      promoteStagedEntities(stageInstances, realInstances);
+
+      const mintedProduct: Product = { productId, name: productName };
+      return {
+        ok: true,
+        tenant: tenantName,
+        product: mintedProduct,
+        project: { projectId, source: input.source },
+      };
+    } finally {
+      rmSync(configDir, { recursive: true, force: true });
+      rmSync(stageDir, { recursive: true, force: true });
+    }
+  }
+
+  /** Run a spine-emitter CLI (a python script under scriptsDir) via python3. */
+  private runEmitter(name: string, args: string[]): Promise<ExecResult> {
+    const script = path.join(this.scriptsDir, name);
+    if (!existsSync(script)) {
+      return Promise.resolve({
+        ok: false,
+        stdout: "",
+        stderr: `emitter not found: ${script}`,
+      });
+    }
+    return this.exec("python3", [script, ...args], this.scriptsDir);
+  }
+
+  /** execFile with a string[] argv (no shell), bounded timeout, captured I/O. */
+  private exec(cmd: string, args: string[], cwd: string): Promise<ExecResult> {
+    return new Promise((resolve) => {
+      execFile(
+        cmd,
+        args,
+        { cwd, timeout: this.timeoutMs, shell: false },
+        (error, stdout, stderr) => {
+          if (error) {
+            resolve({ ok: false, stdout: stdout ?? "", stderr: stderr || String(error) });
+            return;
+          }
+          resolve({ ok: true, stdout: stdout ?? "", stderr: stderr ?? "" });
+        },
+      );
+    });
+  }
+}
+
+// ─── pure helpers ────────────────────────────────────────────────────────────
+
+function mintFail(message: string): MintResult {
+  return { ok: false, code: "MINT_FAILED", message };
+}
+
+/** Parse the first emitted entity id from an emitter's JSON envelope. */
+function firstEntityId(stdout: string): string | null {
+  try {
+    const parsed = JSON.parse(stdout) as {
+      ok?: boolean;
+      data?: { id?: string; entities?: Array<{ id?: string }> };
+    };
+    if (parsed.ok !== true || !parsed.data) return null;
+    if (typeof parsed.data.id === "string") return parsed.data.id;
+    const id = parsed.data.entities?.[0]?.id;
+    return typeof id === "string" ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Move every staged `.jsonld` entity (under `<stage>/<domain>/<kind>/`) into the
+ * real brain, preserving the domain/kind layout. The staging step is what makes
+ * the mint all-or-nothing: nothing reaches the real brain until all emits pass.
+ */
+function promoteStagedEntities(stageInstances: string, realInstances: string): void {
+  if (!existsSync(stageInstances)) return;
+  for (const domain of readdirSync(stageInstances)) {
+    const domainDir = path.join(stageInstances, domain);
+    for (const kind of readdirSync(domainDir)) {
+      const kindDir = path.join(domainDir, kind);
+      const destDir = path.join(realInstances, domain, kind);
+      mkdirSync(destDir, { recursive: true });
+      for (const file of readdirSync(kindDir)) {
+        if (!file.endsWith(".jsonld")) continue;
+        const from = path.join(kindDir, file);
+        const to = path.join(destDir, file);
+        try {
+          renameSync(from, to);
+        } catch {
+          // Cross-device rename — fall back to copy (same outcome).
+          copyFileSync(from, to);
+        }
+      }
+    }
+  }
+}
+
+/** Slug from a display name (matches the orchestrator's slugify). */
+function slugify(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "product"
+  );
+}
+
+/** Quote a yaml scalar so a name with `:` / leading spaces stays one value. */
+function yamlScalar(value: string): string {
+  return JSON.stringify(value);
+}
+
+/** The dir holding the bundled spine helper scripts (emit-project.py). */
+function spineHelperDir(): string {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  return path.join(here, "spine");
+}
+
+/**
+ * Resolve the spine-emitter scripts dir, mirroring index.ts's helper
+ * resolution. Order:
+ *   1. `SULIS_EMITTER_SCRIPTS_DIR` env override (tests / CI);
+ *   2. the in-repo `plugins/sulis/scripts` (a marketplace checkout);
+ *   3. the latest installed plugin cache
+ *      (`~/.claude/plugins/cache/.../sulis/<version>/scripts`).
+ * Returns the first dir that actually holds `sulis-emit-tenant`, else "".
+ */
+export function resolveEmitterScriptsDir(): string {
+  const override = process.env.SULIS_EMITTER_SCRIPTS_DIR;
+  if (override && existsSync(path.join(override, "sulis-emit-tenant"))) {
+    return override;
+  }
+
+  // In-repo (marketplace checkout): apps/cockpit/server/adapters → repo root.
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const repoRoot = path.resolve(here, "..", "..", "..", "..");
+  const inRepo = path.join(repoRoot, "plugins", "sulis", "scripts");
+  if (existsSync(path.join(inRepo, "sulis-emit-tenant"))) return inRepo;
+
+  // Installed plugin cache — pick the latest version dir that has the emitter.
+  const home = process.env.HOME ?? "";
+  if (home) {
+    const cacheRoot = path.join(home, ".claude", "plugins", "cache");
+    const found = latestPluginScriptsDir(cacheRoot);
+    if (found) return found;
+  }
+
+  return "";
+}
+
+/** Find the newest `.../sulis/<version>/scripts` dir holding sulis-emit-tenant. */
+function latestPluginScriptsDir(cacheRoot: string): string | null {
+  if (!existsSync(cacheRoot)) return null;
+  const candidates: string[] = [];
+  // Layout: <cacheRoot>/<marketplace>/sulis/<version>/scripts/sulis-emit-tenant
+  for (const marketplace of safeReaddir(cacheRoot)) {
+    const sulisDir = path.join(cacheRoot, marketplace, "sulis");
+    for (const version of safeReaddir(sulisDir)) {
+      const scripts = path.join(sulisDir, version, "scripts");
+      if (existsSync(path.join(scripts, "sulis-emit-tenant"))) {
+        candidates.push(scripts);
+      }
+    }
+  }
+  if (candidates.length === 0) return null;
+  // Newest version string last (lexical sort is adequate for semver-ish dirs).
+  candidates.sort();
+  return candidates[candidates.length - 1] ?? null;
+}
+
+function safeReaddir(dir: string): string[] {
+  try {
+    return readdirSync(dir);
+  } catch {
+    return [];
+  }
+}
+=== NEW: apps/cockpit/server/adapters/spine/emit-project.py ===
+#!/usr/bin/env python3
+"""emit-project — schema-validated Project mint into the active brain.
+
+WP-010 (fix-forward). The Tenant and Product spine emitters ship as
+first-class CLIs (`sulis-emit-tenant` / `sulis-emit-product`); a Project
+emitter does not, so the cockpit's deterministic server-side mint drives the
+SAME validated adapter the other emitters use (`_entity_adapter_local`) to
+write the Project entity through the vendored schema. This is NOT a freehand
+entity write (ADR-007): the entity is validated against
+`brain/compiled/foundation/project.schema.json` before any byte is written —
+the same reject-on-invalid discipline as every other emitter.
+
+It derives the Project ULID deterministically from the Product id + the
+project name (the same scheme the product/tenant emitters use), so a re-mint
+of the same names overwrites in place and never duplicates (FR-31). The
+Project carries `belongs_to_product_ref`, `belongs_to_tenant`, and
+`source` = JSON {repo, path, primary_branch} (FR-36).
+
+Usage:
+    emit-project.py --scripts-dir <dir> --base-dir <brain/instances>
+                    --tenant-id <dna:tenant:..> --product-id <dna:product:..>
+                    --name <project-name> --source-json <json>
+
+Envelope: {"ok": true, "data": {...}} / {"ok": false, "error": ".."} (exit 0/1).
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+
+def _ok(data: dict) -> int:
+    print(json.dumps({"ok": True, "data": data}, indent=2))
+    return 0
+
+
+def _err(message: str) -> int:
+    print(json.dumps({"ok": False, "error": message}, indent=2))
+    return 1
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Emit a Project entity (validated).")
+    parser.add_argument("--scripts-dir", required=True, help="the spine-emitter scripts dir (has _entity_adapter_local)")
+    parser.add_argument("--base-dir", required=True, help="<state>/.brain/instances")
+    parser.add_argument("--tenant-id", required=True)
+    parser.add_argument("--product-id", required=True)
+    parser.add_argument("--name", required=True)
+    parser.add_argument("--source-json", required=True, help="JSON {repo, path, primary_branch}")
+    parser.add_argument("--domain", default="foundation")
+    args = parser.parse_args()
+
+    scripts_dir = Path(args.scripts_dir).resolve()
+    if not (scripts_dir / "_entity_adapter_local.py").exists():
+        return _err(f"emitter scripts not found under: {scripts_dir}")
+    sys.path.insert(0, str(scripts_dir))
+
+    try:
+        from _entity_adapter_local import LocalFileEntityAdapter  # noqa: E402
+        from _entity_repository import EntityValidationError  # noqa: E402
+        from _tenant_emission import _deterministic_ulid_from  # noqa: E402
+    except Exception as exc:  # noqa: BLE001 — surface the import problem verbatim
+        return _err(f"could not import the validated adapter: {exc}")
+
+    name = args.name.strip()
+    if not name:
+        return _err("a non-empty project name is required")
+
+    # Deterministic ULID from product + name ⇒ idempotent re-mint (FR-31).
+    ulid = _deterministic_ulid_from(f"project-name:{name}:product:{args.product_id}")
+    entity = {
+        "id": f"dna:project:{ulid}",
+        "name": name,
+        "belongs_to_tenant": args.tenant_id,
+        "belongs_to_product_ref": args.product_id,
+        "type": "application",
+        "source": args.source_json,
+        "version_files": ["package.json"],
+        "branch_policy": "trunk",
+        "state": "active",
+        "sys_status": "active",
+    }
+
+    adapter = LocalFileEntityAdapter(
+        base_dir=Path(args.base_dir).resolve(), domain=args.domain
+    )
+    try:
+        adapter.save("project", entity)  # validates first; nothing written on invalid
+    except EntityValidationError as exc:
+        return _err(f"project failed schema validation: {exc}")
+    except Exception as exc:  # noqa: BLE001
+        return _err(f"project write failed: {exc}")
+
+    return _ok({"id": entity["id"], "name": name})
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+=== NEW: apps/cockpit/server/ports/SpineMinter.ts ===
+// WP-010 (fix-forward) — SpineMinter port (ADR-007 amended; FR-32/35/36/N10/N11).
+//
+// THE deterministic, server-side mint seam. The original onboarding delegated
+// the mint to the bridge AGENT (a headless `claude -p` that hunted for + ran
+// the spine emitters) — slow (167s observed) and unreliable (minted NOTHING
+// live). ADR-007 is amended: the CONVERSATION (search / clarify / propose)
+// stays an agent turn over the bridge; the consequential MINT + `git init` move
+// to a deterministic SERVER action behind THIS port.
+//
+// Hexagonal shape, like SessionBridge: the cockpit owns this interface; the
+// adapter (`SpineEmitterMinter`) is the one that actually starts processes (the
+// vendored spine-emitter CLIs + `git init`). The orchestrator depends only on
+// the port, so it itself starts no process — the read-only gate's per-file
+// process-start rule still passes for the orchestrator; only the adapter is
+// allow-listed as the new sanctioned site (alongside the SessionBridge adapter).
+//
+// Two operations, mirroring the two consequential acts onboarding performs:
+//
+//   findOrCreateRepo(...)  — the FIND vs CREATE branch (FR-35). Local-only
+//                            `git init` is the founder-locked safe default
+//                            (ADR-008). Returns a RepoOutcome the pure
+//                            repoFindOrCreate module interprets (no-dangling-
+//                            config, FR-N10/N11).
+//   mint(...)              — emit the Tenant / Product / Project through the
+//                            validated spine emitters into the active brain.
+//                            ALL-OR-NOTHING (FR-N11): a failed emit leaves no
+//                            partial graph. IDEMPOTENT (FR-31): deterministic
+//                            entity ids ⇒ a re-mint never duplicates.
+
+// eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (TDD §9 permits)
+import type { ProjectSource, Product } from "../../shared/api-types";
+import type { RepoChoice, RepoOutcome } from "../lib/discovery/repoFindOrCreate";
+
+/** What the founder confirmed minting (names + the resolved repo source). */
+export interface MintInput {
+  /** The Tenant display name (its ULID is derived deterministically from it). */
+  tenantName: string;
+  /** The Product display name. */
+  productName: string;
+  /** The Project name/slug. */
+  projectName: string;
+  /** The founder's chosen area — the emitters' `--repo-root`. */
+  chosenArea: string;
+  /** The persisted Project.source = {repo, path, primary_branch} (FR-36). */
+  source: ProjectSource;
+}
+
+/** The minted graph (on success) or a typed failure (all-or-nothing). */
+export type MintResult =
+  | {
+      ok: true;
+      tenant: string;
+      product: Product;
+      project: { projectId: string; source: ProjectSource };
+    }
+  | { ok: false; code: "MINT_FAILED"; message: string };
+
+/** The find-or-create request the adapter performs (FR-35). */
+export interface FindOrCreateRepoInput {
+  /** The founder's chosen area — the find root / the create target dir. */
+  chosenArea: string;
+  /** The founder's repo branch decision (find vs create, local vs hosted). */
+  repoChoice?: RepoChoice;
+}
+
+/**
+ * The deterministic, server-side mint seam (ADR-007 amended). The adapter
+ * starts processes (the spine emitters + `git init`); the orchestrator depends
+ * only on this port and stays process-free.
+ */
+export interface SpineMinter {
+  /**
+   * Find-or-create the repo for the chosen area (FR-35). A CREATE defaults to
+   * local-only `git init` (ADR-008). Returns the outcome the pure
+   * repoFindOrCreate module interprets (no-dangling-config on failure).
+   */
+  findOrCreateRepo(input: FindOrCreateRepoInput): Promise<RepoOutcome>;
+
+  /**
+   * Mint the Tenant / Product / Project through the validated spine emitters
+   * into the active brain (FR-32). All-or-nothing (FR-N11), idempotent (FR-31).
+   */
+  mint(input: MintInput): Promise<MintResult>;
+}
+=== NEW: apps/cockpit/server/tests/discovery.mint-real.test.ts ===
+// WP-010 (fix-forward) — REAL deterministic server-side mint (FR-32/36/N11/31).
+//
+// THE failure this pins: the original confirm→mint delegated the mint to the
+// bridge AGENT (a headless `claude -p` that had to hunt for + run the spine
+// emitters). Live, it ran 167s and minted NOTHING — yet the recorded-bridge
+// integration test passed because it STUBBED the bridge. The stub proved a
+// prompt was relayed, not that a graph was minted.
+//
+// This test drives the REAL SpineEmitterMinter adapter (the deterministic
+// server-side mint) against a TEMP SULIS_STATE_DIR + the vendored spine-emitter
+// CLIs, and asserts REAL entities land on disk:
+//   - a Tenant, a Product, and a Project jsonld actually exist in the temp brain
+//     after a confirm (the thing that failed live);
+//   - the Project carries source = {repo, path, primary_branch} (FR-36);
+//   - the entities are readable by the cockpit's OWN reader (readProducts) — the
+//     same reader the board uses — so onboarding actually populates the app;
+//   - ALL-OR-NOTHING: an emit failure leaves NO partial graph (FR-N11);
+//   - IDEMPOTENT: a re-confirm with the same names does not duplicate (FR-31).
+//
+// It needs the vendored emitter scripts (tenant/product) + python3. When the
+// scripts can't be resolved (a bare checkout with no plugin cache), the suite
+// skips with a clear message rather than failing vacuously.
+
+import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { mkdtempSync, rmSync, existsSync, readdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { execFileSync } from "node:child_process";
+
+import {
+  SpineEmitterMinter,
+  resolveEmitterScriptsDir,
+} from "../adapters/SpineEmitterMinter";
+import { readProducts } from "../lib/products/readProducts";
+import type { ProjectSource } from "../../shared/api-types";
+
+// ── resolve the vendored emitter scripts (skip cleanly if unavailable) ───────
+let scriptsDir: string | null = null;
+let havePython = false;
+beforeAll(() => {
+  scriptsDir = resolveEmitterScriptsDir();
+  try {
+    execFileSync("python3", ["--version"], { stdio: "ignore" });
+    havePython = true;
+  } catch {
+    havePython = false;
+  }
+});
+
+// Each test gets its own temp state dir + repo so runs never collide.
+const cleanups: string[] = [];
+afterEach(() => {
+  while (cleanups.length > 0) {
+    const dir = cleanups.pop();
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+function tmp(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  cleanups.push(dir);
+  return dir;
+}
+
+/** Count `.jsonld` files of one kind across every brain domain. */
+function countKind(stateDir: string, kind: string): number {
+  const instances = join(stateDir, ".brain", "instances");
+  if (!existsSync(instances)) return 0;
+  let n = 0;
+  for (const domain of readdirSync(instances)) {
+    const kindDir = join(instances, domain, kind);
+    if (!existsSync(kindDir)) continue;
+    n += readdirSync(kindDir).filter((f) => f.endsWith(".jsonld")).length;
+  }
+  return n;
+}
+
+const SOURCE: ProjectSource = {
+  repo: "",
+  path: "",
+  primary_branch: "main",
+};
+
+describe("SpineEmitterMinter — the REAL deterministic server-side mint", () => {
+  it("mints a real Tenant + Product + Project into the temp brain on confirm (FR-32/36)", async () => {
+    if (!scriptsDir || !havePython) {
+      // eslint-disable-next-line no-console
+      console.warn("skipping: vendored emitter scripts or python3 unavailable");
+      return;
+    }
+    const stateDir = tmp("mint-state-");
+    const repo = tmp("mint-repo-");
+    const minter = new SpineEmitterMinter({
+      scriptsDir,
+      sulisStateDir: stateDir,
+    });
+
+    const result = await minter.mint({
+      tenantName: "Acme Checkout",
+      productName: "Acme Checkout",
+      projectName: "acme-checkout",
+      chosenArea: repo,
+      source: { ...SOURCE, repo, path: repo },
+    });
+
+    expect(result.ok).toBe(true);
+
+    // REAL entities exist on disk — the thing that failed live.
+    expect(countKind(stateDir, "tenant")).toBe(1);
+    expect(countKind(stateDir, "product")).toBe(1);
+    expect(countKind(stateDir, "project")).toBe(1);
+
+    // The cockpit's OWN reader sees the minted Product (no implicit fallback).
+    const { list } = await readProducts({ sulisStateDir: stateDir });
+    expect(list.products.length).toBe(1);
+    expect(list.products[0]?.name).toBe("Acme Checkout");
+    expect(list.products[0]?.productId).not.toBe("dna:product:implicit-single");
+
+    // The Project carries source = {repo, path, primary_branch} (FR-36): the
+    // roll-up keys on source.path, so a regression here would orphan changes.
+    if (result.ok) {
+      expect(result.project.source.repo).toBe(repo);
+      expect(result.project.source.path).toBe(repo);
+      expect(result.project.source.primary_branch).toBe("main");
+    }
+  });
+
+  it("is IDEMPOTENT — a re-confirm with the same names does not duplicate (FR-31)", async () => {
+    if (!scriptsDir || !havePython) return;
+    const stateDir = tmp("mint-state-");
+    const repo = tmp("mint-repo-");
+    const minter = new SpineEmitterMinter({ scriptsDir, sulisStateDir: stateDir });
+
+    const input = {
+      tenantName: "Acme Checkout",
+      productName: "Acme Checkout",
+      projectName: "acme-checkout",
+      chosenArea: repo,
+      source: { ...SOURCE, repo, path: repo },
+    };
+
+    await minter.mint(input);
+    await minter.mint(input); // same names again
+
+    // Deterministic ULIDs ⇒ the second mint overwrites, never grows the count.
+    expect(countKind(stateDir, "tenant")).toBe(1);
+    expect(countKind(stateDir, "product")).toBe(1);
+    expect(countKind(stateDir, "project")).toBe(1);
+  });
+
+  it("ALL-OR-NOTHING — an emit failure leaves NO partial graph (FR-N11)", async () => {
+    if (!scriptsDir || !havePython) return;
+    const stateDir = tmp("mint-state-");
+    const repo = tmp("mint-repo-");
+    // Point the minter at a bogus scripts dir so the FIRST emit (tenant) fails:
+    // nothing must be written anywhere under the state dir.
+    const minter = new SpineEmitterMinter({
+      scriptsDir: join(repo, "does-not-exist"),
+      sulisStateDir: stateDir,
+    });
+
+    const result = await minter.mint({
+      tenantName: "Acme Checkout",
+      productName: "Acme Checkout",
+      projectName: "acme-checkout",
+      chosenArea: repo,
+      source: { ...SOURCE, repo, path: repo },
+    });
+
+    expect(result.ok).toBe(false);
+    // No dangling graph — neither a tenant, a product, nor a project survives.
+    expect(countKind(stateDir, "tenant")).toBe(0);
+    expect(countKind(stateDir, "product")).toBe(0);
+    expect(countKind(stateDir, "project")).toBe(0);
+  });
+
+  it("a CREATE branch runs a real `git init` in the chosen area (deterministic, server-side)", async () => {
+    if (!scriptsDir || !havePython) return;
+    const stateDir = tmp("mint-state-");
+    const repo = tmp("mint-repo-");
+    const minter = new SpineEmitterMinter({ scriptsDir, sulisStateDir: stateDir });
+
+    const outcome = await minter.findOrCreateRepo({
+      chosenArea: repo,
+      repoChoice: { mode: "create", createTarget: "local" },
+    });
+
+    expect(outcome.outcome).toBe("reachable");
+    // `git init` produced a real .git in the chosen area (local-only, ADR-008).
+    expect(existsSync(join(repo, ".git"))).toBe(true);
+  });
+});

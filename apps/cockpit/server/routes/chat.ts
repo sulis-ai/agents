@@ -30,6 +30,8 @@ import type {
 import type {
   ChatStreamEvent,
   ConciergeStreamEvent,
+  OnboardingRequest,
+  OnboardingStreamEvent,
 } from "../../shared/api-types";
 import { checkSessionBinding } from "../lib/sessionBinding";
 import { InFlightLock } from "../lib/inFlightLock";
@@ -38,6 +40,12 @@ import {
   buildConciergeContext,
   type ConciergeRoute,
 } from "../lib/concierge/conciergeRead";
+import { OnboardingOrchestrator } from "../lib/discovery/onboardingOrchestrator";
+import type { SpineMinter } from "../ports/SpineMinter";
+import {
+  readProducts,
+  IMPLICIT_PRODUCT_ID,
+} from "../lib/products/readProducts";
 
 import { requireChange } from "./_change-lookup";
 
@@ -285,7 +293,7 @@ function openSseHeaders(res: import("express").Response): void {
  */
 function writeSseFrame(
   res: import("express").Response,
-  event: ChatStreamEvent | ConciergeStreamEvent,
+  event: ChatStreamEvent | ConciergeStreamEvent | OnboardingStreamEvent,
 ): void {
   res.write(`data: ${JSON.stringify(event)}\n\n`);
 }
@@ -490,4 +498,157 @@ function finishConcierge(
   writeSseFrame(res, { type: "complete", route });
   log({ outcome: "completed", route });
   res.end();
+}
+
+// ─── WP-010 — the cold-start onboarding route (ADR-007/008) ──────────────────
+//
+// The conversational front door for an EMPTY graph (UC-07). It is the SECOND
+// confirm-gated ACT path in the cockpit (after the chat relay). It is
+// registered HERE — in the ONE already-sanctioned write-verb file (ADR-003) —
+// so onboarding adds NO new file-level write exception (WP-010 AC#3 / ADR-006);
+// the read-only gate's rule-5 allow-list is unchanged.
+//
+// It rides the SAME bridge as the chat (no second bridge, FR-27) for the
+// CONVERSATION (search / clarify / propose — the agent runs the discover-*
+// skills). The consequential MINT + `git init`, however, are DETERMINISTIC
+// SERVER actions behind the SpineMinter port (ADR-007 amended): the
+// agent-delegated mint proved slow + unreliable (167s, minted nothing live).
+// The orchestrator owns only the safety plumbing — scope bound, confirm gate,
+// repo find-or-create, idempotency, all-or-nothing — and starts no process
+// itself; the SpineMinter adapter is the one sanctioned emitter-invocation site.
+//
+// One discovery session at a time (one Product per conversation, founder-
+// locked): a single in-flight lock yields 409 SESSION_BUSY on a second
+// concurrent session, and a single orchestrator instance carries the live
+// proposal across the propose→confirm turns.
+//
+// One structured act-log line per consequential act — never a directory,
+// prompt, or reply (NFR-SEC-03).
+
+/** A structured onboarding log line — no chosen area, prompt, or reply text. */
+export interface OnboardingLogLine {
+  phase: OnboardingRequest["phase"];
+  outcome: "proposed" | "minted" | "refused";
+  code?: string;
+}
+
+export interface OnboardingRouterDeps {
+  sessionBridge: SessionBridge;
+  /**
+   * The deterministic server-side mint + repo find-or-create (ADR-007 amended).
+   * The MINT + `git init` go through this port, not the bridge agent.
+   */
+  spineMinter: SpineMinter;
+  /** ~/.sulis (or a test override) — the idempotency probe reads Products here. */
+  sulisStateDir: string;
+  /** The permitted search root the chosen area must be inside (FR-N7). */
+  permittedRoot: string;
+  /** One-line-per-act structured log (no area/prompt/reply). Default no-op. */
+  onboardingLogSink?: (line: OnboardingLogLine) => void;
+}
+
+/** The sentinel discovery session id (NOT a change id). */
+const ONBOARDING_LOCK_KEY = "onboarding";
+
+export function createOnboardingRouter(deps: OnboardingRouterDeps): Router {
+  const router = Router({ mergeParams: true });
+  const log = deps.onboardingLogSink ?? (() => {});
+  const lock = new InFlightLock();
+
+  // One orchestrator instance per process carries the live proposal across the
+  // propose→confirm turns (one Product per conversation, founder-locked).
+  const orchestrator = new OnboardingOrchestrator({
+    sessionBridge: deps.sessionBridge,
+    spineMinter: deps.spineMinter,
+    permittedRoot: deps.permittedRoot,
+    newToken: () => randomToken(),
+    listProductIds: async () => {
+      // Idempotency probe (FR-31): the REAL minted Products (the synthesised
+      // single implicit Product is not a real mint, so it is filtered out).
+      const { list } = await readProducts({ sulisStateDir: deps.sulisStateDir });
+      return list.products
+        .map((p) => p.productId)
+        .filter((id) => id !== IMPLICIT_PRODUCT_ID);
+    },
+  });
+
+  router.use(jsonBody());
+
+  router.post("/session", (req, res, next) => {
+    void handleOnboarding(req, res, orchestrator, lock, log).catch(next);
+  });
+
+  return router;
+}
+
+async function handleOnboarding(
+  req: import("express").Request,
+  res: import("express").Response,
+  orchestrator: OnboardingOrchestrator,
+  lock: InFlightLock,
+  log: (line: OnboardingLogLine) => void,
+): Promise<void> {
+  const body = req.body as OnboardingRequest;
+  const phase = body?.phase;
+
+  // A missing/invalid phase is a 400.
+  if (phase !== "search" && phase !== "ask" && phase !== "confirm") {
+    res
+      .status(400)
+      .json({ error: "a valid phase is required", code: "BAD_REQUEST" });
+    return;
+  }
+
+  // One discovery session at a time (FR — one Product per conversation). A
+  // second concurrent session is refused with 409 SESSION_BUSY.
+  const handle = lock.acquire(ONBOARDING_LOCK_KEY);
+  if (handle === null) {
+    log({ phase, outcome: "refused", code: "SESSION_BUSY" });
+    res.status(409).json({
+      error: "I'm already setting something up — one at a time.",
+      code: "SESSION_BUSY",
+    });
+    return;
+  }
+
+  try {
+    // PRE-STREAM refusals (parity with the chat relay's lazy-open): a scope
+    // violation or a stale confirm returns a clean JSON status, never a 200
+    // stream with an error frame (FR-N6/N7).
+    const refusal = orchestrator.precheck(body);
+    if (refusal) {
+      log({ phase, outcome: "refused", code: refusal.code });
+      res.status(refusal.status).json({
+        error: refusal.message,
+        code: refusal.code,
+      });
+      return;
+    }
+
+    // Stream the turn as SSE. We open the headers eagerly here (the orchestrator
+    // always emits at least a leading `state`).
+    openSseHeaders(res);
+    let sawMinted = false;
+    let sawError: string | undefined;
+    await orchestrator.turn(body, {
+      emit: (event: OnboardingStreamEvent) => {
+        if (event.type === "minted") sawMinted = true;
+        if (event.type === "error") sawError = event.code;
+        writeSseFrame(res, event);
+      },
+    });
+    log({
+      phase,
+      outcome: sawError ? "refused" : sawMinted ? "minted" : "proposed",
+      ...(sawError ? { code: sawError } : {}),
+    });
+    res.end();
+  } finally {
+    handle.release();
+  }
+}
+
+/** A short, opaque confirm token (no crypto needed — it is a same-process nonce). */
+function randomToken(): string {
+  return `tok-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }

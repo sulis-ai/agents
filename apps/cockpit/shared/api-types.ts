@@ -356,6 +356,7 @@ export type OnboardingStreamEvent =
         | "DISCOVERY_SCOPE_VIOLATION"
         | "DISCOVERY_CONFIRM_STALE"
         | "REPO_CREATE_FAILED"
+        | "MINT_FAILED"
         | "SESSION_UNREACHABLE"
         | "SESSION_BUSY";
       message: string;

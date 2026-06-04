@@ -1,0 +1,352 @@
+/* WP-010 — OnboardingChat (the cold-start conversational setup). Built to the
+ * SIGNED visual contract (sulis-app.html panels 13–16). Tokens only — no raw
+ * hex (WPF-07 / UXD-04). Reuses the concierge/chat composer idiom (EP-03): a
+ * wider centred conversation, a quiet proposal recap, the confirm gate, and the
+ * "you're set up" end state. The product tile is a NEUTRAL monogram (chrome,
+ * not brand decoration — founder-locked). */
+
+.frontdoor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+}
+
+.scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0 4px;
+}
+
+.hero h2 {
+  font-family: var(--font-sans);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.hero p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted-foreground);
+  margin: 0;
+}
+
+/* The streamed agent text. */
+.agent {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--foreground);
+  white-space: pre-wrap;
+}
+
+/* The neutral two-letter product tile (founder-locked — no logo upload). */
+.tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-interactive);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* The proposal recap — what I'll set up, BEFORE any mint (the confirm gate). */
+.proposalCard {
+  align-self: stretch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--card);
+  padding: 15px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.proposalHead {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.proposalTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.alreadyNote {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  margin-top: 2px;
+}
+
+.proposalList {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 5px 14px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.proposalList dt {
+  color: var(--muted-foreground);
+}
+
+.proposalList dd {
+  color: var(--foreground);
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* The find-or-create branch — two pickable options. */
+.branch {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.branchOpt {
+  flex: 1 1 0;
+  min-width: 160px;
+  text-align: left;
+  background: var(--card);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-interactive);
+  padding: 9px 13px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.branchOpt:hover {
+  border-color: var(--input);
+}
+
+.branchOpt.sel {
+  border-color: var(--ring);
+  background: var(--muted);
+}
+
+/* The create-location segmented control — local-only pre-selected. */
+.seg {
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-interactive);
+  overflow: hidden;
+  width: fit-content;
+}
+
+.segOpt {
+  background: var(--card);
+  color: var(--foreground);
+  border: none;
+  border-right: 1px solid var(--border);
+  padding: 7px 13px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.segOpt:last-child {
+  border-right: none;
+}
+
+.segOpt.on {
+  background: var(--muted);
+  font-weight: var(--weight-label);
+}
+
+/* The confirm gate — needs your go-ahead before it happens (FR-N6). */
+.gate {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.gateBody {
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+.gateActions {
+  display: flex;
+  gap: 9px;
+}
+
+.primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: none;
+  border-radius: var(--radius-interactive);
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: var(--weight-label);
+  cursor: pointer;
+}
+
+.primary:hover:not(:disabled) {
+  filter: brightness(0.96);
+}
+
+.primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.outline {
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-interactive);
+  padding: 9px 18px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.outline:hover:not(:disabled) {
+  background: var(--muted);
+}
+
+.outline:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* The "your product is set up" end state (panel 16). */
+.setupdone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  padding: 40px 24px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.setupdone .tile {
+  width: 44px;
+  height: 44px;
+  font-size: 16px;
+}
+
+.setupdone h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.setupdone p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted-foreground);
+  margin: 0;
+}
+
+/* Honest failure — surfaced plainly, creates nothing (FR-N7/N10). */
+.error {
+  align-self: stretch;
+  background: var(--bg-destructive);
+  border: 1px solid var(--bg-destructive-border);
+  color: var(--destructive);
+  border-radius: var(--radius-container);
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.composerWrap {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+  padding: 12px 24px 16px;
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.statusLine {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.composer {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.field {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 44px;
+  resize: vertical;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--foreground);
+  background: var(--card);
+  border: 1px solid var(--input);
+  border-radius: var(--radius-interactive);
+  padding: 10px 12px;
+}
+
+.textarea:focus {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+.textarea:disabled {
+  opacity: 0.6;
+}
+
+.send {
+  flex: 0 0 auto;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: none;
+  border-radius: var(--radius-interactive);
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: var(--weight-label);
+  cursor: pointer;
+}
+
+.send:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

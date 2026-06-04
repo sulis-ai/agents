@@ -39,8 +39,12 @@ specific class of mutation is absent from the active source tree.
 
   1. Filesystem writes
      Forbids: fs.writeFile / writeFileSync / appendFile / appendFileSync /
-     createWriteStream, and the same as bare named imports (await writeFile(…)).
-     Why: the cockpit reads worktrees and transcripts; it never writes to them.
+     createWriteStream, and the same as bare named imports (await writeFile(…)),
+     EXCEPT in server/adapters/SpineEmitterMinter.ts (the cold-start mint's
+     confirm-gated ACT path — WP-010 fix-forward, ADR-007 amended: writes the
+     emitter config yaml + stages entities for the all-or-nothing brain mint).
+     Why: the cockpit reads worktrees and transcripts; it never writes to them
+     EXCEPT through the audited, confirm-gated mint seam.
 
   2. git spawn
      Forbids: spawn("git", …) / spawnSync("git", …) / execFile("git", …)
@@ -151,11 +155,20 @@ for f in "${SOURCE_FILES[@]}"; do
   #    prefix. The bare-call patterns use a negative guard so a member
   #    access on an unrelated object (e.g. `.writeFile(`) is matched too —
   #    that is still a write and should be flagged for inspection.
-  while IFS= read -r line; do
-    [ -n "$line" ] && fs_hits+=("$rel: $line")
-  done < <(printf '%s\n' "$stripped" | grep -nE \
-    '(\bfs\.(writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream)\b|\b(writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream)[[:space:]]*\()' \
-    || true)
+  #
+  #    SANCTIONED WRITE SITE (WP-010 fix-forward, ADR-007 amended): the
+  #    SpineEmitterMinter is the cold-start mint's confirm-gated ACT path. It
+  #    writes the tenant/product config yaml the validated emitters consume and
+  #    stages entities for the all-or-nothing promotion into the brain. It is
+  #    allow-listed BY PATH here — the same single-audited-site discipline as the
+  #    chat relay (rule 5) and the process-start sites (rule 2b).
+  if [ "$rel" != "server/adapters/SpineEmitterMinter.ts" ]; then
+    while IFS= read -r line; do
+      [ -n "$line" ] && fs_hits+=("$rel: $line")
+    done < <(printf '%s\n' "$stripped" | grep -nE \
+      '(\bfs\.(writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream)\b|\b(writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream)[[:space:]]*\()' \
+      || true)
+  fi
 
   # 2. git spawn outside lib/gitShow.ts
   if [ "$rel" != "server/lib/gitShow.ts" ]; then
@@ -179,13 +192,21 @@ for f in "${SOURCE_FILES[@]}"; do
   #       - SulisChangeRecreator.ts    — the recreate-on-demand CLI (RecreateRunner
   #                                       port; an explicitly-invoked read/recreate,
   #                                       MVP ADR-004 — never in-process server work).
+  #       - SpineEmitterMinter.ts      — the deterministic cold-start mint (WP-010
+  #                                       fix-forward, ADR-007 amended): invokes the
+  #                                       validated spine-emitter CLIs + `git init`
+  #                                       on a confirmed onboarding turn. Confirm-
+  #                                       gated + all-or-nothing; the mint moved
+  #                                       server-side because the agent-delegated
+  #                                       mint was slow + unreliable (minted nothing).
   #     The guarantee this rule adds: NO NEW file may start a process; a future
   #     route or lib that sprouts a spawn fails the gate.
   case "$rel" in
     "$BRIDGE_ADAPTER_REL" | \
     server/lib/gitShow.ts | \
     server/adapters/SulisChangeStoreReader.ts | \
-    server/adapters/SulisChangeRecreator.ts)
+    server/adapters/SulisChangeRecreator.ts | \
+    server/adapters/SpineEmitterMinter.ts)
       ;; # sanctioned process-start site — skip
     *)
       while IFS= read -r line; do

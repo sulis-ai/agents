@@ -14,7 +14,7 @@
 // change.
 
 import { useState } from "react";
-import { useParams, NavLink } from "react-router-dom";
+import { useParams, NavLink, useNavigate } from "react-router-dom";
 import { useChangesWithLiveness } from "../api/useChangesWithLiveness";
 import { useProducts } from "../api/useProducts";
 import { useActiveProduct } from "../api/activeProduct";
@@ -31,6 +31,7 @@ export function Sidebar() {
   // The single-Product Tenant is the trivial case (one Product, shown active
   // — synthesised server-side).
   const { activeProductId, setActiveProductId } = useActiveProduct();
+  const navigate = useNavigate();
   const products = useProducts();
   const query = useChangesWithLiveness(activeProductId);
   const [shippedOpen, setShippedOpen] = useState(false);
@@ -52,6 +53,7 @@ export function Sidebar() {
           products={productList}
           activeProductId={activeProductId ?? serverActiveProductId}
           onSelect={setActiveProductId}
+          onSetUpNew={() => navigate("/onboarding")}
         />
       )}
       {/* WP-009 — the concierge front door: the plain-English way to find a

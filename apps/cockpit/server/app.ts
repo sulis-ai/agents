@@ -17,6 +17,8 @@
 // Read-only invariant: only `router.get` is ever called. The
 // read-only-inventory.test.ts gate enforces this by grep.
 
+import { homedir } from "node:os";
+
 import express, { type Application } from "express";
 import cors from "cors";
 
@@ -27,9 +29,16 @@ import { InFlightLock } from "./lib/inFlightLock";
 import {
   createChatRouter,
   createConciergeRouter,
+  createOnboardingRouter,
   type ChatLogLine,
   type ConciergeLogLine,
+  type OnboardingLogLine,
 } from "./routes/chat";
+import type { SpineMinter } from "./ports/SpineMinter";
+import {
+  SpineEmitterMinter,
+  resolveEmitterScriptsDir,
+} from "./adapters/SpineEmitterMinter";
 
 import { createChangesRouter } from "./routes/changes";
 import { createChangeDetailRouter } from "./routes/change-detail";
@@ -75,6 +84,25 @@ export interface CreateAppDeps {
    * capture it. The concierge rides the SAME bridge as the chat (ADR-006).
    */
   conciergeLogSink?: (line: ConciergeLogLine) => void;
+  /**
+   * WP-010 — the permitted search root for cold-start onboarding (FR-N7): the
+   * chosen area MUST be inside it; discovery never roams to a parent / sibling /
+   * the whole disk (NFR-DISC-01). Defaults to the founder's home directory.
+   */
+  onboardingPermittedRoot?: string;
+  /**
+   * WP-010 (fix-forward) — the deterministic server-side mint + repo
+   * find-or-create (ADR-007 amended). Production defaults to the real
+   * `SpineEmitterMinter` (invokes the validated spine emitters + `git init`
+   * directly); tests inject a fake to exercise success / all-or-nothing
+   * (FR-N11) / idempotency (FR-31) without a live agent.
+   */
+  onboardingSpineMinter?: SpineMinter;
+  /**
+   * WP-010 — where the onboarding one-structured-line-per-act log goes
+   * (NFR-SEC-03: never the chosen area, prompt, or reply). Defaults to no-op.
+   */
+  onboardingLogSink?: (line: OnboardingLogLine) => void;
   sulisStateDir: string;
   claudeProjectsDir: string;
   /** Optional override for the 1 MiB file cap (tests + future tuning). */
@@ -135,6 +163,32 @@ export function createApp(deps: CreateAppDeps): Application {
         changeStore: deps.changeStore,
         sessionBridge: deps.sessionBridge,
         conciergeLogSink: deps.conciergeLogSink,
+      }),
+    );
+
+    // WP-010 — the cold-start onboarding route (ADR-007 amended/008). The SECOND
+    // confirm-gated ACT path, registered in the SAME sanctioned relay file
+    // (routes/chat.ts) so no NEW file gains a write verb (ADR-006). It rides the
+    // SAME bridge (FR-27) for the CONVERSATION; the MINT + `git init` are
+    // deterministic server actions behind the SpineMinter port (production
+    // defaults to the real SpineEmitterMinter — the one sanctioned emitter-
+    // invocation site). Mounted only when a bridge is wired (else onboarding
+    // degrades to unavailable — read surfaces unaffected).
+    app.use(
+      "/api/onboarding",
+      createOnboardingRouter({
+        sessionBridge: deps.sessionBridge,
+        spineMinter:
+          deps.onboardingSpineMinter ??
+          new SpineEmitterMinter({
+            scriptsDir: resolveEmitterScriptsDir(),
+            sulisStateDir: deps.sulisStateDir,
+          }),
+        sulisStateDir: deps.sulisStateDir,
+        permittedRoot: deps.onboardingPermittedRoot ?? homedir(),
+        ...(deps.onboardingLogSink
+          ? { onboardingLogSink: deps.onboardingLogSink }
+          : {}),
       }),
     );
   }
