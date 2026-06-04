@@ -577,6 +577,22 @@ If extending or superseding, reference the existing ADR by path.}
    codebase, OR a TDD component / WP-to-be that will build it. A hop with
    neither an existing component nor a planned one is a **GAP**.
 
+   **Sharper "exists" for a host-rendered / integration hop (MUST).** When a hop
+   crosses a seam into a host or platform you don't control — a host-rendered
+   surface (MCP App / OpenAI App / figma-plugin / browser-extension), or any
+   third-party protocol round-trip — "exists" is **NOT** satisfied by a serving
+   endpoint, rendering HTML, or a passing unit test. It requires: (1) the
+   protocol binding cited in code on **both** sides of the seam (e.g. for
+   MCP-Apps: server `_meta.ui.resourceUri` + the host's accepted MIME; client the
+   ext-apps runtime `app.connect`/`ontoolresult`/`callServerTool`/`openLink`),
+   **and** (2) the round-trip **observed — or attested via
+   `sulis-attest-scenario` — in the real host**, planned as the hop's proof. A
+   surface that serves but isn't bound, or whose buttons only flip local state,
+   is a **GAP**, not "exists." See
+   [`mcp-ui-surface-patterns.md`](../../references/mcp-ui-surface-patterns.md)
+   § "Done = wired + legible" for the full gate (incl. the legibility metadata:
+   `title` + one-line `description` + `icon`, not a technical `name` alone).
+
    **(c) Classify every scenario in the set** (so ALL are checked even when
    only some are built): **covered-this-change** (its gaps become WPs) /
    **already-green** (confirm via `find_passing_testresults_for_scenario(<id>)`
@@ -591,7 +607,10 @@ If extending or superseding, reference the existing ADR by path.}
    start — until *every hop of every in-scope Scenario* is **exists** or
    **planned-WP**, and every journey scenario is classified. A bare `GAP`
    (a hop neither built nor planned) blocks design completion; turn it into a
-   planned WP or an explicit, recorded out-of-scope decision. (Pure docs/infra
+   planned WP or an explicit, recorded out-of-scope decision. **For a
+   host-rendered / integration hop, "exists" means the sharper bar above
+   (binding both sides + real-host round-trip), not a serving endpoint** — an
+   unbound surface that merely serves is a GAP that blocks here. (Pure docs/infra
    change with no user-facing surface: exempt — log `journey-walk: exempt —
    <reason>`, mirroring the scenario-authoring exemption in step 3d.)
 

@@ -205,6 +205,16 @@ the audit from being "done" — turn it into a hardening delta or a recorded
 out-of-scope decision. (Pure non-user-facing change: exempt — log
 `journey-walk: exempt — <reason>`.)
 
+**Sharper "exists" for a host-rendered / integration hop (MUST).** For a hop that
+crosses into a host/platform you don't control (a host-rendered surface — MCP
+App / OpenAI App / figma-plugin / browser-extension — or a third-party protocol
+round-trip), "exists" is **not** an HTML page that serves. It requires the
+protocol binding present in code on **both** sides of the seam **and** the
+round-trip observed (or attested via `sulis-attest-scenario`) in the real host.
+A surface that serves but isn't bound, or whose buttons only flip local state, is
+a GAP. See [`mcp-ui-surface-patterns.md`](../../references/mcp-ui-surface-patterns.md)
+§ "Done = wired + legible" (incl. the legibility metadata bar).
+
 ## Step 3 — offer the to-do list (route to plan-work)
 
 The hardening deltas are the proposed fixes; they become the change's to-do
