@@ -1,3 +1,9 @@
+## v0.103.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- specify authors the user journey FIRST (Work-Backwards/Outside-In) so it drives the requirements, and every journey must be verifiable — sulis-author-scenario rejects a journey with no observable check or an unobservable outcome. Closes the reverse-engineered-scenario hole where only the requirement is checked, never the round-trip the user walks.
+
 ## v0.102.0 — 2026-06-04
 
 **Minor — release-train batch.**
