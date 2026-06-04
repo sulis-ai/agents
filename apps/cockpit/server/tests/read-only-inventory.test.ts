@@ -289,4 +289,32 @@ describe("read-only inventory (TDD §13.7)", () => {
     }
     expect(offenders).toEqual([]);
   });
+
+  // WP-009 (ADR-006) — the concierge is READ-ONLY: it rides the SAME bridge as
+  // the chat and reaches consequence ONLY through the already-sanctioned paths.
+  // It must add NO new file-level write/process exception (WP-009 AC#3): the
+  // write-verb allow-list stays exactly {chat.ts} and the process-start
+  // allow-list stays exactly the audited bridge/git/recreate set. The concierge
+  // read lib (lib/concierge/conciergeRead.ts) must itself be clean.
+  it("adds NO new write-verb file for the concierge — the allow-list stays {chat.ts} (FR-N8/ADR-006)", async () => {
+    const files = await collectSourceFiles();
+    const writeVerbFiles: string[] = [];
+    for (const f of files) {
+      const src = stripComments(await readSource(f));
+      if (MUTATION_VERB_PATTERNS.some((p) => p.test(src))) {
+        writeVerbFiles.push(basename(f));
+      }
+    }
+    // Exactly one file registers a write verb: the sanctioned relay (which now
+    // also hosts the read-only concierge POST so no NEW file gains a verb).
+    expect(writeVerbFiles).toEqual([RELAY_ROUTE_BASENAME]);
+  });
+
+  it("the concierge read lib starts no process and writes nothing (FR-N8)", async () => {
+    const conciergeLib = join(serverRoot, "lib", "concierge", "conciergeRead.ts");
+    const src = stripComments(await readSource(conciergeLib));
+    expect(PROCESS_START_PATTERNS.some((p) => p.test(src))).toBe(false);
+    expect(FS_MUTATION_PATTERNS.some((p) => p.test(src))).toBe(false);
+    expect(MUTATION_VERB_PATTERNS.some((p) => p.test(src))).toBe(false);
+  });
 });

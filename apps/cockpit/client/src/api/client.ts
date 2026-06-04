@@ -18,7 +18,11 @@
 // inventory gate allow exactly api/client.ts to call `fetch`.
 
 // eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (TDD §9 permits)
-import type { ChatStreamEvent, ChatErrorCode } from "../../../shared/api-types";
+import type {
+  ChatStreamEvent,
+  ChatErrorCode,
+  ConciergeStreamEvent,
+} from "../../../shared/api-types";
 
 /**
  * ApiError is the only error type any caller has to handle. A failed
@@ -111,21 +115,16 @@ function asChatErrorCode(code: string | null): ChatErrorCode {
   return "SESSION_UNREACHABLE";
 }
 
-export const streamChat: StreamChatFn = async (changeId, prompt, onEvent) => {
-  const res = await fetch(`/api/changes/${changeId}/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt }),
-  });
-
-  if (!res.ok) {
-    const { code, message } = await readErrorBody(res);
-    onEvent({ type: "error", code: asChatErrorCode(code), message });
-    return;
-  }
-
-  const body = res.body;
-  if (!body) return;
+/**
+ * Read an SSE body to completion, invoking `onEvent` per `data:` frame. Shared
+ * by `streamChat` and `streamConciergeQuery` (EP-03 — 2-consumer threshold) so
+ * the frame-splitting + malformed-frame skipping lives in exactly one place.
+ * The frame JSON is typed by the caller's generic.
+ */
+async function readSseStream<T>(
+  body: ReadableStream<Uint8Array>,
+  onEvent: (event: T) => void,
+): Promise<void> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -144,10 +143,67 @@ export const streamChat: StreamChatFn = async (changeId, prompt, onEvent) => {
       const json = dataLine.slice("data:".length).trim();
       if (json === "") continue;
       try {
-        onEvent(JSON.parse(json) as ChatStreamEvent);
+        onEvent(JSON.parse(json) as T);
       } catch {
         // Skip a malformed frame; the next decides.
       }
     }
   }
+}
+
+export const streamChat: StreamChatFn = async (changeId, prompt, onEvent) => {
+  const res = await fetch(`/api/changes/${changeId}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt }),
+  });
+
+  if (!res.ok) {
+    const { code, message } = await readErrorBody(res);
+    onEvent({ type: "error", code: asChatErrorCode(code), message });
+    return;
+  }
+
+  if (!res.body) return;
+  await readSseStream<ChatStreamEvent>(res.body, onEvent);
+};
+
+// ─── WP-009 — the concierge query funnel (read-only; FR-33; ADR-006) ─────────
+//
+// `streamConciergeQuery` POSTs the founder's question to the concierge route
+// and reads the SSE answer stream, invoking `onEvent` per `ConciergeStreamEvent`.
+// It lives HERE alongside `streamChat` so it is one of the only two `fetch`
+// callers (the client inventory gate allow-lists exactly api/client.ts). The
+// POST verb carries the question body; the PATH is read-only (the server route
+// performs no write/mint/start, ADR-006).
+
+/** The signature the ConciergeChat / useConciergeStream inject (testable). */
+export type StreamConciergeFn = (
+  question: string,
+  onEvent: (event: ConciergeStreamEvent) => void,
+  productId?: string,
+) => Promise<void>;
+
+export const streamConciergeQuery: StreamConciergeFn = async (
+  question,
+  onEvent,
+  productId,
+) => {
+  const res = await fetch("/api/concierge/query", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(
+      productId ? { question, product: productId } : { question },
+    ),
+  });
+
+  if (!res.ok) {
+    const { message } = await readErrorBody(res);
+    // The concierge's only error code is SESSION_UNREACHABLE (read-only path).
+    onEvent({ type: "error", code: "SESSION_UNREACHABLE", message });
+    return;
+  }
+
+  if (!res.body) return;
+  await readSseStream<ConciergeStreamEvent>(res.body, onEvent);
 };

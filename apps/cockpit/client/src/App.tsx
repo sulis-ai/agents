@@ -4,15 +4,17 @@
 // MemoryRouter; <App /> wraps it in BrowserRouter for production use.
 //
 // Route shape per WP Contract:
-//   /                → <Board>       (inside <Shell>) — WP-003 stage board
-//   /c/:changeId     → <ThreadView>  (inside <Shell>)
-//   /*               → <NotFound>    (inside <Shell>)
+//   /                → <Board>          (inside <Shell>) — WP-003 stage board
+//   /c/:changeId     → <ThreadView>     (inside <Shell>)
+//   /concierge       → <ConciergePage>  (inside <Shell>) — WP-009 front door
+//   /*               → <NotFound>       (inside <Shell>)
 
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { ActiveProductProvider } from "./api/activeProduct";
 import { Shell } from "./layouts/Shell";
 import { Board } from "./pages/Board";
 import { ThreadView } from "./pages/ThreadView";
+import { ConciergePage } from "./pages/ConciergePage";
 import { NotFound } from "./pages/NotFound";
 
 export function AppRoutes() {
@@ -21,6 +23,7 @@ export function AppRoutes() {
       <Route element={<Shell />}>
         <Route path="/" element={<Board />} />
         <Route path="/c/:changeId" element={<ThreadView />} />
+        <Route path="/concierge" element={<ConciergePage />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

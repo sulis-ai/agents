@@ -24,7 +24,12 @@ import type { ChangeStoreReader } from "./ports/ChangeStoreReader";
 import type { RecreateRunner } from "./ports/RecreateRunner";
 import type { SessionBridge } from "./ports/SessionBridge";
 import { InFlightLock } from "./lib/inFlightLock";
-import { createChatRouter, type ChatLogLine } from "./routes/chat";
+import {
+  createChatRouter,
+  createConciergeRouter,
+  type ChatLogLine,
+  type ConciergeLogLine,
+} from "./routes/chat";
 
 import { createChangesRouter } from "./routes/changes";
 import { createChangeDetailRouter } from "./routes/change-detail";
@@ -64,6 +69,12 @@ export interface CreateAppDeps {
    * it. Production points it at the request-log discipline.
    */
   chatLogSink?: (line: ChatLogLine) => void;
+  /**
+   * WP-009 — where the concierge query's one-structured-line-per-query log goes
+   * (NFR-SEC-03: never the question or reply). Defaults to a no-op; tests
+   * capture it. The concierge rides the SAME bridge as the chat (ADR-006).
+   */
+  conciergeLogSink?: (line: ConciergeLogLine) => void;
   sulisStateDir: string;
   claudeProjectsDir: string;
   /** Optional override for the 1 MiB file cap (tests + future tuning). */
@@ -110,6 +121,20 @@ export function createApp(deps: CreateAppDeps): Application {
         sessionBridge: deps.sessionBridge,
         inFlightLock,
         chatLogSink: deps.chatLogSink,
+      }),
+    );
+
+    // WP-009 — the concierge query route (FR-33/34/N8/N9; ADR-006). Read-only:
+    // it rides the SAME bridge, registered in the SAME sanctioned relay file
+    // (routes/chat.ts) so no NEW file gains a write verb. Mounted only when a
+    // bridge is wired (else the concierge degrades to unavailable — the
+    // rollback shape; read surfaces unaffected).
+    app.use(
+      "/api/concierge",
+      createConciergeRouter({
+        changeStore: deps.changeStore,
+        sessionBridge: deps.sessionBridge,
+        conciergeLogSink: deps.conciergeLogSink,
       }),
     );
   }

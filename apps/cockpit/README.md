@@ -67,6 +67,7 @@ and the ports (the change-store reader, WP-003; the `SessionBridge`, WP-005).
 | `GET /api/changes/:id/contract/data` | Serves the rendered `CONTRACT.html` (the data-contract preview).                                                                                                                                                                                                    | `text/html`                                             |
 | `GET /api/changes/:id/contract/ui`   | Serves the rendered `UI.html`, or a typed JSON note when the change has no UI contract (never a broken link).                                                                                                                                                       | `text/html` or `{ uiContract, note }`                   |
 | `POST /api/changes/:id/chat`         | **The one write/act path (WP-005).** Delivers a message to the change's agent (resume-or-spawn) and streams the reply as SSE. Refuses with `SESSION_BUSY` (409), `SESSION_CHANGE_MISMATCH` (422, zero bytes), or `SESSION_UNREACHABLE` (502, not delivered).        | SSE `ChatStreamEvent` (`state` → `chunk*` → `complete`) |
+| `POST /api/concierge/query`          | **The concierge front door (WP-009, read-only).** Answers plain-English nav / status / Q&A over the change store + brain, streaming SSE; it rides the SAME bridge as the chat (no second bridge, ADR-006) and performs ZERO writes/mints/starts (FR-N8). When intent is consequential (start / investigate / empty-world set-up) `complete` carries a `route` hint — the concierge OFFERS the confirm-gated next step, never acts inline (FR-N9). 502 `SESSION_UNREACHABLE` if the bridge can't be reached. | SSE `ConciergeStreamEvent` (`state` → `chunk*` → `complete{route}`) |
 
 ### Two-way chat relay (WP-005)
 
@@ -208,7 +209,10 @@ call, a mutating git verb, a non-zero process signal, **or a process start**
 (the WP-005/ADR-003 rule). The allow-list is a file-path + rule pairing, not a
 blanket waiver — the relay may register one write route, the bridge may start
 one process, nothing else may do either (TDD §13.7 / ADR-003 — "guarantee,
-not convention").
+not convention"). The concierge query (`POST /api/concierge/query`, WP-009) is
+read-only and adds **no new** gate exception: it is registered inside the SAME
+sanctioned relay file (`routes/chat.ts`) and rides the SAME bridge, so the
+write-verb allow-list stays exactly `{chat.ts}` (asserted by the gate, ADR-006).
 
 ## Testing
 
@@ -270,7 +274,7 @@ apps/cockpit/
 │   ├── config.ts           # CONFIG — bindAddress is hard-coded
 │   ├── ports/              # ChangeStoreReader + RecreateRunner (WP-004) + SessionBridge (the chat seam, WP-005)
 │   ├── adapters/           # SulisChangeStoreReader (Python helper bridge); SulisChangeRecreator + FakeRecreateRunner (WP-004); StreamJsonSessionBridge (prod) + RecordedSessionBridge (recorded fixture) (WP-005)
-│   ├── routes/             # GET read handlers + the one chat relay (POST, SSE) + shared shims
+│   ├── routes/             # GET read handlers + the one chat relay (POST, SSE) + the read-only concierge query (POST, SSE — same file, WP-009) + shared shims
 │   ├── middleware/         # request-log + typed-error → JSON mapper
 │   ├── lib/                # domain logic — no framework imports
 │   └── tests/
@@ -280,8 +284,8 @@ apps/cockpit/
 │   ├── src/
 │   │   ├── main.tsx        # React mount point
 │   │   ├── App.tsx         # placeholder root
-│   │   ├── pages/          # board (stage columns, WP-003), thread view (WP-013)
-│   │   ├── components/     # shells, panels (WP-011/013/014)
+│   │   ├── pages/          # board (stage columns, WP-003), thread view (WP-013), concierge front door (WP-009)
+│   │   ├── components/     # shells, panels (WP-011/013/014), ConciergeChat (the read-only front door, WP-009)
 │   │   ├── api/            # TanStack Query hooks (WP-011)
 │   │   └── tests/
 ├── shared/                 # types + constants both halves import

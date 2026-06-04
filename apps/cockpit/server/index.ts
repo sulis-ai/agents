@@ -104,6 +104,12 @@ export function buildProductionApp() {
       // eslint-disable-next-line no-console -- intentional: structured relay log
       console.log(JSON.stringify({ at: "chat-relay", ...line }));
     },
+    // WP-009 — the concierge's one-structured-line-per-query log (NFR-SEC-03:
+    // never the question or reply text — only outcome / route / code).
+    conciergeLogSink: (line) => {
+      // eslint-disable-next-line no-console -- intentional: structured concierge log
+      console.log(JSON.stringify({ at: "concierge-query", ...line }));
+    },
     sulisStateDir: CONFIG.sulisStateDir,
     claudeProjectsDir: CONFIG.claudeProjectsDir,
     fileMaxBytes: CONFIG.fileMaxBytes,

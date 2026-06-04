@@ -14,7 +14,7 @@
 // change.
 
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, NavLink } from "react-router-dom";
 import { useChangesWithLiveness } from "../api/useChangesWithLiveness";
 import { useProducts } from "../api/useProducts";
 import { useActiveProduct } from "../api/activeProduct";
@@ -54,6 +54,25 @@ export function Sidebar() {
           onSelect={setActiveProductId}
         />
       )}
+      {/* WP-009 — the concierge front door: the plain-English way to find a
+          change, ask about your world, or start something new (FR-33/34). */}
+      <nav className={styles.topnav} aria-label="Primary">
+        <NavLink
+          to="/"
+          end
+          className={styles.navlink}
+          data-testid="nav-board"
+        >
+          Board
+        </NavLink>
+        <NavLink
+          to="/concierge"
+          className={styles.navlink}
+          data-testid="nav-concierge"
+        >
+          Concierge
+        </NavLink>
+      </nav>
       <h2 className={styles.heading}>Changes</h2>
       {query.isLoading && <p className={styles.placeholder}>Loading…</p>}
       {query.isError && (
