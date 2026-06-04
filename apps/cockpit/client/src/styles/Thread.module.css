@@ -15,19 +15,20 @@
   text-align: center;
 }
 
+/* 404-gone reuses the one state-pattern set's destructive tint (ADR-005);
+ * tokens.css only — no raw hex (WP-004 Boy Scout, scoped to this file). */
 .goneOrMoved {
   padding: 32px 16px;
-  background: #fff5f5;
-  border: 1px solid #ffd6d6;
-  border-radius: 8px;
-  color: #86181d;
+  background: var(--bg-destructive);
+  border: 1px solid var(--bg-destructive-border);
+  border-radius: var(--radius-container);
+  color: var(--foreground);
 }
 
 .goneOrMovedDetail {
   margin-top: 8px;
   font-size: 13px;
-  color: #86181d;
-  opacity: 0.85;
+  color: var(--muted-foreground);
 }
 
 .header {
@@ -37,7 +38,36 @@
   gap: 16px;
   padding: 12px 0;
   border-bottom: 1px solid var(--border);
-  background: #fff;
+  background: var(--card);
+}
+
+/* WP-004 — the coherent "where am I" spine: stage track + read-time status,
+ * sitting directly under the header (ADR-005). */
+.spine {
+  flex: 0 0 auto;
+  padding: 14px 0 4px;
+  border-bottom: 1px solid var(--border-muted);
+}
+
+/* WP-004 — named working sections (Conversation / Files) replace the tab
+ * rail (ADR-005, CL-02). Each carries a quiet title; the sections stack in
+ * the coherent reading order rather than gating one-at-a-time. */
+.section {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding-top: 12px;
+}
+
+.sectionTitle {
+  flex: 0 0 auto;
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: var(--weight-label);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
 }
 
 .left {
@@ -72,12 +102,14 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  border-radius: 4px;
-  background: #f1f8ff;
+  border-radius: var(--radius-interactive);
+  background: var(--muted);
   color: var(--primary);
-  border: 1px solid #c8e1ff;
+  border: 1px solid var(--border);
 }
 
+/* Liveness dot — one shared status vocabulary (ADR-005); tokens.css only.
+ * running = positive, unknown = warning, not-running = neutral border. */
 .liveness {
   width: 10px;
   height: 10px;
@@ -85,14 +117,14 @@
   background: var(--border);
 }
 .liveness[data-status="running"] {
-  background: #28a745;
-  box-shadow: 0 0 0 2px #d4f4dd;
+  background: var(--positive);
+  box-shadow: 0 0 0 2px var(--bg-positive);
 }
 .liveness[data-status="not-running"] {
   background: var(--border);
 }
 .liveness[data-status="unknown"] {
-  background: #ffd33d;
+  background: var(--warning);
 }
 
 .right {
@@ -111,52 +143,6 @@
   max-width: 100%;
 }
 
-.tabs {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.tabBar {
-  flex: 0 0 auto;
-  display: flex;
-  gap: 4px;
-  border-bottom: 1px solid var(--border);
-}
-
-.tab,
-.tabActive {
-  padding: 8px 16px;
-  background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--muted-foreground);
-}
-
-.tabActive {
-  color: var(--foreground);
-  font-weight: 600;
-  border-bottom-color: var(--primary);
-}
-
-.tab:hover {
-  color: var(--foreground);
-}
-
-.panel {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-  padding-top: 4px;
-}
-
-.filesPlaceholder {
-  padding: 48px 16px;
-  text-align: center;
-  color: var(--muted-foreground);
-  font-style: italic;
-}
+/* WP-004 Blue: the .tabs/.tabBar/.tab/.tabActive/.panel/.filesPlaceholder
+ * classes were removed with the ThreadTabs component — the thread is now a
+ * coherent stacked shell (named sections), not a tab rail (ADR-005). */

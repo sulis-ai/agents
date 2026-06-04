@@ -30,6 +30,7 @@ import { createFileRouter } from "./routes/file";
 import { createDiffRouter } from "./routes/diff";
 import { createTranscriptRouter } from "./routes/transcript";
 import { createContractRouter } from "./routes/contract";
+import { createStatusRouter } from "./routes/status";
 
 import { errorMiddleware } from "./middleware/errors";
 import { requestLogMiddleware } from "./middleware/request-log";
@@ -126,6 +127,19 @@ export function createApp(deps: CreateAppDeps): Application {
     createContractRouter({
       changeStore: deps.changeStore,
       recreateRunner: deps.recreateRunner,
+    }),
+  );
+
+  // WP-004 — read-time status endpoint (FR-04/05/12). GET-only; computes
+  // the plain-English status + needs-attention flag on each read from the
+  // record + transcript + liveness + open-BLOCKER signal (never a stored
+  // periodic post). Composes existing reads — no new port.
+  app.use(
+    "/api/changes/:id/status",
+    createStatusRouter({
+      changeStore: deps.changeStore,
+      sulisStateDir: deps.sulisStateDir,
+      claudeProjectsDir: deps.claudeProjectsDir,
     }),
   );
 

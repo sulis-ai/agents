@@ -48,6 +48,7 @@ The route handlers are thin — they delegate to the lib functions
 | -------------------------------------------- | ------------------------------------------------------------- | -------------------- |
 | `GET /api/changes`                           | List every change with liveness.                              | `Change[]`           |
 | `GET /api/changes/:id`                       | One change + the resolved transcript file paths.              | `ChangeDetail`       |
+| `GET /api/changes/:id/status`                | Read-time plain-English status + needs-attention flag, computed on each read from the record + transcript + liveness (never a stored post). | `ChangeStatus`       |
 | `GET /api/changes/:id/tree?path=...`         | One level of the worktree's folder tree. Default = root.      | `TreeNode[]`         |
 | `GET /api/changes/:id/file?path=...`         | Current contents of a file in the worktree (1 MiB cap).       | `FileContents`       |
 | `GET /api/changes/:id/diff?path=...`         | Base (at `baseSha`) + current contents for Monaco's DiffEditor. | `FileDiff`         |
