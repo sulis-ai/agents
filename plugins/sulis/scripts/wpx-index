@@ -28,6 +28,8 @@ from _wpxlib import (  # noqa: E402
     compute_wp_status,
     emit_error,
     emit_ok,
+    interaction_flow_exercised,
+    is_interaction_contract_wp,
     is_visual_contract_wp,
     parse_index_md,
     parse_md_table,
@@ -400,8 +402,38 @@ def _enforce_visual_contract_signoff_on_done(args: argparse.Namespace) -> None:
         emit_error(f"{args.wp}: {err}")
 
 
+def _enforce_interaction_flow_on_done(args: argparse.Namespace) -> None:
+    """CH-01KT9H runtime gate — an interaction-contract WP cannot be flipped to
+    `done` until its multi-step flow's exercise evidence is recorded. No-op for
+    any other WP / status. Direct sibling of
+    :func:`_enforce_visual_contract_signoff_on_done`.
+
+    The gate trusts the recorded evidence (`exercised_at` / `exercised_by` /
+    `exercised_attestation`) and does NOT re-run the flow (ADR-003).
+    """
+    if args.to != "done":
+        return
+    paths = paths_from_args(args)
+    try:
+        wp_path = paths.wp_file(args.wp)
+    except (FileNotFoundError, ValueError):
+        return  # no WP file → not a checkable interaction-contract WP
+    fm = read_frontmatter(wp_path)
+    if not is_interaction_contract_wp(fm):
+        return
+    err = interaction_flow_exercised(fm)
+    if err is not None:
+        emit_error(f"{args.wp}: {err}")
+
+
 def cmd_flip_status(args: argparse.Namespace) -> None:
+    # Both done-gates run at this single chokepoint. They are independent and
+    # order-insensitive: each fires only for the contract_type its predicate
+    # matches (visual vs interaction), so an ordinary WP is a double no-op —
+    # the regression-safety guarantee that ordinary flips behave exactly as
+    # before. A WP that is somehow both kinds is gated by both.
     _enforce_visual_contract_signoff_on_done(args)
+    _enforce_interaction_flow_on_done(args)
     text = _read_index(args)
 
     # Iterate ALL WP sub-tables (#50). The contract-first decompose
