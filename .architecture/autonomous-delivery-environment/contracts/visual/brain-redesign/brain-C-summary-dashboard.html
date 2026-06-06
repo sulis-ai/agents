@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sulis Brain redesign — Direction C · Summary-first dashboard</title>
+<!--
+  ============================================================================
+  REVIEW MOCKUP (UNSIGNED — for founder comparison) · Sulis cockpit Brain view
+  DIRECTION C — "Summary-first dashboard" (digest-then-doors lens)
+  ----------------------------------------------------------------------------
+  Renders INSIDE the signed chat-B2-tabbed-workspace shell. The Brain opens on
+  a plain-English DIGEST, not a graph:
+    - four tiles — What it did · What it covered · What it decided ·
+      What it flagged (the flagged tile carries a real gap + self-critique:
+      the trust signal),
+    - two DOOR-BUTTONS — "See the run log" / "See the coverage map" — for the
+      founder who wants to go deeper (those are Directions A and B),
+    - a quiet "Browse everything (119 items)" link for power users.
+  ≤5 primary elements at rest (4 tiles read; 2 doors are the only primary
+  actions; browse is visually subordinate). Progressive disclosure by design:
+  the dashboard IS the recognition layer; the run log / coverage map are recall.
+  Two SECONDARY PANELS below show the EMPTY ("No brain yet") and LOADING looks.
+
+  Strictly bound to the SIGNED design instance (tokens.css / sulis-app.html);
+  every colour a var(--*); fonts loaded as the signed contract. Heroicons (MIT)
+  throughout. Stage palette tints per tile. Worded status, AA pairs. UXD-15.
+  ============================================================================
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --background:#fafafa; --foreground:#171717;
+  --card:#ffffff; --card-foreground:#171717;
+  --popover:#ffffff; --popover-foreground:#171717;
+  --muted:#f5f5f5; --muted-foreground:#737373;
+  --secondary:#f5f5f5; --secondary-foreground:#171717;
+  --border:#e5e5e5; --border-muted:#f0f0f0; --input:#e5e5e5;
+  --primary:#2563EB; --primary-foreground:#FFFFFF;
+  --accent:#2D7D90; --accent-foreground:#FFFFFF;
+  --destructive:#DC2626; --destructive-foreground:#FFFFFF;
+  --positive:#16A34A; --positive-foreground:#FFFFFF;
+  --warning:#F59E0B; --warning-foreground:#121212;
+  --ring:#2563EB; --brand-gold:#C9A962; --brand-depth:#1E3A5F;
+  --bg-positive:#F0FDF4; --bg-positive-border:#BBF7D0;
+  --bg-destructive:#FEF2F2; --bg-destructive-border:#FECACA;
+  --bg-warning:#FFFBEB; --bg-warning-border:#FDE68A;
+  --stage-recon:#8B7355; --stage-specify:#6366F1; --stage-design:#2D7D90;
+  --stage-implement:#2563EB; --stage-review:#9333EA; --stage-ship:#15803D;
+  --radius-interactive:4px; --radius-button:9999px; --radius-container:4px;
+  --radius-badge:9999px; --radius-media:4px;
+  --font-sans:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-display:'Satoshi',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono','SF Mono','Monaco','Inconsolata','Fira Mono',monospace;
+  --weight-body:400; --weight-heading:300; --weight-label:500;
+  --bg-card:var(--card); --bg-muted:var(--muted); --border-light:var(--border-muted);
+  --font:var(--font-sans); --radius:var(--radius-container);
+  --text:var(--foreground); --text-secondary:#525252; --text-muted:var(--muted-foreground);
+  --attn-icon:#B45309;
+  --bg-accent:color-mix(in srgb,var(--accent) 8%,#fff);
+  --bg-accent-border:color-mix(in srgb,var(--accent) 28%,var(--border));
+  /* AA-internal ink shade for text on the accent tint (~5.9:1). NOTE: pending
+   * token regen — becomes a named semantic token next instance regeneration. */
+  --accent-ink:#246676;
+  --shadow-float:0 6px 20px rgba(23,23,23,.08), 0 1px 3px rgba(23,23,23,.06);
+  --skel-a:#eeeeee; --skel-b:#f6f6f6;
+}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#EDEAE3;color:var(--text);font-family:var(--font-sans);font-weight:var(--weight-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+:focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:var(--radius)}
+button{appearance:none;-webkit-appearance:none;background:none;border:0;margin:0;padding:0;font:inherit;color:inherit;line-height:inherit;text-align:inherit}
+button,[role="button"],[tabindex],a{cursor:pointer}
+svg{display:block}
+
+.docnote{max-width:1440px;margin:0 auto;padding:18px 28px 6px;color:var(--text-secondary);font-size:12.5px}
+.docnote b{color:var(--text);font-weight:600}
+.frame{width:1440px;height:900px;margin:8px auto 28px;background:var(--background);border-radius:10px;overflow:hidden;border:1px solid var(--border);box-shadow:0 1px 3px rgba(23,23,23,.07);display:flex;flex-direction:column}
+
+/* ===== WORKSPACE TOP BAR (verbatim shell) ===== */
+.topbar{flex:0 0 auto;display:flex;align-items:stretch;background:var(--card);border-bottom:1px solid var(--border);height:48px}
+.prodswitch{display:flex;align-items:center;gap:9px;padding:0 14px;border-right:1px solid var(--border);min-width:210px}
+.prodswitch .tile{width:28px;height:28px;flex:none;border-radius:7px;background:var(--brand-depth);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:12px;letter-spacing:.02em}
+.prodswitch .pn{font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--text);letter-spacing:-.01em}
+.prodswitch .chev{margin-left:auto;color:var(--text-muted)}
+.prodswitch:hover{background:var(--bg-muted)}
+.tabstrip{display:flex;align-items:stretch;gap:0;flex:1;min-width:0;overflow:hidden}
+.gtab{display:flex;align-items:center;gap:8px;padding:0 14px;border-right:1px solid var(--border);color:var(--text-secondary);font-size:13px;font-weight:var(--weight-label);position:relative;white-space:nowrap;max-width:260px}
+.gtab .ic{width:18px;height:18px;flex:none;color:var(--text-muted)}
+.gtab:hover{background:var(--bg-muted);color:var(--text)}
+.gtab .nm{overflow:hidden;text-overflow:ellipsis}
+.gtab .sdot{width:8px;height:8px;border-radius:50%;flex:none}
+.gtab .x{width:18px;height:18px;flex:none;display:inline-flex;align-items:center;justify-content:center;border-radius:5px;color:var(--text-muted);margin-left:2px}
+.gtab .x:hover{background:var(--border);color:var(--text)}
+.gtab .x svg{width:13px;height:13px}
+.gtab.active{background:var(--background);color:var(--text);font-weight:600}
+.gtab.active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--accent)}
+.gtab.board .ic{color:var(--text-secondary)}
+.tabstrip .newtab{display:inline-flex;align-items:center;justify-content:center;width:42px;color:var(--text-muted);border-right:1px solid var(--border)}
+.tabstrip .newtab:hover{background:var(--bg-muted);color:var(--text)}
+.tabstrip .newtab svg{width:18px;height:18px}
+
+/* ===== THE OPEN CHANGE — left nav + full-width main (verbatim shell) ===== */
+.change{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:248px 1fr}
+.leftnav{background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:auto;padding:16px 12px 12px}
+.cn-head{padding:2px 8px 14px;border-bottom:1px solid var(--border-muted);margin-bottom:6px}
+.cn-kicker{font-family:var(--font-mono);font-size:11px;color:var(--text-muted)}
+.cn-name{font-size:15px;font-weight:600;line-height:1.3;color:var(--text);margin-top:4px;letter-spacing:-.01em}
+.cn-meta{display:flex;align-items:center;gap:7px;margin-top:9px}
+.stagebadge{padding:3px 9px;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;border-radius:var(--radius);background:var(--bg-accent);color:var(--accent-ink);border:1px solid var(--bg-accent-border)}
+.cn-live{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary);font-weight:var(--weight-label)}
+.cn-live .g{width:8px;height:8px;border-radius:50%;background:var(--positive);box-shadow:0 0 0 2px var(--bg-positive)}
+.cn-sectionlabel{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin:14px 8px 8px;font-weight:600}
+.vtrack{list-style:none;margin:0 4px 4px;padding:0}
+.vstep{display:flex;align-items:center;gap:10px;padding:4px 8px;font-size:12px;color:var(--text-muted);position:relative}
+.vstep .vd{width:10px;height:10px;border-radius:50%;background:var(--input);flex:none;border:2px solid var(--card);z-index:2}
+.vstep:not(:last-child)::before{content:"";position:absolute;left:13px;top:18px;width:1px;height:14px;background:var(--border);z-index:1}
+.vstep[data-state="done"]{color:var(--text-secondary)}
+.vstep[data-state="done"] .vd{background:var(--text-secondary)}
+.vstep[data-state="now"]{color:var(--accent);font-weight:700}
+.vstep[data-state="now"] .vd{background:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,#fff)}
+.vstep .vw{margin-left:auto;font-size:9px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;color:var(--text-muted)}
+.vstep[data-state="now"] .vw{color:var(--accent)}
+.navitem{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:var(--radius);color:var(--text-secondary);font-size:13px;border:1px solid transparent;text-decoration:none;font-weight:var(--weight-label)}
+.navitem:hover{background:var(--bg-muted);color:var(--text)}
+.navitem.active{background:var(--bg-muted);color:var(--text)}
+.navitem .ic{width:20px;height:20px;flex:none;color:var(--text-muted)}
+.navitem.active .ic{color:var(--accent)}
+.navitem .cnt{margin-left:auto;font-size:11px;color:var(--text-muted);font-family:var(--font-mono)}
+.leftnav-foot{margin-top:auto;padding:12px 8px 2px;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:7px;border-top:1px solid var(--border-muted)}
+.leftnav-foot .g{width:8px;height:8px;border-radius:50%;background:var(--positive);flex:none;box-shadow:0 0 0 2px var(--bg-positive)}
+
+/* ===== MAIN AREA — Brain · Summary dashboard ===== */
+.main{display:flex;flex-direction:column;min-width:0;overflow-y:auto;background:var(--background);scrollbar-width:thin}
+.wrap{max-width:920px;margin:0 auto;width:100%;padding:26px 28px 36px}
+.bhead{display:flex;align-items:flex-end;gap:12px;margin-bottom:20px}
+.bhead .ttl{font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:-.015em;color:var(--text)}
+.bhead .sub{font-size:13px;color:var(--text-secondary);margin-top:3px}
+.bhead .conf{margin-left:auto;display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:var(--weight-label);color:var(--accent-ink);background:var(--bg-accent);border:1px solid var(--bg-accent-border);border-radius:var(--radius-button);padding:5px 12px}
+.bhead .conf svg{width:14px;height:14px}
+
+/* FOUR DIGEST TILES — recognition layer */
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.tile{border:1px solid var(--border);border-radius:12px;background:var(--card);padding:16px 17px;box-shadow:0 1px 2px rgba(23,23,23,.04)}
+.tile .th{display:flex;align-items:center;gap:9px}
+.tile .th .ti{width:32px;height:32px;flex:none;border-radius:9px;display:inline-flex;align-items:center;justify-content:center}
+.tile .th .ti svg{width:18px;height:18px}
+.tile .th .tl{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:600}
+.tile.did   .th .ti{background:color-mix(in srgb,var(--stage-specify) 10%,#fff);color:var(--stage-specify)}
+.tile.cov   .th .ti{background:var(--bg-positive);color:var(--stage-ship)}
+.tile.dec   .th .ti{background:color-mix(in srgb,var(--stage-review) 10%,#fff);color:var(--stage-review)}
+.tile.flag  .th .ti{background:var(--bg-warning);color:var(--attn-icon)}
+.tile .big{font-family:var(--font-display);font-size:17px;font-weight:600;color:var(--text);margin-top:12px;line-height:1.35;letter-spacing:-.005em}
+.tile .body{font-size:12.5px;color:var(--text-secondary);margin-top:7px;line-height:1.55}
+.tile.flag{background:var(--bg-warning);border-color:var(--bg-warning-border)}
+.tile.flag .big{font-size:15px}
+.crit{margin-top:11px;border-left:3px solid var(--attn-icon);background:var(--card);border-radius:6px;padding:9px 11px}
+.crit p{font-size:12px;color:var(--text-secondary);font-style:italic;line-height:1.5}
+.crit .by{font-style:normal;font-size:10px;color:var(--text-muted);margin-top:6px;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+
+/* TWO DOOR BUTTONS — the only primary actions */
+.doors{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
+.door{display:flex;align-items:center;gap:13px;border:1px solid var(--bg-accent-border);border-radius:12px;background:var(--bg-accent);padding:15px 17px;text-align:left}
+.door:hover{background:color-mix(in srgb,var(--accent) 13%,#fff)}
+.door .di{width:38px;height:38px;flex:none;border-radius:10px;background:var(--card);border:1px solid var(--bg-accent-border);display:inline-flex;align-items:center;justify-content:center;color:var(--accent)}
+.door .di svg{width:20px;height:20px}
+.door .dt{flex:1;min-width:0}
+.door .dt .dn{font-size:14px;font-weight:600;color:var(--text)}
+.door .dt .dd{font-size:12px;color:var(--text-secondary);margin-top:2px}
+.door .arrow{flex:none;color:var(--accent-ink)}
+.door .arrow svg{width:18px;height:18px}
+
+/* quiet browse-everything link — visually subordinate */
+.browse{display:inline-flex;align-items:center;gap:8px;margin-top:18px;font-size:12.5px;color:var(--text-secondary);padding:8px 4px}
+.browse:hover{color:var(--text)}
+.browse svg{width:15px;height:15px;color:var(--text-muted)}
+.browse .ct{font-family:var(--font-mono);font-size:11px;color:var(--text-muted)}
+
+/* ===== SECONDARY PANELS — empty + loading looks (documentation) ===== */
+.statesrow{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px;padding-top:22px;border-top:1px dashed var(--border)}
+.statelabel{grid-column:1/-1;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:-4px}
+.statelabel svg{width:14px;height:14px;color:var(--text-muted)}
+.minipanel{border:1px solid var(--border);border-radius:10px;background:var(--card);overflow:hidden}
+.minipanel .mphead{font-size:11px;font-weight:600;color:var(--text-secondary);padding:8px 12px;border-bottom:1px solid var(--border-muted);background:var(--bg-muted)}
+.minipanel .mpbody{padding:24px 18px;min-height:172px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+
+/* empty look */
+.emptyglyph{width:46px;height:46px;border-radius:12px;background:var(--bg-muted);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;color:var(--text-muted);margin-bottom:12px}
+.emptyglyph svg{width:24px;height:24px}
+.empty-t{font-size:14px;font-weight:600;color:var(--text)}
+.empty-s{font-size:12px;color:var(--text-secondary);margin-top:5px;max-width:280px}
+
+/* loading look — skeletons (tokens) */
+.skelhead{height:13px;width:46%;border-radius:5px;background:linear-gradient(90deg,var(--skel-a),var(--skel-b),var(--skel-a));background-size:200% 100%;animation:sh 1.3s ease-in-out infinite;margin-bottom:14px}
+.skeltile{width:100%;border:1px solid var(--border-muted);border-radius:9px;padding:12px;margin-bottom:10px}
+.skelline{height:11px;border-radius:5px;background:linear-gradient(90deg,var(--skel-a),var(--skel-b),var(--skel-a));background-size:200% 100%;animation:sh 1.3s ease-in-out infinite}
+.skelline.w70{width:70%} .skelline.w40{width:40%;margin-top:8px} .skelline.w90{width:90%;margin-top:8px}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.mpbody.load{align-items:stretch;justify-content:flex-start}
+.loadnote{font-size:11.5px;color:var(--text-muted);margin-top:6px;text-align:center}
+</style>
+</head>
+<body>
+<div class="docnote"><b>Brain redesign — Direction C · Summary-first dashboard.</b> The Brain opens on plain English, not a graph: four digest tiles (what it did · what it covered · what it decided · what it flagged), then two doors for going deeper — the run log and the coverage map (Directions A and B) — and a quiet “browse everything” link for power users. The flagged tile carries a real gap plus the agent’s own self-critique: the trust signal. Two small panels below show the empty (“no brain yet”) and loading looks. <b>Unsigned review mockup</b>, real tokens, light theme.</div>
+
+<div class="frame">
+
+  <!-- ===== WORKSPACE TOP BAR ===== -->
+  <div class="topbar">
+    <button class="prodswitch" type="button" aria-label="Switch product — Clinics">
+      <span class="tile" aria-hidden="true">CL</span>
+      <span class="pn">Clinics</span>
+      <svg class="chev" width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
+    </button>
+    <div class="tabstrip" role="tablist" aria-label="Open tabs">
+      <button class="gtab board" role="tab" aria-selected="false" type="button">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"/></svg>
+        <span class="nm">Board</span>
+      </button>
+      <div class="gtab active" role="tab" aria-selected="true" tabindex="0">
+        <span class="sdot" style="background:var(--stage-design)" aria-hidden="true"></span>
+        <span class="nm">Set up the autonomous delivery environment</span>
+        <span class="x" role="button" tabindex="0" aria-label="Close tab"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg></span>
+      </div>
+      <button class="gtab" role="tab" aria-selected="false" type="button">
+        <span class="sdot" style="background:var(--stage-implement)" aria-hidden="true"></span>
+        <span class="nm">Tidy the morning digest</span>
+        <span class="x" role="button" tabindex="0" aria-label="Close tab"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg></span>
+      </button>
+      <button class="newtab" type="button" aria-label="Open a new change tab"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg></button>
+    </div>
+  </div>
+
+  <!-- ===== THE OPEN CHANGE ===== -->
+  <div class="change">
+    <nav class="leftnav" aria-label="Change navigation">
+      <div class="cn-head">
+        <div class="cn-kicker">autonomous-delivery-env</div>
+        <div class="cn-name">Set up the autonomous delivery environment</div>
+        <div class="cn-meta"><span class="stagebadge">Design</span><span class="cn-live"><span class="g" aria-hidden="true"></span>Running</span></div>
+      </div>
+      <div class="cn-sectionlabel">Stage</div>
+      <ol class="vtrack" aria-label="Change progress">
+        <li class="vstep" data-state="done"><span class="vd" aria-hidden="true"></span>Recon<span class="vw">Done</span></li>
+        <li class="vstep" data-state="done"><span class="vd" aria-hidden="true"></span>Specify<span class="vw">Done</span></li>
+        <li class="vstep" data-state="now" aria-current="step"><span class="vd" aria-hidden="true"></span>Design<span class="vw">Now</span></li>
+        <li class="vstep" data-state="pending"><span class="vd" aria-hidden="true"></span>Implement<span class="vw">Pending</span></li>
+        <li class="vstep" data-state="pending"><span class="vd" aria-hidden="true"></span>Review<span class="vw">Pending</span></li>
+        <li class="vstep" data-state="pending"><span class="vd" aria-hidden="true"></span>Ship<span class="vw">Pending</span></li>
+      </ol>
+      <div class="cn-sectionlabel">Views</div>
+      <a class="navitem" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 0 1-.825-.242m9.345-8.334a2.126 2.126 0 0 0-.476-.095 48.64 48.64 0 0 0-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0 0 11.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155"/></svg>Conversation</a>
+      <a class="navitem" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>Files <span class="cnt">2</span></a>
+      <a class="navitem active" href="#" aria-current="page"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m21 7.5-2.25-1.313M21 7.5v2.25m0-2.25-2.25 1.313M3 7.5l2.25-1.313M3 7.5l2.25 1.313M3 7.5v2.25m9 3 2.25-1.313M12 12.75l-2.25-1.313M12 12.75V15m0 6.75 2.25-1.313M12 21.75V19.5m0 2.25-2.25-1.313m0-16.875L12 2.25l2.25 1.313M21 14.25v2.25l-2.25 1.313m-13.5 0L3 16.5v-2.25"/></svg>Brain <span class="cnt">119</span></a>
+      <a class="navitem" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>Preview</a>
+      <div class="leftnav-foot"><span class="g" aria-hidden="true"></span>Agent running in this change</div>
+    </nav>
+
+    <!-- MAIN AREA — Brain · Summary dashboard -->
+    <div class="main">
+      <div class="wrap">
+
+        <div class="bhead">
+          <div>
+            <div class="ttl">The Brain</div>
+            <div class="sub">A plain-English read on what the agent has done — start here, go deeper when you want.</div>
+          </div>
+          <span class="conf">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.403 12.652a3 3 0 0 0 0-5.304 3 3 0 0 0-3.75-3.751 3 3 0 0 0-5.305 0 3 3 0 0 0-3.751 3.75 3 3 0 0 0 0 5.305 3 3 0 0 0 3.75 3.751 3 3 0 0 0 5.305 0 3 3 0 0 0 3.751-3.75Zm-2.546-4.46a.75.75 0 0 0-1.214-.883l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+            88% confident overall
+          </span>
+        </div>
+
+        <!-- FOUR DIGEST TILES -->
+        <div class="tiles">
+          <div class="tile did">
+            <div class="th"><span class="ti" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M11.983 1.907a.75.75 0 0 0-1.292-.657l-8.5 9.5A.75.75 0 0 0 2.75 12h6.572l-1.305 6.093a.75.75 0 0 0 1.292.657l8.5-9.5A.75.75 0 0 0 17.25 8h-6.572l1.305-6.093Z"/></svg></span><span class="tl">What it did</span></div>
+            <div class="big">Ran twice, end to end</div>
+            <div class="body">A Specify pass turned the brief into a written spec, then a Verify pass checked the work against it. Both runs completed across 28 steps.</div>
+          </div>
+
+          <div class="tile cov">
+            <div class="th"><span class="ti" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg></span><span class="tl">What it covered</span></div>
+            <div class="big">49 requirements written · 1 proven by a test</div>
+            <div class="body">13 scenarios are ready to prove them. So far 1 has run (and passed); 48 requirements are still awaiting a test.</div>
+          </div>
+
+          <div class="tile dec">
+            <div class="th"><span class="ti" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a.75.75 0 0 1 .75.75v.258a33.186 33.186 0 0 1 6.668.83.75.75 0 0 1-.336 1.461 31.28 31.28 0 0 0-1.103-.232l1.702 7.545a.75.75 0 0 1-.387.832A4.981 4.981 0 0 1 15 14c-.825 0-1.606-.2-2.294-.556a.75.75 0 0 1-.387-.832l1.77-7.849a31.743 31.743 0 0 0-3.339-.254v11.505a20.01 20.01 0 0 1 3.78.501.75.75 0 1 1-.339 1.462A18.558 18.558 0 0 0 10 17.5c-1.442 0-2.845.165-4.191.477a.75.75 0 1 1-.338-1.462 20.01 20.01 0 0 1 3.779-.501V4.509c-1.129.026-2.243.112-3.34.254l1.771 7.85a.75.75 0 0 1-.387.83A4.981 4.981 0 0 1 5 14a4.982 4.982 0 0 1-2.294-.556.75.75 0 0 1-.387-.832L4.02 5.067c-.37.07-.738.148-1.103.232a.75.75 0 0 1-.336-1.462 33.184 33.184 0 0 1 6.668-.829V2.75A.75.75 0 0 1 10 2Z"/></svg></span><span class="tl">What it decided</span></div>
+            <div class="big">4 calls along the way</div>
+            <div class="body">Notably: use short-lived payment tokens, and store an audit trail of every payment attempt. Each decision is linked to the design that follows it.</div>
+          </div>
+
+          <div class="tile flag">
+            <div class="th"><span class="ti" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg></span><span class="tl">What it flagged</span></div>
+            <div class="big">Test coverage is thin on the payments path</div>
+            <div class="body">The one payments test was skipped — it needs a sandbox key that isn’t set here — so that path isn’t yet proven.</div>
+            <div class="crit">
+              <p>“My confidence is in the spec, not in proven behaviour on payments. I’d set the sandbox key and re-run before ship — a skipped test is not a passing test.”</p>
+              <div class="by">The agent’s own note</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TWO DOOR BUTTONS — only primary actions -->
+        <div class="doors">
+          <button class="door" type="button">
+            <span class="di" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z"/></svg></span>
+            <span class="dt"><span class="dn">See the run log</span><span class="dd">Walk each run, step by step, with what it produced</span></span>
+            <span class="arrow" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd"/></svg></span>
+          </button>
+          <button class="door" type="button">
+            <span class="di" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z"/></svg></span>
+            <span class="dt"><span class="dn">See the coverage map</span><span class="dd">Trace any requirement to its reason, design and test</span></span>
+            <span class="arrow" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd"/></svg></span>
+          </button>
+        </div>
+
+        <!-- quiet browse-everything link -->
+        <a class="browse" href="#">
+          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3.196 12.87l-.825.483a.75.75 0 0 0 0 1.294l7.25 4.25a.75.75 0 0 0 .758 0l7.25-4.25a.75.75 0 0 0 0-1.294l-.825-.484-5.666 3.322a2.25 2.25 0 0 1-2.276 0L3.196 12.87Z"/><path d="M3.196 8.87l-.825.483a.75.75 0 0 0 0 1.294l7.25 4.25a.75.75 0 0 0 .758 0l7.25-4.25a.75.75 0 0 0 0-1.294l-.825-.484-5.666 3.322a2.25 2.25 0 0 1-2.276 0L3.196 8.87Z"/><path d="M10.38 1.103a.75.75 0 0 0-.76 0l-7.25 4.25a.75.75 0 0 0 0 1.294l7.25 4.25a.75.75 0 0 0 .76 0l7.25-4.25a.75.75 0 0 0 0-1.294l-7.25-4.25Z"/></svg>
+          Browse everything <span class="ct">119 items</span>
+        </a>
+
+        <!-- ===== SECONDARY PANELS: empty + loading looks ===== -->
+        <div class="statesrow">
+          <div class="statelabel">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/></svg>
+            How the same view reads before there’s anything to show
+          </div>
+
+          <!-- EMPTY -->
+          <div class="minipanel">
+            <div class="mphead">Empty — no brain yet</div>
+            <div class="mpbody">
+              <span class="emptyglyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"/></svg></span>
+              <div class="empty-t">Nothing here yet</div>
+              <div class="empty-s">The agent hasn’t run on this change. Once it does, you’ll see what it did, covered, decided and flagged — right here.</div>
+            </div>
+          </div>
+
+          <!-- LOADING -->
+          <div class="minipanel">
+            <div class="mphead">Loading — first run in progress</div>
+            <div class="mpbody load">
+              <div class="skelhead" aria-hidden="true"></div>
+              <div class="skeltile" aria-hidden="true"><div class="skelline w40"></div><div class="skelline w90"></div><div class="skelline w70"></div></div>
+              <div class="skeltile" aria-hidden="true"><div class="skelline w40"></div><div class="skelline w70"></div></div>
+              <div class="loadnote">Gathering what the agent has done so far…</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

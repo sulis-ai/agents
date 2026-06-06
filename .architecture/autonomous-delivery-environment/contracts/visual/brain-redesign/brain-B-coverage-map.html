@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sulis Brain redesign — Direction B · The Coverage Map</title>
+<!--
+  ============================================================================
+  REVIEW MOCKUP (UNSIGNED — for founder comparison) · Sulis cockpit Brain view
+  DIRECTION B — "The Coverage Map" (traceability lens)
+  ----------------------------------------------------------------------------
+  Renders INSIDE the signed chat-B2-tabbed-workspace shell. Answers "is every
+  requirement reasoned, designed and tested?" as four columns:
+    Why (opportunities) → What (requirements) → How (designs + decisions) →
+    Tested (scenarios + test results), each with a count pill.
+  The WHAT column is the one searchable list. Clicking a requirement does NOT
+  light up the whole graph — it draws ONE focused trace beneath the columns:
+  that single requirement + labelled edges to its reason, its design decision
+  and its test. One thing in focus, never an all-edges node-blob (CL-01/03).
+
+  Strictly bound to the SIGNED design instance (tokens.css / sulis-app.html);
+  every colour a var(--*); fonts loaded as the signed contract. Heroicons (MIT)
+  throughout. Stage palette tints per entity-kind. Worded status, AA pairs.
+  LAYOUT / INTERACTION exploration only (UXD-15).
+  ============================================================================
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --background:#fafafa; --foreground:#171717;
+  --card:#ffffff; --card-foreground:#171717;
+  --popover:#ffffff; --popover-foreground:#171717;
+  --muted:#f5f5f5; --muted-foreground:#737373;
+  --secondary:#f5f5f5; --secondary-foreground:#171717;
+  --border:#e5e5e5; --border-muted:#f0f0f0; --input:#e5e5e5;
+  --primary:#2563EB; --primary-foreground:#FFFFFF;
+  --accent:#2D7D90; --accent-foreground:#FFFFFF;
+  --destructive:#DC2626; --destructive-foreground:#FFFFFF;
+  --positive:#16A34A; --positive-foreground:#FFFFFF;
+  --warning:#F59E0B; --warning-foreground:#121212;
+  --ring:#2563EB; --brand-gold:#C9A962; --brand-depth:#1E3A5F;
+  --bg-positive:#F0FDF4; --bg-positive-border:#BBF7D0;
+  --bg-destructive:#FEF2F2; --bg-destructive-border:#FECACA;
+  --bg-warning:#FFFBEB; --bg-warning-border:#FDE68A;
+  --stage-recon:#8B7355; --stage-specify:#6366F1; --stage-design:#2D7D90;
+  --stage-implement:#2563EB; --stage-review:#9333EA; --stage-ship:#15803D;
+  --radius-interactive:4px; --radius-button:9999px; --radius-container:4px;
+  --radius-badge:9999px; --radius-media:4px;
+  --font-sans:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-display:'Satoshi',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono','SF Mono','Monaco','Inconsolata','Fira Mono',monospace;
+  --weight-body:400; --weight-heading:300; --weight-label:500;
+  --bg-card:var(--card); --bg-muted:var(--muted); --border-light:var(--border-muted);
+  --font:var(--font-sans); --radius:var(--radius-container);
+  --text:var(--foreground); --text-secondary:#525252; --text-muted:var(--muted-foreground);
+  --attn-icon:#B45309;
+  --bg-accent:color-mix(in srgb,var(--accent) 8%,#fff);
+  --bg-accent-border:color-mix(in srgb,var(--accent) 28%,var(--border));
+  /* AA-internal ink shade for text on the accent tint (~5.9:1). NOTE: pending
+   * token regen — becomes a named semantic token next instance regeneration. */
+  --accent-ink:#246676;
+  /* AA-internal ink shades for the recon/specify COUNT-PILL numerals + entity
+   * labels — same hue family as --stage-recon / --stage-specify, darkened so the
+   * pill text clears WCAG AA *as text* on its own 9–10% tint (base stage hues
+   * land ~3.95:1; these clear ~6.7 / ~7.1:1). Fill/border tints are unchanged.
+   * NOTE: pending token regen — becomes a named semantic token next regen. */
+  --recon-ink:#6B4F2E; --specify-ink:#4338CA;
+  --shadow-float:0 6px 20px rgba(23,23,23,.08), 0 1px 3px rgba(23,23,23,.06);
+  --skel-a:#eeeeee; --skel-b:#f6f6f6;
+}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#EDEAE3;color:var(--text);font-family:var(--font-sans);font-weight:var(--weight-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+:focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:var(--radius)}
+button{appearance:none;-webkit-appearance:none;background:none;border:0;margin:0;padding:0;font:inherit;color:inherit;line-height:inherit;text-align:inherit}
+button,[role="button"],[tabindex],a{cursor:pointer}
+svg{display:block}
+
+.docnote{max-width:1440px;margin:0 auto;padding:18px 28px 6px;color:var(--text-secondary);font-size:12.5px}
+.docnote b{color:var(--text);font-weight:600}
+.frame{width:1440px;height:900px;margin:8px auto 28px;background:var(--background);border-radius:10px;overflow:hidden;border:1px solid var(--border);box-shadow:0 1px 3px rgba(23,23,23,.07);display:flex;flex-direction:column}
+
+/* ===== WORKSPACE TOP BAR (verbatim shell) ===== */
+.topbar{flex:0 0 auto;display:flex;align-items:stretch;background:var(--card);border-bottom:1px solid var(--border);height:48px}
+.prodswitch{display:flex;align-items:center;gap:9px;padding:0 14px;border-right:1px solid var(--border);min-width:210px}
+.prodswitch .tile{width:28px;height:28px;flex:none;border-radius:7px;background:var(--brand-depth);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:12px;letter-spacing:.02em}
+.prodswitch .pn{font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--text);letter-spacing:-.01em}
+.prodswitch .chev{margin-left:auto;color:var(--text-muted)}
+.prodswitch:hover{background:var(--bg-muted)}
+.tabstrip{display:flex;align-items:stretch;gap:0;flex:1;min-width:0;overflow:hidden}
+.gtab{display:flex;align-items:center;gap:8px;padding:0 14px;border-right:1px solid var(--border);color:var(--text-secondary);font-size:13px;font-weight:var(--weight-label);position:relative;white-space:nowrap;max-width:260px}
+.gtab .ic{width:18px;height:18px;flex:none;color:var(--text-muted)}
+.gtab:hover{background:var(--bg-muted);color:var(--text)}
+.gtab .nm{overflow:hidden;text-overflow:ellipsis}
+.gtab .sdot{width:8px;height:8px;border-radius:50%;flex:none}
+.gtab .x{width:18px;height:18px;flex:none;display:inline-flex;align-items:center;justify-content:center;border-radius:5px;color:var(--text-muted);margin-left:2px}
+.gtab .x:hover{background:var(--border);color:var(--text)}
+.gtab .x svg{width:13px;height:13px}
+.gtab.active{background:var(--background);color:var(--text);font-weight:600}
+.gtab.active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--accent)}
+.gtab.board .ic{color:var(--text-secondary)}
+.tabstrip .newtab{display:inline-flex;align-items:center;justify-content:center;width:42px;color:var(--text-muted);border-right:1px solid var(--border)}
+.tabstrip .newtab:hover{background:var(--bg-muted);color:var(--text)}
+.tabstrip .newtab svg{width:18px;height:18px}
+
+/* ===== THE OPEN CHANGE — left nav + full-width main (verbatim shell) ===== */
+.change{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:248px 1fr}
+.leftnav{background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:auto;padding:16px 12px 12px}
+.cn-head{padding:2px 8px 14px;border-bottom:1px solid var(--border-muted);margin-bottom:6px}
+.cn-kicker{font-family:var(--font-mono);font-size:11px;color:var(--text-muted)}
+.cn-name{font-size:15px;font-weight:600;line-height:1.3;color:var(--text);margin-top:4px;letter-spacing:-.01em}
+.cn-meta{display:flex;align-items:center;gap:7px;margin-top:9px}
+.stagebadge{padding:3px 9px;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;border-radius:var(--radius);background:var(--bg-accent);color:var(--accent-ink);border:1px solid var(--bg-accent-border)}
+.cn-live{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary);font-weight:var(--weight-label)}
+.cn-live .g{width:8px;height:8px;border-radius:50%;background:var(--positive);box-shadow:0 0 0 2px var(--bg-positive)}
+.cn-sectionlabel{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin:14px 8px 8px;font-weight:600}
+.vtrack{list-style:none;margin:0 4px 4px;padding:0}
+.vstep{display:flex;align-items:center;gap:10px;padding:4px 8px;font-size:12px;color:var(--text-muted);position:relative}
+.vstep .vd{width:10px;height:10px;border-radius:50%;background:var(--input);flex:none;border:2px solid var(--card);z-index:2}
+.vstep:not(:last-child)::before{content:"";position:absolute;left:13px;top:18px;width:1px;height:14px;background:var(--border);z-index:1}
+.vstep[data-state="done"]{color:var(--text-secondary)}
+.vstep[data-state="done"] .vd{background:var(--text-secondary)}
+.vstep[data-state="now"]{color:var(--accent);font-weight:700}
+.vstep[data-state="now"] .vd{background:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,#fff)}
+.vstep .vw{margin-left:auto;font-size:9px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;color:var(--text-muted)}
+.vstep[data-state="now"] .vw{color:var(--accent)}
+.navitem{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:var(--radius);color:var(--text-secondary);font-size:13px;border:1px solid transparent;text-decoration:none;font-weight:var(--weight-label)}
+.navitem:hover{background:var(--bg-muted);color:var(--text)}
+.navitem.active{background:var(--bg-muted);color:var(--text)}
+.navitem .ic{width:20px;height:20px;flex:none;color:var(--text-muted)}
+.navitem.active .ic{color:var(--accent)}
+.navitem .cnt{margin-left:auto;font-size:11px;color:var(--text-muted);font-family:var(--font-mono)}
+.leftnav-foot{margin-top:auto;padding:12px 8px 2px;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:7px;border-top:1px solid var(--border-muted)}
+.leftnav-foot .g{width:8px;height:8px;border-radius:50%;background:var(--positive);flex:none;box-shadow:0 0 0 2px var(--bg-positive)}
+
+/* ===== MAIN AREA — Brain · Coverage Map ===== */
+.main{display:flex;flex-direction:column;min-width:0;overflow:hidden;background:var(--background)}
+.bhead{flex:0 0 auto;display:flex;align-items:center;gap:14px;padding:18px 28px 14px}
+.bhead .ttl{font-family:var(--font-display);font-size:19px;font-weight:700;letter-spacing:-.01em;color:var(--text)}
+.bhead .sub{font-size:12.5px;color:var(--text-secondary)}
+.lens{margin-left:auto;display:inline-flex;background:var(--bg-muted);border:1px solid var(--border);border-radius:var(--radius-button);padding:3px}
+.lens button{display:inline-flex;align-items:center;gap:7px;padding:6px 14px;border-radius:var(--radius-button);font-size:12.5px;font-weight:var(--weight-label);color:var(--text-secondary)}
+.lens button svg{width:15px;height:15px}
+.lens button[aria-pressed="true"]{background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(23,23,23,.06)}
+.lens button[aria-pressed="true"] svg{color:var(--accent)}
+
+.bbody{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;padding:0 28px 22px;overflow:hidden}
+
+/* FOUR TRACEABILITY COLUMNS */
+.cols{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.col{display:flex;flex-direction:column;min-height:0;background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.col-head{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:12px 14px;border-bottom:1px solid var(--border-muted)}
+.col-head .ci{width:18px;height:18px;flex:none}
+.col-head .step{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
+.col-head .ttl2{font-size:13.5px;font-weight:600;color:var(--text)}
+.col-head .pill{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;font-weight:600;padding:2px 9px;border-radius:var(--radius-button);background:var(--bg-muted);color:var(--text-secondary);border:1px solid var(--border)}
+/* per-column hue from stage palette */
+.col.why .ci{color:var(--recon-ink)} .col.why .pill{background:color-mix(in srgb,var(--stage-recon) 10%,#fff);border-color:color-mix(in srgb,var(--stage-recon) 26%,var(--border));color:var(--recon-ink)}
+.col.what .ci{color:var(--specify-ink)} .col.what .pill{background:color-mix(in srgb,var(--stage-specify) 9%,#fff);border-color:color-mix(in srgb,var(--stage-specify) 26%,var(--border));color:var(--specify-ink)}
+.col.how .ci{color:var(--stage-design)} .col.how .pill{background:var(--bg-accent);border-color:var(--bg-accent-border);color:var(--accent-ink)}
+.col.tested .ci{color:var(--stage-review)} .col.tested .pill{background:color-mix(in srgb,var(--stage-review) 9%,#fff);border-color:color-mix(in srgb,var(--stage-review) 26%,var(--border));color:var(--stage-review)}
+
+/* the WHAT column carries the one search box */
+.searchwrap{flex:0 0 auto;padding:10px 12px;border-bottom:1px solid var(--border-muted)}
+.searchbox{display:flex;align-items:center;gap:8px;border:1px solid var(--input);border-radius:var(--radius-button);padding:7px 12px;background:var(--bg-muted)}
+.searchbox svg{width:15px;height:15px;color:var(--text-muted);flex:none}
+.searchbox input{flex:1;border:0;outline:0;background:transparent;font-family:var(--font-sans);font-size:12.5px;color:var(--text)}
+.searchbox input::placeholder{color:var(--text-muted)}
+
+.collist{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px;scrollbar-width:thin}
+.entity{width:100%;display:flex;align-items:flex-start;gap:9px;padding:9px 10px;border-radius:8px;text-align:left;border:1px solid transparent}
+.entity:hover{background:var(--bg-muted)}
+.entity .ei{width:16px;height:16px;flex:none;margin-top:1px}
+.col.why .entity .ei{color:var(--recon-ink)} .col.how .entity .ei.dec{color:var(--stage-review)} .col.how .entity .ei.des{color:var(--stage-design)} .col.tested .entity .ei{color:var(--stage-review)}
+.entity .etx{flex:1;min-width:0}
+.entity .etx .en{font-size:12.5px;color:var(--text);line-height:1.4;font-weight:var(--weight-label)}
+.entity .etx .em{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);margin-top:2px}
+.entity .wstat{flex:none;font-size:10px;font-weight:600;padding:2px 7px;border-radius:var(--radius-button);align-self:center}
+.entity .wstat.ok{background:var(--bg-positive);border:1px solid var(--bg-positive-border);color:var(--stage-ship)}
+.entity .wstat.wait{background:var(--bg-warning);border:1px solid var(--bg-warning-border);color:var(--attn-icon)}
+.entity .wstat.skip{background:var(--bg-muted);border:1px solid var(--border);color:var(--text-secondary)}
+/* the selected requirement in the WHAT column */
+.col.what .entity.sel{background:var(--bg-accent);border-color:var(--bg-accent-border)}
+.col.what .entity.sel .ei{color:var(--accent-ink)}
+.col.what .entity .ei{color:var(--specify-ink)}
+.morelink{display:block;text-align:center;padding:9px;font-size:11.5px;color:var(--accent-ink);font-weight:var(--weight-label)}
+.morelink:hover{text-decoration:underline}
+
+/* FOCUSED TRACE — one requirement + labelled edges, beneath the columns */
+.focus{flex:0 0 auto;margin-top:14px;border:1px solid var(--bg-accent-border);border-radius:10px;background:var(--card);overflow:hidden}
+.focus-head{display:flex;align-items:center;gap:9px;padding:10px 16px;background:var(--bg-accent);border-bottom:1px solid var(--bg-accent-border)}
+.focus-head svg{width:15px;height:15px;color:var(--accent-ink)}
+.focus-head .fl{font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:var(--accent-ink)}
+.focus-head .fn{font-size:12.5px;color:var(--text);font-weight:var(--weight-label)}
+.focus-head .close{margin-left:auto;color:var(--text-muted)}
+.focus-head .close svg{width:16px;height:16px;color:var(--text-muted)}
+/* the trace row: focus node in the centre, labelled edges left & right */
+.trace{display:grid;grid-template-columns:1fr auto 1.1fr auto 1fr;align-items:center;gap:0;padding:18px 20px}
+.tnode{border:1px solid var(--border);border-radius:9px;padding:11px 13px;background:var(--card)}
+.tnode.focusnode{border-color:var(--bg-accent-border);background:var(--bg-accent);box-shadow:0 1px 3px rgba(23,23,23,.06)}
+.tnode .tk{display:flex;align-items:center;gap:7px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:600}
+.tnode .tk svg{width:14px;height:14px}
+.tnode.focusnode .tk{color:var(--accent-ink)}
+.tnode.why .tk svg{color:var(--recon-ink)} .tnode.dec .tk svg{color:var(--stage-review)} .tnode.test .tk svg{color:var(--stage-review)}
+.tnode .ttxt{font-size:12.5px;color:var(--text);margin-top:6px;line-height:1.4;font-weight:var(--weight-label)}
+.tnode .tmeta{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);margin-top:5px}
+.tnode .tstat{display:inline-flex;align-items:center;gap:5px;margin-top:8px;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:var(--radius-button)}
+.tnode .tstat svg{width:12px;height:12px}
+.tnode .tstat.skip{background:var(--bg-warning);border:1px solid var(--bg-warning-border);color:var(--attn-icon)}
+/* a labelled EDGE between two nodes — the explicit relationship word */
+.tedge{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 6px;min-width:108px}
+.tedge .eline{position:relative;width:100%;height:2px;background:var(--bg-accent-border)}
+.tedge .eline::after{content:"";position:absolute;right:-1px;top:-3px;border-left:7px solid var(--bg-accent-border);border-top:4px solid transparent;border-bottom:4px solid transparent}
+.tedge .elbl{margin-top:7px;font-family:var(--font-mono);font-size:10px;color:var(--accent-ink);background:var(--bg-accent);border:1px solid var(--bg-accent-border);border-radius:var(--radius-button);padding:2px 9px;white-space:nowrap}
+/* second-tier edges stacked under the How node (design references decision) */
+.stacktest{display:flex;flex-direction:column;gap:8px}
+</style>
+</head>
+<body>
+<div class="docnote"><b>Brain redesign — Direction B · The Coverage Map.</b> Answers “is every requirement reasoned, designed and tested?” as four columns — Why → What → How → Tested — each with a live count. The requirements column is the one searchable list. Click a requirement and the map doesn’t light up everything: it draws a single focused trace beneath the columns — that one requirement plus labelled links to its reason, its design decision and its test. One thing in focus, never a tangle. <b>Unsigned review mockup</b>, real tokens, light theme.</div>
+
+<div class="frame">
+
+  <!-- ===== WORKSPACE TOP BAR ===== -->
+  <div class="topbar">
+    <button class="prodswitch" type="button" aria-label="Switch product — Clinics">
+      <span class="tile" aria-hidden="true">CL</span>
+      <span class="pn">Clinics</span>
+      <svg class="chev" width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
+    </button>
+    <div class="tabstrip" role="tablist" aria-label="Open tabs">
+      <button class="gtab board" role="tab" aria-selected="false" type="button">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"/></svg>
+        <span class="nm">Board</span>
+      </button>
+      <div class="gtab active" role="tab" aria-selected="true" tabindex="0">
+        <span class="sdot" style="background:var(--stage-design)" aria-hidden="true"></span>
+        <span class="nm">Set up the autonomous delivery environment</span>
+        <span class="x" role="button" tabindex="0" aria-label="Close tab"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg></span>
+      </div>
+      <button class="gtab" role="tab" aria-selected="false" type="button">
+        <span class="sdot" style="background:var(--stage-implement)" aria-hidden="true"></span>
+        <span class="nm">Tidy the morning digest</span>
+        <span class="x" role="button" tabindex="0" aria-label="Close tab"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg></span>
+      </button>
+      <button class="newtab" type="button" aria-label="Open a new change tab"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg></button>
+    </div>
+  </div>
+
+  <!-- ===== THE OPEN CHANGE ===== -->
+  <div class="change">
+    <nav class="leftnav" aria-label="Change navigation">
+      <div class="cn-head">
+        <div class="cn-kicker">autonomous-delivery-env</div>
+        <div class="cn-name">Set up the autonomous delivery environment</div>
+        <div class="cn-meta"><span class="stagebadge">Design</span><span class="cn-live"><span class="g" aria-hidden="true"></span>Running</span></div>
+      </div>
+      <div class="cn-sectionlabel">Stage</div>
+      <ol class="vtrack" aria-label="Change progress">
+        <li class="vstep" data-state="done"><span class="vd" aria-hidden="true"></span>Recon<span class="vw">Done</span></li>
+        <li class="vstep" data-state="done"><span class="vd" aria-hidden="true"></span>Specify<span class="vw">Done</span></li>
+        <li class="vstep" data-state="now" aria-current="step"><span class="vd" aria-hidden="true"></span>Design<span class="vw">Now</span></li>
+        <li class="vstep" data-state="pending"><span class="vd" aria-hidden="true"></span>Implement<span class="vw">Pending</span></li>
+        <li class="vstep" data-state="pending"><span class="vd" aria-hidden="true"></span>Review<span class="vw">Pending</span></li>
+        <li class="vstep" data-state="pending"><span class="vd" aria-hidden="true"></span>Ship<span class="vw">Pending</span></li>
+      </ol>
+      <div class="cn-sectionlabel">Views</div>
+      <a class="navitem" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 0 1-.825-.242m9.345-8.334a2.126 2.126 0 0 0-.476-.095 48.64 48.64 0 0 0-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0 0 11.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155"/></svg>Conversation</a>
+      <a class="navitem" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>Files <span class="cnt">2</span></a>
+      <a class="navitem active" href="#" aria-current="page"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m21 7.5-2.25-1.313M21 7.5v2.25m0-2.25-2.25 1.313M3 7.5l2.25-1.313M3 7.5l2.25 1.313M3 7.5v2.25m9 3 2.25-1.313M12 12.75l-2.25-1.313M12 12.75V15m0 6.75 2.25-1.313M12 21.75V19.5m0 2.25-2.25-1.313m0-16.875L12 2.25l2.25 1.313M21 14.25v2.25l-2.25 1.313m-13.5 0L3 16.5v-2.25"/></svg>Brain <span class="cnt">119</span></a>
+      <a class="navitem" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>Preview</a>
+      <div class="leftnav-foot"><span class="g" aria-hidden="true"></span>Agent running in this change</div>
+    </nav>
+
+    <!-- MAIN AREA — Brain · Coverage Map -->
+    <div class="main">
+      <div class="bhead">
+        <div>
+          <div class="ttl">The Brain</div>
+          <div class="sub">Everything the agent knows about this change — and how it’s connected.</div>
+        </div>
+        <div class="lens" role="group" aria-label="Choose a lens">
+          <button type="button" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z"/></svg>
+            Run log
+          </button>
+          <button type="button" aria-pressed="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z"/></svg>
+            Coverage map
+          </button>
+        </div>
+      </div>
+
+      <div class="bbody">
+        <div class="cols">
+
+          <!-- WHY -->
+          <section class="col why" aria-label="Why — opportunities">
+            <div class="col-head">
+              <!-- light-bulb (24 outline) -->
+              <svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"/></svg>
+              <div><div class="step">Why</div><div class="ttl2">Opportunities</div></div>
+              <span class="pill">2</span>
+            </div>
+            <div class="collist">
+              <button class="entity" type="button"><svg class="ei" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 1a6 6 0 0 0-3.815 10.631C7.237 12.5 8 13.443 8 14.456v.644a.75.75 0 0 0 .572.729 6.016 6.016 0 0 0 2.856 0A.75.75 0 0 0 12 15.1v-.644c0-1.013.763-1.957 1.815-2.825A6 6 0 0 0 10 1Z"/><path fill-rule="evenodd" d="M7.5 17.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75ZM8.5 19.25a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd"/></svg><div class="etx"><div class="en">Agents should run unattended and overnight</div><div class="em">opportunity</div></div></button>
+              <button class="entity" type="button"><svg class="ei" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 1a6 6 0 0 0-3.815 10.631C7.237 12.5 8 13.443 8 14.456v.644a.75.75 0 0 0 .572.729 6.016 6.016 0 0 0 2.856 0A.75.75 0 0 0 12 15.1v-.644c0-1.013.763-1.957 1.815-2.825A6 6 0 0 0 10 1Z"/><path fill-rule="evenodd" d="M7.5 17.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75ZM8.5 19.25a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd"/></svg><div class="etx"><div class="en">The founder needs to trust the work without reading code</div><div class="em">opportunity</div></div></button>
+            </div>
+          </section>
+
+          <!-- WHAT — the searchable requirements column -->
+          <section class="col what" aria-label="What — requirements">
+            <div class="col-head">
+              <!-- clipboard-document-check (24 outline) -->
+              <svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C8.32 4.073 7.5 5.011 7.5 6.108V8.25m9.65-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0 1 18 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3 1.5 1.5 3-3.75"/></svg>
+              <div><div class="step">What</div><div class="ttl2">Requirements</div></div>
+              <span class="pill">49</span>
+            </div>
+            <div class="searchwrap">
+              <div class="searchbox">
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd"/></svg>
+                <input type="search" placeholder="Search 49 requirements…" value="payment" aria-label="Search requirements" />
+              </div>
+            </div>
+            <div class="collist">
+              <button class="entity sel" type="button" aria-current="true"><svg class="ei" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M15.988 3.012A2.25 2.25 0 0 1 18 5.25v6.5A2.25 2.25 0 0 1 15.75 14H13.5v-3.379a3 3 0 0 0-.879-2.121l-3.12-3.121a3 3 0 0 0-1.402-.791 2.252 2.252 0 0 1 1.913-1.576A2.25 2.25 0 0 1 12 1.25h1.75a2.25 2.25 0 0 1 2.238 1.762Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M3.5 6A1.5 1.5 0 0 0 2 7.5v9A1.5 1.5 0 0 0 3.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L8.44 6.439A1.5 1.5 0 0 0 7.378 6H3.5Z" clip-rule="evenodd"/></svg><div class="etx"><div class="en">A payment must capture only after the order is confirmed</div><div class="em">requirement · must</div></div><span class="wstat wait">Awaiting test</span></button>
+              <button class="entity" type="button"><svg class="ei" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M15.988 3.012A2.25 2.25 0 0 1 18 5.25v6.5A2.25 2.25 0 0 1 15.75 14H13.5v-3.379a3 3 0 0 0-.879-2.121l-3.12-3.121a3 3 0 0 0-1.402-.791 2.252 2.252 0 0 1 1.913-1.576A2.25 2.25 0 0 1 12 1.25h1.75a2.25 2.25 0 0 1 2.238 1.762Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M3.5 6A1.5 1.5 0 0 0 2 7.5v9A1.5 1.5 0 0 0 3.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L8.44 6.439A1.5 1.5 0 0 0 7.378 6H3.5Z" clip-rule="evenodd"/></svg><div class="etx"><div class="en">A declined payment must show a clear retry path</div><div class="em">requirement · must</div></div><span class="wstat ok">Tested</span></button>
+              <button class="entity" type="button"><svg class="ei" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M15.988 3.012A2.25 2.25 0 0 1 18 5.25v6.5A2.25 2.25 0 0 1 15.75 14H13.5v-3.379a3 3 0 0 0-.879-2.121l-3.12-3.121a3 3 0 0 0-1.402-.791 2.252 2.252 0 0 1 1.913-1.576A2.25 2.25 0 0 1 12 1.25h1.75a2.25 2.25 0 0 1 2.238 1.762Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M3.5 6A1.5 1.5 0 0 0 2 7.5v9A1.5 1.5 0 0 0 3.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L8.44 6.439A1.5 1.5 0 0 0 7.378 6H3.5Z" clip-rule="evenodd"/></svg><div class="etx"><div class="en">Payment tokens must be short-lived</div><div class="em">requirement · should</div></div><span class="wstat wait">Awaiting test</span></button>
+              <button class="entity" type="button"><svg class="ei" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M15.988 3.012A2.25 2.25 0 0 1 18 5.25v6.5A2.25 2.25 0 0 1 15.75 14H13.5v-3.379a3 3 0 0 0-.879-2.121l-3.12-3.121a3 3 0 0 0-1.402-.791 2.252 2.252 0 0 1 1.913-1.576A2.25 2.25 0 0 1 12 1.25h1.75a2.25 2.25 0 0 1 2.238 1.762Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M3.5 6A1.5 1.5 0 0 0 2 7.5v9A1.5 1.5 0 0 0 3.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L8.44 6.439A1.5 1.5 0 0 0 7.378 6H3.5Z" clip-rule="evenodd"/></svg><div class="etx"><div class="en">Every payment attempt must be written to an audit trail</div><div class="em">requirement · must</div></div><span class="wstat wait">Awaiting test</span></button>
+              <a class="morelink" href="#">3 of 49 shown · clear search to see all</a>
+            </div>
+          </section>
+
+          <!-- HOW -->
+          <section class="col how" aria-label="How — designs and decisions">
+            <div class="col-head">
+              <!-- cube (24 outline) -->
+              <svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"/></svg>
+              <div><div class="step">How</div><div class="ttl2">Designs &amp; decisions</div></div>
+              <span class="pill">2 + 4</span>
+            </div>
+            <div class="collist">
+              <button class="entity" type="button"><svg class="ei des" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m11.644 1.59.063.052 6.5 6.5a.75.75 0 0 1 0 1.06l-9.5 9.5a.75.75 0 0 1-.53.22H2.75a.75.75 0 0 1-.75-.75v-5.5a.75.75 0 0 1 .22-.53l9.5-9.5a.75.75 0 0 1 .998-.052Z"/></svg><div class="etx"><div class="en">Checkout payment flow design</div><div class="em">design · satisfies 6 requirements</div></div></button>
+              <button class="entity" type="button"><svg class="ei des" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m11.644 1.59.063.052 6.5 6.5a.75.75 0 0 1 0 1.06l-9.5 9.5a.75.75 0 0 1-.53.22H2.75a.75.75 0 0 1-.75-.75v-5.5a.75.75 0 0 1 .22-.53l9.5-9.5a.75.75 0 0 1 .998-.052Z"/></svg><div class="etx"><div class="en">Audit-trail storage design</div><div class="em">design · satisfies 4 requirements</div></div></button>
+              <button class="entity" type="button"><svg class="ei dec" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2a.75.75 0 0 1 .75.75v.258a33.186 33.186 0 0 1 6.668.83.75.75 0 0 1-.336 1.461 31.28 31.28 0 0 0-1.103-.232l1.702 7.545a.75.75 0 0 1-.387.832A4.981 4.981 0 0 1 15 14c-.825 0-1.606-.2-2.294-.556a.75.75 0 0 1-.387-.832l1.77-7.849a31.743 31.743 0 0 0-3.339-.254v11.505a20.01 20.01 0 0 1 3.78.501.75.75 0 1 1-.339 1.462A18.558 18.558 0 0 0 10 17.5c-1.442 0-2.845.165-4.191.477a.75.75 0 1 1-.338-1.462 20.01 20.01 0 0 1 3.779-.501V4.509c-1.129.026-2.243.112-3.34.254l1.771 7.85a.75.75 0 0 1-.387.83A4.981 4.981 0 0 1 5 14a4.982 4.982 0 0 1-2.294-.556.75.75 0 0 1-.387-.832L4.02 5.067c-.37.07-.738.148-1.103.232a.75.75 0 0 1-.336-1.462 33.184 33.184 0 0 1 6.668-.829V2.75A.75.75 0 0 1 10 2Z"/></svg><div class="etx"><div class="en">Use short-lived tokens</div><div class="em">decision</div></div></button>
+              <button class="entity" type="button"><svg class="ei dec" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2a.75.75 0 0 1 .75.75v.258a33.186 33.186 0 0 1 6.668.83.75.75 0 0 1-.336 1.461 31.28 31.28 0 0 0-1.103-.232l1.702 7.545a.75.75 0 0 1-.387.832A4.981 4.981 0 0 1 15 14c-.825 0-1.606-.2-2.294-.556a.75.75 0 0 1-.387-.832l1.77-7.849a31.743 31.743 0 0 0-3.339-.254v11.505a20.01 20.01 0 0 1 3.78.501.75.75 0 1 1-.339 1.462A18.558 18.558 0 0 0 10 17.5c-1.442 0-2.845.165-4.191.477a.75.75 0 1 1-.338-1.462 20.01 20.01 0 0 1 3.779-.501V4.509c-1.129.026-2.243.112-3.34.254l1.771 7.85a.75.75 0 0 1-.387.83A4.981 4.981 0 0 1 5 14a4.982 4.982 0 0 1-2.294-.556.75.75 0 0 1-.387-.832L4.02 5.067c-.37.07-.738.148-1.103.232a.75.75 0 0 1-.336-1.462 33.184 33.184 0 0 1 6.668-.829V2.75A.75.75 0 0 1 10 2Z"/></svg><div class="etx"><div class="en">Store an audit trail</div><div class="em">decision</div></div></button>
+              <a class="morelink" href="#">2 more decisions</a>
+            </div>
+          </section>
+
+          <!-- TESTED -->
+          <section class="col tested" aria-label="Tested — scenarios and results">
+            <div class="col-head">
+              <!-- beaker (24 outline) -->
+              <svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23-.693L5 14.5m14.8.8 1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0 1 12 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.068-3.611L5 14.5"/></svg>
+              <div><div class="step">Tested</div><div class="ttl2">Scenarios &amp; results</div></div>
+              <span class="pill">13 + 1</span>
+            </div>
+            <div class="collist">
+              <button class="entity" type="button"><svg class="ei" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.5 3.528v4.644c0 .729-.29 1.428-.805 1.944l-1.217 1.216a8.75 8.75 0 0 1 3.55.621l.502.201a7.25 7.25 0 0 0 4.178.529l-2.701-2.7a2.75 2.75 0 0 1-.806-1.945V3.528a40.205 40.205 0 0 0-3 0Zm4.5.084.142.003a.75.75 0 0 0 .015-1.5 41.642 41.642 0 0 0-6.314 0 .75.75 0 0 0 .015 1.5l.142-.003v4.56c0 .331-.132.65-.366.884L1.708 14.51c-1.523 1.524-.83 4.246 1.45 4.493a44.32 44.32 0 0 0 9.684 0c2.28-.247 2.973-2.969 1.45-4.493l-4.94-4.939a1.25 1.25 0 0 1-.366-.884v-4.56Z" clip-rule="evenodd"/></svg><div class="etx"><div class="en">Declined card shows the retry path</div><div class="em">scenario · verifies 1 requirement</div></div><span class="wstat ok">Passed</span></button>
+              <button class="entity" type="button"><svg class="ei" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.5 3.528v4.644c0 .729-.29 1.428-.805 1.944l-1.217 1.216a8.75 8.75 0 0 1 3.55.621l.502.201a7.25 7.25 0 0 0 4.178.529l-2.701-2.7a2.75 2.75 0 0 1-.806-1.945V3.528a40.205 40.205 0 0 0-3 0Zm4.5.084.142.003a.75.75 0 0 0 .015-1.5 41.642 41.642 0 0 0-6.314 0 .75.75 0 0 0 .015 1.5l.142-.003v4.56c0 .331-.132.65-.366.884L1.708 14.51c-1.523 1.524-.83 4.246 1.45 4.493a44.32 44.32 0 0 0 9.684 0c2.28-.247 2.973-2.969 1.45-4.493l-4.94-4.939a1.25 1.25 0 0 1-.366-.884v-4.56Z" clip-rule="evenodd"/></svg><div class="etx"><div class="en">Capture happens only after confirmation</div><div class="em">scenario · verifies 1 requirement</div></div><span class="wstat skip">Not run</span></button>
+              <button class="entity" type="button"><svg class="ei" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.5 3.528v4.644c0 .729-.29 1.428-.805 1.944l-1.217 1.216a8.75 8.75 0 0 1 3.55.621l.502.201a7.25 7.25 0 0 0 4.178.529l-2.701-2.7a2.75 2.75 0 0 1-.806-1.945V3.528a40.205 40.205 0 0 0-3 0Zm4.5.084.142.003a.75.75 0 0 0 .015-1.5 41.642 41.642 0 0 0-6.314 0 .75.75 0 0 0 .015 1.5l.142-.003v4.56c0 .331-.132.65-.366.884L1.708 14.51c-1.523 1.524-.83 4.246 1.45 4.493a44.32 44.32 0 0 0 9.684 0c2.28-.247 2.973-2.969 1.45-4.493l-4.94-4.939a1.25 1.25 0 0 1-.366-.884v-4.56Z" clip-rule="evenodd"/></svg><div class="etx"><div class="en">Audit row written for every attempt</div><div class="em">scenario · verifies 1 requirement</div></div><span class="wstat skip">Not run</span></button>
+              <a class="morelink" href="#">10 more scenarios · 1 test result</a>
+            </div>
+          </section>
+        </div>
+
+        <!-- FOCUSED TRACE — one requirement + labelled edges -->
+        <div class="focus" aria-label="Focused trace for the selected requirement">
+          <div class="focus-head">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd"/></svg>
+            <span class="fl">In focus</span>
+            <span class="fn">A payment must capture only after the order is confirmed</span>
+            <button class="close" type="button" aria-label="Clear focus"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg></button>
+          </div>
+          <div class="trace">
+
+            <!-- Why node -->
+            <div class="tnode why">
+              <div class="tk"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 1a6 6 0 0 0-3.815 10.631C7.237 12.5 8 13.443 8 14.456v.644a.75.75 0 0 0 .572.729 6.016 6.016 0 0 0 2.856 0A.75.75 0 0 0 12 15.1v-.644c0-1.013.763-1.957 1.815-2.825A6 6 0 0 0 10 1Z"/><path fill-rule="evenodd" d="M7.5 17.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75ZM8.5 19.25a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd"/></svg>Opportunity</div>
+              <div class="ttxt">The founder needs to trust the work without reading code</div>
+              <div class="tmeta">opportunity</div>
+            </div>
+
+            <!-- edge: requirement derived-from opportunity -->
+            <div class="tedge"><div class="eline"></div><div class="elbl">derived from</div></div>
+
+            <!-- Focus node: the requirement -->
+            <div class="tnode focusnode">
+              <div class="tk"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M15.988 3.012A2.25 2.25 0 0 1 18 5.25v6.5A2.25 2.25 0 0 1 15.75 14H13.5v-3.379a3 3 0 0 0-.879-2.121l-3.12-3.121a3 3 0 0 0-1.402-.791 2.252 2.252 0 0 1 1.913-1.576A2.25 2.25 0 0 1 12 1.25h1.75a2.25 2.25 0 0 1 2.238 1.762Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M3.5 6A1.5 1.5 0 0 0 2 7.5v9A1.5 1.5 0 0 0 3.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L8.44 6.439A1.5 1.5 0 0 0 7.378 6H3.5Z" clip-rule="evenodd"/></svg>Requirement · must</div>
+              <div class="ttxt">A payment must capture only after the order is confirmed</div>
+              <div class="tmeta">requirement</div>
+            </div>
+
+            <!-- edge: design satisfies requirement -->
+            <div class="tedge"><div class="eline"></div><div class="elbl">satisfied by</div></div>
+
+            <!-- How + Tested stacked -->
+            <div class="stacktest">
+              <div class="tnode dec">
+                <div class="tk"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m11.644 1.59.063.052 6.5 6.5a.75.75 0 0 1 0 1.06l-9.5 9.5a.75.75 0 0 1-.53.22H2.75a.75.75 0 0 1-.75-.75v-5.5a.75.75 0 0 1 .22-.53l9.5-9.5a.75.75 0 0 1 .998-.052Z"/></svg>Design → references decision</div>
+                <div class="ttxt">Checkout payment flow design</div>
+                <div class="tmeta">design · references “Use short-lived tokens”</div>
+              </div>
+              <div class="tnode test">
+                <div class="tk"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.5 3.528v4.644c0 .729-.29 1.428-.805 1.944l-1.217 1.216a8.75 8.75 0 0 1 3.55.621l.502.201a7.25 7.25 0 0 0 4.178.529l-2.701-2.7a2.75 2.75 0 0 1-.806-1.945V3.528a40.205 40.205 0 0 0-3 0Zm4.5.084.142.003a.75.75 0 0 0 .015-1.5 41.642 41.642 0 0 0-6.314 0 .75.75 0 0 0 .015 1.5l.142-.003v4.56c0 .331-.132.65-.366.884L1.708 14.51c-1.523 1.524-.83 4.246 1.45 4.493a44.32 44.32 0 0 0 9.684 0c2.28-.247 2.973-2.969 1.45-4.493l-4.94-4.939a1.25 1.25 0 0 1-.366-.884v-4.56Z" clip-rule="evenodd"/></svg>Scenario → verifies</div>
+                <div class="ttxt">Capture happens only after confirmation</div>
+                <div class="tstat skip"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>Test result: skipped — needs the sandbox key</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
