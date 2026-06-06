@@ -3,7 +3,7 @@
 // Inside an open change tab the change owns the screen. This nav carries the
 // change's identity (slug kicker + intent name + stage badge + liveness), a
 // VERTICAL stage track (Recon → Ship), and the view switches (Conversation /
-// Files / Brain / Preview) that swap the main area. Replaces the old
+// Files / Provenance / Preview) that swap the main area. Replaces the old
 // right-hand rail — one navigation model. Heroicons throughout.
 
 import {
@@ -20,7 +20,7 @@ import styles from "../styles/ChangeWorkspace.module.css";
 export type ChangeView =
   | "conversation"
   | "files"
-  | "brain"
+  | "provenance"
   | "preview"
   | "advanced";
 
@@ -37,7 +37,7 @@ const STATE_WORD = { done: "Done", now: "Now", pending: "Pending" } as const;
 const VIEWS: { id: ChangeView; label: string; Icon: typeof EyeIcon }[] = [
   { id: "conversation", label: "Conversation", Icon: ChatBubbleLeftRightIcon },
   { id: "files", label: "Files", Icon: DocumentTextIcon },
-  { id: "brain", label: "Brain", Icon: CubeTransparentIcon },
+  { id: "provenance", label: "Provenance", Icon: CubeTransparentIcon },
   { id: "preview", label: "Preview", Icon: EyeIcon },
   { id: "advanced", label: "Advanced", Icon: Cog6ToothIcon },
 ];

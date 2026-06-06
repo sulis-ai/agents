@@ -8,7 +8,7 @@
 //   ┌ ChangeNav ─┐ ┌ main ─────────────────────────────┐
 //   │ name       │ │ Conversation = sticky status bar + │
 //   │ stage      │ │   chat (Turn Cards) + composer     │
-//   │ views      │ │ Files / Brain / Preview swap here  │
+//   │ views      │ │ Files / Provenance / Preview swap  │
 //   └────────────┘ └────────────────────────────────────┘
 //
 // One state-pattern set (ADR-005): loading skeleton, 404-gone, generic error.
@@ -24,7 +24,7 @@ import { Chat } from "../components/Chat";
 import { Composer } from "../components/Composer";
 import { FilesPanel } from "../components/FilesPanel";
 import { ContractLinks } from "../components/ContractLinks";
-import { BrainSection } from "../components/BrainSection";
+import { ProvenanceSection } from "../components/ProvenanceSection";
 import { AdvancedView } from "../components/AdvancedView";
 import { REASON_WORD } from "../components/StatusHeader";
 import ws from "../styles/ChangeWorkspace.module.css";
@@ -117,13 +117,9 @@ export function ThreadView() {
           </div>
         )}
 
-        {view === "brain" && (
-          <div className={ws.viewfill} data-testid="section-brain">
-            <div className={ws.scroll}>
-              <div className={ws.measure}>
-                <BrainSection changeId={id} />
-              </div>
-            </div>
+        {view === "provenance" && (
+          <div className={ws.viewfill} data-testid="section-provenance">
+            <ProvenanceSection changeId={id} />
           </div>
         )}
 

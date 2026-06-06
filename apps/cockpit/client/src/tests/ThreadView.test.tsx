@@ -3,7 +3,7 @@
 // The change owns the screen inside its tab: a change-scoped LEFT NAV
 // (<ChangeNav>: name + vertical stage track + view switches) + a full-width
 // MAIN area rendering the selected view. Conversation is the default; Files /
-// Brain / Preview swap the main area (one at a time).
+// Provenance / Preview swap the main area (one at a time).
 //
 // Preserved: the header info (name/stage) renders; a 404 renders the
 // gone-or-moved message without crashing; the loading state renders.
