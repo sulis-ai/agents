@@ -11,15 +11,20 @@
 import { useState } from "react";
 import { useProvenance, useFocusedTrace } from "../api/useProvenance";
 import { useBrain } from "../api/useBrain";
+import { useOrigin } from "../api/useOrigin";
 import { ProvenanceView } from "./ProvenanceView";
+import type { ChangeView } from "./ChangeNav";
 
 interface Props {
   changeId: string;
+  /** Switch the change view (for the "How it came to be" lens's jumps). */
+  onSelectView?: (view: ChangeView) => void;
 }
 
-export function ProvenanceSection({ changeId }: Props) {
+export function ProvenanceSection({ changeId, onSelectView }: Props) {
   const query = useProvenance(changeId);
   const brain = useBrain(changeId);
+  const origin = useOrigin(changeId);
 
   // The selected requirement for the coverage drill-in; the focus query stays
   // disabled (returns nothing) until one is chosen.
@@ -56,6 +61,8 @@ export function ProvenanceSection({ changeId }: Props) {
         isError: focusId ? focusQuery.isError : false,
       }}
       brain={brain.isSuccess ? brain.data : undefined}
+      origin={origin.isSuccess ? origin.data : undefined}
+      onSelectView={onSelectView}
     />
   );
 }

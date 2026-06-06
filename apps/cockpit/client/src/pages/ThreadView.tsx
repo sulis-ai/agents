@@ -113,13 +113,13 @@ export function ThreadView() {
 
         {view === "files" && (
           <div className={ws.viewfill} data-testid="section-files">
-            <FilesPanel changeId={id} />
+            <FilesPanel changeId={id} onSelectView={setView} />
           </div>
         )}
 
         {view === "provenance" && (
           <div className={ws.viewfill} data-testid="section-provenance">
-            <ProvenanceSection changeId={id} />
+            <ProvenanceSection changeId={id} onSelectView={setView} />
           </div>
         )}
 

@@ -30,16 +30,19 @@ import { FileTree } from "./FileTree";
 import { ChangedList } from "./ChangedList";
 import { FolderOverview } from "./FolderOverview";
 import { FilePane } from "./FilePane";
+import type { ChangeView } from "./ChangeNav";
 import type { ChangedMap } from "./FileTreeNode";
 import styles from "../styles/FilesPanel.module.css";
 
 interface Props {
   changeId: string;
+  /** Switch the change view (for the open-file provenance panel's jumps). */
+  onSelectView?: (view: ChangeView) => void;
 }
 
 type Scope = "all" | "changed";
 
-export function FilesPanel({ changeId }: Props) {
+export function FilesPanel({ changeId, onSelectView }: Props) {
   const [params, setParams] = useSearchParams();
   const selectedFile = params.get("file") ?? "";
   const selectedDir = params.get("dir") ?? "";
@@ -141,7 +144,7 @@ export function FilesPanel({ changeId }: Props) {
 
       {/* ---- CONTENT COLUMN ---- */}
       {fileSelected ? (
-        <FilePane changeId={changeId} />
+        <FilePane changeId={changeId} onSelectView={onSelectView} />
       ) : (
         <div className={styles.content} data-testid="file-pane">
           <div className={styles.cbar}>

@@ -38,10 +38,14 @@ import { DiffUnavailableState } from "./DiffUnavailableState";
 import { NoBaseShaState } from "./NoBaseShaState";
 import { MonacoDiff } from "./MonacoDiff";
 import { RenderedPreview } from "./RenderedPreview";
+import { HowThisFileCameToBe } from "./HowThisFileCameToBe";
+import type { ChangeView } from "./ChangeNav";
 import styles from "../styles/FilesPanel.module.css";
 
 interface Props {
   changeId: string;
+  /** Switch the change view (for the file-provenance panel's trace jumps). */
+  onSelectView?: (view: ChangeView) => void;
 }
 
 function content(children: ReactNode) {
@@ -98,7 +102,7 @@ function CouldNotLoad({
   );
 }
 
-export function FilePane({ changeId }: Props) {
+export function FilePane({ changeId, onSelectView }: Props) {
   const [params] = useSearchParams();
   const selected = params.get("file") ?? "";
   const diffMode = params.get("diff") === "1";
@@ -186,6 +190,13 @@ export function FilePane({ changeId }: Props) {
       <div className={styles.cbody}>
         <div className={styles.fileFill}>{body()}</div>
       </div>
+      {/* WP-P10/P11 — "How this file came to be": the per-file origin badge +
+          trace, beneath the content (progressive disclosure). */}
+      <HowThisFileCameToBe
+        changeId={changeId}
+        path={selected}
+        onSelectView={onSelectView}
+      />
     </>,
   );
 }

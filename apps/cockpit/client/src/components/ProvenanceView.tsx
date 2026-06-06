@@ -22,8 +22,13 @@ import type {
   RunLogEntry,
   RunStep,
 } from "../../../shared/api-types";
-import type { BrainView as BrainViewModel } from "../../../shared/api-types";
+import type {
+  BrainView as BrainViewModel,
+  ChangeOriginView,
+} from "../../../shared/api-types";
 import { BrainView } from "./BrainView";
+import { HowItCameToBeLens } from "./HowItCameToBeLens";
+import type { ChangeView } from "./ChangeNav";
 import styles from "../styles/ProvenanceView.module.css";
 import {
   ArrowLeftIcon,
@@ -53,7 +58,7 @@ import {
   TriangleExclaimIcon,
 } from "./provenanceIcons";
 
-type Lens = "dashboard" | "runlog" | "coverage" | "browse";
+type Lens = "dashboard" | "runlog" | "coverage" | "origin" | "browse";
 
 /** The focused-trace query state for the currently-selected requirement. */
 export interface FocusState {
@@ -74,6 +79,11 @@ interface Props {
   /** The flat grouped brain — the "Browse everything" fallback. Optional:
    *  when absent the browse link is hidden (still a dashboard front door). */
   brain?: BrainViewModel;
+  /** The whole-change origin list — the "How it came to be" lens (WP-P10/P11).
+   *  Optional: when absent the lens door is hidden. */
+  origin?: ChangeOriginView;
+  /** Switch the change view (for the lens's "Open conversation" jump). */
+  onSelectView?: (view: ChangeView) => void;
 }
 
 /* Is there anything at all to show? (empty-state guard) */
@@ -93,6 +103,8 @@ export function ProvenanceView({
   onFocus,
   focus,
   brain,
+  origin,
+  onSelectView,
 }: Props) {
   const [lens, setLens] = useState<Lens>("dashboard");
 
@@ -119,8 +131,10 @@ export function ProvenanceView({
         <Dashboard
           view={view}
           hasBrain={brain !== undefined}
+          hasOrigin={origin !== undefined}
           onOpenRunLog={() => setLens("runlog")}
           onOpenCoverage={() => setLens("coverage")}
+          onOpenOrigin={() => setLens("origin")}
           onBrowse={() => setLens("browse")}
         />
       )}
@@ -140,6 +154,39 @@ export function ProvenanceView({
           onBack={() => setLens("dashboard")}
           onLens={setLens}
         />
+      )}
+      {lens === "origin" && (
+        <section className={styles.root} aria-label="How it came to be">
+          <header className={styles.bhead}>
+            <button
+              type="button"
+              className={styles.backbtn}
+              onClick={() => setLens("dashboard")}
+              data-testid="provenance-back"
+            >
+              <ArrowLeftIcon />
+              Provenance
+            </button>
+            <div className={styles.htxt}>
+              <div className={styles.ttl}>How it came to be</div>
+              <div className={styles.sub}>
+                The same changes, grouped by how each one was made.
+              </div>
+            </div>
+          </header>
+          <div className={styles.scroll}>
+            <div className={styles.wrap}>
+              {origin ? (
+                <HowItCameToBeLens view={origin} onSelectView={onSelectView} />
+              ) : (
+                <p className={styles.statusline}>
+                  Nothing to trace yet — origins will appear once this change has
+                  changes.
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
       )}
       {lens === "browse" && (
         <section className={styles.root} aria-label="Browse everything">
@@ -195,14 +242,18 @@ function overallConfidence(runLog: RunLogEntry[]): string | null {
 function Dashboard({
   view,
   hasBrain,
+  hasOrigin,
   onOpenRunLog,
   onOpenCoverage,
+  onOpenOrigin,
   onBrowse,
 }: {
   view: ProvenanceModel;
   hasBrain: boolean;
+  hasOrigin: boolean;
   onOpenRunLog: () => void;
   onOpenCoverage: () => void;
+  onOpenOrigin: () => void;
   onBrowse: () => void;
 }) {
   const { digest } = view;
@@ -408,6 +459,28 @@ function Dashboard({
               <ArrowRightIcon />
             </span>
           </button>
+          {hasOrigin && (
+            <button
+              type="button"
+              className={styles.door}
+              onClick={onOpenOrigin}
+              data-testid="door-origin"
+            >
+              <span className={styles.di} aria-hidden="true">
+                <BoltOutline strokeWidth={1.7} />
+              </span>
+              <span className={styles.dt}>
+                <span className={styles.dn}>How it came to be</span>
+                <span className={styles.dd}>
+                  See where each changed file came from — autonomous, assisted,
+                  or unknown
+                </span>
+              </span>
+              <span className={styles.arrow} aria-hidden="true">
+                <ArrowRightIcon />
+              </span>
+            </button>
+          )}
         </div>
 
         {hasBrain && (
