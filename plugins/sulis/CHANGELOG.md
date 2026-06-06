@@ -1,3 +1,9 @@
+## v0.109.0 — 2026-06-06
+
+**Minor — release-train batch.**
+
+- /sulis:prove — point it at a built thing and it reports what is genuinely working vs stubbed/faked: finds the critical scenarios (user journeys + non-functional/production mechanisms), drives each for real against the real interface as a consumer (no stubs), validates the actual saved output by inspecting it, and returns an observed-or-blocked verdict with evidence. The reusable form of the is-it-real-or-vibe-coded check.
+
 ## v0.108.0 — 2026-06-04
 
 **Minor — release-train batch.**
