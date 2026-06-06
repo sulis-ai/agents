@@ -200,3 +200,56 @@ describe("WP-005 bug 3 — buildArgv includes --verbose (real-CLI contract)", ()
     expect(argv[argv.indexOf("--resume") + 1]).toBe("sess-abc");
   });
 });
+
+// ─── WP-P12 — the relay passes assisted origin context to the spawned session ─
+//
+// The relay's contribution to origin-stamping is READ-ONLY inside the cockpit:
+// it passes a `SULIS_ORIGIN` (assisted) env to the already-sanctioned bridge
+// spawn, so any commit the assisted session makes carries the trailer (the
+// trailer is written OUTSIDE the cockpit, by the prepare-commit-msg hook in the
+// spawned session — never by cockpit code). The cockpit never writes the
+// trailer or sidecar itself.
+describe("WP-P12 — spawnClaudeBridge forwards assisted origin env (read-only)", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await realpath(await mkdtemp(join(tmpdir(), "wpp12-claude-")));
+  });
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("merges a supplied SULIS_ORIGIN into the child env, inheriting the rest", async () => {
+    const sentinel = join(dir, "child-env");
+    const fakeClaude = join(dir, "claude");
+    await writeFile(
+      fakeClaude,
+      [
+        "#!/usr/bin/env bash",
+        "set -uo pipefail",
+        `printf '%s\\n' "$SULIS_ORIGIN" > "${sentinel}"`,
+        `printf '%s\\n' '{\"type\":\"result\",\"subtype\":\"success\"}'`,
+        "exit 0",
+      ].join("\n") + "\n",
+      "utf8",
+    );
+    await chmod(fakeClaude, 0o755);
+
+    const originalPath = process.env.PATH;
+    process.env.PATH = `${dir}:${originalPath ?? ""}`;
+    try {
+      const handle = spawnClaudeBridge(["-p", "hi"], dir, {
+        SULIS_ORIGIN: "assisted; conversation=sess-xyz; turn=7",
+      });
+      await new Promise<void>((resolve, reject) => {
+        handle.process.on("close", () => resolve());
+        handle.process.on("error", reject);
+        handle.stdout.resume();
+      });
+      const seen = (await readFile(sentinel, "utf8")).trim();
+      expect(seen).toBe("assisted; conversation=sess-xyz; turn=7");
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+});

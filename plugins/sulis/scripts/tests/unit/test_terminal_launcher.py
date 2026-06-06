@@ -130,6 +130,31 @@ def test_build_launch_script_inserts_extra_env_shlex_quoted(tmp_path):
     assert "export FOO='bar; rm -rf /'" in script
 
 
+def test_build_launch_script_wires_origin_hook(tmp_path):
+    """WP-P12 — the executor session launch wires the prepare-commit-msg hook
+    so commits the session makes carry the Sulis-Origin trailer. The hook path
+    is set via GIT_CONFIG_* env (no .git/config mutation) and SULIS_SCRIPTS_DIR
+    lets the hook locate _origin_stamp."""
+    script = tl._build_launch_script(_GOOD_ULID, tmp_path, enable_origin_hook=True)
+    assert "GIT_CONFIG_COUNT" in script
+    assert "core.hooksPath" in script
+    assert "GIT_CONFIG_VALUE_0" in script
+    # The configured hooks dir is the scripts/hooks dir holding the hook.
+    assert "hooks" in script
+    assert "export SULIS_SCRIPTS_DIR=" in script
+    # The exports come AFTER the env-scrub (which would otherwise strip them).
+    scrub_idx = script.index("compgen -v")
+    cfg_idx = script.index("GIT_CONFIG_COUNT")
+    assert scrub_idx < cfg_idx
+
+
+def test_build_launch_script_omits_origin_hook_by_default(tmp_path):
+    """Default (no flag) is byte-compatible with the prior baseline."""
+    script = tl._build_launch_script(_GOOD_ULID, tmp_path)
+    assert "GIT_CONFIG_COUNT" not in script
+    assert "core.hooksPath" not in script
+
+
 def test_build_launch_script_cd_then_exec_order(tmp_path):
     script = tl._build_launch_script(_GOOD_ULID, tmp_path)
     cd_idx = script.index('cd "')

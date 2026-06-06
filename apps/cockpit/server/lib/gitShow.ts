@@ -415,3 +415,48 @@ export async function gitLogLastCommit(
   if (sha === "") return null;
   return { sha, author, at, message: message.trim() };
 }
+
+// ─── WP-P13 — read the recorded `Sulis-Origin:` trailer for a path (ADR-013) ──
+//
+// The recorded origin (WP-P12 stamps it as a commit trailer) is read back here
+// through the SAME single git boundary as everything else — it reuses
+// `gitLogLastCommit` (the read-only `git log -1`, which already returns the full
+// message INCLUDING trailers), so NO new git spawn is added and the read-only
+// gate stays green. This is the ONE site that knows how to pull a stamp off a
+// commit; `RecordedOriginAttribution` calls it and maps the value to an Origin.
+
+/** The recorded `Sulis-Origin:` stamp on a file's last-changing commit. */
+export interface GitTrailerResult {
+  /** Abbreviated sha of that commit (the sidecar key when the trailer is absent). */
+  sha: string;
+  /** The trailer value (everything after `Sulis-Origin:`), or null if absent. */
+  originTrailer: string | null;
+}
+
+/** The trailer key the write paths stamp (ADR-013) — the same family as Co-Authored-By. */
+const ORIGIN_TRAILER_KEY = "Sulis-Origin";
+const ORIGIN_TRAILER_RE = new RegExp(
+  `^${ORIGIN_TRAILER_KEY}:\\s*(.+)$`,
+  "im",
+);
+
+/**
+ * Read the `Sulis-Origin:` trailer (if any) from a path's last-changing commit,
+ * plus that commit's sha (so the caller can look up a sidecar keyed by sha when
+ * the trailer is absent). Returns null when the path has no commit history.
+ *
+ * Read-only — it composes `gitLogLastCommit` (the sanctioned `git log` read);
+ * it spawns no new process. Fail-soft: a git failure throws `TimeoutError` only
+ * (the caller treats any other failure as "no recorded origin").
+ */
+export async function gitOriginTrailer(
+  opts: GitLogLastCommitOptions,
+): Promise<GitTrailerResult | null> {
+  const commit = await gitLogLastCommit(opts);
+  if (commit === null) return null;
+  const m = ORIGIN_TRAILER_RE.exec(commit.message);
+  return {
+    sha: commit.sha,
+    originTrailer: m ? m[1]!.trim() : null,
+  };
+}

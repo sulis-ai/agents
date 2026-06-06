@@ -19,6 +19,8 @@ import { Router } from "express";
 import type { ChangeOriginView, OriginView } from "../../shared/api-types";
 import type { ChangeStoreReader } from "../ports/ChangeStoreReader";
 import { InferredOriginAttribution } from "../adapters/InferredOriginAttribution";
+import { RecordedOriginAttribution } from "../adapters/RecordedOriginAttribution";
+import { CompositeOriginAttribution } from "../adapters/CompositeOriginAttribution";
 import { readOrigin } from "../lib/readOrigin";
 
 import { asyncHandler } from "./_async";
@@ -45,7 +47,10 @@ export function createOriginRouter(deps: OriginRouterDeps): Router {
       const record = await requireChange(deps.changeStore, id);
       const worktreeRoot = await resolveWorktreeRoot(record.worktreePath);
 
-      const attribution = new InferredOriginAttribution({
+      // Recorded-supersedes-inferred (ADR-012): a stamped commit (WP-P12) reads
+      // back its EXACT origin (attribution "recorded", the badge drops "· likely"
+      // with NO UI change); every other file falls back to the inferred adapter.
+      const inferred = new InferredOriginAttribution({
         worktreeRoot,
         recordedWorktreePath: record.worktreePath,
         claudeProjectsDir: deps.claudeProjectsDir,
@@ -53,6 +58,13 @@ export function createOriginRouter(deps: OriginRouterDeps): Router {
           ? { gitTimeoutMs: deps.gitTimeoutMs }
           : {}),
       });
+      const recorded = new RecordedOriginAttribution({
+        worktreeRoot,
+        ...(deps.gitTimeoutMs !== undefined
+          ? { gitTimeoutMs: deps.gitTimeoutMs }
+          : {}),
+      });
+      const attribution = new CompositeOriginAttribution(recorded, inferred);
 
       // `?path=` → one file's origin (OriginView). `path: null` is allowed and
       // yields the honest change-level answer (per-file is the meaningful view).

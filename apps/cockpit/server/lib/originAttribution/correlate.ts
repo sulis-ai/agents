@@ -18,6 +18,10 @@
 
 // eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (TDD §9 permits; the rule's `../../*` pattern blocks escapes out of apps/cockpit/, which import/no-restricted-paths enforces)
 import type { Origin } from "../../../shared/api-types";
+import {
+  originFromTrailerValue,
+  trailerValueFromMessage,
+} from "./recorded";
 
 /** A file's last-changing commit, as read via the ONE git site (gitShow.ts). */
 export interface CommitFacts {
@@ -73,9 +77,6 @@ export interface CorrelateOptions {
 const DEFAULT_RUN_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const DEFAULT_TURN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
-/** The `Sulis-Origin:` commit trailer (ADR-013). Recorded overrides inferred. */
-const RECORDED_TRAILER = /^Sulis-Origin:\s*(.+)$/im;
-
 /** Author signals that mark a commit as bot/relay-authored (→ autonomous). */
 const BOT_AUTHOR = /\b(bot|\[bot\]|sulis[- ]?(bot|executor|agent)|noreply)\b/i;
 
@@ -85,55 +86,13 @@ function parseMs(iso: string): number | null {
 }
 
 /**
- * Parse a recorded `Sulis-Origin:` trailer into an Origin, or null if absent /
- * unparseable. Shape (ADR-013/CF-11):
- *   `Sulis-Origin: autonomous; run=<ulid>; confidence=<0..1>`
- *   `Sulis-Origin: assisted; conversation=<id>; turn=<n>`
+ * Parse a recorded `Sulis-Origin:` trailer off a full commit message into an
+ * Origin, or null if absent / unparseable. The trailer-shape parse is the
+ * SHARED primitive in `recorded.ts` (EP-03) — used here AND by the recorded
+ * adapter (WP-P13), so the two readers can never drift on the stamp shape.
  */
 function recordedFromTrailer(message: string): Origin | null {
-  const m = RECORDED_TRAILER.exec(message);
-  if (m === null) return null;
-  const value = m[1]!.trim();
-  const fields = new Map<string, string>();
-  let kind = "";
-  for (const part of value.split(";")) {
-    const seg = part.trim();
-    if (seg === "") continue;
-    const eq = seg.indexOf("=");
-    if (eq === -1) {
-      if (kind === "") kind = seg; // the leading bare token is the kind
-      continue;
-    }
-    fields.set(seg.slice(0, eq).trim(), seg.slice(eq + 1).trim());
-  }
-
-  if (kind === "autonomous") {
-    const runId = fields.get("run") ?? "";
-    if (runId === "") return null;
-    const confRaw = fields.get("confidence");
-    const conf = confRaw !== undefined ? Number.parseFloat(confRaw) : NaN;
-    return {
-      kind: "autonomous",
-      run: { runId, workflow: null, outcome: "" },
-      confidence: Number.isFinite(conf) ? conf : null,
-      attribution: "recorded",
-    };
-  }
-  if (kind === "assisted") {
-    const conversationId = fields.get("conversation") ?? "";
-    if (conversationId === "") return null;
-    const turn = Number.parseInt(fields.get("turn") ?? "", 10);
-    return {
-      kind: "assisted",
-      conversation: {
-        conversationId,
-        turn: Number.isFinite(turn) ? turn : 0,
-        summary: null,
-      },
-      attribution: "recorded",
-    };
-  }
-  return null;
+  return originFromTrailerValue(trailerValueFromMessage(message));
 }
 
 /** Find the run whose `at` is nearest the commit and within `windowMs`. */

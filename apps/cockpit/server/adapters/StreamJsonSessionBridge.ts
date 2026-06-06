@@ -246,6 +246,14 @@ function describeError(err: unknown): string {
 export function spawnClaudeBridge(
   argv: string[],
   cwd: string,
+  // WP-P12 — assisted origin context (ADR-013). The relay MAY pass a
+  // `SULIS_ORIGIN: "assisted; conversation=<id>; turn=<n>"` env here; it is
+  // merged onto the inherited env of the spawned session so any commit THAT
+  // SESSION makes carries the assisted trailer (written by the session's
+  // prepare-commit-msg hook — OUTSIDE the cockpit, never by cockpit code).
+  // Passing env to the already-sanctioned spawn is read-only from the cockpit's
+  // side: it neither writes a file nor mutates git.
+  originEnv?: Record<string, string>,
 ): BridgeChildHandle {
   // stdin is IGNORED (mapped to /dev/null) — the prompt is passed via `-p`,
   // so the child needs NO stdin. If stdin were left open/inherited, the real
@@ -258,6 +266,9 @@ export function spawnClaudeBridge(
   const child = spawn("claude", argv, {
     cwd,
     stdio: ["ignore", "pipe", "pipe"],
+    ...(originEnv !== undefined
+      ? { env: { ...process.env, ...originEnv } }
+      : {}),
   });
   return {
     process: child,

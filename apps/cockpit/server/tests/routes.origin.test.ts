@@ -242,6 +242,65 @@ describe("GET /api/changes/:id/origin (ADR-012)", () => {
     expect(body.error.length).toBeGreaterThan(0);
   });
 
+  it("recorded supersedes inferred: a stamped file reads recorded, an unstamped file stays inferred", async () => {
+    // A second repo whose auto.txt carries a real Sulis-Origin trailer (the
+    // WP-P12 stamp) and whose plain.txt does not — the route must return
+    // recorded for the stamped file and fall back to inferred for the other
+    // (ADR-012 precedence, no UI change).
+    const stampedRepo = await realpath(
+      await mkdtemp(join(tmpdir(), "origin-route-stamped-")),
+    );
+    git(stampedRepo, ["init", "-q", "-b", "main"]);
+    git(stampedRepo, ["config", "commit.gpgsign", "false"]);
+    writeFileSync(join(stampedRepo, "base.txt"), "base\n", "utf8");
+    git(stampedRepo, ["add", "base.txt"]);
+    git(stampedRepo, ["commit", "-q", "-m", "base"]);
+    const stampedBase = git(stampedRepo, ["rev-parse", "HEAD"]);
+
+    // stamped: a commit carrying the trailer.
+    writeFileSync(join(stampedRepo, "auto.txt"), "auto\n", "utf8");
+    git(stampedRepo, ["add", "auto.txt"]);
+    git(stampedRepo, [
+      "commit",
+      "-q",
+      "-m",
+      `add auto.txt\n\nSulis-Origin: autonomous; run=${RUN_ID}; confidence=0.91`,
+    ]);
+    // unstamped: a plain commit (no trailer, no run/turn nearby → inferred unknown).
+    commitFile(
+      stampedRepo,
+      "plain.txt",
+      "plain\n",
+      "2020-01-01T00:00:00Z",
+      "Iain <i@nivbow.com>",
+    );
+
+    const reader = new FakeChangeStoreReader([
+      record({ changeId: "01STAMP", worktreePath: stampedRepo, baseSha: stampedBase }),
+    ]);
+
+    const stamped = await request(app(reader)).get(
+      "/api/changes/01STAMP/origin?path=auto.txt",
+    );
+    expect(stamped.status).toBe(200);
+    const stampedBody = stamped.body as OriginView;
+    expect(stampedBody.origin.kind).toBe("autonomous");
+    expect(stampedBody.origin.attribution).toBe("recorded"); // the hedge drops
+    if (stampedBody.origin.kind === "autonomous") {
+      expect(stampedBody.origin.run.runId).toBe(RUN_ID);
+      expect(stampedBody.origin.confidence).toBe(0.91);
+    }
+
+    const unstamped = await request(app(reader)).get(
+      "/api/changes/01STAMP/origin?path=plain.txt",
+    );
+    expect(unstamped.status).toBe(200);
+    const unstampedBody = unstamped.body as OriginView;
+    expect(unstampedBody.origin.attribution).toBe("inferred"); // hedge stays
+
+    await rm(stampedRepo, { recursive: true, force: true });
+  });
+
   it("rejects a POST to the origin route (read-only; 405)", async () => {
     const reader = new FakeChangeStoreReader([
       record({ changeId: "01XYZ", worktreePath: repo, baseSha }),
