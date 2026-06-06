@@ -54,6 +54,8 @@ import { createChangeDetailRouter } from "./routes/change-detail";
 import { createTreeRouter } from "./routes/tree";
 import { createFileRouter } from "./routes/file";
 import { createDiffRouter } from "./routes/diff";
+import { createChangedRouter } from "./routes/changed";
+import { createProvenanceRouter } from "./routes/provenance";
 import { createTranscriptRouter } from "./routes/transcript";
 import { createTurnSummariesRouter } from "./routes/turnSummaries";
 import { createAdvancedRouter } from "./routes/advanced";
@@ -294,6 +296,26 @@ export function createApp(deps: CreateAppDeps): Application {
       changeStore: deps.changeStore,
       gitTimeoutMs: deps.gitTimeoutMs,
       fileMaxBytes: deps.fileMaxBytes,
+    }),
+  );
+
+  // Files redesign — the change's changed-files set (base → worktree) for
+  // the repo-browser's All-files ↔ Changed scope + worded status badges.
+  // GET-only; read-only (composes the sanctioned `git diff` boundary).
+  app.use(
+    "/api/changes/:id/changed",
+    createChangedRouter({
+      changeStore: deps.changeStore,
+      gitTimeoutMs: deps.gitTimeoutMs,
+    }),
+  );
+
+  // Provenance — read projection over the change's brain (digest + run-log +
+  // coverage map; `?focus=<reqId>` for one requirement's trace). GET-only.
+  app.use(
+    "/api/changes/:id/provenance",
+    createProvenanceRouter({
+      changeStore: deps.changeStore,
     }),
   );
 

@@ -13,7 +13,7 @@
 // eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (TDD §9 permits; the rule's `../../*` pattern blocks escapes OUT of apps/cockpit/, which import/no-restricted-paths enforces)
 import type { ChangedFiles } from "../../shared/api-types";
 
-import { gitDiffNameStatus } from "./gitShow";
+import { gitDiffNameStatus, gitDiffNumstat } from "./gitShow";
 
 interface ReadChangedFilesOptions {
   /** Override the gitDiffNameStatus subprocess timeout (default 5 s). */
@@ -40,21 +40,37 @@ export async function readChangedFiles(
     return { files: [], baseKnown: false };
   }
 
-  const entries = await gitDiffNameStatus({
+  const gitOpts = {
     cwd: worktreeRoot,
     baseSha,
     ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
-  });
+  };
+
+  // Name-status is the authoritative set (one row per changed path,
+  // worded new/edited/removed). Numstat carries the per-file +N/−N
+  // counts; we run it alongside and merge by path. The two views agree
+  // on the path set under `--no-renames`, but we key off name-status so
+  // a count with no matching status row is never surfaced on its own.
+  const [entries, numstat] = await Promise.all([
+    gitDiffNameStatus(gitOpts),
+    gitDiffNumstat(gitOpts),
+  ]);
+
+  const countsByPath = new Map(numstat.map((n) => [n.path, n]));
 
   return {
-    // added/removed are null placeholders here; WP-P02 fills them from
-    // `git diff --numstat` via the sanctioned git boundary.
-    files: entries.map((e) => ({
-      path: e.path,
-      status: e.status,
-      added: null,
-      removed: null,
-    })),
+    files: entries.map((e) => {
+      const counts = countsByPath.get(e.path);
+      // A path present in name-status but absent from numstat changed
+      // without touching line counts (e.g. a pure mode change) → 0/0.
+      // A binary file appears in numstat with null counts → null/null.
+      return {
+        path: e.path,
+        status: e.status,
+        added: counts ? counts.added : 0,
+        removed: counts ? counts.removed : 0,
+      };
+    }),
     baseKnown: true,
   };
 }

@@ -148,7 +148,7 @@ export async function listChangeProcesses(
       const state = m[3]!;
       const cwd = line.match(/\bPWD=([^\s]+)/)?.[1] ?? null;
       // Strip the env tail (KEY=value tokens ps appends) for a clean display.
-      const command = m[4].replace(/\s+[A-Z_][A-Z0-9_]*=[^\s]*/g, "").trim();
+      const command = (m[4] ?? "").replace(/\s+[A-Z_][A-Z0-9_]*=[^\s]*/g, "").trim();
       const { kind, label } = classifyProcess(command);
       const { health, hint } = processHealth(state, ppid);
       out.push({

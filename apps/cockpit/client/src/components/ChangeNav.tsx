@@ -77,6 +77,30 @@ export function ChangeNav({ change, activeView, onSelectView }: Props) {
         </div>
       </div>
 
+      {/* Views first — this is the primary navigation the founder clicks to
+          move around. The stage track below is status/context, not nav;
+          keeping the clickable views at the top removes the mis-click of
+          reaching for the stage icons when meaning to switch views. */}
+      <div className={styles.sectionLabel}>Views</div>
+      {VIEWS.map(({ id, label, Icon }) => (
+        <button
+          key={id}
+          type="button"
+          role="tab"
+          aria-selected={activeView === id}
+          data-testid={`view-${id}`}
+          className={
+            activeView === id
+              ? `${styles.navitem} ${styles.navitemActive}`
+              : styles.navitem
+          }
+          onClick={() => onSelectView(id)}
+        >
+          <Icon className={styles.ic} aria-hidden="true" />
+          {label}
+        </button>
+      ))}
+
       <div className={styles.sectionLabel}>Stage</div>
       <ol className={styles.vtrack} aria-label="Change progress">
         {TRACK_STAGES.map((s, i) => {
@@ -97,26 +121,6 @@ export function ChangeNav({ change, activeView, onSelectView }: Props) {
           );
         })}
       </ol>
-
-      <div className={styles.sectionLabel}>Views</div>
-      {VIEWS.map(({ id, label, Icon }) => (
-        <button
-          key={id}
-          type="button"
-          role="tab"
-          aria-selected={activeView === id}
-          data-testid={`view-${id}`}
-          className={
-            activeView === id
-              ? `${styles.navitem} ${styles.navitemActive}`
-              : styles.navitem
-          }
-          onClick={() => onSelectView(id)}
-        >
-          <Icon className={styles.ic} aria-hidden="true" />
-          {label}
-        </button>
-      ))}
 
       {running && (
         <div className={styles.leftnavFoot}>
