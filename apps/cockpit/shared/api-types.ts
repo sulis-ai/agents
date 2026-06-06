@@ -77,6 +77,100 @@ export interface FileContents {
   language: string | null;
 }
 
+/** One path that differs between the change's base commit and its worktree. */
+export interface ChangedFile {
+  /** relative to the worktree root */
+  path: string;
+  status: "new" | "edited" | "removed";
+  /** added lines (git numstat); null = binary/unknown (numstat "-"). WP-P02 fills these. */
+  added: number | null;
+  /** removed lines (git numstat); null = binary/unknown. */
+  removed: number | null;
+}
+
+/**
+ * The change's changed-files set (base commit → worktree). `baseKnown`
+ * is false for a legacy change with no recorded base sha — the list is
+ * empty and the UI says so rather than implying "nothing changed".
+ */
+export interface ChangedFiles {
+  files: ChangedFile[];
+  baseKnown: boolean;
+}
+
+// ─── Provenance (WP-P01 contract; ADR-010/011) ───────────────────────────────
+//
+// The read projection over the change's brain entities + autonomous runs that
+// powers the Provenance view (`GET /api/changes/:id/provenance`). Edge resolve
+// stays server-side; the focused per-requirement trace is a `?focus=<reqId>`
+// variant on the same endpoint (ADR-011). All shapes are named + reusable; the
+// producer (WP-P05) and consumer (WP-P06) import these verbatim, never redeclare.
+
+/** The dashboard front door — four plain-English digest tiles. */
+export interface ProvenanceDigest {
+  /** completed autonomous runs ("what it did"). */
+  did: number;
+  /** requirements verified-by-test vs total ("what it covered"). */
+  covered: { verified: number; total: number };
+  /** decision entities ("what it decided"). */
+  decided: number;
+  /** the agent's own gaps + self-critique ("what it flagged") — the trust tile. */
+  flagged: { count: number; topGap: string | null; selfCritique: string | null };
+}
+
+/** One step within an autonomous run (from a lifecyclerun's _step_runs). */
+export interface RunStep {
+  step: string;
+  outcome: string;
+  detail: string | null;
+  gap: string | null;
+  selfCritique: string | null;
+}
+
+/** One autonomous run (a lifecyclerun) — lens A, the run log. */
+export interface RunLogEntry {
+  runId: string;
+  workflow: string | null;
+  stepName: string;
+  /** ISO 8601 */
+  at: string;
+  outcome: string;
+  confidence: number | null;
+  finalVerdict: string | null;
+  steps: RunStep[];
+}
+
+/** One column of the Why → What → How → Tested coverage map — lens B. */
+export type CoverageColumn =
+  | { axis: "why"; items: { id: string; title: string }[] }
+  | { axis: "what"; items: { id: string; title: string; verified: boolean }[] }
+  | {
+      axis: "how";
+      items: { id: string; title: string; kind: "design" | "decision" }[];
+    }
+  | {
+      axis: "tested";
+      items: { id: string; title: string; outcome: "pass" | "skip" | "fail" }[];
+    };
+
+/** The single per-requirement focused trace (lens B drill-in; `?focus=<reqId>`). */
+export interface FocusedTrace {
+  requirementId: string;
+  why: { id: string; title: string }[];
+  how: { id: string; title: string; kind: "design" | "decision" }[];
+  tested: { id: string; title: string; outcome: "pass" | "skip" | "fail" }[];
+}
+
+/** The Provenance read projection (`GET /api/changes/:id/provenance`). */
+export interface ProvenanceView {
+  changeId: string;
+  digest: ProvenanceDigest;
+  /** lens A — the autonomous runs, newest first. */
+  runLog: RunLogEntry[];
+  /** lens B — the Why/What/How/Tested columns. */
+  coverage: CoverageColumn[];
+}
+
 export interface FileDiff {
   path: string;
   absolutePath: string;
