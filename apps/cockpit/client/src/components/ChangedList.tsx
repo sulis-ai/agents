@@ -35,6 +35,10 @@ interface TNode {
   children: TNode[];
   /** Number of changed files within this folder (descendants); dirs only. */
   count?: number;
+  /** Added lines: per-file from numstat (null = binary); per-folder = rolled-up sum of descendants (nulls skipped). */
+  added?: number | null;
+  /** Removed lines: per-file from numstat (null = binary); per-folder = rolled-up sum of descendants (nulls skipped). */
+  removed?: number | null;
 }
 
 /** Build a nested dir/file tree from the flat changed-file list. */
@@ -55,7 +59,7 @@ function buildTree(files: ChangedFile[]): TNode[] {
           path: p,
           kind: isLeaf ? "file" : "dir",
           children: [],
-          ...(isLeaf ? { status: f.status } : {}),
+          ...(isLeaf ? { status: f.status, added: f.added, removed: f.removed } : {}),
         };
         cur.children.push(child);
       }
@@ -63,16 +67,38 @@ function buildTree(files: ChangedFile[]): TNode[] {
     });
   }
   sortRec(root);
-  countFiles(root);
+  rollUp(root);
   return root.children;
 }
 
-/** Tag each directory with the number of changed files it contains. */
-function countFiles(node: TNode): number {
-  if (node.kind === "file") return 1;
-  const n = node.children.reduce((sum, c) => sum + countFiles(c), 0);
-  node.count = n;
-  return n;
+/**
+ * Tag each directory with the number of changed files it contains AND the
+ * rolled-up sum of its descendants' added/removed lines (binary files —
+ * null counts — are skipped, never coerced to 0). One bottom-up pass.
+ */
+function rollUp(node: TNode): { files: number; added: number; removed: number } {
+  if (node.kind === "file") {
+    return {
+      files: 1,
+      added: node.added ?? 0,
+      removed: node.removed ?? 0,
+    };
+  }
+  const acc = node.children.reduce(
+    (sum, c) => {
+      const r = rollUp(c);
+      return {
+        files: sum.files + r.files,
+        added: sum.added + r.added,
+        removed: sum.removed + r.removed,
+      };
+    },
+    { files: 0, added: 0, removed: 0 },
+  );
+  node.count = acc.files;
+  node.added = acc.added;
+  node.removed = acc.removed;
+  return acc;
 }
 
 /** Directories first, then files; alphabetical within each group. */
@@ -82,6 +108,45 @@ function sortRec(node: TNode): void {
     return a.name.localeCompare(b.name);
   });
   node.children.forEach(sortRec);
+}
+
+/**
+ * The +N −N line counts for one node. `+N` reads in the positive token,
+ * `−N` in the destructive token — worded/number-led, never colour-alone
+ * (the sign character carries the meaning without colour). Mono numerals.
+ *
+ * A binary file (both counts null) shows a calm "binary" word instead of
+ * numbers. A folder whose descendants are all binary rolls up to 0/0 and
+ * shows +0 −0 (it still changed); we only suppress numbers for the binary
+ * *file* case where there is genuinely nothing to count.
+ */
+function DiffCounts({
+  added,
+  removed,
+  isFile,
+}: {
+  added: number | null | undefined;
+  removed: number | null | undefined;
+  isFile: boolean;
+}) {
+  if (isFile && added == null && removed == null) {
+    return (
+      <span className={styles.tdiff} title="binary file — no line count">
+        <span className={styles.binary}>binary</span>
+      </span>
+    );
+  }
+  const add = added ?? 0;
+  const rm = removed ?? 0;
+  return (
+    <span
+      className={styles.tdiff}
+      aria-label={`${add} added, ${rm} removed`}
+    >
+      <span className={styles.add}>+{add}</span>
+      <span className={styles.del}>−{rm}</span>
+    </span>
+  );
 }
 
 function ChangedTreeNode({
@@ -116,13 +181,16 @@ function ChangedTreeNode({
         <span className={styles.tn} title={node.path}>
           {node.name}
         </span>
-        {node.status && (
-          <span
-            className={`${styles.dot} ${styles[node.status]}`}
-            title={node.status}
-            aria-label={node.status}
-          />
-        )}
+        <span className={styles.statWrap}>
+          <DiffCounts added={node.added} removed={node.removed} isFile />
+          {node.status && (
+            <span
+              className={`${styles.dot} ${styles[node.status]}`}
+              title={node.status}
+              aria-label={node.status}
+            />
+          )}
+        </span>
       </button>
     );
   }
@@ -148,14 +216,16 @@ function ChangedTreeNode({
         <span className={styles.tn} title={node.path}>
           {node.name}
         </span>
-        {node.count !== undefined && (
-          <span
-            className={styles.treecount}
-            title={`${node.count} changed file${node.count === 1 ? "" : "s"}`}
-          >
-            {node.count}
-          </span>
-        )}
+        <span
+          className={styles.folderStats}
+          title={`${node.count} changed file${node.count === 1 ? "" : "s"}`}
+        >
+          <DiffCounts
+            added={node.added}
+            removed={node.removed}
+            isFile={false}
+          />
+        </span>
       </button>
       {expanded && (
         <div className={styles.tchildren} role="group">

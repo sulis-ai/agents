@@ -240,20 +240,48 @@
   height: 7px;
   border-radius: 50%;
   flex: none;
-  margin-left: auto;
 }
-/* per-folder changed-file count pill (Changed tree) */
-.treecount {
+/* +N/−N diff counts on the Changed tree (WP-P03/P04).
+ * Mono numerals; the sign character carries the meaning so this reads
+ * without colour (WCAG 1.4.1). The `--new-mk`/`--rm-mk` shades are the
+ * AA-internal darker variants of --positive/--destructive defined at the
+ * top of this file, dark enough to clear AA as small text. */
+.tdiff {
   flex: none;
-  margin-left: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   font-family: var(--font-mono);
   font-size: 10px;
+  font-weight: 500;
+}
+.tnode.folder .tdiff {
+  font-weight: 600;
+}
+.tdiff .add {
+  color: var(--new-mk);
+}
+.tdiff .del {
+  color: var(--rm-mk);
+}
+.tdiff .binary {
   color: var(--text-muted);
-  background: var(--bg-muted);
-  border: 1px solid var(--border-muted);
-  border-radius: var(--radius-badge);
-  padding: 0 6px;
-  line-height: 1.5;
+  font-style: italic;
+}
+/* file row: groups the +N/−N counts with the status dot, pinned right */
+.statWrap {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+/* folder row: the rolled-up +N/−N counts, pinned right */
+.folderStats {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
 }
 
 .tnode .dot.new { background: var(--positive); }
