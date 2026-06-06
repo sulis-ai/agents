@@ -330,3 +330,88 @@ export async function gitDiffNumstat(
   }
   return entries;
 }
+
+// ─── WP-P09 — last-changing commit for a path (ADR-012) ──────────────────────
+//
+// `git log -1 -- <path>` reads the most-recent commit that touched a path —
+// the input to origin correlation (who authored it, when, and the message). It
+// is read-only (`git log` inspects history; it never mutates the tree or
+// index), so it rides the SAME single git boundary as `git show` / `git diff`.
+// Adding origin-inference here keeps the cockpit's "git lives in exactly one
+// file" invariant intact (the read-only gate proves no git spawn elsewhere).
+
+/** The last-changing commit for a path, as origin correlation consumes it. */
+export interface GitLastCommit {
+  /** Abbreviated commit sha. */
+  sha: string;
+  /** Author identity line: `Name <email>`. */
+  author: string;
+  /** Author timestamp, ISO 8601 (strict). */
+  at: string;
+  /** Full commit message — subject + body + trailers (for the run-id grep). */
+  message: string;
+}
+
+export interface GitLogLastCommitOptions {
+  /** Directory to invoke `git -C <cwd>` in — the worktree root. */
+  cwd: string;
+  /** Path within the repo, relative to its root. */
+  relativePath: string;
+  /** Override the default 5-second timeout (tests use a tiny value). */
+  timeoutMs?: number;
+}
+
+// A record separator git itself never emits inside the fields — lets us split
+// the four `%x1f`-joined fields unambiguously even when the message has tabs /
+// newlines.
+const FIELD_SEP = "\x1f";
+
+/**
+ * Run `git -C <cwd> log -1 --format=<sha|author|date|body> -- <relativePath>`
+ * and parse the most-recent commit that changed `relativePath`.
+ *
+ * Returns `null` when the path has no commit history (a brand-new untracked
+ * file, or a path absent from history) — fail-soft, so the caller maps it to
+ * `unknown` rather than an error (DoD: "a file with no resolvable commit →
+ * unknown"). Throws `TimeoutError` on timeout (the only hard failure).
+ *
+ * The args array is built EXPLICITLY (no string concat / interpolation into a
+ * command line); `git`'s argv parser receives the path as a separate, structured
+ * argument after `--`. `git log` is read-only.
+ */
+export async function gitLogLastCommit(
+  opts: GitLogLastCommitOptions,
+): Promise<GitLastCommit | null> {
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const args: string[] = [
+    "-C",
+    opts.cwd,
+    "log",
+    "-1",
+    `--format=%h${FIELD_SEP}%an <%ae>${FIELD_SEP}%aI${FIELD_SEP}%B`,
+    "--",
+    opts.relativePath,
+  ];
+
+  const { exitCode, stdout, stderr } = await runGit(
+    args,
+    timeoutMs,
+    `git log -1 (path=${opts.relativePath})`,
+  );
+
+  // A non-zero exit OR empty stdout both mean "no commit for this path". `git
+  // log` exits 0 with empty output for an untracked path, and non-zero only for
+  // a genuine error (e.g. not a repo) — either way the file has no resolvable
+  // commit, which is the fail-soft `null` the caller turns into `unknown`. We
+  // deliberately do NOT throw here (unlike git diff) because an unresolvable
+  // path is an expected, normal condition for origin inference.
+  const text = stdout.toString("utf8").trim();
+  if (exitCode !== 0 || text === "") {
+    void stderr; // kept for symmetry; not surfaced — null is the soft signal
+    return null;
+  }
+
+  const [sha = "", author = "", at = "", message = ""] = text.split(FIELD_SEP);
+  if (sha === "") return null;
+  return { sha, author, at, message: message.trim() };
+}

@@ -56,6 +56,7 @@ import { createFileRouter } from "./routes/file";
 import { createDiffRouter } from "./routes/diff";
 import { createChangedRouter } from "./routes/changed";
 import { createProvenanceRouter } from "./routes/provenance";
+import { createOriginRouter } from "./routes/origin";
 import { createTranscriptRouter } from "./routes/transcript";
 import { createTurnSummariesRouter } from "./routes/turnSummaries";
 import { createAdvancedRouter } from "./routes/advanced";
@@ -316,6 +317,21 @@ export function createApp(deps: CreateAppDeps): Application {
     "/api/changes/:id/provenance",
     createProvenanceRouter({
       changeStore: deps.changeStore,
+    }),
+  );
+
+  // WP-P08/P09 — change-origin (inferred). Per-file likely origin (autonomous /
+  // assisted / unknown) with the honest `attribution:"inferred"` flag; `?path=`
+  // for one file. GET-only; the only git is the sanctioned `git log` boundary,
+  // reached THROUGH the InferredOriginAttribution adapter (ADR-012).
+  app.use(
+    "/api/changes/:id/origin",
+    createOriginRouter({
+      changeStore: deps.changeStore,
+      claudeProjectsDir: deps.claudeProjectsDir,
+      ...(deps.gitTimeoutMs !== undefined
+        ? { gitTimeoutMs: deps.gitTimeoutMs }
+        : {}),
     }),
   );
 

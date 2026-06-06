@@ -171,6 +171,76 @@ export interface ProvenanceView {
   coverage: CoverageColumn[];
 }
 
+// ─── WP-P08 — change-origin attribution (ADR-012/013) ────────────────────────
+//
+// The honesty flag. ALWAYS present on every Origin variant (TDD §3.3): the seam
+// never presents an inference as a recorded fact. `"inferred"` means "we worked
+// this out from the timeline"; `"recorded"` means "the commit/sidecar stamped
+// it" (the recorded path arrives with stamping — WP-P12/P13). A recorded origin
+// OVERRIDES an inferred one (ADR-012).
+export type Attribution = "inferred" | "recorded";
+
+/**
+ * Where a file's change came from. A discriminated union on `kind`:
+ *   - `autonomous` — a brain `lifecyclerun` (the agent's own autonomous run).
+ *   - `assisted`   — a chat conversation turn (a human-in-the-loop session).
+ *   - `unknown`    — neither correlated; carries a plain-English `reason`.
+ *     `unknown` is NOT an error — it is the honest "we couldn't tell" answer.
+ *
+ * Every variant carries `attribution` (the honesty flag — ADR-012, TDD §3.3).
+ */
+export type Origin =
+  | {
+      kind: "autonomous";
+      run: { runId: string; workflow: string | null; outcome: string };
+      /** The run's recorded confidence (0..1), or null when absent. */
+      confidence: number | null;
+      attribution: Attribution;
+    }
+  | {
+      kind: "assisted";
+      conversation: {
+        conversationId: string;
+        turn: number;
+        /** The turn's plain-English summary (FE), or null when unavailable. */
+        summary: string | null;
+      };
+      attribution: Attribution;
+    }
+  | {
+      kind: "unknown";
+      /** Plain-English reason we could not attribute (never a guess). */
+      reason: string;
+      attribution: Attribution;
+    };
+
+/** One file's origin within a change (the per-file row of the change list). */
+export interface FileOrigin {
+  /** Path relative to the repo root. */
+  path: string;
+  origin: Origin;
+}
+
+/**
+ * One origin result (`GET /api/changes/:id/origin?path=<relpath>`): the origin
+ * of a single file, or the change-level origin when `path` is null.
+ */
+export interface OriginView {
+  changeId: string;
+  /** null = change-level origin; a relpath = that one file's origin. */
+  path: string | null;
+  origin: Origin;
+}
+
+/**
+ * The whole-change origin list (`GET /api/changes/:id/origin`): one inferred
+ * `FileOrigin` per changed file.
+ */
+export interface ChangeOriginView {
+  changeId: string;
+  files: FileOrigin[];
+}
+
 export interface FileDiff {
   path: string;
   absolutePath: string;
