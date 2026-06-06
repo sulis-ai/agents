@@ -14,7 +14,7 @@
 //   assist.txt  — committed at a transcript turn's timestamp          → assisted
 //   stray.txt   — committed years earlier, no run/turn nearby         → unknown
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import {
   mkdtemp,
   mkdir,
@@ -28,6 +28,8 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { InferredOriginAttribution } from "../adapters/InferredOriginAttribution";
+import * as parseTranscriptsMod from "../lib/parseTranscripts";
+import * as readBrainMod from "../lib/readBrain";
 import { mangleCwd } from "../lib/mangleCwd";
 import {
   runContract,
@@ -226,6 +228,30 @@ describe("InferredOriginAttribution (real world)", () => {
       if (o.kind !== "assisted") throw new Error("expected assisted");
       expect(o.conversation.conversationId).toBe("session-abc");
       expect(o.conversation.summary).toContain("assisted change");
+    });
+  });
+
+  // PERF — the whole-change read attributes every file through ONE adapter
+  // instance; transcripts must be parsed (and the brain walked) at most ONCE per
+  // instance, not once per file. Without this the cost is O(files × transcripts)
+  // and the endpoint times out for a large change (~117 files × ~40 transcripts).
+  describe("indexes transcripts + runs ONCE per instance (not per file)", () => {
+    it("parses transcripts once and walks the brain once across many files", async () => {
+      const parseSpy = vi.spyOn(parseTranscriptsMod, "parseTranscripts");
+      const brainSpy = vi.spyOn(readBrainMod, "readBrain");
+      try {
+        const attribution = makeAttribution();
+        // Attribute every changed file through the SAME instance, as the route's
+        // readOrigin does for the whole change.
+        for (const path of ["auto.txt", "assist.txt", "stray.txt"]) {
+          await attribution.originFor(CHANGE_ID, path);
+        }
+        expect(parseSpy).toHaveBeenCalledTimes(1);
+        expect(brainSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        parseSpy.mockRestore();
+        brainSpy.mockRestore();
+      }
     });
   });
 });

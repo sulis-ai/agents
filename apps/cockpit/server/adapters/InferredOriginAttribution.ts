@@ -115,6 +115,16 @@ function firstSentences(text: string): string | null {
 export class InferredOriginAttribution implements OriginAttribution {
   constructor(private readonly deps: InferredOriginDeps) {}
 
+  // Per-instance correlation index, built ONCE and reused across every file.
+  // The route creates one adapter per request and `readOrigin` maps every
+  // changed file through it, so memoising here turns the whole-change read from
+  // O(files × transcripts) — re-parsing all transcripts + re-walking the brain
+  // per file — into O(transcripts + files): each transcript is parsed at most
+  // once per request, each brain walked at most once. This is the main speed
+  // win; correlation itself is pure and cheap (PERF — change-origin endpoint).
+  private runsPromise: Promise<RunFacts[]> | null = null;
+  private turnsPromise: Promise<TurnFacts[]> | null = null;
+
   async originFor(changeId: string, path?: string): Promise<Origin> {
     // Change-level origin: with no path we have no single commit to read.
     // Honest unknown — the per-file list (readOrigin) is the meaningful view.
@@ -166,8 +176,19 @@ export class InferredOriginAttribution implements OriginAttribution {
     );
   }
 
-  /** The change's autonomous runs (fail-soft: absent brain → []). */
+  /**
+   * The change's autonomous runs (fail-soft: absent brain → []). Memoised per
+   * instance: the brain is walked at most once per request, even though every
+   * changed file is attributed through the same adapter.
+   */
   private async readRuns(changeId: string): Promise<RunFacts[]> {
+    if (this.runsPromise === null) {
+      this.runsPromise = this.loadRuns(changeId);
+    }
+    return this.runsPromise;
+  }
+
+  private async loadRuns(changeId: string): Promise<RunFacts[]> {
     try {
       const brain = await readBrain(this.deps.worktreeRoot, changeId);
       return runsFromBrain(brain.groups.flatMap((g) => g.items));
@@ -176,8 +197,19 @@ export class InferredOriginAttribution implements OriginAttribution {
     }
   }
 
-  /** The change's conversation turns (fail-soft: no transcripts → []). */
+  /**
+   * The change's conversation turns (fail-soft: no transcripts → []). Memoised
+   * per instance: transcripts are located + parsed at most once per request, no
+   * matter how many files are attributed (the O(files × transcripts) fix).
+   */
   private async readTurns(): Promise<TurnFacts[]> {
+    if (this.turnsPromise === null) {
+      this.turnsPromise = this.loadTurns();
+    }
+    return this.turnsPromise;
+  }
+
+  private async loadTurns(): Promise<TurnFacts[]> {
     try {
       const paths = await locateTranscripts(
         this.deps.recordedWorktreePath,
