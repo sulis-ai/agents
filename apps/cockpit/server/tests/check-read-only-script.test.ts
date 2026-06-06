@@ -149,6 +149,154 @@ describe("read-only inventory gate script (TDD §13.7, ADR-003)", () => {
     }
   });
 
+  // ADR-015 (keep-the-gate-with-named-exception) — the four operator-action +
+  // summary-cache exceptions are PATH-SCOPED, not blanket. Each test below
+  // plants the same forbidden shape in (a) the sanctioned file → still passes,
+  // and (b) some OTHER file → still trips the gate.
+
+  it("allows a filesystem write ONLY in the sanctioned summary-cache lib (ADR-015)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "lib"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "lib", "turnSummaries.ts"),
+        'import { writeFile } from "node:fs/promises";\n' +
+          'export const cache = () => writeFile("/tmp/x", "data");\n',
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status, res.stdout + res.stderr).toBe(0);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("still flags a filesystem write in ANY other lib (the exception is path-scoped)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "lib"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "lib", "notTurnSummaries.ts"),
+        'import { writeFile } from "node:fs/promises";\n' +
+          'export const go = () => writeFile("/tmp/x", "data");\n',
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status).toBe(1);
+      expect(res.stdout).toMatch(/VIOLATION \[filesystem write API\]/);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("allows a `claude` spawn ONLY in the sanctioned summary-cache lib (ADR-015)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "lib"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "lib", "turnSummaries.ts"),
+        'import { spawn } from "node:child_process";\n' +
+          'export const go = () => spawn("claude", ["-p"]);\n',
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status, res.stdout + res.stderr).toBe(0);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("allows the two operator POST routes ONLY in the sanctioned advanced route (ADR-015)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "routes"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "routes", "advanced.ts"),
+        "export const reg = (router: any) => {\n" +
+          "  router.post('/api/changes/:id/reveal', () => {});\n" +
+          "  router.post('/api/changes/:id/processes/:pid/stop', () => {});\n" +
+          "};\n",
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status, res.stdout + res.stderr).toBe(0);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("still flags a POST route in ANY other route file (the exception is path-scoped)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "routes"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "routes", "notAdvanced.ts"),
+        "export const reg = (router: any) => router.post('/x', () => {});\n",
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status).toBe(1);
+      expect(res.stdout).toMatch(/VIOLATION \[HTTP mutation verb\]/);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("allows a non-zero process signal ONLY in the sanctioned stop-process lib (ADR-015)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "lib"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "lib", "changeAdvanced.ts"),
+        'export const stop = (pid: number) => process.kill(pid, "SIGTERM");\n',
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status, res.stdout + res.stderr).toBe(0);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("still flags a non-zero process signal in ANY other lib (the exception is path-scoped)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "lib"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "lib", "notChangeAdvanced.ts"),
+        'export const kill = (pid: number) => process.kill(pid, "SIGKILL");\n',
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status).toBe(1);
+      expect(res.stdout).toMatch(/VIOLATION \[non-zero process signal\]/);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("--explain documents the four ADR-015 named exceptions", () => {
+    const res = spawnSync("bash", [script, "--explain"], { encoding: "utf8" });
+    expect(res.status).toBe(0);
+    expect(res.stdout).toMatch(/server\/routes\/advanced\.ts \(ADR-015/);
+    expect(res.stdout).toMatch(/server\/lib\/changeAdvanced\.ts \(ADR-015/);
+    expect(res.stdout).toMatch(/server\/lib\/turnSummaries\.ts \(ADR-015/);
+  });
+
   it("ignores forbidden tokens that appear only inside comments", async () => {
     const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
     try {

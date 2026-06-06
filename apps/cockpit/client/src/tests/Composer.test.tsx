@@ -13,21 +13,16 @@
 // We inject a fake `streamChat` so the component is tested without a network.
 
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "jest-axe";
 
 import { Composer } from "../components/Composer";
 import type { ChatStreamEvent } from "../../../shared/api-types";
+import { renderWithClient } from "./_renderWithClient";
 
-// useChatStream now invalidates the transcript/summaries queries on complete,
-// so the Composer needs a QueryClient in the tree.
-function renderComposer(ui: React.ReactElement) {
-  const qc = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
-}
+// useChatStream invalidates the transcript/summaries queries on complete, so
+// the Composer needs a QueryClient in the tree — provided by the shared helper.
+const renderComposer = renderWithClient;
 
 function fakeStream(events: ChatStreamEvent[], opts: { hang?: boolean } = {}) {
   return vi.fn(

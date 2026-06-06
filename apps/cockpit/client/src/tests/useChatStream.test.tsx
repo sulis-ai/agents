@@ -13,6 +13,13 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 
 import { useChatStream } from "../api/useChatStream";
 import type { ChatStreamEvent } from "../../../shared/api-types";
+import { withQueryClient } from "./_renderWithClient";
+
+// useChatStream calls useQueryClient (it invalidates the transcript/summaries
+// queries on a reply), so every renderHook needs a QueryClient in the tree.
+// The shared helper provides one fresh per render (EP-03 — no per-test wrapper).
+const wrapper = ({ children }: { children: React.ReactNode }) =>
+  withQueryClient(children);
 
 /** Build a fake streamChat that replays `events` then resolves. */
 function fakeStream(events: ChatStreamEvent[]) {
@@ -29,8 +36,9 @@ function fakeStream(events: ChatStreamEvent[]) {
 
 describe("useChatStream (ADR-001)", () => {
   it("starts in the 'ready' state with no reply", () => {
-    const { result } = renderHook(() =>
-      useChatStream("01CHAT", { streamChat: fakeStream([]) }),
+    const { result } = renderHook(
+      () => useChatStream("01CHAT", { streamChat: fakeStream([]) }),
+      { wrapper },
     );
     expect(result.current.state).toBe("ready");
     expect(result.current.replyText).toBe("");
@@ -44,8 +52,9 @@ describe("useChatStream (ADR-001)", () => {
       { type: "chunk", text: "world" },
       { type: "complete", resumed: false },
     ]);
-    const { result } = renderHook(() =>
-      useChatStream("01CHAT", { streamChat: stream }),
+    const { result } = renderHook(
+      () => useChatStream("01CHAT", { streamChat: stream }),
+      { wrapper },
     );
     await act(async () => {
       await result.current.send("hi");
@@ -61,8 +70,9 @@ describe("useChatStream (ADR-001)", () => {
       { type: "chunk", text: "back" },
       { type: "complete", resumed: true },
     ]);
-    const { result } = renderHook(() =>
-      useChatStream("01CHAT", { streamChat: stream }),
+    const { result } = renderHook(
+      () => useChatStream("01CHAT", { streamChat: stream }),
+      { wrapper },
     );
     await act(async () => {
       await result.current.send("continue");
@@ -78,8 +88,9 @@ describe("useChatStream (ADR-001)", () => {
         message: "couldn't reach the session",
       },
     ]);
-    const { result } = renderHook(() =>
-      useChatStream("01CHAT", { streamChat: stream }),
+    const { result } = renderHook(
+      () => useChatStream("01CHAT", { streamChat: stream }),
+      { wrapper },
     );
     await act(async () => {
       await result.current.send("hi");
@@ -96,8 +107,9 @@ describe("useChatStream (ADR-001)", () => {
       { type: "chunk", text: "half a th" },
       { type: "state", state: "interrupted" },
     ]);
-    const { result } = renderHook(() =>
-      useChatStream("01CHAT", { streamChat: stream }),
+    const { result } = renderHook(
+      () => useChatStream("01CHAT", { streamChat: stream }),
+      { wrapper },
     );
     await act(async () => {
       await result.current.send("hi");
@@ -110,8 +122,9 @@ describe("useChatStream (ADR-001)", () => {
     const stream = vi.fn(async () => {
       throw new Error("network down");
     });
-    const { result } = renderHook(() =>
-      useChatStream("01CHAT", { streamChat: stream }),
+    const { result } = renderHook(
+      () => useChatStream("01CHAT", { streamChat: stream }),
+      { wrapper },
     );
     await act(async () => {
       await result.current.send("hi");

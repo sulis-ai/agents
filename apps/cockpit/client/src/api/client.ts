@@ -92,6 +92,31 @@ export async function apiGet<T>(
   return (await res.json()) as T;
 }
 
+/**
+ * POST helper for the operator-action routes (reveal-in-finder + stop-process,
+ * ADR-015). It lives HERE so it stays inside the client `fetch` funnel — the
+ * inventory gate allow-lists exactly api/client.ts as a fetch caller. Returns
+ * the parsed JSON body on 2xx; throws ApiError on non-2xx (the same error
+ * contract as apiGet). `body` is optional (the stop route takes no body).
+ */
+export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const { code, message } = await readErrorBody(res);
+    throw new ApiError(res.status, code, message);
+  }
+  // The reveal route returns no body; tolerate an empty/!json response.
+  try {
+    return (await res.json()) as T;
+  } catch {
+    return undefined as T;
+  }
+}
+
 // ─── WP-005 — the chat relay funnel (the ONE write path; ADR-001/003) ────────
 //
 // `streamChat` POSTs the founder's prompt to the relay and reads the SSE reply

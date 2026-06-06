@@ -5,7 +5,7 @@
 // these OS-side calls are fine; stop is guarded server-side).
 
 import { useQuery } from "@tanstack/react-query";
-import { apiGet } from "./client";
+import { ApiError, apiGet, apiPost } from "./client";
 
 export type ProcessHealth = "running" | "orphaned" | "defunct";
 
@@ -37,11 +37,12 @@ export function useAdvanced(changeId: string) {
 
 /** Reveal a folder in the OS file manager (default: the change's worktree). */
 export async function revealPath(changeId: string, path?: string): Promise<void> {
-  await fetch(`/api/changes/${changeId}/reveal`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(path ? { path } : {}),
-  });
+  // Through the single client fetch funnel (apiPost) so the inventory gate's
+  // "only api/client.ts calls fetch" guarantee holds.
+  await apiPost<void>(
+    `/api/changes/${changeId}/reveal`,
+    path ? { path } : {},
+  );
 }
 
 /** Stop a linked process by pid (guarded server-side). */
@@ -49,12 +50,16 @@ export async function stopLinkedProcess(
   changeId: string,
   pid: number,
 ): Promise<{ ok: boolean; error?: string }> {
-  const res = await fetch(`/api/changes/${changeId}/processes/${pid}/stop`, {
-    method: "POST",
-  });
   try {
-    return (await res.json()) as { ok: boolean; error?: string };
-  } catch {
-    return { ok: res.ok };
+    return await apiPost<{ ok: boolean; error?: string }>(
+      `/api/changes/${changeId}/processes/${pid}/stop`,
+    );
+  } catch (err) {
+    // The funnel throws ApiError on non-2xx; surface it as the {ok,error}
+    // shape the caller already handles (parity with the previous behaviour).
+    if (err instanceof ApiError) {
+      return { ok: false, error: err.message };
+    }
+    return { ok: false };
   }
 }
