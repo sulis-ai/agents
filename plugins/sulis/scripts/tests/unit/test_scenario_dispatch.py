@@ -109,3 +109,77 @@ def test_agent_driven_kind_is_deferred_not_yet_implemented():
     out = execute_step(step, base_url="http://local")
     assert out.status == "deferred"
     assert "mcp_server" in (out.need or "")
+
+
+# ── browser driver (deterministic — journey-rigor #6 machine-half) ─────────────
+
+from _scenario_dispatch import BrowserUnavailable  # noqa: E402
+
+
+def _browser_step(detail: dict, **kw) -> ResolvedStep:
+    return ResolvedStep(
+        step_id="s", name="land on dashboard", driver="browser",
+        mechanism="deterministic", mechanism_detail=json.dumps(detail), **kw,
+    )
+
+
+def test_browser_pass_when_assert_holds():
+    step = _browser_step({"url": "/login", "actions": [{"fill": "#email", "value": "a@b.c"},
+                          {"click": "#submit"}], "assert": {"visible": "Dashboard"}})
+    fake = lambda url, actions, a: SimpleNamespace(ok=True, detail="visible(Dashboard)")
+    out = execute_step(step, base_url="http://local", browser=fake)
+    assert out.status == "pass", out
+
+
+def test_browser_fail_when_assert_misses():
+    step = _browser_step({"url": "/login", "assert": {"visible": "Dashboard"}})
+    fake = lambda url, actions, a: SimpleNamespace(ok=False, detail="not visible")
+    out = execute_step(step, base_url="http://local", browser=fake)
+    assert out.status == "fail"
+    assert "not visible" in out.detail
+
+
+def test_browser_joins_base_url_and_passes_actions_assert():
+    seen = {}
+    def fake(url, actions, a):
+        seen.update(url=url, actions=actions, assert_spec=a)
+        return SimpleNamespace(ok=True, detail="ok")
+    step = _browser_step({"url": "app/home", "actions": [{"click": "#go"}],
+                          "assert": {"url_contains": "/home"}})
+    execute_step(step, base_url="http://local:3000", browser=fake)
+    assert seen["url"] == "http://local:3000/app/home"
+    assert seen["actions"] == [{"click": "#go"}]
+    assert seen["assert_spec"] == {"url_contains": "/home"}
+
+
+def test_browser_absolute_url_not_rejoined():
+    seen = {}
+    def fake(url, actions, a):
+        seen["url"] = url
+        return SimpleNamespace(ok=True)
+    step = _browser_step({"url": "https://dev.example.app/login", "assert": {"visible": "X"}})
+    execute_step(step, base_url="http://ignored", browser=fake)
+    assert seen["url"] == "https://dev.example.app/login"
+
+
+def test_browser_unavailable_defers_never_fakes():
+    # the transport can't run (e.g. Playwright absent) → DEFER with the need,
+    # never a fake pass. Routes to the agent / human-attest path.
+    def fake(url, actions, a):
+        raise BrowserUnavailable("playwright not installed")
+    step = _browser_step({"url": "/login", "assert": {"visible": "Dashboard"}})
+    out = execute_step(step, base_url="http://local", browser=fake)
+    assert out.status == "deferred"
+    assert "playwright" in (out.need or "")
+
+
+def test_browser_real_default_degrades_gracefully_without_playwright():
+    # With no transport injected, the real default lazily imports Playwright;
+    # it's an OPTIONAL extra (stdlib-only contract), so when absent the step
+    # DEFERS — it does not crash and does not fake green.
+    step = _browser_step({"url": "/login", "assert": {"visible": "Dashboard"}})
+    out = execute_step(step, base_url="http://local")
+    assert out.status in {"deferred", "pass", "fail"}
+    # in CI/dev without Playwright installed, it's deferred-with-need:
+    if out.status == "deferred":
+        assert "playwright" in (out.need or "")

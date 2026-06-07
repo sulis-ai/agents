@@ -28,6 +28,7 @@ IMPLEMENTATION_KINDS: frozenset[str] = frozenset(
         "subprocess",
         "python_import",
         "http_call",
+        "browser",
         "claude_code_tool",
         "skill_invocation",
         "workflow_dispatch",

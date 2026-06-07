@@ -1,28 +1,35 @@
 """Step dispatcher — execute ONE resolved Scenario step against a target.
 
-v1 implements two concrete drivers — `http_call` (stdlib urllib) and `subprocess`
-(shell) — and reports every other (agent-driven) kind as `deferred`
-(not-yet-implemented). A step whose `input_artifacts` (needs / credentials)
-are not in the available set defers with the missing need named — never a
-silent pass. `mechanism: human` steps surface as `manual` checklist items.
+Concrete drivers: `http_call` (stdlib urllib), `subprocess` (shell), and
+`browser` (a real browser, deterministic — the machine half of journey-rigor
+#6). Every other (agent-driven) kind reports `deferred` (not-yet-implemented). A
+step whose `input_artifacts` (needs / credentials) are not in the available set
+defers with the missing need named — never a silent pass. `mechanism: human`
+steps surface as `manual` checklist items.
 
-UI / browser flows. A browser journey (a login, a checkout) is authored as a
-`mechanism: human` step today, so it surfaces as `manual` → the scenario verdict
-is `manual-pending` → journey-rigor #1 BLOCKS it (never a silent green). The
-human then drives the real flow and records the observation via
-`sulis-attest-scenario` (journey-rigor #6), which deposits a real
-`harness="human-attested"` TestResult the coverage gate reads. The *automated*
-browser driver (Playwright / CDP — the machine half of "drives the real flow")
-is the NAMED FOLLOW-ON, not silently dropped: until it lands, a browser step is
-a deferred/manual handoff to the human attester, never a faked automated pass.
+UI / browser flows — two ways to drive them, picked per step by `mechanism`
+(the same deterministic-vs-agent fork the system uses everywhere):
+  - **deterministic** → the `browser` driver here (Playwright/CDP): scripted
+    actions + an observable assert, reproducible — a real regression gate.
+  - **probabilistic / human** → the agent-driven browser (a browser MCP) or the
+    human-attest path (`sulis-attest-scenario`, journey-rigor #6), for the messy
+    interactive bits (e.g. an interactive sign-in). The agent-driven driver is
+    the NEXT slice; this one is the deterministic half.
+A browser step a machine can't yet complete (e.g. it needs a real session)
+DEFERS with the need named — never a faked green.
 
-Transports (`http`, `run`) are injected for unit-purity; the runner (WP-004)
-wires the real httpx + subprocess. The driver-specific params live in the
-step's `mechanism_detail` as a JSON blob:
+Transports (`http`, `run`, `browser`) are injected for unit-purity; the real
+ones are lazy defaults. **The marketplace is stdlib-only by contract**, so the
+browser transport's Playwright import is OPTIONAL + lazy: present → deterministic
+browser proving; absent → the step DEFERS (need: playwright) to the agent /
+human-attest path, never a fake. The driver-specific params live in the step's
+`mechanism_detail` as a JSON blob:
   http_call → {"method","path","expect_status"}
   subprocess → {"cmd","expect_exit"}
+  browser   → {"url","actions":[{"fill":sel,"value":v}|{"click":sel}|
+               {"wait_for":sel}],"assert":{"visible":text}|{"url_contains":s}}
 
-Stdlib only. Python 3.11-safe.
+Stdlib only at import time. Python 3.11-safe.
 """
 
 from __future__ import annotations
@@ -33,8 +40,15 @@ from types import SimpleNamespace
 
 from _scenario_runtime import HUMAN_DRIVER, UNRESOLVED_DRIVER, ResolvedStep
 
-# Drivers WP-002 actually runs. Everything else automatable is deferred.
-_IMPLEMENTED = {"http_call", "subprocess"}
+# Drivers actually run here. Everything else automatable is deferred.
+_IMPLEMENTED = {"http_call", "subprocess", "browser"}
+
+
+class BrowserUnavailable(RuntimeError):
+    """The deterministic browser transport (Playwright) isn't installed. The step
+    DEFERS with the need named — it never fakes a pass. Playwright is an optional
+    extra (stdlib-only contract); absent, browser proving falls to the agent /
+    human-attest path."""
 
 
 @dataclass
@@ -67,6 +81,46 @@ def _default_run(cmd: str):
     return subprocess.run(cmd, shell=True, capture_output=True, text=True)
 
 
+def _default_browser(url: str, actions: list, assert_spec: dict):
+    """Drive a real browser deterministically via Playwright (lazy, optional).
+
+    Returns ``SimpleNamespace(ok: bool, detail: str)``. Raises
+    ``BrowserUnavailable`` if Playwright isn't installed — so the dispatcher
+    defers rather than crashing or faking. This function is the real-browser
+    integration point; the dispatcher branch below is transport-agnostic and is
+    what the unit tests exercise (via an injected fake).
+    """
+    try:
+        from playwright.sync_api import sync_playwright  # lazy, optional extra
+    except ImportError as exc:  # stdlib-only contract — Playwright is opt-in
+        raise BrowserUnavailable("playwright not installed") from exc
+
+    with sync_playwright() as p:
+        chrome = p.chromium.launch()
+        try:
+            page = chrome.new_page()
+            page.goto(url)
+            for a in actions:
+                if "fill" in a:
+                    page.fill(a["fill"], a.get("value", ""))
+                elif "click" in a:
+                    page.click(a["click"])
+                elif "wait_for" in a:
+                    page.wait_for_selector(a["wait_for"])
+            if "visible" in assert_spec:
+                text = assert_spec["visible"]
+                ok = page.get_by_text(text).count() > 0
+                return SimpleNamespace(ok=ok, detail=f"visible({text!r})={ok}")
+            if "url_contains" in assert_spec:
+                frag = assert_spec["url_contains"]
+                ok = frag in page.url
+                return SimpleNamespace(ok=ok, detail=f"url={page.url} contains({frag!r})={ok}")
+            # no assert declared → reaching here without error is the pass
+            return SimpleNamespace(ok=True, detail="reached end of journey, no assert")
+        finally:
+            chrome.close()
+
+
 def execute_step(
     step: ResolvedStep,
     *,
@@ -74,6 +128,7 @@ def execute_step(
     available_artifacts=frozenset(),
     http=None,
     run=None,
+    browser=None,
 ) -> StepOutcome:
     """Execute one resolved step; return a StepOutcome."""
     if step.driver == HUMAN_DRIVER:
@@ -91,7 +146,7 @@ def execute_step(
 
     if step.driver not in _IMPLEMENTED:
         # Agent-driven + python_import + workflow_dispatch: real kinds, not yet
-        # wired in v1. Deferred-with-need, never silent.
+        # wired. Deferred-with-need, never silent.
         return StepOutcome(status="deferred", need=f"driver:{step.driver}",
                            detail=f"driver '{step.driver}' not yet implemented")
 
@@ -116,6 +171,28 @@ def execute_step(
             return StepOutcome(status="pass", detail=f"{method} {url} → {got}")
         return StepOutcome(status="fail",
                            detail=f"{method} {url} → {got} (expected {expect})")
+
+    if step.driver == "browser":
+        browser = browser or _default_browser
+        url = str(params.get("url", ""))
+        if url and not url.startswith(("http://", "https://")):
+            url = base_url.rstrip("/") + "/" + url.lstrip("/")
+        actions = params.get("actions", []) or []
+        assert_spec = params.get("assert", {}) or {}
+        try:
+            result = browser(url, actions, assert_spec)
+        except BrowserUnavailable as exc:
+            # never a fake pass — defer with the need so it routes to the agent /
+            # human-attest path.
+            return StepOutcome(status="deferred", need="playwright",
+                               detail=f"browser driver unavailable: {exc}")
+        except Exception as exc:  # a real drive/assert failure
+            return StepOutcome(status="fail", detail=f"browser {url} raised {exc!r}")
+        if getattr(result, "ok", False):
+            return StepOutcome(status="pass",
+                               detail=getattr(result, "detail", "") or f"browser {url} ok")
+        return StepOutcome(status="fail",
+                           detail=getattr(result, "detail", "") or f"browser {url} assert failed")
 
     # subprocess
     run = run or _default_run
