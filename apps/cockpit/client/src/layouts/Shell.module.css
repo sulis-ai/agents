@@ -4,13 +4,38 @@
   display: flex;
   height: 100vh;
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial,
-    sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   color: var(--foreground);
 }
 
-/* The outlet region fills the shell height and is a flex column so each
- * page owns its own scroll region. Padding moves into the pages so a
+/* WP-004 — the right pane: a flex column holding the top bar above the outlet.
+ * It takes the role the outlet had in the shell row (fills the remaining
+ * width), so the existing full-height behaviour is preserved by construction. */
+.pane {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* WP-004 — minimal top-bar region: colours-only, no layout redesign elsewhere.
+ * Hosts the ThemeToggle pushed to the right (top-right per the visual
+ * contract). Token-only (no raw colours). */
+.topbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
+}
+
+/* The outlet region fills the remaining pane height and is a flex column so
+ * each page owns its own scroll region. Padding moves into the pages so a
  * full-height region (the Monaco file viewer) can reach the edges. */
 .main {
   flex: 1 1 auto;
