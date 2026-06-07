@@ -183,7 +183,8 @@ apps/cockpit/
 │   │   ├── main.tsx        # React mount point
 │   │   ├── App.tsx         # placeholder root
 │   │   ├── pages/          # dashboard, thread view (WP-012/013)
-│   │   ├── components/     # shells, panels (WP-011/013/014)
+│   │   ├── components/     # shells, panels; LiveTerminal — the xterm.js Terminal tab (WP-011/013/014, WP-008)
+│   │   ├── terminal/       # client TerminalBridge factory — reuses the WP-007 port (WP-008)
 │   │   ├── api/            # TanStack Query hooks (WP-011)
 │   │   └── tests/
 ├── shared/                 # types + constants both halves import
