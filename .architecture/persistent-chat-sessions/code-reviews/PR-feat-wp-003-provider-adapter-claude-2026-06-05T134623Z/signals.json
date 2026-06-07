@@ -1,0 +1,26 @@
+{
+  "target": "feat/wp-003-provider-adapter-claude",
+  "base": "13ff02a",
+  "timestamp": "2026-06-05T134623Z",
+  "verdict": "PASS",
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "typecheck": "mypy clean (4 source files)",
+    "lint": "ruff check clean",
+    "tests": "14 passed (test_claude_adapter.py); 51 passed (session suite)"
+  },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "none" },
+    "size": { "lines_added": 626, "files_changed": 8, "severity": "low" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "secret_pattern_hits": 0, "infra_files": 0, "severity": "none" },
+    "completeness": { "new_source_without_test": 0, "api_change_without_schema": false, "severity": "none" }
+  },
+  "lenses": {
+    "architecture": { "in_changes": 0, "in_neighbours": 0, "note": "dependency-inward verified; runtime_checkable Protocol seam; no infra->domain imports, no singletons, no circular paths" },
+    "security": { "in_changes": 0, "in_neighbours": 0, "primitives_checked": ["SEC-01","SEC-04","SEC-05","DAT-03","SC-01"], "note": "no secrets; untrusted CLI stdout parsed with explicit .get + typed InternalError on bad JSON; --dangerously-skip-permissions in argv is documented contract per §2.4" },
+    "quality": { "in_changes": 0, "in_neighbours": 0, "cr10_matches": 0, "test_coverage": "100% on both new files; 14 tests driven by recorded real claude fixtures", "note": "no dead surface; no contract drift; is_error discriminator correctly mapped to category=expected matching fixtures" }
+  },
+  "findings": [],
+  "hardening_deltas": [],
+  "dispatch": "single-reader full-file read of all 8 files (each source file read end-to-end; per-WP Step 6.5 gate over self-contained adapter)"
+}
