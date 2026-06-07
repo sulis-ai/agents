@@ -13,26 +13,36 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ChangedFiles } from "../../../shared/api-types";
 import { ChangedList } from "../components/ChangedList";
 
+function freshClient() {
+  return new QueryClient({
+    defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+  });
+}
+
 function renderList(changed: ChangedFiles) {
   return render(
-    <MemoryRouter initialEntries={["/c/abc"]}>
-      <Routes>
-        <Route
-          path="/c/:changeId"
-          element={
-            <ChangedList
-              changed={changed}
-              isLoading={false}
-              isError={false}
-              filter=""
-            />
-          }
-        />
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={freshClient()}>
+      <MemoryRouter initialEntries={["/c/abc"]}>
+        <Routes>
+          <Route
+            path="/c/:changeId"
+            element={
+              <ChangedList
+                changeId="abc"
+                changed={changed}
+                isLoading={false}
+                isError={false}
+                filter=""
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -96,25 +106,31 @@ describe("ChangedList — diff counts", () => {
 
   it("does not render diff counts in the loading/error/no-baseline states", () => {
     const { rerender } = render(
-      <MemoryRouter>
-        <ChangedList
-          changed={undefined}
-          isLoading={true}
-          isError={false}
-          filter=""
-        />
-      </MemoryRouter>,
+      <QueryClientProvider client={freshClient()}>
+        <MemoryRouter>
+          <ChangedList
+            changeId="abc"
+            changed={undefined}
+            isLoading={true}
+            isError={false}
+            filter=""
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
     expect(screen.queryByText(/^\+/)).not.toBeInTheDocument();
     rerender(
-      <MemoryRouter>
-        <ChangedList
-          changed={{ files: [], baseKnown: false }}
-          isLoading={false}
-          isError={false}
-          filter=""
-        />
-      </MemoryRouter>,
+      <QueryClientProvider client={freshClient()}>
+        <MemoryRouter>
+          <ChangedList
+            changeId="abc"
+            changed={{ files: [], baseKnown: false }}
+            isLoading={false}
+            isError={false}
+            filter=""
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
     expect(screen.getByText(/No baseline recorded/)).toBeInTheDocument();
   });

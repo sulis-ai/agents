@@ -8,17 +8,13 @@
 // `fetch` in a component (WPF-02).
 
 import { useQuery } from "@tanstack/react-query";
-import type {
-  FocusedTrace,
-  ProvenanceView,
-} from "../../../shared/api-types";
+import type { FocusedTrace } from "../../../shared/api-types";
 import { apiGet } from "./client";
+import { provenanceQuery } from "./fileQueries";
 
 export function useProvenance(changeId: string) {
   return useQuery({
-    queryKey: ["provenance", changeId],
-    queryFn: () =>
-      apiGet<ProvenanceView>(`/api/changes/${changeId}/provenance`),
+    ...provenanceQuery(changeId),
     enabled: changeId.length > 0,
   });
 }

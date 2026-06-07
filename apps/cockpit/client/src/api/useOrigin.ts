@@ -9,25 +9,18 @@
 // "recorded" once stamping lands — the badge flips with no UI change, ADR-012).
 
 import { useQuery } from "@tanstack/react-query";
-import type { ChangeOriginView, OriginView } from "../../../shared/api-types";
-import { apiGet } from "./client";
+import { fileOriginQuery, originQuery } from "./fileQueries";
 
 export function useOrigin(changeId: string) {
   return useQuery({
-    queryKey: ["origin", changeId],
-    queryFn: () =>
-      apiGet<ChangeOriginView>(`/api/changes/${changeId}/origin`),
+    ...originQuery(changeId),
     enabled: changeId.length > 0,
   });
 }
 
 export function useFileOrigin(changeId: string, path: string) {
   return useQuery({
-    queryKey: ["origin", changeId, "path", path],
-    queryFn: () =>
-      apiGet<OriginView>(
-        `/api/changes/${changeId}/origin?path=${encodeURIComponent(path)}`,
-      ),
+    ...fileOriginQuery(changeId, path),
     enabled: changeId.length > 0 && path.length > 0,
   });
 }

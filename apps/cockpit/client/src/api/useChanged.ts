@@ -6,13 +6,11 @@
 // new/edited/removed status badges. Read-only; cached per change.
 
 import { useQuery } from "@tanstack/react-query";
-import type { ChangedFiles } from "../../../shared/api-types";
-import { apiGet } from "./client";
+import { changedQuery } from "./fileQueries";
 
 export function useChanged(changeId: string) {
   return useQuery({
-    queryKey: ["changed", changeId],
-    queryFn: () => apiGet<ChangedFiles>(`/api/changes/${changeId}/changed`),
+    ...changedQuery(changeId),
     enabled: changeId.length > 0,
   });
 }

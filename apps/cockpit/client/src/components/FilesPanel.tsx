@@ -16,7 +16,7 @@
 //
 // References: the signed files-B-repo-browser visual contract.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   FolderIcon,
@@ -46,6 +46,16 @@ export function FilesPanel({ changeId, onSelectView }: Props) {
   const [params, setParams] = useSearchParams();
   const selectedFile = params.get("file") ?? "";
   const selectedDir = params.get("dir") ?? "";
+
+  // Warm the heavy Monaco editor bundle as soon as the Files view mounts, so
+  // it downloads during idle BEFORE the founder opens their first file — the
+  // first open then renders with no chunk-download wait. The chunks are
+  // code-split via React.lazy in MonacoFile/MonacoDiff; importing the inner
+  // modules here kicks the same fetch early. Fire-and-forget, once per mount.
+  useEffect(() => {
+    void import("./MonacoFileInner");
+    void import("./MonacoDiffInner");
+  }, []);
 
   const [scope, setScope] = useState<Scope>("all");
   const [filterRaw, setFilterRaw] = useState("");
@@ -133,6 +143,7 @@ export function FilesPanel({ changeId, onSelectView }: Props) {
             <FileTree changeId={changeId} filter={filter} changed={changedMap} />
           ) : (
             <ChangedList
+              changeId={changeId}
               changed={changedQuery.data}
               isLoading={changedQuery.isLoading}
               isError={changedQuery.isError}

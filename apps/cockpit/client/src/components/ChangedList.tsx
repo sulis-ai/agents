@@ -15,12 +15,15 @@
 
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronRightIcon, ChevronDownIcon } from "@heroicons/react/20/solid";
 import type { ChangedFile, ChangedFiles } from "../../../shared/api-types";
+import { fileOriginQuery, fileQuery } from "../api/fileQueries";
 import { NodeIcon } from "./fileIcons";
 import styles from "../styles/FilesPanel.module.css";
 
 interface Props {
+  changeId: string;
   changed: ChangedFiles | undefined;
   isLoading: boolean;
   isError: boolean;
@@ -155,24 +158,31 @@ function ChangedTreeNode({
   defaultExpanded,
   selectedPath,
   onSelectFile,
+  onPrefetchFile,
 }: {
   node: TNode;
   depth: number;
   defaultExpanded: boolean;
   selectedPath: string;
   onSelectFile: (path: string) => void;
+  onPrefetchFile: (path: string) => void;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const indent = { paddingLeft: `${depth * 12 + 8}px` };
 
   if (node.kind === "file") {
     const isSelected = selectedPath === node.path;
+    const prefetch = () => {
+      if (!isSelected) onPrefetchFile(node.path);
+    };
     return (
       <button
         type="button"
         className={`${styles.tnode} ${isSelected ? styles.sel : ""}`}
         style={indent}
         onClick={() => onSelectFile(node.path)}
+        onMouseEnter={prefetch}
+        onFocus={prefetch}
         data-testid={`changed-row-${node.path}`}
         data-active={isSelected ? "true" : "false"}
       >
@@ -237,6 +247,7 @@ function ChangedTreeNode({
               defaultExpanded={defaultExpanded}
               selectedPath={selectedPath}
               onSelectFile={onSelectFile}
+              onPrefetchFile={onPrefetchFile}
             />
           ))}
         </div>
@@ -245,10 +256,25 @@ function ChangedTreeNode({
   );
 }
 
-export function ChangedList({ changed, isLoading, isError, filter }: Props) {
+export function ChangedList({
+  changeId,
+  changed,
+  isLoading,
+  isError,
+  filter,
+}: Props) {
   const [params, setParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const selectedPath = params.get("file") ?? "";
   const filtering = filter !== "";
+
+  // Warm a changed file's contents + its "how this file came to be" panel on
+  // hover/focus, so the click lands on a cache hit (parity with the All-files
+  // tree). Idempotent + staleTime-gated, so repeated hovers don't refire.
+  function prefetchFile(path: string) {
+    void queryClient.prefetchQuery(fileQuery(changeId, path));
+    void queryClient.prefetchQuery(fileOriginQuery(changeId, path));
+  }
 
   const tree = useMemo(() => {
     const files = (changed?.files ?? []).filter(
@@ -299,6 +325,7 @@ export function ChangedList({ changed, isLoading, isError, filter }: Props) {
           defaultExpanded={filtering}
           selectedPath={selectedPath}
           onSelectFile={selectFile}
+          onPrefetchFile={prefetchFile}
         />
       ))}
     </nav>

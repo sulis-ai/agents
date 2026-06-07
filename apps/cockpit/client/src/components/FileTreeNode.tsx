@@ -16,9 +16,11 @@
 // visual contract.
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronRightIcon, ChevronDownIcon } from "@heroicons/react/20/solid";
 import type { TreeNode, ChangedFile } from "../../../shared/api-types";
 import { useTree } from "../api/useTree";
+import { fileOriginQuery, fileQuery, treeQuery } from "../api/fileQueries";
 import { NodeIcon } from "./fileIcons";
 import styles from "../styles/FilesPanel.module.css";
 
@@ -53,6 +55,7 @@ export function FileTreeNode({
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const isDirectory = node.kind === "directory";
+  const queryClient = useQueryClient();
 
   const childrenActive = expanded && isDirectory;
   const childrenQuery = useTree(changeId, isDirectory ? node.path : "", {
@@ -64,12 +67,22 @@ export function FileTreeNode({
   if (!isDirectory) {
     const isSelected = selectedPath === node.path;
     const status = changed.get(node.path);
+    // Warm the file's contents + its "how this file came to be" panel on
+    // hover/focus, so the click lands on a cache hit. Skip the already-open
+    // file; prefetch is idempotent + staleTime-gated, so repeats are free.
+    const prefetchFile = () => {
+      if (isSelected) return;
+      void queryClient.prefetchQuery(fileQuery(changeId, node.path));
+      void queryClient.prefetchQuery(fileOriginQuery(changeId, node.path));
+    };
     return (
       <button
         type="button"
         className={`${styles.tnode} ${isSelected ? styles.sel : ""}`}
         style={indent}
         onClick={() => onSelectFile(node.path)}
+        onMouseEnter={prefetchFile}
+        onFocus={prefetchFile}
         data-testid={`file-tree-node-${node.path}`}
         data-active={isSelected ? "true" : "false"}
       >
@@ -89,6 +102,14 @@ export function FileTreeNode({
 
   const isDirSelected = selectedDir === node.path && selectedPath === "";
 
+  // Warm this folder's children on hover/focus so expanding it lands on a
+  // cache hit. Skip an already-expanded folder (its children are loaded);
+  // prefetch is idempotent + staleTime-gated, so repeats are free.
+  const prefetchChildren = () => {
+    if (expanded) return;
+    void queryClient.prefetchQuery(treeQuery(changeId, node.path));
+  };
+
   return (
     <div data-testid={`file-tree-node-${node.path}`}>
       <button
@@ -99,6 +120,8 @@ export function FileTreeNode({
           onSelectDir(node.path);
           setExpanded((v) => !v);
         }}
+        onMouseEnter={prefetchChildren}
+        onFocus={prefetchChildren}
         aria-expanded={expanded}
         data-active={isDirSelected ? "true" : "false"}
       >
