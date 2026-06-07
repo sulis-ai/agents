@@ -101,6 +101,10 @@ describe("GET /api/changes/:id/origin (ADR-012)", () => {
     repo = await realpath(await mkdtemp(join(tmpdir(), "origin-route-")));
     git(repo, ["init", "-q", "-b", "main"]);
     git(repo, ["config", "commit.gpgsign", "false"]);
+    // Committer identity — CI has no global git identity, so commits without
+    // this fail with "empty ident name" (matches the other git tests).
+    git(repo, ["config", "user.email", "test@example.com"]);
+    git(repo, ["config", "user.name", "origin-route test"]);
 
     // Base commit (the recorded baseSha) — readChangedFiles diffs base→worktree.
     writeFileSync(join(repo, "base.txt"), "base\n", "utf8");
@@ -252,6 +256,8 @@ describe("GET /api/changes/:id/origin (ADR-012)", () => {
     );
     git(stampedRepo, ["init", "-q", "-b", "main"]);
     git(stampedRepo, ["config", "commit.gpgsign", "false"]);
+    git(stampedRepo, ["config", "user.email", "test@example.com"]);
+    git(stampedRepo, ["config", "user.name", "origin-route test"]);
     writeFileSync(join(stampedRepo, "base.txt"), "base\n", "utf8");
     git(stampedRepo, ["add", "base.txt"]);
     git(stampedRepo, ["commit", "-q", "-m", "base"]);
