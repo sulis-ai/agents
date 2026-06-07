@@ -1,3 +1,10 @@
+## v0.114.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- wire browser-proving into the plugin: declare the Playwright MCP as a dependent MCP server (.mcp.json, alongside mobbin) + add an opt-in --with-browser layer to install-sulis.sh that installs the playwright extra + chromium + checks Node. Graceful-degrade (optional, never fails the install), matching the code-health layer; not pulled by --all (heavy + opt-in). This is the install + MCP half of the browser-proving machinery (#92).
+- Installer now covers two Sulis-own tool deps that slipped the net: yq (required by /sulis:index-specifications — installs mikefarah yq via brew, points Linux at the right release, never apt the wrong yq) and testssl.sh (audited in the code-health layer, Docker-fallback). Conditional project toolchains (node/pytest/eslint/etc.) deliberately stay the project job.
+
 ## v0.113.0 — 2026-06-07
 
 **Minor — release-train batch.**
