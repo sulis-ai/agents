@@ -107,15 +107,29 @@ export interface TerminalBridge {
 }
 
 // ── base64 ⇄ bytes (the inverse of the socket's encoding, §2.13.1) ─────────
+//
+// ISOMORPHIC (WP-010): this port runs in BOTH the Node test harness (vitest /
+// jsdom) AND the real browser bundle (the cockpit imports TerminalBridgeClient
+// into the client). `Buffer` is a Node-only global — using it broke the live
+// browser round-trip with `ReferenceError: Buffer is not defined`. These two
+// helpers use the platform-neutral `atob`/`btoa` (available in both browsers and
+// modern Node) so the same port serves both the recorded-fixture replay and the
+// live WebSocket transport.
 
-/** Decode a base64 `term.data` field to raw bytes. */
+/** Decode a base64 `term.data` field to raw bytes (browser + Node). */
 function decodeTermData(b64: string): Uint8Array {
-  return new Uint8Array(Buffer.from(b64, "base64"));
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
-/** Encode keystroke bytes to the base64 `feed` `data` field. */
+/** Encode keystroke bytes to the base64 `feed` `data` field (browser + Node). */
 function encodeFeedData(bytes: Uint8Array): string {
-  return Buffer.from(bytes).toString("base64");
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 1)
+    binary += String.fromCharCode(bytes[i]!);
+  return btoa(binary);
 }
 
 /** Narrow a raw wire error object to the typed §2.15 TerminalError. */
