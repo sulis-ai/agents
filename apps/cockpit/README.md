@@ -185,6 +185,7 @@ apps/cockpit/
 │   │   ├── pages/          # dashboard, thread view (WP-012/013)
 │   │   ├── components/     # shells, panels (WP-011/013/014)
 │   │   ├── api/            # TanStack Query hooks (WP-011)
+│   │   ├── theme/          # ThemeProvider, useTheme(), resolveInitialTheme (WP-003)
 │   │   └── tests/
 ├── shared/                 # types + constants both halves import
 │   ├── api-types.ts        # the wire shapes (TDD §5.1)

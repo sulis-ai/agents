@@ -13,6 +13,10 @@ import { Shell } from "./layouts/Shell";
 import { Dashboard } from "./pages/Dashboard";
 import { ThreadView } from "./pages/ThreadView";
 import { NotFound } from "./pages/NotFound";
+// WP-003 — the theme context layer wraps the whole app so every route is
+// inside it. AppRoutes stays bare so MemoryRouter-based tests keep mounting
+// it directly without needing the provider.
+import { ThemeProvider } from "./theme/ThemeProvider";
 
 export function AppRoutes() {
   return (
@@ -28,8 +32,10 @@ export function AppRoutes() {
 
 export function App() {
   return (
-    <BrowserRouter>
-      <AppRoutes />
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }
