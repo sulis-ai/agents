@@ -1,18 +1,22 @@
-// WP-013 — <Chat /> — renders the chronological transcript for a change.
+// <Chat /> — the Turn-Cards transcript for a change (chat-B2 signed contract).
 //
 //   - Loading → "Loading conversation..."
-//   - Error → "Could not load the conversation" + retry button (calls
-//     queryClient.invalidateQueries internally via refetch()).
+//   - Error → "Could not load the conversation" + retry button.
 //   - Empty → <EmptyTranscript />.
-//   - Non-empty → vertical list of <ChatMessage />s.
+//   - Non-empty → the transcript grouped into the founder's message bubbles +
+//     one Turn Card per agent turn (headline + prose + folded steps).
 //
-// Auto-scroll: a bottom sentinel calls scrollIntoView when the message
-// list grows on initial load. Manual refresh reuses the same effect.
+// Auto-scroll: a bottom sentinel calls scrollIntoView when the conversation
+// grows on initial load. Manual refresh reuses the same effect.
 
 import { useEffect, useRef } from "react";
 import { useTranscript } from "../api/useTranscript";
-import { ChatMessage } from "./ChatMessage";
+import { useTurnSummaries } from "../api/useTurnSummaries";
 import { EmptyTranscript } from "./EmptyTranscript";
+import { TurnCard } from "./TurnCard";
+import { groupTurns } from "../lib/groupTurns";
+import { formatRelativeTime } from "../utils/relativeTime";
+import convo from "../styles/Conversation.module.css";
 import styles from "../styles/Chat.module.css";
 
 interface Props {
@@ -21,6 +25,7 @@ interface Props {
 
 export function Chat({ changeId }: Props) {
   const query = useTranscript(changeId);
+  const summaries = useTurnSummaries(changeId);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const messageCount = query.data?.length ?? 0;
 
@@ -63,11 +68,28 @@ export function Chat({ changeId }: Props) {
     return <EmptyTranscript />;
   }
 
+  const items = groupTurns(messages);
+
   return (
     <div className={styles.chat} data-testid="chat-list">
-      {messages.map((m) => (
-        <ChatMessage key={m.uuid} message={m} />
-      ))}
+      {items.map((item) =>
+        item.type === "user" ? (
+          <div key={item.key} className={convo.msgUser} data-testid="chat-message-user">
+            <div className={convo.who}>You</div>
+            <div className={convo.say}>{item.text}</div>
+            <div className={convo.userTime}>
+              {formatRelativeTime(item.timestamp)}
+            </div>
+          </div>
+        ) : (
+          <TurnCard
+            key={item.key}
+            turn={item}
+            summary={summaries.data?.summaries?.[item.key]}
+            generating={summaries.data?.generating?.includes(item.key) ?? false}
+          />
+        ),
+      )}
       <div ref={bottomRef} data-testid="chat-bottom-sentinel" />
     </div>
   );

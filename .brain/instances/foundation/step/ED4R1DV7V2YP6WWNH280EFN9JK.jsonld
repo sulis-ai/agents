@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Confirm what it found.",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:ED4R1DV7V2YP6WWNH280EFN9JK",
+  "input_artifacts": [
+    "518jnqev-tell-it-you-don-t-have-a-repo-yet-or-poi-2-result"
+  ],
+  "mechanism": "human",
+  "name": "518jnqev-confirm-what-it-found-3",
+  "output_artifacts": [
+    "518jnqev-confirm-what-it-found-3-result"
+  ],
+  "postconditions": [
+    "your Product and Project are created only after you confirm",
+    "the setup is saved so next time needs no repeat"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

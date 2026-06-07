@@ -12,13 +12,24 @@
 // git boundary — TDD §14.5, MEA-09).
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdtemp, rm, writeFile, readFile, realpath } from "node:fs/promises";
+import {
+  mkdtemp,
+  rm,
+  writeFile,
+  readFile,
+  realpath,
+  unlink,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { gitShow } from "../lib/gitShow";
-import { TimeoutError } from "../lib/errors";
+import {
+  gitShow,
+  gitDiffNameStatus,
+  gitDiffNumstat,
+} from "../lib/gitShow";
+import { TimeoutError, GitError } from "../lib/errors";
 
 function gitInit(cwd: string, args: string[]): string {
   const result = spawnSync("git", args, { cwd, encoding: "utf8" });
@@ -175,5 +186,133 @@ describe("gitShow", () => {
     expect(code).not.toMatch(/["']rebase["']/);
     // The one subcommand it MUST contain:
     expect(code).toMatch(/["']show["']/);
+  });
+});
+
+// WP-P02 — per-file diff data (git diff --name-status / --numstat).
+//
+// Both helpers run `git diff <baseSha> --` against the worktree through
+// the same sanctioned spawn site as gitShow. Tested against a real
+// ephemeral repo (no mocks at the git boundary — TDD §14.5, MEA-09):
+//   - hello.txt   edited (1 added, 1 removed)
+//   - added.txt   new    (1 added, 0 removed)
+//   - removed.txt removed (0 added, 1 removed)
+//   - blob.bin    binary edit ("-" / "-" → null counts)
+describe("gitDiffNameStatus / gitDiffNumstat", () => {
+  let repo: string; // realpath-resolved
+  let baseSha: string;
+
+  beforeAll(async () => {
+    const base = await mkdtemp(join(tmpdir(), "gitdiff-test-"));
+    repo = await realpath(base);
+
+    gitInit(repo, ["init", "-q", "-b", "main"]);
+    gitInit(repo, ["config", "user.email", "test@example.com"]);
+    gitInit(repo, ["config", "user.name", "WP-P02 test"]);
+    gitInit(repo, ["config", "commit.gpgsign", "false"]);
+
+    // Base commit:
+    //   hello.txt   — "one\n" (edited later)
+    //   removed.txt — "gone\n" (deleted later)
+    //   blob.bin    — 8 bytes incl. a NUL (binary; changed later)
+    await writeFile(join(repo, "hello.txt"), "one\n", "utf8");
+    await writeFile(join(repo, "removed.txt"), "gone\n", "utf8");
+    await writeFile(
+      join(repo, "blob.bin"),
+      Buffer.from([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]),
+    );
+    gitInit(repo, ["add", "."]);
+    gitInit(repo, ["commit", "-q", "-m", "base"]);
+    baseSha = gitInit(repo, ["rev-parse", "HEAD"]);
+
+    // Changes committed on top of the base (the cockpit diffs a
+    // change's committed worktree against its recorded base sha, so the
+    // fixture commits its edits — `git diff <base>` ignores untracked
+    // files):
+    //   hello.txt   — "two\n"   (1 added, 1 removed)
+    //   added.txt   — new file  (1 added, 0 removed)
+    //   removed.txt — deleted   (0 added, 1 removed)
+    //   blob.bin    — different bytes (binary; numstat "-\t-")
+    await writeFile(join(repo, "hello.txt"), "two\n", "utf8");
+    await writeFile(join(repo, "added.txt"), "fresh\n", "utf8");
+    await unlink(join(repo, "removed.txt"));
+    await writeFile(
+      join(repo, "blob.bin"),
+      Buffer.from([0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00]),
+    );
+    gitInit(repo, ["add", "-A"]);
+    gitInit(repo, ["commit", "-q", "-m", "changes"]);
+  });
+
+  afterAll(async () => {
+    await rm(repo, { recursive: true, force: true });
+  });
+
+  it("name-status maps A/M/D to new/edited/removed", async () => {
+    const entries = await gitDiffNameStatus({ cwd: repo, baseSha });
+    const byPath = new Map(entries.map((e) => [e.path, e.status]));
+    expect(byPath.get("hello.txt")).toBe("edited");
+    expect(byPath.get("added.txt")).toBe("new");
+    expect(byPath.get("removed.txt")).toBe("removed");
+    expect(byPath.get("blob.bin")).toBe("edited");
+  });
+
+  it("numstat parses added/removed counts for text files", async () => {
+    const entries = await gitDiffNumstat({ cwd: repo, baseSha });
+    const byPath = new Map(entries.map((e) => [e.path, e]));
+    expect(byPath.get("hello.txt")).toMatchObject({ added: 1, removed: 1 });
+    expect(byPath.get("added.txt")).toMatchObject({ added: 1, removed: 0 });
+    expect(byPath.get("removed.txt")).toMatchObject({ added: 0, removed: 1 });
+  });
+
+  it('numstat maps a binary file ("-\\t-") to null counts', async () => {
+    const entries = await gitDiffNumstat({ cwd: repo, baseSha });
+    const blob = entries.find((e) => e.path === "blob.bin");
+    expect(blob).toBeDefined();
+    expect(blob?.added).toBeNull();
+    expect(blob?.removed).toBeNull();
+  });
+
+  it("numstat returns [] for an empty diff (base == worktree)", async () => {
+    // A throwaway repo whose worktree matches its only commit exactly.
+    const clean = await realpath(
+      await mkdtemp(join(tmpdir(), "gitdiff-clean-")),
+    );
+    try {
+      gitInit(clean, ["init", "-q", "-b", "main"]);
+      gitInit(clean, ["config", "user.email", "test@example.com"]);
+      gitInit(clean, ["config", "user.name", "WP-P02 test"]);
+      gitInit(clean, ["config", "commit.gpgsign", "false"]);
+      await writeFile(join(clean, "only.txt"), "stable\n", "utf8");
+      gitInit(clean, ["add", "."]);
+      gitInit(clean, ["commit", "-q", "-m", "only"]);
+      const sha = gitInit(clean, ["rev-parse", "HEAD"]);
+
+      const entries = await gitDiffNumstat({ cwd: clean, baseSha: sha });
+      expect(entries).toEqual([]);
+    } finally {
+      await rm(clean, { recursive: true, force: true });
+    }
+  });
+
+  it("throws GitError on a non-zero exit (bad-revision sha)", async () => {
+    await expect(
+      gitDiffNumstat({
+        cwd: repo,
+        baseSha: "0000000000000000000000000000000000000000",
+      }),
+    ).rejects.toBeInstanceOf(GitError);
+    await expect(
+      gitDiffNameStatus({
+        cwd: repo,
+        baseSha: "0000000000000000000000000000000000000000",
+      }),
+    ).rejects.toBeInstanceOf(GitError);
+  });
+
+  it("throws TimeoutError when timeoutMs expires", async () => {
+    await expect(
+      gitDiffNumstat({ cwd: repo, baseSha, timeoutMs: 1 }),
+    ).rejects.toBeInstanceOf(TimeoutError);
   });
 });

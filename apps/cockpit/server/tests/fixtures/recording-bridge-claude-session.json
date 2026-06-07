@@ -1,0 +1,41 @@
+{
+  "_comment": "WP-005 — recording-bridge-claude-session fixture (deferred infra need; ADR-002, MEA-09). A RECORDED real stream-json session, replayed by RecordedSessionBridge, covering all four resolution cases so the relay + resolution + binding + lock + composer run in CI WITHOUT a live claude. The full LIVE round-trip is the BLOCK-and-hand-to-founder observation on the founder machine. Each case carries: the resolution kind resolveSession should report (side-effect-free), and the ordered stream-json events the recorded session emitted (system/init → stream_event deltas → result/success), which the adapter maps to ChatStreamEvents (state → chunk* → complete). `resumed` is derived from the resolution (resumable/mid-step ⇒ true), never synthesised. The mid-step case is the FR-N5 proof: the recorded reply RE-RUNS the incomplete step (it talks about resuming the work) rather than reporting a fake done.",
+  "cases": {
+    "live": {
+      "resolution": "live",
+      "events": [
+        { "type": "system", "subtype": "init" },
+        { "type": "stream_event", "event": { "type": "content_block_delta", "delta": { "text": "On it — " } } },
+        { "type": "stream_event", "event": { "type": "content_block_delta", "delta": { "text": "looking at the board now." } } },
+        { "type": "result", "subtype": "success" }
+      ]
+    },
+    "resumable": {
+      "resolution": "resumable",
+      "events": [
+        { "type": "system", "subtype": "init", "resumed": true },
+        { "type": "stream_event", "event": { "type": "content_block_delta", "delta": { "text": "I've resumed this change " } } },
+        { "type": "stream_event", "event": { "type": "content_block_delta", "delta": { "text": "and I'm picking up where we left off." } } },
+        { "type": "result", "subtype": "success" }
+      ]
+    },
+    "fresh": {
+      "resolution": "fresh",
+      "events": [
+        { "type": "system", "subtype": "init" },
+        { "type": "stream_event", "event": { "type": "content_block_delta", "delta": { "text": "Starting fresh on this change — " } } },
+        { "type": "stream_event", "event": { "type": "content_block_delta", "delta": { "text": "let me read the context first." } } },
+        { "type": "result", "subtype": "success" }
+      ]
+    },
+    "mid-step": {
+      "resolution": "resumable",
+      "events": [
+        { "type": "system", "subtype": "init", "resumed": true },
+        { "type": "stream_event", "event": { "type": "content_block_delta", "delta": { "text": "Resuming — the previous step was left half-finished, " } } },
+        { "type": "stream_event", "event": { "type": "content_block_delta", "delta": { "text": "so I'm re-running it now rather than reporting it done." } } },
+        { "type": "result", "subtype": "success" }
+      ]
+    }
+  }
+}

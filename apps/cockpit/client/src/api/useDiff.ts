@@ -4,14 +4,11 @@
 // the file's base-vs-current diff. Disabled when path is empty.
 
 import { useQuery } from "@tanstack/react-query";
-import type { FileDiff } from "../../../shared/api-types";
-import { apiGet } from "./client";
+import { diffQuery } from "./fileQueries";
 
 export function useDiff(changeId: string, path: string) {
   return useQuery({
-    queryKey: ["diff", changeId, path],
-    queryFn: () =>
-      apiGet<FileDiff>(`/api/changes/${changeId}/diff`, { path }),
+    ...diffQuery(changeId, path),
     enabled: changeId.length > 0 && path.length > 0,
   });
 }

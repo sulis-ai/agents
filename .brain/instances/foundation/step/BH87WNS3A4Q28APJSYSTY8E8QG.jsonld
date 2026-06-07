@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Open a change's 'what's been created' view.",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:BH87WNS3A4Q28APJSYSTY8E8QG",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "3jttwd8f-open-a-change-s-what-s-been-created-view-1",
+  "output_artifacts": [
+    "3jttwd8f-open-a-change-s-what-s-been-created-view-1-result"
+  ],
+  "postconditions": [
+    "the entities and workflows produced for the change are listed, grouped by kind"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

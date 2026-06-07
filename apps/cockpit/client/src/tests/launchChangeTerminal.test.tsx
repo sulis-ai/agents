@@ -3,15 +3,16 @@
 // cockpit-rendered <LiveTerminal/> path).
 //
 // Per WP-009 Contract + contract §2.13.5: from a change, opening its terminal
-// navigates to the change's Terminal tab (/c/:changeId?tab=terminal) — which
-// mounts <LiveTerminal/> (WP-008) — and warms the pty session via the WP-007
-// TerminalBridge port's idempotent get-or-spawn open({io_mode:"pty"}). The
-// launcher consumes ONLY the typed bridge port (WPF-02 — no raw socket) and a
-// navigate function (WPF-03 — injected, mock-first), so it is unit-testable
-// against a fake bridge with no live socket and no router.
+// navigates to the change's Terminal view (/c/:changeId?view=terminal) — which
+// ThreadView seeds as its initial ChangeNav view, mounting <LiveTerminal/>
+// (WP-008) — and warms the pty session via the WP-007 TerminalBridge port's
+// idempotent get-or-spawn open({io_mode:"pty"}). The launcher consumes ONLY the
+// typed bridge port (WPF-02 — no raw socket) and a navigate function (WPF-03 —
+// injected, mock-first), so it is unit-testable against a fake bridge with no
+// live socket and no router.
 //
-// References: WP-009 DoD Red (opens_pty_terminal_tab); contract §2.13.5;
-// WP-007 TerminalBridge; WP-008 <LiveTerminal/> + ThreadTabs ?tab=terminal.
+// References: WP-009 DoD Red (opens_pty_terminal_view); contract §2.13.5;
+// WP-007 TerminalBridge; WP-008 <LiveTerminal/> + ThreadView ?view=terminal.
 
 import { describe, it, expect, vi } from "vitest";
 
@@ -46,15 +47,15 @@ function fakeBridge(): {
 }
 
 describe("launchChangeTerminal (WP-009)", () => {
-  it("opens_pty_terminal_tab: navigates to the change's Terminal tab and warms the pty session via the bridge", async () => {
+  it("opens_pty_terminal_view: navigates to the change's Terminal view and warms the pty session via the bridge", async () => {
     const { bridge, openCalls } = fakeBridge();
     const navigate = vi.fn();
 
     await launchChangeTerminal("CH-01KTGY", { navigate, bridge });
 
-    // Navigates to the existing change route's Terminal tab (?tab=terminal) —
-    // mounting <LiveTerminal/> (WP-008).
-    expect(navigate).toHaveBeenCalledWith("/c/CH-01KTGY?tab=terminal");
+    // Navigates to the existing change route's Terminal view (?view=terminal) —
+    // ThreadView seeds it as the initial view, mounting <LiveTerminal/> (WP-008).
+    expect(navigate).toHaveBeenCalledWith("/c/CH-01KTGY?view=terminal");
     // Warms the pty session (idempotent get-or-spawn, contract §2.13.5) so the
     // terminal is ready when the tab mounts — open({io_mode:"pty"}) via the
     // port (the bridge.open() encodes io_mode:"pty", WP-007).
@@ -62,12 +63,12 @@ describe("launchChangeTerminal (WP-009)", () => {
     expect(bridge.open).toHaveBeenCalledWith("CH-01KTGY");
   });
 
-  it("navigates even when the bridge is not supplied (navigation is the load-bearing step; the tab mount warms the session)", async () => {
+  it("navigates even when the bridge is not supplied (navigation is the load-bearing step; the view mount warms the session)", async () => {
     const navigate = vi.fn();
 
     await launchChangeTerminal("CH-01KZZZ", { navigate });
 
-    expect(navigate).toHaveBeenCalledWith("/c/CH-01KZZZ?tab=terminal");
+    expect(navigate).toHaveBeenCalledWith("/c/CH-01KZZZ?view=terminal");
   });
 
   it("does not let a warm-open failure block the navigation (the session is get-or-spawned on tab mount regardless)", async () => {
@@ -81,6 +82,6 @@ describe("launchChangeTerminal (WP-009)", () => {
     await expect(
       launchChangeTerminal("CH-01KFAIL", { navigate, bridge }),
     ).resolves.toBeUndefined();
-    expect(navigate).toHaveBeenCalledWith("/c/CH-01KFAIL?tab=terminal");
+    expect(navigate).toHaveBeenCalledWith("/c/CH-01KFAIL?view=terminal");
   });
 });

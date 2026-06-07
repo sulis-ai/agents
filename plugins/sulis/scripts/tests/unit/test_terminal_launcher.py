@@ -130,6 +130,31 @@ def test_build_launch_script_inserts_extra_env_shlex_quoted(tmp_path):
     assert "export FOO='bar; rm -rf /'" in script
 
 
+def test_build_launch_script_wires_origin_hook(tmp_path):
+    """WP-P12 — the executor session launch wires the prepare-commit-msg hook
+    so commits the session makes carry the Sulis-Origin trailer. The hook path
+    is set via GIT_CONFIG_* env (no .git/config mutation) and SULIS_SCRIPTS_DIR
+    lets the hook locate _origin_stamp."""
+    script = tl._build_launch_script(_GOOD_ULID, tmp_path, enable_origin_hook=True)
+    assert "GIT_CONFIG_COUNT" in script
+    assert "core.hooksPath" in script
+    assert "GIT_CONFIG_VALUE_0" in script
+    # The configured hooks dir is the scripts/hooks dir holding the hook.
+    assert "hooks" in script
+    assert "export SULIS_SCRIPTS_DIR=" in script
+    # The exports come AFTER the env-scrub (which would otherwise strip them).
+    scrub_idx = script.index("compgen -v")
+    cfg_idx = script.index("GIT_CONFIG_COUNT")
+    assert scrub_idx < cfg_idx
+
+
+def test_build_launch_script_omits_origin_hook_by_default(tmp_path):
+    """Default (no flag) is byte-compatible with the prior baseline."""
+    script = tl._build_launch_script(_GOOD_ULID, tmp_path)
+    assert "GIT_CONFIG_COUNT" not in script
+    assert "core.hooksPath" not in script
+
+
 def test_build_launch_script_cd_then_exec_order(tmp_path):
     script = tl._build_launch_script(_GOOD_ULID, tmp_path)
     cd_idx = script.index('cd "')
@@ -630,6 +655,57 @@ def test_launch_change_terminal_forwards_pre_prompt(tmp_path, monkeypatch):
                               wraps=tl._build_launch_script) as b:
         tl.launch_change_terminal(_GOOD_ULID, tmp_path, pre_prompt="hello")
     assert b.call_args.kwargs.get("pre_prompt") == "hello" or "hello" in b.call_args[0]
+
+
+# ─── #93: default opening prompt so a re-spawned session never sits idle ──────
+
+
+def test_default_change_pre_prompt_is_change_oriented():
+    body = tl._default_change_pre_prompt(_GOOD_ULID)
+    assert _GOOD_ULID in body              # binds the brief to this change
+    assert "CONTEXT.md" in body            # points at the pre-spawn recon
+    assert "change-context" in body        # tells Sulis to greet in change-context mode
+    assert "route" in body.lower()         # and route to the right stage
+
+
+def test_launch_change_terminal_defaults_opening_prompt_when_none(tmp_path, monkeypatch):
+    # The #93 bug: focus/recreate re-spawn with pre_prompt=None → claude came up
+    # bound to the change but idle (no opening turn; the agent never reads
+    # SULIS_CHANGE_ID until the user types). The launcher must default a
+    # change-context opening prompt so ANY caller's session auto-starts.
+    # The default-prompt behaviour lives on the launch-script path, which the
+    # WP-009 Strangle now gates behind the OS-window flag — opt in so this test
+    # exercises the script-writing path the #93 fix added.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, "1")  # WP-009: opt into OS-window path
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl, "_launch_macos",
+                              side_effect=lambda sp, cid, vis: _spawned_dict(sp)):
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path, pre_prompt=None)
+    # the sidecar carrying the opening prompt was written...
+    sidecar = tl._change_dir(_GOOD_ULID) / tl._PRE_PROMPT_SIDECAR
+    assert sidecar.exists(), "no opening prompt delivered — the session would sit idle"
+    assert _GOOD_ULID in sidecar.read_text()
+    # ...and the launch script reads it as claude's opening argument.
+    script = Path(result["script_path"]).read_text()
+    assert '"$(cat ' in script
+
+
+def test_launch_change_terminal_explicit_pre_prompt_not_overridden(tmp_path, monkeypatch):
+    # start --spawn passes a rich brief; the default must never clobber it.
+    # The sidecar write lives on the launch-script path, which the WP-009
+    # Strangle now gates behind the OS-window flag — opt in so this test
+    # exercises the script-writing path that carries the brief.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, "1")  # WP-009: opt into OS-window path
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl, "_launch_macos",
+                              side_effect=lambda sp, cid, vis: _spawned_dict(sp)):
+        tl.launch_change_terminal(
+            _GOOD_ULID, tmp_path, pre_prompt="custom brief from start --spawn",
+        )
+    sidecar = tl._change_dir(_GOOD_ULID) / tl._PRE_PROMPT_SIDECAR
+    assert sidecar.read_text() == "custom brief from start --spawn"
 
 
 def test_launch_change_terminal_writes_pre_prompt_sidecar(tmp_path, monkeypatch):

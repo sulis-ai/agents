@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sulis chat redesign — Direction C · Coordination + Timeline split (boldest)</title>
+<!--
+  ============================================================================
+  REVIEW MOCKUP (not the signed contract) · Sulis cockpit chat surface
+  DIRECTION C — "Coordination + Timeline split" (boldest)
+  ----------------------------------------------------------------------------
+  The conversation column carries ONLY what's addressed to the founder —
+  questions, summaries, decisions, sign-off prompts (with inline action buttons
+  like "Yes, sign off" / "Wait"). ALL the agent's detailed steps move OUT of the
+  chat into a new "Timeline" tab in the RIGHT rail (tabs become
+  Timeline · Files · Brain · Preview), shown as collapsed activity entries with
+  timestamps. The chat reads calm, like talking to a person. Composer floats
+  inset; on a short thread it sits in comfortable reach.
+
+  Bound strictly to the SIGNED design instance (sulis-app.html / tokens.css):
+  every colour is a var(--*); nothing new in palette or type. LAYOUT/INTERACTION
+  exploration only (UXD-15). Fonts loaded as the signed contract does.
+  ============================================================================
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet">
+<style>
+/* ===== TOKENS — verbatim from apps/cockpit/client/src/tokens.css :root (light) ===== */
+:root{
+  --background:#fafafa; --foreground:#171717;
+  --card:#ffffff; --card-foreground:#171717;
+  --popover:#ffffff; --popover-foreground:#171717;
+  --muted:#f5f5f5; --muted-foreground:#737373;
+  --secondary:#f5f5f5; --secondary-foreground:#171717;
+  --border:#e5e5e5; --border-muted:#f0f0f0; --input:#e5e5e5;
+  --primary:#2563EB; --primary-foreground:#FFFFFF;
+  --accent:#2D7D90; --accent-foreground:#FFFFFF;
+  --destructive:#DC2626; --destructive-foreground:#FFFFFF;
+  --positive:#16A34A; --positive-foreground:#FFFFFF;
+  --warning:#F59E0B; --warning-foreground:#121212;
+  --ring:#2563EB; --brand-gold:#C9A962; --brand-depth:#1E3A5F;
+  --bg-positive:#F0FDF4; --bg-positive-border:#BBF7D0;
+  --bg-destructive:#FEF2F2; --bg-destructive-border:#FECACA;
+  --bg-warning:#FFFBEB; --bg-warning-border:#FDE68A;
+  --stage-recon:#8B7355; --stage-specify:#6366F1; --stage-design:#2D7D90;
+  --stage-implement:#2563EB; --stage-review:#9333EA; --stage-ship:#15803D;
+  --radius-interactive:4px; --radius-button:9999px; --radius-container:4px;
+  --radius-badge:9999px; --radius-media:4px;
+  --font-sans:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-display:'Satoshi',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono','SF Mono','Monaco','Inconsolata','Fira Mono',monospace;
+  --weight-body:400; --weight-heading:300; --weight-label:500;
+  --bg-card:var(--card); --bg-muted:var(--muted); --border-light:var(--border-muted);
+  --font:var(--font-sans); --radius:var(--radius-container);
+  --text:var(--foreground); --text-secondary:#525252; --text-muted:var(--muted-foreground);
+  --attn-icon:#B45309;
+  --shadow-float:0 6px 20px rgba(23,23,23,.08), 0 1px 3px rgba(23,23,23,.06);
+}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#EDEAE3;color:var(--text);font-family:var(--font-sans);font-weight:var(--weight-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+:focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:var(--radius)}
+button{appearance:none;-webkit-appearance:none;background:none;border:0;margin:0;padding:0;font:inherit;color:inherit;line-height:inherit;text-align:inherit}
+button,[role="button"],[tabindex],a{cursor:pointer}
+
+.docnote{max-width:1440px;margin:0 auto;padding:18px 28px 6px;color:var(--text-secondary);font-size:12.5px}
+.docnote b{color:var(--text);font-weight:600}
+
+.frame{width:1440px;height:900px;margin:8px auto 28px;background:var(--background);border-radius:10px;overflow:hidden;border:1px solid var(--border);box-shadow:0 1px 3px rgba(23,23,23,.07);display:grid;grid-template-columns:240px 1fr}
+
+/* sidebar (shared) */
+.sidebar{background:var(--card);border-right:1px solid var(--border);padding:18px 12px;overflow:auto;display:flex;flex-direction:column}
+.brandrow{display:flex;align-items:center;gap:11px;padding:4px 8px 18px}
+.brandrow .mark{width:26px;height:26px;flex:none;border-radius:50%;background:conic-gradient(from 200deg,#C9A962,#1E3A5F,#2D7D90,#C9A962)}
+.brandname{font-family:var(--font-display);font-weight:700;font-size:18px;letter-spacing:-.01em;color:var(--text)}
+.sidebar h4{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin:16px 8px 8px;font-weight:600}
+.navitem{display:flex;align-items:center;gap:9px;padding:9px 8px;border-radius:var(--radius);color:var(--text-secondary);font-size:13px;border:1px solid transparent;text-decoration:none}
+.navitem:hover{background:var(--bg-muted);color:var(--text)}
+.navitem.active{background:var(--bg-muted);color:var(--text);font-weight:var(--weight-label)}
+.navitem .ic{width:15px;height:15px;flex:none;color:var(--text-muted)}
+.navitem.active .ic{color:var(--accent)}
+.sidefoot{margin-top:auto;padding:12px 8px 2px;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:7px}
+.sidefoot .g{width:8px;height:8px;border-radius:50%;background:var(--positive);flex:none;box-shadow:0 0 0 2px var(--bg-positive)}
+
+.work{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.head{flex:0 0 auto;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:16px 24px 12px;border-bottom:1px solid var(--border);background:var(--card)}
+.head .kicker{font-family:var(--font-mono);font-size:11.5px;color:var(--text-muted)}
+.head h1{font-size:19px;font-weight:600;line-height:1.25;color:var(--text);margin-top:3px;letter-spacing:-.01em}
+.headmeta{flex:none;display:flex;align-items:center;gap:8px}
+.stagebadge{padding:3px 9px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;border-radius:var(--radius);background:color-mix(in srgb,var(--accent) 8%,#fff);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 28%,var(--border))}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary);font-weight:var(--weight-label)}
+.live .g{width:9px;height:9px;border-radius:50%;background:var(--positive);box-shadow:0 0 0 2px var(--bg-positive)}
+
+.spine{flex:0 0 auto;padding:14px 24px 10px;border-bottom:1px solid var(--border-muted);background:var(--card)}
+.track{list-style:none;display:flex;align-items:flex-start;margin-bottom:12px}
+.step{flex:1;text-align:center;position:relative;padding-top:22px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:var(--weight-label)}
+.step .dot{position:absolute;top:3px;left:50%;width:10px;height:10px;border-radius:50%;background:var(--input);transform:translateX(-50%);z-index:2;border:2px solid var(--card)}
+.step::after{content:"";position:absolute;top:8px;left:50%;width:100%;height:1px;background:var(--border);z-index:1}
+.step:last-child::after{display:none}
+.step[data-state="done"]{color:var(--text-secondary)}
+.step[data-state="done"] .dot{background:var(--text-secondary)}
+.step[data-state="now"]{color:var(--accent);font-weight:700}
+.step[data-state="now"] .dot{background:var(--accent);width:13px;height:13px;top:2px;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,#fff)}
+.step .sw{display:block;font-size:8px;margin-top:3px;font-weight:600}
+.step[data-state="now"] .sw{color:var(--accent)}
+.step[data-state="done"] .sw{color:var(--text-muted)}
+.step[data-state="pending"] .sw{color:var(--text-muted)}
+.statusline{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--text)}
+.statusline .si{width:14px;height:14px;flex:none;color:var(--accent)}
+.statusline b{font-weight:600}
+.statusline .when{color:var(--text-muted);font-size:12px}
+
+.body{flex:1 1 auto;min-height:0;display:flex}
+.convocol{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;position:relative;min-height:0}
+/* short, calm thread — content sits comfortably, not pinned to the very bottom */
+.scroll{flex:1 1 auto;min-height:0;overflow-y:auto;padding:26px 28px 8px;display:flex;flex-direction:column;scrollbar-width:thin}
+.day{display:flex;align-items:center;gap:12px;margin:0 0 18px;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.day::before,.day::after{content:"";height:1px;background:var(--border-muted);flex:1}
+
+/* CALM conversation — person-to-person. Bigger type, generous spacing.
+   ONLY founder-addressed content lives here: questions, summaries, decisions. */
+.msg{margin-bottom:22px;max-width:84%}
+.msg.user{margin-left:auto}
+.who{font-size:10px;color:var(--text-muted);margin:0 2px 6px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.msg.user .who{text-align:right}
+.msg.agent .say{font-size:15px;line-height:1.7;color:var(--text)}
+.msg.agent .say p{margin-bottom:10px}
+.msg.agent .say p:last-child{margin-bottom:0}
+.msg.user .say{background:var(--muted);border:1px solid var(--border);border-radius:12px 12px 4px 12px;padding:12px 15px;font-size:14px;line-height:1.6;color:var(--text)}
+.msg .time{font-size:11px;color:var(--text-muted);margin:7px 2px 0}
+.msg.user .time{text-align:right}
+/* a tiny inline "what happened" link that opens the Timeline tab */
+.bgwork{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;font-weight:var(--weight-label);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 22%,var(--border));background:color-mix(in srgb,var(--accent) 5%,#fff);border-radius:var(--radius-button);padding:5px 11px}
+.bgwork:hover{background:color-mix(in srgb,var(--accent) 9%,#fff)}
+.bgwork svg{width:12px;height:12px}
+
+/* DECISION / sign-off prompt — inline action buttons in the chat */
+.decision{border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border));border-radius:12px;background:color-mix(in srgb,var(--accent) 4%,#fff);padding:16px 18px;margin-bottom:22px;max-width:84%}
+.decision .dq{font-size:15px;font-weight:600;color:var(--text);line-height:1.5}
+.decision .dd{font-size:13.5px;color:var(--text-secondary);line-height:1.65;margin-top:7px}
+.decision .acts{display:flex;gap:9px;margin-top:14px}
+.decision .yes{background:var(--primary);color:var(--primary-foreground);border-radius:var(--radius-button);padding:10px 18px;font-size:13px;font-weight:600}
+.decision .yes:hover{filter:brightness(.94)}
+.decision .wait{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-button);padding:10px 18px;font-size:13px;font-weight:var(--weight-label)}
+.decision .wait:hover{background:var(--bg-muted)}
+
+/* composer dock — floats inset */
+.composer-dock{flex:0 0 auto;padding:8px 28px 20px}
+.composer{background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-float);padding:12px 12px 10px}
+.composer .row{display:flex;gap:10px;align-items:flex-end}
+.composer textarea{flex:1;resize:none;border:0;outline:0;padding:8px 6px;font-family:var(--font-sans);font-size:14px;min-height:26px;color:var(--text);background:transparent;line-height:1.5}
+.composer textarea::placeholder{color:var(--text-muted)}
+.send{flex:none;background:var(--primary);color:var(--primary-foreground);border-radius:var(--radius-button);padding:11px 22px;font-weight:600;font-size:13px;height:42px}
+.send:hover{filter:brightness(.94)}
+.composer .foot{display:flex;align-items:center;gap:8px;margin-top:7px;padding:0 4px;font-size:11px;color:var(--text-muted)}
+.composer .foot kbd{font-family:var(--font-mono);font-size:10px;background:var(--bg-muted);border:1px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--text)}
+
+/* ===== right rail — 4 tabs: Timeline · Files · Brain · Preview ===== */
+.rail{flex:0 0 384px;min-width:0;display:flex;flex-direction:column;border-left:1px solid var(--border);background:var(--background);overflow:hidden}
+.railtabs{flex:0 0 auto;display:flex;gap:2px;padding:14px 14px 0;border-bottom:1px solid var(--border-muted)}
+.railtab{display:inline-flex;align-items:center;gap:5px;padding:9px 9px;font-size:12.5px;font-weight:var(--weight-label);color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.railtab svg{width:14px;height:14px}
+.railtab:hover{color:var(--text)}
+.railtab.active{color:var(--text);border-bottom-color:var(--accent)}
+.railtab .ct{font-family:var(--font-mono);font-size:10px;background:var(--bg-muted);border:1px solid var(--border);border-radius:var(--radius-button);padding:0 6px;color:var(--text-secondary)}
+.railbody{flex:1 1 auto;min-height:0;overflow-y:auto;padding:16px}
+
+/* TIMELINE — the agent's detailed steps, moved out of the chat */
+.tlhead{font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.55}
+.tlgroup{position:relative;padding-left:22px;margin-bottom:6px}
+.tlgroup::before{content:"";position:absolute;left:6px;top:4px;bottom:-6px;width:1px;background:var(--border)}
+.tlgroup:last-child::before{display:none}
+.tlnode{position:absolute;left:1px;top:3px;width:11px;height:11px;border-radius:50%;background:var(--card);border:2px solid var(--accent);z-index:2}
+.tlgroup.done .tlnode{border-color:var(--text-secondary);background:var(--text-secondary)}
+.tlsum{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:2px 0 4px;font-size:13px;font-weight:600;color:var(--text)}
+.tlsum .ts{margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);font-weight:400}
+.tlsum .chev{color:var(--text-muted);font-size:10px}
+.tlcollapsed{font-size:12px;color:var(--text-secondary);padding:2px 0 12px}
+.tlcollapsed .bg{display:inline-flex;align-items:center;gap:6px}
+.tlcollapsed .bg .d{width:6px;height:6px;border-radius:50%;background:var(--text-muted)}
+/* expanded entry — the small steps with timestamps */
+.tlsteps{padding:4px 0 14px}
+.tlstep{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;color:var(--text-secondary)}
+.tlstep .si{width:13px;height:13px;flex:none;color:var(--text-muted)}
+.tlstep .obj{font-family:var(--font-mono);font-size:11px;color:var(--text);background:var(--card);border:1px solid var(--border-muted);border-radius:3px;padding:0 5px}
+.tlstep .ok{margin-left:auto;display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--text-secondary)}
+.tlstep .ok .d{width:6px;height:6px;border-radius:50%;background:var(--positive)}
+.tlstep .ts{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);flex:none}
+.tlcheckpoint{display:flex;align-items:center;gap:9px;border:1px solid color-mix(in srgb,var(--accent) 20%,var(--border));border-radius:var(--radius);background:color-mix(in srgb,var(--accent) 5%,#fff);padding:9px 11px;margin:2px 0 6px}
+.tlcheckpoint .ck{width:22px;height:22px;border-radius:50%;flex:none;display:inline-flex;align-items:center;justify-content:center;background:var(--card);border:1px solid color-mix(in srgb,var(--accent) 22%,var(--border));color:var(--accent)}
+.tlcheckpoint .cb{flex:1;min-width:0}
+.tlcheckpoint .ct2{font-size:12px;font-weight:600;color:var(--text)}
+.tlcheckpoint .rb{flex:none;border:1px solid var(--border);background:var(--card);border-radius:var(--radius);padding:5px 10px;font-size:11px;font-weight:var(--weight-label);color:var(--text)}
+.tlcheckpoint .rb:hover{background:var(--bg-muted)}
+</style>
+</head>
+<body>
+<div class="docnote"><b>Direction C — Coordination + Timeline split (boldest).</b> The chat carries only what’s addressed to you — questions, summaries, decisions, sign-off prompts with inline buttons — so it reads like talking to a person. Every detailed step moves into a new <b>Timeline</b> tab in the right rail (Timeline · Files · Brain · Preview). Review mockup, real tokens, light theme.</div>
+
+<div class="frame">
+  <nav class="sidebar" aria-label="Primary">
+    <div class="brandrow"><span class="mark" aria-hidden="true"></span><span class="brandname">Sulis</span></div>
+    <h4>Workspace</h4>
+    <a class="navitem" href="#"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="2" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>Board</a>
+    <a class="navitem active" href="#" aria-current="page"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3.5h12v7H6l-3 3v-3H2Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>Conversation</a>
+    <a class="navitem" href="#"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 1.5h6L13 5.5V14.5H3Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M9 1.5V5.5H13" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>Files</a>
+    <a class="navitem" href="#"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 14.5 8 8 14.5 1.5 8Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>Brain</a>
+    <h4>Recent changes</h4>
+    <a class="navitem" href="#"><span class="ic"></span>Add the sign-off button</a>
+    <a class="navitem" href="#"><span class="ic"></span>Tidy the morning digest</a>
+    <div class="sidefoot"><span class="g" aria-hidden="true"></span>Agent running</div>
+  </nav>
+
+  <div class="work">
+    <header class="head">
+      <div>
+        <div class="kicker">add-signoff-button · design</div>
+        <h1>Add the “sign off” button to the checkout screen</h1>
+      </div>
+      <div class="headmeta">
+        <span class="stagebadge">Design</span>
+        <span class="live"><span class="g" aria-hidden="true"></span>Running</span>
+      </div>
+    </header>
+
+    <div class="spine">
+      <ol class="track" aria-label="Change progress">
+        <li class="step" data-state="done"><span class="dot" aria-hidden="true"></span>Recon<span class="sw">Done</span></li>
+        <li class="step" data-state="done"><span class="dot" aria-hidden="true"></span>Specify<span class="sw">Done</span></li>
+        <li class="step" data-state="now" aria-current="step"><span class="dot" aria-hidden="true"></span>Design<span class="sw">Now</span></li>
+        <li class="step" data-state="pending"><span class="dot" aria-hidden="true"></span>Implement<span class="sw">Pending</span></li>
+        <li class="step" data-state="pending"><span class="dot" aria-hidden="true"></span>Review<span class="sw">Pending</span></li>
+        <li class="step" data-state="pending"><span class="dot" aria-hidden="true"></span>Ship<span class="sw">Pending</span></li>
+      </ol>
+      <div class="statusline">
+        <svg class="si" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 4.5V8l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span><b>Waiting for you</b> — the button’s designed; I’d like your sign-off before it’s built.</span>
+        <span class="when">· updated just now</span>
+      </div>
+    </div>
+
+    <div class="body">
+      <!-- CALM CONVERSATION — only founder-addressed content -->
+      <section class="convocol" aria-label="Conversation">
+        <div class="scroll">
+          <div class="day">Today</div>
+
+          <div class="msg user">
+            <div class="who">You</div>
+            <div class="say">Can you add a clear “sign off” button to the checkout screen? It should feel like the obvious next step once everything looks right.</div>
+            <div class="time">9:41 AM</div>
+          </div>
+
+          <div class="msg agent">
+            <div class="who">Sulis</div>
+            <div class="say">
+              <p>Done — I’ve designed it as the primary action right under the order total, in your brand blue, and it only lights up once the order’s valid.</p>
+              <p>I checked it reads clearly for low vision too, and saved a checkpoint so we can always come back to this point.</p>
+            </div>
+            <button class="bgwork" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 5v3l2 1.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>7 steps performed in the background ›</button>
+            <div class="time">9:43 AM</div>
+          </div>
+
+          <!-- DECISION / sign-off prompt with inline action buttons -->
+          <div class="decision" role="group" aria-label="Sign-off prompt">
+            <div class="dq">Ready to lock this design?</div>
+            <div class="dd">Once you sign off, the team can build the button exactly as shown in the preview on the right. Nothing ships until you do.</div>
+            <div class="acts">
+              <button class="yes" type="button">Yes, sign off</button>
+              <button class="wait" type="button">Wait — let me look</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="composer-dock">
+          <div class="composer">
+            <div class="row">
+              <textarea rows="1" placeholder="Reply to Sulis, or type / for a command…" aria-label="Message Sulis"></textarea>
+              <button class="send" type="button">Send</button>
+            </div>
+            <div class="foot"><kbd>/</kbd> for commands · <kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT RAIL — Timeline · Files · Brain · Preview -->
+      <aside class="rail" aria-label="Timeline, files, brain and previews">
+        <div class="railtabs" role="tablist" aria-label="Context panel">
+          <button class="railtab active" role="tab" aria-selected="true" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 4.6V8l2.4 1.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Timeline<span class="ct">7</span></button>
+          <button class="railtab" role="tab" aria-selected="false" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 1.5h6L13 5.5V14.5H3Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M9 1.5V5.5H13" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>Files</button>
+          <button class="railtab" role="tab" aria-selected="false" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 14.5 8 8 14.5 1.5 8Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>Brain</button>
+          <button class="railtab" role="tab" aria-selected="false" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8Z" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="1.8" fill="currentColor"/></svg>Preview</button>
+        </div>
+        <div class="railbody" role="tabpanel" aria-label="Timeline">
+          <p class="tlhead">Everything Sulis did, in order. The chat stays calm; the detail lives here.</p>
+
+          <!-- group 1 — collapsed -->
+          <div class="tlgroup done">
+            <span class="tlnode" aria-hidden="true"></span>
+            <button class="tlsum" type="button" aria-expanded="false">Looked at the checkout layout<span class="ts">9:41</span><span class="chev" aria-hidden="true">›</span></button>
+            <div class="tlcollapsed"><span class="bg"><span class="d" aria-hidden="true"></span>2 steps performed in the background ›</span></div>
+          </div>
+
+          <!-- group 2 — expanded so the founder sees the entry detail -->
+          <div class="tlgroup done">
+            <span class="tlnode" aria-hidden="true"></span>
+            <button class="tlsum" type="button" aria-expanded="true">Built the button &amp; checked it<span class="ts">9:42</span><span class="chev" aria-hidden="true">⌄</span></button>
+            <div class="tlsteps">
+              <div class="tlstep"><svg class="si" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 11.5 11 2.5l2.5 2.5L4.5 14H2Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>Edited <span class="obj">Composer.tsx</span><span class="ok"><span class="d" aria-hidden="true"></span>saved</span><span class="ts">9:42</span></div>
+              <div class="tlstep"><svg class="si" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Ran the tests<span class="ok"><span class="d" aria-hidden="true"></span>28 passed</span><span class="ts">9:42</span></div>
+              <div class="tlstep"><svg class="si" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="3" width="11" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="7.5" r="2" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>Took a screenshot<span class="ts">9:43</span></div>
+              <div class="tlstep"><svg class="si" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 1.5h6L13 5.5V14.5H3Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>Read the visual contract <span class="obj">sulis-app.html</span><span class="ts">9:43</span></div>
+            </div>
+          </div>
+
+          <!-- group 3 — checkpoint outcome -->
+          <div class="tlgroup">
+            <span class="tlnode" aria-hidden="true"></span>
+            <button class="tlsum" type="button" aria-expanded="true">Saved a checkpoint<span class="ts">9:43</span><span class="chev" aria-hidden="true">⌄</span></button>
+            <div class="tlsteps">
+              <div class="tlcheckpoint">
+                <span class="ck" aria-hidden="true"><svg viewBox="0 0 16 16" width="12" height="12"><path d="M2 8.5 6 12.5l8-9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <div class="cb"><div class="ct2">“Sign-off button added, tests pass”</div></div>
+                <button class="rb" type="button">Revert</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+</body>
+</html>

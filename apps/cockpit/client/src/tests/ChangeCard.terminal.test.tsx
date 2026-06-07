@@ -1,7 +1,7 @@
 // WP-009 — <ChangeCard> "Open terminal" action.
 //
 // The SUBSTITUTE-Strangle re-point at the UI surface: the card's "open
-// terminal" action now opens the change's in-cockpit Terminal tab via
+// terminal" action now opens the change's in-cockpit Terminal view via
 // launchChangeTerminal (the cockpit-rendered <LiveTerminal/> path), NOT the
 // OS-window launcher (_terminal_launcher.py, now a deprecated fallback).
 //

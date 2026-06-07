@@ -22,7 +22,11 @@
 #   bash install-sulis.sh --check          # audit only; no changes
 #   bash install-sulis.sh --core-only      # just core (git/gh/python3/pipx)
 #   bash install-sulis.sh --with-code-health   # core + analyse + code-health
-#   bash install-sulis.sh --all            # alias for --with-code-health
+#   bash install-sulis.sh --with-browser   # core + analyse + browser-proving
+#                                          #   (Node + Playwright + chromium,
+#                                          #    for /sulis:prove on UI/auth flows)
+#   bash install-sulis.sh --all            # core + analyse + code-health (NOT
+#                                          #   browser — that's heavy + opt-in)
 #   bash install-sulis.sh -y / --yes       # skip interactive prompts (CI)
 #
 # Exit codes:
@@ -38,14 +42,16 @@ set -euo pipefail
 LAYER_CORE=1
 LAYER_PROBE=1
 LAYER_CODE_HEALTH=0
+LAYER_BROWSER=0
 CHECK_ONLY=0
 ASSUME_YES=0
 
 for arg in "$@"; do
   case "$arg" in
     --check)              CHECK_ONLY=1 ;;
-    --core-only)          LAYER_PROBE=0; LAYER_CODE_HEALTH=0 ;;
+    --core-only)          LAYER_PROBE=0; LAYER_CODE_HEALTH=0; LAYER_BROWSER=0 ;;
     --with-code-health)   LAYER_CODE_HEALTH=1 ;;
+    --with-browser)       LAYER_BROWSER=1 ;;
     --all)                LAYER_CODE_HEALTH=1 ;;
     -y|--yes)             ASSUME_YES=1 ;;
     -h|--help)
@@ -103,6 +109,7 @@ CORE_TOOLS=(
   "gh|required|GitHub CLI (for sulis-change ship + sulis-issues)"
   "python3|required|Python 3.11 or newer"
   "pipx|optional|isolated Python-CLI installer (recommended)"
+  "yq|optional|YAML reader for /sulis:index-specifications (mikefarah's — NOT apt's yq)"
 )
 
 # Probe tools — the existing install-probe-tools.sh installs these.
@@ -124,6 +131,7 @@ CODE_HEALTH_TOOLS=(
   "vulture|optional|Python dead-code detector"
   "ruff|optional|Python linter (Tier 5)"
   "mypy|optional|Python type-checker"
+  "testssl.sh|optional|TLS/cipher scanner (DAT-02; Docker-fallback, degrades to NOT_ASSESSED)"
 )
 
 # ─── Python version check ──────────────────────────────────────────────────
@@ -184,6 +192,9 @@ audit_all() {
 become NOT_ASSESSED tiers)" "${CODE_HEALTH_TOOLS[@]}" || true
     # Code-health tools are ALL optional — never count toward `missing`.
   fi
+  if [[ "$LAYER_BROWSER" -eq 1 ]]; then
+    audit_browser_layer || true   # all optional — never counts toward `missing`
+  fi
   return $missing
 }
 
@@ -204,6 +215,12 @@ install_core_macos() {
       brew install "$t"
     fi
   done
+  # yq — brew's formula IS mikefarah's yq (the one /sulis:index-specifications
+  # needs). Optional; degrade loudly rather than fail the install.
+  if ! is_installed yq; then
+    info "Installing yq via brew (for /sulis:index-specifications)…"
+    brew install yq || warn "yq install failed; /sulis:index-specifications will be unavailable."
+  fi
   if is_installed pipx; then
     pipx ensurepath >/dev/null 2>&1 || true
   fi
@@ -225,6 +242,13 @@ install_core_debian() {
     warn "gh not in default apt repos for this Ubuntu version."
     warn "Follow: https://cli.github.com/manual/installation"
   fi
+  # Deliberately NOT `apt-get install yq` — Debian's `yq` is a different tool (a
+  # Python jq-wrapper) with incompatible syntax. /sulis:index-specifications needs
+  # mikefarah's yq — install via snap or the release binary.
+  if ! is_installed yq; then
+    warn "yq not installed (needed for /sulis:index-specifications)."
+    warn "Install mikefarah's yq: snap install yq — or https://github.com/mikefarah/yq/releases"
+  fi
   if is_installed pipx; then
     pipx ensurepath >/dev/null 2>&1 || true
   fi
@@ -235,6 +259,11 @@ install_core_fedora() {
   sudo dnf install -y git gh python3 python3-pip pipx
   if is_installed pipx; then
     pipx ensurepath >/dev/null 2>&1 || true
+  fi
+  # mikefarah's yq for /sulis:index-specifications (dnf's `yq` may be the jq-wrapper).
+  if ! is_installed yq; then
+    warn "yq not installed (needed for /sulis:index-specifications)."
+    warn "Install mikefarah's yq: https://github.com/mikefarah/yq/releases"
   fi
 }
 
@@ -271,9 +300,10 @@ install_code_health_macos() {
     err "Homebrew is required on macOS for code-health tools."
     exit 3
   fi
-  # Available via brew directly.
-  for t in hadolint trivy gitleaks semgrep; do
-    if ! is_installed "$t"; then
+  # Available via brew directly. (testssl's brew formula is `testssl`; the binary
+  # it installs is `testssl.sh` — the security review also has a Docker fallback.)
+  for t in hadolint trivy gitleaks semgrep testssl; do
+    if ! is_installed "$t" && ! is_installed "${t}.sh"; then
       info "Installing $t via brew (code-health, optional)…"
       brew install "$t" || warn "$t install failed; tier will degrade to NOT_ASSESSED."
     fi
@@ -345,6 +375,53 @@ install_code_health() {
   esac
 }
 
+# ─── Browser-proving install routines (opt-in; --with-browser) ───────────────
+# The deterministic browser driver + the Playwright MCP (declared in .mcp.json)
+# need: the Python `playwright` package (the `browser` extra), a chromium binary,
+# and Node/npx (for the @playwright/mcp server). ALL OPTIONAL — absent,
+# browser-proving degrades to the human-attest path (never a fake green), the
+# same way code-health tools degrade to NOT_ASSESSED.
+
+playwright_python_present() {
+  [ -x "$SCRIPT_DIR/.venv/bin/python" ] && \
+    "$SCRIPT_DIR/.venv/bin/python" -c "import playwright" >/dev/null 2>&1
+}
+
+chromium_present() {
+  ls "${PLAYWRIGHT_BROWSERS_PATH:-$HOME/Library/Caches/ms-playwright}"/chromium-* >/dev/null 2>&1 || \
+  ls "$HOME/.cache/ms-playwright"/chromium-* >/dev/null 2>&1
+}
+
+audit_browser_layer() {
+  hdr "Browser-proving layer (opt-in — for /sulis:prove on UI/auth flows)"
+  if is_installed node; then ok "node"; dim "    JS runtime (for the @playwright/mcp server)"
+  else warn "node  (optional — needed for the Playwright MCP; install Node.js)"; fi
+  if is_installed npx; then ok "npx"; else warn "npx  (optional — ships with Node.js)"; fi
+  if playwright_python_present; then ok "playwright (python)"; dim "    the 'browser' extra"
+  else warn "playwright (python)  (optional — installed by --with-browser)"; fi
+  if chromium_present; then ok "chromium (playwright browser)"
+  else warn "chromium  (optional — run: uv run playwright install chromium)"; fi
+  return 0   # all optional — never counts toward `missing`
+}
+
+install_browser_layer() {
+  if ! is_installed uv; then
+    warn "uv not found — needed to install the playwright extra."
+    warn "  Install uv: https://docs.astral.sh/uv/  — then re-run with --with-browser."
+    return 0
+  fi
+  info "Installing the playwright extra (uv sync --extra browser)…"
+  ( cd "$SCRIPT_DIR" && uv sync --extra browser ) \
+    || warn "playwright extra install failed; browser-proving degrades to human-attest."
+  info "Installing the chromium browser binary…"
+  ( cd "$SCRIPT_DIR" && uv run playwright install chromium ) \
+    || warn "chromium install failed; browser-proving degrades."
+  if ! is_installed node; then
+    warn "Node.js not found — the @playwright/mcp server (declared in .mcp.json) needs it."
+    warn "  Install Node.js to enable agent-driven browser proving: https://nodejs.org/"
+  fi
+}
+
 # ─── Manual instructions ───────────────────────────────────────────────────
 
 show_manual_instructions() {
@@ -387,6 +464,7 @@ layers=()
 [[ "$LAYER_CORE"         -eq 1 ]] && layers+=("core")
 [[ "$LAYER_PROBE"        -eq 1 ]] && layers+=("analyse-codebase")
 [[ "$LAYER_CODE_HEALTH"  -eq 1 ]] && layers+=("code-health")
+[[ "$LAYER_BROWSER"      -eq 1 ]] && layers+=("browser-proving")
 printf "Layers:   %s\n" "${layers[*]}"
 if [[ "$CHECK_ONLY" -eq 1 ]]; then
   printf "Mode:     audit-only (--check; no changes)\n"
@@ -420,6 +498,11 @@ fi
 if [[ "$LAYER_CODE_HEALTH" -eq 1 ]]; then
   hdr "Installing code-health layer (all optional)…"
   install_code_health
+fi
+
+if [[ "$LAYER_BROWSER" -eq 1 ]]; then
+  hdr "Installing browser-proving layer (opt-in)…"
+  install_browser_layer
 fi
 
 # Final audit.

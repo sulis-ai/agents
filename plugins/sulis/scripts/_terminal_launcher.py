@@ -187,6 +187,7 @@ def _build_launch_script(
     entry_command: str = "claude --dangerously-skip-permissions --agent sulis",
     extra_env: dict[str, str] | None = None,
     pre_prompt: str | None = None,
+    enable_origin_hook: bool = False,
 ) -> str:
     """Return the bash script body (string).
 
@@ -228,7 +229,12 @@ def _build_launch_script(
         # has no heredoc nesting (parses clean under bash 3.2), and the
         # pre_prompt bytes are never shell-parsed — so there is no injection
         # surface either (what the old heredoc's single-quoted tag guarded).
-        sidecar = _change_dir(change_id) / _PRE_PROMPT_SIDECAR
+        # Path only — do NOT mkdir here. _build_launch_script is pure (no file
+        # I/O); launch_change_terminal creates the dir + writes the sidecar
+        # inside its I/O-failure try-block. (Using _change_dir here would mkdir
+        # before that try, so an unwritable ~/.sulis would escape as a raw
+        # OSError instead of the structured _failed dict.)
+        sidecar = Path.home() / ".sulis" / "changes" / change_id / _PRE_PROMPT_SIDECAR
         exec_line = f'exec {entry_command} "$(cat {shlex.quote(str(sidecar))})"'
     else:
         exec_line = f"exec {entry_command}"
@@ -240,6 +246,21 @@ def _build_launch_script(
         _ENV_SCRUB_LINE,
         f'export SULIS_CHANGE_ID="{change_id}"',
     ]
+    if enable_origin_hook:
+        # WP-P12 (ADR-013) — wire the origin-stamp `prepare-commit-msg` hook for
+        # the executor session, so any commit it makes carries the Sulis-Origin
+        # trailer. The hook dir is set via GIT_CONFIG_* env (a per-session
+        # override; NO `.git/config` mutation, so it leaves the worktree
+        # untouched and reversible). SULIS_SCRIPTS_DIR lets the hook locate
+        # `_origin_stamp`. The hook itself is a no-op unless SULIS_ORIGIN is set
+        # at commit time (the run-ulid + confidence the executor supplies for
+        # the autonomous stamp), so wiring it is harmless when no origin is set.
+        scripts_dir = Path(__file__).resolve().parent
+        hooks_dir = scripts_dir / "hooks"
+        lines.append(f"export SULIS_SCRIPTS_DIR={shlex.quote(str(scripts_dir))}")
+        lines.append("export GIT_CONFIG_COUNT=1")
+        lines.append("export GIT_CONFIG_KEY_0=core.hooksPath")
+        lines.append(f"export GIT_CONFIG_VALUE_0={shlex.quote(str(hooks_dir))}")
     if extra_env_block:
         lines.append(extra_env_block)
     lines.append(f'cd "{worktree_path}"')
@@ -409,6 +430,32 @@ def _change_dir(change_id: str) -> Path:
     return change_dir
 
 
+def _default_change_pre_prompt(change_id: str) -> str:
+    """Opening prompt used when a caller spawns a change terminal without one.
+
+    Without an opening turn, ``claude --agent sulis`` comes up correctly bound
+    to the change (``SULIS_CHANGE_ID`` exported, cwd = the worktree) but sits
+    idle: the agent never reads the env var until the founder types something,
+    so it never self-orients. ``sulis-change start --spawn`` avoids this by
+    passing a rich brief; the ``focus`` / ``recreate`` re-spawn paths (and any
+    direct caller) historically passed ``None`` and hit the idle-session bug
+    (#93). Defaulting here makes an auto-starting session the floor for EVERY
+    caller — an explicit ``pre_prompt`` still wins.
+
+    Deterministic (a pure function of ``change_id``) so the sidecar write and
+    the launch script's ``cat`` of it always agree on the same bytes.
+    """
+    recon = Path.home() / ".sulis" / "changes" / change_id / "CONTEXT.md"
+    return (
+        f"You are Sulis, focused on the change bound to this session "
+        f"(id: {change_id}). Your working directory is the change worktree. "
+        f"Read the pre-spawn recon at {recon} for the change identity, git "
+        f"state, and suggested next step — and any .changes/*.HANDOFF.md or "
+        f".changes/*.WORKING-SET.md in the worktree — then greet me in "
+        f"change-context mode and route to the right stage."
+    )
+
+
 def _write_session_json(
     change_dir: Path,
     change_id: str,
@@ -468,6 +515,7 @@ def launch_change_terminal(
     entry_command: str = "claude --dangerously-skip-permissions --agent sulis",
     extra_env: dict[str, str] | None = None,
     pre_prompt: str | None = None,
+    enable_origin_hook: bool = True,
 ) -> dict:
     """Spawn a new terminal in the change worktree with SULIS_CHANGE_ID set.
 
@@ -516,9 +564,17 @@ def launch_change_terminal(
         result["session_json_path"] = ""
         return result
 
+    # Default an opening prompt so the spawned session auto-starts rather than
+    # sitting idle at an empty claude prompt (#93). start --spawn passes a rich
+    # brief; focus / recreate / direct callers historically passed None. An
+    # explicit pre_prompt still wins — we only fill the gap.
+    if pre_prompt is None:
+        pre_prompt = _default_change_pre_prompt(change_id)
+
     script_body = _build_launch_script(
         change_id, resolved, entry_command=entry_command,
         extra_env=extra_env, pre_prompt=pre_prompt,
+        enable_origin_hook=enable_origin_hook,
     )
 
     # File-I/O hardening: an unwritable change dir / launch.sh (permission

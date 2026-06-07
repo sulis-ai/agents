@@ -4,14 +4,15 @@
 //
 // SUBSTITUTE-Strangle (contract §2.13.5; TDD §1.6): "open this change's
 // terminal" no longer spawns a separate OS Terminal.app/gnome-terminal window
-// running `claude` directly. It opens the change's in-cockpit Terminal tab —
+// running `claude` directly. It opens the change's in-cockpit Terminal view —
 // the WP-008 <LiveTerminal/> rendered in the browser — backed by the session
 // manager's pty-mode session.
 //
 // What it does (two steps, navigation is the load-bearing one):
-//   1. Navigate to the change's Terminal tab: /c/:changeId?tab=terminal. That
-//      route mounts <LiveTerminal/> (WP-008), which on mount calls
-//      bridge.open({io_mode:"pty"}) + attach (the snapshot→live render).
+//   1. Navigate to the change's Terminal view: /c/:changeId?view=terminal. That
+//      route mounts ThreadView, which seeds its initial ChangeNav view from
+//      `?view=` → "terminal", rendering <LiveTerminal/> (WP-008), which on
+//      mount calls bridge.open({io_mode:"pty"}) + attach (snapshot→live).
 //   2. Warm the pty session via the WP-007 TerminalBridge port's idempotent
 //      get-or-spawn open() (contract §2.13.5) so the session is spawning while
 //      the route transition + xterm.js lazy-import happen — the terminal is
@@ -28,15 +29,17 @@
 // states (WP-008 WPF-05). Warming is an optimisation, not a precondition.
 //
 // References: WP-009 Contract + DoD; contract §2.13.5; WP-007 TerminalBridge;
-// WP-008 <LiveTerminal/> + ThreadTabs (?tab=terminal).
+// WP-008 <LiveTerminal/> + ThreadView/ChangeNav (?view=terminal).
 
 import { createTerminalBridge } from "../terminal/terminalBridge";
 import type { TerminalBridge } from "../../../server/ports/TerminalBridge";
 
-/** The route + query the change's in-cockpit Terminal tab lives at (WP-008
- *  ThreadTabs reads ?tab=terminal; App routes /c/:changeId → ThreadView). */
+/** The route + query the change's in-cockpit Terminal view lives at. App routes
+ *  /c/:changeId → ThreadView; ThreadView seeds its initial view from the
+ *  optional `?view=` param, so `?view=terminal` lands directly on the WP-008
+ *  <LiveTerminal/> view inside the change's ChangeNav workspace. */
 export function changeTerminalPath(changeId: string): string {
-  return `/c/${changeId}?tab=terminal`;
+  return `/c/${changeId}?view=terminal`;
 }
 
 /** Dependencies for {@link launchChangeTerminal}. Injected for testability
@@ -50,7 +53,7 @@ export interface LaunchChangeTerminalDeps {
 }
 
 /**
- * Open a change's terminal in the cockpit: navigate to its Terminal tab (which
+ * Open a change's terminal in the cockpit: navigate to its Terminal view (which
  * mounts <LiveTerminal/>) and warm its pty session via the bridge's idempotent
  * get-or-spawn open(). The new default "open this change's terminal" — the
  * cockpit-rendered path that strangles the OS-window launcher (WP-009).

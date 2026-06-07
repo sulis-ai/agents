@@ -1,7 +1,7 @@
 // WP-011 — Routing test.
 //
 // Asserts the three routes per the WP Contract:
-//   /              → <Dashboard> placeholder
+//   /              → <Board>      (WP-003 stage-column board; was Dashboard)
 //   /c/:changeId   → <ThreadView> placeholder
 //   /garbage       → <NotFound>
 //
@@ -52,21 +52,21 @@ describe("App routes", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders Dashboard at /", () => {
+  it("renders the Board at /", () => {
     renderAt("/");
-    expect(screen.getByTestId("page-dashboard")).toBeInTheDocument();
-    expect(screen.getByTestId("shell-sidebar")).toBeInTheDocument();
+    expect(screen.getByTestId("page-board")).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-topbar")).toBeInTheDocument();
   });
 
   it("renders ThreadView at /c/:changeId", () => {
     renderAt("/c/CH-01KSJA");
     expect(screen.getByTestId("page-thread")).toBeInTheDocument();
-    expect(screen.getByTestId("shell-sidebar")).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-topbar")).toBeInTheDocument();
   });
 
   it("renders NotFound for an unknown path", () => {
     renderAt("/garbage");
     expect(screen.getByTestId("page-not-found")).toBeInTheDocument();
-    expect(screen.getByTestId("shell-sidebar")).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-topbar")).toBeInTheDocument();
   });
 });
