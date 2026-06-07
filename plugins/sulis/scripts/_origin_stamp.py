@@ -62,6 +62,14 @@ def assisted_origin(*, conversation: str, turn: int) -> OriginDict:
 # ─── trailer formatting + env parsing (shape pinned to CF-11) ─────────────
 
 
+def _has_control_char(value: str) -> bool:
+    """True if `value` carries any control character (newline, carriage return,
+    tab, NUL, etc.). A trailer is a single line; a control char in a field is
+    either malformed input or a trailer-injection attempt (a smuggled `\\n` +
+    `Forged-Trailer:` line). Both are rejected at the boundary."""
+    return any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in value)
+
+
 def _fmt_number(value: float) -> str:
     # 0.9 not 0.900000001; an int stays an int. Mirrors the reader's tolerant
     # parseFloat, but emit the tidiest form.
@@ -73,8 +81,20 @@ def _fmt_number(value: float) -> str:
 
 
 def format_trailer(origin: OriginDict) -> str:
-    """Render an origin dict as the single `Sulis-Origin: …` trailer line."""
+    """Render an origin dict as the single `Sulis-Origin: …` trailer line.
+
+    A trailer is ONE line. Any string field carrying a control character
+    (notably a newline) would forge a second trailer line, so it is refused
+    here as a last line of defence (the env-parse boundary rejects it first).
+    """
     kind = origin.get("kind")
+    for field in ("run", "conversation"):
+        v = origin.get(field)
+        if isinstance(v, str) and _has_control_char(v):
+            raise ValueError(
+                f"origin field {field!r} contains a control character; "
+                "refusing to emit a forgeable trailer"
+            )
     if kind == "autonomous":
         run = origin["run"]
         parts = [f"autonomous; run={run}"]
@@ -97,6 +117,13 @@ def parse_origin_env(value: Optional[str]) -> Optional[OriginDict]:
     (`Sulis-Origin: autonomous; run=…`) so the env can carry either form.
     """
     if not value:
+        return None
+    # A trailer is a SINGLE line. A control character anywhere in the value
+    # (an embedded `\n` + `Forged-Trailer:`, a `\r`, etc.) is either malformed
+    # or a trailer-injection attempt — treat the whole value as malformed and
+    # return None (the graceful "unstamped" path), so no forged second trailer
+    # line can ever be smuggled through.
+    if _has_control_char(value):
         return None
     body = value.strip()
     if body.lower().startswith(f"{TRAILER_KEY.lower()}:"):

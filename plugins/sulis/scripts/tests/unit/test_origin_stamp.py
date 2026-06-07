@@ -86,6 +86,32 @@ def test_parse_origin_env_rejects_garbage():
     assert parse_origin_env("autonomous; confidence=0.5") is None  # no run id
 
 
+def test_parse_origin_env_rejects_embedded_newline_no_forged_trailer():
+    """A SULIS_ORIGIN value carrying a newline (a trailer-injection attempt)
+    must NOT yield an origin — it returns None (the graceful unstamped path),
+    so no second, forged trailer line can be smuggled in."""
+    malicious = (
+        "autonomous; run=abc\n"
+        "Malicious-Trailer: pwned; confidence=0.9"
+    )
+    assert parse_origin_env(malicious) is None
+    # A carriage return is equally rejected.
+    assert parse_origin_env("autonomous; run=abc\rconfidence=0.9") is None
+    # Any other control character (e.g. a vertical tab) is rejected too.
+    assert parse_origin_env("autonomous; run=ab\x0bc") is None
+
+
+def test_format_trailer_refuses_control_char_value():
+    """Belt-and-braces: even if a control char reaches format_trailer, it must
+    refuse rather than emit a multi-line / forged trailer."""
+    with pytest.raises(ValueError):
+        format_trailer({"kind": "autonomous", "run": "abc\nMalicious: x"})
+    with pytest.raises(ValueError):
+        format_trailer(
+            {"kind": "assisted", "conversation": "sess\n1", "turn": 1}
+        )
+
+
 # ─── stamp_origin — real round-trip on a real commit ──────────────────────
 
 

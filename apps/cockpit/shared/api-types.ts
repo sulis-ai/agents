@@ -150,7 +150,14 @@ export type CoverageColumn =
     }
   | {
       axis: "tested";
-      items: { id: string; title: string; outcome: "pass" | "skip" | "fail" }[];
+      items: {
+        id: string;
+        title: string;
+        outcome: "pass" | "skip" | "fail";
+        /** Whether this row is an authored scenario or an actual test result —
+         *  the TESTED column mixes both; the UI labels each by its real kind. */
+        kind: "scenario" | "testresult";
+      }[];
     };
 
 /** The single per-requirement focused trace (lens B drill-in; `?focus=<reqId>`). */

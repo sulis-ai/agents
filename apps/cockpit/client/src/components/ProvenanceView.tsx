@@ -976,7 +976,9 @@ function CoverageLens({
                     <BeakerIcon className={styles.ei} />
                     <div className={styles.etx}>
                       <div className={styles.en}>{it.title}</div>
-                      <div className={styles.em}>scenario</div>
+                      <div className={styles.em}>
+                        {it.kind === "testresult" ? "test result" : "scenario"}
+                      </div>
                     </div>
                     <span className={`${styles.wstat} ${outcomeClass(it.outcome, styles)}`}>
                       {outcomeWord(it.outcome)}

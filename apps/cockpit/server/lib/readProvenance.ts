@@ -87,12 +87,29 @@ function verifiedRequirementIds(entities: BrainEntity[]): Set<string> {
   return verified;
 }
 
+/**
+ * Whether a `lifecyclerun`'s outcome counts as "completed" (the `did` digest).
+ *
+ * Run outcomes use a different vocabulary ("completed") than the tri-state
+ * `normaliseOutcome` covers (pass/skip/fail for testresult/scenario), so this is
+ * the run-outcome counterpart. It applies the SAME tolerant coercion as
+ * `normaliseOutcome` — string-only, trimmed, case-insensitive — rather than a
+ * bare `=== "completed"`, so the digest's "did" agrees with how every other
+ * outcome in this file is normalised (a `" Completed "` or non-string value no
+ * longer slips the count).
+ */
+function isCompletedRun(raw: unknown): boolean {
+  return typeof raw === "string" && raw.trim().toLowerCase() === "completed";
+}
+
 function buildDigest(entities: BrainEntity[]): ProvenanceDigest {
   const runs = ofKind(entities, "lifecyclerun");
   const requirements = ofKind(entities, "requirement");
   const verified = verifiedRequirementIds(entities);
 
-  const did = runs.filter((r) => detailOf(r).outcome === "completed").length;
+  const did = runs.filter(
+    (r) => isCompletedRun(detailOf(r).outcome),
+  ).length;
   const decided = ofKind(entities, "decision").length;
   const coveredVerified = requirements.filter((r) =>
     verified.has(r.id),
@@ -201,11 +218,13 @@ function buildCoverage(entities: BrainEntity[]): CoverageColumn[] {
         id: s.id,
         title: s.title,
         outcome: normaliseOutcome(detailOf(s).outcome),
+        kind: "scenario" as const,
       })),
       ...ofKind(entities, "testresult").map((t) => ({
         id: t.id,
         title: t.title,
         outcome: normaliseOutcome(detailOf(t).outcome),
+        kind: "testresult" as const,
       })),
     ],
   };

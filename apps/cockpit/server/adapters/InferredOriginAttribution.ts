@@ -217,6 +217,13 @@ export class InferredOriginAttribution implements OriginAttribution {
       );
       if (paths.length === 0) return [];
       const messages = await parseTranscripts(paths);
+      // TODO(deferred): multi-session transcripts mis-attribute. Only the FIRST
+      // transcript's stem is used as the conversation id, and turns are indexed
+      // across the MERGED stream — so a change spanning 2+ sessions reports the
+      // wrong conversation id / turn number for turns from the later session(s).
+      // REASON: correct multi-session attribution needs per-session turn
+      // indexing + a conversation id per transcript; tracked as the
+      // origin-stamping-live follow-up (#23).
       // The conversation id is the first transcript's file stem (the session id).
       const stem = paths[0]!.split("/").pop()?.replace(/\.jsonl$/, "") ?? "";
       return turnsFromMessages(messages, stem);

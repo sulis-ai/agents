@@ -13,15 +13,19 @@
 // (CF-03). Recorded overrides inferred at the adapter swap (WP-P13) with no
 // change to this route (ADR-012).
 
+import { relative } from "node:path";
+
 import { Router } from "express";
 
 // eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (TDD §9 permits; the rule's `../../*` pattern blocks escapes out of apps/cockpit/, which import/no-restricted-paths enforces)
-import type { ChangeOriginView, OriginView } from "../../shared/api-types";
+import type { ChangeOriginView, Origin, OriginView } from "../../shared/api-types";
 import type { ChangeStoreReader } from "../ports/ChangeStoreReader";
 import { InferredOriginAttribution } from "../adapters/InferredOriginAttribution";
 import { RecordedOriginAttribution } from "../adapters/RecordedOriginAttribution";
 import { CompositeOriginAttribution } from "../adapters/CompositeOriginAttribution";
 import { readOrigin } from "../lib/readOrigin";
+import { safeJoin } from "../lib/safeJoin";
+import { PathOutsideWorktreeError } from "../lib/errors";
 
 import { asyncHandler } from "./_async";
 import { requireChange } from "./_change-lookup";
@@ -69,7 +73,34 @@ export function createOriginRouter(deps: OriginRouterDeps): Router {
       // `?path=` → one file's origin (OriginView). `path: null` is allowed and
       // yields the honest change-level answer (per-file is the meaningful view).
       if (path !== null) {
-        const origin = await attribution.originFor(id, path);
+        // Funnel the untrusted `?path=` through the SAME single chokepoint the
+        // sibling /file and /diff routes use (safeJoin — WP-004) before it ever
+        // reaches the git boundary, so this route honours the path-traversal
+        // invariant too (a `../` escape or a symlink out of the worktree is
+        // rejected here, not handed to `git log` as a pathspec). safeJoin
+        // returns the realpath-resolved ABSOLUTE path; convert it back to a
+        // worktree-relative pathspec for the adapter.
+        let relPath: string;
+        try {
+          const safe = await safeJoin(worktreeRoot, path);
+          relPath = relative(worktreeRoot, safe);
+        } catch (err) {
+          if (err instanceof PathOutsideWorktreeError) {
+            // Fail-soft (matches the rest of origin: a bad path → unknown, not
+            // a 500) — the path is outside the worktree, so there is no origin.
+            const origin: Origin = {
+              kind: "unknown",
+              reason: "path is outside this change's worktree",
+              attribution: "inferred",
+            };
+            const body: OriginView = { changeId: id, path, origin };
+            res.json(body);
+            return;
+          }
+          throw err;
+        }
+        const origin = await attribution.originFor(id, relPath);
+        // Echo back the caller's original `path` (unmodified), as /file does.
         const body: OriginView = { changeId: id, path, origin };
         res.json(body);
         return;

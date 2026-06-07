@@ -120,6 +120,13 @@ function model(overrides: Partial<ProvenanceModel> = {}): ProvenanceModel {
             id: "sc1",
             title: "Declined card shows the retry path",
             outcome: "pass",
+            kind: "scenario",
+          },
+          {
+            id: "tr1",
+            title: "Declined card retry — verified",
+            outcome: "pass",
+            kind: "testresult",
           },
         ],
       },
@@ -260,6 +267,16 @@ describe("<ProvenanceView /> — coverage-map lens (WP-P06)", () => {
     const list = screen.getByTestId("req-list");
     expect(within(list).getByText("Tested")).toBeInTheDocument();
     expect(within(list).getAllByText("Awaiting test").length).toBeGreaterThan(0);
+  });
+
+  it("labels each TESTED item by its actual kind (scenario vs test result)", () => {
+    renderView();
+    fireEvent.click(screen.getByTestId("door-coverage"));
+    const tested = screen.getByLabelText("Tested — scenarios and results");
+    // The column mixes a scenario and a test result — each carries its real
+    // label, not a hardcoded "scenario" for both.
+    expect(within(tested).getByText("scenario")).toBeInTheDocument();
+    expect(within(tested).getByText("test result")).toBeInTheDocument();
   });
 
   it("filters the requirements list", () => {

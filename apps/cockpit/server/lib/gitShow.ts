@@ -26,6 +26,7 @@
 import { spawn } from "node:child_process";
 
 import { GitError, TimeoutError } from "./errors";
+import { trailerValueFromMessage } from "./originAttribution/recorded";
 
 /** Default subprocess timeout. TDD §13.6 mandates a 5-second bound. */
 const DEFAULT_TIMEOUT_MS = 5_000;
@@ -433,17 +434,15 @@ export interface GitTrailerResult {
   originTrailer: string | null;
 }
 
-/** The trailer key the write paths stamp (ADR-013) — the same family as Co-Authored-By. */
-const ORIGIN_TRAILER_KEY = "Sulis-Origin";
-const ORIGIN_TRAILER_RE = new RegExp(
-  `^${ORIGIN_TRAILER_KEY}:\\s*(.+)$`,
-  "im",
-);
-
 /**
  * Read the `Sulis-Origin:` trailer (if any) from a path's last-changing commit,
  * plus that commit's sha (so the caller can look up a sidecar keyed by sha when
  * the trailer is absent). Returns null when the path has no commit history.
+ *
+ * The trailer-shape parse lives in ONE place — `trailerValueFromMessage` in
+ * `originAttribution/recorded.ts` (the module that owns the trailer key + parse,
+ * EP-03). This site only fetches the commit message; it does not re-implement
+ * the regex/key.
  *
  * Read-only — it composes `gitLogLastCommit` (the sanctioned `git log` read);
  * it spawns no new process. Fail-soft: a git failure throws `TimeoutError` only
@@ -454,9 +453,8 @@ export async function gitOriginTrailer(
 ): Promise<GitTrailerResult | null> {
   const commit = await gitLogLastCommit(opts);
   if (commit === null) return null;
-  const m = ORIGIN_TRAILER_RE.exec(commit.message);
   return {
     sha: commit.sha,
-    originTrailer: m ? m[1]!.trim() : null,
+    originTrailer: trailerValueFromMessage(commit.message),
   };
 }

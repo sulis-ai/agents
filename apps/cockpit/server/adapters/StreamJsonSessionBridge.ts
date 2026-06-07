@@ -65,6 +65,13 @@ export interface StreamJsonSessionBridgeOptions {
    * this is `child_process.spawn("claude", argv, { cwd })`; the contract suite
    * injects a stubbed child. This is the one sanctioned process start.
    */
+  // TODO(deferred): thread the assisted-origin env through this port. The
+  // production `spawnClaudeBridge` accepts a 3rd `originEnv` param (the
+  // `SULIS_ORIGIN: "assisted; …"` stamp), but this 2-arg port signature drops
+  // it, so a web-chat session's commits don't yet carry the `assisted` trailer
+  // and fall back to inferred origin.
+  // REASON: live origin-stamping needs the relay to compute conversation+turn
+  // and pass it here; tracked as the origin-stamping-live follow-up (#23).
   spawnBridge(argv: string[], cwd: string): BridgeChildHandle;
   /** Bound the bridge startup so a stuck child can't leak the lock (§3.2). */
   startupTimeoutMs: number;

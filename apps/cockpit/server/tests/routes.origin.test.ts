@@ -301,6 +301,21 @@ describe("GET /api/changes/:id/origin (ADR-012)", () => {
     await rm(stampedRepo, { recursive: true, force: true });
   });
 
+  it("fail-soft unknown for a traversal `?path=` (safeJoin chokepoint)", async () => {
+    // A `../`-escape path must NOT be handed to the git boundary as a pathspec;
+    // safeJoin rejects it and the route returns a fail-soft unknown (not a 500).
+    const reader = new FakeChangeStoreReader([
+      record({ changeId: "01XYZ", worktreePath: repo, baseSha }),
+    ]);
+    const res = await request(app(reader)).get(
+      "/api/changes/01XYZ/origin?path=../../etc/passwd",
+    );
+    expect(res.status).toBe(200);
+    const body = res.body as OriginView;
+    expect(body.path).toBe("../../etc/passwd");
+    expect(body.origin.kind).toBe("unknown");
+  });
+
   it("rejects a POST to the origin route (read-only; 405)", async () => {
     const reader = new FakeChangeStoreReader([
       record({ changeId: "01XYZ", worktreePath: repo, baseSha }),

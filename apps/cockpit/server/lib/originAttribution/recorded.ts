@@ -22,6 +22,22 @@ import type { Origin } from "../../../shared/api-types";
 /** The trailer key the write paths stamp — the same family as Co-Authored-By. */
 export const ORIGIN_TRAILER_KEY = "Sulis-Origin";
 
+/**
+ * True if `value` carries any control character (newline, carriage return, tab,
+ * NUL, etc.). A trailer is a single line; a control char in the value is either
+ * malformed input or a trailer-injection attempt (a smuggled `\n` +
+ * `Forged-Trailer:` line). The mirror of the Python writer's guard
+ * (`_origin_stamp._has_control_char`): such a value is treated as no/unknown
+ * origin rather than parsed into a forged result.
+ */
+function hasControlChar(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code < 0x20 || code === 0x7f) return true;
+  }
+  return false;
+}
+
 /** Pull the `Sulis-Origin:` trailer VALUE from a full commit message, or null. */
 export function trailerValueFromMessage(message: string): string | null {
   const re = new RegExp(`^${ORIGIN_TRAILER_KEY}:\\s*(.+)$`, "im");
@@ -36,6 +52,10 @@ export function trailerValueFromMessage(message: string): string | null {
  */
 export function originFromTrailerValue(value: string | null): Origin | null {
   if (value === null) return null;
+  // A trailer is a SINGLE line. A control character anywhere in the value (a
+  // smuggled `\n` + forged trailer, a `\r`, etc.) is malformed or an injection
+  // attempt — treat as no/unknown origin (mirrors the Python writer's guard).
+  if (hasControlChar(value)) return null;
   const trimmed = value.trim();
   if (trimmed === "") return null;
 

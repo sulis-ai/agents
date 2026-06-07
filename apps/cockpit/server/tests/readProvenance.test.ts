@@ -258,8 +258,10 @@ describe("readProvenance — coverage (ADR-011)", () => {
       id: "dna:testresult:TR1",
       title: "Provenance digest passes",
       outcome: "pass",
+      kind: "testresult",
     });
     const scn = tested.items.find((i) => i.id === "dna:scenario:SCN1")!;
+    expect(scn.kind).toBe("scenario");
     // A scenario with no recorded outcome defaults to skip (never throws).
     expect(scn.outcome).toBe("skip");
   });
