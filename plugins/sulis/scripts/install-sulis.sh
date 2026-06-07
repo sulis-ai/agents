@@ -109,6 +109,7 @@ CORE_TOOLS=(
   "gh|required|GitHub CLI (for sulis-change ship + sulis-issues)"
   "python3|required|Python 3.11 or newer"
   "pipx|optional|isolated Python-CLI installer (recommended)"
+  "yq|optional|YAML reader for /sulis:index-specifications (mikefarah's — NOT apt's yq)"
 )
 
 # Probe tools — the existing install-probe-tools.sh installs these.
@@ -130,6 +131,7 @@ CODE_HEALTH_TOOLS=(
   "vulture|optional|Python dead-code detector"
   "ruff|optional|Python linter (Tier 5)"
   "mypy|optional|Python type-checker"
+  "testssl.sh|optional|TLS/cipher scanner (DAT-02; Docker-fallback, degrades to NOT_ASSESSED)"
 )
 
 # ─── Python version check ──────────────────────────────────────────────────
@@ -213,6 +215,12 @@ install_core_macos() {
       brew install "$t"
     fi
   done
+  # yq — brew's formula IS mikefarah's yq (the one /sulis:index-specifications
+  # needs). Optional; degrade loudly rather than fail the install.
+  if ! is_installed yq; then
+    info "Installing yq via brew (for /sulis:index-specifications)…"
+    brew install yq || warn "yq install failed; /sulis:index-specifications will be unavailable."
+  fi
   if is_installed pipx; then
     pipx ensurepath >/dev/null 2>&1 || true
   fi
@@ -234,6 +242,13 @@ install_core_debian() {
     warn "gh not in default apt repos for this Ubuntu version."
     warn "Follow: https://cli.github.com/manual/installation"
   fi
+  # Deliberately NOT `apt-get install yq` — Debian's `yq` is a different tool (a
+  # Python jq-wrapper) with incompatible syntax. /sulis:index-specifications needs
+  # mikefarah's yq — install via snap or the release binary.
+  if ! is_installed yq; then
+    warn "yq not installed (needed for /sulis:index-specifications)."
+    warn "Install mikefarah's yq: snap install yq — or https://github.com/mikefarah/yq/releases"
+  fi
   if is_installed pipx; then
     pipx ensurepath >/dev/null 2>&1 || true
   fi
@@ -244,6 +259,11 @@ install_core_fedora() {
   sudo dnf install -y git gh python3 python3-pip pipx
   if is_installed pipx; then
     pipx ensurepath >/dev/null 2>&1 || true
+  fi
+  # mikefarah's yq for /sulis:index-specifications (dnf's `yq` may be the jq-wrapper).
+  if ! is_installed yq; then
+    warn "yq not installed (needed for /sulis:index-specifications)."
+    warn "Install mikefarah's yq: https://github.com/mikefarah/yq/releases"
   fi
 }
 
@@ -280,9 +300,10 @@ install_code_health_macos() {
     err "Homebrew is required on macOS for code-health tools."
     exit 3
   fi
-  # Available via brew directly.
-  for t in hadolint trivy gitleaks semgrep; do
-    if ! is_installed "$t"; then
+  # Available via brew directly. (testssl's brew formula is `testssl`; the binary
+  # it installs is `testssl.sh` — the security review also has a Docker fallback.)
+  for t in hadolint trivy gitleaks semgrep testssl; do
+    if ! is_installed "$t" && ! is_installed "${t}.sh"; then
       info "Installing $t via brew (code-health, optional)…"
       brew install "$t" || warn "$t install failed; tier will degrade to NOT_ASSESSED."
     fi
