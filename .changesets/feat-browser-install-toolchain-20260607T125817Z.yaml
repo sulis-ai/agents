@@ -1,7 +1,0 @@
-change_id: RP254SVGRN9ZZS32JB5SAT9MKJ
-primitive: feat
-tier: minor
-touches_plugin: true
-summary: |
-  wire browser-proving into the plugin: declare the Playwright MCP as a dependent MCP server (.mcp.json, alongside mobbin) + add an opt-in --with-browser layer to install-sulis.sh that installs the playwright extra + chromium + checks Node. Graceful-degrade (optional, never fails the install), matching the code-health layer; not pulled by --all (heavy + opt-in). This is the install + MCP half of the browser-proving machinery (#92).
-created_at: 2026-06-07T12:58:17Z
