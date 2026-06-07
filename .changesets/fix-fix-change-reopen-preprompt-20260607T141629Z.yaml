@@ -1,7 +1,0 @@
-change_id: MS3FA5CMJ5RHGEQ4CAJRBW4HHX
-primitive: fix
-tier: patch
-touches_plugin: true
-summary: |
-  Reopening a change (focus/recreate) now auto-starts the session instead of sitting idle at an empty prompt. The terminal launcher defaults a change-context opening prompt whenever a caller omits one, so a re-spawned claude --agent sulis reads its recon + handoff and self-orients; start --spawn richer brief still wins. Also made _build_launch_script pure (no mkdir side-effect).
-created_at: 2026-06-07T14:16:29Z
