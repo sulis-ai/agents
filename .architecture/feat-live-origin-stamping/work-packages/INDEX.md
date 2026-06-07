@@ -43,7 +43,7 @@ max_parallel: 3
 | WP-003 | Conversation-identity port + local adapter + relay-origin helper (Thread id + Message ordinal) | expand-create | done | WP-001 | WP-004 |
 | WP-004 | Relay wires assisted Thread/Message origin; inferred path reconciles (closes #23) | expand-create | done | WP-002, WP-003 | WP-006 |
 | WP-005 | Executor exports autonomous SULIS_ORIGIN at commit | expand-create | done | — | WP-006 |
-| WP-006 | Grammar conformance + live likely→exact round-trip | reinforce-test | pending | WP-004, WP-005 | — |
+| WP-006 | Grammar conformance + live likely→exact round-trip | reinforce-test | done | WP-004, WP-005 | — |
 
 ## Notes
 
