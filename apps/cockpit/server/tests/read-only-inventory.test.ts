@@ -96,13 +96,36 @@ const TURN_SUMMARIES_BASENAME = "turnSummaries.ts";
 // process-start site the terminal composition introduces; allow-listed BY PATH
 // (parity with the bridge/mint/starter exceptions above). The HTTP surface
 // stays GET-only — the WS endpoint rides `upgrade`, never `app.post`.
-//   NOTE: WP-005 owns the FULL read-only-gate reconciliation (the
-//   `check-read-only.sh` shell gate, the WS-attachment exception for the
-//   sidecar file, the positive `test_terminal_seams_are_named_exceptions`
-//   assertion, and the `--explain` block). This single allow-list entry is the
-//   minimum needed to keep WP-004's own suite green now that index.ts spawns
-//   the host; the richer named-exception assertions land in WP-005.
+//   WP-005 (ADR-010) — this file is also the TERMINAL HOST start site: it is
+//   the ONLY file that starts the session-manager host process. It is named as
+//   one of the two terminal write seams (the other is the sidecar bridge's
+//   WS-attachment, below) in `test_terminal_seams_are_named_exceptions`.
 const HOST_BOOT_BASENAME = "index.ts";
+
+// WP-005 (ADR-010) — the terminal sidecar bridge is the SECOND founder-intended
+// write path's transport seam. It registers NO `app.post` and starts NO process
+// (the host spawn lives in index.ts); instead it attaches a WebSocket upgrade
+// handler to the existing HTTP server's `upgrade` event — the WS-ATTACHMENT
+// seam. A keystroke written into a live PTY through this seam is a sanctioned
+// write, gated at attach authorisation in the engine (ADR-010 §1). The gate
+// allow-lists this ONE file BY PATH for WS-attachment — every other file that
+// attaches a WS upgrade handler is a violation, the literal analogue of the
+// process-start rule. This keeps the GET-only HTTP surface provable AND names
+// the new write transport as an audited exception (not a silent bypass).
+//   INDEPENDENCE (founder directive): the terminal sidecar is its OWN bridge —
+//   it does not depend on, and is not coupled to, the chat relay/bridge. The
+//   allow-list ADDS the terminal seams alongside chat's; it does not couple them.
+const TERMINAL_SIDECAR_BASENAME = "TerminalSidecar.ts";
+
+// WS-attachment shapes — attaching a WebSocket upgrade handler to the HTTP
+// server. This is the terminal's write-transport seam (browser keystroke →
+// live PTY). Forbidden everywhere except the allow-listed sidecar bridge
+// (the ADR-010 WS-attachment rule), parity with PROCESS_START_PATTERNS.
+const WS_ATTACHMENT_PATTERNS = [
+  /\bnew\s+WebSocketServer\s*\(/,
+  /\.handleUpgrade\s*\(/,
+  /\.on\s*\(\s*["']upgrade["']/,
+];
 
 // Process-start shapes — spawn/exec of a child process. Forbidden everywhere
 // except the allow-listed bridge adapter (the new ADR-003 process-start rule).
@@ -438,5 +461,106 @@ describe("read-only inventory (TDD §13.7)", () => {
       // It DOES start a process (that is its sanctioned job).
       expect(PROCESS_START_PATTERNS.some((p) => p.test(src))).toBe(true);
     }
+  });
+
+  // WP-005 (ADR-010) — the interactive terminal is a SANCTIONED write path, not
+  // a read-only bypass. It introduces EXACTLY two write seams, each named and
+  // path-scoped (parity with ADR-003's chat relay/bridge pairing):
+  //   1. the terminal sidecar bridge's WS-ATTACHMENT (TerminalSidecar.ts) — the
+  //      browser-keystroke → live-PTY transport, gated at attach authorisation;
+  //   2. the session-manager host PROCESS-START (index.ts) — the one site that
+  //      spawns the Python host that owns the pty + AF_UNIX socket.
+  // This test is the positive proof: those two files are the ONLY terminal
+  // seams, every OTHER file that attaches a WS upgrade handler is a violation,
+  // and the chat seams (ADR-003) are untouched alongside them.
+  it("test_terminal_seams_are_named_exceptions — the sidecar WS-attachment + host start are the ONLY two terminal seams (ADR-010)", async () => {
+    const files = await collectSourceFiles();
+    expect(files.length).toBeGreaterThan(0);
+
+    // (a) WS-attachment is allow-listed BY PATH in exactly the sidecar bridge.
+    // Every other file that attaches a WS upgrade handler is a violation — the
+    // literal analogue of the process-start rule (the terminal's write is the
+    // keystroke that reaches the PTY through this attached socket).
+    const wsOffenders: string[] = [];
+    const wsAttachers = new Set<string>();
+    for (const f of files) {
+      const src = stripComments(await readSource(f));
+      const attachesWs = WS_ATTACHMENT_PATTERNS.some((p) => p.test(src));
+      if (!attachesWs) continue;
+      wsAttachers.add(basename(f));
+      if (basename(f) === TERMINAL_SIDECAR_BASENAME) continue;
+      wsOffenders.push(`${f} :: WS-attachment outside the sanctioned terminal sidecar`);
+    }
+    expect(wsOffenders, JSON.stringify(wsOffenders)).toEqual([]);
+    // The EXACT WS-attachment exception set: exactly the sidecar bridge attaches
+    // a WS upgrade handler — no more, no less. (A terminal view that mounted a
+    // second WS-attachment file would fail here.)
+    expect([...wsAttachers]).toEqual([TERMINAL_SIDECAR_BASENAME]);
+
+    // (b) The sidecar bridge itself starts NO process and registers NO write
+    // verb — its only write seam is the WS-attachment. The host spawn lives in
+    // index.ts; the two seams are deliberately separate files (ADR-010 §2).
+    const sidecar = files.find((f) => basename(f) === TERMINAL_SIDECAR_BASENAME);
+    expect(sidecar, "TerminalSidecar.ts must exist (the WS-attachment seam)").toBeDefined();
+    if (sidecar) {
+      const src = stripComments(await readSource(sidecar));
+      expect(PROCESS_START_PATTERNS.some((p) => p.test(src))).toBe(false);
+      expect(MUTATION_VERB_PATTERNS.some((p) => p.test(src))).toBe(false);
+      // It IS the WS-attachment seam (that is its sanctioned job).
+      expect(WS_ATTACHMENT_PATTERNS.some((p) => p.test(src))).toBe(true);
+    }
+
+    // (c) The session-manager host start is named in index.ts (the host PROCESS-
+    // start seam) and nowhere else — the host spawn is the second terminal seam.
+    const host = files.find((f) => basename(f) === HOST_BOOT_BASENAME);
+    expect(host, "index.ts must exist (the host process-start seam)").toBeDefined();
+    if (host) {
+      const src = stripComments(await readSource(host));
+      expect(PROCESS_START_PATTERNS.some((p) => p.test(src))).toBe(true);
+    }
+
+    // (d) INDEPENDENCE (founder directive): the terminal sidecar does NOT import
+    // the chat relay/bridge — the terminal seams are added alongside chat's, not
+    // coupled to them. The bridge stands up with no chat present.
+    if (sidecar) {
+      const raw = await readSource(sidecar);
+      expect(raw).not.toMatch(/from\s+["'][^"']*routes\/chat["']/);
+      expect(raw).not.toMatch(/from\s+["'][^"']*StreamJsonSessionBridge["']/);
+    }
+  });
+
+  // WP-005 (ADR-010 §3 / NFR-SEC-05) — reading a surface still starts NOTHING.
+  // The host process is started at server boot (the one audited index.ts site),
+  // never on a read. No read-view file (route/lib that serves a GET surface)
+  // starts a process or attaches a WS write seam. This extends the existing
+  // NFR-SEC-05 "loading a read view starts no session" assertion to cover the
+  // terminal's two new seam shapes (process-start + WS-attachment).
+  it("test_read_views_start_no_session — mounting a read view spawns no host / attaches no write seam (NFR-SEC-05)", async () => {
+    const files = await collectSourceFiles();
+    // The ONLY files permitted to start a process OR attach a WS write seam are
+    // the audited seams; a read view (everything else) does neither.
+    const SANCTIONED_SEAM_FILES = new Set([
+      BRIDGE_ADAPTER_BASENAME,
+      "gitShow.ts",
+      "SulisChangeStoreReader.ts",
+      "SulisChangeRecreator.ts",
+      SPINE_MINTER_BASENAME,
+      STARTER_BASENAME,
+      TURN_SUMMARIES_BASENAME,
+      HOST_BOOT_BASENAME,
+      TERMINAL_SIDECAR_BASENAME,
+    ]);
+    const readViewOffenders: string[] = [];
+    for (const f of files) {
+      if (SANCTIONED_SEAM_FILES.has(basename(f))) continue;
+      const src = stripComments(await readSource(f));
+      if (PROCESS_START_PATTERNS.some((p) => p.test(src))) {
+        readViewOffenders.push(`${f} :: read view starts a process`);
+      }
+      if (WS_ATTACHMENT_PATTERNS.some((p) => p.test(src))) {
+        readViewOffenders.push(`${f} :: read view attaches a WS write seam`);
+      }
+    }
+    expect(readViewOffenders, JSON.stringify(readViewOffenders)).toEqual([]);
   });
 });

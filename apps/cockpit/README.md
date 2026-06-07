@@ -15,7 +15,10 @@ runs the discovery skills and the validated spine emitters inside its session;
 the server starts no extra process. Every other route is GET-only and provably
 so; the read-only gate allow-lists exactly that one relay file (its write verbs)
 and the `SessionBridge` adapter (one process start), and fails the build on any
-mutation or process start anywhere else. It binds to `127.0.0.1` only.
+mutation or process start anywhere else. The interactive terminal is a SECOND
+sanctioned write path (ADR-010) — it adds exactly two more named, audited gate
+exceptions (the sidecar bridge's WebSocket attachment + the session-manager host
+start), detailed in the read-only gate section below. It binds to `127.0.0.1` only.
 
 This README covers the workspace shape, the dev-run flow, and the
 HTTP surface that ships with WP-001 + WP-010. The React components
@@ -223,6 +226,26 @@ write-verb allow-list stays exactly `{chat.ts}` (asserted by the gate, ADR-006).
 The cold-start onboarding route (`POST /api/onboarding/session`, WP-010) is the
 SECOND act path and follows the same rule: it is registered inside that SAME
 file and rides the SAME bridge, so the allow-list is unchanged.
+
+The interactive **terminal** is a SECOND sanctioned write path alongside chat
+(ADR-010) — typing into a live PTY is a write, gated at attach authorisation in
+the engine, not a read-only bypass. It adds **exactly two** named gate
+exceptions, each a single audited file (parity with the chat relay/bridge
+pairing, never a blanket waiver):
+
+- the **sidecar bridge** (`adapters/TerminalSidecar.ts`) — the one WS-attachment
+  seam. It attaches a WebSocket upgrade handler to the existing HTTP server's
+  `upgrade` event (the keystroke → live-PTY transport); it registers no
+  `app.post`, so the HTTP surface stays GET-only. The gate's WS-attachment rule
+  (`new WebSocketServer` / `.handleUpgrade` / `.on("upgrade"`) flags this shape
+  in any _other_ file.
+- the **session-manager host start** (`index.ts`) — the one site that spawns the
+  Python host owning the pty + AF_UNIX socket. It joins the process-start
+  allow-list; the host starts at server boot (one audited site), never on a read.
+
+The terminal is its OWN bridge — added alongside chat's seams, never coupled to
+them (it does not import the chat relay or the chat bridge). Run
+`npm run check:read-only -- --explain` for the full rule catalogue.
 
 ### Cold-start onboarding (WP-010)
 

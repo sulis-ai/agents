@@ -74,13 +74,36 @@ specific class of mutation is absent from the active source tree.
      Forbids: spawn / spawnSync / execFile / execFileSync of ANY child
      EXCEPT in server/adapters/StreamJsonSessionBridge.ts (the one session
      process-start site), server/lib/gitShow.ts (read-only `git show`), the
-     audited change read/recreate/mint/start adapters, and
+     audited change read/recreate/mint/start adapters,
      server/lib/turnSummaries.ts (ADR-015 named exception): it spawns `claude`
      headless to produce the Haiku one-line turn summary it caches on disk — a
-     best-effort derived-summary helper, not a session start.
+     best-effort derived-summary helper, not a session start, and
+       - server/index.ts (ADR-010/011 — the TERMINAL HOST start): the server
+         entry spawns the ONE long-lived Python session-manager host at boot
+         (the terminal engine owner that owns the pty + AF_UNIX socket). It is
+         the second founder-intended write path's process-start seam; allow-
+         listed BY PATH alongside the chat bridge above. No other file may start
+         the host. The host is started at boot (a single audited site), never on
+         a read.
      Why: resume/spawn launches a `claude` session — the most consequential
      side effect in the app. It is confined to one audited adapter; loading
      any read surface starts no process (NFR-SEC-05).
+
+  2c. WebSocket-attachment outside the sanctioned terminal sidecar (WP-005, ADR-010)
+     Forbids: attaching a WebSocket upgrade handler to the HTTP server —
+     `new WebSocketServer(`, `.handleUpgrade(`, or `.on("upgrade"` — of ANY
+     kind EXCEPT in server/adapters/TerminalSidecar.ts (ADR-010 — the terminal
+     sidecar bridge: the ONE WS-ATTACHMENT write-transport seam).
+     Why: typing into a live PTY is a write — keystrokes drive a real shell in
+     the change's worktree. The terminal is a SANCTIONED write path (ADR-010),
+     gated at attach authorisation in the engine, not a read-only bypass. Its
+     transport seam is the WebSocket upgrade attachment; it is confined to one
+     named, audited file. The HTTP surface stays GET-only — the WS endpoint
+     rides `upgrade`, never `app.post`. Every other file that attaches a WS
+     upgrade handler is a violation, the literal analogue of rule 2b for the
+     terminal's write transport. INDEPENDENCE (founder directive): the terminal
+     sidecar is its OWN bridge — added alongside chat's seams (ADR-003), never
+     coupled to them.
 
   5. HTTP mutation verbs on the Express app/router
      Forbids: app/router .post / .put / .patch / .delete in server/ EXCEPT in:
@@ -167,8 +190,15 @@ ADVANCED_ROUTE_REL="server/routes/advanced.ts"          # operator POSTs: reveal
 CHANGE_ADVANCED_REL="server/lib/changeAdvanced.ts"      # operator "stop a process" — SIGTERM/SIGKILL
 TURN_SUMMARIES_REL="server/lib/turnSummaries.ts"        # turn-summary disk cache write + Haiku `claude` spawn
 
+# WP-005 (ADR-010) — the interactive terminal is a SANCTIONED write path. The
+# gate names EXACTLY two terminal write seams, each allow-listed BY PATH (parity
+# with the ADR-003 relay/bridge pairing): the sidecar bridge's WS-ATTACHMENT
+# (the keystroke → live-PTY transport, rule 2c) and the session-manager host
+# PROCESS-START (server/index.ts, in rule 2b's set). No exception beyond these.
+TERMINAL_SIDECAR_REL="server/adapters/TerminalSidecar.ts"  # the ONE WS-attachment seam (ADR-010)
+
 # Accumulate per-rule hits across all files.
-declare -a fs_hits=() git_spawn_hits=() git_verb_hits=() kill_hits=() http_hits=() bind_hits=() proc_hits=()
+declare -a fs_hits=() git_spawn_hits=() git_verb_hits=() kill_hits=() http_hits=() bind_hits=() proc_hits=() ws_hits=()
 
 for f in "${SOURCE_FILES[@]}"; do
   rel="${f#"$ROOT"/}"
@@ -267,6 +297,24 @@ for f in "${SOURCE_FILES[@]}"; do
       ;;
   esac
 
+  # 2c. WP-005 (ADR-010 NEW rule) — WebSocket-attachment (attaching a WS upgrade
+  #     handler to the HTTP server) outside the sanctioned terminal sidecar.
+  #     Typing into a live PTY is a write; the terminal's write transport is the
+  #     WebSocket upgrade attachment. The shapes: `new WebSocketServer(`,
+  #     `.handleUpgrade(`, `.on("upgrade"`. Allow-listed BY PATH in exactly the
+  #     sidecar bridge (parity with rule 2b's process-start allow-list). Every
+  #     OTHER file that attaches a WS upgrade handler is flagged — the literal
+  #     analogue of "the bridge is the only thing that starts a session".
+  #     The host PROCESS-start (server/index.ts) is the second terminal seam and
+  #     is covered by rule 2b's allow-list above; here we guard the WS transport.
+  if [ "$rel" != "$TERMINAL_SIDECAR_REL" ]; then
+    while IFS= read -r line; do
+      [ -n "$line" ] && ws_hits+=("$rel: $line")
+    done < <(printf '%s\n' "$stripped" | grep -nE \
+      '(new[[:space:]]+WebSocketServer[[:space:]]*\(|\.handleUpgrade[[:space:]]*\(|\.on[[:space:]]*\([[:space:]]*["'\'']upgrade["'\''])' \
+      || true)
+  fi
+
   # 3. Mutating git verbs as quoted argv tokens
   while IFS= read -r line; do
     [ -n "$line" ] && git_verb_hits+=("$rel: $line")
@@ -317,6 +365,7 @@ done
 report "filesystem write API"        "${fs_hits[@]+"${fs_hits[@]}"}"
 report "git spawn outside gitShow.ts" "${git_spawn_hits[@]+"${git_spawn_hits[@]}"}"
 report "process start outside the sanctioned bridge" "${proc_hits[@]+"${proc_hits[@]}"}"
+report "WS-attachment outside the sanctioned terminal sidecar" "${ws_hits[@]+"${ws_hits[@]}"}"
 report "mutating git verb token"      "${git_verb_hits[@]+"${git_verb_hits[@]}"}"
 report "non-zero process signal"      "${kill_hits[@]+"${kill_hits[@]}"}"
 report "HTTP mutation verb"           "${http_hits[@]+"${http_hits[@]}"}"
