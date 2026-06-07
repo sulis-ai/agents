@@ -244,12 +244,20 @@ for f in "${SOURCE_FILES[@]}"; do
     server/adapters/SulisChangeRecreator.ts | \
     server/adapters/SpineEmitterMinter.ts | \
     server/adapters/SulisChangeStarter.ts | \
+    server/index.ts | \
     "$TURN_SUMMARIES_REL")
       ;; # sanctioned process-start site — skip
       #   - turnSummaries.ts (ADR-015) — spawns `claude` headless to produce the
       #     Haiku one-line turn summary cached on disk. A derived-summary helper,
       #     not a session start; the summary is best-effort + the spawn is the
       #     only consequential call it makes.
+      #   - server/index.ts (WP-004, ADR-010/011) — spawns the ONE long-lived
+      #     Python session-manager host at boot (the terminal engine owner). The
+      #     HTTP surface stays GET-only (the WS endpoint rides `upgrade`, never
+      #     app.post). NOTE: WP-005 owns the full gate reconciliation (the
+      #     WS-attachment exception for the sidecar file + the --explain doc +
+      #     the positive named-exception assertion). This entry is the minimum to
+      #     keep WP-004's branch green now that index.ts spawns the host.
     *)
       while IFS= read -r line; do
         [ -n "$line" ] && proc_hits+=("$rel: $line")
