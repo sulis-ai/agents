@@ -1,0 +1,3 @@
+{"change}
+{openTerminal}
+# both resolve in lexical scope (Dashboard openTerminal const; map change param)
