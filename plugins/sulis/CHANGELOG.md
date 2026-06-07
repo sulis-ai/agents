@@ -1,3 +1,9 @@
+## v0.116.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- Autonomous Delivery Environment — cockpit (chat, Files repo-browser, Provenance view, change-origin tracing) + provenance/origin backend + performance pass.
+
 ## v0.115.0 — 2026-06-07
 
 **Minor — release-train batch.**
