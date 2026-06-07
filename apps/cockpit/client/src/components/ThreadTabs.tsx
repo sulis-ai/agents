@@ -1,18 +1,20 @@
-// WP-013 — <ThreadTabs /> — URL-driven tab switcher (Chat | Files).
+// WP-013 / WP-008 — <ThreadTabs /> — URL-driven tab switcher
+// (Chat | Files | Terminal).
 //
-// The active tab is read from the search-param ?tab=chat|files;
+// The active tab is read from the search-param ?tab=chat|files|terminal;
 // clicking a tab updates the search param so the URL is the source of
 // truth (shareable within the same machine; preserves on refresh).
 //
 // Renders ONE panel at a time (the inactive tab's children are not
-// mounted). This keeps the Files tab (Monaco-bearing) from loading
-// when the founder is on Chat.
+// mounted). This keeps the Files tab (Monaco-bearing) AND the Terminal
+// tab (xterm.js-bearing — it attaches a live session on mount) from
+// loading when the founder is on another tab. (WP-008 added Terminal.)
 
 import type { ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import styles from "../styles/Thread.module.css";
 
-export type TabId = "chat" | "files";
+export type TabId = "chat" | "files" | "terminal";
 
 interface Props {
   /** The Chat panel content. Always provided. */
@@ -20,12 +22,21 @@ interface Props {
   /** The Files panel content. WP-014 ships the real one; this WP
    *  accepts a placeholder. */
   files: ReactNode;
+  /** The Terminal panel content — <LiveTerminal/> (WP-008). Only mounted
+   *  when the Terminal tab is active, so xterm.js attaches a live session
+   *  only when the founder is actually looking at it. */
+  terminal: ReactNode;
 }
 
-export function ThreadTabs({ chat, files }: Props) {
+function parseTab(raw: string | null): TabId {
+  if (raw === "files") return "files";
+  if (raw === "terminal") return "terminal";
+  return "chat";
+}
+
+export function ThreadTabs({ chat, files, terminal }: Props) {
   const [params, setParams] = useSearchParams();
-  const rawTab = params.get("tab");
-  const active: TabId = rawTab === "files" ? "files" : "chat";
+  const active: TabId = parseTab(params.get("tab"));
 
   function select(tab: TabId) {
     const next = new URLSearchParams(params);
@@ -58,14 +69,39 @@ export function ThreadTabs({ chat, files }: Props) {
         >
           Files
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={active === "terminal"}
+          className={active === "terminal" ? styles.tabActive : styles.tab}
+          onClick={() => select("terminal")}
+        >
+          Terminal
+        </button>
       </div>
       {active === "chat" ? (
-        <div role="tabpanel" data-testid="tab-panel-chat" className={styles.panel}>
+        <div
+          role="tabpanel"
+          data-testid="tab-panel-chat"
+          className={styles.panel}
+        >
           {chat}
         </div>
-      ) : (
-        <div role="tabpanel" data-testid="tab-panel-files" className={styles.panel}>
+      ) : active === "files" ? (
+        <div
+          role="tabpanel"
+          data-testid="tab-panel-files"
+          className={styles.panel}
+        >
           {files}
+        </div>
+      ) : (
+        <div
+          role="tabpanel"
+          data-testid="tab-panel-terminal"
+          className={styles.panel}
+        >
+          {terminal}
         </div>
       )}
     </div>

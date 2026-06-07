@@ -20,6 +20,7 @@ import { ThreadHeader } from "../components/ThreadHeader";
 import { ThreadTabs } from "../components/ThreadTabs";
 import { Chat } from "../components/Chat";
 import { FilesPanel } from "../components/FilesPanel";
+import { LiveTerminal } from "../components/LiveTerminal";
 import { ContractLinks } from "../components/ContractLinks";
 import styles from "../styles/Thread.module.css";
 
@@ -71,6 +72,7 @@ export function ThreadView() {
       <ThreadTabs
         chat={<Chat changeId={id} />}
         files={<FilesPanel changeId={id} />}
+        terminal={<LiveTerminal changeId={id} />}
       />
     </section>
   );
