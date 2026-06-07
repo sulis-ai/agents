@@ -24,7 +24,6 @@ Tests (RED first, per the WP Definition of Done):
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 import threading
@@ -33,118 +32,28 @@ from pathlib import Path
 
 import pytest
 
-from _session_manager.adapter import Capabilities, SessionSpec
-from _session_manager.events import Event, ExpectedError, TurnResult
+from _session_manager.adapter import SessionSpec
+from _session_manager.events import ExpectedError
 from _session_manager.manager import SessionManager
 
-# The shared fake-claude child helper lives under tests/lib (mirrors the
-# session suites' import pattern — sys.path.insert, then import).
+# Shared test helpers live under tests/lib (mirrors the session suites' import
+# pattern — sys.path.insert, then import). ``session_child_adapters`` carries the
+# real pty + pipe ProviderAdapters extracted at the 2-consumer threshold (EP-03,
+# shared with tests/integration/test_socket_server.py); ``fake_claude_child`` is
+# the real PTY-backed child it spawns.
 _SCRIPTS_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_SCRIPTS_DIR / "tests" / "lib"))
 import fake_claude_child  # noqa: E402
+from session_child_adapters import (  # noqa: E402
+    PIPE_CHILD_SOURCE as _PIPE_CHILD_SOURCE,
+    PipeChildAdapter as _PipeChildAdapter,
+    PtyChildAdapter as _PtyChildAdapter,
+)
 
 # Bounded wait for a threaded assertion: long enough never to flake on a loaded
 # CI runner, short enough that a real hang fails fast. Matches the session
 # suites' _WAIT.
 _WAIT = 5.0
-
-
-class _PtyChildAdapter:
-    """A real :class:`ProviderAdapter` whose child runs as a raw PTY terminal.
-
-    ``spawn_argv`` starts WP-006's ``fake_claude_child`` in ``pty`` mode (echoes
-    stdin to stdout, emits ``PTY_PONG`` on the ``__PTY_PING__`` sentinel). The
-    encode/decode/turn_complete trio is unused on the pty path (a pty session is
-    a terminal view, not a structured-chat stream), but the Protocol shape is
-    honoured so the manager treats it like any other adapter.
-    """
-
-    capabilities = Capabilities(
-        supports_resume=False,
-        supports_tools=False,
-        supports_partial_streaming=False,
-    )
-
-    def __init__(self, child: Path) -> None:
-        self._child = child
-
-    def spawn_argv(self, spec: SessionSpec) -> list[str]:
-        return fake_claude_child.child_argv(self._child, mode="pty")
-
-    def encode(self, command: str) -> bytes:  # pragma: no cover - unused on pty
-        return command.encode("utf-8")
-
-    def decode(self, line: bytes):  # pragma: no cover - unused on pty
-        return None
-
-    def turn_complete(self, event) -> bool:  # pragma: no cover - unused on pty
-        return False
-
-
-# A tiny scripted pipe child (mirrors test_session_manager_core.py): emits one
-# chunk then a terminal result per stdin turn. Used only by the pipe-mode
-# NOT_PTY_SESSION test, so a real (non-pty) session exists to attach against.
-_PIPE_CHILD_SOURCE = r"""
-import json, sys
-
-def emit(obj):
-    sys.stdout.write(json.dumps(obj) + "\n")
-    sys.stdout.flush()
-
-for line in sys.stdin:
-    line = line.strip()
-    if not line:
-        continue
-    try:
-        msg = json.loads(line)
-    except Exception:
-        continue
-    text = str(msg.get("command", ""))
-    emit({"kind": "chunk", "text": text})
-    emit({"kind": "result", "input_tokens": 1, "output_tokens": len(text),
-          "duration_ms": 1, "stop_reason": "end_turn"})
-"""
-
-
-class _PipeChildAdapter:
-    """A real pipe-mode :class:`ProviderAdapter` over a tiny scripted child."""
-
-    capabilities = Capabilities(
-        supports_resume=False,
-        supports_tools=False,
-        supports_partial_streaming=True,
-    )
-
-    def __init__(self, child: Path) -> None:
-        self._child = child
-
-    def spawn_argv(self, spec: SessionSpec) -> list[str]:
-        return [sys.executable, str(self._child)]
-
-    def encode(self, command: str) -> bytes:
-        return (json.dumps({"command": command}) + "\n").encode("utf-8")
-
-    def decode(self, line: bytes) -> Event | None:
-        record = json.loads(line)
-        if record.get("kind") == "chunk":
-            return Event(offset=-1, key="", turn=-1, kind="chunk", text=record["text"])
-        if record.get("kind") == "result":
-            return Event(
-                offset=-1,
-                key="",
-                turn=-1,
-                kind="result",
-                result=TurnResult(
-                    input_tokens=int(record.get("input_tokens", 0)),
-                    output_tokens=int(record.get("output_tokens", 0)),
-                    duration_ms=int(record.get("duration_ms", 0)),
-                    stop_reason=str(record.get("stop_reason", "")),
-                ),
-            )
-        return None
-
-    def turn_complete(self, event: Event) -> bool:
-        return event.kind == "result"
 
 
 def _wait_for(predicate, timeout: float = _WAIT) -> bool:
