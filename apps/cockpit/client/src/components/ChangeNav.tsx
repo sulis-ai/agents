@@ -46,9 +46,20 @@ interface Props {
   change: Change;
   activeView: ChangeView;
   onSelectView: (view: ChangeView) => void;
+  /**
+   * Warm a view's data on hover/focus so switching to it is instant. Fired on
+   * pointer-enter AND focus (keyboard parity). Optional — the nav renders the
+   * same without it.
+   */
+  onPrefetchView?: (view: ChangeView) => void;
 }
 
-export function ChangeNav({ change, activeView, onSelectView }: Props) {
+export function ChangeNav({
+  change,
+  activeView,
+  onSelectView,
+  onPrefetchView,
+}: Props) {
   const running = change.liveness.status === "running";
   const currentIndex =
     change.stage === "shipped"
@@ -95,6 +106,8 @@ export function ChangeNav({ change, activeView, onSelectView }: Props) {
               : styles.navitem
           }
           onClick={() => onSelectView(id)}
+          onMouseEnter={() => onPrefetchView?.(id)}
+          onFocus={() => onPrefetchView?.(id)}
         >
           <Icon className={styles.ic} aria-hidden="true" />
           {label}

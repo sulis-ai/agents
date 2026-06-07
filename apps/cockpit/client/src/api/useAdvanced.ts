@@ -5,7 +5,8 @@
 // these OS-side calls are fine; stop is guarded server-side).
 
 import { useQuery } from "@tanstack/react-query";
-import { ApiError, apiGet, apiPost } from "./client";
+import { ApiError, apiPost } from "./client";
+import { advancedQuery } from "./viewQueries";
 
 export type ProcessHealth = "running" | "orphaned" | "defunct";
 
@@ -28,8 +29,7 @@ export interface AdvancedData {
 
 export function useAdvanced(changeId: string) {
   return useQuery({
-    queryKey: ["advanced", changeId],
-    queryFn: () => apiGet<AdvancedData>(`/api/changes/${changeId}/advanced`),
+    ...advancedQuery(changeId),
     enabled: changeId.length > 0,
     refetchInterval: 5000, // processes are live
   });

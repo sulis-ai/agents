@@ -13,11 +13,19 @@
 //
 // One state-pattern set (ADR-005): loading skeleton, 404-gone, generic error.
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useChange } from "../api/useChange";
 import { useStatus } from "../api/useStatus";
 import { ApiError } from "../api/client";
+import { changedQuery, provenanceQuery, treeQuery } from "../api/fileQueries";
+import {
+  advancedQuery,
+  contractPreviewQuery,
+  transcriptQuery,
+  turnSummariesQuery,
+} from "../api/viewQueries";
 import { ChangeNav, type ChangeView } from "../components/ChangeNav";
 import { stageLabel } from "../components/StageBadge";
 import { Chat } from "../components/Chat";
@@ -35,6 +43,56 @@ export function ThreadView() {
   const query = useChange(id);
   const statusQuery = useStatus(id);
   const [view, setView] = useState<ChangeView>("conversation");
+  const queryClient = useQueryClient();
+
+  // Warm a view's primary read(s) on nav hover/focus so the click lands on a
+  // cache hit and the switch is instant. Each view maps to the SAME query
+  // definitions its hook consumes (fileQueries / viewQueries — DRY/EP-03), so
+  // there's one fetch definition per read. Skip the already-active view.
+  //
+  // The static file reads (tree/changed/provenance) carry their own staleTime
+  // (FILE_QUERY_CACHE), so repeated hovers are free. The live reads (transcript
+  // / turn-summaries / contract / advanced) default to staleTime 0, which would
+  // refire on every hover — so the prefetch passes a short HOVER_STALE_TIME to
+  // gate repeats without touching the hooks' own polling cadence.
+  const prefetchView = useCallback(
+    (target: ChangeView) => {
+      if (target === view || id.length === 0) return;
+      const HOVER_STALE_TIME = 10_000;
+      switch (target) {
+        case "conversation":
+          void queryClient.prefetchQuery({
+            ...transcriptQuery(id),
+            staleTime: HOVER_STALE_TIME,
+          });
+          void queryClient.prefetchQuery({
+            ...turnSummariesQuery(id),
+            staleTime: HOVER_STALE_TIME,
+          });
+          break;
+        case "files":
+          void queryClient.prefetchQuery(treeQuery(id, ""));
+          void queryClient.prefetchQuery(changedQuery(id));
+          break;
+        case "provenance":
+          void queryClient.prefetchQuery(provenanceQuery(id));
+          break;
+        case "preview":
+          void queryClient.prefetchQuery({
+            ...contractPreviewQuery(id),
+            staleTime: HOVER_STALE_TIME,
+          });
+          break;
+        case "advanced":
+          void queryClient.prefetchQuery({
+            ...advancedQuery(id),
+            staleTime: HOVER_STALE_TIME,
+          });
+          break;
+      }
+    },
+    [queryClient, id, view],
+  );
 
   if (query.isLoading) {
     return (
@@ -72,7 +130,12 @@ export function ThreadView() {
 
   return (
     <div data-testid="page-thread" className={ws.change}>
-      <ChangeNav change={change} activeView={view} onSelectView={setView} />
+      <ChangeNav
+        change={change}
+        activeView={view}
+        onSelectView={setView}
+        onPrefetchView={prefetchView}
+      />
 
       <div className={ws.main}>
         {view === "conversation" && (

@@ -7,7 +7,7 @@
 // entry is never an error, just "not generated yet".
 
 import { useQuery } from "@tanstack/react-query";
-import { apiGet } from "./client";
+import { turnSummariesQuery } from "./viewQueries";
 
 export interface TurnSummaries {
   /** turnKey -> generated summary. */
@@ -18,9 +18,7 @@ export interface TurnSummaries {
 
 export function useTurnSummaries(changeId: string) {
   return useQuery({
-    queryKey: ["turn-summaries", changeId],
-    queryFn: () =>
-      apiGet<TurnSummaries>(`/api/changes/${changeId}/turn-summaries`),
+    ...turnSummariesQuery(changeId),
     enabled: changeId.length > 0,
     // Background generation fills in over a few cycles; poll to pick it up.
     refetchInterval: 5000,

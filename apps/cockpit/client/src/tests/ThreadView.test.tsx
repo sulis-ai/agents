@@ -11,7 +11,7 @@
 // + needs-attention badge show; switching views swaps the main area.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThreadView } from "../pages/ThreadView";
@@ -30,9 +30,8 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-function renderAt(initialPath: string) {
-  const client = freshClient();
-  return render(
+function renderAt(initialPath: string, client = freshClient()) {
+  const utils = render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
@@ -41,6 +40,7 @@ function renderAt(initialPath: string) {
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  return { ...utils, client };
 }
 
 const sampleChange: ChangeDetail = {
@@ -169,6 +169,77 @@ describe("<ThreadView /> — change workspace (chat-B2)", () => {
     await waitFor(() =>
       expect(screen.getByTestId("thread-gone-or-moved")).toBeInTheDocument(),
     );
+  });
+
+  // Hover/focus on a nav item warms THAT view's primary read(s) so the click
+  // lands on a cache hit. We spy on queryClient.prefetchQuery and assert the
+  // right query key(s) fire per nav item — for both pointer-enter and focus
+  // (keyboard parity). Conversation is the active view, so it's skipped.
+  function keysOf(spy: { mock: { calls: unknown[][] } }): string[][] {
+    return spy.mock.calls.map(
+      (c) => (c[0] as { queryKey: string[] }).queryKey,
+    );
+  }
+
+  it.each<[string, string, string[][]]>([
+    ["view-files", "files", [["tree", "abc", ""], ["changed", "abc"]]],
+    ["view-provenance", "provenance", [["provenance", "abc"]]],
+    ["view-preview", "preview", [["contract-preview", "abc"]]],
+    ["view-advanced", "advanced", [["advanced", "abc"]]],
+    [
+      "view-conversation",
+      "conversation",
+      [["transcript", "abc"], ["turn-summaries", "abc"]],
+    ],
+  ])(
+    "hovering %s prefetches its view's read(s)",
+    async (testid, _view, expectedKeys) => {
+      mockFetch({});
+      const client = freshClient();
+      const spy = vi.spyOn(client, "prefetchQuery");
+      // Conversation is the default active view; switch off it so every item
+      // (including conversation) is a non-active target that prefetches.
+      const { findByTestId } = renderAt("/c/abc", client);
+      const nav = await findByTestId("change-nav");
+      fireEvent.click(within(nav).getByTestId("view-files"));
+      spy.mockClear();
+
+      fireEvent.mouseEnter(within(nav).getByTestId(testid));
+      // Files is the active view after the click above — skip its own re-hover.
+      if (testid === "view-files") {
+        expect(spy).not.toHaveBeenCalled();
+        return;
+      }
+      const got = keysOf(spy);
+      for (const key of expectedKeys) {
+        expect(got).toContainEqual(key);
+      }
+    },
+  );
+
+  it("fires the same prefetch on keyboard focus as on hover (a11y parity)", async () => {
+    mockFetch({});
+    const client = freshClient();
+    const spy = vi.spyOn(client, "prefetchQuery");
+    const { findByTestId } = renderAt("/c/abc", client);
+    const nav = await findByTestId("change-nav");
+    spy.mockClear();
+
+    fireEvent.focus(within(nav).getByTestId("view-provenance"));
+    expect(keysOf(spy)).toContainEqual(["provenance", "abc"]);
+  });
+
+  it("does not prefetch the already-active view on hover", async () => {
+    mockFetch({});
+    const client = freshClient();
+    const spy = vi.spyOn(client, "prefetchQuery");
+    const { findByTestId } = renderAt("/c/abc", client);
+    const nav = await findByTestId("change-nav");
+    spy.mockClear();
+
+    // Conversation is the active default — hovering it must not refetch.
+    fireEvent.mouseEnter(within(nav).getByTestId("view-conversation"));
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it("renders a loading state while the change is in flight (one state-pattern set)", async () => {
