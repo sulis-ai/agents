@@ -1,0 +1,7 @@
+change_id: E7DJ6GYNAKHYN0KH224NK48NG8
+primitive: feat
+tier: minor
+touches_plugin: true
+summary: |
+  deterministic browser driver: the scenario dispatcher gains a browser driver (url/actions/assert) that drives a real browser via lazy/optional Playwright, so a machine can prove auth/UI flows as a regression gate. Stdlib-only contract kept (Playwright is an opt-in lazy default; absent -> the step DEFERS with the need, never a fake green). First slice of the journey-rigor #88 machine-half; agent-driven driver + dev session-mint are the next slices.
+created_at: 2026-06-07T10:20:14Z

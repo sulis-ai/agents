@@ -24,9 +24,11 @@ def test_change_skill_offers_the_human_handoff_for_blocked_journeys() -> None:
     assert "human-attested" in low and "by hand" in low
 
 
-def test_dispatch_names_the_browser_driver_followon() -> None:
+def test_dispatch_names_the_browser_path_no_silent_gap() -> None:
     t = _DISPATCH.read_text(encoding="utf-8").lower()
-    # browser flows route via human → manual → attestation today; the automated
-    # driver is a NAMED follow-on, not a silent gap
-    assert "browser" in t and "follow-on" in t
-    assert "sulis-attest-scenario" in t
+    # The deterministic browser driver is now BUILT; the agent-driven one is the
+    # next slice. Either way browser flows are named, never a silent gap, and a
+    # browser step a machine can't complete still routes to the human-attest path.
+    assert "browser" in t and "deterministic" in t
+    assert "next slice" in t or "follow-on" in t          # the agent-driven half
+    assert "sulis-attest-scenario" in t                   # the human path remains
