@@ -1,0 +1,4 @@
+{"id":"1","method":"open","params":{"key":"chg_01KTGY","spec":{"provider":"claude","cwd":"/\u2026/worktree","io_mode":"pipe"}}}
+{"id":"1","ok":true,"result":{"key":"chg_01KTGY","pid":51200,"provider":"claude","io_mode":"pipe","viewer_count":0,"state":"ready"}}
+{"id":"7","method":"attach","params":{"key":"chg_01KTGY"}}
+{"id":"7","ok":false,"error":{"category":"expected","code":"NOT_PTY_SESSION","message":"session is pipe io-mode; open with io_mode='pty' to get a terminal"}}
