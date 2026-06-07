@@ -46,6 +46,7 @@ from _session_manager.event_log import EventLog
 from _session_manager.events import (
     CWD_NOT_FOUND,
     NO_SESSION,
+    NOT_PTY_SESSION,
     PTY_OPEN_FAILED,
     SESSION_DISABLED,
     SPAWN_FAILED,
@@ -69,6 +70,7 @@ from _session_manager.maintenance import (
 )
 from _session_manager.session import Session
 from _session_manager.state import Health, SessionState, SessionStatus
+from _session_manager.viewer import Viewer, ViewerRegistry
 
 # Default per-session scrollback ceiling for a pty session (contract §2.11.3,
 # the Armor ceiling — bounded memory is a MUST): 1 MiB is generous for a terminal
@@ -99,6 +101,13 @@ class SessionManager:
         self._adapters = dict(adapters)
         self._tuning = dict(tuning)
         self._sessions: dict[str, Session] = {}
+        # WP-004 attach/viewer: one ViewerRegistry per pty session, keyed by
+        # session key. Wired to the session's ``on_pty_output`` broadcast seam at
+        # spawn (so live master reads fan out to attached viewers) and torn down
+        # at ``close``. A pipe session has no entry (there is no terminal to
+        # attach to; attach on it declines NOT_PTY_SESSION). Guarded by the same
+        # registry lock as ``_sessions`` since the two are mutated together.
+        self._viewer_registries: dict[str, ViewerRegistry] = {}
         # Guards the registry; per-session concurrency lives on each Session.
         self._registry_lock = threading.Lock()
         # WP-005 restart-on-death + resume + recovery budget. The ``_on_process_\
@@ -225,6 +234,15 @@ class SessionManager:
                 scrollback=scrollback,
                 resumed=resume,
             )
+            # WP-004 attach/viewer: a pty session gets a ViewerRegistry wired to
+            # its ``on_pty_output`` broadcast seam BEFORE the pumps run, so the
+            # very first live master read fans out to any viewer that attaches.
+            # The registry carries across restart on the same Session (the seam
+            # survives ``replace_process``, §2.12.3). A pipe session gets none.
+            if master_fd is not None:
+                registry = ViewerRegistry(session)
+                session.on_pty_output = registry.broadcast
+                self._viewer_registries[key] = registry
             # Register restart-on-death BEFORE the pumps run, so even a child
             # that dies instantly is recovered (§2.7). The callback routes to
             # the manager's hook, which delegates to the lifecycle.
@@ -295,6 +313,12 @@ class SessionManager:
             state=session.state_machine.state.value,
             pid=session.pid,
             provider=session.spec.provider,
+            # Visible/headless observability (§2.12.5): io-model from the spec,
+            # viewer_count from the per-session registry (the single source of
+            # truth — viewer_count > 0 ⇔ visible). A pipe session has no registry,
+            # so its count is 0 and io_mode "pipe" (byte-unchanged, acceptance #4).
+            io_mode=session.spec.io_mode,
+            viewer_count=self._viewer_count(key),
         )
 
     def status(self) -> list[SessionStatus]:
@@ -320,6 +344,9 @@ class SessionManager:
                     memory_bytes=rss_by_pid.get(session.pid, 0),
                     last_activity=session.last_activity,
                     log_len=session.log.next_offset(),
+                    # Visible/headless observability (§2.12.5), mirroring health().
+                    io_mode=session.spec.io_mode,
+                    viewer_count=self._viewer_count(session.key),
                 )
             )
         return snapshot
@@ -341,6 +368,13 @@ class SessionManager:
         """
         with self._registry_lock:
             session = self._sessions.pop(key, None)
+            # WP-004: drop + close the pty session's viewer registry so every
+            # attached viewer's ``stream`` ends cleanly (the end sentinel) and a
+            # long-lived manager accumulates no stale registries. A pipe session
+            # has no entry — ``pop`` is a no-op.
+            registry = self._viewer_registries.pop(key, None)
+        if registry is not None:
+            registry.close()
         if session is None:
             return
         # Drop the WP-007 guard's per-turn state for this session (cancel any
@@ -348,6 +382,38 @@ class SessionManager:
         # entries; then tear the session down.
         self._guards.detach(session)
         session.terminate()
+
+    # ── §2.12 attach/viewer (WP-004) ───────────────────────────────────────
+
+    def attach(self, key: str) -> Viewer:
+        """Attach a viewer to the pty-mode session for ``key`` (contract
+        §2.12.2). Returns a :class:`~_session_manager.viewer.Viewer` that yields
+        the scrollback snapshot then live PTY bytes (acceptance #1) and feeds
+        keystrokes back into the live PTY master (acceptance #2).
+
+        Multiple viewers may attach to one session (each renders the same
+        screen); attach is additive and never restarts the process (§2.12.2).
+        Attaching makes the session *visible* (``viewer_count`` rises); detaching
+        the last viewer leaves it *headless* but running (§2.12.3).
+
+        Errors: Expected ``NO_SESSION`` (no session for ``key``); Expected
+        ``NOT_PTY_SESSION`` (the session is pipe io-mode — there is no terminal
+        to attach to; the consumer must ``open`` with ``io_mode="pty"``, §2.15);
+        Internal.
+        """
+        session = self._require_session(key)
+        # NOT_PTY_SESSION is decided by the session's io-model, not a flag: a
+        # pipe session has no pty master + no scrollback, so there is no terminal
+        # to attach to. The registry exists iff the session is pty (wired at open).
+        with self._registry_lock:
+            registry = self._viewer_registries.get(key)
+        if registry is None or session.pty_master_fd is None:
+            raise ExpectedError(
+                NOT_PTY_SESSION,
+                f"session {key!r} is pipe io-mode; open with io_mode='pty' to "
+                f"get a terminal",
+            )
+        return registry.attach()
 
     # ── §2.2 the WP-004-owned liveness primitive ───────────────────────────
 
@@ -582,6 +648,17 @@ class SessionManager:
         except OSError:
             pass
         return process, master_fd
+
+    def _viewer_count(self, key: str) -> int:
+        """The attached-viewer count for ``key`` — ``viewer_count`` (§2.12.5).
+
+        Reads the per-session :class:`ViewerRegistry`'s live count (the single
+        source of truth for visible/headless); a session with no registry (a pipe
+        session, or one already closed) is headless: ``0``. Cheap + side-effect-
+        free, as the §2.3 observational surface requires."""
+        with self._registry_lock:
+            registry = self._viewer_registries.get(key)
+        return registry.count if registry is not None else 0
 
     def _require_session(self, key: str) -> Session:
         """Return the live session for ``key`` or raise Expected

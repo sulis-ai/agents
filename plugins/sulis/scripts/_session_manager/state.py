@@ -32,6 +32,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Literal
 
 
 class SessionState(Enum):
@@ -154,12 +155,21 @@ class Health:
     (``"ready"`` / ``"executing"`` / ``"dead"`` / ``"permanently_disabled"`` /
     …); ``pid`` is the OS process id (``None`` once the process is gone);
     ``provider`` is the adapter key the session was opened with.
+
+    ``io_mode`` + ``viewer_count`` (NEW, additive, defaulted — contract §2.12.5)
+    make visible/headless observable without a new method: ``io_mode`` is
+    ``"pipe"`` (the chat path) or ``"pty"`` (a terminal), and ``viewer_count`` is
+    the number of attached viewers — ``> 0`` ⇔ visible, ``0`` ⇔ headless. Both
+    default so an existing pipe-session ``Health`` is byte-unchanged (acceptance
+    #4): a pipe session reads ``io_mode="pipe"``, ``viewer_count=0``.
     """
 
     alive: bool
     state: str
     pid: int | None
     provider: str
+    io_mode: Literal["pipe", "pty"] = "pipe"
+    viewer_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -171,6 +181,12 @@ class SessionStatus:
     no signature churn). ``last_activity`` is a monotonic-clock timestamp of the
     session's most recent send/append; ``log_len`` is the number of events
     retained in the session's log.
+
+    ``io_mode`` + ``viewer_count`` (NEW, additive, defaulted — contract §2.12.5)
+    mirror :class:`Health`: ``io_mode`` is the session's io-model and
+    ``viewer_count`` is its attached-viewer count (``> 0`` ⇔ visible). Both
+    default so an existing pipe-session ``SessionStatus`` snapshot is byte-
+    unchanged (acceptance #4).
     """
 
     key: str
@@ -180,3 +196,5 @@ class SessionStatus:
     memory_bytes: int
     last_activity: float
     log_len: int
+    io_mode: Literal["pipe", "pty"] = "pipe"
+    viewer_count: int = 0
