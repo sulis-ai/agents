@@ -1,7 +1,0 @@
-change_id: 01KTGYDA7XJDGAMGBEMGXR9YF0
-primitive: extend
-tier: minor
-touches_plugin: true
-summary: |
-  Interactive/visible terminal sessions: the session manager owns a PTY from birth with a terminal-scrollback model and an attach/viewer mechanism, served over a local socket, so the cockpit renders a live, watch-and-type change-session terminal in the browser (the change-terminal launcher opens it as a left-nav view). Headless chat path unchanged.
-created_at: 2026-06-07T19:49:39Z

@@ -1,3 +1,9 @@
+## v0.117.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- Interactive/visible terminal sessions: the session manager owns a PTY from birth with a terminal-scrollback model and an attach/viewer mechanism, served over a local socket, so the cockpit renders a live, watch-and-type change-session terminal in the browser (the change-terminal launcher opens it as a left-nav view). Headless chat path unchanged.
+
 ## v0.116.0 — 2026-06-07
 
 **Minor — release-train batch.**
