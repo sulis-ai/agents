@@ -38,6 +38,11 @@ UNKNOWN_PROVIDER = "UNKNOWN_PROVIDER"
 CWD_NOT_FOUND = "CWD_NOT_FOUND"
 OFFSET_EVICTED = "OFFSET_EVICTED"
 SESSION_DISABLED = "SESSION_DISABLED"
+# attach/feed/resize targeted a pipe-mode session — there is no terminal to
+# attach to; the consumer must open() with io_mode="pty" (contract §2.12.2 /
+# §2.15; ADR-003). Expected: the op ran and deterministically declined, with no
+# new error category.
+NOT_PTY_SESSION = "NOT_PTY_SESSION"
 
 # Internal — an unexpected crash (a bug).
 DECODE_FAILED = "DECODE_FAILED"

@@ -141,6 +141,16 @@ class Session:
     on_event: "Callable[[Session, Event], None] | None" = field(
         default=None, repr=False
     )
+    #: Registered by the manager (WP-004 viewers): ``on_pty_output(data)`` is
+    #: fired by the master-reader pump for every raw byte chunk it appends to
+    #: ``scrollback`` — the live-feed broadcast seam the per-session viewer
+    #: registry subscribes to so each attached viewer's ``stream`` receives live
+    #: PTY output (contract §2.12.2; acceptance #1). Mirrors ``on_event``:
+    #: ``None`` until registered, so a pty session with no viewers (headless) is
+    #: untouched — the pump still fills the scrollback ring, it just broadcasts to
+    #: nobody. Carried across restart on the same Session (the registry is wired
+    #: once at spawn; §2.12.3).
+    on_pty_output: "Callable[[bytes], None] | None" = field(default=None, repr=False)
 
     # ── private synchronisation + threads (not part of the value surface) ──
     _commands: "queue.Queue" = field(default_factory=queue.Queue, repr=False)
@@ -334,6 +344,15 @@ class Session:
         pump's per-event point), if a guard is registered (§2.7). The runaway
         counter + the watchdog-cancel observe here."""
         self._fire_guard_hook(self.on_event, self, event)
+
+    def _fire_pty_output(self, data: bytes) -> None:
+        """Fire the ``on_pty_output`` broadcast seam for one raw master-read
+        chunk (the pty pump's per-chunk point), if a viewer registry is wired
+        (WP-004, §2.12.2). Reuses :meth:`_fire_guard_hook`'s fire-if-registered,
+        never-crash-the-pump discipline (Blue: one method, now three callers) — a
+        viewer-fanout fault must never kill the master-reader pump (which would
+        stop the scrollback ring filling). No-op for a headless pty session."""
+        self._fire_guard_hook(self.on_pty_output, data)
 
     def force_terminate_turn(self, *, terminal: SessionState, error: Event) -> None:
         """End the in-flight turn on a guard trip: surface ``error`` then move to
@@ -725,6 +744,12 @@ class Session:
             with self._lock:
                 self.last_activity = time.monotonic()
             scrollback.append(data)
+            # Broadcast the live chunk to any attached viewers (WP-004), AFTER
+            # the scrollback append so a viewer attaching at this instant takes a
+            # snapshot that already includes ``data`` (the registry registers
+            # before snapshotting, so a small overlap is harmless; a gap is not).
+            # No-op when no registry is wired (a headless pty session, §2.12.5).
+            self._fire_pty_output(data)
         # EOF / master gone — run the SAME EOF death discipline as the stdout pump
         # so a pty child that dies is restarted like a pipe child (§2.7/§2.12.3).
         # Pass the pump's OWN captured process (not self.process) so a stale pump
