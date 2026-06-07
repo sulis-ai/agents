@@ -1,0 +1,24 @@
+{
+  "pr": "feat/wp-009-cli-driver-observed-done",
+  "project": "persistent-chat-sessions",
+  "verdict": "PASS",
+  "build_verification": { "errors": 0, "checker": "ruff", "result": "All checks passed" },
+  "hygiene": {
+    "scope": { "severity": "low", "note": "single concern: CLI driver + tests + one adapter argv fix the gate surfaced" },
+    "size": { "severity": "low", "lines_added": 1000, "files_changed": 7, "note": "logically one WP; new CLI module + its tests" },
+    "safety": { "severity": "none", "migrations": 0, "schemas": 0, "secrets": 0, "infra": 0 },
+    "completeness": { "severity": "none", "new_source": 2, "new_tests": 3, "note": "every new source file has tests; observed-done evidence captured" }
+  },
+  "lenses": {
+    "architecture": { "in_changes": 1, "in_neighbours": 0, "top": "CLI reads session.state_machine.state.value directly (note: identical to public health().state; left as-is — Session is the documented honest-state surface)" },
+    "security": { "in_changes": 0, "in_neighbours": 0, "note": "no secrets/eval/shell=True; SULIS_SESSION_CLAUDE_ARGV is a documented test-only seam requiring pre-existing env control; no privilege escalation" },
+    "quality": { "in_changes": 1, "in_neighbours": 0, "top": "local 'import os' inside _run_demo (fixed inline: moved to module top)" }
+  },
+  "findings_resolved": {
+    "inline": 1,
+    "notes": 1,
+    "remediation_wps": 0,
+    "exceptions": 0
+  },
+  "files_read_end_to_end": 7
+}
