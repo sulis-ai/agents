@@ -46,11 +46,14 @@ from _session_manager.event_log import EventLog
 from _session_manager.events import (
     CWD_NOT_FOUND,
     NO_SESSION,
+    NOT_PTY_SESSION,
+    PTY_OPEN_FAILED,
     SESSION_DISABLED,
     SPAWN_FAILED,
     UNKNOWN_PROVIDER,
     Event,
     ExpectedError,
+    InternalError,
     ProtocolError,
 )
 from _session_manager.guards import (
@@ -59,6 +62,7 @@ from _session_manager.guards import (
     TurnGuardManager,
 )
 from _session_manager.lifecycle import DEFAULT_RECOVERY_BUDGET, LifecycleManager
+from _session_manager.scrollback import ScrollbackBuffer
 from _session_manager.maintenance import (
     DEFAULT_MAINTENANCE_INTERVAL_SECONDS,
     MaintenanceManager,
@@ -66,6 +70,13 @@ from _session_manager.maintenance import (
 )
 from _session_manager.session import Session
 from _session_manager.state import Health, SessionState, SessionStatus
+from _session_manager.viewer import Viewer, ViewerRegistry
+
+# Default per-session scrollback ceiling for a pty session (contract §2.11.3,
+# the Armor ceiling — bounded memory is a MUST): 1 MiB is generous for a terminal
+# screen + deep scrollback; appending past it drops oldest bytes. Overridable via
+# the ``scrollback_capacity_bytes`` tuning kwarg.
+DEFAULT_SCROLLBACK_CAPACITY_BYTES = 1024 * 1024
 
 
 class SessionManager:
@@ -90,6 +101,13 @@ class SessionManager:
         self._adapters = dict(adapters)
         self._tuning = dict(tuning)
         self._sessions: dict[str, Session] = {}
+        # WP-004 attach/viewer: one ViewerRegistry per pty session, keyed by
+        # session key. Wired to the session's ``on_pty_output`` broadcast seam at
+        # spawn (so live master reads fan out to attached viewers) and torn down
+        # at ``close``. A pipe session has no entry (there is no terminal to
+        # attach to; attach on it declines NOT_PTY_SESSION). Guarded by the same
+        # registry lock as ``_sessions`` since the two are mutated together.
+        self._viewer_registries: dict[str, ViewerRegistry] = {}
         # Guards the registry; per-session concurrency lives on each Session.
         self._registry_lock = threading.Lock()
         # WP-005 restart-on-death + resume + recovery budget. The ``_on_process_\
@@ -131,6 +149,14 @@ class SessionManager:
         self._maintenance_interval = float(
             self._tuning.get(
                 "maintenance_interval", DEFAULT_MAINTENANCE_INTERVAL_SECONDS
+            )
+        )
+        # Per-session scrollback ceiling for pty sessions (§2.11.3, the Armor
+        # ceiling). Defaults to 1 MiB; overridable via the tuning kwarg so a host
+        # under memory pressure can shrink it without a signature change.
+        self._scrollback_capacity = int(
+            self._tuning.get(
+                "scrollback_capacity_bytes", DEFAULT_SCROLLBACK_CAPACITY_BYTES
             )
         )
         self._maintenance_stop = threading.Event()
@@ -188,16 +214,35 @@ class SessionManager:
                 )
 
             resume = bool(spec.resume_ref) and adapter.capabilities.supports_resume
-            process = self._spawn_process(adapter, spec)
+            process, master_fd = self._spawn_process(adapter, spec)
 
+            # A pty session owns a ScrollbackBuffer (§2.11) alongside its log; the
+            # master-reader pump appends raw terminal bytes to it. A pipe session
+            # leaves both pty fields None (byte-for-byte unchanged, acceptance #4).
+            scrollback = (
+                ScrollbackBuffer(capacity_bytes=self._scrollback_capacity)
+                if master_fd is not None
+                else None
+            )
             session = Session(
                 key=key,
                 spec=spec,
                 adapter=adapter,
                 log=EventLog(),
                 process=process,
+                pty_master_fd=master_fd,
+                scrollback=scrollback,
                 resumed=resume,
             )
+            # WP-004 attach/viewer: a pty session gets a ViewerRegistry wired to
+            # its ``on_pty_output`` broadcast seam BEFORE the pumps run, so the
+            # very first live master read fans out to any viewer that attaches.
+            # The registry carries across restart on the same Session (the seam
+            # survives ``replace_process``, §2.12.3). A pipe session gets none.
+            if master_fd is not None:
+                registry = ViewerRegistry(session)
+                session.on_pty_output = registry.broadcast
+                self._viewer_registries[key] = registry
             # Register restart-on-death BEFORE the pumps run, so even a child
             # that dies instantly is recovered (§2.7). The callback routes to
             # the manager's hook, which delegates to the lifecycle.
@@ -268,6 +313,12 @@ class SessionManager:
             state=session.state_machine.state.value,
             pid=session.pid,
             provider=session.spec.provider,
+            # Visible/headless observability (§2.12.5): io-model from the spec,
+            # viewer_count from the per-session registry (the single source of
+            # truth — viewer_count > 0 ⇔ visible). A pipe session has no registry,
+            # so its count is 0 and io_mode "pipe" (byte-unchanged, acceptance #4).
+            io_mode=session.spec.io_mode,
+            viewer_count=self._viewer_count(key),
         )
 
     def status(self) -> list[SessionStatus]:
@@ -293,6 +344,9 @@ class SessionManager:
                     memory_bytes=rss_by_pid.get(session.pid, 0),
                     last_activity=session.last_activity,
                     log_len=session.log.next_offset(),
+                    # Visible/headless observability (§2.12.5), mirroring health().
+                    io_mode=session.spec.io_mode,
+                    viewer_count=self._viewer_count(session.key),
                 )
             )
         return snapshot
@@ -314,6 +368,13 @@ class SessionManager:
         """
         with self._registry_lock:
             session = self._sessions.pop(key, None)
+            # WP-004: drop + close the pty session's viewer registry so every
+            # attached viewer's ``stream`` ends cleanly (the end sentinel) and a
+            # long-lived manager accumulates no stale registries. A pipe session
+            # has no entry — ``pop`` is a no-op.
+            registry = self._viewer_registries.pop(key, None)
+        if registry is not None:
+            registry.close()
         if session is None:
             return
         # Drop the WP-007 guard's per-turn state for this session (cancel any
@@ -321,6 +382,38 @@ class SessionManager:
         # entries; then tear the session down.
         self._guards.detach(session)
         session.terminate()
+
+    # ── §2.12 attach/viewer (WP-004) ───────────────────────────────────────
+
+    def attach(self, key: str) -> Viewer:
+        """Attach a viewer to the pty-mode session for ``key`` (contract
+        §2.12.2). Returns a :class:`~_session_manager.viewer.Viewer` that yields
+        the scrollback snapshot then live PTY bytes (acceptance #1) and feeds
+        keystrokes back into the live PTY master (acceptance #2).
+
+        Multiple viewers may attach to one session (each renders the same
+        screen); attach is additive and never restarts the process (§2.12.2).
+        Attaching makes the session *visible* (``viewer_count`` rises); detaching
+        the last viewer leaves it *headless* but running (§2.12.3).
+
+        Errors: Expected ``NO_SESSION`` (no session for ``key``); Expected
+        ``NOT_PTY_SESSION`` (the session is pipe io-mode — there is no terminal
+        to attach to; the consumer must ``open`` with ``io_mode="pty"``, §2.15);
+        Internal.
+        """
+        session = self._require_session(key)
+        # NOT_PTY_SESSION is decided by the session's io-model, not a flag: a
+        # pipe session has no pty master + no scrollback, so there is no terminal
+        # to attach to. The registry exists iff the session is pty (wired at open).
+        with self._registry_lock:
+            registry = self._viewer_registries.get(key)
+        if registry is None or session.pty_master_fd is None:
+            raise ExpectedError(
+                NOT_PTY_SESSION,
+                f"session {key!r} is pipe io-mode; open with io_mode='pty' to "
+                f"get a terminal",
+            )
+        return registry.attach()
 
     # ── §2.2 the WP-004-owned liveness primitive ───────────────────────────
 
@@ -361,9 +454,14 @@ class SessionManager:
         same honest rule as first ``open`` (§2.7). The fresh process replaces
         the dead one on the SAME session (same key, same log) via
         :meth:`Session.replace_process`, which restarts the pumps; the log's
-        offsets keep climbing and every prior event stays readable."""
-        process = self._spawn_process(session.adapter, session.spec)
-        session.replace_process(process)
+        offsets keep climbing and every prior event stays readable.
+
+        For a pty session the fresh spawn re-creates the PTY (a new
+        ``os.openpty`` master, §2.12.3); the new master fd is handed to
+        ``replace_process``, which closes the old master and keeps the scrollback
+        across the restart (restart-is-not-a-new-key applied to scrollback)."""
+        process, master_fd = self._spawn_process(session.adapter, session.spec)
+        session.replace_process(process, master_fd)
 
     def _maintenance_tick(self) -> None:
         """One pass of the periodic maintenance loop (§2.7), filled by WP-006.
@@ -459,20 +557,32 @@ class SessionManager:
 
     def _spawn_process(
         self, adapter: ProviderAdapter, spec: SessionSpec
-    ) -> subprocess.Popen:
+    ) -> tuple[subprocess.Popen, int | None]:
         """Launch one child process for ``spec`` via ``adapter.spawn_argv``.
 
         The single spawn path shared by first ``open`` and restart-on-death
-        ``_respawn`` (§2.7) — extracted so the resume-flag decision (the adapter
-        appends ``--resume`` iff ``spec.resume_ref`` is set, and the manager
-        only passes a ref when the adapter supports resume) and the
-        ``SPAWN_FAILED`` mapping live in exactly one place. The streams are all
-        PIPEs (§2.8 transport).
+        ``_respawn`` (§2.7) — and the **single seam** the io-model branches at
+        (contract §2.12.1, ADR-001; WPB-07 composition root). Returns
+        ``(process, master_fd)``: ``master_fd`` is ``None`` for the default pipe
+        io-model and the manager-owned PTY master end for the pty io-model.
+        Extracted so the resume-flag decision and the spawn error mapping live in
+        exactly one place.
 
-        Errors: Protocol ``SPAWN_FAILED`` (the spawn itself failed)."""
+        - **pipe** (default): today's ``subprocess.Popen`` with stdin/stdout/
+          stderr all PIPEs (§2.8 transport) — byte-for-byte unchanged.
+        - **pty** (§2.12.1): ``os.openpty()`` allocates a master/slave pair
+          (stdlib, ADR-001 alt #4 rejection — no third-party pty lib); the child
+          is spawned with the slave fd as stdin/stdout/stderr (its controlling
+          terminal), the slave is closed in the parent (the child holds it), and
+          the master fd is returned for the session's master-reader pump.
+
+        Errors: Protocol ``SPAWN_FAILED`` (the pipe spawn failed); Internal
+        ``PTY_OPEN_FAILED`` (``os.openpty`` / the pty spawn failed, §2.15)."""
         argv = adapter.spawn_argv(spec)
+        if spec.io_mode == "pty":
+            return self._spawn_pty_process(argv, spec)
         try:
-            return subprocess.Popen(
+            process = subprocess.Popen(
                 argv,
                 cwd=spec.cwd,
                 stdin=subprocess.PIPE,
@@ -484,6 +594,71 @@ class SessionManager:
                 SPAWN_FAILED,
                 f"could not spawn {spec.provider!r}: {exc}",
             ) from exc
+        return process, None
+
+    def _spawn_pty_process(
+        self, argv: list[str], spec: SessionSpec
+    ) -> tuple[subprocess.Popen, int]:
+        """Spawn ``argv`` on a fresh PTY the manager owns from birth (§2.12.1).
+
+        Allocates the master/slave pair with ``os.openpty()`` (stdlib, ADR-001),
+        launches the child with the slave end as its controlling terminal
+        (stdin/stdout/stderr → slave), closes the slave in the parent (the child
+        holds it; the parent keeps only the master), and returns
+        ``(process, master_fd)``. The manager **owns its own PTY** — it spawns
+        its own child onto it, exactly as it owns its pipe-backed child today; it
+        never drives a terminal it did not spawn (ADR-001, foundation alt #4
+        rejection).
+
+        Any failure — ``os.openpty`` (fd exhaustion / kernel pty limit) or the
+        spawn-with-slave — maps to Internal ``PTY_OPEN_FAILED`` (§2.15): a
+        resource/bug condition to log + escalate, not a retry-with-backoff
+        transport decline. Both fds are closed on a spawn failure so a failed
+        open leaks no fd."""
+        try:
+            master_fd, slave_fd = os.openpty()
+        except OSError as exc:
+            raise InternalError(
+                PTY_OPEN_FAILED,
+                f"os.openpty() failed for {spec.provider!r}: {exc}",
+            ) from exc
+        try:
+            process = subprocess.Popen(
+                argv,
+                cwd=spec.cwd,
+                stdin=slave_fd,
+                stdout=slave_fd,
+                stderr=slave_fd,
+                close_fds=True,
+            )
+        except (OSError, ValueError) as exc:
+            for fd in (slave_fd, master_fd):
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+            raise InternalError(
+                PTY_OPEN_FAILED,
+                f"could not spawn {spec.provider!r} on a pty: {exc}",
+            ) from exc
+        # The child now holds the slave end as its controlling tty; the parent
+        # keeps only the master. Close the parent's slave copy.
+        try:
+            os.close(slave_fd)
+        except OSError:
+            pass
+        return process, master_fd
+
+    def _viewer_count(self, key: str) -> int:
+        """The attached-viewer count for ``key`` — ``viewer_count`` (§2.12.5).
+
+        Reads the per-session :class:`ViewerRegistry`'s live count (the single
+        source of truth for visible/headless); a session with no registry (a pipe
+        session, or one already closed) is headless: ``0``. Cheap + side-effect-
+        free, as the §2.3 observational surface requires."""
+        with self._registry_lock:
+            registry = self._viewer_registries.get(key)
+        return registry.count if registry is not None else 0
 
     def _require_session(self, key: str) -> Session:
         """Return the live session for ``key`` or raise Expected

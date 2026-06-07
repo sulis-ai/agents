@@ -12,12 +12,14 @@
     "lint": "eslint --ext .ts,.tsx .",
     "test": "vitest run",
     "check:read-only": "bash scripts/check-read-only.sh",
-    "test:e2e": "playwright test --config e2e/playwright.config.ts"
+    "test:e2e": "playwright test --config e2e/playwright.config.ts",
+    "test:e2e:terminal": "playwright test --config e2e/live-terminal.config.ts"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "@monaco-editor/react": "^4.7.0",
     "@tanstack/react-query": "^5.100.14",
+    "@xterm/xterm": "^6.0.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "react": "^19.2.6",
@@ -36,6 +38,7 @@
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "@types/supertest": "^6.0.3",
+    "@types/ws": "^8.5.12",
     "@typescript-eslint/eslint-plugin": "^8.60.0",
     "@typescript-eslint/parser": "^8.60.0",
     "@vitejs/plugin-react": "^6.0.2",
@@ -50,6 +53,7 @@
     "tsx": "^4.22.3",
     "typescript": "^6.0.3",
     "vite": "^8.0.14",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.7",
+    "ws": "^8.18.0"
   }
 }

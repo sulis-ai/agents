@@ -1,0 +1,50 @@
+{
+  "wp": "WP-003",
+  "project": "interactive-terminal-sessions",
+  "branch": "feat/wp-003-pty-io-model",
+  "base": "change/extend-interactive-terminal-sessions",
+  "timestamp": "2026-06-07T134404Z",
+  "verdict": "PASS",
+  "outcome_plain": "Ready to merge",
+  "build_verification": {
+    "errors_introduced": 0,
+    "linter": "ruff",
+    "linter_result": "pass",
+    "py_compile": "ok",
+    "typechecker": "none-configured"
+  },
+  "pr_hygiene": {
+    "scope": {"severity": "low", "commit_types": ["feat"], "module_fan_out": 1},
+    "size": {"severity": "low", "lines_added": 288, "lines_removed": 44, "net": 244, "files_changed": 6},
+    "safety": {"severity": "low", "migrations": 0, "schema_idl": 0, "infra": 0, "secret_hits": 0},
+    "completeness": {"severity": "low", "new_source_without_test": 0}
+  },
+  "findings": {
+    "in_changes": [
+      {
+        "id": "F-01",
+        "severity": "medium",
+        "lens": "architecture",
+        "file": "_session_manager/session.py",
+        "symbol": "_pty_master_pump",
+        "summary": "pty pump passed self.process instead of its captured process to _handle_eof_death; broke the stale-pump invariant the docstring claims",
+        "status": "fixed-inline"
+      }
+    ],
+    "in_neighbours": [],
+    "watch_list": [
+      {
+        "summary": "pty restart re-creation + master-pump EOF death discipline have dedicated integration proof (test_terminal_lifecycle.py::test_restart_recreates_pty) owned by a later WP per TDD 6.4",
+        "status": "out-of-scope-for-WP-003"
+      }
+    ]
+  },
+  "lenses": {
+    "architecture": {"findings": 1, "status": "complete"},
+    "security": {"findings": 0, "status": "nothing-surfaced", "note": "attach/feed is WP-004; pty bytes read-only into scrollback; no auth/injection/secret surface"},
+    "quality": {"findings": 0, "status": "complete", "cr10_perf": "no-anti-pattern-matches", "test_coverage": "present"}
+  },
+  "draft_fixes": 0,
+  "addressed": true,
+  "resolution": "1 inline fix (F-01); 0 remediation WPs; 0 exceptions"
+}
