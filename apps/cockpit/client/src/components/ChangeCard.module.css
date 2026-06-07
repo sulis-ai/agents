@@ -52,6 +52,27 @@
   color: var(--muted-foreground);
 }
 
+/* WP-009 — "Open terminal" action row (the cockpit-rendered terminal path). */
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.openTerminal {
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  border-radius: var(--radius-interactive);
+  cursor: pointer;
+}
+
+.openTerminal:hover {
+  border-color: var(--primary);
+}
+
 .livenessGroup {
   display: inline-flex;
   align-items: center;

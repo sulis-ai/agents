@@ -1,5 +1,17 @@
 """Cross-platform terminal launcher for the change-as-primitive flow.
 
+DEPRECATED(strangle): the OS-window launch path (Terminal.app / gnome-terminal
+spawning ``claude`` directly, NOT backed by the session manager) is a
+deprecated FALLBACK as of WP-009. "Open this change's terminal" now defaults to
+the in-cockpit ``<LiveTerminal/>`` path (a pty-mode session in the manager,
+rendered in the browser). The OS-window path here is reachable ONLY when the
+``SULIS_TERMINAL_OS_WINDOW`` environment flag is set (default off), retained as
+an offline / no-cockpit fallback until the cockpit path is proven. Removal is
+tracked: see the ``removal_plan`` in
+``.architecture/interactive-terminal-sessions/work-packages/WP-009-change-terminal-launcher-repoint.md``
+(deletion target 2026-07-31, gated on WP-010 e2e green + a founder dogfood run).
+Do NOT extend this path; new terminal work belongs on the cockpit-rendered seam.
+
 Port of `ae_task_executor/terminal_launcher.py` (504 LOC) stripped to the
 load-bearing cross-platform spawn path for sulis's single-founder,
 single-machine v1 use case. See:
@@ -24,6 +36,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import platform
 import re
 import shlex
@@ -41,6 +54,14 @@ logger = logging.getLogger("sulis.terminal_launcher")
 
 
 # ─── Module-level constants ────────────────────────────────────────────────
+
+# DEPRECATED(strangle, WP-009) — opt-in flag for the OS-window fallback.
+# The visible OS-window launch (Terminal.app / gnome-terminal) is reachable
+# ONLY when this env var is truthy. Default off: the in-cockpit <LiveTerminal/>
+# path is the default "open this change's terminal". Removal tracked in WP-009's
+# removal_plan (target 2026-07-31).
+_OS_WINDOW_FLAG = "SULIS_TERMINAL_OS_WINDOW"
+_OS_WINDOW_TRUTHY = frozenset({"1", "true", "yes", "on"})
 
 # entry_command whitelist: lower-case letters/digits, spaces, dashes.
 _ENTRY_COMMAND_RE = re.compile(r"^[a-z][a-z0-9 \-]+$")
@@ -74,6 +95,20 @@ _LINUX_TERMINAL_APPS = ("gnome-terminal", "konsole", "xterm")
 _PRE_PROMPT_HEREDOC_TAG = "SULIS_PROMPT_EOF"
 _PRE_PROMPT_SIDECAR = "pre_prompt.txt"  # co-located with launch.sh in the change dir
 _PRE_PROMPT_MAX_BYTES = 50_000
+
+
+# ─── Strangle gate (WP-009) ────────────────────────────────────────────────
+
+
+def _os_window_enabled() -> bool:
+    """Return True when the OS-window fallback is opted into via the flag.
+
+    DEPRECATED(strangle, WP-009). Default off: when ``SULIS_TERMINAL_OS_WINDOW``
+    is absent or not truthy, the visible OS-window launch is suppressed in
+    favour of the in-cockpit ``<LiveTerminal/>`` path. Truthy values: ``1``,
+    ``true``, ``yes``, ``on`` (case-insensitive).
+    """
+    return os.environ.get(_OS_WINDOW_FLAG, "").strip().lower() in _OS_WINDOW_TRUTHY
 
 
 # ─── Validators (pure functions, no subprocess) ────────────────────────────
@@ -464,6 +499,22 @@ def launch_change_terminal(
     ok, resolved = validate_worktree_path(worktree_path)
     if not ok:
         raise ValueError(f"worktree_path is not an existing directory: {worktree_path}")
+
+    # DEPRECATED(strangle, WP-009) gate. A VISIBLE launch is the OS-window path
+    # — now a deprecated fallback. Unless the founder opts in via the flag, the
+    # in-cockpit <LiveTerminal/> path is the default, so suppress the OS window
+    # and return a structured pointer to it (no window spawns, no launch.sh
+    # written). The headless path (visible=False) is NOT the OS-window path and
+    # is not gated — automation that needs a background session still works.
+    if visible and not _os_window_enabled():
+        result = _failed(
+            "the OS-window terminal launch is deprecated (WP-009); open this "
+            "change's terminal in the cockpit instead. To use the OS-window "
+            f"fallback, set {_OS_WINDOW_FLAG}=1.",
+            "",  # no launch.sh written on the suppressed path
+        )
+        result["session_json_path"] = ""
+        return result
 
     script_body = _build_launch_script(
         change_id, resolved, entry_command=entry_command,

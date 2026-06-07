@@ -10,16 +10,28 @@
 //   - isSuccess + empty   → <EmptyState />
 //   - isSuccess + items   → grid of <ChangeCard>s
 
+import { useNavigate } from "react-router-dom";
+
 import { useChangesWithLiveness } from "../api/useChangesWithLiveness";
 import { ChangeCard } from "../components/ChangeCard";
 import { EmptyState } from "../components/EmptyState";
 import { RefreshButton } from "../components/RefreshButton";
+import { launchChangeTerminal } from "../utils/launchChangeTerminal";
 import styles from "./Dashboard.module.css";
 
 const SKELETON_COUNT = 4;
 
 export function Dashboard() {
   const query = useChangesWithLiveness();
+  const navigate = useNavigate();
+
+  // WP-009 — "open this change's terminal" opens the in-cockpit Terminal tab
+  // (the cockpit-rendered <LiveTerminal/> path), strangling the OS-window
+  // launcher. Fire-and-forget: launchChangeTerminal navigates synchronously,
+  // then warms the pty session best-effort (it never rejects on warm failure).
+  const openTerminal = (changeId: string) => {
+    void launchChangeTerminal(changeId, { navigate });
+  };
 
   return (
     <section className={styles.page} data-testid="page-dashboard">
@@ -63,7 +75,11 @@ export function Dashboard() {
       {query.isSuccess && query.data.length > 0 && (
         <div className={styles.grid}>
           {query.data.map((change) => (
-            <ChangeCard key={change.changeId} change={change} />
+            <ChangeCard
+              key={change.changeId}
+              change={change}
+              onOpenTerminal={openTerminal}
+            />
           ))}
         </div>
       )}

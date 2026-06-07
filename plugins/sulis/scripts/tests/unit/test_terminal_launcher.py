@@ -386,6 +386,7 @@ def test_launch_change_terminal_validates_worktree_path(tmp_path):
 
 def test_launch_change_terminal_writes_executable_launch_script(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, "1")  # WP-009: opt into OS-window path
     with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
             mock.patch.object(tl, "_launch_macos",
                               side_effect=lambda sp, cid, vis: _spawned_dict(sp)):
@@ -398,6 +399,7 @@ def test_launch_change_terminal_writes_executable_launch_script(tmp_path, monkey
 
 def test_launch_change_terminal_writes_session_json_on_spawn(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, "1")  # WP-009: opt into OS-window path
     with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
             mock.patch.object(tl, "_launch_macos",
                               side_effect=lambda sp, cid, vis: _spawned_dict(sp)):
@@ -416,6 +418,7 @@ def test_launch_change_terminal_writes_session_json_on_spawn(tmp_path, monkeypat
 
 def test_launch_change_terminal_does_not_write_session_json_on_failure(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, "1")  # WP-009: opt into OS-window path
     failed = {
         "status": "failed", "pid": None, "terminal_app_used": None,
         "script_path": "", "error": "boom",
@@ -432,6 +435,7 @@ def test_launch_change_terminal_does_not_write_session_json_on_failure(tmp_path,
 
 def test_launch_change_terminal_dispatches_to_macos_on_darwin(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, "1")  # WP-009: opt into OS-window path
     with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
             mock.patch.object(tl, "_launch_macos",
                               side_effect=lambda sp, cid, vis: _spawned_dict(sp)) as m:
@@ -441,6 +445,7 @@ def test_launch_change_terminal_dispatches_to_macos_on_darwin(tmp_path, monkeypa
 
 def test_launch_change_terminal_dispatches_to_linux_on_linux(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, "1")  # WP-009: opt into OS-window path
     with mock.patch.object(tl.platform, "system", return_value="Linux"), \
             mock.patch.object(tl, "_launch_linux",
                               side_effect=lambda sp, cid, vis: _spawned_dict(sp)) as m:
@@ -450,6 +455,7 @@ def test_launch_change_terminal_dispatches_to_linux_on_linux(tmp_path, monkeypat
 
 def test_launch_change_terminal_fails_on_unknown_platform_visible(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, "1")  # WP-009: opt into OS-window path
     with mock.patch.object(tl.platform, "system", return_value="Windows"):
         result = tl.launch_change_terminal(_GOOD_ULID, tmp_path, visible=True)
     assert result["status"] == "failed"
@@ -471,6 +477,7 @@ def test_launch_change_terminal_uses_headless_on_unknown_platform_invisible(tmp_
 def test_launch_change_terminal_returns_failed_when_write_text_raises(tmp_path, monkeypatch):
     """An unwritable launch.sh path must surface a structured failure, not raise."""
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, "1")  # WP-009: opt into OS-window path
     with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
             mock.patch.object(tl.Path, "write_text",
                               side_effect=PermissionError(13, "Permission denied")), \
@@ -488,6 +495,7 @@ def test_launch_change_terminal_returns_failed_when_write_text_raises(tmp_path, 
 def test_launch_change_terminal_returns_failed_when_chmod_raises(tmp_path, monkeypatch):
     """A chmod failure on the launch script must degrade to a structured failure."""
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, "1")  # WP-009: opt into OS-window path
     with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
             mock.patch.object(tl.Path, "chmod",
                               side_effect=OSError(30, "Read-only file system")), \
@@ -501,6 +509,7 @@ def test_launch_change_terminal_returns_failed_when_chmod_raises(tmp_path, monke
 def test_launch_change_terminal_returns_failed_when_mkdir_raises(tmp_path, monkeypatch):
     """An unwritable ~/.sulis/changes dir must surface a structured failure."""
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, "1")  # WP-009: opt into OS-window path
     with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
             mock.patch.object(tl.Path, "mkdir",
                               side_effect=PermissionError(13, "Permission denied")), \
@@ -516,6 +525,7 @@ def test_launch_change_terminal_returns_failed_when_mkdir_raises(tmp_path, monke
 def test_launch_change_terminal_failure_error_names_the_os_error(tmp_path, monkeypatch):
     """The structured error message must include the underlying OS error text."""
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, "1")  # WP-009: opt into OS-window path
     with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
             mock.patch.object(tl.Path, "write_text",
                               side_effect=OSError(28, "No space left on device")):
@@ -612,6 +622,7 @@ def test_build_launch_script_invokes_pre_prompt_validator(tmp_path):
 
 def test_launch_change_terminal_forwards_pre_prompt(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, "1")  # WP-009: opt into OS-window path
     with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
             mock.patch.object(tl, "_launch_macos",
                               side_effect=lambda sp, cid, vis: _spawned_dict(sp)), \
@@ -625,6 +636,7 @@ def test_launch_change_terminal_writes_pre_prompt_sidecar(tmp_path, monkeypatch)
     # The brief lands in the sidecar file the exec line reads, with its exact
     # bytes (apostrophes/quotes/backticks included) — never inline (#86).
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, "1")
     body = "render each change's contract -- apostrophe, \"quote\", `tick`"
     with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
             mock.patch.object(tl, "_launch_macos",
@@ -632,3 +644,83 @@ def test_launch_change_terminal_writes_pre_prompt_sidecar(tmp_path, monkeypatch)
         tl.launch_change_terminal(_GOOD_ULID, tmp_path, pre_prompt=body)
     sidecar = tl._change_dir(_GOOD_ULID) / tl._PRE_PROMPT_SIDECAR
     assert sidecar.read_text() == body
+
+
+# ─── WP-009: OS-window path is a deprecated, flag-gated fallback (Strangle) ──
+#
+# The SUBSTITUTE-Strangle re-point: "open this change's terminal" defaults to
+# the in-cockpit <LiveTerminal/> path; the OS-window launch (Terminal.app /
+# gnome-terminal spawning `claude` directly) is DEPRECATED — kept only as an
+# opt-in fallback behind SULIS_TERMINAL_OS_WINDOW=1 (default off), with the
+# removal_plan recorded in WP-009. The OS-window path itself is unchanged when
+# the flag is on (no behaviour change — only the gate is new). See WP-009.
+
+
+def test_os_window_disabled_by_default(monkeypatch):
+    # Default off: no SULIS_TERMINAL_OS_WINDOW in the environment.
+    monkeypatch.delenv(tl._OS_WINDOW_FLAG, raising=False)
+    assert tl._os_window_enabled() is False
+
+
+@pytest.mark.parametrize("value", ["1", "true", "TRUE", "yes", "on"])
+def test_os_window_enabled_by_truthy_flag(monkeypatch, value):
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, value)
+    assert tl._os_window_enabled() is True
+
+
+@pytest.mark.parametrize("value", ["", "0", "false", "no", "off"])
+def test_os_window_disabled_by_falsey_flag(monkeypatch, value):
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, value)
+    assert tl._os_window_enabled() is False
+
+
+def test_visible_launch_deprecated_when_flag_off(tmp_path, monkeypatch):
+    # With the flag off, a visible (OS-window) launch returns a structured
+    # _failed pointing the founder at the in-cockpit terminal — it does NOT
+    # spawn an OS window. This is the Strangle: the default is the cockpit path.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv(tl._OS_WINDOW_FLAG, raising=False)
+    with mock.patch.object(tl, "_launch_macos") as mac, \
+            mock.patch.object(tl, "_launch_linux") as lin, \
+            mock.patch.object(tl.platform, "system", return_value="Darwin"):
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path, visible=True)
+    assert result["status"] == "failed"
+    assert "deprecated" in result["error"].lower()
+    assert tl._OS_WINDOW_FLAG in result["error"]
+    # No OS-window dispatcher was invoked.
+    mac.assert_not_called()
+    lin.assert_not_called()
+
+
+def test_visible_launch_dispatches_when_flag_on(tmp_path, monkeypatch):
+    # With the flag on, the OS-window path is reachable and unchanged — it
+    # dispatches to the platform launcher exactly as before.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, "1")
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl, "_launch_macos",
+                              side_effect=lambda sp, cid, vis: _spawned_dict(sp)) as m:
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path, visible=True)
+    assert m.call_count == 1
+    assert result["status"] == "spawned"
+
+
+def test_headless_launch_unaffected_by_flag(tmp_path, monkeypatch):
+    # The headless (visible=False) path is NOT the OS-window path and is not
+    # gated — it spawns regardless of the flag (used by automation).
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv(tl._OS_WINDOW_FLAG, raising=False)
+    with mock.patch.object(tl.platform, "system", return_value="Linux"), \
+            mock.patch.object(tl, "_launch_headless",
+                              side_effect=lambda sp, cid: _spawned_dict(sp)) as m:
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path, visible=False)
+    assert m.call_count == 1
+    assert result["status"] == "spawned"
+
+
+def test_module_records_deprecation_marker():
+    # Deprecate-before-delete MUST: a DEPRECATED(strangle) marker at the code
+    # site referencing the WP-009 removal_plan.
+    src = Path(tl.__file__).read_text()
+    assert "DEPRECATED(strangle)" in src
+    assert "WP-009" in src
