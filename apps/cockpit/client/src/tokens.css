@@ -52,3 +52,42 @@
   --weight-label: 500;
 
 }
+
+/* Dark theme — overrides every colour custom property the light :root defines
+ * (ADR-001 theme mechanism: components keep reading var(--*); the cascade
+ * re-themes them under data-theme="dark"). Radius / typography / weight tokens
+ * are theme-invariant and intentionally NOT redefined here — they inherit from
+ * :root. Values are copied verbatim from the founder-signed visual contract:
+ * .architecture/feat-dark-mode/mockup/dark-theme.html (its
+ * :root[data-theme="dark"] block is the canonical value source per TDD §6). */
+:root[data-theme="dark"] {
+  /* Surfaces (dark) — layered: background is darkest, cards lift above it */
+  --background: #16181d;
+  --foreground: #e8e6e3;
+  --card: #1e2127;
+  --card-foreground: #e8e6e3;
+  --popover: #23262e;
+  --popover-foreground: #e8e6e3;
+  --muted: #20232a;
+  --muted-foreground: #a3a09b;
+  --secondary: #2a2e36;
+  --secondary-foreground: #e8e6e3;
+  --border: #343842;
+  --border-muted: #2a2e36;
+  --input: #343842;
+
+  /* Semantic colours — brightened for WCAG AA on dark surfaces */
+  --primary: #5b9bff;
+  --primary-foreground: #0b1220;
+  --accent: #4fb3c9;
+  --accent-foreground: #07181c;
+  --destructive: #f0686b;
+  --destructive-foreground: #1a0b0c;
+  --positive: #4caf68;
+  --positive-foreground: #07210f;
+  --warning: #f5b342;
+  --warning-foreground: #1f1402;
+  --ring: #5b9bff;
+  --brand-gold: #d8bd7e;
+  --brand-depth: #6f9cc9;
+}
