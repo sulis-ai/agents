@@ -1,7 +1,0 @@
-change_id: 01KTAD9GEHD5NANDWSP0M86GJZ
-primitive: create
-tier: minor
-touches_plugin: true
-summary: |
-  Provider-neutral warm-session foundation: a session manager that keeps a warm Claude (or other agent) alive per key and streams replies, with restart/eviction/guards — the engine for fast cockpit chat and the future agentic CLI.
-created_at: 2026-06-07T11:40:40Z

@@ -1,3 +1,9 @@
+## v0.112.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- Provider-neutral warm-session foundation: a session manager that keeps a warm Claude (or other agent) alive per key and streams replies, with restart/eviction/guards — the engine for fast cockpit chat and the future agentic CLI.
+
 ## v0.111.0 — 2026-06-07
 
 **Minor — release-train batch.**
