@@ -621,6 +621,49 @@ def test_launch_change_terminal_forwards_pre_prompt(tmp_path, monkeypatch):
     assert b.call_args.kwargs.get("pre_prompt") == "hello" or "hello" in b.call_args[0]
 
 
+# ─── #93: default opening prompt so a re-spawned session never sits idle ──────
+
+
+def test_default_change_pre_prompt_is_change_oriented():
+    body = tl._default_change_pre_prompt(_GOOD_ULID)
+    assert _GOOD_ULID in body              # binds the brief to this change
+    assert "CONTEXT.md" in body            # points at the pre-spawn recon
+    assert "change-context" in body        # tells Sulis to greet in change-context mode
+    assert "route" in body.lower()         # and route to the right stage
+
+
+def test_launch_change_terminal_defaults_opening_prompt_when_none(tmp_path, monkeypatch):
+    # The #93 bug: focus/recreate re-spawn with pre_prompt=None → claude came up
+    # bound to the change but idle (no opening turn; the agent never reads
+    # SULIS_CHANGE_ID until the user types). The launcher must default a
+    # change-context opening prompt so ANY caller's session auto-starts.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl, "_launch_macos",
+                              side_effect=lambda sp, cid, vis: _spawned_dict(sp)):
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path, pre_prompt=None)
+    # the sidecar carrying the opening prompt was written...
+    sidecar = tl._change_dir(_GOOD_ULID) / tl._PRE_PROMPT_SIDECAR
+    assert sidecar.exists(), "no opening prompt delivered — the session would sit idle"
+    assert _GOOD_ULID in sidecar.read_text()
+    # ...and the launch script reads it as claude's opening argument.
+    script = Path(result["script_path"]).read_text()
+    assert '"$(cat ' in script
+
+
+def test_launch_change_terminal_explicit_pre_prompt_not_overridden(tmp_path, monkeypatch):
+    # start --spawn passes a rich brief; the default must never clobber it.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl, "_launch_macos",
+                              side_effect=lambda sp, cid, vis: _spawned_dict(sp)):
+        tl.launch_change_terminal(
+            _GOOD_ULID, tmp_path, pre_prompt="custom brief from start --spawn",
+        )
+    sidecar = tl._change_dir(_GOOD_ULID) / tl._PRE_PROMPT_SIDECAR
+    assert sidecar.read_text() == "custom brief from start --spawn"
+
+
 def test_launch_change_terminal_writes_pre_prompt_sidecar(tmp_path, monkeypatch):
     # The brief lands in the sidecar file the exec line reads, with its exact
     # bytes (apostrophes/quotes/backticks included) — never inline (#86).

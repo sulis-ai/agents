@@ -193,7 +193,12 @@ def _build_launch_script(
         # has no heredoc nesting (parses clean under bash 3.2), and the
         # pre_prompt bytes are never shell-parsed — so there is no injection
         # surface either (what the old heredoc's single-quoted tag guarded).
-        sidecar = _change_dir(change_id) / _PRE_PROMPT_SIDECAR
+        # Path only — do NOT mkdir here. _build_launch_script is pure (no file
+        # I/O); launch_change_terminal creates the dir + writes the sidecar
+        # inside its I/O-failure try-block. (Using _change_dir here would mkdir
+        # before that try, so an unwritable ~/.sulis would escape as a raw
+        # OSError instead of the structured _failed dict.)
+        sidecar = Path.home() / ".sulis" / "changes" / change_id / _PRE_PROMPT_SIDECAR
         exec_line = f'exec {entry_command} "$(cat {shlex.quote(str(sidecar))})"'
     else:
         exec_line = f"exec {entry_command}"
@@ -374,6 +379,32 @@ def _change_dir(change_id: str) -> Path:
     return change_dir
 
 
+def _default_change_pre_prompt(change_id: str) -> str:
+    """Opening prompt used when a caller spawns a change terminal without one.
+
+    Without an opening turn, ``claude --agent sulis`` comes up correctly bound
+    to the change (``SULIS_CHANGE_ID`` exported, cwd = the worktree) but sits
+    idle: the agent never reads the env var until the founder types something,
+    so it never self-orients. ``sulis-change start --spawn`` avoids this by
+    passing a rich brief; the ``focus`` / ``recreate`` re-spawn paths (and any
+    direct caller) historically passed ``None`` and hit the idle-session bug
+    (#93). Defaulting here makes an auto-starting session the floor for EVERY
+    caller — an explicit ``pre_prompt`` still wins.
+
+    Deterministic (a pure function of ``change_id``) so the sidecar write and
+    the launch script's ``cat`` of it always agree on the same bytes.
+    """
+    recon = Path.home() / ".sulis" / "changes" / change_id / "CONTEXT.md"
+    return (
+        f"You are Sulis, focused on the change bound to this session "
+        f"(id: {change_id}). Your working directory is the change worktree. "
+        f"Read the pre-spawn recon at {recon} for the change identity, git "
+        f"state, and suggested next step — and any .changes/*.HANDOFF.md or "
+        f".changes/*.WORKING-SET.md in the worktree — then greet me in "
+        f"change-context mode and route to the right stage."
+    )
+
+
 def _write_session_json(
     change_dir: Path,
     change_id: str,
@@ -464,6 +495,13 @@ def launch_change_terminal(
     ok, resolved = validate_worktree_path(worktree_path)
     if not ok:
         raise ValueError(f"worktree_path is not an existing directory: {worktree_path}")
+
+    # Default an opening prompt so the spawned session auto-starts rather than
+    # sitting idle at an empty claude prompt (#93). start --spawn passes a rich
+    # brief; focus / recreate / direct callers historically passed None. An
+    # explicit pre_prompt still wins — we only fill the gap.
+    if pre_prompt is None:
+        pre_prompt = _default_change_pre_prompt(change_id)
 
     script_body = _build_launch_script(
         change_id, resolved, entry_command=entry_command,
