@@ -168,6 +168,37 @@ def parse_origin_env(value: Optional[str]) -> Optional[OriginDict]:
     return None
 
 
+# ─── commit-time env builder (the executor's autonomous write path) ────────
+
+
+def autonomous_env(
+    *, run: Optional[str], confidence: Optional[float]
+) -> dict[str, str]:
+    """Build the `{"SULIS_ORIGIN": <bare-body>}` env the executor exports at
+    COMMIT time so the wired `prepare-commit-msg` hook stamps the autonomous
+    trailer onto the commit it is already making (WP-005, ADR-013).
+
+    The value is the bare trailer BODY (`autonomous; run=…`) — the exact form
+    `parse_origin_env` accepts and the hook prepends `Sulis-Origin: ` to. It is
+    produced via the existing `autonomous_origin` + `format_trailer` (NO second
+    formatter), so it can never drift from #216's grammar.
+
+    The run-ulid is per-`lifecyclerun`, so the caller passes it AT commit time
+    (not a static launch-script export — one launched terminal serves many runs).
+    `confidence` is OPTIONAL: pass None when no per-run scalar exists and the
+    body is `run=`-only (never invent a value).
+
+    NON-FATAL (ADR-013): a missing / empty / whitespace-only run-ulid yields an
+    EMPTY env (`{}`) — nothing is exported, the commit lands UNSTAMPED, and
+    origin degrades to inferred. This function never raises for an absent run.
+    """
+    if not run or not run.strip():
+        return {}
+    trailer = format_trailer(autonomous_origin(run=run, confidence=confidence))
+    body = trailer[len(f"{TRAILER_KEY}: ") :]
+    return {"SULIS_ORIGIN": body}
+
+
 def append_trailer_to_message(message: str, origin: OriginDict) -> str:
     """Return `message` with the `Sulis-Origin:` trailer appended to the trailer
     block, idempotently (never a second copy). Used by the `prepare-commit-msg`
