@@ -31,6 +31,8 @@ import { WebSocketServer, type WebSocket } from "ws";
 
 // eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (the shared NDJSON framer, also used by e2e/terminal-proxy.ts; the rule blocks escapes OUT of apps/cockpit/, which import/no-restricted-paths enforces)
 import { createNdjsonLineFramer } from "../../shared/ndjsonLineFramer";
+// eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (the one source for the terminal WS path, also consumed by the client transport; the rule blocks escapes OUT of apps/cockpit/, which import/no-restricted-paths enforces)
+import { TERMINAL_WS_PATH } from "../../shared/terminalWsPath";
 
 /** The session spec the sidecar resolves a change to: the cockpit client sends
  *  only `{io_mode:"pty"}`; the sidecar supplies provider+cwd (it owns the
@@ -92,8 +94,10 @@ export interface CreateTerminalSidecarOptions {
  *  violation (the §6455 code for "received a message that violates policy"). */
 const WS_POLICY_VIOLATION = 1008;
 
-/** The path the terminal WS endpoint lives at on the shared HTTP server. */
-const TERMINAL_WS_PATH = "/terminal";
+// The path the terminal WS endpoint lives at on the shared HTTP server is the
+// single shared constant `TERMINAL_WS_PATH` (apps/cockpit/shared/terminalWsPath.ts),
+// imported above — the same value the client transport derives against, so the
+// two ends cannot drift (WP-006 Blue).
 
 export interface TerminalSidecar {
   /** Wire the WS endpoint to an HTTP server's `upgrade` event. */

@@ -22,6 +22,7 @@ import type {
   SocketTransport,
   WireResponse,
 } from "../../../server/ports/TerminalBridge";
+import { TERMINAL_WS_PATH } from "../../../shared/terminalWsPath";
 
 /** Each request gets a unique id so responses (and streaming `term` lines) can
  *  be routed back to their caller over the one multiplexed socket. */
@@ -166,19 +167,39 @@ export class WebSocketTransport implements SocketTransport {
   }
 }
 
-/** Read the configured terminal WS endpoint, if any. The cockpit only wires the
- *  live transport when this is set (Vite-standard `import.meta.env.VITE_*`,
- *  matching client/config.ts; or a runtime window global the e2e injects). When
- *  unset, the bridge falls back to the not-yet-wired transport — production-safe
- *  (no live terminal until the WS sidecar is configured). */
+/**
+ * Resolve the terminal WS endpoint the live transport connects to. Resolution
+ * order, most specific first (WP-006 Contract):
+ *
+ *   1. explicit `VITE_TERMINAL_WS_URL` — the e2e / deployment override;
+ *   2. `window.__COCKPIT_TERMINAL_WS__` — a runtime global the e2e injects;
+ *   3. **same-origin default** — derive `ws(s)://<location.host>${TERMINAL_WS_PATH}`
+ *      from the page origin. The terminal WS endpoint rides the cockpit's own
+ *      HTTP server on the same host/port (TDD §3.1; WP-002), so the running
+ *      cockpit reaches its OWN sidecar with no configuration. This is what makes
+ *      the live terminal connect in a plain build instead of falling back to the
+ *      no-op transport (acceptance #1 — no more "not wired" pane).
+ *
+ * Returns `undefined` only when there is no `window`/`location` (the non-browser
+ * test/SSR path), preserving the no-op fallback there.
+ *
+ * The env read uses the Vite-standard inlined `import.meta.env.VITE_*` access,
+ * which Vite statically replaces at build time and `vi.stubEnv` controls under
+ * test.
+ */
 export function terminalWsUrl(): string | undefined {
-  const fromEnv = (import.meta as { env?: Record<string, string | undefined> })
-    .env?.VITE_TERMINAL_WS_URL;
+  const fromEnv = import.meta.env.VITE_TERMINAL_WS_URL;
   if (fromEnv) return fromEnv;
-  const fromWindow =
-    typeof window !== "undefined"
-      ? (window as unknown as { __COCKPIT_TERMINAL_WS__?: string })
-          .__COCKPIT_TERMINAL_WS__
-      : undefined;
-  return fromWindow || undefined;
+
+  if (typeof window === "undefined" || !window.location) return undefined;
+
+  const fromWindow = (window as unknown as { __COCKPIT_TERMINAL_WS__?: string })
+    .__COCKPIT_TERMINAL_WS__;
+  if (fromWindow) return fromWindow;
+
+  // Same-origin default: the WS endpoint rides the page's own host/port. Map the
+  // page scheme to the WS scheme (https→wss, otherwise ws) per RFC 6455.
+  const { protocol, host } = window.location;
+  const wsScheme = protocol === "https:" ? "wss:" : "ws:";
+  return `${wsScheme}//${host}${TERMINAL_WS_PATH}`;
 }
