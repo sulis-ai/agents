@@ -40,8 +40,11 @@ const clientOrigin = `http://${COCKPIT_HOST}:${clientPort}`;
 
 export default defineConfig({
   testDir: here,
-  // Specs only — fixtures/seed/run-server are helpers, not test files.
+  // Specs only — fixtures/seed/run-server are helpers, not test files. The
+  // live-terminal round-trip runs under its OWN config (live-terminal.config.ts:
+  // dedicated ports + the WS terminal proxy), so exclude it from this smoke run.
   testMatch: /.*\.spec\.ts$/,
+  testIgnore: /live-terminal\.spec\.ts$/,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

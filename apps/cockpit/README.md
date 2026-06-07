@@ -162,6 +162,39 @@ gate + the combined Vitest suite still gate the merge). Visual-regression
 comparison is off by default — set `PWTEST_SCREENSHOTS=1` to capture
 screenshots on failure locally.
 
+### Live-terminal round-trip (Playwright + real socket)
+
+The live-terminal end-to-end proves the founder's interactive-terminal
+journey for real: open a change's **Terminal** tab → see the running session
+with its scrollback (not a blank pane) → type a command → see the output →
+close the tab and reopen → the session is still alive and scrollback catches
+up. It runs under its **own** Playwright config (dedicated ports, so it never
+collides with a cockpit you already have running) and a **real** backend — no
+mocks:
+
+```bash
+npm run test:e2e:terminal
+```
+
+How it wires up (all under `apps/cockpit/e2e/`):
+
+- `terminal-backend.py` boots a **real** `SessionManager` serving a **real**
+  pty-backed fake child over a **real** AF_UNIX socket, pre-seeded with a
+  known scrollback banner.
+- `terminal-proxy.ts` bridges the browser's **WebSocket** to that AF_UNIX
+  socket (a browser can't open AF_UNIX, and the cockpit HTTP server is
+  read-only). It is **harness-only** — not part of the production server, so
+  the read-only guarantee stays intact. A real deployment would run an
+  equivalent terminal sidecar.
+- The cockpit's `createTerminalBridge` builds the live `WebSocketTransport`
+  when `VITE_TERMINAL_WS_URL` is set (the dedicated config sets it); with no
+  endpoint configured the bridge falls back to the "no terminal here" state,
+  so a plain build is always safe to mount.
+
+The same run is the **bootstrap-from-zero** proof: from a clean clone it
+needs only Python + Node + a Chromium download; the pty fake child has no
+external dependency.
+
 ## How the workspace is organised
 
 ```
@@ -240,3 +273,5 @@ Both server and client read the host constant from
 | `npm run typecheck`  | `tsc --noEmit` on both halves.   |
 | `npm run lint`       | ESLint over `apps/cockpit/`.     |
 | `npm run test`       | Vitest — both test environments. |
+| `npm run test:e2e`   | Playwright end-to-end smoke (browser required). |
+| `npm run test:e2e:terminal` | Live-terminal round-trip — real socket + pty child (browser required). |

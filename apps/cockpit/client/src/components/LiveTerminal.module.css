@@ -52,7 +52,10 @@
 
 .badgeConnected {
   background: var(--positive);
-  color: var(--positive-foreground);
+  /* Dark label on the positive fill — matches the warning badge's dark-on-fill
+     pattern and clears WCAG AA (5.44:1) at the 11px badge size, where
+     white-on-positive falls short (3.3:1). WPF-10 live-surface a11y gate. */
+  color: var(--foreground);
 }
 
 .badgeConnecting {
@@ -68,7 +71,10 @@
 
 .meta {
   font-size: 11px;
-  color: var(--muted-foreground);
+  /* --foreground (not --muted-foreground) so the 11px meta clears WCAG AA:
+     --muted-foreground on the card surface is 4.34:1, just under 4.5:1 for
+     small text (WPF-10). */
+  color: var(--foreground);
 }
 
 .reconnect {
@@ -106,7 +112,9 @@
   border-top: 1px solid var(--border-muted);
   background: var(--card);
   font-size: 12px;
-  color: var(--muted-foreground);
+  /* --foreground for the small type-here hint + its <kbd> chips so they clear
+     WCAG AA at 11–12px (WPF-10). */
+  color: var(--foreground);
 }
 
 .inputHint kbd {
