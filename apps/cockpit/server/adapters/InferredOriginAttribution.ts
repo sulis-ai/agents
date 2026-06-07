@@ -30,6 +30,7 @@ import { groupTurns, type TurnItem } from "../../shared/groupTurns";
 import { locateTranscripts } from "../lib/locateTranscripts";
 import { parseTranscripts } from "../lib/parseTranscripts";
 import { readBrain } from "../lib/readBrain";
+import { deriveThreadId, sessionStemFromRef } from "../lib/threadIdentity";
 
 /** The reads the adapter needs, injected so tests can stub git/brain/turns. */
 export interface InferredOriginDeps {
@@ -79,11 +80,14 @@ function runsFromBrain(entities: BrainEntity[]): RunFacts[] {
 }
 
 /**
- * Project the change's conversation turns into TurnFacts. The conversation id
- * is the transcript file's stem (the Claude Code session id); each turn's index
- * is its 1-based position; its `at` is the turn's timestamp; its summary is the
- * turn's first sentences (the plain-English carry — full Haiku summaries are the
- * chat surface's concern, not origin inference).
+ * Project ONE transcript's conversation turns into TurnFacts. The conversation
+ * id is the transcript's `thread_`-shaped Thread id (NOT the raw stem) — derived
+ * via the SHARED `deriveThreadId` helper (`lib/threadIdentity`), the SAME rule
+ * the relay records (EP-03, ADR-018 D2), so a file's displayed conversation id
+ * does not change shape on flip likely→exact. Each turn's index is its 1-based
+ * position WITHIN this transcript; its `at` is the turn's timestamp; its summary
+ * is the turn's first sentences (the plain-English carry — full Haiku summaries
+ * are the chat surface's concern, not origin inference).
  */
 function turnsFromMessages(
   messages: Parameters<typeof groupTurns>[0],
@@ -199,8 +203,9 @@ export class InferredOriginAttribution implements OriginAttribution {
 
   /**
    * The change's conversation turns (fail-soft: no transcripts → []). Memoised
-   * per instance: transcripts are located + parsed at most once per request, no
-   * matter how many files are attributed (the O(files × transcripts) fix).
+   * per instance: transcripts are located + parsed once per request, no matter
+   * how many files are attributed (the O(files × transcripts) fix) — each
+   * transcript is parsed exactly once, inside the single memoised `loadTurns`.
    */
   private async readTurns(): Promise<TurnFacts[]> {
     if (this.turnsPromise === null) {
@@ -216,17 +221,25 @@ export class InferredOriginAttribution implements OriginAttribution {
         this.deps.claudeProjectsDir,
       );
       if (paths.length === 0) return [];
-      const messages = await parseTranscripts(paths);
-      // TODO(deferred): multi-session transcripts mis-attribute. Only the FIRST
-      // transcript's stem is used as the conversation id, and turns are indexed
-      // across the MERGED stream — so a change spanning 2+ sessions reports the
-      // wrong conversation id / turn number for turns from the later session(s).
-      // REASON: correct multi-session attribution needs per-session turn
-      // indexing + a conversation id per transcript; tracked as the
-      // origin-stamping-live follow-up (#23).
-      // The conversation id is the first transcript's file stem (the session id).
-      const stem = paths[0]!.split("/").pop()?.replace(/\.jsonl$/, "") ?? "";
-      return turnsFromMessages(messages, stem);
+
+      // WP-004 (#23 multi-session fix, ADR-018 D2): index turns PER TRANSCRIPT
+      // with a Thread id PER TRANSCRIPT (one `Thread` per session). For each
+      // located transcript we derive its `thread_`-shaped id via the SHARED
+      // `deriveThreadId` rule the relay records (EP-03 — recorded and inferred
+      // render the SAME id, so a file's displayed id does not change shape on
+      // flip likely→exact) and index that transcript's turns 1-based WITHIN it,
+      // then concatenate. This retires the old "first stem only across the
+      // merged stream" behaviour, which mis-attributed every turn of a 2+
+      // session change to the first session's id + a merged turn index.
+      const perTranscript = await Promise.all(
+        paths.map(async (path) => {
+          const conversationId =
+            deriveThreadId(sessionStemFromRef(path) ?? "") ?? "";
+          const messages = await parseTranscripts([path]);
+          return turnsFromMessages(messages, conversationId);
+        }),
+      );
+      return perTranscript.flat();
     } catch {
       return [];
     }

@@ -23,9 +23,14 @@ import { Router, json as jsonBody } from "express";
 import type { ChangeStoreReader } from "../ports/ChangeStoreReader";
 import type {
   SessionBridge,
+  SessionResolution,
   RelaySink,
   RelayOutcome,
 } from "../ports/SessionBridge";
+import type { ConversationIdentity } from "../ports/ConversationIdentity";
+import { assistedOriginEnv } from "../lib/relayOrigin";
+import { locateTranscripts } from "../lib/locateTranscripts";
+import { parseTranscripts } from "../lib/parseTranscripts";
 // eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (TDD §9 permits)
 import type {
   ChatStreamEvent,
@@ -34,6 +39,7 @@ import type {
   OnboardingStreamEvent,
   StartFromIntentRequest,
   StartFromIntentStreamEvent,
+  TranscriptMessage,
 } from "../../shared/api-types";
 import { checkSessionBinding } from "../lib/sessionBinding";
 import { InFlightLock } from "../lib/inFlightLock";
@@ -62,6 +68,13 @@ export interface ChatLogLine {
   resolution: "live" | "resume" | "spawn";
   outcome: "accepted" | "refused" | "completed" | "broken";
   code?: string;
+  /**
+   * WP-004 (NFR-SEC-03) — whether THIS send carried an assisted origin stamp to
+   * the spawn (so the live likely→exact round-trip is observable). A boolean
+   * ONLY: never the thread-id body, the prompt, or the reply text. Absent when
+   * no relay was attempted (a pre-relay refusal).
+   */
+  originStamped?: boolean;
 }
 
 export interface ChatRouterDeps {
@@ -69,6 +82,21 @@ export interface ChatRouterDeps {
   sessionBridge: SessionBridge;
   /** The per-change one-in-flight lock (shared singleton across requests). */
   inFlightLock: InFlightLock;
+  /**
+   * WP-004 — the conversation-identity seam (ADR-018). The relay computes the
+   * assisted origin via this port's local adapter
+   * (`LocalTranscriptConversationIdentity`); a live service adapter later swaps
+   * in behind the same port with no route change. Optional: when absent, the
+   * relay spawns unstamped (every commit degrades to inferred — ADR-013).
+   */
+  conversationIdentity?: ConversationIdentity;
+  /**
+   * WP-004 — where Claude Code stores session transcripts (`~/.claude/projects`).
+   * The relay reads the resolved session's transcript (read-only) to derive the
+   * Message ordinal for the assisted origin. Optional alongside
+   * `conversationIdentity`; absent → unstamped.
+   */
+  claudeProjectsDir?: string;
   /** Where the one-line-per-send structured log goes (defaults to no-op). */
   chatLogSink?: (line: ChatLogLine) => void;
 }
@@ -159,6 +187,16 @@ async function handleChat(
       return;
     }
 
+    // 3a. Compute the assisted origin (WP-004; ADR-016/017/018). Best-effort +
+    //     read-only: derive the Thread id + Message ordinal from the resolved
+    //     session's transcript via the ConversationIdentity port, and pass the
+    //     result straight through as `relay`'s 4th argument so the spawned
+    //     session's commits carry the `assisted` trailer. `null` ⇒ spawn
+    //     unstamped (commit degrades to inferred — ADR-013). This computes ids
+    //     and reads a transcript; it writes nothing and starts no process
+    //     (ADR-003 read-only preserved).
+    const originEnv = await computeAssistedOrigin(deps, resolution);
+
     // 4. Act + stream. We open the SSE response LAZILY — only on the first
     //    emitted event — so a session that never starts (zero bytes, FR-19/N3)
     //    can still return a clean 502 JSON status rather than a 200 stream with
@@ -177,7 +215,12 @@ async function handleChat(
 
     let outcome: RelayOutcome;
     try {
-      outcome = await deps.sessionBridge.relay(id, prompt, sink);
+      outcome = await deps.sessionBridge.relay(
+        id,
+        prompt,
+        sink,
+        originEnv ?? undefined,
+      );
     } catch {
       // An unexpected relay throw: if nothing streamed yet, it's unreachable;
       // otherwise a broken stream.
@@ -186,7 +229,15 @@ async function handleChat(
         : { kind: "unreachable", detail: "relay threw before streaming" };
     }
 
-    finishOutcome(res, outcome, streamOpened, id, resolutionLabel, log);
+    finishOutcome(
+      res,
+      outcome,
+      streamOpened,
+      id,
+      resolutionLabel,
+      log,
+      originEnv !== null,
+    );
   } finally {
     // 5. Always release the lock.
     handle.release();
@@ -211,6 +262,7 @@ function finishOutcome(
   changeId: string,
   resolution: ChatLogLine["resolution"],
   log: (line: ChatLogLine) => void,
+  originStamped: boolean,
 ): void {
   if (!streamOpened) {
     // Nothing was delivered. Return a clean JSON status (FR-19/N3).
@@ -220,6 +272,7 @@ function finishOutcome(
         resolution,
         outcome: "refused",
         code: "SESSION_UNREACHABLE",
+        originStamped,
       });
       res.status(502).json({
         error: "couldn't reach this change's session",
@@ -233,6 +286,7 @@ function finishOutcome(
         resolution,
         outcome: "refused",
         code: "SESSION_CHANGE_MISMATCH",
+        originStamped,
       });
       res.status(422).json({
         error: "the resolved session does not belong to this change",
@@ -246,9 +300,9 @@ function finishOutcome(
   }
 
   if (outcome.kind === "completed") {
-    log({ changeId, resolution, outcome: "completed" });
+    log({ changeId, resolution, outcome: "completed", originStamped });
   } else if (outcome.kind === "interrupted") {
-    log({ changeId, resolution, outcome: "broken" });
+    log({ changeId, resolution, outcome: "broken", originStamped });
   } else if (outcome.kind === "unreachable") {
     writeSseFrame(res, {
       type: "error",
@@ -260,6 +314,7 @@ function finishOutcome(
       resolution,
       outcome: "refused",
       code: "SESSION_UNREACHABLE",
+      originStamped,
     });
   } else {
     writeSseFrame(res, {
@@ -272,9 +327,56 @@ function finishOutcome(
       resolution,
       outcome: "refused",
       code: "SESSION_CHANGE_MISMATCH",
+      originStamped,
     });
   }
   res.end();
+}
+
+/**
+ * Compute the assisted origin env for the resolved session (WP-004), or `null`
+ * when it can't be derived (caller spawns unstamped → commit degrades to
+ * inferred, ADR-013). Best-effort + read-only (ADR-003): it reads the resolved
+ * session's transcript (no new disk write, no process start) and derives the
+ * Thread id + Message ordinal via the injected `ConversationIdentity` port
+ * (`assistedOriginEnv`, WP-003). Any failure — no identity port wired, no
+ * transcript, a parse error — resolves to `null`; it NEVER throws.
+ */
+async function computeAssistedOrigin(
+  deps: ChatRouterDeps,
+  resolution: SessionResolution,
+): Promise<Record<string, string> | null> {
+  const identity = deps.conversationIdentity;
+  if (identity === undefined) return null;
+  try {
+    const transcript = await loadResolvedTranscript(deps, resolution);
+    return assistedOriginEnv(identity, resolution, transcript);
+  } catch {
+    // Best-effort (ADR-013): any derivation failure → unstamped → inferred.
+    return null;
+  }
+}
+
+/**
+ * Read the resolved session's transcript (read-only). Resolves the same
+ * `lastSessionRef` the resolver chose when present (so the ordinal counts THIS
+ * session's turns); otherwise locates the session's transcripts under the
+ * change's worktree via the shared locator. Returns `[]` on any miss — the
+ * identity adapter then yields a turn count of 0 (in-flight turn 1) or `null`
+ * when it can derive no Thread id at all.
+ */
+async function loadResolvedTranscript(
+  deps: ChatRouterDeps,
+  resolution: SessionResolution,
+): Promise<TranscriptMessage[]> {
+  const projectsDir = deps.claudeProjectsDir;
+  if (projectsDir === undefined) return [];
+  const ref = resolution.session.lastSessionRef;
+  if (ref !== undefined && ref.endsWith(".jsonl")) {
+    return parseTranscripts([ref]);
+  }
+  const paths = await locateTranscripts(resolution.session.cwd, projectsDir);
+  return paths.length === 0 ? [] : parseTranscripts(paths);
 }
 
 /** SSE headers (ADR-001 §Consequences): event-stream, no-cache, keep-alive, unbuffered. */
