@@ -1,0 +1,43 @@
+{
+  "pr": "feat/wp-003-origin-validation-and-resource-caps",
+  "base": "change/create-production-terminal-sidecar",
+  "timestamp": "2026-06-07T221226Z",
+  "verdict": "PASS",
+  "outcome_plain": "Ready to merge",
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "tsc": "clean",
+    "eslint": "clean"
+  },
+  "hygiene": {
+    "scope": "low",
+    "size": "low",
+    "safety": "low",
+    "completeness": "low",
+    "lines_added": 227,
+    "lines_removed": 1,
+    "files_changed": 2,
+    "migrations": 0,
+    "schema_idl": 0,
+    "secret_pattern_hits": 0,
+    "new_source_without_test": 0
+  },
+  "findings": {
+    "in_changes": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "in_neighbours": {
+      "total": 0
+    }
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "status": "nothing-surfaced" },
+    "security": { "findings": 0, "status": "nothing-surfaced" },
+    "quality": { "findings": 0, "status": "nothing-surfaced" }
+  },
+  "draft_fixes": 0,
+  "auto_downgrade_triggers": []
+}

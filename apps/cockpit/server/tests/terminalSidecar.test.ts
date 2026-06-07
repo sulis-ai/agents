@@ -28,6 +28,7 @@ import { join } from "node:path";
 import { WebSocket } from "ws";
 
 import { createTerminalSidecar } from "../adapters/TerminalSidecar";
+import type { TerminalSidecarLogLine } from "../adapters/TerminalSidecar";
 import { FakeChangeStoreReader } from "../adapters/FakeChangeStoreReader";
 import type { ChangeStoreRecord } from "../ports/ChangeStoreReader";
 
@@ -127,6 +128,9 @@ interface Harness {
    *  path/query/origin (origin-refuse, cap tests). */
   baseUrl: string;
   httpServer: Server;
+  /** Every structured log line the sidecar emitted (WP-003 §3.5 observability:
+   *  one line per refuse; the test asserts on outcome/code/changeId only). */
+  logLines: TerminalSidecarLogLine[];
   close: () => Promise<void>;
 }
 
@@ -162,6 +166,7 @@ async function startHarness(
   resolveDelayMs = 0,
 ): Promise<Harness> {
   const changeStore = new FakeChangeStoreReader([fakeRecord()]);
+  const logLines: TerminalSidecarLogLine[] = [];
   const sidecar = createTerminalSidecar({
     socketPath,
     resolveChange: async (changeId: string) => {
@@ -174,6 +179,7 @@ async function startHarness(
     },
     originAllowList: ["http://127.0.0.1:5173"],
     caps,
+    logSink: (line) => logLines.push(line),
   });
 
   const httpServer = createHttpServer((_req, res) => {
@@ -195,6 +201,7 @@ async function startHarness(
     url,
     baseUrl,
     httpServer,
+    logLines,
     close: async () => {
       await sidecar.close();
       await new Promise<void>((res) => httpServer.close(() => res()));
@@ -504,5 +511,181 @@ describe("WP-002 terminal sidecar bridge", () => {
     expect(code).toBe(1008); // policy violation
     // The over-cap attach was NOT relayed to the endpoint.
     expect(endpoint.connections[0]!.lines.length).toBe(1);
+  });
+});
+
+// ── WP-003 — Origin validation + resource caps (full negative-path matrix) ───
+//
+// REINFORCE-Secure on the WP-002 bridge (TDD §3.2, §3.4; ADR-010). WP-002 shipped
+// the gate MECHANISM and a smoke proof per branch; this block is the COMPLETE
+// negative-path matrix the WP Contract names — the four named tests
+// (test_rejects_foreign_origin, test_accepts_own_origin, test_connection_cap,
+// test_attachment_cap) plus the §3.5 observability assertions: one structured
+// log line per refuse, carrying outcome/code/changeId ONLY (NFR-SEC-03: never a
+// keystroke byte or terminal-output byte).
+
+describe("WP-003 Origin validation + resource caps", () => {
+  it("test_rejects_foreign_origin — upgrade with Origin: http://evil.example is refused 403, no endpoint connection opened", async () => {
+    const { endpoint, harness } = await setup();
+    const url = `${harness.baseUrl}/terminal?changeId=${CHANGE_ID}`;
+
+    const outcome = await openWsExpectClosed(url, "http://evil.example");
+    expect(outcome.refused).toBe(true);
+    // The whole point of an upgrade-time refusal: zero AF_UNIX connections open.
+    expect(endpoint.connections.length).toBe(0);
+  });
+
+  it("test_rejects_foreign_origin — an ABSENT Origin header is also refused (no socket opened)", async () => {
+    const { endpoint, harness } = await setup();
+    // A WS client with NO Origin header at all — must be refused like a foreign
+    // one (the gate is allow-list, not deny-list).
+    const refused = await new Promise<boolean>((resolve) => {
+      const ws = new WebSocket(`${harness.baseUrl}/terminal?changeId=${CHANGE_ID}`);
+      ws.once("error", () => resolve(true));
+      ws.once("close", () => resolve(true));
+      ws.once("open", () => {
+        ws.close();
+        resolve(false);
+      });
+    });
+    expect(refused).toBe(true);
+    expect(endpoint.connections.length).toBe(0);
+  });
+
+  it("test_accepts_own_origin — upgrade with Origin === the allow-listed client origin establishes the connection", async () => {
+    const { endpoint, harness } = await setup();
+    const ws = await openWs(harness.url); // openWs sends the allow-listed origin
+    cleanups.push(async () => ws.close());
+
+    expect(ws.readyState).toBe(WebSocket.OPEN);
+    // An accepted upgrade lets the first message reach a real endpoint connection.
+    ws.send(JSON.stringify({ id: "1", method: "attach", params: { key: CHANGE_ID } }));
+    await until(() => endpoint.connections.length >= 1);
+    expect(endpoint.connections.length).toBe(1);
+  });
+
+  it("test_connection_cap — the N+1th concurrent WS is refused while the first N stay up", async () => {
+    // Ceiling of 2: open two, the third is refused; the first two keep streaming.
+    const { endpoint, harness } = await setup({
+      maxConnections: 2,
+      maxAttachmentsPerConnection: 4,
+    });
+    const first = await openWs(harness.url);
+    cleanups.push(async () => first.close());
+    const second = await openWs(harness.url);
+    cleanups.push(async () => second.close());
+    await until(() => endpoint.connections.length >= 2);
+
+    // The third upgrade is past the ceiling → refused, no third connection.
+    const outcome = await openWsExpectClosed(harness.url);
+    expect(outcome.refused).toBe(true);
+    expect(endpoint.connections.length).toBe(2);
+
+    // The first N are unaffected: each can still relay a message to its socket.
+    first.send(JSON.stringify({ id: "1", method: "feed", params: { key: CHANGE_ID, data: "QQ==", encoding: "base64" } }));
+    second.send(JSON.stringify({ id: "1", method: "feed", params: { key: CHANGE_ID, data: "Qg==", encoding: "base64" } }));
+    await until(
+      () =>
+        (endpoint.connections[0]?.lines.length ?? 0) >= 1 &&
+        (endpoint.connections[1]?.lines.length ?? 0) >= 1,
+    );
+    expect(first.readyState).toBe(WebSocket.OPEN);
+    expect(second.readyState).toBe(WebSocket.OPEN);
+  });
+
+  it("test_attachment_cap — the N+1th attach on one WS is refused while earlier attachments keep streaming", async () => {
+    // Ceiling of 2 attachments per connection.
+    const { endpoint, harness } = await setup({
+      maxConnections: 8,
+      maxAttachmentsPerConnection: 2,
+    });
+    const ws = await openWs(harness.url);
+    const closed = new Promise<number>((resolve) =>
+      ws.once("close", (code: number) => resolve(code)),
+    );
+
+    // Two attaches are admitted and relayed.
+    ws.send(JSON.stringify({ id: "1", method: "attach", params: { key: CHANGE_ID } }));
+    ws.send(JSON.stringify({ id: "2", method: "attach", params: { key: CHANGE_ID } }));
+    await until(() => (endpoint.connections[0]?.lines.length ?? 0) >= 2);
+
+    // The earlier attachments keep streaming: a feed relays fine before the cap trips.
+    ws.send(JSON.stringify({ id: "f", method: "feed", params: { key: CHANGE_ID, data: "QQ==", encoding: "base64" } }));
+    await until(() => (endpoint.connections[0]?.lines.length ?? 0) >= 3);
+
+    // The third attach is past the ceiling → refused (WS closed with policy code),
+    // and NOT relayed to the endpoint.
+    ws.send(JSON.stringify({ id: "3", method: "attach", params: { key: CHANGE_ID } }));
+    const code = await closed;
+    expect(code).toBe(1008); // policy violation
+    expect(endpoint.connections[0]!.lines.length).toBe(3); // 2 attach + 1 feed, no 3rd attach
+  });
+
+  // ── §3.5 observability — one structured log line per refuse ────────────────
+
+  it("emits exactly one structured log line on an Origin refuse (outcome/code/changeId only, no byte content)", async () => {
+    const { harness } = await setup();
+    const url = `${harness.baseUrl}/terminal?changeId=${CHANGE_ID}`;
+    await openWsExpectClosed(url, "http://evil.example");
+    await until(() => harness.logLines.length >= 1);
+
+    expect(harness.logLines.length).toBe(1);
+    const line = harness.logLines[0]!;
+    expect(line.event).toBe("refuse");
+    expect(line.outcome).toBe("origin-refused");
+    expect(line.code).toBe(403);
+    expect(line.changeId).toBe(CHANGE_ID);
+    // NFR-SEC-03 parity: the structured line carries NO byte/data content.
+    expect(JSON.stringify(line)).not.toContain("data");
+    expect(JSON.stringify(line)).not.toContain("term");
+  });
+
+  it("emits exactly one structured log line on a connection-cap refuse (code = the WS close code)", async () => {
+    const { harness } = await setup({
+      maxConnections: 1,
+      maxAttachmentsPerConnection: 4,
+    });
+    const first = await openWs(harness.url);
+    cleanups.push(async () => first.close());
+    await openWsExpectClosed(harness.url);
+    await until(() => harness.logLines.length >= 1);
+
+    expect(harness.logLines.length).toBe(1);
+    const line = harness.logLines[0]!;
+    expect(line.event).toBe("refuse");
+    expect(line.outcome).toBe("connection-cap");
+    expect(line.code).toBe(503);
+    expect(line.changeId).toBe(CHANGE_ID);
+  });
+
+  it("emits exactly one structured log line on an attachment-cap refuse (code = the WS policy close code)", async () => {
+    const { endpoint, harness } = await setup({
+      maxConnections: 8,
+      maxAttachmentsPerConnection: 1,
+    });
+    const ws = await openWs(harness.url);
+    ws.send(JSON.stringify({ id: "1", method: "attach", params: { key: CHANGE_ID } }));
+    await until(() => (endpoint.connections[0]?.lines.length ?? 0) >= 1);
+    ws.send(JSON.stringify({ id: "2", method: "attach", params: { key: CHANGE_ID } }));
+    await until(() => harness.logLines.length >= 1);
+
+    expect(harness.logLines.length).toBe(1);
+    const line = harness.logLines[0]!;
+    expect(line.event).toBe("refuse");
+    expect(line.outcome).toBe("attachment-cap");
+    expect(line.code).toBe(1008);
+    expect(line.changeId).toBe(CHANGE_ID);
+    // NFR-SEC-03 parity: no base64 keystroke payload leaks into the log line.
+    expect(JSON.stringify(line)).not.toContain("data");
+  });
+
+  it("does NOT emit a refuse log line on an accepted upgrade (only refusals are logged)", async () => {
+    const { harness } = await setup();
+    const ws = await openWs(harness.url);
+    cleanups.push(async () => ws.close());
+    // Give any (erroneous) async log a chance to land.
+    await new Promise((r) => setTimeout(r, 50));
+    const refusals = harness.logLines.filter((l) => l.event === "refuse");
+    expect(refusals.length).toBe(0);
   });
 });

@@ -49,6 +49,28 @@ export interface TerminalSidecarCaps {
   maxAttachmentsPerConnection: number;
 }
 
+/**
+ * One structured log line per WS refuse (TDD §3.5 observability, WP-003).
+ *
+ * NFR-SEC-03 PARITY (MUST): this line carries OUTCOME / CODE / CHANGE-ID ONLY —
+ * never a keystroke byte, never terminal-output bytes, never the `term.data`
+ * payload. Modelled on the chat relay's `ChatLogLine` shape (an injected sink +
+ * a typed line), but this is the terminal's OWN type in its OWN module — zero
+ * dependency on routes/chat.ts (founder independence directive).
+ */
+export interface TerminalSidecarLogLine {
+  /** The lifecycle event. WP-003 only emits `refuse`; future WPs (connect /
+   *  bind / close, §3.5) may extend this union without changing the contract. */
+  event: "refuse";
+  /** Which control refused the connection. */
+  outcome: "origin-refused" | "connection-cap" | "attachment-cap";
+  /** The HTTP status (handshake refuse) or WS close code (cap refuse). */
+  code: number;
+  /** The change the WS was opened for, if known from the connection URL.
+   *  `undefined` when a foreign page connects without a `?changeId`. */
+  changeId?: string;
+}
+
 export interface CreateTerminalSidecarOptions {
   /** The AF_UNIX socket path the session-manager host serves (per-run temp). */
   socketPath: string;
@@ -59,6 +81,11 @@ export interface CreateTerminalSidecarOptions {
   originAllowList: string[];
   /** Resource ceilings (TDD §3.4). */
   caps: TerminalSidecarCaps;
+  /** Where the one-line-per-refuse structured log goes (TDD §3.5). Defaults to
+   *  no-op. NFR-SEC-03: the sink only ever receives outcome/code/changeId — the
+   *  bridge never passes byte content through it. The composition seam (WP-004)
+   *  routes this through the dev-runner console, as the chat relay does. */
+  logSink?: (line: TerminalSidecarLogLine) => void;
 }
 
 /** WebSocket close codes used at the handshake / cap boundaries. 1008 = policy
@@ -91,6 +118,11 @@ export function createTerminalSidecar(
   // handled in `bridge()`.
   wss.on("error", () => {});
 
+  // One-line-per-refuse structured log (TDD §3.5). Defaults to no-op; the
+  // composition seam injects a real console sink. NFR-SEC-03: only ever called
+  // with outcome/code/changeId — never a byte of terminal traffic.
+  const log = opts.logSink ?? ((): void => {});
+
   let attachedServer: Server | undefined;
   let onUpgrade: ((req: IncomingMessage, socket: Duplex, head: Buffer) => void) | undefined;
   let openConnections = 0;
@@ -120,10 +152,15 @@ export function createTerminalSidecar(
       const path = req.url ? new URL(req.url, "http://127.0.0.1").pathname : "";
       if (path !== TERMINAL_WS_PATH) return;
 
+      // The change identity from the connection URL — used by the caps + the
+      // refuse log lines (NFR-SEC-03: identity only, never byte content).
+      const changeId = changeIdFromUrl(req);
+
       // Origin gate (TDD §3.2) — refuse the handshake outright on mismatch.
       if (!originAllowed(req)) {
         socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
         socket.destroy();
+        log({ event: "refuse", outcome: "origin-refused", code: 403, changeId });
         return;
       }
 
@@ -131,10 +168,10 @@ export function createTerminalSidecar(
       if (openConnections >= opts.caps.maxConnections) {
         socket.write("HTTP/1.1 503 Service Unavailable\r\n\r\n");
         socket.destroy();
+        log({ event: "refuse", outcome: "connection-cap", code: 503, changeId });
         return;
       }
 
-      const changeId = changeIdFromUrl(req);
       wss.handleUpgrade(req, socket, head, (ws) => {
         openConnections += 1;
         bridge(ws, changeId);
@@ -205,6 +242,12 @@ export function createTerminalSidecar(
             if (ws.readyState === ws.OPEN) {
               ws.close(WS_POLICY_VIOLATION, "attachment cap reached");
             }
+            log({
+              event: "refuse",
+              outcome: "attachment-cap",
+              code: WS_POLICY_VIOLATION,
+              changeId,
+            });
             return;
           }
           attachments += 1;
