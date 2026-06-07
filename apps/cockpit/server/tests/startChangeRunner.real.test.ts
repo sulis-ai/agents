@@ -34,6 +34,17 @@ import {
   resolveSulisChangeScript,
 } from "../adapters/SulisChangeStarter";
 
+// Real-subprocess budget (parity with discovery.mint-real.test.ts, flake #8).
+// Each case cold-starts git + `sulis-change` (python3) one or more times; some
+// also `git clone`. Vitest's 5s default per-test timeout cannot cover real
+// process startup, and under the full parallel `vitest run` (CI's constrained
+// CPU) the spawns are slower still — so the 5s default times out
+// deterministically there. We give these REAL tests a generous per-test budget
+// without weakening any assertion (the work itself is bounded inside the
+// adapter). The fork pool is also CPU-capped (see vitest.config.ts) so these
+// spawns are not starved by the rest of the suite.
+const REAL_SUBPROCESS_TIMEOUT_MS = 120_000;
+
 let scriptPath: string | null = null;
 let haveGitPython = false;
 
@@ -85,7 +96,7 @@ function listChanges(scripts: string, stateDir: string): Array<Record<string, un
   return JSON.parse(out) as Array<Record<string, unknown>>;
 }
 
-describe("SulisChangeStarter — the REAL deterministic server-side change-start", () => {
+describe("SulisChangeStarter — the REAL deterministic server-side change-start", { timeout: REAL_SUBPROCESS_TIMEOUT_MS }, () => {
   it("starts a REAL change at `recon` against a present repo (FR-29)", async () => {
     if (!scriptPath || !haveGitPython) {
       // eslint-disable-next-line no-console

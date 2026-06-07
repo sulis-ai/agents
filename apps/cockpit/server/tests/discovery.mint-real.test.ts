@@ -34,6 +34,18 @@ import {
 import { readProducts } from "../lib/products/readProducts";
 import type { ProjectSource } from "../../shared/api-types";
 
+// Real-subprocess budget. Each mint cold-starts python3 THREE times (tenant,
+// product, project); the idempotent case does it twice (six spawns). Vitest's
+// 5s default per-test timeout cannot cover that even in isolation — and under
+// the full parallel `vitest run` (CI's constrained CPU, every fork competing
+// for cores) the cold spawns are slower still, so the 5s default is a
+// deterministic failure there. We give these REAL tests a generous per-test
+// budget (the emitters themselves are bounded at 30s each inside the adapter)
+// without weakening any assertion. The fork pool is also CPU-capped (see
+// vitest.config.ts) so these spawns are not starved by the rest of the suite.
+// Flake #8.
+const REAL_SUBPROCESS_TIMEOUT_MS = 120_000;
+
 // ── resolve the vendored emitter scripts (skip cleanly if unavailable) ───────
 let scriptsDir: string | null = null;
 let havePython = false;
@@ -81,7 +93,7 @@ const SOURCE: ProjectSource = {
   primary_branch: "main",
 };
 
-describe("SpineEmitterMinter — the REAL deterministic server-side mint", () => {
+describe("SpineEmitterMinter — the REAL deterministic server-side mint", { timeout: REAL_SUBPROCESS_TIMEOUT_MS }, () => {
   it("mints a real Tenant + Product + Project into the temp brain on confirm (FR-32/36)", async () => {
     if (!scriptsDir || !havePython) {
       // eslint-disable-next-line no-console
