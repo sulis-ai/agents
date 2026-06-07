@@ -54,6 +54,7 @@ from _session_manager.event_log import (
     OffsetEvictedError,
     OffsetOutOfRangeError,
 )
+from _session_manager.scrollback import ScrollbackBuffer
 from _session_manager.events import (
     CWD_NOT_FOUND,
     DECODE_FAILED,
@@ -115,6 +116,8 @@ __all__ = [
     "EventLog",
     "OffsetEvictedError",
     "OffsetOutOfRangeError",
+    # terminal-scrollback content model (§2.11) — WP-002
+    "ScrollbackBuffer",
     # provider adapter seam (§2.4)
     "ProviderAdapter",
     "Capabilities",
