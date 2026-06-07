@@ -65,20 +65,36 @@ def _default_http(method: str, url: str):
     # so the dispatcher compares it to expect_status; a real connection error
     # propagates and the caller marks the step failed.
     import urllib.error
+    import urllib.parse
     import urllib.request
+
+    # Scheme guard: only real web requests. urllib would otherwise honour
+    # file:// (read a local file), ftp://, etc. from an authored scenario URL.
+    scheme = urllib.parse.urlsplit(url).scheme.lower()
+    if scheme not in ("http", "https"):
+        raise ValueError(f"unsupported URL scheme {scheme!r} (http/https only): {url}")
 
     req = urllib.request.Request(url, method=method)
     try:
-        resp = urllib.request.urlopen(req, timeout=15)
+        # Mitigated: the scheme guard above rejects file://, ftp://, etc. — only
+        # http/https reach urlopen, so no arbitrary-local-file read is possible.
+        resp = urllib.request.urlopen(req, timeout=15)  # noqa: S310  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
         return SimpleNamespace(status_code=getattr(resp, "status", resp.getcode()))
     except urllib.error.HTTPError as exc:
         return SimpleNamespace(status_code=exc.code)
 
 
 def _default_run(cmd: str):
+    # No shell. `cmd` is authored-scenario content (trusted, local test
+    # tooling), but no scenario relies on shell features — pipes, redirects,
+    # `&&`, globs — so shell=True would only add an injection surface for zero
+    # benefit. shlex.split reproduces the one shell-like feature scenarios DO
+    # use (POSIX quoting of args with spaces, e.g. --what 'a b c') as argv,
+    # exactly as the shell would word-split it.
+    import shlex
     import subprocess  # lazy
 
-    return subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    return subprocess.run(shlex.split(cmd), capture_output=True, text=True)
 
 
 def _default_browser(url: str, actions: list, assert_spec: dict):

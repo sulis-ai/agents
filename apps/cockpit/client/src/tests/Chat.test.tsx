@@ -86,7 +86,7 @@ describe("<Chat />", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders 3 messages (user + assistant w/ mixed blocks + system) in order", async () => {
+  it("groups the transcript into a user bubble + an agent Turn Card (chat-B2)", async () => {
     const messages: TranscriptMessage[] = [
       {
         kind: "user",
@@ -104,6 +104,7 @@ describe("<Chat />", () => {
         ],
       },
       {
+        // Agent-lifecycle meta — folded out of the founder-facing card stream.
         kind: "system",
         uuid: "s1",
         timestamp: "2026-05-26T10:02:00Z",
@@ -119,18 +120,21 @@ describe("<Chat />", () => {
     await waitFor(() =>
       expect(screen.getByTestId("chat-message-user")).toBeInTheDocument(),
     );
-    expect(screen.getByTestId("chat-message-assistant")).toBeInTheDocument();
-    expect(screen.getByTestId("system-chip")).toBeInTheDocument();
-
-    // Order: user first, then assistant, then system.
-    const list = screen.getByTestId("chat-list");
-    const children = within(list).getAllByTestId(/^(chat-message|system-chip)/);
-    expect(children[0]).toHaveAttribute("data-testid", "chat-message-user");
-    expect(children[1]).toHaveAttribute(
-      "data-testid",
-      "chat-message-assistant",
+    // The agent turn renders as ONE Turn Card, headed by its summary.
+    expect(screen.getByTestId("turn-card")).toBeInTheDocument();
+    expect(screen.getByText("On it.")).toBeInTheDocument();
+    // The single tool call is folded behind a "1 step" disclosure.
+    expect(screen.getByTestId("turn-steps-toggle").textContent).toMatch(
+      /1 step\b/,
     );
-    expect(children[2]).toHaveAttribute("data-testid", "system-chip");
+    // System meta is NOT shown as its own message in the card stream.
+    expect(screen.queryByTestId("system-chip")).not.toBeInTheDocument();
+
+    // Order: the founder's bubble first, then the agent Turn Card.
+    const list = screen.getByTestId("chat-list");
+    const children = within(list).getAllByTestId(/^(chat-message-user|turn-card)$/);
+    expect(children[0]).toHaveAttribute("data-testid", "chat-message-user");
+    expect(children[1]).toHaveAttribute("data-testid", "turn-card");
   });
 
   it("scrolls the bottom sentinel into view on initial load", async () => {

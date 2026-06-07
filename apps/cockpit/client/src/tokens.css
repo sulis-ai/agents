@@ -34,6 +34,33 @@
   --brand-gold: #C9A962;
   --brand-depth: #1E3A5F;
 
+  /* Status tints (light) — functional tint background + matching border for
+   * the one state-pattern set's error/empty/server-down surfaces (ADR-005).
+   * Lifted verbatim from the SIGNED visual contract (sulis-app.html, light).
+   * Status colour rides the tint + a dark-neutral label, never coloured text
+   * on a saturated fill (the contract's status-label readability fix). */
+  --bg-positive: #F0FDF4;
+  --bg-positive-border: #BBF7D0;
+  --bg-destructive: #FEF2F2;
+  --bg-destructive-border: #FECACA;
+  --bg-warning: #FFFBEB;
+  --bg-warning-border: #FDE68A;
+
+  /* Stage scale (light) — the one shared stage palette (ADR-005). Used
+   * identically in the board column-header dot, the card badge, and the
+   * thread stage track; the board never invents a parallel palette. The
+   * stage is ALSO carried by the column's label + left-to-right position,
+   * so colour is decorative reinforcement, never the sole cue (WCAG 1.4.1).
+   * Values lifted verbatim from the SIGNED visual contract (sulis-app.html,
+   * light theme): recon stone · specify indigo · design teal · implement
+   * blue · review violet · ship green. All clear the 3:1 non-text bar. */
+  --stage-recon: #8B7355;
+  --stage-specify: #6366F1;
+  --stage-design: #2D7D90;
+  --stage-implement: #2563EB;
+  --stage-review: #9333EA;
+  --stage-ship: #15803D;
+
   /* Radius */
   --radius-interactive: 4px;
   --radius-button: 9999px;
@@ -50,5 +77,22 @@
   --weight-body: 400;
   --weight-heading: 300;
   --weight-label: 500;
+
+  /* Compatibility aliases — components authored against the experience-fragments
+   * token vocabulary (--bg-card / --bg-muted / --text / --radius / --font …)
+   * map onto the cockpit's defined v4.2.0 tokens. Without these the referencing
+   * components (e.g. ProductSwitcher) resolved to nothing → transparent menu /
+   * unstyled surfaces. (CH-01KT50 integration fix; see task #4.) */
+  --bg-card: var(--card);
+  --bg-muted: var(--muted);
+  --border-light: var(--border-muted);
+  --font: var(--font-sans);
+  --radius: var(--radius-container);
+  --text: var(--foreground);
+  --text-secondary: #525252;
+  --text-muted: var(--muted-foreground);
+
+  /* Float shadow for the docked composer + raised cards (chat-B2). */
+  --shadow-float: 0 6px 20px rgba(23, 23, 23, 0.08);
 
 }

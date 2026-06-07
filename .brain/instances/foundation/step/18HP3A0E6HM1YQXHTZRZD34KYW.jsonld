@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Open Sulis when no changes are in flight.",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:18HP3A0E6HM1YQXHTZRZD34KYW",
+  "input_artifacts": [
+    "67g38g9b-look-at-any-change-s-card-on-the-board-2-result"
+  ],
+  "mechanism": "human",
+  "name": "67g38g9b-open-sulis-when-no-changes-are-in-flight-3",
+  "output_artifacts": [
+    "67g38g9b-open-sulis-when-no-changes-are-in-flight-3-result"
+  ],
+  "postconditions": [
+    "a clear prompt explains how to start a change"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

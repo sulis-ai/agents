@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""WP-P12 — origin-stamp `prepare-commit-msg` git hook (ADR-013).
+
+The commit-time interception for the two write paths (executor + chat-relay).
+Git calls this hook with the path to the in-flight commit-message file BEFORE
+the commit object is written. If the `SULIS_ORIGIN` env is set, the hook
+appends the `Sulis-Origin:` trailer to that message — so the trailer lands on
+the very commit the path is already making (no new commit, no amend).
+
+  SULIS_ORIGIN="autonomous; run=<ulid>; confidence=<0..1>"
+  SULIS_ORIGIN="assisted; conversation=<id>; turn=<n>"
+
+NON-FATAL by construction: no env, a malformed env, or ANY internal error → the
+hook exits 0 and the commit lands UNSTAMPED (origin falls back to inferred —
+graceful degradation, ADR-013). A hook must never block the commit.
+
+Install: copy / symlink into `.git/hooks/prepare-commit-msg` (chmod +x), or
+point `core.hooksPath` at this `hooks/` dir. The executor / relay set
+`SULIS_ORIGIN` in the environment of the commit they make.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+
+def _locate_scripts_dir() -> Path | None:
+    """Find the dir holding `_origin_stamp.py`, so the hook works whether it is
+    run from its home `hooks/` dir (sibling import via parents[1]) OR copied
+    into `.git/hooks/` (where the sibling is gone). Honours an explicit
+    `SULIS_SCRIPTS_DIR` override, then the resolved-symlink home, then a small
+    upward walk."""
+    override = os.environ.get("SULIS_SCRIPTS_DIR")
+    if override and (Path(override) / "_origin_stamp.py").exists():
+        return Path(override)
+    # The hook's true home (resolve symlinks so a `.git/hooks` symlink still
+    # points back at the scripts/hooks dir).
+    home = Path(__file__).resolve().parents[1]
+    if (home / "_origin_stamp.py").exists():
+        return home
+    for parent in Path(__file__).resolve().parents:
+        cand = parent / "_origin_stamp.py"
+        if cand.exists():
+            return parent
+    return None
+
+
+_scripts_dir = _locate_scripts_dir()
+if _scripts_dir is not None:
+    sys.path.insert(0, str(_scripts_dir))
+
+
+def main(argv: list[str]) -> int:
+    try:
+        env = os.environ.get("SULIS_ORIGIN")
+        if not env:
+            return 0  # no origin context → unstamped commit (inferred).
+        if not argv:
+            return 0  # git always passes the message-file path; defensive.
+
+        # arg2 is the message source (message|template|merge|squash|commit).
+        # Skip amend/merge/squash where appending could double-stamp or fight a
+        # rebase; only stamp a fresh message/template commit.
+        source = argv[1] if len(argv) > 1 else ""
+        if source in ("merge", "squash", "commit"):
+            return 0
+
+        from _origin_stamp import append_trailer_to_message, parse_origin_env
+
+        origin = parse_origin_env(env)
+        if origin is None:
+            return 0  # malformed → leave the commit unstamped.
+
+        msg_path = Path(argv[0])
+        message = msg_path.read_text()
+        stamped = append_trailer_to_message(message, origin)
+        if stamped != message:
+            msg_path.write_text(stamped)
+        return 0
+    except Exception:  # noqa: BLE001 — a hook must NEVER block the commit.
+        return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

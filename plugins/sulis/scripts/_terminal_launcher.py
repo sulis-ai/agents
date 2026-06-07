@@ -152,6 +152,7 @@ def _build_launch_script(
     entry_command: str = "claude --dangerously-skip-permissions --agent sulis",
     extra_env: dict[str, str] | None = None,
     pre_prompt: str | None = None,
+    enable_origin_hook: bool = False,
 ) -> str:
     """Return the bash script body (string).
 
@@ -210,6 +211,21 @@ def _build_launch_script(
         _ENV_SCRUB_LINE,
         f'export SULIS_CHANGE_ID="{change_id}"',
     ]
+    if enable_origin_hook:
+        # WP-P12 (ADR-013) — wire the origin-stamp `prepare-commit-msg` hook for
+        # the executor session, so any commit it makes carries the Sulis-Origin
+        # trailer. The hook dir is set via GIT_CONFIG_* env (a per-session
+        # override; NO `.git/config` mutation, so it leaves the worktree
+        # untouched and reversible). SULIS_SCRIPTS_DIR lets the hook locate
+        # `_origin_stamp`. The hook itself is a no-op unless SULIS_ORIGIN is set
+        # at commit time (the run-ulid + confidence the executor supplies for
+        # the autonomous stamp), so wiring it is harmless when no origin is set.
+        scripts_dir = Path(__file__).resolve().parent
+        hooks_dir = scripts_dir / "hooks"
+        lines.append(f"export SULIS_SCRIPTS_DIR={shlex.quote(str(scripts_dir))}")
+        lines.append("export GIT_CONFIG_COUNT=1")
+        lines.append("export GIT_CONFIG_KEY_0=core.hooksPath")
+        lines.append(f"export GIT_CONFIG_VALUE_0={shlex.quote(str(hooks_dir))}")
     if extra_env_block:
         lines.append(extra_env_block)
     lines.append(f'cd "{worktree_path}"')
@@ -464,6 +480,7 @@ def launch_change_terminal(
     entry_command: str = "claude --dangerously-skip-permissions --agent sulis",
     extra_env: dict[str, str] | None = None,
     pre_prompt: str | None = None,
+    enable_origin_hook: bool = True,
 ) -> dict:
     """Spawn a new terminal in the change worktree with SULIS_CHANGE_ID set.
 
@@ -506,6 +523,7 @@ def launch_change_terminal(
     script_body = _build_launch_script(
         change_id, resolved, entry_command=entry_command,
         extra_env=extra_env, pre_prompt=pre_prompt,
+        enable_origin_hook=enable_origin_hook,
     )
 
     # File-I/O hardening: an unwritable change dir / launch.sh (permission

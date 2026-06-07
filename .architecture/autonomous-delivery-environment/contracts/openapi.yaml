@@ -1,0 +1,809 @@
+openapi: 3.1.0
+info:
+  title: Sulis app — data seam (CH-01KT50 new + changed endpoints)
+  version: 0.1.0
+  description: >
+    The single API boundary ("the seam") the Sulis app reaches all its data
+    through. This document covers ONLY the endpoints added or changed by the
+    drive-a-change slice. Existing read endpoints (tree, file, diff,
+    transcript, contract) are unchanged and documented by the cockpit MVP.
+    All endpoints bind to 127.0.0.1 only (NFR-SEC-01). Every endpoint is
+    read-only EXCEPT three confirm-gated act paths, all reaching consequence
+    through exactly two sanctioned mechanisms (the spine-emitter mint and
+    `sulis-change start`): POST /api/changes/{id}/chat (the chat relay,
+    ADR-003), POST /api/onboarding/session (discovery mint, ADR-007/008),
+    and POST /api/changes/start-from-intent (change-start, ADR-007). The
+    concierge query and the product list/switch are read-only
+    (FR-N8, FR-38; ADR-006/009). POST /api/products/active is a read-only
+    SCOPE-SELECTION (it changes what the seam returns, writes no data;
+    ADR-009) — a `?product=` query-param variant is offered as the
+    all-GET alternative.
+servers:
+  - url: http://127.0.0.1:4317
+    description: Local Sulis app server (loopback only)
+
+paths:
+  /api/changes:
+    get:
+      summary: List the active Product's in-flight changes for the board (CHANGED — now Product-scoped)
+      description: >
+        Returns the changes for the board with stage + liveness, sorted
+        most-recent-first, SCOPED TO THE ACTIVE PRODUCT (FR-37; supersedes the
+        single-implicit-product board). The change→Project→Product roll-up is
+        computed server-side, so a client never receives another Product's
+        changes (ADR-009). The board groups the returned changes into stage
+        columns client-side. Shipped changes are returned but not rendered as
+        in-flight cards (FR-15). FR-01, FR-02, FR-15, FR-37.
+        Scope source: the active Product set via POST /api/products/active, OR
+        the optional `product` query param (the stateless all-GET variant,
+        ADR-009). If neither is supplied and the Tenant has exactly one
+        Product, that Product is the implicit scope.
+      parameters:
+        - name: product
+          in: query
+          required: false
+          schema: { type: string }
+          description: >
+            Optional Product id to scope to (the stateless variant of the
+            active-Product selection, ADR-009). When omitted, the server uses
+            the active Product set via POST /api/products/active.
+      responses:
+        "200":
+          description: The full change list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Change" }
+
+  /api/changes/{id}/status:
+    get:
+      summary: Plain-English read-time status for a change (NEW)
+      description: >
+        Computes, at read time, a human-readable "what's happening" status
+        from the change's state + journal/conversation. Not a stored periodic
+        checkpoint (the periodic beat is out of scope). FR-05.
+      parameters: [ { $ref: "#/components/parameters/ChangeId" } ]
+      responses:
+        "200":
+          description: The computed status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChangeStatus" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/changes/{id}/brain:
+    get:
+      summary: The change's brain entities + workflows, grouped by kind (NEW)
+      description: >
+        Lists the entities and workflows the agent created for this change,
+        grouped by kind, read-only, each with enough content for a readable
+        detail view. Reached through the seam, never the filesystem (NFR-ARCH-01).
+        FR-06, FR-07.
+      parameters: [ { $ref: "#/components/parameters/ChangeId" } ]
+      responses:
+        "200":
+          description: Grouped brain entities (empty groups omitted).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BrainView" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/search:
+    get:
+      summary: Search + filter changes by content, stage, and needs-attention (NEW)
+      description: >
+        Searches change CONTENT (conversation + created entities/artifacts),
+        not just handle/intent/stage (FR-10). Optional stage filter (FR-11)
+        and needs-attention filter (FR-12: blocked OR waiting-on-decision OR
+        agent-stopped-mid-reply; idle-but-fine is NOT flagged). All filters
+        narrow the same board, WITHIN THE ACTIVE PRODUCT (FR-37/38 — search
+        and filters operate inside the active Product's change set, server-side,
+        so a filter can never surface another Product's change). Read-only.
+      parameters:
+        - name: product
+          in: query
+          required: false
+          schema: { type: string }
+          description: >
+            Optional Product id to scope to (the stateless variant, ADR-009).
+            When omitted, the server uses the active Product.
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+          description: Free-text matched against change content.
+        - name: stage
+          in: query
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: array
+            items: { $ref: "#/components/schemas/WorkflowStage" }
+          description: Zero or more stages to filter to.
+        - name: needsAttention
+          in: query
+          required: false
+          schema: { type: boolean }
+          description: When true, only changes that need attention.
+      responses:
+        "200":
+          description: Matching changes (same shape as the board list).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                properties:
+                  results:
+                    type: array
+                    items: { $ref: "#/components/schemas/Change" }
+
+  /api/changes/{id}/chat:
+    post:
+      summary: Send a message to a change's agent and stream the reply (NEW — the one write path)
+      description: >
+        THE single sanctioned write/act path (ADR-003). Resolves a session
+        for the named change WITHOUT asking the founder to choose: use the
+        live session, else resume the last one from its transcript (FR-24),
+        else spawn a fresh one grounded in saved context (FR-25). Positively
+        binds the resolved session to the named change before delivering any
+        byte (FR-21 / NFR-SEC-02). At most one in-flight per change (FR-20).
+        The reply streams back as Server-Sent Events (ADR-001). On a broken
+        stream the partial is preserved and marked interrupted (FR-22). The
+        completed exchange joins the change's existing conversation (FR-18,
+        NFR-DATA-01). No message bodies are logged (NFR-SEC-03).
+      parameters: [ { $ref: "#/components/parameters/ChangeId" } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+                  description: The founder's prompt for this change's agent.
+      responses:
+        "200":
+          description: >
+            The reply stream. An SSE event stream; events are `state`,
+            `chunk`, `complete`, and `error` (see ChatStreamEvent). The
+            connection stays open until the reply ends or breaks.
+          content:
+            text/event-stream:
+              schema: { $ref: "#/components/schemas/ChatStreamEvent" }
+        "409":
+          description: A reply is already streaming for this change (SESSION_BUSY, FR-20).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: >
+            The resolved session does not belong to the named change
+            (SESSION_CHANGE_MISMATCH, FR-21 / NFR-SEC-02). Zero bytes delivered.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502":
+          description: >
+            Could not resume or spawn a session at all (SESSION_UNREACHABLE,
+            FR-19). The message is NOT shown as delivered (FR-N3).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/products:
+    get:
+      summary: List the Tenant's Products, marking the active one (NEW — multi-product)
+      description: >
+        Returns the Tenant's Products with the active one marked, for the
+        product switcher (FR-38). Read-only. The single-Product Tenant is the
+        trivial case — one Product, shown as active. ADR-009.
+      responses:
+        "200":
+          description: The Products, with the active one marked.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductList" }
+
+  /api/products/active:
+    post:
+      summary: Set the active Product — a read-only SCOPE selection, not a data write (NEW)
+      description: >
+        Re-scopes the board and the per-product views (search FR-10, stage
+        filter FR-11, needs-attention FR-12) to the chosen Product (FR-38,
+        UC-11). This changes WHAT THE SEAM RETURNS; it writes nothing to the
+        change store or brain, mints nothing, starts/signals no session — it
+        is a scope selection, the read-side equivalent of a query parameter
+        (ADR-009). The read-only gate classifies it as a scope-selection verb,
+        distinct from forbidden mutations and from the sanctioned chat write.
+        ALTERNATIVE (ADR-009): omit this endpoint entirely and pass
+        `?product=<id>` on every board/search read (the stateless all-GET
+        variant). The builder picks one and records it; the roll-up is
+        server-side either way.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId]
+              properties:
+                productId: { type: string }
+      responses:
+        "200":
+          description: The new active Product (echoed), for the client to re-scope.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/concierge/query:
+    post:
+      summary: Ask the concierge a read-only question about the founder's world (NEW)
+      description: >
+        The concierge front door (modelled on `sulis:sulis`). Answers
+        plain-English navigation / status / Q&A questions — finding changes,
+        reporting a change's stage + status, answering over the change store +
+        brain — READ-ONLY, through the same seam as the board/thread (FR-33).
+        It rides the SAME headless bridge as the chat (ADR-002/006), so the
+        reply streams as SSE. The concierge COORDINATES ONLY — this query path
+        performs zero writes, mints nothing, starts/signals no session
+        (FR-N8 / NFR-DISC-05). If the founder's intent is to START WORK or to
+        INVESTIGATE, the concierge does NOT do it here: it routes to
+        onboarding (POST /api/onboarding/session) or to start-from-intent
+        (POST /api/changes/start-from-intent), where the act is confirm-gated
+        and contained in a change (FR-34 / FR-N9; ADR-006). A POST verb is used
+        to carry the question body; it remains a read-only path (no mutation,
+        no process start beyond the read-only bridge read).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question:
+                  type: string
+                  description: The founder's plain-English question about their world.
+                product:
+                  type: string
+                  description: Optional Product scope for the answer (ADR-009).
+      responses:
+        "200":
+          description: >
+            The concierge's streamed answer (SSE). Events reuse ChatStreamEvent
+            shapes (`state`, `chunk`, `complete`, `error`). May include a
+            `route` hint when the question should become onboarding or a change.
+          content:
+            text/event-stream:
+              schema: { $ref: "#/components/schemas/ConciergeStreamEvent" }
+        "502":
+          description: The read-only bridge could not be reached (SESSION_UNREACHABLE).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/onboarding/session:
+    post:
+      summary: Cold-start onboarding — discover, find-or-create the repo, mint the graph (NEW — act, confirm-gated)
+      description: >
+        The conversational front door for an EMPTY graph (UC-07). Backed by the
+        headless discovery agent on the SAME stream bridge as the chat (FR-27).
+        It orchestrates the EXISTING discovery skills (`discover-project`,
+        `discover-context`, `codebase-mapping`) and the VALIDATED spine emitters
+        (Tenant/Product/Project) — it reimplements nothing (ADR-007). The flow:
+        SEARCH the founder's chosen area only (FR-N7 / NFR-DISC-01) → ASK
+        plain-English clarifying questions → PROPOSE the Tenant/Product/Project
+        and the repo plan → on the founder's CONFIRM (FR-N6 / NFR-DISC-04)
+        FIND-OR-CREATE the repo (FR-35: find existing, or local-first `git init`
+        create, ADR-008) → MINT via the emitters (FR-32 / NFR-DISC-03) and
+        PERSIST a durable Product/Project config including
+        `Project.source = {repo, path, primary_branch}` (FR-36 / NFR-DISC-06).
+        Idempotent: an already-minted entity is surfaced, never duplicated
+        (FR-31 / NFR-DISC-02). All-or-nothing: a declined/abandoned flow or a
+        failed repo-create leaves the graph UNCHANGED and persists NO dangling
+        config (FR-N10 / FR-N11). Streams as SSE (drives the bridge).
+        The `phase`/`confirm` fields make the propose→confirm→mint turns
+        explicit so the confirm gate is in the contract, not implicit.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OnboardingRequest" }
+      responses:
+        "200":
+          description: >
+            The onboarding conversation stream (SSE). Events are
+            OnboardingStreamEvent: `state`, `chunk` (agent text), `proposal`
+            (what it will mint/create, awaiting confirm), `minted` (after a
+            confirmed mint), `error`.
+          content:
+            text/event-stream:
+              schema: { $ref: "#/components/schemas/OnboardingStreamEvent" }
+        "409":
+          description: A discovery session is already in flight (SESSION_BUSY).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: >
+            The chosen search area is outside the founder's permitted root
+            (DISCOVERY_SCOPE_VIOLATION, FR-N7), OR a confirm referenced a
+            proposal that no longer matches (DISCOVERY_CONFIRM_STALE).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502":
+          description: The discovery bridge could not be reached (SESSION_UNREACHABLE).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/changes/start-from-intent:
+    post:
+      summary: Start a change from plain-English intent (NEW — act, confirm-gated)
+      description: >
+        Turns plain-English intent into a started change (UC-08; also the path
+        an investigation takes, UC-10 / FR-34). The headless agent resolves the
+        intent to a CHANGE PRIMITIVE + SLUG using the EXISTING classifier and
+        change-primitives vocabulary (FR-29), PROPOSES what it will start, and
+        — on the founder's CONFIRM (FR-N6) — maps the chosen Project's
+        `source = {repo, path, primary_branch}` to `--repo-root` and runs
+        `sulis-change start`, so the change appears on the board at RECON.
+        LOCAL-FIRST (FR-30): if the Project's repo is not present on the machine,
+        it is CLONED from `Project.source.repo` first; a clone failure ⇒ visible
+        failure and NO change started. An investigation request creates an
+        investigation change rather than running the exploration inline
+        (FR-34 / FR-N9). Streams as SSE (drives the bridge).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StartFromIntentRequest" }
+      responses:
+        "200":
+          description: >
+            The start-from-intent stream (SSE). Events: `state`, `chunk`,
+            `proposal` (primitive + slug awaiting confirm), `started`
+            (the new change at Recon), `error`.
+          content:
+            text/event-stream:
+              schema: { $ref: "#/components/schemas/StartFromIntentStreamEvent" }
+        "409":
+          description: A start session is already in flight (SESSION_BUSY).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: >
+            Intent too ambiguous to resolve a primitive (INTENT_AMBIGUOUS — the
+            agent asks one clarifying question instead of guessing), OR a stale
+            confirm (START_CONFIRM_STALE).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502":
+          description: >
+            The Project's repo could not be cloned/reached, or the bridge could
+            not be reached (REPO_UNREACHABLE / SESSION_UNREACHABLE, FR-30). No
+            change started.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+components:
+  parameters:
+    ChangeId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      description: The change id or handle.
+
+  responses:
+    NotFound:
+      description: No such change.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    WorkflowStage:
+      type: string
+      enum: [recon, specify, design, implement, review, ship, shipped]
+
+    Liveness:
+      oneOf:
+        - type: object
+          required: [status, pid]
+          properties:
+            status: { const: running }
+            pid: { type: integer }
+        - type: object
+          required: [status]
+          properties:
+            status: { const: not-running }
+        - type: object
+          required: [status, reason]
+          properties:
+            status: { const: unknown }
+            reason: { type: string }
+
+    Change:
+      type: object
+      description: One change card on the board (unchanged shape from MVP).
+      required: [changeId, handle, slug, primitive, branch, worktreePath, intent, baseBranch, baseSha, createdAt, updatedAt, stage, liveness]
+      properties:
+        changeId: { type: string }
+        handle: { type: string }
+        slug: { type: string }
+        primitive: { type: string }
+        branch: { type: string }
+        worktreePath: { type: string }
+        intent: { type: string }
+        baseBranch: { type: string }
+        baseSha: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        stage: { $ref: "#/components/schemas/WorkflowStage" }
+        liveness: { $ref: "#/components/schemas/Liveness" }
+
+    ChangeStatus:
+      type: object
+      description: Read-time plain-English status (FR-05).
+      required: [changeId, stage, headline, needsAttention]
+      properties:
+        changeId: { type: string }
+        stage: { $ref: "#/components/schemas/WorkflowStage" }
+        headline:
+          type: string
+          description: One human-readable sentence/short paragraph of what's happening.
+        needsAttention:
+          type: object
+          description: Why this change does/doesn't need attention (FR-12).
+          required: [flagged]
+          properties:
+            flagged: { type: boolean }
+            reason:
+              type: [string, "null"]
+              enum: [blocked, waiting-on-decision, stopped-mid-reply, null]
+
+    BrainEntity:
+      type: object
+      required: [id, kind, title]
+      properties:
+        id: { type: string, description: "e.g. dna:requirement:<ulid>" }
+        kind: { type: string, description: "requirement | workflow | design | decision | …" }
+        title: { type: string }
+        detail:
+          type: object
+          additionalProperties: true
+          description: The readable fields/content for the detail view (FR-07).
+
+    BrainGroup:
+      type: object
+      required: [kind, items]
+      properties:
+        kind: { type: string }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/BrainEntity" }
+
+    BrainView:
+      type: object
+      required: [changeId, groups]
+      properties:
+        changeId: { type: string }
+        groups:
+          type: array
+          description: Entities grouped by kind; empty when no brain yet (FR-06 empty case).
+          items: { $ref: "#/components/schemas/BrainGroup" }
+
+    Product:
+      type: object
+      description: One Product under the Tenant (multi-product, FR-37/38).
+      required: [productId, name]
+      properties:
+        productId: { type: string, description: "e.g. dna:product:<ulid>" }
+        name: { type: string }
+        active:
+          type: boolean
+          description: True for the currently active Product (board scope).
+
+    ProductList:
+      type: object
+      required: [products]
+      properties:
+        products:
+          type: array
+          items: { $ref: "#/components/schemas/Product" }
+        activeProductId:
+          type: [string, "null"]
+          description: The active Product id, or null when none selected yet.
+
+    ProjectSource:
+      type: object
+      description: >
+        Where a Project's code lives — mapped to `--repo-root` for
+        `sulis-change start` (FR-29/30) and persisted durably (FR-36).
+      required: [repo, path, primary_branch]
+      properties:
+        repo: { type: string, description: "Repo URL or local path (Project.source.repo)." }
+        path: { type: string, description: "Sub-path within the repo, if any." }
+        primary_branch: { type: string }
+
+    OnboardingRequest:
+      type: object
+      description: One turn in the cold-start onboarding conversation (UC-07).
+      required: [phase]
+      properties:
+        phase:
+          type: string
+          enum: [search, ask, confirm]
+          description: >
+            `search` = begin/continue discovery in the chosen area;
+            `ask` = answer a clarifying question;
+            `confirm` = approve the pending proposal (the consequential act —
+            mint + repo find-or-create — happens ONLY on confirm, FR-N6).
+        chosenArea:
+          type: string
+          description: >
+            The folder the founder chose; discovery reads ONLY under it
+            (FR-N7 / NFR-DISC-01). Required on the first `search` turn.
+        message:
+          type: string
+          description: The founder's plain-English answer (for `ask`).
+        confirmToken:
+          type: string
+          description: >
+            The token from the proposal being confirmed (for `confirm`), so a
+            stale proposal can't be mis-confirmed (DISCOVERY_CONFIRM_STALE).
+        repoChoice:
+          type: object
+          description: >
+            The repo branch decision when confirming (FR-35). `find` configures
+            an existing repo from the chosen area; `create` makes a new one —
+            default local-only `git init` (ADR-008). Hosted-remote create is a
+            separately-confirmed founder choice.
+          properties:
+            mode: { type: string, enum: [find, create] }
+            createTarget:
+              type: string
+              enum: [local, hosted-remote]
+              description: Local-only is the safe default (ADR-008).
+
+    OnboardingStreamEvent:
+      description: One SSE event in the onboarding conversation stream.
+      oneOf:
+        - type: object
+          required: [type, state]
+          properties:
+            type: { const: state }
+            state:
+              type: string
+              enum: [searching, asking, proposing, confirming, minting, complete, failed]
+        - type: object
+          required: [type, text]
+          properties:
+            type: { const: chunk }
+            text: { type: string, description: Agent text (no directory contents logged). }
+        - type: object
+          required: [type, proposal]
+          properties:
+            type: { const: proposal }
+            proposal:
+              type: object
+              description: >
+                What the agent will mint/create, awaiting the founder's confirm
+                (FR-N6). Nothing is created until a `confirm` turn arrives.
+              required: [confirmToken]
+              properties:
+                confirmToken: { type: string }
+                tenant: { type: string }
+                product: { type: string }
+                projects:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name: { type: string }
+                      source: { $ref: "#/components/schemas/ProjectSource" }
+                repoPlan:
+                  type: string
+                  enum: [found-existing, will-create-local, will-create-hosted-remote]
+                alreadyMinted:
+                  type: boolean
+                  description: True when the entity exists — surfaced, not duplicated (FR-31).
+        - type: object
+          required: [type, minted]
+          properties:
+            type: { const: minted }
+            minted:
+              type: object
+              description: The entities minted after a confirmed turn (via the spine emitters, FR-32).
+              properties:
+                tenant: { type: string }
+                product: { $ref: "#/components/schemas/Product" }
+                projects:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      projectId: { type: string }
+                      source: { $ref: "#/components/schemas/ProjectSource" }
+        - type: object
+          required: [type, code]
+          properties:
+            type: { const: error }
+            code:
+              type: string
+              enum: [DISCOVERY_SCOPE_VIOLATION, DISCOVERY_CONFIRM_STALE, REPO_CREATE_FAILED, SESSION_UNREACHABLE, SESSION_BUSY]
+            message: { type: string }
+
+    StartFromIntentRequest:
+      type: object
+      description: Start a change (or an investigation, FR-34) from plain-English intent (UC-08).
+      required: [phase]
+      properties:
+        phase:
+          type: string
+          enum: [propose, confirm]
+          description: >
+            `propose` = classify the intent to a primitive + slug and show the
+            founder what will start; `confirm` = approve it (the change-start
+            act happens ONLY on confirm, FR-N6).
+        productId:
+          type: string
+          description: The Product whose Project's repo the change starts against (FR-29).
+        intent:
+          type: string
+          description: The founder's plain-English description of the work (for `propose`).
+        kind:
+          type: string
+          enum: [change, investigation]
+          description: >
+            `investigation` marks an explore/look-into request — it still
+            becomes a real change to contain the work (FR-34 / FR-N9), never
+            inline concierge work.
+        confirmToken:
+          type: string
+          description: The token from the proposal being confirmed (for `confirm`).
+
+    StartFromIntentStreamEvent:
+      description: One SSE event in the start-from-intent stream.
+      oneOf:
+        - type: object
+          required: [type, state]
+          properties:
+            type: { const: state }
+            state:
+              type: string
+              enum: [classifying, proposing, confirming, cloning, starting, complete, failed]
+        - type: object
+          required: [type, text]
+          properties:
+            type: { const: chunk }
+            text: { type: string }
+        - type: object
+          required: [type, proposal]
+          properties:
+            type: { const: proposal }
+            proposal:
+              type: object
+              required: [confirmToken, primitive, slug]
+              properties:
+                confirmToken: { type: string }
+                primitive: { type: string, description: The resolved change primitive (FR-29). }
+                slug: { type: string }
+                willCloneRepo:
+                  type: boolean
+                  description: True when the Project's repo is absent and must be cloned first (FR-30).
+        - type: object
+          required: [type, started]
+          properties:
+            type: { const: started }
+            started:
+              $ref: "#/components/schemas/Change"
+              description: The new change at Recon (FR-29).
+        - type: object
+          required: [type, code]
+          properties:
+            type: { const: error }
+            code:
+              type: string
+              enum: [INTENT_AMBIGUOUS, START_CONFIRM_STALE, REPO_UNREACHABLE, SESSION_UNREACHABLE, SESSION_BUSY]
+            message: { type: string }
+
+    ConciergeStreamEvent:
+      description: >
+        One SSE event in the concierge's read-only answer stream (FR-33).
+        Reuses the chat event shapes; adds an optional `route` hint when the
+        question should become onboarding or a started change (FR-34 — but the
+        concierge does NOT act here; it routes).
+      oneOf:
+        - type: object
+          required: [type, state]
+          properties:
+            type: { const: state }
+            state: { type: string, enum: [thinking, replying, complete, failed] }
+        - type: object
+          required: [type, text]
+          properties:
+            type: { const: chunk }
+            text: { type: string }
+        - type: object
+          required: [type]
+          properties:
+            type: { const: complete }
+            route:
+              type: [string, "null"]
+              enum: [onboarding, start-from-intent, null]
+              description: >
+                A hint that the founder's intent is consequential and should go
+                to the confirm-gated act endpoint — NOT performed inline
+                (FR-N8 / FR-N9).
+        - type: object
+          required: [type, code]
+          properties:
+            type: { const: error }
+            code: { type: string, enum: [SESSION_UNREACHABLE] }
+            message: { type: string }
+
+    ChatStreamEvent:
+      description: One SSE event in the reply stream (ADR-001).
+      oneOf:
+        - type: object
+          required: [type, state]
+          properties:
+            type: { const: state }
+            state:
+              type: string
+              enum: [ready, resuming, spawning, replying, complete, interrupted, failed]
+              description: Session lifecycle for the founder (FR-23).
+        - type: object
+          required: [type, text]
+          properties:
+            type: { const: chunk }
+            text: { type: string, description: A reply token/delta (FR-17). }
+        - type: object
+          required: [type]
+          properties:
+            type: { const: complete }
+            resumed:
+              type: boolean
+              description: True when the change was resumed (FR-26 honest indication).
+        - type: object
+          required: [type, code]
+          properties:
+            type: { const: error }
+            code:
+              type: string
+              enum: [SESSION_UNREACHABLE, SESSION_CHANGE_MISMATCH, SESSION_BUSY]
+            message: { type: string }
+
+    Error:
+      type: object
+      required: [error, code]
+      description: The existing typed error envelope, with chat codes added.
+      properties:
+        error: { type: string }
+        code:
+          type: string
+          enum:
+            - NOT_FOUND
+            - SESSION_BUSY
+            - SESSION_CHANGE_MISMATCH
+            - SESSION_UNREACHABLE
+            # discovery / onboarding (FR-27..36, FR-N6..N11)
+            - DISCOVERY_SCOPE_VIOLATION
+            - DISCOVERY_CONFIRM_STALE
+            - REPO_CREATE_FAILED
+            # start-from-intent (FR-29/30/34)
+            - INTENT_AMBIGUOUS
+            - START_CONFIRM_STALE
+            - REPO_UNREACHABLE

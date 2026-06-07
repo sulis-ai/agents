@@ -1,0 +1,339 @@
+// WP-007 — <SearchBar> + board-wiring tests (FR-10/11/12, ADR-005).
+//
+// Two layers:
+//   1. <SearchBar> as a controlled component — the search box, the stage
+//      filter chips, and the needs-attention chip emit the right change
+//      events and reflect their pressed/active state. It consumes
+//      tokens.css only and matches the SIGNED visual contract toolbar
+//      (sulis-app.html: role="search", a content-search box, stage chips,
+//      a "Needs attention" chip).
+//   2. The board wiring — with the SearchBar in the Board's toolbar,
+//      typing a term narrows the SAME board (not a separate results
+//      screen, ADR-005); stage + needs-attention filters narrow it;
+//      clearing restores the full board.
+//
+// Data is fetched through the typed client (apiGet funnel) — never `fetch`
+// in the component (WPF-02); the board-wiring tests drive the real hooks
+// against mocked global fetch, the substrate every client test uses.
+
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { render, waitFor, within, fireEvent } from "@testing-library/react";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { axe } from "jest-axe";
+import type { Change } from "../../../shared/api-types";
+import { SearchBar } from "../components/SearchBar";
+import { Board } from "../pages/Board";
+
+function makeChange(overrides: Partial<Change> = {}): Change {
+  return {
+    changeId: "01ABC",
+    handle: "CH-01ABC",
+    slug: "fix-thing",
+    primitive: "fix",
+    branch: "fix/thing",
+    worktreePath: "/tmp/worktree",
+    intent: "Fix the broken thing",
+    baseBranch: "main",
+    baseSha: "abc123",
+    createdAt: "2026-05-26T11:00:00Z",
+    updatedAt: "2026-05-26T11:55:00Z",
+    stage: "implement",
+    liveness: { status: "unknown", reason: "no session" },
+    ...overrides,
+  };
+}
+
+// ─── Layer 1: <SearchBar> controlled-component contract ──────────────────────
+
+describe("<SearchBar> (controlled component)", () => {
+  function noop() {}
+
+  it("renders the search box, the stage chip, and the needs-attention chip (visual contract toolbar)", () => {
+    const { getByRole, getByText } = render(
+      <SearchBar
+        query=""
+        stages={[]}
+        needsAttention={false}
+        onQueryChange={noop}
+        onToggleStage={noop}
+        onToggleNeedsAttention={noop}
+      />,
+    );
+    // The toolbar is a search landmark (sulis-app.html role="search").
+    expect(getByRole("search")).toBeInTheDocument();
+    // A content-search textbox.
+    expect(getByRole("searchbox")).toBeInTheDocument();
+    // The needs-attention chip.
+    expect(getByText(/needs attention/i)).toBeInTheDocument();
+  });
+
+  it("calls onQueryChange as the founder types", () => {
+    const onQueryChange = vi.fn();
+    const { getByRole } = render(
+      <SearchBar
+        query=""
+        stages={[]}
+        needsAttention={false}
+        onQueryChange={onQueryChange}
+        onToggleStage={noop}
+        onToggleNeedsAttention={noop}
+      />,
+    );
+    fireEvent.change(getByRole("searchbox"), { target: { value: "login" } });
+    expect(onQueryChange).toHaveBeenCalledWith("login");
+  });
+
+  it("reflects the current query value (controlled)", () => {
+    const { getByRole } = render(
+      <SearchBar
+        query="rollback"
+        stages={[]}
+        needsAttention={false}
+        onQueryChange={noop}
+        onToggleStage={noop}
+        onToggleNeedsAttention={noop}
+      />,
+    );
+    expect((getByRole("searchbox") as HTMLInputElement).value).toBe("rollback");
+  });
+
+  it("toggles a stage when its chip is clicked (FR-11)", () => {
+    const onToggleStage = vi.fn();
+    const { getByRole } = render(
+      <SearchBar
+        query=""
+        stages={[]}
+        needsAttention={false}
+        onQueryChange={noop}
+        onToggleStage={onToggleStage}
+        onToggleNeedsAttention={noop}
+      />,
+    );
+    fireEvent.click(getByRole("button", { name: /design/i }));
+    expect(onToggleStage).toHaveBeenCalledWith("design");
+  });
+
+  it("marks an active stage chip as pressed (aria-pressed)", () => {
+    const { getByRole } = render(
+      <SearchBar
+        query=""
+        stages={["design"]}
+        needsAttention={false}
+        onQueryChange={noop}
+        onToggleStage={noop}
+        onToggleNeedsAttention={noop}
+      />,
+    );
+    expect(getByRole("button", { name: /design/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("toggles needs-attention when its chip is clicked (FR-12) and reflects pressed state", () => {
+    const onToggleNeedsAttention = vi.fn();
+    const { getByRole, rerender } = render(
+      <SearchBar
+        query=""
+        stages={[]}
+        needsAttention={false}
+        onQueryChange={noop}
+        onToggleStage={noop}
+        onToggleNeedsAttention={onToggleNeedsAttention}
+      />,
+    );
+    const chip = getByRole("button", { name: /needs attention/i });
+    expect(chip).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(chip);
+    expect(onToggleNeedsAttention).toHaveBeenCalledTimes(1);
+    rerender(
+      <SearchBar
+        query=""
+        stages={[]}
+        needsAttention={true}
+        onQueryChange={noop}
+        onToggleStage={noop}
+        onToggleNeedsAttention={onToggleNeedsAttention}
+      />,
+    );
+    expect(
+      getByRole("button", { name: /needs attention/i }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("has no WCAG AA violations (jest-axe, WPF-06)", async () => {
+    const { container } = render(
+      <SearchBar
+        query=""
+        stages={[]}
+        needsAttention={false}
+        onQueryChange={noop}
+        onToggleStage={noop}
+        onToggleNeedsAttention={noop}
+      />,
+    );
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+});
+
+// ─── Layer 2: board wiring — filters narrow the SAME board (ADR-005) ─────────
+
+function freshClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, refetchOnWindowFocus: false, staleTime: 0 },
+    },
+  });
+}
+
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function renderBoard(client: QueryClient) {
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route path="/" element={<Board />} />
+          <Route path="/c/:changeId" element={<div data-testid="thread-view" />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+/**
+ * Route the mocked fetch: `/api/changes` returns the full board; `/api/search`
+ * returns whatever the search args resolve to. The test controls both so it
+ * can assert the board narrows to the search results.
+ */
+function mockApi(opts: {
+  changes: Change[];
+  onSearch: (url: URL) => Change[];
+}) {
+  vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
+    const raw = typeof input === "string" ? input : input.toString();
+    const url = new URL(raw, "http://localhost");
+    if (url.pathname === "/api/search") {
+      return Promise.resolve(
+        jsonResponse(200, { results: opts.onSearch(url) }),
+      );
+    }
+    // default: the full board list
+    return Promise.resolve(jsonResponse(200, opts.changes));
+  });
+}
+
+describe("Board wiring — the toolbar narrows the SAME board (ADR-005)", () => {
+  beforeEach(() => {
+    vi.spyOn(globalThis, "fetch").mockReset();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("renders the search toolbar above the board", async () => {
+    mockApi({
+      changes: [makeChange({ changeId: "01A", handle: "CH-01A" })],
+      onSearch: () => [],
+    });
+    const { findByRole } = renderBoard(freshClient());
+    expect(await findByRole("search")).toBeInTheDocument();
+  });
+
+  it("typing a term narrows the SAME board to the matching changes (FR-10) — no separate results screen", async () => {
+    const all = [
+      makeChange({ changeId: "01HIT", handle: "CH-01HIT", stage: "design" }),
+      makeChange({ changeId: "01MISS", handle: "CH-01MISS", stage: "design" }),
+    ];
+    mockApi({
+      changes: all,
+      onSearch: (url) =>
+        url.searchParams.get("q") === "marshmallow"
+          ? [all[0]!]
+          : all,
+    });
+    const { findByText, getByRole, queryByText, getByTestId } = renderBoard(
+      freshClient(),
+    );
+    // Full board first.
+    await findByText("CH-01HIT");
+    expect(getByText0(queryByText, "CH-01MISS")).toBe(true);
+
+    // Type a content-only term → the board narrows to the one match, and it
+    // is still the board (the stage columns), not a new screen.
+    fireEvent.change(getByRole("searchbox"), {
+      target: { value: "marshmallow" },
+    });
+    // Wait for the narrowed result to land (the loading flicker between the
+    // full list and the search can briefly hide both rows).
+    await findByText("CH-01HIT");
+    await waitFor(() => {
+      expect(queryByText("CH-01MISS")).not.toBeInTheDocument();
+    });
+    expect(getByTestId("board")).toBeInTheDocument();
+    expect(within(getByTestId("board")).getByText("CH-01HIT")).toBeInTheDocument();
+  });
+
+  it("the needs-attention filter narrows the board to flagged changes (FR-12)", async () => {
+    const all = [
+      makeChange({ changeId: "01FLAG", handle: "CH-01FLAG", stage: "design" }),
+      makeChange({ changeId: "01IDLE", handle: "CH-01IDLE", stage: "design" }),
+    ];
+    mockApi({
+      changes: all,
+      onSearch: (url) =>
+        url.searchParams.get("needsAttention") === "true" ? [all[0]!] : all,
+    });
+    const { findByText, getByRole, queryByText } = renderBoard(freshClient());
+    await findByText("CH-01IDLE");
+    fireEvent.click(getByRole("button", { name: /needs attention/i }));
+    // The board narrows to the one flagged change; wait for the positive
+    // condition (the loading flicker between the two queries can briefly
+    // hide both, so assert on the result, not the absence).
+    await findByText("CH-01FLAG");
+    await waitFor(() => {
+      expect(queryByText("CH-01IDLE")).not.toBeInTheDocument();
+    });
+    expect(queryByText("CH-01FLAG")).toBeInTheDocument();
+  });
+
+  it("clearing the search restores the full board (ADR-005)", async () => {
+    const all = [
+      makeChange({ changeId: "01HIT", handle: "CH-01HIT", stage: "design" }),
+      makeChange({ changeId: "01MISS", handle: "CH-01MISS", stage: "design" }),
+    ];
+    mockApi({
+      changes: all,
+      onSearch: (url) =>
+        url.searchParams.get("q") ? [all[0]!] : all,
+    });
+    const { findByText, getByRole, queryByText } = renderBoard(freshClient());
+    await findByText("CH-01MISS");
+    // Narrow.
+    fireEvent.change(getByRole("searchbox"), { target: { value: "x" } });
+    await findByText("CH-01HIT");
+    await waitFor(() => {
+      expect(queryByText("CH-01MISS")).not.toBeInTheDocument();
+    });
+    // Clear → the full board returns.
+    fireEvent.change(getByRole("searchbox"), { target: { value: "" } });
+    await waitFor(() => {
+      expect(queryByText("CH-01MISS")).toBeInTheDocument();
+    });
+  });
+});
+
+/** Tiny helper: assert a queryByText found an element (kept terse + typed). */
+function getByText0(
+  queryByText: (text: string) => HTMLElement | null,
+  text: string,
+): boolean {
+  return queryByText(text) !== null;
+}

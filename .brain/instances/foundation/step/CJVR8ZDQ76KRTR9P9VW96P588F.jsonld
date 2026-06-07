@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Click one of the created items.",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:CJVR8ZDQ76KRTR9P9VW96P588F",
+  "input_artifacts": [
+    "3jttwd8f-open-a-change-s-what-s-been-created-view-1-result"
+  ],
+  "mechanism": "human",
+  "name": "3jttwd8f-click-one-of-the-created-items-2",
+  "output_artifacts": [
+    "3jttwd8f-click-one-of-the-created-items-2-result"
+  ],
+  "postconditions": [
+    "a readable detail view of that item is shown"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

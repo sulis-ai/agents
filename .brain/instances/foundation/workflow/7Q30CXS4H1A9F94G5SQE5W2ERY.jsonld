@@ -1,0 +1,24 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:7Q30CXS4H1A9F94G5SQE5W2ERY",
+  "initial_steps": [
+    "67g38g9b-open-sulis-on-your-machine-and-look-at-t-1"
+  ],
+  "name": "See everything in flight at a glance",
+  "state": "draft",
+  "steps": [
+    "67g38g9b-open-sulis-on-your-machine-and-look-at-t-1",
+    "67g38g9b-look-at-any-change-s-card-on-the-board-2",
+    "67g38g9b-open-sulis-when-no-changes-are-in-flight-3"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "67g38g9b-open-sulis-when-no-changes-are-in-flight-3"
+  ],
+  "transitions": [
+    "67g38g9b-open-sulis-on-your-machine-and-look-at-t-1 -> 67g38g9b-look-at-any-change-s-card-on-the-board-2",
+    "67g38g9b-look-at-any-change-s-card-on-the-board-2 -> 67g38g9b-open-sulis-when-no-changes-are-in-flight-3"
+  ],
+  "type": "review"
+}

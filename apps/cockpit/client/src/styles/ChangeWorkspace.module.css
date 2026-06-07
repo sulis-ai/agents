@@ -1,0 +1,297 @@
+/* Chat-redesign (chat-B2 signed contract) — the open change owns the screen:
+ * a change-scoped LEFT NAV (name + stage track + view switches) and a
+ * full-width MAIN area that renders the selected view. Lifted from the signed
+ * mockup (chat-B2-tabbed-workspace.html) to real tokens. */
+
+.change {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 248px 1fr;
+}
+
+/* ── change-scoped LEFT NAV ─────────────────────────────────────────────── */
+.leftnav {
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding: 16px 12px 12px;
+}
+
+.cnHead {
+  padding: 2px 8px 14px;
+  border-bottom: 1px solid var(--border-muted);
+  margin-bottom: 6px;
+}
+.cnKicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.cnName {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--foreground);
+  margin-top: 4px;
+  letter-spacing: -0.01em;
+  /* Long intents would crowd the stage track + views off-screen — cap the
+   * name at 3 lines (the full text is in the tab tooltip + the sticky bar). */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.cnMeta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 9px;
+}
+.stagebadge {
+  padding: 3px 9px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: var(--radius-container);
+  background: color-mix(in srgb, var(--accent) 8%, #fff);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+}
+.cnLive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: var(--weight-label);
+}
+.cnLive .g {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--positive);
+  box-shadow: 0 0 0 2px var(--bg-positive);
+}
+
+.sectionLabel {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted-foreground);
+  margin: 14px 8px 8px;
+  font-weight: 600;
+}
+
+/* vertical stage track */
+.vtrack {
+  list-style: none;
+  margin: 0 4px 4px;
+  padding: 0;
+}
+.vstep {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  position: relative;
+}
+.vstep .vd {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--input);
+  flex: none;
+  border: 2px solid var(--card);
+  z-index: 2;
+}
+.vstep:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 18px;
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+  z-index: 1;
+}
+.vstep[data-state="done"] {
+  color: var(--text-secondary);
+}
+.vstep[data-state="done"] .vd {
+  background: var(--text-secondary);
+}
+.vstep[data-state="now"] {
+  color: var(--accent);
+  font-weight: 700;
+}
+.vstep[data-state="now"] .vd {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, #fff);
+}
+.vstep .vw {
+  margin-left: auto;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+.vstep[data-state="now"] .vw {
+  color: var(--accent);
+}
+
+/* view switches (Conversation / Files / Brain / Preview) */
+.navitem {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 10px;
+  border-radius: var(--radius-container);
+  color: var(--text-secondary);
+  font-size: 13px;
+  border: 1px solid transparent;
+  background: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-weight: var(--weight-label);
+  font-family: var(--font-sans);
+}
+.navitem:hover {
+  background: var(--bg-muted);
+  color: var(--foreground);
+}
+.navitemActive {
+  background: var(--bg-muted);
+  color: var(--foreground);
+}
+.navitem .ic {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--muted-foreground);
+}
+.navitemActive .ic {
+  color: var(--accent);
+}
+.navitem .cnt {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+}
+.leftnavFoot {
+  margin-top: auto;
+  padding: 12px 8px 2px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border-top: 1px solid var(--border-muted);
+}
+.leftnavFoot .g {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--positive);
+  flex: none;
+  box-shadow: 0 0 0 2px var(--bg-positive);
+}
+
+/* ── MAIN AREA ──────────────────────────────────────────────────────────── */
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--background);
+}
+.convocol {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* the non-conversation views fill the main area with their own scroll */
+.viewfill {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* slim sticky stage/status bar at the top of the conversation */
+.stickybar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 32px;
+  background: color-mix(in srgb, var(--accent) 5%, #fff);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  font-size: 12px;
+  color: var(--foreground);
+}
+.stickybar .sd {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: none;
+  position: relative;
+}
+.stickybar b {
+  font-weight: 600;
+  color: var(--accent);
+}
+.stickybar .sep {
+  color: var(--muted-foreground);
+}
+.stickybar .msg {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stickybar .when {
+  margin-left: auto;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  flex: none;
+}
+.needsAttn {
+  margin-left: auto;
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--warning-foreground);
+  background: var(--bg-warning);
+  border: 1px solid var(--bg-warning-border);
+  border-radius: var(--radius-badge);
+  padding: 2px 9px;
+}
+
+/* readable measure for the fuller width */
+.scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 22px 32px 8px;
+}
+.measure {
+  max-width: 780px;
+  margin: 0 auto;
+}

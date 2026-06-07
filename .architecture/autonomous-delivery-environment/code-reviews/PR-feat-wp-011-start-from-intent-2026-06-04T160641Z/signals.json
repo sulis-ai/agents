@@ -1,0 +1,22 @@
+{
+  "pr": "feat/wp-011-start-from-intent",
+  "base": "change/create-autonomous-delivery-environment",
+  "verdict": "PASS",
+  "build_verification": { "errors": 0, "tsc_server": 0, "tsc_client": 0, "eslint": 0, "read_only_gate": "clean" },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["feat"], "severity": "low" },
+    "size": { "lines": 3271, "files": 23, "severity": "medium", "note": "vertical-slice round-trip: port+adapter+lib+route+UI+tests for one journey, by design" },
+    "safety": { "migrations": 0, "schema_idl": 0, "secrets": 0, "infra": 0, "severity": "low" },
+    "completeness": { "new_source_without_test": 0, "new_tests": 5, "severity": "low" }
+  },
+  "findings": {
+    "in_changes": { "critical": 0, "high": 0, "medium": 1, "low": 0, "resolved_inline": 1 },
+    "in_neighbours": { "total": 0 }
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "note": "hexagonal port+adapter (StartChangeRunner/SulisChangeStarter); deterministic server-side act (the WP-010 lesson); read-only gate allow-list extended by path; subprocess bounded-timeout + execFile string[] argv" },
+    "security": { "findings": 0, "note": "execFile shell:false string[] argv (no injection); SULIS_STATE_DIR env-scoped (no real-brain pollution); one act-log line never carrying intent text (NFR-SEC-03); confirm-gated act; git clone verb not in banned set" },
+    "quality": { "findings": 1, "resolved": 1, "note": "render-phase side-effect (onStarted called in render body) → moved to useEffect (inline fix)" }
+  },
+  "deltas": []
+}

@@ -1,37 +1,105 @@
-// WP-013 — <ThreadView /> — per-thread page at /c/:changeId.
+// <ThreadView /> — the open change's workspace (chat-B2 signed contract).
 //
-// Hosts the thread header, the URL-driven Chat | Files tab switcher,
-// the Chat panel, and (WP-014) the Files panel — the worktree tree +
-// Monaco read-only viewer + copy-path button.
+// The change owns the screen inside its tab: a change-scoped LEFT NAV
+// (<ChangeNav>: name + vertical stage track + view switches) and a full-width
+// MAIN area that renders the selected view. This REPLACES the old
+// header + horizontal stage spine + right-hand rail — one navigation model.
 //
-// Empty states:
-//   - useChange loading → "Loading..." status.
-//   - useChange 404 → "This change is gone or moved." rendered in the
-//     page body. The Shell's sidebar continues to render (because this
-//     page returns a normal node rather than throwing).
+//   ┌ ChangeNav ─┐ ┌ main ─────────────────────────────┐
+//   │ name       │ │ Conversation = sticky status bar + │
+//   │ stage      │ │   chat (Turn Cards) + composer     │
+//   │ views      │ │ Files / Provenance / Preview swap  │
+//   └────────────┘ └────────────────────────────────────┘
 //
-// References: WP-013 Contract (<ThreadView>), TDD §6.2 (empty/error
-// states), ADR-007 (TanStack Query for server data).
+// One state-pattern set (ADR-005): loading skeleton, 404-gone, generic error.
 
+import { useCallback, useState } from "react";
 import { useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useChange } from "../api/useChange";
+import { useStatus } from "../api/useStatus";
 import { ApiError } from "../api/client";
-import { ThreadHeader } from "../components/ThreadHeader";
-import { ThreadTabs } from "../components/ThreadTabs";
+import { changedQuery, provenanceQuery, treeQuery } from "../api/fileQueries";
+import {
+  advancedQuery,
+  contractPreviewQuery,
+  transcriptQuery,
+  turnSummariesQuery,
+} from "../api/viewQueries";
+import { ChangeNav, type ChangeView } from "../components/ChangeNav";
+import { stageLabel } from "../components/StageBadge";
 import { Chat } from "../components/Chat";
+import { Composer } from "../components/Composer";
 import { FilesPanel } from "../components/FilesPanel";
 import { ContractLinks } from "../components/ContractLinks";
-import styles from "../styles/Thread.module.css";
+import { ProvenanceSection } from "../components/ProvenanceSection";
+import { AdvancedView } from "../components/AdvancedView";
+import { REASON_WORD } from "../components/StatusHeader";
+import ws from "../styles/ChangeWorkspace.module.css";
 
 export function ThreadView() {
   const { changeId } = useParams<{ changeId: string }>();
   const id = changeId ?? "";
   const query = useChange(id);
+  const statusQuery = useStatus(id);
+  const [view, setView] = useState<ChangeView>("conversation");
+  const queryClient = useQueryClient();
+
+  // Warm a view's primary read(s) on nav hover/focus so the click lands on a
+  // cache hit and the switch is instant. Each view maps to the SAME query
+  // definitions its hook consumes (fileQueries / viewQueries — DRY/EP-03), so
+  // there's one fetch definition per read. Skip the already-active view.
+  //
+  // The static file reads (tree/changed/provenance) carry their own staleTime
+  // (FILE_QUERY_CACHE), so repeated hovers are free. The live reads (transcript
+  // / turn-summaries / contract / advanced) default to staleTime 0, which would
+  // refire on every hover — so the prefetch passes a short HOVER_STALE_TIME to
+  // gate repeats without touching the hooks' own polling cadence.
+  const prefetchView = useCallback(
+    (target: ChangeView) => {
+      if (target === view || id.length === 0) return;
+      const HOVER_STALE_TIME = 10_000;
+      switch (target) {
+        case "conversation":
+          void queryClient.prefetchQuery({
+            ...transcriptQuery(id),
+            staleTime: HOVER_STALE_TIME,
+          });
+          void queryClient.prefetchQuery({
+            ...turnSummariesQuery(id),
+            staleTime: HOVER_STALE_TIME,
+          });
+          break;
+        case "files":
+          void queryClient.prefetchQuery(treeQuery(id, ""));
+          void queryClient.prefetchQuery(changedQuery(id));
+          break;
+        case "provenance":
+          void queryClient.prefetchQuery(provenanceQuery(id));
+          break;
+        case "preview":
+          void queryClient.prefetchQuery({
+            ...contractPreviewQuery(id),
+            staleTime: HOVER_STALE_TIME,
+          });
+          break;
+        case "advanced":
+          void queryClient.prefetchQuery({
+            ...advancedQuery(id),
+            staleTime: HOVER_STALE_TIME,
+          });
+          break;
+      }
+    },
+    [queryClient, id, view],
+  );
 
   if (query.isLoading) {
     return (
-      <section data-testid="page-thread" className={styles.page}>
-        <p className={styles.status}>Loading...</p>
+      <section data-testid="page-thread" className={ws.main}>
+        <p data-testid="thread-loading" style={{ padding: 32, textAlign: "center", color: "var(--muted-foreground)" }}>
+          Loading...
+        </p>
       </section>
     );
   }
@@ -39,39 +107,105 @@ export function ThreadView() {
   if (query.isError) {
     const isNotFound =
       query.error instanceof ApiError && query.error.status === 404;
-    if (isNotFound) {
-      return (
-        <section data-testid="page-thread" className={styles.page}>
+    return (
+      <section data-testid="page-thread" className={ws.main}>
+        {isNotFound ? (
           <div
-            className={styles.goneOrMoved}
             data-testid="thread-gone-or-moved"
+            style={{ margin: 32, padding: 24, background: "var(--bg-destructive)", border: "1px solid var(--bg-destructive-border)", borderRadius: "var(--radius-container)" }}
           >
             <p>This change is gone or moved.</p>
-            <p className={styles.goneOrMovedDetail}>
-              Worktree path: <code>{id}</code>
-            </p>
           </div>
-        </section>
-      );
-    }
-    return (
-      <section data-testid="page-thread" className={styles.page}>
-        <p className={styles.status}>Could not load this change.</p>
+        ) : (
+          <p style={{ padding: 32, textAlign: "center" }}>
+            Could not load this change.
+          </p>
+        )}
       </section>
     );
   }
 
   const change = query.data!;
+  const status = statusQuery.isSuccess ? statusQuery.data : null;
+
   return (
-    <section data-testid="page-thread" className={styles.page}>
-      <ThreadHeader change={change} />
-      {/* WP-003 — per-change contract preview: each change surfaces its OWN
-          rendered data + UI contracts (generic resolution, ADR-003). */}
-      <ContractLinks change={change} />
-      <ThreadTabs
-        chat={<Chat changeId={id} />}
-        files={<FilesPanel changeId={id} />}
+    <div data-testid="page-thread" className={ws.change}>
+      <ChangeNav
+        change={change}
+        activeView={view}
+        onSelectView={setView}
+        onPrefetchView={prefetchView}
       />
-    </section>
+
+      <div className={ws.main}>
+        {view === "conversation" && (
+          <section
+            className={ws.convocol}
+            data-testid="section-conversation"
+            aria-label="Conversation"
+          >
+            {/* slim sticky stage/status bar */}
+            <div className={ws.stickybar} data-testid="thread-spine">
+              <span className={ws.sd} aria-hidden="true" />
+              <b>{stageLabel(change.stage)}</b>
+              {status && (
+                <>
+                  <span className={ws.sep}>·</span>
+                  <span className={ws.msg}>{status.headline}</span>
+                </>
+              )}
+              {status?.needsAttention.flagged &&
+              status.needsAttention.reason !== null ? (
+                <span className={ws.needsAttn} data-testid="needs-attention">
+                  {REASON_WORD[status.needsAttention.reason]}
+                </span>
+              ) : (
+                <span className={ws.when}>live</span>
+              )}
+            </div>
+
+            <div className={ws.scroll}>
+              <div className={ws.measure}>
+                <Chat changeId={id} />
+              </div>
+            </div>
+
+            <Composer changeId={id} />
+          </section>
+        )}
+
+        {view === "files" && (
+          <div className={ws.viewfill} data-testid="section-files">
+            <FilesPanel changeId={id} onSelectView={setView} />
+          </div>
+        )}
+
+        {view === "provenance" && (
+          <div className={ws.viewfill} data-testid="section-provenance">
+            <ProvenanceSection changeId={id} onSelectView={setView} />
+          </div>
+        )}
+
+        {view === "preview" && (
+          <div className={ws.viewfill} data-testid="section-preview">
+            <div className={ws.scroll}>
+              <div className={ws.measure}>
+                <ContractLinks change={change} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {view === "advanced" && (
+          <div className={ws.viewfill} data-testid="section-advanced">
+            <div className={ws.scroll}>
+              <div className={ws.measure}>
+                <AdvancedView change={change} />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

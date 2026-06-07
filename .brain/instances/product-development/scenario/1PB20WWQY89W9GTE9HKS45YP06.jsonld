@@ -1,0 +1,12 @@
+{
+  "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+  "id": "dna:scenario:1PB20WWQY89W9GTE9HKS45YP06",
+  "journey": "dna:workflow:51BXJWZ8JY36K37E5TAJHW5D2D",
+  "name": "Understand where a change is",
+  "state": "draft",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:JETECCCV4TPZSST2XX25CCJMGE",
+    "dna:requirement:J6G3NF24ZSTZYMQ1FD3H06A3FD"
+  ]
+}

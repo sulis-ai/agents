@@ -1,0 +1,12 @@
+{
+  "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+  "id": "dna:scenario:9H2Z4JQMYRMS50659BKJRHZSX4",
+  "journey": "dna:workflow:5HGJZ641VKKGCFXSBQVG1Z6FQN",
+  "name": "An investigation becomes a change",
+  "state": "draft",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:NFZZQ0TG3ERDBNK5G0WBP5BYHP",
+    "dna:requirement:QBABG4P5FTXRVJBCNX2QTKGXXQ"
+  ]
+}

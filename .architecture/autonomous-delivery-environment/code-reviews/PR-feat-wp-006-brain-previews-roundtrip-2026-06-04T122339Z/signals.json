@@ -1,0 +1,25 @@
+{
+  "pr": "feat/wp-006-brain-previews-roundtrip",
+  "base": "change/create-autonomous-delivery-environment",
+  "verdict": "PASS",
+  "build_verification": { "errors": 0 },
+  "hygiene": {
+    "scope": { "severity": "low", "commit_types": ["feat"], "note": "single vertical slice; one top-dir apps/cockpit" },
+    "size": { "severity": "medium", "lines_added": 1711, "files_changed": 18, "note": "round-trip slice (backend route + lib + 4 components + 5 test files + docs); cohesive single concern" },
+    "safety": { "severity": "none", "migrations": 0, "schema_idl": 0, "secrets": 0, "infra": 0 },
+    "completeness": { "severity": "none", "new_source_without_test": 0, "note": "every new source file has a paired test; 5 new test files" }
+  },
+  "findings": {
+    "changes": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+    "neighbours": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+    "watch_list": [
+      { "id": "WL-1", "file": "apps/cockpit/server/lib/readBrain.ts", "lens": "quality", "severity": "low", "cr": "CR-10 #3 (N+1 filesystem)", "note": "entities read with sequential await in nested loops; bounded (per-change brain, tens of entities, one read per panel open) — not a hot path. Could use Promise.all but fail-soft sequential is simpler + correct. No delta." }
+    ]
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "note": "new brain route composes existing requireChange + resolveWorktreeRoot ports; no new port; client→server HTTP seam preserved; read-only gate clean" },
+    "security": { "findings": 0, "note": "renderMarkdown escapes all source before emitting bounded tag subset; link scheme allow-list drops javascript:; .html in sandbox='' iframe; no new write/process path (read-only gate: 118 files clean)" },
+    "quality": { "findings": 0, "watch_list": 1, "note": "typecheck+lint+prettier clean; every new file tested; JSX identifiers all in scope; no dead surface; no contract drift" }
+  },
+  "draft_deltas": 0
+}

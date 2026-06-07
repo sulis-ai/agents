@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Open a Markdown or HTML file inside a change.",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:AKFBSVFC3CAGX2Z23W181AHT9C",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "ep08yjmf-open-a-markdown-or-html-file-inside-a-ch-1",
+  "output_artifacts": [
+    "ep08yjmf-open-a-markdown-or-html-file-inside-a-ch-1-result"
+  ],
+  "postconditions": [
+    "the file is shown rendered and formatted, not as raw source"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

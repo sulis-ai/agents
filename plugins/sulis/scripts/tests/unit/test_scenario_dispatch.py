@@ -19,7 +19,9 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
-from _scenario_dispatch import execute_step
+import pytest
+
+from _scenario_dispatch import _default_http, _default_run, execute_step
 from _scenario_runtime import ResolvedStep
 
 
@@ -111,6 +113,57 @@ def test_agent_driven_kind_is_deferred_not_yet_implemented():
     assert "mcp_server" in (out.need or "")
 
 
+# ─── _default_run: runs argv-split, NOT via a shell ─────────────────────────
+
+
+def test_default_run_executes_a_real_command():
+    # A plain command runs and reports its exit code (no shell needed).
+    result = _default_run("true")
+    assert result.returncode == 0
+
+
+def test_default_run_honours_posix_quoting_like_authored_scenarios():
+    # Authored scenario cmds carry quoted args with spaces (e.g.
+    # --what 'a probe with spaces'). shlex.split must keep that one argv item
+    # whole, exactly as a shell would word-split it — this is the only
+    # "shell-like" feature any scenario relies on.
+    result = _default_run(
+        "python3 -c \"import sys; print(len(sys.argv)); sys.exit(len(sys.argv) - 3)\" "
+        "--what 'a probe with spaces'"
+    )
+    # argv = [-c prog, --what, 'a probe with spaces'] → 3 → exit 0
+    assert result.returncode == 0
+
+
+def test_default_run_does_not_invoke_a_shell():
+    # With shell=False, a shell metacharacter is an INERT argument byte, never
+    # an operator. `echo` simply prints the literal string; the `; touch …`
+    # cannot run as a second command. We assert the metachars survive verbatim
+    # in stdout (proof no shell parsed them).
+    result = _default_run("echo a;b|c")
+    assert result.returncode == 0
+    assert result.stdout.strip() == "a;b|c"
+
+
+def test_default_run_empty_cmd_fails_cleanly_not_via_shell():
+    # An empty cmd splits to [] — there is no program to exec. This must raise
+    # (IndexError / ValueError), which execute_step catches as a fail; it must
+    # NOT silently spawn a shell that exits 0.
+    with pytest.raises(Exception):
+        _default_run("")
+
+
+# ─── _default_http: scheme guard (no file:// local reads) ───────────────────
+
+
+def test_default_http_rejects_file_scheme():
+    with pytest.raises(ValueError):
+        _default_http("GET", "file:///etc/passwd")
+
+
+def test_default_http_rejects_non_http_scheme():
+    with pytest.raises(ValueError):
+        _default_http("GET", "ftp://example.com/x")
 # ── browser driver (deterministic — journey-rigor #6 machine-half) ─────────────
 
 from _scenario_dispatch import BrowserUnavailable  # noqa: E402

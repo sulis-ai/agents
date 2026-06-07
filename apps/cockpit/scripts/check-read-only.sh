@@ -39,8 +39,16 @@ specific class of mutation is absent from the active source tree.
 
   1. Filesystem writes
      Forbids: fs.writeFile / writeFileSync / appendFile / appendFileSync /
-     createWriteStream, and the same as bare named imports (await writeFile(…)).
-     Why: the cockpit reads worktrees and transcripts; it never writes to them.
+     createWriteStream, and the same as bare named imports (await writeFile(…)),
+     EXCEPT in:
+       - server/adapters/SpineEmitterMinter.ts (the cold-start mint's
+         confirm-gated ACT path — WP-010 fix-forward, ADR-007 amended: writes
+         the emitter config yaml + stages entities for the all-or-nothing mint).
+       - server/lib/turnSummaries.ts (ADR-015 named exception): writes a hashed
+         disk cache of Haiku-generated turn summaries — a derived cache outside
+         the cockpit's read surface, never a worktree or transcript write.
+     Why: the cockpit reads worktrees and transcripts; it never writes to them
+     EXCEPT through the audited, confirm-gated mint seam and the summary cache.
 
   2. git spawn
      Forbids: spawn("git", …) / spawnSync("git", …) / execFile("git", …)
@@ -53,13 +61,37 @@ specific class of mutation is absent from the active source tree.
      Why: these are the four mutating porcelain verbs banned by TDD §13.7.
 
   4. Non-zero process signals
-     Forbids: process.kill(pid, <sig>) where <sig> is anything but 0.
+     Forbids: process.kill(pid, <sig>) where <sig> is anything but 0, EXCEPT in
+     server/lib/changeAdvanced.ts (ADR-015 named exception): the operator
+     "stop a process" action sends SIGTERM then escalates to SIGKILL. This is
+     an explicit, operator-invoked OS action on a process the operator already
+     sees — not a background mutation of a read surface.
      Why: liveness is observation-only (ADR-005); signal 0 probes without
-     affecting the target. Any other signal would terminate/interrupt it.
+     affecting the target. Any other signal would terminate/interrupt it — only
+     the audited operator stop-process site may do so.
 
-  5. HTTP mutation verbs on the Express app
-     Forbids: app.post / app.put / app.patch / app.delete in server/.
-     Why: the cockpit exposes GET endpoints only; the surface is read-only.
+  2b. Process start outside the sanctioned bridge (WP-005, ADR-003)
+     Forbids: spawn / spawnSync / execFile / execFileSync of ANY child
+     EXCEPT in server/adapters/StreamJsonSessionBridge.ts (the one session
+     process-start site), server/lib/gitShow.ts (read-only `git show`), the
+     audited change read/recreate/mint/start adapters, and
+     server/lib/turnSummaries.ts (ADR-015 named exception): it spawns `claude`
+     headless to produce the Haiku one-line turn summary it caches on disk — a
+     best-effort derived-summary helper, not a session start.
+     Why: resume/spawn launches a `claude` session — the most consequential
+     side effect in the app. It is confined to one audited adapter; loading
+     any read surface starts no process (NFR-SEC-05).
+
+  5. HTTP mutation verbs on the Express app/router
+     Forbids: app/router .post / .put / .patch / .delete in server/ EXCEPT in:
+       - server/routes/chat.ts (the ONE sanctioned write path — the chat relay,
+         ADR-001/003).
+       - server/routes/advanced.ts (ADR-015 named exception): its two operator
+         POST routes — reveal-in-finder + stop-process — are explicit operator
+         actions, not edits to any read surface.
+     Every other route is GET-only.
+     Why: the cockpit is read-only everywhere except the chat write seam and
+     the explicitly-audited operator-action routes.
 
   6. Non-loopback bind
      Forbids: "0.0.0.0" or any bind/listen address other than 127.0.0.1 in
@@ -121,8 +153,22 @@ report() {
   fi
 }
 
+# WP-005 (ADR-003) — the ONE sanctioned write path is the chat relay; the ONE
+# sanctioned process-start site is the SessionBridge prod adapter. These two
+# files are allow-listed BY PATH; every other file must still be clean.
+RELAY_ROUTE_REL="server/routes/chat.ts"
+BRIDGE_ADAPTER_REL="server/adapters/StreamJsonSessionBridge.ts"
+
+# ADR-015 (keep-the-gate-with-named-exception) — four operator-action +
+# summary-cache sites. Each is a single, audited file outside the cockpit's
+# read surface; each is allow-listed BY PATH with the same discipline as the
+# chat relay and the process-start sites above. No exception beyond these four.
+ADVANCED_ROUTE_REL="server/routes/advanced.ts"          # operator POSTs: reveal-in-finder + stop-process
+CHANGE_ADVANCED_REL="server/lib/changeAdvanced.ts"      # operator "stop a process" — SIGTERM/SIGKILL
+TURN_SUMMARIES_REL="server/lib/turnSummaries.ts"        # turn-summary disk cache write + Haiku `claude` spawn
+
 # Accumulate per-rule hits across all files.
-declare -a fs_hits=() git_spawn_hits=() git_verb_hits=() kill_hits=() http_hits=() bind_hits=()
+declare -a fs_hits=() git_spawn_hits=() git_verb_hits=() kill_hits=() http_hits=() bind_hits=() proc_hits=()
 
 for f in "${SOURCE_FILES[@]}"; do
   rel="${f#"$ROOT"/}"
@@ -134,11 +180,24 @@ for f in "${SOURCE_FILES[@]}"; do
   #    prefix. The bare-call patterns use a negative guard so a member
   #    access on an unrelated object (e.g. `.writeFile(`) is matched too —
   #    that is still a write and should be flagged for inspection.
-  while IFS= read -r line; do
-    [ -n "$line" ] && fs_hits+=("$rel: $line")
-  done < <(printf '%s\n' "$stripped" | grep -nE \
-    '(\bfs\.(writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream)\b|\b(writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream)[[:space:]]*\()' \
-    || true)
+  #
+  #    SANCTIONED WRITE SITE (WP-010 fix-forward, ADR-007 amended): the
+  #    SpineEmitterMinter is the cold-start mint's confirm-gated ACT path. It
+  #    writes the tenant/product config yaml the validated emitters consume and
+  #    stages entities for the all-or-nothing promotion into the brain. It is
+  #    allow-listed BY PATH here — the same single-audited-site discipline as the
+  #    chat relay (rule 5) and the process-start sites (rule 2b).
+  #    ADR-015 also allow-lists turnSummaries.ts (the turn-summary disk cache):
+  #    it writes a hashed cache file of Haiku-generated turn summaries. This is
+  #    a derived cache outside the cockpit's read surface — never a worktree or
+  #    transcript write.
+  if [ "$rel" != "server/adapters/SpineEmitterMinter.ts" ] && [ "$rel" != "$TURN_SUMMARIES_REL" ]; then
+    while IFS= read -r line; do
+      [ -n "$line" ] && fs_hits+=("$rel: $line")
+    done < <(printf '%s\n' "$stripped" | grep -nE \
+      '(\bfs\.(writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream)\b|\b(writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream)[[:space:]]*\()' \
+      || true)
+  fi
 
   # 2. git spawn outside lib/gitShow.ts
   if [ "$rel" != "server/lib/gitShow.ts" ]; then
@@ -149,6 +208,57 @@ for f in "${SOURCE_FILES[@]}"; do
       || true)
   fi
 
+  # 2b. WP-005 (ADR-003 NEW rule) — process start (spawn/exec of ANY child)
+  #     outside the sanctioned set. This makes "the bridge is the only thing
+  #     that starts a SESSION" a runnable check: resume/spawn launches a
+  #     `claude` session (the most consequential side effect), so any process
+  #     start outside the audited set is flagged.
+  #
+  #     The sanctioned set (path allow-list — each is a single, audited site):
+  #       - StreamJsonSessionBridge.ts — the ONE session process-start (NEW).
+  #       - gitShow.ts                 — read-only `git show` (MVP, rule 2).
+  #       - SulisChangeStoreReader.ts  — read-only `sulis-list-changes` helper.
+  #       - SulisChangeRecreator.ts    — the recreate-on-demand CLI (RecreateRunner
+  #                                       port; an explicitly-invoked read/recreate,
+  #                                       MVP ADR-004 — never in-process server work).
+  #       - SpineEmitterMinter.ts      — the deterministic cold-start mint (WP-010
+  #                                       fix-forward, ADR-007 amended): invokes the
+  #                                       validated spine-emitter CLIs + `git init`
+  #                                       on a confirmed onboarding turn. Confirm-
+  #                                       gated + all-or-nothing; the mint moved
+  #                                       server-side because the agent-delegated
+  #                                       mint was slow + unreliable (minted nothing).
+  #       - SulisChangeStarter.ts      — the deterministic start-from-intent
+  #                                       change-start (WP-011, ADR-007): execFiles
+  #                                       `sulis-change start` + `git clone` on a
+  #                                       confirmed start turn. Confirm-gated +
+  #                                       all-or-nothing; server-side for the SAME
+  #                                       reason as the mint (the agent-delegated
+  #                                       act was slow + created nothing).
+  #     The guarantee this rule adds: NO NEW file may start a process; a future
+  #     route or lib that sprouts a spawn fails the gate.
+  case "$rel" in
+    "$BRIDGE_ADAPTER_REL" | \
+    server/lib/gitShow.ts | \
+    server/adapters/SulisChangeStoreReader.ts | \
+    server/adapters/SulisChangeRecreator.ts | \
+    server/adapters/SpineEmitterMinter.ts | \
+    server/adapters/SulisChangeStarter.ts | \
+    "$TURN_SUMMARIES_REL")
+      ;; # sanctioned process-start site — skip
+      #   - turnSummaries.ts (ADR-015) — spawns `claude` headless to produce the
+      #     Haiku one-line turn summary cached on disk. A derived-summary helper,
+      #     not a session start; the summary is best-effort + the spawn is the
+      #     only consequential call it makes.
+    *)
+      while IFS= read -r line; do
+        [ -n "$line" ] && proc_hits+=("$rel: $line")
+      done < <(printf '%s\n' "$stripped" | grep -nE \
+        '\b(spawn|spawnSync|execFile|execFileSync)[[:space:]]*\(' \
+        || true)
+      ;;
+  esac
+
   # 3. Mutating git verbs as quoted argv tokens
   while IFS= read -r line; do
     [ -n "$line" ] && git_verb_hits+=("$rel: $line")
@@ -157,20 +267,35 @@ for f in "${SOURCE_FILES[@]}"; do
     || true)
 
   # 4. Non-zero process signals
-  while IFS= read -r line; do
-    [ -n "$line" ] && kill_hits+=("$rel: $line")
-  done < <(printf '%s\n' "$stripped" | grep -nE \
-    'process\.kill[[:space:]]*\([^,]+,[[:space:]]*[^0[:space:])]' \
-    || true)
+  #    ADR-015 allow-lists changeAdvanced.ts: the operator "stop a process"
+  #    action sends SIGTERM then escalates to SIGKILL. This is an explicit,
+  #    operator-invoked OS action on a process the operator already sees — not
+  #    a background mutation of any read surface. Allow-listed BY PATH.
+  if [ "$rel" != "$CHANGE_ADVANCED_REL" ]; then
+    while IFS= read -r line; do
+      [ -n "$line" ] && kill_hits+=("$rel: $line")
+    done < <(printf '%s\n' "$stripped" | grep -nE \
+      'process\.kill[[:space:]]*\([^,]+,[[:space:]]*[^0[:space:])]' \
+      || true)
+  fi
 
   # 5 + 6 are server-only.
   case "$rel" in
     server/*)
-      while IFS= read -r line; do
-        [ -n "$line" ] && http_hits+=("$rel: $line")
-      done < <(printf '%s\n' "$stripped" | grep -nE \
-        '\bapp\.(post|put|patch|delete)[[:space:]]*\(' \
-        || true)
+      # The mutation-verb rule now catches BOTH `app.post` and `router.post`
+      # (and put/patch/delete) — except in the ONE sanctioned relay file, which
+      # may register exactly one write route (ADR-003). Every other server file
+      # must stay GET-only.
+      #    ADR-015 also allow-lists advanced.ts: its two operator POST routes
+      #    (reveal-in-finder + stop-process) are explicit operator actions, not
+      #    edits to any read surface. Allow-listed BY PATH alongside the relay.
+      if [ "$rel" != "$RELAY_ROUTE_REL" ] && [ "$rel" != "$ADVANCED_ROUTE_REL" ]; then
+        while IFS= read -r line; do
+          [ -n "$line" ] && http_hits+=("$rel: $line")
+        done < <(printf '%s\n' "$stripped" | grep -nE \
+          '\b(app|router)\.(post|put|patch|delete)[[:space:]]*\(' \
+          || true)
+      fi
 
       while IFS= read -r line; do
         [ -n "$line" ] && bind_hits+=("$rel: $line")
@@ -183,6 +308,7 @@ done
 
 report "filesystem write API"        "${fs_hits[@]+"${fs_hits[@]}"}"
 report "git spawn outside gitShow.ts" "${git_spawn_hits[@]+"${git_spawn_hits[@]}"}"
+report "process start outside the sanctioned bridge" "${proc_hits[@]+"${proc_hits[@]}"}"
 report "mutating git verb token"      "${git_verb_hits[@]+"${git_verb_hits[@]}"}"
 report "non-zero process signal"      "${kill_hits[@]+"${kill_hits[@]}"}"
 report "HTTP mutation verb"           "${http_hits[@]+"${http_hits[@]}"}"

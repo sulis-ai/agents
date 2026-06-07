@@ -1,0 +1,13 @@
+{
+  "acceptance_criteria": [
+    "see SRD body"
+  ],
+  "id": "dna:requirement:AYGSMRN96PT1G0RH1M3DQZP588",
+  "priority": "must",
+  "rationale": "Extracted from FR-28 of /Users/iain/.sulis/changes/01KT500K2JTE2EGW6TPPQ4D4VN/worktree/.specifications/autonomous-delivery-environment/SRD.md. The `source` ref is a synthetic Opportunity placeholder generated from the SRD path; replace when Opportunity emission lands (queued follow-on slice). Defaults applied for SRD-absent fields: priority=must, verification_method=test, state=draft.",
+  "source": "dna:opportunity:BG8E0H5JPPWEK3G3B26T3H087A",
+  "state": "draft",
+  "statement": "Cold-start onboarding discovers and mints the entity graph from a conversation. When the founder has **no Product / Project minted yet**, the discovery agent SHALL search the founder's **chosen area** of the machine, ask plain-English clarifying questions, and \u2014 orchestrating `discover-project`, `discover-context`, and `codebase-mapping` plus the Tenant / Product / Project spine emitters \u2014 **discover and mint** the Tenant / Product / Project entities, so the founder ends with a populated graph rather than an empty board. - *Acceptance:* Given an empty graph and a chosen folder containing a recognisable repo, the onboarding conversation results in minted Tenant / Product / Project entities for that repo; given a chosen folder with nothing recognisable, no entity is minted and the agent says so",
+  "sys_status": "active",
+  "verification_method": "test"
+}

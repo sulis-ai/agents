@@ -1,0 +1,12 @@
+ ...overy-orchestrates-skills-and-spine-emitters.md |  40 ++++++-
+ .../work-packages/WP-010-onboarding-roundtrip.md   |  22 ++++
+ apps/cockpit/scripts/check-read-only.sh            |  37 ++++--
+ apps/cockpit/server/app.ts                         |  36 +++---
+ .../server/lib/discovery/onboardingOrchestrator.ts | 101 ++++++++--------
+ apps/cockpit/server/routes/chat.ts                 |  28 +++--
+ .../server/tests/discovery.emitter-only.test.ts    |  79 ++++++++++---
+ .../server/tests/discovery.orchestrator.test.ts    | 128 +++++++++++++++++----
+ .../server/tests/read-only-inventory.test.ts       |  13 ++-
+ .../cockpit/server/tests/routes.onboarding.test.ts |  46 +++++++-
+ apps/cockpit/shared/api-types.ts                   |   1 +
+ 11 files changed, 399 insertions(+), 132 deletions(-)

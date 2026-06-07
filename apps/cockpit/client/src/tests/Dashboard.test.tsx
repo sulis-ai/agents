@@ -1,20 +1,29 @@
-// WP-012 — <Dashboard> tests.
+// WP-012 — <Dashboard> CHARACTERISATION test (WP-003 REORGANISE-Refactor).
 //
-// Coverage:
+// This is the characterisation pin (EP-07, catalogue MUST) for the
+// Dashboard→Board refactor: it locks the *behaviour* the flat-grid
+// dashboard guaranteed and that the stage-column Board MUST preserve —
+// the three async states, one ChangeCard (link) per change, card-click
+// navigation, the manual Refresh, and the 10s liveness poll. The subject
+// was renamed Dashboard→Board in this WP; the behaviour pinned here is
+// unchanged. The NEW stage-column behaviour (six columns, placement,
+// shipped-excluded) is added in Board.test.tsx.
+//
+// Coverage (behaviour preserved across the refactor):
 //   - Loading state renders skeleton placeholders.
 //   - Error state renders message + retry button.
 //   - Empty state renders <EmptyState />.
 //   - Two fixture changes render two <ChangeCard>s with right text.
 //   - Card click navigates to /c/:changeId (asserted via current URL).
 //   - Refresh button calls queryClient.invalidateQueries on ["changes"].
-//   - The Dashboard's underlying query has refetchInterval = LIVENESS_POLL_MS.
+//   - The board's underlying query has refetchInterval = LIVENESS_POLL_MS.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Change } from "../../../shared/api-types";
-import { Dashboard } from "../pages/Dashboard";
+import { Board } from "../pages/Board";
 import { LIVENESS_POLL_MS } from "../config";
 
 function makeChange(overrides: Partial<Change> = {}): Change {
@@ -56,7 +65,7 @@ function renderDashboard(client: QueryClient) {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={["/"]}>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<Board />} />
           <Route
             path="/c/:changeId"
             element={<div data-testid="thread-view" />}
@@ -67,7 +76,7 @@ function renderDashboard(client: QueryClient) {
   );
 }
 
-describe("<Dashboard>", () => {
+describe("<Board> — characterisation (preserved Dashboard behaviour)", () => {
   beforeEach(() => {
     vi.spyOn(globalThis, "fetch").mockReset();
   });
@@ -79,7 +88,7 @@ describe("<Dashboard>", () => {
     // Never resolves → stays in loading.
     vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => {}));
     const { getByTestId } = renderDashboard(freshClient());
-    expect(getByTestId("dashboard-loading")).toBeInTheDocument();
+    expect(getByTestId("board-loading")).toBeInTheDocument();
   });
 
   it("renders an error message + retry button on failure", async () => {
