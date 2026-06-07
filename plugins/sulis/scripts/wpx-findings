@@ -37,6 +37,8 @@ def _read_textish(value: str) -> str:
 def _signature(severity: str, summary: str, file_path: str) -> str:
     """Compute signature hash for dedup."""
     raw = f"{severity}|{summary}|{file_path}".encode("utf-8")
+    # SHA-1 here is a non-cryptographic content/dedup signature (a stable short
+    # fingerprint), NOT a security primitive — collision resistance is not relied on.
     return hashlib.sha1(raw).hexdigest()[:12]  # noqa: S324
 
 

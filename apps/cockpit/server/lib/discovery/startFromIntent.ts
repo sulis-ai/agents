@@ -171,8 +171,12 @@ export function classifyIntent(intent: string, kind: IntentKind): ClassifyResult
     return ambiguous();
   }
 
+  // Regex source is a CONTROLLED constant (the module-level INVESTIGATION_PHRASES
+  // array), and each phrase is regex-escaped to a literal match — no untrusted
+  // input reaches the pattern, so no ReDoS surface.
   const isInvestigation =
     kind === "investigation" ||
+    // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
     INVESTIGATION_PHRASES.some((p) => new RegExp(`\\b${escapeRegExp(p)}\\b`).test(text));
 
   // An investigation is a CONTAINED change. It carries no behaviour change, so

@@ -121,8 +121,12 @@ const LEADING_IMPERATIVES =
 
 /** Match any phrase as a whole word/phrase (word boundaries on each end). */
 function matchesAny(haystack: string, phrases: string[]): boolean {
+  // `phrases` is always a CONTROLLED module-level constant (SETUP_PHRASES /
+  // CONSEQUENTIAL_PHRASES), never founder/external input, and each phrase is
+  // regex-escaped to a literal match — so `new RegExp` carries no ReDoS surface.
   return phrases.some((p) => {
     const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
     return new RegExp(`\\b${escaped}\\b`).test(haystack);
   });
 }
