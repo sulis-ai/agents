@@ -44,17 +44,17 @@ all bound to `127.0.0.1:5174` by default (TDD §5, ADR-002, ADR-003).
 The route handlers are thin — they delegate to the lib functions
 (WP-005..WP-009) and the change-store port (WP-003).
 
-| Method + path                                | Purpose                                                       | Wire shape           |
-| -------------------------------------------- | ------------------------------------------------------------- | -------------------- |
-| `GET /api/changes`                           | List every change with liveness.                              | `Change[]`           |
-| `GET /api/changes/:id`                       | One change + the resolved transcript file paths.              | `ChangeDetail`       |
-| `GET /api/changes/:id/tree?path=...`         | One level of the worktree's folder tree. Default = root.      | `TreeNode[]`         |
-| `GET /api/changes/:id/file?path=...`         | Current contents of a file in the worktree (1 MiB cap).       | `FileContents`       |
-| `GET /api/changes/:id/diff?path=...`         | Base (at `baseSha`) + current contents for Monaco's DiffEditor. | `FileDiff`         |
-| `GET /api/changes/:id/transcript`            | Chronologically-merged chat messages from the change's transcripts. | `TranscriptMessage[]` |
-| `GET /api/changes/:id/contract`              | Whether the change's rendered contracts are reachable + what they are. | `ContractAvailability` |
-| `GET /api/changes/:id/contract/data`         | Serves the rendered `CONTRACT.html` (the data-contract preview). | `text/html`        |
-| `GET /api/changes/:id/contract/ui`           | Serves the rendered `UI.html`, or a typed JSON note when the change has no UI contract (never a broken link). | `text/html` or `{ uiContract, note }` |
+| Method + path                        | Purpose                                                                                                       | Wire shape                            |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `GET /api/changes`                   | List every change with liveness.                                                                              | `Change[]`                            |
+| `GET /api/changes/:id`               | One change + the resolved transcript file paths.                                                              | `ChangeDetail`                        |
+| `GET /api/changes/:id/tree?path=...` | One level of the worktree's folder tree. Default = root.                                                      | `TreeNode[]`                          |
+| `GET /api/changes/:id/file?path=...` | Current contents of a file in the worktree (1 MiB cap).                                                       | `FileContents`                        |
+| `GET /api/changes/:id/diff?path=...` | Base (at `baseSha`) + current contents for Monaco's DiffEditor.                                               | `FileDiff`                            |
+| `GET /api/changes/:id/transcript`    | Chronologically-merged chat messages from the change's transcripts.                                           | `TranscriptMessage[]`                 |
+| `GET /api/changes/:id/contract`      | Whether the change's rendered contracts are reachable + what they are.                                        | `ContractAvailability`                |
+| `GET /api/changes/:id/contract/data` | Serves the rendered `CONTRACT.html` (the data-contract preview).                                              | `text/html`                           |
+| `GET /api/changes/:id/contract/ui`   | Serves the rendered `UI.html`, or a typed JSON note when the change has no UI contract (never a broken link). | `text/html` or `{ uiContract, note }` |
 
 ### Contract preview (WP-003)
 
@@ -80,7 +80,7 @@ rejects a leading `-` to foreclose argparse flag-confusion).
 
 - **Design-time (pre-dispatch review gate):** after `decompose` and
   before `run-all` dispatch, `plugins/sulis/scripts/wpx-render-review-gate
-  --worktree <path>` renders the in-flight change's `CONTRACT.html` +
+--worktree <path>` renders the in-flight change's `CONTRACT.html` +
   `UI.html` so the founder can eyeball them before anything is built on
   the contract. It is a thin orchestrator over the two renderers
   (subprocess discipline: argv array, `shell=false`, bounded timeout).
@@ -183,8 +183,9 @@ apps/cockpit/
 │   │   ├── main.tsx        # React mount point
 │   │   ├── App.tsx         # placeholder root
 │   │   ├── pages/          # dashboard, thread view (WP-012/013)
-│   │   ├── components/     # shells, panels (WP-011/013/014)
+│   │   ├── components/     # shells, panels, ThemeToggle (WP-011/013/014, WP-004)
 │   │   ├── api/            # TanStack Query hooks (WP-011)
+│   │   ├── layouts/        # Shell — sidebar + top-bar (theme toggle) + outlet (WP-011, WP-004)
 │   │   ├── theme/          # ThemeProvider, useTheme(), resolveInitialTheme (WP-003)
 │   │   └── tests/
 ├── shared/                 # types + constants both halves import

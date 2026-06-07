@@ -1,0 +1,37 @@
+/* WP-004 — ThemeToggle styles. Token-only (no raw colours), mirrors the
+ * signed-off mockup's .toggle (mockup/dark-theme.html): a pill button with a
+ * card background, quiet border, icon + label, primary-border hover. */
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  padding: 6px 12px;
+  border-radius: var(--radius-button);
+  font-size: 13px;
+  font-weight: var(--weight-label);
+  font-family: var(--font-sans);
+}
+
+.toggle:hover {
+  border-color: var(--primary);
+}
+
+/* Visible focus ring (WPF-06 — never outline:none). Uses the theme's --ring
+ * token so the indicator is legible in both light and dark. */
+.toggle:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  line-height: 16px;
+  text-align: center;
+}
