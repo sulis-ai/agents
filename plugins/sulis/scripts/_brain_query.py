@@ -277,6 +277,85 @@ def find_passing_testresults_verifying(
     ]
 
 
+# ─── Scenario-set enumeration + state (journey-rigor #84) ────────────────────
+# The journey-walk (design) + scenario-coverage check (plan) need to pull the
+# COMPLETE set of scenarios for a journey — to check ALL of them even when only
+# some are being built — and to ask each one's verification state. Built on the
+# same iter_entities + predicate primitives; no new traversal mechanism.
+
+
+def find_scenarios_for_journey(
+    base_dir: Path,
+    journey_workflow_id: str,
+    *,
+    domain: str = "product-development",
+) -> list[dict]:
+    """All Scenarios whose `journey` is `journey_workflow_id` (a Workflow id).
+
+    The "all scenarios in THIS journey" enumeration: a journey is a Workflow,
+    and each Scenario carries `journey -> dna:workflow:<ulid>`. Group by it to
+    get the journey's full scenario set, so the journey-walk / coverage check
+    can account for every one even if only some are in the current change.
+    """
+    if not _ENTITY_ID_RE.match(journey_workflow_id):
+        raise ValueError(
+            f"journey_workflow_id must match dna:<type>:<ulid>; got {journey_workflow_id!r}"
+        )
+    return find_entities(
+        base_dir,
+        domain=domain,
+        entity_type="scenario",
+        predicate=where_field_equals("journey", journey_workflow_id),
+    )
+
+
+def find_scenarios_verifying(
+    base_dir: Path,
+    requirement_id: str,
+    *,
+    domain: str = "product-development",
+) -> list[dict]:
+    """All Scenarios whose `verifies` array contains `requirement_id`.
+
+    The other grouping key: the scenario set for a change's requirements.
+    """
+    if not _ENTITY_ID_RE.match(requirement_id):
+        raise ValueError(
+            f"requirement_id must match dna:<type>:<ulid>; got {requirement_id!r}"
+        )
+    return find_entities(
+        base_dir,
+        domain=domain,
+        entity_type="scenario",
+        predicate=where_list_field_contains("verifies", requirement_id),
+    )
+
+
+def find_passing_testresults_for_scenario(
+    base_dir: Path,
+    scenario_id: str,
+    *,
+    domain: str = "product-development",
+) -> list[dict]:
+    """All passing TestResults back-linked to `scenario_id` (`scenario` field).
+
+    "Is this Scenario currently observed-green?" — the per-scenario state the
+    coverage check uses to classify an already-built scenario as still-green
+    (vs needing a re-run). Uses the `TestResult.scenario` back-link the
+    acceptance run deposits (see `_scenario_evidence`)."""
+    if not _ENTITY_ID_RE.match(scenario_id):
+        raise ValueError(
+            f"scenario_id must match dna:<type>:<ulid>; got {scenario_id!r}"
+        )
+    return [
+        r for r in find_entities(
+            base_dir, domain=domain, entity_type="testresult",
+            predicate=where_field_equals("scenario", scenario_id),
+        )
+        if r.get("outcome") == "pass"
+    ]
+
+
 # ─── Roadmap sidecar — the member reader (ADR-001 / FR-07) ───────────────
 # The Roadmap flag is a per-repo sidecar label file, NOT a field on the
 # entity (the vendored schemas are ``unevaluatedProperties: false``; ADR-001).

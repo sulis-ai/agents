@@ -40,9 +40,21 @@ def test_manual_pending_blocks():
     assert d.verdict == "blocked"
 
 
-def test_deferred_does_not_block_but_is_recorded():
+def test_deferred_blocks_by_default_observed_or_blocked():
+    # The #83 fix: a deferred (never-driven) outcome is NOT done. Default strict.
     d = gate_decision([_res("login", "pass"),
                        _res("billing", "deferred", needs=["secret:stripe-test-key"])])
+    assert d.verdict == "blocked"
+    assert "billing" in [b["scenario"] for b in d.blocking]
+    # the need is still surfaced (both in the blocking why and deferred_needs)
+    assert "secret:stripe-test-key" in d.deferred_needs
+
+
+def test_deferred_records_without_blocking_only_with_allow_deferred():
+    # The conscious opt-out: require_observed=False restores legacy behaviour.
+    d = gate_decision([_res("login", "pass"),
+                       _res("billing", "deferred", needs=["secret:stripe-test-key"])],
+                      require_observed=False)
     assert d.verdict == "pass"
     assert "secret:stripe-test-key" in d.deferred_needs
 

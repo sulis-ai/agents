@@ -557,17 +557,52 @@ deposits the TestRun/TestResult evidence the next gate reads — pass
 the `deployed` leg once that target is reachable — both per the repo-contract
 `targets:` + `commands.standup`. Read the gate verdict:
 
-- **pass** → every Scenario passed, or is deferred-with-need. Done is
-  honest. Log it.
-- **blocked** → a step failed, or a manual check is unconfirmed. **STOP** —
-  surface the founder-English gap (which Scenario, what's broken). Do not
-  call the change done.
-- **deferred-with-need** → a recorded gap (a credential / infra absent);
-  non-blocking, but surface the needs so they're visible.
+**Observed-or-blocked (the default — the gate now refuses deferred-as-done).**
+A user-facing outcome is done only when it was actually *observed* green:
 
-Advisory when it can't run (no Scenarios authored — pure docs/infra change;
-or no target URL yet): like 4.9, the founder owns proceed-anyway, and
-block-by-default applies only to a real `blocked`.
+- **pass** → every Scenario was driven and passed. Done is honest. Log it.
+- **blocked** → a step failed, a manual check is unconfirmed, **OR a Scenario
+  was `deferred` (the real outcome was never driven — a credential / infra /
+  third-party hop absent).** **STOP** — surface the founder-English gap (which
+  Scenario, what wasn't driven, the exact need). Do not call the change done.
+  *"I couldn't verify it" reads as blocked, never done* — this is the lesson
+  from four login attempts that shipped green-but-never-signed-in.
+
+The **human-handoff path (journey-rigor #6).** A `manual-pending` block means
+the journey can't be machine-driven in this run — a browser login, a checkout
+with a real card, anything whose only honest check is a person looking at the
+screen. That's not a dead end: the founder (or you, with them) **drives the real
+flow by hand** and records what they saw, turning the block into genuine green.
+
+1. Show the checklist — what to do, what to look for, per step:
+   ```bash
+   "$SCRIPTS_DIR/sulis-attest-scenario" --scenario <scenario-id> \
+     --repo-root "$REPO_ROOT" --list
+   ```
+2. The founder runs the flow, then records the outcome:
+   ```bash
+   "$SCRIPTS_DIR/sulis-attest-scenario" --scenario <scenario-id> \
+     --repo-root "$REPO_ROOT" --attester "<who ran it>" --all-observed
+   ```
+   (or per-check `--observed "…"` / `--not-observed "…"` for a partial run).
+
+A pass deposits a **real** TestResult stamped `harness="human-attested"` — the
+same evidence the gate reads from an automated run, honest about who observed it.
+Any unobserved check records a fail and the scenario stays blocked. This is the
+opposite of waving it through: it forces a person to look at the real thing and
+keeps the record. (The *automated* browser driver is the named follow-on; until
+it lands, the human is the verifier-of-last-resort and this is how their
+observation becomes evidence the gate trusts.)
+
+The **conscious escape**: if a `deferred` is genuinely acceptable — a
+*non-user-facing* Scenario whose infra leg is unavailable in this run — re-run
+with `--allow-deferred`, which lets that deferral pass as a recorded gap. This
+is a deliberate, logged choice (surface it to the founder), never the default.
+
+Advisory when it can't run at all (no Scenarios authored — pure docs/infra
+change; or no target URL for an http journey): like 4.9, the founder owns
+proceed-anyway. But a `deferred` is no longer a quiet pass — it blocks unless
+`--allow-deferred` is consciously chosen.
 
 **4.9. DoD verification gate — run `sulis-verify-requirements` (MUST when
 an SRD is touched).** This asks the brain whether every Requirement the
