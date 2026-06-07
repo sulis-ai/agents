@@ -16,12 +16,18 @@
 // child) without leaking the shape into the contract.
 
 import { describe, it, expect } from "vitest";
+import { Readable } from "node:stream";
+import { EventEmitter } from "node:events";
 
 import type {
   SessionBridge,
   SessionResolution,
   RelaySink,
 } from "../ports/SessionBridge";
+import type {
+  BridgeChildHandle,
+  StreamJsonSessionBridgeOptions,
+} from "../adapters/StreamJsonSessionBridge";
 // eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (TDD §9 permits)
 import type { ChatStreamEvent } from "../../shared/api-types";
 
@@ -182,6 +188,72 @@ export function runSessionBridgeContract(
     });
   });
 }
+
+// ── WP-001 — the widened `spawnBridge` port carries `originEnv` (ADR-017) ────
+//
+// CONTRACT_FIRST: this WP pins ONLY the port SIGNATURE — the optional third
+// `originEnv` argument — before either side of the producer/consumer seam is
+// built (relay carry is WP-004; the adapter's *call* with the env is WP-002).
+//
+// The stub below is typed as the REAL port type
+// `StreamJsonSessionBridgeOptions["spawnBridge"]`, so it tracks the production
+// signature exactly. With the port still 2-arg, invoking it with a third
+// argument is a compile error ("Expected 2 arguments, but got 3"), so
+// `tsc --noEmit -p server` (the typecheck gate) fails — RED for the right
+// reason. Once the port is widened to the optional 3-arg shape, the stub
+// captures the third argument and both cases below pass.
+
+/** A minimal fake child: empty stdout that closes 0. Process detail is not
+ *  under test here — only the port's argument shape is. */
+function emptyFakeChild(): BridgeChildHandle {
+  const stdout = Readable.from([] as string[]);
+  const emitter = new EventEmitter() as BridgeChildHandle["process"];
+  stdout.on("end", () => setImmediate(() => emitter.emit("close", 0)));
+  return {
+    process: emitter,
+    stdout,
+    kill: () => {
+      /* no-op for the stub */
+    },
+  };
+}
+
+describe("spawnBridge port — originEnv third argument (WP-001, ADR-017)", () => {
+  it("carries originEnv to the spawn as the third argument when present", () => {
+    let received: Record<string, string> | undefined;
+    // Typed as the production port: the assertion lives in the type, so this
+    // file fails to type-check until the port grows the optional 3rd arg.
+    const spawnBridge: StreamJsonSessionBridgeOptions["spawnBridge"] = (
+      _argv,
+      _cwd,
+      originEnv,
+    ) => {
+      received = originEnv;
+      return emptyFakeChild();
+    };
+
+    const env = { SULIS_ORIGIN: "assisted; conversation=abc123; turn=2" };
+    spawnBridge(["-p", "hi"], "/tmp/wt", env);
+
+    expect(received).toEqual(env);
+  });
+
+  it("leaves the third argument undefined when no origin is supplied (byte-identical to today)", () => {
+    let received: Record<string, string> | undefined = { sentinel: "x" };
+    const spawnBridge: StreamJsonSessionBridgeOptions["spawnBridge"] = (
+      _argv,
+      _cwd,
+      originEnv,
+    ) => {
+      received = originEnv;
+      return emptyFakeChild();
+    };
+
+    spawnBridge(["-p", "hi"], "/tmp/wt");
+
+    expect(received).toBeUndefined();
+  });
+});
 
 // vitest's include pattern matches this file; a trivial self-suite keeps the
 // runner from failing "no test suite found" — the substantive coverage runs
