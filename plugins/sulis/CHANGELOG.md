@@ -1,3 +1,9 @@
+## v0.111.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- real-browser integration proof for the deterministic browser driver: a skip-gated integration test drives an actual headless chromium against real DOM (visible/url_contains/fill+click), closing the /sulis:prove blocked item (the real browser drive was never exercised). Playwright is an OPTIONAL extra (browser) — core stays stdlib-only + jsonschema/pyyaml; CI without the extra skips the test.
+
 ## v0.110.0 — 2026-06-07
 
 **Minor — release-train batch.**
