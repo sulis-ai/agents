@@ -1,0 +1,64 @@
+{
+  "train_id": "train-2026-06-07T204629Z",
+  "started_at": "2026-06-07T20:46:29Z",
+  "phase": "paused",
+  "phase_started_at": "2026-06-07T20:52:01Z",
+  "phase_history": [
+    {
+      "phase": "pending",
+      "started_at": "2026-06-07T20:46:29Z",
+      "ended_at": "2026-06-07T20:46:29Z",
+      "outcome": "advanced"
+    },
+    {
+      "phase": "rebasing",
+      "started_at": "2026-06-07T20:46:29Z",
+      "ended_at": "2026-06-07T20:46:52Z",
+      "outcome": "advanced"
+    },
+    {
+      "phase": "ci_running",
+      "started_at": "2026-06-07T20:46:52Z",
+      "ended_at": "2026-06-07T20:52:01Z",
+      "outcome": "advanced"
+    },
+    {
+      "phase": "paused",
+      "started_at": "2026-06-07T20:52:01Z",
+      "ended_at": null,
+      "outcome": null
+    }
+  ],
+  "pause_reason": "bundled-tip CI failed on feat/wp-005-executor-autonomous-origin",
+  "recovery_hint": "Bundled-tip CI is failed. Likely culprit (file-overlap heuristic): <no signal>. Inspect via `wpx-train inspect train-2026-06-07T204629Z`. Once you've identified + fixed the failing branch, run `wpx-train resume train-2026-06-07T204629Z`. To unwind the rebases + free the WPs back to step-7-complete, `wpx-train abort train-2026-06-07T204629Z`.",
+  "args": {
+    "project": "feat-live-origin-stamping",
+    "repo_root": "/Users/iain/.sulis/changes/01KTHP2NYQ1A3WHPJD75VP31NT/worktree",
+    "repo": "sulis-ai/agents",
+    "deploy_workflow": null,
+    "staging_url": null,
+    "smoke_cmd": "",
+    "base_branch": "change/feat-live-origin-stamping",
+    "force": true,
+    "strict_ci": false,
+    "enable_gate_handoff": false
+  },
+  "bundle": [
+    {
+      "wp": "WP-001",
+      "branch": "feat/wp-001-pin-spawnbridge-originenv-contract",
+      "pre_train_sha": null,
+      "rebased_to_sha": null,
+      "merge_sha_on_dev": null,
+      "phase_outcomes": {}
+    },
+    {
+      "wp": "WP-005",
+      "branch": "feat/wp-005-executor-autonomous-origin",
+      "pre_train_sha": null,
+      "rebased_to_sha": null,
+      "merge_sha_on_dev": null,
+      "phase_outcomes": {}
+    }
+  ]
+}
