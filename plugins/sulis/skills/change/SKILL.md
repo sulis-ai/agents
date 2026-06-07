@@ -259,6 +259,13 @@ say so plainly and offer `list`:
   "
   ```
 
+  No `pre_prompt` is passed here on purpose: `launch_change_terminal`
+  **defaults a change-context opening prompt** when a caller omits one (so
+  the re-spawned session reads its recon + handoff and self-orients rather
+  than sitting idle at an empty claude prompt — #93). `start --spawn` passes
+  a richer brief, which still wins. If you ever want a custom reopen brief,
+  pass `pre_prompt="…"`; otherwise the default auto-start is the floor.
+
   Then:
 
   > *"Reopening **fix the login bug** (`CH-01HQ8X`) — a fresh terminal is
