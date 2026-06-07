@@ -42,6 +42,10 @@ SESSION_DISABLED = "SESSION_DISABLED"
 # Internal — an unexpected crash (a bug).
 DECODE_FAILED = "DECODE_FAILED"
 LOG_CORRUPT = "LOG_CORRUPT"
+# os.openpty() / spawn-with-pty failed on a pty-mode open (fd exhaustion, kernel
+# pty limit). Internal: log + escalate, do not retry blindly (contract §2.15;
+# ADR-001 — maps onto the existing three-category model, no new category).
+PTY_OPEN_FAILED = "PTY_OPEN_FAILED"
 
 
 EventKind = Literal["chunk", "tool_use", "result", "error"]

@@ -36,6 +36,20 @@ extension hooks the WP-004 core reserved (``_on_process_death`` / ``_maintenance
 tick`` / ``_guard``) are now filled by delegation, so the §2.2 six-method core
 flow stayed lean.
 
+Interactive-terminal extension (CH-01KTGY, contract extension §2.11–§2.15):
+WP-002 added ``scrollback.py`` (``ScrollbackBuffer`` — the bounded raw-byte ring,
+the second content model, §2.11); WP-003 adds the **PTY io-model** as an additive
+branch at the single spawn seam (``manager._spawn_process``): a defaulted
+``SessionSpec.io_mode`` (``"pipe"`` | ``"pty"``, §2.12.1, immutable "PTY from
+birth") selects it, a ``pty`` open allocates an ``os.openpty()`` pair the manager
+owns, spawns the child with the slave as its controlling tty, and runs ONE
+generation-bound master-reader pump (``session._pty_master_pump``) that appends
+raw bytes into the session's ``ScrollbackBuffer`` — restart re-creates the PTY
+while keeping the scrollback (§2.12.3). The pipe path is byte-for-byte unchanged
+(``io_mode`` defaults to ``"pipe"`` — acceptance #4). New error code
+``PTY_OPEN_FAILED`` (Internal, §2.15) maps ``os.openpty`` / pty-spawn failure onto
+the existing three-category model.
+
 The leading underscore signals "foundation-internal" — exactly as ``_discovery``
 and ``_canonical_drift`` do. The public surface is re-exported here so callers
 import from the package, not its sub-modules.
@@ -61,6 +75,7 @@ from _session_manager.events import (
     LOG_CORRUPT,
     NO_SESSION,
     OFFSET_EVICTED,
+    PTY_OPEN_FAILED,
     SESSION_DISABLED,
     SOCKET_CLOSED,
     SPAWN_FAILED,
@@ -163,4 +178,6 @@ __all__ = [
     "SESSION_DISABLED",
     "DECODE_FAILED",
     "LOG_CORRUPT",
+    # pty io-model spawn failure (§2.15) — CH-01KTGY WP-003
+    "PTY_OPEN_FAILED",
 ]

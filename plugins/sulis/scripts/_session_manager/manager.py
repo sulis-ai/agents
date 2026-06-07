@@ -46,11 +46,13 @@ from _session_manager.event_log import EventLog
 from _session_manager.events import (
     CWD_NOT_FOUND,
     NO_SESSION,
+    PTY_OPEN_FAILED,
     SESSION_DISABLED,
     SPAWN_FAILED,
     UNKNOWN_PROVIDER,
     Event,
     ExpectedError,
+    InternalError,
     ProtocolError,
 )
 from _session_manager.guards import (
@@ -59,6 +61,7 @@ from _session_manager.guards import (
     TurnGuardManager,
 )
 from _session_manager.lifecycle import DEFAULT_RECOVERY_BUDGET, LifecycleManager
+from _session_manager.scrollback import ScrollbackBuffer
 from _session_manager.maintenance import (
     DEFAULT_MAINTENANCE_INTERVAL_SECONDS,
     MaintenanceManager,
@@ -66,6 +69,12 @@ from _session_manager.maintenance import (
 )
 from _session_manager.session import Session
 from _session_manager.state import Health, SessionState, SessionStatus
+
+# Default per-session scrollback ceiling for a pty session (contract §2.11.3,
+# the Armor ceiling — bounded memory is a MUST): 1 MiB is generous for a terminal
+# screen + deep scrollback; appending past it drops oldest bytes. Overridable via
+# the ``scrollback_capacity_bytes`` tuning kwarg.
+DEFAULT_SCROLLBACK_CAPACITY_BYTES = 1024 * 1024
 
 
 class SessionManager:
@@ -133,6 +142,14 @@ class SessionManager:
                 "maintenance_interval", DEFAULT_MAINTENANCE_INTERVAL_SECONDS
             )
         )
+        # Per-session scrollback ceiling for pty sessions (§2.11.3, the Armor
+        # ceiling). Defaults to 1 MiB; overridable via the tuning kwarg so a host
+        # under memory pressure can shrink it without a signature change.
+        self._scrollback_capacity = int(
+            self._tuning.get(
+                "scrollback_capacity_bytes", DEFAULT_SCROLLBACK_CAPACITY_BYTES
+            )
+        )
         self._maintenance_stop = threading.Event()
         self._maintenance_thread: threading.Thread | None = None
         if bool(self._tuning.get("start_maintenance", True)):
@@ -188,14 +205,24 @@ class SessionManager:
                 )
 
             resume = bool(spec.resume_ref) and adapter.capabilities.supports_resume
-            process = self._spawn_process(adapter, spec)
+            process, master_fd = self._spawn_process(adapter, spec)
 
+            # A pty session owns a ScrollbackBuffer (§2.11) alongside its log; the
+            # master-reader pump appends raw terminal bytes to it. A pipe session
+            # leaves both pty fields None (byte-for-byte unchanged, acceptance #4).
+            scrollback = (
+                ScrollbackBuffer(capacity_bytes=self._scrollback_capacity)
+                if master_fd is not None
+                else None
+            )
             session = Session(
                 key=key,
                 spec=spec,
                 adapter=adapter,
                 log=EventLog(),
                 process=process,
+                pty_master_fd=master_fd,
+                scrollback=scrollback,
                 resumed=resume,
             )
             # Register restart-on-death BEFORE the pumps run, so even a child
@@ -361,9 +388,14 @@ class SessionManager:
         same honest rule as first ``open`` (§2.7). The fresh process replaces
         the dead one on the SAME session (same key, same log) via
         :meth:`Session.replace_process`, which restarts the pumps; the log's
-        offsets keep climbing and every prior event stays readable."""
-        process = self._spawn_process(session.adapter, session.spec)
-        session.replace_process(process)
+        offsets keep climbing and every prior event stays readable.
+
+        For a pty session the fresh spawn re-creates the PTY (a new
+        ``os.openpty`` master, §2.12.3); the new master fd is handed to
+        ``replace_process``, which closes the old master and keeps the scrollback
+        across the restart (restart-is-not-a-new-key applied to scrollback)."""
+        process, master_fd = self._spawn_process(session.adapter, session.spec)
+        session.replace_process(process, master_fd)
 
     def _maintenance_tick(self) -> None:
         """One pass of the periodic maintenance loop (§2.7), filled by WP-006.
@@ -459,20 +491,32 @@ class SessionManager:
 
     def _spawn_process(
         self, adapter: ProviderAdapter, spec: SessionSpec
-    ) -> subprocess.Popen:
+    ) -> tuple[subprocess.Popen, int | None]:
         """Launch one child process for ``spec`` via ``adapter.spawn_argv``.
 
         The single spawn path shared by first ``open`` and restart-on-death
-        ``_respawn`` (§2.7) — extracted so the resume-flag decision (the adapter
-        appends ``--resume`` iff ``spec.resume_ref`` is set, and the manager
-        only passes a ref when the adapter supports resume) and the
-        ``SPAWN_FAILED`` mapping live in exactly one place. The streams are all
-        PIPEs (§2.8 transport).
+        ``_respawn`` (§2.7) — and the **single seam** the io-model branches at
+        (contract §2.12.1, ADR-001; WPB-07 composition root). Returns
+        ``(process, master_fd)``: ``master_fd`` is ``None`` for the default pipe
+        io-model and the manager-owned PTY master end for the pty io-model.
+        Extracted so the resume-flag decision and the spawn error mapping live in
+        exactly one place.
 
-        Errors: Protocol ``SPAWN_FAILED`` (the spawn itself failed)."""
+        - **pipe** (default): today's ``subprocess.Popen`` with stdin/stdout/
+          stderr all PIPEs (§2.8 transport) — byte-for-byte unchanged.
+        - **pty** (§2.12.1): ``os.openpty()`` allocates a master/slave pair
+          (stdlib, ADR-001 alt #4 rejection — no third-party pty lib); the child
+          is spawned with the slave fd as stdin/stdout/stderr (its controlling
+          terminal), the slave is closed in the parent (the child holds it), and
+          the master fd is returned for the session's master-reader pump.
+
+        Errors: Protocol ``SPAWN_FAILED`` (the pipe spawn failed); Internal
+        ``PTY_OPEN_FAILED`` (``os.openpty`` / the pty spawn failed, §2.15)."""
         argv = adapter.spawn_argv(spec)
+        if spec.io_mode == "pty":
+            return self._spawn_pty_process(argv, spec)
         try:
-            return subprocess.Popen(
+            process = subprocess.Popen(
                 argv,
                 cwd=spec.cwd,
                 stdin=subprocess.PIPE,
@@ -484,6 +528,60 @@ class SessionManager:
                 SPAWN_FAILED,
                 f"could not spawn {spec.provider!r}: {exc}",
             ) from exc
+        return process, None
+
+    def _spawn_pty_process(
+        self, argv: list[str], spec: SessionSpec
+    ) -> tuple[subprocess.Popen, int]:
+        """Spawn ``argv`` on a fresh PTY the manager owns from birth (§2.12.1).
+
+        Allocates the master/slave pair with ``os.openpty()`` (stdlib, ADR-001),
+        launches the child with the slave end as its controlling terminal
+        (stdin/stdout/stderr → slave), closes the slave in the parent (the child
+        holds it; the parent keeps only the master), and returns
+        ``(process, master_fd)``. The manager **owns its own PTY** — it spawns
+        its own child onto it, exactly as it owns its pipe-backed child today; it
+        never drives a terminal it did not spawn (ADR-001, foundation alt #4
+        rejection).
+
+        Any failure — ``os.openpty`` (fd exhaustion / kernel pty limit) or the
+        spawn-with-slave — maps to Internal ``PTY_OPEN_FAILED`` (§2.15): a
+        resource/bug condition to log + escalate, not a retry-with-backoff
+        transport decline. Both fds are closed on a spawn failure so a failed
+        open leaks no fd."""
+        try:
+            master_fd, slave_fd = os.openpty()
+        except OSError as exc:
+            raise InternalError(
+                PTY_OPEN_FAILED,
+                f"os.openpty() failed for {spec.provider!r}: {exc}",
+            ) from exc
+        try:
+            process = subprocess.Popen(
+                argv,
+                cwd=spec.cwd,
+                stdin=slave_fd,
+                stdout=slave_fd,
+                stderr=slave_fd,
+                close_fds=True,
+            )
+        except (OSError, ValueError) as exc:
+            for fd in (slave_fd, master_fd):
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+            raise InternalError(
+                PTY_OPEN_FAILED,
+                f"could not spawn {spec.provider!r} on a pty: {exc}",
+            ) from exc
+        # The child now holds the slave end as its controlling tty; the parent
+        # keeps only the master. Close the parent's slave copy.
+        try:
+            os.close(slave_fd)
+        except OSError:
+            pass
+        return process, master_fd
 
     def _require_session(self, key: str) -> Session:
         """Return the live session for ``key`` or raise Expected

@@ -33,7 +33,7 @@ lands.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+from typing import Literal, Protocol, runtime_checkable
 
 from _session_manager.events import Event
 
@@ -61,11 +61,22 @@ class SessionSpec:
     passes it to ``Popen``; it is not an argv flag. ``resume_ref`` is the
     provider-specific handle to prior context (a session id, a transcript
     path); ``None`` means start fresh.
+
+    ``io_mode`` (NEW, additive, defaulted — contract §2.12.1, ADR-001) selects
+    the session's io-model and is **immutable for the session's life** ("PTY from
+    birth"): ``"pipe"`` (the DEFAULT) is today's ``subprocess.PIPE`` stdin/stdout
+    io-model that decodes structured chat into the offset event log, so every
+    existing caller is byte-for-byte unchanged; ``"pty"`` is a PTY the manager
+    owns from spawn (``os.openpty``) whose master end feeds a
+    :class:`~_session_manager.scrollback.ScrollbackBuffer` (§2.11). A viewer
+    attaching (WP-004) does NOT toggle this on — a pty session is pty whether or
+    not a viewer is attached (visible = a viewer attached; headless = none).
     """
 
     provider: str
     cwd: str
     resume_ref: str | None = None
+    io_mode: Literal["pipe", "pty"] = "pipe"
 
     def __post_init__(self) -> None:
         # Defence-in-depth (SEC CONCERN-1): ``resume_ref`` is an opaque,
