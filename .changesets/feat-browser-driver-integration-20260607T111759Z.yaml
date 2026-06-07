@@ -1,0 +1,7 @@
+change_id: 6T2DBAPB91NYM0WQH2JC9YQ5FD
+primitive: feat
+tier: minor
+touches_plugin: true
+summary: |
+  real-browser integration proof for the deterministic browser driver: a skip-gated integration test drives an actual headless chromium against real DOM (visible/url_contains/fill+click), closing the /sulis:prove blocked item (the real browser drive was never exercised). Playwright is an OPTIONAL extra (browser) — core stays stdlib-only + jsonschema/pyyaml; CI without the extra skips the test.
+created_at: 2026-06-07T11:17:59Z
