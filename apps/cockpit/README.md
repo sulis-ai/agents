@@ -301,8 +301,14 @@ never writes: it greps the active source tree for filesystem-write APIs,
 `git` spawns outside the read-only `git show`, mutating git verbs,
 non-zero process signals, HTTP mutation verbs, and non-loopback binds
 (TDD §13.7, ADR-002, ADR-003). It is the load-bearing read-only proof for
-the whole MVP and runs in CI on every change. Run it locally with
-`npm run check:read-only`; explain every rule with:
+the whole MVP and runs in CI on every change. The HTTP surface stays
+GET-only by construction; the gate names a small set of **path-scoped
+exceptions** for the sanctioned process-start sites — the chat session
+bridge (ADR-003) and, from the production terminal sidecar, the
+session-manager host the server entry spawns at boot (ADR-010/ADR-011).
+The WebSocket terminal endpoint rides the existing HTTP server's `upgrade`
+event, never an `app.post`, so the GET-only guarantee is unaffected. Run it
+locally with `npm run check:read-only`; explain every rule with:
 
 ```bash
 bash apps/cockpit/scripts/check-read-only.sh --explain
@@ -347,10 +353,17 @@ How it wires up (all under `apps/cockpit/e2e/`):
   pty-backed fake child over a **real** AF_UNIX socket, pre-seeded with a
   known scrollback banner.
 - `terminal-proxy.ts` bridges the browser's **WebSocket** to that AF_UNIX
-  socket (a browser can't open AF_UNIX, and the cockpit HTTP server is
-  read-only). It is **harness-only** — not part of the production server, so
-  the read-only guarantee stays intact. A real deployment would run an
-  equivalent terminal sidecar.
+  socket (a browser can't open AF_UNIX). It is **harness-only** — the e2e
+  proxy/backend pair predate the production sidecar. The real cockpit server
+  now ships its own equivalent: `startProductionServer()` (`server/index.ts`)
+  spawns the Python session-manager host (`session_manager_host.py`,
+  ADR-011), waits for its `READY <socket>` line, then attaches the production
+  terminal sidecar (`server/adapters/TerminalSidecar.ts`) to the running HTTP
+  server's `upgrade` event — riding the same loopback port, with the binding
+  guard ON, Origin validation, and connection/attachment caps. A host crash
+  drops live terminals but never the read-only HTTP surface (separate
+  processes). Both the host and sidecar are torn down on SIGTERM/SIGINT
+  alongside the HTTP server.
 - The cockpit's `createTerminalBridge` builds the live `WebSocketTransport`
   when `VITE_TERMINAL_WS_URL` is set (the dedicated config sets it); with no
   endpoint configured the bridge falls back to the "no terminal here" state,

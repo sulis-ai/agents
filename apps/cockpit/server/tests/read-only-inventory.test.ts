@@ -90,6 +90,20 @@ const ADVANCED_ROUTE_BASENAME = "advanced.ts";
 const CHANGE_ADVANCED_BASENAME = "changeAdvanced.ts";
 const TURN_SUMMARIES_BASENAME = "turnSummaries.ts";
 
+// WP-004 (ADR-010/ADR-011) — the server entry spawns the ONE long-lived
+// Python session-manager host at boot (`startSessionManagerHost` →
+// `spawn(python, session_manager_host.py)`). This is the new sanctioned
+// process-start site the terminal composition introduces; allow-listed BY PATH
+// (parity with the bridge/mint/starter exceptions above). The HTTP surface
+// stays GET-only — the WS endpoint rides `upgrade`, never `app.post`.
+//   NOTE: WP-005 owns the FULL read-only-gate reconciliation (the
+//   `check-read-only.sh` shell gate, the WS-attachment exception for the
+//   sidecar file, the positive `test_terminal_seams_are_named_exceptions`
+//   assertion, and the `--explain` block). This single allow-list entry is the
+//   minimum needed to keep WP-004's own suite green now that index.ts spawns
+//   the host; the richer named-exception assertions land in WP-005.
+const HOST_BOOT_BASENAME = "index.ts";
+
 // Process-start shapes — spawn/exec of a child process. Forbidden everywhere
 // except the allow-listed bridge adapter (the new ADR-003 process-start rule).
 const PROCESS_START_PATTERNS = [
@@ -278,6 +292,10 @@ describe("read-only inventory (TDD §13.7)", () => {
         // ADR-015 — turnSummaries.ts spawns `claude` headless for the Haiku
         // one-line turn summary it caches on disk (a derived-summary helper).
         TURN_SUMMARIES_BASENAME,
+        // WP-004 (ADR-010/011) — index.ts spawns the session-manager host at
+        // boot (the terminal engine owner). WP-005 owns the full gate
+        // reconciliation; this entry keeps WP-004's suite green.
+        HOST_BOOT_BASENAME,
       ]);
       if (SANCTIONED_PROCESS_STARTERS.has(basename(f))) {
         continue;

@@ -67,6 +67,16 @@ export const CONFIG = Object.freeze({
     process.env.CHAT_BRIDGE_STARTUP_TIMEOUT_MS,
     60_000,
   ),
+  /**
+   * WP-004 / TDD §3.4 — terminal sidecar resource ceilings. Conservative,
+   * localhost-tuned defaults for a single-founder local app: refuse new WS
+   * upgrades past `terminalMaxConnections`, and refuse an `attach` past
+   * `terminalMaxAttachmentsPerConnection` open attachments on one WS. Frozen
+   * constants (not env-driven beyond the existing override convention) — the
+   * composition seam passes them straight into `createTerminalSidecar`.
+   */
+  terminalMaxConnections: 8,
+  terminalMaxAttachmentsPerConnection: 4,
 } as const);
 
 export type ServerConfig = typeof CONFIG;
