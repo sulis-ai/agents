@@ -93,6 +93,7 @@ export class StreamJsonSessionBridge implements SessionBridge {
     changeId: string,
     prompt: string,
     sink: RelaySink,
+    originEnv?: Record<string, string>,
   ): Promise<RelayOutcome> {
     const resolution = await this.opts.resolve(changeId);
     const kind = resolution.kind;
@@ -100,7 +101,13 @@ export class StreamJsonSessionBridge implements SessionBridge {
 
     let child: BridgeChildHandle;
     try {
-      child = this.opts.spawnBridge(argv, resolution.session.cwd);
+      // Forward the assisted-origin stamp the relay route carried (WP-002,
+      // ADR-017): the route computed it via `assistedOriginEnv(...)` (WP-003)
+      // and we pass it AS-IS to the spawn so the session's commits carry the
+      // `assisted` trailer. When absent it is `undefined`, so the spawn is
+      // byte-identical to today (commit degrades to inferred origin, ADR-013).
+      // The adapter neither computes nor formats the origin — it only forwards.
+      child = this.opts.spawnBridge(argv, resolution.session.cwd, originEnv);
     } catch (err) {
       sink.emit({ type: "state", state: "failed" });
       return { kind: "unreachable", detail: describeError(err) };
