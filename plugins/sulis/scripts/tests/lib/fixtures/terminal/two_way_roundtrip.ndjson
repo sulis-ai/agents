@@ -1,0 +1,9 @@
+{"id":"1","method":"open","params":{"key":"chg_01KTGY","spec":{"provider":"claude","cwd":"/\u2026/worktree","io_mode":"pty"}}}
+{"id":"1","ok":true,"result":{"key":"chg_01KTGY","pid":51200,"provider":"claude","io_mode":"pty","viewer_count":0,"state":"ready"}}
+{"id":"7","method":"attach","params":{"key":"chg_01KTGY"}}
+{"id":"7","ok":true,"term":{"data":"JCA=","encoding":"base64","phase":"snapshot"}}
+{"id":"8","method":"feed","params":{"key":"chg_01KTGY","data":"bHMK","encoding":"base64"}}
+{"id":"8","ok":true,"result":{"written":3}}
+{"id":"7","ok":true,"term":{"data":"bHMNCg==","encoding":"base64","phase":"live"}}
+{"id":"7","ok":true,"term":{"data":"UkVBRE1FLm1kICBzcmMgIHRlc3RzDQokIA==","encoding":"base64","phase":"live"}}
+{"id":"7","ok":true,"end":true}
