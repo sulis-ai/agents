@@ -1,0 +1,294 @@
+/* WP-009 — ConciergeChat (the concierge front door). Built to the SIGNED
+ * visual contract (sulis-app.html, concierge front door). Tokens only — no raw
+ * hex (WPF-07 / UXD-04). A wider, centred conversation; the founder's own
+ * message is a NEUTRAL bubble (alignment, not a brand fill); the one filled
+ * action is Send (primary). The read-only honesty tag is a quiet muted pill. */
+
+.frontdoor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+}
+
+.scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0 4px;
+}
+
+.hero h2 {
+  font-family: var(--font-sans);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.hero p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted-foreground);
+  margin: 0;
+}
+
+/* The founder's own question — neutral muted bubble, right-aligned. */
+.userMessage {
+  align-self: flex-end;
+  max-width: 80%;
+  background: var(--muted);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  padding: 10px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.answerWrap {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.answer {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--foreground);
+  white-space: pre-wrap;
+}
+
+/* The streaming caret — the accent marks "the live thing". */
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--accent);
+  animation: concierge-blink 1s steps(2, start) infinite;
+}
+
+@keyframes concierge-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none;
+  }
+}
+
+/* The read-only honesty chip — it looked, it did not act (FR-N8). */
+.readonlyTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: var(--weight-label);
+  color: var(--muted-foreground);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-interactive);
+  padding: 3px 9px;
+  align-self: flex-start;
+}
+
+.readonlyTag svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* The investigation/start OFFER — confirm-gated; nothing acted on yet (FR-N9). */
+.offer {
+  align-self: stretch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--card);
+  padding: 14px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.offerBody {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.offerActions {
+  display: flex;
+  gap: 9px;
+}
+
+.offerConfirm {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: none;
+  border-radius: var(--radius-interactive);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: var(--weight-label);
+  cursor: pointer;
+}
+
+.offerConfirm:hover {
+  filter: brightness(0.96);
+}
+
+.offerDecline {
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-interactive);
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.offerDecline:hover {
+  background: var(--muted);
+}
+
+/* Honest failure — never shown as an answer (FR-19). */
+.error {
+  align-self: stretch;
+  background: var(--bg-destructive);
+  border: 1px solid var(--bg-destructive-border);
+  color: var(--destructive);
+  border-radius: var(--radius-container);
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.composerWrap {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+  padding: 12px 24px 16px;
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.statusLine {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  background: var(--muted);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-interactive);
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chip:hover:not(:disabled) {
+  border-color: var(--input);
+}
+
+.chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.composer {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.composerBusy {
+  opacity: 0.85;
+}
+
+.field {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 44px;
+  resize: vertical;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--foreground);
+  background: var(--card);
+  border: 1px solid var(--input);
+  border-radius: var(--radius-interactive);
+  padding: 10px 12px;
+}
+
+.textarea:focus {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+.textarea:disabled {
+  opacity: 0.6;
+}
+
+.slashhint {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.slashhint kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+.send {
+  flex: 0 0 auto;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: none;
+  border-radius: var(--radius-interactive);
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: var(--weight-label);
+  cursor: pointer;
+}
+
+.send:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

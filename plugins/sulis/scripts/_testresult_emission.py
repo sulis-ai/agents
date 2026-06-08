@@ -25,6 +25,7 @@ from _entity_repository import EntityRepository
 _CROCKFORD: Final[str] = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _TESTRUN_RE: Final = re.compile(r"^dna:testrun:[0-9A-HJKMNP-TV-Z]{26}$")
 _REQ_RE: Final = re.compile(r"^dna:requirement:[0-9A-HJKMNP-TV-Z]{26}$")
+_SCENARIO_RE: Final = re.compile(r"^dna:scenario:[0-9A-HJKMNP-TV-Z]{26}$")
 _VALID_TYPES: Final[set[str]] = {"unit", "integration", "e2e", "contract", "security"}
 _VALID_OUTCOMES: Final[set[str]] = {"pass", "fail", "skip"}
 
@@ -45,6 +46,7 @@ def compose_testresult(
     type: str,
     outcome: str,
     evidence: str = "",
+    scenario: str = "",
 ) -> dict:
     if not _TESTRUN_RE.match(of_run):
         raise ValueError(f"of_run must be a valid dna:testrun:<ulid>; got {of_run!r}")
@@ -57,6 +59,8 @@ def compose_testresult(
     bad = [v for v in verifies if not isinstance(v, str) or not _REQ_RE.match(v)]
     if bad:
         raise ValueError(f"testresult verifies entries must match dna:requirement:<ulid>; got {bad!r}")
+    if scenario and not _SCENARIO_RE.match(scenario):
+        raise ValueError(f"scenario must be a valid dna:scenario:<ulid>; got {scenario!r}")
 
     res: dict = {
         "id": "dna:testresult:" + _ulid(f"testresult:{of_run}:{','.join(sorted(verifies))}:{type}"),
@@ -68,6 +72,8 @@ def compose_testresult(
     }
     if evidence:
         res["evidence"] = evidence
+    if scenario:
+        res["scenario"] = scenario
     return res
 
 
@@ -79,10 +85,11 @@ def emit_testresult(
     type: str,
     outcome: str,
     evidence: str = "",
+    scenario: str = "",
 ) -> dict:
     res = compose_testresult(
         of_run=of_run, verifies=verifies, type=type,
-        outcome=outcome, evidence=evidence,
+        outcome=outcome, evidence=evidence, scenario=scenario,
     )
     repo.save("testresult", res)
     return res

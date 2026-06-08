@@ -1,3 +1,537 @@
+## v0.122.0 — 2026-06-08
+
+**Minor — release-train batch.**
+
+- Change-owned terminal: a change now owns ONE manager-backed session (running the real interactive claude --agent sulis in a pty), with two views onto it — the desktop terminal (sulis-change start opens a viewer) and the cockpit Terminal view — both attaching to a single shared session-manager daemon. Adds the real interactive-pty adapter (prior terminal ran a test echo stub), the shared daemon (flock singleton, idle-exit), the desktop viewer client, and migrates the cockpit off its own ephemeral host. Supersedes the standalone-start window and the cockpit ephemeral host.
+
+## v0.121.1 — 2026-06-08
+
+**Patch — release-train batch.**
+
+- Harden wpx-train for the trunk model: back-integrate change branches from origin/main (not the retired dev), and resolve each WP-s exact pushed branch from its Step-7 journal instead of an ambiguous feat/wp-NNN-* glob.
+
+## v0.121.0 — 2026-06-08
+
+**Minor — release-train batch.**
+
+- Dark mode for the cockpit: a dark token set + a light/dark toggle that themes the whole app, with the Monaco code viewer following the active theme.
+
+## v0.120.0 — 2026-06-08
+
+**Minor — release-train batch.**
+
+- Record change-origin exactly at commit time: the chat relay and executor now stamp a Sulis-Origin git trailer (assisted=thread id+turn, modelled on the communication service; autonomous=run id), the cockpit reads it as exact origin (likely->exact), and the trailer is a formal git trailer with field-separator + non-fatal hardening.
+
+## v0.119.0 — 2026-06-08
+
+**Minor — release-train batch.**
+
+- start a change opens a terminal again by default: sulis-change start --spawn / /sulis:change start opens a Terminal window briefed on the change, instead of the deprecated cockpit pointer message. The in-cockpit live terminal stays a separate capability.
+
+## v0.118.0 — 2026-06-08
+
+**Minor — release-train batch.**
+
+- Production terminal sidecar: the cockpit server now spawns the session-manager host and bridges the browser to it over a localhost WebSocket (origin-checked, per-change binding guard ON, resource-capped), so the live interactive terminal actually opens and responds in the running cockpit. Independent of the chat path.
+
+## v0.117.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- Interactive/visible terminal sessions: the session manager owns a PTY from birth with a terminal-scrollback model and an attach/viewer mechanism, served over a local socket, so the cockpit renders a live, watch-and-type change-session terminal in the browser (the change-terminal launcher opens it as a left-nav view). Headless chat path unchanged.
+
+## v0.116.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- Autonomous Delivery Environment — cockpit (chat, Files repo-browser, Provenance view, change-origin tracing) + provenance/origin backend + performance pass.
+
+## v0.115.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- wire browser-proving into the plugin: declare the Playwright MCP as a dependent MCP server (.mcp.json, alongside mobbin) + add an opt-in --with-browser layer to install-sulis.sh that installs the playwright extra + chromium + checks Node. Graceful-degrade (optional, never fails the install), matching the code-health layer; not pulled by --all (heavy + opt-in). This is the install + MCP half of the browser-proving machinery (#92).
+- Installer now covers two Sulis-own tool deps that slipped the net: yq (required by /sulis:index-specifications — installs mikefarah yq via brew, points Linux at the right release, never apt the wrong yq) and testssl.sh (audited in the code-health layer, Docker-fallback). Conditional project toolchains (node/pytest/eslint/etc.) deliberately stay the project job.
+- Reopening a change (focus/recreate) now auto-starts the session instead of sitting idle at an empty prompt. The terminal launcher defaults a change-context opening prompt whenever a caller omits one, so a re-spawned claude --agent sulis reads its recon + handoff and self-orients; start --spawn richer brief still wins. Also made _build_launch_script pure (no mkdir side-effect).
+
+## v0.114.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- wire browser-proving into the plugin: declare the Playwright MCP as a dependent MCP server (.mcp.json, alongside mobbin) + add an opt-in --with-browser layer to install-sulis.sh that installs the playwright extra + chromium + checks Node. Graceful-degrade (optional, never fails the install), matching the code-health layer; not pulled by --all (heavy + opt-in). This is the install + MCP half of the browser-proving machinery (#92).
+- Installer now covers two Sulis-own tool deps that slipped the net: yq (required by /sulis:index-specifications — installs mikefarah yq via brew, points Linux at the right release, never apt the wrong yq) and testssl.sh (audited in the code-health layer, Docker-fallback). Conditional project toolchains (node/pytest/eslint/etc.) deliberately stay the project job.
+
+## v0.113.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- wire browser-proving into the plugin: declare the Playwright MCP as a dependent MCP server (.mcp.json, alongside mobbin) + add an opt-in --with-browser layer to install-sulis.sh that installs the playwright extra + chromium + checks Node. Graceful-degrade (optional, never fails the install), matching the code-health layer; not pulled by --all (heavy + opt-in). This is the install + MCP half of the browser-proving machinery (#92).
+
+## v0.112.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- Provider-neutral warm-session foundation: a session manager that keeps a warm Claude (or other agent) alive per key and streams replies, with restart/eviction/guards — the engine for fast cockpit chat and the future agentic CLI.
+
+## v0.111.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- real-browser integration proof for the deterministic browser driver: a skip-gated integration test drives an actual headless chromium against real DOM (visible/url_contains/fill+click), closing the /sulis:prove blocked item (the real browser drive was never exercised). Playwright is an OPTIONAL extra (browser) — core stays stdlib-only + jsonschema/pyyaml; CI without the extra skips the test.
+
+## v0.110.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- deterministic browser driver: the scenario dispatcher gains a browser driver (url/actions/assert) that drives a real browser via lazy/optional Playwright, so a machine can prove auth/UI flows as a regression gate. Stdlib-only contract kept (Playwright is an opt-in lazy default; absent -> the step DEFERS with the need, never a fake green). First slice of the journey-rigor #88 machine-half; agent-driven driver + dev session-mint are the next slices.
+
+## v0.109.0 — 2026-06-06
+
+**Minor — release-train batch.**
+
+- /sulis:prove — point it at a built thing and it reports what is genuinely working vs stubbed/faked: finds the critical scenarios (user journeys + non-functional/production mechanisms), drives each for real against the real interface as a consumer (no stubs), validates the actual saved output by inspecting it, and returns an observed-or-blocked verdict with evidence. The reusable form of the is-it-real-or-vibe-coded check.
+
+## v0.108.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- wire /sulis:working-set into the Sulis agent body so it is actually maintained when working a change — init at binding, show at the start of every turn (the read-every-turn habit), edit+log as decisions land, crystallize at stage boundaries. Closes the built-but-not-wired gap: the skill shipped but nothing triggered it.
+
+## v0.107.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- the Working Set: an agent-triggered skill (/sulis:working-set) + helper that keeps current thinking (problem/solution/decisions, and the why — rejected alternatives + rationale) in a small live file that is read at the start of every turn and carries across session boundaries. The fix for long-session drift; the staging area that crystallizes into Opportunity/Design/Decision.
+
+## v0.106.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- Interaction-flow done-gate: block a founder-facing capability from being marked done until its multi-step flow is exercised end-to-end over stub adapters (agent-observed or human-attested). Adds contract_type: interaction, mirrors the visual-contract gate, documents its home in WP decomposition (SHOULD), and spikes it on the clinics-scheme flow. Structural fix for watch #200 (built-but-not-clickable).
+
+## v0.105.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- host-rendered surface contract: a surface a host renders for us (MCP App / OpenAI App / figma-plugin / browser-extension) is not done when its HTML merely serves — it must be bound on both sides + observed in the real host + legible (friendly name, one-line description, icon — not a technical name alone). Closes the recurring looks-built-but-not-wired failure (the Cowork MCP App that narrated tool data as text). Extends mcp-ui-surface-patterns + CONTRACT_FIRST CF-08 + the design/audit journey-walk; no new standard.
+
+## v0.104.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- a human can drive a blocked journey to real green: sulis-attest-scenario records a first-hand walk of the flow (a browser login, a real-card checkout) as a real human-attested TestResult the coverage gate reads. Closes the journey-rigor loop — a blocked manual journey now has an honest, recorded path to verified, never a fake pass.
+
+## v0.103.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- specify authors the user journey FIRST (Work-Backwards/Outside-In) so it drives the requirements, and every journey must be verifiable — sulis-author-scenario rejects a journey with no observable check or an unobservable outcome. Closes the reverse-engineered-scenario hole where only the requirement is checked, never the round-trip the user walks.
+
+## v0.102.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- plan-work scenario-coverage gate: every journey scenario is observed-green, planned, or recorded out-of-scope — a not-green journey scenario with no WP blocks the decompose (check ALL, build some). Closes the half-built-round-trip hole behind green-but-broken login.
+
+## v0.101.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- Journey-rigor #3 (the main upstream fix): a walk-the-journey step at design. draft-architecture step 8.5 + audit step 2.5 now require, for any user-facing/behavioural change, walking each verification Scenarios journey OUTSIDE-IN hop-by-hop against the actual code — every hop must point at a component that EXISTS or is a planned WP, else it is a GAP that BLOCKS design completion (plan-work does not start). Pulls the journeys COMPLETE scenario set (find_scenarios_for_journey, #84) so ALL are checked even when only some are built — classified covered/already-green/GAP/out-of-scope. Catches the consumption-half-never-built failure (four green-but-broken login attempts) at design, not after deploys. The mechanical form of Outside-In (OI prose) + Work-Backwards. Pinned by a structural test.
+
+## v0.100.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- Journey-rigor #2 (enabler): enumerate a journeys full scenario set + per-scenario verification state. Three _brain_query helpers — find_scenarios_for_journey(workflow_id), find_scenarios_verifying(requirement_id), find_passing_testresults_for_scenario(scenario_id) (the is-this-scenario-green check via the TestResult.scenario back-link). Built on the existing iter_entities + predicate primitives; no new traversal. This is the substrate the journey-walk (#85) + scenario-coverage check (#86) call to check ALL scenarios in a journey even when building only some.
+
+## v0.99.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- Journey-rigor #1: the acceptance gate is now observed-or-blocked. A deferred Scenario (the real outcome never driven) BLOCKS done by default instead of passing as a recorded gap — closing the hole behind four login attempts that shipped green/merged while no human ever signed in. gate_decision gains require_observed=True (default); deferred → blocking + the need surfaced + the escape named. The conscious opt-out is sulis-verify-acceptance --allow-deferred (require_observed=False) for genuinely non-user-facing scenarios. The change-ship gate 4.8 prose rewritten to teach observed-or-blocked. Gives the Outcome Test (v0.97.2 prose) its first mechanical teeth.
+
+## v0.98.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- discover-brand translator (foundation): the load-bearing bridge that turns a design generator TOKEN_MAP into authored Brand + DesignSystem records the emitters ingest. A URL scrape produces a full DTCG DesignSystem + a PARTIAL Brand (visual_identity only, state=Researched) — the judged identity (voice/values/positioning) is left absent for the founder to articulate, never invented. E2E-tested: translator output flows through the real sulis-emit-brand/design-system into the brain, link surviving the round-trip. The full self-contained URL→brand skill (generator-into-plugin + SKILL.md front door) is the remaining build on this core.
+
+## v0.97.5 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- Skills + scripts audit: repoint residual dev references to the trunk that the cutover missed. Scripts (runtime-breaking now that dev is deleted): wpx-train + wpx-pipeline + _change_context base-branch defaults dev→main; revert_train_on_dev (the train rollback path) parameterised to base_branch=main; back_integrate_change_branch + wpx-preflight defaults dev→main; wpx-pipeline log strings. Skills: resolve-lessons (rebase change branches onto main, was back-integrate dev), run-all (BASE_BRANCH else-default + founder messages + fetch-base + review prompts), run-wp, backfill-gates/code-review. Tests reconciled to the trunk base. release-train SKILL.md rewrite is a separate follow-up (broken-but-superseded by the auto-robot).
+
+## v0.97.4 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- CI workflows repointed to the trunk: deploy-staging fires on push to main (was dev); branch-ci pull_request targets main (was dev); version-check resolves its diff base against origin/main only (dropped the origin/dev preference). Completes the two-branch decommission — no workflow references dev. Unblocks lossless deletion of the dev branch.
+
+## v0.97.3 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- Decommission the two-branch (dev/main) machinery left over from the trunk cutover. Deleted drift_check.sh + the dead drift/GIT-12 test suite + promote-dev-to-main.yml; severed the dev/back-merge constants from abm_canonical.sh (kept path helpers for the trunk tests); repointed wpx-arrival-check repo-contract rules to the trunk (RC-01 default=main + main-only existence, RC-02 protection on main, RC-03 merge-queue on main, RC-04 required workflow release-on-merge); rewrote git-workflow-standard GIT-01 to single-trunk, reframed GIT-06 to release-on-trunk, RETIRED GIT-12, bumped 0.3.0→0.4.0. Net -1026 lines. dev branch deletion is the separate final step.
+
+## v0.97.2 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- Sulis agent: add The Outcome Test — one unifying principle (the founder measures the outcome they can use, not the artifact you produced) that consolidates three repeat watchlist strikes (#81 done-against-wrong-gate, #173 deferred-the-wanted-slice, #174 menu-instead-of-demonstrate). Placed at the turn-end chokepoint + wired as self-check step 8 so it fires mechanically; DoD generalised from CI-gate to capability-exercisable; GATHER now routes a confused founder to PROCEED-and-show; Scope Posture phase-1 must reach the usable capability. Consolidation not accretion (+52 lines).
+
+## v0.97.1 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- wpx-findings: SF + WP-AUTO ids now derive from the finding signature hash (SF-{sig[:8]} / WP-AUTO-{sig[:8]}) instead of a racy max(existing)+1 counter. Collision-free under parallel run-all security reviews, dedup-unified (same finding always → same id), 1:1-traceable SF↔WP-AUTO. Regexes widened decimal→hex (back-compatible: legacy SF-001 still parses). First fix in the multi-agent numbering strategy; the plugins-repo DR/L counters are the paired change.
+
+## v0.97.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- Vendor the brand-identity domain (Brand + DesignSystem + Tenant mirror,
+  sulis-brain v0.15.0 / DR-030) into plugins/sulis/brain/compiled/brand-identity/,
+  and wire the ux-designer agent to it: Section 0 now READs an existing
+  DesignSystem instance (binding the mockup to its real DTCG tokens) and EMITs a
+  Brand + DesignSystem when it establishes a design language. Adds two emit shims
+  (sulis-emit-brand, sulis-emit-design-system) over the generic ingest, with the
+  UXD-04 primitive/semantic/component -> DTCG global/alias/component tier mapping
+  baked into the agent body. CI-locked by 3 new emitter tests (valid Brand, valid
+  DesignSystem-realizing-Brand, and missing-realizes_identity rejects).
+
+## v0.96.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- retire the spent release-train changeset
+  The create-release-train changeset (#66/#73, tier minor) was already
+  version-bumped into dev's history by hand, so it is not an unreleased
+  change. Removing it before the dev->main promotion keeps release-on-merge
+  a no-op for this batch, so main lands at dev's current 1.129.0 rather than
+  a spurious +1 (1.130.0) with thin notes mentioning only #66.
+  Going forward: changes drop a changeset and let release-on-merge be the
+  single bump authority (Option B as designed) — no more manual bumping.
+- vendor requirement+decision bitemporal fields (evolution data-shape foundation)
+- vendor the Scenario entity (source v0.9.0) into the marketplace brain — scenario.schema + testrun/testresult re-point
+- Brain as a living backlog + traversal: /sulis:capture (why-rooted idea deposit), /sulis:backlog (open/roadmap/done off the brain graph), conversational what-is-open, and the opportunity-analyst agent. Wires the orphaned opportunity/product emitters + the query read-seam into live callers.
+- discover-project
+- platform-contract-standard — Platform Contracts (outside-in, harness-grounded third-party platform contracts) + P-PLAT rubric gate + GitHub Actions n=1 dogfood
+- release-train-as-entities
+  Encode the sulis release-train + release-on-merge pipeline as canonical Workflow + Step + Trigger + FailureMode entities in the brain. Replace imperative YAML + skill prose with a declarative graph the agent can read, render, execute against, and gap-check structurally. First dogfood of the brain's workflow primitives on Sulis's own operational pipeline.
+- testable-state definition of done — Scenario-based verification engine + sulis-verify-acceptance runner + DoD gate (done = the app is testable, not merged)
+- auto-back-merge-on-release
+- canonicalise-cross-wp-ids
+- tighten-drift-gate
+- verification-by-design
+- changeset-based release-train
+  ## Summary
+  Decouples integration from release to fix unbumped ships (#66). Each
+  change writes a `.changesets/*.yaml` on ship (tier derived from the
+  change primitive, no version touched); changes accumulate on `dev`;
+  `/sulis:release-train` opens the reviewed `dev→main` PR;
+  `release-on-merge.yml` (the single bump authority) computes the
+  cumulative version, bumps `plugin.json` + both `marketplace.json`
+  values, assembles the CHANGELOG, deletes consumed changesets, and tags
+  `v<metadata>` as the bot.
+  ## What's in it (9 WPs)
+  - **`_changeset.py`** + `.changesets/README.md` — the deterministic core
+  (51 unit tests): tier-from-primitive (all 22 primitives), cumulative
+  tier, dual-series `next_version`, collision-proof filenames,
+  str|Path-safe I/O, injection-guarded writer.
+  - **`/sulis:change ship`** — new step 4.7 writes a changeset (no bump).
+  - **`release-on-merge.yml`** — the bump authority (VERSION_DRIFT +
+  post-bump verification + loop-guard; calls `_changeset.py` directly —
+  one version-math implementation).
+  - **`/sulis:release-train`** — read-only skill that opens the `dev→main`
+  PR with a CHANGELOG preview.
+  - **`version-check.yml`** — advisory-first CI guard (warn + exit 0 this
+  cycle; promotion to required is a later founder-gated step).
+  - **branch protection** — exact config + bot-push verification recorded
+  as a go-live runbook (founder-gated; applied next cycle, not now).
+  - **standards/docs** — `git-workflow-standard.md` GIT-06 + ship docs
+  describe the new ceremony.
+  ## Bootstrapping
+  This change ships through the **old flow** (manual bump at the
+  `dev→main` promotion) one last time — the train goes live next cycle. It
+  carries its own changeset as the closing-loop proof; the go-live runbook
+  records the double-count guard (clear accumulated changesets at the
+  final manual promotion).
+  ## Test plan
+  - [x] `_changeset.py`: 51 unit tests; full suite green (one in-session
+  failure is a pre-existing `SULIS_CHANGE_ID` test-isolation gap, green in
+  CI — captured as follow-up).
+  - [x] End-to-end seam: 3 changesets → cumulative `minor` → plugin 0.78.0
+  / metadata 1.123.0 / tag v1.123.0; injection guard holds.
+  - [x] Per-WP code-reviews + batch composition gate (caught + fixed the
+  str/Path producer crash and the GHA loop-guard quoting before they
+  reached `dev`).
+  - [ ] **Verified on a real cut** at go-live: the first train cut bumps +
+  tags + pushes back as the bot under branch protection.
+  Closes #66
+  🤖 Generated with [Claude Code](https://claude.com/claude-code)
+  ---------
+  Co-authored-by: Iain Niven-Bowling <iain@nivbow.com>
+  Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+- cockpit contract preview — see the contracts before you go
+  Change CH-01KSSV · primitive: feat · 5 WPs
+  Render each change's **data contract** (founder-legible,
+  ServiceSpec-first → OpenAPI → raw fallback; worked walkthrough,
+  what-it-does with who-can + real identifiers, form fields,
+  entities+states, rules, languages, journeys, what-changes, errors;
+  area-grouped; full picture auto-trimmed; technical detail behind a
+  toggle) and its **UI/visual contract** (reuses the design-system
+  VIEWER), surfaced as one-click "open data contract / open UI" links in
+  the cockpit — at the pre-dispatch review gate and on-demand. Generic
+  per-change resolution (nothing hard-wired; release-acceptance test walks
+  every change). Recreate-on-demand for tidied/shipped changes. Renders
+  from source-of-truth so the preview can't drift.
+  ## Verification
+  - 5 WPs shipped through the train (rebase + bundled-tip CI +
+  squash-merge); WP-005 visual contract founder-signed-off.
+  - Renderer suite + cockpit suite (342) + cockpit-e2e all green on the
+  branch.
+  - Step 10.5 cross-WP code-review caught + fixed a shared-manifest
+  composition bug (two renderers wrote different files / clobbered);
+  composition test added.
+  - Step 11 per-WP security passes + a dedicated WP-003 serving-path
+  security pass: all PASS, advisories only.
+  Events deliberately out of scope (contract doesn't carry them; would
+  break no-drift) — tracked separately.
+  Closes #85
+  ---------
+  Co-authored-by: Iain Niven-Bowling <iain@nivbow.com>
+  Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+- wire-watchlist-consult
+  Wires the watchlist (the watching-labelled probation issues #81-83) into
+  existing reflexes — agent-body 'When Things Go Wrong' check +
+  capture-lessons surfacing during its dedup query — so it gets consulted
+  without a new skill (deferred deliberately). Prose-only. sulis v0.81.0 /
+  marketplace v1.126.0.
+  Co-authored-by: Iain Niven-Bowling <iain@nivbow.com>
+  Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+- Fix /sulis:discover-project verify gate that rolled back every mint in consumer repos: add a --scope single-entity mode to the drift checker, resolve the detector path relative to __file__, record primary_branch as the repo default, and pin the verify subprocess to sys.executable.
+- drift-ci-paths
+- gate-handoff completion surfaces Step-12 wrap checklist
+  ## Summary
+  - In the `--enable-gate-handoff` flow, after `mark-gates-complete` the
+  shipped WPs stayed at `step-7-complete` with stranded worktrees +
+  branches — the batched path never ran the per-WP Step 12 wrap the legacy
+  path runs (the train doesn't own the executor worktrees). The calling
+  session cleaned up by hand across 6 train runs.
+  - `mark-gates-complete`'s clean-success envelope now carries a
+  `pending_step12` checklist (`{wp, branch}` per shipped WP) +
+  `next_action`; it stays a pure record read (no git ops).
+  - run-all SKILL.md gains an explicit **Step 12.6** that consumes the
+  checklist (`wpx-step12 wrap` + `git branch -D` per entry).
+  ## Test plan
+  - [x] New `test_mark_gates_complete_emits_pending_step12_checklist` (RED
+  before the fix)
+  - [x] Full scripts suite green (967 passed)
+  Closes #75
+  🤖 Generated with [Claude Code](https://claude.com/claude-code)
+  Co-authored-by: Iain Niven-Bowling <iain@nivbow.com>
+  Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+- ground-done-in-blocking-gate
+  Grounds the 'shipped/complete' claim in the gate that actually blocks —
+  never advisory branch-CI (the false-completion that reported a broken
+  55-WP build as finished; #79). Agent-body Definition of Done + run-all
+  gate-type check + GIT-05 caveat, wiring the #52 unprotected-repo
+  detection into the 'done' claim. Programmatic deploy-gate poll scoped as
+  follow-on. Prose-only. sulis v0.80.0 / marketplace v1.125.0.
+  Co-authored-by: Iain Niven-Bowling <iain@nivbow.com>
+  Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+- isolate SULIS_CHANGE_ID in test conftest
+  ## Summary
+  - The repo-wide autouse fixture `_isolate_sulis_state` isolated
+  `SULIS_STATE_DIR` but not `SULIS_CHANGE_ID`.
+  - Inside a change-bound session (`SULIS_CHANGE_ID` exported),
+  subcommands that fall back to the env var — e.g. `sulis-change
+  mark-shipped` — picked up the real session's change id through
+  `run_tool`'s `os.environ.copy()`, failing
+  `test_mark_shipped_via_handle_flips_stage`.
+  - Fix: `monkeypatch.delenv("SULIS_CHANGE_ID", raising=False)` in the
+  autouse fixture.
+  ## Test plan
+  - [x] New `tests/unit/test_conftest_env_isolation.py` pins both halves
+  of the isolation
+  - [x] Full scripts suite green (968 passed) with `SULIS_CHANGE_ID` set
+  Closes #74
+  🤖 Generated with [Claude Code](https://claude.com/claude-code)
+  Co-authored-by: Iain Niven-Bowling <iain@nivbow.com>
+  Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+- liveness-checks-claude-process
+  Closes #87 — session_is_live verifies a claude process is on the tty (ps
+  -t <tty> -o command=), not just any process, so a dead spawn (the #86
+  abort, or claude exited) no longer reports as live. Refines #32.
+  Regression-locked. sulis v0.83.0 / marketplace v1.128.0.
+  Co-authored-by: Iain Niven-Bowling <iain@nivbow.com>
+  Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+- Fix release-on-merge loop-guard skipping founder-merged release PRs.
+  The previous guard pattern-matched on the message prefix
+  `release: sulis`, which matched BOTH the bot's auto-commits AND the
+  founder-merged release-train PR commits (because release-train PRs
+  are titled `release: sulis vX.Y.Z (minor)`). PR #132 was silently
+  skipped for exactly this reason — no v0.86.0 release was cut.
+  Switched the loop-guard to match by AUTHOR
+  (`github-actions[bot]`) instead of by message prefix. Founder-merged
+  release PRs now run the robot; the bot's own follow-up commits
+  don't re-trigger it.
+  Pair with CH-01KSYZ (YAML parse fix): two latent defects in the
+  same workflow surfaced on the same release attempt. Both now closed.
+- Fix YAML parse error in `.github/workflows/release-on-merge.yml`
+  that crashed the release robot silently on PR #130 merge. The
+  brain-emit Release step (CH-01KSYE) had a multi-line python3 -c
+  expression with lines starting at column 0 inside a `run: |`
+  literal block — terminating the YAML block early.
+  Collapsed to a single-line python -c with an explanatory NOTE
+  above. Added a regression test that walks
+  `.github/workflows/*.yml` and asserts every file is YAML-parseable
+  (pinned by running against main's broken file: fails; against the
+  fix: passes).
+  Unblocks the next release — when this lands on main, the robot
+  runs with the fixed YAML and cuts the v0.86.0 / v1.131.0 release
+  that PR #130's merge should have produced.
+  12 new tests; full suite 1320 passing.
+- ship-writes-changeset
+- spawn-prompt-via-file
+  Closes #86 — the silent spawn-killer. Spawn pre_prompt now delivered via
+  a sidecar file read at runtime ("$(cat <file>)") instead of a
+  quoted-heredoc-in-$() that macOS bash 3.2 mis-parses on any apostrophe.
+  Removes the obsolete heredoc-tag guard + dead _render_heredoc.
+  Regression-locked with a bash -n test over
+  apostrophes/quotes/backticks/$ + a sidecar-bytes test. 838 unit green.
+  sulis v0.82.0 / marketplace v1.127.0.
+  Co-authored-by: Iain Niven-Bowling <iain@nivbow.com>
+  Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+- train-branch-slug-tolerance
+- update-drift-ci-test
+- version-check advisory guard fails closed on zero changesets
+  GitHub's default run: shell is `bash -e -o pipefail`, so errexit is
+  injected by the runner even though the script never writes `set -e`
+  (the prior comment's premise was wrong). With zero changesets,
+  `ls .changesets/*.yaml` exits 2 on the no-match glob, tripping errexit
+  and aborting the step (exit 2) before the intended `exit 0` — turning
+  the deliberately-advisory guard into a hard failure on the exact case
+  it exists to warn-not-block.
+  Count with `find` (exits 0 on no match inside an existing dir) so the
+  advisory guard stays advisory. Surfaced on the v1.129.0 dev->main PR,
+  which legitimately carries zero changesets.
+- widen wpx-train rollback except to FileNotFoundError
+  ## Summary
+  - `_rollback_pre_merge_train_state` caught only `RuntimeError` after an
+  `exists()` check, but `read_train_state` raises `FileNotFoundError` if
+  the state file vanishes in the TOCTOU window — so that edge propagated
+  into `cmd_run`'s terminal error handlers.
+  - Fix: widen the catch to `(RuntimeError, FileNotFoundError)`; the
+  helper degrades cleanly (returns False, leaves state for inspection).
+  ## Test plan
+  - [x] New `tests/unit/test_wpx_train_rollback_toctou.py` covers the
+  vanished-file + corrupt-JSON edges (RED before the fix)
+  - [x] Train-related suites green (190 passed)
+  Closes #68
+  🤖 Generated with [Claude Code](https://claude.com/claude-code)
+  Co-authored-by: Iain Niven-Bowling <iain@nivbow.com>
+  Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+- founder-legible-design-and-contracts
+  Closes #88 + #89 — the founder-legibility lens reaches the design +
+  standards layers. CF-10 (contract carries
+  auth/audience/plain-language-guide/error-fixes — the ServiceSpec
+  richness) + agent-body 'design for the audience' rule +
+  draft-architecture wiring. Prose/standards. sulis v0.84.0 / marketplace
+  v1.129.0.
+  Co-authored-by: Iain Niven-Bowling <iain@nivbow.com>
+  Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+- frontend local-verify builds workspace deps first
+  ## Summary
+  - Executors ran `pnpm run typecheck` before building `workspace:*` deps
+  whose exports resolve to `./dist/*`; with `dist/` absent, `tsc` fails
+  fast on module resolution and never reaches the rest of the file —
+  masking real type errors as a false green (L-02).
+  - Adds **WPF-14 (MUST)** to `WP_FRONTEND_STANDARD.md`: build workspace
+  deps before local typecheck/test/lint, reproducing CI order.
+  Verification-gates section notes the dependency; version → 0.2.0.
+  ## Test plan
+  - [x] Documentation-only standard amendment (no executable test);
+  verified WPF-14 + cross-refs + version history render correctly
+  - [x] branch-ci doc/reference checks
+  Closes #78
+  🤖 Generated with [Claude Code](https://claude.com/claude-code)
+  Co-authored-by: Iain Niven-Bowling <iain@nivbow.com>
+  Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+- worktree-colocate — change worktrees live at ~/.sulis/changes/{id}/worktree (ADE relocation)
+
+## v0.95.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- verify-requirements now recognises the Scenario route. A green Scenario run (sulis-verify-acceptance --scenario) deposits a passing TestResult verifying its Requirements, so a requirement proven only by a Scenario journey reads as covered — closing the false-red where the DoD gate saw the @verifies route but not the Scenario route. The ship flow runs the acceptance gate BEFORE the coverage gate (acceptance produces the evidence coverage consumes). TestRun/TestResult gain scenario back-links; ids are deterministic per-scenario so a regressed scenario overwrites its record (no stale pass).
+
+## v0.94.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- New /sulis:retro skill — the session-grain retrospective. Run at session end:
+  surfaces friction and ROUTES every finding (surface→classify→route, not
+  journal). Four acts: extract-the-steers-first (the user's corrections — the
+  highest-signal, objective input), framework-friction, missing-context, the
+  open self-attack probe. Routes by consumer/type: trivial→fix; bug/gap→task;
+  recurring→watchlist (2-strikes→structural fix); lesson→capture-lessons;
+  missing decision-context→brain (idea-backlog as a Lesson-shaped slot until the
+  Lesson entity is minted); wrong default→candidate standard change. The
+  session-grain funnel that feeds capture-lessons (change), the watchlist
+  (pattern), and #69 (idea). Founder-facing, structural-not-personal, no
+  self-congratulation. Authored via add-skill (5 gates, Verdict PASS, STANDARD
+  tier). Queued: the Lesson brain entity + a Stop-hook auto-buffer (#73).
+
+## v0.93.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- MCP-UI surface patterns — new reference (mcp-ui-surface-patterns.md) for
+  driving custom interactive UI in an AI client. The load-bearing point:
+  choosing the rendering path is an ARCHITECTURE decision (data-connection +
+  durability), not styling — Artifact (ephemeral, no live data) vs MCP App
+  (ui:// bundled HTML in a sandboxed iframe, data over the ui/ postMessage
+  channel) vs MCP-UI externalUrl. Encodes the safe iframe-HTML assumption +
+  flags the two open uncertainties (Cowork parity, remoteDom). Cited from four
+  homes: ux-designer (surface type is part of the visual contract), draft-
+  architecture (the path choice is an ADR), WP_FRONTEND (WPF-15 — build
+  constraints: sandboxed iframe, ui/ channel, CSP allowlist, no-localStorage-in-
+  artifacts), CONTRACT_FIRST (CF-08 — the ui:// resource + ui/ channel as a
+  contract seam). Grounded in the cowork-custom-ui critical-thinking analysis +
+  the MCP Apps official spec.
+
+## v0.92.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- New ux-designer specialist agent — owns the visual contract end-to-end (the
+  #45 design-stage gate): inspiration probe, real-token HTML mockup,
+  accessibility, cognitive load, and the founder sign-off conversation. Also
+  owns visual design at the SYSTEM level: when no design system/language exists
+  it establishes one (Identity -> three-tier tokens) or asks the founder which
+  to use. draft-architecture (step 3.5b) now DISPATCHES it instead of producing
+  the visual contract inline; Sulis routes/delegation/roster wired to it.
+  Adds UXD-16 (Cognitive load, CL-01..06) to UX_VISUAL_DESIGN_STANDARD (0.2.0 ->
+  0.3.0) — the missing dimension, sourced from the platform cognitive-load.md;
+  confirms WCAG-AA (UXD-07) + agentic-interface (UXD-10) + design-lifecycle
+  IDC/DS conventions were already reconciled. Authored via add-agent (5 gates,
+  Verdict PASS); full suite 1747 green.
+
+## v0.91.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- Scope posture — full coherent go by default. New MUST principle in the Sulis
+  agent body + the specify/draft-architecture sizing steps: default to a solid
+  attempt at the full coherent scope; thin-slicing is the exception for
+  genuinely-too-big work, not the reflex. When slicing IS needed the agent owns
+  the cut — a phased plan (phase 1 a real meaningful go; deferred phases
+  captured to the backlog so nothing's lost), never handing the slicing to the
+  founder. Depth/tier sizes design rigour, not the scope delivered.
+
 ## v0.90.0 — 2026-06-02
 
 **Minor — release-train batch.**

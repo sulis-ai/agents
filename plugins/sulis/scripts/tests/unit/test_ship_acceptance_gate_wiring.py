@@ -36,8 +36,14 @@ def test_ship_blocks_on_blocked_verdict() -> None:
     )
 
 
-def test_ship_records_deferred_needs_without_blocking() -> None:
+def test_ship_treats_deferred_as_blocking_by_default() -> None:
+    # #83: observed-or-blocked. A deferred (never-driven) outcome no longer
+    # passes silently — ship blocks unless --allow-deferred is consciously set.
     text = _text().lower()
-    assert "deferred-with-need" in text or "deferred with need" in text, (
-        "ship must treat deferred-with-need as a recorded, non-blocking gap"
+    assert "deferred" in text and "allow-deferred" in text, (
+        "ship must treat a deferred outcome as blocking by default, with the "
+        "conscious --allow-deferred escape documented"
+    )
+    assert "observed-or-blocked" in text, (
+        "ship must state the observed-or-blocked discipline"
     )

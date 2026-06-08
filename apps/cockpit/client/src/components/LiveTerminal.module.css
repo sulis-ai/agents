@@ -1,0 +1,176 @@
+/* WP-008 — <LiveTerminal /> chrome.
+ *
+ * Every colour here references var(--*) from tokens.css (UXD-04 / WPF-07 —
+ * zero raw hex). The single documented exception is the terminal CONTENT
+ * area, which renders its own ANSI palette (a terminal's job, WP-VISUAL §5.1);
+ * xterm.js owns that surface and maps its theme to the token palette where it
+ * can. This file styles only the surrounding chrome — toolbar, connection
+ * badge, scrollback meter, type-here affordance, and the three state panels.
+ *
+ * Traces to the signed visual contract mockup
+ * (../../../../.architecture/interactive-terminal-sessions/mockups/cockpit-live-terminal.html).
+ */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  overflow: hidden;
+}
+
+/* Toolbar (chrome — tokens). */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-muted);
+  background: var(--muted);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: var(--radius-badge);
+  font-weight: var(--weight-label);
+  font-size: 11px;
+}
+
+.badgeConnected {
+  background: var(--positive);
+  /* Dark label on the positive fill — matches the warning badge's dark-on-fill
+     pattern and clears WCAG AA (5.44:1) at the 11px badge size, where
+     white-on-positive falls short (3.3:1). WPF-10 live-surface a11y gate. */
+  color: var(--foreground);
+}
+
+.badgeConnecting {
+  background: var(--warning);
+  color: var(--warning-foreground);
+}
+
+.badgeDisconnected {
+  background: var(--muted);
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+}
+
+.meta {
+  font-size: 11px;
+  /* --foreground (not --muted-foreground) so the 11px meta clears WCAG AA:
+     --muted-foreground on the card surface is 4.34:1, just under 4.5:1 for
+     small text (WPF-10). */
+  color: var(--foreground);
+}
+
+.reconnect {
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  border-radius: var(--radius-interactive);
+  cursor: pointer;
+}
+
+.reconnect:hover {
+  border-color: var(--primary);
+}
+
+/* The terminal content host — xterm.js mounts here. The xterm theme owns the
+ * ANSI palette (the documented token exception, WP-VISUAL §5.1); we only set
+ * the box. The fallback background keeps the box from flashing the page
+ * surface before xterm paints. */
+.viewport {
+  flex: 1 1 auto;
+  min-height: 320px;
+  padding: 8px 10px;
+  background: var(--background);
+  overflow: hidden;
+}
+
+/* Type-here affordance (the two-way feed). */
+.inputHint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-muted);
+  background: var(--card);
+  font-size: 12px;
+  /* --foreground for the small type-here hint + its <kbd> chips so they clear
+     WCAG AA at 11–12px (WPF-10). */
+  color: var(--foreground);
+}
+
+.inputHint kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-interactive);
+  padding: 1px 5px;
+}
+
+/* State panels (WPF-05: connecting / disconnected / no-terminal-here). Each
+ * is distinct and never a blank pane (acceptance #1). */
+.state {
+  flex: 1 1 auto;
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px 16px;
+  text-align: center;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.stateTitle {
+  font-size: 14px;
+  font-weight: var(--weight-label);
+  color: var(--foreground);
+}
+
+.stateNote {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  max-width: 36ch;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: var(--radius-button);
+  animation: live-terminal-spin 0.8s linear infinite;
+}
+
+@keyframes live-terminal-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}

@@ -33,11 +33,33 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _acceptance_gate import format_gate_message, gate_decision  # noqa: E402
 from _run_contract import resolve_run_contract, target_url  # noqa: E402
 from _scenario_graph_load import JourneyNotFound, load_scenario_journey  # noqa: E402
+from _scenario_evidence import emit_scenario_evidence  # noqa: E402
 from _scenario_runner import (  # noqa: E402
     format_founder_summary,
     run_bundle,
     run_scenario,
 )
+from _scenario_runtime import driver_for_step  # noqa: E402  (#171)
+
+
+def _journey_needs_target_url(
+    steps_by_id: dict, tools_by_id: dict, ordered_step_ids: list,
+) -> bool:
+    """True iff any step in the ordered journey resolves to ``http_call``.
+
+    #171 — a scenario whose every step is a subprocess (or human, or no-op)
+    needs no HTTP target URL. Before, the acceptance gate refused to run on
+    a no-app repo (plugin / library / published-artifact) with no
+    ``targets.local`` even when the journey never dereferenced one. Only
+    require the URL when at least one step's driver is ``http_call``.
+    """
+    for sid in ordered_step_ids:
+        step = steps_by_id.get(sid)
+        if step is None:
+            continue
+        if driver_for_step(step, tools_by_id) == "http_call":
+            return True
+    return False
 
 
 def _read_repo_contract(repo_root: str) -> dict:
@@ -71,6 +93,16 @@ def main(argv=None) -> int:
     p.add_argument("--available-artifacts", default="",
                    help="comma list of available needs/credentials (others defer)")
     p.add_argument("--json", action="store_true", help="emit the machine envelope")
+    p.add_argument("--no-emit-evidence", dest="emit_evidence", action="store_false",
+                   help="don't deposit a TestRun/TestResult for this run "
+                        "(--scenario mode only; default: emit so the "
+                        "requirement-coverage gate sees the Scenario route)")
+    p.set_defaults(emit_evidence=True)
+    p.add_argument("--allow-deferred", action="store_true",
+                   help="allow a `deferred` Scenario (real outcome not driven) to "
+                        "PASS rather than BLOCK. Default OFF: observed-or-blocked. "
+                        "Use ONLY for a consciously non-user-facing Scenario where a "
+                        "recorded, non-blocking gap is the honest call.")
     args = p.parse_args(argv)
 
     # Resolve the journey source: a hand-built bundle, or the emitted brain graph.
@@ -98,9 +130,21 @@ def main(argv=None) -> int:
                 file=sys.stderr,
             )
 
+    # Resolve the journey's step/tool lookup tables BEFORE the target-URL
+    # check so we can ask whether the journey actually needs one (#171).
+    if bundle is not None:
+        steps_by_id = {s.get("@id"): s for s in (bundle.get("steps") or [])}
+        tools_by_id = {t.get("@id"): t for t in (bundle.get("tools") or [])}
+        ordered_step_ids = (bundle.get("workflow") or {}).get("steps", []) or []
+    else:
+        steps_by_id = loaded.steps_by_name
+        tools_by_id = loaded.tools_by_id
+        ordered_step_ids = (loaded.workflow or {}).get("steps", []) or []
+    needs_url = _journey_needs_target_url(steps_by_id, tools_by_id, ordered_step_ids)
+
     rc = resolve_run_contract(_read_repo_contract(args.repo_root))
     base = target_url(rc, args.target)
-    if not base:
+    if needs_url and not base:
         print(
             f"No '{args.target}' target URL in the repo-contract "
             f"(targets.{args.target}). Add it (and a commands.standup recipe), "
@@ -108,6 +152,9 @@ def main(argv=None) -> int:
             file=sys.stderr,
         )
         return 2
+    # When no step needs an HTTP target, the runner is happy with an empty
+    # base URL — subprocess and human drivers never dereference it.
+    base = base or ""
 
     available = frozenset(
         a.strip() for a in args.available_artifacts.split(",") if a.strip()
@@ -119,7 +166,22 @@ def main(argv=None) -> int:
             loaded.scenario, loaded.workflow, loaded.steps_by_name, loaded.tools_by_id,
             target_base_url=base, available_artifacts=available,
         )
-    decision = gate_decision([result])
+    decision = gate_decision([result], require_observed=not args.allow_deferred)
+
+    # Deposit the verification evidence so the requirement-coverage gate sees
+    # the Scenario route. Best-effort: an emission failure NEVER changes the
+    # verdict or the exit code — a run that proved green stays green even if
+    # the brain store is unwritable. Only in --scenario mode (we have a
+    # scenario entity + a brain store to write to).
+    evidence = None
+    if loaded is not None and args.emit_evidence:
+        try:
+            evidence = emit_scenario_evidence(
+                base_dir=base_dir, scenario=loaded.scenario, verdict=result.verdict,
+            )
+        except Exception as exc:  # noqa: BLE001 — evidence is advisory, never fatal
+            print(f"⚠ Couldn't record this run's verification evidence: {exc}",
+                  file=sys.stderr)
 
     if args.json:
         print(json.dumps({
@@ -129,6 +191,7 @@ def main(argv=None) -> int:
             "steps": result.steps,
             "deferred_needs": decision.deferred_needs,
             "blocking": decision.blocking,
+            "evidence": evidence,
         }, ensure_ascii=False))
     else:
         print(format_founder_summary(result))

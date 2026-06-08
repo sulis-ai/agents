@@ -56,6 +56,7 @@ def assemble_scenario_graph(
     tenant: str,
     seed: str,
     steps: list[dict],
+    require_verifiable: bool = True,
 ) -> dict:
     """Assemble a plain-English journey into a Scenario + Workflow + Steps.
 
@@ -69,12 +70,56 @@ def assemble_scenario_graph(
             {"instruction": str,                 # plain-English; → agent_instructions
              "asserts": list[str] = [],          # "see X" checks → postconditions
              "mechanism": str = "human",         # deterministic|probabilistic|human|mixed
-             "tool_ref": str | None = None}      # dna:tool:<ulid> when automated
+             "tool_ref": str | None = None,      # dna:tool:<ulid> when automated
+             "mechanism_detail": str | None = None,  # JSON driver params:
+                                                  #   subprocess → {"cmd","expect_exit"}
+                                                  #   http_call  → {"method","path","expect_status"}
+             "input_artifacts": list[str] = []}  # EXTRA external needs (credentials/
+                                                  #   fixtures) beyond the data-flow chain
+        require_verifiable: when True (the default), the journey MUST be
+            verifiable — at least one beat carries an observable check
+            (``asserts``) AND the final (outcome) beat carries one. A journey
+            with no checks, or whose outcome isn't observable, can report green
+            while the feature is broken (the green-but-broken-login class
+            journey-rigor #5 closes). Pass False only for structural tests of
+            properties orthogonal to verifiability.
 
     Returns the emitter-ready bundle: {"scenarios", "workflows", "steps"}.
+
+    Data-flow vs needs: the first beat's ``input_artifacts`` seeds from
+    ``test-target`` and each subsequent beat consumes the previous beat's
+    ``output_artifacts`` — the IDEF0 data-flow chain (also what satisfies the
+    Step schema's ``input_artifacts`` minItems:1). The runner recognises an
+    artifact produced by an earlier step in the same journey as available
+    (``_scenario_runner``), so the chain doesn't defer a runnable journey. A
+    beat that needs a genuinely-external artifact (a credential) declares it via
+    ``input_artifacts``; that one isn't journey-produced, so the runner surfaces
+    it as a deferred need rather than faking green.
     """
     if not steps:
         raise ValueError("a scenario journey needs at least one step")
+
+    # Verifiability gate (journey-rigor #5). A *verification* journey that
+    # carries no observable check is just a description of clicks — it can pass
+    # while the feature is broken. The outcome (final beat) MUST be provable, or
+    # the whole journey proves nothing. This is the "verifiable at specify"
+    # mechanical tooth: a journey can't be authored unverifiable.
+    if require_verifiable:
+        total_asserts = sum(len(beat.get("asserts") or []) for beat in steps)
+        if total_asserts == 0:
+            raise ValueError(
+                "a verification journey needs at least one observable check — "
+                "every journey must carry an 'asserts' entry (what the user "
+                "should see / what proves it worked). A journey with no checks "
+                "can report green while the feature is broken."
+            )
+        if not (steps[-1].get("asserts") or []):
+            raise ValueError(
+                "the outcome of a verification journey must be observable — the "
+                "final step needs an 'asserts' entry (what proves the journey "
+                "succeeded). Without it the journey can pass while the feature "
+                "is broken."
+            )
 
     # Step names are the linkage the Workflow uses (workflow.steps holds
     # Step.name slugs, not ULIDs) — and the flat brain store keys files by
@@ -90,11 +135,16 @@ def assemble_scenario_graph(
         instruction = beat["instruction"]
         slug = f"{namespace}-{_slugify(instruction, index=i)}"
         output = [f"{slug}-result"]
+        # input_artifacts = the data-flow chain (previous beat's output, or the
+        # test-target seed for the first beat) PLUS any beat-declared external
+        # needs. The data-flow part is journey-produced (the runner treats it as
+        # available); a declared external need is not, so it surfaces if absent.
+        needs = list(prev_output) + list(beat.get("input_artifacts") or [])
         step: dict = {
             "id": f"dna:step:{_ulid(f'{seed}:step:{i}')}",
             "name": slug,
             "for_domain": tenant,
-            "input_artifacts": list(prev_output),
+            "input_artifacts": needs,
             "output_artifacts": output,
             "mechanism": beat.get("mechanism", "human"),
             "agent_instructions": instruction,
@@ -108,6 +158,13 @@ def assemble_scenario_graph(
         tool_ref = beat.get("tool_ref")
         if tool_ref:
             step["tool_ref"] = tool_ref
+        # The driver params (subprocess cmd / http_call path) — carried through
+        # so the runner can actually execute the step. The runtime reads this
+        # off the stored Step (_scenario_runtime), the dispatcher parses it as
+        # the driver's JSON params (_scenario_dispatch).
+        mechanism_detail = beat.get("mechanism_detail")
+        if mechanism_detail:
+            step["mechanism_detail"] = mechanism_detail
         step_entities.append(step)
         prev_output = output
 

@@ -1,0 +1,10 @@
+{"id":"1","method":"open","params":{"key":"chg_01KTGY","spec":{"provider":"claude","cwd":"/\u2026/worktree","io_mode":"pty"}}}
+{"id":"1","ok":true,"result":{"key":"chg_01KTGY","pid":51200,"provider":"claude","io_mode":"pty","viewer_count":1,"state":"ready"}}
+{"id":"7","method":"attach","params":{"key":"chg_01KTGY"}}
+{"id":"7","ok":true,"term":{"data":"JCBsb25nLXJ1bm5pbmcNCg==","encoding":"base64","phase":"snapshot"}}
+{"id":"7","ok":true,"event":{"kind":"error","code":"RESTARTED","detail":"child died; restart re-created the pty"}}
+{"id":"1","ok":true,"result":{"key":"chg_01KTGY","pid":51999,"provider":"claude","io_mode":"pty","viewer_count":1,"state":"ready"}}
+{"id":"7","ok":true,"term":{"data":"JCBsb25nLXJ1bm5pbmcNCltyZXN0YXJ0ZWRdDQo=","encoding":"base64","phase":"live"}}
+{"id":"7","ok":true,"end":true}
+{"id":"20","method":"status","params":{"key":"chg_01KTGY"}}
+{"id":"20","ok":true,"result":{"state":"evicted","io_mode":"pty","viewer_count":0,"reason":"idle-timeout (same timer as a headless pipe session)"}}

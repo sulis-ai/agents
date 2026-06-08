@@ -1,0 +1,16 @@
+train_id: "train-2026-06-03T102806Z"
+started_at: "2026-06-03T10:28:06Z"
+completed_at: "2026-06-03T10:32:14Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-03T10:28:28Z"
+bundle:
+  - wp: WP-013
+    branch: feat/wp-013-dogfood-and-scenario-emission
+    pre_train_sha: b9155d18724df0460ec7e1f3196f9b5f7a8661cf
+    rebased_to_sha: b9155d18724df0460ec7e1f3196f9b5f7a8661cf
+    merge_sha_on_dev: f377a23f253dc1daf4456ff9d6717af9d0be62c9

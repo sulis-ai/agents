@@ -65,7 +65,7 @@ CURRENT_BRANCH=$(git -C <repo-root> branch --show-current)
 if [[ "$CURRENT_BRANCH" == change/* ]]; then
     BASE_BRANCH="$CURRENT_BRANCH"
 else
-    BASE_BRANCH="dev"
+    BASE_BRANCH="main"
 fi
 ```
 
@@ -74,7 +74,7 @@ and merge into. In v0.11.0+ this is `dev` directly; in a change-bounded
 workflow (v0.12.0+) it's the change branch. Pass it as `--base-branch
 $BASE_BRANCH` to wpx-pipeline (Step 2b) and wpx-train (when run-all
 fires the train). The dev-SHA-at-creation sidecar uses
-`origin/$BASE_BRANCH`'s SHA, not `origin/dev` directly.
+`origin/$BASE_BRANCH`'s SHA (the trunk, `origin/main`).
 
 The executor itself does not need to know about the change context —
 it just works in its WP worktree, branched off whatever the calling
@@ -91,6 +91,22 @@ Given the user invokes `/sulis:run-wp WP-NNN`:
    (optional; one of `haiku | sonnet | opus`), include the `model`
    parameter in the Agent call. Otherwise omit `model` (the executor
    inherits the calling session's model — typically Opus).
+4. **Flip INDEX status `pending → in_progress` BEFORE invoking the
+   Agent (#142).** The run-all loop relies on the executor to do this
+   at Step 1; the single-WP path historically didn't, so the eventual
+   Step 12.2 (`wpx-step12 wrap` → `flip-status --expected in_progress`)
+   failed at ship-time on a still-`pending` WP. Doing it here makes the
+   single-WP path symmetric with run-all:
+
+   ```bash
+   "$WPX_DIR/wpx-index" flip-status \
+     --wp WP-NNN --project <slug> --repo-root <repo> \
+     --to in_progress --expected pending
+   ```
+
+   The flip is **idempotent** (#142): a WP already at `in_progress` (or
+   `done` on a replay) returns success without rewriting the row. Run
+   it unconditionally — no pre-check needed.
 
 ```
 Agent({
@@ -272,7 +288,7 @@ Agent({
   description: "Step 11 post-deploy verification for WP-NNN",
   model: <security_model from frontmatter, if present>,
   prompt: """
-    Review the squash-merge at <merge_sha> on dev (deployed to
+    Review the squash-merge at <merge_sha> on main (deployed to
     <deploy_url>). Health: <health_status>. Smoke: <smoke_verdict>.
 
     Verify against WP-NNN's Definition of Done. Categorise findings

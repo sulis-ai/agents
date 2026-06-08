@@ -188,6 +188,35 @@ def cli_main(parser: argparse.ArgumentParser, handlers: dict) -> None:
 _FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
 
 
+# #104 — historical drift: SEA authored snake-case `depends_on` while every
+# wpx/execution reader uses camel-case `dependsOn`. Alias snake → camel at
+# parse time so the dep set surfaces regardless of which spelling the
+# author used. List form (`depends-on`) covered for symmetry.
+_FRONTMATTER_KEY_ALIASES: dict[str, str] = {
+    "depends_on": "dependsOn",
+    "depends-on": "dependsOn",
+}
+
+
+def _alias_frontmatter_key(key: str) -> str:
+    return _FRONTMATTER_KEY_ALIASES.get(key, key)
+
+
+_FM_INLINE_COMMENT_RE = re.compile(r"\s+#(?:\s.*)?$")
+
+
+def _strip_frontmatter_inline_comment(s: str) -> str:
+    """Strip a trailing YAML-style inline ``# comment``.
+
+    A comment starts with whitespace + ``#`` and either ends the line
+    immediately OR is followed by whitespace + the comment text. A ``#``
+    glued to a value with no leading whitespace stays intact, and a
+    ``#`` immediately followed by a non-space token (e.g. ``Honest #1``
+    or ``id: WP-#1``) stays intact — only YAML-form comments are stripped.
+    """
+    return _FM_INLINE_COMMENT_RE.sub("", s).rstrip()
+
+
 def parse_frontmatter(text: str) -> tuple[dict[str, str | list[str]], str]:
     """Parse a Markdown file's YAML-like frontmatter.
 
@@ -197,6 +226,9 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str | list[str]], str]:
         - item1
         - item2
       key: [a, b, c]      (inline list)
+
+    Snake-case `depends_on` and `depends-on` alias to `dependsOn` (#104).
+    Trailing inline `# comment`s are stripped from values + list items.
 
     Returns (frontmatter_dict, body_after_frontmatter).
     """
@@ -212,8 +244,8 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str | list[str]], str]:
         if not line or line.startswith("#"):
             continue
         if current_list_key is not None and line.startswith("  - "):
-            # Continue list
-            item = line[4:].strip().strip("'\"")
+            # Continue list — strip inline comment before unquoting.
+            item = _strip_frontmatter_inline_comment(line[4:]).strip().strip("'\"")
             assert isinstance(fm[current_list_key], list)
             fm[current_list_key].append(item)  # type: ignore[union-attr]
             continue
@@ -222,16 +254,20 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str | list[str]], str]:
         if ":" not in line:
             continue
         key, _, rest = line.partition(":")
-        key = key.strip()
-        rest = rest.strip()
+        key = _alias_frontmatter_key(key.strip())
+        rest = _strip_frontmatter_inline_comment(rest.strip())
         if rest == "":
             # Start of a list
             fm[key] = []
             current_list_key = key
         elif rest.startswith("[") and rest.endswith("]"):
-            # Inline list
+            # Inline list — strip per-item inline comments too.
             inner = rest[1:-1]
-            items = [i.strip().strip("'\"") for i in inner.split(",") if i.strip()]
+            items = [
+                _strip_frontmatter_inline_comment(i).strip().strip("'\"")
+                for i in inner.split(",")
+                if i.strip()
+            ]
             fm[key] = items
         else:
             # Scalar
@@ -493,6 +529,79 @@ def visual_contract_signed_off(fm: dict) -> str | None:
             f"visual contract provenance is {provenance!r}, not "
             f"'production-approved' — sign-off means the founder approved the "
             f"rendered mockup, not just that token values matched (UXD-13/L-13)."
+        )
+    return None
+
+
+# ─── Interaction-flow gate (CH-01KT9H / ADR-001) ────────────────────────────
+#
+# Sibling of the visual-contract gate above. Same two seams (recognition
+# predicate + runtime done-gate predicate), reused verbatim in shape. The one
+# genuinely-new contract is the evidence frontmatter (ADR-001): an interaction
+# contract carries TWO valid evidence sources (agent-observed | human-attested)
+# rather than the visual gate's single `production-approved` track, so the
+# controlled token compares against a frozenset of two rather than a literal —
+# the only structural difference from `visual_contract_signed_off`. The token
+# set and the messages differ, so no helper is force-extracted (Boy-Scout-
+# scoped non-extraction; the two predicates stay legible side-by-side).
+
+
+def is_interaction_contract_wp(fm: dict) -> bool:
+    """True if a WP's frontmatter marks it as the interaction-contract WP
+    (``kind: contract`` + ``contract_type: interaction``). Sibling of
+    :func:`is_visual_contract_wp`."""
+    return (
+        str(fm.get("kind", "")).strip().lower() == "contract"
+        and str(fm.get("contract_type", "")).strip().lower() == "interaction"
+    )
+
+
+# The two valid evidence sources for an exercised interaction flow (ADR-001).
+_INTERACTION_EVIDENCE_SOURCES: frozenset[str] = frozenset(
+    {"agent-observed", "human-attested"}
+)
+
+
+def interaction_flow_exercised(fm: dict) -> str | None:
+    """Return None if an interaction-contract WP's frontmatter shows its flow
+    was exercised end-to-end over stub adapters, else a founder-readable error
+    (the runtime half of the CH-01KT9H gate, wired at the interaction-contract
+    WP's done-transition). Mirrors :func:`visual_contract_signed_off`.
+
+    Exercised = (ADR-001) a non-empty ``exercised_at`` timestamp AND
+    ``exercised_by`` ∈ {``agent-observed``, ``human-attested``}
+    (case-insensitive) AND a non-empty ``exercised_attestation``. Requiring the
+    attestation keeps the evidence falsifiable — a bare timestamp with no record
+    of *who/what* exercised the flow must NOT satisfy the gate. The gate trusts
+    the record and does not re-run the flow (ADR-003).
+    """
+    exercised_at = str(fm.get("exercised_at", "") or "").strip()
+    exercised_by = str(fm.get("exercised_by", "") or "").strip().lower()
+    attestation = str(fm.get("exercised_attestation", "") or "").strip()
+    if not exercised_at:
+        return (
+            "interaction flow not exercised — `exercised_at` is empty. The flow "
+            "must be exercised end-to-end over stub adapters before this "
+            "contract WP can reach `done` (CH-01KT9H / ADR-001)."
+        )
+    if not exercised_by:
+        return (
+            "interaction flow not exercised — `exercised_by` is empty. Record "
+            "the evidence source: `agent-observed` or `human-attested` "
+            "(ADR-001)."
+        )
+    if exercised_by not in _INTERACTION_EVIDENCE_SOURCES:
+        return (
+            f"interaction `exercised_by` is {exercised_by!r}, not a valid "
+            f"evidence source — must be `agent-observed` or `human-attested` "
+            f"(ADR-001)."
+        )
+    if not attestation:
+        return (
+            "interaction flow not exercised — `exercised_attestation` is empty. "
+            "Name who/what exercised the flow (an agent run points at its "
+            "transcript; a human names themselves), so the evidence is "
+            "falsifiable (ADR-001)."
         )
     return None
 
@@ -1216,7 +1325,7 @@ def _gh_ref_sha(repo: str, ref: str,
     return _resolve_gh(gh).ref_sha(repo, ref)
 
 
-def _gh_branch_already_merged(repo: str, branch: str, base: str = "dev",
+def _gh_branch_already_merged(repo: str, branch: str, base: str = "main",
                               *, gh: GHClient | None = None) -> tuple[bool, str]:
     """Check whether `branch` is already fully merged into `base`.
 
@@ -1357,7 +1466,7 @@ def _poll_ci(repo: str, branch: str, interval: int, cap: int) -> str:
 
 def _rebase_on_dev(repo: str, branch: str, worktree: Path,
                    dev_sha_at_creation: str,
-                   base_branch: str = "dev") -> tuple[bool, str]:
+                   base_branch: str = "main") -> tuple[bool, str]:
     """If base_branch advanced past dev_sha_at_creation, rebase. Return (rebased, new_sha).
 
     `base_branch` parameterises the rebase target — defaults to "dev" for
@@ -1387,7 +1496,7 @@ def _rebase_on_dev(repo: str, branch: str, worktree: Path,
 
 
 def _merge_squash(repo: str, branch: str, wp: str,
-                  base_branch: str = "dev",
+                  base_branch: str = "main",
                   *, gh: GHClient | None = None) -> str:
     """Squash-merge branch into base_branch. Return merge SHA on base_branch.
 
@@ -1867,6 +1976,65 @@ def _branch_name(wp_id: str, slug: str) -> str:
     return f"feat/wp-{wp_id.lower().removeprefix('wp-')}-{slug}"
 
 
+# Matches a Step-7 trace Outcome that records the exact pushed branch, e.g.:
+#   "Pushed to feat/wp-002-dark-token-block at SHA abc1234 (commit: ...)"
+# Tolerant of casing ("Pushed"/"pushed") and the "to" being optional, so it
+# also catches "success — pushed feat/wp-5-... after rebase". The branch token
+# is the first ``feat/...`` run of non-whitespace following "push(ed)".
+_JOURNAL_PUSHED_BRANCH_RE = re.compile(
+    r"push(?:ed)?\s+(?:to\s+)?(feat/\S+)",
+    re.IGNORECASE,
+)
+
+
+def _journal_pushed_branch(wp_dir: Path, wp_id: str) -> str | None:
+    """Return the exact feat-branch the executor recorded pushing for ``wp_id``.
+
+    Reads the per-WP executor journal at ``wp_dir/.executor-{wp_id}.md`` and
+    parses the Step-7 trace row's Outcome cell for the canonical
+    ``Pushed to <branch> at SHA ...`` phrasing (see ``wpx-journal
+    complete-step --step 7``).
+
+    This is the authoritative source for which branch belongs to THIS change's
+    WP — unlike the ``feat/wp-NNN-*`` glob, which collides across changes when
+    WP numbers are recycled (#229).
+
+    Robust to a missing or malformed journal: any read/parse failure, or a
+    Step-7 row that doesn't name a ``feat/...`` branch, returns ``None`` so the
+    caller falls through to the literal → glob order.
+    """
+    journal = wp_dir / f".executor-{wp_id}.md"
+    try:
+        text = journal.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+    in_trace = False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("## "):
+            in_trace = line.lower().startswith("## step trace")
+            continue
+        if not in_trace or not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        # Step-trace rows are: | Step | Started | Completed | Outcome |
+        if len(cells) < 4:
+            continue
+        if cells[0] != "7":
+            continue
+        outcome = cells[3]
+        m = _JOURNAL_PUSHED_BRANCH_RE.search(outcome)
+        if m:
+            # Strip trailing punctuation the regex's \S+ may have swept up
+            # (e.g. a comma before "(commit: ...)").
+            return m.group(1).rstrip(".,;)")
+        # A Step-7 row exists but names no branch (blocked, in-flight, …) →
+        # treat as no record and fall through.
+        return None
+    return None
+
+
 def _gh_branch_exists(repo: str, branch: str,
                       *, gh: GHClient | None = None) -> bool:
     """True if origin/{branch} exists. Best-effort; returns False on gh error."""
@@ -1902,6 +2070,14 @@ def resolve_wp_branch(
 
     Resolution order:
 
+      0. **Journal-recorded branch (#229).** If the executor journal
+         (``wp_dir/.executor-NNN.md``) records an exact pushed branch in its
+         Step-7 trace AND that branch exists on origin, return it. This scopes
+         resolution to what THIS change's executor actually pushed, eliminating
+         the cross-change ambiguity that arises when WP numbers are recycled
+         (the glob below would otherwise match unrelated past changes' branches
+         and pick the wrong one by recency). A missing/malformed journal, or a
+         recorded branch no longer on origin, falls through to step 1.
       1. **Slug-literal match.** If ``feat/wp-NNN-<slug-from-file>`` exists
          on origin, return it. Byte-for-byte preservation of the
          historical happy path.
@@ -1923,6 +2099,23 @@ def resolve_wp_branch(
         # No WP file → caller already handles this case via its own
         # "no WP file found" branch. Return None to be consistent.
         return None
+
+    # Step 0 (#229): the executor journal is authoritative for this change's
+    # WP. Trust it over the recycled-number-prone glob, but only if the
+    # recorded branch still exists on origin (guards stale/deleted refs).
+    journal_branch = _journal_pushed_branch(wp_dir, wp_id)
+    if journal_branch is not None:
+        if gh is None:
+            present = _gh_branch_exists(repo, journal_branch)
+        else:
+            present = _gh_branch_exists(repo, journal_branch, gh=gh)
+        if present:
+            return journal_branch
+        _log(
+            f"resolve_wp_branch: {wp_id} — journal recorded "
+            f"'{journal_branch}' but it is not on origin; falling back to "
+            f"slug-literal / fuzzy match."
+        )
 
     literal = _branch_name(wp_id, slug)
     # Only forward ``gh`` when the caller explicitly supplied one; passing
@@ -2018,7 +2211,7 @@ def find_eligible_branches(
     strict_ci: bool = False,
     *,
     paths: "WpxPaths | None" = None,
-    base_branch: str = "dev",
+    base_branch: str = "main",
 ) -> list[EligibilityResult]:
     """Discover which WPs are eligible for the next train.
 
@@ -2365,7 +2558,7 @@ def rebase_branch_in_clone(
     clone_dir: Path,
     branch: str,
     onto: str,
-    base_branch: str = "dev",
+    base_branch: str = "main",
 ) -> str:
     """Within an existing clone: fetch, checkout, rebase, push --force-with-lease.
 
@@ -3288,7 +3481,7 @@ def compute_culprit_heuristic(
     return best_wp
 
 
-def is_sha_on_branch(repo: str, sha: str, branch: str = "dev",
+def is_sha_on_branch(repo: str, sha: str, branch: str = "main",
                      *, gh: GHClient | None = None) -> bool:
     """Check whether `sha` is reachable from origin/<branch>.
 
@@ -3460,7 +3653,7 @@ def compute_wp_status(
     wp_id: str,
     paths: "WpxPaths",
     repo: str,
-    base_branch: str = "dev",
+    base_branch: str = "main",
     *,
     gh: GHClient | None = None,
     stored_status: str | None = None,
@@ -3543,8 +3736,14 @@ def revert_train_on_dev(
     bundle: list[dict],
     reason: str,
     train_id: str,
+    base_branch: str = "main",
 ) -> tuple[bool, str]:
-    """Revert all merged WPs in the bundle in reverse order, push to dev.
+    """Revert all merged WPs in the bundle in reverse order, push to the trunk.
+
+    `base_branch` is the integration line the merges landed on (the trunk,
+    `main`, by default; pass the change branch when reverting a change-bounded
+    train). The function name keeps the historical `_on_dev` suffix for
+    call-site stability; the operation targets `base_branch`.
 
     Produces a single wrapper commit
     `revert(train-{ts}): rollback {WPs} — {reason}` on `dev`.
@@ -3556,15 +3755,15 @@ def revert_train_on_dev(
     if not merged:
         return True, "no merged WPs to revert"
 
-    # Checkout dev, fetch latest
-    rc, _, err = _run(["git", "fetch", "origin", "dev"], cwd=clone_dir,
+    # Checkout the trunk, fetch latest
+    rc, _, err = _run(["git", "fetch", "origin", base_branch], cwd=clone_dir,
                      timeout=60)
     if rc != 0:
-        return False, f"git fetch dev failed: {err}"
-    rc, _, err = _run(["git", "checkout", "-B", "dev", "origin/dev"],
+        return False, f"git fetch {base_branch} failed: {err}"
+    rc, _, err = _run(["git", "checkout", "-B", base_branch, f"origin/{base_branch}"],
                      cwd=clone_dir, timeout=30)
     if rc != 0:
-        return False, f"git checkout dev failed: {err}"
+        return False, f"git checkout {base_branch} failed: {err}"
 
     # Revert each merge SHA in reverse order; --no-commit to stage all
     # changes into a single wrapper commit
@@ -3586,10 +3785,10 @@ def revert_train_on_dev(
     rc, _, err = _run(["git", "commit", "-m", msg], cwd=clone_dir, timeout=30)
     if rc != 0:
         return False, f"git commit (revert wrapper) failed: {err}"
-    rc, _, err = _run(["git", "push", "origin", "dev"], cwd=clone_dir,
+    rc, _, err = _run(["git", "push", "origin", base_branch], cwd=clone_dir,
                      timeout=60)
     if rc != 0:
-        return False, f"git push dev (revert) failed: {err}"
+        return False, f"git push {base_branch} (revert) failed: {err}"
     return True, f"reverted {len(merged)} merges under wrapper commit"
 
 
@@ -3920,7 +4119,7 @@ def read_change_metadata(metadata_path: Path) -> dict:
 
 
 def git_worktree_add(repo_root: Path, branch: str, dest: Path,
-                     base_ref: str = "dev") -> tuple[bool, str]:
+                     base_ref: str = "main") -> tuple[bool, str]:
     """Create a worktree at `dest` for a new branch off `base_ref`.
 
     If the branch already exists, the worktree is added on the existing
@@ -3968,7 +4167,7 @@ def git_worktree_remove(repo_root: Path, dest: Path,
 
 
 def detect_adopt_state(repo_root: Path,
-                      remote_ref: str = "origin/dev") -> dict:
+                      remote_ref: str = "origin/main") -> dict:
     """Inspect the current repo state for `sulis-change adopt`.
 
     Returns a dict:
@@ -4570,15 +4769,20 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
 def back_integrate_change_branch(
     repo_root: Path,
     change_branch: str,
-    dev_ref: str = "origin/dev",
+    dev_ref: str = "origin/main",
     *,
     fetch_first: bool = True,
 ) -> dict:
     """Auto back-integration mechanic per CW-04 + lifecycle Step 0 / Step 12.5.
 
-    Runs `git fetch origin dev` (unless fetch_first=False) + checks whether
-    `dev_ref` is ancestor of the change branch HEAD; if not, runs
-    `git merge --no-edit origin/dev` to bring the change branch current.
+    Fetches the trunk (unless fetch_first=False) + checks whether ``dev_ref``
+    is an ancestor of the change branch HEAD; if not, runs ``git merge
+    --no-edit <dev_ref>`` to bring the change branch current. The ref to fetch
+    + merge is derived from the ``dev_ref`` parameter, which defaults to the
+    trunk (``origin/main``); e.g. with the default it runs ``git fetch origin
+    main`` + ``git merge origin/main``. (The parameter name is kept for
+    back-compatibility with existing callers — see #228; the repo retired the
+    dev branch in #177.)
 
     Per CW-04: merge-not-rebase (preserves commit SHAs so in-flight WP
     worktrees stay valid).
@@ -4681,4 +4885,104 @@ def back_integrate_change_branch(
         "change_branch": change_branch,
         "dev_ref": dev_ref,
         "error": stderr.strip() or "git merge returned non-zero with no conflict files",
+    }
+
+
+def ff_local_change_branch_from_origin(
+    repo_root: Path,
+    change_branch: str,
+    *,
+    fetch_first: bool = True,
+) -> dict:
+    """Fast-forward the change worktree's HEAD to `origin/<change_branch>`.
+
+    #141: after wpx-pipeline squash-merges a WP into the change branch via
+    the GitHub API, the squash commit lands on `origin/<change_branch>` but
+    the LOCAL change worktree (where the calling session and subsequent
+    agents read files from) is still at the pre-merge SHA. The next agent
+    (e.g. the Step 11 security-review) reads stale files and reports a false
+    "CANNOT REVIEW" verdict. Fast-forwarding the worktree here closes that
+    gap before any post-pipeline agent dispatches.
+
+    Caller MUST invoke this from inside the change worktree (HEAD ==
+    change branch).
+
+    Returns:
+    - {"status": "already_current", "change_branch": ...}
+    - {"status": "fast_forwarded", "change_branch": ..., "advanced_commits": N}
+    - {"status": "fetch_failed", "error": "..."}
+    - {"status": "ff_not_possible", "error": "..."}  # local diverged
+    - {"status": "internal_error", "error": "..."}
+
+    The caller is expected to handle each status:
+    - "already_current" / "fast_forwarded" → proceed
+    - "fetch_failed" / "ff_not_possible" → log + continue (defence in depth:
+      the next Step 0 will retry); the merge already landed on origin.
+    - "internal_error" → log + continue (same rationale).
+    """
+    repo_root = Path(repo_root).resolve()
+    origin_ref = f"origin/{change_branch}"
+
+    # Step 1: fetch the change branch from origin so the local tracking ref
+    # carries any merge commits pushed there since.
+    if fetch_first:
+        rc, _, stderr = _run(
+            ["git", "fetch", "origin", change_branch],
+            cwd=repo_root,
+            timeout=60,
+        )
+        if rc != 0:
+            return {
+                "status": "fetch_failed",
+                "change_branch": change_branch,
+                "error": stderr.strip() or "git fetch returned non-zero",
+            }
+
+    # Step 2: is origin/<change_branch> already an ancestor of HEAD? Then
+    # the local worktree is at or ahead of origin — nothing to do.
+    rc, _, _ = _run(
+        ["git", "merge-base", "--is-ancestor", origin_ref, "HEAD"],
+        cwd=repo_root,
+        timeout=10,
+    )
+    if rc == 0:
+        return {
+            "status": "already_current",
+            "change_branch": change_branch,
+        }
+
+    # Step 3: count how many commits we're about to advance (informational).
+    rc_count, count_out, _ = _run(
+        ["git", "rev-list", "--count", f"HEAD..{origin_ref}"],
+        cwd=repo_root,
+        timeout=10,
+    )
+    advanced_commits = (
+        int(count_out.strip())
+        if rc_count == 0 and count_out.strip().isdigit()
+        else 0
+    )
+
+    # Step 4: fast-forward. --ff-only refuses to create a merge commit, so
+    # local divergence is surfaced explicitly rather than silently merged.
+    rc, _, stderr = _run(
+        ["git", "merge", "--ff-only", origin_ref],
+        cwd=repo_root,
+        timeout=60,
+    )
+    if rc == 0:
+        return {
+            "status": "fast_forwarded",
+            "change_branch": change_branch,
+            "advanced_commits": advanced_commits,
+        }
+
+    # Step 5: --ff-only refused → local has diverged from origin.
+    return {
+        "status": "ff_not_possible",
+        "change_branch": change_branch,
+        "error": (
+            stderr.strip()
+            or "git merge --ff-only refused; local change branch has diverged"
+        ),
     }

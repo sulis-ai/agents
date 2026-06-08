@@ -115,6 +115,47 @@ where you hand off: write the push outcome to the journal via
 at SHA ..."`, then return cleanly. The journal is the calling
 session's read-only contract.
 
+### Step 7 — stamp the autonomous origin before you commit (ADR-013)
+
+Before running `git commit` at Step 7, export `SULIS_ORIGIN` so the
+already-wired `prepare-commit-msg` hook stamps a `Sulis-Origin:
+autonomous; run=<lifecyclerun-ulid>` trailer onto the commit you are
+making. The launcher already installs the hook for the executor
+session (`_terminal_launcher.py` `enable_origin_hook`); the hook is a
+no-op until this env is set. Build the env from the helper rather than
+hand-formatting the trailer:
+
+```bash
+python3 - <<'PY'
+import os, sys
+sys.path.insert(0, "plugins/sulis/scripts")
+from _origin_stamp import autonomous_env
+# run-ulid is the CURRENT lifecyclerun's ulid (per-run, NOT per-terminal):
+# read it from the run context the orchestrator set for this dispatch.
+run = os.environ.get("SULIS_LIFECYCLERUN_ULID", "")
+env = autonomous_env(run=run, confidence=None)  # confidence omitted by design
+for k, v in env.items():
+    print(f"export {k}={v!r}")
+PY
+```
+
+Key points (do not deviate):
+
+- **Export at COMMIT time, not launch time.** The run-ulid is
+  per-lifecyclerun; one launched terminal serves many runs, so a static
+  launch-script export would mis-attribute. Set `SULIS_ORIGIN` in the
+  environment of the `git commit` you run at Step 7.
+- **`confidence` is OPTIONAL — omit it.** There is no real per-run
+  confidence scalar at the executor, so pass `confidence=None` and let
+  the body be `run=`-only. Do NOT invent a value.
+- **Non-fatal (MUST).** If the run-ulid is missing/empty,
+  `autonomous_env` returns `{}` — nothing is exported and the commit
+  lands unstamped (origin degrades to inferred). Never abort the commit
+  to chase a stamp.
+- **No second formatter.** `autonomous_env` reuses `autonomous_origin`
+  + `format_trailer`; the body is the exact bare-body grammar the
+  hook's `parse_origin_env` accepts.
+
 Each step that can fail runs OODA + Five Whys + scope guard + budget
 per `executor-loop-standard.md`. The worktree is cleaned up at Step
 12 by the calling session via `wpx-worktree remove` (called by

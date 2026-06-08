@@ -1,5 +1,21 @@
 """SRD → Requirement-entity transformation + persistence helper.
 
+Two compose paths share this module:
+
+  - `compose_requirements_from_srd` — the document path: parses an SRD's
+    `**FR-NN: ...**` markers into N Requirement dicts (described below).
+  - `compose_requirement_from_idea` — the single-idea path (ADR-005): one
+    Requirement dict built from explicit conversation fields, sourced from a
+    **real** Opportunity ref the caller already emitted. This closes the
+    synthetic-placeholder loop note (3) below documents: the from-idea path
+    never synthesises a source, so it raises `ValueError` rather than emit a
+    dangling/synthetic ref (the code-level "no orphan requirements" gate).
+
+Both produce the same Requirement dict shape (same vendored schema) and reuse
+the `_deterministic_ulid_from` + `_flatten` helpers unchanged; the from-idea
+path uses a distinct id namespace (`requirement-from-idea:{seed}`) so the two
+never collide on the same seed string.
+
 Second worked entity emission (n=2 toward generalising the entity-emitter
 skill). Pairs with `_decision_emission.py` (n=1 from CH-01KSWB). The shape
 diverges in three interesting ways that inform the generalised skill:
@@ -43,10 +59,16 @@ from _entity_repository import EntityRepository
 # Crockford base32 — same alphabet as ULID; no I/L/O/U.
 _CROCKFORD_ALPHABET: Final[str] = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
-# `**FR-NN: Title**` or `**NFR-NN: Title**` on a line of its own. The title
-# captures up to the closing `**` (greedy across the rest of the line).
+# `**FR-NN: Title**` / `**FR-NN — Title**` heading (or NFR-NN). Reconciled
+# from two fixes that must both hold:
+#  - #170 — the closing `**` terminates the heading; inline body MAY follow
+#    it (`**FR-NN: Title.** body`), so there is NO trailing end-anchor (the
+#    old `\s*$` silently dropped every inline-body heading).
+#  - CH-01KT50 — the separator may be a colon, em-dash, en-dash, or hyphen
+#    (the requirements house style uses ` — `), and the id allows an optional
+#    leading `N` for the negative-requirement scheme (FR-N1).
 _FR_HEADER_RE: Final = re.compile(
-    r"^\*\*((?:FR|NFR)-\d+(?:\.\d+)?):\s*(.+?)\*\*\s*$",
+    r"^\*\*((?:FR|NFR)-N?\d+(?:\.\d+)?)\s*[:—–-]\s*(.+?)\*\*",
     re.MULTILINE,
 )
 
@@ -62,6 +84,15 @@ _SECTION_HEADING_RE: Final = re.compile(r"^#{2,5}\s+\S", re.MULTILINE)
 _ACCEPTANCE_MARKER_RE: Final = re.compile(
     r"^\*\*Acceptance criteria:\*\*\s*", re.MULTILINE
 )
+
+# A well-formed Opportunity reference: `dna:opportunity:` + a 26-char
+# Crockford-base32 ULID (no I/L/O/U). This is the *load-bearing* gate of the
+# single-idea path (ADR-005): a Requirement composed from an idea MUST trace to
+# a real Opportunity the orchestrator just emitted — never a synthetic
+# placeholder, never a dangling ref. It is deliberately tighter than the
+# schema's `source` pattern (which also admits `dna:actor:`): the from-idea
+# path only ever sources from an Opportunity.
+_OPPORTUNITY_REF_RE: Final = re.compile(r"^dna:opportunity:[0-9A-HJKMNP-TV-Z]{26}$")
 
 
 # ─── id derivation ────────────────────────────────────────────────────────
@@ -201,6 +232,77 @@ def compose_requirements_from_srd(
         })
 
     return requirements
+
+
+def compose_requirement_from_idea(
+    *,
+    statement: str,
+    source: str,
+    seed: str,
+    priority: str = "must",
+    acceptance_criteria: list[str] | None = None,
+) -> dict:
+    """Pure transform: single idea fields → one Requirement entity dict. No I/O.
+
+    The single-idea sibling of `compose_requirements_from_srd` (ADR-005).
+    Capture has no document to parse — it has a what-string typed in
+    conversation and a *real* Opportunity ref the orchestrator just emitted.
+    This produces the same Requirement dict shape the from-SRD path produces
+    (validates against the same vendored `requirement.schema.json`), but from
+    explicit fields rather than parsed markers.
+
+    Args:
+        statement: the requirement text (the "what").
+        source: a `dna:opportunity:<ulid>` reference — REAL, never synthetic.
+            The caller (the capture orchestrator) supplies an Opportunity id it
+            just emitted. Passed through verbatim.
+        seed: a stable seed string → deterministic ULID (NFR-04). Same seed ⇒
+            same id ⇒ re-capturing overwrites in place rather than duplicating.
+        priority: MoSCoW priority; defaults to ``"must"``.
+        acceptance_criteria: optional list; ``None`` ⇒ a single honest
+            placeholder criterion (the schema requires ``minItems: 1``).
+
+    Returns:
+        A Requirement entity dict. The ``id`` is
+        ``dna:requirement:`` + ``_deterministic_ulid_from("requirement-from-idea:" + seed)``
+        — a distinct namespace from the from-SRD path so the two never collide
+        on the same seed string. ``state`` defaults to ``"draft"``
+        (captured-and-set-aside lives as a draft).
+
+    Raises:
+        ValueError: if ``source`` is not a well-formed
+            ``dna:opportunity:<ulid>`` reference. This is the code-level
+            enforcement of "no orphan requirements": the function refuses to
+            emit a Requirement with a dangling or synthetic source (ADR-005,
+            ADR-003). Fail loud — never compose a Requirement that can't trace
+            to a real Opportunity.
+    """
+    if not _OPPORTUNITY_REF_RE.match(source):
+        raise ValueError(
+            "compose_requirement_from_idea: `source` must be a real "
+            "Opportunity reference matching "
+            "'dna:opportunity:<26-char-ULID>' (ADR-005: no orphan "
+            f"requirements); got {source!r}. The caller must pass the id of "
+            "an Opportunity it has already emitted — never a synthetic "
+            "placeholder."
+        )
+
+    req_ulid = _deterministic_ulid_from(f"requirement-from-idea:{seed}")
+
+    return {
+        "id": f"dna:requirement:{req_ulid}",
+        "statement": _flatten(statement),
+        "priority": priority,
+        "source": source,
+        "verification_method": "test",
+        "acceptance_criteria": (
+            acceptance_criteria
+            if acceptance_criteria
+            else ["captured from idea; acceptance criteria to be elaborated"]
+        ),
+        "state": "draft",
+        "sys_status": "active",
+    }
 
 
 def emit_requirements_from_srd(

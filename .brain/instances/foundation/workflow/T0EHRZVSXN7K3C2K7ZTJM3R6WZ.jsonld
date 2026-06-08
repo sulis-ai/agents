@@ -1,0 +1,21 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:T0EHRZVSXN7K3C2K7ZTJM3R6WZ",
+  "initial_steps": [
+    "z624c1zy-ask-the-chat-what-s-in-flight-or-where-a-1"
+  ],
+  "name": "Ask the concierge about your world",
+  "state": "draft",
+  "steps": [
+    "z624c1zy-ask-the-chat-what-s-in-flight-or-where-a-1"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "z624c1zy-ask-the-chat-what-s-in-flight-or-where-a-1"
+  ],
+  "transitions": [
+    "z624c1zy-ask-the-chat-what-s-in-flight-or-where-a-1 -> end"
+  ],
+  "type": "review"
+}

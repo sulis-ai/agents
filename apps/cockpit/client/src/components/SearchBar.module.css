@@ -1,0 +1,94 @@
+/* WP-007 — board toolbar (search + filters) styles.
+ *
+ * Matches the SIGNED visual contract (sulis-app.html, toolbar panel):
+ * a flexible content-search box + neutral filter chips. Consumes
+ * tokens.css only — no raw hex. The contract's token names (--bg-card,
+ * --input, --ring, --text, --text-muted, --radius, --font) map to the
+ * app's resolved tokens (--card, --input, --ring, --foreground,
+ * --muted-foreground, --radius-container, --font-sans). Active chips take
+ * the neutral-inverse state (muted bg + darker text), never a brand fill,
+ * per the contract. */
+
+.toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.search {
+  flex: 1;
+  min-width: 240px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--card);
+  border: 1px solid var(--input);
+  border-radius: var(--radius-container);
+  padding: 10px 12px;
+}
+.search:focus-within {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 22%, transparent);
+}
+
+.searchIcon {
+  width: 15px;
+  height: 15px;
+  color: var(--muted-foreground);
+  flex: none;
+}
+
+.input {
+  border: 0;
+  outline: 0;
+  flex: 1;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  background: transparent;
+  color: var(--foreground);
+}
+.input::placeholder {
+  color: var(--muted-foreground);
+}
+/* hide the native search clear affordance — the box is controlled and
+ * clearing happens by deleting the text (the board restores on empty). */
+.input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.hint {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border-radius: var(--radius-container);
+  border: 1px solid var(--border);
+  background: var(--card);
+  font-size: 12px;
+  font-weight: var(--weight-label);
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+.chip svg {
+  width: 13px;
+  height: 13px;
+}
+.chip:hover {
+  background: var(--muted);
+}
+/* active = neutral inverse (muted bg + matching border + darker text),
+ * never a brand fill (the contract's chip-active state). */
+.chip.on {
+  background: var(--muted);
+  border-color: var(--input);
+  color: var(--foreground);
+}

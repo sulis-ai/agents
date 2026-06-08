@@ -14,6 +14,7 @@ from _testresult_emission import compose_testresult, emit_testresult
 _RUN = "dna:testrun:01ABCDEFGHJKMNPQRSTVWXYZ12"
 _R1 = "dna:requirement:01BCDEFGHJKMNPQRSTVWXYZ123"
 _R2 = "dna:requirement:01CDEFGHJKMNPQRSTVWXYZ1234"
+_SCEN = "dna:scenario:01ABCDEFGHJKMNPQRSTVWXYZ12"
 
 
 class TestComposeTestResult:
@@ -41,6 +42,20 @@ class TestComposeTestResult:
         # outcome doesn't bind ID — same (run, requirements, type) is the same result-record
         assert a["id"] == b["id"]
         assert a["outcome"] != b["outcome"]
+
+    def test_with_scenario_sets_scenario(self) -> None:
+        r = compose_testresult(
+            of_run=_RUN, verifies=[_R1], type="e2e", outcome="pass",
+            scenario=_SCEN,
+        )
+        assert r["scenario"] == _SCEN
+
+    def test_invalid_scenario_raises(self) -> None:
+        with pytest.raises(ValueError, match="scenario"):
+            compose_testresult(
+                of_run=_RUN, verifies=[_R1], type="e2e", outcome="pass",
+                scenario="not-a-scenario",
+            )
 
     def test_invalid_run_raises(self) -> None:
         with pytest.raises(ValueError, match="of_run"):

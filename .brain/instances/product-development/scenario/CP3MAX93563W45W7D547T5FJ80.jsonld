@@ -1,0 +1,13 @@
+{
+  "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+  "id": "dna:scenario:CP3MAX93563W45W7D547T5FJ80",
+  "journey": "dna:workflow:FDWB5Z2AZFHJ3WAZARDH2FS1DY",
+  "name": "Find a change",
+  "state": "draft",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:QEVAS9866MZ1Y9EDYVAX69F8EZ",
+    "dna:requirement:TA6RYW9W28TDV7PQKW233NDPC5",
+    "dna:requirement:2CDHZE8EW4B5Z89BABZDK87F83"
+  ]
+}

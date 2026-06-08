@@ -33,6 +33,39 @@ function record(overrides: Partial<ChangeStoreRecord> = {}): ChangeStoreRecord {
   };
 }
 
+describe("GET /api/changes — active-Product scope (WP-003, trivial single-Product)", () => {
+  it("returns the active Product's change set; the trivial single-Product case returns all, shape unchanged (FR-37 trivial)", async () => {
+    // The single-Product Tenant is the trivial case: one Product, implicitly
+    // active → the board receives every change. This pins the seam-owns-scope
+    // behaviour (ADR-009) without the full productScope roll-up (WP-008): the
+    // route returns the same shape it always did, scoped through the helper.
+    const reader = new FakeChangeStoreReader([
+      record({ changeId: "01AAA", handle: "CH-01AAA", createdAt: "2026-05-10T00:00:00Z" }),
+      record({ changeId: "01BBB", handle: "CH-01BBB", createdAt: "2026-05-01T00:00:00Z" }),
+    ]);
+    const tmpState = await mkdtemp(join(tmpdir(), "cockpit-state-"));
+    try {
+      const app = createApp({
+        changeStore: reader,
+        sulisStateDir: tmpState,
+        claudeProjectsDir: "/tmp/never-used-here",
+      });
+      const res = await request(app).get("/api/changes");
+      expect(res.status).toBe(200);
+      const body = res.body as Array<{ changeId: string; stage: string; liveness: { status: string } }>;
+      // Trivial scope: every change in the store is the active Product's.
+      expect(body.map((r) => r.changeId).sort()).toEqual(["01AAA", "01BBB"]);
+      // Shape unchanged: the same enriched Change rows (stage + liveness present).
+      for (const row of body) {
+        expect(typeof row.stage).toBe("string");
+        expect(typeof row.liveness.status).toBe("string");
+      }
+    } finally {
+      await rm(tmpState, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("GET /api/changes", () => {
   it("returns the change list with liveness shape attached to each row", async () => {
     const reader = new FakeChangeStoreReader([

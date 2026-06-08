@@ -1,0 +1,39 @@
+{
+  "pr": "feat/wp-006-sulis-capture-cli",
+  "base": "change/create-brain-backlog-and-traversal",
+  "scope": {
+    "commit_type_spread": ["feat"],
+    "module_fan_out": 1,
+    "severity": "none",
+    "note": "Single top-level dir: plugins/sulis/scripts. Single feat WP."
+  },
+  "size": {
+    "lines_added": 472,
+    "lines_removed": 0,
+    "total": 472,
+    "files_changed": 2,
+    "generated_ratio": 0.0,
+    "lock_file_ratio": 0.0,
+    "severity": "low",
+    "note": "Two new files: a 192-line CLI + a 280-line integration test. Above the 200-line single-reader threshold but only 2 files, both brand-new and single-purpose."
+  },
+  "safety": {
+    "migration_count": 0,
+    "schema_idl_count": 0,
+    "infra_files": 0,
+    "secret_pattern_hits": 0,
+    "severity": "none"
+  },
+  "completeness": {
+    "new_source_without_test": 0,
+    "api_change_without_schema": false,
+    "severity": "none",
+    "note": "CLI ships with 7 integration tests covering happy path, why-first gate, idempotence, roadmap sidecar, brain-unavailable, envelope shape, and missing-contract degradation."
+  },
+  "build_verification": {
+    "ruff": "pass",
+    "compileall": "pass",
+    "pr_introduced_errors": 0
+  },
+  "verdict": "PASS"
+}

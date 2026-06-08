@@ -1,0 +1,24 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:FDWB5Z2AZFHJ3WAZARDH2FS1DY",
+  "initial_steps": [
+    "mcb8vdsg-type-a-word-into-search-that-appears-ins-1"
+  ],
+  "name": "Find a change",
+  "state": "draft",
+  "steps": [
+    "mcb8vdsg-type-a-word-into-search-that-appears-ins-1",
+    "mcb8vdsg-apply-the-stage-filter-2",
+    "mcb8vdsg-apply-the-needs-attention-filter-3"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "mcb8vdsg-apply-the-needs-attention-filter-3"
+  ],
+  "transitions": [
+    "mcb8vdsg-type-a-word-into-search-that-appears-ins-1 -> mcb8vdsg-apply-the-stage-filter-2",
+    "mcb8vdsg-apply-the-stage-filter-2 -> mcb8vdsg-apply-the-needs-attention-filter-3"
+  ],
+  "type": "review"
+}

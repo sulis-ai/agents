@@ -1,0 +1,13 @@
+{
+  "acceptance_criteria": [
+    "see SRD body"
+  ],
+  "id": "dna:requirement:WYR8SKRZEZTG0VZ7TRNTTV2PYX",
+  "priority": "must",
+  "rationale": "Extracted from FR-25 of /Users/iain/.sulis/changes/01KT500K2JTE2EGW6TPPQ4D4VN/worktree/.specifications/autonomous-delivery-environment/SRD.md. The `source` ref is a synthetic Opportunity placeholder generated from the SRD path; replace when Opportunity emission lands (queued follow-on slice). Defaults applied for SRD-absent fields: priority=must, verification_method=test, state=draft.",
+  "source": "dna:opportunity:BG8E0H5JPPWEK3G3B26T3H087A",
+  "state": "draft",
+  "statement": "Never had a session: spawn fresh, grounded in the change's saved context. When the founder sends a message to a change that has **never had a session**, the server SHALL spawn a fresh session that is grounded in the change's saved context (CONTEXT.md / change manifest / stage / prior decisions) so the agent re-reads the change before acting, and SHALL then deliver the message. The founder SHALL NOT be asked to choose. - *Acceptance:* Given a change with no session history but saved context, sending a message spawns a session that re-reads the change's context before its first action, and delivers the message \u2014 with no prompt shown to the founder",
+  "sys_status": "active",
+  "verification_method": "test"
+}

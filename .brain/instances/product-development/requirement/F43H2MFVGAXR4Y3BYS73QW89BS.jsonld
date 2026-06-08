@@ -1,0 +1,13 @@
+{
+  "acceptance_criteria": [
+    "see SRD body"
+  ],
+  "id": "dna:requirement:F43H2MFVGAXR4Y3BYS73QW89BS",
+  "priority": "must",
+  "rationale": "Extracted from FR-30 of /Users/iain/.sulis/changes/01KT500K2JTE2EGW6TPPQ4D4VN/worktree/.specifications/autonomous-delivery-environment/SRD.md. The `source` ref is a synthetic Opportunity placeholder generated from the SRD path; replace when Opportunity emission lands (queued follow-on slice). Defaults applied for SRD-absent fields: priority=must, verification_method=test, state=draft.",
+  "source": "dna:opportunity:BG8E0H5JPPWEK3G3B26T3H087A",
+  "state": "draft",
+  "statement": "Local-first: the Project's repo must be reachable, else clone first (or fail clearly). Before starting a change, the app SHALL ensure the chosen Project's repo is reachable on the machine. If it is **absent**, the app SHALL **clone it from `Project.source.repo`** first; if the clone fails, the app SHALL show a clear, plain-English failure and SHALL NOT start the change. - *Acceptance:* Given a Project whose repo is not present locally, starting a change first clones from `Project.source.repo` and then starts; given a clone that fails, the founder sees a visible failure and **no** change is started",
+  "sys_status": "active",
+  "verification_method": "test"
+}

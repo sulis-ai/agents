@@ -1,0 +1,15 @@
+{
+  "pr": "feat/wp-010-end-to-end-round-trip",
+  "base": "change/extend-interactive-terminal-sessions",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "scope": { "commit_type_spread": ["test", "feat"], "module_fan_out": 3, "severity": "low" },
+  "size": { "lines_added": 141, "tracked_files": 7, "new_source_files": 9, "new_loc": 1209, "severity": "medium", "note": "mostly new e2e harness + one backend test; cohesive single concern (the WP-010 integration proof)" },
+  "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none" },
+  "completeness": { "new_source_without_test": 0, "tests_included": ["plugins/sulis/scripts/tests/integration/test_terminal_lifecycle.py", "apps/cockpit/e2e/live-terminal.spec.ts"], "severity": "none", "note": "this IS the test WP (primitive: test); the deliverables are the tests" },
+  "lenses": {
+    "architecture": { "in_changes": 1, "in_neighbours": 0 },
+    "security": { "in_changes": 0, "in_neighbours": 0 },
+    "quality": { "in_changes": 2, "in_neighbours": 0 }
+  },
+  "verdict": "Approve with fixes"
+}

@@ -1,0 +1,99 @@
+/* WP-003 — StageColumn styles.
+ *
+ * Matches the SIGNED visual contract (sulis-app.html, board panel): a
+ * neutral column on --muted with a hairline border, a header row with the
+ * stage-colour dot + uppercase name + a count pill, and a vertical card
+ * list. Colour appears ONLY on the stage dot (the board's one colour,
+ * ADR-005); everything else is neutral. Consumes tokens.css only — no raw
+ * hex. The dot draws on the shared --stage-* scale (one palette, no
+ * parallel set). */
+
+.col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* The list scrolls within the column rather than every card cramming into
+   * one viewport (matches the SIGNED contract's calm board: columns scroll,
+   * the board doesn't sprawl). */
+  max-height: 560px;
+  background: var(--muted);
+  border: 1px solid var(--border-muted);
+  /* a quiet 2px top hairline gives each column a calm "header band" edge,
+   * exactly as the signed board panel (.col border-top:2px solid border). */
+  border-top: 2px solid var(--border);
+  border-radius: var(--radius-container);
+}
+
+.colhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sdot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+  /* Neutral fallback; each stage class overrides with its shared token. */
+  background: var(--muted-foreground);
+}
+
+.colname {
+  flex: 1;
+  font-size: 11px;
+  font-weight: var(--weight-label);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  /* secondary (not full-strength) text — the calm signed treatment: the
+   * column name is a quiet label, the dot carries the only colour. */
+  color: var(--muted-foreground);
+}
+
+.colcount {
+  font-size: 11px;
+  font-weight: var(--weight-label);
+  color: var(--muted-foreground);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-badge);
+  padding: 1px 8px;
+}
+
+.collist {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.colEmpty {
+  margin: 0;
+  padding: 20px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+/* Per-stage dot colour — the one shared stage scale (tokens.css). */
+.recon .sdot {
+  background: var(--stage-recon);
+}
+.specify .sdot {
+  background: var(--stage-specify);
+}
+.design .sdot {
+  background: var(--stage-design);
+}
+.implement .sdot {
+  background: var(--stage-implement);
+}
+.review .sdot {
+  background: var(--stage-review);
+}
+.ship .sdot {
+  background: var(--stage-ship);
+}

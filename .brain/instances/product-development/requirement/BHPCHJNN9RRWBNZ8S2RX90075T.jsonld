@@ -1,0 +1,13 @@
+{
+  "acceptance_criteria": [
+    "see SRD body"
+  ],
+  "id": "dna:requirement:BHPCHJNN9RRWBNZ8S2RX90075T",
+  "priority": "must",
+  "rationale": "Extracted from FR-20 of /Users/iain/.sulis/changes/01KT500K2JTE2EGW6TPPQ4D4VN/worktree/.specifications/autonomous-delivery-environment/SRD.md. The `source` ref is a synthetic Opportunity placeholder generated from the SRD path; replace when Opportunity emission lands (queued follow-on slice). Defaults applied for SRD-absent fields: priority=must, verification_method=test, state=draft.",
+  "source": "dna:opportunity:BG8E0H5JPPWEK3G3B26T3H087A",
+  "state": "draft",
+  "statement": "One message in flight per change at a time. While a reply is streaming for a change, the app SHALL prevent a second message from being sent to that same change until the first completes or fails. - *Acceptance:* With a stream in progress, the send control for that change is disabled/refused; sending is possible again once the stream ends",
+  "sys_status": "active",
+  "verification_method": "test"
+}

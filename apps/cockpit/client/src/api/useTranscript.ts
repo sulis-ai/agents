@@ -5,14 +5,11 @@
 // owned by WP-013; this hook just supplies the array.
 
 import { useQuery } from "@tanstack/react-query";
-import type { TranscriptMessage } from "../../../shared/api-types";
-import { apiGet } from "./client";
+import { transcriptQuery } from "./viewQueries";
 
 export function useTranscript(changeId: string) {
   return useQuery({
-    queryKey: ["transcript", changeId],
-    queryFn: () =>
-      apiGet<TranscriptMessage[]>(`/api/changes/${changeId}/transcript`),
+    ...transcriptQuery(changeId),
     enabled: changeId.length > 0,
   });
 }

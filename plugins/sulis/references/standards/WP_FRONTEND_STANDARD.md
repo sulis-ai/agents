@@ -232,6 +232,33 @@ verify so local and CI agree.
 
 ---
 
+### WPF-15 — MCP-UI / AI-client surfaces (MCP App / Artifact) · MUST when building one
+
+When the frontend surface renders inside an **AI client** (Claude / Cowork /
+Desktop / mobile), the rendering path is chosen at design time (an ADR — see
+[`mcp-ui-surface-patterns.md`](../mcp-ui-surface-patterns.md)); building it has
+specific constraints the executor MUST honour:
+
+- **MCP App** (`ui://` bundled HTML in a **sandboxed iframe**): data flows over
+  the **`ui/` JSON-RPC-`postMessage`** channel — never direct network from the
+  iframe; declare every external asset origin in the **`_meta.ui.csp`** allowlist
+  (the sandbox CSP blocks un-allowlisted origins); camera/mic via
+  `_meta.ui.permissions`. Ship a **self-contained, framework-agnostic bundle**
+  (start from the official template).
+- **Artifact** (native `jsx`/`html`/…): **ephemeral + session-scoped; NO
+  `localStorage`/`sessionStorage`** (React artifacts). Don't build state that
+  must outlive the session into an Artifact — that's the signal it should be an
+  MCP App instead.
+- **Assume the iframe-HTML path** — MCP-UI `remoteDom` (host-native components)
+  is unconfirmed in Claude; don't depend on it.
+
+> **Anti-pattern:** an MCP-App component that `fetch`es directly from the iframe
+> (blocked by sandbox CSP) instead of routing through the `ui/` channel; or an
+> Artifact that writes to `localStorage` (silently unavailable) for state it
+> needs next session.
+
+---
+
 ## Verification gates (per `kind: frontend`)
 
 From `engineering-principles.md`'s verification-operationalisation mapping,

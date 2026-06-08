@@ -1,0 +1,13 @@
+{
+  "acceptance_criteria": [
+    "see SRD body"
+  ],
+  "id": "dna:requirement:WP1D55HXWYPQ0QE1JFSJ6R38AW",
+  "priority": "must",
+  "rationale": "Extracted from FR-01 of /Users/iain/.sulis/changes/01KT500K2JTE2EGW6TPPQ4D4VN/worktree/.specifications/autonomous-delivery-environment/SRD.md. The `source` ref is a synthetic Opportunity placeholder generated from the SRD path; replace when Opportunity emission lands (queued follow-on slice). Defaults applied for SRD-absent fields: priority=must, verification_method=test, state=draft.",
+  "source": "dna:opportunity:BG8E0H5JPPWEK3G3B26T3H087A",
+  "state": "draft",
+  "statement": "Board lists the active Product's in-flight changes as cards in stage columns. The app's landing view SHALL render every in-flight change **belonging to the active Product** (changes roll up Project \u2192 Product) as a card, arranged in columns where each column is one lifecycle stage in order: `recon`, `specify`, `design`, `implement`, `review`, `ship`. Changes belonging to other Products SHALL NOT appear. - *Acceptance:* Given Product A with three changes at stages `specify`, `design`, `ship`, and Product B with two changes, when Product A is active the board shows A's three cards (each in the column matching its stage, in left-to-right stage order) and **none** of B's changes",
+  "sys_status": "active",
+  "verification_method": "test"
+}

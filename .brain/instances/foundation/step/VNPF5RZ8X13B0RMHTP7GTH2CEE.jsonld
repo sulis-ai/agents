@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Ask the chat what's in flight or where a change is up to.",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:VNPF5RZ8X13B0RMHTP7GTH2CEE",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "z624c1zy-ask-the-chat-what-s-in-flight-or-where-a-1",
+  "output_artifacts": [
+    "z624c1zy-ask-the-chat-what-s-in-flight-or-where-a-1-result"
+  ],
+  "postconditions": [
+    "it answers from your changes and brain",
+    "nothing is changed \u2014 the answer is read-only"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

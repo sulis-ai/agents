@@ -3,10 +3,19 @@
 > Launcher mechanism (WP-001..WP-003 + WP-006). Not run in CI (CI has no
 > desktop). Run by hand on macOS and Linux.
 
+> **Default-on (CH-01KTK7).** A visible launch opens the change's terminal by
+> default — no environment flag is required. This is the sanctioned
+> change-start launcher (`sulis-change start --spawn`). The
+> `SULIS_TERMINAL_OS_WINDOW` flag remains only as an explicit override knob; it
+> does NOT gate the default-on behaviour. The in-cockpit live terminal (the
+> cockpit's Terminal tab) is a separate, browser-rendered capability — not a
+> replacement for popping a focused terminal here.
+
 ## Goal
 
-Confirm `launch_change_terminal(...)` opens a NEW terminal window, cd's to
-the worktree, exports `SULIS_CHANGE_ID`, and runs the entry command.
+Confirm a visible launch (`launch_change_terminal(..., visible=True)`) opens a
+NEW terminal window by default, cd's to the worktree, exports
+`SULIS_CHANGE_ID`, and runs the entry command.
 
 ## Pre-conditions
 
@@ -37,8 +46,9 @@ PY
   an int `pid`, and a `session_json_path`.
 - `cat ~/.sulis/changes/01HYQC71000000000000000000/launch.sh` shows the
   env-scrub line, the `export SULIS_CHANGE_ID=...` line, the `cd "/tmp"`
-  line, and the `exec claude --agent sulis "$(cat <<'SULIS_PROMPT_EOF' ...`
-  heredoc.
+  line, and an `exec ... "$(cat <sidecar>)"` line that reads the pre_prompt
+  from the `pre_prompt.txt` sidecar (#86 — the brief is delivered via a file,
+  never inline in the script).
 - In the new window: `echo $SULIS_CHANGE_ID` prints the ULID.
 
 ## Procedure (Linux)
@@ -51,5 +61,8 @@ Same script. Expected `terminal_app_used` is the first available of
 ## Fail signals
 
 - `status="failed"` with `unsupported platform` → not macOS/Linux.
-- The heredoc body shows `$HOME` expanded to a path → the tag was not
-  single-quoted (regression against ADR-003).
+- `status="failed"` with `no supported terminal app found` (Linux) → install
+  `gnome-terminal` / `konsole` / `xterm`, or pass `visible=False` for headless.
+- The pre_prompt body appears inline in `launch.sh` with `$HOME` expanded →
+  the brief was embedded instead of read from the sidecar (regression against
+  the #86 sidecar-delivery fix).

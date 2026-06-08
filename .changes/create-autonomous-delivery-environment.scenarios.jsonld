@@ -1,0 +1,844 @@
+{
+  "scenarios": [
+    {
+      "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+      "id": "dna:scenario:Y6Z1EJPF6GY1BAQ96WGA86TDHS",
+      "journey": "dna:workflow:7Q30CXS4H1A9F94G5SQE5W2ERY",
+      "name": "See everything in flight at a glance",
+      "state": "draft",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:WP1D55HXWYPQ0QE1JFSJ6R38AW",
+        "dna:requirement:XAGQS26PTRB6R219C72SX1J0YD",
+        "dna:requirement:HB1NP6C7TSBQ4HR0SG0PRBTAXR",
+        "dna:requirement:Y9KFTYBT08BGNVJ1PM7TTZ503A"
+      ]
+    },
+    {
+      "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+      "id": "dna:scenario:1PB20WWQY89W9GTE9HKS45YP06",
+      "journey": "dna:workflow:51BXJWZ8JY36K37E5TAJHW5D2D",
+      "name": "Understand where a change is",
+      "state": "draft",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:JETECCCV4TPZSST2XX25CCJMGE",
+        "dna:requirement:J6G3NF24ZSTZYMQ1FD3H06A3FD"
+      ]
+    },
+    {
+      "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+      "id": "dna:scenario:YY4RJ7JS8KT55BS61BD0ER3ZNF",
+      "journey": "dna:workflow:0B1EGDH1AVY64AK1BB9ARQQ80H",
+      "name": "Talk to the agent about a change",
+      "state": "draft",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:0KFX92DMZC7NMGR0A3CFS4JP6B",
+        "dna:requirement:RDPXSYKACKXGF786YVF03P3HCA",
+        "dna:requirement:XXAQEYE524J6JV7E0N7J6PXVP2",
+        "dna:requirement:WYR8SKRZEZTG0VZ7TRNTTV2PYX",
+        "dna:requirement:G6SRJSZWP73P65KS85WMKJHGXK"
+      ]
+    },
+    {
+      "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+      "id": "dna:scenario:CP3MAX93563W45W7D547T5FJ80",
+      "journey": "dna:workflow:FDWB5Z2AZFHJ3WAZARDH2FS1DY",
+      "name": "Find a change",
+      "state": "draft",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:QEVAS9866MZ1Y9EDYVAX69F8EZ",
+        "dna:requirement:TA6RYW9W28TDV7PQKW233NDPC5",
+        "dna:requirement:2CDHZE8EW4B5Z89BABZDK87F83"
+      ]
+    },
+    {
+      "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+      "id": "dna:scenario:00VX23T9WP4T6W7XXN39FMT6YH",
+      "journey": "dna:workflow:06YJEFE15P193JHGX1HK7NWP6S",
+      "name": "Read a document the way it's meant to be seen",
+      "state": "draft",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:M557CZC7VXSNMR17FZP4MDABGG",
+        "dna:requirement:0PATPS61NY26WW9DG8Q67VEAFE"
+      ]
+    },
+    {
+      "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+      "id": "dna:scenario:65JX0VABSE53NJJCVP8NQRTMXH",
+      "journey": "dna:workflow:K0CVH5547B0CCKC8V2BPB28WD2",
+      "name": "See what the agent has created",
+      "state": "draft",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:BH3DEVG3Y5C0MT95S252ZRC75B",
+        "dna:requirement:4CD6D4P1F75S5J8DWVY84AVA03"
+      ]
+    },
+    {
+      "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+      "id": "dna:scenario:G9V6QGPERX1Y3DWQ2BXJ201WW4",
+      "journey": "dna:workflow:7TY3701DKFDKYAJZ21YTYWTN52",
+      "name": "Set up a product just by talking",
+      "state": "draft",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:M4DSBEM3TFHN3J5JY12MZ52ZF1",
+        "dna:requirement:AYGSMRN96PT1G0RH1M3DQZP588",
+        "dna:requirement:QXFMGQTRP8QHE7BR82YFY8J7YK",
+        "dna:requirement:X0Z853C9A6ZCR25F5F2H86J8A0"
+      ]
+    },
+    {
+      "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+      "id": "dna:scenario:K97R26J92J912SWVAVWE2B5C17",
+      "journey": "dna:workflow:T25HR0BVH4TNP7BS5G9FBYHRZH",
+      "name": "Start work by saying what you want",
+      "state": "draft",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:KXMT8ZDKGPQHAS8HGF3031QSNP",
+        "dna:requirement:F43H2MFVGAXR4Y3BYS73QW89BS"
+      ]
+    },
+    {
+      "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+      "id": "dna:scenario:BXA4FVDX2CKBT3XNWB47PJFYQY",
+      "journey": "dna:workflow:T0EHRZVSXN7K3C2K7ZTJM3R6WZ",
+      "name": "Ask the concierge about your world",
+      "state": "draft",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:1YVQ922F7BM2WZDRZQP0MFN2NT",
+        "dna:requirement:NDVEVYDQAAPZ52NSQ0HS4Z5EAV"
+      ]
+    },
+    {
+      "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+      "id": "dna:scenario:9H2Z4JQMYRMS50659BKJRHZSX4",
+      "journey": "dna:workflow:5HGJZ641VKKGCFXSBQVG1Z6FQN",
+      "name": "An investigation becomes a change",
+      "state": "draft",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:NFZZQ0TG3ERDBNK5G0WBP5BYHP",
+        "dna:requirement:QBABG4P5FTXRVJBCNX2QTKGXXQ"
+      ]
+    },
+    {
+      "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+      "id": "dna:scenario:WWTP6MD7A19JS09Z2VSGQ848WY",
+      "journey": "dna:workflow:T4VDCCCR65XFPXHTNC2RWY5DCK",
+      "name": "Switch product and the board re-scopes",
+      "state": "draft",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:KSCHGX0DEVJTB874BCQRXW7KA8",
+        "dna:requirement:08QYK0Z87YGJZ7MWGVHMDZ7GQE"
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "agent_instructions": "Open Sulis on your machine and look at the landing board.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:K2S0RWATWFG0GNT2KR6MGY2660",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "67g38g9b-open-sulis-on-your-machine-and-look-at-t-1",
+      "output_artifacts": [
+        "67g38g9b-open-sulis-on-your-machine-and-look-at-t-1-result"
+      ],
+      "postconditions": [
+        "the board shows a column for each lifecycle stage",
+        "every in-flight change appears as a card in its current stage's column"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Look at any change's card on the board.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:2CQF8GDBEY24VF0RYYZNQ5DFW3",
+      "input_artifacts": [
+        "67g38g9b-open-sulis-on-your-machine-and-look-at-t-1-result"
+      ],
+      "mechanism": "human",
+      "name": "67g38g9b-look-at-any-change-s-card-on-the-board-2",
+      "output_artifacts": [
+        "67g38g9b-look-at-any-change-s-card-on-the-board-2-result"
+      ],
+      "postconditions": [
+        "the card shows the change's name and a one-line description of what it's for",
+        "the card shows whether its agent is working right now"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Open Sulis when no changes are in flight.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:18HP3A0E6HM1YQXHTZRZD34KYW",
+      "input_artifacts": [
+        "67g38g9b-look-at-any-change-s-card-on-the-board-2-result"
+      ],
+      "mechanism": "human",
+      "name": "67g38g9b-open-sulis-when-no-changes-are-in-flight-3",
+      "output_artifacts": [
+        "67g38g9b-open-sulis-when-no-changes-are-in-flight-3-result"
+      ],
+      "postconditions": [
+        "a clear prompt explains how to start a change"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Click a change on the board to open it.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:PKSKTCY96SCWKQS3G3KAAZH6ZC",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "0ve63eqs-click-a-change-on-the-board-to-open-it-1",
+      "output_artifacts": [
+        "0ve63eqs-click-a-change-on-the-board-to-open-it-1-result"
+      ],
+      "postconditions": [
+        "its lifecycle stages are laid out in order",
+        "the stage it is currently on is clearly marked"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Read the change's status line.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:CQ1WZ2XMBHZACSY0D9S9XAHKE4",
+      "input_artifacts": [
+        "0ve63eqs-click-a-change-on-the-board-to-open-it-1-result"
+      ],
+      "mechanism": "human",
+      "name": "0ve63eqs-read-the-change-s-status-line-2",
+      "output_artifacts": [
+        "0ve63eqs-read-the-change-s-status-line-2-result"
+      ],
+      "postconditions": [
+        "a plain-English summary describes what is happening right now",
+        "there is no raw log or jargon in the summary"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Open a change whose agent is currently running and type a message.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:S6D1R35BAR89PK7CB5KV1BJ1WX",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "ggh0aqmx-open-a-change-whose-agent-is-currently-r-1",
+      "output_artifacts": [
+        "ggh0aqmx-open-a-change-whose-agent-is-currently-r-1-result"
+      ],
+      "postconditions": [
+        "the agent's reply appears live as it is written"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Send a message to a change whose agent is not currently running.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:BFRK5JFZS0B97CQCPB5ANYVAB7",
+      "input_artifacts": [
+        "ggh0aqmx-open-a-change-whose-agent-is-currently-r-1-result"
+      ],
+      "mechanism": "human",
+      "name": "ggh0aqmx-send-a-message-to-a-change-whose-agent-i-2",
+      "output_artifacts": [
+        "ggh0aqmx-send-a-message-to-a-change-whose-agent-i-2-result"
+      ],
+      "postconditions": [
+        "the change's previous session resumes, or a fresh one starts having first read the change",
+        "a reply comes back without the user choosing resume-or-start",
+        "a step that was unfinished at the prior close is re-run, not reported as already done"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Type a word into search that appears inside a change's conversation or created items.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:6YYBKBZ274EC492YMTA7YHK7CZ",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "mcb8vdsg-type-a-word-into-search-that-appears-ins-1",
+      "output_artifacts": [
+        "mcb8vdsg-type-a-word-into-search-that-appears-ins-1-result"
+      ],
+      "postconditions": [
+        "results narrow to changes whose content matches, not only their titles"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Apply the stage filter.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:Z9V4YRTKYKH6Y3ZR7VDVBJPWB5",
+      "input_artifacts": [
+        "mcb8vdsg-type-a-word-into-search-that-appears-ins-1-result"
+      ],
+      "mechanism": "human",
+      "name": "mcb8vdsg-apply-the-stage-filter-2",
+      "output_artifacts": [
+        "mcb8vdsg-apply-the-stage-filter-2-result"
+      ],
+      "postconditions": [
+        "only changes in the chosen stage are shown"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Apply the 'needs attention' filter.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:9W8X3KEGGG97K4BRWKSAMTGQPE",
+      "input_artifacts": [
+        "mcb8vdsg-apply-the-stage-filter-2-result"
+      ],
+      "mechanism": "human",
+      "name": "mcb8vdsg-apply-the-needs-attention-filter-3",
+      "output_artifacts": [
+        "mcb8vdsg-apply-the-needs-attention-filter-3-result"
+      ],
+      "postconditions": [
+        "only changes that are blocked, waiting on a decision, or whose agent stopped mid-reply are shown"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Open a Markdown or HTML file inside a change.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:AKFBSVFC3CAGX2Z23W181AHT9C",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "ep08yjmf-open-a-markdown-or-html-file-inside-a-ch-1",
+      "output_artifacts": [
+        "ep08yjmf-open-a-markdown-or-html-file-inside-a-ch-1-result"
+      ],
+      "postconditions": [
+        "the file is shown rendered and formatted, not as raw source"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Toggle to source and then back to rendered.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:62GFBRH4V1XW1HEQ2YTJC6R4KC",
+      "input_artifacts": [
+        "ep08yjmf-open-a-markdown-or-html-file-inside-a-ch-1-result"
+      ],
+      "mechanism": "human",
+      "name": "ep08yjmf-toggle-to-source-and-then-back-to-render-2",
+      "output_artifacts": [
+        "ep08yjmf-toggle-to-source-and-then-back-to-render-2-result"
+      ],
+      "postconditions": [
+        "the raw text is shown when toggled to source",
+        "the rendered view returns when toggled back"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Open a change's 'what's been created' view.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:BH87WNS3A4Q28APJSYSTY8E8QG",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "3jttwd8f-open-a-change-s-what-s-been-created-view-1",
+      "output_artifacts": [
+        "3jttwd8f-open-a-change-s-what-s-been-created-view-1-result"
+      ],
+      "postconditions": [
+        "the entities and workflows produced for the change are listed, grouped by kind"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Click one of the created items.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:CJVR8ZDQ76KRTR9P9VW96P588F",
+      "input_artifacts": [
+        "3jttwd8f-open-a-change-s-what-s-been-created-view-1-result"
+      ],
+      "mechanism": "human",
+      "name": "3jttwd8f-click-one-of-the-created-items-2",
+      "output_artifacts": [
+        "3jttwd8f-click-one-of-the-created-items-2-result"
+      ],
+      "postconditions": [
+        "a readable detail view of that item is shown"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Open Sulis with nothing set up and say what product you're working on.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:9P4ATDEQ88MD3S8J9K2MDY1REV",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "518jnqev-open-sulis-with-nothing-set-up-and-say-w-1",
+      "output_artifacts": [
+        "518jnqev-open-sulis-with-nothing-set-up-and-say-w-1-result"
+      ],
+      "postconditions": [
+        "the agent asks where the code lives"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Tell it you don't have a repo yet (or point it at your folders).",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:KWFGVM4GDRPJBAXW7H6JR8SZY0",
+      "input_artifacts": [
+        "518jnqev-open-sulis-with-nothing-set-up-and-say-w-1-result"
+      ],
+      "mechanism": "human",
+      "name": "518jnqev-tell-it-you-don-t-have-a-repo-yet-or-poi-2",
+      "output_artifacts": [
+        "518jnqev-tell-it-you-don-t-have-a-repo-yet-or-poi-2-result"
+      ],
+      "postconditions": [
+        "if none, it offers to create a repo and asks you to confirm first",
+        "if folders exist, it finds and configures them"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Confirm what it found.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:ED4R1DV7V2YP6WWNH280EFN9JK",
+      "input_artifacts": [
+        "518jnqev-tell-it-you-don-t-have-a-repo-yet-or-poi-2-result"
+      ],
+      "mechanism": "human",
+      "name": "518jnqev-confirm-what-it-found-3",
+      "output_artifacts": [
+        "518jnqev-confirm-what-it-found-3-result"
+      ],
+      "postconditions": [
+        "your Product and Project are created only after you confirm",
+        "the setup is saved so next time needs no repeat"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "With a product set up, say what you want to do (e.g. add a password-reset flow).",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:C1SQ78MRMVW12B4ZEFN8W6W8A1",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "n5hbzs53-with-a-product-set-up-say-what-you-want-1",
+      "output_artifacts": [
+        "n5hbzs53-with-a-product-set-up-say-what-you-want-1-result"
+      ],
+      "postconditions": [
+        "it becomes a started change against the right repo",
+        "the repo is fetched first if it isn't on the machine"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Look at the board.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:MS6FCPV1NJHTPVJW92PZWWJ3VC",
+      "input_artifacts": [
+        "n5hbzs53-with-a-product-set-up-say-what-you-want-1-result"
+      ],
+      "mechanism": "human",
+      "name": "n5hbzs53-look-at-the-board-2",
+      "output_artifacts": [
+        "n5hbzs53-look-at-the-board-2-result"
+      ],
+      "postconditions": [
+        "the new change is there at the first stage"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Ask the chat what's in flight or where a change is up to.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:VNPF5RZ8X13B0RMHTP7GTH2CEE",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "z624c1zy-ask-the-chat-what-s-in-flight-or-where-a-1",
+      "output_artifacts": [
+        "z624c1zy-ask-the-chat-what-s-in-flight-or-where-a-1-result"
+      ],
+      "postconditions": [
+        "it answers from your changes and brain",
+        "nothing is changed \u2014 the answer is read-only"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Ask the concierge to look into something (e.g. why checkout is slow).",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:BMD5C3B7E7RP98MBAHQ8FPYPMJ",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "56zjtxqz-ask-the-concierge-to-look-into-something-1",
+      "output_artifacts": [
+        "56zjtxqz-ask-the-concierge-to-look-into-something-1-result"
+      ],
+      "postconditions": [
+        "it creates a change to hold the investigation rather than poking around in the chat",
+        "the exploring happens inside that change, captured"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "With more than one product, open the board.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:VZM9FK8S5K9CYV38HNNX03FFNM",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "fbe7b1nz-with-more-than-one-product-open-the-boar-1",
+      "output_artifacts": [
+        "fbe7b1nz-with-more-than-one-product-open-the-boar-1-result"
+      ],
+      "postconditions": [
+        "it shows only the active product's in-flight changes"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Switch to another product.",
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:step:64116R38DS2BX2Z64KC10YSGZN",
+      "input_artifacts": [
+        "fbe7b1nz-with-more-than-one-product-open-the-boar-1-result"
+      ],
+      "mechanism": "human",
+      "name": "fbe7b1nz-switch-to-another-product-2",
+      "output_artifacts": [
+        "fbe7b1nz-switch-to-another-product-2-result"
+      ],
+      "postconditions": [
+        "the board (and search/filters) re-scope to that product",
+        "no other product's changes are shown"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    }
+  ],
+  "workflows": [
+    {
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:workflow:7Q30CXS4H1A9F94G5SQE5W2ERY",
+      "initial_steps": [
+        "67g38g9b-open-sulis-on-your-machine-and-look-at-t-1"
+      ],
+      "name": "See everything in flight at a glance",
+      "state": "draft",
+      "steps": [
+        "67g38g9b-open-sulis-on-your-machine-and-look-at-t-1",
+        "67g38g9b-look-at-any-change-s-card-on-the-board-2",
+        "67g38g9b-open-sulis-when-no-changes-are-in-flight-3"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "67g38g9b-open-sulis-when-no-changes-are-in-flight-3"
+      ],
+      "transitions": [
+        "67g38g9b-open-sulis-on-your-machine-and-look-at-t-1 -> 67g38g9b-look-at-any-change-s-card-on-the-board-2",
+        "67g38g9b-look-at-any-change-s-card-on-the-board-2 -> 67g38g9b-open-sulis-when-no-changes-are-in-flight-3"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:workflow:51BXJWZ8JY36K37E5TAJHW5D2D",
+      "initial_steps": [
+        "0ve63eqs-click-a-change-on-the-board-to-open-it-1"
+      ],
+      "name": "Understand where a change is",
+      "state": "draft",
+      "steps": [
+        "0ve63eqs-click-a-change-on-the-board-to-open-it-1",
+        "0ve63eqs-read-the-change-s-status-line-2"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "0ve63eqs-read-the-change-s-status-line-2"
+      ],
+      "transitions": [
+        "0ve63eqs-click-a-change-on-the-board-to-open-it-1 -> 0ve63eqs-read-the-change-s-status-line-2"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:workflow:0B1EGDH1AVY64AK1BB9ARQQ80H",
+      "initial_steps": [
+        "ggh0aqmx-open-a-change-whose-agent-is-currently-r-1"
+      ],
+      "name": "Talk to the agent about a change",
+      "state": "draft",
+      "steps": [
+        "ggh0aqmx-open-a-change-whose-agent-is-currently-r-1",
+        "ggh0aqmx-send-a-message-to-a-change-whose-agent-i-2"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "ggh0aqmx-send-a-message-to-a-change-whose-agent-i-2"
+      ],
+      "transitions": [
+        "ggh0aqmx-open-a-change-whose-agent-is-currently-r-1 -> ggh0aqmx-send-a-message-to-a-change-whose-agent-i-2"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:workflow:FDWB5Z2AZFHJ3WAZARDH2FS1DY",
+      "initial_steps": [
+        "mcb8vdsg-type-a-word-into-search-that-appears-ins-1"
+      ],
+      "name": "Find a change",
+      "state": "draft",
+      "steps": [
+        "mcb8vdsg-type-a-word-into-search-that-appears-ins-1",
+        "mcb8vdsg-apply-the-stage-filter-2",
+        "mcb8vdsg-apply-the-needs-attention-filter-3"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "mcb8vdsg-apply-the-needs-attention-filter-3"
+      ],
+      "transitions": [
+        "mcb8vdsg-type-a-word-into-search-that-appears-ins-1 -> mcb8vdsg-apply-the-stage-filter-2",
+        "mcb8vdsg-apply-the-stage-filter-2 -> mcb8vdsg-apply-the-needs-attention-filter-3"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:workflow:06YJEFE15P193JHGX1HK7NWP6S",
+      "initial_steps": [
+        "ep08yjmf-open-a-markdown-or-html-file-inside-a-ch-1"
+      ],
+      "name": "Read a document the way it's meant to be seen",
+      "state": "draft",
+      "steps": [
+        "ep08yjmf-open-a-markdown-or-html-file-inside-a-ch-1",
+        "ep08yjmf-toggle-to-source-and-then-back-to-render-2"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "ep08yjmf-toggle-to-source-and-then-back-to-render-2"
+      ],
+      "transitions": [
+        "ep08yjmf-open-a-markdown-or-html-file-inside-a-ch-1 -> ep08yjmf-toggle-to-source-and-then-back-to-render-2"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:workflow:K0CVH5547B0CCKC8V2BPB28WD2",
+      "initial_steps": [
+        "3jttwd8f-open-a-change-s-what-s-been-created-view-1"
+      ],
+      "name": "See what the agent has created",
+      "state": "draft",
+      "steps": [
+        "3jttwd8f-open-a-change-s-what-s-been-created-view-1",
+        "3jttwd8f-click-one-of-the-created-items-2"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "3jttwd8f-click-one-of-the-created-items-2"
+      ],
+      "transitions": [
+        "3jttwd8f-open-a-change-s-what-s-been-created-view-1 -> 3jttwd8f-click-one-of-the-created-items-2"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:workflow:7TY3701DKFDKYAJZ21YTYWTN52",
+      "initial_steps": [
+        "518jnqev-open-sulis-with-nothing-set-up-and-say-w-1"
+      ],
+      "name": "Set up a product just by talking",
+      "state": "draft",
+      "steps": [
+        "518jnqev-open-sulis-with-nothing-set-up-and-say-w-1",
+        "518jnqev-tell-it-you-don-t-have-a-repo-yet-or-poi-2",
+        "518jnqev-confirm-what-it-found-3"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "518jnqev-confirm-what-it-found-3"
+      ],
+      "transitions": [
+        "518jnqev-open-sulis-with-nothing-set-up-and-say-w-1 -> 518jnqev-tell-it-you-don-t-have-a-repo-yet-or-poi-2",
+        "518jnqev-tell-it-you-don-t-have-a-repo-yet-or-poi-2 -> 518jnqev-confirm-what-it-found-3"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:workflow:T25HR0BVH4TNP7BS5G9FBYHRZH",
+      "initial_steps": [
+        "n5hbzs53-with-a-product-set-up-say-what-you-want-1"
+      ],
+      "name": "Start work by saying what you want",
+      "state": "draft",
+      "steps": [
+        "n5hbzs53-with-a-product-set-up-say-what-you-want-1",
+        "n5hbzs53-look-at-the-board-2"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "n5hbzs53-look-at-the-board-2"
+      ],
+      "transitions": [
+        "n5hbzs53-with-a-product-set-up-say-what-you-want-1 -> n5hbzs53-look-at-the-board-2"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:workflow:T0EHRZVSXN7K3C2K7ZTJM3R6WZ",
+      "initial_steps": [
+        "z624c1zy-ask-the-chat-what-s-in-flight-or-where-a-1"
+      ],
+      "name": "Ask the concierge about your world",
+      "state": "draft",
+      "steps": [
+        "z624c1zy-ask-the-chat-what-s-in-flight-or-where-a-1"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "z624c1zy-ask-the-chat-what-s-in-flight-or-where-a-1"
+      ],
+      "transitions": [
+        "z624c1zy-ask-the-chat-what-s-in-flight-or-where-a-1 -> end"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:workflow:5HGJZ641VKKGCFXSBQVG1Z6FQN",
+      "initial_steps": [
+        "56zjtxqz-ask-the-concierge-to-look-into-something-1"
+      ],
+      "name": "An investigation becomes a change",
+      "state": "draft",
+      "steps": [
+        "56zjtxqz-ask-the-concierge-to-look-into-something-1"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "56zjtxqz-ask-the-concierge-to-look-into-something-1"
+      ],
+      "transitions": [
+        "56zjtxqz-ask-the-concierge-to-look-into-something-1 -> end"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+      "for_process": "verification",
+      "id": "dna:workflow:T4VDCCCR65XFPXHTNC2RWY5DCK",
+      "initial_steps": [
+        "fbe7b1nz-with-more-than-one-product-open-the-boar-1"
+      ],
+      "name": "Switch product and the board re-scopes",
+      "state": "draft",
+      "steps": [
+        "fbe7b1nz-with-more-than-one-product-open-the-boar-1",
+        "fbe7b1nz-switch-to-another-product-2"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "fbe7b1nz-switch-to-another-product-2"
+      ],
+      "transitions": [
+        "fbe7b1nz-with-more-than-one-product-open-the-boar-1 -> fbe7b1nz-switch-to-another-product-2"
+      ],
+      "type": "review"
+    }
+  ]
+}

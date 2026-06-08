@@ -1,0 +1,25 @@
+{
+  "pr": "feat/wp-007-search-roundtrip",
+  "base": "change/create-autonomous-delivery-environment",
+  "timestamp": "2026-06-04T125317Z",
+  "verdict": "PASS",
+  "outcome": "Ready to merge",
+  "build_verification": { "pr_introduced_errors": 0, "typecheck": "clean", "lint": "clean", "read_only_gate": "clean" },
+  "findings": {
+    "changes": { "critical": 0, "high": 0, "medium": 0, "low": 1 },
+    "neighbours": { "critical": 0, "high": 0, "medium": 0, "low": 0 }
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "status": "nothing-surfaced" },
+    "security": { "findings": 0, "status": "nothing-surfaced" },
+    "quality": { "findings": 1, "status": "surfaced" }
+  },
+  "hygiene": {
+    "scope": "low", "size": "low", "safety": "low", "completeness": "low",
+    "lines_added": 1661, "lines_removed": 33, "files_changed": 15,
+    "migrations": 0, "schema_idl": 0, "secrets": 0, "infra": 0,
+    "new_source_without_test": 0
+  },
+  "auto_downgrade_fired": [],
+  "draft_deltas": 0
+}

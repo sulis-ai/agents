@@ -9,6 +9,33 @@
   background: var(--muted);
 }
 
+/* WP-009 — primary nav (Board · Concierge) above the change list. */
+.topnav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 16px;
+}
+
+.navlink {
+  display: block;
+  padding: 8px 10px;
+  border-radius: var(--radius-interactive);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--foreground);
+  text-decoration: none;
+}
+
+.navlink:hover {
+  background: var(--background);
+}
+
+.navlink[aria-current="page"] {
+  background: var(--background);
+  font-weight: 600;
+}
+
 .heading {
   font-size: 14px;
   font-weight: 600;
@@ -27,7 +54,7 @@
 
 .error {
   font-size: 13px;
-  color: #d73a49;
+  color: var(--destructive);
   margin: 0;
 }
 

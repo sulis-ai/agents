@@ -470,7 +470,7 @@ def cmd_start(args: argparse.Namespace) -> None:
     repo_root = _resolve_repo_root(args)
     primitive, slug = _resolve_primitive_and_slug(args)
     branch = compose_change_branch(primitive, slug)
-    base_ref = args.base or "dev"
+    base_ref = args.base or "main"
 
     # Check the branch doesn't already exist
     rc, _, _ = _run(["git", "rev-parse", "--verify", f"refs/heads/{branch}"],
@@ -631,7 +631,7 @@ def cmd_adopt(args: argparse.Namespace) -> None:
     repo_root = _resolve_repo_root(args)
     primitive, slug = _resolve_primitive_and_slug(args)
     branch = compose_change_branch(primitive, slug)
-    base_ref = args.base or "dev"
+    base_ref = args.base or "main"
     mode = (args.mode or "forward").lower()
     remote_ref = args.remote_ref or "origin/dev"
 
@@ -796,7 +796,7 @@ def cmd_finish(args: argparse.Namespace) -> None:
     repo_root = _resolve_repo_root(args)
     primitive, slug = _resolve_primitive_and_slug(args)
     branch = compose_change_branch(primitive, slug)
-    base_ref = args.base or "dev"
+    base_ref = args.base or "main"
 
     # Verify the branch exists
     rc, _, _ = _run(["git", "rev-parse", "--verify", f"refs/heads/{branch}"],
@@ -1033,7 +1033,7 @@ def cmd_status(args: argparse.Namespace) -> None:
     repo_root = _resolve_repo_root(args)
     primitive, slug = _resolve_primitive_and_slug(args)
     branch = compose_change_branch(primitive, slug)
-    base_ref = args.base or "dev"
+    base_ref = args.base or "main"
 
     rc, _, _ = _run(["git", "rev-parse", "--verify", f"refs/heads/{branch}"],
                    cwd=repo_root, timeout=10)
@@ -1293,7 +1293,7 @@ def _resolve_nuke_target(repo_root: Path, args: argparse.Namespace) -> dict:
 
 
 def _branch_has_unmerged_commits(repo_root: Path, branch: str,
-                                  base_ref: str = "dev") -> int:
+                                  base_ref: str = "main") -> int:
     """Return the count of commits on `branch` not yet on `base_ref`.
 
     0 means fully merged (or branch/base unresolvable — treated as nothing
@@ -1494,7 +1494,7 @@ def build_parser() -> argparse.ArgumentParser:
                            help=f"Change primitive (default: feat). "
                                 f"Allowed: {', '.join(ALLOWED_CHANGE_PRIMITIVES)}")
         p.add_argument("--base", default=None,
-                       help="Base ref for the change (default: dev)")
+                       help="Base ref for the change (default: main)")
 
     p_start = sub.add_parser("start", help="Create a new change branch + worktree")
     _common(p_start)

@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Click a change on the board to open it.",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:PKSKTCY96SCWKQS3G3KAAZH6ZC",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "0ve63eqs-click-a-change-on-the-board-to-open-it-1",
+  "output_artifacts": [
+    "0ve63eqs-click-a-change-on-the-board-to-open-it-1-result"
+  ],
+  "postconditions": [
+    "its lifecycle stages are laid out in order",
+    "the stage it is currently on is clearly marked"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

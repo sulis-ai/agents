@@ -1,0 +1,29 @@
+{
+  "target": "feat/wp-001-shared-data-contract",
+  "base": "change/create-autonomous-delivery-environment",
+  "timestamp": "2026-06-04T094143Z",
+  "verdict": "PASS",
+  "build_verification": {
+    "typecheck_errors_introduced": 0,
+    "lint_errors_introduced": 0,
+    "prettier_clean": true
+  },
+  "hygiene": {
+    "scope": { "severity": "none", "commit_types": ["feat"], "module_fan_out": 1 },
+    "size": { "severity": "low", "files_changed": 3, "lines_added_api_types": 313, "lines_added_test": 394, "generated_ratio": 0, "lock_file_ratio": 0 },
+    "safety": { "severity": "none", "migration_count": 0, "schema_idl_count": 1, "infra_files": 0, "secret_pattern_hits": 0 },
+    "completeness": { "severity": "none", "new_source_without_test": false, "api_change_without_schema": false }
+  },
+  "findings": {
+    "in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 0, "note": 1 },
+    "in_neighbours": { "critical": 0, "high": 0, "medium": 0, "low": 0 }
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "status": "nothing-surfaced" },
+    "security": { "findings": 0, "status": "nothing-surfaced" },
+    "quality": { "findings": 1, "status": "complete", "note": "contract-document redocly hygiene (upstream artifact, pre-existing on base)" }
+  },
+  "contract_drift": { "checked": true, "drift_found": false },
+  "draft_deltas": 0,
+  "auto_downgrade_triggers_fired": []
+}

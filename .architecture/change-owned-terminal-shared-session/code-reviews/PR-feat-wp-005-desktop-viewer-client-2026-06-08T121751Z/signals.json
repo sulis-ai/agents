@@ -1,0 +1,24 @@
+{
+  "pr": "feat/wp-005-desktop-viewer-client",
+  "base": "change/create-change-owned-terminal-shared-session",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "low" },
+    "size": { "lines_added": 1109, "files_changed": 2, "severity": "low",
+              "note": "two cohesive new files (impl + its integration test); single concern" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "secret_pattern_hits": 0, "infra_files": 0, "severity": "low" },
+    "completeness": { "new_source_without_test": 0, "api_change_without_schema": false, "severity": "low",
+                      "note": "new source ships with its integration test; 100% coverage on session_viewer.py" }
+  },
+  "findings": {
+    "in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+    "in_neighbours": { "total": 0 }
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "note": "deps inward (stdlib + daemon_client only); timeouts on every request; no secrets; AF_UNIX local; no-logging is correct per NFR-SEC-03" },
+    "security": { "findings": 0, "note": "no auth surface (server-side binding guard); bytes never logged; no injection/shell/eval; spawn_command is the contract-controlled ensure_daemon seam" },
+    "quality": { "findings": 0, "note": "ruff clean; mypy 0 errors on file; compileall OK; 9 tests / 100% cov; no dead surface; no CR-10 perf anti-patterns" }
+  },
+  "draft_fixes": 0
+}

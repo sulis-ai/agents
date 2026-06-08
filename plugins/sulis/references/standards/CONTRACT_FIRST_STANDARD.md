@@ -157,6 +157,34 @@ wired" (WPB-09) **at the seam**.
 > step that proves the real producer matches the contract the consumer built
 > against.
 
+### CF-07.5 — The `interaction` contract type (founder-facing flows) · SHOULD
+
+Alongside the **data** contract (the schema layer, CF-02) and the **visual**
+contract (`contract_type: visual`, tokens + mockup; `WORK_PACKAGE_STANDARD.md`
+WP-08.5), a third contract flavour governs **founder-facing multi-step flows**:
+the **interaction** contract — a `kind: contract` WP with
+`contract_type: interaction`. Where the data contract's conformance is "the
+producer matches the schema" (CF-07) and the visual contract's is "the founder
+signed off the mockup", the **interaction** contract's conformance is **"the
+flow was exercised end-to-end over stub adapters"** — evidenced
+`agent-observed` or `human-attested` and gated at the done-transition by
+`wpx-index`, exactly as the data and visual conformance checks gate their own
+seams.
+
+**Phase 1 is SHOULD strength.** A founder-facing capability spanning a
+multi-step flow SHOULD emit an interaction contract; the runtime done-gate
+applies to any WP that opts in by declaring `contract_type: interaction`.
+Making it MUST for *all* founder-facing work — enforced at write-time — is the
+**Phase 2** flip and is **out of scope** here (ADR-002). The schema layer
+(CF-02) + three-category errors (CF-03) remain the floor; the interaction
+contract adds the *was-this-flow-actually-walked* check on top, for the seams
+where a single schema-conformance pass doesn't prove the user can complete the
+journey.
+
+> **Anti-pattern:** shipping a multi-step founder-facing flow whose only proof
+> is that each step's data contract conforms in isolation — with no evidence
+> the steps compose into a flow the user can actually walk end-to-end.
+
 ### CF-08 — Explicit, conventional transport binding · SHOULD
 
 Choose the transport per the established binding and map its native errors
@@ -164,6 +192,25 @@ onto the three categories: **HTTP/REST** (OpenAPI; statuses), **MCP-over-stdio**
 (JSON Schema; the canonical agent-facing local transport), **subprocess +
 JSON-on-stdout** (the wpx pattern; exit 0/1/2), **library** (in-process; no
 ProtocolError). Don't invent a bespoke transport when a conventional one fits.
+
+When the seam is a **host-rendered surface** (an MCP App / OpenAI App /
+figma-plugin / browser-extension — a UI a host you don't control renders via a
+protocol handshake), the binding is the host-render resource (for MCP-Apps: the
+`ui://` resource served with the host's accepted MIME — `text/html;profile=mcp-app`,
+or `text/html+skybridge` / `text/html+mcp` for the OpenAI/Skybridge adapter) +
+the host runtime channel (for MCP-Apps: `ui/` JSON-RPC-over-`postMessage`, e.g.
+the ext-apps `app.connect`/`ontoolresult`/`callServerTool`/`openLink`). The UI's
+actions are tool calls, so they are contract operations (CF-03 error categories
+apply). **This binding is MUST when building such a surface** (not merely SHOULD): the
+recurring failure is serving the surface's HTML *unbound* — no `_meta.ui`
+binding, no client runtime — so the host narrates tool data as text. Its CF-07
+conformance check is specifically **a real-host round-trip**: the surface
+observed rendering in the actual host (or human-attested via
+`sulis-attest-scenario`), never a green test against a mock. See
+[`mcp-ui-surface-patterns.md`](../mcp-ui-surface-patterns.md) § "Done = wired +
+legible" for the full gate (binding both sides + real-host round-trip + the
+legibility metadata: `title` + one-line `description` + `icon`, not a technical
+`name` alone), the resource scheme, CSP allowlist, and sandbox model.
 
 ### CF-09 — Streaming contracts use a structured event schema · SHOULD
 
@@ -223,6 +270,34 @@ mechanically enforce the bar; hold it by hand until then. This is the
 third design-stage structured deliverable alongside the visual contract
 (#45) and the data contract (#48).
 
+### CF-11 — Shared producer-side artifacts are pinned in the contract WP · MUST
+
+When the decomposition has **two or more producer WPs** that emit into the
+**same logical artifact** — a manifest, registry, index, codegen output, or
+any file the producers compose — the artifact's identity (**filename, path,
+schema, and merge semantics**) MUST be pinned as an **explicit shared
+constant in the contract WP**, never independently chosen by each producer.
+
+Anchor case (#107, CH-01KSSV): two producer renderers (WP-001 data-contract,
+WP-002 UI-contract) were designed to share one manifest; they independently
+picked `CONTRACT.manifest.json` vs `manifest.json` and one clobbered the
+other instead of merging. The shared manifest split silently. Caught at
+Step 10.5 cross-WP review (the gate worked) and fixed.
+
+In practice the contract WP carries — in `Contract` or a dedicated
+`## Shared Artifacts` block — for each shared artifact:
+
+- a **constant** the producer WPs reference verbatim (`MANIFEST_PATH =
+  ".sulis/contracts/manifest.json"`, never re-spelled);
+- the **schema** (the JSON / YAML / TS shape the file conforms to);
+- the **merge semantics** (overwrite vs append vs structural-merge vs
+  per-key-merge, and the resolution rule on collision).
+
+Producer WPs `dependsOn` the contract WP (per CF-05) and import the
+constant; they do NOT re-declare the filename. The decompose-validation
+rubric P6 enforces this mechanically (check 6.06 — see
+`decompose-validation-rubric.md`).
+
 ---
 
 ## Tiers (scope the rigor to the case)
@@ -280,3 +355,5 @@ the in-repo reference implementation of the subprocess+JSON transport binding.
 | Version | Date | Changes |
 |---------|------|---------|
 | 0.1.0 | 2026-05-26 | Initial sulis-local definition. 9 requirements (CF-01..CF-09) on the two-axis + three-category-error backbone. Two tiers (lightweight internal seam / full published SDK). Sits between WP_BACKEND and WP_FRONTEND; amends WORK_PACKAGE_STANDARD cross-kind decomposition (parallel via contract dependency — to be reflected there). SHOULD-tier requirements (CF-08/09) carry 90-day calibration. |
+| 0.2.0 | 2026-06-03 | Added CF-11 (MUST) — shared producer-side artifacts must be pinned in the contract WP with filename + path + schema + merge semantics as an explicit shared constant; producer WPs reference the constant verbatim and never independently choose a filename. Mechanically enforced by decompose-validation rubric P6 check 6.06. Provenance: lesson #107 (anchor case CH-01KSSV — two producer WPs picked `CONTRACT.manifest.json` vs `manifest.json` and one clobbered the other). |
+| 0.3.0 | 2026-06-04 | CF-08 host-rendered surface clause promoted from SHOULD to **MUST-when-building**, generalised beyond MCP-Apps (OpenAI Apps SDK / figma-plugin / browser-extension are instances), MIME widened to the host's accepted value (`text/html+skybridge` / `text/html+mcp` alongside `text/html;profile=mcp-app`), and its CF-07 conformance check named as **the real-host round-trip** (observed or human-attested, never a mock). Provenance: host-rendered-surface critical-thinking analysis (2026-06-04, spiral-converged) — a Cowork MCP App shipped "built" with its HTML serving but unbound (`_meta.ui` + client runtime absent), so the host narrated tool data as text. Companion edits: `mcp-ui-surface-patterns.md` § "Done = wired + legible" (the fail-closed gate) + the design/audit journey-walk's sharper "exists" for host-rendered hops. |

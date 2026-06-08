@@ -1,0 +1,21 @@
+{
+  "agent_instructions": "Deposit an idea: its why is matured into an Opportunity and its what becomes a draft Requirement rooted in that why.",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:JG0QJ617RBMT03Q6G8P355HW00",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/sulis-capture --repo-root . --base-dir .brain/instances --why-intensity full --opportunity-id dna:opportunity:KST8MDFYHQHM1W2E92VJ9RGDXK --what 'capture-journey probe: the deposit path works end to end' --seed dogfood-capture-journey-probe\", \"expect_exit\": 0}",
+  "name": "7y6vxt0c-deposit-an-idea-its-why-is-matured-into-1",
+  "output_artifacts": [
+    "7y6vxt0c-deposit-an-idea-its-why-is-matured-into-1-result"
+  ],
+  "postconditions": [
+    "an Opportunity and a draft Requirement sourced from it land, chain whole"
+  ],
+  "state": "draft",
+  "sys_status": "active",
+  "tool_ref": "dna:tool:XV1303ZB30B7ZBVBPSQG3FC194"
+}

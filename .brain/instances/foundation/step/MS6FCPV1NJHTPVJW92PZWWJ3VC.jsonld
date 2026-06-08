@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Look at the board.",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:MS6FCPV1NJHTPVJW92PZWWJ3VC",
+  "input_artifacts": [
+    "n5hbzs53-with-a-product-set-up-say-what-you-want-1-result"
+  ],
+  "mechanism": "human",
+  "name": "n5hbzs53-look-at-the-board-2",
+  "output_artifacts": [
+    "n5hbzs53-look-at-the-board-2-result"
+  ],
+  "postconditions": [
+    "the new change is there at the first stage"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

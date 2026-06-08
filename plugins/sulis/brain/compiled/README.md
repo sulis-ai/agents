@@ -58,6 +58,21 @@ mixed-version vendor is safe):
   type violation), so it stays at v1.0.0, untouched. `wasRevisionOf` appears
   nowhere (ADR-002).
 
+**`brand-identity`** is vendored from sulis-brain **v0.15.0** (DR-030 — the
+domain's first compiled entities). Three schemas, vendored flat as
+`compiled/brand-identity/{entity}.schema.json` (matching foundation +
+product-development — schemas only; triples are not vendored here):
+
+- `brand` — the upstream identity anchor (id + name + `belongs_to_tenant` +
+  the discovery-lifecycle `state` + the nine soft element_schema_v0.3 elements:
+  voice/values/positioning/audience/offering/lexicon/claims/visual-identity/
+  distinctive-assets). schema.org `Brand`.
+- `design-system` — the realized W3C-DTCG token + asset artifact;
+  `realizes_identity → brand` (required, minItems 1); `tokens` is a DTCG object
+  OR a URI string; WCAG pairs; three-axis lifecycle. The `ux-designer` agent
+  emits one when it establishes a design language, and reads it when one exists.
+- `tenant` — the foundation mirror (so `Brand.belongs_to_tenant` resolves).
+
 **Still to catch up (breaking / structural — deliberately NOT bundled):**
 the 10 foundation-mirror entities the PD source now carries (the mirror-surface
 reconciliation). Tracked, not done here.

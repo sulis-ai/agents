@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sulis app — whole-surface visual contract (CH-01KT50)</title>
+<!--
+  VISUAL CONTRACT — for founder sign-off (ADR-005, UXD-14).
+  Real tokens copied verbatim from apps/cockpit/client/src/tokens.css (v4.2.0).
+  This renders how the app will actually LOOK: real colours, real fonts,
+  real stage palette (from StageBadge.module.css). Not a token table — a
+  picture of the coherent surface: board, thread, chat, brain, preview, search.
+  Inter/Satoshi load from Google Fonts when online; system-ui fallback offline.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --background:#fafafa; --foreground:#171717; --card:#ffffff; --card-foreground:#171717;
+  --muted:#f5f5f5; --muted-foreground:#737373; --secondary:#f5f5f5; --border:#e5e5e5;
+  --border-muted:#f0f0f0; --input:#e5e5e5;
+  --primary:#2563EB; --primary-foreground:#FFFFFF; --accent:#2D7D90; --accent-foreground:#FFFFFF;
+  --destructive:#DC2626; --positive:#16A34A; --warning:#F59E0B; --ring:#2563EB;
+  --brand-gold:#C9A962; --brand-depth:#1E3A5F;
+  --radius-interactive:4px; --radius-button:9999px; --radius-container:4px; --radius-badge:9999px;
+  --font-sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-display:'Satoshi','Inter',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono','SF Mono','Monaco',monospace;
+  --weight-body:400; --weight-heading:300; --weight-label:500;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--background);color:var(--foreground);font-family:var(--font-sans);font-weight:var(--weight-body);-webkit-font-smoothing:antialiased;font-size:14px;line-height:1.5}
+.mock-note{background:var(--brand-depth);color:#fff;padding:8px 16px;font-size:12px;letter-spacing:.02em}
+.mock-note b{color:var(--brand-gold)}
+
+/* ---- App shell ---- */
+.shell{display:grid;grid-template-columns:240px 1fr;height:calc(100% - 33px)}
+.sidebar{background:var(--card);border-right:1px solid var(--border);padding:16px 12px;overflow:auto}
+.brandrow{display:flex;align-items:center;gap:8px;padding:4px 8px 16px}
+.brandmark{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--brand-depth),var(--accent))}
+.brandname{font-family:var(--font-display);font-weight:var(--weight-heading);font-size:17px;letter-spacing:.01em}
+.navitem{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:var(--radius-container);color:var(--muted-foreground);font-weight:var(--weight-label);font-size:13px;cursor:pointer}
+.navitem.active{background:var(--secondary);color:var(--foreground)}
+.navitem .dot{width:8px;height:8px;border-radius:50%}
+.sidebar h4{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);margin:18px 8px 6px;font-weight:600}
+
+.main{overflow:auto;padding:0}
+.viewtitle{font-family:var(--font-display);font-weight:var(--weight-heading);font-size:22px;padding:20px 24px 4px}
+.viewsub{color:var(--muted-foreground);padding:0 24px 16px;font-size:13px}
+
+/* ---- Board toolbar (search + filters; one toolbar, one board) ---- */
+.toolbar{display:flex;gap:10px;align-items:center;padding:0 24px 16px;flex-wrap:wrap}
+.search{flex:1;min-width:220px;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--input);border-radius:var(--radius-container);padding:8px 12px}
+.search input{border:0;outline:0;flex:1;font-family:var(--font-sans);font-size:13px;background:transparent;color:var(--foreground)}
+.search .hint{color:var(--muted-foreground);font-size:12px}
+.chip{padding:6px 12px;border-radius:var(--radius-button);border:1px solid var(--border);background:var(--card);font-size:12px;font-weight:var(--weight-label);cursor:pointer;color:var(--muted-foreground)}
+.chip.on{background:var(--primary);border-color:var(--primary);color:var(--primary-foreground)}
+.chip.attn.on{background:var(--warning);border-color:var(--warning);color:#121212}
+
+/* ---- Stage Kanban ---- */
+.board{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;padding:0 24px 28px;align-items:start}
+.col{background:var(--muted);border:1px solid var(--border-muted);border-radius:var(--radius-container);min-height:120px}
+.colhead{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border)}
+.colname{font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.colcount{font-size:11px;color:var(--muted-foreground);background:var(--card);border:1px solid var(--border);border-radius:var(--radius-badge);padding:1px 7px}
+.collist{padding:10px;display:flex;flex-direction:column;gap:10px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-container);padding:12px;cursor:pointer;box-shadow:0 1px 0 rgba(0,0,0,.02)}
+.card:hover{border-color:var(--ring)}
+.card .handle{font-family:var(--font-mono);font-size:11px;color:var(--muted-foreground)}
+.card .intent{font-size:13px;font-weight:var(--weight-label);margin:5px 0 9px;line-height:1.35}
+.cardfoot{display:flex;align-items:center;justify-content:space-between}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted-foreground)}
+.live .d{width:9px;height:9px;border-radius:50%;border:1px solid transparent}
+.live .running{background:#28a745;border-color:#1e7e34}
+.live .notRunning{background:var(--border);border-color:var(--muted-foreground)}
+.live .unknown{background:var(--muted);border-color:var(--border)}
+.attnflag{font-size:10px;font-weight:600;color:#121212;background:var(--warning);border-radius:var(--radius-badge);padding:2px 7px}
+/* stage palette — verbatim from StageBadge.module.css */
+.s-recon .colname{color:var(--primary)} .s-recon .colhead{background:#f1f8ff}
+.s-specify .colname{color:#735c0f} .s-specify .colhead{background:#fff5b1}
+.s-design .colname{color:#4b0082} .s-design .colhead{background:#e6e6fa}
+.s-implement .colname{color:#22863a} .s-implement .colhead{background:#e1ffe1}
+.s-review .colname{color:#c04a00} .s-review .colhead{background:#fff0e6}
+.s-ship .colname{color:#155724} .s-ship .colhead{background:#d4edda}
+
+/* ---- Thread view ---- */
+.thread{display:grid;grid-template-columns:1.15fr .85fr;gap:0;height:100%}
+.threadmain{display:flex;flex-direction:column;border-right:1px solid var(--border);height:100%}
+.threadhead{padding:18px 24px;border-bottom:1px solid var(--border)}
+.threadhead .handle{font-family:var(--font-mono);font-size:11px;color:var(--muted-foreground)}
+.threadhead h2{font-family:var(--font-display);font-weight:var(--weight-heading);font-size:19px;margin:5px 0 14px}
+/* stage track */
+.track{display:flex;align-items:center;gap:0;margin-bottom:14px}
+.step{flex:1;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-foreground);position:relative;padding-top:18px}
+.step::before{content:"";position:absolute;top:4px;left:50%;width:11px;height:11px;border-radius:50%;background:var(--border);transform:translateX(-50%);z-index:2}
+.step::after{content:"";position:absolute;top:9px;left:50%;width:100%;height:2px;background:var(--border);z-index:1}
+.step:last-child::after{display:none}
+.step.done{color:var(--positive)} .step.done::before{background:var(--positive)} .step.done::after{background:var(--positive)}
+.step.current{color:#4b0082;font-weight:600} .step.current::before{background:#4b0082;box-shadow:0 0 0 4px #e6e6fa}
+.status{background:var(--secondary);border:1px solid var(--border-muted);border-radius:var(--radius-container);padding:12px 14px;font-size:13px;line-height:1.5}
+.status .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground);font-weight:600;margin-bottom:5px}
+
+/* conversation */
+.convo{flex:1;overflow:auto;padding:18px 24px;display:flex;flex-direction:column;gap:14px;background:var(--background)}
+.msg{max-width:86%}
+.msg.user{align-self:flex-end}
+.bubble{padding:10px 13px;border-radius:12px;font-size:13px;line-height:1.5}
+.msg.user .bubble{background:var(--primary);color:var(--primary-foreground);border-bottom-right-radius:3px}
+.msg.agent .bubble{background:var(--card);border:1px solid var(--border);border-bottom-left-radius:3px}
+.msg .who{font-size:10px;color:var(--muted-foreground);margin:0 4px 4px;text-transform:uppercase;letter-spacing:.04em}
+.msg.user .who{text-align:right}
+.streaming .bubble{border-color:var(--accent)}
+.caret{display:inline-block;width:7px;height:14px;background:var(--accent);vertical-align:text-bottom;margin-left:1px;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+.resumednote{align-self:center;font-size:11px;color:var(--accent);background:#eaf4f6;border:1px solid #cfe6ea;border-radius:var(--radius-badge);padding:4px 12px}
+
+/* composer (persistent dock) */
+.composer{border-top:1px solid var(--border);padding:12px 16px;background:var(--card);display:flex;gap:10px;align-items:flex-end}
+.composer textarea{flex:1;resize:none;border:1px solid var(--input);border-radius:var(--radius-container);padding:10px 12px;font-family:var(--font-sans);font-size:13px;min-height:42px;outline:0}
+.composer textarea:focus{border-color:var(--ring)}
+.send{background:var(--primary);color:#fff;border:0;border-radius:var(--radius-button);padding:10px 18px;font-weight:var(--weight-label);font-size:13px;cursor:pointer}
+.composer .state{font-size:11px;color:var(--accent);align-self:center}
+.composer.busy .send{background:var(--muted);color:var(--muted-foreground);cursor:not-allowed}
+
+/* right rail — brain + preview, named sections (not loose tabs) */
+.rail{overflow:auto;height:100%}
+.railtabs{display:flex;gap:4px;padding:14px 18px 0;border-bottom:1px solid var(--border)}
+.railtab{padding:8px 12px;font-size:12px;font-weight:var(--weight-label);color:var(--muted-foreground);border-bottom:2px solid transparent;cursor:pointer}
+.railtab.active{color:var(--foreground);border-bottom-color:var(--primary)}
+.railbody{padding:16px 18px}
+.bgroup{margin-bottom:18px}
+.bgroup h5{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground);margin-bottom:8px;font-weight:600}
+.bitem{border:1px solid var(--border);border-radius:var(--radius-container);padding:10px 12px;margin-bottom:8px;background:var(--card);cursor:pointer}
+.bitem:hover{border-color:var(--ring)}
+.bitem .bt{font-size:13px;font-weight:var(--weight-label)}
+.bitem .bk{font-family:var(--font-mono);font-size:10px;color:var(--muted-foreground)}
+
+/* preview */
+.previewbar{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--border);border-bottom:0;border-radius:var(--radius-container) var(--radius-container) 0 0;padding:8px 12px;background:var(--secondary)}
+.previewbar .fn{font-family:var(--font-mono);font-size:12px}
+.toggle{display:flex;border:1px solid var(--border);border-radius:var(--radius-button);overflow:hidden}
+.toggle span{padding:4px 11px;font-size:11px;font-weight:var(--weight-label);cursor:pointer;color:var(--muted-foreground)}
+.toggle span.on{background:var(--foreground);color:#fff}
+.rendered{border:1px solid var(--border);border-radius:0 0 var(--radius-container) var(--radius-container);padding:18px 20px;background:var(--card)}
+.rendered h1{font-family:var(--font-display);font-weight:var(--weight-heading);font-size:20px;margin-bottom:8px}
+.rendered h2{font-size:15px;margin:14px 0 6px}
+.rendered p{font-size:13px;color:var(--card-foreground);margin-bottom:8px}
+.rendered ul{margin:0 0 8px 18px;font-size:13px}
+.section-label{font-family:var(--font-display);font-weight:var(--weight-heading);font-size:15px;color:var(--muted-foreground);padding:26px 24px 10px;border-top:1px dashed var(--border);margin-top:8px}
+</style>
+</head>
+<body>
+
+<div class="mock-note">VISUAL CONTRACT — real tokens from <b>tokens.css v4.2.0</b>. This is how the Sulis app will look. Two views shown: <b>1) the board</b> and <b>2) a change's thread with live chat</b>. For founder sign-off (CH-01KT50).</div>
+
+<!-- ============ VIEW 1: THE BOARD ============ -->
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brandrow"><div class="brandmark"></div><div class="brandname">Sulis</div></div>
+    <div class="navitem active"><span class="dot" style="background:var(--primary)"></span>Board</div>
+    <h4>In flight</h4>
+    <div class="navitem"><span class="live"><span class="d running"></span></span>add-checkout-flow</div>
+    <div class="navitem"><span class="live"><span class="d notRunning"></span></span>fix-login-redirect</div>
+    <div class="navitem"><span class="live"><span class="d unknown"></span></span>drive-a-change</div>
+    <h4>Shipped</h4>
+    <div class="navitem" style="opacity:.6">cockpit-contract-preview</div>
+  </aside>
+
+  <main class="main">
+    <div class="viewtitle">Your work, at a glance</div>
+    <div class="viewsub">Every change in flight, in the stage it's reached. Click a card to open it.</div>
+
+    <div class="toolbar">
+      <div class="search">
+        <span>🔎</span>
+        <input placeholder="Search inside your changes — conversations and created items, not just titles" value="" />
+        <span class="hint">searches content</span>
+      </div>
+      <span class="chip on">All stages</span>
+      <span class="chip">Design</span>
+      <span class="chip attn">⚠ Needs attention</span>
+    </div>
+
+    <div class="board">
+      <div class="col s-recon"><div class="colhead"><span class="colname">Recon</span><span class="colcount">1</span></div>
+        <div class="collist">
+          <div class="card"><div class="handle">CH-01KTAA</div><div class="intent">Map the billing module before the rework</div>
+            <div class="cardfoot"><span class="live"><span class="d unknown"></span>unknown</span></div></div>
+        </div>
+      </div>
+      <div class="col s-specify"><div class="colhead"><span class="colname">Specify</span><span class="colcount">1</span></div>
+        <div class="collist">
+          <div class="card"><div class="handle">CH-01KTBC</div><div class="intent">Password reset by email link</div>
+            <div class="cardfoot"><span class="live"><span class="d notRunning"></span>not running</span><span class="attnflag">waiting on you</span></div></div>
+        </div>
+      </div>
+      <div class="col s-design"><div class="colhead"><span class="colname">Design</span><span class="colcount">1</span></div>
+        <div class="collist">
+          <div class="card" style="border-color:var(--ring)"><div class="handle">CH-01KT50</div><div class="intent">Drive a change from the app (this one)</div>
+            <div class="cardfoot"><span class="live"><span class="d running"></span>running</span></div></div>
+        </div>
+      </div>
+      <div class="col s-implement"><div class="colhead"><span class="colname">Implement</span><span class="colcount">2</span></div>
+        <div class="collist">
+          <div class="card"><div class="handle">CH-01KTDE</div><div class="intent">Add checkout flow with saved cards</div>
+            <div class="cardfoot"><span class="live"><span class="d running"></span>running</span></div></div>
+          <div class="card"><div class="handle">CH-01KTFG</div><div class="intent">Fix login redirect loop</div>
+            <div class="cardfoot"><span class="live"><span class="d notRunning"></span>not running</span><span class="attnflag">stopped mid-reply</span></div></div>
+        </div>
+      </div>
+      <div class="col s-review"><div class="colhead"><span class="colname">Review</span><span class="colcount">0</span></div><div class="collist"></div></div>
+      <div class="col s-ship"><div class="colhead"><span class="colname">Ship</span><span class="colcount">1</span></div>
+        <div class="collist">
+          <div class="card"><div class="handle">CH-01KTHJ</div><div class="intent">Weekly digest email</div>
+            <div class="cardfoot"><span class="live"><span class="d notRunning"></span>not running</span></div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="section-label">↓ When you click a change — the thread, with live chat</div>
+
+<!-- ============ VIEW 2: THE THREAD ============ -->
+<div class="shell" style="height:780px">
+  <aside class="sidebar">
+    <div class="brandrow"><div class="brandmark"></div><div class="brandname">Sulis</div></div>
+    <div class="navitem"><span class="dot" style="background:var(--border)"></span>Board</div>
+    <h4>In flight</h4>
+    <div class="navitem active"><span class="live"><span class="d running"></span></span>drive-a-change</div>
+    <div class="navitem"><span class="live"><span class="d running"></span></span>add-checkout-flow</div>
+    <div class="navitem"><span class="live"><span class="d notRunning"></span></span>fix-login-redirect</div>
+  </aside>
+
+  <div class="main" style="padding:0;overflow:hidden">
+    <div class="thread">
+      <!-- left: status + conversation + composer -->
+      <div class="threadmain">
+        <div class="threadhead">
+          <div class="handle">CH-01KT50 · create</div>
+          <h2>Drive a change from the app</h2>
+          <div class="track">
+            <div class="step done">Recon</div>
+            <div class="step done">Specify</div>
+            <div class="step current">Design</div>
+            <div class="step">Implement</div>
+            <div class="step">Review</div>
+            <div class="step">Ship</div>
+          </div>
+          <div class="status">
+            <div class="lbl">What's happening</div>
+            The design pass is underway. The technical blueprint and both contracts
+            (the data contract and this visual one) are drafted and waiting for your
+            sign-off before building starts.
+          </div>
+        </div>
+
+        <div class="convo">
+          <div class="resumednote">↻ This change was resumed — picking up where it left off</div>
+          <div class="msg user"><div class="who">You</div><div class="bubble">Can you make the board land on stage columns, left to right?</div></div>
+          <div class="msg agent"><div class="who">Agent</div><div class="bubble">Yes — the board now reads recon → specify → design → implement → review → ship, with each change as a card in its stage's column. Want me to show shipped changes there too, or keep them in the sidebar's archive?</div></div>
+          <div class="msg user"><div class="who">You</div><div class="bubble">Keep shipped in the archive. Now add the live chat dock.</div></div>
+          <div class="msg agent streaming"><div class="who">Agent</div><div class="bubble">Adding the chat composer as a dock at the bottom of every thread, so sending a message is always one glance from reading the change<span class="caret"></span></div></div>
+        </div>
+
+        <div class="composer">
+          <textarea placeholder="Message this change's agent…">Now wire the brain view on the right.</textarea>
+          <span class="state">agent is replying…</span>
+          <button class="send">Send</button>
+        </div>
+      </div>
+
+      <!-- right: brain + preview -->
+      <div class="rail">
+        <div class="railtabs">
+          <div class="railtab active">Brain</div>
+          <div class="railtab">Files</div>
+        </div>
+        <div class="railbody">
+          <div class="bgroup">
+            <h5>Requirements (6)</h5>
+            <div class="bitem"><div class="bt">Board lists changes in stage columns</div><div class="bk">requirement · FR-01</div></div>
+            <div class="bitem"><div class="bt">Send a message to a change's agent</div><div class="bk">requirement · FR-16</div></div>
+            <div class="bitem"><div class="bt">Reply streams back live</div><div class="bk">requirement · FR-17</div></div>
+          </div>
+          <div class="bgroup">
+            <h5>Workflows (6)</h5>
+            <div class="bitem"><div class="bt">Talk to the agent about a change</div><div class="bk">workflow</div></div>
+            <div class="bitem"><div class="bt">Find a change</div><div class="bk">workflow</div></div>
+          </div>
+
+          <h5 style="margin-top:8px">Reading a document</h5>
+          <div class="previewbar">
+            <span class="fn">SRD.md</span>
+            <span class="toggle"><span class="on">Rendered</span><span>Raw</span></span>
+          </div>
+          <div class="rendered">
+            <h1>Drive a change from the app</h1>
+            <p>Today the Sulis app is a read-only window onto your work…</p>
+            <h2>Six things get added</h2>
+            <ul><li>A board you land on</li><li>Plain-English progress</li><li>The brain, in plain sight</li><li>Two-way chat</li></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

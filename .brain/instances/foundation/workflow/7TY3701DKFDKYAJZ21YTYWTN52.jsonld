@@ -1,0 +1,24 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:7TY3701DKFDKYAJZ21YTYWTN52",
+  "initial_steps": [
+    "518jnqev-open-sulis-with-nothing-set-up-and-say-w-1"
+  ],
+  "name": "Set up a product just by talking",
+  "state": "draft",
+  "steps": [
+    "518jnqev-open-sulis-with-nothing-set-up-and-say-w-1",
+    "518jnqev-tell-it-you-don-t-have-a-repo-yet-or-poi-2",
+    "518jnqev-confirm-what-it-found-3"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "518jnqev-confirm-what-it-found-3"
+  ],
+  "transitions": [
+    "518jnqev-open-sulis-with-nothing-set-up-and-say-w-1 -> 518jnqev-tell-it-you-don-t-have-a-repo-yet-or-poi-2",
+    "518jnqev-tell-it-you-don-t-have-a-repo-yet-or-poi-2 -> 518jnqev-confirm-what-it-found-3"
+  ],
+  "type": "review"
+}

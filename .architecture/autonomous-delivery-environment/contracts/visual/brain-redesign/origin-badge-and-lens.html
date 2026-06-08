@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Change origin — badge + lens (UNSIGNED)</title>
+<!--
+  ============================================================================
+  REVIEW MOCKUP (UNSIGNED — for founder choice) · Sulis cockpit
+  CHANGE ORIGIN / ATTRIBUTION — Mockup 1 of 2 · "origin-badge-and-lens"
+  ----------------------------------------------------------------------------
+  The recommended A+B fork: PER-ITEM attribution shown on BOTH surfaces in one
+  page (stacked sections, like the earlier multi-state mockups):
+
+    SECTION A · IN FILES — the changed-files list, each file carries a WORDED
+      origin badge ("Autonomous" / "Assisted · likely" / "Origin unknown").
+      Clicking a badge opens a small trace panel beneath the row:
+        - Assisted → the conversation's plain-English Turn Card summary +
+          "Open conversation →"
+        - Autonomous → the run row (name + outcome + confidence)
+      One Assisted file is shown with its trace panel already open.
+
+    SECTION B · IN PROVENANCE — a "How it came to be" lens: changes grouped
+      under "Autonomous (12)" and "Assisted · likely (4)" with count pills;
+      one Assisted row expanded inline to its summary + link. A one-line
+      honesty banner sits at the top of the lens.
+
+    EMPTY / UNKNOWN treatment is shown in both sections: a neutral
+    "Origin unknown" badge with "we couldn't match this to a run or
+    conversation" — never a fabricated guess.
+
+  Bound to the SIGNED design instance (apps/cockpit/client/src/tokens.css /
+  sulis-app.html): every colour a var(--*); fonts loaded as the signed contract
+  (L-13 — Inter / Satoshi / JetBrains Mono). Heroicons (MIT, Tailwind Labs):
+  bolt = Autonomous, chat-bubble = Assisted, question-mark-circle = unknown,
+  arrow-uturn-left = trace-back, clock = timing. Worded status never
+  colour-alone (Autonomous / Assisted spelled out). AA pairs on every
+  badge/chip/button. Progressive disclosure: badge → trace panel on click.
+  AA-internal ink shades sit in :root, flagged pending token regen. UNSIGNED.
+  ============================================================================
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet">
+<style>
+/* ===== TOKENS — verbatim from apps/cockpit/client/src/tokens.css :root (light) ===== */
+:root{
+  --background:#fafafa; --foreground:#171717;
+  --card:#ffffff; --card-foreground:#171717;
+  --popover:#ffffff; --popover-foreground:#171717;
+  --muted:#f5f5f5; --muted-foreground:#737373;
+  --secondary:#f5f5f5; --secondary-foreground:#171717;
+  --border:#e5e5e5; --border-muted:#f0f0f0; --input:#e5e5e5;
+  --primary:#2563EB; --primary-foreground:#FFFFFF;
+  --accent:#2D7D90; --accent-foreground:#FFFFFF;
+  --destructive:#DC2626; --destructive-foreground:#FFFFFF;
+  --positive:#16A34A; --positive-foreground:#FFFFFF;
+  --warning:#F59E0B; --warning-foreground:#121212;
+  --ring:#2563EB; --brand-gold:#C9A962; --brand-depth:#1E3A5F;
+  --bg-positive:#F0FDF4; --bg-positive-border:#BBF7D0;
+  --bg-destructive:#FEF2F2; --bg-destructive-border:#FECACA;
+  --bg-warning:#FFFBEB; --bg-warning-border:#FDE68A;
+  --stage-recon:#8B7355; --stage-specify:#6366F1; --stage-design:#2D7D90;
+  --stage-implement:#2563EB; --stage-review:#9333EA; --stage-ship:#15803D;
+  --radius-interactive:4px; --radius-button:9999px; --radius-container:4px;
+  --radius-badge:9999px; --radius-media:4px;
+  --font-sans:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-display:'Satoshi',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono','SF Mono','Monaco','Inconsolata','Fira Mono',monospace;
+  --weight-body:400; --weight-heading:300; --weight-label:500;
+  --bg-card:var(--card); --bg-muted:var(--muted); --border-light:var(--border-muted);
+  --font:var(--font-sans); --radius:var(--radius-container);
+  --text:var(--foreground); --text-secondary:#525252; --text-muted:var(--muted-foreground);
+  --attn-icon:#B45309;
+  --bg-accent:color-mix(in srgb,var(--accent) 8%,#fff);
+  --bg-accent-border:color-mix(in srgb,var(--accent) 28%,var(--border));
+  /* AA-internal ink shades — same hue family as their base hue, darkened so
+   * text/numerals clear WCAG AA *as text* on their own tint. NOTE: pending
+   * token regen — each becomes a named semantic token next instance regen. */
+  --accent-ink:#246676;     /* on --bg-accent (~5.9:1) */
+  --specify-ink:#4338CA;    /* assisted = specify-indigo family (~7.1:1) */
+  --bg-specify:color-mix(in srgb,var(--stage-specify) 9%,#fff);
+  --bg-specify-border:color-mix(in srgb,var(--stage-specify) 26%,var(--border));
+  --shadow-float:0 6px 20px rgba(23,23,23,.08), 0 1px 3px rgba(23,23,23,.06);
+}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#EDEAE3;color:var(--text);font-family:var(--font-sans);font-weight:var(--weight-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+:focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:var(--radius)}
+button{appearance:none;-webkit-appearance:none;background:none;border:0;margin:0;padding:0;font:inherit;color:inherit;line-height:inherit;text-align:inherit}
+button,[role="button"],[tabindex],a{cursor:pointer}
+svg{display:block}
+[hidden]{display:none!important}
+
+.docnote{max-width:1440px;margin:0 auto;padding:18px 28px 6px;color:var(--text-secondary);font-size:12.5px}
+.docnote b{color:var(--text);font-weight:600}
+.frame{width:1440px;height:1640px;margin:8px auto 28px;background:var(--background);border-radius:10px;overflow:hidden;border:1px solid var(--border);box-shadow:0 1px 3px rgba(23,23,23,.07);display:flex;flex-direction:column}
+
+/* ===== WORKSPACE TOP BAR (verbatim shell) ===== */
+.topbar{flex:0 0 auto;display:flex;align-items:stretch;background:var(--card);border-bottom:1px solid var(--border);height:48px}
+.prodswitch{display:flex;align-items:center;gap:9px;padding:0 14px;border-right:1px solid var(--border);min-width:210px}
+.prodswitch .tile{width:28px;height:28px;flex:none;border-radius:7px;background:var(--brand-depth);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:12px;letter-spacing:.02em}
+.prodswitch .pn{font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--text);letter-spacing:-.01em}
+.prodswitch .chev{margin-left:auto;color:var(--text-muted)}
+.prodswitch:hover{background:var(--bg-muted)}
+.tabstrip{display:flex;align-items:stretch;gap:0;flex:1;min-width:0;overflow:hidden}
+.gtab{display:flex;align-items:center;gap:8px;padding:0 14px;border-right:1px solid var(--border);color:var(--text-secondary);font-size:13px;font-weight:var(--weight-label);position:relative;white-space:nowrap;max-width:280px}
+.gtab .ic{width:18px;height:18px;flex:none;color:var(--text-muted)}
+.gtab:hover{background:var(--bg-muted);color:var(--text)}
+.gtab .nm{overflow:hidden;text-overflow:ellipsis}
+.gtab .sdot{width:8px;height:8px;border-radius:50%;flex:none}
+.gtab .x{width:18px;height:18px;flex:none;display:inline-flex;align-items:center;justify-content:center;border-radius:5px;color:var(--text-muted);margin-left:2px}
+.gtab .x:hover{background:var(--border);color:var(--text)}
+.gtab .x svg{width:13px;height:13px}
+.gtab.active{background:var(--background);color:var(--text);font-weight:600}
+.gtab.active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--accent)}
+.tabstrip .newtab{display:inline-flex;align-items:center;justify-content:center;width:42px;color:var(--text-muted);border-right:1px solid var(--border)}
+.tabstrip .newtab:hover{background:var(--bg-muted);color:var(--text)}
+.tabstrip .newtab svg{width:18px;height:18px}
+
+/* ===== THE OPEN CHANGE — left nav + full-width main (verbatim shell) ===== */
+.change{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:248px 1fr}
+.leftnav{background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:auto;padding:16px 12px 12px}
+.cn-head{padding:2px 8px 14px;border-bottom:1px solid var(--border-muted);margin-bottom:6px}
+.cn-kicker{font-family:var(--font-mono);font-size:11px;color:var(--text-muted)}
+.cn-name{font-size:15px;font-weight:600;line-height:1.3;color:var(--text);margin-top:4px;letter-spacing:-.01em}
+.cn-meta{display:flex;align-items:center;gap:7px;margin-top:9px}
+.stagebadge{padding:3px 9px;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;border-radius:var(--radius);background:var(--bg-accent);color:var(--accent-ink);border:1px solid var(--bg-accent-border)}
+.cn-live{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary);font-weight:var(--weight-label)}
+.cn-live .g{width:8px;height:8px;border-radius:50%;background:var(--positive);box-shadow:0 0 0 2px var(--bg-positive)}
+.cn-sectionlabel{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin:14px 8px 8px;font-weight:600}
+.vtrack{list-style:none;margin:0 4px 4px;padding:0}
+.vstep{display:flex;align-items:center;gap:10px;padding:4px 8px;font-size:12px;color:var(--text-muted);position:relative}
+.vstep .vd{width:10px;height:10px;border-radius:50%;background:var(--input);flex:none;border:2px solid var(--card);z-index:2}
+.vstep:not(:last-child)::before{content:"";position:absolute;left:13px;top:18px;width:1px;height:14px;background:var(--border);z-index:1}
+.vstep[data-state="done"]{color:var(--text-secondary)}
+.vstep[data-state="done"] .vd{background:var(--text-secondary)}
+.vstep[data-state="now"]{color:var(--accent);font-weight:700}
+.vstep[data-state="now"] .vd{background:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,#fff)}
+.vstep .vw{margin-left:auto;font-size:9px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;color:var(--text-muted)}
+.vstep[data-state="now"] .vw{color:var(--accent)}
+.navitem{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:var(--radius);color:var(--text-secondary);font-size:13px;border:1px solid transparent;text-decoration:none;font-weight:var(--weight-label);width:100%}
+.navitem:hover{background:var(--bg-muted);color:var(--text)}
+.navitem.active{background:var(--bg-muted);color:var(--text)}
+.navitem .ic{width:20px;height:20px;flex:none;color:var(--text-muted)}
+.navitem.active .ic{color:var(--accent)}
+.navitem .cnt{margin-left:auto;font-size:11px;color:var(--text-muted);font-family:var(--font-mono)}
+.leftnav-foot{margin-top:auto;padding:12px 8px 2px;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:7px;border-top:1px solid var(--border-muted)}
+.leftnav-foot .g{width:8px;height:8px;border-radius:50%;background:var(--positive);flex:none;box-shadow:0 0 0 2px var(--bg-positive)}
+
+/* ===== MAIN AREA ===== */
+.main{display:flex;flex-direction:column;min-width:0;overflow-y:auto;background:var(--background);scrollbar-width:thin}
+.wrap{max-width:980px;margin:0 auto;width:100%;padding:8px 28px 40px}
+
+/* section header */
+.sec{margin-top:26px}
+.sec:first-of-type{margin-top:8px}
+.sechead{display:flex;align-items:flex-end;gap:12px;margin-bottom:6px}
+.sechead .where{display:inline-flex;align-items:center;gap:7px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--accent-ink);background:var(--bg-accent);border:1px solid var(--bg-accent-border);border-radius:var(--radius-button);padding:4px 11px}
+.sechead .where svg{width:13px;height:13px}
+.sechead .ttl{font-family:var(--font-display);font-size:20px;font-weight:700;letter-spacing:-.012em;color:var(--text)}
+.sechead .sub{font-size:12.5px;color:var(--text-secondary);margin-top:2px}
+.secdiv{height:1px;background:var(--border-muted);margin:6px 0 16px}
+
+/* ===== ORIGIN BADGE — the shared idiom (worded, never colour-alone) ===== */
+.obadge{display:inline-flex;align-items:center;gap:6px;padding:3px 11px 3px 9px;border-radius:var(--radius-button);font-size:11.5px;font-weight:600;border:1px solid var(--border);white-space:nowrap}
+.obadge svg{width:13px;height:13px;flex:none}
+.obadge .qual{font-weight:500;opacity:.85}
+.obadge.auto{background:var(--bg-accent);border-color:var(--bg-accent-border);color:var(--accent-ink)}
+.obadge.assist{background:var(--bg-specify);border-color:var(--bg-specify-border);color:var(--specify-ink)}
+.obadge.unknown{background:var(--bg-muted);border-color:var(--border);color:var(--text-secondary)}
+.obadge.btn:hover{filter:brightness(.97)}
+.obadge.btn .caret{width:13px;height:13px;margin-left:1px;transition:transform .15s ease}
+.obadge.btn[aria-expanded="true"] .caret{transform:rotate(180deg)}
+
+/* ===== SECTION A · FILES LIST ===== */
+.filelist{border:1px solid var(--border);border-radius:10px;background:var(--card);overflow:hidden;box-shadow:0 1px 2px rgba(23,23,23,.04)}
+.filerow{display:flex;align-items:center;gap:13px;padding:13px 16px;border-bottom:1px solid var(--border-muted)}
+.filerow:last-child{border-bottom:0}
+.frow-wrap:last-child .filerow{border-bottom:0}
+.fr-ic{width:30px;height:30px;flex:none;border-radius:7px;background:var(--bg-muted);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;color:var(--text-secondary)}
+.fr-ic svg{width:16px;height:16px}
+.fr-tx{flex:1;min-width:0}
+.fr-tx .fn{font-family:var(--font-mono);font-size:13px;color:var(--text);font-weight:500}
+.fr-tx .fm{font-size:11.5px;color:var(--text-muted);margin-top:2px}
+.fr-stat{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;font-family:var(--font-mono)}
+.fr-stat .add{color:var(--stage-ship)} .fr-stat .del{color:var(--destructive)}
+
+/* trace panel beneath a file row */
+.trace{border-bottom:1px solid var(--border-muted);background:var(--bg-muted);padding:0 16px 14px 59px}
+.frow-wrap:last-child .trace{border-bottom:0}
+.tracecard{border:1px solid var(--border);border-radius:9px;background:var(--card);overflow:hidden}
+.tracecard .th{display:flex;align-items:center;gap:8px;padding:9px 13px;border-bottom:1px solid var(--border-muted)}
+.tracecard .th svg{width:14px;height:14px;color:var(--specify-ink)}
+.tracecard.autoT .th svg{color:var(--accent-ink)}
+.tracecard .th .tk{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:var(--specify-ink)}
+.tracecard.autoT .th .tk{color:var(--accent-ink)}
+.tracecard .th .tt{font-size:12px;color:var(--text-secondary);font-weight:var(--weight-label)}
+.tracecard .body{padding:12px 14px}
+.turncard{display:flex;gap:11px}
+.turncard .av{width:26px;height:26px;flex:none;border-radius:50%;background:var(--bg-specify);border:1px solid var(--bg-specify-border);display:inline-flex;align-items:center;justify-content:center;color:var(--specify-ink)}
+.turncard .av svg{width:14px;height:14px}
+.turncard .tcx .q{font-size:13px;color:var(--text);line-height:1.5}
+.turncard .tcx .meta{font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);margin-top:6px}
+.traceact{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:0 14px 12px}
+.openconv{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:var(--weight-label);color:var(--accent-foreground);background:var(--accent);border-radius:var(--radius-button);padding:7px 14px}
+.openconv:hover{filter:brightness(.95)}
+.openconv svg{width:14px;height:14px}
+/* autonomous run row inside trace */
+.runrow{display:flex;align-items:center;gap:11px;padding:11px 14px}
+.runrow .ri{width:30px;height:30px;flex:none;border-radius:7px;background:var(--bg-accent);border:1px solid var(--bg-accent-border);display:inline-flex;align-items:center;justify-content:center;color:var(--accent-ink)}
+.runrow .ri svg{width:16px;height:16px}
+.runrow .rx{flex:1;min-width:0}
+.runrow .rx .rn{font-size:13px;color:var(--text);font-weight:600}
+.runrow .rx .rm{font-size:11.5px;color:var(--text-secondary);margin-top:2px}
+.minichips{display:flex;align-items:center;gap:7px;flex:none}
+.mchip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:var(--radius-button);font-size:10.5px;font-weight:600;border:1px solid var(--border)}
+.mchip svg{width:12px;height:12px}
+.mchip.done{background:var(--bg-positive);border-color:var(--bg-positive-border);color:var(--stage-ship)}
+.mchip.conf{background:var(--bg-accent);border-color:var(--bg-accent-border);color:var(--accent-ink)}
+.unkmsg{font-size:12px;color:var(--text-secondary);padding:11px 14px;display:flex;align-items:center;gap:9px}
+.unkmsg svg{width:16px;height:16px;flex:none;color:var(--text-muted)}
+
+/* ===== SECTION B · PROVENANCE LENS ===== */
+.honesty{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--text-secondary);background:var(--bg-warning);border:1px solid var(--bg-warning-border);border-radius:9px;padding:9px 13px;margin-bottom:14px}
+.honesty svg{width:15px;height:15px;flex:none;color:var(--attn-icon)}
+.honesty b{color:var(--text);font-weight:600}
+.lensgroup{border:1px solid var(--border);border-radius:10px;background:var(--card);overflow:hidden;box-shadow:0 1px 2px rgba(23,23,23,.04);margin-bottom:14px}
+.grouphead{display:flex;align-items:center;gap:10px;padding:12px 15px;border-bottom:1px solid var(--border-muted);background:var(--bg-muted)}
+.grouphead .gi{width:28px;height:28px;flex:none;border-radius:7px;display:inline-flex;align-items:center;justify-content:center}
+.grouphead .gi svg{width:15px;height:15px}
+.grouphead.auto .gi{background:var(--bg-accent);border:1px solid var(--bg-accent-border);color:var(--accent-ink)}
+.grouphead.assist .gi{background:var(--bg-specify);border:1px solid var(--bg-specify-border);color:var(--specify-ink)}
+.grouphead .gt{font-size:14px;font-weight:600;color:var(--text)}
+.grouphead .gsub{font-size:11.5px;color:var(--text-secondary);margin-top:1px}
+.grouphead .pill{margin-left:auto;display:inline-flex;align-items:center;font-family:var(--font-mono);font-size:12px;font-weight:600;padding:3px 11px;border-radius:var(--radius-button)}
+.grouphead.auto .pill{background:var(--bg-accent);border:1px solid var(--bg-accent-border);color:var(--accent-ink)}
+.grouphead.assist .pill{background:var(--bg-specify);border:1px solid var(--bg-specify-border);color:var(--specify-ink)}
+.lensrow-wrap{border-bottom:1px solid var(--border-muted)}
+.lensrow-wrap:last-child{border-bottom:0}
+.lensrow{width:100%;display:flex;align-items:center;gap:12px;padding:11px 16px;text-align:left}
+.lensrow:hover{background:var(--bg-muted)}
+.lensrow .lfn{font-family:var(--font-mono);font-size:12.5px;color:var(--text);flex:none;min-width:108px}
+.lensrow .lsum{flex:1;min-width:0;font-size:12.5px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lensrow .lwhen{font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);flex:none}
+.lensrow .caret{width:16px;height:16px;flex:none;color:var(--text-muted);transition:transform .15s ease}
+.lensrow[aria-expanded="true"] .caret{transform:rotate(180deg)}
+.lensrow[aria-expanded="true"]{background:var(--bg-muted)}
+.lensdetail{background:var(--bg-muted);padding:0 16px 14px 16px;border-top:1px dashed var(--border)}
+.lensdetail .inner{border:1px solid var(--bg-specify-border);border-radius:9px;background:var(--card);padding:13px 15px;margin-top:12px}
+.lensdetail .inner.autoD{border-color:var(--bg-accent-border)}
+
+.tip{font-size:11.5px;color:var(--text-muted);margin-top:4px;display:flex;align-items:center;gap:7px}
+.tip svg{width:14px;height:14px;flex:none}
+</style>
+</head>
+<body>
+<div class="docnote"><b>Change origin — Mockup 1 of 2: badge + lens (UNSIGNED).</b> The recommended A+B fork — per-item attribution shown on both surfaces. In Files, each changed file carries a worded origin badge; click it to trace back (one Assisted file is shown open). In Provenance, a “How it came to be” lens groups changes by origin with an honesty banner. The empty/unknown case is shown honestly in both. Real tokens, fonts loaded, Heroicons. Click any badge or lens row.</div>
+
+<div class="frame">
+
+  <!-- ===== WORKSPACE TOP BAR (verbatim shell) ===== -->
+  <div class="topbar">
+    <button class="prodswitch" type="button" aria-label="Switch product — Clinics">
+      <span class="tile" aria-hidden="true">CL</span>
+      <span class="pn">Clinics</span>
+      <svg class="chev" width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
+    </button>
+    <div class="tabstrip" role="tablist" aria-label="Open tabs">
+      <button class="gtab board" role="tab" aria-selected="false" type="button">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"/></svg>
+        <span class="nm">Board</span>
+      </button>
+      <div class="gtab active" role="tab" aria-selected="true" tabindex="0">
+        <span class="sdot" style="background:var(--stage-design)" aria-hidden="true"></span>
+        <span class="nm">Set up the autonomous delivery environment</span>
+        <span class="x" role="button" tabindex="0" aria-label="Close tab"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg></span>
+      </div>
+      <button class="gtab" role="tab" aria-selected="false" type="button">
+        <span class="sdot" style="background:var(--stage-implement)" aria-hidden="true"></span>
+        <span class="nm">Tidy the morning digest</span>
+        <span class="x" role="button" tabindex="0" aria-label="Close tab"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg></span>
+      </button>
+      <button class="newtab" type="button" aria-label="Open a new change tab"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg></button>
+    </div>
+  </div>
+
+  <!-- ===== THE OPEN CHANGE ===== -->
+  <div class="change">
+
+    <!-- LEFT NAV — Provenance selected -->
+    <nav class="leftnav" aria-label="Change navigation">
+      <div class="cn-head">
+        <div class="cn-kicker">autonomous-delivery-env</div>
+        <div class="cn-name">Set up the autonomous delivery environment</div>
+        <div class="cn-meta"><span class="stagebadge">Design</span><span class="cn-live"><span class="g" aria-hidden="true"></span>Running</span></div>
+      </div>
+      <div class="cn-sectionlabel">Stage</div>
+      <ol class="vtrack" aria-label="Change progress">
+        <li class="vstep" data-state="done"><span class="vd" aria-hidden="true"></span>Recon<span class="vw">Done</span></li>
+        <li class="vstep" data-state="done"><span class="vd" aria-hidden="true"></span>Specify<span class="vw">Done</span></li>
+        <li class="vstep" data-state="now" aria-current="step"><span class="vd" aria-hidden="true"></span>Design<span class="vw">Now</span></li>
+        <li class="vstep" data-state="pending"><span class="vd" aria-hidden="true"></span>Implement<span class="vw">Pending</span></li>
+        <li class="vstep" data-state="pending"><span class="vd" aria-hidden="true"></span>Review<span class="vw">Pending</span></li>
+        <li class="vstep" data-state="pending"><span class="vd" aria-hidden="true"></span>Ship<span class="vw">Pending</span></li>
+      </ol>
+      <div class="cn-sectionlabel">Views</div>
+      <a class="navitem" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 0 1-.825-.242m9.345-8.334a2.126 2.126 0 0 0-.476-.095 48.64 48.64 0 0 0-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0 0 11.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155"/></svg>Conversation</a>
+      <a class="navitem" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>Files <span class="cnt">16</span></a>
+      <button class="navitem active" aria-current="page"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m21 7.5-2.25-1.313M21 7.5v2.25m0-2.25-2.25 1.313M3 7.5l2.25-1.313M3 7.5l2.25 1.313M3 7.5v2.25m9 3 2.25-1.313M12 12.75l-2.25-1.313M12 12.75V15m0 6.75 2.25-1.313M12 21.75V19.5m0 2.25-2.25-1.313m0-16.875L12 2.25l2.25 1.313M21 14.25v2.25l-2.25 1.313m-13.5 0L3 16.5v-2.25"/></svg>Provenance <span class="cnt">119</span></button>
+      <a class="navitem" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>Preview</a>
+      <div class="leftnav-foot"><span class="g" aria-hidden="true"></span>Agent running in this change</div>
+    </nav>
+
+    <!-- ===== MAIN AREA — both surfaces stacked ===== -->
+    <div class="main">
+      <div class="wrap">
+
+        <!-- ============================================================ -->
+        <!-- SECTION A · IN FILES — changed-files list with origin badges -->
+        <!-- ============================================================ -->
+        <section class="sec" aria-label="Files — changed files with origin">
+          <div class="sechead">
+            <span class="where"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>In Files</span>
+            <div>
+              <div class="ttl">Changed files — where each came from</div>
+              <div class="sub">Every changed file shows its origin. Click a badge to trace it back.</div>
+            </div>
+          </div>
+          <div class="secdiv" aria-hidden="true"></div>
+
+          <div class="filelist">
+
+            <!-- file 1 — Assisted, trace panel OPEN -->
+            <div class="frow-wrap">
+              <div class="filerow">
+                <span class="fr-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776"/></svg></span>
+                <span class="fr-tx"><span class="fn">cart.ts</span><span class="fm">src/checkout · changed in this change</span></span>
+                <span class="fr-stat"><span class="add">+34</span><span class="del">−12</span></span>
+                <button class="obadge assist btn" type="button" data-trace="t1" aria-expanded="true" aria-controls="t1">
+                  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 2c-2.236 0-4.43.18-6.57.524C1.993 2.755 1 4.014 1 5.426v5.148c0 1.413.993 2.67 2.43 2.902.848.137 1.705.248 2.57.331v3.443a.75.75 0 0 0 1.28.53l3.58-3.579a.78.78 0 0 1 .527-.224 41.202 41.202 0 0 0 5.183-.5c1.437-.232 2.43-1.49 2.43-2.903V5.426c0-1.413-.993-2.67-2.43-2.902A41.289 41.289 0 0 0 10 2Z" clip-rule="evenodd"/></svg>
+                  Assisted <span class="qual">· likely</span>
+                  <svg class="caret" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
+                </button>
+              </div>
+              <div class="trace" id="t1">
+                <div class="tracecard">
+                  <div class="th">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3 19.5a6 6 0 0 1 12 0v.75H3v-.75Z"/></svg>
+                    <span class="tk">Assisted in conversation</span>
+                    <span class="tt">a working chat session on this change</span>
+                  </div>
+                  <div class="body">
+                    <div class="turncard">
+                      <span class="av" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.465 14.493a1.23 1.23 0 0 0 .41 1.412A9.957 9.957 0 0 0 10 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 0 0-13.074.003Z"/></svg></span>
+                      <div class="tcx">
+                        <div class="q">“Reworked the cart total so discounts apply before tax.”</div>
+                        <div class="meta">turn 14 · you + the agent · ~3 hours ago</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="traceact">
+                    <button class="openconv" type="button">
+                      Open conversation
+                      <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- file 2 — Autonomous (collapsed) -->
+            <div class="frow-wrap">
+              <div class="filerow">
+                <span class="fr-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776"/></svg></span>
+                <span class="fr-tx"><span class="fn">checkout.ts</span><span class="fm">src/checkout · changed in this change</span></span>
+                <span class="fr-stat"><span class="add">+118</span><span class="del">−9</span></span>
+                <button class="obadge auto btn" type="button" data-trace="t2" aria-expanded="false" aria-controls="t2">
+                  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M11.983 1.907a.75.75 0 0 0-1.292-.657l-8.5 9.5A.75.75 0 0 0 2.75 12h6.572l-1.305 6.093a.75.75 0 0 0 1.292.657l8.5-9.5A.75.75 0 0 0 17.25 8h-6.572l1.305-6.093Z" clip-rule="evenodd"/></svg>
+                  Autonomous
+                  <svg class="caret" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
+                </button>
+              </div>
+              <div class="trace" id="t2" hidden>
+                <div class="tracecard autoT">
+                  <div class="th">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z"/></svg>
+                    <span class="tk">Made by an autonomous run</span>
+                    <span class="tt">no human in the loop for this change</span>
+                  </div>
+                  <div class="runrow">
+                    <span class="ri" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.983 1.907a.75.75 0 0 0-1.292-.657l-8.5 9.5A.75.75 0 0 0 2.75 12h6.572l-1.305 6.093a.75.75 0 0 0 1.292.657l8.5-9.5A.75.75 0 0 0 17.25 8h-6.572l1.305-6.093Z" clip-rule="evenodd"/></svg></span>
+                    <div class="rx"><div class="rn">Specify pass</div><div class="rm">Turned the brief into a written spec — completed across 16 steps.</div></div>
+                    <div class="minichips">
+                      <span class="mchip done"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>Completed</span>
+                      <span class="mchip conf">88% confident</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- file 3 — Autonomous (collapsed) -->
+            <div class="frow-wrap">
+              <div class="filerow">
+                <span class="fr-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776"/></svg></span>
+                <span class="fr-tx"><span class="fn">pricing.ts</span><span class="fm">src/checkout · changed in this change</span></span>
+                <span class="fr-stat"><span class="add">+52</span><span class="del">−4</span></span>
+                <button class="obadge auto btn" type="button" data-trace="t3" aria-expanded="false" aria-controls="t3">
+                  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M11.983 1.907a.75.75 0 0 0-1.292-.657l-8.5 9.5A.75.75 0 0 0 2.75 12h6.572l-1.305 6.093a.75.75 0 0 0 1.292.657l8.5-9.5A.75.75 0 0 0 17.25 8h-6.572l1.305-6.093Z" clip-rule="evenodd"/></svg>
+                  Autonomous
+                  <svg class="caret" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
+                </button>
+              </div>
+              <div class="trace" id="t3" hidden>
+                <div class="tracecard autoT">
+                  <div class="th">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z"/></svg>
+                    <span class="tk">Made by an autonomous run</span>
+                    <span class="tt">no human in the loop for this change</span>
+                  </div>
+                  <div class="runrow">
+                    <span class="ri" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.983 1.907a.75.75 0 0 0-1.292-.657l-8.5 9.5A.75.75 0 0 0 2.75 12h6.572l-1.305 6.093a.75.75 0 0 0 1.292.657l8.5-9.5A.75.75 0 0 0 17.25 8h-6.572l1.305-6.093Z" clip-rule="evenodd"/></svg></span>
+                    <div class="rx"><div class="rn">Specify pass</div><div class="rm">Turned the brief into a written spec — completed across 16 steps.</div></div>
+                    <div class="minichips">
+                      <span class="mchip done"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>Completed</span>
+                      <span class="mchip conf">88% confident</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- file 4 — UNKNOWN (collapsed; honest "couldn't match") -->
+            <div class="frow-wrap">
+              <div class="filerow">
+                <span class="fr-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776"/></svg></span>
+                <span class="fr-tx"><span class="fn">README.md</span><span class="fm">root · changed in this change</span></span>
+                <span class="fr-stat"><span class="add">+6</span><span class="del">−1</span></span>
+                <button class="obadge unknown btn" type="button" data-trace="t4" aria-expanded="false" aria-controls="t4">
+                  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0ZM8.94 6.94a.75.75 0 1 1-1.061-1.061 3 3 0 1 1 2.871 5.026v.345a.75.75 0 0 1-1.5 0v-.5c0-.72.57-1.172 1.081-1.287A1.5 1.5 0 1 0 8.94 6.94ZM10 15a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+                  Origin unknown
+                  <svg class="caret" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
+                </button>
+              </div>
+              <div class="trace" id="t4" hidden>
+                <div class="tracecard">
+                  <div class="unkmsg">
+                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0ZM8.94 6.94a.75.75 0 1 1-1.061-1.061 3 3 0 1 1 2.871 5.026v.345a.75.75 0 0 1-1.5 0v-.5c0-.72.57-1.172 1.081-1.287A1.5 1.5 0 1 0 8.94 6.94ZM10 15a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+                    We couldn’t match this to a run or a conversation. We won’t guess — when this change is stamped at its source, the origin will fill in here.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+          <div class="tip"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm-.25-9.25a.75.75 0 1 1 0-1.5h.5a.75.75 0 0 1 .75.75v3.25h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2.5h-.25Z" clip-rule="evenodd"/></svg>“Likely” means we inferred it from timing — it isn’t stamped yet.</div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- SECTION B · IN PROVENANCE — "How it came to be" lens -->
+        <!-- ============================================================ -->
+        <section class="sec" aria-label="Provenance — how it came to be">
+          <div class="sechead">
+            <span class="where"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m21 7.5-2.25-1.313M21 7.5v2.25m0-2.25-2.25 1.313M3 7.5l2.25-1.313M3 7.5l2.25 1.313M3 7.5v2.25m9 3 2.25-1.313M12 12.75l-2.25-1.313M12 12.75V15m0 6.75 2.25-1.313M12 21.75V19.5m0 2.25-2.25-1.313m0-16.875L12 2.25l2.25 1.313M21 14.25v2.25l-2.25 1.313m-13.5 0L3 16.5v-2.25"/></svg>In Provenance</span>
+            <div>
+              <div class="ttl">How it came to be</div>
+              <div class="sub">The same changes, grouped by how each one was made.</div>
+            </div>
+          </div>
+          <div class="secdiv" aria-hidden="true"></div>
+
+          <!-- one-line honesty banner -->
+          <div class="honesty">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/></svg>
+            <span><b>Origins are inferred from timing</b> until changes are stamped at their source. We mark inferred ones “likely”.</span>
+          </div>
+
+          <!-- group: Autonomous (12) -->
+          <div class="lensgroup">
+            <div class="grouphead auto">
+              <span class="gi" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.983 1.907a.75.75 0 0 0-1.292-.657l-8.5 9.5A.75.75 0 0 0 2.75 12h6.572l-1.305 6.093a.75.75 0 0 0 1.292.657l8.5-9.5A.75.75 0 0 0 17.25 8h-6.572l1.305-6.093Z" clip-rule="evenodd"/></svg></span>
+              <div><div class="gt">Autonomous</div><div class="gsub">made by runs, no human in the loop</div></div>
+              <span class="pill">12</span>
+            </div>
+            <div class="lensrow-wrap">
+              <button class="lensrow" type="button" aria-expanded="false"><span class="lfn">checkout.ts</span><span class="lsum">Specify pass · built the payment flow against the spec</span><span class="lwhen">88% · 4h ago</span><svg class="caret" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg></button>
+            </div>
+            <div class="lensrow-wrap">
+              <button class="lensrow" type="button" aria-expanded="false"><span class="lfn">pricing.ts</span><span class="lsum">Specify pass · set the discount + tax order of operations</span><span class="lwhen">88% · 4h ago</span><svg class="caret" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg></button>
+            </div>
+            <div class="lensrow-wrap">
+              <button class="lensrow" type="button" aria-expanded="false"><span class="lfn">checkout.test.ts</span><span class="lsum">Verify pass · added the checkout scenario harness</span><span class="lwhen">88% · 2h ago</span><svg class="caret" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg></button>
+            </div>
+            <div class="lensrow-wrap">
+              <button class="lensrow" type="button" aria-expanded="false" style="color:var(--text-muted)"><span class="lfn" style="color:var(--text-muted)">+ 9 more</span><span class="lsum">all from the Specify and Verify passes</span><span class="lwhen">88% avg</span><svg class="caret" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg></button>
+            </div>
+          </div>
+
+          <!-- group: Assisted · likely (4) — one row expanded inline -->
+          <div class="lensgroup">
+            <div class="grouphead assist">
+              <span class="gi" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2c-2.236 0-4.43.18-6.57.524C1.993 2.755 1 4.014 1 5.426v5.148c0 1.413.993 2.67 2.43 2.902.848.137 1.705.248 2.57.331v3.443a.75.75 0 0 0 1.28.53l3.58-3.579a.78.78 0 0 1 .527-.224 41.202 41.202 0 0 0 5.183-.5c1.437-.232 2.43-1.49 2.43-2.903V5.426c0-1.413-.993-2.67-2.43-2.902A41.289 41.289 0 0 0 10 2Z" clip-rule="evenodd"/></svg></span>
+              <div><div class="gt">Assisted · likely</div><div class="gsub">shaped with you in a chat session — inferred from timing</div></div>
+              <span class="pill">4</span>
+            </div>
+            <!-- expanded row -->
+            <div class="lensrow-wrap">
+              <button class="lensrow" type="button" aria-expanded="true"><span class="lfn">cart.ts</span><span class="lsum">Reworked the cart total so discounts apply before tax.</span><span class="lwhen">~3h ago</span><svg class="caret" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg></button>
+              <div class="lensdetail">
+                <div class="inner">
+                  <div class="turncard">
+                    <span class="av" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.465 14.493a1.23 1.23 0 0 0 .41 1.412A9.957 9.957 0 0 0 10 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 0 0-13.074.003Z"/></svg></span>
+                    <div class="tcx">
+                      <div class="q">“Reworked the cart total so discounts apply before tax.”</div>
+                      <div class="meta">turn 14 · you + the agent · ~3 hours ago</div>
+                    </div>
+                  </div>
+                  <div class="traceact" style="padding:12px 0 0">
+                    <button class="openconv" type="button">Open conversation<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd"/></svg></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="lensrow-wrap">
+              <button class="lensrow" type="button" aria-expanded="false"><span class="lfn">cart.ts</span><span class="lsum">Added a guard so an empty cart can’t reach checkout.</span><span class="lwhen">~3h ago</span><svg class="caret" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg></button>
+            </div>
+            <div class="lensrow-wrap">
+              <button class="lensrow" type="button" aria-expanded="false"><span class="lfn">README.md</span><span class="lsum">Documented the new discount-before-tax behaviour.</span><span class="lwhen">~2h ago</span><svg class="caret" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg></button>
+            </div>
+            <div class="lensrow-wrap">
+              <button class="lensrow" type="button" aria-expanded="false"><span class="lfn">pricing.ts</span><span class="lsum">Tweaked rounding on the line-item total.</span><span class="lwhen">~2h ago</span><svg class="caret" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg></button>
+            </div>
+          </div>
+
+          <!-- group: Origin unknown (1) — honest, never a fake guess -->
+          <div class="lensgroup">
+            <div class="grouphead" style="background:var(--bg-muted)">
+              <span class="gi" aria-hidden="true" style="background:var(--bg-muted);border:1px solid var(--border);color:var(--text-secondary)"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0ZM8.94 6.94a.75.75 0 1 1-1.061-1.061 3 3 0 1 1 2.871 5.026v.345a.75.75 0 0 1-1.5 0v-.5c0-.72.57-1.172 1.081-1.287A1.5 1.5 0 1 0 8.94 6.94ZM10 15a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg></span>
+              <div><div class="gt">Origin unknown</div><div class="gsub">we couldn’t match this to a run or conversation</div></div>
+              <span class="pill" style="background:var(--bg-muted);border:1px solid var(--border);color:var(--text-secondary)">1</span>
+            </div>
+            <div class="lensrow-wrap">
+              <div class="lensrow" style="cursor:default"><span class="lfn">config.json</span><span class="lsum">No run or conversation matched this change — we won’t guess.</span><span class="lwhen">—</span></div>
+            </div>
+          </div>
+
+        </section>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// progressive disclosure — badge toggles its trace panel (Section A)
+document.querySelectorAll('.obadge.btn').forEach(function(b){
+  b.addEventListener('click', function(){
+    var id=b.getAttribute('data-trace');
+    var panel=document.getElementById(id);
+    var open=b.getAttribute('aria-expanded')==='true';
+    b.setAttribute('aria-expanded', String(!open));
+    if(panel) panel.hidden=open;
+  });
+});
+// lens rows — toggle inline detail (Section B), only rows that have one
+document.querySelectorAll('.lensrow[aria-expanded]').forEach(function(r){
+  r.addEventListener('click', function(){
+    var detail=r.parentElement.querySelector('.lensdetail');
+    var open=r.getAttribute('aria-expanded')==='true';
+    r.setAttribute('aria-expanded', String(!open));
+    if(detail) detail.hidden=open;
+  });
+});
+</script>
+</body>
+</html>

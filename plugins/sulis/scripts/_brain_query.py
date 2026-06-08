@@ -29,6 +29,8 @@ import re
 from pathlib import Path
 from typing import Callable, Final, Iterator
 
+from _brain_labels import roadmap_sidecar_path
+
 
 _INSTANCE_FILE_GLOB: Final[str] = "*.jsonld"
 _ENTITY_ID_RE: Final = re.compile(r"^dna:[a-z]+:[0-9A-HJKMNP-TV-Z]{26}$")
@@ -329,7 +331,41 @@ def find_current_for_tenant(
     return current
 
 
+# ─── Backlog state sets — the single source (ADR-006) ──────────────────
+# The open/done view definitions live here, once, as immutable frozensets.
+# The `/sulis:backlog` skill (WP-010) and the Sulis agent body (WP-012) import
+# these rather than re-deriving the state→view mapping, so the two FR-07/FR-08
+# consumers cannot drift (ADR-006 — "no duplication across the two consumers").
+#
+# Requirement states (vendored schema enum): draft / approved / implemented /
+# verified. Opportunity states: hypothesis / validated / defined / dropped.
+
+_OPEN_REQUIREMENT_STATES: Final[frozenset[str]] = frozenset({"draft"})
+_OPEN_OPPORTUNITY_STATES: Final[frozenset[str]] = frozenset({"hypothesis"})
+_DONE_REQUIREMENT_STATES: Final[frozenset[str]] = frozenset({"implemented", "verified"})
+
+
 # ─── Domain-specific high-level queries ────────────────────────────────
+
+
+def _find_typed(
+    base_dir: Path,
+    entity_type: str,
+    *,
+    domain: str,
+    state: str | None,
+) -> list[dict]:
+    """Enumerate one entity type, optionally narrowed to a single `state`.
+
+    Shared shape behind `find_requirements` and `find_opportunities`. When
+    `state` is None the type filter is the only predicate (preserving the
+    historical `find_requirements` behaviour exactly); otherwise the existing
+    `where_field_equals("state", …)` combinator narrows the result.
+    """
+    predicate = where_field_equals("state", state) if state is not None else None
+    return find_entities(
+        base_dir, domain=domain, entity_type=entity_type, predicate=predicate
+    )
 
 
 def find_testresults_verifying(
@@ -362,13 +398,40 @@ def find_requirements(
     base_dir: Path,
     *,
     domain: str = "product-development",
+    state: str | None = None,
 ) -> list[dict]:
-    """All Requirement entities under `base_dir`.
+    """All Requirement entities under `base_dir`, optionally filtered by state.
 
     Used by the DoD checker: enumerate every Requirement, then for each
     ask whether any TestResult verifies it.
+
+    Args:
+        state: optional requirement state to narrow to (`draft` / `approved` /
+            `implemented` / `verified`). The default `None` reproduces the
+            historical behaviour exactly — every Requirement, unfiltered — so
+            existing callers (the DoD verification flow) are unaffected.
     """
-    return find_entities(base_dir, domain=domain, entity_type="requirement")
+    return _find_typed(base_dir, "requirement", domain=domain, state=state)
+
+
+def find_opportunities(
+    base_dir: Path,
+    *,
+    domain: str = "product-development",
+    state: str | None = None,
+) -> list[dict]:
+    """All Opportunity entities under `base_dir`, optionally filtered by state.
+
+    The sibling to `find_requirements` (ADR-006 — the module had the
+    requirement enumerator but not the opportunity one). State filtering uses
+    the existing `where_field_equals` combinator; no new traversal primitive.
+
+    Args:
+        state: optional opportunity state to narrow to (`hypothesis` /
+            `validated` / `defined` / `dropped`). `None` returns every
+            Opportunity.
+    """
+    return _find_typed(base_dir, "opportunity", domain=domain, state=state)
 
 
 def find_passing_testresults_verifying(
@@ -383,3 +446,155 @@ def find_passing_testresults_verifying(
         for r in find_testresults_verifying(base_dir, requirement_id, domain=domain)
         if r.get("outcome") == "pass"
     ]
+
+
+# ─── Scenario-set enumeration + state (journey-rigor #84) ────────────────────
+# The journey-walk (design) + scenario-coverage check (plan) need to pull the
+# COMPLETE set of scenarios for a journey — to check ALL of them even when only
+# some are being built — and to ask each one's verification state. Built on the
+# same iter_entities + predicate primitives; no new traversal mechanism.
+
+
+def find_scenarios_for_journey(
+    base_dir: Path,
+    journey_workflow_id: str,
+    *,
+    domain: str = "product-development",
+) -> list[dict]:
+    """All Scenarios whose `journey` is `journey_workflow_id` (a Workflow id).
+
+    The "all scenarios in THIS journey" enumeration: a journey is a Workflow,
+    and each Scenario carries `journey -> dna:workflow:<ulid>`. Group by it to
+    get the journey's full scenario set, so the journey-walk / coverage check
+    can account for every one even if only some are in the current change.
+    """
+    if not _ENTITY_ID_RE.match(journey_workflow_id):
+        raise ValueError(
+            f"journey_workflow_id must match dna:<type>:<ulid>; got {journey_workflow_id!r}"
+        )
+    return find_entities(
+        base_dir,
+        domain=domain,
+        entity_type="scenario",
+        predicate=where_field_equals("journey", journey_workflow_id),
+    )
+
+
+def find_scenarios_verifying(
+    base_dir: Path,
+    requirement_id: str,
+    *,
+    domain: str = "product-development",
+) -> list[dict]:
+    """All Scenarios whose `verifies` array contains `requirement_id`.
+
+    The other grouping key: the scenario set for a change's requirements.
+    """
+    if not _ENTITY_ID_RE.match(requirement_id):
+        raise ValueError(
+            f"requirement_id must match dna:<type>:<ulid>; got {requirement_id!r}"
+        )
+    return find_entities(
+        base_dir,
+        domain=domain,
+        entity_type="scenario",
+        predicate=where_list_field_contains("verifies", requirement_id),
+    )
+
+
+def find_passing_testresults_for_scenario(
+    base_dir: Path,
+    scenario_id: str,
+    *,
+    domain: str = "product-development",
+) -> list[dict]:
+    """All passing TestResults back-linked to `scenario_id` (`scenario` field).
+
+    "Is this Scenario currently observed-green?" — the per-scenario state the
+    coverage check uses to classify an already-built scenario as still-green
+    (vs needing a re-run). Uses the `TestResult.scenario` back-link the
+    acceptance run deposits (see `_scenario_evidence`)."""
+    if not _ENTITY_ID_RE.match(scenario_id):
+        raise ValueError(
+            f"scenario_id must match dna:<type>:<ulid>; got {scenario_id!r}"
+        )
+    return [
+        r for r in find_entities(
+            base_dir, domain=domain, entity_type="testresult",
+            predicate=where_field_equals("scenario", scenario_id),
+        )
+        if r.get("outcome") == "pass"
+    ]
+
+
+# ─── Roadmap sidecar — the member reader (ADR-001 / FR-07) ───────────────
+# The Roadmap flag is a per-repo sidecar label file, NOT a field on the
+# entity (the vendored schemas are ``unevaluatedProperties: false``; ADR-001).
+# This module is the single read seam (ADR-006). The on-disk shape (filename,
+# layout) is defined once in ``_brain_labels`` and shared with the writer
+# (``_brain_capture``).
+
+
+def roadmap_members(base_dir: Path) -> list[str]:
+    """Read the Roadmap sidecar → its member entity ids, sorted.
+
+    Reads ``<base_dir>/labels/roadmap.jsonld`` (ADR-001 shape
+    ``{"label": "roadmap", "members": [...]}``) and returns the member ids
+    sorted (diff-friendly, deterministic).
+
+    Best-effort (NFR-01): if the sidecar is missing OR malformed (not valid
+    JSON, or the wrong shape), returns ``[]`` and never raises — the same
+    degradation contract as the entity store (`iter_entities` skips corrupt
+    files silently).
+
+    Args:
+        base_dir: the ``.brain/`` root. The sidecar lives at
+            ``base_dir / "labels" / "roadmap.jsonld"``.
+
+    Returns:
+        Sorted list of member entity ids; ``[]`` when absent or malformed.
+    """
+    sidecar = roadmap_sidecar_path(base_dir)
+    try:
+        data = json.loads(sidecar.read_text())
+    except (json.JSONDecodeError, OSError):
+        return []
+    members = data.get("members", []) if isinstance(data, dict) else []
+    if not isinstance(members, list):
+        return []
+    return sorted(m for m in members if isinstance(m, str))
+
+
+def find_roadmap(
+    base_dir: Path,
+    *,
+    domain: str = "product-development",
+) -> list[dict]:
+    """Resolve the Roadmap sidecar's member ids to their entities.
+
+    Reads the member ids via `roadmap_members` (WP-005 — the single sidecar
+    reader; this function does NOT re-read the on-disk layout) and resolves
+    them to entities via the existing `where_id_in` predicate. No new
+    traversal primitive (ADR-006).
+
+    Best-effort (NFR-01): an empty / missing / malformed sidecar yields no
+    members, so this returns `[]` and never raises — `roadmap_members`
+    already absorbs the malformed case.
+
+    Args:
+        base_dir: the `.brain/` root (the sidecar lives under it; the entity
+            instances live under `base_dir / "instances"`).
+        domain: the domain whose instances the member ids resolve against.
+
+    Returns:
+        The roadmap member entities; `[]` when the sidecar is empty / absent /
+        malformed.
+    """
+    member_ids = roadmap_members(base_dir)
+    if not member_ids:
+        return []
+    return find_entities(
+        base_dir / "instances",
+        domain=domain,
+        predicate=where_id_in(member_ids),
+    )

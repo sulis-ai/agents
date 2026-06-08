@@ -234,6 +234,26 @@ child_wps:
 > makes it a WP so the dependency is enforceable via the existing done-oracle
 > rather than aspirational prose.)
 
+> **Founder-facing flows need an interaction contract.** When the
+> founder-facing capability spans a **multi-step interaction flow** (a sequence
+> the user walks end-to-end, not a single screen), the work **SHOULD** emit a
+> `kind: contract` WP with `contract_type: interaction` — sibling to the visual
+> contract. Its done-gate is the **exercised-flow predicate**: the WP reaches
+> `done` only when the flow has been **exercised end-to-end over stub
+> adapters** and the evidence is recorded (`exercised_at` + `exercised_by` ∈
+> {`agent-observed`, `human-attested`} + `exercised_attestation`). That gate is
+> enforced by `wpx-index` at the done-transition — the same done-oracle that
+> signs off the visual contract — so an un-exercised interaction contract can't
+> be marked done.
+>
+> **Phase 1 is SHOULD strength.** This callout makes the interaction contract a
+> recommended decomposition with a runtime done-gate for any WP that *opts in*
+> by declaring `contract_type: interaction`. Making it **MUST** — mandatory for
+> *all* founder-facing work, enforced at write-time so a founder-facing WP
+> without an interaction contract is refused at INDEX entry — is the **Phase 2**
+> flip, and is explicitly **out of scope** here (ADR-002). Until Phase 2 lands,
+> the interaction contract is SHOULD, not MUST.
+
 > **Exemption.** Single-kind work and `--prototype` changes are exempt from
 > contract-first decomposition (`CONTRACT_FIRST_STANDARD.md` tier carve-out).
 

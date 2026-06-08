@@ -177,7 +177,7 @@ loop:
            if [[ "$CURRENT_BRANCH" == change/* ]]; then
                BASE_BRANCH="$CURRENT_BRANCH"
            else
-               BASE_BRANCH="dev"
+               BASE_BRANCH="main"
            fi
 
        Then read the base branch HEAD's CURRENT recorded CI
@@ -286,7 +286,7 @@ loop:
        - If any WPs remain "pending" (deps not met) → blocked on
          dependencies; surface what's blocking; exit.
        - If no WPs remain pending and no auto-drafts → the batch is
-         **merged**, but DO NOT claim "shipped / complete / dev is
+         **merged**, but DO NOT claim "shipped / complete / main is
          green" yet — that claim must be grounded in the gate that
          actually blocks (Definition of Done, agents/sulis.md). Run the
          gate check before the completion report:
@@ -303,14 +303,14 @@ loop:
            green → honest to report "shipped / all WPs done."
          - **branch-CI is advisory (protection unavailable)** → branch-CI
            green is NOT a ship signal. Report, in founder English:
-           *"All {N} pieces are built and merged to dev — but automated
+           *"All {N} pieces are built and merged to main — but automated
            checks are advisory on this repo, so this isn't verified-
            shippable yet. The real gate is the deploy run; I'll confirm
            it's green before calling this done."* Then verify the
            blocking gate (the deploy-to-dev workflow conclusion, read
            explicitly — never a watched exit code) and only claim
            complete once it's green. NEVER report "journey complete /
-           dev is green / nothing blocked" off advisory CI. (#79;
+           main is green / nothing blocked" off advisory CI. (#79;
            wires the #52 unprotected-repo detection into the "done"
            claim. Programmatic deploy-gate polling is the scoped
            follow-on.)
@@ -346,12 +346,46 @@ loop:
     7. Mark each picked WP status: in_progress in INDEX with
        timestamp.
 
+    7.5. **Pin ONE base ref for the whole batch (#106 — MUST).**
+       Parallel executors that resolve their own `--base-branch` will
+       drift: one ends up off the local `change/*` tip, another off
+       `origin/main` after a fetch — the calling session then has to
+       reconcile bases by hand before the train. Pick
+       the base ref **once, here**, and pass it verbatim to every
+       executor in the wave so all worktrees branch off the same SHA:
+
+       ```bash
+       CURRENT_BRANCH=$(git -C <repo-root> branch --show-current)
+       if [[ "$CURRENT_BRANCH" == change/* ]]; then
+           # Shipping into a change — use the change branch (LOCAL ref,
+           # since the change branch may not exist on origin yet).
+           BATCH_BASE_BRANCH="$CURRENT_BRANCH"
+       else
+           # Shipping direct to main (the trunk) — fetch origin/main once
+           # so every executor branches off the same fresh tip.
+           git -C <repo-root> fetch origin main
+           BATCH_BASE_BRANCH="main"
+       fi
+       BATCH_BASE_SHA=$(git -C <repo-root> rev-parse "$BATCH_BASE_BRANCH")
+       ```
+
+       Substitute `<BATCH_BASE_BRANCH>` into every executor brief in
+       Step 8 below — every Agent prompt MUST include
+       `--base-branch <BATCH_BASE_BRANCH>` on its `wpx-worktree create`
+       call. Capture `<BATCH_BASE_SHA>` for the drift gate at Step 12.5
+       so any in-batch drift is detected before the train pass.
+
     8. Dispatch ALL picked WPs in a SINGLE message containing
        multiple Agent tool_use blocks — Claude Code runs them
        concurrently. The Agent `description` is rendered on the
        founder's screen — it MUST be founder-English (the plain
        translation of the WP's title), NEVER a raw WP ID or
        "Ship WP-NNN". See "Founder progress discipline" below.
+
+       **Every executor prompt in this dispatch MUST include
+       `--base-branch <BATCH_BASE_BRANCH>` on its `wpx-worktree create`
+       call (per Step 7.5 #106).** Don't let executors resolve their
+       own base independently — that's the divergence the pin closes.
 
        Agent({
          subagent_type: "sulis:executor",
@@ -511,7 +545,7 @@ loop:
        if [[ "$CURRENT_BRANCH" == change/* ]]; then
            BASE_BRANCH="$CURRENT_BRANCH"
        else
-           BASE_BRANCH="dev"
+           BASE_BRANCH="main"
        fi
 
        "$WPX_DIR/wpx-train" run \
@@ -706,7 +740,7 @@ loop:
              description: "Step 11 post-batch verification for <wp_id>",
              model: <security_model from frontmatter, if present>,
              prompt: """
-               Review the squash-merge at <merge_sha> on dev
+               Review the squash-merge at <merge_sha> on main
                (deployed to <deploy_url>). Health: <health_status>.
                Smoke: <smoke_verdict>.
 
@@ -791,7 +825,7 @@ loop:
 
        Step 11 doesn't tight-loop within one train run (re-spawning
        the reviewer per WP after a fix isn't useful — the merge is
-       already on dev). Instead, the loop is DISTRIBUTED across trains:
+       already on main). Instead, the loop is DISTRIBUTED across trains:
 
        - This train's Step 11 produces N findings + M auto-drafted WPs
        - Founder promotes WP-AUTO-* to `pending`
@@ -874,7 +908,7 @@ loop:
               --branch <branch> \
               --pipeline-result @<batch deploy/verify result JSON> \
               --worktree-path <worktree>
-            git branch -D <branch>   # merged to dev; safe to delete
+            git branch -D <branch>   # merged to main; safe to delete
 
         Only the calling run-all session has the per-WP worktree paths,
         so this step lives here, not in `mark-gates-complete`. Skip it on
@@ -958,7 +992,7 @@ loop:
              description: "Step 11 post-deploy verification for WP-NNN",
              model: <security_model from frontmatter, if present>,
              prompt: """
-               Review the squash-merge at <merge_sha> on dev
+               Review the squash-merge at <merge_sha> on main
                (deployed to <deploy_url>). Health: <health_status>.
                Smoke: <smoke_verdict>.
 

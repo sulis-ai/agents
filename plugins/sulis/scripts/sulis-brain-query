@@ -10,6 +10,19 @@ Modes (mutually exclusive):
     --by-id <full-id>               Fetch one instance by its dna:<type>:<ulid> id.
     --verifying <req-id>            All TestResults whose `verifies` contains <req-id>.
     --passing-verifying <req-id>    Same, but filtered to outcome=pass.
+    --open                          Open backlog = draft requirements +
+                                    hypothesis opportunities (merged, deduped by id).
+    --done                          Done = implemented/verified requirements.
+    --roadmap                       Roadmap sidecar members resolved to entities.
+    --by-type {opportunity,requirement}
+                                    All instances of one backlog type; composable
+                                    with --by-state.
+    --by-state <state>              Narrow --by-type to a single state.
+
+The --open/--done/--roadmap/--by-type/--by-state modes delegate to the
+`_brain_query` view functions and the `_OPEN_*`/`_DONE_*` state constants —
+the open/done state mapping is defined once in that module, never re-derived
+here (ADR-006 single-source).
 
 Common args:
     [--base-dir <dir>]              Default: <repo-root>/.brain/instances
@@ -33,8 +46,14 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from _brain_query import (  # noqa: E402
+    _DONE_REQUIREMENT_STATES,
+    _OPEN_OPPORTUNITY_STATES,
+    _OPEN_REQUIREMENT_STATES,
     find_entities,
+    find_opportunities,
     find_passing_testresults_verifying,
+    find_requirements,
+    find_roadmap,
     find_testresults_verifying,
     iter_entities,
 )
@@ -63,6 +82,43 @@ def _err(message: str) -> int:
     return 1
 
 
+def _find_in_states(finder, base_dir: Path, domain: str, states) -> list[dict]:
+    """Run `finder(base_dir, domain=…, state=…)` once per state in `states`,
+    flattening the results into one list.
+
+    The shared shape behind `--open` (draft requirements + hypothesis
+    opportunities) and `--done` (implemented + verified requirements): each
+    view is a finder applied across a frozenset of states from the `_OPEN_*` /
+    `_DONE_*` module constants (ADR-006 single-source). `states` is sorted so
+    the output order is deterministic (the frozensets are unordered).
+    """
+    return [
+        inst
+        for state in sorted(states)
+        for inst in finder(base_dir, domain=domain, state=state)
+    ]
+
+
+def _dedupe_by_id(*entity_lists: list[dict]) -> list[dict]:
+    """Merge entity lists into one, keeping first-seen per `id`.
+
+    Used by `--open`, which unions two view results (draft requirements +
+    hypothesis opportunities). Distinct entity types can't share an id today,
+    but the dedupe keeps the merge honest and single-sourced rather than
+    inlining the same loop at each call site (Blue: one small helper).
+    """
+    seen: set = set()
+    merged: list[dict] = []
+    for entities in entity_lists:
+        for inst in entities:
+            ident = inst.get("id")
+            if ident in seen:
+                continue
+            seen.add(ident)
+            merged.append(inst)
+    return merged
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Query the brain entity graph.")
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -72,6 +128,16 @@ def main() -> int:
     mode.add_argument("--verifying", help="dna:requirement:<ulid> — return all TestResults verifying it")
     mode.add_argument("--passing-verifying",
                       help="dna:requirement:<ulid> — return only passing TestResults verifying it")
+    mode.add_argument("--open", action="store_true",
+                      help="open backlog: draft requirements + hypothesis opportunities")
+    mode.add_argument("--done", action="store_true",
+                      help="done: implemented/verified requirements")
+    mode.add_argument("--roadmap", action="store_true",
+                      help="roadmap sidecar members resolved to entities")
+    mode.add_argument("--by-type", choices=("opportunity", "requirement"),
+                      help="all instances of one backlog type (composable with --by-state)")
+    parser.add_argument("--by-state",
+                        help="narrow --by-type to a single state (e.g. draft/approved/hypothesis)")
     parser.add_argument("--base-dir")
     parser.add_argument("--domain", default="product-development")
     parser.add_argument("--repo-root")
@@ -114,6 +180,41 @@ def main() -> int:
                 base_dir, args.passing_verifying, domain=args.domain,
             )
             return _ok({"count": len(results), "entities": results})
+
+        if args.open:
+            # open = draft requirements + hypothesis opportunities (ADR-006:
+            # the state mapping is the _OPEN_* module constants, not redefined
+            # here). Merge + dedupe by id via the single helper.
+            reqs = _find_in_states(
+                find_requirements, base_dir, args.domain, _OPEN_REQUIREMENT_STATES
+            )
+            opps = _find_in_states(
+                find_opportunities, base_dir, args.domain, _OPEN_OPPORTUNITY_STATES
+            )
+            entities = _dedupe_by_id(reqs, opps)
+            return _ok({"count": len(entities), "entities": entities})
+
+        if args.done:
+            # done = implemented/verified requirements (_DONE_* constants).
+            entities = _find_in_states(
+                find_requirements, base_dir, args.domain, _DONE_REQUIREMENT_STATES
+            )
+            return _ok({"count": len(entities), "entities": entities})
+
+        if args.roadmap:
+            # find_roadmap takes the `.brain/` root (it appends `instances`);
+            # base_dir is `.brain/instances`, so its parent is that root.
+            entities = find_roadmap(base_dir.parent, domain=args.domain)
+            return _ok({"count": len(entities), "entities": entities})
+
+        if args.by_type:
+            finder = (
+                find_requirements
+                if args.by_type == "requirement"
+                else find_opportunities
+            )
+            entities = finder(base_dir, domain=args.domain, state=args.by_state)
+            return _ok({"count": len(entities), "entities": entities})
 
     except ValueError as exc:
         return _err(str(exc))

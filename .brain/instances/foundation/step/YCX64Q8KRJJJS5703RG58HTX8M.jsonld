@@ -1,0 +1,21 @@
+{
+  "agent_instructions": "Read the captured Requirement back by id; the chain is whole.",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:YCX64Q8KRJJJS5703RG58HTX8M",
+  "input_artifacts": [
+    "7y6vxt0c-deposit-an-idea-its-why-is-matured-into-1-result"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/sulis-brain-query --base-dir .brain/instances --by-id dna:requirement:ZW14SZB4V7KY7RXP2QWSBWAF6S\", \"expect_exit\": 0}",
+  "name": "7y6vxt0c-read-the-captured-requirement-back-by-id-2",
+  "output_artifacts": [
+    "7y6vxt0c-read-the-captured-requirement-back-by-id-2-result"
+  ],
+  "postconditions": [
+    "the Requirement resolves with a source pointing at the Opportunity"
+  ],
+  "state": "draft",
+  "sys_status": "active",
+  "tool_ref": "dna:tool:XV1303ZB30B7ZBVBPSQG3FC194"
+}

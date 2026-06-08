@@ -1,0 +1,185 @@
+diff --git a/plugins/sulis/scripts/_origin_stamp.py b/plugins/sulis/scripts/_origin_stamp.py
+index fd86c3cb..9fb784a4 100644
+--- a/plugins/sulis/scripts/_origin_stamp.py
++++ b/plugins/sulis/scripts/_origin_stamp.py
+@@ -70,6 +70,24 @@ def _has_control_char(value: str) -> bool:
+     return any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in value)
+ 
+ 
++# The trailer grammar's structural separators: `;` splits segments, `=` binds a
++# key to its value. A FIELD value carrying either could smuggle extra segments
++# into the single trailer line (`thread_x; confidence=1; run=evil`), so a value
++# is refused at emit time if it contains a control char OR a separator. This is
++# the EMIT-side guard only — `parse_origin_env` legitimately consumes `;`/`=`
++# (there they ARE the grammar, not injection).
++_TRAILER_SEPARATORS = (";", "=")
++
++
++def _is_trailer_safe(value: str) -> bool:
++    """True if `value` is safe to interpolate into a trailer field: no control
++    character AND none of the grammar separators (`;`, `=`). Legitimate inputs
++    (ULIDs, `thread_<uuid>`) contain neither, so they pass unchanged."""
++    return not _has_control_char(value) and not any(
++        sep in value for sep in _TRAILER_SEPARATORS
++    )
++
++
+ def _fmt_number(value: float) -> str:
+     # 0.9 not 0.900000001; an int stays an int. Mirrors the reader's tolerant
+     # parseFloat, but emit the tidiest form.
+@@ -83,17 +101,21 @@ def _fmt_number(value: float) -> str:
+ def format_trailer(origin: OriginDict) -> str:
+     """Render an origin dict as the single `Sulis-Origin: …` trailer line.
+ 
+-    A trailer is ONE line. Any string field carrying a control character
+-    (notably a newline) would forge a second trailer line, so it is refused
+-    here as a last line of defence (the env-parse boundary rejects it first).
++    A trailer is ONE line built from a `;`/`=` grammar. Any string field
++    carrying a control character (notably a newline, which would forge a second
++    trailer line) OR one of the grammar's own separators (`;` / `=`, which would
++    forge extra segments) is refused here as a last line of defence (the
++    env-parse boundary rejects control chars first; the separator guard is the
++    defence-in-depth for service-assigned IDs flowing through the same port).
+     """
+     kind = origin.get("kind")
+     for field in ("run", "conversation"):
+         v = origin.get(field)
+-        if isinstance(v, str) and _has_control_char(v):
++        if isinstance(v, str) and not _is_trailer_safe(v):
+             raise ValueError(
+-                f"origin field {field!r} contains a control character; "
+-                "refusing to emit a forgeable trailer"
++                f"origin field {field!r} contains a control character or a "
++                "trailer separator (';' / '='); refusing to emit a forgeable "
++                "trailer"
+             )
+     if kind == "autonomous":
+         run = origin["run"]
+@@ -190,11 +212,20 @@ def autonomous_env(
+ 
+     NON-FATAL (ADR-013): a missing / empty / whitespace-only run-ulid yields an
+     EMPTY env (`{}`) — nothing is exported, the commit lands UNSTAMPED, and
+-    origin degrades to inferred. This function never raises for an absent run.
++    origin degrades to inferred. A MALFORMED run-ulid (one `format_trailer`
++    refuses — a control char or a `;`/`=` separator) is handled the same way:
++    the `ValueError` is swallowed and `{}` returned, so a bad run yields an
++    unstamped commit, NEVER an aborted one ("a stamp failure is non-fatal;
++    never abort the commit to chase a stamp"). This function never raises.
+     """
+     if not run or not run.strip():
+         return {}
+-    trailer = format_trailer(autonomous_origin(run=run, confidence=confidence))
++    try:
++        trailer = format_trailer(autonomous_origin(run=run, confidence=confidence))
++    except ValueError:
++        # A malformed run (control char / `;` / `=`) must degrade to unstamped,
++        # the same non-fatal posture as the empty-run case (ADR-013).
++        return {}
+     body = trailer[len(f"{TRAILER_KEY}: ") :]
+     return {"SULIS_ORIGIN": body}
+ 
+diff --git a/plugins/sulis/scripts/tests/unit/test_origin_stamp.py b/plugins/sulis/scripts/tests/unit/test_origin_stamp.py
+index ab003c74..36219c29 100644
+--- a/plugins/sulis/scripts/tests/unit/test_origin_stamp.py
++++ b/plugins/sulis/scripts/tests/unit/test_origin_stamp.py
+@@ -25,6 +25,7 @@ import pytest
+ 
+ from _origin_stamp import (
+     append_trailer_to_message,
++    autonomous_env,
+     autonomous_origin,
+     assisted_origin,
+     format_trailer,
+@@ -115,6 +116,92 @@ def test_format_trailer_refuses_control_char_value():
+         )
+ 
+ 
++# ─── WP-008 ADVISORY-01: field-separator safety (`;` / `=`) ───────────────
++#
++# The trailer grammar uses `;` to separate segments and `=` to bind a key to
++# its value. A field value carrying either separator could smuggle extra
++# `;`/`=` segments into the single trailer line (`thread_x; confidence=1;
++# run=evil`). Inert today (the field values are filesystem-derived session IDs
++# / an internal run ULID, never `;`/`=`-bearing user input), but a
++# defence-in-depth hole the moment service-assigned IDs flow through the same
++# port. format_trailer must refuse a separator-bearing value, exactly as it
++# already refuses a control char.
++
++
++def test_format_trailer_refuses_separator_in_run():
++    """An autonomous `run` carrying the grammar's own `;` or `=` separators
++    must be refused — it could forge extra trailer segments."""
++    with pytest.raises(ValueError):
++        format_trailer({"kind": "autonomous", "run": "abc; confidence=1"})
++    with pytest.raises(ValueError):
++        format_trailer({"kind": "autonomous", "run": "run=evil"})
++
++
++def test_format_trailer_refuses_separator_in_conversation():
++    """An assisted `conversation` carrying `;` or `=` must be refused too."""
++    with pytest.raises(ValueError):
++        format_trailer(
++            {"kind": "assisted", "conversation": "thread_x; turn=9", "turn": 1}
++        )
++    with pytest.raises(ValueError):
++        format_trailer(
++            {"kind": "assisted", "conversation": "a=b", "turn": 1}
++        )
++
++
++def test_format_trailer_accepts_legitimate_values_unchanged():
++    """The guard must NOT regress legitimate inputs: a ULID run and a
++    `thread_<uuid>` conversation contain neither `;` nor `=`, so they still
++    render the exact pinned trailer."""
++    assert (
++        format_trailer(
++            autonomous_origin(run="01KT500K2JTE2EGW6TPPQ4D4VN", confidence=0.9)
++        )
++        == "Sulis-Origin: autonomous; run=01KT500K2JTE2EGW6TPPQ4D4VN; confidence=0.9"
++    )
++    assert format_trailer(
++        assisted_origin(
++            conversation="thread_3f2504e0-4f89-41d3-9a0c-0305e82c3301", turn=2
++        )
++    ) == (
++        "Sulis-Origin: assisted; "
++        "conversation=thread_3f2504e0-4f89-41d3-9a0c-0305e82c3301; turn=2"
++    )
++
++
++# ─── WP-008 ADVISORY-02: the autonomous stamp is NON-FATAL ────────────────
++#
++# autonomous_env already degrades to {} for an empty/whitespace run. But a run
++# carrying a control char (or, post-ADVISORY-01, a `;`/`=`) makes
++# format_trailer raise ValueError — which, unguarded in the executor's Step-7
++# export, would ABORT the commit rather than land it unstamped, violating the
++# "a stamp failure is non-fatal; never abort the commit to chase a stamp"
++# invariant (ADR-013). autonomous_env must swallow it and return {}.
++
++
++def test_autonomous_env_nonfatal_on_control_char_run():
++    """A control-char `run` must NOT propagate a ValueError out of
++    autonomous_env — it degrades to {} (unstamped), the same non-fatal posture
++    as the empty-run case (ADR-013)."""
++    assert autonomous_env(run="abc\nMalicious: x", confidence=0.9) == {}
++
++
++def test_autonomous_env_nonfatal_on_separator_run():
++    """A `;`/`=`-bearing `run` is likewise non-fatal: {} not a raise."""
++    assert autonomous_env(run="abc; confidence=1", confidence=0.5) == {}
++    assert autonomous_env(run="run=evil", confidence=None) == {}
++
++
++def test_autonomous_env_still_stamps_legitimate_run():
++    """The non-fatal guard must NOT swallow legitimate runs: a normal ULID
++    still produces the exported body."""
++    assert autonomous_env(
++        run="01KT500K2JTE2EGW6TPPQ4D4VN", confidence=0.7
++    ) == {
++        "SULIS_ORIGIN": "autonomous; run=01KT500K2JTE2EGW6TPPQ4D4VN; confidence=0.7"
++    }
++
++
+ # ─── stamp_origin — real round-trip on a real commit ──────────────────────
+ 
+ 

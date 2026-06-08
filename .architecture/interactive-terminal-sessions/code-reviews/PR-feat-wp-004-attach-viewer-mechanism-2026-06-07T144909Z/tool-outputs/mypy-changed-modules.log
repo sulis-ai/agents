@@ -1,0 +1,24 @@
+_session_manager/manager.py:117: error: No overload variant of "int" matches argument type "object"  [call-overload]
+_session_manager/manager.py:117: note: Possible overload variants:
+_session_manager/manager.py:117: note:     def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+_session_manager/manager.py:117: note:     def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+_session_manager/manager.py:128: error: Argument 1 to "float" has incompatible type "object"; expected "str | Buffer | SupportsFloat | SupportsIndex"  [arg-type]
+_session_manager/manager.py:130: error: No overload variant of "int" matches argument type "object"  [call-overload]
+_session_manager/manager.py:130: note: Possible overload variants:
+_session_manager/manager.py:130: note:     def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+_session_manager/manager.py:130: note:     def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+_session_manager/manager.py:131: error: Argument 1 to "MaintenanceManager" has incompatible type "**dict[str, object]"; expected "float"  [arg-type]
+_session_manager/manager.py:131: error: Argument 1 to "MaintenanceManager" has incompatible type "**dict[str, object]"; expected "int | None"  [arg-type]
+_session_manager/manager.py:131: error: Argument 1 to "MaintenanceManager" has incompatible type "**dict[str, object]"; expected "Callable[[], float]"  [arg-type]
+_session_manager/manager.py:139: error: Argument 1 to "float" has incompatible type "object"; expected "str | Buffer | SupportsFloat | SupportsIndex"  [arg-type]
+_session_manager/manager.py:141: error: No overload variant of "int" matches argument type "object"  [call-overload]
+_session_manager/manager.py:141: note: Possible overload variants:
+_session_manager/manager.py:141: note:     def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+_session_manager/manager.py:141: note:     def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+_session_manager/manager.py:150: error: Argument 1 to "float" has incompatible type "object"; expected "str | Buffer | SupportsFloat | SupportsIndex"  [arg-type]
+_session_manager/manager.py:157: error: No overload variant of "int" matches argument type "object"  [call-overload]
+_session_manager/manager.py:157: note: Possible overload variants:
+_session_manager/manager.py:157: note:     def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+_session_manager/manager.py:157: note:     def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+_session_manager/manager.py:344: error: Argument 1 to "get" of "dict" has incompatible type "int | None"; expected "int"  [arg-type]
+Found 11 errors in 1 file (checked 4 source files)

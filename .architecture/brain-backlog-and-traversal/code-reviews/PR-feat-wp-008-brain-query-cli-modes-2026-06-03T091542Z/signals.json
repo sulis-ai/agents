@@ -1,0 +1,54 @@
+{
+  "pr": "feat/wp-008-brain-query-cli-modes",
+  "project": "brain-backlog-and-traversal",
+  "timestamp": "2026-06-03T091542Z",
+  "base": "change/create-brain-backlog-and-traversal",
+  "head": "feat/wp-008-brain-query-cli-modes",
+  "verdict": "PASS",
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "tools": ["ruff check", "py_compile"],
+    "base_errors": 0,
+    "head_errors": 0
+  },
+  "pr_hygiene": {
+    "scope": {"severity": "none", "commit_types": ["feat"], "module_fan_out": 1},
+    "size": {"severity": "none", "lines_added": 291, "lines_removed": 0, "files_changed": 2},
+    "safety": {"severity": "none", "migrations": 0, "schemas": 0, "secrets": 0, "infra": 0},
+    "completeness": {"severity": "none", "new_source_without_test": 0}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 1},
+    "in_neighbours": {"critical": 0, "high": 0, "medium": 0, "low": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "status": "nothing-surfaced"},
+    "security": {"findings": 0, "status": "nothing-surfaced"},
+    "quality": {"findings": 1, "status": "complete"}
+  },
+  "findings_detail": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "lens": "quality",
+      "rule": "CR-10 (repeated invariant scan in loop)",
+      "file": "plugins/sulis/scripts/sulis-brain-query",
+      "line": "184-204",
+      "summary": "--open/--done re-walk the entity subtree once per state; benign at documented N (<5000) with fixed <=2 constant multiplier; in-scope fix would violate ADR-006 single-source or widen the WP-007 seam (out of scope).",
+      "resolution": "watch-list",
+      "delta": null
+    }
+  ],
+  "draft_deltas": [],
+  "auto_downgrade_triggers": [],
+  "methodology": {
+    "cr01_baseline": true,
+    "cr02_dispatch": "single-reader (carve-out: ~291 lines / 2 files)",
+    "cr03_full_reads": true,
+    "cr04_evidence": true,
+    "cr05_severity": true,
+    "cr06_verdict_computed": "PASS",
+    "cr07_lens_completion": true,
+    "cr09_pr_hygiene": true
+  }
+}

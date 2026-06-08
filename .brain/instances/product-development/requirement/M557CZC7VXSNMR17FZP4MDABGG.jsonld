@@ -1,0 +1,13 @@
+{
+  "acceptance_criteria": [
+    "see SRD body"
+  ],
+  "id": "dna:requirement:M557CZC7VXSNMR17FZP4MDABGG",
+  "priority": "must",
+  "rationale": "Extracted from FR-08 of /Users/iain/.sulis/changes/01KT500K2JTE2EGW6TPPQ4D4VN/worktree/.specifications/autonomous-delivery-environment/SRD.md. The `source` ref is a synthetic Opportunity placeholder generated from the SRD path; replace when Opportunity emission lands (queued follow-on slice). Defaults applied for SRD-absent fields: priority=must, verification_method=test, state=draft.",
+  "source": "dna:opportunity:BG8E0H5JPPWEK3G3B26T3H087A",
+  "state": "draft",
+  "statement": "Renderable files show a rendered view. For files whose type supports rendering (`.md`, `.html`, and similar), the app SHALL show a rendered view of the file. - *Acceptance:* Opening a `.md` file shows formatted output (headings, lists, etc.), not raw markdown source",
+  "sys_status": "active",
+  "verification_method": "test"
+}

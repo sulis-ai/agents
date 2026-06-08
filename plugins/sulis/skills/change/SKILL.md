@@ -38,7 +38,7 @@ You give it a subcommand and it does the right thing:
 
 | You type | What happens |
 |---|---|
-| `/sulis:change start "fix the login bug"` | Opens a fresh, focused workspace for that work — a new terminal with Sulis already briefed on it. |
+| `/sulis:change start "fix the login bug"` | Opens a fresh, focused workspace for that work — a desktop window showing a live view of the change's session, with Sulis already briefed on it. The same session also shows up in the cockpit: two views, one session. |
 | `/sulis:change list` | Shows everything you have in flight, in one scannable list. |
 | `/sulis:change focus CH-01HQ8X` | Jumps you back into a piece of work you started earlier. |
 | `/sulis:change ship CH-01HQ8X` | Lands the finished work into the shared `dev` line (after the safety checks pass). |
@@ -116,45 +116,28 @@ fits, default to `feat` — never block on this.
 will recognise — derive it from the intent ("fix the login bug" →
 `fix-login-bug`) unless the founder gave one explicitly.
 
-**3. Preflight — don't start work on a stale `dev` (FR-010, ADR-003, GIT-12).**
-This is the first thing that runs and it runs BEFORE any branch is cut.
-A new change branch taken off a `dev` that's behind `main` re-introduces
-stale content into the next release — so refuse to start until `dev` has
-caught up. Run the shared drift helper, which prints its own recovery
-instructions when it finds drift:
+**3. Preflight — cut the change branch off the latest `main` (FR-010, ADR-003).**
+On the trunk model there is one integration line — `main` — so the only
+staleness that matters is a *local* `main` lagging `origin/main`. The branch
+is always cut off the freshest `origin/main`; `sulis-change start` fetches
+`origin/main` before branching, so there is nothing to gate here — a fresh
+clone, a behind-by-N local, and an up-to-date local all resolve to the same
+freshly-fetched base.
 
 ```bash
-DRIFT_ERR="$(bash plugins/sulis/scripts/drift_check.sh 2>&1)"
-if [ $? -ne 0 ]; then
-  if printf '%s' "$DRIFT_ERR" | grep -q "dev is behind main"; then
-    # Definitive drift. STOP — cut no branch, write no change record.
-    printf '%s\n' "$DRIFT_ERR" >&2
-    exit 1
-  fi
-  # Tooling / fresh-repo error (no git, not a repo yet, no origin/main,
-  # or a failed fetch). Surface it as a heads-up but DO NOT block — a
-  # fresh clone with no upstream yet is not drift.
-  printf 'Heads-up: skipped the stale-dev check (%s). Continuing.\n' "$DRIFT_ERR" >&2
-fi
+git fetch origin main -q 2>/dev/null || true   # best-effort; branch is cut off origin/main
 ```
 
-Only a definitive "`dev` is behind `main`" stops the skill — then no
-branch is cut and no change record is created, and the helper's message
-names the next step (wait for the open back-integrate PR to merge, or run
-the GIT-12 manual recovery). Any other non-zero result is a tooling or
-fresh-repo condition (the helper can't reach `origin/main`); that does not
-block — surface it and carry on. The helper owns the recovery wording; do
-not restate it here. This is the developer-side half of the same gate
-`/sulis:release-train` runs (single helper, two call sites). Per TDD §5.5
-L3: this is the developer entry-point's defence-in-depth layer — the
-release-train gate is L2, the workflow itself is L1.
+(The old `dev`-behind-`main` drift gate — `drift_check.sh` + the GIT-12
+auto-back-merge invariant — was retired with the two-branch model. There is
+no `dev` to fall behind, so there is no drift to detect.)
 
 **4. Echo the plan before acting (Rule 3).** One sentence, plain English,
 before running anything:
 
 > *"I'll start a new piece of work called **fix the login bug**
-> (`fix-login-bug`), set up its own workspace, and open a fresh terminal
-> with me already focused on it. Here goes."*
+> (`fix-login-bug`), set up its own workspace, and open a desktop window
+> onto its session with me already focused on it. Here goes."*
 
 **5. Run the tool.** Substitute the resolved path:
 
@@ -166,18 +149,27 @@ before running anything:
   --spawn
 ```
 
-`--spawn` is what makes a new terminal open: the tool creates the
+`--spawn` is what opens the desktop window: the tool creates the
 `change/{primitive}-{slug}` branch + a dedicated worktree, writes the
-recon `CONTEXT.md`, and launches a new terminal running
-`claude --agent sulis` bound to this change via the `SULIS_CHANGE_ID`
-environment variable.
+recon `CONTEXT.md`, and opens a desktop window that shows a **live view of
+the change's session** (with Sulis already focused on this work via the
+`SULIS_CHANGE_ID` environment variable). Opening that window is the
+default — no environment flag is required.
+
+There is **one session per change**, and the desktop window is a *view* onto
+it — not a separate copy. The cockpit shows the **same** session in the
+browser, so you can watch or use the work from either place: two views,
+one session, always in sync. Closing the desktop window just **detaches**
+that view — the session keeps running, and you can reopen it (or pick it up
+in the cockpit) any time. Closing a window never ends the work.
 
 **6. Report (Rule 1 + Rule 2).** Parse the JSON on stdout. Lead with the
 outcome; carry the handle in parentheses:
 
-> *"Started **fix the login bug** (`CH-01HQ8X`). A new terminal just
-> opened — I'm in there, already briefed on this work and ready to go.
-> This window stays free for anything else."*
+> *"Started **fix the login bug** (`CH-01HQ8X`). A desktop window just
+> opened onto its session — I'm in there, already briefed on this work and
+> ready to go. The same session is in the cockpit too, if you'd rather work
+> there. This window stays free for anything else."*
 
 If `spawn_result.status` is **not** `"spawned"` (`failed` /
 `unsupported platform` / no terminal app), the branch + worktree + recon
@@ -276,6 +268,13 @@ say so plainly and offer `list`:
   "
   ```
 
+  No `pre_prompt` is passed here on purpose: `launch_change_terminal`
+  **defaults a change-context opening prompt** when a caller omits one (so
+  the re-spawned session reads its recon + handoff and self-orients rather
+  than sitting idle at an empty claude prompt — #93). `start --spawn` passes
+  a richer brief, which still wins. If you ever want a custom reopen brief,
+  pass `pre_prompt="…"`; otherwise the default auto-start is the floor.
+
   Then:
 
   > *"Reopening **fix the login bug** (`CH-01HQ8X`) — a fresh terminal is
@@ -286,15 +285,16 @@ say so plainly and offer `list`:
 
 ### `ship <CH-handle>` — the solo landing flow
 
-Land a finished change into the shared `dev` line. **Destructive +
+Land a finished change into `main` — the trunk. **Destructive +
 external blast radius** — this is the one subcommand that changes shared
 state, so echo-before-act AND prompt-before-destroy both apply (Rule 3).
 
 This repo's profile is **solo** (`contribution_model: solo`): no merge
-queue, no deploy. Ship = open a PR to `dev`, wait for the branch checks to
-pass, squash-merge, sync `dev`. **Ship lands on `dev` ONLY — never
-`main`.** Promotion to `main` is a separate, explicit founder act and is
-out of scope here.
+queue, no deploy. Ship = open a PR to `main`, wait for the branch checks to
+pass, squash-merge, sync local `main`. On the trunk model `main` IS the
+integration line; **cutting a release** (the version bump + tag from the
+accumulated changesets) is the separate, explicit step — `/sulis:release-train`
+— not part of ship.
 
 **1. Resolve the change** (same as `focus`). Get its branch + slug +
 primitive. If the handle doesn't match, say so and offer `list`.
@@ -304,8 +304,8 @@ primitive. If the handle doesn't match, say so and offer `list`.
 exact branch and the irreversible step BEFORE doing it, and require an
 explicit yes:
 
-> *"This will merge **fix the login bug** (`change/fix-login-bug`) into the
-> shared `dev` line. The merge itself can't be casually undone. Afterwards
+> *"This will merge **fix the login bug** (`change/fix-login-bug`) into
+> `main` (the trunk). The merge itself can't be casually undone. Afterwards
 > I'll tidy away the workspace (you don't need it once it's shipped), but
 > the branch + the full history stay as an audit trail you can retrace in
 > the cockpit — and I can re-open the exact workspace any time with
@@ -316,11 +316,11 @@ Do not proceed without an affirmative. If the founder's phrasing was
 ambiguous ("get rid of this", "clear it"), do NOT treat it as ship — ask
 what they mean.
 
-**3. Push the branch and open the PR to `dev`:**
+**3. Push the branch and open the PR to `main`:**
 
 ```bash
 git push -u origin change/fix-login-bug
-gh pr create --base dev --head change/fix-login-bug \
+gh pr create --base main --head change/fix-login-bug \
   --title "fix: fix the login bug" \
   --body "Change CH-01HQ8X · primitive: fix · Closes #42"
 ```
@@ -373,7 +373,7 @@ review gate are all unchanged.
 
 ```bash
 PROTECTION=$("$SCRIPTS_DIR/wpx-preflight" protection-status \
-  --repo <org/repo> --branch dev)
+  --repo <org/repo> --branch main)
 ```
 
 Read `data.protection` from the JSON it emits:
@@ -419,11 +419,11 @@ critical findings block the merge rather than land on `dev`.
 
 *CW-05 size carve-out — skip review when the change is genuinely
 trivial:* before invoking the review, parse the diff size against
-`origin/dev`:
+`origin/main`:
 
 ```bash
-git fetch origin dev -q
-SHORTSTAT=$(git diff --shortstat origin/dev...HEAD)
+git fetch origin main -q
+SHORTSTAT=$(git diff --shortstat origin/main...HEAD)
 # e.g. " 1 file changed, 5 insertions(+), 0 deletions(-)"
 FILES=$(echo "$SHORTSTAT" | grep -oE '[0-9]+ files? changed' | grep -oE '[0-9]+')
 INS=$(echo "$SHORTSTAT" | grep -oE '[0-9]+ insertions?\(\+\)' | grep -oE '[0-9]+')
@@ -504,8 +504,8 @@ does (don't re-derive it), then:
 
 ```bash
 # Does this change touch what people install? (the sulis plugin tree)
-git fetch origin dev -q
-TOUCHES_PLUGIN=$( [ -n "$(git diff --name-only origin/dev...HEAD -- plugins/sulis/)" ] \
+git fetch origin main -q
+TOUCHES_PLUGIN=$( [ -n "$(git diff --name-only origin/main...HEAD -- plugins/sulis/)" ] \
   && echo True || echo False )
 
 # Record the release note. The size is read from the change's primitive;
@@ -539,19 +539,102 @@ does NOT bump any version** — the version is computed and applied once, for th
 whole batch, when `dev` is released to production. Read the `wrote` field of the
 JSON to know what to say in the ship report (step 7).
 
-**4.8. DoD verification gate — run `sulis-verify-requirements` (MUST when
-an SRD is touched).** The change's tests claim what they verify via
-`@pytest.mark.verifies("FR-NN")` markers; the pytest brain-emit plugin
-turns those claims into TestResult entities in `.brain/instances/`; this
-gate asks the brain whether every Requirement the change touched has at
-least one passing TestResult verifying it. If yes → ship. If not → the
-founder owns the call.
+**4.8. Testable-state acceptance gate — run `sulis-verify-acceptance`
+(MUST for a user-facing / behavioural change).** A change that authored
+verification `Scenario`s at specify (`/sulis:specify` deep mode) is not
+*done* until those Scenarios pass against a **standing app** — the real
+"done" is *the app is testable*, not *merged* (the failure this catches:
+agent-journey shipped, but you couldn't log in).
+
+**This runs BEFORE the DoD coverage gate (4.9) on purpose.** A green
+Scenario run is itself coverage evidence — `sulis-verify-acceptance`
+deposits a passing TestResult per Scenario (verifying that Scenario's
+Requirements) into `.brain/instances/`. Running it first means the
+Requirements proven *only* by a Scenario journey are already covered when
+4.9 reads the brain. Run acceptance first, then check coverage — never the
+other way round (the false-red where a Scenario-verified change failed the
+coverage gate because the Scenarios hadn't run yet).
+
+Run each of the change's Scenarios **straight from the emitted brain graph**
+(no hand-built bundle): the authoring step wrote a durable
+`{worktree}/.changes/{primitive}-{slug}.scenarios.jsonld` and emitted the
+entities, so the scenario ids are right there. For each `scenarios[].id`:
+
+```bash
+"$SCRIPTS_DIR/sulis-verify-acceptance" \
+  --scenario <dna:scenario:…> --target local --repo-root . --json
+```
+
+(`--scenario` loads the Scenario + its journey Workflow + Steps from the
+store; `--base-dir` defaults to `<repo-root>/.brain/instances`. The legacy
+`--bundle <file>` path still works for a hand-built bundle. A passing run
+deposits the TestRun/TestResult evidence the next gate reads — pass
+`--no-emit-evidence` only when you explicitly want a dry run.) `local` now;
+the `deployed` leg once that target is reachable — both per the repo-contract
+`targets:` + `commands.standup`. Read the gate verdict:
+
+**Observed-or-blocked (the default — the gate now refuses deferred-as-done).**
+A user-facing outcome is done only when it was actually *observed* green:
+
+- **pass** → every Scenario was driven and passed. Done is honest. Log it.
+- **blocked** → a step failed, a manual check is unconfirmed, **OR a Scenario
+  was `deferred` (the real outcome was never driven — a credential / infra /
+  third-party hop absent).** **STOP** — surface the founder-English gap (which
+  Scenario, what wasn't driven, the exact need). Do not call the change done.
+  *"I couldn't verify it" reads as blocked, never done* — this is the lesson
+  from four login attempts that shipped green-but-never-signed-in.
+
+The **human-handoff path (journey-rigor #6).** A `manual-pending` block means
+the journey can't be machine-driven in this run — a browser login, a checkout
+with a real card, anything whose only honest check is a person looking at the
+screen. That's not a dead end: the founder (or you, with them) **drives the real
+flow by hand** and records what they saw, turning the block into genuine green.
+
+1. Show the checklist — what to do, what to look for, per step:
+   ```bash
+   "$SCRIPTS_DIR/sulis-attest-scenario" --scenario <scenario-id> \
+     --repo-root "$REPO_ROOT" --list
+   ```
+2. The founder runs the flow, then records the outcome:
+   ```bash
+   "$SCRIPTS_DIR/sulis-attest-scenario" --scenario <scenario-id> \
+     --repo-root "$REPO_ROOT" --attester "<who ran it>" --all-observed
+   ```
+   (or per-check `--observed "…"` / `--not-observed "…"` for a partial run).
+
+A pass deposits a **real** TestResult stamped `harness="human-attested"` — the
+same evidence the gate reads from an automated run, honest about who observed it.
+Any unobserved check records a fail and the scenario stays blocked. This is the
+opposite of waving it through: it forces a person to look at the real thing and
+keeps the record. (The *automated* browser driver is the named follow-on; until
+it lands, the human is the verifier-of-last-resort and this is how their
+observation becomes evidence the gate trusts.)
+
+The **conscious escape**: if a `deferred` is genuinely acceptable — a
+*non-user-facing* Scenario whose infra leg is unavailable in this run — re-run
+with `--allow-deferred`, which lets that deferral pass as a recorded gap. This
+is a deliberate, logged choice (surface it to the founder), never the default.
+
+Advisory when it can't run at all (no Scenarios authored — pure docs/infra
+change; or no target URL for an http journey): like 4.9, the founder owns
+proceed-anyway. But a `deferred` is no longer a quiet pass — it blocks unless
+`--allow-deferred` is consciously chosen.
+
+**4.9. DoD verification gate — run `sulis-verify-requirements` (MUST when
+an SRD is touched).** This asks the brain whether every Requirement the
+change touched has at least one **passing TestResult** verifying it. That
+evidence arrives by **either route**: a `@pytest.mark.verifies("FR-NN")`
+unit test (the pytest brain-emit plugin turns the claim into a TestResult)
+*or* a green Scenario run from gate 4.8 above (which deposits its own
+TestResult). The gate doesn't care which route proved it — a passing
+TestResult is a passing TestResult. If covered → ship. If not → the founder
+owns the call.
 
 Detect: does this change touch any SRD?
 
 ```bash
-git fetch origin dev -q
-SRDS_TOUCHED=$(git diff --name-only origin/dev...HEAD \
+git fetch origin main -q
+SRDS_TOUCHED=$(git diff --name-only origin/main...HEAD \
   | grep -E '^\.specifications/.+/SRD\.md$' || true)
 ```
 
@@ -578,26 +661,27 @@ done
 Verdict policy:
 
 - **WORST=pass** → log it ("DoD gate: every Requirement verified by a
-  passing test.") and continue to step 5.
+  passing test or Scenario.") and continue to step 5.
 - **WORST=partial** → some Requirements have NO passing verifier. The
   founder owns the call (mirrors the review-gate CONCERN pattern):
 
   > *"DoD gate: {N} of {M} Requirements aren't yet verified by a
-  > passing test: {fr_ids + titles, plain English, no IDs}. None of
-  > this is broken — these Requirements just don't have a test claim
-  > yet. Proceed with the merge anyway? (yes / no)"*
+  > passing test or Scenario: {fr_ids + titles, plain English, no IDs}.
+  > None of this is broken — these Requirements just don't have a
+  > passing proof yet. Proceed with the merge anyway? (yes / no)"*
 
 - **WORST=fail** → STOP. Zero Requirements have a passing verifier,
-  which means either no tests claim them OR every claim is currently
-  failing. Don't merge:
+  which means no test or Scenario claims them OR every claim is
+  currently failing. Don't merge:
 
-  > *"DoD gate: no Requirements have a passing test verifying them.
-  > That usually means tests aren't tagged with `@pytest.mark.verifies`
-  > yet, or the tests that DO claim Requirements are failing. I
-  > haven't merged. Either add `@verifies` to the tests that prove
-  > the Requirements, or run `sulis-verify-requirements --srd <path>`
-  > locally to see which ones are uncovered. Then
-  > `/sulis:change ship CH-XXXXXX` again."*
+  > *"DoD gate: no Requirements have a passing test or Scenario
+  > verifying them. That usually means the tests aren't tagged with
+  > `@pytest.mark.verifies` and the Scenarios that prove these
+  > Requirements haven't been run green yet (gate 4.8), or the proofs
+  > that DO claim them are failing. I haven't merged. Re-run the
+  > acceptance gate, add `@verifies` to the proving tests, or run
+  > `sulis-verify-requirements --srd <path>` locally to see which ones
+  > are uncovered. Then `/sulis:change ship CH-XXXXXX` again."*
 
 - **WORST=error** → log the gate failure but PROCEED with the merge
   (don't break ship on tooling issues; the gate is advisory when it
@@ -611,41 +695,6 @@ the founder always owns the proceed-anyway decision. Block-by-default
 applies only to verdict=fail (zero coverage), which is genuinely
 broken state.
 
-**4.9. Testable-state acceptance gate — run `sulis-verify-acceptance`
-(MUST for a user-facing / behavioural change).** A change that authored
-verification `Scenario`s at specify (`/sulis:specify` deep mode) is not
-*done* until those Scenarios pass against a **standing app** — the real
-"done" is *the app is testable*, not *merged* (the failure this catches:
-agent-journey shipped, but you couldn't log in).
-
-Run each of the change's Scenarios **straight from the emitted brain graph**
-(no hand-built bundle): the authoring step wrote a durable
-`{worktree}/.changes/{primitive}-{slug}.scenarios.jsonld` and emitted the
-entities, so the scenario ids are right there. For each `scenarios[].id`:
-
-```bash
-"$SCRIPTS_DIR/sulis-verify-acceptance" \
-  --scenario <dna:scenario:…> --target local --repo-root . --json
-```
-
-(`--scenario` loads the Scenario + its journey Workflow + Steps from the
-store; `--base-dir` defaults to `<repo-root>/.brain/instances`. The legacy
-`--bundle <file>` path still works for a hand-built bundle.) `local` now;
-the `deployed` leg once that target is reachable — both per the repo-contract
-`targets:` + `commands.standup`. Read the gate verdict:
-
-- **pass** → every Scenario passed, or is deferred-with-need. Done is
-  honest. Log it.
-- **blocked** → a step failed, or a manual check is unconfirmed. **STOP** —
-  surface the founder-English gap (which Scenario, what's broken). Do not
-  call the change done.
-- **deferred-with-need** → a recorded gap (a credential / infra absent);
-  non-blocking, but surface the needs so they're visible.
-
-Advisory when it can't run (no Scenarios authored — pure docs/infra change;
-or no target URL yet): like 4.8, the founder owns proceed-anyway, and
-block-by-default applies only to a real `blocked`.
-
 **5. Squash-merge** (only after green + confirmation):
 
 ```bash
@@ -656,14 +705,14 @@ gh pr merge change/fix-login-bug --squash --delete-branch
 no longer needs). The **local** branch stays — it's the audit trail. (The
 local worktree is tidied away in step 6.)
 
-Then sync local `dev` — **in whichever worktree holds it** (never `git
-checkout dev` inside a change worktree; in the multi-worktree model `dev`
+Then sync local `main` — **in whichever worktree holds it** (never `git
+checkout main` inside a change worktree; in the multi-worktree model `main`
 may be checked out elsewhere and git forbids the same branch in two
 worktrees):
 
 ```bash
-git -C "$(git worktree list --porcelain | awk '/^worktree /{p=$2} /^branch refs\/heads\/dev$/{print p}')" pull origin dev 2>/dev/null \
-  || { git checkout dev && git pull origin dev; }
+git -C "$(git worktree list --porcelain | awk '/^worktree /{p=$2} /^branch refs\/heads\/main$/{print p}')" pull origin main 2>/dev/null \
+  || { git checkout main && git pull origin main; }
 ```
 
 **6. Mark the change as shipped, and tidy the workspace (#38/#56).** Flips
@@ -680,13 +729,13 @@ session is bound or if there's uncommitted work). The branch + record stay;
 **7. Report** (include the lessons captured at step 4.6 and the release note
 recorded at step 4.7, if any):
 
-> *"Shipped **fix the login bug** (`CH-01HQ8X`) into `dev`. Recorded this as a
+> *"Shipped **fix the login bug** (`CH-01HQ8X`) into `main`. Recorded this as a
 > `minor` release note, and captured 2 lessons along the way (issues #60-61).
 > I've tidied away the workspace, but the full history is preserved as an audit
 > trail you can retrace in the cockpit (under 'Shipped') — and I can re-open the
-> exact workspace any time with `recreate`. When you're ready to release
-> everything on `dev` to production, that's a separate, deliberate step — just
-> ask."*
+> exact workspace any time with `recreate`. When you're ready to cut a release
+> (the version bump + tag from everything accumulated on `main`), that's a
+> separate, deliberate step — just ask."*
 
 State the release note as a fact, never as a question. When step 4.7 wrote one,
 name its size (*"Recorded this as a `minor` release note."*); when it wrote none
@@ -715,7 +764,7 @@ import json
 r = back_integrate_change_branch(
     repo_root=Path('/abs/path/to/worktree'),
     change_branch='change/fix-login-bug',
-    dev_ref='origin/dev',
+    dev_ref='origin/main',
 )
 print(json.dumps(r))
 "
@@ -802,7 +851,7 @@ yes** (MUC-F3 — never act on vague phrasing like "get rid of this"):
 
 Do not proceed without an affirmative. If the founder is currently *in* the
 change's workspace, the tool refuses (you can't nuke the change you're on) —
-relay that and tell them to switch away first (`git checkout dev`).
+relay that and tell them to switch away first (`git checkout main`).
 
 **4. Delete (only after an explicit yes):**
 
@@ -900,10 +949,10 @@ them the dashboard updates on its own as work progresses, and point them at
   file movement (`transfer_worktree_changes`), never the shared stash stack.
   If you ever need to park transient state, make a throwaway WIP commit —
   don't reach for `git stash`.
-- **Never `git checkout dev` inside a change worktree (issue #56).** A change
+- **Never `git checkout main` inside a change worktree (issue #56).** A change
   worktree only ever holds its OWN `change/*` branch. In the multi-worktree
   model `dev` is checked out elsewhere and git forbids the same branch in two
-  worktrees — `git checkout dev` returns *"fatal: 'dev' is already checked
+  worktrees — `git checkout main` returns *"fatal: 'main' is already checked
   out"*. To sync `dev`, operate in whatever worktree holds it (`git worktree
   list --porcelain`). `sulis-change finish --merge` already does this for you.
 - **Ship removes the worktree but keeps the branch — that's intended (issue
@@ -937,8 +986,8 @@ them the dashboard updates on its own as work progresses, and point them at
 ## Vocabulary
 
 - **Change** — one piece of work in flight: its own branch, worktree, and
-  (when spawned) a focused terminal. The founder's mental model of "the
-  thing I'm working on".
+  (when spawned) a desktop window onto its session. The founder's mental
+  model of "the thing I'm working on".
 - **Handle (`CH-XXXXXX`)** — the short, founder-facing reference for a
   change (first 6 characters of its underlying ULID). Used everywhere the
   founder sees a change.
@@ -951,8 +1000,11 @@ them the dashboard updates on its own as work progresses, and point them at
   checks → squash-merge). Solo profile: no merge queue.
 - **Rebase** (founder sense) — catch a change up with the latest team work;
   implemented as a merge, not a git rebase (CW-04).
-- **Workspace / focused terminal** — the new terminal `start` opens, with
-  Sulis already briefed on the change via the recon `CONTEXT.md`.
+- **Workspace / session view** — the desktop window `start` opens: a live
+  view onto the change's one session, with Sulis already briefed on the
+  change via the recon `CONTEXT.md`. The cockpit shows the same session in
+  the browser — two views, one session. Closing a view detaches it; the
+  session keeps running.
 - **Nuke** — throw a change away: delete its branch, worktree, local state,
   and manifest. Irreversible; dry-runs by default, deletes only with
   `--force` after explicit founder confirmation.

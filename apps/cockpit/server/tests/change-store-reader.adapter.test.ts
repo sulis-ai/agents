@@ -27,6 +27,7 @@ import {
   SulisChangeStoreReader,
   ChangeStoreReaderError,
 } from "../adapters/SulisChangeStoreReader";
+import { CONFIG } from "../config";
 
 // Resolve the helper path once. The worktree may sit alongside the
 // repo (e.g. /Users/.../wp-003-worktree) or be the repo itself; either
@@ -167,6 +168,31 @@ describe("SulisChangeStoreReader — timeout (TIMEOUT)", () => {
     }
     expect(err).toBeInstanceOf(ChangeStoreReaderError);
     expect((err as ChangeStoreReaderError).code).toBe("TIMEOUT");
+  });
+
+  afterEachCleanup();
+});
+
+describe("SulisChangeStoreReader — generous listing budget (#216 follow-up)", () => {
+  it("tolerates a listing slower than a single-git-op budget when given the generous change-list timeout", async () => {
+    // Enumerating many changes legitimately takes longer than one git op.
+    // A stub that sleeps ~250ms (well past a hypothetical sub-second tight
+    // budget) must NOT time out when the reader is constructed with the
+    // dedicated generous listing budget — proving the listing path no
+    // longer rides the tight 5 s shared git budget.
+    const stubDir = await mkTempStateDir();
+    const stub = path.join(stubDir, "slow-list-helper.sh");
+    await fs.writeFile(stub, "#!/bin/sh\nsleep 0.25\necho '[]'\n", "utf8");
+    await fs.chmod(stub, 0o755);
+
+    const reader = new SulisChangeStoreReader({
+      helperPath: stub,
+      sulisStateDir: stubDir,
+      timeoutMs: CONFIG.changeListTimeoutMs,
+    });
+
+    // Resolves (does not throw TIMEOUT) — the generous budget covers it.
+    await expect(reader.listAllChanges()).resolves.toEqual([]);
   });
 
   afterEachCleanup();

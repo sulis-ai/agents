@@ -1,0 +1,29 @@
+{
+  "pr": "feat/wp-004-capture-idea-orchestrator",
+  "base": "change/create-brain-backlog-and-traversal",
+  "timestamp": "2026-06-03T085304Z",
+  "verdict": "PASS",
+  "build_verification": {
+    "errors_introduced": 0,
+    "typecheck": "none configured (stdlib-only plugin contract — coverage gap)",
+    "lint": "ruff clean",
+    "compile": "py_compile OK",
+    "tests": "10 passed (test_brain_capture.py); full unit suite 1787 passed, 9 skipped"
+  },
+  "hygiene": {
+    "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "none"},
+    "size": {"lines_added": 317, "lines_removed": 6, "new_test_lines": 425, "files_changed": 2, "severity": "low"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+    "completeness": {"new_source_without_test": 0, "api_change_without_schema": false, "severity": "none"}
+  },
+  "findings": {
+    "changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "neighbours": {"total": 0}
+  },
+  "lenses": {
+    "architecture": "nothing surfaced",
+    "security": "nothing surfaced",
+    "quality": "nothing surfaced"
+  },
+  "draft_fixes": 0
+}

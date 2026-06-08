@@ -1,0 +1,26 @@
+train_id: "train-2026-06-03T094250Z"
+started_at: "2026-06-03T09:42:50Z"
+completed_at: "2026-06-03T09:49:03Z"
+outcome: "success"
+batch_size: 3
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-03T09:48:07Z"
+bundle:
+  - wp: WP-009
+    branch: feat/wp-009-capture-skill
+    pre_train_sha: 31dea726c6a9eb904c9fb7da391a81fa56d9b1e2
+    rebased_to_sha: 31dea726c6a9eb904c9fb7da391a81fa56d9b1e2
+    merge_sha_on_dev: 425b144b5e11f0e27095f66fe68d91cab6ed5533
+  - wp: WP-010
+    branch: feat/wp-010-backlog-skill
+    pre_train_sha: 68cc41ad954b0b2fef23a95c1c11b68ef41c185b
+    rebased_to_sha: 3c3d92869accdcc1af3df31b82b271cc5f45fad4
+    merge_sha_on_dev: b559e773d7eb77a8af082465f9f10708c768359f
+  - wp: WP-012
+    branch: feat/wp-012-sulis-agent-traverse-wiring
+    pre_train_sha: a6980e5cc811b44db65b75f83faa5127f6583fdc
+    rebased_to_sha: a5aefeebef197f8e478a3d0b2fde72e769be2634
+    merge_sha_on_dev: 1c8dfcf72f110e35ce834c9000f6d77772e1c35a

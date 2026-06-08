@@ -9,14 +9,20 @@
   border: 1px solid transparent;
 }
 
+/* Status hues map to the semantic tokens so they re-theme with the rest of the
+ * app. The dot's MEANING is carried by aria-label + data-state + title (see
+ * LivenessDot.tsx), not by colour alone, so this stays WPF-06 compliant; the
+ * brightened dark --positive / --warning clear WCAG AA on the dark canvas
+ * (TDD §6 contrast table), so no fixed-hue exception is needed. The 1px ring
+ * reuses the same semantic hue purely for edge definition. WP-008. */
 .running {
-  background: #28a745;
-  border-color: #1e7e34;
+  background: var(--positive);
+  border-color: var(--positive);
 }
 
 .terminal {
-  background: #f0a020;
-  border-color: #c97f00;
+  background: var(--warning);
+  border-color: var(--warning);
 }
 
 .notRunning {

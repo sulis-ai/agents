@@ -1,0 +1,43 @@
+{
+  "pr": "feat/wp-003-board-read-roundtrip",
+  "base": "change/create-autonomous-delivery-environment",
+  "timestamp": "2026-06-04T100750Z",
+  "verdict": "PASS",
+  "outcome": "Ready to merge",
+  "build_verification": {
+    "tsc": "clean",
+    "eslint": "clean",
+    "read_only_gate": "clean",
+    "vitest": "370/370 passed",
+    "pr_introduced_errors": 0
+  },
+  "pr_hygiene": {
+    "scope": { "severity": "clean", "commit_type_spread": ["feat"], "concerns": 1 },
+    "size": { "severity": "moderate", "lines_added": 833, "lines_removed": 162, "files_changed": 19, "test_heavy": true },
+    "safety": { "severity": "clean", "migration_count": 0, "schema_idl_count": 0, "secret_pattern_hits": 0, "infra_files": 0 },
+    "completeness": { "severity": "clean", "new_source_without_test": 0 }
+  },
+  "findings": {
+    "in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+    "in_neighbours": [
+      {
+        "id": "SF-6cb9efa7",
+        "file": "apps/cockpit/client/src/components/StageBadge.module.css",
+        "severity": "advisory",
+        "lens": "quality",
+        "summary": "Pre-existing raw-hex per-stage badge palette parallel to the canonical --stage-* scale; out of WP-003 scope; already registered.",
+        "introduced_by_this_pr": false
+      }
+    ]
+  },
+  "lenses": {
+    "architecture": "nothing surfaced",
+    "security": "nothing surfaced",
+    "quality": "1 neighbour advisory (pre-existing)"
+  },
+  "cr10_performance": "no anti-pattern matches",
+  "jsx_identifier_scan": "all identifiers resolve in lexical scope",
+  "fetch_funnel": "no fetch( in new client code (WPF-02)",
+  "draft_hardening_deltas": 0,
+  "auto_downgrade_triggers": []
+}
