@@ -1,12 +1,26 @@
 """Cross-platform terminal launcher for the change-as-primitive flow.
 
-This is the sanctioned launcher for the change-start flow (CH-01KTK7). When the
-founder starts a change (``sulis-change start --spawn`` → the ``/sulis:change``
-skill), a VISIBLE launch opens a real terminal window — Terminal.app on macOS,
-gnome-terminal / konsole / xterm on Linux — running ``claude --agent sulis``
-bound to the change via ``SULIS_CHANGE_ID``, with the pre-prompt sidecar so the
-session self-orients rather than sitting idle. This is the DEFAULT: no env flag
-is required to open the terminal.
+This is the sanctioned launcher for the change-start flow. When the founder
+starts a change (``sulis-change start --spawn`` → the ``/sulis:change`` skill),
+a VISIBLE launch opens a real terminal window — Terminal.app on macOS,
+gnome-terminal / konsole / xterm on Linux — bound to the change via
+``SULIS_CHANGE_ID``, with the pre-prompt sidecar so the session self-orients
+rather than sitting idle. This is the DEFAULT: no env flag is required to open
+the terminal.
+
+By DEFAULT the window now runs the **desktop viewer** (``session_viewer.py``,
+WP-005) attached to the change's **shared session** over the daemon's stable
+socket — so the window is a VIEW onto the change's *one* session (the same
+session the cockpit attaches to), not a standalone ``claude``. This supersedes
+the prior CH-01KTK7 standalone-``claude`` path (change CH-01KTKB ADR-003): the
+launcher keeps all of its proven cross-platform spawn, env-scrub, origin-hook,
+and pre-prompt machinery — only WHAT the window execs changed. The viewer
+itself cold-starts the daemon on demand (ensure-daemon → get-or-spawn); the
+daemon's interactive pty adapter spawns the session's ``claude`` and reads the
+pre-prompt sidecar via ``SULIS_CHANGE_ID``, so the session is still briefed on
+its first turn. An explicit chat-style ``entry_command`` is still honoured for
+callers that pass one (it remains subject to the injection whitelist); the
+viewer is the default.
 
 ``SULIS_TERMINAL_OS_WINDOW`` is retained only as an explicit override knob (see
 ``_os_window_enabled``); it does NOT gate the default-on spawn. The in-cockpit
@@ -25,8 +39,9 @@ single-machine v1 use case. See:
 - ADR-003 (pre-prompt delivery — quoted HERE-DOC into `claude`'s positional arg)
 
 Public entry-point: `launch_change_terminal(...)` opens a new terminal in
-a change worktree with `SULIS_CHANGE_ID` exported and a focused
-`claude --agent sulis` session inside it.
+a change worktree with `SULIS_CHANGE_ID` exported and the desktop viewer
+attached to the change's shared session inside it (or, if an explicit
+chat-style `entry_command` is passed, that command instead).
 
 The generated launch script begins with a `compgen`-based env-scrub
 preamble (MUC-2 env-leak prevention). This line is bash-specific; sulis
@@ -97,6 +112,11 @@ _LINUX_TERMINAL_APPS = ("gnome-terminal", "konsole", "xterm")
 _PRE_PROMPT_HEREDOC_TAG = "SULIS_PROMPT_EOF"
 _PRE_PROMPT_SIDECAR = "pre_prompt.txt"  # co-located with launch.sh in the change dir
 _PRE_PROMPT_MAX_BYTES = 50_000
+
+# Desktop viewer (WP-005). By default the launched window runs this — attached
+# to the change's shared session over the daemon's stable socket — instead of a
+# standalone `claude` (change CH-01KTKB ADR-003). Co-located with this module.
+_VIEWER_SCRIPT = "session_viewer.py"
 
 
 # ─── OS-window override knob ────────────────────────────────────────────────
@@ -183,10 +203,39 @@ def _validate_pre_prompt(text: str | None) -> tuple[bool, str]:
 # ─── Shell-script construction ─────────────────────────────────────────────
 
 
+def _build_viewer_exec_line(
+    change_id: str,
+    worktree_path: Path,
+    scripts_dir: Path,
+) -> str:
+    """Return the ``exec`` line that runs the desktop viewer (WP-005).
+
+    The window runs ``python3 <scripts>/session_viewer.py --change-id <id>
+    --worktree <wt>`` — a VIEW onto the change's shared session, not a
+    standalone ``claude`` (change CH-01KTKB ADR-003). The viewer cold-starts the
+    daemon on demand (ensure-daemon → get-or-spawn).
+
+    This is built OUTSIDE the chat-style ``_ENTRY_COMMAND_RE`` whitelist (which
+    forbids ``/``, ``.``, digits, and ``--flags`` for injection safety on
+    operator-typed commands). Like the existing pre-prompt ``cat`` line, every
+    argument is ``shlex.quote``-d here, so the path/id bytes are inert to the
+    shell — the injection guard is preserved by construction, not by the
+    whitelist regex. ``_build_launch_script`` is pure (no file I/O / no mkdir);
+    the caller resolves ``scripts_dir`` and ``worktree_path``.
+    """
+    viewer = scripts_dir / _VIEWER_SCRIPT
+    return (
+        "exec python3 "
+        f"{shlex.quote(str(viewer))} "
+        f"--change-id {shlex.quote(change_id)} "
+        f"--worktree {shlex.quote(str(worktree_path))}"
+    )
+
+
 def _build_launch_script(
     change_id: str,
     worktree_path: Path,
-    entry_command: str = "claude --dangerously-skip-permissions --agent sulis",
+    entry_command: str | None = None,
     extra_env: dict[str, str] | None = None,
     pre_prompt: str | None = None,
     enable_origin_hook: bool = False,
@@ -197,13 +246,25 @@ def _build_launch_script(
     are ``shlex.quote``-d before insertion. The script begins with the
     env-scrub preamble (MUC-2) before any ``export``.
 
-    When ``pre_prompt`` is set the ``exec`` line delivers it via a quoted
-    HERE-DOC (ADR-003); when None the script is byte-identical to the
-    no-pre-prompt baseline.
+    ``entry_command`` selects WHAT the window execs:
+
+    - ``None`` (the DEFAULT) → the desktop viewer attached to the change's
+      shared session, built via :func:`_build_viewer_exec_line` (change
+      CH-01KTKB ADR-003). The viewer line is path-/flag-shaped and is therefore
+      built outside the chat-style whitelist, with each arg ``shlex.quote``-d.
+    - a chat-style command string → that command instead (the legacy path),
+      still subject to the ``_ENTRY_COMMAND_RE`` injection whitelist.
+
+    When ``pre_prompt`` is set the ``exec`` line is suffixed with a quoted
+    ``cat`` of the sidecar file the brief is written to (#86); when None the
+    script omits it. The daemon's interactive pty adapter reads the same sidecar
+    via ``SULIS_CHANGE_ID``, so the session is briefed regardless of which exec
+    path is taken.
     """
-    ok, reason = validate_entry_command(entry_command)
-    if not ok:
-        raise ValueError(reason)
+    if entry_command is not None:
+        ok, reason = validate_entry_command(entry_command)
+        if not ok:
+            raise ValueError(reason)
     ok, reason = validate_change_ulid(change_id)
     if not ok:
         raise ValueError(reason)
@@ -222,20 +283,34 @@ def _build_launch_script(
         extra_env_lines.append(f"export {key}={shlex.quote(value)}")
     extra_env_block = "\n".join(extra_env_lines)
 
-    if pre_prompt is not None:
-        # Deliver the pre_prompt via a SIDECAR FILE read at runtime — NOT a
-        # heredoc (#86). macOS ships bash 3.2, which mis-parses a quoted
-        # heredoc nested inside "$(...)": any apostrophe in the brief is read
-        # as an unterminated quote, the script aborts, and claude never starts
-        # (silently — the launcher still reports spawned). A `cat` of a file
-        # has no heredoc nesting (parses clean under bash 3.2), and the
-        # pre_prompt bytes are never shell-parsed — so there is no injection
-        # surface either (what the old heredoc's single-quoted tag guarded).
-        # Path only — do NOT mkdir here. _build_launch_script is pure (no file
-        # I/O); launch_change_terminal creates the dir + writes the sidecar
-        # inside its I/O-failure try-block. (Using _change_dir here would mkdir
-        # before that try, so an unwritable ~/.sulis would escape as a raw
-        # OSError instead of the structured _failed dict.)
+    if entry_command is None:
+        # DEFAULT: run the desktop viewer attached to the change's shared
+        # session (change CH-01KTKB ADR-003). The brief is NOT passed to the
+        # viewer as a CLI arg — the viewer's only args are --change-id /
+        # --worktree. The pre_prompt sidecar is still written (below /
+        # launch_change_terminal) and SULIS_CHANGE_ID is still exported, so the
+        # daemon's interactive pty adapter reads the sidecar and briefs the
+        # session's claude on its first turn. The viewer line is path-/flag-
+        # shaped, so it is built outside the chat-style whitelist with each arg
+        # shlex.quote-d (like the sidecar `cat`). scripts_dir is resolved from
+        # this module's location — session_viewer.py is co-located here.
+        scripts_dir = Path(__file__).resolve().parent
+        exec_line = _build_viewer_exec_line(change_id, worktree_path, scripts_dir)
+    elif pre_prompt is not None:
+        # Chat-style path with a brief: deliver the pre_prompt via a SIDECAR
+        # FILE read at runtime — NOT a heredoc (#86). macOS ships bash 3.2,
+        # which mis-parses a quoted heredoc nested inside "$(...)": any
+        # apostrophe in the brief is read as an unterminated quote, the script
+        # aborts, and claude never starts (silently — the launcher still
+        # reports spawned). A `cat` of a file has no heredoc nesting (parses
+        # clean under bash 3.2), and the pre_prompt bytes are never shell-parsed
+        # — so there is no injection surface either (what the old heredoc's
+        # single-quoted tag guarded). Path only — do NOT mkdir here.
+        # _build_launch_script is pure (no file I/O); launch_change_terminal
+        # creates the dir + writes the sidecar inside its I/O-failure try-block.
+        # (Using _change_dir here would mkdir before that try, so an unwritable
+        # ~/.sulis would escape as a raw OSError instead of the structured
+        # _failed dict.)
         sidecar = Path.home() / ".sulis" / "changes" / change_id / _PRE_PROMPT_SIDECAR
         exec_line = f'exec {entry_command} "$(cat {shlex.quote(str(sidecar))})"'
     else:
@@ -514,12 +589,17 @@ def launch_change_terminal(
     worktree_path: Path | str,
     *,
     visible: bool = True,
-    entry_command: str = "claude --dangerously-skip-permissions --agent sulis",
+    entry_command: str | None = None,
     extra_env: dict[str, str] | None = None,
     pre_prompt: str | None = None,
     enable_origin_hook: bool = True,
 ) -> dict:
     """Spawn a new terminal in the change worktree with SULIS_CHANGE_ID set.
+
+    ``entry_command`` defaults to ``None`` → the window runs the desktop viewer
+    attached to the change's shared session (change CH-01KTKB ADR-003). Pass a
+    chat-style command string to run that instead (the legacy direct path; it
+    is still injection-whitelisted).
 
     Composes:
         1. Validate all inputs (raises ValueError on bad input)
