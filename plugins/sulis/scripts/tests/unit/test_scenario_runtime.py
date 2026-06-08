@@ -16,13 +16,15 @@ Stdlib + pytest. Python 3.11-safe.
 
 from __future__ import annotations
 
-import pytest
-
 from _scenario_runtime import (
+    AGENT_STEP_KINDS,
     HUMAN_DRIVER,
+    IMPLEMENTATION_KINDS,
+    SCRIPTED_KINDS,
     UNRESOLVED_DRIVER,
     driver_for_step,
     resolve_journey,
+    tier_for_kind,
 )
 
 
@@ -97,3 +99,83 @@ def test_driver_reads_tool_implementation_kind():
 def test_unknown_tool_ref_is_unresolved():
     step = {"@id": "x", "name": "x", "mechanism": "deterministic", "tool_ref": "dna:tool:nope"}
     assert driver_for_step(step, _TOOLS) == UNRESOLVED_DRIVER
+
+
+# --- WP-002: derived driver tier (ADR-001) --------------------------------
+# The tier is a derived surfacing of implementation_kind, NOT a stored field:
+#   scripted   = deterministic drivers (http_call, subprocess)
+#   agent-step = probabilistic drivers (mcp_server, claude_code_tool,
+#                skill_invocation) — declared here, executed in #92
+#   ""         = python_import / workflow_dispatch / human / unresolved —
+#                not the deterministic/probabilistic split, so no tier label.
+
+def test_tier_for_kind_maps_every_kind():
+    # Explicit expected label for every implementation_kind plus the two
+    # non-tool drivers, per ADR-001's mapping.
+    expected = {
+        # scripted (deterministic)
+        "http_call": "scripted",
+        "subprocess": "scripted",
+        # agent-step (probabilistic) — declared, executed in #92
+        "mcp_server": "agent-step",
+        "claude_code_tool": "agent-step",
+        "skill_invocation": "agent-step",
+        # no tier — not the deterministic/probabilistic split
+        "python_import": "",
+        "workflow_dispatch": "",
+        HUMAN_DRIVER: "",
+        UNRESOLVED_DRIVER: "",
+    }
+    for kind, tier in expected.items():
+        assert tier_for_kind(kind) == tier, f"{kind} should map to {tier!r}"
+
+    # Totality: every implementation_kind in the foundation enum is partitioned
+    # into exactly one of the two tier frozensets, or is a deliberate "" kind.
+    # A kind added to the enum later WITHOUT a tier decision is caught here.
+    _NO_TIER_KINDS = {"python_import", "workflow_dispatch"}
+    for kind in IMPLEMENTATION_KINDS:
+        in_scripted = kind in SCRIPTED_KINDS
+        in_agent = kind in AGENT_STEP_KINDS
+        in_no_tier = kind in _NO_TIER_KINDS
+        # exactly one bucket owns each kind
+        assert (in_scripted + in_agent + in_no_tier) == 1, (
+            f"{kind} must belong to exactly one tier bucket "
+            f"(scripted/agent-step/no-tier); add it to the mapping"
+        )
+        # the bucket and tier_for_kind agree
+        if in_scripted:
+            assert tier_for_kind(kind) == "scripted"
+        elif in_agent:
+            assert tier_for_kind(kind) == "agent-step"
+        else:
+            assert tier_for_kind(kind) == ""
+
+    # The two tier frozensets are disjoint.
+    assert SCRIPTED_KINDS.isdisjoint(AGENT_STEP_KINDS)
+
+
+def test_resolved_step_carries_tier():
+    tools = {
+        "dna:tool:http": {"@id": "dna:tool:http", "implementation_kind": "http_call"},
+        "dna:tool:mcp": {"@id": "dna:tool:mcp", "implementation_kind": "mcp_server"},
+    }
+    steps = {
+        "dna:step:api": {
+            "@id": "dna:step:api", "name": "POST /thing",
+            "mechanism": "deterministic", "tool_ref": "dna:tool:http",
+        },
+        "dna:step:agent": {
+            "@id": "dna:step:agent", "name": "agent drives the browser",
+            "mechanism": "probabilistic", "tool_ref": "dna:tool:mcp",
+        },
+    }
+    workflow = {
+        "@id": "dna:workflow:mixed",
+        "steps": ["dna:step:api", "dna:step:agent"],
+    }
+    scenario = {"@id": "dna:scenario:mixed", "journey": "dna:workflow:mixed"}
+
+    resolved = resolve_journey(scenario, workflow, steps, tools)
+    by_name = {r.name: r for r in resolved}
+    assert by_name["POST /thing"].tier == "scripted"
+    assert by_name["agent drives the browser"].tier == "agent-step"

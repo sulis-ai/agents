@@ -40,6 +40,38 @@ IMPLEMENTATION_KINDS: frozenset[str] = frozenset(
 HUMAN_DRIVER = "human"
 UNRESOLVED_DRIVER = "unresolved"
 
+# --- Driver tier (ADR-001) -------------------------------------------------
+# The tier is a DERIVED surfacing of ``implementation_kind`` — not a stored
+# field and not a new engine. It mirrors the deterministic-vs-probabilistic
+# mechanism split so the run report carries *which kind of thing ran*:
+#   ``scripted``   ← deterministic drivers (executed today).
+#   ``agent-step`` ← probabilistic drivers (DECLARED here; EXECUTION is #92's,
+#                    surfaced as a named ``deferred`` need by the dispatcher).
+#   ``""``         ← python_import / workflow_dispatch / human / unresolved:
+#                    not the deterministic/probabilistic split, so no tier
+#                    label — forcing them into the binary would misreport them.
+# Deriving from the already-stored ``implementation_kind`` keeps one source of
+# truth, with no stored copy to drift.
+SCRIPTED_KINDS: frozenset[str] = frozenset({"http_call", "subprocess"})
+AGENT_STEP_KINDS: frozenset[str] = frozenset(
+    {"mcp_server", "claude_code_tool", "skill_invocation"}
+)
+
+
+def tier_for_kind(kind: str) -> str:
+    """Derive the driver tier from an ``implementation_kind`` (or driver label).
+
+    Returns ``"scripted"`` for deterministic drivers, ``"agent-step"`` for
+    probabilistic ones, and ``""`` for everything else (``python_import`` /
+    ``workflow_dispatch`` / ``human`` / ``unresolved``). Pure: no IO; total
+    over every kind (an unrecognised kind falls through to ``""``).
+    """
+    if kind in SCRIPTED_KINDS:
+        return "scripted"
+    if kind in AGENT_STEP_KINDS:
+        return "agent-step"
+    return ""
+
 
 def _entity_id(entity: dict) -> str:
     """An entity's identity, tolerant of both conventions: brain-store entities
@@ -66,6 +98,9 @@ class ResolvedStep:
     # Driver-specific executable params (a JSON blob the dispatcher parses):
     # http_call → {"method","path","expect_status"}; subprocess → {"cmd","expect_exit"}.
     mechanism_detail: str = ""
+    # Derived (ADR-001): scripted | agent-step | "" — surfaced per step from
+    # the resolved driver's ``implementation_kind`` via ``tier_for_kind``.
+    tier: str = ""
 
 
 def driver_for_step(step: dict, tools_by_id: dict) -> str:
@@ -109,11 +144,13 @@ def resolve_journey(
                              mechanism="")
             )
             continue
+        driver = driver_for_step(step, tools_by_id)
         resolved.append(
             ResolvedStep(
                 step_id=_entity_id(step) or sid,
                 name=step.get("name", sid),
-                driver=driver_for_step(step, tools_by_id),
+                driver=driver,
+                tier=tier_for_kind(driver),
                 mechanism=str(step.get("mechanism", "")),
                 tool_ref=step.get("tool_ref"),
                 input_artifacts=list(step.get("input_artifacts", []) or []),

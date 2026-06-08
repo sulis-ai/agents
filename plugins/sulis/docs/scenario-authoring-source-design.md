@@ -33,6 +33,13 @@ A journey step invokes a **typed `Tool`**, not a free-text driver:
   enum IS the invocation contract** (how the step is actually executed), with
   `inputs_schema_ref` / `outputs_schema_ref` typing the call.
 - `_scenario_runtime.driver_for_step` already dispatches on exactly this enum.
+- `_scenario_runtime.tier_for_kind` **derives** a driver *tier* from the same
+  enum (it is not a stored field): `scripted` for the deterministic drivers
+  (`http_call`, `subprocess`), `agent-step` for the probabilistic ones
+  (`mcp_server`, `claude_code_tool`, `skill_invocation`), and `""` for
+  `python_import` / `workflow_dispatch` / human / unresolved. `ResolvedStep.tier`
+  carries it so a run report says *which kind of thing ran*. `agent-step`
+  execution is declared-only (deferred to #92); only `scripted` runs today.
 
 So the earlier sketch's `(driver: http_call POST /pay)` was an ad-hoc render of
 `Step.tool_ref → Tool{ implementation_kind: http_call, inputs_schema_ref: … }`.
