@@ -3,25 +3,27 @@
 // The production sibling of live-terminal-setup.ts. Where that setup started the
 // e2e harness WS→AF_UNIX proxy (terminal-proxy.ts + terminal-backend.py), THIS
 // setup drives the REAL server endpoint: run-terminal-real-server.ts boots
-// startProductionServer() (which spawns the real Python session-manager host and
-// attaches the real terminal sidecar to the /terminal WS), and the client reaches
-// it via the WP-006 SAME-ORIGIN default with NO VITE_TERMINAL_WS_URL.
+// startProductionServer() (which `ensureDaemon`s the SHARED Python session-
+// manager daemon, WP-007, and attaches the real terminal sidecar to the
+// /terminal WS), and the client reaches it via the WP-006 SAME-ORIGIN default
+// with NO VITE_TERMINAL_WS_URL.
 //
 // Two production-truthful differences from the harness setup:
 //
 //   1. NO harness proxy. The browser → /terminal WS → real sidecar → AF_UNIX →
-//      real host → real pty. The vite client proxies the /terminal WS upgrade to
-//      the real Express server (see live-terminal-real.config.ts), so the
+//      shared daemon → real pty. The vite client proxies the /terminal WS upgrade
+//      to the real Express server (see live-terminal-real.config.ts), so the
 //      same-origin default resolves to the running cockpit's own sidecar.
 //
-//   2. The production host seeds NO scrollback banner (that pre-seed is
+//   2. The production daemon seeds NO scrollback banner (that pre-seed is
 //      harness-only in terminal-backend.py). So this setup injects the known
 //      scrollback token the way PRODUCTION would see content arrive: it opens a
-//      real AF_UNIX connection to the SAME socket the server serves and drives a
+//      real AF_UNIX connection to the SAME socket the daemon serves and drives a
 //      real `open` + `feed` (the fake pty child echoes the fed bytes into the
 //      scrollback ring) BEFORE the browser attaches. The pre-seed connection is
 //      transient — it opens, feeds, waits for the ring to catch the token, then
-//      closes; the browser's later attach replays the seeded scrollback.
+//      closes; the browser's later attach replays the seeded scrollback. The
+//      fake pty child is wired via SULIS_DAEMON_PTY_CHILD in the server wrapper.
 //
 // Isolation invariant (DoD Blue): a dedicated state/projects dir + a dedicated
 // worktree (the existing seeder), so NO developer `~/.sulis` is read. The seed +

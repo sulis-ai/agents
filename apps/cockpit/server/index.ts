@@ -1,4 +1,5 @@
-// WP-010 — Server bootstrap.  ·  WP-004 — terminal host + WS lifecycle.
+// WP-010 — Server bootstrap.  ·  WP-004 — terminal + WS lifecycle.
+// WP-007 — migrated onto the SHARED session-manager daemon (ADR-001/ADR-003).
 //
 // Replaces the WP-001 placeholder banner with the real Express HTTP
 // surface (six GET routes on 127.0.0.1:5174 by default). Composition:
@@ -10,31 +11,38 @@
 //   3. createApp() with those deps.
 //   4. app.listen(port, "127.0.0.1") — the bind address is the literal
 //      from CONFIG; never read from env per TDD §13.1.
-//   5. WP-004 — spawn the Python session-manager host (ADR-011), wait for
-//      its `READY <socket>` line, then attach the terminal sidecar
-//      (WP-002/003) to the running HTTP server's `upgrade` event. The host +
-//      sidecar are torn down on SIGTERM/SIGINT alongside the HTTP server.
+//   5. WP-007 — `ensureDaemon` the SHARED session-manager daemon at the STABLE
+//      socket (`~/.sulis/session-manager.sock`, env `SULIS_SESSION_MANAGER_SOCKET`)
+//      — probe-first, cold-start-on-demand, idempotent (ADR-001). Then attach
+//      the terminal sidecar (WP-002/003) to the running HTTP server's `upgrade`
+//      event. The sidecar + HTTP server are torn down on SIGTERM/SIGINT — but
+//      the SHARED daemon is NOT (it outlives any one cockpit; it may serve the
+//      desktop view). This is what lands the cockpit view and the desktop view
+//      on the SAME session — the load-bearing invariant.
+//
+//   The CH-01KTHV behaviour this REPLACES: the cockpit used to spawn its OWN
+//   ephemeral host (`startSessionManagerHost`) on a per-run `mkdtempSync` temp
+//   socket and own its lifetime. That made the two views land on DIFFERENT
+//   managers. The ephemeral host is gone; the cockpit attaches the shared daemon.
 //
 // The dev runner (`npm run dev`) calls this via `tsx watch`, restarts
 // the server on file changes. Vite serves the client in parallel.
 //
 // `buildProductionApp()` stays a PURE FACTORY: importing this file or calling
-// it binds no port and spawns no host. The host spawn + WS attach live in
+// it binds no port and ensures no daemon. The daemon-ensure + WS attach live in
 // `startProductionServer()`, invoked only from the `isMainModule` boot block
-// (the WP-001 isMainModule discipline carries to the host spawn) or explicitly
-// from a test/harness.
+// (the WP-001 isMainModule discipline carries to the daemon-ensure) or
+// explicitly from a test/harness.
 //
-// INDEPENDENCE (founder directive — MUST): the terminal host + sidecar are
+// INDEPENDENCE (founder directive — MUST): the terminal daemon + sidecar are
 // their OWN lifecycle. This composition does NOT wire the terminal path through
 // the chat relay (routes/chat.ts) or the chat SessionBridge — `startProduction
-// Server` attaches the terminal sidecar to the shared HTTP server directly. The
-// chat bridge (above) and the terminal host (below) are independent processes
-// composed into one server entry; neither imports the other.
+// Server` ensures the daemon (via the `ensureDaemon` binding, which imports no
+// chat/platform) and attaches the terminal sidecar to the shared HTTP server
+// directly. The chat bridge (above) and the terminal path (below) are
+// independent processes composed into one server entry; neither imports the other.
 
-import { spawn, type ChildProcess } from "node:child_process";
 import type { Server } from "node:http";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -48,6 +56,7 @@ import {
   type TerminalSidecar,
 } from "./adapters/TerminalSidecar";
 import { resolveSessionFor } from "./lib/resolveSession";
+import { ensureDaemon, resolveDefaultSocket } from "./lib/ensureDaemon";
 import type { ChangeStoreReader } from "./ports/ChangeStoreReader";
 import type { SessionResolution } from "./ports/SessionBridge";
 import { CONFIG } from "./config";
@@ -74,29 +83,6 @@ function resolveHelperPath(): string {
     "sulis",
     "scripts",
     "sulis-list-changes",
-  );
-}
-
-/**
- * Resolve the absolute path to the bundled Python session-manager host
- * `plugins/sulis/scripts/session_manager_host.py` (WP-001, ADR-011). Mirrors
- * `resolveHelperPath` exactly (EP-03 — same repo-root-relative resolution, an
- * env override for tests/CI), keyed on the host script name. Honours
- * `SULIS_SESSION_MANAGER_HOST` (used by tests + CI).
- */
-function resolveHostPath(): string {
-  const override = process.env.SULIS_SESSION_MANAGER_HOST;
-  if (override !== undefined && override.length > 0) {
-    return override;
-  }
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  const repoRoot = path.resolve(here, "..", "..", "..");
-  return path.join(
-    repoRoot,
-    "plugins",
-    "sulis",
-    "scripts",
-    "session_manager_host.py",
   );
 }
 
@@ -162,103 +148,25 @@ export function buildProductionApp() {
   });
 }
 
-/** A spawned session-manager host + the AF_UNIX socket it serves on. */
-export interface SessionManagerHostHandle {
-  /** The long-lived host process (killed with SIGTERM on shutdown). */
-  host: ChildProcess;
-  /** The AF_UNIX socket path the host's `SocketServer` is serving on. */
-  socketPath: string;
-}
-
-/** Options for {@link startSessionManagerHost}. All have safe defaults so a
- *  bare call works in dev; tests inject a python override / fixed socket dir. */
-export interface StartSessionManagerHostOptions {
-  /** python executable (defaults to `python3`). */
-  python?: string;
-  /** The AF_UNIX socket path to serve on (defaults to a fresh per-run temp). */
-  socketPath?: string;
-  /** How long to wait for the `READY <socket>` line before failing (ms). */
-  readyTimeoutMs?: number;
-}
-
-/**
- * Spawn the Python session-manager host (ADR-011) and resolve once it prints
- * its `READY <socket>` line on stdout. The production sibling of the e2e
- * `terminal-proxy.ts::startBackend`, extracted here as a small, unit-testable
- * named helper (WP-004 Blue): same READY-line handshake, but the production
- * host runs with the binding guard ON (its default) and seeds no banner.
- *
- * The socket lives in a per-run temp dir with 0o600 perms (the engine's
- * `SocketServer.start` chmods it). The host runs until killed (SIGTERM) — the
- * cockpit owns its lifetime (tied to `startProductionServer`'s shutdown).
- *
- * READ-ONLY GATE (ADR-010 / WP-005): this is the ONE new sanctioned process-
- * start site this change introduces. It is named in the read-only gate's
- * allow-list (WP-005 owns the full gate reconciliation; ADR-010).
- */
-export function startSessionManagerHost(
-  opts: StartSessionManagerHostOptions = {},
-): Promise<SessionManagerHostHandle> {
-  const python = opts.python ?? "python3";
-  const socketPath =
-    opts.socketPath ??
-    path.join(mkdtempSync(path.join(tmpdir(), "wp004-sock-")), "terminal.sock");
-  const readyTimeoutMs = opts.readyTimeoutMs ?? 30_000;
-
-  return new Promise<SessionManagerHostHandle>((resolve, reject) => {
-    const host = spawn(python, [resolveHostPath(), "--socket", socketPath], {
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    let ready = false;
-    const timer = setTimeout(() => {
-      if (!ready) {
-        host.kill("SIGKILL");
-        reject(new Error("session_manager_host.py did not become READY"));
-      }
-    }, readyTimeoutMs);
-
-    host.stdout.on("data", (chunk: Buffer) => {
-      if (chunk.toString().includes("READY")) {
-        ready = true;
-        clearTimeout(timer);
-        resolve({ host, socketPath });
-      }
-    });
-    host.stderr.on("data", (chunk: Buffer) => {
-      // Surface host errors to the dev-runner console for debugging (NFR-SEC-03:
-      // the host never writes terminal bytes to stderr — only diagnostics).
-      // eslint-disable-next-line no-console -- intentional: dev-runner host diagnostics
-      console.error(`[session-manager-host] ${chunk.toString().trimEnd()}`);
-    });
-    host.on("exit", (code) => {
-      if (!ready) {
-        clearTimeout(timer);
-        reject(
-          new Error(`session_manager_host.py exited early (code ${code})`),
-        );
-      }
-    });
-  });
-}
-
-/** A running production server: the HTTP surface + the terminal host + the
- *  attached sidecar, with a single `close()` that tears all three down. */
+/** A running production server: the HTTP surface + the attached terminal
+ *  sidecar (bridging to the SHARED daemon), with a single `close()` that tears
+ *  down the sidecar + HTTP server — but NEVER the shared daemon (WP-007). */
 export interface ProductionServerHandle {
   /** The bound HTTP server (the GET surface + the WS upgrade endpoint). */
   httpServer: Server;
   /** The terminal sidecar attached to `httpServer`'s `upgrade` event. */
   sidecar: TerminalSidecar;
-  /** The spawned Python session-manager host process. */
-  host: ChildProcess;
-  /** The AF_UNIX socket path the host's `SocketServer` serves on (a per-run temp
-   *  unless a fixed `socketPath` was injected). Exposed so a test/e2e harness can
-   *  pre-seed the same socket the server serves. */
+  /** The SHARED daemon's AF_UNIX socket path the sidecar bridges to (the stable
+   *  socket by default; a fixed path when injected for tests/e2e). Exposed so a
+   *  test/e2e harness can pre-seed the same socket the server bridges to. The
+   *  daemon behind it is SHARED — it is not owned by this server. */
   socketPath: string;
   /** The bound port (resolves an ephemeral `port: 0` to the actual port). */
   port: number;
   /** The `ws://host:port` base URL the terminal endpoint rides (`/terminal`). */
   url: string;
-  /** Tear down the sidecar, then the host, then the HTTP server. Idempotent. */
+  /** Tear down the sidecar then the HTTP server. Idempotent. Does NOT touch the
+   *  shared daemon — it outlives the cockpit (it may serve the desktop view). */
   close(): Promise<void>;
 }
 
@@ -274,20 +182,28 @@ export interface StartProductionServerOptions {
   /** The allowed browser origin(s) for the WS upgrade (defaults to
    *  `[CONFIG.clientOrigin]` — the same allow-one-origin posture as CORS). */
   originAllowList?: string[];
-  /** python executable for the host (defaults to `python3`). */
+  /** python executable to launch the daemon with (defaults to `python3`). */
   python?: string;
-  /** The AF_UNIX socket path the host serves on (defaults to a fresh per-run
-   *  temp inside {@link startSessionManagerHost}). Test-injection only — the e2e
-   *  passes a fixed path so its setup can pre-seed the change's scrollback over
-   *  the SAME socket the running server serves (the production host seeds no
-   *  banner). Mirrors the existing `python` test-injection option. */
+  /** The AF_UNIX socket of the SHARED daemon to bridge to. Defaults to the
+   *  STABLE socket (`resolveDefaultSocket()` — `~/.sulis/session-manager.sock`,
+   *  env-overridable). Injecting a fixed path is the test/e2e seam: the e2e
+   *  passes a fixed isolated path so `ensureDaemon` cold-starts (or finds) a
+   *  daemon there and its setup can pre-seed the change's scrollback over the
+   *  SAME socket the running server bridges to. Mirrors the existing `python`
+   *  test-injection option. */
   socketPath?: string;
 }
 
 /**
- * Boot the full production server: build the app, listen, spawn the session-
- * manager host, wait for READY, then attach the terminal sidecar to the running
- * HTTP server's `upgrade` event (WP-004, the composition seam, TDD §2.3).
+ * Boot the full production server: build the app, listen, `ensureDaemon` the
+ * SHARED session-manager daemon at the stable socket (WP-007, ADR-001), then
+ * attach the terminal sidecar to the running HTTP server's `upgrade` event
+ * (WP-004, the composition seam, TDD §2.3/§6).
+ *
+ * `ensureDaemon` is probe-first + idempotent: if the daemon is already live
+ * (e.g. the desktop view started it), the cockpit ATTACHES it and spawns
+ * nothing; otherwise it cold-starts the daemon detached and waits for `READY`.
+ * Either way both views land on the SAME daemon — the load-bearing invariant.
  *
  * The sidecar's `resolveChange` is bound to the change-store reader
  * (`readChangeRecord(id).worktreePath` → `{provider:"pty", cwd:worktreePath}`)
@@ -297,14 +213,16 @@ export interface StartProductionServerOptions {
  * line per refuse through the dev-runner console (NFR-SEC-03: outcome/code/
  * change-id only, never a terminal byte).
  *
- * A host crash drops live terminals but NEVER the HTTP surface (separate
- * processes); attached clients receive `SOCKET_CLOSED` (handled client-side).
+ * A daemon crash drops live terminals but NEVER the HTTP surface (separate
+ * processes); attached clients receive `SOCKET_CLOSED` (handled client-side) and
+ * the next `ensureDaemon` rebuilds it.
  */
 export async function startProductionServer(
   opts: StartProductionServerOptions = {},
 ): Promise<ProductionServerHandle> {
   const port = opts.port ?? CONFIG.serverPort;
   const originAllowList = opts.originAllowList ?? [CONFIG.clientOrigin];
+  const socketPath = opts.socketPath ?? resolveDefaultSocket();
   const changeStore =
     opts.changeStore ??
     new SulisChangeStoreReader({
@@ -328,24 +246,24 @@ export async function startProductionServer(
   const addr = httpServer.address();
   const boundPort = addr && typeof addr !== "string" ? addr.port : port;
 
-  // 2. Spawn the host + wait for READY (ADR-011). If it never becomes READY,
+  // 2. Ensure the SHARED daemon is live at the stable socket (ADR-001). Probe-
+  //    first + idempotent: attaches an already-running daemon (it may serve the
+  //    desktop view), or cold-starts one detached. If it never becomes live,
   //    tear down the HTTP server we already bound so we leak nothing.
-  let hostHandle: SessionManagerHostHandle;
+  let daemonSocket: string;
   try {
-    hostHandle = await startSessionManagerHost({
-      python: opts.python,
-      socketPath: opts.socketPath,
-    });
+    daemonSocket = await ensureDaemon(socketPath, { python: opts.python });
   } catch (err) {
     await new Promise<void>((res) => httpServer.close(() => res()));
     throw err;
   }
 
-  // 3. Attach the terminal sidecar (WP-002/003) to the upgrade event. The
-  //    change→spec resolution REUSES the change-store reader (TDD §2.4); the
-  //    origin allow-list + caps + log sink are the production controls (WP-003).
+  // 3. Attach the terminal sidecar (WP-002/003) to the upgrade event, bridging
+  //    to the SHARED daemon's socket. The change→spec resolution REUSES the
+  //    change-store reader (TDD §2.4); the origin allow-list + caps + log sink
+  //    are the production controls (WP-003).
   const sidecar = createTerminalSidecar({
-    socketPath: hostHandle.socketPath,
+    socketPath: daemonSocket,
     resolveChange: async (changeId: string) => {
       const record = await changeStore.readChangeRecord(changeId);
       if (record === null) return null;
@@ -367,19 +285,18 @@ export async function startProductionServer(
   const close = async (): Promise<void> => {
     if (closed) return;
     closed = true;
-    // Sidecar first (stop accepting/serving WS), then the host (drop the
-    // engine), then the HTTP surface. A host crash never reaches here — it
-    // drops terminals but leaves the HTTP server up (separate processes).
+    // Sidecar first (stop accepting/serving WS), then the HTTP surface. The
+    // SHARED daemon is deliberately NOT torn down here — it outlives the cockpit
+    // (it may be serving the desktop view; ADR-001/003). `close()` only detaches
+    // this cockpit's view; the daemon's own idle-empty auto-exit bounds it.
     await sidecar.close();
-    hostHandle.host.kill("SIGTERM");
     await new Promise<void>((res) => httpServer.close(() => res()));
   };
 
   return {
     httpServer,
     sidecar,
-    host: hostHandle.host,
-    socketPath: hostHandle.socketPath,
+    socketPath: daemonSocket,
     port: boundPort,
     url: `ws://${CONFIG.bindAddress}:${boundPort}`,
     close,
@@ -397,24 +314,24 @@ function isMainModule(): boolean {
 const banner = `cockpit server up — bound to http://${CONFIG.bindAddress}:${CONFIG.serverPort}`;
 
 if (isMainModule()) {
-  // WP-004 — boot the full server: HTTP surface + session-manager host + the
-  // attached terminal sidecar (the composition seam). A failure to spawn the
-  // host is fatal at boot (the terminal would be dead); the HTTP surface is
-  // never bound without the host because they boot together here.
+  // WP-007 — boot the full server: HTTP surface + ensure the SHARED daemon + the
+  // attached terminal sidecar (the composition seam). A failure to ensure the
+  // daemon is fatal at boot (the terminal would be dead); the HTTP surface is
+  // never left bound without a daemon because they boot together here.
   startProductionServer()
     .then((handle) => {
       // eslint-disable-next-line no-console -- intentional: dev-runner heartbeat
       console.log(banner);
 
       // Graceful shutdown so `tsx watch` can restart cleanly: tear down the
-      // sidecar + host (handle.close) then exit. A host crash drops terminals
-      // but never the HTTP surface — only this signal-driven path exits.
+      // sidecar + HTTP surface (handle.close) then exit. The SHARED daemon is
+      // NOT torn down — it outlives the cockpit (it may serve the desktop view).
       let shuttingDown = false;
       const shutdown = (signal: NodeJS.Signals): void => {
         if (shuttingDown) return;
         shuttingDown = true;
         // eslint-disable-next-line no-console -- intentional: dev-runner heartbeat
-        console.log(`[cockpit] received ${signal} — closing server + host`);
+        console.log(`[cockpit] received ${signal} — closing server (daemon survives)`);
         handle.close().finally(() => process.exit(0));
       };
       process.on("SIGTERM", () => shutdown("SIGTERM"));
