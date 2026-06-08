@@ -1,0 +1,26 @@
+{
+  "pr": "feat/wp-001-front-door-button",
+  "base": "change/feat-cockpit-start-change-button",
+  "timestamp": "2026-06-08T223618Z",
+  "build_verification": {
+    "typecheck_introduced_errors": 0,
+    "lint_introduced_errors": 0,
+    "note": "eslint passes on .ts/.tsx; the .css file is not eslint-parseable by design and is excluded"
+  },
+  "pr_hygiene": {
+    "scope": { "commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "none" },
+    "size": { "lines_added": 225, "lines_removed": 1, "files_changed": 3, "severity": "none" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none" },
+    "completeness": { "new_source_without_test": 0, "new_tests": 1, "api_change_without_schema": false, "severity": "none" }
+  },
+  "findings": {
+    "architecture": { "in_changes": 0, "in_neighbours": 0 },
+    "security": { "in_changes": 0, "in_neighbours": 0 },
+    "quality": { "in_changes": 0, "in_neighbours": 0 }
+  },
+  "watch_list": [
+    "⌘N hint span is aria-hidden — decorative kbd hint; accessible name 'Start something new' is complete; intentional per design. Not a finding."
+  ],
+  "draft_fixes": 0,
+  "verdict": "PASS"
+}
