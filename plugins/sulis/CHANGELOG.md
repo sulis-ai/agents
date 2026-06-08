@@ -1,3 +1,9 @@
+## v0.118.0 — 2026-06-08
+
+**Minor — release-train batch.**
+
+- Production terminal sidecar: the cockpit server now spawns the session-manager host and bridges the browser to it over a localhost WebSocket (origin-checked, per-change binding guard ON, resource-capped), so the live interactive terminal actually opens and responds in the running cockpit. Independent of the chat path.
+
 ## v0.117.0 — 2026-06-07
 
 **Minor — release-train batch.**
