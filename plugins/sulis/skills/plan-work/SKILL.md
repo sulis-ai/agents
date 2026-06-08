@@ -536,7 +536,7 @@ These standards shape the WP set's *shape*, not just the content:
    (`flip-status`, `list-ready`, `lint`, etc.) and bricks run-all at
    dispatch time (`Could not find WP table (no | ID | header)`).
 
-9.5. **Decompose-time INDEX shape gate (#103 — MUST).** After writing
+9.5. **Decompose-time INDEX gate (#103/#222 — MUST).** After writing
     `INDEX.md`, run `wpx-index lint` and treat a non-zero exit as a
     BLOCKING gate failure of the decompose:
 
@@ -545,15 +545,29 @@ These standards shape the WP set's *shape*, not just the content:
     ```
 
     On non-zero exit the decompose is **NOT done**. Read the lint
-    error, fix the INDEX (typically: convert a bullet list to the
-    canonical table, or correct a column-order typo per
-    `## INDEX.md Structure` below), and re-run lint. Only proceed to
-    Step 10 (Report) when lint exits 0.
+    error, fix the INDEX, and re-run lint. Only proceed to Step 10
+    (Report) when lint exits 0.
 
-    This catches the #103 class — a list-shape INDEX surfacing as a
-    cryptic "no | ID | header" error at run-all dispatch time, hours
-    after the architect finished. Failing at authoring time is
-    surgical; failing at run-all is a hard recovery.
+    The gate runs two checks. First it checks the WP table's **header
+    shape** — a list-shape or drifted-header INDEX (the #103 class) is
+    invisible to the run-all loop and would otherwise surface as a
+    cryptic "no | ID | header" error at dispatch time, hours after the
+    architect finished. Second, it runs a **list-ready round-trip**: it
+    drives the exact same reader the builder uses and confirms the
+    to-do list is actually runnable. The header check alone is just a
+    proxy — it can't see an INDEX that has a perfect header but no
+    runnable work, so the round-trip additionally fails the decompose
+    when:
+
+    - there are no WP rows the builder can read (header present, rows
+      missing or unparseable);
+    - there are WP rows but **none are `pending`** (every status is
+      already `ready`/`blocked`/`done`, so the builder sees nothing to
+      run — the #222 class the header check cannot catch);
+    - a `pending` WP exists that the builder cannot account for at all.
+
+    Failing at authoring time is surgical; failing at run-all is a hard
+    recovery.
 
 10. **Report** — total WP count, critical path length, parallelisation
     opportunity (how many WPs can be implemented simultaneously at peak),
