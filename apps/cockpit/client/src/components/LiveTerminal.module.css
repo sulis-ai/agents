@@ -12,6 +12,11 @@
  */
 
 .card {
+  /* Grow to fill the full height of the view container (.viewfill is a
+   * flex column); without this the card sits at content height (~the pane's
+   * min-height) instead of full height. Full width comes for free from the
+   * column's default stretch. */
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;

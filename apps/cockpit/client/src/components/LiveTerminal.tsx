@@ -76,9 +76,19 @@ type ViewState =
   | { kind: "error"; error: TerminalError };
 
 /** The default xterm.js-backed sink (the production path). Lazily imports
- *  xterm so the heavy emulator only loads when the Terminal tab mounts. */
-async function createXtermSink(): Promise<TerminalSink> {
+ *  xterm so the heavy emulator only loads when the Terminal tab mounts.
+ *
+ *  Exported (not module-private) so the fit-addon wiring — loadAddon(fitAddon),
+ *  fit-on-open, the ResizeObserver re-fit, dispose teardown — is unit-tested
+ *  against mocked xterm (LiveTerminal.fit.test.ts, CH-01KTMB). That wiring
+ *  shipped missing once and is invisible to the component tests, which inject a
+ *  fake sink; this export is the seam that makes it regression-testable. */
+export async function createXtermSink(): Promise<TerminalSink> {
   const { Terminal } = await import("@xterm/xterm");
+  // The fit addon sizes the terminal's cols×rows to its container (and re-sizes
+  // on container resize) — without it xterm renders at a fixed default width
+  // (~80 cols, about half the panel) and never adapts to the window.
+  const { FitAddon } = await import("@xterm/addon-fit");
   // The xterm stylesheet (the terminal content's own palette — the documented
   // token exception, WP-VISUAL §5.1).
   await import("@xterm/xterm/css/xterm.css");
@@ -89,8 +99,28 @@ async function createXtermSink(): Promise<TerminalSink> {
       "'JetBrains Mono', 'SF Mono', Monaco, Inconsolata, 'Fira Mono', monospace",
     fontSize: 13,
   });
+  const fitAddon = new FitAddon();
+  term.loadAddon(fitAddon);
+  let resizeObserver: ResizeObserver | undefined;
+  // fit() reads the container's measured size, so it can throw if the container
+  // isn't laid out yet — guard it.
+  const safeFit = () => {
+    try {
+      fitAddon.fit();
+    } catch {
+      /* container not measurable yet — a later resize tick will fit */
+    }
+  };
   return {
-    open: (parent) => term.open(parent),
+    open: (parent) => {
+      term.open(parent);
+      // Fit once the browser has laid the container out, then keep it fitted to
+      // the container's size. fit() updates cols/rows → term.onResize fires →
+      // the geometry is forwarded to the backend (§2.13.3), already wired below.
+      requestAnimationFrame(safeFit);
+      resizeObserver = new ResizeObserver(() => safeFit());
+      resizeObserver.observe(parent);
+    },
     write: (data) => term.write(data),
     onData: (handler) => {
       term.onData(handler);
@@ -98,7 +128,10 @@ async function createXtermSink(): Promise<TerminalSink> {
     onResize: (handler) => {
       term.onResize(({ rows, cols }) => handler({ rows, cols }));
     },
-    dispose: () => term.dispose(),
+    dispose: () => {
+      resizeObserver?.disconnect();
+      term.dispose();
+    },
   };
 }
 
