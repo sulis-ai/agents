@@ -12,12 +12,17 @@ import { useEffect } from "react";
 import { Outlet, useMatch } from "react-router-dom";
 import { WorkspaceTopBar } from "../components/WorkspaceTopBar";
 import { useOpenTabs } from "../api/openTabs";
+import { useStartHotkey } from "../api/useStartHotkey";
 import styles from "./WorkspaceShell.module.css";
 
 export function WorkspaceShell() {
   const match = useMatch("/c/:changeId");
   const activeChangeId = match?.params.changeId ?? null;
   const { openTab } = useOpenTabs();
+
+  // WP-002 — the global ⌘N / ⌘K start accelerant, live on every workspace
+  // route (ADR-002). Same destination as the front-door button (ADR-001).
+  useStartHotkey();
 
   // Opening a change (navigating to its route) gives it a tab in the strip.
   useEffect(() => {
