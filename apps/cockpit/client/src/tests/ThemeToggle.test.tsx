@@ -45,6 +45,21 @@ describe("<ThemeToggle />", () => {
     ).toBeInTheDocument();
   });
 
+  it("renders an SVG icon (Heroicon), never an emoji glyph", () => {
+    stubMatchMedia(false); // start light → sun
+    renderToggle();
+    const button = screen.getByRole("button");
+    // The icon is a real inline SVG (Heroicon), matching the app's icon
+    // convention — not an emoji character.
+    expect(button.querySelector("svg")).not.toBeNull();
+    expect(button.textContent ?? "").not.toMatch(/[🌙☀️]/u);
+
+    // Still an SVG after flipping to dark (moon).
+    fireEvent.click(button);
+    expect(button.querySelector("svg")).not.toBeNull();
+    expect(button.textContent ?? "").not.toMatch(/[🌙☀️]/u);
+  });
+
   it("conveys the active theme via aria-pressed (state not by colour alone)", () => {
     stubMatchMedia(true); // start dark
     renderToggle();

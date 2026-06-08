@@ -29,9 +29,14 @@
 }
 
 .icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The Heroicon SVG fills the icon slot and inherits the button's text colour
+ * via currentColor (so it re-themes with the rest of the app). */
+.icon svg {
   width: 16px;
   height: 16px;
-  display: inline-block;
-  line-height: 16px;
-  text-align: center;
 }
