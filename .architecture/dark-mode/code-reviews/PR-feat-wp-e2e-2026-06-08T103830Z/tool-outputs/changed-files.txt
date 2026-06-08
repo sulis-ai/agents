@@ -1,0 +1,4 @@
+apps/cockpit/e2e/empty-state.spec.ts
+apps/cockpit/e2e/happy-path.spec.ts
+apps/cockpit/e2e/live-terminal.spec.ts
+apps/cockpit/e2e/playwright.config.ts
