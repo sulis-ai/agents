@@ -1,3 +1,9 @@
+## v0.121.1 — 2026-06-08
+
+**Patch — release-train batch.**
+
+- Harden wpx-train for the trunk model: back-integrate change branches from origin/main (not the retired dev), and resolve each WP-s exact pushed branch from its Step-7 journal instead of an ambiguous feat/wp-NNN-* glob.
+
 ## v0.121.0 — 2026-06-08
 
 **Minor — release-train batch.**

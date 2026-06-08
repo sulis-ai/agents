@@ -1,7 +1,0 @@
-change_id: wpxtrain-trunk-branch-resolution-fix
-primitive: fix
-tier: patch
-touches_plugin: true
-summary: |
-  Harden wpx-train for the trunk model: back-integrate change branches from origin/main (not the retired dev), and resolve each WP-s exact pushed branch from its Step-7 journal instead of an ambiguous feat/wp-NNN-* glob.
-created_at: 2026-06-08T13:04:28Z
