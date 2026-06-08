@@ -15,6 +15,10 @@ import { useActiveProduct } from "../api/activeProduct";
 import { useChangesWithLiveness } from "../api/useChangesWithLiveness";
 import { useOpenTabs } from "../api/openTabs";
 import { ProductSwitcher } from "./ProductSwitcher";
+// CH-01KTHP — the light/dark toggle is re-homed here. #216 deleted the old
+// <Shell /> top bar that used to host it; the workspace top bar is the new
+// always-present chrome, so the toggle lives top-right of it.
+import { ThemeToggle } from "./ThemeToggle";
 import styles from "../layouts/WorkspaceShell.module.css";
 
 /** "deploy-founder-web" → "Deploy founder web" — a readable tab name. */
@@ -112,6 +116,12 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
           );
         })}
       </nav>
+
+      {/* Light/dark toggle — pushed to the far right (CH-01KTHP). Reachable
+          from every route because the top bar is persistent chrome. */}
+      <div className={styles.toggleSlot}>
+        <ThemeToggle />
+      </div>
     </header>
   );
 }

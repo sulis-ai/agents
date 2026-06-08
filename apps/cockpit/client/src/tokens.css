@@ -61,6 +61,20 @@
   --stage-review: #9333EA;
   --stage-ship: #15803D;
 
+  /* Stage-badge tints (light) — all SIX active workflow stages
+   * (recon/specify/design/implement/review/ship). Genuinely-new semantic
+   * tokens added per TDD §2 remediation route (b): each trio exists in BOTH
+   * this light :root and the dark block below. Suffix: -bg / -fg / -border
+   * (full word, matching --border / --card-foreground). Values are the
+   * verbatim source literals from StageBadge.module.css → light is
+   * pixel-unchanged. */
+  --stage-recon-bg: #f1f8ff;     --stage-recon-fg: #2563EB;     --stage-recon-border: #c8e1ff;
+  --stage-specify-bg: #fff5b1;   --stage-specify-fg: #735c0f;   --stage-specify-border: #ffd33d;
+  --stage-design-bg: #e6e6fa;    --stage-design-fg: #4b0082;    --stage-design-border: #c5c5e6;
+  --stage-implement-bg: #e1ffe1; --stage-implement-fg: #22863a; --stage-implement-border: #c0e6c0;
+  --stage-review-bg: #fff0e6;    --stage-review-fg: #c04a00;    --stage-review-border: #ffd0b0;
+  --stage-ship-bg: #d4edda;      --stage-ship-fg: #155724;      --stage-ship-border: #a5d6a7;
+
   /* Radius */
   --radius-interactive: 4px;
   --radius-button: 9999px;
@@ -95,4 +109,92 @@
   /* Float shadow for the docked composer + raised cards (chat-B2). */
   --shadow-float: 0 6px 20px rgba(23, 23, 23, 0.08);
 
+}
+
+/* Dark theme — overrides every colour custom property the light :root defines
+ * (ADR-001 theme mechanism: components keep reading var(--*); the cascade
+ * re-themes them under data-theme="dark"). Radius / typography / weight tokens
+ * are theme-invariant and intentionally NOT redefined here — they inherit from
+ * :root. Values are copied verbatim from the founder-signed visual contract:
+ * .architecture/feat-dark-mode/mockup/dark-theme.html (its
+ * :root[data-theme="dark"] block is the canonical value source per TDD §6). */
+:root[data-theme="dark"] {
+  /* Surfaces (dark) — layered: background is darkest, cards lift above it */
+  --background: #16181d;
+  --foreground: #e8e6e3;
+  --card: #1e2127;
+  --card-foreground: #e8e6e3;
+  --popover: #23262e;
+  --popover-foreground: #e8e6e3;
+  --muted: #20232a;
+  --muted-foreground: #a3a09b;
+  --secondary: #2a2e36;
+  --secondary-foreground: #e8e6e3;
+  --border: #343842;
+  --border-muted: #2a2e36;
+  --input: #343842;
+
+  /* Semantic colours — brightened for WCAG AA on dark surfaces */
+  --primary: #5b9bff;
+  --primary-foreground: #0b1220;
+  --accent: #4fb3c9;
+  --accent-foreground: #07181c;
+  --destructive: #f0686b;
+  --destructive-foreground: #1a0b0c;
+  --positive: #4caf68;
+  --positive-foreground: #07210f;
+  --warning: #f5b342;
+  --warning-foreground: #1f1402;
+  --ring: #5b9bff;
+  --brand-gold: #d8bd7e;
+  --brand-depth: #6f9cc9;
+
+  /* Stage-badge tints (dark) — the founder-signed pairing for all SIX active
+   * stages. Each dark fg-on-bg clears WCAG AA (TDD §6 contrast summary); the
+   * six hues are mutually distinguishable. Values verbatim from the signed-off
+   * mockup (mockup/dark-theme.html). */
+  --stage-recon-bg: #16263a;     --stage-recon-fg: #7fb0ff;     --stage-recon-border: #234a73;
+  --stage-specify-bg: #332b10;   --stage-specify-fg: #f0c75a;   --stage-specify-border: #5c4d1e;
+  --stage-design-bg: #241c3a;    --stage-design-fg: #b79cff;    --stage-design-border: #3d2f63;
+  --stage-implement-bg: #1a3014; --stage-implement-fg: #9bd86a; --stage-implement-border: #345526;
+  --stage-review-bg: #3a2310;    --stage-review-fg: #f2a368;    --stage-review-border: #63401f;
+  --stage-ship-bg: #13301d;      --stage-ship-fg: #73d391;      --stage-ship-border: #245636;
+
+  /* ---- Dark re-fit of the surfaces #216 introduced AFTER the dark mockup ----
+   * #216 ("Autonomous Delivery Environment") landed a tabbed cockpit with a
+   * new single --stage-* scale, status-tint tokens (--bg-*), and
+   * --text-secondary. The signed dark mockup (mockup/dark-theme.html)
+   * pre-dates #216, so it carries no literals for these. Rather than invent
+   * UNSIGNED dark colours, we DERIVE each from values the mockup already
+   * signed off:
+   *
+   *  - Single --stage-* → the matching signed dark badge foreground
+   *    (--stage-*-fg). Same hue the founder approved; reused, not re-picked.
+   *  - --bg-* status tints → the mockup's signed soft-tint recipe
+   *    (color-mix var(--semantic) N%, var(--card)) — its .banner.error /
+   *    .banner.warn use exactly 16% / 18% fills with 45% borders. Positive
+   *    follows the same 16%/45% shape. These are theme-derived, not new
+   *    literals: in dark they read the dark --destructive/--positive/--warning
+   *    + dark --card, so they re-theme correctly.
+   *  - --text-secondary → --muted-foreground (the dark neutral the mockup
+   *    already uses for secondary text). */
+  --stage-recon: var(--stage-recon-fg);
+  --stage-specify: var(--stage-specify-fg);
+  --stage-design: var(--stage-design-fg);
+  --stage-implement: var(--stage-implement-fg);
+  --stage-review: var(--stage-review-fg);
+  --stage-ship: var(--stage-ship-fg);
+
+  --bg-positive: color-mix(in srgb, var(--positive) 16%, var(--card));
+  --bg-positive-border: color-mix(in srgb, var(--positive) 45%, var(--card));
+  --bg-destructive: color-mix(in srgb, var(--destructive) 16%, var(--card));
+  --bg-destructive-border: color-mix(in srgb, var(--destructive) 45%, var(--card));
+  --bg-warning: color-mix(in srgb, var(--warning) 18%, var(--card));
+  --bg-warning-border: color-mix(in srgb, var(--warning) 45%, var(--card));
+
+  --text-secondary: var(--muted-foreground);
+
+  /* Float shadow — deepen for dark surfaces (the light 8%-black shadow is
+   * invisible on a dark background; a stronger black reads as elevation). */
+  --shadow-float: 0 6px 20px rgba(0, 0, 0, 0.45);
 }

@@ -417,9 +417,11 @@ apps/cockpit/
 │   │   ├── main.tsx        # React mount point
 │   │   ├── App.tsx         # placeholder root
 │   │   ├── pages/          # board (stage columns, WP-003), thread view (WP-013), concierge front door (WP-009)
-│   │   ├── components/     # shells, panels (WP-011/013/014), ConciergeChat (the read-only front door, WP-009); LiveTerminal — the xterm.js terminal view (WP-008)
+│   │   ├── components/     # shells, panels (WP-011/013/014), ConciergeChat (the read-only front door, WP-009); LiveTerminal — the xterm.js terminal view (WP-008); ThemeToggle — light/dark control, mounted in WorkspaceTopBar (WP-004)
 │   │   ├── terminal/       # client TerminalBridge factory — reuses the WP-007 port (WP-008)
 │   │   ├── api/            # TanStack Query hooks (WP-011)
+│   │   ├── layouts/        # WorkspaceShell — tabbed top bar (WorkspaceTopBar: product switcher + tab strip + theme toggle) + outlet (#216, WP-004)
+│   │   ├── theme/          # ThemeProvider, useTheme(), resolveInitialTheme (WP-003)
 │   │   └── tests/
 ├── shared/                 # types + constants both halves import
 │   ├── api-types.ts        # the wire shapes (TDD §5.1)

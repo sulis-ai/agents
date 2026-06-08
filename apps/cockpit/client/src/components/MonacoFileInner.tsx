@@ -10,11 +10,18 @@
 // writes files. `options.readOnly === true` is the load-bearing
 // client-side read-only guarantee (asserted in MonacoFile.test.tsx).
 //
+// The editor theme follows the active app theme (WP-005 / ADR-002):
+// Monaco does not read CSS variables, so we pass it the matching built-in
+// theme id derived from useTheme() via monacoThemeFor(). Flipping the app
+// toggle re-renders this wrapper and Monaco restyles live (no remount).
+//
 // References: WP-014 Contract (<MonacoFile>), ADR-001 (Monaco
-// read-only).
+// read-only), WP-005 / ADR-002 (Monaco theme binds to the app theme).
 
 import Editor from "@monaco-editor/react";
 import styles from "../styles/FilesPanel.module.css";
+import { useTheme } from "../theme/ThemeProvider";
+import { monacoThemeFor } from "../theme/monacoThemeFor";
 
 export interface MonacoFileProps {
   /** File contents to display. */
@@ -27,10 +34,11 @@ export default function MonacoFileInner({
   content,
   language,
 }: MonacoFileProps) {
+  const { theme } = useTheme();
   return (
     <div className={styles.monaco} data-testid="monaco-file">
       <Editor
-        theme="vs-dark"
+        theme={monacoThemeFor(theme)}
         defaultLanguage={language ?? "plaintext"}
         value={content}
         options={{

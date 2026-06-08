@@ -16,6 +16,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ActiveProductProvider } from "../api/activeProduct";
 import { OpenTabsProvider } from "../api/openTabs";
 import { WorkspaceShell } from "../layouts/WorkspaceShell";
+// CH-01KTHP — the workspace top bar now hosts the ThemeToggle (a useTheme()
+// consumer), so the shell mount wraps in a ThemeProvider, mirroring App.tsx
+// production composition.
+import { ThemeProvider } from "../theme/ThemeProvider";
 
 function freshClient() {
   return new QueryClient({
@@ -33,20 +37,22 @@ function jsonResponse(status: number, body: unknown): Response {
 function renderShell(path = "/") {
   return render(
     <QueryClientProvider client={freshClient()}>
-      <ActiveProductProvider>
-        <OpenTabsProvider>
-          <MemoryRouter initialEntries={[path]}>
-            <Routes>
-              <Route element={<WorkspaceShell />}>
-                <Route
-                  path="/"
-                  element={<div data-testid="route-marker">child</div>}
-                />
-              </Route>
-            </Routes>
-          </MemoryRouter>
-        </OpenTabsProvider>
-      </ActiveProductProvider>
+      <ThemeProvider>
+        <ActiveProductProvider>
+          <OpenTabsProvider>
+            <MemoryRouter initialEntries={[path]}>
+              <Routes>
+                <Route element={<WorkspaceShell />}>
+                  <Route
+                    path="/"
+                    element={<div data-testid="route-marker">child</div>}
+                  />
+                </Route>
+              </Routes>
+            </MemoryRouter>
+          </OpenTabsProvider>
+        </ActiveProductProvider>
+      </ThemeProvider>
     </QueryClientProvider>,
   );
 }

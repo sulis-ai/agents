@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cockpit — Dark theme visual contract (CH-01KTHP)</title>
+<!--
+  VISUAL CONTRACT — feat-dark-mode (#45 / UXD-14)
+  This file is the canonical source of the dark token values (TDD §6 points
+  here). It renders the cockpit's real surfaces with the real dark tokens.
+  Defaults to DARK on load; the toggle flips to light so the founder can
+  compare. Self-contained, no build step — open in any browser.
+-->
+<style>
+  /* ===== LIGHT set — copied verbatim from apps/cockpit/client/src/tokens.css ===== */
+  :root {
+    --background: #fafafa;
+    --foreground: #171717;
+    --card: #ffffff;
+    --card-foreground: #171717;
+    --popover: #ffffff;
+    --popover-foreground: #171717;
+    --muted: #f5f5f5;
+    --muted-foreground: #737373;
+    --secondary: #f5f5f5;
+    --secondary-foreground: #171717;
+    --border: #e5e5e5;
+    --border-muted: #f0f0f0;
+    --input: #e5e5e5;
+    --primary: #2563EB;
+    --primary-foreground: #FFFFFF;
+    --accent: #2D7D90;
+    --accent-foreground: #FFFFFF;
+    --destructive: #DC2626;
+    --destructive-foreground: #FFFFFF;
+    --positive: #16A34A;
+    --positive-foreground: #FFFFFF;
+    --warning: #F59E0B;
+    --warning-foreground: #121212;
+    --ring: #2563EB;
+    --brand-gold: #C9A962;
+    --brand-depth: #1E3A5F;
+    --radius-interactive: 4px;
+    --radius-button: 9999px;
+    --radius-container: 4px;
+    --radius-badge: 9999px;
+    --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+    --weight-body: 400;
+    --weight-label: 500;
+    /* stage-badge tints — light (these are the colours the audit found
+       hardcoded today; shown here as proposed tokens for both themes).
+       All six workflow stages are covered (recon/specify/design/implement/
+       review/ship). Light values are the verbatim source literals from
+       components/StageBadge.module.css — pixel-unchanged in light mode. */
+    --stage-recon-bg:#f1f8ff;     --stage-recon-fg:#2563EB;     --stage-recon-border:#c8e1ff;
+    --stage-specify-bg:#fff5b1;   --stage-specify-fg:#735c0f;   --stage-specify-border:#ffd33d;
+    --stage-design-bg:#e6e6fa;    --stage-design-fg:#4b0082;    --stage-design-border:#c5c5e6;
+    --stage-implement-bg:#e1ffe1; --stage-implement-fg:#22863a; --stage-implement-border:#c0e6c0;
+    --stage-review-bg:#fff0e6;    --stage-review-fg:#c04a00;    --stage-review-border:#ffd0b0;
+    --stage-ship-bg:#d4edda;      --stage-ship-fg:#155724;      --stage-ship-border:#a5d6a7;
+    /* code viewer (Monaco "vs" light) */
+    --code-bg:#ffffff; --code-fg:#1f2328; --code-gutter:#6e7781;
+    --code-kw:#cf222e; --code-str:#0a3069; --code-fn:#8250df; --code-cmt:#6e7781;
+    --code-add-bg:#e6ffec; --code-del-bg:#ffebe9;
+  }
+
+  /* ===== DARK set — CANONICAL. TDD §6 references this exact block. ===== */
+  :root[data-theme="dark"] {
+    --background: #16181d;
+    --foreground: #e8e6e3;
+    --card: #1e2127;
+    --card-foreground: #e8e6e3;
+    --popover: #23262e;
+    --popover-foreground: #e8e6e3;
+    --muted: #20232a;
+    --muted-foreground: #a3a09b;
+    --secondary: #2a2e36;
+    --secondary-foreground: #e8e6e3;
+    --border: #343842;
+    --border-muted: #2a2e36;
+    --input: #343842;
+    --primary: #5b9bff;
+    --primary-foreground: #0b1220;
+    --accent: #4fb3c9;
+    --accent-foreground: #07181c;
+    --destructive: #f0686b;
+    --destructive-foreground: #1a0b0c;
+    --positive: #4caf68;
+    --positive-foreground: #07210f;
+    --warning: #f5b342;
+    --warning-foreground: #1f1402;
+    --ring: #5b9bff;
+    --brand-gold: #d8bd7e;
+    --brand-depth: #6f9cc9;
+    /* stage-badge tints — dark (proposed; the audit-remediation pairing).
+       All six stages; each fg-on-bg clears WCAG AA (≥4.5:1) and the six are
+       mutually distinguishable: recon=blue, specify=amber, design=purple,
+       implement=lime-green, review=orange, ship=green. Borders follow the
+       same same-hue quiet-outline treatment as the existing signed-off trio. */
+    --stage-recon-bg:#16263a;     --stage-recon-fg:#7fb0ff;     --stage-recon-border:#234a73;
+    --stage-specify-bg:#332b10;   --stage-specify-fg:#f0c75a;   --stage-specify-border:#5c4d1e;
+    --stage-design-bg:#241c3a;    --stage-design-fg:#b79cff;    --stage-design-border:#3d2f63;
+    --stage-implement-bg:#1a3014; --stage-implement-fg:#9bd86a; --stage-implement-border:#345526;
+    --stage-review-bg:#3a2310;    --stage-review-fg:#f2a368;    --stage-review-border:#63401f;
+    --stage-ship-bg:#13301d;      --stage-ship-fg:#73d391;      --stage-ship-border:#245636;
+    /* code viewer (Monaco "vs-dark") */
+    --code-bg:#1e1e1e; --code-fg:#d4d4d4; --code-gutter:#858585;
+    --code-kw:#569cd6; --code-str:#ce9178; --code-fn:#dcdcaa; --code-cmt:#6a9955;
+    --code-add-bg:#16341f; --code-del-bg:#3a1d1d;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height:100%; margin:0; }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    transition: background 160ms ease, color 160ms ease;
+  }
+
+  /* ---- App shell: sidebar + main, with a top bar that holds the toggle ---- */
+  .shell { display:flex; height:100vh; overflow:hidden; }
+  .sidebar {
+    width:280px; flex:0 0 280px; border-right:1px solid var(--border);
+    padding:16px; background: var(--muted); overflow-y:auto;
+  }
+  .sidebar h2 {
+    font-size:14px; font-weight:600; text-transform:uppercase;
+    letter-spacing:.04em; color:var(--muted-foreground); margin:0 0 12px;
+  }
+  .navitem {
+    display:flex; align-items:center; gap:8px; padding:8px 10px;
+    border-radius:var(--radius-interactive); font-size:13px;
+    color:var(--foreground); cursor:pointer; margin-bottom:2px;
+  }
+  .navitem:hover { background: var(--background); }
+  .navitem.active { background: var(--primary); color: var(--primary-foreground); }
+  .navitem.active .dim { color: var(--primary-foreground); opacity:.8; }
+  .dim { color: var(--muted-foreground); }
+
+  .main { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+  .topbar {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 20px; border-bottom:1px solid var(--border); background:var(--background);
+  }
+  .topbar .title { font-size:15px; font-weight:600; }
+  .content { padding:20px; overflow:auto; display:grid; gap:20px; }
+
+  /* ---- Toggle control (the real toggle, colours-only) ---- */
+  .toggle {
+    display:inline-flex; align-items:center; gap:8px; cursor:pointer;
+    border:1px solid var(--border); background:var(--card);
+    color:var(--foreground); padding:6px 12px;
+    border-radius:var(--radius-button); font-size:13px; font-weight:500;
+  }
+  .toggle:hover { border-color: var(--primary); }
+  .toggle .icon { width:16px; height:16px; display:inline-block; }
+
+  /* ---- Change cards (Dashboard) ---- */
+  .cards { display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); }
+  .card {
+    border:1px solid var(--border); border-radius:6px; padding:16px;
+    background:var(--card); color:var(--card-foreground);
+    transition:border-color 120ms ease;
+  }
+  .card:hover { border-color: var(--primary); }
+  .card .row { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .handle { font-family:var(--font-mono); font-size:13px; font-weight:600; color:var(--primary); }
+  .slug { font-size:12px; color:var(--muted-foreground); }
+  .intent { font-size:14px; margin:0 0 12px; line-height:1.4; }
+  .footer { display:flex; justify-content:space-between; font-size:12px; color:var(--muted-foreground); }
+
+  .badge {
+    display:inline-block; padding:2px 8px; border-radius:var(--radius-badge);
+    font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.04em;
+  }
+  .badge.recon     { background:var(--stage-recon-bg);     color:var(--stage-recon-fg);     border:1px solid var(--stage-recon-border); }
+  .badge.specify   { background:var(--stage-specify-bg);   color:var(--stage-specify-fg);   border:1px solid var(--stage-specify-border); }
+  .badge.design    { background:var(--stage-design-bg);    color:var(--stage-design-fg);    border:1px solid var(--stage-design-border); }
+  .badge.implement { background:var(--stage-implement-bg); color:var(--stage-implement-fg); border:1px solid var(--stage-implement-border); }
+  .badge.review    { background:var(--stage-review-bg);    color:var(--stage-review-fg);    border:1px solid var(--stage-review-border); }
+  .badge.ship      { background:var(--stage-ship-bg);      color:var(--stage-ship-fg);      border:1px solid var(--stage-ship-border); }
+
+  .dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+  .dot.live { background:var(--positive); box-shadow:0 0 0 3px color-mix(in srgb, var(--positive) 25%, transparent); }
+  .dot.idle { background:var(--warning); }
+
+  /* ---- Thread / chat panel ---- */
+  .panel { border:1px solid var(--border); border-radius:8px; background:var(--card); overflow:hidden; }
+  .panel > h3 {
+    margin:0; padding:12px 16px; font-size:13px; font-weight:600;
+    border-bottom:1px solid var(--border); color:var(--foreground); background:var(--muted);
+  }
+  .chat { padding:16px; display:grid; gap:12px; }
+  .msg { max-width:80%; padding:10px 14px; border-radius:10px; font-size:14px; line-height:1.45; }
+  .msg.user { background:var(--primary); color:var(--primary-foreground); justify-self:end; }
+  .msg.assistant { background:var(--secondary); color:var(--secondary-foreground); border:1px solid var(--border); }
+  .msg.note {
+    background: color-mix(in srgb, var(--warning) 18%, var(--card));
+    border:1px solid color-mix(in srgb, var(--warning) 45%, var(--card));
+    color:var(--foreground); font-size:13px;
+  }
+  .banner.error {
+    background: color-mix(in srgb, var(--destructive) 16%, var(--card));
+    border:1px solid color-mix(in srgb, var(--destructive) 45%, var(--card));
+    color:var(--foreground); padding:10px 14px; border-radius:6px; font-size:13px;
+  }
+
+  /* ---- Code viewer panel (Monaco-following-theme mock) ---- */
+  .code {
+    font-family:var(--font-mono); font-size:13px; line-height:1.6;
+    background:var(--code-bg); color:var(--code-fg);
+    border:1px solid var(--border); border-radius:8px; overflow:hidden;
+  }
+  .code .tabbar {
+    display:flex; gap:0; background:var(--muted); border-bottom:1px solid var(--border);
+    font-family:var(--font-sans); font-size:12px;
+  }
+  .code .tab { padding:8px 14px; color:var(--muted-foreground); border-right:1px solid var(--border); }
+  .code .tab.active { color:var(--foreground); background:var(--code-bg); }
+  .code pre { margin:0; padding:12px 0; }
+  .code .ln { display:grid; grid-template-columns:48px 1fr; }
+  .code .ln .g { color:var(--code-gutter); text-align:right; padding-right:14px; user-select:none; }
+  .code .add { background:var(--code-add-bg); }
+  .code .del { background:var(--code-del-bg); }
+  .kw { color:var(--code-kw); } .str { color:var(--code-str); }
+  .fn { color:var(--code-fn); } .cmt { color:var(--code-cmt); }
+
+  .sectionlabel { font-size:11px; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--muted-foreground); margin:0 0 8px; font-weight:600; }
+
+  /* contract banner */
+  .contract { font-size:12px; color:var(--muted-foreground); padding:8px 20px;
+    border-top:1px solid var(--border); background:var(--muted); }
+  .swatchrow { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  .swatch { width:34px; height:20px; border-radius:3px; border:1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="shell">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <h2>Active changes</h2>
+    <div class="navitem active"><span class="dot live"></span> CH-01KTHP <span class="dim">· dark-mode</span></div>
+    <div class="navitem"><span class="dot idle"></span> CH-01KXAB <span class="dim">· release-train</span></div>
+    <div class="navitem"><span class="dot idle"></span> CH-01KY7Q <span class="dim">· recon-cache</span></div>
+    <h2 style="margin-top:24px">Shipped</h2>
+    <div class="navitem"><span class="badge ship">shipped</span> <span class="dim">terminal-launcher</span></div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <span class="title">Dashboard</span>
+      <button class="toggle" id="toggle" onclick="flip()">
+        <span class="icon" id="icon">🌙</span><span id="label">Dark</span>
+      </button>
+    </div>
+
+    <div class="content">
+      <!-- Dashboard: change cards with stage badges -->
+      <div>
+        <p class="sectionlabel">Dashboard — change cards</p>
+        <div class="cards">
+          <div class="card">
+            <div class="row"><span class="handle">CH-01KTHP</span><span class="badge design">design</span></div>
+            <p class="intent">Dark mode for the cockpit — token set + app-wide toggle.</p>
+            <div class="footer"><span><span class="dot live"></span> live</span><span class="slug">2m ago</span></div>
+          </div>
+          <div class="card">
+            <div class="row"><span class="handle">CH-01KXAB</span><span class="badge recon">recon</span></div>
+            <p class="intent">Release train as entities — drain dev→main.</p>
+            <div class="footer"><span><span class="dot idle"></span> idle</span><span class="slug">1h ago</span></div>
+          </div>
+          <div class="card">
+            <div class="row"><span class="handle">CH-01KY7Q</span><span class="badge ship">shipped</span></div>
+            <p class="intent">Recon cache invalidation on branch switch.</p>
+            <div class="footer"><span class="dim">merged</span><span class="slug">yesterday</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stage-badge legend: ALL SIX workflow stages, for sign-off -->
+      <div>
+        <p class="sectionlabel">Stage badges — all six workflow stages (sign-off surface)</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+                    padding:14px 16px; border:1px solid var(--border);
+                    border-radius:8px; background:var(--card);">
+          <span class="badge recon">Recon · 1/6</span>
+          <span class="badge specify">Specify · 2/6</span>
+          <span class="badge design">Design · 3/6</span>
+          <span class="badge implement">Implement · 4/6</span>
+          <span class="badge review">Review · 5/6</span>
+          <span class="badge ship">Ship · 6/6</span>
+        </div>
+        <p class="dim" style="font-size:12px; margin:8px 0 0;">
+          Toggle the theme (top-right) to compare each pill in light ⇄ dark. All
+          six clear WCAG AA in both themes; light values are unchanged from today.
+        </p>
+      </div>
+
+      <!-- Thread + chat -->
+      <div>
+        <p class="sectionlabel">Change view — thread &amp; chat</p>
+        <div class="panel">
+          <h3>CH-01KTHP · conversation</h3>
+          <div class="chat">
+            <div class="msg user">Add a dark mode toggle that themes the whole app.</div>
+            <div class="msg assistant">On it. The cockpit already reads colours from one tokens file, so this is a second colour set behind a switch — plus making the code viewer follow the theme.</div>
+            <div class="msg note">Note: 32 hardcoded colours bypass the token system and need remediation before the theme is fully clean.</div>
+            <div class="banner error">Build error: hasMore is not defined (example error-banner styling in dark).</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Code + diff viewer (Monaco following the theme) -->
+      <div>
+        <p class="sectionlabel">Code viewer — follows the active theme (Monaco)</p>
+        <div class="code">
+          <div class="tabbar">
+            <span class="tab active">ThemeProvider.tsx</span>
+            <span class="tab">monacoThemeFor.ts</span>
+          </div>
+          <pre>
+<span class="ln"><span class="g">1</span><span><span class="cmt">// Resolve initial theme: saved choice wins, else OS preference.</span></span></span>
+<span class="ln"><span class="g">2</span><span><span class="kw">export function</span> <span class="fn">resolveInitialTheme</span>(): Theme {</span></span>
+<span class="ln"><span class="g">3</span><span>  <span class="kw">const</span> saved = localStorage.getItem(<span class="str">"cockpit.theme"</span>);</span></span>
+<span class="ln add"><span class="g">4</span><span>  <span class="kw">if</span> (saved === <span class="str">"dark"</span> || saved === <span class="str">"light"</span>) <span class="kw">return</span> saved;</span></span>
+<span class="ln"><span class="g">5</span><span>  <span class="kw">const</span> os = matchMedia(<span class="str">"(prefers-color-scheme: dark)"</span>).matches;</span></span>
+<span class="ln"><span class="g">6</span><span>  <span class="kw">return</span> os ? <span class="str">"dark"</span> : <span class="str">"light"</span>;</span></span>
+<span class="ln"><span class="g">7</span><span>}</span></span>
+<span class="ln del"><span class="g">8</span><span>  <span class="cmt">// removed: theme="vs-dark" hardcode</span></span></span>
+<span class="ln add"><span class="g">9</span><span>  theme={<span class="fn">monacoThemeFor</span>(theme)} <span class="cmt">// now follows the app</span></span></span>
+          </pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="contract">
+      Visual contract for CH-01KTHP. Toggle above to compare dark ⇄ light. Dark surface swatches:
+      <div class="swatchrow">
+        <span class="swatch" style="background:var(--background)" title="--background"></span>
+        <span class="swatch" style="background:var(--card)" title="--card"></span>
+        <span class="swatch" style="background:var(--muted)" title="--muted"></span>
+        <span class="swatch" style="background:var(--primary)" title="--primary"></span>
+        <span class="swatch" style="background:var(--accent)" title="--accent"></span>
+        <span class="swatch" style="background:var(--positive)" title="--positive"></span>
+        <span class="swatch" style="background:var(--warning)" title="--warning"></span>
+        <span class="swatch" style="background:var(--destructive)" title="--destructive"></span>
+        <span class="swatch" style="background:var(--brand-gold)" title="--brand-gold"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function flip() {
+    const root = document.documentElement;
+    const dark = root.getAttribute("data-theme") === "dark";
+    root.setAttribute("data-theme", dark ? "light" : "dark");
+    document.getElementById("icon").textContent = dark ? "☀️" : "🌙";
+    document.getElementById("label").textContent = dark ? "Light" : "Dark";
+  }
+</script>
+</body>
+</html>
