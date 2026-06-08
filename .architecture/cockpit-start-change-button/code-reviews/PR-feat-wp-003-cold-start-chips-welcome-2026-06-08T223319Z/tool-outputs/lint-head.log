@@ -1,0 +1,1 @@
+eslint --ext .ts,.tsx .: 0 errors (Step 6)

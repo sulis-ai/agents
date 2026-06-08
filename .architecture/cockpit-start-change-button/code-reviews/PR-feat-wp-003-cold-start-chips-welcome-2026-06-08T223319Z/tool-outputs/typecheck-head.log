@@ -1,0 +1,1 @@
+tsc --noEmit -p server && tsc --noEmit -p client: 0 errors (Step 6)

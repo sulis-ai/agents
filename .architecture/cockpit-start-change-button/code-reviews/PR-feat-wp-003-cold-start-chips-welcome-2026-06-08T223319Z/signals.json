@@ -1,0 +1,9 @@
+{
+  "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "low"},
+  "size": {"lines_added": 220, "lines_removed": 0, "total": 220, "files_changed": 3, "severity": "low"},
+  "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "low"},
+  "completeness": {"new_source_without_test": 0, "api_change_without_schema": false, "severity": "low"},
+  "build_verification": {"pr_introduced_errors": 0},
+  "findings": {"changes": {"critical": 0, "high": 0, "medium": 0, "low": 0}, "neighbours": {}},
+  "verdict": "PASS"
+}
