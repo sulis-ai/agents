@@ -13,9 +13,12 @@
 //     colour or icon alone.
 //   - aria-pressed mirrors the active theme (pressed === dark) so assistive
 //     tech reports the current state as well as the action.
-//   - The emoji icon + visible label are decorative (aria-hidden); the
-//     aria-label is the single source of the accessible name.
+//   - The icon + visible label are decorative (aria-hidden); the aria-label is
+//     the single source of the accessible name. The icon is a Heroicon
+//     (sun/moon) consuming currentColor — matching the app's icon convention
+//     (e.g. the Board tab's Squares2X2Icon), not an emoji.
 
+import { SunIcon, MoonIcon } from "@heroicons/react/24/outline";
 import { useTheme } from "../theme/ThemeProvider";
 import styles from "./ThemeToggle.module.css";
 
@@ -36,7 +39,7 @@ export function ThemeToggle() {
       aria-pressed={isDark}
     >
       <span className={styles.icon} aria-hidden="true">
-        {isDark ? "🌙" : "☀️"}
+        {isDark ? <MoonIcon /> : <SunIcon />}
       </span>
       <span aria-hidden="true">{isDark ? "Dark" : "Light"}</span>
     </button>
