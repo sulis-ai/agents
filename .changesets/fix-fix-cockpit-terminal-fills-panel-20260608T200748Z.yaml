@@ -1,7 +1,0 @@
-change_id: 01KTMBRH3QZ158FHMNYPEG02GA
-primitive: fix
-tier: patch
-touches_plugin: false
-summary: |
-  Cockpit live terminal now fills its panel: the terminal card grows to full height and the xterm fit addon makes it fill the width and resize with the window (it previously sat at content height and a fixed ~80-column width).
-created_at: 2026-06-08T20:07:48Z
