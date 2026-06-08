@@ -12,11 +12,16 @@
 //   - mid-stream drop ⇒ partial preserved + interrupted (FR-22)
 //   - one structured log line per send, never the body/reply (NFR-SEC-03)
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import request from "supertest";
+import { mkdtemp, mkdir, writeFile, rm, realpath } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { createApp } from "../app";
 import { FakeChangeStoreReader } from "../adapters/FakeChangeStoreReader";
+import { mangleCwd } from "../lib/mangleCwd";
+import { deriveThreadId } from "../lib/threadIdentity";
 import type { ChangeStoreRecord } from "../ports/ChangeStoreReader";
 import type {
   SessionBridge,
@@ -48,6 +53,15 @@ function record(overrides: Partial<ChangeStoreRecord> = {}): ChangeStoreRecord {
 
 /** A SessionBridge whose behaviour the test programs per-case. */
 class ProgrammableBridge implements SessionBridge {
+  /**
+   * The 4th `originEnv` argument the route passed to the most recent `relay`
+   * (WP-002 wiring; WP-004 relay computation). `undefined` means the route
+   * spawned unstamped — the degradation path (ADR-013). Captured so a test can
+   * assert the assisted-origin stamp end-to-end.
+   */
+  public lastOriginEnv: Record<string, string> | undefined;
+  public relayCallCount = 0;
+
   constructor(
     private readonly opts: {
       resolution?: SessionResolution;
@@ -73,7 +87,10 @@ class ProgrammableBridge implements SessionBridge {
     changeId: string,
     prompt: string,
     sink: RelaySink,
+    originEnv?: Record<string, string>,
   ): Promise<RelayOutcome> {
+    this.relayCallCount += 1;
+    this.lastOriginEnv = originEnv;
     if (this.opts.onRelay) return this.opts.onRelay(changeId, prompt, sink);
     sink.emit({ type: "state", state: "replying" });
     sink.emit({ type: "chunk", text: "hello " });
@@ -277,5 +294,170 @@ describe("POST /api/changes/:id/chat — observability (NFR-SEC-03)", () => {
     expect(line).toMatch(/outcome/);
     expect(line).not.toContain("SECRET-PROMPT-TEXT");
     expect(line).not.toContain("hello"); // reply text never logged
+  });
+});
+
+// ─── WP-004 — assisted-origin wiring end-to-end (ADR-016/017/018) ─────────────
+//
+// The relay route computes the assisted origin env from the resolved session +
+// its transcript (via the ConversationIdentity port, WP-003) and passes it to
+// `relay`'s 4th argument (WP-002). A real cockpit-chat commit then carries
+// `Sulis-Origin: assisted; conversation=thread_…; turn=<n>`.
+//
+// These tests use a REAL transcript fixture on disk (no transcript mock — MEA-09)
+// so the route's read-only transcript locate+parse runs exactly as in production.
+describe("POST /api/changes/:id/chat — assisted origin wiring (WP-004)", () => {
+  let worktree: string;
+  let projectsDir: string;
+
+  const STEM = "session-relay-abc";
+  const ORIGIN_CHANGE = "01CHATORIGINWIRING0000000A";
+
+  /**
+   * A transcript with `turnCount` agent turns. A turn is a run of consecutive
+   * agent messages (`groupTurns` semantics), so each turn is a user message
+   * followed by one assistant message — interleaved so the count is genuine.
+   */
+  async function writeTranscript(turnCount: number): Promise<string> {
+    const sessionDir = join(projectsDir, mangleCwd(worktree));
+    await mkdir(sessionDir, { recursive: true });
+    const lines: string[] = [];
+    for (let i = 0; i < turnCount; i++) {
+      // Each user immediately precedes its assistant reply (chronological, as a
+      // real transcript appends), so the post-sort order keeps the turns
+      // interleaved and `groupTurns` counts them as distinct turns.
+      lines.push(
+        JSON.stringify({
+          type: "user",
+          uuid: `u${i}`,
+          timestamp: `2026-06-03T09:0${i}:00Z`,
+          cwd: worktree,
+          message: { role: "user", content: `ask ${i}` },
+        }),
+      );
+      lines.push(
+        JSON.stringify({
+          type: "assistant",
+          uuid: `a${i}`,
+          timestamp: `2026-06-03T09:0${i}:30Z`,
+          cwd: worktree,
+          message: { role: "assistant", content: [{ type: "text", text: `turn ${i}` }] },
+        }),
+      );
+    }
+    const path = join(sessionDir, `${STEM}.jsonl`);
+    await writeFile(path, `${lines.join("\n")}\n`, "utf8");
+    return path;
+  }
+
+  function originRecord(): ChangeStoreRecord {
+    return record({ changeId: ORIGIN_CHANGE, worktreePath: worktree });
+  }
+
+  function appWithOrigin(bridge: SessionBridge, logged?: unknown[]) {
+    return createApp({
+      changeStore: new FakeChangeStoreReader([originRecord()]),
+      sessionBridge: bridge,
+      sulisStateDir: "/tmp/unused-state",
+      claudeProjectsDir: projectsDir,
+      ...(logged ? { chatLogSink: (line) => logged.push(line) } : {}),
+    });
+  }
+
+  beforeAll(async () => {
+    worktree = await realpath(await mkdtemp(join(tmpdir(), "wp004-relay-wt-")));
+    projectsDir = await mkdtemp(join(tmpdir(), "wp004-relay-projects-"));
+  });
+
+  afterAll(async () => {
+    await rm(worktree, { recursive: true, force: true });
+    await rm(projectsDir, { recursive: true, force: true });
+  });
+
+  it("passes an assisted originEnv (conversation=thread_<stem>, turn=existing+1) to relay over a resumable resolution", async () => {
+    const ref = await writeTranscript(2); // two existing turns → in-flight turn 3
+    const bridge = new ProgrammableBridge({
+      resolution: {
+        kind: "resumable",
+        session: { changeId: ORIGIN_CHANGE, cwd: worktree, lastSessionRef: ref },
+      },
+    });
+
+    const res = await request(appWithOrigin(bridge))
+      .post(`/api/changes/${ORIGIN_CHANGE}/chat`)
+      .send({ prompt: "make a change" });
+
+    expect(res.status).toBe(200);
+    expect(bridge.lastOriginEnv).toBeDefined();
+    const body = bridge.lastOriginEnv?.SULIS_ORIGIN;
+    expect(body).toBe(
+      `assisted; conversation=${deriveThreadId(STEM)}; turn=3`,
+    );
+  });
+
+  it("degrades: a fresh resolution (no transcript) relays with NO origin env and still completes", async () => {
+    const bridge = new ProgrammableBridge({
+      resolution: {
+        kind: "fresh",
+        session: { changeId: ORIGIN_CHANGE, cwd: worktree },
+      },
+    });
+
+    const res = await request(appWithOrigin(bridge))
+      .post(`/api/changes/${ORIGIN_CHANGE}/chat`)
+      .send({ prompt: "first message" });
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('"type":"complete"');
+    expect(bridge.relayCallCount).toBe(1);
+    expect(bridge.lastOriginEnv).toBeUndefined();
+  });
+
+  it("the relay log line carries originStamped and NEVER the prompt or the thread-id body", async () => {
+    const ref = await writeTranscript(1);
+    const logged: unknown[] = [];
+    const bridge = new ProgrammableBridge({
+      resolution: {
+        kind: "resumable",
+        session: { changeId: ORIGIN_CHANGE, cwd: worktree, lastSessionRef: ref },
+      },
+    });
+
+    await request(appWithOrigin(bridge, logged))
+      .post(`/api/changes/${ORIGIN_CHANGE}/chat`)
+      .send({ prompt: "SECRET-RELAY-PROMPT" });
+
+    expect(logged.length).toBe(1);
+    const line = JSON.stringify(logged[0]);
+    // Observable that the round-trip stamped (NFR-SEC-03: boolean only).
+    expect(line).toContain('"originStamped":true');
+    // The thread-id body / prompt MUST NOT appear in the log line.
+    expect(line).not.toContain("SECRET-RELAY-PROMPT");
+    expect(line).not.toContain(deriveThreadId(STEM));
+    expect(line).not.toContain(STEM);
+  });
+
+  it("a live resolution (no lastSessionRef) relays unstamped (the WP-003 adapter derives the id from the ref)", async () => {
+    // A live, already-attached session carries NO `lastSessionRef` (SessionRef
+    // contract), so the shipped LocalTranscriptConversationIdentity (WP-003,
+    // consumed unchanged) derives no Thread id and the relay spawns unstamped —
+    // the commit degrades to inferred (ADR-013). A live transcript still exists
+    // on disk; the route's read-only locate fallback runs but the identity port
+    // yields null. (The live Thread id is the later CommunicationService adapter
+    // behind the same port — ADR-018.)
+    await writeTranscript(1);
+    const bridge = new ProgrammableBridge({
+      resolution: {
+        kind: "live",
+        session: { changeId: ORIGIN_CHANGE, cwd: worktree },
+      },
+    });
+
+    const res = await request(appWithOrigin(bridge))
+      .post(`/api/changes/${ORIGIN_CHANGE}/chat`)
+      .send({ prompt: "make a live change" });
+
+    expect(res.status).toBe(200);
+    expect(bridge.lastOriginEnv).toBeUndefined();
   });
 });

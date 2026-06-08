@@ -70,6 +70,24 @@ def _has_control_char(value: str) -> bool:
     return any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in value)
 
 
+# The trailer grammar's structural separators: `;` splits segments, `=` binds a
+# key to its value. A FIELD value carrying either could smuggle extra segments
+# into the single trailer line (`thread_x; confidence=1; run=evil`), so a value
+# is refused at emit time if it contains a control char OR a separator. This is
+# the EMIT-side guard only — `parse_origin_env` legitimately consumes `;`/`=`
+# (there they ARE the grammar, not injection).
+_TRAILER_SEPARATORS = (";", "=")
+
+
+def _is_trailer_safe(value: str) -> bool:
+    """True if `value` is safe to interpolate into a trailer field: no control
+    character AND none of the grammar separators (`;`, `=`). Legitimate inputs
+    (ULIDs, `thread_<uuid>`) contain neither, so they pass unchanged."""
+    return not _has_control_char(value) and not any(
+        sep in value for sep in _TRAILER_SEPARATORS
+    )
+
+
 def _fmt_number(value: float) -> str:
     # 0.9 not 0.900000001; an int stays an int. Mirrors the reader's tolerant
     # parseFloat, but emit the tidiest form.
@@ -83,17 +101,21 @@ def _fmt_number(value: float) -> str:
 def format_trailer(origin: OriginDict) -> str:
     """Render an origin dict as the single `Sulis-Origin: …` trailer line.
 
-    A trailer is ONE line. Any string field carrying a control character
-    (notably a newline) would forge a second trailer line, so it is refused
-    here as a last line of defence (the env-parse boundary rejects it first).
+    A trailer is ONE line built from a `;`/`=` grammar. Any string field
+    carrying a control character (notably a newline, which would forge a second
+    trailer line) OR one of the grammar's own separators (`;` / `=`, which would
+    forge extra segments) is refused here as a last line of defence (the
+    env-parse boundary rejects control chars first; the separator guard is the
+    defence-in-depth for service-assigned IDs flowing through the same port).
     """
     kind = origin.get("kind")
     for field in ("run", "conversation"):
         v = origin.get(field)
-        if isinstance(v, str) and _has_control_char(v):
+        if isinstance(v, str) and not _is_trailer_safe(v):
             raise ValueError(
-                f"origin field {field!r} contains a control character; "
-                "refusing to emit a forgeable trailer"
+                f"origin field {field!r} contains a control character or a "
+                "trailer separator (';' / '='); refusing to emit a forgeable "
+                "trailer"
             )
     if kind == "autonomous":
         run = origin["run"]
@@ -168,6 +190,76 @@ def parse_origin_env(value: Optional[str]) -> Optional[OriginDict]:
     return None
 
 
+# ─── commit-time env builder (the executor's autonomous write path) ────────
+
+
+def autonomous_env(
+    *, run: Optional[str], confidence: Optional[float]
+) -> dict[str, str]:
+    """Build the `{"SULIS_ORIGIN": <bare-body>}` env the executor exports at
+    COMMIT time so the wired `prepare-commit-msg` hook stamps the autonomous
+    trailer onto the commit it is already making (WP-005, ADR-013).
+
+    The value is the bare trailer BODY (`autonomous; run=…`) — the exact form
+    `parse_origin_env` accepts and the hook prepends `Sulis-Origin: ` to. It is
+    produced via the existing `autonomous_origin` + `format_trailer` (NO second
+    formatter), so it can never drift from #216's grammar.
+
+    The run-ulid is per-`lifecyclerun`, so the caller passes it AT commit time
+    (not a static launch-script export — one launched terminal serves many runs).
+    `confidence` is OPTIONAL: pass None when no per-run scalar exists and the
+    body is `run=`-only (never invent a value).
+
+    NON-FATAL (ADR-013): a missing / empty / whitespace-only run-ulid yields an
+    EMPTY env (`{}`) — nothing is exported, the commit lands UNSTAMPED, and
+    origin degrades to inferred. A MALFORMED run-ulid (one `format_trailer`
+    refuses — a control char or a `;`/`=` separator) is handled the same way:
+    the `ValueError` is swallowed and `{}` returned, so a bad run yields an
+    unstamped commit, NEVER an aborted one ("a stamp failure is non-fatal;
+    never abort the commit to chase a stamp"). This function never raises.
+    """
+    if not run or not run.strip():
+        return {}
+    try:
+        trailer = format_trailer(autonomous_origin(run=run, confidence=confidence))
+    except ValueError:
+        # A malformed run (control char / `;` / `=`) must degrade to unstamped,
+        # the same non-fatal posture as the empty-run case (ADR-013).
+        return {}
+    body = trailer[len(f"{TRAILER_KEY}: ") :]
+    return {"SULIS_ORIGIN": body}
+
+
+def _is_trailer_line(line: str) -> bool:
+    """A trailer-shaped `Key: value` line: a token key (no spaces) before the
+    first colon, e.g. `Co-Authored-By: …`. A Conventional Commit subject like
+    `feat: x` is also `Key: value`-shaped, which is why a trailer block can only
+    be recognised as the message's LAST PARAGRAPH preceded by content — never
+    a one-paragraph subject (see `_ends_in_trailer_block`)."""
+    if ":" not in line:
+        return False
+    key = line.split(":", 1)[0]
+    return bool(key) and " " not in key
+
+
+def _ends_in_trailer_block(body: str) -> bool:
+    """True when `body`'s final paragraph is an existing git trailer block — i.e.
+    it is preceded by other content (a blank-line-separated earlier paragraph)
+    AND every line in it is trailer-shaped (`Key: value`).
+
+    Detecting from the LAST PARAGRAPH (the lines after the final blank line),
+    rather than just the last non-blank line, is the fix for the Conventional
+    Commit subject defect: `feat: x` is a single paragraph, so it is NOT a
+    trailer block and the new trailer opens its own blank-line-separated block.
+    """
+    paragraphs = body.split("\n\n")
+    if len(paragraphs) < 2:
+        return False  # single paragraph (bare subject / body only) → new block.
+    last = paragraphs[-1]
+    lines = [ln for ln in last.splitlines() if ln.strip()]
+    return bool(lines) and all(_is_trailer_line(ln) for ln in lines)
+
+
 def append_trailer_to_message(message: str, origin: OriginDict) -> str:
     """Return `message` with the `Sulis-Origin:` trailer appended to the trailer
     block, idempotently (never a second copy). Used by the `prepare-commit-msg`
@@ -180,13 +272,14 @@ def append_trailer_to_message(message: str, origin: OriginDict) -> str:
             return message
 
     body = message.rstrip("\n")
-    # A trailer block is separated from the body by a blank line. If the message
-    # already ends in trailers (e.g. Co-Authored-By:), append within that block;
-    # otherwise open a new trailer block with a blank line.
-    lines = body.splitlines()
-    last_nonblank = next((l for l in reversed(lines) if l.strip()), "")
-    looks_like_trailer = ":" in last_nonblank and " " not in last_nonblank.split(":", 1)[0]
-    sep = "\n" if looks_like_trailer else "\n\n"
+    # A trailer block is the message's LAST PARAGRAPH (after the final blank
+    # line), and only when preceded by content and made entirely of trailer-
+    # shaped `Key: value` lines. Then the new trailer JOINS that block (single
+    # `\n`, no extra blank line). Otherwise — a bare subject (`feat: x`) or a
+    # body paragraph — open a NEW trailer block with a blank line, so
+    # `Sulis-Origin:` is a FORMAL git trailer that `git interpret-trailers` /
+    # `%(trailers:…)` recognise.
+    sep = "\n" if _ends_in_trailer_block(body) else "\n\n"
     return f"{body}{sep}{trailer}\n"
 
 

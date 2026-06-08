@@ -154,3 +154,74 @@ describe("StreamJsonSessionBridge — process-start discipline", () => {
     expect(capturedArgs).toContain("stream-json");
   });
 });
+
+// ── WP-002 — relay forwards the assisted originEnv to the spawn (ADR-017) ─────
+//
+// WP-001 widened the `spawnBridge` PORT with an optional 3rd `originEnv`; this
+// WP wires the adapter so `relay` actually CARRIES the assisted origin from the
+// relay route (WP-004) through to that spawn. The relay neither computes nor
+// formats the origin (`assistedOriginEnv` does that, WP-003) — it only
+// FORWARDS. When the route supplies no origin, the spawn is byte-identical to
+// today (the 3rd arg stays `undefined`).
+describe("StreamJsonSessionBridge — relay forwards assisted originEnv", () => {
+  /** Resolve to a resumable session and capture the env the spawn receives. */
+  function bridgeCapturingEnv(): {
+    bridge: StreamJsonSessionBridge;
+    received: () => Record<string, string> | undefined;
+  } {
+    let captured: Record<string, string> | undefined;
+    const bridge = new StreamJsonSessionBridge({
+      resolve: async () => ({
+        kind: "resumable",
+        session: {
+          changeId: "01CHATAAAAAAAAAAAAAAAAAAAA",
+          cwd: "/tmp/wp-005-change-worktree",
+          lastSessionRef: "/tmp/transcript.jsonl",
+        },
+      }),
+      spawnBridge: (_argv, _cwd, originEnv) => {
+        captured = originEnv;
+        return fakeChild(streamJsonLinesFor("resumable"));
+      },
+      startupTimeoutMs: 1000,
+    });
+    return { bridge, received: () => captured };
+  }
+
+  function collectingSink(): { events: unknown[]; emit(e: unknown): void } {
+    return {
+      events: [] as unknown[],
+      emit(e: unknown) {
+        this.events.push(e);
+      },
+    };
+  }
+
+  it("passes the assisted originEnv straight through as spawnBridge's 3rd arg", async () => {
+    const { bridge, received } = bridgeCapturingEnv();
+    const originEnv = {
+      SULIS_ORIGIN: "assisted; conversation=thread_abc123; turn=2",
+    };
+
+    await bridge.relay(
+      "01CHATAAAAAAAAAAAAAAAAAAAA",
+      "continue",
+      collectingSink() as never,
+      originEnv,
+    );
+
+    expect(received()).toEqual(originEnv);
+  });
+
+  it("omits the 3rd arg (undefined) when no origin is supplied — byte-identical to today", async () => {
+    const { bridge, received } = bridgeCapturingEnv();
+
+    await bridge.relay(
+      "01CHATAAAAAAAAAAAAAAAAAAAA",
+      "continue",
+      collectingSink() as never,
+    );
+
+    expect(received()).toBeUndefined();
+  });
+});

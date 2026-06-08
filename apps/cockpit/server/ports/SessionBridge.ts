@@ -115,10 +115,23 @@ export interface SessionBridge {
    * `state` → `chunk*` → `complete` on success (ADR-001); on a mid-stream
    * drop, preserves the partial and emits `interrupted`; never synthesises a
    * completion (FR-N5). On resume, `complete.resumed` is `true`.
+   *
+   * `originEnv` is the OPTIONAL assisted-origin stamp the relay route carries
+   * to the spawn (ADR-017, WP-002). The route computes it with
+   * `assistedOriginEnv(...)` (WP-003) and passes the RESULT straight through;
+   * the adapter forwards it AS-IS to the one sanctioned spawn as that spawn's
+   * third argument (`{ SULIS_ORIGIN: "assisted; conversation=…; turn=…" }`),
+   * so any commit the spawned session makes carries the `assisted` trailer.
+   * The bridge NEITHER computes NOR formats the origin — it only forwards.
+   * When absent, the spawn is byte-identical to today (the commit degrades to
+   * inferred origin, ADR-013). Read-only from the cockpit's side: passing env
+   * to the already-sanctioned spawn writes nothing and starts no new process
+   * (ADR-003 preserved).
    */
   relay(
     changeId: string,
     prompt: string,
     sink: RelaySink,
+    originEnv?: Record<string, string>,
   ): Promise<RelayOutcome>;
 }

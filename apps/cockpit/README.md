@@ -404,8 +404,8 @@ apps/cockpit/
 │   ├── index.ts            # bootstrap — binds 127.0.0.1:5174
 │   ├── app.ts              # createApp(deps) Express factory (testable)
 │   ├── config.ts           # CONFIG — bindAddress is hard-coded
-│   ├── ports/              # ChangeStoreReader + RecreateRunner (WP-004) + SessionBridge (the chat seam, WP-005) + TerminalBridge (typed terminal socket-client seam, WP-007)
-│   ├── adapters/           # SulisChangeStoreReader (Python helper bridge); SulisChangeRecreator + FakeRecreateRunner (WP-004); StreamJsonSessionBridge (prod) + RecordedSessionBridge (recorded fixture) (WP-005)
+│   ├── ports/              # ChangeStoreReader + RecreateRunner (WP-004) + SessionBridge (the chat seam, WP-005) + TerminalBridge (typed terminal socket-client seam, WP-007) + ConversationIdentity (the assisted-origin seam: resolved session → Thread id + Message ordinal, ADR-016/018)
+│   ├── adapters/           # SulisChangeStoreReader (Python helper bridge); SulisChangeRecreator + FakeRecreateRunner (WP-004); StreamJsonSessionBridge (prod) + RecordedSessionBridge (recorded fixture) (WP-005); LocalTranscriptConversationIdentity (derives the assisted Thread identity locally/read-only — no cross-service call, ADR-018)
 │   ├── routes/             # GET read handlers + chat relay + concierge query + cold-start onboarding (all POST/SSE in the ONE sanctioned file chat.ts — WP-005/009/010)
 │   ├── middleware/         # request-log + typed-error → JSON mapper
 │   ├── lib/                # domain logic — no framework imports

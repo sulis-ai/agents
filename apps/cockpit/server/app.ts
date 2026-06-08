@@ -36,6 +36,7 @@ import {
   type OnboardingLogLine,
   type StartChangeLogLine,
 } from "./routes/chat";
+import { LocalTranscriptConversationIdentity } from "./adapters/LocalTranscriptConversationIdentity";
 import type { SpineMinter } from "./ports/SpineMinter";
 import {
   SpineEmitterMinter,
@@ -181,6 +182,15 @@ export function createApp(deps: CreateAppDeps): Application {
         changeStore: deps.changeStore,
         sessionBridge: deps.sessionBridge,
         inFlightLock,
+        // WP-004 — the conversation-identity seam (ADR-018). The single
+        // sanctioned composition site wires the ONLY adapter this change ships,
+        // `LocalTranscriptConversationIdentity` (derives the assisted Thread id +
+        // Message ordinal locally, read-only — no cross-service call). A live
+        // service adapter swaps in behind the same port later with no route
+        // change. `claudeProjectsDir` lets the relay read the resolved session's
+        // transcript (read-only) to count the Message ordinal.
+        conversationIdentity: new LocalTranscriptConversationIdentity(),
+        claudeProjectsDir: deps.claudeProjectsDir,
         chatLogSink: deps.chatLogSink,
       }),
     );

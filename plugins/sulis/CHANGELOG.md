@@ -1,3 +1,15 @@
+## v0.120.0 — 2026-06-08
+
+**Minor — release-train batch.**
+
+- Record change-origin exactly at commit time: the chat relay and executor now stamp a Sulis-Origin git trailer (assisted=thread id+turn, modelled on the communication service; autonomous=run id), the cockpit reads it as exact origin (likely->exact), and the trailer is a formal git trailer with field-separator + non-fatal hardening.
+
+## v0.119.0 — 2026-06-08
+
+**Minor — release-train batch.**
+
+- start a change opens a terminal again by default: sulis-change start --spawn / /sulis:change start opens a Terminal window briefed on the change, instead of the deprecated cockpit pointer message. The in-cockpit live terminal stays a separate capability.
+
 ## v0.118.0 — 2026-06-08
 
 **Minor — release-train batch.**
