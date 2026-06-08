@@ -1,0 +1,23 @@
+{
+  "pr": "feat/wp-006-integration-bundle-carries",
+  "base": "change/feat-verification-substrate",
+  "verdict": "PASS",
+  "build_verification": {"errors": 0, "tools": ["ruff check", "ruff format --check", "mypy --ignore-missing-imports"]},
+  "hygiene": {
+    "scope": {"commit_type_spread": ["test"], "module_fan_out": 1, "severity": "clean"},
+    "size": {"lines_added": 339, "lines_removed": 0, "files_changed": 1, "severity": "clean"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "clean"},
+    "completeness": {"new_source_without_test": 0, "api_change_without_schema": false, "severity": "clean", "note": "the new file IS a test (kind:test WP); no production source added"}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"critical": 0, "high": 0, "medium": 0, "low": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "note": "test-only; drives via the public run_scenario seam + real LocalFileEntityAdapter; no dependency-direction violation; injected transports honour the established test seam (main's browser unit tests)"},
+    "security": {"findings": 0, "note": "no secrets, no real external calls, no injection surface; subprocess+browser transports are injected fakes; subprocess cmd is the literal 'true'"},
+    "quality": {"findings": 0, "note": "ruff clean, mypy clean, tests included (it is the test), no dead surface, no contract drift, no CR-10 anti-patterns; the only loops are bounded in-memory test-setup iterations"}
+  },
+  "draft_fixes": 0,
+  "registered_findings": ["SF-164c3e5f: vendored foundation/tool.schema.json implementation_kind enum missing 'browser' — WP-007 reconciliation scope, NOT this WP; worked around via in-memory tool injection (the prescribed seam)"]
+}
