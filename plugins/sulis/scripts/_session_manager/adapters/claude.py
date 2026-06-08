@@ -37,11 +37,13 @@ fails loudly at the typed boundary rather than silently mis-mapping.
 from __future__ import annotations
 
 import json
+import uuid
 
 from _session_manager.adapter import Capabilities, SessionSpec
 from _session_manager.classifier import RecoveryClass
 from _session_manager.events import (
     DECODE_FAILED,
+    SOCKET_CLOSED,
     Event,
     EventError,
     InternalError,
@@ -55,6 +57,36 @@ from _session_manager.recovery import ReauthTicket
 _UNASSIGNED_OFFSET = -1
 _UNASSIGNED_TURN = -1
 _UNASSIGNED_KEY = ""
+
+# ── the Claude detection table (WP-006, ADR-003) ──────────────────────────
+# The ONLY place Claude's raw failure vocabulary is interpreted. A flat,
+# explicit lookup over the raw ``EventError.code`` ``_error_payload`` produced
+# (the raw ``api_error_status`` for an HTTP decline, or the protocol code for a
+# transport wobble). The shared classifier never sees these strings — it only
+# ever receives the neutral ``RecoveryClass`` this map yields.
+#
+# - 401 (unauthenticated) / 403 (forbidden): the founder's login expired or was
+#   revoked → pause, surface the re-login link, resume (ADR-004).
+# - 429 (rate limit) / a connection-reset transport shape: a transient blip →
+#   back off and retry.
+# - 400 (bad request) and every other deterministic decline (e.g. the recorded
+#   404 model-not-found): retrying just repeats it → dead-end. Codes absent from
+#   this table fall through to ``DEAD_END`` (the safe direction) via ``.get``.
+_RAW_CODE_TO_RECOVERY_CLASS: dict[str, RecoveryClass] = {
+    "401": RecoveryClass.LOGIN_EXPIRED,
+    "403": RecoveryClass.LOGIN_EXPIRED,
+    "429": RecoveryClass.TRANSIENT_BLIP,
+    SOCKET_CLOSED: RecoveryClass.TRANSIENT_BLIP,
+    "400": RecoveryClass.DEAD_END,
+}
+
+# The Claude re-login URL the notification surfaces for the operator (ADR-004).
+# The real login round-trip (live `claude` + an expired credential) is verified
+# MANUALLY on the founder machine — deferred need ``live-reauth-resume-claude``
+# (TDD §4.3). This adapter's job is to produce a well-formed ticket carrying the
+# link + a completion handle; how the operator completes re-login is the
+# platform's existing surface, outside this layer.
+_CLAUDE_RELOGIN_LINK = "https://claude.ai/login"
 
 # The base streaming argv (§2.4). cwd is NOT here — the CLI is launched *in*
 # cwd by the manager's Popen, so cwd is a process attribute, not a flag.
@@ -142,27 +174,52 @@ class ClaudeAdapter:
         return event.kind == "result"
 
     def classify_failure(self, error: EventError) -> RecoveryClass | None:
-        """Provider detection hint (WP-004 seam; defer-to-neutral for now).
+        """Map Claude's raw failure code to a neutral :class:`RecoveryClass`
+        (WP-006, ADR-003).
 
-        WP-004 only proves the seam shape: this returns ``None`` so the shared
-        classifier applies its category-based default (ADR-003). Claude's
-        HTTP-status mapping (``"401"``/``"403"`` → login-expired, ``"429"`` →
-        transient-blip, ``"400"`` → dead-end) is WP-006 — it overrides this
-        method then, the only place Claude's ``api_error_status`` vocabulary is
-        interpreted. Until then the neutral default (``NOT_AUTHORIZED`` →
-        login-expired, etc.) is correct and safe."""
+        This is the **only** place Claude's HTTP-status vocabulary is
+        interpreted: ``"401"``/``"403"`` → :attr:`~RecoveryClass.LOGIN_EXPIRED`;
+        ``"429"`` and a connection-reset transport shape →
+        :attr:`~RecoveryClass.TRANSIENT_BLIP`; ``"400"`` and every other
+        deterministic decline → :attr:`~RecoveryClass.DEAD_END`. The code is the
+        raw ``api_error_status`` (or transport code) ``_error_payload`` already
+        carried on the ``EventError`` — so the shared classifier never sees a
+        ``"401"``-style status as a magic string; it only ever receives the
+        neutral class this returns.
+
+        A code absent from the table is handled by category: an ``expected``
+        decline (the op ran and Claude deterministically refused — a bad model,
+        an unsupported request) is a :attr:`~RecoveryClass.DEAD_END` because
+        retrying just repeats it (ADR-003's "``400`` *and other deterministic
+        declines*"); the recorded 404 model-not-found turn is exactly this case.
+        Any other category (``protocol`` transport wobble, ``internal`` bug)
+        returns ``None``, deferring to the shared classifier's category-based
+        default rather than the adapter guessing outside its vocabulary — so a
+        future failure shape the founder has not yet observed stays honest:
+        unknown → neutral default, never silently mis-mapped."""
+        mapped = _RAW_CODE_TO_RECOVERY_CLASS.get(error.code)
+        if mapped is not None:
+            return mapped
+        if error.category == "expected":
+            return RecoveryClass.DEAD_END
         return None
 
     def reauth(self) -> ReauthTicket:
-        """Begin Claude re-auth (WP-004 seam stub; ADR-003/004).
+        """Begin Claude re-auth; return the :class:`ReauthTicket` (WP-006,
+        ADR-003/004).
 
-        Wired into the conformance shape by WP-004; the real re-login-link
-        production is WP-006. Raising here keeps the stub honest — the driver
-        only calls ``reauth`` after ``classify_failure`` yields
-        ``LOGIN_EXPIRED``, which this adapter does not do until WP-006."""
-        raise NotImplementedError(
-            "Claude reauth() is implemented in WP-006; the WP-004 seam only "
-            "establishes the Protocol shape."
+        Called only when :meth:`classify_failure` yields
+        :attr:`~RecoveryClass.LOGIN_EXPIRED`. The ticket carries the Claude
+        re-login link the notification surfaces on the existing ``error`` Event
+        stream and a fresh opaque completion handle the driver waits on before
+        resuming the paused run — no new store, no new stream (ADR-004).
+
+        The live login round-trip is verified manually on the founder machine
+        (deferred need ``live-reauth-resume-claude``, TDD §4.3); this method
+        produces the well-formed ticket the driver schedules around."""
+        return ReauthTicket(
+            relogin_link=_CLAUDE_RELOGIN_LINK,
+            completion_handle=uuid.uuid4().hex,
         )
 
     # ── internal mapping helpers (one record shape each) ──────────────────
