@@ -1,3 +1,9 @@
+## v0.119.0 — 2026-06-08
+
+**Minor — release-train batch.**
+
+- start a change opens a terminal again by default: sulis-change start --spawn / /sulis:change start opens a Terminal window briefed on the change, instead of the deprecated cockpit pointer message. The in-cockpit live terminal stays a separate capability.
+
 ## v0.118.0 — 2026-06-08
 
 **Minor — release-train batch.**
