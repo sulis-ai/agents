@@ -1,0 +1,34 @@
+{
+  "review": {
+    "target": "feat/wp-006-remediate-badges-dashboard",
+    "base": "change/feat-dark-mode",
+    "project": "feat-dark-mode",
+    "timestamp": "2026-06-08T061424Z",
+    "verdict": "PASS",
+    "outcome_plain": "Ready to merge"
+  },
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "typecheck": { "command": "npx tsc --noEmit -p client", "exit": 0 },
+    "lint": { "command": "npx eslint client/src/tests/no-raw-colours.badges.test.ts", "exit": 0 }
+  },
+  "findings": {
+    "in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+    "in_neighbours": { "total": 0 },
+    "watch_list": 1,
+    "draft_deltas": 0
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "status": "nothing-surfaced" },
+    "security": { "findings": 0, "status": "nothing-surfaced" },
+    "quality": { "findings": 0, "status": "nothing-surfaced", "design_observations": 1 }
+  },
+  "pr_hygiene": {
+    "scope": { "severity": "low", "commit_types": ["refactor"], "module_fan_out": 1 },
+    "size": { "severity": "low", "lines_added": 331, "lines_removed": 10, "files_changed": 4, "real_css_change_lines": 45 },
+    "safety": { "severity": "low", "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0 },
+    "completeness": { "severity": "low", "new_source_without_test": 0 },
+    "ph03_high_autodowngrade_fired": false
+  },
+  "auto_downgrade_triggers_fired": []
+}
