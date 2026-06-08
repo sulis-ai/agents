@@ -108,7 +108,10 @@ export function buildProductionApp() {
   const changeStore = new SulisChangeStoreReader({
     helperPath: resolveHelperPath(),
     sulisStateDir: CONFIG.sulisStateDir,
-    timeoutMs: CONFIG.gitTimeoutMs,
+    // The change LISTING gets its OWN generous budget (enumerating many
+    // changes >> a single git op); the tight `gitTimeoutMs` would
+    // false-fail the dashboard's first load. (#216 follow-up)
+    timeoutMs: CONFIG.changeListTimeoutMs,
   });
 
   // WP-005 — the production SessionBridge (ADR-002). Its `resolve` looks up the
@@ -310,7 +313,9 @@ export async function startProductionServer(
     new SulisChangeStoreReader({
       helperPath: resolveHelperPath(),
       sulisStateDir: CONFIG.sulisStateDir,
-      timeoutMs: CONFIG.gitTimeoutMs,
+      // Listing budget (not the tight per-git-op `gitTimeoutMs`) — the same
+      // reasoning as buildProductionApp's reader. (#216 follow-up)
+      timeoutMs: CONFIG.changeListTimeoutMs,
     });
 
   const app = buildProductionApp();

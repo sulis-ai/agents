@@ -19,6 +19,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, within, fireEvent } from "@testing-library/react";
 import { axe } from "jest-axe";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type { Product } from "../../../shared/api-types";
 import { ProductSwitcher } from "../components/ProductSwitcher";
 
@@ -141,5 +143,55 @@ describe("<ProductSwitcher>", () => {
     );
     fireEvent.click(getByTestId("product-switcher-trigger"));
     expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+// ─── Top-bar fit (#216) ────────────────────────────────────────────────
+//
+// The switcher's styles were ported VERBATIM from the OLD vertical sidebar
+// and don't fit the new horizontal 48px top bar (.topbar in
+// WorkspaceShell.module.css). The asymmetric vertical margin pushed the
+// control up and the trigger's tall padding overflowed the bar so it poked
+// out above the top edge. These pin the corrected geometry so the
+// regression cannot return. Structural (read the stylesheet text) rather
+// than a brittle pixel-render assertion: CSS modules are class-name-mapped
+// in jsdom, so computed-style is unreliable — the source IS the contract.
+describe("ProductSwitcher.module.css — fits the 48px horizontal top bar", () => {
+  function readSwitcherCss(): string {
+    // vitest may run from the client dir or the cockpit workspace root;
+    // resolve the stylesheet from whichever cwd is in effect (mirrors the
+    // ChangeCard stylesheet test).
+    const candidates = [
+      resolve(process.cwd(), "src/components/ProductSwitcher.module.css"),
+      resolve(process.cwd(), "client/src/components/ProductSwitcher.module.css"),
+    ];
+    const cssPath = candidates.find((p) => existsSync(p));
+    expect(cssPath, "ProductSwitcher.module.css must be locatable").toBeTruthy();
+    return readFileSync(cssPath as string, "utf8");
+  }
+
+  it(".pswitch uses a symmetric zero vertical margin so .brand (align-items:center) centres it", () => {
+    const css = readSwitcherCss();
+    const block = css.slice(css.indexOf(".pswitch"), css.indexOf(".pstrigger"));
+    // The corrected value: no top/bottom margin, 4px sides.
+    expect(block).toMatch(/margin:\s*0 4px;/);
+    // The OLD vertical-sidebar margin must be gone (it pushed the control up).
+    expect(block).not.toMatch(/margin:\s*2px 4px 14px;/);
+  });
+
+  it(".pstrigger padding fits the control within 48px with breathing room", () => {
+    const css = readSwitcherCss();
+    const block = css.slice(css.indexOf(".pstrigger"));
+    expect(block).toMatch(/padding:\s*6px 10px;/);
+    // The OLD too-tall padding must be gone (it overflowed the 48px bar).
+    expect(block).not.toMatch(/padding:\s*9px 10px;/);
+  });
+
+  it("stays token-only — no raw hex colours (the locked tokens.css decision)", () => {
+    // Strip /* … */ comments first so an issue reference like "(#216)" in a
+    // rationale comment isn't mistaken for a hex colour — only DECLARED
+    // values are the contract here.
+    const css = readSwitcherCss().replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
   });
 });

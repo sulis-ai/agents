@@ -9,7 +9,13 @@
 
 .pswitch {
   position: relative;
-  margin: 2px 4px 14px;
+  /*
+   * The switcher lives in the horizontal 48px .topbar's .brand row
+   * (align-items: center). No top/bottom margin — let the row centre it
+   * vertically; the old asymmetric `2px 4px 14px` (ported from the OLD
+   * vertical sidebar) pushed it up and out of the bar. (issue 216)
+   */
+  margin: 0 4px;
 }
 
 .pstrigger {
@@ -17,7 +23,11 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 9px 10px;
+  /*
+   * Fits the control within the 48px top bar with breathing room; the old
+   * `9px 10px` (vertical-sidebar port) overflowed the bar. (issue 216)
+   */
+  padding: 6px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-card);
