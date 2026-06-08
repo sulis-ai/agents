@@ -1,3 +1,9 @@
+## v0.122.0 — 2026-06-08
+
+**Minor — release-train batch.**
+
+- Change-owned terminal: a change now owns ONE manager-backed session (running the real interactive claude --agent sulis in a pty), with two views onto it — the desktop terminal (sulis-change start opens a viewer) and the cockpit Terminal view — both attaching to a single shared session-manager daemon. Adds the real interactive-pty adapter (prior terminal ran a test echo stub), the shared daemon (flock singleton, idle-exit), the desktop viewer client, and migrates the cockpit off its own ephemeral host. Supersedes the standalone-start window and the cockpit ephemeral host.
+
 ## v0.121.1 — 2026-06-08
 
 **Patch — release-train batch.**
