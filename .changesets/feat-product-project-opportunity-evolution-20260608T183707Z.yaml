@@ -1,0 +1,7 @@
+change_id: 01KT61BP8RMRSWWXBH758GJW1R
+primitive: feat
+tier: minor
+touches_plugin: true
+summary: |
+  Make the top-of-hierarchy brain entities (Product, Project, Opportunity) properly emitted and evolving: turn on bitemporal history (close prior valid-window, open new window) with PROV wasGeneratedBy lineage, migrate LifecycleRun to v2 (step_name->step ref) as the evolve spine, add an as-of-time window read, model the cross-repo/Platform central-Tenant home for Product/Opportunity, and reconcile the Project home to the canonical brain store with a .sulis mirror.
+created_at: 2026-06-08T18:37:07Z
