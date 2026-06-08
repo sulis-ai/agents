@@ -164,8 +164,11 @@ Structured log line at phase exit:
 ## Phase 4 — Mint
 
 Mint composes the Project entity from confirmed values + gathered
-ambiguous fields + computed identifiers, then writes it atomically
-to disk.
+ambiguous fields + computed identifiers, then reconciles its home:
+it saves the Project to the **brain store (canonical)** and mirrors it
+to `.sulis/projects/<slug>.jsonld` (the human-readable copy). Per
+ADR-006 the write is **canonical-first, mirror-second** — both derived
+from the same validated entity.
 
 <!-- canonical:step:write-project-entity -->
 Compose the entity. Specifically:
@@ -193,14 +196,29 @@ Collision detection runs before any write touches disk:
   mode (MUC-007). The Project is collapsing what should be two.
 
 Then install the SIGINT handler via `install_sigint_handler` and
-invoke `write_project_entity` for the atomic write — temp file +
-fsync + rename. Mid-flow Ctrl-C between these two calls is the
-window the pre-flight sweep at the top of this skill cleans up
-on the next run (MUC-002).
+invoke `write_project_entity`, which reconciles the Project home in
+two ordered steps (ADR-006):
+
+1. **Canonical** — the inner Project is saved through the
+   `EntityRepository` port at the central Tenant home (the brain
+   store), as a *living* entity via the shared `evolve_entity` helper
+   with `generated_by=None`. Project is `prov:Plan`, so it gets the
+   bitemporal window + supersedes chain but **no** `wasGeneratedBy`
+   edge (ADR-002). A re-discovery (`--update`) *evolves* the existing
+   Project — close the prior window, open a new one — rather than
+   minting a fresh one. If this canonical write fails validation, the
+   founder sees the schema error and **no mirror is written**.
+2. **Mirror** — `.sulis/projects/<slug>.jsonld` is written atomically
+   (temp file + fsync + rename), keeping the path-safety + MUC-003
+   pre-existence + stale-tmp discipline verbatim. A mirror failure
+   *after* a good canonical save is a logged best-effort degradation
+   (the canonical truth is already safe). Mid-flow Ctrl-C between the
+   tmp write and the rename is the window the pre-flight sweep at the
+   top of this skill cleans up on the next run (MUC-002).
 
 Structured log line at phase exit:
 
-    [discover-project] Mint phase: writing to .sulis/projects/<slug>.jsonld (atomic)
+    [discover-project] Mint phase: canonical brain-store save + mirror to .sulis/projects/<slug>.jsonld
 
 ## Phase 5 — Verify
 

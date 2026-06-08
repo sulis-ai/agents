@@ -1,0 +1,45 @@
+{
+  "pr": "feat/wp-009-entity-evolve-helper",
+  "wp": "WP-009",
+  "project": "product-project-opportunity-evolution",
+  "timestamp": "2026-06-03T154144Z",
+  "base_ref": "change/feat-product-project-opportunity-evolution",
+  "head_ref": "feat/wp-009-entity-evolve-helper",
+  "verdict": "PASS",
+  "outcome_plain": "Ready to merge",
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "ruff_check": "pass",
+    "mypy_new_module": "clean",
+    "compileall": "ok",
+    "tests": "16 passed",
+    "coverage_new_file_pct": 100
+  },
+  "hygiene": {
+    "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "clean"},
+    "size": {"files_changed": 3, "lines_added": 305, "lines_removed": 1, "severity": "clean"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "secret_pattern_hits": 0, "infra_files": 0, "severity": "clean"},
+    "completeness": {"new_source_without_test": 0, "api_change_without_schema": false, "severity": "clean"}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 1},
+    "in_neighbours": {"critical": 0, "high": 0, "medium": 0, "low": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "produced_output": true},
+    "security": {"findings": 0, "produced_output": true},
+    "quality": {"findings": 1, "produced_output": true}
+  },
+  "watch_list": [
+    {
+      "id": "WL-001",
+      "severity": "low",
+      "lens": "quality",
+      "location": "plugins/sulis/scripts/_entity_evolve.py:271",
+      "note": "tmp-file naming uses os.getpid(); atomic os.replace prevents torn writes. Cross-process lost-update on the same entity is the WP-013 central-home concurrency concern (ADR-005), out of scope for this file-adapter-only WP (ADR-003 OAQ-1). No race in the only use this WP enables (single in-process writer; no emitter calls it yet).",
+      "delta": null
+    }
+  ],
+  "draft_deltas": [],
+  "auto_downgrade_triggers_fired": []
+}

@@ -1,0 +1,143 @@
+diff --git a/plugins/sulis/scripts/_brain_emit_helper.py b/plugins/sulis/scripts/_brain_emit_helper.py
+index 79cfc1e..52da417 100644
+--- a/plugins/sulis/scripts/_brain_emit_helper.py
++++ b/plugins/sulis/scripts/_brain_emit_helper.py
+@@ -97,6 +97,43 @@ def _brain_base_dir(repo_root: Path) -> Path:
+     return Path(repo_root) / ".brain" / "instances"
+ 
+ 
++def central_tenant_home(tenant_id: str) -> Path:
++    """The central, cross-repo Platform home for one Tenant's living entities.
++
++    Resolves the EXISTING convention ``~/.sulis/instances/{tenant_id}/`` —
++    documented verbatim in ``_tenant_emission.py``'s module docstring and the
++    "follow-up slice" it promised. This is the single cross-repo boundary: a
++    Tenant whose Product/Opportunity history spans many repos has ONE home to
++    read, keyed by the *deterministic* Tenant ULID (same Tenant name everywhere
++    → same ``dna:tenant:<ulid>`` → same path on disk — that is what makes the
++    namespace cross-repo).
++
++    ADR-005 is a **reuse, not build** decision: pointing the living-entity emit
++    ``base_dir`` here — ``LocalFileEntityAdapter(base_dir=central_tenant_home(...))``
++    — IS the cross-repo Platform home. No new backend, no new adapter, no new
++    query class; SQLite is deferred behind the same ``EntityRepository`` port.
++
++    The ``~/.sulis`` root is resolved through ``_change_state.sulis_state_base()``
++    — the ONE place that base is computed (honours ``SULIS_STATE_DIR`` for an
++    isolated store, else ``~/.sulis``). Routing through it rather than
++    hard-coding ``Path.home()`` keeps this home in lockstep with every other
++    reader/writer of the local store and lets tests point at a tmp dir.
++
++    Args:
++        tenant_id: the EXISTING deterministic ``dna:tenant:<ulid>`` id (reused,
++            not minted here — the recipe lives in ``_tenant_emission``). It is
++            the home's namespace component, used verbatim.
++
++    Returns:
++        The ``{sulis_state_base()}/instances/{tenant_id}/`` path. Not created
++        here — the file adapter creates the per-entity-type subtree on first
++        write, exactly as it does for the repo-local tree.
++    """
++    from _change_state import sulis_state_base
++
++    return sulis_state_base() / "instances" / tenant_id
++
++
+ def _try_adapter(repo_root: Path, domain: str) -> Any:
+     """Return a `LocalFileEntityAdapter` or None if the brain isn't usable.
+ 
+diff --git a/plugins/sulis/scripts/_brain_query.py b/plugins/sulis/scripts/_brain_query.py
+index 520d24f..102a023 100644
+--- a/plugins/sulis/scripts/_brain_query.py
++++ b/plugins/sulis/scripts/_brain_query.py
+@@ -241,6 +241,72 @@ def read_as_of(
+     return None  # no envelope for this entity id
+ 
+ 
++# ─── Central Tenant home: cross-repo current-version read (ADR-005) ─────
++
++
++def _current_open_window(envelope: dict) -> dict | None:
++    """The current OPEN window of a history envelope, or ``None``.
++
++    The current version is the last window whose ``valid_to`` is unset (an open
++    window — ``valid_to`` null or empty, == +∞). This is the read-side mirror of
++    the open-window invariant ``evolve_entity`` maintains on the write side: at
++    most one window is open at a time, and it is the last one. A bare snapshot
++    (no ``windows`` list) yields ``None`` — it has no open-window contract.
++    """
++    windows = envelope.get("windows")
++    if not isinstance(windows, list) or not windows:
++        return None
++    last = windows[-1]
++    return last if last.get("valid_to") in (None, "") else None
++
++
++def find_current_for_tenant(
++    *,
++    tenant_id: str,
++    entity_type: str,
++) -> list[dict]:
++    """Every CURRENT (open-window) entity of ``entity_type`` for ``tenant_id``,
++    read from the central Tenant home (ADR-005).
++
++    The cross-repo Tenant read: the central home
++    (``central_tenant_home(tenant_id)`` == ``~/.sulis/instances/{tenant_id}/``)
++    is the single subtree where every repo's living-entity emit for this Tenant
++    lands, so one walk of it returns the Tenant's whole current view across
++    repos — something no single repo-local ``.brain/instances`` tree can do.
++
++    Built entirely on the EXISTING ``iter_entities`` flat-file walk and the
++    open-window invariant — no new traversal code, no new adapter, no new query
++    class (the ADR-005 reuse proof is the ABSENCE of new persistence code). The
++    same walk serves the repo-local tree and the central home; only the
++    ``base_dir`` differs, and here it is resolved from the Tenant id.
++
++    Args:
++        tenant_id: the deterministic ``dna:tenant:<ulid>`` whose central home is
++            read. The home is resolved via ``central_tenant_home`` (which routes
++            through ``sulis_state_base()`` — honouring ``SULIS_STATE_DIR``).
++        entity_type: the living entity type to scope to (``product`` /
++            ``opportunity`` / ``project``) — selects the per-type subtree.
++
++    Returns:
++        One dict per entity that has an OPEN window — the current window body.
++        Entities whose latest window is closed (fully evolved past, no open
++        window) are excluded. Empty list when the home does not exist yet or
++        holds no open windows of ``entity_type``.
++    """
++    # Imported here (not at module top) to avoid a read-seam → emit-helper import
++    # cycle: the home resolver lives with the emit wiring; the read seam consumes
++    # it lazily. central_tenant_home is pure path arithmetic — no side effects.
++    from _brain_emit_helper import central_tenant_home
++
++    base_dir = central_tenant_home(tenant_id)
++    current: list[dict] = []
++    for envelope in iter_entities(base_dir, entity_type=entity_type):
++        window = _current_open_window(envelope)
++        if window is not None:
++            current.append(window)
++    return current
++
++
+ # ─── Domain-specific high-level queries ────────────────────────────────
+ 
+ 
+diff --git a/plugins/sulis/scripts/_tenant_emission.py b/plugins/sulis/scripts/_tenant_emission.py
+index 60211b3..322ef89 100644
+--- a/plugins/sulis/scripts/_tenant_emission.py
++++ b/plugins/sulis/scripts/_tenant_emission.py
+@@ -3,8 +3,11 @@
+ Third worked entity emission (after Decision + Requirement). The Tenant is
+ foundation-domain (cross-cutting per L13 promotion); every customer-namespace
+ of marketplace work is bounded by one Tenant. The marketplace's local entity
+-store is namespaced by Tenant ID (`~/.sulis/instances/{tenant_id}/...`),
+-which a follow-up slice will wire after this emitter is live.
++store is namespaced by Tenant ID (`~/.sulis/instances/{tenant_id}/...`). That
++follow-up slice is now live (ADR-005): `_brain_emit_helper.central_tenant_home`
++resolves this home and the living-entity emit (`evolve_entity`) writes there via
++the existing `LocalFileEntityAdapter`, read back cross-repo by
++`_brain_query.find_current_for_tenant` — reuse, not a new store.
+ 
+ Source format — `.sulis/tenant.yaml`:
+ 

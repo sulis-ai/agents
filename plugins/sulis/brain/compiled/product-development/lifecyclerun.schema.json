@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sulis.co/dna/schema/lifecyclerun/1.0.0",
+  "$id": "https://sulis.co/dna/schema/lifecyclerun/2.2.0",
   "title": "LifecycleRun",
-  "description": "the running of a named lifecycle step (build, release, measurement, \u2026) \u2014 a prov:Activity that consumes inputs and produces outputs",
+  "description": "the running of a Step (a defined transformation) \u2014 a prov:Activity that instantiates a prov:Plan (the Step). Consumes inputs + produces outputs per the Step's contract. MAY belong to a larger workflow-run trace via `run_id`; MAY carry content-addressed references to its inputs + outputs artifacts; MAY record which Project / release-unit it operated in via `for_project` (v2.2.0+).",
   "type": "object",
   "unevaluatedProperties": false,
   "required": [
     "id",
-    "step_name",
+    "step",
     "at",
     "outcome",
     "sys_status"
@@ -41,8 +41,9 @@
       "type": "string",
       "pattern": "^dna:lifecyclerun:[0-9A-HJKMNP-TV-Z]{26}$"
     },
-    "step_name": {
-      "type": "string"
+    "step": {
+      "type": "string",
+      "pattern": "^dna:(step):[0-9A-HJKMNP-TV-Z]{26}$"
     },
     "at": {
       "type": "string",
@@ -59,6 +60,25 @@
         "in-progress",
         "cancelled"
       ]
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "deterministic": {
+      "type": "boolean"
+    },
+    "inputs_ref": {
+      "type": "string",
+      "x-sensitive": true
+    },
+    "outputs_ref": {
+      "type": "string",
+      "x-sensitive": true
+    },
+    "for_project": {
+      "type": "string",
+      "pattern": "^dna:(project):[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "the Project / release-unit this run operated in \u2014 optional; meta-runs and pre-Project runs omit it"
     }
   },
   "x-schema-org-extends": "schema:Action"

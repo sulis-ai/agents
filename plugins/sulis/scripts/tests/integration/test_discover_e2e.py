@@ -524,7 +524,10 @@ def test_uc_003_monorepo_path_scoped(
         inferrer=NullConfigurationInferrer(),
         answers={
             "name": "cli",
-            "type": "tool",
+            # `application` — the compiled foundation Project schema's enum
+            # (post-reconcile the canonical save validates `type`; the loose
+            # `"tool"` label was never a schema value).
+            "type": "application",
             "version_files": ["apps/cli/package.json"],
             "description": "CLI sub-project.",
             "belongs_to_product_ref": "acme-monorepo",
@@ -687,14 +690,25 @@ def test_muc_003_refuse_overwrite(
 def test_muc_005_bad_workflow_ref_rolls_back(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """MUC-005: a bad release_workflow_ref causes the post-mint drift
-    detector to fail; the entity is rolled back (unlinked) and the
-    exception carries the drift detector's stderr."""
+    """MUC-005: a release_workflow_ref that is well-formed but does not RESOLVE
+    in any tenant Workflow catalogue causes the post-mint drift detector to fail;
+    the entity is rolled back (unlinked) and the exception carries the drift
+    detector's stderr.
+
+    Post-reconcile (ADR-006/WP-015) the two failure classes are layered: a
+    *malformed* ref (wrong shape) is now caught earlier at the canonical port's
+    schema validation (reject-on-invalid, before the mirror is written); a
+    *well-formed-but-non-resolving* ref is the Verify phase's job, exercised here.
+    The ULID below is shape-valid (passes the canonical save) but is not the
+    canonical marketplace Workflow, so the drift detector rolls it back."""
     repo = _materialise_fixture("empty", tmp_path)
     make_minimal_git_repo(repo, remote_url="git@github.com:acme/bad-ref.git")
     _patch_consuming_repo_root(monkeypatch, repo)
 
-    bad_ulid = "dna:workflow:DOESNOTEXIST00000000000000"
+    # Well-formed 26-char Crockford ULID, but NOT the canonical marketplace
+    # release-train Workflow — so it passes schema validation at the canonical
+    # port and is caught by the Verify-phase drift detector (resolution check).
+    bad_ulid = "dna:workflow:01KT0NRES0VWRKFW00000000A0"
 
     with pytest.raises(DriftVerifyFailed) as excinfo:
         run_discovery_headless(

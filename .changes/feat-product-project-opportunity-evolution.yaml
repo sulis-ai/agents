@@ -1,0 +1,20 @@
+change_id: "01KT61BP8RMRSWWXBH758GJW1R"
+handle: "CH-01KT61"
+slug: "product-project-opportunity-evolution"
+primitive: "feat"
+intent: "Pick up the Product / Project / Opportunity conversation: make the TOP-OF-HIERARCHY brain entities (the founder's product, project, and the 'why') properly EMITTED + EVOLVING, with the multi-repo / Platform-store home modelled. These are the entities the founder actually builds + will pay to see/steer (the ADE explores them; the Platform operationalises them).
+
+COORDINATE, DON'T DUPLICATE: the already-running CH-01KT60 (brain-backlog-and-traversal) wires the BASIC Opportunity/Product emit via its capture path (single-repo per-repo .brain/instances home). THIS session is the bigger half: EVOLVE + the multi-repo/Platform-store modelling.
+
+BRAIN-CONSULT CONFIRMATIONS (this session, verified vs schemas): Project = the multi-repo anchor — one Product -> many Projects via Project.belongs_to_product_ref (a plain STRING ref, unresolved until ontology v0.7 upstream); depends_on/consumed_by = the inter-repo dependency graph; project.schema.json:5 states the multi-repo case verbatim. Product + Opportunity are Tenant-scoped / CROSS-REPO -> their TRUE home is the Platform-tier central store (tasks #51 Storage Service / #30 SQLite global store); single-repo per-repo emission is a fine near-term stopgap that must be reconciled later. Project today is minted to .sulis/projects/<slug>.jsonld (NOT the brain store) by /sulis:discover-project — a real inconsistency to reconcile.
+
+EVOLVE (this is #67 — change-as-transaction 'turn ON evolution'): bitemporal fields (valid_from/valid_to/confidence/sys_status) EXIST on all living entities, but NO emitter writes history yet — it's OFF for everyone. The mechanism: read-current-version -> close prior valid-window -> open new window + PROV wasGeneratedBy/used (PROV idiom is Activity-generates-Entity; wasRevisionOf does NOT exist in the grammar; bitemporal as-of-time + PROV which-activity are complementary). PREREQUISITE/likely-first-piece: LifecycleRun v1.0.0 -> 2.1.0 (BREAKING: step_name -> required  ref; needs _brain_emit_helper + sulis-emit-lifecyclerun migrated in lockstep + a modelling call — what Step does a change-start/ship LifecycleRun point at). Decision STAYS an event (its supersedes chain is its lineage); don't over-apply the retrofit.
+
+LADDER: properly-emitted + evolving Product/Project/Opportunity = the founder's-product-as-living-memory; Platform tier is their cross-repo home; the flat-file query swaps for a real backend there.
+
+MANDATE: scope a COHERENT slice. Likely shape: (a) the multi-repo/Platform-store home decision for Product/Opportunity (+ reconcile Project's .sulis/projects vs brain-store home); (b) the evolve mechanism (read-current/close-window/new-window + PROV), which depends on the LifecycleRun v2.1.0 migration as its spine. It's big — carve a first slice (the LifecycleRun migration is the natural prerequisite). Tasks: #67 (evolve), #51/#30 (Platform store), #69 (basic emit in flight), #64 (discover-project Project mint)."
+branch: "change/feat-product-project-opportunity-evolution"
+worktree_path: "/Users/iain/.sulis/changes/01KT61BP8RMRSWWXBH758GJW1R/worktree"
+base_branch: "main"
+base_sha: "50eb6d09ae69c45add6ba7d8f6ada7fe3cc46795"
+started_at: "2026-06-03T06:05:03Z"

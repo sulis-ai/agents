@@ -1,0 +1,26 @@
+{
+  "pr": "feat/wp-013-central-tenant-home-wiring",
+  "base": "change/feat-product-project-opportunity-evolution",
+  "timestamp": "2026-06-03T183225Z",
+  "verdict": "PASS",
+  "build_verification": {
+    "py_compile_errors": 0,
+    "ruff_errors": 0
+  },
+  "hygiene": {
+    "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "none"},
+    "size": {"lines_added": 108, "lines_removed": 2, "files_changed": 4, "severity": "none"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+    "completeness": {"new_source_without_test": 0, "new_tests": 1, "api_change_without_schema": false, "severity": "none"}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"critical": 0, "high": 0, "medium": 0, "low": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "note": "nothing surfaced"},
+    "security": {"findings": 0, "note": "nothing surfaced"},
+    "quality": {"findings": 0, "note": "nothing surfaced"}
+  },
+  "draft_fixes": 0
+}

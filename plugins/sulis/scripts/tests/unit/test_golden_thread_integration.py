@@ -154,6 +154,22 @@ def _load(path: Path) -> dict:
     return json.loads(path.read_text())
 
 
+def _load_current(path: Path) -> dict:
+    """Load the current state of a *living* entity (Product / Opportunity).
+
+    Post-WP-012 the living emitters delegate to ``evolve_entity``, so their
+    on-disk file is a history envelope (``{"windows": [...]}``) rather than a
+    flat snapshot; the current state is the last (open) window. Event /
+    non-evolving entities (Tenant, Requirement, Decision, Finding) still write a
+    flat snapshot via ``repo.save`` and are read with ``_load``.
+    """
+    raw = json.loads(path.read_text())
+    windows = raw.get("windows")
+    if isinstance(windows, list) and windows:
+        return windows[-1]
+    return raw
+
+
 def _instance_path(tmp_path: Path, domain: str, entity_type: str, entity_id: str) -> Path:
     ulid = entity_id.rsplit(":", 1)[-1]
     return tmp_path / ".brain" / "instances" / domain / entity_type / f"{ulid}.jsonld"
@@ -196,15 +212,17 @@ class TestGoldenThreadEndToEnd:
 
         # ── The graph resolves — each cross-ref points at a real entity ─
 
-        # Product.belongs_to_tenant → Tenant.id
-        product = _load(_instance_path(tmp_path, "product-development", "product", products[0]["id"]))
+        # Product.belongs_to_tenant → Tenant.id (Product is now a living entity
+        # — read its current open window).
+        product = _load_current(_instance_path(tmp_path, "product-development", "product", products[0]["id"]))
         assert product["belongs_to_tenant"] == tenants[0]["id"], (
             "Product.belongs_to_tenant should equal the emitted Tenant.id"
         )
 
         # Requirement.source → Opportunity.id (the critical alignment that
-        # closes the CH-01KSWQ synthetic-placeholder loop)
-        opp = _load(_instance_path(tmp_path, "product-development", "opportunity", opportunities[0]["id"]))
+        # closes the CH-01KSWQ synthetic-placeholder loop). Opportunity is now
+        # a living entity — read its current open window.
+        opp = _load_current(_instance_path(tmp_path, "product-development", "opportunity", opportunities[0]["id"]))
         for r in requirements:
             r_jsonld = _load(_instance_path(tmp_path, "product-development", "requirement", r["id"]))
             assert r_jsonld["source"] == opp["id"], (

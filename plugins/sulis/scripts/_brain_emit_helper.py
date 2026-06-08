@@ -24,7 +24,7 @@ Why a separate helper:
 
 3. **Substrate-level naming.** Each function names the LIFECYCLE EVENT,
    not the entity type. `emit_change_started_event(...)` reads at the
-   call site; `emit_lifecyclerun(step_name=f"change-started:{slug}", ...)`
+   call site; `emit_lifecyclerun(step=<change-started Step ULID>, ...)`
    does not.
 
 Every helper returns `dict | None`:
@@ -38,10 +38,43 @@ The host script logs but does NOT fail when None comes back.
 
 from __future__ import annotations
 
+import json
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
+
+
+# ─── Step resolution (name → canonical Step ULID) ───────────────────────
+#
+# A LifecycleRun's `step` ref points at a canonical Step (a prov:Plan). The
+# three operational Steps are authored ONCE in
+# `plugins/sulis/instances/lifecycle-steps/steps.jsonld` (WP-001) with
+# deterministic ULIDs; these are the single source of truth, copied here —
+# never re-minted (ADR-001/ADR-004). The per-run specificity that the old free
+# `step_name` string carried is preserved in the run's `run_id`, NOT in a
+# `step_label` (which does not exist in canonical v2).
+
+_STEP_CHANGE_STARTED: Final[str] = "dna:step:01KT61X5ST01CHANGESTART00A"
+_STEP_CHANGE_SHIPPED: Final[str] = "dna:step:01KT61X5ST02CHANGESH1PP00A"
+_STEP_UNCLASSIFIED: Final[str] = "dna:step:01KT61X5ST03VNC1ASS1F1ED0A"
+
+_NAME_TO_STEP_ULID: Final[dict[str, str]] = {
+    "change-started": _STEP_CHANGE_STARTED,
+    "change-shipped": _STEP_CHANGE_SHIPPED,
+}
+
+
+def _resolve_step(name: str) -> str:
+    """Return the canonical Step ULID for a known lifecycle name.
+
+    Unknown names resolve to the `unclassified-lifecycle-step` Step so every
+    run points at a real Step ref rather than an inline-minted one. The
+    original free `name`, where trace grouping is needed, is carried by the
+    run's `run_id` field — not by a `step_label` (which does not exist).
+    """
+    return _NAME_TO_STEP_ULID.get(name, _STEP_UNCLASSIFIED)
 
 
 def _brain_emit_enabled() -> bool:
@@ -55,6 +88,55 @@ def _brain_emit_enabled() -> bool:
     return val not in ("0", "false", "no", "off")
 
 
+# ─── Project resolution (repo → for_project ref) ────────────────────────
+#
+# A change-start LifecycleRun records which Project (release-unit / repo) it ran
+# in, via the optional `for_project` ref (ADR-007, v2.2.0+). The Project entity
+# is minted to `<repo_root>/.sulis/projects/<slug>.jsonld` (the discover-project
+# minter, WP-011/WP-014). We READ that bag here to resolve the ULID — there is
+# no separate resolver helper to reuse (the minter only writes), so this is the
+# minimal in-scope reader. `for_project` is OPTIONAL: a repo with no Project bag
+# (a meta-run, a pre-discovery repo) resolves to None and the field is omitted —
+# never an error (graceful degradation, ADR-007 §4).
+
+_PROJECT_ID_RE: Final = re.compile(r"^dna:project:[0-9A-HJKMNP-TV-Z]{26}$")
+
+
+def _resolve_project_ulid(repo_root: Path) -> str | None:
+    """Resolve the active Project ULID for `repo_root`, or None.
+
+    Reads `<repo_root>/.sulis/projects/*.jsonld` — the minter's output bags,
+    each a `project-instances` doc carrying a `projects` array. Returns the
+    `id` of the first `active` Project found (a single-Project repo is the
+    common case). Any failure (no bag, malformed JSON, no valid ref) returns
+    None so the emit degrades gracefully rather than failing.
+    """
+    projects_dir = Path(repo_root) / ".sulis" / "projects"
+    if not projects_dir.is_dir():
+        return None
+    try:
+        bags = sorted(projects_dir.glob("*.jsonld"))
+    except OSError:
+        return None
+    for bag in bags:
+        try:
+            doc = json.loads(bag.read_text())
+        except (OSError, ValueError):
+            continue
+        projects = doc.get("projects")
+        if not isinstance(projects, list):
+            continue
+        for project in projects:
+            if not isinstance(project, dict):
+                continue
+            if project.get("sys_status") not in (None, "active"):
+                continue
+            pid = project.get("id")
+            if isinstance(pid, str) and _PROJECT_ID_RE.match(pid):
+                return pid
+    return None
+
+
 def _brain_base_dir(repo_root: Path) -> Path:
     """Resolve the brain instances directory.
 
@@ -64,6 +146,43 @@ def _brain_base_dir(repo_root: Path) -> Path:
     if explicit:
         return Path(explicit).resolve()
     return Path(repo_root) / ".brain" / "instances"
+
+
+def central_tenant_home(tenant_id: str) -> Path:
+    """The central, cross-repo Platform home for one Tenant's living entities.
+
+    Resolves the EXISTING convention ``~/.sulis/instances/{tenant_id}/`` —
+    documented verbatim in ``_tenant_emission.py``'s module docstring and the
+    "follow-up slice" it promised. This is the single cross-repo boundary: a
+    Tenant whose Product/Opportunity history spans many repos has ONE home to
+    read, keyed by the *deterministic* Tenant ULID (same Tenant name everywhere
+    → same ``dna:tenant:<ulid>`` → same path on disk — that is what makes the
+    namespace cross-repo).
+
+    ADR-005 is a **reuse, not build** decision: pointing the living-entity emit
+    ``base_dir`` here — ``LocalFileEntityAdapter(base_dir=central_tenant_home(...))``
+    — IS the cross-repo Platform home. No new backend, no new adapter, no new
+    query class; SQLite is deferred behind the same ``EntityRepository`` port.
+
+    The ``~/.sulis`` root is resolved through ``_change_state.sulis_state_base()``
+    — the ONE place that base is computed (honours ``SULIS_STATE_DIR`` for an
+    isolated store, else ``~/.sulis``). Routing through it rather than
+    hard-coding ``Path.home()`` keeps this home in lockstep with every other
+    reader/writer of the local store and lets tests point at a tmp dir.
+
+    Args:
+        tenant_id: the EXISTING deterministic ``dna:tenant:<ulid>`` id (reused,
+            not minted here — the recipe lives in ``_tenant_emission``). It is
+            the home's namespace component, used verbatim.
+
+    Returns:
+        The ``{sulis_state_base()}/instances/{tenant_id}/`` path. Not created
+        here — the file adapter creates the per-entity-type subtree on first
+        write, exactly as it does for the repo-local tree.
+    """
+    from _change_state import sulis_state_base
+
+    return sulis_state_base() / "instances" / tenant_id
 
 
 def _try_adapter(repo_root: Path, domain: str) -> Any:
@@ -125,12 +244,17 @@ def emit_change_started_event(
         from _lifecyclerun_emission import emit_lifecyclerun
     except Exception:
         return None
+    # Resolve the Project this run operated in (ADR-007). Optional — a repo with
+    # no discovered Project omits the field; resolution never fails the emit.
+    for_project = _resolve_project_ulid(repo_root)
     return _safely(
         emit_lifecyclerun,
         repo=adapter,
-        step_name=f"change-started:{primitive}:{slug}",
+        step=_resolve_step("change-started"),
+        run_id=f"change-started:{primitive}:{slug}",
         outcome="completed",
         at=datetime.now(timezone.utc).isoformat(),
+        for_project=for_project,
     )
 
 
@@ -160,7 +284,8 @@ def emit_change_shipped_event(
     return _safely(
         emit_lifecyclerun,
         repo=adapter,
-        step_name=f"change-shipped:{primitive}:{slug}",
+        step=_resolve_step("change-shipped"),
+        run_id=f"change-shipped:{primitive}:{slug}",
         outcome="completed",
         at=datetime.now(timezone.utc).isoformat(),
     )
@@ -181,6 +306,12 @@ def emit_lifecycle_step_event(
     human-readable string that uniquely names the event class
     (e.g. `"wpx-pipeline-success:WP-012"`).
 
+    Under v2 the free `step_name` is resolved to a canonical Step ULID for
+    the run's `step` ref (known names map to their Step; everything else
+    falls back to the `unclassified-lifecycle-step` Step). The original
+    `step_name` string is carried into `run_id` for trace grouping — it is
+    not lost, and it does not go into a `step_label` (which does not exist).
+
     Outcome MUST be one of: completed / failed / in-progress / cancelled.
     """
     if not _brain_emit_enabled():
@@ -195,7 +326,8 @@ def emit_lifecycle_step_event(
     return _safely(
         emit_lifecyclerun,
         repo=adapter,
-        step_name=step_name,
+        step=_resolve_step(step_name),
+        run_id=step_name,
         outcome=outcome,
         at=at or datetime.now(timezone.utc).isoformat(),
     )

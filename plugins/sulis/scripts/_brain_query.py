@@ -160,6 +160,177 @@ def where_id_in(ids: set | list) -> Callable[[dict], bool]:
     return _pred
 
 
+# ─── As-of-time window read (bitemporal; ADR-003) ──────────────────────
+
+
+def _window_contains(window: dict, as_of: str) -> bool:
+    """Whether `as_of` falls inside this window's half-open interval.
+
+    The interval is ``[valid_from, valid_to)`` — the lower bound is
+    **inclusive**, the upper bound **exclusive**. An open window
+    (``valid_to`` null or empty) is treated as ``valid_to == +∞``, so any
+    `as_of` at or after ``valid_from`` is contained.
+
+    The half-open shape is what makes abutting windows partition time without
+    overlap: when window N closes at the same instant window N+1 opens
+    (``N.valid_to == N+1.valid_from`` — exactly how ``evolve_entity`` chains
+    them), that shared instant belongs to N+1 alone. ISO-8601 UTC timestamps
+    are lexicographically ordered, so string comparison is the correct (and
+    boring) ordering — no datetime parse needed.
+    """
+    if as_of < window.get("valid_from", ""):
+        return False
+    valid_to = window.get("valid_to")
+    if not valid_to:
+        # Open window (``valid_to`` null or empty) — no upper bound (+∞).
+        # ``not valid_to`` covers both sentinels (None and "") and narrows
+        # ``valid_to`` to a non-empty string for the comparison below.
+        return True
+    return as_of < valid_to
+
+
+def read_as_of(
+    *,
+    entity_type: str,
+    entity_id: str,
+    as_of: str,
+    base_dir: Path,
+) -> dict | None:
+    """Return the window whose ``[valid_from, valid_to)`` contains `as_of`.
+
+    The read side of the bitemporal window chain (ADR-003): `evolve_entity`
+    writes the history envelope (an ordered ``windows`` list, one file per
+    entity id); this answers *"which version was true at `as_of`?"*.
+
+    Half-open interval semantics: ``valid_from <= as_of < valid_to``. An open
+    window has ``valid_to == None`` (treated as +∞), so an `as_of` after the
+    latest window opens returns that open window. An `as_of` before the first
+    window's ``valid_from`` returns ``None`` (the entity did not exist yet).
+    The boundary is half-open, so ``as_of == valid_to`` of window N returns
+    window N+1, not N — the single source of the boundary rule is
+    ``_window_contains``.
+
+    Reuses the existing ``iter_entities`` flat-file walk — no new traversal
+    code. The signature carries no ``domain``: the walk spans every domain, so
+    a Product/Opportunity (``product-development``) and a Project
+    (``foundation``) are found the same way.
+
+    Args:
+        entity_type: the living entity type (``product`` / ``opportunity`` /
+            ``project``) — selects the per-type subtree of the walk.
+        entity_id: the stable ``dna:{entity_type}:{ulid}`` id whose history
+            envelope is queried.
+        as_of: an ISO-8601 UTC timestamp. Compared lexicographically against
+            the window bounds (ISO-8601 UTC sorts correctly as strings).
+        base_dir: the ``.brain/instances/`` root — repo-local OR the central
+            Tenant home (ADR-005). The same function serves both; the walk is
+            identical. A non-existent ``base_dir`` yields no entities → ``None``.
+
+    Returns:
+        The matching window dict, or ``None`` when no window contains `as_of`
+        (entity unknown, or `as_of` before its first window).
+    """
+    for envelope in iter_entities(base_dir, entity_type=entity_type):
+        if envelope.get("id") != entity_id:
+            continue
+        windows = envelope.get("windows")
+        if not isinstance(windows, list):
+            return None
+        for window in windows:
+            if _window_contains(window, as_of):
+                return window
+        return None  # envelope found, but no window contains as_of
+    return None  # no envelope for this entity id
+
+
+# ─── Central Tenant home: cross-repo current-version read (ADR-005) ─────
+
+
+def _current_open_window(envelope: dict) -> dict | None:
+    """The current OPEN window of a history envelope, or ``None``.
+
+    The current version is the last window whose ``valid_to`` is unset (an open
+    window — ``valid_to`` null or empty, == +∞). This is the read-side mirror of
+    the open-window invariant ``evolve_entity`` maintains on the write side: at
+    most one window is open at a time, and it is the last one. A bare snapshot
+    (no ``windows`` list) yields ``None`` — it has no open-window contract.
+    """
+    windows = envelope.get("windows")
+    if not isinstance(windows, list) or not windows:
+        return None
+    last = windows[-1]
+    return last if last.get("valid_to") in (None, "") else None
+
+
+def find_current_for_tenant(
+    *,
+    tenant_id: str,
+    entity_type: str,
+) -> list[dict]:
+    """Every CURRENT (open-window) entity of ``entity_type`` for ``tenant_id``,
+    read from the central Tenant home (ADR-005).
+
+    The cross-repo Tenant read: the central home
+    (``central_tenant_home(tenant_id)`` == ``~/.sulis/instances/{tenant_id}/``)
+    is the single subtree a Tenant's living-entity emits are *designed* to land
+    in, so one walk of it returns the Tenant's whole current view across repos —
+    something no single repo-local ``.brain/instances`` tree can do.
+
+    Wiring status (ADR-005, reconciled): this central home is *wired-but-not-yet-
+    defaulted* for Product/Opportunity — the seam is proven by
+    ``test_central_tenant_home.py``, but the production emit CLIs still default
+    ``base_dir`` to the repo-local ``.brain/instances`` (nothing invokes them
+    yet), so in production the central home is reached only by the minter (the
+    Project entity, ADR-006). This read serves whatever a caller has written to
+    the home; flipping the Product/Opportunity CLI default is a follow-on slice.
+
+    Built entirely on the EXISTING ``iter_entities`` flat-file walk and the
+    open-window invariant — no new traversal code, no new adapter, no new query
+    class (the ADR-005 reuse proof is the ABSENCE of new persistence code). The
+    same walk serves the repo-local tree and the central home; only the
+    ``base_dir`` differs, and here it is resolved from the Tenant id.
+
+    Args:
+        tenant_id: the deterministic ``dna:tenant:<ulid>`` whose central home is
+            read. The home is resolved via ``central_tenant_home`` (which routes
+            through ``sulis_state_base()`` — honouring ``SULIS_STATE_DIR``).
+        entity_type: the living entity type to scope to (``product`` /
+            ``opportunity`` / ``project``) — selects the per-type subtree.
+
+    Returns:
+        One dict per entity that has an OPEN window — the current window body.
+        Entities whose latest window is closed (fully evolved past, no open
+        window) are excluded. Empty list when the home does not exist yet or
+        holds no open windows of ``entity_type``.
+    """
+    # Validate `tenant_id` against the tenant-ULID shape BEFORE deriving the
+    # path: this id is joined into the central-home filesystem path, so an
+    # unvalidated value (e.g. one bearing `..`) is a path-traversal seam. The
+    # write path validates via schema; the read path must validate here too.
+    # Reuse the single source of truth for the shape (`_tenant_emission`'s
+    # `_TENANT_ID_RE`) — no second pattern. Imported lazily, mirroring the
+    # `central_tenant_home` import below (read-seam → emit-side, no cycle).
+    from _tenant_emission import _TENANT_ID_RE
+
+    if not _TENANT_ID_RE.match(tenant_id):
+        raise ValueError(
+            f"tenant_id must match dna:tenant:<ulid>; got {tenant_id!r}"
+        )
+
+    # Imported here (not at module top) to avoid a read-seam → emit-helper import
+    # cycle: the home resolver lives with the emit wiring; the read seam consumes
+    # it lazily. central_tenant_home is pure path arithmetic — no side effects.
+    from _brain_emit_helper import central_tenant_home
+
+    base_dir = central_tenant_home(tenant_id)
+    current: list[dict] = []
+    for envelope in iter_entities(base_dir, entity_type=entity_type):
+        window = _current_open_window(envelope)
+        if window is not None:
+            current.append(window)
+    return current
+
+
 # ─── Backlog state sets — the single source (ADR-006) ──────────────────
 # The open/done view definitions live here, once, as immutable frozensets.
 # The `/sulis:backlog` skill (WP-010) and the Sulis agent body (WP-012) import

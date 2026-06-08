@@ -18,6 +18,45 @@ mixed-version vendor is safe):
 - `requirement` + `decision` — gain the bitemporal fields (`valid_from`/
   `valid_to`/`confidence`), so the living entities can hold version history.
   This is the data-shape foundation for change-as-transaction / evolution.
+- `lifecyclerun` v1.0.0 → **2.2.0** — RE-VENDORED (WP-002) in lockstep with the
+  emitter. This is the BREAKING `step_name` (free string) → required `step`
+  (a `dna:step:<ulid>` ref) swap from DR-009, PLUS the DR-013 optional fields
+  (`run_id`/`deterministic`/`inputs_ref`/`outputs_ref`) and the optional
+  `for_project` ref (the `for_project` mint, DR-032). The re-vendor and the
+  emitter migration (`_lifecyclerun_emission` + the three `_brain_emit_helper`
+  lifecycle helpers + the `sulis-emit-lifecyclerun` CLI default path) land in
+  **one atomic change** (ADR-004), so no instance is ever emitted in a shape the
+  vendored schema rejects. The per-run specificity the old `step_name` string
+  carried now lives in `run_id`; there is no `step_label` and no `used` field
+  (both rejected upstream — DR-013). The three lifecycle Step ULIDs the `step`
+  ref points at are authored once in
+  `plugins/sulis/instances/lifecycle-steps/steps.jsonld` (WP-001). The
+  pre-existing on-disk v1 instances are migrated to this shape by the one-shot
+  `plugins/sulis/scripts/migrate_lifecyclerun_v1_to_v2.py` (WP-006) —
+  idempotent, reject-on-invalid, run eager on the marketplace's own
+  `.brain/instances` in this change; downstream consumers migrate lazily on
+  next emit. The optional `for_project` ref is then WIRED at change-start
+  (WP-016, ADR-007): `emit_change_started_event` resolves the running repo's
+  Project ULID from `<repo_root>/.sulis/projects/*.jsonld` and sets
+  `for_project` to it (or omits it for a meta / pre-Project repo — the ref is
+  optional and never fails the emit); the `sulis-emit-lifecyclerun` CLI exposes
+  the same via `--for-project`. It is a plain scope ref mirroring the live
+  `Workflow.for_project`, NOT a `prov_constraints` edge.
+- `product` v1.0.0 → **1.1.0** and `opportunity` v2.0.0 → **2.1.0** —
+  RE-VENDORED (WP-008) to consume the upstream-minted `wasGeneratedBy`
+  provenance edge (the `wasGeneratedBy` mint, DR-031). Each gains an optional
+  `wasGeneratedBy → dna:entity:lifecyclerun` edge at card `0..1`, modelled
+  exactly like the five existing producers (Component/Release/Metric/
+  TestResult/PostMortem) via the `prov_constraints` mechanism — **not** a
+  snake_case wire field, no `@context` map, no `_predicate_map` edit (the
+  `prov:wasGeneratedBy` predicate already exists). The edge lives in the
+  **triples manifest**, not the JSON-Schema body, so the vendored schema
+  re-vendor is the `$id` bump only (the vendored tree is schema-only — triples
+  are not vendored for any entity). The `0..1` cardinality (vs the producers'
+  `1..1`) keeps pre-bump instances valid — a zero-migration additive MINOR.
+  **`project` is excluded** — it is a `prov:Plan` (an Entity→Activity edge is a
+  type violation), so it stays at v1.0.0, untouched. `wasRevisionOf` appears
+  nowhere (ADR-002).
 
 **`brand-identity`** is vendored from sulis-brain **v0.15.0** (DR-030 — the
 domain's first compiled entities). Three schemas, vendored flat as
@@ -35,11 +74,8 @@ product-development — schemas only; triples are not vendored here):
 - `tenant` — the foundation mirror (so `Brand.belongs_to_tenant` resolves).
 
 **Still to catch up (breaking / structural — deliberately NOT bundled):**
-`lifecyclerun` v1.0.0 → **2.1.0** is BREAKING (`step_name` → required `step`
-ref) and needs the emitter (`_brain_emit_helper`) migrated in lockstep — that's
-the "LifecycleRun-as-transaction-node" change, coupled + needing a modelling
-call. Plus the 10 foundation-mirror entities the PD source now carries (the
-mirror-surface reconciliation). Tracked, not done here.
+the 10 foundation-mirror entities the PD source now carries (the mirror-surface
+reconciliation). Tracked, not done here.
 
 Distribution mechanism (vendoring) is intentional first-slice pragmatism. A
 published package or git-submodule is the right longer-term answer; track that

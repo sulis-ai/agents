@@ -1,0 +1,47 @@
+{
+  "review": {
+    "target": "fix/review-remediation",
+    "base": "origin/change/feat-product-project-opportunity-evolution",
+    "timestamp": "2026-06-03T215900Z",
+    "verdict": "PASS",
+    "outcome_plain": "Ready to merge"
+  },
+  "build_verification": {
+    "errors_introduced": 0,
+    "ruff": "clean",
+    "compileall": "ok",
+    "pytest": "1899 passed, 9 skipped; characterisation 11 passed"
+  },
+  "pr_hygiene": {
+    "scope": {"severity": "clean", "module_fan_out": 1, "commit_type_spread": "single-concern"},
+    "size": {"severity": "clean", "lines_added": 344, "lines_removed": 15, "files_changed": 12, "test_files": 6},
+    "safety": {"severity": "clean", "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0},
+    "completeness": {"severity": "clean", "new_source_without_test": 0}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "items": []
+  },
+  "watch_list": [
+    {
+      "id": "WL-1",
+      "lens": "architecture",
+      "title": "atomic-write tmp+fsync+rename triplication across two packages",
+      "grounded_failing_test": false,
+      "disposition": "deferred-own-WP",
+      "reason": "task remit forbids refactoring beyond the fixes; differing tmp-naming/dir invariants"
+    }
+  ],
+  "hardening_deltas": [],
+  "lenses": {
+    "architecture": {"findings": 0, "output": "nothing surfaced; 1 watch-list note"},
+    "security": {"findings": 0, "output": "nothing surfaced; diff adds 2 input-validation guards reusing canonical regexes"},
+    "quality": {"findings": 0, "output": "nothing surfaced; all behaviour changes RED-first test-backed; no CR-10 perf anti-pattern"}
+  },
+  "self_attestation": {
+    "CR-01": true, "CR-02": true, "CR-03": true, "CR-04": true,
+    "CR-05": true, "CR-06": true, "CR-07": true, "CR-09": true
+  },
+  "auto_downgrade_triggers_fired": []
+}

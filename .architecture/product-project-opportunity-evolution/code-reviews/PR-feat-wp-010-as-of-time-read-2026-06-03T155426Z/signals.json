@@ -1,0 +1,25 @@
+{
+  "pr": "feat/wp-010-as-of-time-read",
+  "build_verification": {
+    "mechanical_baseline_ran": true,
+    "tools": ["ruff check", "ruff format --check", "mypy --ignore-missing-imports"],
+    "base_errors": 0,
+    "head_errors_pr_introduced": 0,
+    "note": "One mypy narrowing warning (str < None at _brain_query.py:184) was PR-introduced and FIXED INLINE before bundle write; head is now clean."
+  },
+  "hygiene": {
+    "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "none"},
+    "size": {"lines_added": 89, "lines_removed": 1, "files_changed": 2, "production_lines": 84, "test_lines": 348, "severity": "low", "note": "Over the 200-line carve-out line threshold but the bulk is a new test file; production change is ~84 lines in one module."},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+    "completeness": {"new_source_without_test": 0, "new_tests": 1, "api_change_without_schema": false, "severity": "none", "note": "TDD-first: 11 tests written before implementation."}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "note": "Reuses existing iter_entities read seam; no new infra import, no external call, no secret, no domain reach-through."},
+    "security": {"findings": 0, "note": "Pure read over local files; lexicographic string compare; iter_entities already skips malformed files. No auth/injection/SSRF/secrets surface."},
+    "quality": {"findings_open": 0, "findings_fixed_inline": 1, "note": "One mypy narrowing finding fixed inline. Tests included (real-adapter MEA-09). No dead surface, no contract drift. CR-10: O(N) walk over one entity type, identical to existing find_entities; no N+1 introduced."}
+  },
+  "findings_in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+  "findings_in_neighbours": {"total": 0},
+  "draft_hardening_deltas": 0,
+  "verdict": "PASS"
+}

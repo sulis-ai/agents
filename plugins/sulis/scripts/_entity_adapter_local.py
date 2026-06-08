@@ -111,9 +111,23 @@ class LocalFileEntityAdapter(EntityRepository):
             )
         return json.loads(path.read_text())
 
-    def _instance_path(self, entity_type: str, instance_id: str) -> Path:
+    def instance_path(self, entity_type: str, instance_id: str) -> Path:
+        """Resolve the on-disk path for an entity instance / history envelope.
+
+        Public because the path is the adapter's responsibility and more than
+        one consumer needs it: ``save`` / ``find_by_id`` here, and the
+        bitemporal evolve helper (``_entity_evolve.evolve_entity``), which
+        writes the history envelope at this same path. Exposing it as a public
+        seam keeps the layout single-sourced rather than duplicated or reached
+        for via a private name.
+        """
         ulid = self._ulid_from_id(instance_id)
         return self.base_dir / self.domain / entity_type / f"{ulid}.jsonld"
+
+    # Backwards-compatible private alias for any internal caller that still
+    # uses the pre-promotion name.
+    def _instance_path(self, entity_type: str, instance_id: str) -> Path:
+        return self.instance_path(entity_type, instance_id)
 
     @staticmethod
     def _ulid_from_id(instance_id: str) -> str:

@@ -7,11 +7,31 @@ step). The entity records that the step happened, when, the outcome, and
 optionally who/what ran it.
 
 Usage:
-    sulis-emit-lifecyclerun --step-name "run-all Step 7"
+    sulis-emit-lifecyclerun --step <name-or-ref>
                             --outcome <completed|failed|in-progress|cancelled>
                             [--at <iso-timestamp>]
                             [--by-actor dna:actor:<ulid>]
+                            [--run-id <trace-id>]
+                            [--for-project dna:project:<ulid>]
                             [--base-dir <dir>] [--domain <domain>] [--repo-root <dir>]
+
+`--step` (the primary path) takes a **name-or-ref**:
+
+  - a canonical Step ULID ref (a `dna:step:<ulid>`) passes through unchanged —
+    the Step (prov:Plan) this run instantiated;
+  - a known lifecycle name (`change-started`, `change-shipped`) resolves to its
+    canonical Step ULID via the shared `_resolve_step` map;
+  - any other string resolves to the `unclassified-lifecycle-step` Step.
+
+Per-run specificity (the workflow-run trace identifier) goes in `--run-id`.
+
+`--step-name <string>` is a **deprecated alias** kept for one release of consumer
+back-compat (see WP-005 `removal_plan`). It emits a deprecation notice to stderr,
+resolves the legacy string through the same `_resolve_step`, and — when no
+explicit `--run-id` is given — carries the original string into `run_id` for
+trace grouping. The original string is NEVER written to a `step_label` (which
+does not exist in canonical v2.1.0). `--step` and `--step-name` are mutually
+exclusive; exactly one is required.
 
 Defaults:
     --at      current UTC ISO timestamp
@@ -30,9 +50,24 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
+from _brain_emit_helper import _resolve_step  # noqa: E402
 from _entity_adapter_local import LocalFileEntityAdapter  # noqa: E402
 from _entity_repository import EntityValidationError  # noqa: E402
-from _lifecyclerun_emission import emit_lifecyclerun  # noqa: E402
+from _lifecyclerun_emission import _STEP_ID_RE, emit_lifecyclerun  # noqa: E402
+
+
+def _step_ref_for(value: str) -> str:
+    """Resolve a `--step` / `--step-name` value to a canonical Step ULID ref.
+
+    An already-canonical `dna:step:<ulid>` ref passes through unchanged; any
+    other string is treated as a lifecycle name and resolved via WP-002's
+    shared `_resolve_step` (known names → their Step; unknown → the
+    `unclassified-lifecycle-step` Step). No second copy of the name→ULID map
+    lives here.
+    """
+    if _STEP_ID_RE.match(value):
+        return value
+    return _resolve_step(value)
 
 
 def _resolve_repo_root(explicit: str | None) -> Path:
@@ -60,14 +95,50 @@ def _err(message: str) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Emit a LifecycleRun event entity (PD).")
-    parser.add_argument("--step-name", required=True)
+    step_group = parser.add_mutually_exclusive_group(required=True)
+    step_group.add_argument(
+        "--step",
+        help="primary: a canonical Step ULID ref (dna:step:<ulid>) or a "
+        "lifecycle name (change-started / change-shipped / anything else "
+        "→ unclassified-lifecycle-step)",
+    )
+    step_group.add_argument(
+        "--step-name",
+        help="DEPRECATED alias for --step; resolves the legacy string and "
+        "(absent --run-id) carries it into run_id. Removed next minor.",
+    )
     parser.add_argument("--outcome", required=True)
     parser.add_argument("--at", default=None, help="ISO timestamp (default: now UTC)")
     parser.add_argument("--by-actor", default="", help="optional dna:actor:<ulid>")
+    parser.add_argument("--run-id", default=None, help="optional workflow-run trace id")
+    parser.add_argument(
+        "--for-project",
+        default=None,
+        help="optional dna:project:<ulid> — the Project (release-unit) this run "
+        "operated in; omitted when absent (ADR-007)",
+    )
     parser.add_argument("--base-dir")
     parser.add_argument("--domain", default="product-development")
     parser.add_argument("--repo-root")
     args = parser.parse_args()
+
+    # Resolve the step ref + run_id from whichever flag was given. The mutually
+    # exclusive group guarantees exactly one of --step / --step-name is set.
+    run_id = args.run_id
+    if args.step_name is not None:
+        print(
+            "Note: --step-name is deprecated and will be removed in the next "
+            "release. Use --step instead (it takes the same lifecycle name "
+            "or a canonical Step ref).",
+            file=sys.stderr,
+        )
+        step = _step_ref_for(args.step_name)
+        # Preserve the original string for trace grouping unless the caller
+        # supplied an explicit --run-id (which takes precedence).
+        if run_id is None:
+            run_id = args.step_name
+    else:
+        step = _step_ref_for(args.step)
 
     repo_root = _resolve_repo_root(args.repo_root)
     base_dir = (
@@ -80,10 +151,12 @@ def main() -> int:
     try:
         run = emit_lifecyclerun(
             repo=adapter,
-            step_name=args.step_name,
+            step=step,
             outcome=args.outcome,
             at=args.at,
             by_actor=args.by_actor,
+            run_id=run_id,
+            for_project=args.for_project,
         )
     except ValueError as exc:
         return _err(str(exc))

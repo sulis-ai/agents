@@ -28,6 +28,20 @@ Usage (discover-project, with cross-tenant boundary recognition):
         --yaml-path plugins/sulis/skills/discover-project/SKILL.md \\
         --cross-tenant-refs-allowed-for release_workflow_ref
 
+Usage (lifecycle-steps parity — WP-007):
+    python3 plugins/sulis/scripts/check-canonical-drift.py \\
+        --lifecycle-steps-parity \\
+        --instance-dir plugins/sulis/instances/lifecycle-steps \\
+        --schema-path \\
+          plugins/sulis/brain/compiled/product-development/lifecyclerun.schema.json
+
+    Asserts the lifecycle-steps canonical stays in lock-step with its schema:
+    the three pinned canonical Step ULIDs (change-started / change-shipped /
+    unclassified-lifecycle-step) are all present and none are extra, AND the
+    lifecyclerun schema carries no resurrected `step_name` property (DR-009
+    swapped that string for the `step` ref). A missing/extra Step ULID or a
+    `step_name` regression exits 1 with a populated `data.drift`.
+
 Exit codes:
     0 — all conformance checks pass
     1 — drift detected (envelope's data.drift names the gaps)
@@ -86,6 +100,24 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         "project.schema.json and applies the --cross-tenant-refs-allowed-for "
         "allowlist. Mutually exclusive with --instance-dir/--yaml-path; does "
         "NOT require them. Exit 0 clean, 1 drift, 2 invocation error.",
+    )
+    parser.add_argument(
+        "--lifecycle-steps-parity",
+        action="store_true",
+        help="Run the lifecycle-steps parity check (WP-007): assert the "
+        "canonical lifecycle Step ULIDs in --instance-dir/steps.jsonld match "
+        "the pinned set AND the --schema-path lifecyclerun schema carries no "
+        "resurrected `step_name` property (DR-009 swapped it for `step`). "
+        "Requires --instance-dir + --schema-path; ignores --yaml-path. "
+        "Mutually exclusive with --scope.",
+    )
+    parser.add_argument(
+        "--schema-path",
+        type=Path,
+        default=None,
+        help="Path to the re-vendored lifecyclerun.schema.json — the schema "
+        "side of the lifecycle-steps parity check. Required for "
+        "--lifecycle-steps-parity.",
     )
     parser.add_argument(
         "--marketplace-json",
@@ -200,6 +232,114 @@ def _scope_drift_entries(
     return drift
 
 
+# ─── Lifecycle-steps parity mode (WP-007) ────────────────────────────────
+
+# The canonical lifecycle Step ULIDs, pinned in the requirements document
+# (TDD §Canonical Identifiers). These three are authored once in
+# instances/lifecycle-steps/steps.jsonld and copied — never re-minted — by
+# every run and the migration that reference them, so they must stay
+# byte-stable. Registering them here is DATA (the checked set), not a new
+# code path: the parity check is a set-difference against this inventory,
+# reusing the same JsonLdFileReader.read_steps machinery as every other mode.
+_EXPECTED_LIFECYCLE_STEP_ULIDS = {
+    "dna:step:01KT61X5ST01CHANGESTART00A": "change-started",
+    "dna:step:01KT61X5ST02CHANGESH1PP00A": "change-shipped",
+    "dna:step:01KT61X5ST03VNC1ASS1F1ED0A": "unclassified-lifecycle-step",
+}
+
+# The `lifecyclerun` schema property that DR-009 removed (swapped `step_name`
+# string → `step` ref, v1.0.0 → v2.0.0). Its reappearance re-forks the
+# vendored schema from canonical at the same version number — the worst
+# possible drift — so the parity check treats it as a regression.
+_FORBIDDEN_SCHEMA_PROPERTY = "step_name"
+
+
+def _lifecycle_steps_parity_drift(steps: list[dict], schema: dict) -> list[dict]:
+    """Return the drift entries for a lifecycle-steps parity run.
+
+    Two drift surfaces, both producing structured `data.drift` entries:
+
+    - a canonical Step ULID missing from steps.jsonld, or an extra Step ULID
+      not in the pinned set → `{"kind": "step_ulid_mismatch", ...}`;
+    - the `step_name` property reappearing in the lifecyclerun schema →
+      `{"kind": "schema_step_name_regression", ...}`.
+
+    Empty list ⇔ the canonical + schema are in parity.
+    """
+    drift: list[dict] = []
+
+    present_ulids = {s.get("id") for s in steps}
+    expected_ulids = set(_EXPECTED_LIFECYCLE_STEP_ULIDS)
+
+    for ulid in sorted(expected_ulids - present_ulids):
+        drift.append(
+            {
+                "kind": "step_ulid_mismatch",
+                "direction": "missing_in_canonical",
+                "ulid": ulid,
+                "name": _EXPECTED_LIFECYCLE_STEP_ULIDS[ulid],
+            }
+        )
+    for ulid in sorted(u for u in (present_ulids - expected_ulids) if u):
+        drift.append(
+            {
+                "kind": "step_ulid_mismatch",
+                "direction": "extra_in_canonical",
+                "ulid": ulid,
+            }
+        )
+
+    schema_properties = schema.get("properties", {})
+    if _FORBIDDEN_SCHEMA_PROPERTY in schema_properties:
+        drift.append(
+            {
+                "kind": "schema_step_name_regression",
+                "property": _FORBIDDEN_SCHEMA_PROPERTY,
+            }
+        )
+
+    return drift
+
+
+def _run_lifecycle_steps_parity_mode(args: argparse.Namespace) -> int:
+    """Check the lifecycle-steps canonical ↔ lifecyclerun schema parity (WP-007).
+
+    Reuses JsonLdFileReader.read_steps to read the canonical Steps (the same
+    read seam every other mode uses), then runs the set-difference against the
+    pinned ULID inventory and the schema regression guard. Requires
+    --instance-dir + --schema-path. Exit 0 (parity) / 1 (drift) / 2
+    (invocation error), with the same `{"ok": bool, ...}` envelope shape as
+    every other mode.
+    """
+    if args.instance_dir is None or args.schema_path is None:
+        return _emit(
+            {
+                "ok": False,
+                "error": "invocation: --lifecycle-steps-parity requires both "
+                "--instance-dir and --schema-path",
+            },
+            2,
+        )
+
+    reader = JsonLdFileReader()
+    try:
+        steps = reader.read_steps(args.instance_dir)
+    except FileNotFoundError as e:
+        return _emit({"ok": False, "error": f"canonical: {e}"}, 2)
+    except ValueError as e:
+        return _emit({"ok": False, "error": f"canonical: {e}"}, 2)
+
+    try:
+        schema = json.loads(args.schema_path.read_text())
+    except FileNotFoundError as e:
+        return _emit({"ok": False, "error": f"schema: {e}"}, 2)
+    except json.JSONDecodeError as e:
+        return _emit({"ok": False, "error": f"schema: malformed JSON: {e}"}, 2)
+
+    drift = _lifecycle_steps_parity_drift(steps, schema)
+    return _emit({"ok": not drift, "data": {"drift": drift}}, 0 if not drift else 1)
+
+
 def _run_scope_mode(args: argparse.Namespace) -> int:
     """Validate ONE Project-instances entity file in single-entity scope.
 
@@ -254,10 +394,15 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     # ─── Mode selection ──────────────────────────────────────────────────
-    # Two mutually-exclusive entry points. --scope runs the single-entity
-    # path (discover-project verify) and requires neither --instance-dir nor
-    # --yaml-path; the conformance path requires both. The requiredness moved
-    # here (post-parse) from argparse so the modes coexist.
+    # Three mutually-exclusive entry points. --lifecycle-steps-parity (WP-007)
+    # checks the lifecycle-steps canonical ↔ lifecyclerun schema and requires
+    # --instance-dir + --schema-path. --scope runs the single-entity path
+    # (discover-project verify) and requires neither --instance-dir nor
+    # --yaml-path; the conformance path requires --instance-dir + --yaml-path.
+    # The requiredness moved here (post-parse) from argparse so the modes
+    # coexist.
+    if args.lifecycle_steps_parity:
+        return _run_lifecycle_steps_parity_mode(args)
     if args.scope is not None:
         return _run_scope_mode(args)
     if args.instance_dir is None or args.yaml_path is None:
