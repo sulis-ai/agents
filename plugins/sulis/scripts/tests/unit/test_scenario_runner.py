@@ -17,7 +17,12 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
-from _scenario_runner import format_founder_summary, run_scenario
+from _scenario_runner import (
+    _POLL_ATTEMPTS_MAX,
+    evaluate_invariant,
+    format_founder_summary,
+    run_scenario,
+)
 
 _TOOLS = {"dna:tool:http": {"@id": "dna:tool:http", "implementation_kind": "http_call"}}
 
@@ -122,3 +127,131 @@ def test_founder_summary_is_plain():
     summary = format_founder_summary(res)
     assert "A new user can sign up and log in" in summary
     assert "✓" in summary or "pass" in summary.lower()
+
+
+# --- WP-004: isolation rung + verdict-invariant evaluator -------------------
+
+def _http_step_with_record(sid, path, expect, record, **kw):
+    """An http step whose transport carries a REAL saved_record (the artifact
+    the dispatcher captures off the step result — never fabricated)."""
+    return _http_step(sid, path, expect, **kw), record
+
+
+def test_isolation_rung_default_and_recorded():
+    """No `isolation` field → the cheapest-sufficient default `reset` is
+    recorded; a Scenario declaring `isolation: env` → `env` recorded. The pure
+    core records INTENT only — no process/env EXECUTION here (ADR-002)."""
+    steps = [_http_step("a", "/signup", 200)]
+    http = lambda m, u: SimpleNamespace(status_code=200)
+
+    # default (field absent)
+    res_default = _run(steps, http=http)
+    assert res_default.isolation_rung == "reset"
+
+    # explicit env
+    scenario_env = dict(_SCENARIO, isolation="env")
+    steps_by_id = {s["@id"]: s for s in steps}
+    wf = _journey(*[s["@id"] for s in steps])
+    res_env = run_scenario(scenario_env, wf, steps_by_id, _TOOLS,
+                           target_base_url="http://local", http=http)
+    assert res_env.isolation_rung == "env"
+
+
+def test_verdict_invariant_equality():
+    """kind=equality: saved_record == expected → observed; mismatch → blocked.
+    Evaluated over the REAL saved record (never a mock)."""
+    expected = {"user": "ada", "status": "active"}
+    invariant = {"kind": "equality", "expected": expected}
+
+    assert evaluate_invariant(invariant, {"user": "ada", "status": "active"}) == "observed"
+    assert evaluate_invariant(invariant, {"user": "ada", "status": "pending"}) == "blocked"
+    # absent saved record can never equal a declared expected shape → blocked
+    assert evaluate_invariant(invariant, None) == "blocked"
+
+
+def test_verdict_invariant_property_bounded_poll():
+    """kind=property: a record matching shape X appeared → observed; bounded
+    poll exhausted → blocked. Poll is BOUNDED — `sleep` injected so the test
+    never waits; the hard-max ceiling clamps an over-large `attempts`."""
+    slept: list = []
+
+    def sleep(_secs):
+        slept.append(_secs)
+
+    # The shape predicate: a record carrying status == "saved".
+    invariant_appears = {
+        "kind": "property",
+        "expected": {"status": "saved"},
+        "poll": {"attempts": 3, "interval_ms": 10},
+    }
+
+    # A fetcher (callable saved_record) that only matches on the 2nd read.
+    calls = {"n": 0}
+
+    def fetch_on_second():
+        calls["n"] += 1
+        return {"status": "saved"} if calls["n"] >= 2 else {"status": "pending"}
+
+    assert evaluate_invariant(invariant_appears, fetch_on_second, sleep=sleep) == "observed"
+    assert calls["n"] == 2            # stopped as soon as it matched
+    assert len(slept) == 1            # slept once between attempt 1 and 2
+
+    # Never matches → poll exhausted → blocked (honest, never a fake pass).
+    never = {"kind": "property", "expected": {"status": "saved"},
+             "poll": {"attempts": 3, "interval_ms": 10}}
+    assert evaluate_invariant(never, lambda: {"status": "pending"}) == "blocked"
+
+    # Hard-max ceiling: an over-large `attempts` is clamped so a misauthored
+    # scenario cannot spin. Count the reads against a never-matching fetcher.
+    reads = {"n": 0}
+
+    def count_reads():
+        reads["n"] += 1
+        return {"status": "pending"}
+
+    over = {"kind": "property", "expected": {"status": "saved"},
+            "poll": {"attempts": _POLL_ATTEMPTS_MAX + 1000, "interval_ms": 0}}
+    assert evaluate_invariant(over, count_reads, sleep=lambda _s: None) == "blocked"
+    assert reads["n"] == _POLL_ATTEMPTS_MAX   # clamped, not the over-large value
+
+
+def test_invariant_result_empty_when_absent():
+    """A Scenario with no `verdict_invariant` → invariant_result == ""."""
+    steps = [_http_step("a", "/signup", 200)]
+    res = _run(steps, http=lambda m, u: SimpleNamespace(status_code=200))
+    assert res.invariant_result == ""
+    # And the pure evaluator agrees: None/absent invariant → "".
+    assert evaluate_invariant(None, {"any": "record"}) == ""
+    assert evaluate_invariant({}, {"any": "record"}) == ""
+
+
+def test_disposition_precedence_unchanged():
+    """Characterisation: the worst-wins fold (fail > unresolved > deferred >
+    manual > pass) produces the SAME `verdict` as today. The additive
+    isolation/invariant fields must not perturb the disposition."""
+    def http_ok(m, u):
+        return SimpleNamespace(status_code=200)
+
+    # all pass → pass
+    assert _run([_http_step("a", "/x", 200)], http=http_ok).verdict == "pass"
+
+    # a fail wins over everything
+    def fail_http(m, u):
+        return SimpleNamespace(status_code=500)
+
+    assert _run([_http_step("a", "/x", 200)], http=fail_http).verdict == "fail"
+
+    # fail beats a deferred (external missing need)
+    mixed = [_http_step("a", "/charge", 200, input_artifacts=["secret:x"]),
+             _http_step("b", "/dash", 200)]
+    assert _run(mixed, http=fail_http, available_artifacts=frozenset()).verdict == "fail"
+
+    # a human step with otherwise-passing steps → manual-pending
+    human = [_http_step("a", "/x", 200),
+             {"@id": "h", "name": "eyeball", "mechanism": "human"}]
+    assert _run(human, http=http_ok).verdict == "manual-pending"
+
+    # a deferred-only run → deferred (not faked green)
+    deferred_only = [_http_step("a", "/charge", 200, input_artifacts=["secret:x"])]
+    assert _run(deferred_only, http=http_ok,
+                available_artifacts=frozenset()).verdict == "deferred"
