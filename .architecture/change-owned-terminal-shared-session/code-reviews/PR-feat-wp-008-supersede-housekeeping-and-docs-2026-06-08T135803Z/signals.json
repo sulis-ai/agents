@@ -1,0 +1,42 @@
+{
+  "pr": "feat/wp-008-supersede-housekeeping-and-docs",
+  "base": "change/create-change-owned-terminal-shared-session",
+  "timestamp": "2026-06-08T135803Z",
+  "scope": {
+    "commit_type_spread": ["docs"],
+    "module_fan_out": 2,
+    "severity": "low"
+  },
+  "size": {
+    "lines_added": 26,
+    "lines_removed": 17,
+    "new_test_lines": 175,
+    "files_changed": 2,
+    "generated_ratio": 0.0,
+    "lock_file_ratio": 0.0,
+    "severity": "low"
+  },
+  "safety": {
+    "migration_count": 0,
+    "schema_idl_count": 0,
+    "infra_files": 0,
+    "secret_pattern_hits": 0,
+    "severity": "low"
+  },
+  "completeness": {
+    "new_source_without_test": 0,
+    "doc_change_gated_by_test": true,
+    "api_change_without_schema": false,
+    "severity": "low"
+  },
+  "build_verification": {
+    "python_lint_errors_introduced": 0,
+    "test_failures_introduced": 0
+  },
+  "lenses": {
+    "architecture": {"findings": 0},
+    "security": {"findings": 0},
+    "quality": {"findings": 0}
+  },
+  "verdict": "PASS"
+}

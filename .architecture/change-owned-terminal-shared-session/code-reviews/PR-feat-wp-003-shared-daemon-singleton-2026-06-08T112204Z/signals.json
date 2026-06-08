@@ -1,0 +1,20 @@
+{
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0, "checks": ["py_compile", "ruff"] },
+  "pr_hygiene": {
+    "scope": { "commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "low" },
+    "size": { "lines_added": 1047, "files_changed": 4, "severity": "medium" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "low" },
+    "completeness": { "new_source_without_test": 0, "api_change_without_schema": false, "severity": "low" }
+  },
+  "findings": {
+    "in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+    "in_neighbours": { "total": 0 }
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "note": "WPB-01/07 composition-root + dependency-inward correct; flock gates engine unlink without modifying frozen engine; independence import-graph test enforces no chat/platform" },
+    "security": { "findings": 0, "note": "socket 0o600 + dir 0o700 local-user gate; binding guard ON; no secrets; test seam loads test code lazily only when explicitly set" },
+    "quality": { "findings": 0, "note": "all DoD behaviours tested; 96% subprocess-tracked coverage; no dead surface; mypy parity with sanctioned host preserved" }
+  },
+  "draft_fixes": 0
+}

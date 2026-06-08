@@ -304,17 +304,19 @@ describe("read-only inventory gate script (TDD §13.7, ADR-003)", () => {
   // WP-005 (ADR-010) — the interactive terminal is a SANCTIONED write path. The
   // gate gains EXACTLY two new named, path-scoped exceptions (parity with the
   // ADR-003 relay/bridge pairing): the sidecar bridge's WS-ATTACHMENT and the
-  // session-manager host PROCESS-START. The tests below plant the same shapes in
-  // (a) the sanctioned terminal file → still passes, and (b) some OTHER file →
-  // still trips the gate. The exception is named, never blanket.
+  // SHARED-daemon PROCESS-START. WP-007 MOVED the daemon process-start from
+  // index.ts's retired ephemeral host to lib/ensureDaemon.ts; the gate follows.
+  // The tests below plant the same shapes in (a) the sanctioned terminal file →
+  // still passes, and (b) some OTHER file → still trips the gate. The exception
+  // is named, never blanket.
 
-  it("--explain documents the two ADR-010 terminal named exceptions (sidecar WS-attachment + host start)", () => {
+  it("--explain documents the two ADR-010/WP-007 terminal named exceptions (sidecar WS-attachment + shared-daemon start)", () => {
     const res = spawnSync("bash", [script, "--explain"], { encoding: "utf8" });
     expect(res.status).toBe(0);
     // The sidecar bridge — the WS-attachment write-transport seam.
     expect(res.stdout).toMatch(/server\/adapters\/TerminalSidecar\.ts \(ADR-010/);
-    // The session-manager host process-start seam (server/index.ts).
-    expect(res.stdout).toMatch(/server\/index\.ts \(ADR-010/);
+    // The SHARED-daemon process-start seam (server/lib/ensureDaemon.ts, WP-007).
+    expect(res.stdout).toMatch(/server\/lib\/ensureDaemon\.ts \(WP-007/);
     // The rule itself is named so a reader can find it.
     expect(res.stdout).toMatch(/WebSocket .*attach|WS-attachment/i);
   });
@@ -366,16 +368,18 @@ describe("read-only inventory gate script (TDD §13.7, ADR-003)", () => {
     }
   });
 
-  it("allows the host process-start INSIDE the sanctioned server/index.ts (ADR-010/011)", async () => {
+  it("allows the shared-daemon process-start INSIDE the sanctioned server/lib/ensureDaemon.ts (WP-007, ADR-001/003)", async () => {
     const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
     try {
       await mkdir(join(sandbox, "scripts"), { recursive: true });
-      await mkdir(join(sandbox, "server"), { recursive: true });
+      await mkdir(join(sandbox, "server", "lib"), { recursive: true });
       await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      // WP-007 — the daemon spawn lives in lib/ensureDaemon.ts (it MOVED here
+      // from index.ts's retired ephemeral host); the gate allow-lists it BY PATH.
       await writeFile(
-        join(sandbox, "server", "index.ts"),
+        join(sandbox, "server", "lib", "ensureDaemon.ts"),
         'import { spawn } from "node:child_process";\n' +
-          'export const boot = () => spawn("python3", ["host.py", "--socket", "/tmp/s"]);\n',
+          'export const boot = () => spawn("python3", ["session_manager_daemon.py", "--socket", "/tmp/s"]);\n',
         "utf8",
       );
       const res = runGate(sandbox);

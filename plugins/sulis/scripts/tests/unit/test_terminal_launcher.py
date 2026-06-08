@@ -590,8 +590,14 @@ def test_build_launch_script_no_pre_prompt_byte_identical_to_baseline(tmp_path):
 
 
 def test_build_launch_script_with_pre_prompt_reads_sidecar(tmp_path):
+    # The sidecar-`cat` brief-delivery lives on the chat-style entry_command
+    # path (the default path now runs the viewer, WP-006, which takes the brief
+    # via the daemon — see test_terminal_launcher_runs_viewer.py). Pass an
+    # explicit chat-style command to exercise the cat delivery.
     script = tl._build_launch_script(
-        _GOOD_ULID, tmp_path, pre_prompt="hello world",
+        _GOOD_ULID, tmp_path,
+        entry_command="claude --dangerously-skip-permissions --agent sulis",
+        pre_prompt="hello world",
     )
     # Delivered via a sidecar file read at runtime, NOT a heredoc (#86).
     assert "<<'SULIS_PROMPT_EOF'" not in script
@@ -673,9 +679,16 @@ def test_launch_change_terminal_defaults_opening_prompt_when_none(tmp_path, monk
     sidecar = tl._change_dir(_GOOD_ULID) / tl._PRE_PROMPT_SIDECAR
     assert sidecar.exists(), "no opening prompt delivered — the session would sit idle"
     assert _GOOD_ULID in sidecar.read_text()
-    # ...and the launch script reads it as claude's opening argument.
+    # ...and the default window runs the viewer (WP-006), which attaches the
+    # change's shared session over the daemon. The daemon's interactive pty
+    # adapter reads this same sidecar via SULIS_CHANGE_ID and briefs the
+    # session's claude on its first turn — so the brief is delivered through the
+    # daemon, not via the launch-script `cat` (that path is now the explicit
+    # chat-style entry_command only). The launch script still exports
+    # SULIS_CHANGE_ID so the adapter can find the sidecar.
     script = Path(result["script_path"]).read_text()
-    assert '"$(cat ' in script
+    assert "session_viewer.py" in script
+    assert f'export SULIS_CHANGE_ID="{_GOOD_ULID}"' in script
 
 
 def test_launch_change_terminal_explicit_pre_prompt_not_overridden(tmp_path, monkeypatch):

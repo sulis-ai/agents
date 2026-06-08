@@ -17,8 +17,9 @@ so; the read-only gate allow-lists exactly that one relay file (its write verbs)
 and the `SessionBridge` adapter (one process start), and fails the build on any
 mutation or process start anywhere else. The interactive terminal is a SECOND
 sanctioned write path (ADR-010) — it adds exactly two more named, audited gate
-exceptions (the sidecar bridge's WebSocket attachment + the session-manager host
-start), detailed in the read-only gate section below. It binds to `127.0.0.1` only.
+exceptions (the sidecar bridge's WebSocket attachment + the shared session-manager
+daemon start in `lib/ensureDaemon.ts`), detailed in the read-only gate section
+below. It binds to `127.0.0.1` only.
 
 This README covers the workspace shape, the dev-run flow, and the
 HTTP surface that ships with WP-001 + WP-010. The React components
@@ -239,9 +240,16 @@ pairing, never a blanket waiver):
   `app.post`, so the HTTP surface stays GET-only. The gate's WS-attachment rule
   (`new WebSocketServer` / `.handleUpgrade` / `.on("upgrade"`) flags this shape
   in any _other_ file.
-- the **session-manager host start** (`index.ts`) — the one site that spawns the
-  Python host owning the pty + AF_UNIX socket. It joins the process-start
-  allow-list; the host starts at server boot (one audited site), never on a read.
+- the **shared-daemon start** (`lib/ensureDaemon.ts`) — the one site that spawns
+  the Python SHARED session-manager daemon owning the pty + AF_UNIX socket. The
+  cockpit `ensureDaemon`s the daemon at the STABLE socket
+  (`~/.sulis/session-manager.sock`, env `SULIS_SESSION_MANAGER_SOCKET`) so the
+  cockpit view and the desktop view land on the SAME session. (This spawn MOVED
+  here from the retired ephemeral host `startSessionManagerHost` in `index.ts`;
+  the gate followed the spawn.) It joins the process-start allow-list; the daemon
+  is ensured at server boot (one audited site), never on a read. The daemon is
+  SHARED — the cockpit's shutdown does NOT kill it (it may serve the desktop
+  view); the daemon's own idle-empty auto-exit bounds it.
 
 The terminal is its OWN bridge — added alongside chat's seams, never coupled to
 them (it does not import the chat relay or the chat bridge). Run
@@ -327,11 +335,12 @@ non-zero process signals, HTTP mutation verbs, and non-loopback binds
 the whole MVP and runs in CI on every change. The HTTP surface stays
 GET-only by construction; the gate names a small set of **path-scoped
 exceptions** for the sanctioned process-start sites — the chat session
-bridge (ADR-003) and, from the production terminal sidecar, the
-session-manager host the server entry spawns at boot (ADR-010/ADR-011).
-The WebSocket terminal endpoint rides the existing HTTP server's `upgrade`
-event, never an `app.post`, so the GET-only guarantee is unaffected. Run it
-locally with `npm run check:read-only`; explain every rule with:
+bridge (ADR-003) and, for the terminal, the SHARED session-manager daemon the
+cockpit `ensureDaemon`s at boot (`lib/ensureDaemon.ts`, ADR-001/ADR-003 —
+WP-007 moved this from the retired ephemeral host). The WebSocket terminal
+endpoint rides the existing HTTP server's `upgrade` event, never an `app.post`,
+so the GET-only guarantee is unaffected. Run it locally with
+`npm run check:read-only`; explain every rule with:
 
 ```bash
 bash apps/cockpit/scripts/check-read-only.sh --explain
@@ -379,14 +388,17 @@ How it wires up (all under `apps/cockpit/e2e/`):
   socket (a browser can't open AF_UNIX). It is **harness-only** — the e2e
   proxy/backend pair predate the production sidecar. The real cockpit server
   now ships its own equivalent: `startProductionServer()` (`server/index.ts`)
-  spawns the Python session-manager host (`session_manager_host.py`,
-  ADR-011), waits for its `READY <socket>` line, then attaches the production
-  terminal sidecar (`server/adapters/TerminalSidecar.ts`) to the running HTTP
-  server's `upgrade` event — riding the same loopback port, with the binding
-  guard ON, Origin validation, and connection/attachment caps. A host crash
+  `ensureDaemon`s the SHARED Python session-manager daemon
+  (`session_manager_daemon.py`, ADR-001 — WP-007) at the stable socket, waits
+  for its `READY <socket>` line, then attaches the production terminal sidecar
+  (`server/adapters/TerminalSidecar.ts`) to the running HTTP server's `upgrade`
+  event — riding the same loopback port, with the binding
+  guard ON, Origin validation, and connection/attachment caps. A daemon crash
   drops live terminals but never the read-only HTTP surface (separate
-  processes). Both the host and sidecar are torn down on SIGTERM/SIGINT
-  alongside the HTTP server.
+  processes); the next `ensureDaemon` rebuilds it. The sidecar + HTTP server are
+  torn down on SIGTERM/SIGINT — but the SHARED daemon is NOT (it outlives the
+  cockpit; it may serve the desktop view, and its own idle-empty auto-exit
+  bounds it).
 - The cockpit's `createTerminalBridge` builds the live `WebSocketTransport`
   when `VITE_TERMINAL_WS_URL` is set (the dedicated config sets it); with no
   endpoint configured the bridge falls back to the "no terminal here" state,

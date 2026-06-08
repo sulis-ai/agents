@@ -78,12 +78,14 @@ specific class of mutation is absent from the active source tree.
      server/lib/turnSummaries.ts (ADR-015 named exception): it spawns `claude`
      headless to produce the Haiku one-line turn summary it caches on disk — a
      best-effort derived-summary helper, not a session start, and
-       - server/index.ts (ADR-010/011 — the TERMINAL HOST start): the server
-         entry spawns the ONE long-lived Python session-manager host at boot
-         (the terminal engine owner that owns the pty + AF_UNIX socket). It is
-         the second founder-intended write path's process-start seam; allow-
-         listed BY PATH alongside the chat bridge above. No other file may start
-         the host. The host is started at boot (a single audited site), never on
+       - server/lib/ensureDaemon.ts (WP-007, ADR-001/003 — the SHARED DAEMON
+         start): the cockpit `ensureDaemon`s the shared Python session-manager
+         daemon on demand (the daemon owns the pty + AF_UNIX socket). THE SPAWN
+         MOVED HERE from index.ts's retired ephemeral host (`startSessionManager
+         Host`); the gate follows the spawn. It is the second founder-intended
+         write path's process-start seam; allow-listed BY PATH alongside the chat
+         bridge above. No other file may start the daemon; index.ts now starts no
+         process. The daemon is ensured at boot (a single audited site), never on
          a read.
      Why: resume/spawn launches a `claude` session — the most consequential
      side effect in the app. It is confined to one audited adapter; loading
@@ -193,8 +195,9 @@ TURN_SUMMARIES_REL="server/lib/turnSummaries.ts"        # turn-summary disk cach
 # WP-005 (ADR-010) — the interactive terminal is a SANCTIONED write path. The
 # gate names EXACTLY two terminal write seams, each allow-listed BY PATH (parity
 # with the ADR-003 relay/bridge pairing): the sidecar bridge's WS-ATTACHMENT
-# (the keystroke → live-PTY transport, rule 2c) and the session-manager host
-# PROCESS-START (server/index.ts, in rule 2b's set). No exception beyond these.
+# (the keystroke → live-PTY transport, rule 2c) and the SHARED-daemon
+# PROCESS-START (server/lib/ensureDaemon.ts, in rule 2b's set — WP-007 MOVED it
+# there from index.ts's retired ephemeral host). No exception beyond these.
 TERMINAL_SIDECAR_REL="server/adapters/TerminalSidecar.ts"  # the ONE WS-attachment seam (ADR-010)
 
 # Accumulate per-rule hits across all files.
@@ -274,20 +277,19 @@ for f in "${SOURCE_FILES[@]}"; do
     server/adapters/SulisChangeRecreator.ts | \
     server/adapters/SpineEmitterMinter.ts | \
     server/adapters/SulisChangeStarter.ts | \
-    server/index.ts | \
+    server/lib/ensureDaemon.ts | \
     "$TURN_SUMMARIES_REL")
       ;; # sanctioned process-start site — skip
       #   - turnSummaries.ts (ADR-015) — spawns `claude` headless to produce the
       #     Haiku one-line turn summary cached on disk. A derived-summary helper,
       #     not a session start; the summary is best-effort + the spawn is the
       #     only consequential call it makes.
-      #   - server/index.ts (WP-004, ADR-010/011) — spawns the ONE long-lived
-      #     Python session-manager host at boot (the terminal engine owner). The
-      #     HTTP surface stays GET-only (the WS endpoint rides `upgrade`, never
-      #     app.post). NOTE: WP-005 owns the full gate reconciliation (the
-      #     WS-attachment exception for the sidecar file + the --explain doc +
-      #     the positive named-exception assertion). This entry is the minimum to
-      #     keep WP-004's branch green now that index.ts spawns the host.
+      #   - server/lib/ensureDaemon.ts (WP-007, ADR-001/003) — spawns the SHARED
+      #     Python session-manager daemon on demand (the detached
+      #     `spawn(python, session_manager_daemon.py)`). THE SPAWN MOVED HERE from
+      #     index.ts's retired ephemeral host (`startSessionManagerHost`); the gate
+      #     follows the spawn (the WP-007 Contract). index.ts now starts NO process
+      #     — it only calls the ensure binding. The HTTP surface stays GET-only.
     *)
       while IFS= read -r line; do
         [ -n "$line" ] && proc_hits+=("$rel: $line")
