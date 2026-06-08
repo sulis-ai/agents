@@ -51,13 +51,19 @@ test.beforeAll(() => {
   fx = readTerminalHandoff();
 });
 
-/** Navigate to the change's Terminal tab and wait for the live attach to land
+/** Navigate to the change's Terminal view and wait for the live attach to land
  *  (the "connected" badge + the live input hint replace the connecting/
- *  no-terminal states). Returns once the terminal is live. */
+ *  no-terminal states). Returns once the terminal is live.
+ *
+ *  #216: the per-change "thread tabs" (?tab=terminal / tab-panel-terminal) are
+ *  gone. The change opens at /c/:id and the view is seeded from `?view=` (one
+ *  of conversation|files|provenance|preview|advanced|terminal), then driven by
+ *  the ChangeNav `view-<id>` buttons. The terminal panel is `section-terminal`;
+ *  the live card stays `live-terminal`. */
 async function openTerminalTab(page: Page): Promise<void> {
-  await page.goto(`/c/${fx.changeId}?tab=terminal`);
-  await expect(page.getByTestId("thread-tabs")).toBeVisible();
-  await expect(page.getByTestId("tab-panel-terminal")).toBeVisible();
+  await page.goto(`/c/${fx.changeId}?view=terminal`);
+  await expect(page.getByTestId("page-thread")).toBeVisible();
+  await expect(page.getByTestId("section-terminal")).toBeVisible();
   await expect(page.getByTestId("live-terminal")).toBeVisible();
 }
 
@@ -138,8 +144,11 @@ test("acceptance #3 — close the tab + reopen → session alive, scrollback cat
 
   // "Close the tab": navigate away (unmount <LiveTerminal/> → detach). Detach
   // LEAVES THE SESSION RUNNING (§2.12.3) — the process + scrollback survive.
+  // The change's default view is the conversation (section-conversation), and
+  // the live-terminal card is unmounted on a non-terminal view.
   await page.goto(`/c/${fx.changeId}`);
-  await expect(page.getByTestId("tab-panel-chat")).toBeVisible();
+  await expect(page.getByTestId("section-conversation")).toBeVisible();
+  await expect(page.getByTestId("live-terminal")).toHaveCount(0);
 
   // "Reopen": back to the Terminal tab → a fresh attach. The snapshot phase
   // catches up with everything the session accumulated while detached —
