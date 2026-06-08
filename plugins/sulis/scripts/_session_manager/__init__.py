@@ -107,8 +107,24 @@ abandons immediately without consulting the budget; **login-expired** calls
 ``reauth()`` once, surfaces a ``NOT_AUTHORIZED`` notification carrying the
 re-login link, pauses (budget NOT burned), and on ``complete_reauth`` resumes
 via the **existing** ``supports_resume`` + ``resume_ref`` path so the agent
-re-runs the incomplete step (no fabricated completion, ADR-004). It is unwired
-to the live manager until WP-007.
+re-runs the incomplete step (no fabricated completion, ADR-004). WP-007 wires
+it to the live manager: ``manager.py`` constructs a **per-session**
+``RecoveryDriver`` at the composition root (beside the ``LifecycleManager``
+wiring) — its capabilities bound to that session (``send`` replays the last
+recorded command through the FIFO, ``log_append`` surfaces on the existing log,
+``reauth`` / ``resume`` drive login-expiry pause→resume) with the default policy
++ a monotonic clock + the neutral classifier + the adapter's ``classify_failure``
+hint. The driver attaches at the manager's **error-event observation seam** —
+the ``_on_error_event`` hook, a sibling of ``_on_process_death`` (ADR-001) —
+which chains additively onto the existing ``on_event`` callback the per-turn
+guard already owns (the guard's observation is byte-unchanged). Each live
+``error`` Event that is not a process-death ``STDIN_BROKEN`` is routed to the
+driver on an isolated daemon thread (so the driver's FIFO-re-entrant recovery
+never blocks the pump thread that observed the error); a ``STDIN_BROKEN`` is
+filtered at the seam (the lifecycle owns process death — no double-handling).
+The wiring is additive: the existing turn-complete / one-in-flight / state-
+machine behaviour is untouched, guarded by the session-manager unit + integration
+suite staying green.
 
 The leading underscore signals "foundation-internal" — exactly as ``_discovery``
 and ``_canonical_drift`` do. The public surface is re-exported here so callers

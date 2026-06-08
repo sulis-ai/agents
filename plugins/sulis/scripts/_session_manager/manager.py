@@ -39,9 +39,12 @@ from __future__ import annotations
 import os
 import subprocess
 import threading
+import time
+from collections.abc import Callable
 from typing import Iterator
 
 from _session_manager.adapter import ProviderAdapter, SessionSpec
+from _session_manager.classifier import RecoveryClass, classify
 from _session_manager.event_log import EventLog
 from _session_manager.events import (
     CWD_NOT_FOUND,
@@ -50,8 +53,10 @@ from _session_manager.events import (
     PTY_OPEN_FAILED,
     SESSION_DISABLED,
     SPAWN_FAILED,
+    STDIN_BROKEN,
     UNKNOWN_PROVIDER,
     Event,
+    EventError,
     ExpectedError,
     InternalError,
     ProtocolError,
@@ -68,6 +73,11 @@ from _session_manager.maintenance import (
     MaintenanceManager,
     memory_bytes_for_pids,
 )
+from _session_manager.recovery import (
+    DEFAULT_RETRY_POLICY,
+    ReauthTicket,
+    RecoveryDriver,
+)
 from _session_manager.session import Session
 from _session_manager.state import Health, SessionState, SessionStatus
 from _session_manager.viewer import Viewer, ViewerRegistry
@@ -77,6 +87,18 @@ from _session_manager.viewer import Viewer, ViewerRegistry
 # screen + deep scrollback; appending past it drops oldest bytes. Overridable via
 # the ``scrollback_capacity_bytes`` tuning kwarg.
 DEFAULT_SCROLLBACK_CAPACITY_BYTES = 1024 * 1024
+
+
+def _default_recovery_driver_factory(**kwargs: object) -> RecoveryDriver:
+    """Build the real WP-005 :class:`RecoveryDriver` for one session (ADR-001).
+
+    The default the manager uses when no ``recovery_driver_factory`` tuning
+    kwarg is injected. Kept module-level (not a literal in ``__init__``) so the
+    injectable seam — the ``timer_factory`` precedent — has a named, boring
+    default a test can compare against, and so the manager body reads as a
+    single wiring line. The keyword capabilities are the ones
+    :meth:`SessionManager._make_recovery_driver` binds per session."""
+    return RecoveryDriver(**kwargs)  # type: ignore[arg-type]
 
 
 class SessionManager:
@@ -142,6 +164,28 @@ class SessionManager:
                 self._tuning.get("max_tool_calls", DEFAULT_MAX_TOOL_CALLS)
             ),
         )
+        # CH-01KTMK WP-007 turn-level recovery (ADR-001). The error-observation
+        # hook (``_on_error_event``, sibling of ``_on_process_death``) routes a
+        # live turn's ``error`` Event to a per-session RecoveryDriver — the
+        # turn-level Armor primitive that sits *around* the lifecycle, never
+        # inside it. The driver is per-session (it holds at most one pending
+        # re-auth ticket), so the manager keeps one per open key, built by a
+        # factory at ``open`` time with the capabilities bound to that session
+        # (``send`` / ``log_append`` / ``reauth`` / ``resume``) plus the default
+        # policy + clock + classifier + the adapter's ``classify_failure`` hint.
+        # The factory is injectable — the ``timer_factory`` precedent — so a
+        # test substitutes a recording/synchronous driver without a real
+        # retry/backoff loop. Default builds the real WP-005 ``RecoveryDriver``.
+        self._recovery_driver_factory: Callable[..., RecoveryDriver] = self._tuning.get(  # type: ignore[assignment]
+            "recovery_driver_factory", _default_recovery_driver_factory
+        )
+        self._recovery_drivers: dict[str, RecoveryDriver] = {}
+        # The last command submitted per key — captured by ``send`` so the
+        # recovery driver's ``send`` capability can re-submit *the stopped turn*
+        # (not an empty turn) on a transient-blip retry. Additive read-only
+        # bookkeeping: it never changes the FIFO / one-in-flight semantics, it
+        # only records what was last enqueued so a retry replays it.
+        self._last_command: dict[str, str] = {}
         # The background maintenance loop: a daemon timer thread that runs the
         # tick every ``maintenance_interval`` seconds. Disabled with
         # ``start_maintenance=False`` so tests drive ``_maintenance_tick``
@@ -251,6 +295,13 @@ class SessionManager:
             # the pumps run, so the very first turn is watched (§2.7). The guard
             # arms its watchdog on turn-start and counts tool_use per turn.
             self._guards.attach(session)
+            # Attach the CH-01KTMK WP-007 turn-level recovery driver to the same
+            # session BEFORE the pumps run — additive: it chains onto the guard's
+            # ``on_event`` seam (it does not replace it) so a live turn's
+            # ``error`` Event reaches both the guard and the recovery driver
+            # (ADR-001 error-event seam). Done here, beside the guard attach, so
+            # the very first turn is recoverable.
+            self._attach_recovery(session)
             session.start_pumps()
             # The spawn succeeded: INITIALIZING → READY (§2.7 normal entry).
             session.to_state(SessionState.READY)
@@ -280,6 +331,11 @@ class SessionManager:
         # send-path seam WP-004 reserved, kept so a guard can also veto a send
         # synchronously in future without touching the core flow.
         self._guard(session, command)
+        # CH-01KTMK WP-007: record the last command so the recovery driver can
+        # re-submit *this* turn on a transient-blip retry (the driver's ``send``
+        # capability replays the stopped turn, not an empty one). Read-only
+        # bookkeeping — the FIFO / one-in-flight path below is unchanged.
+        self._last_command[key] = command
         return session.submit(command)
 
     def read(self, key: str, since: int = 0, follow: bool = False) -> Iterator[Event]:
@@ -373,6 +429,12 @@ class SessionManager:
             # long-lived manager accumulates no stale registries. A pipe session
             # has no entry — ``pop`` is a no-op.
             registry = self._viewer_registries.pop(key, None)
+            # CH-01KTMK WP-007: drop the per-session recovery driver + last-
+            # command record so a long-lived manager accumulates no stale
+            # per-key recovery state (mirrors the guard detach below). A key
+            # with no recovery state — ``pop`` is a no-op.
+            self._recovery_drivers.pop(key, None)
+            self._last_command.pop(key, None)
         if registry is not None:
             registry.close()
         if session is None:
@@ -446,6 +508,150 @@ class SessionManager:
             is_alive=self.is_alive,
             respawn=self._respawn,
         )
+
+    # ── CH-01KTMK §3.1 turn-level recovery (WP-007 wires the driver) ───────
+
+    def _attach_recovery(self, session: Session) -> None:
+        """Construct the per-session recovery driver and chain its
+        error-observation hook onto the session's ``on_event`` seam (ADR-001).
+
+        Additive by construction: the per-turn guard has already claimed
+        ``on_event`` (:meth:`TurnGuardManager.attach`), so this captures the
+        existing observer and installs a fan-out that calls **both** — the
+        guard first (its watchdog-cancel / runaway-count must keep working
+        byte-unchanged), then the manager's :meth:`_on_error_event` recovery
+        hook. The guard's ``on_turn_start`` seam is untouched. Idempotent on a
+        restart: ``replace_process`` keeps the same session object, so a
+        re-attach simply rebuilds the same chain over the (still guard-owned)
+        ``on_event`` — the driver instance for the key is reused."""
+        driver = self._recovery_drivers.get(session.key)
+        if driver is None:
+            driver = self._make_recovery_driver(session)
+            self._recovery_drivers[session.key] = driver
+        guard_observer = session.on_event
+
+        def _fan_out(s: Session, event: Event) -> None:
+            if guard_observer is not None:
+                guard_observer(s, event)
+            self._on_error_event(s, event)
+
+        session.on_event = _fan_out
+
+    def _make_recovery_driver(self, session: Session) -> RecoveryDriver:
+        """Build the recovery driver for ``session`` via the injected factory,
+        binding the WP-005 capabilities to this session (ADR-001/002).
+
+        The capabilities are session-bound closures — the same
+        inject-what-it-needs shape ``LifecycleManager`` uses: ``send`` re-submits
+        the stopped turn through the manager's FIFO (a retry is just another
+        turn, never a second in-flight one); ``log_append`` surfaces every
+        recovery action on the **existing** log; ``reauth`` / ``resume`` drive
+        the login-expiry pause→resume via the adapter + the existing same-key/
+        same-log restart; ``classify_failure`` is the adapter's provider
+        detection hint. The default policy + a monotonic clock + the neutral
+        classifier are selected here at the composition root (never a literal in
+        the driver). The factory is injectable for tests (the ``timer_factory``
+        precedent)."""
+        adapter = session.adapter
+
+        def _send() -> bool:
+            # Re-submit *the stopped turn* through the manager's FIFO — the last
+            # command recorded for this key (never an empty turn). The queue
+            # serialises it, so a retry is just another turn, never a second
+            # in-flight one (§2.6). A True ack means the retry was enqueued onto
+            # the live session; the driver loops on its own observation of the
+            # re-submitted turn's outcome (it does not block here). A key with no
+            # recorded command (a retry with nothing to replay) is a no-op ack.
+            last = self._last_command.get(session.key)
+            if last is None:
+                return False
+            self.send(session.key, last)
+            return True
+
+        def _log_append(error: EventError) -> None:
+            session.log.append(
+                Event(
+                    offset=-1,
+                    key=session.key,
+                    turn=session.turn,
+                    kind="error",
+                    error=error,
+                )
+            )
+
+        def _reauth() -> ReauthTicket:
+            return adapter.reauth()
+
+        def _resume() -> None:
+            # Trigger the existing same-key/same-log restart (resume-as-
+            # capability, §2.7) — the driver triggers it, it does not
+            # reimplement resume.
+            self._respawn(session)
+
+        def _classify_failure(error: EventError) -> RecoveryClass | None:
+            return adapter.classify_failure(error)
+
+        return self._recovery_driver_factory(
+            send=_send,
+            log_append=_log_append,
+            reauth=_reauth,
+            resume=_resume,
+            classify_failure=_classify_failure,
+            classifier=classify,
+            policy=DEFAULT_RETRY_POLICY,
+            clock=time.monotonic,
+        )
+
+    def _on_error_event(self, session: Session, event: Event) -> None:
+        """The error-observation hook (sibling of :meth:`_on_process_death`,
+        ADR-001). Routes a live turn's ``error`` Event to the session's recovery
+        driver — and **only** an error event that is not a process-death.
+
+        - **Error-only.** Non-``error`` kinds (``chunk`` / ``result`` /
+          ``tool_use``) are not the driver's concern — return immediately.
+        - **No double-handling (TDD §3.1 step 1).** A process-death
+          ``STDIN_BROKEN`` error is the :class:`LifecycleManager`'s seam
+          (restart-on-death); the driver must never also act on it. Filtered
+          here so the two seams stay siblings, not stacked. (The WP-005 driver
+          also no-ops a ``STDIN_BROKEN`` itself — this is the belt to that
+          braces, keeping the manager's routing honest at the seam.)
+
+        **Off the pump thread (load-bearing).** This hook fires on the stdout
+        pump thread that appended the ``error`` (the ``on_event`` seam). The
+        driver's recovery, though, re-enters the manager's FIFO — its ``send``
+        capability re-submits the stopped turn via :meth:`send`/``submit``,
+        which blocks until the stdin pump promotes the command; but the slot is
+        only freed by *this* pump thread. Running ``observe`` inline would
+        self-deadlock (the pump waits on itself). So recovery is dispatched on a
+        short-lived daemon thread: the pump fans the event out and returns
+        immediately, and the driver drives retry / pause→resume off-thread,
+        re-entering the FIFO as just-another-turn (§2.6, one-in-flight intact).
+        Daemon so a hard interpreter exit never hangs on an in-flight recovery.
+
+        Best-effort: routing must never crash the pump thread that fired the
+        event (which would wedge the stdout reader), so a driver fault is
+        swallowed on the recovery thread — the failure is already in the log;
+        recovery is the only casualty."""
+        if event.kind != "error" or event.error is None:
+            return
+        if event.error.code == STDIN_BROKEN:
+            return
+        driver = self._recovery_drivers.get(session.key)
+        if driver is None:
+            return
+        error = event.error
+
+        def _drive() -> None:
+            try:
+                driver.observe(error)
+            except Exception:  # noqa: BLE001 — a recovery fault must not propagate
+                pass
+
+        threading.Thread(
+            target=_drive,
+            name=f"session-{session.key}-recovery",
+            daemon=True,
+        ).start()
 
     def _respawn(self, session: Session) -> None:
         """Spawn a fresh process for ``session``'s spec and swap it in (§2.7).
