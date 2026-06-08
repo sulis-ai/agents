@@ -420,7 +420,7 @@ apps/cockpit/
 │   │   ├── components/     # shells, panels (WP-011/013/014), ConciergeChat (the read-only front door, WP-009); LiveTerminal — the xterm.js terminal view (WP-008); ThemeToggle — light/dark control, mounted in WorkspaceTopBar (WP-004)
 │   │   ├── terminal/       # client TerminalBridge factory — reuses the WP-007 port (WP-008)
 │   │   ├── api/            # TanStack Query hooks (WP-011)
-│   │   ├── layouts/        # Shell — sidebar + top-bar (theme toggle) + outlet (WP-011, WP-004)
+│   │   ├── layouts/        # WorkspaceShell — tabbed top bar (WorkspaceTopBar: product switcher + tab strip + theme toggle) + outlet (#216, WP-004)
 │   │   ├── theme/          # ThemeProvider, useTheme(), resolveInitialTheme (WP-003)
 │   │   └── tests/
 ├── shared/                 # types + constants both halves import

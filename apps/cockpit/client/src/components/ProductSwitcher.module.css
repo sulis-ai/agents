@@ -92,7 +92,9 @@
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(28, 28, 28, 0.12);
+  /* Menu drop shadow — derived from --foreground so it reads on both themes
+   * (CH-01KTHP). Was: rgba(28, 28, 28, 0.12). */
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--foreground) 12%, transparent);
   padding: 6px;
   overflow: hidden;
 }

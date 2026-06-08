@@ -16,13 +16,20 @@
 /* AA-internal ink shades — same hue family as their base hue, darkened so
  * text/numerals clear WCAG AA *as text* on their own 8–10% tint. NOTE: pending
  * token regen — each becomes a named semantic token next regeneration. */
+/* Dark-mode re-fit (CH-01KTHP): the AA-internal ink shades are redefined as
+ * DERIVATIONS of their signed base tokens so they re-theme under
+ * data-theme="dark" (no light-only literal). Original light literals kept here
+ * for provenance:
+ *   --origin-accent-ink   was #246676 (accent family)  -> --accent
+ *   --origin-specify-ink  was #4338ca (specify-indigo)  -> --stage-specify
+ *   --origin-attn-icon    was #b45309 (honesty ink)     -> --warning */
 :where(:root) {
-  --origin-accent-ink: #246676; /* autonomous: accent family on --bg-accent (~5.9:1) */
-  --origin-specify-ink: #4338ca; /* assisted: specify-indigo family (~7.1:1) */
-  --origin-attn-icon: #b45309; /* honesty banner ink on --bg-warning */
-  --origin-bg-accent: color-mix(in srgb, var(--accent) 8%, #fff);
+  --origin-accent-ink: var(--accent);
+  --origin-specify-ink: var(--stage-specify);
+  --origin-attn-icon: var(--warning);
+  --origin-bg-accent: color-mix(in srgb, var(--accent) 8%, var(--card));
   --origin-bg-accent-border: color-mix(in srgb, var(--accent) 28%, var(--border));
-  --origin-bg-specify: color-mix(in srgb, var(--stage-specify) 9%, #fff);
+  --origin-bg-specify: color-mix(in srgb, var(--stage-specify) 9%, var(--card));
   --origin-bg-specify-border: color-mix(in srgb, var(--stage-specify) 26%, var(--border));
 }
 
@@ -399,7 +406,7 @@
   border-radius: 10px;
   background: var(--card);
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(23, 23, 23, 0.04);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--foreground) 4%, transparent);
   margin-bottom: 14px;
 }
 .grouphead {

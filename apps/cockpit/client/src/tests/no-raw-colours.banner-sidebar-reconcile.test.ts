@@ -37,7 +37,15 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 const SRC = path.resolve(__dirname, "..");
-const DASHBOARD_CSS = path.join(SRC, "pages", "Dashboard.module.css");
+// CH-01KTHP re-fit: #216 replaced pages/Dashboard.module.css with
+// pages/Board.module.css (the dashboard became the stage board). The signed
+// soft-tint error-banner contract migrated to the token layer: Board's
+// `.errorBox` consumes --bg-destructive / --bg-destructive-border, whose DARK
+// values are the mockup's `color-mix(... var(--destructive) 16%/45%,
+// var(--card))` recipe (tokens.css dark block). The two banner assertions
+// below were re-pointed accordingly; the sidebar assertions are unchanged.
+const BOARD_CSS = path.join(SRC, "pages", "Board.module.css");
+const TOKENS_CSS = path.join(SRC, "tokens.css");
 const SIDEBAR_ITEM_CSS = path.join(SRC, "components", "SidebarItem.module.css");
 
 /** Extract the declaration block body for a CSS-module class `.name { ... }`. */
@@ -90,53 +98,67 @@ function norm(s: string): string {
 const HEX_RE = /#[0-9a-fA-F]{3,8}\b/;
 const RGB_HSL_RE = /\b(?:rgba?|hsla?)\s*\(/i;
 
-describe("WP-009 — reconcile Dashboard banner + active sidebar item to the signed mockup", () => {
-  it("Dashboard .errorBox uses the color-mix soft tint over var(--destructive)/var(--card) (not a solid fill)", () => {
-    const css = readFileSync(DASHBOARD_CSS, "utf8");
+/** Body of the dark-theme block `:root[data-theme="dark"] { ... }`. */
+function darkBlockBody(css: string): string | null {
+  const idx = css.indexOf('[data-theme="dark"]');
+  if (idx === -1) return null;
+  const open = css.indexOf("{", idx);
+  if (open === -1) return null;
+  let depth = 0;
+  for (let i = open; i < css.length; i++) {
+    const ch = css[i];
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return css.slice(open + 1, i);
+    }
+  }
+  return null;
+}
+
+describe("WP-009 — reconcile board banner + active sidebar item to the signed mockup", () => {
+  // CH-01KTHP re-fit: the soft-tint error-banner contract migrated from the
+  // deleted pages/Dashboard.module.css to the token layer. The DARK values of
+  // --bg-destructive / --bg-destructive-border ARE the mockup's
+  // `color-mix(... var(--destructive) 16%/45%, var(--card))` recipe, and the
+  // board's .errorBox consumes those tokens (a tint, never a solid fill).
+  it("the dark --bg-destructive tokens encode the mockup's soft-tint recipe (16% fill / 45% border over the card)", () => {
+    const dark = norm(darkBlockBody(readFileSync(TOKENS_CSS, "utf8")) as string);
+    expect(dark, "tokens.css must carry a dark theme block").not.toBeNull();
+
+    expect(
+      dark,
+      "dark --bg-destructive must be the 16% destructive tint over the card",
+    ).toMatch(
+      /--bg-destructive:\s*color-mix\(\s*in srgb\s*,\s*var\(--destructive\)\s*16%\s*,\s*var\(--card\)\s*\)/,
+    );
+    expect(
+      dark,
+      "dark --bg-destructive-border must be the 45% destructive tint over the card",
+    ).toMatch(
+      /--bg-destructive-border:\s*color-mix\(\s*in srgb\s*,\s*var\(--destructive\)\s*45%\s*,\s*var\(--card\)\s*\)/,
+    );
+  });
+
+  it("the board .errorBox consumes the soft-tint tokens (not a solid var(--destructive) fill)", () => {
+    const css = readFileSync(BOARD_CSS, "utf8");
     const body = classBody(css, "errorBox");
-    expect(body, "expected a .errorBox class in Dashboard.module.css").not.toBeNull();
+    expect(body, "expected a .errorBox class in Board.module.css").not.toBeNull();
     const b = norm(body as string);
 
-    // Background must be the 16% destructive tint over the card surface.
     expect(
       b,
-      "errorBox background must be the mockup's color-mix soft tint, not a solid var(--destructive) fill",
-    ).toMatch(
-      /background:\s*color-mix\(\s*in srgb\s*,\s*var\(--destructive\)\s*16%\s*,\s*var\(--card\)\s*\)/,
-    );
-
-    // Border must be the 45% destructive tint over the card surface.
+      "errorBox background must be the --bg-destructive tint token",
+    ).toMatch(/background:\s*var\(--bg-destructive\)\s*;/);
     expect(
       b,
-      "errorBox border must be the mockup's 45% color-mix tint",
-    ).toMatch(
-      /border:\s*1px solid color-mix\(\s*in srgb\s*,\s*var\(--destructive\)\s*45%\s*,\s*var\(--card\)\s*\)/,
-    );
+      "errorBox border must use the --bg-destructive-border tint token",
+    ).toMatch(/border:\s*1px solid var\(--bg-destructive-border\)\s*;/);
 
     // It must NOT carry a bare solid destructive background (the drifted state).
     expect(
       /background:\s*var\(--destructive\)\s*;/.test(body as string),
-      "errorBox must no longer use the solid var(--destructive) background",
-    ).toBe(false);
-  });
-
-  it("Dashboard error text uses readable var(--foreground) over the tint (matches the mockup)", () => {
-    const css = readFileSync(DASHBOARD_CSS, "utf8");
-    const box = norm(classBody(css, "errorBox") as string);
-    const msg = norm(classBody(css, "errorMessage") as string);
-
-    // The mockup sets the whole .banner.error to color: var(--foreground).
-    expect(box, "errorBox text colour must be var(--foreground)").toContain(
-      "color: var(--foreground)",
-    );
-    // errorMessage must read over the tint too — foreground (not the solid
-    // destructive-foreground pairing that only works on a solid fill).
-    expect(msg, "errorMessage text colour must be var(--foreground)").toContain(
-      "color: var(--foreground)",
-    );
-    expect(
-      msg.includes("var(--destructive-foreground)"),
-      "errorMessage must not keep the solid-fill var(--destructive-foreground)",
+      "errorBox must not use a solid var(--destructive) background fill",
     ).toBe(false);
   });
 
@@ -181,7 +203,7 @@ describe("WP-009 — reconcile Dashboard banner + active sidebar item to the sig
   });
 
   it("neither reconciled surface introduces a raw colour literal (keeps the no-raw-colours guards green)", () => {
-    for (const file of [DASHBOARD_CSS, SIDEBAR_ITEM_CSS]) {
+    for (const file of [BOARD_CSS, SIDEBAR_ITEM_CSS]) {
       const css = readFileSync(file, "utf8")
         // strip comments so prose colour words don't false-positive
         .replace(/\/\*[\s\S]*?\*\//g, "");

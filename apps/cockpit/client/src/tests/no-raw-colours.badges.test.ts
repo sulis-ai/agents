@@ -29,7 +29,11 @@ import path from "node:path";
 const SRC = path.resolve(__dirname, "..");
 const TOKENS_CSS = path.join(SRC, "tokens.css");
 const STAGE_BADGE_CSS = path.join(SRC, "components", "StageBadge.module.css");
-const DASHBOARD_CSS = path.join(SRC, "pages", "Dashboard.module.css");
+// CH-01KTHP re-fit: #216 replaced pages/Dashboard.module.css with
+// pages/Board.module.css (dashboard → stage board). The error-chrome
+// assertions follow the surface to Board, whose .errorBox now consumes the
+// --bg-destructive* tint tokens (destructive token family).
+const BOARD_CSS = path.join(SRC, "pages", "Board.module.css");
 
 // The six active workflow stages this WP tokenises (terminal shipped/unknown
 // already use tokens and are excluded).
@@ -222,28 +226,30 @@ describe("no raw colours — dashboard change-card surface (WP-006)", () => {
     }
   });
 
-  it("Dashboard.module.css: the error chrome uses only var(--*) (no raw literal)", async () => {
-    const css = await fs.readFile(DASHBOARD_CSS, "utf8");
+  it("Board.module.css: the error chrome uses only var(--*) (no raw literal)", async () => {
+    const css = await fs.readFile(BOARD_CSS, "utf8");
     const offenders: Record<string, string[]> = {};
     for (const cls of ["errorBox", "errorMessage"]) {
       const body = classBody(css, cls);
-      expect(body, `expected a .${cls} class in Dashboard.module.css`).not.toBeNull();
+      expect(body, `expected a .${cls} class in Board.module.css`).not.toBeNull();
       const raw = rawColourLiterals(body as string);
       if (raw.length) offenders[cls] = raw;
     }
     expect(
       offenders,
-      `dashboard error chrome still contains raw colour literals: ${JSON.stringify(offenders)}`,
+      `board error chrome still contains raw colour literals: ${JSON.stringify(offenders)}`,
     ).toEqual({});
   });
 
-  it("Dashboard.module.css: error chrome maps to the existing --destructive* tokens", async () => {
-    const css = await fs.readFile(DASHBOARD_CSS, "utf8");
+  it("Board.module.css: error chrome maps to the destructive token family", async () => {
+    const css = await fs.readFile(BOARD_CSS, "utf8");
     const errorBox = classBody(css, "errorBox");
     expect(errorBox).not.toBeNull();
-    // The error surface must reference the destructive token family rather
-    // than raw literals (the exact mapping is bg/border/text → destructive*).
-    expect(errorBox as string).toContain("var(--destructive");
+    // The error surface must reference the destructive token family rather than
+    // raw literals. Post-#216 it rides the --bg-destructive* tint tokens (whose
+    // dark values are the signed soft-tint recipe), not a bare var(--destructive)
+    // fill — so we accept either member of the destructive family.
+    expect(errorBox as string).toMatch(/var\(--(bg-)?destructive/);
   });
 
   it("tokens.css: all 18 LIGHT stage-badge tokens are defined with the exact Contract values (pixel-unchanged baseline)", async () => {
