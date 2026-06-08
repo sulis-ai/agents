@@ -80,7 +80,15 @@ login-expiry rides the existing ``NOT_AUTHORIZED`` code. The contract's
 example tables (the classification truth table + the ``next_delay`` stubs)
 live as a single shared test fixture (``tests/unit/_recovery_contract_\
 fixtures.py``) the downstream WP suites consume, so the verdict vocabulary is
-never re-spelled on either side of the seam (CF-11).
+never re-spelled on either side of the seam (CF-11). WP-002 adds the producer:
+``classifier.classify(error, adapter_hint) -> RecoveryClass`` — the pure,
+total neutral arbiter that maps an observed ``EventError`` to a verdict, using
+the per-provider hint when present and the category default otherwise
+(``protocol`` → transient-blip, ``internal`` → dead-end, ``expected`` →
+dead-end except ``NOT_AUTHORIZED`` → login-expired; an unknown code with no
+hint falls through to the safe dead-end rather than raising). It imports
+``events.py`` only — never the provider seam (ADR-003), so a provider's raw
+``"401"`` interpretation stays in that provider's ``classify_failure`` hint.
 
 The leading underscore signals "foundation-internal" — exactly as ``_discovery``
 and ``_canonical_drift`` do. The public surface is re-exported here so callers
@@ -95,7 +103,7 @@ from _session_manager.adapter import (
     SessionSpec,
 )
 from _session_manager.adapters.claude import ClaudeAdapter
-from _session_manager.classifier import RecoveryClass
+from _session_manager.classifier import RecoveryClass, classify
 from _session_manager.event_log import (
     EventLog,
     OffsetEvictedError,
@@ -207,6 +215,8 @@ __all__ = [
     "SocketServer",
     # reliability layer: recovery vocabulary + retry policy (CH-01KTMK WP-001)
     "RecoveryClass",
+    # reliability layer: provider-neutral classifier (CH-01KTMK WP-002)
+    "classify",
     "RetryPolicy",
     "DEFAULT_RETRY_POLICY",
     "next_delay_ceiling",

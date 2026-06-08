@@ -1,0 +1,32 @@
+{
+  "review": {
+    "target": "feat/wp-002-classifier",
+    "base": "change/feat-automation-reliability-recovery",
+    "project": "automation-reliability-recovery",
+    "timestamp": "2026-06-08T225135Z",
+    "verdict": "PASS",
+    "files_changed": 3
+  },
+  "build_verification": {
+    "errors_introduced": 0,
+    "typechecker": null,
+    "typechecker_coverage_gap": "no mypy/pyright configured; ruff is the only mechanical floor",
+    "ruff_check": "pass",
+    "ruff_format": "pass",
+    "tests": {"passed": 40, "failed": 0}
+  },
+  "pr_hygiene": {
+    "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "clean"},
+    "size": {"lines_added": 210, "lines_removed": 8, "files_changed": 3, "generated_ratio": 0, "lock_file_ratio": 0, "severity": "clean"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "clean"},
+    "completeness": {"new_source_without_test": 0, "api_change_without_schema": false, "severity": "clean"}
+  },
+  "lenses": {
+    "architecture": {"in_changes": 0, "in_neighbours": 0, "surfaced": false},
+    "security": {"in_changes": 0, "in_neighbours": 0, "surfaced": false, "scanners": {"gitleaks": "clean"}},
+    "quality": {"in_changes": 0, "in_neighbours": 0, "surfaced": false, "cr10_performance": "no anti-pattern matches"}
+  },
+  "findings": [],
+  "draft_deltas": [],
+  "auto_downgrade_triggers": []
+}
