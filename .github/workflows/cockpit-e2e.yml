@@ -100,6 +100,14 @@ jobs:
         if: steps.browsers.outcome == 'success'
         run: npm run test:e2e
 
+      # WP-007 — the load-bearing PRODUCTION proof: the full acceptance journey
+      # driven against the REAL server endpoint (startProductionServer → spawned
+      # host + attached sidecar), via the WP-006 same-origin default. Supersedes
+      # the harness-proxy terminal e2e as the production proof; runs on branch-ci.
+      - name: Playwright live-terminal e2e against the real server
+        if: steps.browsers.outcome == 'success'
+        run: npm run test:e2e:terminal-real
+
       - name: Note skipped e2e (browser unavailable)
         if: steps.browsers.outcome != 'success'
         run: echo "::warning::Playwright browser download failed — e2e smoke skipped. Read-only gate + combined Vitest suite still gated this change."
