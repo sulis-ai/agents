@@ -38,10 +38,27 @@ UNKNOWN_PROVIDER = "UNKNOWN_PROVIDER"
 CWD_NOT_FOUND = "CWD_NOT_FOUND"
 OFFSET_EVICTED = "OFFSET_EVICTED"
 SESSION_DISABLED = "SESSION_DISABLED"
+# attach/feed/resize targeted a pipe-mode session — there is no terminal to
+# attach to; the consumer must open() with io_mode="pty" (contract §2.12.2 /
+# §2.15; ADR-003). Expected: the op ran and deterministically declined, with no
+# new error category.
+NOT_PTY_SESSION = "NOT_PTY_SESSION"
+# The connection is not authorised to attach/feed/detach/resize the requested
+# change's session — the §2.13.4 attach-authorisation gate (the binding guard,
+# ADE ADR-004) declined: a connection bound to change X may not drive change Y's
+# live shell (ADR-003 §Security). Expected: a deterministic refusal that maps to
+# the cockpit's RelayOutcome {kind:"mismatch"} (base §2.8.3). No new auth is
+# invented — this is the existing change-scope mechanism applied to the terminal
+# methods; the code names the decline so the wire carries it in the §2.9 shape.
+NOT_AUTHORIZED = "NOT_AUTHORIZED"
 
 # Internal — an unexpected crash (a bug).
 DECODE_FAILED = "DECODE_FAILED"
 LOG_CORRUPT = "LOG_CORRUPT"
+# os.openpty() / spawn-with-pty failed on a pty-mode open (fd exhaustion, kernel
+# pty limit). Internal: log + escalate, do not retry blindly (contract §2.15;
+# ADR-001 — maps onto the existing three-category model, no new category).
+PTY_OPEN_FAILED = "PTY_OPEN_FAILED"
 
 
 EventKind = Literal["chunk", "tool_use", "result", "error"]

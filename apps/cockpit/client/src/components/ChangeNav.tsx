@@ -12,6 +12,7 @@ import {
   CubeTransparentIcon,
   EyeIcon,
   Cog6ToothIcon,
+  CommandLineIcon,
 } from "@heroicons/react/24/outline";
 import type { Change, WorkflowStage } from "../../../shared/api-types";
 import { stageLabel } from "./StageBadge";
@@ -22,7 +23,8 @@ export type ChangeView =
   | "files"
   | "provenance"
   | "preview"
-  | "advanced";
+  | "advanced"
+  | "terminal";
 
 const TRACK_STAGES: Exclude<WorkflowStage, "shipped">[] = [
   "recon",
@@ -39,8 +41,14 @@ const VIEWS: { id: ChangeView; label: string; Icon: typeof EyeIcon }[] = [
   { id: "files", label: "Files", Icon: DocumentTextIcon },
   { id: "provenance", label: "Provenance", Icon: CubeTransparentIcon },
   { id: "preview", label: "Preview", Icon: EyeIcon },
+  { id: "terminal", label: "Terminal", Icon: CommandLineIcon },
   { id: "advanced", label: "Advanced", Icon: Cog6ToothIcon },
 ];
+
+/** The valid view ids, in nav order. Exported so callers (e.g. ThreadView's
+ *  `?view=` entry-seed) can validate an external value against the known set
+ *  without re-declaring the literals. */
+export const CHANGE_VIEWS: readonly ChangeView[] = VIEWS.map((v) => v.id);
 
 interface Props {
   change: Change;

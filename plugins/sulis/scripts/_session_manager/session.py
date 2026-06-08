@@ -48,6 +48,7 @@ restart-is-not-a-new-key). Death *detection* still consumes WP-004's
 from __future__ import annotations
 
 import dataclasses
+import os
 import queue
 import subprocess
 import threading
@@ -58,6 +59,7 @@ from dataclasses import dataclass, field
 from _session_manager.adapter import ProviderAdapter, SessionSpec
 from _session_manager.event_log import EventLog
 from _session_manager.events import STDIN_BROKEN, Event, EventError
+from _session_manager.scrollback import ScrollbackBuffer
 from _session_manager.state import SessionState, StateMachine
 
 # Sentinel pushed onto the command queue to tell the stdin pump to stop. A
@@ -95,6 +97,18 @@ class Session:
     adapter: ProviderAdapter
     log: EventLog
     process: subprocess.Popen
+    #: PTY io-model (contract §2.12.1, ADR-001), set by the manager at spawn for a
+    #: ``pty``-mode session and ``None`` for the default pipe model. When set, the
+    #: session runs ONE master-reader pump (in place of the three pipe pumps) that
+    #: reads the master fd and appends raw bytes into ``scrollback`` — the
+    #: terminal content model (§2.11), distinct from the decoded ``log`` (§2.5).
+    #: ``pty_master_fd`` is the manager-owned master end of the ``os.openpty()``
+    #: pair (the child holds the slave end as its controlling tty); ``scrollback``
+    #: is the bounded byte ring a viewer (WP-004) later snapshots. Both are
+    #: re-created together on restart (:meth:`replace_process`), keeping the
+    #: scrollback across the restart (§2.12.3 restart-is-not-a-new-key).
+    pty_master_fd: int | None = None
+    scrollback: ScrollbackBuffer | None = None
     resumed: bool = False
     #: Monotonic per-key turn counter — incremented as each submitted turn
     #: starts so every appended Event carries which turn produced it (§2.3).
@@ -127,6 +141,16 @@ class Session:
     on_event: "Callable[[Session, Event], None] | None" = field(
         default=None, repr=False
     )
+    #: Registered by the manager (WP-004 viewers): ``on_pty_output(data)`` is
+    #: fired by the master-reader pump for every raw byte chunk it appends to
+    #: ``scrollback`` — the live-feed broadcast seam the per-session viewer
+    #: registry subscribes to so each attached viewer's ``stream`` receives live
+    #: PTY output (contract §2.12.2; acceptance #1). Mirrors ``on_event``:
+    #: ``None`` until registered, so a pty session with no viewers (headless) is
+    #: untouched — the pump still fills the scrollback ring, it just broadcasts to
+    #: nobody. Carried across restart on the same Session (the registry is wired
+    #: once at spawn; §2.12.3).
+    on_pty_output: "Callable[[bytes], None] | None" = field(default=None, repr=False)
 
     # ── private synchronisation + threads (not part of the value surface) ──
     _commands: "queue.Queue" = field(default_factory=queue.Queue, repr=False)
@@ -171,14 +195,22 @@ class Session:
     # ── lifecycle: start / stop the pumps ──────────────────────────────────
 
     def start_pumps(self) -> None:
-        """Launch the three I/O pump threads for the current process (§2.6).
+        """Launch the I/O pump threads for the current process (§2.6).
 
         Daemon threads so a hard interpreter exit never hangs on a wedged pump;
         :meth:`close` joins them cleanly in the normal path. Each pump is bound
         to the process + generation live at launch, so after a restart the old
         pumps drain their dead streams and exit while the new pumps own the new
         process.
+
+        Branches on the io-model (contract §2.12.1, ADR-001): a ``pty`` session
+        (``pty_master_fd`` set) runs the single generation-bound master-reader
+        pump that appends raw terminal bytes to ``scrollback``; the default pipe
+        session runs today's three pipe pumps (stdin / stdout / stderr) unchanged.
         """
+        if self.pty_master_fd is not None:
+            self._start_pty_pumps()
+            return
         process = self.process
         generation = self._generation
         self._threads = [
@@ -198,6 +230,31 @@ class Session:
                 target=self._stderr_pump,
                 args=(process,),
                 name=f"session-{self.key}-stderr-{generation}",
+                daemon=True,
+            ),
+        ]
+        for t in self._threads:
+            t.start()
+
+    def _start_pty_pumps(self) -> None:
+        """Launch the single master-reader pump for a ``pty`` session (§2.12.1).
+
+        A PTY multiplexes the child's stdin/stdout/stderr onto one master fd, so
+        the pipe model's three pumps collapse into one generation-bound reader.
+        It mirrors the stdout pump's generation discipline (a stale-generation
+        pump exits rather than touching the new process) so restart-on-death
+        (§2.7/§2.12.3) is race-free for pty sessions too. Daemon so a hard exit
+        never hangs on it.
+        """
+        master_fd = self.pty_master_fd
+        assert master_fd is not None  # only called for a pty session
+        process = self.process
+        generation = self._generation
+        self._threads = [
+            threading.Thread(
+                target=self._pty_master_pump,
+                args=(process, master_fd, generation),
+                name=f"session-{self.key}-pty-{generation}",
                 daemon=True,
             ),
         ]
@@ -288,6 +345,15 @@ class Session:
         counter + the watchdog-cancel observe here."""
         self._fire_guard_hook(self.on_event, self, event)
 
+    def _fire_pty_output(self, data: bytes) -> None:
+        """Fire the ``on_pty_output`` broadcast seam for one raw master-read
+        chunk (the pty pump's per-chunk point), if a viewer registry is wired
+        (WP-004, §2.12.2). Reuses :meth:`_fire_guard_hook`'s fire-if-registered,
+        never-crash-the-pump discipline (Blue: one method, now three callers) — a
+        viewer-fanout fault must never kill the master-reader pump (which would
+        stop the scrollback ring filling). No-op for a headless pty session."""
+        self._fire_guard_hook(self.on_pty_output, data)
+
     def force_terminate_turn(self, *, terminal: SessionState, error: Event) -> None:
         """End the in-flight turn on a guard trip: surface ``error`` then move to
         ``terminal`` (WP-007, §2.7).
@@ -351,7 +417,9 @@ class Session:
         except (OSError, ValueError):
             pass
 
-    def replace_process(self, process: subprocess.Popen) -> None:
+    def replace_process(
+        self, process: subprocess.Popen, pty_master_fd: int | None = None
+    ) -> None:
         """Swap in a freshly-spawned ``process`` and restart the pumps, keeping
         the SAME key + SAME log (§2.7 restart-is-not-a-new-key).
 
@@ -361,11 +429,29 @@ class Session:
         the per-process flags and launches new pumps on the new process. The log
         is untouched, so its offsets keep climbing and every prior event stays
         readable — the conversation survives the crash.
+
+        **PTY restart (§2.12.3).** For a pty session the manager passes the fresh
+        ``os.openpty()`` master fd; the old master is closed here (so the stale
+        master-reader pump's ``os.read`` returns EOF and it exits), and the new
+        master is swapped in. The :class:`ScrollbackBuffer` is **kept** across the
+        restart (restart-is-not-a-new-key applied to the scrollback model) — only
+        the master fd is re-created, exactly as the log survives a pipe restart.
         """
         old_threads = self._threads
+        old_master_fd = self.pty_master_fd
         current = threading.current_thread()
         # Invalidate the old generation so any still-running old pump exits.
         self._generation += 1
+        # For a pty session, close the OLD master fd before joining so the stale
+        # master-reader pump (parked in os.read) gets EOF and returns; then point
+        # the session at the fresh master. The scrollback ring is untouched — it
+        # carries across the restart (§2.12.3).
+        if old_master_fd is not None and pty_master_fd is not None:
+            try:
+                os.close(old_master_fd)
+            except OSError:
+                pass
+            self.pty_master_fd = pty_master_fd
         # Release the in-flight wait FIRST, then unblock the command queue —
         # both BEFORE joining the old pumps. An old stdin pump can be parked in
         # either place: on ``_turn_done.wait()`` (a turn was in flight when the
@@ -565,40 +651,42 @@ class Session:
                 # one-in-flight slot. §2.7 normal turn cycle.
                 self._try_transition(SessionState.READY)
                 self._turn_done.set()
-        # stdout closed (EOF / process gone). Snapshot whether a turn was in
-        # flight BEFORE freeing the slot, so the lifecycle can tell a mid-turn
-        # death (needs an error event, §2.10 #6) from an idle one. Only record
-        # it for the current generation (a superseded pump must not clobber the
-        # restarted session's flag).
+        # stdout closed (EOF / process gone) — run the shared EOF death discipline.
+        self._handle_eof_death(process, generation)
+
+    def _handle_eof_death(self, process: subprocess.Popen, generation: int) -> None:
+        """The shared EOF → death discipline both output pumps run at end-of-
+        stream (§2.7/§2.12.3).
+
+        Extracted at the 2-consumer threshold (EP-03): the pipe stdout pump and
+        the pty master-reader pump reach EOF identically — the only difference is
+        WHAT they read (decoded lines vs raw bytes), not how a death is handled.
+        In order:
+
+        1. **Snapshot mid-turn-ness BEFORE freeing the slot** so the lifecycle can
+           tell a mid-turn death (needs an ``error`` event, §2.10 #6) from an idle
+           one (current generation only — a superseded pump must not clobber the
+           restarted session's flag).
+        2. **Reap the now-exited child** so ``process.poll()`` deterministically
+           reports the death before restart-on-death's ``is_alive`` confirm runs
+           — otherwise a not-yet-reaped corpse reads "alive", the EOF looks
+           spurious, and the restart is wrongly declined (a 1-in-N flake; see
+           :meth:`kill_process`'s note). Bounded + best-effort.
+        3. **Mark ``_process_ended`` BEFORE releasing the in-flight wait** so a
+           stdin pump woken by the ``_turn_done.set()`` below sees the reliable
+           "process gone" flag and exits without writing the next command into the
+           corpse (the guard-kill / mid-turn-death race, §2.6/§2.7).
+        4. Release any waiting stdin pump, then fire ``on_death`` once (an
+           unexpected death drives WP-005 restart-on-death).
+
+        Each generation-guarded step is skipped for a superseded (stale) pump."""
         if generation == self._generation:
             self._died_mid_turn = self.turn_in_flight()
-        # Reap the now-exited child BEFORE signalling death (load-bearing).
-        # Stdout EOF means the child closed its stdout — it is exiting. But the
-        # OS may not have reaped it yet, so ``process.poll()`` can still read
-        # ``None`` for a beat. Restart-on-death's FIRST step confirms the death
-        # via ``is_alive`` (which is ``poll()``); if that confirm races the
-        # not-yet-reaped corpse it reads "alive", treats the EOF as spurious, and
-        # declines the restart — stranding the session in its last live state
-        # with ``recovery_used`` untouched (a 1-in-N restart flake the loaded
-        # suite exposed, and a latent bug for a real child dying naturally, not
-        # just a test artefact). Reaping here makes ``poll()`` deterministically
-        # report the death before ``on_death`` runs, so the confirm never races.
-        # Mirrors the same reap :meth:`kill_process` already does for the guard
-        # path (see its docstring). Bounded so a child wedged in <defunct> never
-        # hangs the pump; best-effort (a process already reaped / gone is fine).
-        # Only for the current generation: a superseded pump must not wait on the
-        # restarted session's fresh process.
         if generation == self._generation:
             try:
                 process.wait(timeout=_TERM_GRACE_SECONDS)
             except (subprocess.TimeoutExpired, OSError, ValueError):
                 pass  # on_death's own poll will catch up if reaping stalls
-        # Mark the process as ended BEFORE releasing the in-flight wait, so a
-        # stdin pump woken by the ``_turn_done.set()`` below sees the reliable
-        # "process gone" flag and exits without writing the next command into the
-        # corpse (the guard kill / mid-turn death race — §2.6/§2.7). Only for the
-        # current generation: a superseded pump must not mark the restarted
-        # session's fresh process as ended.
         if generation == self._generation:
             self._process_ended.set()
         # Release any waiting stdin pump so it does not hang.
@@ -619,6 +707,55 @@ class Session:
             return
         self._death_signalled = True
         self.on_death(self)
+
+    def _pty_master_pump(
+        self, process: subprocess.Popen, master_fd: int, generation: int
+    ) -> None:
+        """Read the PTY master end raw and append every byte to ``scrollback``
+        (contract §2.11 / §2.12.1, ADR-001).
+
+        The pty analogue of :meth:`_stdout_pump`: where the pipe stdout pump
+        *decodes* each line into the structured event log, the pty pump appends
+        the **raw** terminal bytes (escape codes, cursor moves — the literal
+        stream xterm.js renders) into the bounded scrollback ring. There is no
+        decode and no per-turn slot on the terminal path (a pty session is a
+        terminal view, not a structured-chat stream, §2.11.1).
+
+        On EOF (the master read returns empty / errors — the child closed its
+        controlling tty, i.e. it exited) it runs the SAME death discipline as the
+        stdout pump so restart-on-death (§2.7/§2.12.3) fires for pty sessions:
+        snapshot whether a turn was in flight, reap the child so ``poll()``
+        reports the death deterministically, mark ``_process_ended``, release any
+        waiter, and fire ``on_death`` once (current generation only). Bound to
+        the generation live at launch so a stale pump (superseded by a restart's
+        fresh master fd) exits without clobbering the restarted session's state.
+        """
+        scrollback = self.scrollback
+        assert scrollback is not None  # a pty session always has a scrollback
+        while True:
+            try:
+                data = os.read(master_fd, 65536)
+            except OSError:
+                # The master end was closed/torn down (EOF on a pty surfaces as
+                # an OSError EIO on some platforms) — treat as end-of-stream.
+                break
+            if not data:
+                break
+            with self._lock:
+                self.last_activity = time.monotonic()
+            scrollback.append(data)
+            # Broadcast the live chunk to any attached viewers (WP-004), AFTER
+            # the scrollback append so a viewer attaching at this instant takes a
+            # snapshot that already includes ``data`` (the registry registers
+            # before snapshotting, so a small overlap is harmless; a gap is not).
+            # No-op when no registry is wired (a headless pty session, §2.12.5).
+            self._fire_pty_output(data)
+        # EOF / master gone — run the SAME EOF death discipline as the stdout pump
+        # so a pty child that dies is restarted like a pipe child (§2.7/§2.12.3).
+        # Pass the pump's OWN captured process (not self.process) so a stale pump
+        # never touches the restarted session's fresh process — parity with the
+        # stdout pump's generation discipline.
+        self._handle_eof_death(process, generation)
 
     def _stderr_pump(self, process: subprocess.Popen) -> None:
         """Drain ``process``'s stderr so the pipe never fills and blocks the
@@ -663,6 +800,14 @@ class Session:
                     stream.close()
                 except (OSError, ValueError):
                     pass
+        # 3b. For a pty session, close the master fd so the master-reader pump's
+        #     os.read returns EOF and the pump exits before the join (the slave
+        #     end was already closed by the manager right after spawn).
+        if self.pty_master_fd is not None:
+            try:
+                os.close(self.pty_master_fd)
+            except OSError:
+                pass
         # 4. Join the pumps (bounded so a wedged pump cannot hang close).
         #    A restart (replace_process) may have just swapped the thread set;
         #    snapshot it and skip any thread not yet started — joining an

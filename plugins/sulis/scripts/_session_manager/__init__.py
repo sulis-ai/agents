@@ -36,6 +36,35 @@ extension hooks the WP-004 core reserved (``_on_process_death`` / ``_maintenance
 tick`` / ``_guard``) are now filled by delegation, so the §2.2 six-method core
 flow stayed lean.
 
+Interactive-terminal extension (CH-01KTGY, contract extension §2.11–§2.15):
+WP-002 added ``scrollback.py`` (``ScrollbackBuffer`` — the bounded raw-byte ring,
+the second content model, §2.11); WP-003 adds the **PTY io-model** as an additive
+branch at the single spawn seam (``manager._spawn_process``): a defaulted
+``SessionSpec.io_mode`` (``"pipe"`` | ``"pty"``, §2.12.1, immutable "PTY from
+birth") selects it, a ``pty`` open allocates an ``os.openpty()`` pair the manager
+owns, spawns the child with the slave as its controlling tty, and runs ONE
+generation-bound master-reader pump (``session._pty_master_pump``) that appends
+raw bytes into the session's ``ScrollbackBuffer`` — restart re-creates the PTY
+while keeping the scrollback (§2.12.3). The pipe path is byte-for-byte unchanged
+(``io_mode`` defaults to ``"pipe"`` — acceptance #4). New error code
+``PTY_OPEN_FAILED`` (Internal, §2.15) maps ``os.openpty`` / pty-spawn failure onto
+the existing three-category model. WP-004 added ``viewer.py`` (the ``attach``/
+``Viewer`` port — snapshot-then-live join, verbatim keystroke ``feed``,
+detach-leaves-running; §2.12) and the ``io_mode`` / ``viewer_count`` observability
+on ``Health`` / ``SessionStatus`` (§2.12.5). WP-005 adds ``socket_server.py``
+(``SocketServer`` — the §2.8 Unix-domain NDJSON socket-serving layer): the remote
+adapter that serves BOTH the six chat methods (§2.2) and the four terminal methods
+(``attach`` streaming + ``feed`` / ``detach`` / ``resize``, §2.13) over a local
+``AF_UNIX`` socket so the cockpit can consume the in-process manager cross-language
+(ADR-003 — one channel, one auth surface). Raw terminal bytes are base64-encoded
+on the wire (§2.13.1 — the socket is the ONLY layer that encodes; the in-process
+viewer speaks raw bytes). The §2.13.4 attach-authorisation gate is the
+local-socket filesystem permission (``0o600``) plus an optional per-connection
+binding resolver that scopes a connection to one change (a connection bound to
+change X may not attach change Y) — declined as Expected ``NOT_AUTHORIZED``, no new
+auth invented. The headless chat path over the socket behaves exactly as the base
+contract (acceptance #4 regression gate).
+
 The leading underscore signals "foundation-internal" — exactly as ``_discovery``
 and ``_canonical_drift`` do. The public surface is re-exported here so callers
 import from the package, not its sub-modules.
@@ -54,12 +83,16 @@ from _session_manager.event_log import (
     OffsetEvictedError,
     OffsetOutOfRangeError,
 )
+from _session_manager.scrollback import ScrollbackBuffer
 from _session_manager.events import (
     CWD_NOT_FOUND,
     DECODE_FAILED,
     LOG_CORRUPT,
     NO_SESSION,
+    NOT_AUTHORIZED,
+    NOT_PTY_SESSION,
     OFFSET_EVICTED,
+    PTY_OPEN_FAILED,
     SESSION_DISABLED,
     SOCKET_CLOSED,
     SPAWN_FAILED,
@@ -97,6 +130,7 @@ from _session_manager.maintenance import (
 )
 from _session_manager.manager import SessionManager
 from _session_manager.session import Session
+from _session_manager.socket_server import SocketServer
 from _session_manager.state import (
     Health,
     SessionState,
@@ -115,6 +149,8 @@ __all__ = [
     "EventLog",
     "OffsetEvictedError",
     "OffsetOutOfRangeError",
+    # terminal-scrollback content model (§2.11) — WP-002
+    "ScrollbackBuffer",
     # provider adapter seam (§2.4)
     "ProviderAdapter",
     "Capabilities",
@@ -143,6 +179,8 @@ __all__ = [
     "RUNAWAY",
     "DEFAULT_TURN_TIMEOUT_SECONDS",
     "DEFAULT_MAX_TOOL_CALLS",
+    # §2.8 Unix-domain NDJSON socket-serving layer (chat + terminal) — WP-005
+    "SocketServer",
     # error model (§2.9)
     "SessionError",
     "ProtocolError",
@@ -160,4 +198,10 @@ __all__ = [
     "SESSION_DISABLED",
     "DECODE_FAILED",
     "LOG_CORRUPT",
+    # pty io-model spawn failure (§2.15) — CH-01KTGY WP-003
+    "PTY_OPEN_FAILED",
+    # attach on a pipe session (§2.15) — CH-01KTGY WP-004/005
+    "NOT_PTY_SESSION",
+    # §2.13.4 attach-authorisation decline (the binding guard) — CH-01KTGY WP-005
+    "NOT_AUTHORIZED",
 ]

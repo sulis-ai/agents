@@ -15,13 +15,19 @@ line per turn) and emits, per turn:
   - a ``content_block_delta`` per word fragment  → the adapter decodes ``chunk``
   - a ``result`` (``is_error`` falsey, with usage) → the turn-terminal ``result``
 
-Two reply modes:
+Three reply modes:
 
   - ``echo`` (default): the reply is ``"echo <prompt>"`` — a stable token the
     smoke can assert appears, proving the streamed text round-trips.
   - ``memory``: the FIRST turn replies ``"you said <prompt>"`` and remembers the
     prompt; the SECOND turn replies ``"earlier you said <first prompt>"`` —
     proving "memory across turns" the same way the real model would.
+  - ``pty``: the child behaves like a raw terminal child — it echoes stdin bytes
+    back to stdout, and on the sentinel line ``__PTY_PING__`` writes the known
+    output line ``PTY_PONG``. This is the **real** PTY-backed child the
+    interactive-terminal integration tests run against (MEA-09: no mocks in
+    integration) — consumed by WP-003 (master-read), WP-004 (viewer), WP-005
+    (socket), WP-010 (end-to-end round-trip).
 
 The source is exposed as a string (``CHILD_SOURCE``) and written to a path via
 :func:`write_child`; the argv to spawn it is built by :func:`child_argv`.
@@ -33,7 +39,7 @@ import sys
 from pathlib import Path
 
 #: The fake-claude child program. ``argv[1]`` selects the reply mode
-#: ("echo" | "memory"); default "echo".
+#: ("echo" | "memory" | "pty"); default "echo".
 CHILD_SOURCE = r"""
 import json, sys
 
@@ -42,6 +48,28 @@ mode = sys.argv[1] if len(sys.argv) > 1 else "echo"
 def emit(obj):
     sys.stdout.write(json.dumps(obj) + "\n")
     sys.stdout.flush()
+
+if mode == "pty":
+    # Raw-terminal child: the real PTY-backed adapter the interactive-terminal
+    # integration tests drive (WP-003/004/005/010). It speaks bytes, not
+    # stream-json — it echoes stdin straight back to stdout (so a master read
+    # surfaces what was typed even with the tty's own ECHO off), and on the
+    # sentinel line "__PTY_PING__" writes the deterministic line "PTY_PONG".
+    in_fd = sys.stdin.fileno()
+    out_fd = sys.stdout.fileno()
+    import os as _os
+    line_buf = b""
+    while True:
+        data = _os.read(in_fd, 1024)
+        if not data:
+            break
+        _os.write(out_fd, data)  # echo input back verbatim
+        line_buf += data
+        while b"\n" in line_buf:
+            one, line_buf = line_buf.split(b"\n", 1)
+            if one.strip() == b"__PTY_PING__":
+                _os.write(out_fd, b"PTY_PONG\n")
+    sys.exit(0)
 
 first_prompt = None
 for line in sys.stdin:

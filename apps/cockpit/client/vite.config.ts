@@ -2,6 +2,10 @@
 //
 // - Binds to 127.0.0.1 (loopback only — ADR-002).
 // - Proxies /api/* → the Express server on its loopback port (TDD §11).
+// - Proxies the /terminal WebSocket → the server's terminal sidecar
+//   (ws: true), so the live terminal connects in `npm run dev` the same
+//   same-origin way it does in production (CH-01KTHV WP-006 made
+//   terminalWsUrl() same-origin; the dev proxy must forward the upgrade).
 // - Pulls both ports from the shared dev-ports module so server and
 //   client cannot drift out of sync.
 
@@ -25,6 +29,12 @@ export default defineConfig(() => {
       proxy: {
         "/api": {
           target: `http://${COCKPIT_HOST}:${serverPort}`,
+          changeOrigin: false,
+          secure: false,
+        },
+        "/terminal": {
+          target: `ws://${COCKPIT_HOST}:${serverPort}`,
+          ws: true,
           changeOrigin: false,
           secure: false,
         },

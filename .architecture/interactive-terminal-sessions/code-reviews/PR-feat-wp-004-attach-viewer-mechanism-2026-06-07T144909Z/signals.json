@@ -1,0 +1,38 @@
+{
+  "review": {
+    "wp": "WP-004",
+    "project": "interactive-terminal-sessions",
+    "branch": "feat/wp-004-attach-viewer-mechanism",
+    "base": "change/extend-interactive-terminal-sessions",
+    "timestamp": "2026-06-07T144909Z",
+    "verdict": "PASS",
+    "outcome": "Ready to merge"
+  },
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "ruff_check": "pass",
+    "ruff_format": "pass",
+    "mypy_changed_modules": {
+      "total_errors": 11,
+      "pr_introduced": 0,
+      "note": "all 11 pre-exist on BASE (identical count); mypy not a project gate"
+    }
+  },
+  "pr_hygiene": {
+    "scope": {"severity": "none", "commit_type_spread": ["feat"]},
+    "size": {"severity": "none", "lines_added": 975, "files_changed": 6, "behavioural_delta_lines": 125},
+    "safety": {"severity": "none", "migrations": 0, "schema_idl": 0, "infra": 0, "secret_hits": 0},
+    "completeness": {"severity": "none", "new_source_without_test": 0}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"total": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "checks": "WPB-01/07/09/12 + resilience (timeout/backpressure/fault-isolation/secrets)"},
+    "security": {"findings": 0, "checks": "SEC access/injection/secrets; verbatim-keystroke is ADR-003; attach-auth gate is WP-005"},
+    "quality": {"findings": 0, "checks": "tests(12, 100% cov on viewer.py), dead-surface, contract-drift, CR-10 perf scan"}
+  },
+  "hardening_deltas": [],
+  "auto_downgrade_triggers": []
+}

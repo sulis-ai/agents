@@ -15,7 +15,10 @@ runs the discovery skills and the validated spine emitters inside its session;
 the server starts no extra process. Every other route is GET-only and provably
 so; the read-only gate allow-lists exactly that one relay file (its write verbs)
 and the `SessionBridge` adapter (one process start), and fails the build on any
-mutation or process start anywhere else. It binds to `127.0.0.1` only.
+mutation or process start anywhere else. The interactive terminal is a SECOND
+sanctioned write path (ADR-010) — it adds exactly two more named, audited gate
+exceptions (the sidecar bridge's WebSocket attachment + the session-manager host
+start), detailed in the read-only gate section below. It binds to `127.0.0.1` only.
 
 This README covers the workspace shape, the dev-run flow, and the
 HTTP surface that ships with WP-001 + WP-010. The React components
@@ -224,6 +227,26 @@ The cold-start onboarding route (`POST /api/onboarding/session`, WP-010) is the
 SECOND act path and follows the same rule: it is registered inside that SAME
 file and rides the SAME bridge, so the allow-list is unchanged.
 
+The interactive **terminal** is a SECOND sanctioned write path alongside chat
+(ADR-010) — typing into a live PTY is a write, gated at attach authorisation in
+the engine, not a read-only bypass. It adds **exactly two** named gate
+exceptions, each a single audited file (parity with the chat relay/bridge
+pairing, never a blanket waiver):
+
+- the **sidecar bridge** (`adapters/TerminalSidecar.ts`) — the one WS-attachment
+  seam. It attaches a WebSocket upgrade handler to the existing HTTP server's
+  `upgrade` event (the keystroke → live-PTY transport); it registers no
+  `app.post`, so the HTTP surface stays GET-only. The gate's WS-attachment rule
+  (`new WebSocketServer` / `.handleUpgrade` / `.on("upgrade"`) flags this shape
+  in any _other_ file.
+- the **session-manager host start** (`index.ts`) — the one site that spawns the
+  Python host owning the pty + AF_UNIX socket. It joins the process-start
+  allow-list; the host starts at server boot (one audited site), never on a read.
+
+The terminal is its OWN bridge — added alongside chat's seams, never coupled to
+them (it does not import the chat relay or the chat bridge). Run
+`npm run check:read-only -- --explain` for the full rule catalogue.
+
 ### Cold-start onboarding (WP-010)
 
 When the graph is empty, a form is useless — there's nothing to pick — so setup
@@ -301,8 +324,14 @@ never writes: it greps the active source tree for filesystem-write APIs,
 `git` spawns outside the read-only `git show`, mutating git verbs,
 non-zero process signals, HTTP mutation verbs, and non-loopback binds
 (TDD §13.7, ADR-002, ADR-003). It is the load-bearing read-only proof for
-the whole MVP and runs in CI on every change. Run it locally with
-`npm run check:read-only`; explain every rule with:
+the whole MVP and runs in CI on every change. The HTTP surface stays
+GET-only by construction; the gate names a small set of **path-scoped
+exceptions** for the sanctioned process-start sites — the chat session
+bridge (ADR-003) and, from the production terminal sidecar, the
+session-manager host the server entry spawns at boot (ADR-010/ADR-011).
+The WebSocket terminal endpoint rides the existing HTTP server's `upgrade`
+event, never an `app.post`, so the GET-only guarantee is unaffected. Run it
+locally with `npm run check:read-only`; explain every rule with:
 
 ```bash
 bash apps/cockpit/scripts/check-read-only.sh --explain
@@ -327,6 +356,46 @@ gate + the combined Vitest suite still gate the merge). Visual-regression
 comparison is off by default — set `PWTEST_SCREENSHOTS=1` to capture
 screenshots on failure locally.
 
+### Live-terminal round-trip (Playwright + real socket)
+
+The live-terminal end-to-end proves the founder's interactive-terminal
+journey for real: open a change's **Terminal** tab → see the running session
+with its scrollback (not a blank pane) → type a command → see the output →
+close the tab and reopen → the session is still alive and scrollback catches
+up. It runs under its **own** Playwright config (dedicated ports, so it never
+collides with a cockpit you already have running) and a **real** backend — no
+mocks:
+
+```bash
+npm run test:e2e:terminal
+```
+
+How it wires up (all under `apps/cockpit/e2e/`):
+
+- `terminal-backend.py` boots a **real** `SessionManager` serving a **real**
+  pty-backed fake child over a **real** AF_UNIX socket, pre-seeded with a
+  known scrollback banner.
+- `terminal-proxy.ts` bridges the browser's **WebSocket** to that AF_UNIX
+  socket (a browser can't open AF_UNIX). It is **harness-only** — the e2e
+  proxy/backend pair predate the production sidecar. The real cockpit server
+  now ships its own equivalent: `startProductionServer()` (`server/index.ts`)
+  spawns the Python session-manager host (`session_manager_host.py`,
+  ADR-011), waits for its `READY <socket>` line, then attaches the production
+  terminal sidecar (`server/adapters/TerminalSidecar.ts`) to the running HTTP
+  server's `upgrade` event — riding the same loopback port, with the binding
+  guard ON, Origin validation, and connection/attachment caps. A host crash
+  drops live terminals but never the read-only HTTP surface (separate
+  processes). Both the host and sidecar are torn down on SIGTERM/SIGINT
+  alongside the HTTP server.
+- The cockpit's `createTerminalBridge` builds the live `WebSocketTransport`
+  when `VITE_TERMINAL_WS_URL` is set (the dedicated config sets it); with no
+  endpoint configured the bridge falls back to the "no terminal here" state,
+  so a plain build is always safe to mount.
+
+The same run is the **bootstrap-from-zero** proof: from a clean clone it
+needs only Python + Node + a Chromium download; the pty fake child has no
+external dependency.
+
 ## How the workspace is organised
 
 ```
@@ -335,7 +404,7 @@ apps/cockpit/
 │   ├── index.ts            # bootstrap — binds 127.0.0.1:5174
 │   ├── app.ts              # createApp(deps) Express factory (testable)
 │   ├── config.ts           # CONFIG — bindAddress is hard-coded
-│   ├── ports/              # ChangeStoreReader + RecreateRunner (WP-004) + SessionBridge (the chat seam, WP-005) + ConversationIdentity (the assisted-origin seam: resolved session → Thread id + Message ordinal, ADR-016/018)
+│   ├── ports/              # ChangeStoreReader + RecreateRunner (WP-004) + SessionBridge (the chat seam, WP-005) + TerminalBridge (typed terminal socket-client seam, WP-007) + ConversationIdentity (the assisted-origin seam: resolved session → Thread id + Message ordinal, ADR-016/018)
 │   ├── adapters/           # SulisChangeStoreReader (Python helper bridge); SulisChangeRecreator + FakeRecreateRunner (WP-004); StreamJsonSessionBridge (prod) + RecordedSessionBridge (recorded fixture) (WP-005); LocalTranscriptConversationIdentity (derives the assisted Thread identity locally/read-only — no cross-service call, ADR-018)
 │   ├── routes/             # GET read handlers + chat relay + concierge query + cold-start onboarding (all POST/SSE in the ONE sanctioned file chat.ts — WP-005/009/010)
 │   ├── middleware/         # request-log + typed-error → JSON mapper
@@ -348,7 +417,8 @@ apps/cockpit/
 │   │   ├── main.tsx        # React mount point
 │   │   ├── App.tsx         # placeholder root
 │   │   ├── pages/          # board (stage columns, WP-003), thread view (WP-013), concierge front door (WP-009)
-│   │   ├── components/     # shells, panels (WP-011/013/014), ConciergeChat (the read-only front door, WP-009)
+│   │   ├── components/     # shells, panels (WP-011/013/014), ConciergeChat (the read-only front door, WP-009); LiveTerminal — the xterm.js terminal view (WP-008)
+│   │   ├── terminal/       # client TerminalBridge factory — reuses the WP-007 port (WP-008)
 │   │   ├── api/            # TanStack Query hooks (WP-011)
 │   │   └── tests/
 ├── shared/                 # types + constants both halves import
@@ -404,3 +474,5 @@ Both server and client read the host constant from
 | `npm run typecheck`  | `tsc --noEmit` on both halves.   |
 | `npm run lint`       | ESLint over `apps/cockpit/`.     |
 | `npm run test`       | Vitest — both test environments. |
+| `npm run test:e2e`   | Playwright end-to-end smoke (browser required). |
+| `npm run test:e2e:terminal` | Live-terminal round-trip — real socket + pty child (browser required). |

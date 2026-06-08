@@ -30,15 +30,19 @@ function runGate(cwdRoot: string) {
 }
 
 describe("read-only inventory gate script (TDD §13.7, ADR-003)", () => {
-  // The script scans the whole cockpit source (~80+ files) and takes ~7-8s
-  // locally; the default 5s test timeout is too tight for the real runtime,
-  // so allow 30s. The gate itself passes — this only stops a slow scan from
-  // being misreported as a failure.
+  // The script scans the whole cockpit source (200+ files) with one perl+grep
+  // pass per rule per file; standalone it runs in ~25s, but under the parallel
+  // executor batch (peer WPs spawning real subprocesses) it can approach the
+  // old 30s budget. WP-005 also adds an 8th per-file pass (rule 2c, the
+  // WS-attachment check), so the headroom shrank further. Raise the budget to
+  // 60s — the same "leave headroom for contention" philosophy the fork-pool cap
+  // in vitest.config.ts uses. The gate itself passes; this only stops a slow
+  // scan from being misreported as a failure under load.
   it("exits 0 against the actual committed cockpit source", () => {
     const res = spawnSync("bash", [script], { encoding: "utf8" });
     expect(res.status, res.stdout + res.stderr).toBe(0);
     expect(res.stdout).toMatch(/Read-only inventory clean/);
-  }, 30000);
+  }, 60000);
 
   it("--explain prints the rule catalogue and exits 0", () => {
     const res = spawnSync("bash", [script, "--explain"], { encoding: "utf8" });
@@ -295,6 +299,110 @@ describe("read-only inventory gate script (TDD §13.7, ADR-003)", () => {
     expect(res.stdout).toMatch(/server\/routes\/advanced\.ts \(ADR-015/);
     expect(res.stdout).toMatch(/server\/lib\/changeAdvanced\.ts \(ADR-015/);
     expect(res.stdout).toMatch(/server\/lib\/turnSummaries\.ts \(ADR-015/);
+  });
+
+  // WP-005 (ADR-010) — the interactive terminal is a SANCTIONED write path. The
+  // gate gains EXACTLY two new named, path-scoped exceptions (parity with the
+  // ADR-003 relay/bridge pairing): the sidecar bridge's WS-ATTACHMENT and the
+  // session-manager host PROCESS-START. The tests below plant the same shapes in
+  // (a) the sanctioned terminal file → still passes, and (b) some OTHER file →
+  // still trips the gate. The exception is named, never blanket.
+
+  it("--explain documents the two ADR-010 terminal named exceptions (sidecar WS-attachment + host start)", () => {
+    const res = spawnSync("bash", [script, "--explain"], { encoding: "utf8" });
+    expect(res.status).toBe(0);
+    // The sidecar bridge — the WS-attachment write-transport seam.
+    expect(res.stdout).toMatch(/server\/adapters\/TerminalSidecar\.ts \(ADR-010/);
+    // The session-manager host process-start seam (server/index.ts).
+    expect(res.stdout).toMatch(/server\/index\.ts \(ADR-010/);
+    // The rule itself is named so a reader can find it.
+    expect(res.stdout).toMatch(/WebSocket .*attach|WS-attachment/i);
+  });
+
+  it("flags a WS-attachment (handleUpgrade) OUTSIDE the sanctioned terminal sidecar", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "lib"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "lib", "sneakyWs.ts"),
+        'import { WebSocketServer } from "ws";\n' +
+          "export const wire = (httpServer: any) => {\n" +
+          "  const wss = new WebSocketServer({ noServer: true });\n" +
+          '  httpServer.on("upgrade", (req: any, sock: any, head: any) =>\n' +
+          "    wss.handleUpgrade(req, sock, head, () => {}));\n" +
+          "};\n",
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status).toBe(1);
+      expect(res.stdout).toMatch(/VIOLATION \[WS-attachment outside the sanctioned terminal sidecar\]/);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("allows the WS-attachment INSIDE the sanctioned terminal sidecar (ADR-010)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "adapters"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "adapters", "TerminalSidecar.ts"),
+        'import { WebSocketServer } from "ws";\n' +
+          "export const wire = (httpServer: any) => {\n" +
+          "  const wss = new WebSocketServer({ noServer: true });\n" +
+          '  httpServer.on("upgrade", (req: any, sock: any, head: any) =>\n' +
+          "    wss.handleUpgrade(req, sock, head, () => {}));\n" +
+          "};\n",
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status, res.stdout + res.stderr).toBe(0);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("allows the host process-start INSIDE the sanctioned server/index.ts (ADR-010/011)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "index.ts"),
+        'import { spawn } from "node:child_process";\n' +
+          'export const boot = () => spawn("python3", ["host.py", "--socket", "/tmp/s"]);\n',
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status, res.stdout + res.stderr).toBe(0);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("still flags a process start in ANY other file even with the terminal exceptions present (path-scoped)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "lib"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "lib", "notTheHost.ts"),
+        'import { spawn } from "node:child_process";\n' +
+          'export const go = () => spawn("python3", ["evil.py"]);\n',
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status).toBe(1);
+      expect(res.stdout).toMatch(/VIOLATION \[process start outside the sanctioned bridge\]/);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
   });
 
   it("ignores forbidden tokens that appear only inside comments", async () => {

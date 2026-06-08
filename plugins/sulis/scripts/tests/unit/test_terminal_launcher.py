@@ -662,6 +662,8 @@ def test_launch_change_terminal_defaults_opening_prompt_when_none(tmp_path, monk
     # bound to the change but idle (no opening turn; the agent never reads
     # SULIS_CHANGE_ID until the user types). The launcher must default a
     # change-context opening prompt so ANY caller's session auto-starts.
+    # The default-prompt behaviour lives on the launch-script path, which a
+    # visible launch reaches by default (CH-01KTK7) — no flag required.
     monkeypatch.setenv("HOME", str(tmp_path))
     with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
             mock.patch.object(tl, "_launch_macos",
@@ -678,6 +680,8 @@ def test_launch_change_terminal_defaults_opening_prompt_when_none(tmp_path, monk
 
 def test_launch_change_terminal_explicit_pre_prompt_not_overridden(tmp_path, monkeypatch):
     # start --spawn passes a rich brief; the default must never clobber it.
+    # The sidecar write lives on the launch-script path, which a visible launch
+    # reaches by default (CH-01KTK7) — no flag required.
     monkeypatch.setenv("HOME", str(tmp_path))
     with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
             mock.patch.object(tl, "_launch_macos",
@@ -700,3 +704,115 @@ def test_launch_change_terminal_writes_pre_prompt_sidecar(tmp_path, monkeypatch)
         tl.launch_change_terminal(_GOOD_ULID, tmp_path, pre_prompt=body)
     sidecar = tl._change_dir(_GOOD_ULID) / tl._PRE_PROMPT_SIDECAR
     assert sidecar.read_text() == body
+
+
+# ─── CH-01KTK7: visible launch opens a terminal by DEFAULT (reverse-strangle) ─
+#
+# WP-009 had Strangled the OS-window path to a deprecated, flag-gated fallback:
+# a visible launch returned a _failed pointer to the in-cockpit <LiveTerminal/>
+# unless SULIS_TERMINAL_OS_WINDOW=1 was set. CH-01KTK7 reverses that DEFAULT:
+# `start --spawn` wants a real terminal to open, so a VISIBLE launch now
+# dispatches to the platform launcher by default — no flag required. The
+# SULIS_TERMINAL_OS_WINDOW flag remains as an explicit override knob but is no
+# longer needed for the default-on behaviour. The in-cockpit <LiveTerminal/> is
+# a SEPARATE browser-rendering capability, untouched.
+
+
+def test_os_window_enabled_helper_still_reads_flag(monkeypatch):
+    # The flag helper is retained as an explicit override knob. With no flag set
+    # it reports False; the DEFAULT-ON spawn behaviour no longer depends on it.
+    monkeypatch.delenv(tl._OS_WINDOW_FLAG, raising=False)
+    assert tl._os_window_enabled() is False
+
+
+@pytest.mark.parametrize("value", ["1", "true", "TRUE", "yes", "on"])
+def test_os_window_enabled_by_truthy_flag(monkeypatch, value):
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, value)
+    assert tl._os_window_enabled() is True
+
+
+@pytest.mark.parametrize("value", ["", "0", "false", "no", "off"])
+def test_os_window_disabled_by_falsey_flag(monkeypatch, value):
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, value)
+    assert tl._os_window_enabled() is False
+
+
+def test_visible_launch_spawns_by_default_no_flag(tmp_path, monkeypatch):
+    # CH-01KTK7 reversal: with NO SULIS_TERMINAL_OS_WINDOW set, a visible launch
+    # OPENS the terminal by default — it dispatches to the platform launcher and
+    # returns "spawned". No "open it in the cockpit" _failed pointer.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv(tl._OS_WINDOW_FLAG, raising=False)
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl, "_launch_macos",
+                              side_effect=lambda sp, cid, vis: _spawned_dict(sp)) as m:
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path, visible=True)
+    assert result["status"] == "spawned"
+    assert m.call_count == 1
+
+
+def test_visible_launch_no_cockpit_pointer_when_flag_off(tmp_path, monkeypatch):
+    # The deprecated suppression path is gone: a visible launch with the flag
+    # off MUST NOT return a _failed dict pointing at the cockpit. (Regression
+    # guard for the exact behaviour CH-01KTK7 removes.)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv(tl._OS_WINDOW_FLAG, raising=False)
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl, "_launch_macos",
+                              side_effect=lambda sp, cid, vis: _spawned_dict(sp)):
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path, visible=True)
+    assert result["status"] != "failed"
+    err = (result.get("error") or "")
+    assert "cockpit" not in err.lower()
+    assert "deprecated" not in err.lower()
+
+
+def test_visible_launch_still_dispatches_when_flag_on(tmp_path, monkeypatch):
+    # The override flag remains harmless: with it on, a visible launch still
+    # dispatches to the platform launcher (same default-on behaviour).
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, "1")
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl, "_launch_macos",
+                              side_effect=lambda sp, cid, vis: _spawned_dict(sp)) as m:
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path, visible=True)
+    assert m.call_count == 1
+    assert result["status"] == "spawned"
+
+
+def test_visible_launch_linux_spawns_by_default_no_flag(tmp_path, monkeypatch):
+    # The default-on reversal applies on Linux too — no flag needed to reach the
+    # gnome-terminal/konsole/xterm dispatch.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv(tl._OS_WINDOW_FLAG, raising=False)
+    with mock.patch.object(tl.platform, "system", return_value="Linux"), \
+            mock.patch.object(tl, "_launch_linux",
+                              side_effect=lambda sp, cid, vis: _spawned_dict(sp)) as m:
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path, visible=True)
+    assert m.call_count == 1
+    assert result["status"] == "spawned"
+
+
+def test_headless_launch_spawns_regardless_of_flag(tmp_path, monkeypatch):
+    # The headless (visible=False) path is unaffected — it spawns regardless of
+    # the flag (used by automation), exactly as before.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv(tl._OS_WINDOW_FLAG, raising=False)
+    with mock.patch.object(tl.platform, "system", return_value="Linux"), \
+            mock.patch.object(tl, "_launch_headless",
+                              side_effect=lambda sp, cid: _spawned_dict(sp)) as m:
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path, visible=False)
+    assert m.call_count == 1
+    assert result["status"] == "spawned"
+
+
+def test_module_un_deprecated_for_change_start():
+    # CH-01KTK7: the direct terminal is the sanctioned change-start launcher
+    # again — the module must NOT frame the change-start spawn path as a
+    # deprecated fallback. (The in-cockpit <LiveTerminal/> is a separate
+    # browser-rendering capability and may still be mentioned as such.)
+    src = Path(tl.__file__).read_text()
+    assert "DEPRECATED(strangle)" not in src
+    # The launcher's purpose statement should describe the sanctioned spawn,
+    # not a deprecated-in-favour-of-cockpit posture.
+    assert "launch_change_terminal" in src

@@ -14,7 +14,7 @@
 // One state-pattern set (ADR-005): loading skeleton, 404-gone, generic error.
 
 import { useCallback, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useChange } from "../api/useChange";
 import { useStatus } from "../api/useStatus";
@@ -26,11 +26,12 @@ import {
   transcriptQuery,
   turnSummariesQuery,
 } from "../api/viewQueries";
-import { ChangeNav, type ChangeView } from "../components/ChangeNav";
+import { ChangeNav, type ChangeView, CHANGE_VIEWS } from "../components/ChangeNav";
 import { stageLabel } from "../components/StageBadge";
 import { Chat } from "../components/Chat";
 import { Composer } from "../components/Composer";
 import { FilesPanel } from "../components/FilesPanel";
+import { LiveTerminal } from "../components/LiveTerminal";
 import { ContractLinks } from "../components/ContractLinks";
 import { ProvenanceSection } from "../components/ProvenanceSection";
 import { AdvancedView } from "../components/AdvancedView";
@@ -42,7 +43,19 @@ export function ThreadView() {
   const id = changeId ?? "";
   const query = useChange(id);
   const statusQuery = useStatus(id);
-  const [view, setView] = useState<ChangeView>("conversation");
+  // The initial view is seeded from the optional `?view=` query param (WP-009:
+  // "open this change's terminal" navigates to /c/:id?view=terminal so the page
+  // lands ON the terminal). It is validated against the known views and falls
+  // back to "conversation" for any absent/unknown value. After mount the view
+  // is plain local state — the nav drives it, the URL is the entry seed only.
+  const [searchParams] = useSearchParams();
+  const initialView: ChangeView = (() => {
+    const requested = searchParams.get("view");
+    return requested && (CHANGE_VIEWS as readonly string[]).includes(requested)
+      ? (requested as ChangeView)
+      : "conversation";
+  })();
+  const [view, setView] = useState<ChangeView>(initialView);
   const queryClient = useQueryClient();
 
   // Warm a view's primary read(s) on nav hover/focus so the click lands on a
@@ -88,6 +101,11 @@ export function ThreadView() {
             ...advancedQuery(id),
             staleTime: HOVER_STALE_TIME,
           });
+          break;
+        case "terminal":
+          // The terminal has no react-query read to warm — <LiveTerminal/>
+          // opens its pty session over the socket bridge on mount. Nothing to
+          // prefetch; the case exists for switch exhaustiveness.
           break;
       }
     },
@@ -203,6 +221,16 @@ export function ThreadView() {
                 <AdvancedView change={change} />
               </div>
             </div>
+          </div>
+        )}
+
+        {/* The change's live terminal (WP-008): the in-cockpit xterm.js view
+            backed by the session manager's pty-mode session. Mirrors the files
+            view's viewfill mount; <LiveTerminal/> owns its own chrome,
+            scrollback, and connecting/disconnected/no-terminal states. */}
+        {view === "terminal" && (
+          <div className={ws.viewfill} data-testid="section-terminal">
+            <LiveTerminal changeId={id} />
           </div>
         )}
       </div>

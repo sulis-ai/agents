@@ -16,9 +16,21 @@ export interface ChangeCardProps {
   /** Optional pidKind from the session record (TDD §8); when present
    *  and equal to "terminal", the liveness dot renders amber. */
   pidKind?: string | null;
+  /** WP-009 — "open this change's terminal" action. When provided, the card
+   *  renders an "Open terminal" button that opens the change's in-cockpit
+   *  Terminal tab (the cockpit-rendered <LiveTerminal/> path) via this
+   *  callback — the SUBSTITUTE-Strangle of the OS-window launcher
+   *  (_terminal_launcher.py, now a deprecated fallback). The page wires this
+   *  to launchChangeTerminal (WPF-03 — the card stays presentational). Omitted
+   *  → no terminal action rendered (existing dashboard usages unchanged). */
+  onOpenTerminal?: (changeId: string) => void;
 }
 
-export function ChangeCard({ change, pidKind }: ChangeCardProps) {
+export function ChangeCard({
+  change,
+  pidKind,
+  onOpenTerminal,
+}: ChangeCardProps) {
   return (
     <Link
       to={`/c/${change.changeId}`}
@@ -43,6 +55,24 @@ export function ChangeCard({ change, pidKind }: ChangeCardProps) {
           <LivenessDot liveness={change.liveness} pidKind={pidKind} />
         </span>
       </div>
+      {onOpenTerminal ? (
+        <div className={styles.actions}>
+          <button
+            type="button"
+            className={styles.openTerminal}
+            // The action lives inside the card's <Link>; stop the click from
+            // also navigating to the change page — "open terminal" is a
+            // distinct action from "open change".
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onOpenTerminal(change.changeId);
+            }}
+          >
+            Open terminal
+          </button>
+        </div>
+      ) : null}
     </Link>
   );
 }

@@ -1,0 +1,2 @@
+{"id":"7","method":"attach","params":{"key":"chg_never_opened"}}
+{"id":"7","ok":false,"error":{"category":"expected","code":"NO_SESSION","message":"no session for key 'chg_never_opened'"}}

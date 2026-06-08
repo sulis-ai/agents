@@ -1,5 +1,20 @@
 """Cross-platform terminal launcher for the change-as-primitive flow.
 
+This is the sanctioned launcher for the change-start flow (CH-01KTK7). When the
+founder starts a change (``sulis-change start --spawn`` → the ``/sulis:change``
+skill), a VISIBLE launch opens a real terminal window — Terminal.app on macOS,
+gnome-terminal / konsole / xterm on Linux — running ``claude --agent sulis``
+bound to the change via ``SULIS_CHANGE_ID``, with the pre-prompt sidecar so the
+session self-orients rather than sitting idle. This is the DEFAULT: no env flag
+is required to open the terminal.
+
+``SULIS_TERMINAL_OS_WINDOW`` is retained only as an explicit override knob (see
+``_os_window_enabled``); it does NOT gate the default-on spawn. The in-cockpit
+``<LiveTerminal/>`` is a SEPARATE capability — a pty-mode session rendered in
+the browser, reached through the cockpit. It is a different job (watch/use a
+session inside the cockpit), not a replacement for popping a focused terminal
+at change start; this launcher is not deprecated in favour of it.
+
 Port of `ae_task_executor/terminal_launcher.py` (504 LOC) stripped to the
 load-bearing cross-platform spawn path for sulis's single-founder,
 single-machine v1 use case. See:
@@ -24,6 +39,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import platform
 import re
 import shlex
@@ -41,6 +57,13 @@ logger = logging.getLogger("sulis.terminal_launcher")
 
 
 # ─── Module-level constants ────────────────────────────────────────────────
+
+# Optional override knob for the OS-window launch. A visible launch opens the
+# terminal by DEFAULT (CH-01KTK7) — this flag is NOT required for that. It is
+# retained only as an explicit override an operator can set when they want to
+# force/annotate the OS-window path; it does not gate the default-on behaviour.
+_OS_WINDOW_FLAG = "SULIS_TERMINAL_OS_WINDOW"
+_OS_WINDOW_TRUTHY = frozenset({"1", "true", "yes", "on"})
 
 # entry_command whitelist: lower-case letters/digits, spaces, dashes.
 _ENTRY_COMMAND_RE = re.compile(r"^[a-z][a-z0-9 \-]+$")
@@ -74,6 +97,20 @@ _LINUX_TERMINAL_APPS = ("gnome-terminal", "konsole", "xterm")
 _PRE_PROMPT_HEREDOC_TAG = "SULIS_PROMPT_EOF"
 _PRE_PROMPT_SIDECAR = "pre_prompt.txt"  # co-located with launch.sh in the change dir
 _PRE_PROMPT_MAX_BYTES = 50_000
+
+
+# ─── OS-window override knob ────────────────────────────────────────────────
+
+
+def _os_window_enabled() -> bool:
+    """Return True when the OS-window override flag is set.
+
+    Override knob only — a visible launch opens the terminal by DEFAULT
+    (CH-01KTK7), so this is NOT required for the change-start spawn. It is
+    retained so an operator can explicitly signal the OS-window path. Truthy
+    values: ``1``, ``true``, ``yes``, ``on`` (case-insensitive).
+    """
+    return os.environ.get(_OS_WINDOW_FLAG, "").strip().lower() in _OS_WINDOW_TRUTHY
 
 
 # ─── Validators (pure functions, no subprocess) ────────────────────────────
@@ -512,6 +549,17 @@ def launch_change_terminal(
     ok, resolved = validate_worktree_path(worktree_path)
     if not ok:
         raise ValueError(f"worktree_path is not an existing directory: {worktree_path}")
+
+    # A VISIBLE launch opens the change's terminal by DEFAULT (CH-01KTK7). This
+    # is the sanctioned change-start launcher: `start --spawn` wants a real
+    # terminal window to open, briefed on the change — not a pointer elsewhere.
+    # No env flag is required. ``SULIS_TERMINAL_OS_WINDOW`` remains only as an
+    # explicit override knob (e.g. forcing the OS-window path in environments
+    # where it would otherwise be skipped); it does NOT gate the default-on
+    # behaviour, so we deliberately do not consult ``_os_window_enabled()`` here.
+    # The in-cockpit ``<LiveTerminal/>`` is a SEPARATE browser-rendering
+    # capability, reached through the cockpit — not a replacement for popping a
+    # focused terminal at change start.
 
     # Default an opening prompt so the spawned session auto-starts rather than
     # sitting idle at an empty claude prompt (#93). start --spawn passes a rich
