@@ -65,6 +65,23 @@ change X may not attach change Y) — declined as Expected ``NOT_AUTHORIZED``, n
 auth invented. The headless chat path over the socket behaves exactly as the base
 contract (acceptance #4 regression gate).
 
+Reliability layer (CH-01KTMK, automation-reliability-recovery): WP-001 lands
+the shared recovery data contract — ``classifier.py`` (``RecoveryClass``, the
+provider-neutral verdict vocabulary ``TRANSIENT_BLIP`` / ``DEAD_END`` /
+``LOGIN_EXPIRED``, ADR-003) and ``recovery.py`` (``RetryPolicy`` frozen
+dataclass + the ``DEFAULT_RETRY_POLICY`` 12-min full-jitter fallback constant,
+ADR-002; ``next_delay_ceiling``, the jitter-free backoff-ceiling core the
+policy's full ``next_delay`` samples within; and ``ReauthTicket``, the
+re-login-link + completion-handle value object ``adapter.reauth()`` returns,
+ADR-003/004). These are pure, frozen value objects — the producer/consumer
+seam the classifier (WP-002), the policy (WP-003), and the recovery driver
+(WP-005) are all built against in parallel. No new error code is introduced:
+login-expiry rides the existing ``NOT_AUTHORIZED`` code. The contract's
+example tables (the classification truth table + the ``next_delay`` stubs)
+live as a single shared test fixture (``tests/unit/_recovery_contract_\
+fixtures.py``) the downstream WP suites consume, so the verdict vocabulary is
+never re-spelled on either side of the seam (CF-11).
+
 The leading underscore signals "foundation-internal" — exactly as ``_discovery``
 and ``_canonical_drift`` do. The public surface is re-exported here so callers
 import from the package, not its sub-modules.
@@ -78,6 +95,7 @@ from _session_manager.adapter import (
     SessionSpec,
 )
 from _session_manager.adapters.claude import ClaudeAdapter
+from _session_manager.classifier import RecoveryClass
 from _session_manager.event_log import (
     EventLog,
     OffsetEvictedError,
@@ -129,6 +147,12 @@ from _session_manager.maintenance import (
     derive_cap,
 )
 from _session_manager.manager import SessionManager
+from _session_manager.recovery import (
+    DEFAULT_RETRY_POLICY,
+    ReauthTicket,
+    RetryPolicy,
+    next_delay_ceiling,
+)
 from _session_manager.session import Session
 from _session_manager.socket_server import SocketServer
 from _session_manager.state import (
@@ -181,6 +205,12 @@ __all__ = [
     "DEFAULT_MAX_TOOL_CALLS",
     # §2.8 Unix-domain NDJSON socket-serving layer (chat + terminal) — WP-005
     "SocketServer",
+    # reliability layer: recovery vocabulary + retry policy (CH-01KTMK WP-001)
+    "RecoveryClass",
+    "RetryPolicy",
+    "DEFAULT_RETRY_POLICY",
+    "next_delay_ceiling",
+    "ReauthTicket",
     # error model (§2.9)
     "SessionError",
     "ProtocolError",
