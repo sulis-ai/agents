@@ -347,6 +347,59 @@ def test_chat_methods_over_socket(tmp_path: Path, socket_path: str) -> None:
         mgr.shutdown()
 
 
+def test_open_threads_brief_change_id(tmp_path: Path, socket_path: str) -> None:
+    """WP-002: an ``open`` whose ``spec`` carries ``brief_change_id`` produces a
+    :class:`SessionSpec` with that value; absent → ``None`` (additive, the
+    behaviour for any caller that doesn't send it is byte-unchanged).
+
+    Real socket round-trip over a real :class:`SessionManager` (MEA-09, no mock
+    of the manager): the resulting spec is read back from the manager's own
+    session registry — the value the server actually constructed from the wire.
+    """
+    child = tmp_path / "pipe_child.py"
+    child.write_text(_PIPE_CHILD_SOURCE)
+    mgr = SessionManager({"claude": _PipeChildAdapter(child)}, start_maintenance=False)
+    server = SocketServer(mgr, socket_path)
+    server.start()
+    try:
+        client = _Client(socket_path)
+        # 1. spec carries brief_change_id → the constructed spec carries it.
+        client.send(
+            {
+                "id": "1",
+                "method": "open",
+                "params": {
+                    "key": "chg_brief",
+                    "spec": {
+                        "provider": "claude",
+                        "cwd": str(tmp_path),
+                        "brief_change_id": "chg_brief",
+                    },
+                },
+            }
+        )
+        assert client.recv_line()["ok"] is True
+        assert mgr._sessions["chg_brief"].spec.brief_change_id == "chg_brief"
+
+        # 2. absent on the wire → None (no synthesis; unchanged base behaviour).
+        client.send(
+            {
+                "id": "2",
+                "method": "open",
+                "params": {
+                    "key": "chg_nobrief",
+                    "spec": {"provider": "claude", "cwd": str(tmp_path)},
+                },
+            }
+        )
+        assert client.recv_line()["ok"] is True
+        assert mgr._sessions["chg_nobrief"].spec.brief_change_id is None
+        client.close()
+    finally:
+        server.stop()
+        mgr.shutdown()
+
+
 def test_attach_on_pipe_returns_not_pty(tmp_path: Path, socket_path: str) -> None:
     """``attach`` on a pipe-mode session returns Expected ``NOT_PTY_SESSION`` over
     the wire (§2.15) — there is no terminal to attach to (acceptance #4)."""

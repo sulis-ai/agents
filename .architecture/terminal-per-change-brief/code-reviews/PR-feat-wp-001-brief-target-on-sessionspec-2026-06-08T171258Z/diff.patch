@@ -1,0 +1,427 @@
+diff --git a/plugins/sulis/scripts/_session_manager/adapter.py b/plugins/sulis/scripts/_session_manager/adapter.py
+index 883c89be..274a6a0e 100644
+--- a/plugins/sulis/scripts/_session_manager/adapter.py
++++ b/plugins/sulis/scripts/_session_manager/adapter.py
+@@ -71,12 +71,27 @@ class SessionSpec:
+     :class:`~_session_manager.scrollback.ScrollbackBuffer` (§2.11). A viewer
+     attaching (WP-004) does NOT toggle this on — a pty session is pty whether or
+     not a viewer is attached (visible = a viewer attached; headless = none).
++
++    ``brief_change_id`` (NEW, additive, defaulted — this change's ADR-001) is
++    the change whose pre-prompt brief the interactive-pty adapter should resolve
++    (``~/.sulis/changes/{brief_change_id}/pre_prompt.txt``). ``None`` (the
++    DEFAULT) means "no brief" — every frozen caller that does not set it is
++    byte-for-byte unchanged, exactly the ``io_mode`` precedent. It exists because
++    the brief target is **per-session** identity: under the shared daemon the
++    ambient ``SULIS_CHANGE_ID`` is constant across every spawned session, so the
++    old "brief from the env" path briefed every session for the daemon's
++    start-time change (the bug ADR-001 corrects). The consumer (cockpit sidecar,
++    desktop viewer) sets this to the same change id it already uses as the
++    ``open()`` key, and the value reaches the adapter through the spec the
++    manager already passes — the ``ProviderAdapter`` Protocol signature is
++    untouched.
+     """
+ 
+     provider: str
+     cwd: str
+     resume_ref: str | None = None
+     io_mode: Literal["pipe", "pty"] = "pipe"
++    brief_change_id: str | None = None
+ 
+     def __post_init__(self) -> None:
+         # Defence-in-depth (SEC CONCERN-1): ``resume_ref`` is an opaque,
+@@ -88,14 +103,29 @@ class SessionSpec:
+         # it can never be mistaken for a flag) and any control character /
+         # newline (so it can never split or smuggle across a line boundary).
+         rr = self.resume_ref
+-        if rr is None:
+-            return
+-        if rr.startswith("-"):
+-            raise ValueError(
+-                "resume_ref must not start with '-' (could be read as a flag)"
+-            )
+-        if any(ord(ch) < 0x20 for ch in rr):
+-            raise ValueError("resume_ref must not contain control characters")
++        if rr is not None:
++            if rr.startswith("-"):
++                raise ValueError(
++                    "resume_ref must not start with '-' (could be read as a flag)"
++                )
++            if any(ord(ch) < 0x20 for ch in rr):
++                raise ValueError("resume_ref must not contain control characters")
++
++        # Same defence-in-depth shape guard for ``brief_change_id``: it flows
++        # into a filesystem path (``~/.sulis/changes/{brief_change_id}/…``), so
++        # reject a leading ``-`` (never mistaken for a flag) and any control
++        # character / newline (never split or smuggle across a path or line
++        # boundary). The adapter additionally validates it is a real change ULID
++        # before the path join (defence in depth); this guard is the central,
++        # every-adapter-inherits-it shape check, mirroring ``resume_ref``.
++        bci = self.brief_change_id
++        if bci is not None:
++            if bci.startswith("-"):
++                raise ValueError(
++                    "brief_change_id must not start with '-' (could be read as a flag)"
++                )
++            if any(ord(ch) < 0x20 for ch in bci):
++                raise ValueError("brief_change_id must not contain control characters")
+ 
+ 
+ @runtime_checkable
+diff --git a/plugins/sulis/scripts/_session_manager/adapters/claude_pty.py b/plugins/sulis/scripts/_session_manager/adapters/claude_pty.py
+index 27f77cc1..b830d50a 100644
+--- a/plugins/sulis/scripts/_session_manager/adapters/claude_pty.py
++++ b/plugins/sulis/scripts/_session_manager/adapters/claude_pty.py
+@@ -38,14 +38,21 @@ brief as a single argv element is the correct realisation under direct-execv
+ spawn, and it preserves the property that matters: the brief's bytes are NEVER
+ shell-parsed (apostrophes/quotes/backticks are safe; MUC-2 / #86).
+ 
+-**The change id rides the process environment, not argv (ADR-004).** The
+-daemon exports ``SULIS_CHANGE_ID`` on the spawned child's environment; this
+-adapter reads it from :data:`os.environ` to resolve the sidecar. That is the
+-contract-note-preferred path: it needs **no** new ``SessionSpec`` field, so
+-the frozen spec is untouched. An env value is attacker-influenceable in
+-principle, so it is validated as a real change ULID before it is ever joined
+-into a filesystem path (defence in depth) — a malformed value is ignored, not
+-turned into a path.
++**The change id rides the SessionSpec, not the process environment (this
++change's ADR-001, correcting ADR-004).** ADR-004 chose to read the brief
++target from the ambient ``SULIS_CHANGE_ID`` to avoid touching the frozen
++``SessionSpec``. That is sound only when one process serves one change — but
++under the shared daemon (one long-lived process spawns every change's session)
++the daemon's environment is fixed at launch, so every spawned child inherits
++the *same* constant ``SULIS_CHANGE_ID`` and every session was briefed for the
++daemon's start-time change (confirmed live: opening CH-01KTKS briefed
++CH-01KTGY). ADR-001 moves the brief target onto a new, additive, defaulted
++``SessionSpec.brief_change_id`` field (the ``io_mode`` precedent): the adapter
++reads ``spec.brief_change_id`` — the per-session change id the consumer already
++uses as the ``open()`` key — and the ambient env is **no longer consulted, not
++even as a fallback** (a fallback re-opens the bug). The value is validated as a
++real change ULID before it is ever joined into a filesystem path (defence in
++depth) — a malformed value is ignored, not turned into a path.
+ 
+ **The real interactive ``claude`` cannot run in CI** (the WP-009
+ ``--verbose``-required lesson: recorded-fixture unit tests never see the real
+@@ -55,7 +62,6 @@ real-pty round-trip is **observed-done** in WP-007.
+ 
+ from __future__ import annotations
+ 
+-import os
+ from pathlib import Path
+ 
+ import _terminal_launcher
+@@ -76,18 +82,19 @@ _BASE_ARGV: tuple[str, ...] = (
+     "sulis",
+ )
+ 
+-# The env var the daemon exports to bind the spawned child to its change
+-# (ADR-004). Read here to resolve the pre-prompt sidecar without a SessionSpec
+-# field — the frozen spec stays untouched.
+-_CHANGE_ID_ENV = "SULIS_CHANGE_ID"
+-
+ 
+ class InteractiveClaudePtyAdapter:
+-    """The interactive Claude pty :class:`ProviderAdapter` (§2.4 / ADR-004).
++    """The interactive Claude pty :class:`ProviderAdapter` (§2.4 / this change's
++    ADR-001, correcting ADR-004).
+ 
+     Stateless: one instance serves any number of sessions; all per-session
+-    state lives on the :class:`SessionSpec` the manager passes in (cwd) and the
+-    ``SULIS_CHANGE_ID`` process environment (the change binding).
++    state lives on the :class:`SessionSpec` the manager passes in — ``cwd``
++    (where the CLI is launched) and ``brief_change_id`` (which change to brief).
++    The change binding travels on the spec, not the process environment: under
++    the shared daemon (one process spawns every change's session) the ambient
++    ``SULIS_CHANGE_ID`` is constant across sessions, so reading the brief target
++    from the env briefed every session for the daemon's start-time change. This
++    change's ADR-001 moves the target onto the per-session spec.
+     """
+ 
+     #: Honest capability flags (§2.7). Interactive Claude resumes and runs
+@@ -104,7 +111,7 @@ class InteractiveClaudePtyAdapter:
+         ``spec.cwd``.
+ 
+         Appends the change's pre-prompt as a single positional argv element
+-        iff a valid ``SULIS_CHANGE_ID`` is in the environment AND that change's
++        iff ``spec.brief_change_id`` is a valid change ULID AND that change's
+         sidecar file exists. Otherwise returns the bare interactive argv (a
+         session with no briefed pre-prompt comes up bound to the change but
+         idle until the founder types — the launcher's #93 default fills the
+@@ -124,7 +131,7 @@ class InteractiveClaudePtyAdapter:
+         apostrophes/quotes/backticks are safe; #86 / MUC-2) without depending on
+         a shell that is not in this spawn path."""
+         argv = list(_BASE_ARGV)
+-        pre_prompt = self._read_pre_prompt()
++        pre_prompt = self._read_pre_prompt(spec)
+         if pre_prompt is not None:
+             argv.append(pre_prompt)
+         return argv
+@@ -150,9 +157,9 @@ class InteractiveClaudePtyAdapter:
+ 
+     # ── internal: pre-prompt sidecar resolution ───────────────────────────
+ 
+-    def _read_pre_prompt(self) -> str | None:
+-        """Return the change's pre-prompt brief text iff a valid change id is in
+-        the environment and the sidecar file exists; else ``None``.
++    def _read_pre_prompt(self, spec: SessionSpec) -> str | None:
++        """Return the change's pre-prompt brief text iff ``spec.brief_change_id``
++        is a valid change ULID and the sidecar file exists; else ``None``.
+ 
+         Resolves the same sidecar the launcher writes
+         (``~/.sulis/changes/{change_id}/{_PRE_PROMPT_SIDECAR}``, reusing the
+@@ -161,11 +168,17 @@ class InteractiveClaudePtyAdapter:
+         element by :meth:`spawn_argv` (the manager spawns argv directly, no
+         shell — see that method's note).
+ 
+-        The change id comes from ``SULIS_CHANGE_ID`` (ADR-004) and is validated
+-        as a real change ULID before it is joined into a filesystem path — an
+-        env value is attacker-influenceable in principle, so a malformed value
+-        is ignored rather than turned into a path (defence in depth)."""
+-        change_id = os.environ.get(_CHANGE_ID_ENV, "").strip()
++        The change id comes from ``spec.brief_change_id`` (this change's
++        ADR-001), NOT the ambient ``SULIS_CHANGE_ID`` — the env is constant
++        across every session the shared daemon spawns, so it cannot identify
++        *this* session's change. The spec carries the per-session change id the
++        consumer already uses as the ``open()`` key. The value is validated as a
++        real change ULID before it is joined into a filesystem path (the
++        ``SessionSpec.__post_init__`` guard already rejects a leading ``-`` /
++        control chars; this ULID check is the additional defence-in-depth before
++        the path join) — a malformed value is ignored rather than turned into a
++        path."""
++        change_id = (spec.brief_change_id or "").strip()
+         if not change_id:
+             return None
+         ok, _reason = validate_change_ulid(change_id)
+diff --git a/plugins/sulis/scripts/tests/unit/test_claude_pty_adapter.py b/plugins/sulis/scripts/tests/unit/test_claude_pty_adapter.py
+index a2267096..abd87605 100644
+--- a/plugins/sulis/scripts/tests/unit/test_claude_pty_adapter.py
++++ b/plugins/sulis/scripts/tests/unit/test_claude_pty_adapter.py
+@@ -1,5 +1,5 @@
+ """Tests for ``_session_manager.adapters.claude_pty`` — the interactive Claude
+-pty adapter (WP-004, TDD §2.4 / ADR-004).
++pty adapter (WP-004, TDD §2.4 / this change's ADR-001).
+ 
+ The shipped :class:`ClaudeAdapter` is the headless ``-p`` stream-json *chat*
+ io-model. This adapter is its pty sibling: it runs the **real interactive**
+@@ -10,7 +10,7 @@ exactly as the ``PtyChildAdapter`` test sibling does.
+ 
+ These are **unit** conformance + argv-shape tests. The real interactive
+ ``claude`` binary cannot run in CI (the WP-009 ``--verbose`` lesson), so the
+-real-pty round-trip is observed-done in WP-007, not asserted here.
++real-pty round-trip is observed-done in WP-003, not asserted here.
+ 
+ Pre-prompt delivery REUSES the launcher's sidecar file
+ (``_terminal_launcher._PRE_PROMPT_SIDECAR``, #86): the change's brief lives in
+@@ -19,9 +19,14 @@ and passes the brief as a single argv element. (The launcher uses a shell
+ ``"$(cat …)"`` because it writes a bash script; the manager spawns this
+ adapter's argv directly with no shell, so the brief must be read here and
+ passed as one literal argv token — still never shell-parsed, the property #86
+-secures.) The change id reaches the adapter via the ``SULIS_CHANGE_ID`` process
+-environment the daemon sets (ADR-004) — NOT a new ``SessionSpec`` field, so the
+-frozen spec is untouched (the contract-note-preferred path).
++secures.)
++
++**The change id reaches the adapter via ``spec.brief_change_id`` (this change's
++ADR-001) — NOT the ambient ``SULIS_CHANGE_ID`` process environment.** Under the
++shared daemon, the ambient env is constant across every session it spawns, so
++briefing from the env briefs every session for the daemon's start-time change
++(the bug ADR-001 corrects). The brief target is now a per-session field on the
++``SessionSpec`` the adapter already receives; the env is no longer consulted.
+ """
+ 
+ from __future__ import annotations
+@@ -34,8 +39,11 @@ import _terminal_launcher
+ from _session_manager.adapter import ProviderAdapter, SessionSpec
+ from _session_manager.adapters.claude_pty import InteractiveClaudePtyAdapter
+ 
+-# A valid 26-char Crockford-base32 change ULID for the sidecar-resolution tests.
++# Two distinct valid 26-char Crockford-base32 change ULIDs. ``_CHANGE_ID`` is
++# the spec's brief target in the single-change cases; ``_OTHER_CHANGE_ID`` is
++# the *ambient* change in the regression test, proving the env is ignored.
+ _CHANGE_ID = "01KTKB8KSD6G2EMZZNPD0TNPHH"
++_OTHER_CHANGE_ID = "01KTGYDA7XJDGAMGBEMGXR9YF0"
+ 
+ 
+ @pytest.fixture
+@@ -43,9 +51,14 @@ def adapter() -> InteractiveClaudePtyAdapter:
+     return InteractiveClaudePtyAdapter()
+ 
+ 
+-@pytest.fixture
+-def spec() -> SessionSpec:
+-    return SessionSpec(provider="pty", cwd="/tmp/worktree", io_mode="pty")
++def _spec(brief_change_id: str | None = None) -> SessionSpec:
++    """A pty :class:`SessionSpec` with the given brief target (default none)."""
++    return SessionSpec(
++        provider="pty",
++        cwd="/tmp/worktree",
++        io_mode="pty",
++        brief_change_id=brief_change_id,
++    )
+ 
+ 
+ def _seed_sidecar(home: Path, change_id: str, body: str = "brief") -> Path:
+@@ -79,12 +92,11 @@ def test_capabilities_declared(adapter):
+ # ── spawn_argv: the interactive shape ─────────────────────────────────────
+ 
+ 
+-def test_spawn_argv_is_interactive(adapter, spec, monkeypatch):
++def test_spawn_argv_is_interactive(adapter):
+     """The argv is the INTERACTIVE invocation: ``--agent sulis`` and
+     ``--dangerously-skip-permissions`` present; none of the headless
+     stream-json flags (``-p`` / ``--output-format`` / ``stream-json``)."""
+-    monkeypatch.delenv("SULIS_CHANGE_ID", raising=False)
+-    argv = adapter.spawn_argv(spec)
++    argv = adapter.spawn_argv(_spec(brief_change_id=None))
+ 
+     assert argv[0] == "claude"
+     assert "--agent" in argv
+@@ -99,39 +111,37 @@ def test_spawn_argv_is_interactive(adapter, spec, monkeypatch):
+     assert "stream-json" not in argv
+ 
+ 
+-def test_spawn_argv_omits_positional_when_no_change_id(adapter, spec, monkeypatch):
+-    """With no ``SULIS_CHANGE_ID`` in the environment there is no sidecar to
+-    resolve — the argv is the bare interactive invocation, no positional."""
+-    monkeypatch.delenv("SULIS_CHANGE_ID", raising=False)
+-    argv = adapter.spawn_argv(spec)
++def test_spawn_argv_omits_positional_when_no_brief_change_id(adapter):
++    """With ``spec.brief_change_id is None`` (the frozen-caller default) there
++    is no sidecar to resolve — the argv is the bare interactive invocation, no
++    positional."""
++    argv = adapter.spawn_argv(_spec(brief_change_id=None))
+     assert not any("cat " in token for token in argv)
+     assert argv[-1] == "sulis"
+ 
+ 
+ def test_spawn_argv_omits_positional_when_sidecar_absent(
+-    adapter, spec, monkeypatch, tmp_path
++    adapter, monkeypatch, tmp_path
+ ):
+-    """``SULIS_CHANGE_ID`` set but the sidecar file does not exist — no
++    """``spec.brief_change_id`` set but the sidecar file does not exist — no
+     positional is appended (a session with no briefed pre-prompt)."""
+-    monkeypatch.setenv("SULIS_CHANGE_ID", _CHANGE_ID)
+     monkeypatch.setattr(Path, "home", lambda: tmp_path)
+-    argv = adapter.spawn_argv(spec)
++    argv = adapter.spawn_argv(_spec(brief_change_id=_CHANGE_ID))
+     assert not any("cat " in token for token in argv)
+     assert argv[-1] == "sulis"
+ 
+ 
+ def test_spawn_argv_appends_preprompt_brief_when_present(
+-    adapter, spec, monkeypatch, tmp_path
++    adapter, monkeypatch, tmp_path
+ ):
+-    """With ``SULIS_CHANGE_ID`` set and the sidecar present, the argv carries
+-    the brief's TEXT as a single positional argv element — read from the
++    """With ``spec.brief_change_id`` set and the sidecar present, the argv
++    carries the brief's TEXT as a single positional argv element — read from the
+     launcher's sidecar (#86). The manager spawns argv directly (no shell), so
+     the brief is read here, not deferred to a shell ``$(cat …)``."""
+-    monkeypatch.setenv("SULIS_CHANGE_ID", _CHANGE_ID)
+     monkeypatch.setattr(Path, "home", lambda: tmp_path)
+     _seed_sidecar(tmp_path, _CHANGE_ID, body="orient yourself, friend")
+ 
+-    argv = adapter.spawn_argv(spec)
++    argv = adapter.spawn_argv(_spec(brief_change_id=_CHANGE_ID))
+ 
+     # The brief is the final argv element — a single token (never split, never
+     # shell-parsed: it is one execv arg the kernel hands claude verbatim).
+@@ -142,13 +152,41 @@ def test_spawn_argv_appends_preprompt_brief_when_present(
+     assert "cat " not in argv[-1]
+ 
+ 
+-def test_spawn_argv_rejects_malformed_change_id(adapter, spec, monkeypatch, tmp_path):
+-    """A ``SULIS_CHANGE_ID`` that is not a valid change ULID is ignored (no
+-    sidecar resolution, no positional) rather than building a path from
+-    attacker-influenced input — defence in depth for an env-sourced value."""
+-    monkeypatch.setenv("SULIS_CHANGE_ID", "../../etc/passwd")
++def test_briefs_from_spec_not_env(adapter, monkeypatch, tmp_path):
++    """THE REGRESSION the bug evaded (ADR-001). Under the shared daemon the
++    ambient ``SULIS_CHANGE_ID`` is constant across sessions, so briefing from
++    the env briefs every session for the daemon's start-time change. Set the
++    ambient env to one change (``CH_A``) and ``spec.brief_change_id`` to a
++    DIFFERENT change (``CH_B``), each with its own sidecar; assert the spawn
++    briefs from CH_B (the spec) — the env is IGNORED.
++
++    The old code briefed from CH_A here (env wins); this asserts the corrected
++    behaviour (spec wins, env irrelevant)."""
++    monkeypatch.setattr(Path, "home", lambda: tmp_path)
++    # Ambient env points at CH_A with its own (distinct) brief...
++    monkeypatch.setenv("SULIS_CHANGE_ID", _OTHER_CHANGE_ID)
++    _seed_sidecar(tmp_path, _OTHER_CHANGE_ID, body="WRONG brief: ambient CH_A")
++    # ...but the per-session spec points at CH_B with the correct brief.
++    _seed_sidecar(tmp_path, _CHANGE_ID, body="CORRECT brief: spec CH_B")
++
++    argv = adapter.spawn_argv(_spec(brief_change_id=_CHANGE_ID))
++
++    # The spec wins: the brief is CH_B's, never the ambient CH_A's.
++    assert argv[-1] == "CORRECT brief: spec CH_B"
++    assert "WRONG" not in argv[-1]
++
++
++def test_spawn_argv_rejects_malformed_change_id(adapter, monkeypatch, tmp_path):
++    """A ``spec.brief_change_id`` that survives ``__post_init__`` (no leading
++    ``-``, no control chars) but is not a valid change ULID is ignored at
++    resolution time (no sidecar resolution, no positional) rather than building
++    a path from it — ULID validation is retained as defence-in-depth before the
++    path join."""
+     monkeypatch.setattr(Path, "home", lambda: tmp_path)
+-    argv = adapter.spawn_argv(spec)
++    # 26 chars but not Crockford-base32 (contains 'I', 'L', 'O', 'U') -> not a
++    # valid ULID, yet it has no leading '-' and no control chars so it passes
++    # __post_init__ and reaches the resolver.
++    argv = adapter.spawn_argv(_spec(brief_change_id="ILOU" + "0" * 22))
+     assert not any("cat " in token for token in argv)
+     assert argv[-1] == "sulis"
+ 
+@@ -179,13 +217,12 @@ def test_turn_complete_returns_false(adapter):
+ # ── reuse: the launcher's sidecar constant, not a duplicate ────────────────
+ 
+ 
+-def test_reuses_launcher_sidecar_constant(adapter, spec, monkeypatch, tmp_path):
++def test_reuses_launcher_sidecar_constant(adapter, monkeypatch, tmp_path):
+     """The adapter resolves the sidecar at the SAME filename the launcher
+     writes (``_terminal_launcher._PRE_PROMPT_SIDECAR``) — proving it reuses
+     the constant rather than duplicating the literal (EP-03). Re-point the
+     constant, write the brief at the relocated filename, and the adapter
+     reads it from there (it followed the constant, not a hardcoded name)."""
+-    monkeypatch.setenv("SULIS_CHANGE_ID", _CHANGE_ID)
+     monkeypatch.setattr(Path, "home", lambda: tmp_path)
+     monkeypatch.setattr(_terminal_launcher, "_PRE_PROMPT_SIDECAR", "relocated.txt")
+ 
+@@ -195,5 +232,32 @@ def test_reuses_launcher_sidecar_constant(adapter, spec, monkeypatch, tmp_path):
+ 
+     # The default sidecar name must NOT exist — so a pass can only mean the
+     # adapter read from the relocated (constant-driven) path.
+-    argv = adapter.spawn_argv(spec)
++    argv = adapter.spawn_argv(_spec(brief_change_id=_CHANGE_ID))
+     assert argv[-1] == "relocated brief body"
++
++
++# ── SessionSpec.brief_change_id shape guard (__post_init__) ─────────────────
++
++
++def test_session_spec_rejects_brief_change_id_leading_dash():
++    """``brief_change_id`` flows into a filesystem path; ``__post_init__``
++    rejects a leading ``-`` (mirroring the ``resume_ref`` guard) so it can never
++    be mistaken for a flag."""
++    with pytest.raises(ValueError):
++        SessionSpec(provider="pty", cwd="/tmp", brief_change_id="-evil")
++
++
++def test_session_spec_rejects_brief_change_id_control_char():
++    """``__post_init__`` rejects a control character / newline in
++    ``brief_change_id`` so it can never split or smuggle across a path or line
++    boundary."""
++    with pytest.raises(ValueError):
++        SessionSpec(provider="pty", cwd="/tmp", brief_change_id="ab\ncd")
++
++
++def test_session_spec_brief_change_id_defaults_none():
++    """``brief_change_id`` is additive + defaulted (the ``io_mode`` precedent):
++    a frozen caller that constructs a spec without it gets ``None`` and is
++    byte-for-byte unchanged."""
++    spec = SessionSpec(provider="pty", cwd="/tmp")
++    assert spec.brief_change_id is None

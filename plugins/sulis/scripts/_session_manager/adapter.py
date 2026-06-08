@@ -71,12 +71,27 @@ class SessionSpec:
     :class:`~_session_manager.scrollback.ScrollbackBuffer` (§2.11). A viewer
     attaching (WP-004) does NOT toggle this on — a pty session is pty whether or
     not a viewer is attached (visible = a viewer attached; headless = none).
+
+    ``brief_change_id`` (NEW, additive, defaulted — this change's ADR-001) is
+    the change whose pre-prompt brief the interactive-pty adapter should resolve
+    (``~/.sulis/changes/{brief_change_id}/pre_prompt.txt``). ``None`` (the
+    DEFAULT) means "no brief" — every frozen caller that does not set it is
+    byte-for-byte unchanged, exactly the ``io_mode`` precedent. It exists because
+    the brief target is **per-session** identity: under the shared daemon the
+    ambient ``SULIS_CHANGE_ID`` is constant across every spawned session, so the
+    old "brief from the env" path briefed every session for the daemon's
+    start-time change (the bug ADR-001 corrects). The consumer (cockpit sidecar,
+    desktop viewer) sets this to the same change id it already uses as the
+    ``open()`` key, and the value reaches the adapter through the spec the
+    manager already passes — the ``ProviderAdapter`` Protocol signature is
+    untouched.
     """
 
     provider: str
     cwd: str
     resume_ref: str | None = None
     io_mode: Literal["pipe", "pty"] = "pipe"
+    brief_change_id: str | None = None
 
     def __post_init__(self) -> None:
         # Defence-in-depth (SEC CONCERN-1): ``resume_ref`` is an opaque,
@@ -88,14 +103,29 @@ class SessionSpec:
         # it can never be mistaken for a flag) and any control character /
         # newline (so it can never split or smuggle across a line boundary).
         rr = self.resume_ref
-        if rr is None:
-            return
-        if rr.startswith("-"):
-            raise ValueError(
-                "resume_ref must not start with '-' (could be read as a flag)"
-            )
-        if any(ord(ch) < 0x20 for ch in rr):
-            raise ValueError("resume_ref must not contain control characters")
+        if rr is not None:
+            if rr.startswith("-"):
+                raise ValueError(
+                    "resume_ref must not start with '-' (could be read as a flag)"
+                )
+            if any(ord(ch) < 0x20 for ch in rr):
+                raise ValueError("resume_ref must not contain control characters")
+
+        # Same defence-in-depth shape guard for ``brief_change_id``: it flows
+        # into a filesystem path (``~/.sulis/changes/{brief_change_id}/…``), so
+        # reject a leading ``-`` (never mistaken for a flag) and any control
+        # character / newline (never split or smuggle across a path or line
+        # boundary). The adapter additionally validates it is a real change ULID
+        # before the path join (defence in depth); this guard is the central,
+        # every-adapter-inherits-it shape check, mirroring ``resume_ref``.
+        bci = self.brief_change_id
+        if bci is not None:
+            if bci.startswith("-"):
+                raise ValueError(
+                    "brief_change_id must not start with '-' (could be read as a flag)"
+                )
+            if any(ord(ch) < 0x20 for ch in bci):
+                raise ValueError("brief_change_id must not contain control characters")
 
 
 @runtime_checkable

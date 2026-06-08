@@ -270,6 +270,11 @@ export function createTerminalSidecar(
               provider: spec.provider,
               cwd: spec.cwd,
               ...(req.params.spec ?? {}),
+              // WP-002: the brief target IS the change this WS is for — the same
+              // `key` already used for provider+cwd resolution. Set AFTER the
+              // client spec spread so the sidecar's value is authoritative (the
+              // client must not set the brief target, ADR-001).
+              brief_change_id: key,
             };
             outbound = JSON.stringify(req);
           }

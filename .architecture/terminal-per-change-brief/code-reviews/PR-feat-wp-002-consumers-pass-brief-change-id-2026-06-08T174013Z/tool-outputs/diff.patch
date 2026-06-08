@@ -1,0 +1,210 @@
+diff --git a/apps/cockpit/server/adapters/TerminalSidecar.ts b/apps/cockpit/server/adapters/TerminalSidecar.ts
+index fc8569b5..c8288e2d 100644
+--- a/apps/cockpit/server/adapters/TerminalSidecar.ts
++++ b/apps/cockpit/server/adapters/TerminalSidecar.ts
+@@ -270,6 +270,11 @@ export function createTerminalSidecar(
+               provider: spec.provider,
+               cwd: spec.cwd,
+               ...(req.params.spec ?? {}),
++              // WP-002: the brief target IS the change this WS is for — the same
++              // `key` already used for provider+cwd resolution. Set AFTER the
++              // client spec spread so the sidecar's value is authoritative (the
++              // client must not set the brief target, ADR-001).
++              brief_change_id: key,
+             };
+             outbound = JSON.stringify(req);
+           }
+diff --git a/apps/cockpit/server/tests/terminalSidecar.test.ts b/apps/cockpit/server/tests/terminalSidecar.test.ts
+index d4f19dde..31fae508 100644
+--- a/apps/cockpit/server/tests/terminalSidecar.test.ts
++++ b/apps/cockpit/server/tests/terminalSidecar.test.ts
+@@ -344,6 +344,39 @@ describe("WP-002 terminal sidecar bridge", () => {
+     expect(endpoint.connections[0]!.lines[0]).toBe(original);
+   });
+ 
++  it("test_open_injects_brief_change_id — the rewritten open sets spec.brief_change_id to the changeId the WS is for", async () => {
++    const { endpoint, harness } = await setup();
++    const ws = await openWs(harness.url); // URL carries ?changeId=CHANGE_ID
++    cleanups.push(async () => ws.close());
++
++    // The client sends only {io_mode:"pty"} — the sidecar supplies the brief
++    // target (the same changeId it already keys provider+cwd resolution on).
++    ws.send(JSON.stringify({ id: "1", method: "open", params: { key: CHANGE_ID, spec: { io_mode: "pty" } } }));
++
++    await endpoint.waitForLine(0);
++    const parsed = JSON.parse(endpoint.connections[0]!.lines[0]!) as {
++      params: { spec: Record<string, unknown> };
++    };
++    expect(parsed.params.spec.brief_change_id).toBe(CHANGE_ID);
++  });
++
++  it("test_open_omits_brief_change_id_when_no_identity — no ?changeId and no open key → field omitted (None server-side)", async () => {
++    const { endpoint, harness } = await setup();
++    // Connect with NO ?changeId, and open with NO key — there is no identity to
++    // brief from, so the resolver returns null and the open is forwarded
++    // verbatim, carrying no brief_change_id.
++    const ws = await openWs(`${harness.baseUrl}/terminal`);
++    cleanups.push(async () => ws.close());
++
++    ws.send(JSON.stringify({ id: "1", method: "open", params: { spec: { io_mode: "pty" } } }));
++
++    await endpoint.waitForLine(0);
++    const parsed = JSON.parse(endpoint.connections[0]!.lines[0]!) as {
++      params?: { spec?: Record<string, unknown> };
++    };
++    expect(parsed.params?.spec?.brief_change_id).toBeUndefined();
++  });
++
+   it("test_forwards_other_methods_verbatim — attach/feed/resize/detach pass through byte-for-byte (incl base64 payloads)", async () => {
+     const { endpoint, harness } = await setup();
+     const ws = await openWs(harness.url);
+diff --git a/plugins/sulis/scripts/_session_manager/socket_server.py b/plugins/sulis/scripts/_session_manager/socket_server.py
+index 912e9faf..0ee0ce97 100644
+--- a/plugins/sulis/scripts/_session_manager/socket_server.py
++++ b/plugins/sulis/scripts/_session_manager/socket_server.py
+@@ -218,6 +218,10 @@ class _Handler(socketserver.BaseRequestHandler):
+             cwd=spec_d["cwd"],
+             resume_ref=spec_d.get("resume_ref"),
+             io_mode=spec_d.get("io_mode", "pipe"),
++            # WP-002: route the per-open brief target (the change this session is
++            # FOR) onto the spec. Absent on the wire → None (unchanged base
++            # behaviour for any caller that doesn't send it). ADR-001.
++            brief_change_id=spec_d.get("brief_change_id"),
+         )
+         session = self.server.manager.open(key, spec)
+         self._send(
+diff --git a/plugins/sulis/scripts/session_viewer.py b/plugins/sulis/scripts/session_viewer.py
+index c8eb1bdb..70d05a14 100644
+--- a/plugins/sulis/scripts/session_viewer.py
++++ b/plugins/sulis/scripts/session_viewer.py
+@@ -390,11 +390,19 @@ def main(
+         #    unary ack with no reader to consume it would block the caller.
+         conn.start_reader()
+         # 3. open (get-or-spawn): idempotent — first view creates, later attach.
++        #    brief_change_id is the SAME change_id already used as the open key —
++        #    routing it onto the spec is what briefs the pty session for the
++        #    change it is FOR (WP-002, ADR-001).
+         conn.request(
+             "open",
+             {
+                 "key": change_id,
+-                "spec": {"provider": "pty", "cwd": worktree, "io_mode": "pty"},
++                "spec": {
++                    "provider": "pty",
++                    "cwd": worktree,
++                    "io_mode": "pty",
++                    "brief_change_id": change_id,
++                },
+             },
+             timeout=_REQUEST_TIMEOUT,
+         )
+diff --git a/plugins/sulis/scripts/tests/integration/test_session_viewer.py b/plugins/sulis/scripts/tests/integration/test_session_viewer.py
+index 32a3e15b..424bc990 100644
+--- a/plugins/sulis/scripts/tests/integration/test_session_viewer.py
++++ b/plugins/sulis/scripts/tests/integration/test_session_viewer.py
+@@ -275,6 +275,41 @@ def test_attach_renders_snapshot_then_live(running_server, tmp_path: Path) -> No
+         os.close(slave_fd)
+ 
+ 
++def test_open_threads_brief_change_id(running_server, tmp_path: Path) -> None:
++    """WP-002: the viewer's ``open`` routes its change id into the session's
++    ``brief_change_id`` so the pty session briefs for the change it is FOR.
++
++    The viewer already keys the session by ``change_id``; this asserts that same
++    value also reaches the spec's brief target (read back from the real manager's
++    session registry — the spec the server actually built from the viewer's wire
++    payload, MEA-09 no-mock)."""
++    socket_path, mgr = running_server
++
++    master_fd, slave_fd = os.openpty()
++    try:
++        thread, _result = _run_viewer_in_thread(
++            change_id="chg_VB",
++            worktree=str(tmp_path),
++            socket_path=socket_path,
++            stdin_fd=slave_fd,
++            stdout_fd=slave_fd,
++        )
++        # The viewer opens get-or-spawn; wait for the session to exist, then read
++        # back the spec the server constructed from the viewer's open payload.
++        deadline = time.monotonic() + _WAIT
++        while time.monotonic() < deadline:
++            if mgr._sessions.get("chg_VB") is not None:
++                break
++            time.sleep(0.02)
++        assert mgr._sessions.get("chg_VB") is not None, "viewer never opened"
++        assert mgr._sessions["chg_VB"].spec.brief_change_id == "chg_VB"
++        master_fd = _stop_viewer(thread, master_fd)
++    finally:
++        if master_fd != -1:
++            os.close(master_fd)
++        os.close(slave_fd)
++
++
+ def test_feed_roundtrip_stdin_to_child(running_server, tmp_path: Path) -> None:
+     """Bytes written to the viewer's stdin reach the child (feed round-trip,
+     echoed back into the live stream). Type the ``__PTY_PING__`` sentinel on the
+diff --git a/plugins/sulis/scripts/tests/integration/test_socket_server.py b/plugins/sulis/scripts/tests/integration/test_socket_server.py
+index 0555114b..5395c620 100644
+--- a/plugins/sulis/scripts/tests/integration/test_socket_server.py
++++ b/plugins/sulis/scripts/tests/integration/test_socket_server.py
+@@ -347,6 +347,59 @@ def test_chat_methods_over_socket(tmp_path: Path, socket_path: str) -> None:
+         mgr.shutdown()
+ 
+ 
++def test_open_threads_brief_change_id(tmp_path: Path, socket_path: str) -> None:
++    """WP-002: an ``open`` whose ``spec`` carries ``brief_change_id`` produces a
++    :class:`SessionSpec` with that value; absent → ``None`` (additive, the
++    behaviour for any caller that doesn't send it is byte-unchanged).
++
++    Real socket round-trip over a real :class:`SessionManager` (MEA-09, no mock
++    of the manager): the resulting spec is read back from the manager's own
++    session registry — the value the server actually constructed from the wire.
++    """
++    child = tmp_path / "pipe_child.py"
++    child.write_text(_PIPE_CHILD_SOURCE)
++    mgr = SessionManager({"claude": _PipeChildAdapter(child)}, start_maintenance=False)
++    server = SocketServer(mgr, socket_path)
++    server.start()
++    try:
++        client = _Client(socket_path)
++        # 1. spec carries brief_change_id → the constructed spec carries it.
++        client.send(
++            {
++                "id": "1",
++                "method": "open",
++                "params": {
++                    "key": "chg_brief",
++                    "spec": {
++                        "provider": "claude",
++                        "cwd": str(tmp_path),
++                        "brief_change_id": "chg_brief",
++                    },
++                },
++            }
++        )
++        assert client.recv_line()["ok"] is True
++        assert mgr._sessions["chg_brief"].spec.brief_change_id == "chg_brief"
++
++        # 2. absent on the wire → None (no synthesis; unchanged base behaviour).
++        client.send(
++            {
++                "id": "2",
++                "method": "open",
++                "params": {
++                    "key": "chg_nobrief",
++                    "spec": {"provider": "claude", "cwd": str(tmp_path)},
++                },
++            }
++        )
++        assert client.recv_line()["ok"] is True
++        assert mgr._sessions["chg_nobrief"].spec.brief_change_id is None
++        client.close()
++    finally:
++        server.stop()
++        mgr.shutdown()
++
++
+ def test_attach_on_pipe_returns_not_pty(tmp_path: Path, socket_path: str) -> None:
+     """``attach`` on a pipe-mode session returns Expected ``NOT_PTY_SESSION`` over
+     the wire (§2.15) — there is no terminal to attach to (acceptance #4)."""

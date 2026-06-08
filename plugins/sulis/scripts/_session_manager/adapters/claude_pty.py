@@ -38,14 +38,21 @@ brief as a single argv element is the correct realisation under direct-execv
 spawn, and it preserves the property that matters: the brief's bytes are NEVER
 shell-parsed (apostrophes/quotes/backticks are safe; MUC-2 / #86).
 
-**The change id rides the process environment, not argv (ADR-004).** The
-daemon exports ``SULIS_CHANGE_ID`` on the spawned child's environment; this
-adapter reads it from :data:`os.environ` to resolve the sidecar. That is the
-contract-note-preferred path: it needs **no** new ``SessionSpec`` field, so
-the frozen spec is untouched. An env value is attacker-influenceable in
-principle, so it is validated as a real change ULID before it is ever joined
-into a filesystem path (defence in depth) — a malformed value is ignored, not
-turned into a path.
+**The change id rides the SessionSpec, not the process environment (this
+change's ADR-001, correcting ADR-004).** ADR-004 chose to read the brief
+target from the ambient ``SULIS_CHANGE_ID`` to avoid touching the frozen
+``SessionSpec``. That is sound only when one process serves one change — but
+under the shared daemon (one long-lived process spawns every change's session)
+the daemon's environment is fixed at launch, so every spawned child inherits
+the *same* constant ``SULIS_CHANGE_ID`` and every session was briefed for the
+daemon's start-time change (confirmed live: opening CH-01KTKS briefed
+CH-01KTGY). ADR-001 moves the brief target onto a new, additive, defaulted
+``SessionSpec.brief_change_id`` field (the ``io_mode`` precedent): the adapter
+reads ``spec.brief_change_id`` — the per-session change id the consumer already
+uses as the ``open()`` key — and the ambient env is **no longer consulted, not
+even as a fallback** (a fallback re-opens the bug). The value is validated as a
+real change ULID before it is ever joined into a filesystem path (defence in
+depth) — a malformed value is ignored, not turned into a path.
 
 **The real interactive ``claude`` cannot run in CI** (the WP-009
 ``--verbose``-required lesson: recorded-fixture unit tests never see the real
@@ -55,7 +62,6 @@ real-pty round-trip is **observed-done** in WP-007.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import _terminal_launcher
@@ -76,18 +82,19 @@ _BASE_ARGV: tuple[str, ...] = (
     "sulis",
 )
 
-# The env var the daemon exports to bind the spawned child to its change
-# (ADR-004). Read here to resolve the pre-prompt sidecar without a SessionSpec
-# field — the frozen spec stays untouched.
-_CHANGE_ID_ENV = "SULIS_CHANGE_ID"
-
 
 class InteractiveClaudePtyAdapter:
-    """The interactive Claude pty :class:`ProviderAdapter` (§2.4 / ADR-004).
+    """The interactive Claude pty :class:`ProviderAdapter` (§2.4 / this change's
+    ADR-001, correcting ADR-004).
 
     Stateless: one instance serves any number of sessions; all per-session
-    state lives on the :class:`SessionSpec` the manager passes in (cwd) and the
-    ``SULIS_CHANGE_ID`` process environment (the change binding).
+    state lives on the :class:`SessionSpec` the manager passes in — ``cwd``
+    (where the CLI is launched) and ``brief_change_id`` (which change to brief).
+    The change binding travels on the spec, not the process environment: under
+    the shared daemon (one process spawns every change's session) the ambient
+    ``SULIS_CHANGE_ID`` is constant across sessions, so reading the brief target
+    from the env briefed every session for the daemon's start-time change. This
+    change's ADR-001 moves the target onto the per-session spec.
     """
 
     #: Honest capability flags (§2.7). Interactive Claude resumes and runs
@@ -104,7 +111,7 @@ class InteractiveClaudePtyAdapter:
         ``spec.cwd``.
 
         Appends the change's pre-prompt as a single positional argv element
-        iff a valid ``SULIS_CHANGE_ID`` is in the environment AND that change's
+        iff ``spec.brief_change_id`` is a valid change ULID AND that change's
         sidecar file exists. Otherwise returns the bare interactive argv (a
         session with no briefed pre-prompt comes up bound to the change but
         idle until the founder types — the launcher's #93 default fills the
@@ -124,7 +131,7 @@ class InteractiveClaudePtyAdapter:
         apostrophes/quotes/backticks are safe; #86 / MUC-2) without depending on
         a shell that is not in this spawn path."""
         argv = list(_BASE_ARGV)
-        pre_prompt = self._read_pre_prompt()
+        pre_prompt = self._read_pre_prompt(spec)
         if pre_prompt is not None:
             argv.append(pre_prompt)
         return argv
@@ -150,9 +157,9 @@ class InteractiveClaudePtyAdapter:
 
     # ── internal: pre-prompt sidecar resolution ───────────────────────────
 
-    def _read_pre_prompt(self) -> str | None:
-        """Return the change's pre-prompt brief text iff a valid change id is in
-        the environment and the sidecar file exists; else ``None``.
+    def _read_pre_prompt(self, spec: SessionSpec) -> str | None:
+        """Return the change's pre-prompt brief text iff ``spec.brief_change_id``
+        is a valid change ULID and the sidecar file exists; else ``None``.
 
         Resolves the same sidecar the launcher writes
         (``~/.sulis/changes/{change_id}/{_PRE_PROMPT_SIDECAR}``, reusing the
@@ -161,11 +168,17 @@ class InteractiveClaudePtyAdapter:
         element by :meth:`spawn_argv` (the manager spawns argv directly, no
         shell — see that method's note).
 
-        The change id comes from ``SULIS_CHANGE_ID`` (ADR-004) and is validated
-        as a real change ULID before it is joined into a filesystem path — an
-        env value is attacker-influenceable in principle, so a malformed value
-        is ignored rather than turned into a path (defence in depth)."""
-        change_id = os.environ.get(_CHANGE_ID_ENV, "").strip()
+        The change id comes from ``spec.brief_change_id`` (this change's
+        ADR-001), NOT the ambient ``SULIS_CHANGE_ID`` — the env is constant
+        across every session the shared daemon spawns, so it cannot identify
+        *this* session's change. The spec carries the per-session change id the
+        consumer already uses as the ``open()`` key. The value is validated as a
+        real change ULID before it is joined into a filesystem path (the
+        ``SessionSpec.__post_init__`` guard already rejects a leading ``-`` /
+        control chars; this ULID check is the additional defence-in-depth before
+        the path join) — a malformed value is ignored rather than turned into a
+        path."""
+        change_id = (spec.brief_change_id or "").strip()
         if not change_id:
             return None
         ok, _reason = validate_change_ulid(change_id)

@@ -1,0 +1,35 @@
+{
+  "target": "feat/wp-001-brief-target-on-sessionspec",
+  "base": "change/fix-terminal-per-change-brief",
+  "project": "terminal-per-change-brief",
+  "wp": "WP-001",
+  "kind": "backend",
+  "timestamp": "2026-06-08T171258Z",
+  "verdict": "PASS",
+  "verdict_plain": "Ready to merge",
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "ruff_check": "pass",
+    "ruff_format": "pass",
+    "mypy_changed_files": "pass",
+    "coverage_gap": "none"
+  },
+  "hygiene": {
+    "scope": {"severity": "none", "commit_types": ["fix"], "module_fan_out": 1},
+    "size": {"severity": "none", "lines_added": 177, "lines_removed": 70, "files_changed": 3},
+    "safety": {"severity": "none", "migrations": 0, "schemas": 0, "secrets": 0, "infra": 0},
+    "completeness": {"severity": "none", "new_source_without_test": 0, "api_change_without_schema": false}
+  },
+  "findings": {
+    "changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "neighbours": {"total": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "status": "nothing-surfaced"},
+    "security": {"findings": 0, "status": "nothing-surfaced"},
+    "quality": {"findings": 0, "status": "nothing-surfaced"}
+  },
+  "draft_fixes": 0,
+  "auto_downgrade_triggers_fired": [],
+  "addressed": true
+}
