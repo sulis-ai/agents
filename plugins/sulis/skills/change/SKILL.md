@@ -38,7 +38,7 @@ You give it a subcommand and it does the right thing:
 
 | You type | What happens |
 |---|---|
-| `/sulis:change start "fix the login bug"` | Opens a fresh, focused workspace for that work — a new terminal with Sulis already briefed on it. |
+| `/sulis:change start "fix the login bug"` | Opens a fresh, focused workspace for that work — a desktop window showing a live view of the change's session, with Sulis already briefed on it. The same session also shows up in the cockpit: two views, one session. |
 | `/sulis:change list` | Shows everything you have in flight, in one scannable list. |
 | `/sulis:change focus CH-01HQ8X` | Jumps you back into a piece of work you started earlier. |
 | `/sulis:change ship CH-01HQ8X` | Lands the finished work into the shared `dev` line (after the safety checks pass). |
@@ -136,8 +136,8 @@ no `dev` to fall behind, so there is no drift to detect.)
 before running anything:
 
 > *"I'll start a new piece of work called **fix the login bug**
-> (`fix-login-bug`), set up its own workspace, and open a fresh terminal
-> with me already focused on it. Here goes."*
+> (`fix-login-bug`), set up its own workspace, and open a desktop window
+> onto its session with me already focused on it. Here goes."*
 
 **5. Run the tool.** Substitute the resolved path:
 
@@ -149,21 +149,27 @@ before running anything:
   --spawn
 ```
 
-`--spawn` is what makes a new terminal open: the tool creates the
+`--spawn` is what opens the desktop window: the tool creates the
 `change/{primitive}-{slug}` branch + a dedicated worktree, writes the
-recon `CONTEXT.md`, and launches a new terminal running
-`claude --agent sulis` bound to this change via the `SULIS_CHANGE_ID`
-environment variable. Opening that terminal is the default — no
-environment flag is required, and `start` never points the founder at the
-cockpit instead. (The in-cockpit terminal is a separate, browser-rendered
-way to use a session; it is not what `start` opens.)
+recon `CONTEXT.md`, and opens a desktop window that shows a **live view of
+the change's session** (with Sulis already focused on this work via the
+`SULIS_CHANGE_ID` environment variable). Opening that window is the
+default — no environment flag is required.
+
+There is **one session per change**, and the desktop window is a *view* onto
+it — not a separate copy. The cockpit shows the **same** session in the
+browser, so you can watch or use the work from either place: two views,
+one session, always in sync. Closing the desktop window just **detaches**
+that view — the session keeps running, and you can reopen it (or pick it up
+in the cockpit) any time. Closing a window never ends the work.
 
 **6. Report (Rule 1 + Rule 2).** Parse the JSON on stdout. Lead with the
 outcome; carry the handle in parentheses:
 
-> *"Started **fix the login bug** (`CH-01HQ8X`). A new terminal just
-> opened — I'm in there, already briefed on this work and ready to go.
-> This window stays free for anything else."*
+> *"Started **fix the login bug** (`CH-01HQ8X`). A desktop window just
+> opened onto its session — I'm in there, already briefed on this work and
+> ready to go. The same session is in the cockpit too, if you'd rather work
+> there. This window stays free for anything else."*
 
 If `spawn_result.status` is **not** `"spawned"` (`failed` /
 `unsupported platform` / no terminal app), the branch + worktree + recon
@@ -980,8 +986,8 @@ them the dashboard updates on its own as work progresses, and point them at
 ## Vocabulary
 
 - **Change** — one piece of work in flight: its own branch, worktree, and
-  (when spawned) a focused terminal. The founder's mental model of "the
-  thing I'm working on".
+  (when spawned) a desktop window onto its session. The founder's mental
+  model of "the thing I'm working on".
 - **Handle (`CH-XXXXXX`)** — the short, founder-facing reference for a
   change (first 6 characters of its underlying ULID). Used everywhere the
   founder sees a change.
@@ -994,8 +1000,11 @@ them the dashboard updates on its own as work progresses, and point them at
   checks → squash-merge). Solo profile: no merge queue.
 - **Rebase** (founder sense) — catch a change up with the latest team work;
   implemented as a merge, not a git rebase (CW-04).
-- **Workspace / focused terminal** — the new terminal `start` opens, with
-  Sulis already briefed on the change via the recon `CONTEXT.md`.
+- **Workspace / session view** — the desktop window `start` opens: a live
+  view onto the change's one session, with Sulis already briefed on the
+  change via the recon `CONTEXT.md`. The cockpit shows the same session in
+  the browser — two views, one session. Closing a view detaches it; the
+  session keeps running.
 - **Nuke** — throw a change away: delete its branch, worktree, local state,
   and manifest. Irreversible; dry-runs by default, deletes only with
   `--force` after explicit founder confirmation.
