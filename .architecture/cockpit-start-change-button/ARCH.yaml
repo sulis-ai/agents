@@ -1,0 +1,10 @@
+id: cockpit-start-change-button
+handle: CH-01KTMF
+change_id: 01KTMFZ76WPCD213DC9JX7JYNX
+status: decomposed
+sourced_from: .changes/feat-cockpit-start-change-button.SPEC.md
+branch: change/feat-cockpit-start-change-button
+base_branch: main
+builds_on: change/create-change-owned-terminal-shared-session
+tier: S
+design_signoff: .design/cockpit-start-change-button/SIGNOFF.md

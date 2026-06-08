@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cockpit — Start something new (visual mockup)</title>
+
+<!-- Real cockpit webfonts (matches apps/cockpit/client/index.html). L-13:
+     the type tokens must actually render, not just "match" on paper.
+     --font-display (Satoshi) is NOT loaded by the live cockpit today, so this
+     mockup uses Inter for display too — exactly what the founder will see. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400&display=swap"
+  rel="stylesheet"
+/>
+
+<style>
+/* ---- Real Sulis design tokens (copied verbatim from
+       apps/cockpit/client/src/tokens.css — no invented values) ---- */
+:root {
+  --background: #fafafa;
+  --foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+  --muted: #f5f5f5;
+  --muted-foreground: #737373;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #171717;
+  --border: #e5e5e5;
+  --border-muted: #f0f0f0;
+  --input: #e5e5e5;
+
+  --primary: #2563EB;
+  --primary-foreground: #FFFFFF;
+  --accent: #2D7D90;
+  --accent-foreground: #FFFFFF;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --positive: #16A34A;
+  --positive-foreground: #FFFFFF;
+  --warning: #F59E0B;
+  --warning-foreground: #121212;
+  --ring: #2563EB;
+  --brand-gold: #C9A962;
+  --brand-depth: #1E3A5F;
+
+  --radius-interactive: 4px;
+  --radius-button: 9999px;
+  --radius-container: 4px;
+  --radius-badge: 9999px;
+  --radius-media: 4px;
+
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
+
+  --weight-body: 400;
+  --weight-heading: 300;
+  --weight-label: 500;
+}
+
+* , *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-weight: var(--weight-body);
+  -webkit-font-smoothing: antialiased;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* page scaffold for the mockup walkthrough */
+.page-wrap { max-width: 1180px; margin: 0 auto; padding: 40px 24px 80px; }
+.page-title { font-family: var(--font-display); font-weight: var(--weight-heading); font-size: 28px; margin: 0 0 4px; }
+.page-sub { color: var(--muted-foreground); margin: 0 0 32px; font-size: 14px; }
+.state-label {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: var(--weight-label); text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--muted-foreground); margin: 40px 0 12px;
+}
+.state-label::before {
+  content: ""; width: 6px; height: 6px; border-radius: 9999px; background: var(--accent);
+}
+.state-note { color: var(--muted-foreground); font-size: 13px; margin: 0 0 14px; max-width: 720px; }
+
+/* ===== App shell (mirrors Shell.tsx + Sidebar.module.css) ===== */
+.shell {
+  display: flex; height: 620px; overflow: hidden;
+  border: 1px solid var(--border); border-radius: var(--radius-container);
+  background: var(--background); box-shadow: 0 1px 2px rgba(23,23,23,0.04);
+}
+.sidebar {
+  width: 280px; flex: 0 0 280px; border-right: 1px solid var(--border);
+  padding: 16px; overflow-y: auto; background: var(--muted);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.sidebar-heading {
+  font-size: 14px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--muted-foreground); margin: 0 0 4px;
+}
+
+/* THE FRONT DOOR — the one primary action, top of the sidebar */
+.start-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 11px 16px; margin-bottom: 8px;
+  background: var(--primary); color: var(--primary-foreground);
+  border: 0; border-radius: var(--radius-button);
+  font-family: var(--font-sans); font-size: 14px; font-weight: var(--weight-label);
+  cursor: pointer; transition: filter .12s ease;
+}
+.start-btn:hover { filter: brightness(1.06); }
+.start-btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.start-btn .plus { font-size: 16px; line-height: 1; }
+.kbd-hint {
+  margin-left: auto; font-family: var(--font-mono); font-size: 11px;
+  background: rgba(255,255,255,0.18); padding: 1px 6px; border-radius: var(--radius-badge);
+  color: var(--primary-foreground);
+}
+
+.change-list { display: flex; flex-direction: column; gap: 2px; }
+.change-item {
+  display: flex; align-items: center; gap: 8px; padding: 9px 10px;
+  border-radius: var(--radius-interactive); cursor: pointer; font-size: 13px;
+}
+.change-item:hover { background: var(--background); }
+.change-item.active { background: var(--card); border: 1px solid var(--border); }
+.dot { width: 8px; height: 8px; border-radius: 9999px; flex: 0 0 8px; }
+.dot.live { background: var(--positive); }
+.dot.idle { background: var(--muted-foreground); }
+.change-item .meta { color: var(--muted-foreground); font-size: 11px; margin-left: auto; }
+.sidebar-empty { color: var(--muted-foreground); font-style: italic; font-size: 13px; margin: 4px 0 0; }
+
+/* main / outlet */
+.main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.topbar {
+  display: flex; align-items: center; gap: 12px; padding: 12px 20px;
+  border-bottom: 1px solid var(--border); background: var(--card); min-height: 52px;
+}
+.topbar .crumb { font-size: 13px; color: var(--muted-foreground); }
+.topbar .crumb strong { color: var(--foreground); font-weight: var(--weight-label); }
+.topbar .spacer { flex: 1; }
+.palette-trigger {
+  display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-button);
+  background: var(--background); color: var(--muted-foreground);
+  font-size: 12px; cursor: pointer;
+}
+.palette-trigger kbd {
+  font-family: var(--font-mono); font-size: 11px; background: var(--muted);
+  border: 1px solid var(--border); border-radius: 3px; padding: 0 5px;
+}
+.outlet { flex: 1; overflow-y: auto; padding: 0; display: flex; flex-direction: column; }
+
+/* ===== Intent screen (the start experience) ===== */
+.intent-stage {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 32px; text-align: center;
+}
+.intent-inner { width: 100%; max-width: 640px; }
+.intent-eyebrow {
+  font-size: 12px; font-weight: var(--weight-label); text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--accent); margin: 0 0 10px;
+}
+.intent-h1 { font-family: var(--font-display); font-weight: var(--weight-heading); font-size: 30px; margin: 0 0 8px; }
+.intent-help { color: var(--muted-foreground); font-size: 14px; margin: 0 0 24px; }
+
+.composer {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius-container); padding: 14px 14px 12px;
+  box-shadow: 0 1px 2px rgba(23,23,23,0.04); text-align: left;
+}
+.composer:focus-within { border-color: var(--ring); box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+.composer textarea {
+  width: 100%; border: 0; resize: none; outline: none; background: transparent;
+  font-family: var(--font-sans); font-size: 15px; color: var(--foreground);
+  line-height: 1.5; min-height: 64px;
+}
+.composer textarea::placeholder { color: var(--muted-foreground); }
+.composer-bar { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.composer-hint { font-size: 12px; color: var(--muted-foreground); }
+.composer-bar .spacer { flex: 1; }
+.send-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
+  background: var(--primary); color: var(--primary-foreground); border: 0;
+  border-radius: var(--radius-button); font-size: 13px; font-weight: var(--weight-label);
+  font-family: var(--font-sans); cursor: pointer;
+}
+.send-btn:hover { filter: brightness(1.06); }
+.send-btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.send-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* cold-start chips */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; justify-content: center; }
+.chip {
+  padding: 7px 14px; border: 1px solid var(--border); border-radius: var(--radius-button);
+  background: var(--card); color: var(--secondary-foreground); font-size: 13px;
+  cursor: pointer; font-family: var(--font-sans);
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.chip:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.cold-card-row { display: flex; gap: 12px; margin-top: 28px; }
+.cold-card {
+  flex: 1; text-align: left; background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius-container); padding: 14px; cursor: pointer;
+}
+.cold-card:hover { border-color: var(--accent); }
+.cold-card .cc-title { font-weight: var(--weight-label); font-size: 13px; margin: 0 0 4px; }
+.cold-card .cc-desc { color: var(--muted-foreground); font-size: 12px; margin: 0; }
+
+/* ===== Clarify step (chat-style Q&A) ===== */
+.clarify-stage { flex: 1; display: flex; flex-direction: column; max-width: 720px; margin: 0 auto; width: 100%; padding: 28px 24px; }
+.stepper { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted-foreground); margin-bottom: 18px; }
+.stepper .pip { width: 24px; height: 3px; border-radius: 9999px; background: var(--border); }
+.stepper .pip.done { background: var(--accent); }
+.stepper .pip.current { background: var(--primary); }
+.bubble-you {
+  align-self: flex-end; max-width: 80%; background: var(--secondary);
+  border-radius: var(--radius-container); padding: 10px 14px; font-size: 14px; margin-bottom: 16px;
+}
+.bubble-sys { max-width: 90%; margin-bottom: 12px; }
+.bubble-sys .q { font-size: 15px; font-weight: var(--weight-label); margin: 0 0 12px; }
+.options { display: flex; flex-direction: column; gap: 8px; }
+.opt {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+  border: 1px solid var(--border); border-radius: var(--radius-container);
+  background: var(--card); cursor: pointer; font-size: 14px;
+}
+.opt:hover { border-color: var(--accent); }
+.opt.selected { border-color: var(--primary); background: rgba(37,99,235,0.04); }
+.opt .radio { width: 16px; height: 16px; border-radius: 9999px; border: 2px solid var(--border); flex: 0 0 16px; }
+.opt.selected .radio { border-color: var(--primary); background: var(--primary); box-shadow: inset 0 0 0 3px var(--card); }
+.clarify-actions { display: flex; align-items: center; gap: 12px; margin-top: 22px; }
+.btn-ghost {
+  padding: 9px 18px; background: transparent; border: 1px solid var(--border);
+  border-radius: var(--radius-button); font-size: 13px; font-family: var(--font-sans);
+  color: var(--secondary-foreground); cursor: pointer;
+}
+.btn-ghost:hover { background: var(--muted); }
+.btn-primary {
+  padding: 9px 20px; background: var(--primary); color: var(--primary-foreground);
+  border: 0; border-radius: var(--radius-button); font-size: 13px; font-weight: var(--weight-label);
+  font-family: var(--font-sans); cursor: pointer;
+}
+.btn-primary:hover { filter: brightness(1.06); }
+.btn-primary:focus-visible, .btn-ghost:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.clarify-actions .spacer { flex: 1; }
+
+/* ===== Confirm card (the gate) ===== */
+.confirm-stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 28px; }
+.confirm-card {
+  width: 100%; max-width: 560px; background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius-container); overflow: hidden; box-shadow: 0 4px 16px rgba(23,23,23,0.06);
+}
+.confirm-head { padding: 20px 24px 16px; border-bottom: 1px solid var(--border-muted); }
+.confirm-eyebrow { font-size: 12px; font-weight: var(--weight-label); text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); margin: 0 0 6px; }
+.confirm-title { font-family: var(--font-display); font-weight: var(--weight-heading); font-size: 20px; margin: 0; }
+.confirm-body { padding: 18px 24px; }
+.summary-row { display: flex; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--border-muted); }
+.summary-row:last-child { border-bottom: 0; }
+.summary-row .lbl { flex: 0 0 120px; color: var(--muted-foreground); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; padding-top: 2px; }
+.summary-row .val { flex: 1; font-size: 14px; }
+.summary-row .val .branch { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+.confirm-foot { display: flex; align-items: center; gap: 12px; padding: 16px 24px; background: var(--muted); border-top: 1px solid var(--border-muted); }
+.confirm-foot .spacer { flex: 1; }
+.confirm-note { font-size: 12px; color: var(--muted-foreground); }
+.start-final {
+  padding: 10px 22px; background: var(--positive); color: var(--positive-foreground);
+  border: 0; border-radius: var(--radius-button); font-size: 14px; font-weight: var(--weight-label);
+  font-family: var(--font-sans); cursor: pointer;
+}
+.start-final:hover { filter: brightness(1.04); }
+.start-final:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+/* ===== ⌘K palette (accelerant) ===== */
+.palette-scrim { position: relative; padding: 40px 0; background: rgba(23,23,23,0.32); border-radius: var(--radius-container); display: flex; justify-content: center; }
+.palette {
+  width: 520px; background: var(--popover); border: 1px solid var(--border);
+  border-radius: var(--radius-container); box-shadow: 0 12px 40px rgba(23,23,23,0.18); overflow: hidden;
+}
+.palette-input { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--border-muted); }
+.palette-input input { flex: 1; border: 0; outline: none; font-family: var(--font-sans); font-size: 15px; background: transparent; color: var(--foreground); }
+.palette-section { padding: 6px 0; }
+.palette-section .sec-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); padding: 6px 16px; }
+.palette-row { display: flex; align-items: center; gap: 12px; padding: 9px 16px; font-size: 14px; cursor: pointer; }
+.palette-row.active { background: rgba(37,99,235,0.06); }
+.palette-row .icon { width: 18px; color: var(--accent); }
+.palette-row .ret { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); }
+
+.legend { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted-foreground); margin-top: 8px; }
+.legend .swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--border); }
+
+/* ===================================================================== */
+/* HAND-OFF PLACEHOLDER — out of scope: the existing change workspace.    */
+/* Deliberately NOT a redesign; a neutral marker for where start ends.    */
+/* ===================================================================== */
+.handoff-placeholder {
+  border: 1px dashed var(--border); border-radius: var(--radius-container);
+  background: var(--muted); padding: 28px 24px; text-align: center;
+}
+.handoff-tag {
+  display: inline-block; font-size: 11px; font-weight: var(--weight-label);
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground);
+  border: 1px solid var(--border); border-radius: var(--radius-badge);
+  padding: 4px 12px; background: var(--card);
+}
+.handoff-text { color: var(--muted-foreground); font-size: 13px; margin: 12px 0 0; }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+  <h1 class="page-title">Start something new — cockpit journey</h1>
+  <p class="page-sub">Real Sulis tokens · real cockpit fonts (Inter / JetBrains Mono) · structure informed by Mobbin references. Scroll for each state — from the front door (1) through the start flow to the moment the change is created and the founder hands off into the change’s existing workspace. This journey covers <strong>only the start flow</strong>; the in-change experience that already exists is out of scope here.</p>
+
+  <!-- =================================================================== -->
+  <!-- STATE 1: The front door (entry point in the chrome) — COLD START -->
+  <!-- =================================================================== -->
+  <div class="state-label">State 1 — The front door, cold start (no changes yet)</div>
+  <p class="state-note">One primary action lives at the top of the sidebar: <strong>Start something new</strong>. It is the only blue button in the chrome, so it reads as the front door. When the founder has no work yet, the workspace itself invites them in rather than showing an empty list.</p>
+
+  <div class="shell">
+    <aside class="sidebar">
+      <button class="start-btn">
+        <span class="plus">+</span> Start something new
+        <span class="kbd-hint">⌘N</span>
+      </button>
+      <div class="sidebar-heading">Changes</div>
+      <p class="sidebar-empty">No changes yet — start your first one above.</p>
+    </aside>
+    <div class="main">
+      <div class="topbar">
+        <span class="crumb">Sulis · <strong>Workspace</strong></span>
+        <span class="spacer"></span>
+        <button class="palette-trigger">Search & commands <kbd>⌘K</kbd></button>
+      </div>
+      <div class="outlet">
+        <div class="intent-stage">
+          <div class="intent-inner">
+            <p class="intent-eyebrow">Welcome to your workspace</p>
+            <h2 class="intent-h1">What do you want to do?</h2>
+            <p class="intent-help">Describe it in your own words. Sulis works out what to start — you confirm before anything happens.</p>
+            <div class="composer">
+              <textarea placeholder="e.g. Add a “forgot password” option to the login screen…"></textarea>
+              <div class="composer-bar">
+                <span class="composer-hint">Plain English is fine — no need to be technical.</span>
+                <span class="spacer"></span>
+                <button class="send-btn" disabled>Continue →</button>
+              </div>
+            </div>
+            <div class="chips">
+              <button class="chip">Fix something that's broken</button>
+              <button class="chip">Add a new feature</button>
+              <button class="chip">Improve how something looks</button>
+              <button class="chip">I'm not sure yet</button>
+            </div>
+            <div class="cold-card-row">
+              <div class="cold-card">
+                <p class="cc-title">New here?</p>
+                <p class="cc-desc">A 60-second tour of how a piece of work flows from idea to shipped.</p>
+              </div>
+              <div class="cold-card">
+                <p class="cc-title">See an example</p>
+                <p class="cc-desc">Walk through a finished change to see what Sulis produces.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- STATE 2: The start screen — intent typed, has existing changes -->
+  <!-- =================================================================== -->
+  <div class="state-label">State 2 — Intent typed (returning founder, work already in flight)</div>
+  <p class="state-note">Same front door, same intent box — but now the sidebar shows live work, and the founder has written what they want. The Continue button activates. No forms, no naming yet: intent first.</p>
+
+  <div class="shell">
+    <aside class="sidebar">
+      <button class="start-btn">
+        <span class="plus">+</span> Start something new
+        <span class="kbd-hint">⌘N</span>
+      </button>
+      <div class="sidebar-heading">Changes</div>
+      <div class="change-list">
+        <div class="change-item active"><span class="dot live"></span> Checkout error messages <span class="meta">live</span></div>
+        <div class="change-item"><span class="dot live"></span> Onboarding email copy <span class="meta">live</span></div>
+        <div class="change-item"><span class="dot idle"></span> Pricing page refresh <span class="meta">idle</span></div>
+      </div>
+    </aside>
+    <div class="main">
+      <div class="topbar">
+        <span class="crumb">Sulis · <strong>Start something new</strong></span>
+        <span class="spacer"></span>
+        <button class="palette-trigger">Search & commands <kbd>⌘K</kbd></button>
+      </div>
+      <div class="outlet">
+        <div class="intent-stage">
+          <div class="intent-inner">
+            <p class="intent-eyebrow">New piece of work</p>
+            <h2 class="intent-h1">What do you want to do?</h2>
+            <p class="intent-help">Describe it in your own words. Sulis works out what to start — you confirm before anything happens.</p>
+            <div class="composer">
+              <textarea>Add a "forgot password" link on the login screen so people who can't sign in can reset it themselves.</textarea>
+              <div class="composer-bar">
+                <span class="composer-hint">Press ⏎ to continue · Shift+⏎ for a new line</span>
+                <span class="spacer"></span>
+                <button class="send-btn">Continue →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- STATE 3: Clarify step (one short Q&A) -->
+  <!-- =================================================================== -->
+  <div class="state-label">State 3 — Clarify (one short step, skippable)</div>
+  <p class="state-note">Sulis reflects the intent back and asks at most a couple of light questions to scope it right. The stepper shows it's short. Skip is always available — clarification accelerates, it never blocks (Base44 pattern, trimmed to avoid too many steps).</p>
+
+  <div class="shell">
+    <aside class="sidebar">
+      <button class="start-btn"><span class="plus">+</span> Start something new <span class="kbd-hint">⌘N</span></button>
+      <div class="sidebar-heading">Changes</div>
+      <div class="change-list">
+        <div class="change-item"><span class="dot live"></span> Checkout error messages <span class="meta">live</span></div>
+        <div class="change-item"><span class="dot live"></span> Onboarding email copy <span class="meta">live</span></div>
+      </div>
+    </aside>
+    <div class="main">
+      <div class="topbar">
+        <span class="crumb">Sulis · <strong>Start something new</strong> · Clarify</span>
+        <span class="spacer"></span>
+        <button class="palette-trigger">Search & commands <kbd>⌘K</kbd></button>
+      </div>
+      <div class="outlet">
+        <div class="clarify-stage">
+          <div class="stepper">
+            <span>Step 1 of 2</span>
+            <span class="pip current"></span>
+            <span class="pip"></span>
+          </div>
+          <div class="bubble-you">Add a "forgot password" link on the login screen so people who can't sign in can reset it themselves.</div>
+          <div class="bubble-sys">
+            <p class="q">Got it — a self-service password reset. How should people receive the reset link?</p>
+            <div class="options">
+              <label class="opt selected"><span class="radio"></span> By email (most common)</label>
+              <label class="opt"><span class="radio"></span> By text message</label>
+              <label class="opt"><span class="radio"></span> Something else — I'll describe it</label>
+            </div>
+          </div>
+          <div class="clarify-actions">
+            <button class="btn-ghost">Skip — Sulis decides</button>
+            <span class="spacer"></span>
+            <button class="btn-primary">Next →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- STATE 4: Confirm before start (the gate) -->
+  <!-- =================================================================== -->
+  <div class="state-label">State 4 — Confirm before start (the single gate)</div>
+  <p class="state-note">One summary, one green button. The founder sees exactly what's about to happen — the title Sulis chose, what it'll do, and that a fresh workspace/branch is created — then commits. This matches the cockpit's existing confirm-before-start moment.</p>
+
+  <div class="shell">
+    <aside class="sidebar">
+      <button class="start-btn"><span class="plus">+</span> Start something new <span class="kbd-hint">⌘N</span></button>
+      <div class="sidebar-heading">Changes</div>
+      <div class="change-list">
+        <div class="change-item"><span class="dot live"></span> Checkout error messages <span class="meta">live</span></div>
+        <div class="change-item"><span class="dot live"></span> Onboarding email copy <span class="meta">live</span></div>
+      </div>
+    </aside>
+    <div class="main">
+      <div class="topbar">
+        <span class="crumb">Sulis · <strong>Start something new</strong> · Confirm</span>
+        <span class="spacer"></span>
+        <button class="palette-trigger">Search & commands <kbd>⌘K</kbd></button>
+      </div>
+      <div class="outlet">
+        <div class="confirm-stage">
+          <div class="confirm-card">
+            <div class="confirm-head">
+              <p class="confirm-eyebrow">Ready to start</p>
+              <h3 class="confirm-title">Self-service password reset on the login screen</h3>
+            </div>
+            <div class="confirm-body">
+              <div class="summary-row">
+                <span class="lbl">What it'll do</span>
+                <span class="val">Add a “Forgot password?” link to the login screen and an email-based flow so people can reset their own password.</span>
+              </div>
+              <div class="summary-row">
+                <span class="lbl">Kind of work</span>
+                <span class="val">New feature · likely touches the login screen and account settings</span>
+              </div>
+              <div class="summary-row">
+                <span class="lbl">Where it lives</span>
+                <span class="val"><span class="branch">change/feat-forgot-password</span> — a fresh workspace, separate from your other work</span>
+              </div>
+            </div>
+            <div class="confirm-foot">
+              <button class="btn-ghost">Back</button>
+              <span class="confirm-note">Nothing changes until you start.</span>
+              <span class="spacer"></span>
+              <button class="start-final">Start this work →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- STATE 5: The accelerant — ⌘K command palette -->
+  <!-- =================================================================== -->
+  <div class="state-label">State 5 — The accelerant (⌘K palette → same flow)</div>
+  <p class="state-note">Power users don't have to reach for the button. ⌘K (or ⌘N) jumps straight into the same start flow — one front door, a faster route in. Typing here lands on the very same intent screen, never a parallel path. (Linear / Todoist palette pattern.)</p>
+
+  <div class="palette-scrim">
+    <div class="palette">
+      <div class="palette-input">
+        <span style="color:var(--muted-foreground)">⌘K</span>
+        <input value="start" />
+      </div>
+      <div class="palette-section">
+        <div class="sec-title">Actions</div>
+        <div class="palette-row active"><span class="icon">＋</span> Start something new <span class="ret">↵</span></div>
+        <div class="palette-row"><span class="icon">🔍</span> Search your changes</div>
+      </div>
+      <div class="palette-section">
+        <div class="sec-title">Recent</div>
+        <div class="palette-row"><span class="icon">•</span> Checkout error messages</div>
+        <div class="palette-row"><span class="icon">•</span> Onboarding email copy</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- STATE 6: Starting (loading) & error -->
+  <!-- =================================================================== -->
+  <div class="state-label">State 6 — Starting… (loading) and the error fallback</div>
+  <p class="state-note">After “Start this work”, the workspace is created — a brief, honest progress moment. If it can't start (e.g. a branch name clash or the engine is busy), the founder sees a plain-language error with a single retry, never a dead end.</p>
+
+  <div style="display:flex; gap:16px; flex-wrap:wrap;">
+    <div class="confirm-card" style="max-width:340px;">
+      <div class="confirm-body" style="text-align:center; padding:36px 24px;">
+        <div style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:9999px;margin:0 auto 16px;animation:spin 1s linear infinite;"></div>
+        <p style="font-weight:var(--weight-label);margin:0 0 4px;">Setting up your workspace…</p>
+        <p style="color:var(--muted-foreground);font-size:13px;margin:0;">Creating <span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">change/feat-forgot-password</span></p>
+      </div>
+    </div>
+    <div class="confirm-card" style="max-width:340px;border-color:var(--destructive);">
+      <div class="confirm-body" style="padding:24px;">
+        <p style="color:var(--destructive);font-weight:var(--weight-label);margin:0 0 6px;">Couldn't start just yet</p>
+        <p style="color:var(--muted-foreground);font-size:13px;margin:0 0 16px;">A piece of work with a similar name already exists. We can start it under a slightly different name, or you can rename it.</p>
+        <div style="display:flex;gap:10px;">
+          <button class="btn-ghost">Rename it</button>
+          <button class="btn-primary">Try again</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
+  <!-- =================================================================== -->
+  <!-- HAND-OFF: the change is created → the founder lands in the change's  -->
+  <!--           EXISTING workspace. Out of scope for this journey.         -->
+  <!-- =================================================================== -->
+  <div class="state-label">After start — hand-off into the existing change workspace</div>
+  <p class="state-note">Once the workspace is created, the founder lands in their change’s <strong>existing workspace</strong> — the coaching chat, terminal, stages and files view that the cockpit already has. That experience is <strong>not redesigned here</strong>; this journey ends at the hand-off. The block below is a placeholder only, to show where the start flow lets go.</p>
+
+  <div class="handoff-placeholder">
+    <span class="handoff-tag">Existing change experience — unchanged</span>
+    <p class="handoff-text">The founder now lands in their change’s existing workspace. No redesign proposed.</p>
+  </div>
+
+  <div class="legend" style="margin-top:36px;">
+    <span class="swatch" style="background:var(--primary)"></span> primary (front door)
+    <span class="swatch" style="background:var(--positive)"></span> positive (start gate)
+    <span class="swatch" style="background:var(--accent)"></span> accent (eyebrows / links / focus)
+    <span class="swatch" style="background:var(--destructive)"></span> destructive (errors)
+  </div>
+</div>
+</body>
+</html>
