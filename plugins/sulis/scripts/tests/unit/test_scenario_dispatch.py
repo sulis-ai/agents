@@ -109,3 +109,54 @@ def test_agent_driven_kind_is_deferred_not_yet_implemented():
     out = execute_step(step, base_url="http://local")
     assert out.status == "deferred"
     assert "mcp_server" in (out.need or "")
+
+
+# --- WP-003: tier echo + saved_record capture + named agent-step deferral ---
+
+
+def test_agent_step_defers_to_92():
+    """An agent-step-tier step (mcp_server) defers with the tier echoed, the
+    driver named in the need, AND a detail naming #92 as the execution owner —
+    never silent (ADR-001 sharpening of today's never-silent contract)."""
+    step = ResolvedStep(step_id="s", name="login via agent", driver="mcp_server",
+                        mechanism="mixed", tier="agent-step")
+    out = execute_step(step, base_url="http://local")
+    assert out.status == "deferred", out
+    assert out.tier == "agent-step", out
+    assert out.need == "driver:mcp_server", out
+    assert "#92" in out.detail, out
+
+
+def test_dispatch_captures_saved_record():
+    """The dispatcher captures the REAL saved record from the step result onto
+    StepOutcome.saved_record (ADR-003 real-data-not-mock guard) — and leaves it
+    None when the step result carries none."""
+    record = {"user_id": "u_123", "email": "a@b.test"}
+
+    def http_with_record(method, url):
+        # Real-shaped transport return carrying the produced artifact.
+        return SimpleNamespace(status_code=200, saved_record=record)
+
+    step = _http_step({"method": "POST", "path": "/signup", "expect_status": 200})
+    out = execute_step(step, base_url="http://local", http=http_with_record)
+    assert out.status == "pass", out
+    assert out.saved_record == record, out
+
+    # No record on the result → saved_record stays None (not fabricated).
+    step2 = _http_step({"method": "GET", "path": "/dashboard", "expect_status": 200})
+    out2 = execute_step(step2, base_url="http://local",
+                        http=lambda m, u: SimpleNamespace(status_code=200))
+    assert out2.status == "pass", out2
+    assert out2.saved_record is None, out2
+
+
+def test_scripted_step_still_executes():
+    """Characterisation (EP-07): an http_call scripted step against an injected
+    transport still passes, now additionally echoing tier == 'scripted'. Proves
+    the additive edit preserves existing behaviour."""
+    step = _http_step({"method": "GET", "path": "/dashboard", "expect_status": 200},
+                      tier="scripted")
+    out = execute_step(step, base_url="http://local",
+                       http=lambda m, u: SimpleNamespace(status_code=200))
+    assert out.status == "pass", out
+    assert out.tier == "scripted", out
