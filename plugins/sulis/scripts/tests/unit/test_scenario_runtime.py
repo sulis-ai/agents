@@ -179,3 +179,12 @@ def test_resolved_step_carries_tier():
     by_name = {r.name: r for r in resolved}
     assert by_name["POST /thing"].tier == "scripted"
     assert by_name["agent drives the browser"].tier == "agent-step"
+
+
+# --- WP-007 (back-integration): browser derives the scripted tier ----------
+# Main (#207) landed a deterministic `browser` driver; it is scripted by
+# construction (scripted actions + an observable assert). The reconciled
+# SCRIPTED_KINDS must include it so a browser step derives tier "scripted",
+# not "" (which would misreport a deterministic driver as having no tier).
+def test_tier_for_kind_browser_is_scripted():
+    assert tier_for_kind("browser") == "scripted"

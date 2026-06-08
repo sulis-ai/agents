@@ -160,3 +160,30 @@ def test_scripted_step_still_executes():
                        http=lambda m, u: SimpleNamespace(status_code=200))
     assert out.status == "pass", out
     assert out.tier == "scripted", out
+
+
+# --- WP-007 (back-integration): browser branch echoes scripted tier + record
+
+
+def test_browser_step_echoes_scripted_tier_and_captures_record():
+    """A browser step (deterministic, scripted tier) run against an INJECTED
+    transport returns tier == 'scripted' AND captures the transport's
+    saved_record — parity with the http_call/subprocess branches (WP-003),
+    layered onto main's browser driver (#207). MEA-09: no real Playwright; the
+    injected fake is the seam."""
+    record = {"order_id": "o_42", "status": "confirmed"}
+
+    def fake_browser(url, actions, assert_spec):
+        # Real-shaped browser-transport return carrying the produced artifact.
+        return SimpleNamespace(ok=True, detail="visible(Confirmed)", saved_record=record)
+
+    step = ResolvedStep(
+        step_id="s", name="confirm order in the UI", driver="browser",
+        mechanism="deterministic",
+        mechanism_detail=json.dumps({"url": "/checkout", "assert": {"visible": "Confirmed"}}),
+        tier="scripted",
+    )
+    out = execute_step(step, base_url="http://local", browser=fake_browser)
+    assert out.status == "pass", out
+    assert out.tier == "scripted", out
+    assert out.saved_record == record, out
