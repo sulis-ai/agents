@@ -17,16 +17,16 @@
 
 .goneOrMoved {
   padding: 32px 16px;
-  background: #fff5f5;
-  border: 1px solid #ffd6d6;
+  background: color-mix(in srgb, var(--destructive) 16%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--destructive) 45%, var(--card));
   border-radius: 8px;
-  color: #86181d;
+  color: var(--destructive);
 }
 
 .goneOrMovedDetail {
   margin-top: 8px;
   font-size: 13px;
-  color: #86181d;
+  color: var(--destructive);
   opacity: 0.85;
 }
 
@@ -37,7 +37,7 @@
   gap: 16px;
   padding: 12px 0;
   border-bottom: 1px solid var(--border);
-  background: #fff;
+  background: var(--card);
 }
 
 .left {
@@ -73,9 +73,9 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   border-radius: 4px;
-  background: #f1f8ff;
+  background: color-mix(in srgb, var(--primary) 10%, var(--card));
   color: var(--primary);
-  border: 1px solid #c8e1ff;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--card));
 }
 
 .liveness {
@@ -85,14 +85,14 @@
   background: var(--border);
 }
 .liveness[data-status="running"] {
-  background: #28a745;
-  box-shadow: 0 0 0 2px #d4f4dd;
+  background: var(--positive);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--positive) 25%, transparent);
 }
 .liveness[data-status="not-running"] {
   background: var(--border);
 }
 .liveness[data-status="unknown"] {
-  background: #ffd33d;
+  background: var(--warning);
 }
 
 .right {
