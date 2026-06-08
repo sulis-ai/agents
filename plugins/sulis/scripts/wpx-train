@@ -1336,7 +1336,7 @@ def _plan_phase(
                     f"back to step-7-complete."
                 ),
                 suggested_next=(
-                    "Pull origin/dev, rebase this branch, resolve "
+                    "Pull origin/main, rebase this branch, resolve "
                     "conflicts, push. Then re-flip INDEX status."
                 ),
             )
@@ -1799,9 +1799,9 @@ def _step_0_arrival_check(
         record["step_0_arrival_check"] = "skipped"
         return
 
-    _log(f"{train_id}: Step 0 arrival check — back-integrating {base_branch} from origin/dev")
+    _log(f"{train_id}: Step 0 arrival check — back-integrating {base_branch} from origin/main")
     arrival = back_integrate_change_branch(
-        Path(change_worktree_path), base_branch, dev_ref="origin/dev",
+        Path(change_worktree_path), base_branch, dev_ref="origin/main",
     )
     record["step_0_arrival_check"] = arrival["status"]
 
@@ -1828,9 +1828,9 @@ def _step_0_arrival_check(
         write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
         emit_result(record, exit_code=1)
     elif arrival["status"] == "merged_ok":
-        _log(f"{train_id}: Step 0: merged {arrival.get('merged_commits', '?')} commits from origin/dev into {base_branch}")
+        _log(f"{train_id}: Step 0: merged {arrival.get('merged_commits', '?')} commits from origin/main into {base_branch}")
     else:
-        _log(f"{train_id}: Step 0: {base_branch} already current with origin/dev")
+        _log(f"{train_id}: Step 0: {base_branch} already current with origin/main")
 
 
 def _step_12_5_back_integration(
@@ -1852,9 +1852,9 @@ def _step_12_5_back_integration(
         record["step_12_5_back_integration"] = "skipped"
         return
 
-    _log(f"{train_id}: Step 12.5 post-batch back-integration of {base_branch} from origin/dev")
+    _log(f"{train_id}: Step 12.5 post-batch back-integration of {base_branch} from origin/main")
     post_batch = back_integrate_change_branch(
-        Path(change_worktree_path), base_branch, dev_ref="origin/dev",
+        Path(change_worktree_path), base_branch, dev_ref="origin/main",
     )
     record["step_12_5_back_integration"] = post_batch["status"]
 
@@ -1874,9 +1874,9 @@ def _step_12_5_back_integration(
             f"{post_batch.get('error', '')}. Continuing — defence in depth at next Step 0."
         )
     elif post_batch["status"] == "merged_ok":
-        _log(f"{train_id}: Step 12.5: merged {post_batch.get('merged_commits', '?')} commits from origin/dev into {base_branch}")
+        _log(f"{train_id}: Step 12.5: merged {post_batch.get('merged_commits', '?')} commits from origin/main into {base_branch}")
     else:
-        _log(f"{train_id}: Step 12.5: {base_branch} already current with origin/dev")
+        _log(f"{train_id}: Step 12.5: {base_branch} already current with origin/main")
 
 
 # Phases an abandoned-on-error train can be sitting in before any merge
@@ -2008,8 +2008,9 @@ def cmd_run(args: argparse.Namespace) -> None:
     }
 
     # Per CW-04: callers inside a change worktree pass --base-branch to
-    # ship to the change branch rather than directly to dev.
-    base_branch = args.base_branch or "dev"
+    # ship to the change branch rather than directly to the trunk.
+    # Default is the trunk (main); the repo retired the dev branch in #177.
+    base_branch = args.base_branch or "main"
 
     args_repr = {
         "project": args.project,
