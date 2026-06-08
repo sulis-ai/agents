@@ -90,21 +90,24 @@ const ADVANCED_ROUTE_BASENAME = "advanced.ts";
 const CHANGE_ADVANCED_BASENAME = "changeAdvanced.ts";
 const TURN_SUMMARIES_BASENAME = "turnSummaries.ts";
 
-// WP-004 (ADR-010/ADR-011) — the server entry spawns the ONE long-lived
-// Python session-manager host at boot (`startSessionManagerHost` →
-// `spawn(python, session_manager_host.py)`). This is the new sanctioned
-// process-start site the terminal composition introduces; allow-listed BY PATH
-// (parity with the bridge/mint/starter exceptions above). The HTTP surface
-// stays GET-only — the WS endpoint rides `upgrade`, never `app.post`.
-//   WP-005 (ADR-010) — this file is also the TERMINAL HOST start site: it is
-//   the ONLY file that starts the session-manager host process. It is named as
-//   one of the two terminal write seams (the other is the sidecar bridge's
-//   WS-attachment, below) in `test_terminal_seams_are_named_exceptions`.
-const HOST_BOOT_BASENAME = "index.ts";
+// WP-004 (ADR-010/ADR-011) — the terminal composition's process-start site:
+// the ONE place that spawns the Python session-manager engine.
+//   WP-007 (ADR-001/ADR-003) — THE SPAWN MOVED. The cockpit no longer spawns its
+//   OWN ephemeral host at boot (the retired `startSessionManagerHost` in
+//   index.ts). It now `ensureDaemon`s the SHARED daemon, and that detached
+//   `spawn(python, session_manager_daemon.py)` lives in `lib/ensureDaemon.ts`.
+//   The gate FOLLOWS the spawn: the sanctioned process-start site is now
+//   `ensureDaemon.ts`, allow-listed BY PATH (parity with the bridge/mint/starter
+//   exceptions above). `index.ts` itself now starts NO process — it only calls
+//   the ensure binding. The HTTP surface stays GET-only — the WS endpoint rides
+//   `upgrade`, never `app.post`. Named as one of the two terminal write seams
+//   (the other is the sidecar bridge's WS-attachment, below) in
+//   `test_terminal_seams_are_named_exceptions`.
+const DAEMON_ENSURE_BASENAME = "ensureDaemon.ts";
 
 // WP-005 (ADR-010) — the terminal sidecar bridge is the SECOND founder-intended
 // write path's transport seam. It registers NO `app.post` and starts NO process
-// (the host spawn lives in index.ts); instead it attaches a WebSocket upgrade
+// (the daemon spawn lives in lib/ensureDaemon.ts, WP-007); instead it attaches a WebSocket upgrade
 // handler to the existing HTTP server's `upgrade` event — the WS-ATTACHMENT
 // seam. A keystroke written into a live PTY through this seam is a sanctioned
 // write, gated at attach authorisation in the engine (ADR-010 §1). The gate
@@ -315,10 +318,11 @@ describe("read-only inventory (TDD §13.7)", () => {
         // ADR-015 — turnSummaries.ts spawns `claude` headless for the Haiku
         // one-line turn summary it caches on disk (a derived-summary helper).
         TURN_SUMMARIES_BASENAME,
-        // WP-004 (ADR-010/011) — index.ts spawns the session-manager host at
-        // boot (the terminal engine owner). WP-005 owns the full gate
-        // reconciliation; this entry keeps WP-004's suite green.
-        HOST_BOOT_BASENAME,
+        // WP-007 (ADR-001/003) — lib/ensureDaemon.ts spawns the SHARED session-
+        // manager daemon on demand (the detached `spawn(python,
+        // session_manager_daemon.py)`). The spawn MOVED here from index.ts's
+        // retired ephemeral host; the gate follows the spawn (the WP-007 Contract).
+        DAEMON_ENSURE_BASENAME,
       ]);
       if (SANCTIONED_PROCESS_STARTERS.has(basename(f))) {
         continue;
@@ -468,12 +472,14 @@ describe("read-only inventory (TDD §13.7)", () => {
   // path-scoped (parity with ADR-003's chat relay/bridge pairing):
   //   1. the terminal sidecar bridge's WS-ATTACHMENT (TerminalSidecar.ts) — the
   //      browser-keystroke → live-PTY transport, gated at attach authorisation;
-  //   2. the session-manager host PROCESS-START (index.ts) — the one site that
-  //      spawns the Python host that owns the pty + AF_UNIX socket.
+  //   2. the daemon PROCESS-START (lib/ensureDaemon.ts, WP-007) — the one site
+  //      that spawns the Python SHARED daemon that owns the pty + AF_UNIX socket.
+  //      (WP-007 MOVED this from index.ts's retired ephemeral host; index.ts now
+  //      starts NO process — it only calls the ensure binding. The gate follows.)
   // This test is the positive proof: those two files are the ONLY terminal
   // seams, every OTHER file that attaches a WS upgrade handler is a violation,
   // and the chat seams (ADR-003) are untouched alongside them.
-  it("test_terminal_seams_are_named_exceptions — the sidecar WS-attachment + host start are the ONLY two terminal seams (ADR-010)", async () => {
+  it("test_terminal_seams_are_named_exceptions — the sidecar WS-attachment + daemon-ensure start are the ONLY two terminal seams (ADR-010/WP-007)", async () => {
     const files = await collectSourceFiles();
     expect(files.length).toBeGreaterThan(0);
 
@@ -498,8 +504,8 @@ describe("read-only inventory (TDD §13.7)", () => {
     expect([...wsAttachers]).toEqual([TERMINAL_SIDECAR_BASENAME]);
 
     // (b) The sidecar bridge itself starts NO process and registers NO write
-    // verb — its only write seam is the WS-attachment. The host spawn lives in
-    // index.ts; the two seams are deliberately separate files (ADR-010 §2).
+    // verb — its only write seam is the WS-attachment. The daemon spawn lives in
+    // lib/ensureDaemon.ts; the two seams are deliberately separate files (ADR-010 §2).
     const sidecar = files.find((f) => basename(f) === TERMINAL_SIDECAR_BASENAME);
     expect(sidecar, "TerminalSidecar.ts must exist (the WS-attachment seam)").toBeDefined();
     if (sidecar) {
@@ -510,13 +516,21 @@ describe("read-only inventory (TDD §13.7)", () => {
       expect(WS_ATTACHMENT_PATTERNS.some((p) => p.test(src))).toBe(true);
     }
 
-    // (c) The session-manager host start is named in index.ts (the host PROCESS-
-    // start seam) and nowhere else — the host spawn is the second terminal seam.
-    const host = files.find((f) => basename(f) === HOST_BOOT_BASENAME);
-    expect(host, "index.ts must exist (the host process-start seam)").toBeDefined();
-    if (host) {
-      const src = stripComments(await readSource(host));
+    // (c) WP-007 — the daemon-ensure process-start is named in lib/ensureDaemon.ts
+    // (the SHARED-daemon spawn seam) and nowhere else; the spawn MOVED here from
+    // index.ts's retired ephemeral host. index.ts now starts NO process.
+    const ensure = files.find((f) => basename(f) === DAEMON_ENSURE_BASENAME);
+    expect(ensure, "lib/ensureDaemon.ts must exist (the daemon process-start seam)").toBeDefined();
+    if (ensure) {
+      const src = stripComments(await readSource(ensure));
       expect(PROCESS_START_PATTERNS.some((p) => p.test(src))).toBe(true);
+    }
+    // index.ts itself no longer starts a process (it calls the ensure binding).
+    const entry = files.find((f) => basename(f) === "index.ts");
+    expect(entry, "index.ts must exist (the composition root)").toBeDefined();
+    if (entry) {
+      const src = stripComments(await readSource(entry));
+      expect(PROCESS_START_PATTERNS.some((p) => p.test(src))).toBe(false);
     }
 
     // (d) INDEPENDENCE (founder directive): the terminal sidecar does NOT import
@@ -530,12 +544,12 @@ describe("read-only inventory (TDD §13.7)", () => {
   });
 
   // WP-005 (ADR-010 §3 / NFR-SEC-05) — reading a surface still starts NOTHING.
-  // The host process is started at server boot (the one audited index.ts site),
-  // never on a read. No read-view file (route/lib that serves a GET surface)
-  // starts a process or attaches a WS write seam. This extends the existing
-  // NFR-SEC-05 "loading a read view starts no session" assertion to cover the
-  // terminal's two new seam shapes (process-start + WS-attachment).
-  it("test_read_views_start_no_session — mounting a read view spawns no host / attaches no write seam (NFR-SEC-05)", async () => {
+  // The daemon is ensured at server boot (the one audited lib/ensureDaemon.ts
+  // site, WP-007), never on a read. No read-view file (route/lib that serves a
+  // GET surface) starts a process or attaches a WS write seam. This extends the
+  // existing NFR-SEC-05 "loading a read view starts no session" assertion to
+  // cover the terminal's two new seam shapes (process-start + WS-attachment).
+  it("test_read_views_start_no_session — mounting a read view spawns no daemon / attaches no write seam (NFR-SEC-05)", async () => {
     const files = await collectSourceFiles();
     // The ONLY files permitted to start a process OR attach a WS write seam are
     // the audited seams; a read view (everything else) does neither.
@@ -547,7 +561,7 @@ describe("read-only inventory (TDD §13.7)", () => {
       SPINE_MINTER_BASENAME,
       STARTER_BASENAME,
       TURN_SUMMARIES_BASENAME,
-      HOST_BOOT_BASENAME,
+      DAEMON_ENSURE_BASENAME,
       TERMINAL_SIDECAR_BASENAME,
     ]);
     const readViewOffenders: string[] = [];
