@@ -1,3 +1,9 @@
+## v0.123.0 — 2026-06-08
+
+**Minor — release-train batch.**
+
+- plan-work decompose gate now drives the real builder consumer (wpx-index lint runs a list-ready round-trip), catching a non-canonical or non-pending INDEX at creation instead of mid-build
+
 ## v0.122.2 — 2026-06-08
 
 **Patch — release-train batch.**
