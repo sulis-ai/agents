@@ -28,12 +28,15 @@
 > end-to-end OUTCOME (compute→write→read→flip) is proven; the last segment
 > (HTTP + live spawn) remains component-tested, not OS-process-driven.
 >
-> **Defect found while driving (see task #4):** the trailer is appended WITHOUT a
-> blank-line separator for Conventional Commit subjects (`feat:`/`fix:` fool the
-> appender's heuristic), so it is NOT a formal git trailer —
-> `git log --format='%(trailers)'` shows nothing. The cockpit's regex reader
-> still works (hence the flip passes), but git-native tools (and this runbook's
-> own original `%(trailers)` verify command) miss it. Fix tracked separately.
+> **Defect found while driving (see task #4) — NOW FIXED (WP-007):** the trailer
+> was appended WITHOUT a blank-line separator for Conventional Commit subjects
+> (`feat:`/`fix:` fooled the appender's heuristic), so it was NOT a formal git
+> trailer and `git log --format='%(trailers)'` showed nothing. WP-007 fixed the
+> block-detection heuristic (it now detects the trailer block from the message's
+> last paragraph), so `Sulis-Origin:` is a formal git trailer for all subjects.
+> The `git log --format='%(trailers:key=Sulis-Origin)'` verify commands below are
+> now CORRECT (no longer a false negative) and `git interpret-trailers --parse`
+> recognises the trailer.
 >
 > The original runbook (for the full HTTP/UI path on a healthy cockpit) follows.
 >

@@ -199,6 +199,36 @@ def autonomous_env(
     return {"SULIS_ORIGIN": body}
 
 
+def _is_trailer_line(line: str) -> bool:
+    """A trailer-shaped `Key: value` line: a token key (no spaces) before the
+    first colon, e.g. `Co-Authored-By: …`. A Conventional Commit subject like
+    `feat: x` is also `Key: value`-shaped, which is why a trailer block can only
+    be recognised as the message's LAST PARAGRAPH preceded by content — never
+    a one-paragraph subject (see `_ends_in_trailer_block`)."""
+    if ":" not in line:
+        return False
+    key = line.split(":", 1)[0]
+    return bool(key) and " " not in key
+
+
+def _ends_in_trailer_block(body: str) -> bool:
+    """True when `body`'s final paragraph is an existing git trailer block — i.e.
+    it is preceded by other content (a blank-line-separated earlier paragraph)
+    AND every line in it is trailer-shaped (`Key: value`).
+
+    Detecting from the LAST PARAGRAPH (the lines after the final blank line),
+    rather than just the last non-blank line, is the fix for the Conventional
+    Commit subject defect: `feat: x` is a single paragraph, so it is NOT a
+    trailer block and the new trailer opens its own blank-line-separated block.
+    """
+    paragraphs = body.split("\n\n")
+    if len(paragraphs) < 2:
+        return False  # single paragraph (bare subject / body only) → new block.
+    last = paragraphs[-1]
+    lines = [ln for ln in last.splitlines() if ln.strip()]
+    return bool(lines) and all(_is_trailer_line(ln) for ln in lines)
+
+
 def append_trailer_to_message(message: str, origin: OriginDict) -> str:
     """Return `message` with the `Sulis-Origin:` trailer appended to the trailer
     block, idempotently (never a second copy). Used by the `prepare-commit-msg`
@@ -211,13 +241,14 @@ def append_trailer_to_message(message: str, origin: OriginDict) -> str:
             return message
 
     body = message.rstrip("\n")
-    # A trailer block is separated from the body by a blank line. If the message
-    # already ends in trailers (e.g. Co-Authored-By:), append within that block;
-    # otherwise open a new trailer block with a blank line.
-    lines = body.splitlines()
-    last_nonblank = next((l for l in reversed(lines) if l.strip()), "")
-    looks_like_trailer = ":" in last_nonblank and " " not in last_nonblank.split(":", 1)[0]
-    sep = "\n" if looks_like_trailer else "\n\n"
+    # A trailer block is the message's LAST PARAGRAPH (after the final blank
+    # line), and only when preceded by content and made entirely of trailer-
+    # shaped `Key: value` lines. Then the new trailer JOINS that block (single
+    # `\n`, no extra blank line). Otherwise — a bare subject (`feat: x`) or a
+    # body paragraph — open a NEW trailer block with a blank line, so
+    # `Sulis-Origin:` is a FORMAL git trailer that `git interpret-trailers` /
+    # `%(trailers:…)` recognise.
+    sep = "\n" if _ends_in_trailer_block(body) else "\n\n"
     return f"{body}{sep}{trailer}\n"
 
 
