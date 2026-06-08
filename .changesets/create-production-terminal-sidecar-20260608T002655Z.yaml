@@ -1,0 +1,7 @@
+change_id: 01KTHV0G7RQYCEV0B57WCA3X6H
+primitive: create
+tier: minor
+touches_plugin: true
+summary: |
+  Production terminal sidecar: the cockpit server now spawns the session-manager host and bridges the browser to it over a localhost WebSocket (origin-checked, per-change binding guard ON, resource-capped), so the live interactive terminal actually opens and responds in the running cockpit. Independent of the chat path.
+created_at: 2026-06-08T00:26:55Z

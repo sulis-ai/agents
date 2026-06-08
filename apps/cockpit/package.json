@@ -13,7 +13,8 @@
     "test": "vitest run",
     "check:read-only": "bash scripts/check-read-only.sh",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
-    "test:e2e:terminal": "playwright test --config e2e/live-terminal.config.ts"
+    "test:e2e:terminal": "playwright test --config e2e/live-terminal.config.ts",
+    "test:e2e:terminal-real": "playwright test --config e2e/live-terminal-real.config.ts"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

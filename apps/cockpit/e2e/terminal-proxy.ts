@@ -27,6 +27,8 @@ import { fileURLToPath } from "node:url";
 
 import { WebSocketServer, type WebSocket } from "ws";
 
+import { createNdjsonLineFramer } from "../shared/ndjsonLineFramer";
+
 const here = dirname(fileURLToPath(import.meta.url));
 
 export interface TerminalProxyHandle {
@@ -114,16 +116,13 @@ interface SpecResolution {
  */
 function bridge(ws: WebSocket, socketPath: string, spec: SpecResolution): void {
   const sock: Socket = connect(socketPath);
-  let buf = "";
+  const framer = createNdjsonLineFramer();
 
-  // socket → browser: forward each NDJSON line as a WS text message.
+  // socket → browser: forward each NDJSON line as a WS text message. The shared
+  // framer re-assembles complete lines across split/batched socket reads.
   sock.on("data", (chunk: Buffer) => {
-    buf += chunk.toString("utf8");
-    let nl: number;
-    while ((nl = buf.indexOf("\n")) !== -1) {
-      const line = buf.slice(0, nl);
-      buf = buf.slice(nl + 1);
-      if (line.trim() && ws.readyState === ws.OPEN) ws.send(line);
+    for (const line of framer.push(chunk)) {
+      if (ws.readyState === ws.OPEN) ws.send(line);
     }
   });
   sock.on("close", () => {
