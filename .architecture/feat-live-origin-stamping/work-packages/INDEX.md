@@ -45,6 +45,7 @@ max_parallel: 3
 | WP-005 | Executor exports autonomous SULIS_ORIGIN at commit | expand-create | done | — | WP-006 |
 | WP-006 | Grammar conformance + live likely→exact round-trip | reinforce-test | done | WP-004, WP-005 | — |
 | WP-007 | Sulis-Origin is a FORMAL git trailer (blank-line separator) for Conventional Commit subjects | fix | done | — | — |
+| WP-008 | Trailer field-separator safety + non-fatal autonomous stamp (security advisories) | harden | done | — | — |
 
 ## Notes
 
