@@ -25,6 +25,7 @@ import pytest
 
 from _origin_stamp import (
     append_trailer_to_message,
+    autonomous_env,
     autonomous_origin,
     assisted_origin,
     format_trailer,
@@ -113,6 +114,92 @@ def test_format_trailer_refuses_control_char_value():
         format_trailer(
             {"kind": "assisted", "conversation": "sess\n1", "turn": 1}
         )
+
+
+# ─── WP-008 ADVISORY-01: field-separator safety (`;` / `=`) ───────────────
+#
+# The trailer grammar uses `;` to separate segments and `=` to bind a key to
+# its value. A field value carrying either separator could smuggle extra
+# `;`/`=` segments into the single trailer line (`thread_x; confidence=1;
+# run=evil`). Inert today (the field values are filesystem-derived session IDs
+# / an internal run ULID, never `;`/`=`-bearing user input), but a
+# defence-in-depth hole the moment service-assigned IDs flow through the same
+# port. format_trailer must refuse a separator-bearing value, exactly as it
+# already refuses a control char.
+
+
+def test_format_trailer_refuses_separator_in_run():
+    """An autonomous `run` carrying the grammar's own `;` or `=` separators
+    must be refused — it could forge extra trailer segments."""
+    with pytest.raises(ValueError):
+        format_trailer({"kind": "autonomous", "run": "abc; confidence=1"})
+    with pytest.raises(ValueError):
+        format_trailer({"kind": "autonomous", "run": "run=evil"})
+
+
+def test_format_trailer_refuses_separator_in_conversation():
+    """An assisted `conversation` carrying `;` or `=` must be refused too."""
+    with pytest.raises(ValueError):
+        format_trailer(
+            {"kind": "assisted", "conversation": "thread_x; turn=9", "turn": 1}
+        )
+    with pytest.raises(ValueError):
+        format_trailer(
+            {"kind": "assisted", "conversation": "a=b", "turn": 1}
+        )
+
+
+def test_format_trailer_accepts_legitimate_values_unchanged():
+    """The guard must NOT regress legitimate inputs: a ULID run and a
+    `thread_<uuid>` conversation contain neither `;` nor `=`, so they still
+    render the exact pinned trailer."""
+    assert (
+        format_trailer(
+            autonomous_origin(run="01KT500K2JTE2EGW6TPPQ4D4VN", confidence=0.9)
+        )
+        == "Sulis-Origin: autonomous; run=01KT500K2JTE2EGW6TPPQ4D4VN; confidence=0.9"
+    )
+    assert format_trailer(
+        assisted_origin(
+            conversation="thread_3f2504e0-4f89-41d3-9a0c-0305e82c3301", turn=2
+        )
+    ) == (
+        "Sulis-Origin: assisted; "
+        "conversation=thread_3f2504e0-4f89-41d3-9a0c-0305e82c3301; turn=2"
+    )
+
+
+# ─── WP-008 ADVISORY-02: the autonomous stamp is NON-FATAL ────────────────
+#
+# autonomous_env already degrades to {} for an empty/whitespace run. But a run
+# carrying a control char (or, post-ADVISORY-01, a `;`/`=`) makes
+# format_trailer raise ValueError — which, unguarded in the executor's Step-7
+# export, would ABORT the commit rather than land it unstamped, violating the
+# "a stamp failure is non-fatal; never abort the commit to chase a stamp"
+# invariant (ADR-013). autonomous_env must swallow it and return {}.
+
+
+def test_autonomous_env_nonfatal_on_control_char_run():
+    """A control-char `run` must NOT propagate a ValueError out of
+    autonomous_env — it degrades to {} (unstamped), the same non-fatal posture
+    as the empty-run case (ADR-013)."""
+    assert autonomous_env(run="abc\nMalicious: x", confidence=0.9) == {}
+
+
+def test_autonomous_env_nonfatal_on_separator_run():
+    """A `;`/`=`-bearing `run` is likewise non-fatal: {} not a raise."""
+    assert autonomous_env(run="abc; confidence=1", confidence=0.5) == {}
+    assert autonomous_env(run="run=evil", confidence=None) == {}
+
+
+def test_autonomous_env_still_stamps_legitimate_run():
+    """The non-fatal guard must NOT swallow legitimate runs: a normal ULID
+    still produces the exported body."""
+    assert autonomous_env(
+        run="01KT500K2JTE2EGW6TPPQ4D4VN", confidence=0.7
+    ) == {
+        "SULIS_ORIGIN": "autonomous; run=01KT500K2JTE2EGW6TPPQ4D4VN; confidence=0.7"
+    }
 
 
 # ─── stamp_origin — real round-trip on a real commit ──────────────────────

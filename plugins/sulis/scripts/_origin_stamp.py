@@ -70,6 +70,24 @@ def _has_control_char(value: str) -> bool:
     return any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in value)
 
 
+# The trailer grammar's structural separators: `;` splits segments, `=` binds a
+# key to its value. A FIELD value carrying either could smuggle extra segments
+# into the single trailer line (`thread_x; confidence=1; run=evil`), so a value
+# is refused at emit time if it contains a control char OR a separator. This is
+# the EMIT-side guard only — `parse_origin_env` legitimately consumes `;`/`=`
+# (there they ARE the grammar, not injection).
+_TRAILER_SEPARATORS = (";", "=")
+
+
+def _is_trailer_safe(value: str) -> bool:
+    """True if `value` is safe to interpolate into a trailer field: no control
+    character AND none of the grammar separators (`;`, `=`). Legitimate inputs
+    (ULIDs, `thread_<uuid>`) contain neither, so they pass unchanged."""
+    return not _has_control_char(value) and not any(
+        sep in value for sep in _TRAILER_SEPARATORS
+    )
+
+
 def _fmt_number(value: float) -> str:
     # 0.9 not 0.900000001; an int stays an int. Mirrors the reader's tolerant
     # parseFloat, but emit the tidiest form.
@@ -83,17 +101,21 @@ def _fmt_number(value: float) -> str:
 def format_trailer(origin: OriginDict) -> str:
     """Render an origin dict as the single `Sulis-Origin: …` trailer line.
 
-    A trailer is ONE line. Any string field carrying a control character
-    (notably a newline) would forge a second trailer line, so it is refused
-    here as a last line of defence (the env-parse boundary rejects it first).
+    A trailer is ONE line built from a `;`/`=` grammar. Any string field
+    carrying a control character (notably a newline, which would forge a second
+    trailer line) OR one of the grammar's own separators (`;` / `=`, which would
+    forge extra segments) is refused here as a last line of defence (the
+    env-parse boundary rejects control chars first; the separator guard is the
+    defence-in-depth for service-assigned IDs flowing through the same port).
     """
     kind = origin.get("kind")
     for field in ("run", "conversation"):
         v = origin.get(field)
-        if isinstance(v, str) and _has_control_char(v):
+        if isinstance(v, str) and not _is_trailer_safe(v):
             raise ValueError(
-                f"origin field {field!r} contains a control character; "
-                "refusing to emit a forgeable trailer"
+                f"origin field {field!r} contains a control character or a "
+                "trailer separator (';' / '='); refusing to emit a forgeable "
+                "trailer"
             )
     if kind == "autonomous":
         run = origin["run"]
@@ -190,11 +212,20 @@ def autonomous_env(
 
     NON-FATAL (ADR-013): a missing / empty / whitespace-only run-ulid yields an
     EMPTY env (`{}`) — nothing is exported, the commit lands UNSTAMPED, and
-    origin degrades to inferred. This function never raises for an absent run.
+    origin degrades to inferred. A MALFORMED run-ulid (one `format_trailer`
+    refuses — a control char or a `;`/`=` separator) is handled the same way:
+    the `ValueError` is swallowed and `{}` returned, so a bad run yields an
+    unstamped commit, NEVER an aborted one ("a stamp failure is non-fatal;
+    never abort the commit to chase a stamp"). This function never raises.
     """
     if not run or not run.strip():
         return {}
-    trailer = format_trailer(autonomous_origin(run=run, confidence=confidence))
+    try:
+        trailer = format_trailer(autonomous_origin(run=run, confidence=confidence))
+    except ValueError:
+        # A malformed run (control char / `;` / `=`) must degrade to unstamped,
+        # the same non-fatal posture as the empty-run case (ADR-013).
+        return {}
     body = trailer[len(f"{TRAILER_KEY}: ") :]
     return {"SULIS_ORIGIN": body}
 
