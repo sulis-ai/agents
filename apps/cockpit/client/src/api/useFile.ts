@@ -5,14 +5,11 @@
 // hook before a file is selected.
 
 import { useQuery } from "@tanstack/react-query";
-import type { FileContents } from "../../../shared/api-types";
-import { apiGet } from "./client";
+import { fileQuery } from "./fileQueries";
 
 export function useFile(changeId: string, path: string) {
   return useQuery({
-    queryKey: ["file", changeId, path],
-    queryFn: () =>
-      apiGet<FileContents>(`/api/changes/${changeId}/file`, { path }),
+    ...fileQuery(changeId, path),
     enabled: changeId.length > 0 && path.length > 0,
   });
 }

@@ -1,0 +1,19 @@
+{
+  "pr": "feat/wp-006-eviction-memory-cap",
+  "base": "change/refactor-persistent-chat-sessions",
+  "build_verification": { "tool": "ruff + py_compile", "pr_introduced_errors": 0 },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "low" },
+    "size": { "lines_added_approx": 700, "files_changed": 4, "severity": "low" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "low" },
+    "completeness": { "new_source_without_test": 0, "new_source_files": 1, "new_test_files": 1, "severity": "low" }
+  },
+  "findings_in_changes": { "critical": 0, "high": 0, "medium": 1, "low": 0, "resolved_inline": 1 },
+  "findings_in_neighbours": { "note": 1 },
+  "verdict": "PASS",
+  "lenses": {
+    "architecture": { "findings": 0, "note": "dependency-inward preserved; consumes is_alive/_on_process_death/last_activity, no fork" },
+    "security": { "findings": 0, "note": "no secrets, no network, stdlib-only; ps argv built from int pids only" },
+    "quality": { "findings": 1, "resolved_inline": 1, "note": "CR-10 N-subprocess-in-status, fixed by batching to one ps call" }
+  }
+}

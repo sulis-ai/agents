@@ -1,0 +1,13 @@
+{
+  "acceptance_criteria": [
+    "see SRD body"
+  ],
+  "id": "dna:requirement:G6SRJSZWP73P65KS85WMKJHGXK",
+  "priority": "must",
+  "rationale": "Extracted from FR-26 of /Users/iain/.sulis/changes/01KT500K2JTE2EGW6TPPQ4D4VN/worktree/.specifications/autonomous-delivery-environment/SRD.md. The `source` ref is a synthetic Opportunity placeholder generated from the SRD path; replace when Opportunity emission lands (queued follow-on slice). Defaults applied for SRD-absent fields: priority=must, verification_method=test, state=draft.",
+  "source": "dna:opportunity:BG8E0H5JPPWEK3G3B26T3H087A",
+  "state": "draft",
+  "statement": "A step left incomplete at the prior session's close is handled gracefully on resume. On resume, the system SHALL restore the change's recoverable state (transcript + worktree files + brain entities) and SHALL NOT claim that an action interrupted mid-flight at the prior close completed. A step that was incomplete at close SHALL be re-run by the resumed agent from the restored state, and the founder SHALL be shown, in plain English, that the change was resumed (not that it silently continued). - *Acceptance:* Given a session that closed with a step part-done, resuming it shows the founder a \"resumed this change\" indication, and the resumed agent re-runs the incomplete step from the restored state rather than reporting it as already finished",
+  "sys_status": "active",
+  "verification_method": "test"
+}

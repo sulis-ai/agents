@@ -1,0 +1,47 @@
+{
+  "review": {
+    "target": "feat/wp-refit-dark-mode-restructure",
+    "project": "feat-dark-mode",
+    "timestamp": "2026-06-08T093320Z",
+    "base": "3c441684",
+    "head": "working-tree",
+    "verdict": "PASS"
+  },
+  "build_verification": {
+    "tsc_client_exit": 0,
+    "eslint_exit": 0,
+    "full_typecheck_exit": 0,
+    "full_lint_exit": 0,
+    "vite_build_exit": 0,
+    "pr_introduced_errors": 0
+  },
+  "pr_hygiene": {
+    "scope": {"severity": "none", "commit_concern": "single (dark-mode re-fit)", "module_fan_out": "apps/cockpit/client"},
+    "size": {"severity": "none", "lines_added": 187, "lines_removed": 107, "files_changed": 12},
+    "safety": {"severity": "none", "migration_count": 0, "schema_idl_count": 0, "secret_pattern_hits": 0, "infra_files": 0},
+    "completeness": {"severity": "none", "new_source_without_test": 0, "new_tests": ["WorkspaceTopBar.theme.test.tsx", "no-raw-colours.ade-surfaces.test.ts"]}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"total": 0},
+    "draft_deltas": 0
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "status": "nothing-surfaced"},
+    "security": {"findings": 0, "status": "nothing-surfaced"},
+    "quality": {"findings": 0, "status": "nothing-surfaced", "seven_outputs_complete": true, "jsx_ident_scan": "all resolve", "cr10_perf": "no matches"}
+  },
+  "watch_list": [
+    {
+      "item": "server/tests/discovery.mint-real.test.ts",
+      "failures": 2,
+      "scope": "out-of-scope",
+      "reason": "server-side SpineEmitterMinter integration test; vendored Python emitter returns result.ok=false under python3.14; pre-existing on origin/main (#216); re-fit touches zero server files",
+      "delta": null
+    }
+  ],
+  "self_attestation": {
+    "CR-01": true, "CR-02": "single-reader deviation recorded (homogeneous 294-line diff)",
+    "CR-03": true, "CR-04": true, "CR-05": true, "CR-06": true, "CR-07": true, "CR-09": true
+  }
+}

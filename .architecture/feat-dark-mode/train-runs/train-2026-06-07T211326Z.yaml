@@ -1,0 +1,10 @@
+train_id: "train-2026-06-07T211326Z"
+started_at: "2026-06-07T21:13:26Z"
+completed_at: "2026-06-07T21:13:27Z"
+outcome: "blocker"
+outcome_reason: "Step 0 fetch_failed: fatal: couldn't find remote ref dev"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: null
+smoke_verdict: null

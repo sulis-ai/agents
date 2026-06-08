@@ -1,28 +1,33 @@
-// WP-014 → WP-015 — <FilePane /> — the right-hand file viewer.
+// Files redesign (Direction B) — <FilePane /> — the single-file level of
+// the content column.
 //
-// Reads the selected file path from the ?file= search param (set by
-// <FileTree>) and the diff toggle from the ?diff=1 param (set by
-// <FileToolbar>). One toolbar always renders above the body so the
-// founder can copy the path and flip the diff toggle in every state.
+// Reads the selected file path from ?file= and the diff toggle from
+// ?diff=1. The breadcrumb-and-actions bar (<FileToolbar>) renders ABOVE
+// the body in EVERY state so the founder can always copy the path and
+// flip the diff toggle — even when diff mode errors (NO_BASE_SHA).
 //
-// The body has two modes, selected by ?diff:
-//   - file mode (?diff absent)  → useFile  → <MonacoFile> (WP-014)
-//   - diff mode (?diff=1)       → useDiff  → <MonacoDiff>  (WP-015)
-// Both modes share one rendering path: loading / error / a
-// "not previewable" state / Monaco. Only the active query fetches —
-// the inactive hook is called with an empty path, which disables it
-// (so diff mode never hits /file, and vice-versa).
+// Body modes (by ?diff):
+//   - file mode → useFile → binary/truncated states, or <RenderedPreview>
+//     (docs render by default, code stays read-only source).
+//   - diff mode → useDiff → binary/truncated → <DiffUnavailableState>;
+//     422 NO_BASE_SHA → <NoBaseShaState>; else <MonacoDiff>.
 //
-// Mode-specific states:
-//   - file: binary → <FileBinaryState>; truncated → <FileTruncatedState>
-//   - diff: binary/truncated → <DiffUnavailableState>;
-//           422 NO_BASE_SHA  → <NoBaseShaState>
+// A genuine read failure → the calm, worded couldn't-load state (heading
+// + a "couldn't read the file" chip + the reason + Try again + Copy
+// path) — the signed honest-failure treatment, never a blank pane or a
+// destructive-red banner.
 //
-// References: WP-014 Contract (<FilePane>), WP-015 Contract (<FilePane>
-// diff behaviour), ADR-001 + ADR-006 (Monaco read-only), TDD §6, §7.
+// References: WP-014/WP-015 Contract, ADR-001/006, the signed files-B
+// visual contract (state 7 — couldn't-load).
 
 import { Suspense, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
+import {
+  ExclamationTriangleIcon,
+  ArrowPathIcon,
+  ClipboardIcon,
+} from "@heroicons/react/20/solid";
+import { DocumentMagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { useFile } from "../api/useFile";
 import { useDiff } from "../api/useDiff";
 import { ApiError } from "../api/client";
@@ -31,59 +36,101 @@ import { FileBinaryState } from "./FileBinaryState";
 import { FileTruncatedState } from "./FileTruncatedState";
 import { DiffUnavailableState } from "./DiffUnavailableState";
 import { NoBaseShaState } from "./NoBaseShaState";
-import { MonacoFile } from "./MonacoFile";
 import { MonacoDiff } from "./MonacoDiff";
+import { RenderedPreview } from "./RenderedPreview";
+import { HowThisFileCameToBe } from "./HowThisFileCameToBe";
+import type { ChangeView } from "./ChangeNav";
 import styles from "../styles/FilesPanel.module.css";
 
 interface Props {
   changeId: string;
+  /** Switch the change view (for the file-provenance panel's trace jumps). */
+  onSelectView?: (view: ChangeView) => void;
 }
 
-function pane(children: ReactNode) {
+function content(children: ReactNode) {
   return (
-    <div className={styles.filePane} data-testid="file-pane">
+    <div className={styles.content} data-testid="file-pane">
       {children}
     </div>
   );
 }
 
-function message(text: string) {
-  return pane(<p className={styles.fileMessage}>{text}</p>);
+/** The calm, worded couldn't-load state (signed contract, state 7). */
+function CouldNotLoad({
+  reason,
+  absolutePath,
+  onRetry,
+}: {
+  reason: string;
+  absolutePath: string;
+  onRetry: () => void;
+}) {
+  async function copyPath() {
+    const clip = navigator.clipboard;
+    if (clip && typeof clip.writeText === "function" && absolutePath) {
+      try {
+        await clip.writeText(absolutePath);
+      } catch {
+        /* copy is a convenience; never surface an error for it */
+      }
+    }
+  }
+  return (
+    <div className={styles.state} role="alert" data-testid="file-load-error">
+      <DocumentMagnifyingGlassIcon className={styles.ic} aria-hidden="true" />
+      <h3>Couldn’t load this file</h3>
+      <span className={styles.why}>
+        <ExclamationTriangleIcon aria-hidden="true" />
+        Couldn’t read the file
+      </span>
+      {/* Keep the literal phrase the contract's body uses. */}
+      <p>Could not load file — {reason}</p>
+      <div className={styles.actions}>
+        <button type="button" className={styles.retry} onClick={onRetry}>
+          <ArrowPathIcon aria-hidden="true" />
+          Try again
+        </button>
+        {absolutePath && (
+          <button type="button" className={styles.copybtn} onClick={copyPath}>
+            <ClipboardIcon aria-hidden="true" />
+            Copy path
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
-export function FilePane({ changeId }: Props) {
+export function FilePane({ changeId, onSelectView }: Props) {
   const [params] = useSearchParams();
   const selected = params.get("file") ?? "";
   const diffMode = params.get("diff") === "1";
 
-  // Only the active query fetches: the inactive hook gets an empty
-  // path, which disables it (useFile/useDiff are `enabled` on a
-  // non-empty path). This is what keeps diff mode off the /file route.
+  // Only the active query fetches: the inactive hook gets an empty path,
+  // which disables it (so diff mode never hits /file, and vice-versa).
   const fileQuery = useFile(changeId, diffMode ? "" : selected);
   const diffQuery = useDiff(changeId, diffMode ? selected : "");
   const query = diffMode ? diffQuery : fileQuery;
 
   if (!selected) {
-    return message("Pick a file from the tree to view it.");
+    return content(
+      <div className={styles.cbody}>
+        <p className={styles.fileMessage}>Pick a file from the tree to view it.</p>
+      </div>,
+    );
   }
 
-  // The toolbar — and crucially the diff toggle — renders ABOVE the body
-  // in EVERY state (loading / error / no-base-sha / success). This is the
-  // documented contract: the founder must always be able to flip the diff
-  // toggle back, even when diff mode errors (e.g. NO_BASE_SHA). Earlier the
-  // error branches returned without the toolbar, stranding the user in diff
-  // mode with no way back. The filename comes from the selected path
-  // (always known); the absolute path (for copy) only fills once data
-  // arrives — CopyPathButton disables itself until then.
   const absolutePath =
     query.data && "absolutePath" in query.data ? query.data.absolutePath : "";
 
   function body(): ReactNode {
     if (query.isLoading) {
       return (
-        <p className={styles.fileMessage}>
-          {diffMode ? "Loading diff..." : "Loading file..."}
-        </p>
+        <div className={styles.loadnote} role="status" aria-live="polite">
+          <span className={styles.spin} aria-hidden="true" />
+          {diffMode ? "Loading diff…" : "Loading file…"}
+        </div>
       );
     }
 
@@ -98,9 +145,11 @@ export function FilePane({ changeId }: Props) {
       const reason =
         query.error instanceof ApiError ? query.error.message : "unknown error";
       return (
-        <p className={styles.fileMessage}>
-          Could not load {diffMode ? "diff" : "file"}: {reason}
-        </p>
+        <CouldNotLoad
+          reason={reason}
+          absolutePath={absolutePath}
+          onRetry={() => void query.refetch()}
+        />
       );
     }
 
@@ -110,7 +159,7 @@ export function FilePane({ changeId }: Props) {
         <DiffUnavailableState absolutePath={diff.absolutePath} />
       ) : (
         <Suspense
-          fallback={<p className={styles.fileMessage}>Loading viewer...</p>}
+          fallback={<p className={styles.fileMessage}>Loading viewer…</p>}
         >
           <MonacoDiff
             base={diff.base}
@@ -127,18 +176,27 @@ export function FilePane({ changeId }: Props) {
     ) : file.truncated ? (
       <FileTruncatedState absolutePath={file.absolutePath} />
     ) : (
-      <Suspense
-        fallback={<p className={styles.fileMessage}>Loading viewer...</p>}
-      >
-        <MonacoFile content={file.content ?? ""} language={file.language} />
-      </Suspense>
+      <RenderedPreview
+        path={selected}
+        content={file.content ?? ""}
+        language={file.language}
+      />
     );
   }
 
-  return pane(
+  return content(
     <>
       <FileToolbar relativePath={selected} absolutePath={absolutePath} />
-      {body()}
+      <div className={styles.cbody}>
+        <div className={styles.fileFill}>{body()}</div>
+      </div>
+      {/* WP-P10/P11 — "How this file came to be": the per-file origin badge +
+          trace, beneath the content (progressive disclosure). */}
+      <HowThisFileCameToBe
+        changeId={changeId}
+        path={selected}
+        onSelectView={onSelectView}
+      />
     </>,
   );
 }

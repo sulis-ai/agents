@@ -58,9 +58,16 @@ from _requirement_emission import _deterministic_ulid_from
 
 # The same regex Requirement-emission uses to find FR/NFR headers in the
 # SRD body. Kept local-and-narrow to avoid coupling to the emitter's
-# whole module structure — we just need to enumerate ids.
+# whole module structure — we just need to enumerate ids. Reconciled from two
+# fixes that must both hold:
+#  - #170 — the closing `**` terminates the heading; inline body MAY follow
+#    (`**FR-NN: Title.** body`) — no trailing end-anchor.
+#  - CH-01KT50 — separator may be colon, em-dash, en-dash, or hyphen (house
+#    style ` — `); id allows an optional leading `N` (scheme FR-N1).
+# NOTE: duplicated with _requirement_emission._FR_HEADER_RE — keep in sync
+# until extracted to a shared primitive (tracked).
 _FR_HEADER_RE: re.Pattern[str] = re.compile(
-    r"^\*\*((?:FR|NFR)-\d+(?:\.\d+)?):\s*(.+?)\*\*\s*$",
+    r"^\*\*((?:FR|NFR)-N?\d+(?:\.\d+)?)\s*[:—–-]\s*(.+?)\*\*",
     re.MULTILINE,
 )
 

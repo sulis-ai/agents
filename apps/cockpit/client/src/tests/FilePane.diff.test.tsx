@@ -33,6 +33,7 @@ vi.mock("@monaco-editor/react", () => ({
 }));
 
 import { FilePane } from "../components/FilePane";
+import { ThemeProvider } from "../theme/ThemeProvider";
 
 function freshClient() {
   return new QueryClient({
@@ -47,17 +48,26 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
+// A fetch impl returning a FRESH Response per call. <FilePane> now mounts the
+// file-provenance panel (<HowThisFileCameToBe>), so more than one fetch fires
+// per render and a single shared Response body can only be read once.
+function respond(status: number, body: unknown) {
+  return () => Promise.resolve(jsonResponse(status, body));
+}
+
 function renderPaneDiff(filePath: string) {
   const entry = `/c/abc?file=${encodeURIComponent(filePath)}&diff=1`;
   const client = freshClient();
   return render(
-    <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[entry]}>
-        <Routes>
-          <Route path="/c/:changeId" element={<FilePane changeId="abc" />} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <ThemeProvider>
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={[entry]}>
+          <Routes>
+            <Route path="/c/:changeId" element={<FilePane changeId="abc" />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    </ThemeProvider>,
   );
 }
 
@@ -83,8 +93,8 @@ describe("<FilePane /> diff mode", () => {
   });
 
   it("renders <MonacoDiff> with base/current/language for a text diff", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse(200, makeDiff()),
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      respond(200, makeDiff()),
     );
     renderPaneDiff("src/index.ts");
 
@@ -98,8 +108,8 @@ describe("<FilePane /> diff mode", () => {
   });
 
   it("renders <DiffUnavailableState> (no Monaco) for a binary diff", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse(200, makeDiff({ binary: true, base: null, current: null })),
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      respond(200, makeDiff({ binary: true, base: null, current: null })),
     );
     renderPaneDiff("logo.png");
 
@@ -110,8 +120,8 @@ describe("<FilePane /> diff mode", () => {
   });
 
   it("renders <DiffUnavailableState> for a truncated diff", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse(200, makeDiff({ truncated: true, base: null, current: null })),
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      respond(200, makeDiff({ truncated: true, base: null, current: null })),
     );
     renderPaneDiff("huge.log");
 
@@ -121,8 +131,8 @@ describe("<FilePane /> diff mode", () => {
   });
 
   it("renders <NoBaseShaState> on a 422 NO_BASE_SHA response", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse(422, {
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      respond(422, {
         error: "no base_sha recorded for this change",
         code: "NO_BASE_SHA",
       }),

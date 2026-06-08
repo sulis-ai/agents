@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:T25HR0BVH4TNP7BS5G9FBYHRZH",
+  "initial_steps": [
+    "n5hbzs53-with-a-product-set-up-say-what-you-want-1"
+  ],
+  "name": "Start work by saying what you want",
+  "state": "draft",
+  "steps": [
+    "n5hbzs53-with-a-product-set-up-say-what-you-want-1",
+    "n5hbzs53-look-at-the-board-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "n5hbzs53-look-at-the-board-2"
+  ],
+  "transitions": [
+    "n5hbzs53-with-a-product-set-up-say-what-you-want-1 -> n5hbzs53-look-at-the-board-2"
+  ],
+  "type": "review"
+}

@@ -1,0 +1,17 @@
+{
+  "pr": "feat/wp-010-onboarding-roundtrip",
+  "build_verification": { "pr_introduced_errors": 0, "typecheck": "clean", "lint": "clean", "read_only_gate": "clean" },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["feat"], "module_fan_out": 1, "note": "all under apps/cockpit (one WP, one journey slice)", "severity": "low" },
+    "size": { "lines_added": 2704, "lines_removed": 14, "files_changed": 19, "note": "vertical round-trip slice — server+client of one journey ship together by design (INDEX decomposition); not splittable without breaking the observable round-trip", "severity": "low-by-design" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none" },
+    "completeness": { "new_source_files": 6, "new_test_files": 6, "ratio": "1:1", "severity": "none" }
+  },
+  "lenses": {
+    "architecture": { "in_changes": 0, "in_neighbours": 0, "notes": "ADR-006 honoured (no new write-gate file); ADR-007 emitter-only mint via bridge; read-only gate clean; no new process-start" },
+    "security": { "in_changes": 0, "in_neighbours": 0, "notes": "scope-bound + path-normalised search (../-escape refused, verified); confirm-gated act; NFR-SEC-03 log discipline; no secrets/injection" },
+    "quality": { "in_changes": 0, "in_neighbours": 0, "watch": ["randomToken uses Math.random (same-process nonce, not a security token — acceptable, documented)", "per-process orchestrator singleton (single-founder-localhost assumption, matches InFlightLock)"] }
+  },
+  "verdict": "PASS",
+  "draft_deltas": 0
+}

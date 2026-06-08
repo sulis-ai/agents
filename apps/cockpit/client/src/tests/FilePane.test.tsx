@@ -31,6 +31,7 @@ vi.mock("@monaco-editor/react", () => ({
 }));
 
 import { FilePane } from "../components/FilePane";
+import { ThemeProvider } from "../theme/ThemeProvider";
 
 function freshClient() {
   return new QueryClient({
@@ -45,19 +46,30 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
+// A fetch impl that returns a FRESH Response per call. <FilePane> now mounts
+// the file-provenance panel (<HowThisFileCameToBe>), so more than one fetch
+// fires per render; a single shared Response body can only be read once, so we
+// hand each call its own (the panel's /origin call falls through to the same
+// stub and lands on the panel's calm fallback — irrelevant to these assertions).
+function respond(status: number, body: unknown) {
+  return () => Promise.resolve(jsonResponse(status, body));
+}
+
 function renderPane(filePath: string | null) {
   const entry = filePath
     ? `/c/abc?file=${encodeURIComponent(filePath)}`
     : "/c/abc";
   const client = freshClient();
   return render(
-    <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[entry]}>
-        <Routes>
-          <Route path="/c/:changeId" element={<FilePane changeId="abc" />} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <ThemeProvider>
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={[entry]}>
+          <Routes>
+            <Route path="/c/:changeId" element={<FilePane changeId="abc" />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    </ThemeProvider>,
   );
 }
 
@@ -97,8 +109,8 @@ describe("<FilePane />", () => {
   });
 
   it("shows the error state on a fetch failure", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse(500, { error: "boom" }),
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      respond(500, { error: "boom" }),
     );
     renderPane("src/index.ts");
     await waitFor(() =>
@@ -107,8 +119,8 @@ describe("<FilePane />", () => {
   });
 
   it("renders <MonacoFile> with the content and language for a text file", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse(200, makeFile()),
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      respond(200, makeFile()),
     );
     renderPane("src/index.ts");
 
@@ -121,8 +133,8 @@ describe("<FilePane />", () => {
   });
 
   it("renders <FileBinaryState> (no Monaco) for a binary file", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse(200, makeFile({ binary: true, content: null })),
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      respond(200, makeFile({ binary: true, content: null })),
     );
     renderPane("logo.png");
 
@@ -133,8 +145,8 @@ describe("<FilePane />", () => {
   });
 
   it("renders <FileTruncatedState> for a truncated file", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse(200, makeFile({ truncated: true, content: null })),
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      respond(200, makeFile({ truncated: true, content: null })),
     );
     renderPane("huge.log");
 
@@ -145,8 +157,8 @@ describe("<FilePane />", () => {
   });
 
   it("renders the toolbar with an enabled diff toggle (WP-015 made it live)", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse(200, makeFile()),
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      respond(200, makeFile()),
     );
     renderPane("src/index.ts");
 

@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:T4VDCCCR65XFPXHTNC2RWY5DCK",
+  "initial_steps": [
+    "fbe7b1nz-with-more-than-one-product-open-the-boar-1"
+  ],
+  "name": "Switch product and the board re-scopes",
+  "state": "draft",
+  "steps": [
+    "fbe7b1nz-with-more-than-one-product-open-the-boar-1",
+    "fbe7b1nz-switch-to-another-product-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "fbe7b1nz-switch-to-another-product-2"
+  ],
+  "transitions": [
+    "fbe7b1nz-with-more-than-one-product-open-the-boar-1 -> fbe7b1nz-switch-to-another-product-2"
+  ],
+  "type": "review"
+}

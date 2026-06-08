@@ -1,0 +1,724 @@
+diff --git a/apps/cockpit/server/adapters/InferredOriginAttribution.ts b/apps/cockpit/server/adapters/InferredOriginAttribution.ts
+index 2b086cf..d6b883b 100644
+--- a/apps/cockpit/server/adapters/InferredOriginAttribution.ts
++++ b/apps/cockpit/server/adapters/InferredOriginAttribution.ts
+@@ -30,6 +30,7 @@ import { groupTurns, type TurnItem } from "../../shared/groupTurns";
+ import { locateTranscripts } from "../lib/locateTranscripts";
+ import { parseTranscripts } from "../lib/parseTranscripts";
+ import { readBrain } from "../lib/readBrain";
++import { deriveThreadId, sessionStemFromRef } from "../lib/threadIdentity";
+ 
+ /** The reads the adapter needs, injected so tests can stub git/brain/turns. */
+ export interface InferredOriginDeps {
+@@ -79,11 +80,14 @@ function runsFromBrain(entities: BrainEntity[]): RunFacts[] {
+ }
+ 
+ /**
+- * Project the change's conversation turns into TurnFacts. The conversation id
+- * is the transcript file's stem (the Claude Code session id); each turn's index
+- * is its 1-based position; its `at` is the turn's timestamp; its summary is the
+- * turn's first sentences (the plain-English carry — full Haiku summaries are the
+- * chat surface's concern, not origin inference).
++ * Project ONE transcript's conversation turns into TurnFacts. The conversation
++ * id is the transcript's `thread_`-shaped Thread id (NOT the raw stem) — derived
++ * via the SHARED `deriveThreadId` helper (`lib/threadIdentity`), the SAME rule
++ * the relay records (EP-03, ADR-018 D2), so a file's displayed conversation id
++ * does not change shape on flip likely→exact. Each turn's index is its 1-based
++ * position WITHIN this transcript; its `at` is the turn's timestamp; its summary
++ * is the turn's first sentences (the plain-English carry — full Haiku summaries
++ * are the chat surface's concern, not origin inference).
+  */
+ function turnsFromMessages(
+   messages: Parameters<typeof groupTurns>[0],
+@@ -199,8 +203,9 @@ export class InferredOriginAttribution implements OriginAttribution {
+ 
+   /**
+    * The change's conversation turns (fail-soft: no transcripts → []). Memoised
+-   * per instance: transcripts are located + parsed at most once per request, no
+-   * matter how many files are attributed (the O(files × transcripts) fix).
++   * per instance: transcripts are located + parsed once per request, no matter
++   * how many files are attributed (the O(files × transcripts) fix) — each
++   * transcript is parsed exactly once, inside the single memoised `loadTurns`.
+    */
+   private async readTurns(): Promise<TurnFacts[]> {
+     if (this.turnsPromise === null) {
+@@ -216,17 +221,25 @@ export class InferredOriginAttribution implements OriginAttribution {
+         this.deps.claudeProjectsDir,
+       );
+       if (paths.length === 0) return [];
+-      const messages = await parseTranscripts(paths);
+-      // TODO(deferred): multi-session transcripts mis-attribute. Only the FIRST
+-      // transcript's stem is used as the conversation id, and turns are indexed
+-      // across the MERGED stream — so a change spanning 2+ sessions reports the
+-      // wrong conversation id / turn number for turns from the later session(s).
+-      // REASON: correct multi-session attribution needs per-session turn
+-      // indexing + a conversation id per transcript; tracked as the
+-      // origin-stamping-live follow-up (#23).
+-      // The conversation id is the first transcript's file stem (the session id).
+-      const stem = paths[0]!.split("/").pop()?.replace(/\.jsonl$/, "") ?? "";
+-      return turnsFromMessages(messages, stem);
++
++      // WP-004 (#23 multi-session fix, ADR-018 D2): index turns PER TRANSCRIPT
++      // with a Thread id PER TRANSCRIPT (one `Thread` per session). For each
++      // located transcript we derive its `thread_`-shaped id via the SHARED
++      // `deriveThreadId` rule the relay records (EP-03 — recorded and inferred
++      // render the SAME id, so a file's displayed id does not change shape on
++      // flip likely→exact) and index that transcript's turns 1-based WITHIN it,
++      // then concatenate. This retires the old "first stem only across the
++      // merged stream" behaviour, which mis-attributed every turn of a 2+
++      // session change to the first session's id + a merged turn index.
++      const perTranscript = await Promise.all(
++        paths.map(async (path) => {
++          const conversationId =
++            deriveThreadId(sessionStemFromRef(path) ?? "") ?? "";
++          const messages = await parseTranscripts([path]);
++          return turnsFromMessages(messages, conversationId);
++        }),
++      );
++      return perTranscript.flat();
+     } catch {
+       return [];
+     }
+diff --git a/apps/cockpit/server/app.ts b/apps/cockpit/server/app.ts
+index 599dfad..e863a0d 100644
+--- a/apps/cockpit/server/app.ts
++++ b/apps/cockpit/server/app.ts
+@@ -36,6 +36,7 @@ import {
+   type OnboardingLogLine,
+   type StartChangeLogLine,
+ } from "./routes/chat";
++import { LocalTranscriptConversationIdentity } from "./adapters/LocalTranscriptConversationIdentity";
+ import type { SpineMinter } from "./ports/SpineMinter";
+ import {
+   SpineEmitterMinter,
+@@ -181,6 +182,15 @@ export function createApp(deps: CreateAppDeps): Application {
+         changeStore: deps.changeStore,
+         sessionBridge: deps.sessionBridge,
+         inFlightLock,
++        // WP-004 — the conversation-identity seam (ADR-018). The single
++        // sanctioned composition site wires the ONLY adapter this change ships,
++        // `LocalTranscriptConversationIdentity` (derives the assisted Thread id +
++        // Message ordinal locally, read-only — no cross-service call). A live
++        // service adapter swaps in behind the same port later with no route
++        // change. `claudeProjectsDir` lets the relay read the resolved session's
++        // transcript (read-only) to count the Message ordinal.
++        conversationIdentity: new LocalTranscriptConversationIdentity(),
++        claudeProjectsDir: deps.claudeProjectsDir,
+         chatLogSink: deps.chatLogSink,
+       }),
+     );
+diff --git a/apps/cockpit/server/routes/chat.ts b/apps/cockpit/server/routes/chat.ts
+index 73b8663..7bb1dfc 100644
+--- a/apps/cockpit/server/routes/chat.ts
++++ b/apps/cockpit/server/routes/chat.ts
+@@ -23,9 +23,14 @@ import { Router, json as jsonBody } from "express";
+ import type { ChangeStoreReader } from "../ports/ChangeStoreReader";
+ import type {
+   SessionBridge,
++  SessionResolution,
+   RelaySink,
+   RelayOutcome,
+ } from "../ports/SessionBridge";
++import type { ConversationIdentity } from "../ports/ConversationIdentity";
++import { assistedOriginEnv } from "../lib/relayOrigin";
++import { locateTranscripts } from "../lib/locateTranscripts";
++import { parseTranscripts } from "../lib/parseTranscripts";
+ // eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (TDD §9 permits)
+ import type {
+   ChatStreamEvent,
+@@ -34,6 +39,7 @@ import type {
+   OnboardingStreamEvent,
+   StartFromIntentRequest,
+   StartFromIntentStreamEvent,
++  TranscriptMessage,
+ } from "../../shared/api-types";
+ import { checkSessionBinding } from "../lib/sessionBinding";
+ import { InFlightLock } from "../lib/inFlightLock";
+@@ -62,6 +68,13 @@ export interface ChatLogLine {
+   resolution: "live" | "resume" | "spawn";
+   outcome: "accepted" | "refused" | "completed" | "broken";
+   code?: string;
++  /**
++   * WP-004 (NFR-SEC-03) — whether THIS send carried an assisted origin stamp to
++   * the spawn (so the live likely→exact round-trip is observable). A boolean
++   * ONLY: never the thread-id body, the prompt, or the reply text. Absent when
++   * no relay was attempted (a pre-relay refusal).
++   */
++  originStamped?: boolean;
+ }
+ 
+ export interface ChatRouterDeps {
+@@ -69,6 +82,21 @@ export interface ChatRouterDeps {
+   sessionBridge: SessionBridge;
+   /** The per-change one-in-flight lock (shared singleton across requests). */
+   inFlightLock: InFlightLock;
++  /**
++   * WP-004 — the conversation-identity seam (ADR-018). The relay computes the
++   * assisted origin via this port's local adapter
++   * (`LocalTranscriptConversationIdentity`); a live service adapter later swaps
++   * in behind the same port with no route change. Optional: when absent, the
++   * relay spawns unstamped (every commit degrades to inferred — ADR-013).
++   */
++  conversationIdentity?: ConversationIdentity;
++  /**
++   * WP-004 — where Claude Code stores session transcripts (`~/.claude/projects`).
++   * The relay reads the resolved session's transcript (read-only) to derive the
++   * Message ordinal for the assisted origin. Optional alongside
++   * `conversationIdentity`; absent → unstamped.
++   */
++  claudeProjectsDir?: string;
+   /** Where the one-line-per-send structured log goes (defaults to no-op). */
+   chatLogSink?: (line: ChatLogLine) => void;
+ }
+@@ -159,6 +187,16 @@ async function handleChat(
+       return;
+     }
+ 
++    // 3a. Compute the assisted origin (WP-004; ADR-016/017/018). Best-effort +
++    //     read-only: derive the Thread id + Message ordinal from the resolved
++    //     session's transcript via the ConversationIdentity port, and pass the
++    //     result straight through as `relay`'s 4th argument so the spawned
++    //     session's commits carry the `assisted` trailer. `null` ⇒ spawn
++    //     unstamped (commit degrades to inferred — ADR-013). This computes ids
++    //     and reads a transcript; it writes nothing and starts no process
++    //     (ADR-003 read-only preserved).
++    const originEnv = await computeAssistedOrigin(deps, resolution);
++
+     // 4. Act + stream. We open the SSE response LAZILY — only on the first
+     //    emitted event — so a session that never starts (zero bytes, FR-19/N3)
+     //    can still return a clean 502 JSON status rather than a 200 stream with
+@@ -177,7 +215,12 @@ async function handleChat(
+ 
+     let outcome: RelayOutcome;
+     try {
+-      outcome = await deps.sessionBridge.relay(id, prompt, sink);
++      outcome = await deps.sessionBridge.relay(
++        id,
++        prompt,
++        sink,
++        originEnv ?? undefined,
++      );
+     } catch {
+       // An unexpected relay throw: if nothing streamed yet, it's unreachable;
+       // otherwise a broken stream.
+@@ -186,7 +229,15 @@ async function handleChat(
+         : { kind: "unreachable", detail: "relay threw before streaming" };
+     }
+ 
+-    finishOutcome(res, outcome, streamOpened, id, resolutionLabel, log);
++    finishOutcome(
++      res,
++      outcome,
++      streamOpened,
++      id,
++      resolutionLabel,
++      log,
++      originEnv !== null,
++    );
+   } finally {
+     // 5. Always release the lock.
+     handle.release();
+@@ -211,6 +262,7 @@ function finishOutcome(
+   changeId: string,
+   resolution: ChatLogLine["resolution"],
+   log: (line: ChatLogLine) => void,
++  originStamped: boolean,
+ ): void {
+   if (!streamOpened) {
+     // Nothing was delivered. Return a clean JSON status (FR-19/N3).
+@@ -220,6 +272,7 @@ function finishOutcome(
+         resolution,
+         outcome: "refused",
+         code: "SESSION_UNREACHABLE",
++        originStamped,
+       });
+       res.status(502).json({
+         error: "couldn't reach this change's session",
+@@ -233,6 +286,7 @@ function finishOutcome(
+         resolution,
+         outcome: "refused",
+         code: "SESSION_CHANGE_MISMATCH",
++        originStamped,
+       });
+       res.status(422).json({
+         error: "the resolved session does not belong to this change",
+@@ -246,9 +300,9 @@ function finishOutcome(
+   }
+ 
+   if (outcome.kind === "completed") {
+-    log({ changeId, resolution, outcome: "completed" });
++    log({ changeId, resolution, outcome: "completed", originStamped });
+   } else if (outcome.kind === "interrupted") {
+-    log({ changeId, resolution, outcome: "broken" });
++    log({ changeId, resolution, outcome: "broken", originStamped });
+   } else if (outcome.kind === "unreachable") {
+     writeSseFrame(res, {
+       type: "error",
+@@ -260,6 +314,7 @@ function finishOutcome(
+       resolution,
+       outcome: "refused",
+       code: "SESSION_UNREACHABLE",
++      originStamped,
+     });
+   } else {
+     writeSseFrame(res, {
+@@ -272,11 +327,58 @@ function finishOutcome(
+       resolution,
+       outcome: "refused",
+       code: "SESSION_CHANGE_MISMATCH",
++      originStamped,
+     });
+   }
+   res.end();
+ }
+ 
++/**
++ * Compute the assisted origin env for the resolved session (WP-004), or `null`
++ * when it can't be derived (caller spawns unstamped → commit degrades to
++ * inferred, ADR-013). Best-effort + read-only (ADR-003): it reads the resolved
++ * session's transcript (no new disk write, no process start) and derives the
++ * Thread id + Message ordinal via the injected `ConversationIdentity` port
++ * (`assistedOriginEnv`, WP-003). Any failure — no identity port wired, no
++ * transcript, a parse error — resolves to `null`; it NEVER throws.
++ */
++async function computeAssistedOrigin(
++  deps: ChatRouterDeps,
++  resolution: SessionResolution,
++): Promise<Record<string, string> | null> {
++  const identity = deps.conversationIdentity;
++  if (identity === undefined) return null;
++  try {
++    const transcript = await loadResolvedTranscript(deps, resolution);
++    return assistedOriginEnv(identity, resolution, transcript);
++  } catch {
++    // Best-effort (ADR-013): any derivation failure → unstamped → inferred.
++    return null;
++  }
++}
++
++/**
++ * Read the resolved session's transcript (read-only). Resolves the same
++ * `lastSessionRef` the resolver chose when present (so the ordinal counts THIS
++ * session's turns); otherwise locates the session's transcripts under the
++ * change's worktree via the shared locator. Returns `[]` on any miss — the
++ * identity adapter then yields a turn count of 0 (in-flight turn 1) or `null`
++ * when it can derive no Thread id at all.
++ */
++async function loadResolvedTranscript(
++  deps: ChatRouterDeps,
++  resolution: SessionResolution,
++): Promise<TranscriptMessage[]> {
++  const projectsDir = deps.claudeProjectsDir;
++  if (projectsDir === undefined) return [];
++  const ref = resolution.session.lastSessionRef;
++  if (ref !== undefined && ref.endsWith(".jsonl")) {
++    return parseTranscripts([ref]);
++  }
++  const paths = await locateTranscripts(resolution.session.cwd, projectsDir);
++  return paths.length === 0 ? [] : parseTranscripts(paths);
++}
++
+ /** SSE headers (ADR-001 §Consequences): event-stream, no-cache, keep-alive, unbuffered. */
+ function openSseHeaders(res: import("express").Response): void {
+   res.status(200);
+diff --git a/apps/cockpit/server/tests/InferredOriginAttribution.test.ts b/apps/cockpit/server/tests/InferredOriginAttribution.test.ts
+index c2b513f..83a1793 100644
+--- a/apps/cockpit/server/tests/InferredOriginAttribution.test.ts
++++ b/apps/cockpit/server/tests/InferredOriginAttribution.test.ts
+@@ -31,6 +31,7 @@ import { InferredOriginAttribution } from "../adapters/InferredOriginAttribution
+ import * as parseTranscriptsMod from "../lib/parseTranscripts";
+ import * as readBrainMod from "../lib/readBrain";
+ import { mangleCwd } from "../lib/mangleCwd";
++import { deriveThreadId } from "../lib/threadIdentity";
+ import {
+   runContract,
+   type OriginContractWorld,
+@@ -226,7 +227,11 @@ describe("InferredOriginAttribution (real world)", () => {
+     it("assisted carries the conversation id + turn summary", async () => {
+       const o = await makeAttribution().originFor(CHANGE_ID, "assist.txt");
+       if (o.kind !== "assisted") throw new Error("expected assisted");
+-      expect(o.conversation.conversationId).toBe("session-abc");
++      // WP-004 (ADR-018 D2): the conversation id is now the SHARED `thread_`-
++      // shaped id (the relay records the same), NOT the raw stem. This is the
++      // intentional change the #23 fix documents — the OLD raw-stem expectation
++      // was the bug that made the id mutate shape on flip likely→exact.
++      expect(o.conversation.conversationId).toBe("thread_session-abc");
+       expect(o.conversation.summary).toContain("assisted change");
+     });
+   });
+@@ -254,4 +259,157 @@ describe("InferredOriginAttribution (real world)", () => {
+       }
+     });
+   });
++
++  // WP-004 (reconcile, ADR-018 D2) — the inferred conversation id renders the
++  // SAME `thread_`-shaped id the relay records (shared-helper parity, EP-03), so
++  // a file's displayed conversation id does not change shape on flip
++  // likely→exact. The id MUST come from `deriveThreadId` of the transcript stem,
++  // NOT the raw stem. Fails until loadTurns routes through the shared helper.
++  describe("reconcile (ADR-018 D2): inferred renders the shared thread_ id", () => {
++    it("assisted conversation id equals deriveThreadId(stem) (NOT the raw stem)", async () => {
++      const o = await makeAttribution().originFor(CHANGE_ID, "assist.txt");
++      if (o.kind !== "assisted") throw new Error("expected assisted");
++      // The session stem is "session-abc"; the displayed id must be the
++      // `thread_`-shaped id the relay would record for the same session.
++      expect(o.conversation.conversationId).toBe(deriveThreadId("session-abc"));
++      expect(o.conversation.conversationId).toBe("thread_session-abc");
++    });
++  });
++});
++
++// WP-004 (#23 multi-session fix, ADR-018 D2) — a change spanning 2+ sessions
++// must attribute each file to ITS OWN session's `thread_` id, with turns indexed
++// 1-based WITHIN that transcript (not "first stem only across the merged
++// stream"). A real two-transcript world: two sessions, each with one assistant
++// turn at a distinct timestamp, each correlated to its own file.
++//
++// OLD (the #23 bug this pins as wrong): both files report the FIRST transcript's
++// stem as the conversation id, and the second file's turn is index 2 in the
++// MERGED stream.
++// NEW (the fix): file-one → thread_(session-one), turn 1; file-two →
++// thread_(session-two), turn 1 — two distinct thread ids, per-transcript turns.
++describe("InferredOriginAttribution — multi-session (#23, ADR-018 D2)", () => {
++  let repo: string;
++  let projectsDir: string;
++
++  const CHANGE = "01MULTISESSIONCHANGE00000A";
++  const STEM_ONE = "session-one";
++  const STEM_TWO = "session-two";
++  const TURN_ONE_AT = "2026-06-03T09:00:00Z";
++  const TURN_TWO_AT = "2026-06-04T14:00:00Z";
++
++  function git(cwd: string, args: string[], env?: NodeJS.ProcessEnv): void {
++    const result = spawnSync("git", args, {
++      cwd,
++      encoding: "utf8",
++      env: { ...process.env, ...env },
++    });
++    if (result.status !== 0) {
++      throw new Error(
++        `git ${args.join(" ")} failed (status ${result.status}): ${result.stderr}`,
++      );
++    }
++  }
++
++  function commitFile(rel: string, isoDate: string): void {
++    writeFileSync(join(repo, rel), `${rel}\n`, "utf8");
++    git(repo, ["add", rel]);
++    git(repo, ["commit", "-q", "-m", `add ${rel}`], {
++      GIT_AUTHOR_DATE: isoDate,
++      GIT_COMMITTER_DATE: isoDate,
++      GIT_AUTHOR_NAME: "Iain",
++      GIT_AUTHOR_EMAIL: "iain@nivbow.com",
++      GIT_COMMITTER_NAME: "Iain",
++      GIT_COMMITTER_EMAIL: "iain@nivbow.com",
++    });
++  }
++
++  /** Write one single-turn transcript (a user record + an assistant turn). */
++  async function writeTranscript(
++    sessionDir: string,
++    stem: string,
++    turnAt: string,
++  ): Promise<void> {
++    const userAt = new Date(Date.parse(turnAt) - 60_000).toISOString();
++    const lines = [
++      JSON.stringify({
++        type: "user",
++        uuid: `${stem}-u`,
++        timestamp: userAt,
++        cwd: repo,
++        message: { role: "user", content: "please change a file" },
++      }),
++      JSON.stringify({
++        type: "assistant",
++        uuid: `${stem}-a`,
++        timestamp: turnAt,
++        cwd: repo,
++        message: {
++          role: "assistant",
++          content: [{ type: "text", text: `Done in ${stem}.` }],
++        },
++      }),
++    ];
++    await writeFile(join(sessionDir, `${stem}.jsonl`), `${lines.join("\n")}\n`, "utf8");
++  }
++
++  beforeAll(async () => {
++    repo = await realpath(await mkdtemp(join(tmpdir(), "origin-multisession-")));
++    git(repo, ["init", "-q", "-b", "main"]);
++    git(repo, ["config", "commit.gpgsign", "false"]);
++
++    // one.txt committed at session-one's turn; two.txt at session-two's turn.
++    commitFile("one.txt", TURN_ONE_AT);
++    commitFile("two.txt", TURN_TWO_AT);
++
++    projectsDir = await mkdtemp(join(tmpdir(), "origin-multisession-projects-"));
++    const sessionDir = join(projectsDir, mangleCwd(repo));
++    await mkdir(sessionDir, { recursive: true });
++    await writeTranscript(sessionDir, STEM_ONE, TURN_ONE_AT);
++    await writeTranscript(sessionDir, STEM_TWO, TURN_TWO_AT);
++  });
++
++  afterAll(async () => {
++    await rm(repo, { recursive: true, force: true });
++    await rm(projectsDir, { recursive: true, force: true });
++  });
++
++  function makeAttribution(): InferredOriginAttribution {
++    return new InferredOriginAttribution({
++      worktreeRoot: repo,
++      recordedWorktreePath: repo,
++      claudeProjectsDir: projectsDir,
++      runWindowMs: 60 * 60 * 1000,
++      turnWindowMs: 15 * 60 * 1000,
++    });
++  }
++
++  it("attributes each file to its OWN session's thread_ id (two distinct ids)", async () => {
++    const a = makeAttribution();
++    const one = await a.originFor(CHANGE, "one.txt");
++    const two = await a.originFor(CHANGE, "two.txt");
++    if (one.kind !== "assisted") throw new Error("expected one.txt assisted");
++    if (two.kind !== "assisted") throw new Error("expected two.txt assisted");
++
++    expect(one.conversation.conversationId).toBe(deriveThreadId(STEM_ONE));
++    expect(two.conversation.conversationId).toBe(deriveThreadId(STEM_TWO));
++    // Two distinct sessions → two distinct thread ids (the #23 fix; OLD behaviour
++    // reported the first stem for BOTH).
++    expect(one.conversation.conversationId).not.toBe(
++      two.conversation.conversationId,
++    );
++  });
++
++  it("indexes turns 1-based WITHIN each transcript (not across the merged stream)", async () => {
++    const a = makeAttribution();
++    const one = await a.originFor(CHANGE, "one.txt");
++    const two = await a.originFor(CHANGE, "two.txt");
++    if (one.kind !== "assisted") throw new Error("expected one.txt assisted");
++    if (two.kind !== "assisted") throw new Error("expected two.txt assisted");
++
++    // Each transcript's single turn is turn 1 within ITS OWN transcript. OLD
++    // behaviour indexed across the merged stream → two.txt's turn was 2.
++    expect(one.conversation.turn).toBe(1);
++    expect(two.conversation.turn).toBe(1);
++  });
+ });
+diff --git a/apps/cockpit/server/tests/routes.chat.test.ts b/apps/cockpit/server/tests/routes.chat.test.ts
+index f1700c7..2bdf5ef 100644
+--- a/apps/cockpit/server/tests/routes.chat.test.ts
++++ b/apps/cockpit/server/tests/routes.chat.test.ts
+@@ -12,11 +12,16 @@
+ //   - mid-stream drop ⇒ partial preserved + interrupted (FR-22)
+ //   - one structured log line per send, never the body/reply (NFR-SEC-03)
+ 
+-import { describe, it, expect, vi } from "vitest";
++import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
+ import request from "supertest";
++import { mkdtemp, mkdir, writeFile, rm, realpath } from "node:fs/promises";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
+ 
+ import { createApp } from "../app";
+ import { FakeChangeStoreReader } from "../adapters/FakeChangeStoreReader";
++import { mangleCwd } from "../lib/mangleCwd";
++import { deriveThreadId } from "../lib/threadIdentity";
+ import type { ChangeStoreRecord } from "../ports/ChangeStoreReader";
+ import type {
+   SessionBridge,
+@@ -48,6 +53,15 @@ function record(overrides: Partial<ChangeStoreRecord> = {}): ChangeStoreRecord {
+ 
+ /** A SessionBridge whose behaviour the test programs per-case. */
+ class ProgrammableBridge implements SessionBridge {
++  /**
++   * The 4th `originEnv` argument the route passed to the most recent `relay`
++   * (WP-002 wiring; WP-004 relay computation). `undefined` means the route
++   * spawned unstamped — the degradation path (ADR-013). Captured so a test can
++   * assert the assisted-origin stamp end-to-end.
++   */
++  public lastOriginEnv: Record<string, string> | undefined;
++  public relayCallCount = 0;
++
+   constructor(
+     private readonly opts: {
+       resolution?: SessionResolution;
+@@ -73,7 +87,10 @@ class ProgrammableBridge implements SessionBridge {
+     changeId: string,
+     prompt: string,
+     sink: RelaySink,
++    originEnv?: Record<string, string>,
+   ): Promise<RelayOutcome> {
++    this.relayCallCount += 1;
++    this.lastOriginEnv = originEnv;
+     if (this.opts.onRelay) return this.opts.onRelay(changeId, prompt, sink);
+     sink.emit({ type: "state", state: "replying" });
+     sink.emit({ type: "chunk", text: "hello " });
+@@ -279,3 +296,168 @@ describe("POST /api/changes/:id/chat — observability (NFR-SEC-03)", () => {
+     expect(line).not.toContain("hello"); // reply text never logged
+   });
+ });
++
++// ─── WP-004 — assisted-origin wiring end-to-end (ADR-016/017/018) ─────────────
++//
++// The relay route computes the assisted origin env from the resolved session +
++// its transcript (via the ConversationIdentity port, WP-003) and passes it to
++// `relay`'s 4th argument (WP-002). A real cockpit-chat commit then carries
++// `Sulis-Origin: assisted; conversation=thread_…; turn=<n>`.
++//
++// These tests use a REAL transcript fixture on disk (no transcript mock — MEA-09)
++// so the route's read-only transcript locate+parse runs exactly as in production.
++describe("POST /api/changes/:id/chat — assisted origin wiring (WP-004)", () => {
++  let worktree: string;
++  let projectsDir: string;
++
++  const STEM = "session-relay-abc";
++  const ORIGIN_CHANGE = "01CHATORIGINWIRING0000000A";
++
++  /**
++   * A transcript with `turnCount` agent turns. A turn is a run of consecutive
++   * agent messages (`groupTurns` semantics), so each turn is a user message
++   * followed by one assistant message — interleaved so the count is genuine.
++   */
++  async function writeTranscript(turnCount: number): Promise<string> {
++    const sessionDir = join(projectsDir, mangleCwd(worktree));
++    await mkdir(sessionDir, { recursive: true });
++    const lines: string[] = [];
++    for (let i = 0; i < turnCount; i++) {
++      // Each user immediately precedes its assistant reply (chronological, as a
++      // real transcript appends), so the post-sort order keeps the turns
++      // interleaved and `groupTurns` counts them as distinct turns.
++      lines.push(
++        JSON.stringify({
++          type: "user",
++          uuid: `u${i}`,
++          timestamp: `2026-06-03T09:0${i}:00Z`,
++          cwd: worktree,
++          message: { role: "user", content: `ask ${i}` },
++        }),
++      );
++      lines.push(
++        JSON.stringify({
++          type: "assistant",
++          uuid: `a${i}`,
++          timestamp: `2026-06-03T09:0${i}:30Z`,
++          cwd: worktree,
++          message: { role: "assistant", content: [{ type: "text", text: `turn ${i}` }] },
++        }),
++      );
++    }
++    const path = join(sessionDir, `${STEM}.jsonl`);
++    await writeFile(path, `${lines.join("\n")}\n`, "utf8");
++    return path;
++  }
++
++  function originRecord(): ChangeStoreRecord {
++    return record({ changeId: ORIGIN_CHANGE, worktreePath: worktree });
++  }
++
++  function appWithOrigin(bridge: SessionBridge, logged?: unknown[]) {
++    return createApp({
++      changeStore: new FakeChangeStoreReader([originRecord()]),
++      sessionBridge: bridge,
++      sulisStateDir: "/tmp/unused-state",
++      claudeProjectsDir: projectsDir,
++      ...(logged ? { chatLogSink: (line) => logged.push(line) } : {}),
++    });
++  }
++
++  beforeAll(async () => {
++    worktree = await realpath(await mkdtemp(join(tmpdir(), "wp004-relay-wt-")));
++    projectsDir = await mkdtemp(join(tmpdir(), "wp004-relay-projects-"));
++  });
++
++  afterAll(async () => {
++    await rm(worktree, { recursive: true, force: true });
++    await rm(projectsDir, { recursive: true, force: true });
++  });
++
++  it("passes an assisted originEnv (conversation=thread_<stem>, turn=existing+1) to relay over a resumable resolution", async () => {
++    const ref = await writeTranscript(2); // two existing turns → in-flight turn 3
++    const bridge = new ProgrammableBridge({
++      resolution: {
++        kind: "resumable",
++        session: { changeId: ORIGIN_CHANGE, cwd: worktree, lastSessionRef: ref },
++      },
++    });
++
++    const res = await request(appWithOrigin(bridge))
++      .post(`/api/changes/${ORIGIN_CHANGE}/chat`)
++      .send({ prompt: "make a change" });
++
++    expect(res.status).toBe(200);
++    expect(bridge.lastOriginEnv).toBeDefined();
++    const body = bridge.lastOriginEnv?.SULIS_ORIGIN;
++    expect(body).toBe(
++      `assisted; conversation=${deriveThreadId(STEM)}; turn=3`,
++    );
++  });
++
++  it("degrades: a fresh resolution (no transcript) relays with NO origin env and still completes", async () => {
++    const bridge = new ProgrammableBridge({
++      resolution: {
++        kind: "fresh",
++        session: { changeId: ORIGIN_CHANGE, cwd: worktree },
++      },
++    });
++
++    const res = await request(appWithOrigin(bridge))
++      .post(`/api/changes/${ORIGIN_CHANGE}/chat`)
++      .send({ prompt: "first message" });
++
++    expect(res.status).toBe(200);
++    expect(res.text).toContain('"type":"complete"');
++    expect(bridge.relayCallCount).toBe(1);
++    expect(bridge.lastOriginEnv).toBeUndefined();
++  });
++
++  it("the relay log line carries originStamped and NEVER the prompt or the thread-id body", async () => {
++    const ref = await writeTranscript(1);
++    const logged: unknown[] = [];
++    const bridge = new ProgrammableBridge({
++      resolution: {
++        kind: "resumable",
++        session: { changeId: ORIGIN_CHANGE, cwd: worktree, lastSessionRef: ref },
++      },
++    });
++
++    await request(appWithOrigin(bridge, logged))
++      .post(`/api/changes/${ORIGIN_CHANGE}/chat`)
++      .send({ prompt: "SECRET-RELAY-PROMPT" });
++
++    expect(logged.length).toBe(1);
++    const line = JSON.stringify(logged[0]);
++    // Observable that the round-trip stamped (NFR-SEC-03: boolean only).
++    expect(line).toContain('"originStamped":true');
++    // The thread-id body / prompt MUST NOT appear in the log line.
++    expect(line).not.toContain("SECRET-RELAY-PROMPT");
++    expect(line).not.toContain(deriveThreadId(STEM));
++    expect(line).not.toContain(STEM);
++  });
++
++  it("a live resolution (no lastSessionRef) relays unstamped (the WP-003 adapter derives the id from the ref)", async () => {
++    // A live, already-attached session carries NO `lastSessionRef` (SessionRef
++    // contract), so the shipped LocalTranscriptConversationIdentity (WP-003,
++    // consumed unchanged) derives no Thread id and the relay spawns unstamped —
++    // the commit degrades to inferred (ADR-013). A live transcript still exists
++    // on disk; the route's read-only locate fallback runs but the identity port
++    // yields null. (The live Thread id is the later CommunicationService adapter
++    // behind the same port — ADR-018.)
++    await writeTranscript(1);
++    const bridge = new ProgrammableBridge({
++      resolution: {
++        kind: "live",
++        session: { changeId: ORIGIN_CHANGE, cwd: worktree },
++      },
++    });
++
++    const res = await request(appWithOrigin(bridge))
++      .post(`/api/changes/${ORIGIN_CHANGE}/chat`)
++      .send({ prompt: "make a live change" });
++
++    expect(res.status).toBe(200);
++    expect(bridge.lastOriginEnv).toBeUndefined();
++  });
++});

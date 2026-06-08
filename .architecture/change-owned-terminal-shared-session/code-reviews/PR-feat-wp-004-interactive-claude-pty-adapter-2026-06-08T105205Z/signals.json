@@ -1,0 +1,39 @@
+{
+  "target": "feat/wp-004-interactive-claude-pty-adapter",
+  "project": "change-owned-terminal-shared-session",
+  "timestamp": "2026-06-08T105205Z",
+  "verdict": "PASS",
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "checks_run": ["ruff check", "ruff format --check", "mypy (changed file)", "pytest (changed test)"],
+    "coverage_gaps": ["pytest-cov absent; manual coverage analysis applied"]
+  },
+  "hygiene": {
+    "scope": {"severity": "none", "commit_types": ["feat"], "module_fan_out": 1},
+    "size": {"severity": "none", "lines_added": 352, "lines_removed": 0, "files_changed": 2},
+    "safety": {"severity": "none", "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0},
+    "completeness": {"severity": "none", "new_source_without_test": 0}
+  },
+  "findings": {
+    "in_changes": [
+      {
+        "id": "F-01",
+        "lens": "quality",
+        "severity": "critical",
+        "status": "fixed-inline",
+        "file": "_session_manager/adapters/claude_pty.py",
+        "summary": "spawn_argv emitted a shell $(cat <sidecar>) token, but the manager spawns argv directly (no shell=True) so it would reach claude as a literal string; fixed to read the sidecar and pass the brief text as a single argv element.",
+        "evidence": "_session_manager/manager.py:626 subprocess.Popen(argv, ...) with no shell=True"
+      }
+    ],
+    "in_neighbours": []
+  },
+  "remaining_unaddressed": 0,
+  "hardening_deltas": [],
+  "auto_downgrade_triggers_fired": [],
+  "lenses": {
+    "architecture": {"findings": 0, "completion": "nothing surfaced"},
+    "security": {"findings": 0, "completion": "nothing surfaced"},
+    "quality": {"findings": 1, "fixed_inline": 1, "remaining": 0}
+  }
+}

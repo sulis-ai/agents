@@ -1,22 +1,21 @@
-// WP-013 — <ThreadView /> tests.
+// <ThreadView /> tests — the change workspace (chat-B2 signed contract).
 //
-//   - Renders <ThreadHeader> with the change's handle + stage from
-//     useChange().
-//   - <ThreadTabs> switches via search param ?tab=chat|files. Default is
-//     chat; Files tab renders the WP-014 placeholder slot.
-//   - A 404 from useChange renders the gone-or-moved message rather
-//     than crashing the sidebar (sidebar testid stays present).
+// The change owns the screen inside its tab: a change-scoped LEFT NAV
+// (<ChangeNav>: name + vertical stage track + view switches) + a full-width
+// MAIN area rendering the selected view. Conversation is the default; Files /
+// Provenance / Preview swap the main area (one at a time).
 //
-// References: WP-013 Contract (<ThreadView>, <ThreadHeader>,
-// <ThreadTabs>), TDD §6 (view tree), TDD §6.2 (worktree-not-found
-// empty state framing).
+// Preserved: the header info (name/stage) renders; a 404 renders the
+// gone-or-moved message without crashing; the loading state renders.
+// New: the vertical stage track marks the current stage; the status headline
+// + needs-attention badge show; switching views swaps the main area.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThreadView } from "../pages/ThreadView";
-import type { ChangeDetail } from "../../../shared/api-types";
+import type { ChangeDetail, ChangeStatus } from "../../../shared/api-types";
 
 function freshClient() {
   return new QueryClient({
@@ -31,9 +30,8 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-function renderAt(initialPath: string) {
-  const client = freshClient();
-  return render(
+function renderAt(initialPath: string, client = freshClient()) {
+  const utils = render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
@@ -42,6 +40,7 @@ function renderAt(initialPath: string) {
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  return { ...utils, client };
 }
 
 const sampleChange: ChangeDetail = {
@@ -61,7 +60,33 @@ const sampleChange: ChangeDetail = {
   transcriptPaths: [],
 };
 
-describe("<ThreadView />", () => {
+const sampleStatus: ChangeStatus = {
+  changeId: "abc",
+  stage: "implement",
+  headline: "Building the change — working now.",
+  needsAttention: { flagged: false, reason: null },
+};
+
+function mockFetch(opts: {
+  change?: { status: number; body: unknown };
+  status?: { status: number; body: unknown };
+}) {
+  vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+    const url = String(input);
+    if (url === "/api/changes/abc") {
+      const c = opts.change ?? { status: 200, body: sampleChange };
+      return Promise.resolve(jsonResponse(c.status, c.body));
+    }
+    if (url === "/api/changes/abc/status") {
+      const s = opts.status ?? { status: 200, body: sampleStatus };
+      return Promise.resolve(jsonResponse(s.status, s.body));
+    }
+    // transcript / files / brain / anything else — empty so children don't error.
+    return Promise.resolve(jsonResponse(200, []));
+  });
+}
+
+describe("<ThreadView /> — change workspace (chat-B2)", () => {
   beforeEach(() => {
     vi.spyOn(globalThis, "fetch").mockReset();
   });
@@ -69,96 +94,162 @@ describe("<ThreadView />", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the header with the change handle + stage", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
-      const url = String(input);
-      if (url === "/api/changes/abc") {
-        return Promise.resolve(jsonResponse(200, sampleChange));
-      }
-      // transcript fetch — return empty so Chat doesn't error.
-      return Promise.resolve(jsonResponse(200, []));
-    });
-
+  it("renders the change-scoped left nav with the change name", async () => {
+    mockFetch({});
     renderAt("/c/abc");
     await waitFor(() =>
-      expect(screen.getByTestId("thread-header")).toBeInTheDocument(),
+      expect(screen.getByTestId("change-nav")).toBeInTheDocument(),
     );
-    const header = screen.getByTestId("thread-header");
-    expect(header.textContent).toContain("CH-01ABC");
-    // Stage renders as its position in the six-stage journey, not the raw
-    // enum (so it reads as a recognisable step): "Implement · 4/6".
-    expect(header.textContent).toContain("Implement · 4/6");
-    expect(header.textContent).toContain("ship the thing");
+    expect(screen.getByTestId("change-nav").textContent).toContain(
+      "ship the thing",
+    );
   });
 
-  it("defaults to the Chat tab when no ?tab= query is present", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
-      const url = String(input);
-      if (url === "/api/changes/abc") {
-        return Promise.resolve(jsonResponse(200, sampleChange));
-      }
-      return Promise.resolve(jsonResponse(200, []));
-    });
+  it("marks the change's current stage in the vertical stage track (FR-04)", async () => {
+    mockFetch({});
+    renderAt("/c/abc");
+    const nav = await screen.findByTestId("change-nav");
+    const now = nav.querySelector('[data-stage="implement"]');
+    expect(now).not.toBeNull();
+    expect(now!.getAttribute("data-state")).toBe("now");
+  });
 
+  it("renders the read-time plain-English status headline (FR-05)", async () => {
+    mockFetch({});
     renderAt("/c/abc");
     await waitFor(() =>
-      expect(screen.getByTestId("tab-panel-chat")).toBeInTheDocument(),
+      expect(
+        screen.getByText("Building the change — working now."),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it("renders the needs-attention badge when the status flags it (FR-12)", async () => {
+    mockFetch({
+      status: {
+        status: 200,
+        body: {
+          ...sampleStatus,
+          needsAttention: { flagged: true, reason: "waiting-on-decision" },
+        },
+      },
+    });
+    renderAt("/c/abc");
+    await waitFor(() =>
+      expect(screen.getByTestId("needs-attention")).toBeInTheDocument(),
     );
     expect(
-      screen.queryByTestId("tab-panel-files"),
-    ).not.toBeInTheDocument();
+      screen.getByTestId("needs-attention").textContent?.toLowerCase(),
+    ).toMatch(/waiting on you/);
   });
 
-  it("switches to the Files tab when the user clicks the Files button", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
-      const url = String(input);
-      if (url === "/api/changes/abc") {
-        return Promise.resolve(jsonResponse(200, sampleChange));
-      }
-      return Promise.resolve(jsonResponse(200, []));
-    });
-
+  it("defaults to the Conversation view; switching the left nav swaps the main area", async () => {
+    mockFetch({});
     renderAt("/c/abc");
     await waitFor(() =>
-      expect(screen.getByTestId("tab-panel-chat")).toBeInTheDocument(),
+      expect(screen.getByTestId("change-nav")).toBeInTheDocument(),
     );
-    const filesTab = screen.getByRole("tab", { name: /files/i });
-    fireEvent.click(filesTab);
+    // Conversation is the default view.
+    expect(screen.getByTestId("section-conversation")).toBeInTheDocument();
+    expect(screen.queryByTestId("section-files")).not.toBeInTheDocument();
+    expect(screen.getByTestId("view-conversation")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
 
-    expect(screen.getByTestId("tab-panel-files")).toBeInTheDocument();
-    expect(screen.queryByTestId("tab-panel-chat")).not.toBeInTheDocument();
+    // Switching to Files swaps the main area — one view at a time.
+    fireEvent.click(screen.getByTestId("view-files"));
+    expect(screen.getByTestId("section-files")).toBeInTheDocument();
+    expect(screen.queryByTestId("section-conversation")).not.toBeInTheDocument();
   });
 
-  it("opens directly on the Files tab when ?tab=files is in the URL", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
-      const url = String(input);
-      if (url === "/api/changes/abc") {
-        return Promise.resolve(jsonResponse(200, sampleChange));
-      }
-      return Promise.resolve(jsonResponse(200, []));
-    });
-
-    renderAt("/c/abc?tab=files");
-    await waitFor(() =>
-      expect(screen.getByTestId("tab-panel-files")).toBeInTheDocument(),
-    );
-  });
-
-  it("shows the 'gone or moved' message when useChange returns 404", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
-      const url = String(input);
-      if (url === "/api/changes/abc") {
-        return Promise.resolve(jsonResponse(404, { error: "not found" }));
-      }
-      return Promise.resolve(jsonResponse(200, []));
-    });
-
+  it("shows the 'gone or moved' message when useChange returns 404 (preserved)", async () => {
+    mockFetch({ change: { status: 404, body: { error: "not found" } } });
     renderAt("/c/abc");
     await waitFor(() =>
       expect(screen.getByTestId("thread-gone-or-moved")).toBeInTheDocument(),
     );
-    expect(
-      screen.getByText(/This change is gone or moved/i),
-    ).toBeInTheDocument();
+  });
+
+  // Hover/focus on a nav item warms THAT view's primary read(s) so the click
+  // lands on a cache hit. We spy on queryClient.prefetchQuery and assert the
+  // right query key(s) fire per nav item — for both pointer-enter and focus
+  // (keyboard parity). Conversation is the active view, so it's skipped.
+  function keysOf(spy: { mock: { calls: unknown[][] } }): string[][] {
+    return spy.mock.calls.map(
+      (c) => (c[0] as { queryKey: string[] }).queryKey,
+    );
+  }
+
+  it.each<[string, string, string[][]]>([
+    ["view-files", "files", [["tree", "abc", ""], ["changed", "abc"]]],
+    ["view-provenance", "provenance", [["provenance", "abc"]]],
+    ["view-preview", "preview", [["contract-preview", "abc"]]],
+    ["view-advanced", "advanced", [["advanced", "abc"]]],
+    [
+      "view-conversation",
+      "conversation",
+      [["transcript", "abc"], ["turn-summaries", "abc"]],
+    ],
+  ])(
+    "hovering %s prefetches its view's read(s)",
+    async (testid, _view, expectedKeys) => {
+      mockFetch({});
+      const client = freshClient();
+      const spy = vi.spyOn(client, "prefetchQuery");
+      // Conversation is the default active view; switch off it so every item
+      // (including conversation) is a non-active target that prefetches.
+      const { findByTestId } = renderAt("/c/abc", client);
+      const nav = await findByTestId("change-nav");
+      fireEvent.click(within(nav).getByTestId("view-files"));
+      spy.mockClear();
+
+      fireEvent.mouseEnter(within(nav).getByTestId(testid));
+      // Files is the active view after the click above — skip its own re-hover.
+      if (testid === "view-files") {
+        expect(spy).not.toHaveBeenCalled();
+        return;
+      }
+      const got = keysOf(spy);
+      for (const key of expectedKeys) {
+        expect(got).toContainEqual(key);
+      }
+    },
+  );
+
+  it("fires the same prefetch on keyboard focus as on hover (a11y parity)", async () => {
+    mockFetch({});
+    const client = freshClient();
+    const spy = vi.spyOn(client, "prefetchQuery");
+    const { findByTestId } = renderAt("/c/abc", client);
+    const nav = await findByTestId("change-nav");
+    spy.mockClear();
+
+    fireEvent.focus(within(nav).getByTestId("view-provenance"));
+    expect(keysOf(spy)).toContainEqual(["provenance", "abc"]);
+  });
+
+  it("does not prefetch the already-active view on hover", async () => {
+    mockFetch({});
+    const client = freshClient();
+    const spy = vi.spyOn(client, "prefetchQuery");
+    const { findByTestId } = renderAt("/c/abc", client);
+    const nav = await findByTestId("change-nav");
+    spy.mockClear();
+
+    // Conversation is the active default — hovering it must not refetch.
+    fireEvent.mouseEnter(within(nav).getByTestId("view-conversation"));
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("renders a loading state while the change is in flight (one state-pattern set)", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      () => new Promise(() => {}),
+    );
+    renderAt("/c/abc");
+    await waitFor(() =>
+      expect(screen.getByTestId("page-thread")).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("thread-loading")).toBeInTheDocument();
   });
 });

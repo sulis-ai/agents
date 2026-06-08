@@ -30,15 +30,19 @@ function runGate(cwdRoot: string) {
 }
 
 describe("read-only inventory gate script (TDD §13.7, ADR-003)", () => {
-  // The script scans the whole cockpit source (~80+ files) and takes ~7-8s
-  // locally; the default 5s test timeout is too tight for the real runtime,
-  // so allow 30s. The gate itself passes — this only stops a slow scan from
-  // being misreported as a failure.
+  // The script scans the whole cockpit source (200+ files) with one perl+grep
+  // pass per rule per file; standalone it runs in ~25s, but under the parallel
+  // executor batch (peer WPs spawning real subprocesses) it can approach the
+  // old 30s budget. WP-005 also adds an 8th per-file pass (rule 2c, the
+  // WS-attachment check), so the headroom shrank further. Raise the budget to
+  // 60s — the same "leave headroom for contention" philosophy the fork-pool cap
+  // in vitest.config.ts uses. The gate itself passes; this only stops a slow
+  // scan from being misreported as a failure under load.
   it("exits 0 against the actual committed cockpit source", () => {
     const res = spawnSync("bash", [script], { encoding: "utf8" });
     expect(res.status, res.stdout + res.stderr).toBe(0);
     expect(res.stdout).toMatch(/Read-only inventory clean/);
-  }, 30000);
+  }, 60000);
 
   it("--explain prints the rule catalogue and exits 0", () => {
     const res = spawnSync("bash", [script, "--explain"], { encoding: "utf8" });
@@ -83,6 +87,323 @@ describe("read-only inventory gate script (TDD §13.7, ADR-003)", () => {
       const res = runGate(sandbox);
       expect(res.status).toBe(1);
       expect(res.stdout).toMatch(/VIOLATION \[HTTP mutation verb\]/);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  // WP-005 (ADR-003) — the gate now allow-lists exactly the chat relay's
+  // app.post and the SessionBridge adapter's process start, and adds a rule
+  // flagging a process start anywhere else.
+  it("allows app.post ONLY in the sanctioned chat relay file", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "routes"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      // The relay file may register one mutation route.
+      await writeFile(
+        join(sandbox, "server", "routes", "chat.ts"),
+        "export const reg = (app: any) => app.post('/api/changes/:id/chat', () => {});\n",
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status, res.stdout + res.stderr).toBe(0);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("flags a process start OUTSIDE the sanctioned bridge adapter", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "lib"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "lib", "sneaky.ts"),
+        'import { spawn } from "node:child_process";\n' +
+          'export const go = () => spawn("claude", ["-p"]);\n',
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status).toBe(1);
+      expect(res.stdout).toMatch(/VIOLATION \[process start outside the sanctioned bridge\]/);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("allows the process start INSIDE the sanctioned bridge adapter", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "adapters"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "adapters", "StreamJsonSessionBridge.ts"),
+        'import { spawn } from "node:child_process";\n' +
+          'export const go = () => spawn("claude", ["-p"]);\n',
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status, res.stdout + res.stderr).toBe(0);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  // ADR-015 (keep-the-gate-with-named-exception) — the four operator-action +
+  // summary-cache exceptions are PATH-SCOPED, not blanket. Each test below
+  // plants the same forbidden shape in (a) the sanctioned file → still passes,
+  // and (b) some OTHER file → still trips the gate.
+
+  it("allows a filesystem write ONLY in the sanctioned summary-cache lib (ADR-015)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "lib"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "lib", "turnSummaries.ts"),
+        'import { writeFile } from "node:fs/promises";\n' +
+          'export const cache = () => writeFile("/tmp/x", "data");\n',
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status, res.stdout + res.stderr).toBe(0);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("still flags a filesystem write in ANY other lib (the exception is path-scoped)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "lib"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "lib", "notTurnSummaries.ts"),
+        'import { writeFile } from "node:fs/promises";\n' +
+          'export const go = () => writeFile("/tmp/x", "data");\n',
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status).toBe(1);
+      expect(res.stdout).toMatch(/VIOLATION \[filesystem write API\]/);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("allows a `claude` spawn ONLY in the sanctioned summary-cache lib (ADR-015)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "lib"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "lib", "turnSummaries.ts"),
+        'import { spawn } from "node:child_process";\n' +
+          'export const go = () => spawn("claude", ["-p"]);\n',
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status, res.stdout + res.stderr).toBe(0);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("allows the two operator POST routes ONLY in the sanctioned advanced route (ADR-015)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "routes"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "routes", "advanced.ts"),
+        "export const reg = (router: any) => {\n" +
+          "  router.post('/api/changes/:id/reveal', () => {});\n" +
+          "  router.post('/api/changes/:id/processes/:pid/stop', () => {});\n" +
+          "};\n",
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status, res.stdout + res.stderr).toBe(0);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("still flags a POST route in ANY other route file (the exception is path-scoped)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "routes"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "routes", "notAdvanced.ts"),
+        "export const reg = (router: any) => router.post('/x', () => {});\n",
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status).toBe(1);
+      expect(res.stdout).toMatch(/VIOLATION \[HTTP mutation verb\]/);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("allows a non-zero process signal ONLY in the sanctioned stop-process lib (ADR-015)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "lib"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "lib", "changeAdvanced.ts"),
+        'export const stop = (pid: number) => process.kill(pid, "SIGTERM");\n',
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status, res.stdout + res.stderr).toBe(0);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("still flags a non-zero process signal in ANY other lib (the exception is path-scoped)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "lib"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "lib", "notChangeAdvanced.ts"),
+        'export const kill = (pid: number) => process.kill(pid, "SIGKILL");\n',
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status).toBe(1);
+      expect(res.stdout).toMatch(/VIOLATION \[non-zero process signal\]/);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("--explain documents the four ADR-015 named exceptions", () => {
+    const res = spawnSync("bash", [script, "--explain"], { encoding: "utf8" });
+    expect(res.status).toBe(0);
+    expect(res.stdout).toMatch(/server\/routes\/advanced\.ts \(ADR-015/);
+    expect(res.stdout).toMatch(/server\/lib\/changeAdvanced\.ts \(ADR-015/);
+    expect(res.stdout).toMatch(/server\/lib\/turnSummaries\.ts \(ADR-015/);
+  });
+
+  // WP-005 (ADR-010) — the interactive terminal is a SANCTIONED write path. The
+  // gate gains EXACTLY two new named, path-scoped exceptions (parity with the
+  // ADR-003 relay/bridge pairing): the sidecar bridge's WS-ATTACHMENT and the
+  // SHARED-daemon PROCESS-START. WP-007 MOVED the daemon process-start from
+  // index.ts's retired ephemeral host to lib/ensureDaemon.ts; the gate follows.
+  // The tests below plant the same shapes in (a) the sanctioned terminal file →
+  // still passes, and (b) some OTHER file → still trips the gate. The exception
+  // is named, never blanket.
+
+  it("--explain documents the two ADR-010/WP-007 terminal named exceptions (sidecar WS-attachment + shared-daemon start)", () => {
+    const res = spawnSync("bash", [script, "--explain"], { encoding: "utf8" });
+    expect(res.status).toBe(0);
+    // The sidecar bridge — the WS-attachment write-transport seam.
+    expect(res.stdout).toMatch(/server\/adapters\/TerminalSidecar\.ts \(ADR-010/);
+    // The SHARED-daemon process-start seam (server/lib/ensureDaemon.ts, WP-007).
+    expect(res.stdout).toMatch(/server\/lib\/ensureDaemon\.ts \(WP-007/);
+    // The rule itself is named so a reader can find it.
+    expect(res.stdout).toMatch(/WebSocket .*attach|WS-attachment/i);
+  });
+
+  it("flags a WS-attachment (handleUpgrade) OUTSIDE the sanctioned terminal sidecar", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "lib"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "lib", "sneakyWs.ts"),
+        'import { WebSocketServer } from "ws";\n' +
+          "export const wire = (httpServer: any) => {\n" +
+          "  const wss = new WebSocketServer({ noServer: true });\n" +
+          '  httpServer.on("upgrade", (req: any, sock: any, head: any) =>\n' +
+          "    wss.handleUpgrade(req, sock, head, () => {}));\n" +
+          "};\n",
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status).toBe(1);
+      expect(res.stdout).toMatch(/VIOLATION \[WS-attachment outside the sanctioned terminal sidecar\]/);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("allows the WS-attachment INSIDE the sanctioned terminal sidecar (ADR-010)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "adapters"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "adapters", "TerminalSidecar.ts"),
+        'import { WebSocketServer } from "ws";\n' +
+          "export const wire = (httpServer: any) => {\n" +
+          "  const wss = new WebSocketServer({ noServer: true });\n" +
+          '  httpServer.on("upgrade", (req: any, sock: any, head: any) =>\n' +
+          "    wss.handleUpgrade(req, sock, head, () => {}));\n" +
+          "};\n",
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status, res.stdout + res.stderr).toBe(0);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("allows the shared-daemon process-start INSIDE the sanctioned server/lib/ensureDaemon.ts (WP-007, ADR-001/003)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "lib"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      // WP-007 — the daemon spawn lives in lib/ensureDaemon.ts (it MOVED here
+      // from index.ts's retired ephemeral host); the gate allow-lists it BY PATH.
+      await writeFile(
+        join(sandbox, "server", "lib", "ensureDaemon.ts"),
+        'import { spawn } from "node:child_process";\n' +
+          'export const boot = () => spawn("python3", ["session_manager_daemon.py", "--socket", "/tmp/s"]);\n',
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status, res.stdout + res.stderr).toBe(0);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it("still flags a process start in ANY other file even with the terminal exceptions present (path-scoped)", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "cockpit-readonly-"));
+    try {
+      await mkdir(join(sandbox, "scripts"), { recursive: true });
+      await mkdir(join(sandbox, "server", "lib"), { recursive: true });
+      await cp(script, join(sandbox, "scripts", "check-read-only.sh"));
+      await writeFile(
+        join(sandbox, "server", "lib", "notTheHost.ts"),
+        'import { spawn } from "node:child_process";\n' +
+          'export const go = () => spawn("python3", ["evil.py"]);\n',
+        "utf8",
+      );
+      const res = runGate(sandbox);
+      expect(res.status).toBe(1);
+      expect(res.stdout).toMatch(/VIOLATION \[process start outside the sanctioned bridge\]/);
     } finally {
       await rm(sandbox, { recursive: true, force: true });
     }

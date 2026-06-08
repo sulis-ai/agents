@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:51BXJWZ8JY36K37E5TAJHW5D2D",
+  "initial_steps": [
+    "0ve63eqs-click-a-change-on-the-board-to-open-it-1"
+  ],
+  "name": "Understand where a change is",
+  "state": "draft",
+  "steps": [
+    "0ve63eqs-click-a-change-on-the-board-to-open-it-1",
+    "0ve63eqs-read-the-change-s-status-line-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "0ve63eqs-read-the-change-s-status-line-2"
+  ],
+  "transitions": [
+    "0ve63eqs-click-a-change-on-the-board-to-open-it-1 -> 0ve63eqs-read-the-change-s-status-line-2"
+  ],
+  "type": "review"
+}

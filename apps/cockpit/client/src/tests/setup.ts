@@ -12,6 +12,23 @@ import { toHaveNoViolations } from "jest-axe";
 
 expect.extend(toHaveNoViolations);
 
+// jsdom does not implement window.matchMedia; xterm.js (mounted by the
+// <LiveTerminal/> view) queries it for prefers-color-scheme. Provide a
+// no-op stub so terminal-view tests render cleanly (added with WP-008/010).
+if (typeof window !== "undefined" && !window.matchMedia) {
+  window.matchMedia = (query: string): MediaQueryList =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }) as MediaQueryList;
+}
+
 afterEach(() => {
   cleanup();
 });

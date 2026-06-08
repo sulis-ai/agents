@@ -247,6 +247,35 @@ it's for — are different: those are founder-owned, ask them per AAF-01.)
 
 ## Step 4 — run the chosen mode
 
+### Work backwards — the journey is the driver, not a trailing artifact (MUST for user-facing changes)
+
+For any user-facing or behavioural change, the **user journey comes first** and
+*drives* the requirements — it is not a verification step bolted on after the
+spec is written. This is the Outside-In / Work-Backwards discipline
+(`platform/methodology/METHODOLOGY.md` DT-7, DT-8): start from what the user
+does and must see, then derive the requirements that make each journey step
+true. A spec whose requirements were written first and whose scenarios were
+reverse-engineered to match tends to prove the requirements *as written* — not
+the journey the user actually walks. That gap is the green-but-broken class
+(login "passed" because the only thing checked was the requirement, never the
+round-trip the user lives).
+
+Two rules, both MUST:
+
+1. **Scenarios first.** Draft the plain-English journey (what the user does +
+   what they should *see*) before — or alongside — the requirements, and let it
+   shape them. In deep mode, hand the drafted journey to the requirements
+   specialist as the opening frame so the SRD is derived to make the journey
+   pass. The "Author the verification journey" section below is therefore the
+   *entry* to a user-facing deep/standard spec, not its epilogue.
+2. **Every journey is verifiable.** Every scenario carries at least one
+   observable check, and its **outcome** (the final step) is observable — what
+   proves it worked. `sulis-author-scenario` enforces this at authoring time
+   (`assemble_scenario_graph(require_verifiable=True)`): a journey with no
+   checks, or whose outcome isn't observable, is rejected. An unverifiable
+   journey can report green while the feature is broken — the exact failure this
+   closes.
+
 ### Lite mode
 
 Three short prompts, conversational, ~30 seconds total:
@@ -571,22 +600,34 @@ full SRD with FR/NFR blocks), skip the emission — there are no
 Requirement entities to extract. The SPEC.md is the founder-facing
 shorthand; the brain only gets the structured FR/NFR form.
 
-## Author the verification journey (deep mode — the testable-state intake)
+## Author the verification journey (the testable-state intake — authored first for user-facing changes)
 
-A spec isn't truly done when the requirements are written — it's done when
-there are **verification scenarios the founder can run** to prove the work.
-After the requirements are emitted (deep mode), draft those scenarios *with*
-the founder and land them as living Scenario entities.
+A user-facing spec *starts* from the journey, not from a list of requirements
+(Work-Backwards, above). The journey is the thing the founder can run to prove
+the work; the requirements are derived to make it pass. Draft the journey
+**with** the founder and land each scenario as a living Scenario entity, then
+let it frame the requirements conversation — in deep mode, the drafted journey
+is the opening brief you hand the requirements specialist, not an artifact you
+assemble after they finish.
 
 This is founder-facing: the founder authors and reads a **plain-English
 journey**. They never see Workflows, Steps, IDEF0, or `tool_ref` —
 `sulis-author-scenario` assembles that graph underneath (FE-09).
 
-1. **Draft from acceptance criteria.** For each major use case / acceptance
-   criterion, propose one scenario: a name + a numbered journey of plain-English
-   steps (what the user does), each with what they should *see* ("see the
-   payment-succeeded confirmation"). Draft from the SRD's acceptance criteria so
-   the founder starts from something concrete, not a blank page.
+1. **Draft the journey from intent + acceptance.** For each major use case /
+   acceptance criterion, propose one scenario: a name + a numbered journey of
+   plain-English steps (what the user does), each with what they should *see*
+   ("see the payment-succeeded confirmation"). Draft from the change's intent
+   and the recon `CONTEXT.md` (and, when an SRD already exists, its acceptance
+   criteria) so the founder starts from something concrete, not a blank page.
+
+   **Verifiability is a MUST (journey-rigor #5).** Every scenario carries at
+   least one observable check, and its **outcome — the final step — is
+   observable** (what proves the journey succeeded, e.g. "see the dashboard",
+   "the response shows payment succeeded"). A step that's pure navigation
+   ("open the app") needn't assert, but the journey as a whole and its outcome
+   must. `sulis-author-scenario` rejects an unverifiable journey at authoring
+   time; an unobservable journey can report green while the feature is broken.
 
 2. **Refine with the founder, one at a time.** Read each journey back in plain
    English; let them add / cut / reword steps. COACHING tone (questions over

@@ -37,9 +37,12 @@ context_sources:
   - path: plugins/sulis/references/founder-english.md
     required: true
     purpose: "FE-06 scan + no-mechanism-narration for the founder-facing sign-off"
-  - path: .design/{project}/        # or the project's identity/design-instance artifacts
+  - path: .brain/instances/brand-identity/
     required: false
-    purpose: "The product's real design tokens + identity; the mockup binds to these, never invented hex"
+    purpose: "The product's design language as brain entities — a Brand (identity) + its DesignSystem (real DTCG tokens). The mockup binds to the DesignSystem's tokens; READ here in Section 0, EMIT here when establishing one (sulis-emit-brand / sulis-emit-design-system)."
+  - path: plugins/sulis/brain/compiled/brand-identity/
+    required: false
+    purpose: "The vendored Brand + DesignSystem schemas (DR-030) the emit shims validate against — the wire-shape of the design language."
   - path: plugins/sulis/references/mcp-ui-surface-patterns.md
     required: false
     purpose: "When the surface renders inside an AI client (MCP App / Artifact / externalUrl) — the path decision + the ui:// contract shape + sandbox constraints"
@@ -80,26 +83,52 @@ steps 1–5 run per surface.
 ### 0. Establish or confirm the design language (system level)
 > Standards: UX_VISUAL_DESIGN_STANDARD.md (UXD-01 Golden Circle, UXD-02 distinctive assets, UXD-04 three-tier tokens, UXD-05 systematic visual evaluation; the founder-owned identity/brand carve-out)
 
-First, **does a design system / language exist?** (a design instance — tokens +
-identity artifacts the project already carries.) Two branches:
+First, **does a design system / language exist?** The design language is a pair
+of brain entities (brand-identity domain, DR-030): a **`Brand`** (the founder-
+owned identity — voice/values/positioning/lexicon/...) and a **`DesignSystem`**
+(its realized tokens, `realizes_identity → brand`). **READ** before you ask:
+check `.brain/instances/brand-identity/design-system/` for a `DesignSystem`
+instance and `.brain/instances/brand-identity/brand/` for its Brand. Two
+branches:
 
-- **It exists** → bind to it (the mockup uses its real tokens; never invent).
+- **It exists** → bind to it (the mockup uses the DesignSystem's real `tokens`;
+  never invent). Read the Brand for the identity traits, the DesignSystem for
+  the token values.
 - **It does NOT exist** → do **not** silently invent one. Either:
   - **Establish one** (the design-language process): Identity first (UXD-01
     Golden Circle — why/how/what; UXD-02 distinctive assets + substitution
     test) → translate brand traits to measurable visual parameters (UXD-03) →
     a **three-tier token architecture** (UXD-04: primitive → semantic →
-    component) → systematic visual-identity evaluation (UXD-05). Persist it as
-    the project's design instance so every later surface binds to it.
+    component) → systematic visual-identity evaluation (UXD-05). **Then persist
+    it as brain entities (EMIT)** so every later surface binds to one validated
+    source:
+    1. Author the **Brand** — the identity you just established as a
+       `element_schema_v0.3` shape per element (`voice`/`values`/`positioning`/
+       `audience`/`offering`/`lexicon`/`claims`/`visual_identity`/
+       `distinctive_assets`, each `{what_it_is, what_its_not[]}`); `state` on
+       the discovery lifecycle (`Researched|Articulated|Codified|Coherence-checked|Live|Evolving`).
+       Write `brands.jsonld` and run
+       `sulis-emit-brand --from-instances <path>` — it validates against the
+       vendored schema and persists (rejecting-without-persisting if malformed).
+    2. Author the **DesignSystem** — the three-tier tokens as a **W3C-DTCG**
+       `tokens` object (or a URI string), `realizes_identity` → the Brand's id
+       (required), `state` on `draft|reviewed|accepted`. **Tier-name mapping
+       (MUST):** UXD-04's `primitive → semantic → component` maps to the DTCG
+       `token_tiers` enum `global → alias → component` (the DesignSystem schema
+       rejects `semantic`/`primitive` — use `global`/`alias`/`component`). Run
+       `sulis-emit-design-system --from-instances <path>`.
+    The two emit shims live at `${CLAUDE_PLUGIN_ROOT}/scripts/sulis-emit-{brand,design-system}`;
+    instances land under `.brain/instances/brand-identity/`.
   - **Or ask the founder which to use** — identity + brand values are
     **founder-owned** (the carve-out). If they have a brand, design language,
     or token set they want (or a reference product to match), use it. Ask in
     plain English: *"You don't have a design system yet — want me to create a
     starting one from your brand, or do you have colours / fonts / a look you
-    want me to use?"*
+    want me to use?"* (Once captured, EMIT it as above so it's reusable.)
 
-Offering to establish the design language — rather than assuming or inventing
-one — is the difference between a UX *specialist* and a mockup generator.
+Offering to establish the design language — and persisting it as a reusable,
+validated Brand + DesignSystem rather than assuming or inventing one — is the
+difference between a UX *specialist* and a mockup generator.
 
 ### 1. Inspiration probe (UXD-15 — gated on MCP availability)
 > Standards: UX_VISUAL_DESIGN_STANDARD.md (UXD-15 — structure transferable, visuals NOT)
@@ -116,9 +145,10 @@ If the MCP is unavailable: log one line, set `inspiration: none`, proceed —
 ### 2. Visual layer — bind to real tokens (never invent)
 > Standards: UX_VISUAL_DESIGN_STANDARD.md (Visual layer — semantic/component token tiers)
 
-Select the token tiers the surface consumes (semantic + component tokens, not
-raw values) from the **project's actual design instance** — never invented hex.
-Map the brand traits to measurable visual parameters; name the structural
+Select the token tiers the surface consumes (alias + component tokens, not
+raw `global` values) from the **DesignSystem instance's `tokens`** (the one you
+read or emitted in Section 0) — never invented hex. Map the brand traits (from
+the linked `Brand`) to measurable visual parameters; name the structural
 profile (navigation / layout / density / elevation).
 
 ### 3. Experience layer — states, accessibility, cognitive load

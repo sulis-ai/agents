@@ -18,8 +18,7 @@
 // guard.
 
 import { useQuery } from "@tanstack/react-query";
-import type { TreeNode } from "../../../shared/api-types";
-import { apiGet } from "./client";
+import { treeQuery } from "./fileQueries";
 
 interface Options {
   /** Defer the fetch until the caller is ready (default true). */
@@ -29,12 +28,7 @@ interface Options {
 export function useTree(changeId: string, path = "", options: Options = {}) {
   const { enabled = true } = options;
   return useQuery({
-    queryKey: ["tree", changeId, path],
-    queryFn: () =>
-      apiGet<TreeNode[]>(
-        `/api/changes/${changeId}/tree`,
-        path ? { path } : undefined,
-      ),
+    ...treeQuery(changeId, path),
     enabled: enabled && changeId.length > 0,
   });
 }

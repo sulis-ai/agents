@@ -65,7 +65,7 @@ CURRENT_BRANCH=$(git -C <repo-root> branch --show-current)
 if [[ "$CURRENT_BRANCH" == change/* ]]; then
     BASE_BRANCH="$CURRENT_BRANCH"
 else
-    BASE_BRANCH="dev"
+    BASE_BRANCH="main"
 fi
 ```
 
@@ -74,7 +74,7 @@ and merge into. In v0.11.0+ this is `dev` directly; in a change-bounded
 workflow (v0.12.0+) it's the change branch. Pass it as `--base-branch
 $BASE_BRANCH` to wpx-pipeline (Step 2b) and wpx-train (when run-all
 fires the train). The dev-SHA-at-creation sidecar uses
-`origin/$BASE_BRANCH`'s SHA, not `origin/dev` directly.
+`origin/$BASE_BRANCH`'s SHA (the trunk, `origin/main`).
 
 The executor itself does not need to know about the change context —
 it just works in its WP worktree, branched off whatever the calling
@@ -288,7 +288,7 @@ Agent({
   description: "Step 11 post-deploy verification for WP-NNN",
   model: <security_model from frontmatter, if present>,
   prompt: """
-    Review the squash-merge at <merge_sha> on dev (deployed to
+    Review the squash-merge at <merge_sha> on main (deployed to
     <deploy_url>). Health: <health_status>. Smoke: <smoke_verdict>.
 
     Verify against WP-NNN's Definition of Done. Categorise findings

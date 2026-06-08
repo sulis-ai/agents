@@ -18,11 +18,19 @@
 // `current` means the file was deleted → empty modified pane (fully
 // removed). See TDD §7.
 //
+// The diff editor theme follows the active app theme (WP-005 / ADR-002):
+// Monaco does not read CSS variables, so we pass it the matching built-in
+// theme id derived from useTheme() via monacoThemeFor(). Flipping the app
+// toggle re-renders this wrapper and Monaco restyles live (no remount).
+//
 // References: WP-015 Contract (<MonacoDiff>), ADR-006 (server computes,
-// DiffEditor displays, both panes read-only).
+// DiffEditor displays, both panes read-only), WP-005 / ADR-002 (Monaco
+// theme binds to the app theme).
 
 import { DiffEditor } from "@monaco-editor/react";
 import styles from "../styles/FilesPanel.module.css";
+import { useTheme } from "../theme/ThemeProvider";
+import { monacoThemeFor } from "../theme/monacoThemeFor";
 
 export interface MonacoDiffProps {
   /** File contents at the change's starting point; null = did not exist. */
@@ -38,11 +46,12 @@ export default function MonacoDiffInner({
   current,
   language,
 }: MonacoDiffProps) {
+  const { theme } = useTheme();
   const lang = language ?? "plaintext";
   return (
     <div className={styles.monaco} data-testid="monaco-diff">
       <DiffEditor
-        theme="vs-dark"
+        theme={monacoThemeFor(theme)}
         original={base ?? ""}
         modified={current ?? ""}
         originalLanguage={lang}

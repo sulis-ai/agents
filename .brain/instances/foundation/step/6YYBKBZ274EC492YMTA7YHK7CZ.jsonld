@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Type a word into search that appears inside a change's conversation or created items.",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:6YYBKBZ274EC492YMTA7YHK7CZ",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "mcb8vdsg-type-a-word-into-search-that-appears-ins-1",
+  "output_artifacts": [
+    "mcb8vdsg-type-a-word-into-search-that-appears-ins-1-result"
+  ],
+  "postconditions": [
+    "results narrow to changes whose content matches, not only their titles"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

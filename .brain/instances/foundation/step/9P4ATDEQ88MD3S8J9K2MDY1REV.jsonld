@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Open Sulis with nothing set up and say what product you're working on.",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:9P4ATDEQ88MD3S8J9K2MDY1REV",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "518jnqev-open-sulis-with-nothing-set-up-and-say-w-1",
+  "output_artifacts": [
+    "518jnqev-open-sulis-with-nothing-set-up-and-say-w-1-result"
+  ],
+  "postconditions": [
+    "the agent asks where the code lives"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

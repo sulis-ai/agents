@@ -30,6 +30,52 @@ def _run(cmd: list[str], cwd: Path | None = None) -> tuple[int, str, str]:
     return proc.returncode, proc.stdout, proc.stderr
 
 
+def _resolve_change_branch_base_ref(
+    repo_root: Path, base_branch: str, *,
+    fetch_succeeded: bool, fetch_err: str,
+) -> str:
+    """Pick LOCAL vs origin for a `change/*` base branch (#167).
+
+    The change branch is the calling session's working state. When the local
+    ref is ahead of (or equal to) origin — the common run-all case where
+    prior WPs have been merged locally but not yet pushed — branching from
+    origin/<branch> drops those merges and forces every executor to
+    hard-reset by hand. Prefer local in that case. If origin is ahead
+    (someone else pushed), use origin/<branch> so the worktree gets the
+    freshest shared tip.
+
+    Precedence:
+      1. Both exist + local is ancestor of nothing-newer-than-itself, i.e.
+         origin/<branch> is an ancestor of local/<branch> → LOCAL wins.
+      2. Both exist + origin is ahead → origin/<branch>.
+      3. Only local exists (origin had no ref) → LOCAL wins.
+      4. Only origin exists (no local checkout) → origin/<branch>.
+      5. Neither → error.
+    """
+    local_rc, _, _ = _run(
+        ["git", "rev-parse", "--verify", "--quiet", f"refs/heads/{base_branch}"],
+        cwd=repo_root,
+    )
+    has_local = local_rc == 0
+    has_origin = fetch_succeeded
+    if has_local and has_origin:
+        # is origin/<branch> an ancestor of local/<branch>?
+        anc_rc, _, _ = _run(
+            ["git", "merge-base", "--is-ancestor",
+             f"origin/{base_branch}", f"refs/heads/{base_branch}"],
+            cwd=repo_root,
+        )
+        return base_branch if anc_rc == 0 else f"origin/{base_branch}"
+    if has_local:
+        return base_branch
+    if has_origin:
+        return f"origin/{base_branch}"
+    emit_error(
+        f"base branch {base_branch!r} not found on origin "
+        f"(fetch: {fetch_err.strip()}) or locally"
+    )
+
+
 def _normalise_base_branch(raw: str) -> str:
     """Strip `origin/` or `refs/heads/` prefixes so both spellings resolve.
 
@@ -57,15 +103,31 @@ def cmd_create(args: argparse.Namespace) -> None:
         emit_error(f"Worktree path already exists: {worktree_path}")
 
     # Resolve the base ref (L-04, CW-04). Prefer the freshest shared state:
-    # fetch origin/<base> and branch off it — this keeps the default `dev`
+    # fetch origin/<base> and branch off it — this keeps the default `main`
     # behaviour identical to pre-L-04 (always the latest integration line).
     # A CW-04 change branch (`change/{primitive}-{slug}`) usually lives only
     # locally (origin doesn't have it yet), so the fetch fails to find the
     # remote ref; we then fall back to the LOCAL branch with no further fetch.
+    #
+    # #167 — for `change/*` bases specifically, prefer the LOCAL ref when it
+    # is ahead of or equal to origin. The change branch is the calling
+    # session's working state: WPs that landed locally but haven't been
+    # pushed yet (run-all integrates each merge into the local change branch
+    # before the next wave) MUST appear in the next executor's worktree, or
+    # every executor independently hard-resets onto the local tip (the
+    # 13-times-repeated CH-01KT61 friction). For non-change bases (main /
+    # dev), origin remains the source of truth.
     fetch_rc, _, fetch_err = _run(
         ["git", "fetch", "origin", base_branch], cwd=paths.repo_root,
     )
-    if fetch_rc == 0:
+
+    if base_branch.startswith("change/"):
+        base_ref = _resolve_change_branch_base_ref(
+            paths.repo_root, base_branch,
+            fetch_succeeded=(fetch_rc == 0),
+            fetch_err=fetch_err,
+        )
+    elif fetch_rc == 0:
         base_ref = f"origin/{base_branch}"
     else:
         # origin has no such branch (or fetch failed) — try the local ref.

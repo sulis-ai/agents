@@ -102,6 +102,28 @@ an empty list, not crash.
 """
 
 
+# House style: ` — ` (em-dash) separator instead of a colon, plus the
+# negative-requirement scheme FR-N1. A real SRD in exactly this shape
+# silently emitted 0 requirements during the CH-01KT50 scenario-loop
+# dogfood — the parser was colon-and-digit-only. Both forms MUST parse.
+_SRD_EMDASH_AND_NEGATIVE = """# Software Requirements Document: House style
+
+## 4. Functional Requirements
+
+**FR-01 — Board lists in-flight changes**
+
+The board MUST list every in-flight change as a card.
+
+**Acceptance criteria:** Each in-flight change appears exactly once.
+
+**FR-N1 — A resumed session must not fabricate completion**
+
+A resumed session MUST NOT report a mid-action step as complete.
+
+**Acceptance criteria:** An interrupted step is re-run, not faked.
+"""
+
+
 # ─── pure-transformation tests ────────────────────────────────────────────
 
 
@@ -123,6 +145,17 @@ class TestComposeRequirementsFromSrd:
         assert any("authenticate" in t.lower() for t in titles)
         assert any("audit" in t.lower() for t in titles)
         assert any("latency" in t.lower() for t in titles)
+
+    def test_extracts_FRs_with_emdash_separator_and_negative_ids(self) -> None:
+        # Regression (CH-01KT50 dogfood): em-dash separator + FR-N1 negative
+        # id silently produced 0 requirements. Both MUST now parse.
+        rs = compose_requirements_from_srd(
+            _SRD_EMDASH_AND_NEGATIVE, srd_path="dummy/house/SRD.md"
+        )
+        assert len(rs) == 2
+        statements = " ".join(r.get("statement", "").lower() for r in rs)
+        assert "board" in statements
+        assert "fabricate" in statements
 
     def test_empty_srd_returns_empty_list(self) -> None:
         rs = compose_requirements_from_srd(

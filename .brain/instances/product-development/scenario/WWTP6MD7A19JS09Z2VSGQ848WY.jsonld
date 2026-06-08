@@ -1,0 +1,12 @@
+{
+  "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+  "id": "dna:scenario:WWTP6MD7A19JS09Z2VSGQ848WY",
+  "journey": "dna:workflow:T4VDCCCR65XFPXHTNC2RWY5DCK",
+  "name": "Switch product and the board re-scopes",
+  "state": "draft",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:KSCHGX0DEVJTB874BCQRXW7KA8",
+    "dna:requirement:08QYK0Z87YGJZ7MWGVHMDZ7GQE"
+  ]
+}

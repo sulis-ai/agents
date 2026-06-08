@@ -13,8 +13,8 @@
 // References: WP-015 Contract (<MonacoDiff>), ADR-006 (DiffEditor
 // displays, both panes read-only), TDD §7.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Suspense } from "react";
 
 // Capture the props @monaco-editor/react's <DiffEditor> receives.
@@ -29,6 +29,27 @@ vi.mock("@monaco-editor/react", () => ({
 
 // Imported after the mock is registered.
 import { MonacoDiff } from "../components/MonacoDiff";
+import { ThemeProvider, useTheme } from "../theme/ThemeProvider";
+import { THEME_STORAGE_KEY } from "../theme/resolveInitialTheme";
+
+/** Minimal harness exposing a toggle so a test can flip the provider theme. */
+function ThemeToggleProbe() {
+  const { toggle } = useTheme();
+  return (
+    <button type="button" data-testid="flip-theme" onClick={toggle}>
+      flip
+    </button>
+  );
+}
+
+/** Read the Monaco theme id from the last props the mocked DiffEditor got. */
+function lastTheme(): unknown {
+  const props = diffEditorProps.mock.calls.at(-1)?.[0] as Record<
+    string,
+    unknown
+  >;
+  return props.theme;
+}
 
 async function renderDiff(props: {
   base: string | null;
@@ -36,9 +57,11 @@ async function renderDiff(props: {
   language: string | null;
 }) {
   render(
-    <Suspense fallback={<div>loading diff</div>}>
-      <MonacoDiff {...props} />
-    </Suspense>,
+    <ThemeProvider>
+      <Suspense fallback={<div>loading diff</div>}>
+        <MonacoDiff {...props} />
+      </Suspense>
+    </ThemeProvider>,
   );
   await waitFor(() =>
     expect(screen.getByTestId("monaco-diff-mock")).toBeInTheDocument(),
@@ -104,5 +127,52 @@ describe("<MonacoDiff />", () => {
     const Lazy = mod.MonacoDiff as unknown as { $$typeof?: symbol };
     expect(typeof Lazy).not.toBe("function");
     expect(String(Lazy.$$typeof)).toContain("lazy");
+  });
+});
+
+describe("<MonacoDiff /> follows the app theme (WP-005, ADR-002)", () => {
+  beforeEach(() => {
+    diffEditorProps.mockClear();
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  async function renderWithSavedTheme(saved: "light" | "dark") {
+    // A saved choice wins outright (ADR-001), so the provider resolves to it
+    // deterministically without touching matchMedia.
+    window.localStorage.setItem(THEME_STORAGE_KEY, saved);
+    render(
+      <ThemeProvider>
+        <ThemeToggleProbe />
+        <Suspense fallback={<div>loading diff</div>}>
+          <MonacoDiff base={"a"} current={"b"} language={null} />
+        </Suspense>
+      </ThemeProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("monaco-diff-mock")).toBeInTheDocument(),
+    );
+  }
+
+  it("passes the light Monaco theme when the app theme is light", async () => {
+    await renderWithSavedTheme("light");
+    expect(lastTheme()).toBe("vs");
+  });
+
+  it("passes the dark Monaco theme when the app theme is dark", async () => {
+    await renderWithSavedTheme("dark");
+    expect(lastTheme()).toBe("vs-dark");
+  });
+
+  it("restyles live when the provider theme flips (no remount)", async () => {
+    await renderWithSavedTheme("light");
+    expect(lastTheme()).toBe("vs");
+
+    fireEvent.click(screen.getByTestId("flip-theme"));
+
+    await waitFor(() => expect(lastTheme()).toBe("vs-dark"));
   });
 });

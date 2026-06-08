@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sulis Brain redesign — Direction A · The Run Log</title>
+<!--
+  ============================================================================
+  REVIEW MOCKUP (UNSIGNED — for founder comparison) · Sulis cockpit Brain view
+  DIRECTION A — "The Run Log" (execution-trace lens)
+  ----------------------------------------------------------------------------
+  Renders INSIDE the signed chat-B2-tabbed-workspace shell: workspace top tab
+  strip + the change's change-scoped LEFT NAV with BRAIN selected + full-width
+  main. The Brain view answers "what did the agent actually do, and can I
+  trust it?" through an EXECUTION TRACE:
+    - a summary banner (runs / confidence / what's covered / what's flagged),
+    - a [Run log] / [Coverage map] toggle (one lens at a time),
+    - a vertical TIMELINE of the agent's autonomous runs; each run is a card
+      with a worded outcome + a worded confidence chip (never colour-alone),
+    - a run expands to its ordered steps; clicking a step fills the RIGHT
+      DETAIL RAIL (what it produced, gaps it flagged, its own self-critique).
+
+  Strictly bound to the SIGNED design instance (tokens.css / sulis-app.html):
+  every colour is a var(--*); fonts loaded exactly as the signed contract.
+  Heroicons (MIT, Tailwind Labs) throughout — 24 outline for sections, 20 mini
+  inline. The stage palette tints per entity-kind icon. LAYOUT / INTERACTION
+  exploration only (UXD-15). Cognitive load honoured (cognitive-load.md):
+  one lens at a time, progressive disclosure of steps, worded status, AA pairs.
+  ============================================================================
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet">
+<style>
+/* ===== TOKENS — verbatim from apps/cockpit/client/src/tokens.css :root (light) ===== */
+:root{
+  --background:#fafafa; --foreground:#171717;
+  --card:#ffffff; --card-foreground:#171717;
+  --popover:#ffffff; --popover-foreground:#171717;
+  --muted:#f5f5f5; --muted-foreground:#737373;
+  --secondary:#f5f5f5; --secondary-foreground:#171717;
+  --border:#e5e5e5; --border-muted:#f0f0f0; --input:#e5e5e5;
+  --primary:#2563EB; --primary-foreground:#FFFFFF;
+  --accent:#2D7D90; --accent-foreground:#FFFFFF;
+  --destructive:#DC2626; --destructive-foreground:#FFFFFF;
+  --positive:#16A34A; --positive-foreground:#FFFFFF;
+  --warning:#F59E0B; --warning-foreground:#121212;
+  --ring:#2563EB; --brand-gold:#C9A962; --brand-depth:#1E3A5F;
+  --bg-positive:#F0FDF4; --bg-positive-border:#BBF7D0;
+  --bg-destructive:#FEF2F2; --bg-destructive-border:#FECACA;
+  --bg-warning:#FFFBEB; --bg-warning-border:#FDE68A;
+  --stage-recon:#8B7355; --stage-specify:#6366F1; --stage-design:#2D7D90;
+  --stage-implement:#2563EB; --stage-review:#9333EA; --stage-ship:#15803D;
+  --radius-interactive:4px; --radius-button:9999px; --radius-container:4px;
+  --radius-badge:9999px; --radius-media:4px;
+  --font-sans:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-display:'Satoshi',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono','SF Mono','Monaco','Inconsolata','Fira Mono',monospace;
+  --weight-body:400; --weight-heading:300; --weight-label:500;
+  --bg-card:var(--card); --bg-muted:var(--muted); --border-light:var(--border-muted);
+  --font:var(--font-sans); --radius:var(--radius-container);
+  --text:var(--foreground); --text-secondary:#525252; --text-muted:var(--muted-foreground);
+  --attn-icon:#B45309;
+  /* tints lifted from sulis-app's --bg-accent (same teal hue family as --accent) */
+  --bg-accent:color-mix(in srgb,var(--accent) 8%,#fff);
+  --bg-accent-border:color-mix(in srgb,var(--accent) 28%,var(--border));
+  /* AA-internal ink shade for label/figures sitting ON the accent tint — same
+   * teal hue family, darkened so text clears WCAG AA as text (~5.9:1 on
+   * --bg-accent vs base accent's 4.3:1). NOTE: pending token regen — when the
+   * design instance next regenerates, this becomes a named semantic token. */
+  --accent-ink:#246676;
+  --shadow-float:0 6px 20px rgba(23,23,23,.08), 0 1px 3px rgba(23,23,23,.06);
+  /* skeleton tints (lifted from sulis-app loading) */
+  --skel-a:#eeeeee; --skel-b:#f6f6f6;
+}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#EDEAE3;color:var(--text);font-family:var(--font-sans);font-weight:var(--weight-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+:focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:var(--radius)}
+button{appearance:none;-webkit-appearance:none;background:none;border:0;margin:0;padding:0;font:inherit;color:inherit;line-height:inherit;text-align:inherit}
+button,[role="button"],[tabindex],a{cursor:pointer}
+svg{display:block}
+
+.docnote{max-width:1440px;margin:0 auto;padding:18px 28px 6px;color:var(--text-secondary);font-size:12.5px}
+.docnote b{color:var(--text);font-weight:600}
+
+.frame{width:1440px;height:900px;margin:8px auto 28px;background:var(--background);border-radius:10px;overflow:hidden;border:1px solid var(--border);box-shadow:0 1px 3px rgba(23,23,23,.07);display:flex;flex-direction:column}
+
+/* ===== WORKSPACE TOP BAR (verbatim shell) ===== */
+.topbar{flex:0 0 auto;display:flex;align-items:stretch;background:var(--card);border-bottom:1px solid var(--border);height:48px}
+.prodswitch{display:flex;align-items:center;gap:9px;padding:0 14px;border-right:1px solid var(--border);min-width:210px}
+.prodswitch .tile{width:28px;height:28px;flex:none;border-radius:7px;background:var(--brand-depth);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:12px;letter-spacing:.02em}
+.prodswitch .pn{font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--text);letter-spacing:-.01em}
+.prodswitch .chev{margin-left:auto;color:var(--text-muted)}
+.prodswitch:hover{background:var(--bg-muted)}
+.tabstrip{display:flex;align-items:stretch;gap:0;flex:1;min-width:0;overflow:hidden}
+.gtab{display:flex;align-items:center;gap:8px;padding:0 14px;border-right:1px solid var(--border);color:var(--text-secondary);font-size:13px;font-weight:var(--weight-label);position:relative;white-space:nowrap;max-width:260px}
+.gtab .ic{width:18px;height:18px;flex:none;color:var(--text-muted)}
+.gtab:hover{background:var(--bg-muted);color:var(--text)}
+.gtab .nm{overflow:hidden;text-overflow:ellipsis}
+.gtab .sdot{width:8px;height:8px;border-radius:50%;flex:none}
+.gtab .x{width:18px;height:18px;flex:none;display:inline-flex;align-items:center;justify-content:center;border-radius:5px;color:var(--text-muted);margin-left:2px}
+.gtab .x:hover{background:var(--border);color:var(--text)}
+.gtab .x svg{width:13px;height:13px}
+.gtab.active{background:var(--background);color:var(--text);font-weight:600}
+.gtab.active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--accent)}
+.gtab.board .ic{color:var(--text-secondary)}
+.tabstrip .newtab{display:inline-flex;align-items:center;justify-content:center;width:42px;color:var(--text-muted);border-right:1px solid var(--border)}
+.tabstrip .newtab:hover{background:var(--bg-muted);color:var(--text)}
+.tabstrip .newtab svg{width:18px;height:18px}
+
+/* ===== THE OPEN CHANGE — left nav + full-width main (verbatim shell) ===== */
+.change{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:248px 1fr}
+.leftnav{background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:auto;padding:16px 12px 12px}
+.cn-head{padding:2px 8px 14px;border-bottom:1px solid var(--border-muted);margin-bottom:6px}
+.cn-kicker{font-family:var(--font-mono);font-size:11px;color:var(--text-muted)}
+.cn-name{font-size:15px;font-weight:600;line-height:1.3;color:var(--text);margin-top:4px;letter-spacing:-.01em}
+.cn-meta{display:flex;align-items:center;gap:7px;margin-top:9px}
+.stagebadge{padding:3px 9px;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;border-radius:var(--radius);background:var(--bg-accent);color:var(--accent-ink);border:1px solid var(--bg-accent-border)}
+.cn-live{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary);font-weight:var(--weight-label)}
+.cn-live .g{width:8px;height:8px;border-radius:50%;background:var(--positive);box-shadow:0 0 0 2px var(--bg-positive)}
+.cn-sectionlabel{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin:14px 8px 8px;font-weight:600}
+.vtrack{list-style:none;margin:0 4px 4px;padding:0}
+.vstep{display:flex;align-items:center;gap:10px;padding:4px 8px;font-size:12px;color:var(--text-muted);position:relative}
+.vstep .vd{width:10px;height:10px;border-radius:50%;background:var(--input);flex:none;border:2px solid var(--card);z-index:2}
+.vstep:not(:last-child)::before{content:"";position:absolute;left:13px;top:18px;width:1px;height:14px;background:var(--border);z-index:1}
+.vstep[data-state="done"]{color:var(--text-secondary)}
+.vstep[data-state="done"] .vd{background:var(--text-secondary)}
+.vstep[data-state="now"]{color:var(--accent);font-weight:700}
+.vstep[data-state="now"] .vd{background:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,#fff)}
+.vstep .vw{margin-left:auto;font-size:9px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;color:var(--text-muted)}
+.vstep[data-state="now"] .vw{color:var(--accent)}
+.navitem{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:var(--radius);color:var(--text-secondary);font-size:13px;border:1px solid transparent;text-decoration:none;font-weight:var(--weight-label)}
+.navitem:hover{background:var(--bg-muted);color:var(--text)}
+.navitem.active{background:var(--bg-muted);color:var(--text)}
+.navitem .ic{width:20px;height:20px;flex:none;color:var(--text-muted)}
+.navitem.active .ic{color:var(--accent)}
+.navitem .cnt{margin-left:auto;font-size:11px;color:var(--text-muted);font-family:var(--font-mono)}
+.leftnav-foot{margin-top:auto;padding:12px 8px 2px;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:7px;border-top:1px solid var(--border-muted)}
+.leftnav-foot .g{width:8px;height:8px;border-radius:50%;background:var(--positive);flex:none;box-shadow:0 0 0 2px var(--bg-positive)}
+
+/* ===== MAIN AREA — Brain view ===== */
+.main{display:flex;flex-direction:column;min-width:0;overflow:hidden;background:var(--background)}
+
+/* view header: title + lens toggle */
+.bhead{flex:0 0 auto;display:flex;align-items:center;gap:14px;padding:18px 28px 14px}
+.bhead .ttl{font-family:var(--font-display);font-size:19px;font-weight:700;letter-spacing:-.01em;color:var(--text)}
+.bhead .sub{font-size:12.5px;color:var(--text-secondary)}
+.lens{margin-left:auto;display:inline-flex;background:var(--bg-muted);border:1px solid var(--border);border-radius:var(--radius-button);padding:3px}
+.lens button{display:inline-flex;align-items:center;gap:7px;padding:6px 14px;border-radius:var(--radius-button);font-size:12.5px;font-weight:var(--weight-label);color:var(--text-secondary)}
+.lens button svg{width:15px;height:15px}
+.lens button[aria-pressed="true"]{background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(23,23,23,.06)}
+.lens button[aria-pressed="true"] svg{color:var(--accent)}
+
+/* summary banner — four plain digests + flagged callout. ≤5 items at rest. */
+.banner{margin:0 28px;display:grid;grid-template-columns:repeat(3,1fr) 1.35fr;gap:12px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px 15px}
+.stat .lbl{display:flex;align-items:center;gap:7px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:600}
+.stat .lbl svg{width:14px;height:14px;color:var(--text-muted)}
+.stat .big{font-family:var(--font-display);font-size:24px;font-weight:700;color:var(--text);margin-top:6px;letter-spacing:-.01em;line-height:1}
+.stat .note{font-size:11.5px;color:var(--text-secondary);margin-top:5px}
+.stat.flag{background:var(--bg-warning);border-color:var(--bg-warning-border)}
+.stat.flag .lbl{color:var(--attn-icon)}
+.stat.flag .lbl svg{color:var(--attn-icon)}
+.stat.flag .big{font-size:14px;font-weight:600;line-height:1.35;margin-top:7px}
+.stat.flag .note{color:var(--text-secondary)}
+
+/* the timeline + detail rail split */
+.body{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:1fr 420px;gap:0;margin-top:16px;border-top:1px solid var(--border-muted)}
+.timeline{overflow-y:auto;padding:18px 24px 28px 28px;scrollbar-width:thin}
+.tl-label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);font-weight:600;margin:0 0 14px}
+
+/* a RUN card on the vertical timeline */
+.runline{position:relative;padding-left:30px}
+.runline::before{content:"";position:absolute;left:9px;top:6px;bottom:6px;width:2px;background:var(--border)}
+.run{position:relative;margin-bottom:16px}
+.run .node{position:absolute;left:-30px;top:16px;width:20px;height:20px;border-radius:50%;background:var(--card);border:2px solid var(--stage-specify);display:inline-flex;align-items:center;justify-content:center;color:var(--stage-specify);z-index:2}
+.run .node svg{width:11px;height:11px}
+.run.verify .node{border-color:var(--stage-review);color:var(--stage-review)}
+.run .card{border:1px solid var(--border);border-radius:10px;background:var(--card);box-shadow:0 1px 2px rgba(23,23,23,.04)}
+.run .card.open{border-color:var(--bg-accent-border)}
+.runtop{width:100%;display:flex;align-items:flex-start;gap:12px;padding:14px 16px;text-align:left}
+.runtop .rt{flex:1;min-width:0}
+.runtop .rt .nm{font-size:14.5px;font-weight:600;color:var(--text);letter-spacing:-.005em}
+.runtop .rt .meta{font-size:11.5px;color:var(--text-muted);margin-top:3px;font-family:var(--font-mono)}
+.runtop .rt .out{font-size:12.5px;color:var(--text-secondary);margin-top:7px;line-height:1.5}
+.chips{display:flex;align-items:center;gap:7px;margin-top:10px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:var(--radius-button);font-size:11px;font-weight:var(--weight-label);border:1px solid var(--border)}
+.chip svg{width:12px;height:12px}
+.chip.done{background:var(--bg-positive);border-color:var(--bg-positive-border);color:var(--stage-ship)}
+.chip.conf{background:var(--bg-accent);border-color:var(--bg-accent-border);color:var(--accent-ink)}
+.chip.count{background:var(--bg-muted);color:var(--text-secondary)}
+.runtop .exp{flex:none;color:var(--text-muted);align-self:center}
+.runtop .exp svg{width:18px;height:18px}
+.runtop:hover{background:var(--bg-muted)}
+.run .card.open .runtop:hover{background:transparent}
+
+/* expanded ordered steps inside a run */
+.steplist{border-top:1px solid var(--border-muted);padding:6px 8px 8px}
+.stepitem{width:100%;display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:var(--radius);text-align:left;font-size:12.5px;color:var(--text-secondary)}
+.stepitem:hover{background:var(--bg-muted);color:var(--text)}
+.stepitem.sel{background:var(--bg-accent);color:var(--text)}
+.stepitem .sn{font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);width:30px;flex:none}
+.stepitem.sel .sn{color:var(--accent-ink)}
+.stepitem .si{width:16px;height:16px;flex:none;color:var(--text-muted)}
+.stepitem.sel .si{color:var(--accent-ink)}
+.stepitem .stx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stepitem .sok{flex:none;display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--text-muted)}
+.stepitem .sok svg{width:13px;height:13px;color:var(--positive)}
+.stepitem .sok.gap svg{color:var(--attn-icon)}
+.stepitem .sok.gap{color:var(--attn-icon)}
+
+/* RIGHT DETAIL RAIL */
+.rail{border-left:1px solid var(--border);background:var(--card);overflow-y:auto;padding:18px 20px 24px;scrollbar-width:thin}
+.rail .rl-kicker{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--accent-ink);font-weight:700;display:flex;align-items:center;gap:7px}
+.rail .rl-kicker svg{width:14px;height:14px}
+.rail .rl-ttl{font-size:15.5px;font-weight:600;color:var(--text);margin-top:8px;line-height:1.35;letter-spacing:-.005em}
+.rail .rl-meta{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);margin-top:5px}
+.rl-sec{margin-top:18px}
+.rl-sec h4{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:600;display:flex;align-items:center;gap:7px;margin-bottom:8px}
+.rl-sec h4 svg{width:14px;height:14px}
+.rl-sec p{font-size:12.5px;color:var(--text-secondary);line-height:1.55}
+.produced{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:8px;padding:9px 12px;background:var(--bg-muted)}
+.produced .pi{width:30px;height:30px;flex:none;border-radius:7px;background:var(--card);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;color:var(--stage-specify)}
+.produced .pi svg{width:16px;height:16px}
+.produced .pt{font-size:12.5px;font-weight:var(--weight-label);color:var(--text)}
+.produced .pm{font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);margin-top:1px}
+.gapbox{border:1px solid var(--bg-warning-border);background:var(--bg-warning);border-radius:8px;padding:11px 13px}
+.gapbox .gh{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--attn-icon)}
+.gapbox .gh svg{width:15px;height:15px}
+.gapbox p{font-size:12px;color:var(--text-secondary);margin-top:6px;line-height:1.5}
+.selfcrit{border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:11px 13px;background:var(--card)}
+.selfcrit p{font-size:12.5px;color:var(--text-secondary);font-style:italic;line-height:1.55}
+.selfcrit .by{font-style:normal;font-size:10.5px;color:var(--text-muted);margin-top:7px;display:flex;align-items:center;gap:6px}
+.selfcrit .by svg{width:13px;height:13px}
+</style>
+</head>
+<body>
+<div class="docnote"><b>Brain redesign — Direction A · The Run Log.</b> Answers “what did the agent do, and can I trust it?” as an execution trace: a summary banner, a one-lens-at-a-time toggle, and a vertical timeline of the agent’s autonomous runs. Each run shows a worded outcome + worded confidence; expand a run to its ordered steps; click a step to fill the right rail with what it produced, any gap it flagged, and its own self-critique. <b>Unsigned review mockup</b>, real tokens, light theme.</div>
+
+<div class="frame">
+
+  <!-- ===== WORKSPACE TOP BAR (verbatim shell) ===== -->
+  <div class="topbar">
+    <button class="prodswitch" type="button" aria-label="Switch product — Clinics">
+      <span class="tile" aria-hidden="true">CL</span>
+      <span class="pn">Clinics</span>
+      <svg class="chev" width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
+    </button>
+    <div class="tabstrip" role="tablist" aria-label="Open tabs">
+      <button class="gtab board" role="tab" aria-selected="false" type="button">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"/></svg>
+        <span class="nm">Board</span>
+      </button>
+      <div class="gtab active" role="tab" aria-selected="true" tabindex="0">
+        <span class="sdot" style="background:var(--stage-design)" aria-hidden="true"></span>
+        <span class="nm">Set up the autonomous delivery environment</span>
+        <span class="x" role="button" tabindex="0" aria-label="Close tab">
+          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
+        </span>
+      </div>
+      <button class="gtab" role="tab" aria-selected="false" type="button">
+        <span class="sdot" style="background:var(--stage-implement)" aria-hidden="true"></span>
+        <span class="nm">Tidy the morning digest</span>
+        <span class="x" role="button" tabindex="0" aria-label="Close tab">
+          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
+        </span>
+      </button>
+      <button class="newtab" type="button" aria-label="Open a new change tab">
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== THE OPEN CHANGE ===== -->
+  <div class="change">
+
+    <!-- change-scoped LEFT NAV — Brain selected -->
+    <nav class="leftnav" aria-label="Change navigation">
+      <div class="cn-head">
+        <div class="cn-kicker">autonomous-delivery-env</div>
+        <div class="cn-name">Set up the autonomous delivery environment</div>
+        <div class="cn-meta">
+          <span class="stagebadge">Design</span>
+          <span class="cn-live"><span class="g" aria-hidden="true"></span>Running</span>
+        </div>
+      </div>
+      <div class="cn-sectionlabel">Stage</div>
+      <ol class="vtrack" aria-label="Change progress">
+        <li class="vstep" data-state="done"><span class="vd" aria-hidden="true"></span>Recon<span class="vw">Done</span></li>
+        <li class="vstep" data-state="done"><span class="vd" aria-hidden="true"></span>Specify<span class="vw">Done</span></li>
+        <li class="vstep" data-state="now" aria-current="step"><span class="vd" aria-hidden="true"></span>Design<span class="vw">Now</span></li>
+        <li class="vstep" data-state="pending"><span class="vd" aria-hidden="true"></span>Implement<span class="vw">Pending</span></li>
+        <li class="vstep" data-state="pending"><span class="vd" aria-hidden="true"></span>Review<span class="vw">Pending</span></li>
+        <li class="vstep" data-state="pending"><span class="vd" aria-hidden="true"></span>Ship<span class="vw">Pending</span></li>
+      </ol>
+      <div class="cn-sectionlabel">Views</div>
+      <a class="navitem" href="#">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 0 1-.825-.242m9.345-8.334a2.126 2.126 0 0 0-.476-.095 48.64 48.64 0 0 0-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0 0 11.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155"/></svg>
+        Conversation
+      </a>
+      <a class="navitem" href="#">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>
+        Files <span class="cnt">2</span>
+      </a>
+      <a class="navitem active" href="#" aria-current="page">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m21 7.5-2.25-1.313M21 7.5v2.25m0-2.25-2.25 1.313M3 7.5l2.25-1.313M3 7.5l2.25 1.313M3 7.5v2.25m9 3 2.25-1.313M12 12.75l-2.25-1.313M12 12.75V15m0 6.75 2.25-1.313M12 21.75V19.5m0 2.25-2.25-1.313m0-16.875L12 2.25l2.25 1.313M21 14.25v2.25l-2.25 1.313m-13.5 0L3 16.5v-2.25"/></svg>
+        Brain <span class="cnt">119</span>
+      </a>
+      <a class="navitem" href="#">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+        Preview
+      </a>
+      <div class="leftnav-foot"><span class="g" aria-hidden="true"></span>Agent running in this change</div>
+    </nav>
+
+    <!-- MAIN AREA — Brain · Run Log -->
+    <div class="main">
+
+      <div class="bhead">
+        <div>
+          <div class="ttl">The Brain</div>
+          <div class="sub">Everything the agent knows about this change — and how it got there.</div>
+        </div>
+        <div class="lens" role="group" aria-label="Choose a lens">
+          <button type="button" aria-pressed="true">
+            <!-- bolt (24 outline) — run -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z"/></svg>
+            Run log
+          </button>
+          <button type="button" aria-pressed="false">
+            <!-- map (24 outline) — coverage -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z"/></svg>
+            Coverage map
+          </button>
+        </div>
+      </div>
+
+      <!-- SUMMARY BANNER — four digests; ≤5 elements at rest -->
+      <div class="banner">
+        <div class="stat">
+          <div class="lbl">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M11.983 1.907a.75.75 0 0 0-1.292-.657l-8.5 9.5A.75.75 0 0 0 2.75 12h6.572l-1.305 6.093a.75.75 0 0 0 1.292.657l8.5-9.5A.75.75 0 0 0 17.25 8h-6.572l1.305-6.093Z"/></svg>
+            What it did
+          </div>
+          <div class="big">2 runs</div>
+          <div class="note">Specify pass · Verify pass — both completed</div>
+        </div>
+        <div class="stat">
+          <div class="lbl">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>
+            What it covered
+          </div>
+          <div class="big">1 of 49</div>
+          <div class="note">requirements verified by a test · 48 awaiting</div>
+        </div>
+        <div class="stat">
+          <div class="lbl">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M15.5 2A1.5 1.5 0 0 0 14 3.5v13a1.5 1.5 0 0 0 1.5 1.5h1a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 16.5 2h-1ZM9.5 6A1.5 1.5 0 0 0 8 7.5v9A1.5 1.5 0 0 0 9.5 18h1a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 10.5 6h-1ZM3.5 10A1.5 1.5 0 0 0 2 11.5v5A1.5 1.5 0 0 0 3.5 18h1A1.5 1.5 0 0 0 6 16.5v-5A1.5 1.5 0 0 0 4.5 10h-1Z"/></svg>
+            What it decided
+          </div>
+          <div class="big">4 calls</div>
+          <div class="note">incl. short-lived tokens · keep an audit trail</div>
+        </div>
+        <div class="stat flag">
+          <div class="lbl">
+            <!-- exclamation-triangle (20 mini) -->
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+            What it flagged
+          </div>
+          <div class="big">Test coverage is thin on the payments path</div>
+          <div class="note">1 of 13 scenarios run so far · 1 result, skipped. The agent says this is the riskiest gap to close before ship.</div>
+        </div>
+      </div>
+
+      <!-- TIMELINE + DETAIL RAIL -->
+      <div class="body">
+
+        <div class="timeline" aria-label="Run timeline">
+          <div class="tl-label">The agent’s runs · newest first</div>
+
+          <div class="runline">
+
+            <!-- RUN 2 — Verify pass (selected/open) -->
+            <div class="run verify">
+              <span class="node" aria-hidden="true">
+                <!-- check-badge (mini) -->
+                <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="m9.661 2.237a.531.531 0 0 1 .678 0 11.947 11.947 0 0 0 7.078 2.749.5.5 0 0 1 .479.425c.069.52.104 1.05.104 1.59 0 5.162-3.26 9.563-7.834 11.256a.48.48 0 0 1-.332 0C5.26 16.564 2 12.163 2 7c0-.538.035-1.069.104-1.589a.5.5 0 0 1 .48-.425 11.947 11.947 0 0 0 7.077-2.75Zm4.196 5.954a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+              </span>
+              <div class="card open">
+                <button class="runtop" type="button" aria-expanded="true">
+                  <div class="rt">
+                    <div class="nm">Verify pass</div>
+                    <div class="meta">run · finished 11:58 AM · 16 steps</div>
+                    <div class="out">Checked the work against the requirements and tried the test suite. Most requirements are written but not yet exercised by a test, and one test was skipped — flagged below.</div>
+                    <div class="chips">
+                      <span class="chip done"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>Completed</span>
+                      <span class="chip conf">88% confident</span>
+                      <span class="chip count">1 test result · skipped</span>
+                    </div>
+                  </div>
+                  <span class="exp" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.77 12.79a.75.75 0 0 1-1.06-.02L10 8.832 6.29 12.77a.75.75 0 1 1-1.08-1.04l4.25-4.5a.75.75 0 0 1 1.08 0l4.25 4.5a.75.75 0 0 1-.02 1.06Z" clip-rule="evenodd"/></svg></span>
+                </button>
+                <div class="steplist" role="list">
+                  <button class="stepitem" type="button" role="listitem"><span class="sn">12</span>
+                    <svg class="si" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4.5 2A1.5 1.5 0 0 0 3 3.5v13A1.5 1.5 0 0 0 4.5 18h6.388a4.49 4.49 0 0 1-.798-1.5H4.5v-13h7v3a1.5 1.5 0 0 0 1.5 1.5h3v1.528a4.49 4.49 0 0 1 1.5.798V7.621a1.5 1.5 0 0 0-.44-1.06l-3.62-3.622A1.5 1.5 0 0 0 12.378 2H4.5Z"/></svg>
+                    <span class="stx">Read the 49 requirements</span><span class="sok"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>done</span></button>
+                  <button class="stepitem" type="button" role="listitem"><span class="sn">13</span>
+                    <svg class="si" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 0 1 4.25 2h6.5A2.25 2.25 0 0 1 13 4.25V5.5H9.25A3.75 3.75 0 0 0 5.5 9.25V13H4.25A2.25 2.25 0 0 1 2 10.75v-6.5Z"/><path fill-rule="evenodd" d="M9.25 7A2.25 2.25 0 0 0 7 9.25v6.5A2.25 2.25 0 0 0 9.25 18h6.5A2.25 2.25 0 0 0 18 15.75v-6.5A2.25 2.25 0 0 0 15.75 7h-6.5Z"/></svg>
+                    <span class="stx">Mapped scenarios to the requirements they verify</span><span class="sok"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>done</span></button>
+                  <button class="stepitem sel" type="button" role="listitem" aria-current="true"><span class="sn">14</span>
+                    <!-- beaker (mini) — ran the test -->
+                    <svg class="si" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.5 3.528v4.644c0 .729-.29 1.428-.805 1.944l-1.217 1.216a8.75 8.75 0 0 1 3.55.621l.502.201a7.25 7.25 0 0 0 4.178.529l-2.701-2.7a2.75 2.75 0 0 1-.806-1.945V3.528a40.205 40.205 0 0 0-3 0Zm4.5.084.142.003a.75.75 0 0 0 .015-1.5 41.642 41.642 0 0 0-6.314 0 .75.75 0 0 0 .015 1.5l.142-.003v4.56c0 .331-.132.65-.366.884L1.708 14.51c-1.523 1.524-.83 4.246 1.45 4.493a44.32 44.32 0 0 0 9.684 0c2.28-.247 2.973-2.969 1.45-4.493l-4.94-4.939a1.25 1.25 0 0 1-.366-.884v-4.56Z" clip-rule="evenodd"/></svg>
+                    <span class="stx">Ran the test suite for the payments path</span><span class="sok gap"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>skipped</span></button>
+                  <button class="stepitem" type="button" role="listitem"><span class="sn">15</span>
+                    <svg class="si" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.898l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684Z"/></svg>
+                    <span class="stx">Wrote a confidence note + the gap to close</span><span class="sok"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>done</span></button>
+                </div>
+              </div>
+            </div>
+
+            <!-- RUN 1 — Specify pass (collapsed) -->
+            <div class="run">
+              <span class="node" aria-hidden="true">
+                <!-- play (mini) -->
+                <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clip-rule="evenodd"/></svg>
+              </span>
+              <div class="card">
+                <button class="runtop" type="button" aria-expanded="false">
+                  <div class="rt">
+                    <div class="nm">Specify pass</div>
+                    <div class="meta">run · finished 10:42 AM · 12 steps</div>
+                    <div class="out">Turned the brief into a written spec: drafted the requirements, the scenarios that prove them, two design notes and four decisions, and linked each back to the opportunity it serves.</div>
+                    <div class="chips">
+                      <span class="chip done"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>Completed</span>
+                      <span class="chip conf">88% confident</span>
+                      <span class="chip count">49 requirements · 13 scenarios</span>
+                    </div>
+                  </div>
+                  <span class="exp" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg></span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- RIGHT DETAIL RAIL — fills from the selected step -->
+        <aside class="rail" aria-label="Step detail">
+          <div class="rl-kicker">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.5 3.528v4.644c0 .729-.29 1.428-.805 1.944l-1.217 1.216a8.75 8.75 0 0 1 3.55.621l.502.201a7.25 7.25 0 0 0 4.178.529l-2.701-2.7a2.75 2.75 0 0 1-.806-1.945V3.528a40.205 40.205 0 0 0-3 0Zm4.5.084.142.003a.75.75 0 0 0 .015-1.5 41.642 41.642 0 0 0-6.314 0 .75.75 0 0 0 .015 1.5l.142-.003v4.56c0 .331-.132.65-.366.884L1.708 14.51c-1.523 1.524-.83 4.246 1.45 4.493a44.32 44.32 0 0 0 9.684 0c2.28-.247 2.973-2.969 1.45-4.493l-4.94-4.939a1.25 1.25 0 0 1-.366-.884v-4.56Z" clip-rule="evenodd"/></svg>
+            Step 14 · Verify pass
+          </div>
+          <div class="rl-ttl">Ran the test suite for the payments path</div>
+          <div class="rl-meta">testrun → 1 result · outcome: skip</div>
+
+          <div class="rl-sec">
+            <h4>
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M15.988 3.012A2.25 2.25 0 0 1 18 5.25v6.5A2.25 2.25 0 0 1 15.75 14H13.5v-3.379a3 3 0 0 0-.879-2.121l-3.12-3.121a3 3 0 0 0-1.402-.791 2.252 2.252 0 0 1 1.913-1.576A2.25 2.25 0 0 1 12 1.25h1.75a2.25 2.25 0 0 1 2.238 1.762Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M3.5 6A1.5 1.5 0 0 0 2 7.5v9A1.5 1.5 0 0 0 3.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L8.44 6.439A1.5 1.5 0 0 0 7.378 6H3.5Z" clip-rule="evenodd"/></svg>
+              What it produced
+            </h4>
+            <div class="produced">
+              <span class="pi" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.5 3.528v4.644c0 .729-.29 1.428-.805 1.944l-1.217 1.216a8.75 8.75 0 0 1 3.55.621l.502.201a7.25 7.25 0 0 0 4.178.529l-2.701-2.7a2.75 2.75 0 0 1-.806-1.945V3.528a40.205 40.205 0 0 0-3 0Zm4.5.084.142.003a.75.75 0 0 0 .015-1.5 41.642 41.642 0 0 0-6.314 0 .75.75 0 0 0 .015 1.5l.142-.003v4.56c0 .331-.132.65-.366.884L1.708 14.51c-1.523 1.524-.83 4.246 1.45 4.493a44.32 44.32 0 0 0 9.684 0c2.28-.247 2.973-2.969 1.45-4.493l-4.94-4.939a1.25 1.25 0 0 1-.366-.884v-4.56Z" clip-rule="evenodd"/></svg></span>
+              <div>
+                <div class="pt">1 test result</div>
+                <div class="pm">outcome: skip · of-run → Verify pass</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rl-sec">
+            <h4>
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+              Gap it flagged
+            </h4>
+            <div class="gapbox">
+              <div class="gh">
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+                Test coverage is thin on the payments path
+              </div>
+              <p>The payments test needs a sandbox key that isn’t set in this environment, so the run skipped it rather than reporting a false pass. 48 of 49 requirements still have no test exercising them. Recommend setting the key and re-running before ship.</p>
+            </div>
+          </div>
+
+          <div class="rl-sec">
+            <h4>
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 8.75a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z"/><path fill-rule="evenodd" d="M10 1a6 6 0 0 0-3.815 10.631C7.237 12.5 8 13.443 8 14.456v.644a.75.75 0 0 0 .572.729 6.016 6.016 0 0 0 2.856 0A.75.75 0 0 0 12 15.1v-.644c0-1.013.763-1.957 1.815-2.825A6 6 0 0 0 10 1Z" clip-rule="evenodd"/></svg>
+              Its self-critique
+            </h4>
+            <div class="selfcrit">
+              <p>“I marked the run complete because the spec is sound, but a skipped test is not a passing test. My 88% confidence is in the written work, not in proven behaviour on payments — treat that path as unverified until the suite runs green.”</p>
+              <div class="by">
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/></svg>
+                the agent, in its own words
+              </div>
+            </div>
+          </div>
+        </aside>
+
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

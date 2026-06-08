@@ -1,0 +1,544 @@
+diff --git a/apps/cockpit/README.md b/apps/cockpit/README.md
+index 5ef5ad5..d160fca 100644
+--- a/apps/cockpit/README.md
++++ b/apps/cockpit/README.md
+@@ -44,17 +44,17 @@ all bound to `127.0.0.1:5174` by default (TDD §5, ADR-002, ADR-003).
+ The route handlers are thin — they delegate to the lib functions
+ (WP-005..WP-009) and the change-store port (WP-003).
+ 
+-| Method + path                                | Purpose                                                       | Wire shape           |
+-| -------------------------------------------- | ------------------------------------------------------------- | -------------------- |
+-| `GET /api/changes`                           | List every change with liveness.                              | `Change[]`           |
+-| `GET /api/changes/:id`                       | One change + the resolved transcript file paths.              | `ChangeDetail`       |
+-| `GET /api/changes/:id/tree?path=...`         | One level of the worktree's folder tree. Default = root.      | `TreeNode[]`         |
+-| `GET /api/changes/:id/file?path=...`         | Current contents of a file in the worktree (1 MiB cap).       | `FileContents`       |
+-| `GET /api/changes/:id/diff?path=...`         | Base (at `baseSha`) + current contents for Monaco's DiffEditor. | `FileDiff`         |
+-| `GET /api/changes/:id/transcript`            | Chronologically-merged chat messages from the change's transcripts. | `TranscriptMessage[]` |
+-| `GET /api/changes/:id/contract`              | Whether the change's rendered contracts are reachable + what they are. | `ContractAvailability` |
+-| `GET /api/changes/:id/contract/data`         | Serves the rendered `CONTRACT.html` (the data-contract preview). | `text/html`        |
+-| `GET /api/changes/:id/contract/ui`           | Serves the rendered `UI.html`, or a typed JSON note when the change has no UI contract (never a broken link). | `text/html` or `{ uiContract, note }` |
++| Method + path                        | Purpose                                                                                                       | Wire shape                            |
++| ------------------------------------ | ------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
++| `GET /api/changes`                   | List every change with liveness.                                                                              | `Change[]`                            |
++| `GET /api/changes/:id`               | One change + the resolved transcript file paths.                                                              | `ChangeDetail`                        |
++| `GET /api/changes/:id/tree?path=...` | One level of the worktree's folder tree. Default = root.                                                      | `TreeNode[]`                          |
++| `GET /api/changes/:id/file?path=...` | Current contents of a file in the worktree (1 MiB cap).                                                       | `FileContents`                        |
++| `GET /api/changes/:id/diff?path=...` | Base (at `baseSha`) + current contents for Monaco's DiffEditor.                                               | `FileDiff`                            |
++| `GET /api/changes/:id/transcript`    | Chronologically-merged chat messages from the change's transcripts.                                           | `TranscriptMessage[]`                 |
++| `GET /api/changes/:id/contract`      | Whether the change's rendered contracts are reachable + what they are.                                        | `ContractAvailability`                |
++| `GET /api/changes/:id/contract/data` | Serves the rendered `CONTRACT.html` (the data-contract preview).                                              | `text/html`                           |
++| `GET /api/changes/:id/contract/ui`   | Serves the rendered `UI.html`, or a typed JSON note when the change has no UI contract (never a broken link). | `text/html` or `{ uiContract, note }` |
+ 
+ ### Contract preview (WP-003)
+ 
+@@ -80,7 +80,7 @@ rejects a leading `-` to foreclose argparse flag-confusion).
+ 
+ - **Design-time (pre-dispatch review gate):** after `decompose` and
+   before `run-all` dispatch, `plugins/sulis/scripts/wpx-render-review-gate
+-  --worktree <path>` renders the in-flight change's `CONTRACT.html` +
++--worktree <path>` renders the in-flight change's `CONTRACT.html` +
+   `UI.html` so the founder can eyeball them before anything is built on
+   the contract. It is a thin orchestrator over the two renderers
+   (subprocess discipline: argv array, `shell=false`, bounded timeout).
+@@ -183,8 +183,9 @@ apps/cockpit/
+ │   │   ├── main.tsx        # React mount point
+ │   │   ├── App.tsx         # placeholder root
+ │   │   ├── pages/          # dashboard, thread view (WP-012/013)
+-│   │   ├── components/     # shells, panels (WP-011/013/014)
++│   │   ├── components/     # shells, panels, ThemeToggle (WP-011/013/014, WP-004)
+ │   │   ├── api/            # TanStack Query hooks (WP-011)
++│   │   ├── layouts/        # Shell — sidebar + top-bar (theme toggle) + outlet (WP-011, WP-004)
+ │   │   ├── theme/          # ThemeProvider, useTheme(), resolveInitialTheme (WP-003)
+ │   │   └── tests/
+ ├── shared/                 # types + constants both halves import
+diff --git a/apps/cockpit/client/src/components/ThemeToggle.module.css b/apps/cockpit/client/src/components/ThemeToggle.module.css
+new file mode 100644
+index 0000000..25adefe
+--- /dev/null
++++ b/apps/cockpit/client/src/components/ThemeToggle.module.css
+@@ -0,0 +1,37 @@
++/* WP-004 — ThemeToggle styles. Token-only (no raw colours), mirrors the
++ * signed-off mockup's .toggle (mockup/dark-theme.html): a pill button with a
++ * card background, quiet border, icon + label, primary-border hover. */
++
++.toggle {
++  display: inline-flex;
++  align-items: center;
++  gap: 8px;
++  cursor: pointer;
++  border: 1px solid var(--border);
++  background: var(--card);
++  color: var(--foreground);
++  padding: 6px 12px;
++  border-radius: var(--radius-button);
++  font-size: 13px;
++  font-weight: var(--weight-label);
++  font-family: var(--font-sans);
++}
++
++.toggle:hover {
++  border-color: var(--primary);
++}
++
++/* Visible focus ring (WPF-06 — never outline:none). Uses the theme's --ring
++ * token so the indicator is legible in both light and dark. */
++.toggle:focus-visible {
++  outline: 2px solid var(--ring);
++  outline-offset: 2px;
++}
++
++.icon {
++  width: 16px;
++  height: 16px;
++  display: inline-block;
++  line-height: 16px;
++  text-align: center;
++}
+diff --git a/apps/cockpit/client/src/components/ThemeToggle.tsx b/apps/cockpit/client/src/components/ThemeToggle.tsx
+new file mode 100644
+index 0000000..4ac75dc
+--- /dev/null
++++ b/apps/cockpit/client/src/components/ThemeToggle.tsx
+@@ -0,0 +1,44 @@
++// WP-004 — <ThemeToggle />: the light/dark control in the Shell top bar.
++//
++// A base component (stateless beyond useTheme() from WP-003): token-consuming,
++// accessible, keyboard-operable. It matches the signed-off mockup's toggle
++// (mockup/dark-theme.html — a pill button, top-right, icon + label).
++//
++// Accessibility (WPF-06 / WCAG AA):
++//   - It is a real <button>, so it is keyboard-operable (Enter/Space) and
++//     focusable by default; the focus ring is provided in the CSS module
++//     (never outline:none).
++//   - Its accessible name reflects the *action* ("Switch to dark/light
++//     theme") via aria-label, so the state is conveyed by name/role — not by
++//     colour or icon alone.
++//   - aria-pressed mirrors the active theme (pressed === dark) so assistive
++//     tech reports the current state as well as the action.
++//   - The emoji icon + visible label are decorative (aria-hidden); the
++//     aria-label is the single source of the accessible name.
++
++import { useTheme } from "../theme/ThemeProvider";
++import styles from "./ThemeToggle.module.css";
++
++export function ThemeToggle() {
++  const { theme, toggle } = useTheme();
++  const isDark = theme === "dark";
++
++  // The accessible name names the action the control performs, not the current
++  // state — the convention for a toggle button announced via aria-pressed.
++  const actionLabel = isDark ? "Switch to light theme" : "Switch to dark theme";
++
++  return (
++    <button
++      type="button"
++      className={styles.toggle}
++      onClick={toggle}
++      aria-label={actionLabel}
++      aria-pressed={isDark}
++    >
++      <span className={styles.icon} aria-hidden="true">
++        {isDark ? "🌙" : "☀️"}
++      </span>
++      <span aria-hidden="true">{isDark ? "Dark" : "Light"}</span>
++    </button>
++  );
++}
+diff --git a/apps/cockpit/client/src/layouts/Shell.module.css b/apps/cockpit/client/src/layouts/Shell.module.css
+index f2fe3ca..c8fd119 100644
+--- a/apps/cockpit/client/src/layouts/Shell.module.css
++++ b/apps/cockpit/client/src/layouts/Shell.module.css
+@@ -4,13 +4,38 @@
+   display: flex;
+   height: 100vh;
+   overflow: hidden;
+-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial,
+-    sans-serif;
++  font-family:
++    -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+   color: var(--foreground);
+ }
+ 
+-/* The outlet region fills the shell height and is a flex column so each
+- * page owns its own scroll region. Padding moves into the pages so a
++/* WP-004 — the right pane: a flex column holding the top bar above the outlet.
++ * It takes the role the outlet had in the shell row (fills the remaining
++ * width), so the existing full-height behaviour is preserved by construction. */
++.pane {
++  flex: 1 1 auto;
++  min-width: 0;
++  min-height: 0;
++  display: flex;
++  flex-direction: column;
++  overflow: hidden;
++}
++
++/* WP-004 — minimal top-bar region: colours-only, no layout redesign elsewhere.
++ * Hosts the ThemeToggle pushed to the right (top-right per the visual
++ * contract). Token-only (no raw colours). */
++.topbar {
++  flex: 0 0 auto;
++  display: flex;
++  align-items: center;
++  justify-content: flex-end;
++  padding: 12px 20px;
++  border-bottom: 1px solid var(--border);
++  background: var(--background);
++}
++
++/* The outlet region fills the remaining pane height and is a flex column so
++ * each page owns its own scroll region. Padding moves into the pages so a
+  * full-height region (the Monaco file viewer) can reach the edges. */
+ .main {
+   flex: 1 1 auto;
+diff --git a/apps/cockpit/client/src/layouts/Shell.tsx b/apps/cockpit/client/src/layouts/Shell.tsx
+index 77914bf..13b3f43 100644
+--- a/apps/cockpit/client/src/layouts/Shell.tsx
++++ b/apps/cockpit/client/src/layouts/Shell.tsx
+@@ -4,18 +4,29 @@
+ //
+ // The outlet region has `data-testid="shell-outlet"` so tests can
+ // assert structural containment without depending on rendered text.
++//
++// WP-004 — a minimal top-bar region (colours-only, no layout redesign of the
++// existing regions) hosts the <ThemeToggle /> top-right, so the theme control
++// is reachable from every route (ADR-001). The right pane is now a flex
++// column: top bar above, outlet below. The outlet keeps its testid + role.
+ 
+ import { Outlet } from "react-router-dom";
+ import { Sidebar } from "../components/Sidebar";
++import { ThemeToggle } from "../components/ThemeToggle";
+ import styles from "./Shell.module.css";
+ 
+ export function Shell() {
+   return (
+     <div className={styles.shell}>
+       <Sidebar />
+-      <main className={styles.main} data-testid="shell-outlet">
+-        <Outlet />
+-      </main>
++      <div className={styles.pane}>
++        <header className={styles.topbar}>
++          <ThemeToggle />
++        </header>
++        <main className={styles.main} data-testid="shell-outlet">
++          <Outlet />
++        </main>
++      </div>
+     </div>
+   );
+ }
+diff --git a/apps/cockpit/client/src/tests/Shell.test.tsx b/apps/cockpit/client/src/tests/Shell.test.tsx
+index b877aa0..789076f 100644
+--- a/apps/cockpit/client/src/tests/Shell.test.tsx
++++ b/apps/cockpit/client/src/tests/Shell.test.tsx
+@@ -14,6 +14,8 @@ import { render, screen } from "@testing-library/react";
+ import { MemoryRouter, Routes, Route } from "react-router-dom";
+ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+ import { Shell } from "../layouts/Shell";
++import { ThemeProvider } from "../theme/ThemeProvider";
++import { stubMatchMedia } from "./helpers/stubMatchMedia";
+ 
+ function freshClient() {
+   return new QueryClient({
+@@ -31,26 +33,31 @@ function jsonResponse(status: number, body: unknown): Response {
+ function renderShellWith(_children: React.ReactNode, path = "/") {
+   return render(
+     <QueryClientProvider client={freshClient()}>
+-      <MemoryRouter initialEntries={[path]}>
+-        <Routes>
+-          <Route element={<Shell />}>
+-            <Route
+-              path="/"
+-              element={<div data-testid="route-marker">child</div>}
+-            />
+-          </Route>
+-        </Routes>
+-      </MemoryRouter>
++      <ThemeProvider>
++        <MemoryRouter initialEntries={[path]}>
++          <Routes>
++            <Route element={<Shell />}>
++              <Route
++                path="/"
++                element={<div data-testid="route-marker">child</div>}
++              />
++            </Route>
++          </Routes>
++        </MemoryRouter>
++      </ThemeProvider>
+     </QueryClientProvider>,
+   );
+ }
+ 
+ describe("<Shell />", () => {
+   beforeEach(() => {
++    stubMatchMedia(false);
+     vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, []));
+   });
+   afterEach(() => {
++    vi.unstubAllGlobals();
+     vi.restoreAllMocks();
++    delete document.documentElement.dataset.theme;
+   });
+ 
+   it("renders sidebar and outlet regions", () => {
+@@ -66,4 +73,18 @@ describe("<Shell />", () => {
+     // The marker is a descendant of the outlet region (TDD §6).
+     expect(screen.getByTestId("shell-outlet")).toContainElement(marker);
+   });
++
++  it("mounts the ThemeToggle in the shell top bar (reachable on every route) — WP-004", () => {
++    renderShellWith(null);
++    // The toggle is the accessible-name button the ThemeToggle renders; its
++    // presence in the shell means it is reachable from every screen (ADR-001).
++    expect(
++      screen.getByRole("button", { name: /switch to (dark|light) theme/i }),
++    ).toBeInTheDocument();
++    // It lives outside the outlet region (it is shell chrome, not page content).
++    const toggle = screen.getByRole("button", {
++      name: /switch to (dark|light) theme/i,
++    });
++    expect(screen.getByTestId("shell-outlet")).not.toContainElement(toggle);
++  });
+ });
+diff --git a/apps/cockpit/client/src/tests/ThemeToggle.test.tsx b/apps/cockpit/client/src/tests/ThemeToggle.test.tsx
+new file mode 100644
+index 0000000..6ceb13a
+--- /dev/null
++++ b/apps/cockpit/client/src/tests/ThemeToggle.test.tsx
+@@ -0,0 +1,106 @@
++// WP-004 — <ThemeToggle /> component tests (TDD §3/§5.2, ADR-001).
++//
++// Real DOM via jsdom + Testing Library. The toggle is a base component that
++// consumes useTheme() from WP-003: it renders a button whose accessible name
++// reflects the *action* (switch to the other theme), flips
++// documentElement.dataset.theme on activation (click + keyboard Enter/Space),
++// and conveys the active theme via aria-pressed (state by role/name, not
++// colour alone — WCAG AA). It carries a jest-axe assertion (WPF-06): zero
++// WCAG AA violations.
++
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { render, screen, fireEvent } from "@testing-library/react";
++import { axe } from "jest-axe";
++import { ThemeProvider } from "../theme/ThemeProvider";
++import { ThemeToggle } from "../components/ThemeToggle";
++import { stubMatchMedia } from "./helpers/stubMatchMedia";
++
++function renderToggle() {
++  return render(
++    <ThemeProvider>
++      <ThemeToggle />
++    </ThemeProvider>,
++  );
++}
++
++describe("<ThemeToggle />", () => {
++  beforeEach(() => {
++    window.localStorage.clear();
++    delete document.documentElement.dataset.theme;
++  });
++
++  afterEach(() => {
++    vi.unstubAllGlobals();
++    window.localStorage.clear();
++    delete document.documentElement.dataset.theme;
++    vi.restoreAllMocks();
++  });
++
++  it("renders a control with an accessible name", () => {
++    stubMatchMedia(false); // start light
++    renderToggle();
++    // The accessible name reflects the action, not just an icon.
++    expect(
++      screen.getByRole("button", { name: /switch to dark theme/i }),
++    ).toBeInTheDocument();
++  });
++
++  it("conveys the active theme via aria-pressed (state not by colour alone)", () => {
++    stubMatchMedia(true); // start dark
++    renderToggle();
++    const button = screen.getByRole("button");
++    // Dark active → pressed; accessible name offers the light action.
++    expect(button).toHaveAttribute("aria-pressed", "true");
++    expect(button).toHaveAccessibleName(/switch to light theme/i);
++  });
++
++  it("clicking the control flips documentElement.dataset.theme", () => {
++    stubMatchMedia(false); // start light
++    renderToggle();
++    expect(document.documentElement.dataset.theme).toBe("light");
++
++    fireEvent.click(screen.getByRole("button"));
++
++    expect(document.documentElement.dataset.theme).toBe("dark");
++    // The accessible name and pressed state now reflect the new active theme.
++    expect(
++      screen.getByRole("button", { name: /switch to light theme/i }),
++    ).toHaveAttribute("aria-pressed", "true");
++  });
++
++  it("is keyboard-operable: Enter activates the control", () => {
++    stubMatchMedia(false); // start light
++    renderToggle();
++    const button = screen.getByRole("button");
++    button.focus();
++    expect(button).toHaveFocus();
++
++    // A native <button> activates on Enter/Space via click; Testing Library's
++    // keyboard event on a focused button drives the same path the browser does.
++    fireEvent.keyDown(button, { key: "Enter", code: "Enter" });
++    fireEvent.keyUp(button, { key: "Enter", code: "Enter" });
++    fireEvent.click(button);
++
++    expect(document.documentElement.dataset.theme).toBe("dark");
++  });
++
++  it("is keyboard-operable: Space activates the control", () => {
++    stubMatchMedia(false); // start light
++    renderToggle();
++    const button = screen.getByRole("button");
++    button.focus();
++
++    fireEvent.keyDown(button, { key: " ", code: "Space" });
++    fireEvent.keyUp(button, { key: " ", code: "Space" });
++    fireEvent.click(button);
++
++    expect(document.documentElement.dataset.theme).toBe("dark");
++  });
++
++  it("has no WCAG AA violations (jest-axe)", async () => {
++    stubMatchMedia(false);
++    const { container } = renderToggle();
++    const results = await axe(container);
++    expect(results).toHaveNoViolations();
++  });
++});
+diff --git a/apps/cockpit/client/src/tests/helpers/stubMatchMedia.ts b/apps/cockpit/client/src/tests/helpers/stubMatchMedia.ts
+new file mode 100644
+index 0000000..9b94c7c
+--- /dev/null
++++ b/apps/cockpit/client/src/tests/helpers/stubMatchMedia.ts
+@@ -0,0 +1,33 @@
++// WP-004 — shared test helper: stub window.matchMedia for theme tests.
++//
++// The ThemeProvider reads `matchMedia("(prefers-color-scheme: dark)")` to
++// resolve the first-visit theme (ADR-001). jsdom has no real matchMedia, so
++// every test that mounts the provider (directly or via the Shell that hosts
++// the toggle) needs a deterministic stub. Extracted here at the 2-consumer
++// threshold (RGB Blue / EP-03) so the toggle, Shell, routing, and smoke tests
++// share one source of truth instead of copy-pasting the stub.
++//
++// Pair with `vi.unstubAllGlobals()` in afterEach to restore the global.
++
++import { vi } from "vitest";
++
++/**
++ * Install a `matchMedia` stub that reports the given dark-mode preference.
++ *
++ * @param prefersDark - what `(prefers-color-scheme: dark)` should report.
++ */
++export function stubMatchMedia(prefersDark = false): void {
++  vi.stubGlobal(
++    "matchMedia",
++    vi.fn((query: string) => ({
++      matches: prefersDark,
++      media: query,
++      onchange: null,
++      addEventListener: vi.fn(),
++      removeEventListener: vi.fn(),
++      addListener: vi.fn(),
++      removeListener: vi.fn(),
++      dispatchEvent: vi.fn(),
++    })),
++  );
++}
+diff --git a/apps/cockpit/client/src/tests/routing.test.tsx b/apps/cockpit/client/src/tests/routing.test.tsx
+index 54dd045..13981d5 100644
+--- a/apps/cockpit/client/src/tests/routing.test.tsx
++++ b/apps/cockpit/client/src/tests/routing.test.tsx
+@@ -17,6 +17,11 @@ import { render, screen } from "@testing-library/react";
+ import { MemoryRouter } from "react-router-dom";
+ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+ import { AppRoutes } from "../App";
++// WP-004 — the Shell now hosts the ThemeToggle (a useTheme() consumer), so the
++// routes must be mounted inside a ThemeProvider, mirroring App.tsx's
++// production wiring (ADR-001 — the provider wraps every route).
++import { ThemeProvider } from "../theme/ThemeProvider";
++import { stubMatchMedia } from "./helpers/stubMatchMedia";
+ 
+ function freshClient() {
+   return new QueryClient({
+@@ -37,19 +42,24 @@ function renderAt(path: string) {
+   // freshClient() gives test-friendly defaults (retry off, focus-refetch off).
+   return render(
+     <QueryClientProvider client={freshClient()}>
+-      <MemoryRouter initialEntries={[path]}>
+-        <AppRoutes />
+-      </MemoryRouter>
++      <ThemeProvider>
++        <MemoryRouter initialEntries={[path]}>
++          <AppRoutes />
++        </MemoryRouter>
++      </ThemeProvider>
+     </QueryClientProvider>,
+   );
+ }
+ 
+ describe("App routes", () => {
+   beforeEach(() => {
++    stubMatchMedia(false);
+     vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, []));
+   });
+   afterEach(() => {
++    vi.unstubAllGlobals();
+     vi.restoreAllMocks();
++    delete document.documentElement.dataset.theme;
+   });
+ 
+   it("renders Dashboard at /", () => {
+diff --git a/apps/cockpit/client/src/tests/skeleton.test.tsx b/apps/cockpit/client/src/tests/skeleton.test.tsx
+index 0d56b8f..32addb6 100644
+--- a/apps/cockpit/client/src/tests/skeleton.test.tsx
++++ b/apps/cockpit/client/src/tests/skeleton.test.tsx
+@@ -6,22 +6,36 @@
+ // renders inside the persistent Shell. Detailed route + layout
+ // behaviour lives in routing.test.tsx + Shell.test.tsx.
+ 
+-import { describe, it, expect } from "vitest";
++import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+ import { render, screen } from "@testing-library/react";
+ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+ import { MemoryRouter } from "react-router-dom";
+ import { AppRoutes } from "../App";
++// WP-004 — the Shell now hosts the ThemeToggle (a useTheme() consumer), so the
++// smoke mount wraps AppRoutes in a ThemeProvider, mirroring App.tsx production.
++import { ThemeProvider } from "../theme/ThemeProvider";
++import { stubMatchMedia } from "./helpers/stubMatchMedia";
+ 
+ describe("App smoke", () => {
++  beforeEach(() => {
++    stubMatchMedia(false);
++  });
++  afterEach(() => {
++    vi.unstubAllGlobals();
++    delete document.documentElement.dataset.theme;
++  });
++
+   it("mounts AppRoutes with a router + query client without throwing", () => {
+     const client = new QueryClient({
+       defaultOptions: { queries: { retry: false } },
+     });
+     render(
+       <QueryClientProvider client={client}>
+-        <MemoryRouter initialEntries={["/"]}>
+-          <AppRoutes />
+-        </MemoryRouter>
++        <ThemeProvider>
++          <MemoryRouter initialEntries={["/"]}>
++            <AppRoutes />
++          </MemoryRouter>
++        </ThemeProvider>
+       </QueryClientProvider>,
+     );
+     expect(screen.getByTestId("page-dashboard")).toBeInTheDocument();

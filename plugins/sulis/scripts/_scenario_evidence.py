@@ -50,6 +50,8 @@ def emit_scenario_evidence(
     verdict: str,
     domain: str = "product-development",
     ran_at: str | None = None,
+    harness: str = "scenario-runner",
+    evidence: str | None = None,
 ) -> dict | None:
     """Deposit the TestRun + TestResult for one Scenario run.
 
@@ -57,6 +59,15 @@ def emit_scenario_evidence(
     `verifies`) on emission, or ``None`` when the scenario verifies nothing
     (no requirement refs → nothing the gate could gain, so no
     verifies-less record is written).
+
+    ``harness`` records *who/what produced the evidence* — ``"scenario-runner"``
+    for an automated run, ``"human-attested"`` when a person actually walked the
+    journey and confirmed the outcome (the human-handoff path, journey-rigor #6).
+    The provenance travels on the TestRun, so a green is never silently
+    ambiguous about whether a machine or a human observed it. ``evidence`` is the
+    free-text trace recorded on the TestResult; it defaults to
+    ``scenario-run:<id>`` and an attester passes their own (e.g.
+    ``human-attested:<who>:<id>``).
 
     Raises on a malformed scenario id / requirement ref (programmer error);
     callers that want best-effort behaviour (the CLI) wrap the call.
@@ -72,7 +83,7 @@ def emit_scenario_evidence(
     run = emit_testrun(
         repo=adapter,
         ran_at=ran_at,
-        harness="scenario-runner",
+        harness=harness,
         of_scenario=scenario_id,
     )
     result = emit_testresult(
@@ -82,11 +93,12 @@ def emit_scenario_evidence(
         type="e2e",
         outcome=outcome,
         scenario=scenario_id,
-        evidence=f"scenario-run:{scenario_id}",
+        evidence=evidence or f"scenario-run:{scenario_id}",
     )
     return {
         "testrun": run["id"],
         "testresult": result["id"],
         "outcome": outcome,
         "verifies": verifies,
+        "harness": harness,
     }

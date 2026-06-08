@@ -1,0 +1,14 @@
+{
+  "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+  "id": "dna:scenario:G9V6QGPERX1Y3DWQ2BXJ201WW4",
+  "journey": "dna:workflow:7TY3701DKFDKYAJZ21YTYWTN52",
+  "name": "Set up a product just by talking",
+  "state": "draft",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:M4DSBEM3TFHN3J5JY12MZ52ZF1",
+    "dna:requirement:AYGSMRN96PT1G0RH1M3DQZP588",
+    "dna:requirement:QXFMGQTRP8QHE7BR82YFY8J7YK",
+    "dna:requirement:X0Z853C9A6ZCR25F5F2H86J8A0"
+  ]
+}

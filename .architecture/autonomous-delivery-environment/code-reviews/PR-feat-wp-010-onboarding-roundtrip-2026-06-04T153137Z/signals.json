@@ -1,0 +1,14 @@
+{
+  "pr": "feat/wp-010-onboarding-roundtrip (WP-010 fix-forward)",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0, "typecheck": "clean", "lint": "clean", "read_only_gate": "clean" },
+  "scope": { "commit_type_spread": ["fix"], "module_fan_out": 4, "severity": "low", "note": "cohesive single fix-forward: server-side deterministic mint" },
+  "size": { "lines_added": 399, "lines_removed": 132, "files_changed": 15, "severity": "low" },
+  "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "new_process_start_site": 1, "new_fs_write_site": 1, "severity": "low", "note": "new process-start + write site (SpineEmitterMinter) is allow-listed in both read-only gates; confirm-gated + all-or-nothing" },
+  "completeness": { "new_source_without_test": 0, "new_tests": 1, "api_change_without_schema": false, "severity": "low" },
+  "lenses": {
+    "architecture": { "findings": 0, "note": "orchestrator stays process-free behind SpineMinter port; hexagonal shape preserved; gate allow-list updated in both bash + vitest twins" },
+    "security": { "findings": 1, "max_severity": "low", "note": "execFile shell:false argv (no injection); no secrets; SSE error message may echo founder's own path to their own UI (awareness only)" },
+    "quality": { "findings": 0, "note": "real-mint integration test added; idempotency + all-or-nothing + git-init covered; 700/700 suite green" }
+  }
+}

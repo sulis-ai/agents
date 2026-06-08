@@ -1,0 +1,32 @@
+{
+  "pr": "feat/wp-001-extract-binding-module",
+  "project": "change-owned-terminal-shared-session",
+  "timestamp": "2026-06-08T104152Z",
+  "verdict": "PASS",
+  "outcome_plain": "Ready to merge",
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "commands": ["ruff check (3 changed files)", "import smoke (binding + host)"]
+  },
+  "pr_hygiene": {
+    "scope": "none",
+    "size": "none",
+    "safety": "none",
+    "completeness": "none",
+    "files_changed": 3,
+    "migration_count": 0,
+    "secret_pattern_hits": 0
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"total": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "status": "nothing-surfaced"},
+    "security": {"findings": 0, "status": "nothing-surfaced"},
+    "quality": {"findings": 0, "status": "nothing-surfaced"}
+  },
+  "draft_fixes": 0,
+  "auto_downgrade_triggers": [],
+  "dispatch_shape": "single-reader (within CR-02 carve-out: 3 files)"
+}

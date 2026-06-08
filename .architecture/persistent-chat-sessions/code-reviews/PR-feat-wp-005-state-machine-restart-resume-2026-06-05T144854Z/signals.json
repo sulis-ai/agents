@@ -1,0 +1,63 @@
+{
+  "review": {
+    "target": "feat/wp-005-state-machine-restart-resume",
+    "base": "change/refactor-persistent-chat-sessions",
+    "project": "persistent-chat-sessions",
+    "wp": "WP-005",
+    "timestamp": "2026-06-05T144854Z",
+    "verdict": "PASS",
+    "verdict_plain": "Ready to merge"
+  },
+  "build_verification": {
+    "ruff_check": "pass",
+    "pytest": "pass",
+    "tests_total": 76,
+    "pr_introduced_errors": 0
+  },
+  "pr_hygiene": {
+    "scope_severity": "clean",
+    "size_severity": "moderate",
+    "size_lines_added": 1076,
+    "size_lines_removed": 50,
+    "size_files_changed": 6,
+    "safety_migrations": 0,
+    "safety_schema_idl": 0,
+    "safety_secret_pattern_hits": 0,
+    "safety_infra_files": 0,
+    "completeness_new_source_without_test": 0
+  },
+  "lenses": {
+    "architecture": { "in_changes": 0, "in_neighbours": 0 },
+    "security": { "in_changes": 0, "in_neighbours": 0 },
+    "quality": { "in_changes": 1, "in_neighbours": 0 }
+  },
+  "findings": [
+    {
+      "id": "F-1",
+      "lens": "quality",
+      "severity": "high",
+      "severity_plain": "Strongly recommend fixing",
+      "ring": "changes",
+      "file": "_session_manager/session.py",
+      "symbol": "_stdin_pump / terminate",
+      "title": "send-during-death-window race could hang a follower; terminate join on unstarted thread raised RuntimeError",
+      "status": "addressed",
+      "resolution": "inline-fix",
+      "test": "test_send_during_death_window_never_hangs",
+      "draft_delta": null
+    }
+  ],
+  "resolution_summary": {
+    "inline_fixes": 1,
+    "remediation_wps": 0,
+    "exceptions": 0,
+    "unaddressed": 0
+  },
+  "auto_downgrade_triggers": [],
+  "coverage": {
+    "lifecycle_py": 94,
+    "state_py": 100,
+    "session_py": 93,
+    "manager_py": 97
+  }
+}
