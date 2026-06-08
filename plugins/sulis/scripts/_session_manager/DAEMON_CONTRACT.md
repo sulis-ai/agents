@@ -17,7 +17,7 @@ against in parallel.
 | Resource | Path | Override |
 |---|---|---|
 | **Socket** (stable, `0o600`, one per user) | `~/.sulis/session-manager.sock` | env `SULIS_SESSION_MANAGER_SOCKET` |
-| **Lock** (singleton arbiter) | `~/.sulis/session-manager.lock` | derived from the socket path: sibling `*.lock` |
+| **Lock** (singleton arbiter) | `~/.sulis/session-manager.lock` | the daemon's `--lock` flag (CI/test isolation) |
 
 The parent directory (`~/.sulis/`) is created `0o700` if absent. The socket is
 chmod `0o600` by the engine's `SocketServer.start` (the established local-IPC
@@ -88,6 +88,27 @@ would otherwise open.
 > What the *caller* contract (this WP) guarantees is the matching half:
 > probe-first, spawn-at-most-once-per-caller, and poll-until-live when another
 > caller's daemon wins the race.
+
+## Lifecycle: idle-empty auto-exit
+
+The daemon persists across views and across sessions — it is **not** tied to any
+one cockpit or terminal window. Two distinct idle policies apply, and they are
+not the same thing:
+
+- **Per-session idle eviction** (the engine's existing maintenance loop, always
+  ON) reaps a single *idle session* the daemon still owns.
+- **Daemon-level idle-empty auto-exit** (WP-003, ADR-001): when the daemon has
+  owned **zero sessions** continuously for `SULIS_DAEMON_IDLE_EXIT_SECS`
+  (default `1800`), it self-shuts-down — the same clean teardown a `SIGTERM`
+  drives: stop the server, shut the manager down, unlink the socket, release the
+  flock, exit `0`. A session appearing resets the empty window (it must be
+  *continuous* emptiness).
+
+This bounds a forgotten daemon without coupling its lifetime to any window. It is
+**transparent to callers**: a caller that finds the daemon gone simply
+`ensure_daemon`s it back — the cold-start path restarts it. No caller-side change
+is needed; this note exists so a caller's mental model of "is it still there?"
+accounts for a daemon that has self-exited after a long idle-empty stretch.
 
 ## Idempotent ensure
 
