@@ -91,6 +91,24 @@ dead-end except ``NOT_AUTHORIZED`` → login-expired; an unknown code with no
 hint falls through to the safe dead-end rather than raising). It imports
 ``events.py`` only — never the provider seam (ADR-003), so a provider's raw
 ``"401"`` interpretation stays in that provider's ``classify_failure`` hint.
+WP-005 adds the consumer: ``recovery.RecoveryDriver`` — the turn-level Armor
+primitive (ADR-001), the sibling of ``LifecycleManager`` (process-death) for a
+*live session's turn* that ended in an ``error`` Event. Built against injected
+manager capabilities (``send`` to re-submit, ``log_append`` to surface every
+action on the existing log, ``reauth`` + ``resume`` for login-expiry, the
+adapter's ``classify_failure`` hint) plus an injected ``clock`` / ``sleep`` /
+``rng`` so the wall-clock retry budget is exercised deterministically and
+sleep-free (MEA-09). ``observe(error)`` runs the §3.1 pipeline: skip a
+``STDIN_BROKEN`` process-death (the lifecycle owns it — no double-handling),
+classify, then branch — **transient-blip** retries with full-jitter backoff via
+the existing ``send`` until it clears or ``next_delay`` returns ``None`` (budget
+exhausted → abandoned with a typed Event, never a silent hang); **dead-end**
+abandons immediately without consulting the budget; **login-expired** calls
+``reauth()`` once, surfaces a ``NOT_AUTHORIZED`` notification carrying the
+re-login link, pauses (budget NOT burned), and on ``complete_reauth`` resumes
+via the **existing** ``supports_resume`` + ``resume_ref`` path so the agent
+re-runs the incomplete step (no fabricated completion, ADR-004). It is unwired
+to the live manager until WP-007.
 
 The leading underscore signals "foundation-internal" — exactly as ``_discovery``
 and ``_canonical_drift`` do. The public surface is re-exported here so callers
@@ -160,6 +178,7 @@ from _session_manager.manager import SessionManager
 from _session_manager.recovery import (
     DEFAULT_RETRY_POLICY,
     ReauthTicket,
+    RecoveryDriver,
     RetryPolicy,
     next_delay,
     next_delay_ceiling,
@@ -225,6 +244,8 @@ __all__ = [
     "next_delay_ceiling",
     "next_delay",
     "ReauthTicket",
+    # reliability layer: the turn-level recovery driver (CH-01KTMK WP-005)
+    "RecoveryDriver",
     # error model (§2.9)
     "SessionError",
     "ProtocolError",
