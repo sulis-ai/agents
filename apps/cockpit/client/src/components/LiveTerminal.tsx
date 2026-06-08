@@ -76,8 +76,14 @@ type ViewState =
   | { kind: "error"; error: TerminalError };
 
 /** The default xterm.js-backed sink (the production path). Lazily imports
- *  xterm so the heavy emulator only loads when the Terminal tab mounts. */
-async function createXtermSink(): Promise<TerminalSink> {
+ *  xterm so the heavy emulator only loads when the Terminal tab mounts.
+ *
+ *  Exported (not module-private) so the fit-addon wiring — loadAddon(fitAddon),
+ *  fit-on-open, the ResizeObserver re-fit, dispose teardown — is unit-tested
+ *  against mocked xterm (LiveTerminal.fit.test.ts, CH-01KTMB). That wiring
+ *  shipped missing once and is invisible to the component tests, which inject a
+ *  fake sink; this export is the seam that makes it regression-testable. */
+export async function createXtermSink(): Promise<TerminalSink> {
   const { Terminal } = await import("@xterm/xterm");
   // The fit addon sizes the terminal's cols×rows to its container (and re-sizes
   // on container resize) — without it xterm renders at a fixed default width

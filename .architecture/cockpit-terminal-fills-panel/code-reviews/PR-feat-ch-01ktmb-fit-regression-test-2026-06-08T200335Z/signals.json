@@ -1,0 +1,32 @@
+{
+  "review": {
+    "target": "feat/ch-01ktmb-fit-regression-test",
+    "base": "change/fix-cockpit-terminal-fills-panel",
+    "base_sha": "f1118125",
+    "project": "cockpit-terminal-fills-panel",
+    "timestamp": "2026-06-08T200335Z",
+    "verdict": "PASS",
+    "outcome_plain": "Ready to merge"
+  },
+  "build_verification": {
+    "typecheck_errors_introduced": 0,
+    "lint_errors_introduced": 0
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"total": 0},
+    "draft_fixes": 0
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "status": "nothing-surfaced"},
+    "security": {"findings": 0, "status": "nothing-surfaced"},
+    "quality": {"findings": 0, "status": "nothing-surfaced"}
+  },
+  "pr_hygiene": {
+    "scope": {"severity": "none", "commit_types": ["test"], "module_fan_out": 1},
+    "size": {"severity": "none", "lines_added": 146, "lines_removed": 2, "files_changed": 2},
+    "safety": {"severity": "none", "migrations": 0, "schemas": 0, "secrets": 0, "infra": 0},
+    "completeness": {"severity": "none", "new_source_without_test": 0}
+  },
+  "auto_downgrades_fired": []
+}
