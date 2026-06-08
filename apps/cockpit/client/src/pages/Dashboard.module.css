@@ -45,10 +45,16 @@
   border-radius: 6px;
 }
 
+/* WP-009 — soft-tint error banner, reconciled to the signed mockup's
+ * `.banner.error` (mockup/dark-theme.html). A 16% --destructive tint over
+ * --card with a 45% tinted border, text in readable --foreground. Matches the
+ * thread/chat banner (styles/Thread.module.css), which already uses this
+ * color-mix approach. Re-themes automatically: --destructive and --card are
+ * both theme-scoped. */
 .errorBox {
-  border: 1px solid var(--destructive);
-  background: var(--destructive);
-  color: var(--destructive-foreground);
+  border: 1px solid color-mix(in srgb, var(--destructive) 45%, var(--card));
+  background: color-mix(in srgb, var(--destructive) 16%, var(--card));
+  color: var(--foreground);
   padding: 16px;
   border-radius: 6px;
 }
@@ -62,5 +68,5 @@
 .errorMessage {
   font-size: 13px;
   margin: 0 0 12px;
-  color: var(--destructive-foreground);
+  color: var(--foreground);
 }
