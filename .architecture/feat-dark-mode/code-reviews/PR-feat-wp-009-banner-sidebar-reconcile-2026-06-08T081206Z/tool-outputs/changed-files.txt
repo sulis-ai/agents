@@ -1,0 +1,3 @@
+apps/cockpit/client/src/components/SidebarItem.module.css
+apps/cockpit/client/src/pages/Dashboard.module.css
+apps/cockpit/client/src/tests/no-raw-colours.banner-sidebar-reconcile.test.ts

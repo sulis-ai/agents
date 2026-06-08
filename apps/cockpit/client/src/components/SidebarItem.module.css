@@ -17,14 +17,24 @@
   background: var(--muted);
 }
 
-/* Active item: a quiet lifted surface (--secondary) with the primary accent
- * carried by the text colour + weight. --secondary re-themes for dark; the
- * active state stays distinct from :hover (--muted) by colour + weight in both
- * themes (in dark --secondary and --muted are distinct surfaces). WP-008. */
+/* WP-009 — active item reconciled to the signed mockup's `.navitem.active`
+ * (mockup/dark-theme.html): a solid --primary highlight with --primary-foreground
+ * text. --primary / --primary-foreground is a pre-validated, designed-together
+ * pairing that re-themes for dark, so the active state stays distinct from
+ * :hover (--muted) by surface + weight in both themes. */
 .item[data-active="true"] {
-  background: var(--secondary);
-  color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
   font-weight: 600;
+}
+
+/* The dim child (slug) defaults to --muted-foreground for inactive items; on the
+ * solid-primary active surface it must read against --primary, so it switches to
+ * --primary-foreground at reduced opacity (mirrors the mockup's
+ * `.navitem.active .dim`). */
+.item[data-active="true"] .slug {
+  color: var(--primary-foreground);
+  opacity: 0.8;
 }
 
 .label {
