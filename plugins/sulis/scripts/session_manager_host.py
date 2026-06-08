@@ -51,74 +51,24 @@ _SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(_SCRIPTS))
 sys.path.insert(0, str(_SCRIPTS / "tests" / "lib"))
 
-from _session_manager.adapter import SessionSpec  # noqa: E402
+from _session_manager.binding import (  # noqa: E402
+    BindingManager,
+    ConnectionBindingRegistry,
+)
 from _session_manager.manager import SessionManager  # noqa: E402
 from _session_manager.socket_server import SocketServer  # noqa: E402
 
 import fake_claude_child  # noqa: E402
 from session_child_adapters import PtyChildAdapter  # noqa: E402
 
-
-class ConnectionBindingRegistry:
-    """Per-connection change binding for the §2.13.4 guard (the resolver state).
-
-    A connection is bound to the single change ``key`` of its **first** session
-    use; every subsequent guarded method on a *different* key is refused. The
-    shipped :class:`SocketServer` serves one handler thread per connection
-    (``ThreadingMixIn``), so the handler thread id identifies the connection —
-    :meth:`bind_first` (called on the same thread as the connection's first
-    ``open``) records it, and :meth:`resolve` (the ``bound_key_for`` callback)
-    reads it back.
-
-    Pure and thread-safe; testable without a live socket (Blue).
-    """
-
-    def __init__(self) -> None:
-        self._bindings: dict[int, str] = {}
-        self._lock = threading.Lock()
-
-    def bind_first(self, key: str, *, thread_id: int | None = None) -> str:
-        """Record (idempotently) the change a connection is bound to.
-
-        The first ``key`` seen on a connection thread wins; later calls on the
-        same thread keep the original binding (they do not re-bind). Returns the
-        binding now in force for the thread."""
-        tid = thread_id if thread_id is not None else threading.get_ident()
-        with self._lock:
-            return self._bindings.setdefault(tid, key)
-
-    def resolve(self, _conn: object, *, thread_id: int | None = None) -> str | None:
-        """The ``bound_key_for`` resolver: the change this connection is bound to.
-
-        ``None`` before the connection has opened anything (no guarded method can
-        precede the bind on a real client flow). The ``_conn`` socket argument is
-        the shipped resolver signature; binding is keyed by handler thread."""
-        tid = thread_id if thread_id is not None else threading.get_ident()
-        with self._lock:
-            return self._bindings.get(tid)
-
-
-class _BindingManager:
-    """A thin pass-through wrapper over :class:`SessionManager` that records the
-    per-connection binding on each ``open`` (the only place a connection first
-    names its change), then delegates verbatim. It changes no engine behaviour —
-    it only observes ``open`` to feed the §2.13.4 guard. Everything else is
-    forwarded unchanged via ``__getattr__`` so the frozen manager surface is
-    untouched."""
-
-    def __init__(
-        self, manager: SessionManager, registry: ConnectionBindingRegistry
-    ) -> None:
-        self._manager = manager
-        self._registry = registry
-
-    def open(self, key: str, spec: SessionSpec):  # noqa: ANN201 - delegates the engine's type
-        # Bind this connection (handler thread) to the first change it opens.
-        self._registry.bind_first(key)
-        return self._manager.open(key, spec)
-
-    def __getattr__(self, name: str):  # noqa: ANN001, ANN201 - transparent delegation
-        return getattr(self._manager, name)
+# The per-connection binding resolver (:class:`ConnectionBindingRegistry`) and the
+# ``open``-observing manager wrapper (:class:`BindingManager`) now live in
+# :mod:`_session_manager.binding` (WP-001) so this host and the shared daemon
+# (WP-003) reuse one resolver — no duplication (EP-03). They are imported above;
+# this module is a thin shim until WP-003 retires the host's standalone ``main``.
+# ``_BindingManager`` is the pre-rename alias kept so a pre-WP-001 importer (and
+# the unchanged host unit suite) still resolves the old private name.
+_BindingManager = BindingManager
 
 
 def _build_server(
@@ -135,7 +85,7 @@ def _build_server(
     if bound:
         registry = ConnectionBindingRegistry()
         server = SocketServer(
-            _BindingManager(manager, registry),
+            BindingManager(manager, registry),
             socket_path,
             bound_key_for=registry.resolve,
         )
