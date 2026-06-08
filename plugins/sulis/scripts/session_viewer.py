@@ -390,11 +390,19 @@ def main(
         #    unary ack with no reader to consume it would block the caller.
         conn.start_reader()
         # 3. open (get-or-spawn): idempotent — first view creates, later attach.
+        #    brief_change_id is the SAME change_id already used as the open key —
+        #    routing it onto the spec is what briefs the pty session for the
+        #    change it is FOR (WP-002, ADR-001).
         conn.request(
             "open",
             {
                 "key": change_id,
-                "spec": {"provider": "pty", "cwd": worktree, "io_mode": "pty"},
+                "spec": {
+                    "provider": "pty",
+                    "cwd": worktree,
+                    "io_mode": "pty",
+                    "brief_change_id": change_id,
+                },
             },
             timeout=_REQUEST_TIMEOUT,
         )

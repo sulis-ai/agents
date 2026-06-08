@@ -218,6 +218,10 @@ class _Handler(socketserver.BaseRequestHandler):
             cwd=spec_d["cwd"],
             resume_ref=spec_d.get("resume_ref"),
             io_mode=spec_d.get("io_mode", "pipe"),
+            # WP-002: route the per-open brief target (the change this session is
+            # FOR) onto the spec. Absent on the wire → None (unchanged base
+            # behaviour for any caller that doesn't send it). ADR-001.
+            brief_change_id=spec_d.get("brief_change_id"),
         )
         session = self.server.manager.open(key, spec)
         self._send(

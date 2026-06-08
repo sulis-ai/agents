@@ -344,6 +344,39 @@ describe("WP-002 terminal sidecar bridge", () => {
     expect(endpoint.connections[0]!.lines[0]).toBe(original);
   });
 
+  it("test_open_injects_brief_change_id — the rewritten open sets spec.brief_change_id to the changeId the WS is for", async () => {
+    const { endpoint, harness } = await setup();
+    const ws = await openWs(harness.url); // URL carries ?changeId=CHANGE_ID
+    cleanups.push(async () => ws.close());
+
+    // The client sends only {io_mode:"pty"} — the sidecar supplies the brief
+    // target (the same changeId it already keys provider+cwd resolution on).
+    ws.send(JSON.stringify({ id: "1", method: "open", params: { key: CHANGE_ID, spec: { io_mode: "pty" } } }));
+
+    await endpoint.waitForLine(0);
+    const parsed = JSON.parse(endpoint.connections[0]!.lines[0]!) as {
+      params: { spec: Record<string, unknown> };
+    };
+    expect(parsed.params.spec.brief_change_id).toBe(CHANGE_ID);
+  });
+
+  it("test_open_omits_brief_change_id_when_no_identity — no ?changeId and no open key → field omitted (None server-side)", async () => {
+    const { endpoint, harness } = await setup();
+    // Connect with NO ?changeId, and open with NO key — there is no identity to
+    // brief from, so the resolver returns null and the open is forwarded
+    // verbatim, carrying no brief_change_id.
+    const ws = await openWs(`${harness.baseUrl}/terminal`);
+    cleanups.push(async () => ws.close());
+
+    ws.send(JSON.stringify({ id: "1", method: "open", params: { spec: { io_mode: "pty" } } }));
+
+    await endpoint.waitForLine(0);
+    const parsed = JSON.parse(endpoint.connections[0]!.lines[0]!) as {
+      params?: { spec?: Record<string, unknown> };
+    };
+    expect(parsed.params?.spec?.brief_change_id).toBeUndefined();
+  });
+
   it("test_forwards_other_methods_verbatim — attach/feed/resize/detach pass through byte-for-byte (incl base64 payloads)", async () => {
     const { endpoint, harness } = await setup();
     const ws = await openWs(harness.url);

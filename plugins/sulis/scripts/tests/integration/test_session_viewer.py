@@ -275,6 +275,41 @@ def test_attach_renders_snapshot_then_live(running_server, tmp_path: Path) -> No
         os.close(slave_fd)
 
 
+def test_open_threads_brief_change_id(running_server, tmp_path: Path) -> None:
+    """WP-002: the viewer's ``open`` routes its change id into the session's
+    ``brief_change_id`` so the pty session briefs for the change it is FOR.
+
+    The viewer already keys the session by ``change_id``; this asserts that same
+    value also reaches the spec's brief target (read back from the real manager's
+    session registry — the spec the server actually built from the viewer's wire
+    payload, MEA-09 no-mock)."""
+    socket_path, mgr = running_server
+
+    master_fd, slave_fd = os.openpty()
+    try:
+        thread, _result = _run_viewer_in_thread(
+            change_id="chg_VB",
+            worktree=str(tmp_path),
+            socket_path=socket_path,
+            stdin_fd=slave_fd,
+            stdout_fd=slave_fd,
+        )
+        # The viewer opens get-or-spawn; wait for the session to exist, then read
+        # back the spec the server constructed from the viewer's open payload.
+        deadline = time.monotonic() + _WAIT
+        while time.monotonic() < deadline:
+            if mgr._sessions.get("chg_VB") is not None:
+                break
+            time.sleep(0.02)
+        assert mgr._sessions.get("chg_VB") is not None, "viewer never opened"
+        assert mgr._sessions["chg_VB"].spec.brief_change_id == "chg_VB"
+        master_fd = _stop_viewer(thread, master_fd)
+    finally:
+        if master_fd != -1:
+            os.close(master_fd)
+        os.close(slave_fd)
+
+
 def test_feed_roundtrip_stdin_to_child(running_server, tmp_path: Path) -> None:
     """Bytes written to the viewer's stdin reach the child (feed round-trip,
     echoed back into the live stream). Type the ``__PTY_PING__`` sentinel on the
