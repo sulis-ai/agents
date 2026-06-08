@@ -1,16 +1,19 @@
 """Cross-platform terminal launcher for the change-as-primitive flow.
 
-DEPRECATED(strangle): the OS-window launch path (Terminal.app / gnome-terminal
-spawning ``claude`` directly, NOT backed by the session manager) is a
-deprecated FALLBACK as of WP-009. "Open this change's terminal" now defaults to
-the in-cockpit ``<LiveTerminal/>`` path (a pty-mode session in the manager,
-rendered in the browser). The OS-window path here is reachable ONLY when the
-``SULIS_TERMINAL_OS_WINDOW`` environment flag is set (default off), retained as
-an offline / no-cockpit fallback until the cockpit path is proven. Removal is
-tracked: see the ``removal_plan`` in
-``.architecture/interactive-terminal-sessions/work-packages/WP-009-change-terminal-launcher-repoint.md``
-(deletion target 2026-07-31, gated on WP-010 e2e green + a founder dogfood run).
-Do NOT extend this path; new terminal work belongs on the cockpit-rendered seam.
+This is the sanctioned launcher for the change-start flow (CH-01KTK7). When the
+founder starts a change (``sulis-change start --spawn`` → the ``/sulis:change``
+skill), a VISIBLE launch opens a real terminal window — Terminal.app on macOS,
+gnome-terminal / konsole / xterm on Linux — running ``claude --agent sulis``
+bound to the change via ``SULIS_CHANGE_ID``, with the pre-prompt sidecar so the
+session self-orients rather than sitting idle. This is the DEFAULT: no env flag
+is required to open the terminal.
+
+``SULIS_TERMINAL_OS_WINDOW`` is retained only as an explicit override knob (see
+``_os_window_enabled``); it does NOT gate the default-on spawn. The in-cockpit
+``<LiveTerminal/>`` is a SEPARATE capability — a pty-mode session rendered in
+the browser, reached through the cockpit. It is a different job (watch/use a
+session inside the cockpit), not a replacement for popping a focused terminal
+at change start; this launcher is not deprecated in favour of it.
 
 Port of `ae_task_executor/terminal_launcher.py` (504 LOC) stripped to the
 load-bearing cross-platform spawn path for sulis's single-founder,
@@ -55,11 +58,10 @@ logger = logging.getLogger("sulis.terminal_launcher")
 
 # ─── Module-level constants ────────────────────────────────────────────────
 
-# DEPRECATED(strangle, WP-009) — opt-in flag for the OS-window fallback.
-# The visible OS-window launch (Terminal.app / gnome-terminal) is reachable
-# ONLY when this env var is truthy. Default off: the in-cockpit <LiveTerminal/>
-# path is the default "open this change's terminal". Removal tracked in WP-009's
-# removal_plan (target 2026-07-31).
+# Optional override knob for the OS-window launch. A visible launch opens the
+# terminal by DEFAULT (CH-01KTK7) — this flag is NOT required for that. It is
+# retained only as an explicit override an operator can set when they want to
+# force/annotate the OS-window path; it does not gate the default-on behaviour.
 _OS_WINDOW_FLAG = "SULIS_TERMINAL_OS_WINDOW"
 _OS_WINDOW_TRUTHY = frozenset({"1", "true", "yes", "on"})
 
@@ -97,16 +99,16 @@ _PRE_PROMPT_SIDECAR = "pre_prompt.txt"  # co-located with launch.sh in the chang
 _PRE_PROMPT_MAX_BYTES = 50_000
 
 
-# ─── Strangle gate (WP-009) ────────────────────────────────────────────────
+# ─── OS-window override knob ────────────────────────────────────────────────
 
 
 def _os_window_enabled() -> bool:
-    """Return True when the OS-window fallback is opted into via the flag.
+    """Return True when the OS-window override flag is set.
 
-    DEPRECATED(strangle, WP-009). Default off: when ``SULIS_TERMINAL_OS_WINDOW``
-    is absent or not truthy, the visible OS-window launch is suppressed in
-    favour of the in-cockpit ``<LiveTerminal/>`` path. Truthy values: ``1``,
-    ``true``, ``yes``, ``on`` (case-insensitive).
+    Override knob only — a visible launch opens the terminal by DEFAULT
+    (CH-01KTK7), so this is NOT required for the change-start spawn. It is
+    retained so an operator can explicitly signal the OS-window path. Truthy
+    values: ``1``, ``true``, ``yes``, ``on`` (case-insensitive).
     """
     return os.environ.get(_OS_WINDOW_FLAG, "").strip().lower() in _OS_WINDOW_TRUTHY
 
@@ -548,21 +550,16 @@ def launch_change_terminal(
     if not ok:
         raise ValueError(f"worktree_path is not an existing directory: {worktree_path}")
 
-    # DEPRECATED(strangle, WP-009) gate. A VISIBLE launch is the OS-window path
-    # — now a deprecated fallback. Unless the founder opts in via the flag, the
-    # in-cockpit <LiveTerminal/> path is the default, so suppress the OS window
-    # and return a structured pointer to it (no window spawns, no launch.sh
-    # written). The headless path (visible=False) is NOT the OS-window path and
-    # is not gated — automation that needs a background session still works.
-    if visible and not _os_window_enabled():
-        result = _failed(
-            "the OS-window terminal launch is deprecated (WP-009); open this "
-            "change's terminal in the cockpit instead. To use the OS-window "
-            f"fallback, set {_OS_WINDOW_FLAG}=1.",
-            "",  # no launch.sh written on the suppressed path
-        )
-        result["session_json_path"] = ""
-        return result
+    # A VISIBLE launch opens the change's terminal by DEFAULT (CH-01KTK7). This
+    # is the sanctioned change-start launcher: `start --spawn` wants a real
+    # terminal window to open, briefed on the change — not a pointer elsewhere.
+    # No env flag is required. ``SULIS_TERMINAL_OS_WINDOW`` remains only as an
+    # explicit override knob (e.g. forcing the OS-window path in environments
+    # where it would otherwise be skipped); it does NOT gate the default-on
+    # behaviour, so we deliberately do not consult ``_os_window_enabled()`` here.
+    # The in-cockpit ``<LiveTerminal/>`` is a SEPARATE browser-rendering
+    # capability, reached through the cockpit — not a replacement for popping a
+    # focused terminal at change start.
 
     # Default an opening prompt so the spawned session auto-starts rather than
     # sitting idle at an empty claude prompt (#93). start --spawn passes a rich

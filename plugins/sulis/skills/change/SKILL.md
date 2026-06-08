@@ -153,7 +153,10 @@ before running anything:
 `change/{primitive}-{slug}` branch + a dedicated worktree, writes the
 recon `CONTEXT.md`, and launches a new terminal running
 `claude --agent sulis` bound to this change via the `SULIS_CHANGE_ID`
-environment variable.
+environment variable. Opening that terminal is the default — no
+environment flag is required, and `start` never points the founder at the
+cockpit instead. (The in-cockpit terminal is a separate, browser-rendered
+way to use a session; it is not what `start` opens.)
 
 **6. Report (Rule 1 + Rule 2).** Parse the JSON on stdout. Lead with the
 outcome; carry the handle in parentheses:
