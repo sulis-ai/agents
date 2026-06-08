@@ -1,0 +1,31 @@
+{
+  "review": {
+    "wp": "WP-002",
+    "title": "Bridge adapter passes originEnv through to the spawn",
+    "timestamp": "2026-06-07T224925Z",
+    "branch": "feat/wp-002-bridge-passes-originenv-to-spawn",
+    "base": "change/feat-live-origin-stamping",
+    "verdict": "PASS"
+  },
+  "build_verification": {
+    "tsc_server_head_errors": 0,
+    "tsc_client_head_errors": 0,
+    "eslint_head_errors": 0,
+    "pr_introduced_errors": 0
+  },
+  "pr_hygiene": {
+    "scope": { "commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "clean" },
+    "size": { "lines_added": 92, "lines_removed": 1, "files_changed": 3, "severity": "clean" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "clean" },
+    "completeness": { "new_source_without_test": 0, "new_tests": 2, "api_change_without_schema": false, "severity": "clean" }
+  },
+  "lenses": {
+    "architecture": { "in_changes": 0, "in_neighbours": 0, "surfaced": false },
+    "security": { "in_changes": 0, "in_neighbours": 0, "surfaced": false },
+    "quality": { "in_changes": 0, "in_neighbours": 0, "surfaced": false }
+  },
+  "findings": [],
+  "hardening_deltas": [],
+  "auto_downgrade_triggers_fired": [],
+  "dispatch": { "shape": "single-reader", "justification": "93 lines / 3 files within CR-02 carve-out" }
+}

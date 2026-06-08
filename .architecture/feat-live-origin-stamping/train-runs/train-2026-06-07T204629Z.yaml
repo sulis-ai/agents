@@ -1,0 +1,20 @@
+train_id: "train-2026-06-07T204629Z"
+started_at: "2026-06-07T20:46:29Z"
+outcome: "paused"
+outcome_reason: "bundled-tip CI failed on feat/wp-005-executor-autonomous-origin"
+batch_size: 2
+deploy_url: null
+deploy_workflow_run: null
+health_status: null
+smoke_verdict: null
+bundle:
+  - wp: WP-001
+    branch: feat/wp-001-pin-spawnbridge-originenv-contract
+    pre_train_sha: 192306f5fcca6dd952759b1bf1334e148050ba95
+    rebased_to_sha: 192306f5fcca6dd952759b1bf1334e148050ba95
+    merge_sha_on_dev: null
+  - wp: WP-005
+    branch: feat/wp-005-executor-autonomous-origin
+    pre_train_sha: 7be61f7050b73a142d36a9fe8c9c09744a6aa1ed
+    rebased_to_sha: 712d4fa24436a81fc65f5471cadb248eed511e9e
+    merge_sha_on_dev: null

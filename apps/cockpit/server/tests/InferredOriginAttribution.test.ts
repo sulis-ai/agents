@@ -31,6 +31,7 @@ import { InferredOriginAttribution } from "../adapters/InferredOriginAttribution
 import * as parseTranscriptsMod from "../lib/parseTranscripts";
 import * as readBrainMod from "../lib/readBrain";
 import { mangleCwd } from "../lib/mangleCwd";
+import { deriveThreadId } from "../lib/threadIdentity";
 import {
   runContract,
   type OriginContractWorld,
@@ -226,7 +227,11 @@ describe("InferredOriginAttribution (real world)", () => {
     it("assisted carries the conversation id + turn summary", async () => {
       const o = await makeAttribution().originFor(CHANGE_ID, "assist.txt");
       if (o.kind !== "assisted") throw new Error("expected assisted");
-      expect(o.conversation.conversationId).toBe("session-abc");
+      // WP-004 (ADR-018 D2): the conversation id is now the SHARED `thread_`-
+      // shaped id (the relay records the same), NOT the raw stem. This is the
+      // intentional change the #23 fix documents — the OLD raw-stem expectation
+      // was the bug that made the id mutate shape on flip likely→exact.
+      expect(o.conversation.conversationId).toBe("thread_session-abc");
       expect(o.conversation.summary).toContain("assisted change");
     });
   });
@@ -253,5 +258,158 @@ describe("InferredOriginAttribution (real world)", () => {
         brainSpy.mockRestore();
       }
     });
+  });
+
+  // WP-004 (reconcile, ADR-018 D2) — the inferred conversation id renders the
+  // SAME `thread_`-shaped id the relay records (shared-helper parity, EP-03), so
+  // a file's displayed conversation id does not change shape on flip
+  // likely→exact. The id MUST come from `deriveThreadId` of the transcript stem,
+  // NOT the raw stem. Fails until loadTurns routes through the shared helper.
+  describe("reconcile (ADR-018 D2): inferred renders the shared thread_ id", () => {
+    it("assisted conversation id equals deriveThreadId(stem) (NOT the raw stem)", async () => {
+      const o = await makeAttribution().originFor(CHANGE_ID, "assist.txt");
+      if (o.kind !== "assisted") throw new Error("expected assisted");
+      // The session stem is "session-abc"; the displayed id must be the
+      // `thread_`-shaped id the relay would record for the same session.
+      expect(o.conversation.conversationId).toBe(deriveThreadId("session-abc"));
+      expect(o.conversation.conversationId).toBe("thread_session-abc");
+    });
+  });
+});
+
+// WP-004 (#23 multi-session fix, ADR-018 D2) — a change spanning 2+ sessions
+// must attribute each file to ITS OWN session's `thread_` id, with turns indexed
+// 1-based WITHIN that transcript (not "first stem only across the merged
+// stream"). A real two-transcript world: two sessions, each with one assistant
+// turn at a distinct timestamp, each correlated to its own file.
+//
+// OLD (the #23 bug this pins as wrong): both files report the FIRST transcript's
+// stem as the conversation id, and the second file's turn is index 2 in the
+// MERGED stream.
+// NEW (the fix): file-one → thread_(session-one), turn 1; file-two →
+// thread_(session-two), turn 1 — two distinct thread ids, per-transcript turns.
+describe("InferredOriginAttribution — multi-session (#23, ADR-018 D2)", () => {
+  let repo: string;
+  let projectsDir: string;
+
+  const CHANGE = "01MULTISESSIONCHANGE00000A";
+  const STEM_ONE = "session-one";
+  const STEM_TWO = "session-two";
+  const TURN_ONE_AT = "2026-06-03T09:00:00Z";
+  const TURN_TWO_AT = "2026-06-04T14:00:00Z";
+
+  function git(cwd: string, args: string[], env?: NodeJS.ProcessEnv): void {
+    const result = spawnSync("git", args, {
+      cwd,
+      encoding: "utf8",
+      env: { ...process.env, ...env },
+    });
+    if (result.status !== 0) {
+      throw new Error(
+        `git ${args.join(" ")} failed (status ${result.status}): ${result.stderr}`,
+      );
+    }
+  }
+
+  function commitFile(rel: string, isoDate: string): void {
+    writeFileSync(join(repo, rel), `${rel}\n`, "utf8");
+    git(repo, ["add", rel]);
+    git(repo, ["commit", "-q", "-m", `add ${rel}`], {
+      GIT_AUTHOR_DATE: isoDate,
+      GIT_COMMITTER_DATE: isoDate,
+      GIT_AUTHOR_NAME: "Iain",
+      GIT_AUTHOR_EMAIL: "iain@nivbow.com",
+      GIT_COMMITTER_NAME: "Iain",
+      GIT_COMMITTER_EMAIL: "iain@nivbow.com",
+    });
+  }
+
+  /** Write one single-turn transcript (a user record + an assistant turn). */
+  async function writeTranscript(
+    sessionDir: string,
+    stem: string,
+    turnAt: string,
+  ): Promise<void> {
+    const userAt = new Date(Date.parse(turnAt) - 60_000).toISOString();
+    const lines = [
+      JSON.stringify({
+        type: "user",
+        uuid: `${stem}-u`,
+        timestamp: userAt,
+        cwd: repo,
+        message: { role: "user", content: "please change a file" },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        uuid: `${stem}-a`,
+        timestamp: turnAt,
+        cwd: repo,
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: `Done in ${stem}.` }],
+        },
+      }),
+    ];
+    await writeFile(join(sessionDir, `${stem}.jsonl`), `${lines.join("\n")}\n`, "utf8");
+  }
+
+  beforeAll(async () => {
+    repo = await realpath(await mkdtemp(join(tmpdir(), "origin-multisession-")));
+    git(repo, ["init", "-q", "-b", "main"]);
+    git(repo, ["config", "commit.gpgsign", "false"]);
+
+    // one.txt committed at session-one's turn; two.txt at session-two's turn.
+    commitFile("one.txt", TURN_ONE_AT);
+    commitFile("two.txt", TURN_TWO_AT);
+
+    projectsDir = await mkdtemp(join(tmpdir(), "origin-multisession-projects-"));
+    const sessionDir = join(projectsDir, mangleCwd(repo));
+    await mkdir(sessionDir, { recursive: true });
+    await writeTranscript(sessionDir, STEM_ONE, TURN_ONE_AT);
+    await writeTranscript(sessionDir, STEM_TWO, TURN_TWO_AT);
+  });
+
+  afterAll(async () => {
+    await rm(repo, { recursive: true, force: true });
+    await rm(projectsDir, { recursive: true, force: true });
+  });
+
+  function makeAttribution(): InferredOriginAttribution {
+    return new InferredOriginAttribution({
+      worktreeRoot: repo,
+      recordedWorktreePath: repo,
+      claudeProjectsDir: projectsDir,
+      runWindowMs: 60 * 60 * 1000,
+      turnWindowMs: 15 * 60 * 1000,
+    });
+  }
+
+  it("attributes each file to its OWN session's thread_ id (two distinct ids)", async () => {
+    const a = makeAttribution();
+    const one = await a.originFor(CHANGE, "one.txt");
+    const two = await a.originFor(CHANGE, "two.txt");
+    if (one.kind !== "assisted") throw new Error("expected one.txt assisted");
+    if (two.kind !== "assisted") throw new Error("expected two.txt assisted");
+
+    expect(one.conversation.conversationId).toBe(deriveThreadId(STEM_ONE));
+    expect(two.conversation.conversationId).toBe(deriveThreadId(STEM_TWO));
+    // Two distinct sessions → two distinct thread ids (the #23 fix; OLD behaviour
+    // reported the first stem for BOTH).
+    expect(one.conversation.conversationId).not.toBe(
+      two.conversation.conversationId,
+    );
+  });
+
+  it("indexes turns 1-based WITHIN each transcript (not across the merged stream)", async () => {
+    const a = makeAttribution();
+    const one = await a.originFor(CHANGE, "one.txt");
+    const two = await a.originFor(CHANGE, "two.txt");
+    if (one.kind !== "assisted") throw new Error("expected one.txt assisted");
+    if (two.kind !== "assisted") throw new Error("expected two.txt assisted");
+
+    // Each transcript's single turn is turn 1 within ITS OWN transcript. OLD
+    // behaviour indexed across the merged stream → two.txt's turn was 2.
+    expect(one.conversation.turn).toBe(1);
+    expect(two.conversation.turn).toBe(1);
   });
 });
