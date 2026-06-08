@@ -1,3 +1,9 @@
+## v0.121.0 — 2026-06-08
+
+**Minor — release-train batch.**
+
+- Dark mode for the cockpit: a dark token set + a light/dark toggle that themes the whole app, with the Monaco code viewer following the active theme.
+
 ## v0.120.0 — 2026-06-08
 
 **Minor — release-train batch.**

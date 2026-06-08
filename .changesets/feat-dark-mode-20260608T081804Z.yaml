@@ -1,7 +1,0 @@
-change_id: 01KTHP4QQA79BPHNDNNBTS1EJP
-primitive: feat
-tier: minor
-touches_plugin: false
-summary: |
-  Dark mode for the cockpit: a dark token set + a light/dark toggle that themes the whole app, with the Monaco code viewer following the active theme.
-created_at: 2026-06-08T08:18:04Z
