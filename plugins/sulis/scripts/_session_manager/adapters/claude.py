@@ -39,6 +39,7 @@ from __future__ import annotations
 import json
 
 from _session_manager.adapter import Capabilities, SessionSpec
+from _session_manager.classifier import RecoveryClass
 from _session_manager.events import (
     DECODE_FAILED,
     Event,
@@ -46,6 +47,7 @@ from _session_manager.events import (
     InternalError,
     TurnResult,
 )
+from _session_manager.recovery import ReauthTicket
 
 # Placeholder log-coordinate values for the partial Event decode() returns.
 # The manager (WP-004) overwrites these when it appends the event; the adapter
@@ -138,6 +140,30 @@ class ClaudeAdapter:
         failed turn through the state machine (§2.7), not the normal
         completion path."""
         return event.kind == "result"
+
+    def classify_failure(self, error: EventError) -> RecoveryClass | None:
+        """Provider detection hint (WP-004 seam; defer-to-neutral for now).
+
+        WP-004 only proves the seam shape: this returns ``None`` so the shared
+        classifier applies its category-based default (ADR-003). Claude's
+        HTTP-status mapping (``"401"``/``"403"`` → login-expired, ``"429"`` →
+        transient-blip, ``"400"`` → dead-end) is WP-006 — it overrides this
+        method then, the only place Claude's ``api_error_status`` vocabulary is
+        interpreted. Until then the neutral default (``NOT_AUTHORIZED`` →
+        login-expired, etc.) is correct and safe."""
+        return None
+
+    def reauth(self) -> ReauthTicket:
+        """Begin Claude re-auth (WP-004 seam stub; ADR-003/004).
+
+        Wired into the conformance shape by WP-004; the real re-login-link
+        production is WP-006. Raising here keeps the stub honest — the driver
+        only calls ``reauth`` after ``classify_failure`` yields
+        ``LOGIN_EXPIRED``, which this adapter does not do until WP-006."""
+        raise NotImplementedError(
+            "Claude reauth() is implemented in WP-006; the WP-004 seam only "
+            "establishes the Protocol shape."
+        )
 
     # ── internal mapping helpers (one record shape each) ──────────────────
 

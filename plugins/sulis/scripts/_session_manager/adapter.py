@@ -35,7 +35,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Protocol, runtime_checkable
 
-from _session_manager.events import Event
+from _session_manager.classifier import RecoveryClass
+from _session_manager.events import Event, EventError
+from _session_manager.recovery import ReauthTicket
 
 
 @dataclass(frozen=True)
@@ -159,4 +161,35 @@ class ProviderAdapter(Protocol):
     def turn_complete(self, event: Event) -> bool:
         """This agent's 'turn done' signal — the manager uses it to release the
         one-in-flight slot (§2.6) and run the next queued send."""
+        ...
+
+    def classify_failure(self, error: EventError) -> RecoveryClass | None:
+        """Provider-specific *detection hint* (NEW, additive, defaulted — ADR-003).
+
+        Map THIS provider's raw failure to a neutral :class:`RecoveryClass`, or
+        return ``None`` to **defer to the neutral classifier** (the
+        category-based default in ``classifier.py``). The default implementation
+        below returns ``None``, so a brand-new adapter that does not override it
+        stays safe and honest — it simply opts out of provider-specific
+        detection and lets the shared arbiter decide (protocol→retry,
+        internal/expected→dead-end, ``NOT_AUTHORIZED``→login-expired).
+
+        This mirrors the ``io_mode`` / ``brief_change_id`` additive precedent:
+        new optional surface, every existing method signature byte-unchanged.
+        Only the provider that *can* read its own raw codes (e.g. the Claude
+        adapter's 401→login-expired, 429→blip mapping, WP-006) overrides it; the
+        raw vocabulary never leaks into the shared layer."""
+        return None
+
+    def reauth(self) -> ReauthTicket:
+        """Begin re-auth for this provider; return the WP-001 :class:`ReauthTicket`
+        (NEW, additive — ADR-003/004).
+
+        Called **only** when ``classify_failure`` yields
+        :attr:`RecoveryClass.LOGIN_EXPIRED`. The ticket carries the re-login link
+        the notification surfaces on the existing ``error`` Event stream and a
+        completion handle the driver waits on before resuming the paused run — no
+        new store, no new stream (ADR-004). A default adapter never reaches here
+        (it never returns ``LOGIN_EXPIRED``), so this has no neutral default; the
+        provider that detects login-expiry is the one that supplies it."""
         ...
