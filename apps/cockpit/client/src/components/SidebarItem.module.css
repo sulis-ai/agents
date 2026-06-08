@@ -17,8 +17,12 @@
   background: var(--muted);
 }
 
+/* Active item: a quiet lifted surface (--secondary) with the primary accent
+ * carried by the text colour + weight. --secondary re-themes for dark; the
+ * active state stays distinct from :hover (--muted) by colour + weight in both
+ * themes (in dark --secondary and --muted are distinct surfaces). WP-008. */
 .item[data-active="true"] {
-  background: #dbedff;
+  background: var(--secondary);
   color: var(--primary);
   font-weight: 600;
 }
