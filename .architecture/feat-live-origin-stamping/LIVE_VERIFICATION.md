@@ -1,9 +1,41 @@
 # LIVE round-trip verification — feat: live-origin-stamping (WP-006, Part B)
 
-> **Status:** runbook authored; **NOT yet observed.** The live likely→exact
-> flip can only be seen with a real `claude` child + a running cockpit on the
-> founder's machine — CI stubs the child, so this is deliberately out of CI
-> (the "green-but-broken" guard; TDD §4, ADR-013).
+> **Status:** **OBSERVED — likely→exact proven** (2026-06-08, driven by Sulis with Iain).
+> Driven with the REAL change code (no mocks): the actual `assistedOriginEnv` +
+> `LocalTranscriptConversationIdentity` (WP-003), the real `prepare-commit-msg`
+> hook + `_origin_stamp` (#216), and the real `RecordedOriginAttribution`
+> reader, against REAL git commits.
+>
+> **Observed evidence:**
+> - **Autonomous write:** a real `git commit` with `SULIS_ORIGIN` exported (via
+>   `autonomous_env`) produced the trailer
+>   `Sulis-Origin: autonomous; run=01KTAUTO9REALULID000000000; confidence=0.9`.
+> - **Assisted compute→write→read (the headline flip):** `assistedOriginEnv`
+>   emitted `assisted; conversation=thread_01997abc-…-000000000001; turn=1`; the
+>   hook stamped it on a real commit; `RecordedOriginAttribution.originFor`
+>   returned `{kind:"assisted", conversation:{conversationId:"thread_01997abc-…",
+>   turn:1}, attribution:"recorded"}` → **EXACT**.
+> - **Degradation (the differential):** an UNSTAMPED commit read back as
+>   `kind:"unknown"` (no recorded origin) → composite falls to **inferred
+>   (likely)**. So stamped → exact, unstamped → likely: the flip.
+> - **Cross-language grammar:** locked by the WP-006 conformance test (TS-emitted
+>   bodies round-trip through Python's `parse_origin_env`).
+>
+> **Boundary (honest):** driven at the real-module + real-git level, NOT through
+> the running cockpit HTTP server or a live `claude` child spawned by the relay
+> (the local cockpit instance was unresponsive; the HTTP route is a thin wrapper
+> over the exact adapters proven here, covered by routes.chat 14/14). The
+> end-to-end OUTCOME (compute→write→read→flip) is proven; the last segment
+> (HTTP + live spawn) remains component-tested, not OS-process-driven.
+>
+> **Defect found while driving (see task #4):** the trailer is appended WITHOUT a
+> blank-line separator for Conventional Commit subjects (`feat:`/`fix:` fool the
+> appender's heuristic), so it is NOT a formal git trailer —
+> `git log --format='%(trailers)'` shows nothing. The cockpit's regex reader
+> still works (hence the flip passes), but git-native tools (and this runbook's
+> own original `%(trailers)` verify command) miss it. Fix tracked separately.
+>
+> The original runbook (for the full HTTP/UI path on a healthy cockpit) follows.
 >
 > **How to use this file:** run each step's command, then fill the blank
 > **Observed** cell with what you actually saw (paste the real output / a
