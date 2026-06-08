@@ -1,0 +1,145 @@
+diff --git a/plugins/sulis/scripts/_session_manager/adapter.py b/plugins/sulis/scripts/_session_manager/adapter.py
+index 274a6a0e..c6f06466 100644
+--- a/plugins/sulis/scripts/_session_manager/adapter.py
++++ b/plugins/sulis/scripts/_session_manager/adapter.py
+@@ -35,7 +35,9 @@ from __future__ import annotations
+ from dataclasses import dataclass
+ from typing import Literal, Protocol, runtime_checkable
+ 
+-from _session_manager.events import Event
++from _session_manager.classifier import RecoveryClass
++from _session_manager.events import Event, EventError
++from _session_manager.recovery import ReauthTicket
+ 
+ 
+ @dataclass(frozen=True)
+@@ -160,3 +162,34 @@ class ProviderAdapter(Protocol):
+         """This agent's 'turn done' signal — the manager uses it to release the
+         one-in-flight slot (§2.6) and run the next queued send."""
+         ...
++
++    def classify_failure(self, error: EventError) -> RecoveryClass | None:
++        """Provider-specific *detection hint* (NEW, additive, defaulted — ADR-003).
++
++        Map THIS provider's raw failure to a neutral :class:`RecoveryClass`, or
++        return ``None`` to **defer to the neutral classifier** (the
++        category-based default in ``classifier.py``). The default implementation
++        below returns ``None``, so a brand-new adapter that does not override it
++        stays safe and honest — it simply opts out of provider-specific
++        detection and lets the shared arbiter decide (protocol→retry,
++        internal/expected→dead-end, ``NOT_AUTHORIZED``→login-expired).
++
++        This mirrors the ``io_mode`` / ``brief_change_id`` additive precedent:
++        new optional surface, every existing method signature byte-unchanged.
++        Only the provider that *can* read its own raw codes (e.g. the Claude
++        adapter's 401→login-expired, 429→blip mapping, WP-006) overrides it; the
++        raw vocabulary never leaks into the shared layer."""
++        return None
++
++    def reauth(self) -> ReauthTicket:
++        """Begin re-auth for this provider; return the WP-001 :class:`ReauthTicket`
++        (NEW, additive — ADR-003/004).
++
++        Called **only** when ``classify_failure`` yields
++        :attr:`RecoveryClass.LOGIN_EXPIRED`. The ticket carries the re-login link
++        the notification surfaces on the existing ``error`` Event stream and a
++        completion handle the driver waits on before resuming the paused run — no
++        new store, no new stream (ADR-004). A default adapter never reaches here
++        (it never returns ``LOGIN_EXPIRED``), so this has no neutral default; the
++        provider that detects login-expiry is the one that supplies it."""
++        ...
+diff --git a/plugins/sulis/scripts/_session_manager/adapters/claude.py b/plugins/sulis/scripts/_session_manager/adapters/claude.py
+index b3188240..b837ea5e 100644
+--- a/plugins/sulis/scripts/_session_manager/adapters/claude.py
++++ b/plugins/sulis/scripts/_session_manager/adapters/claude.py
+@@ -39,6 +39,7 @@ from __future__ import annotations
+ import json
+ 
+ from _session_manager.adapter import Capabilities, SessionSpec
++from _session_manager.classifier import RecoveryClass
+ from _session_manager.events import (
+     DECODE_FAILED,
+     Event,
+@@ -46,6 +47,7 @@ from _session_manager.events import (
+     InternalError,
+     TurnResult,
+ )
++from _session_manager.recovery import ReauthTicket
+ 
+ # Placeholder log-coordinate values for the partial Event decode() returns.
+ # The manager (WP-004) overwrites these when it appends the event; the adapter
+@@ -139,6 +141,30 @@ class ClaudeAdapter:
+         completion path."""
+         return event.kind == "result"
+ 
++    def classify_failure(self, error: EventError) -> RecoveryClass | None:
++        """Provider detection hint (WP-004 seam; defer-to-neutral for now).
++
++        WP-004 only proves the seam shape: this returns ``None`` so the shared
++        classifier applies its category-based default (ADR-003). Claude's
++        HTTP-status mapping (``"401"``/``"403"`` → login-expired, ``"429"`` →
++        transient-blip, ``"400"`` → dead-end) is WP-006 — it overrides this
++        method then, the only place Claude's ``api_error_status`` vocabulary is
++        interpreted. Until then the neutral default (``NOT_AUTHORIZED`` →
++        login-expired, etc.) is correct and safe."""
++        return None
++
++    def reauth(self) -> ReauthTicket:
++        """Begin Claude re-auth (WP-004 seam stub; ADR-003/004).
++
++        Wired into the conformance shape by WP-004; the real re-login-link
++        production is WP-006. Raising here keeps the stub honest — the driver
++        only calls ``reauth`` after ``classify_failure`` yields
++        ``LOGIN_EXPIRED``, which this adapter does not do until WP-006."""
++        raise NotImplementedError(
++            "Claude reauth() is implemented in WP-006; the WP-004 seam only "
++            "establishes the Protocol shape."
++        )
++
+     # ── internal mapping helpers (one record shape each) ──────────────────
+ 
+     def _decode_stream_event(self, record: dict) -> Event | None:
+diff --git a/plugins/sulis/scripts/_session_manager/adapters/claude_pty.py b/plugins/sulis/scripts/_session_manager/adapters/claude_pty.py
+index b830d50a..a825c432 100644
+--- a/plugins/sulis/scripts/_session_manager/adapters/claude_pty.py
++++ b/plugins/sulis/scripts/_session_manager/adapters/claude_pty.py
+@@ -66,7 +66,9 @@ from pathlib import Path
+ 
+ import _terminal_launcher
+ from _session_manager.adapter import Capabilities, SessionSpec
+-from _session_manager.events import Event
++from _session_manager.classifier import RecoveryClass
++from _session_manager.events import Event, EventError
++from _session_manager.recovery import ReauthTicket
+ from _wpxlib import validate_change_ulid
+ 
+ # The interactive argv (§2.4 / ADR-004). cwd is NOT here — the CLI is launched
+@@ -155,6 +157,28 @@ class InteractiveClaudePtyAdapter:
+         signal, so the one-in-flight slot model (§2.6) does not apply."""
+         return False
+ 
++    def classify_failure(self, error: EventError) -> RecoveryClass | None:
++        """Provider detection hint (WP-004 seam; defer-to-neutral).
++
++        Returns ``None`` so the shared classifier applies its category-based
++        default (ADR-003). The interactive pty path surfaces failures as raw
++        terminal output rather than a structured ``error`` Event stream, so any
++        provider-specific detection it gains is WP-006's concern; until then the
++        neutral default is correct."""
++        return None
++
++    def reauth(self) -> ReauthTicket:
++        """Begin re-auth (WP-004 seam stub; ADR-003/004).
++
++        Wired into the conformance shape by WP-004; the real re-login flow for
++        the interactive pty path is WP-006. Raising keeps the stub honest — the
++        driver only calls ``reauth`` after ``classify_failure`` yields
++        ``LOGIN_EXPIRED``, which this adapter does not do until WP-006."""
++        raise NotImplementedError(
++            "Interactive-pty reauth() is implemented in WP-006; the WP-004 seam "
++            "only establishes the Protocol shape."
++        )
++
+     # ── internal: pre-prompt sidecar resolution ───────────────────────────
+ 
+     def _read_pre_prompt(self, spec: SessionSpec) -> str | None:
