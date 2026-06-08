@@ -46,9 +46,9 @@
 }
 
 .errorBox {
-  border: 1px solid #fdb8c0;
-  background: #ffeef0;
-  color: #86181d;
+  border: 1px solid var(--destructive);
+  background: var(--destructive);
+  color: var(--destructive-foreground);
   padding: 16px;
   border-radius: 6px;
 }
@@ -62,5 +62,5 @@
 .errorMessage {
   font-size: 13px;
   margin: 0 0 12px;
-  color: #2f1419;
+  color: var(--destructive-foreground);
 }
