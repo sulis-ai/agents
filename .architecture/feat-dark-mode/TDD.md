@@ -161,6 +161,21 @@ semantic hues **brightened** so fills/text clear WCAG AA on dark surfaces.
   --ring: #5b9bff;                /* focus ring matches primary */
   --brand-gold: #d8bd7e;          /* gold reads warmer/brighter on dark */
   --brand-depth: #6f9cc9;         /* depth-blue lifted so it's visible on dark */
+
+  /* Stage-badge tints — all SIX workflow stages (recon/specify/design/
+     implement/review/ship). Genuinely-new semantic tokens added per §2
+     remediation route (b): each pair exists in BOTH the light :root and this
+     dark block. Suffix convention: -bg / -fg / -border (full word "border",
+     matching --border / --card-foreground; the earlier -bd shorthand is
+     retired — see §6 note). Each dark fg-on-bg clears WCAG AA; the six hues
+     are mutually distinguishable. Light values = verbatim source literals
+     from StageBadge.module.css (pixel-unchanged in light). */
+  --stage-recon-bg:#16263a;     --stage-recon-fg:#7fb0ff;     --stage-recon-border:#234a73;
+  --stage-specify-bg:#332b10;   --stage-specify-fg:#f0c75a;   --stage-specify-border:#5c4d1e;
+  --stage-design-bg:#241c3a;    --stage-design-fg:#b79cff;    --stage-design-border:#3d2f63;
+  --stage-implement-bg:#1a3014; --stage-implement-fg:#9bd86a; --stage-implement-border:#345526;
+  --stage-review-bg:#3a2310;    --stage-review-fg:#f2a368;    --stage-review-border:#63401f;
+  --stage-ship-bg:#13301d;      --stage-ship-fg:#73d391;      --stage-ship-border:#245636;
 }
 ```
 
@@ -184,6 +199,26 @@ semantic hues **brightened** so fills/text clear WCAG AA on dark surfaces.
 | `--primary-foreground` on `--primary` fill | 7.9:1 | 4.5 | ✅ |
 | `--destructive` text on `--background` | 5.9:1 | 4.5 | ✅ |
 | `--border` on `--background` | 3.1:1 | 3.0 | ✅ |
+| `--stage-recon-fg` on `--stage-recon-bg` (dark) | 7.0:1 | 4.5 | ✅ |
+| `--stage-specify-fg` on `--stage-specify-bg` (dark) | 8.7:1 | 4.5 | ✅ |
+| `--stage-design-fg` on `--stage-design-bg` (dark) | 7.1:1 | 4.5 | ✅ |
+| `--stage-implement-fg` on `--stage-implement-bg` (dark) | 8.4:1 | 4.5 | ✅ |
+| `--stage-review-fg` on `--stage-review-bg` (dark) | 7.2:1 | 4.5 | ✅ |
+| `--stage-ship-fg` on `--stage-ship-bg` (dark) | 7.8:1 | 4.5 | ✅ |
+
+> **Stage-badge border note:** the same-hue badge borders (`--stage-*-border`)
+> are quiet outlines sitting behind a fg-distinguished pill, not load-bearing
+> UI dividers; they match the treatment of the original signed-off trio
+> (recon/design/ship), whose borders sit at the same ~1.4–1.7:1 level. The
+> badge's meaning is carried by its bg+fg pair (both AA), so the border is
+> decorative and intentionally below the 3:1 UI-component bar. Kept coherent
+> with the existing signed-off set rather than diverging for these three.
+>
+> **Suffix convention (reconciled):** stage-badge tokens use `-bg` / `-fg` /
+> `-border`. The earlier `-bd` shorthand seen in an early mockup draft is
+> retired in favour of the full word `-border`, matching the codebase's
+> `--border` / `--card-foreground` style. The mockup, this §6, and the WP-006
+> contract all use `-border`.
 
 <!-- VERIFICATION_QUESTIONS source: plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md v1.0.0 -->
 

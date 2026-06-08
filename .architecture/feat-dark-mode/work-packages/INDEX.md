@@ -48,9 +48,9 @@ three can start now, in parallel:
 | WP-001 | Dark-theme visual contract (sign-off gate) | frontend | REINFORCE-Document | reinforce | — | ~5k | done |
 | WP-002 | Dark token block in `tokens.css` | frontend | EXPAND-Extend | expand | WP-001 | ~5k | done |
 | WP-003 | Theme context layer (provider, hook, resolver, root wiring) | frontend | EXPAND-Create | expand | WP-001 | ~10k | done |
-| WP-004 | ThemeToggle in the Shell top bar | frontend | EXPAND-Create | expand | WP-001, WP-003 | ~8k | pending |
-| WP-005 | Monaco binding via `monacoThemeFor()` | frontend | SUBSTITUTE-Replace | substitute | WP-001, WP-002, WP-003 | ~7k | pending |
-| WP-006 | Tokenise the dashboard change-card surface | frontend | REORGANISE-Refactor | reorganise | WP-001, WP-002 | ~9k | pending |
+| WP-004 | ThemeToggle in the Shell top bar | frontend | EXPAND-Create | expand | WP-001, WP-003 | ~8k | done |
+| WP-005 | Monaco binding via `monacoThemeFor()` | frontend | SUBSTITUTE-Replace | substitute | WP-001, WP-002, WP-003 | ~7k | done |
+| WP-006 | Tokenise the dashboard change-card surface | frontend | REORGANISE-Refactor | reorganise | WP-001, WP-002 | ~9k | blocked |
 | WP-007 | Tokenise the conversation-view panels | frontend | REORGANISE-Refactor | reorganise | WP-001, WP-002 | ~9k | pending |
 | WP-008 | Tokenise the navigation-chrome stragglers | frontend | REORGANISE-Refactor | reorganise | WP-001, WP-002 | ~7k | pending |
 

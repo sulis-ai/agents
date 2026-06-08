@@ -67,3 +67,13 @@ The implementation work this contract gates, to be decomposed next:
    stage-badge token pairings; this WP-set tokenises the rest.
 
 Each of the above ships its own Vitest spec (all concrete; none deferred).
+
+## Amendment — stage-badge extension sign-off (2026-06-08)
+
+A scope-guard during WP-006 found the original mockup defined dark stage-badge
+colours for only 3 of 6 workflow stages. The architect extended the mockup
+with WCAG-AA light+dark pairings for the 3 missing stages (specify=amber,
+implement=lime, review=orange) and reconciled the token suffix to `-border`.
+**Founder signed off all six badge colours on 2026-06-08** (rendered dark +
+light). TDD §6 and the WP-006 contract were reconciled to match. WP-006 is
+cleared to resume.
