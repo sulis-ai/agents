@@ -71,6 +71,50 @@
         "active",
         "deprecated"
       ]
+    },
+    "isolation": {
+      "enum": [
+        "reset",
+        "process",
+        "env"
+      ],
+      "description": "cheapest-sufficient state-isolation rung for a run; default reset (reset fixture/state in the existing worktree). NOT a new workspace per run."
+    },
+    "verdict_invariant": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "how the runner checks the saved record → observed|blocked (distinct from the run's aggregate disposition). The field #95's gate reads.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "equality",
+            "property"
+          ]
+        },
+        "expected_ref": {
+          "type": "string"
+        },
+        "poll": {
+          "type": "object",
+          "unevaluatedProperties": false,
+          "properties": {
+            "attempts": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "interval_ms": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "attempts"
+          ]
+        }
+      },
+      "required": [
+        "kind"
+      ]
     }
   },
   "x-schema-org-extends": "schema:HowTo"
