@@ -70,8 +70,10 @@ the shared recovery data contract — ``classifier.py`` (``RecoveryClass``, the
 provider-neutral verdict vocabulary ``TRANSIENT_BLIP`` / ``DEAD_END`` /
 ``LOGIN_EXPIRED``, ADR-003) and ``recovery.py`` (``RetryPolicy`` frozen
 dataclass + the ``DEFAULT_RETRY_POLICY`` 12-min full-jitter fallback constant,
-ADR-002; ``next_delay_ceiling``, the jitter-free backoff-ceiling core the
-policy's full ``next_delay`` samples within; and ``ReauthTicket``, the
+ADR-002; ``next_delay_ceiling``, the jitter-free backoff-ceiling core, and
+``next_delay`` (WP-003), the full-jitter curve — ``random_between(0, ceiling)``
+with an injectable RNG, ``None`` on budget exhaustion — the driver schedules
+on; and ``ReauthTicket``, the
 re-login-link + completion-handle value object ``adapter.reauth()`` returns,
 ADR-003/004). These are pure, frozen value objects — the producer/consumer
 seam the classifier (WP-002), the policy (WP-003), and the recovery driver
@@ -151,6 +153,7 @@ from _session_manager.recovery import (
     DEFAULT_RETRY_POLICY,
     ReauthTicket,
     RetryPolicy,
+    next_delay,
     next_delay_ceiling,
 )
 from _session_manager.session import Session
@@ -210,6 +213,7 @@ __all__ = [
     "RetryPolicy",
     "DEFAULT_RETRY_POLICY",
     "next_delay_ceiling",
+    "next_delay",
     "ReauthTicket",
     # error model (§2.9)
     "SessionError",

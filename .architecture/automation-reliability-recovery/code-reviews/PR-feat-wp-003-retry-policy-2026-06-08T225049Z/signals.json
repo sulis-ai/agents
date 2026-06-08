@@ -1,0 +1,24 @@
+{
+  "pr": "feat/wp-003-retry-policy",
+  "base": "change/feat-automation-reliability-recovery",
+  "kind": "backend",
+  "build_verification": {
+    "ruff_check_delta_errors": 0,
+    "ruff_format_clean": true,
+    "type_checker": "none configured (coverage gap)",
+    "test_suite": "40 session_manager tests pass; 7 WP-003 + 10 contract no-regression green"
+  },
+  "hygiene": {
+    "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "clean"},
+    "size": {"lines_added": 215, "lines_removed": 2, "files_changed": 3, "severity": "clean"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "clean"},
+    "completeness": {"new_source_without_test": 0, "new_tests": 1, "api_change_without_schema": false, "severity": "clean"}
+  },
+  "lenses": {
+    "architecture": {"in_changes": 0, "in_neighbours": 0},
+    "security": {"in_changes": 0, "in_neighbours": 0},
+    "quality": {"in_changes": 0, "in_neighbours": 0}
+  },
+  "draft_deltas": 0,
+  "verdict": "PASS"
+}

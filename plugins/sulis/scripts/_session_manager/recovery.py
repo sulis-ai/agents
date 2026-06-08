@@ -17,6 +17,16 @@ WP-001 contributes the **shapes** the recovery driver (WP-005) and the policy
   ceiling (``random_between(0, ceiling)``); pinning the ceiling here is the
   single source of truth the contract's stub table asserts against, so the
   policy and the driver agree on the curve without re-spelling it.
+
+WP-003 adds:
+
+- :func:`next_delay` — the full backoff curve the driver schedules on: full
+  jitter (the AWS convention, CP-01) sampled *within* the
+  :func:`next_delay_ceiling` band — ``random_between(0, ceiling)`` — or
+  ``None`` on budget exhaustion (reusing the ceiling's exhaustion signal, so
+  the two never disagree). The RNG is injectable (default ``random.random``)
+  so it is testable with a seeded source and no real ``time.sleep``; the
+  clock is the driver's concern (``elapsed_seconds`` is passed in, WP-005).
 - :class:`ReauthTicket` — the value object ``adapter.reauth()`` returns: the
   re-login link the notification surfaces + a completion handle the driver
   waits on (ADR-003/004).
@@ -27,6 +37,8 @@ code from ``events.py``; this module declares no code constants.
 
 from __future__ import annotations
 
+import random
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
 
@@ -94,6 +106,38 @@ def next_delay_ceiling(
         return None
     uncapped = policy.base_delay_seconds * (policy.multiplier**attempt)
     return min(policy.max_delay_seconds, uncapped)
+
+
+def next_delay(
+    attempt: int,
+    elapsed_seconds: float,
+    policy: RetryPolicy,
+    rng: Callable[[], float] = random.random,
+) -> float | None:
+    """The full-jitter backoff delay before the next attempt (ADR-002), or
+    ``None`` on budget exhaustion.
+
+    Full jitter (the AWS convention, CP-01): the delay is sampled uniformly in
+    ``[0, ceiling]`` where ``ceiling`` is the jitter-free per-attempt ceiling
+    :func:`next_delay_ceiling` pins — ``random_between(0, min(max_delay,
+    base * multiplier**attempt))``. Sampling the whole band (rather than always
+    sleeping the ceiling) prevents thundering-herd on a shared provider outage.
+
+    Returns ``None`` when the budget is exhausted — i.e. exactly when
+    :func:`next_delay_ceiling` returns ``None`` (``elapsed_seconds`` has reached
+    ``policy.total_budget_seconds``). Reusing the ceiling's exhaustion signal
+    keeps the policy and the ceiling from ever disagreeing; ``None`` is the
+    driver's signal to reclassify ``TRANSIENT_BLIP`` → ``DEAD_END`` and abandon.
+
+    Pure: the RNG is injected (``rng`` defaults to :func:`random.random`, a
+    ``() -> float`` in ``[0, 1)``) so the curve is testable with a seeded source
+    and **no real** ``time.sleep`` — the clock is the driver's concern; this
+    function only consumes the ``elapsed_seconds`` it is handed (WP-005).
+    """
+    ceiling = next_delay_ceiling(attempt, elapsed_seconds, policy)
+    if ceiling is None:
+        return None
+    return rng() * ceiling
 
 
 @dataclass(frozen=True)
