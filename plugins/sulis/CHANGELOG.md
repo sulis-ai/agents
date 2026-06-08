@@ -1,3 +1,9 @@
+## v0.122.1 — 2026-06-08
+
+**Patch — release-train batch.**
+
+- Fix the change-owned terminal briefing every session as the wrong change: the interactive-pty adapter resolved which change to brief from the ambient SULIS_CHANGE_ID, which is constant across the shared daemon, so opening change X gave a session briefed for whatever change the daemon was started with. The change identity now travels with the session spec (brief_change_id) and the os.environ read is deleted; consumers pass the change they opened.
+
 ## v0.122.0 — 2026-06-08
 
 **Minor — release-train batch.**
