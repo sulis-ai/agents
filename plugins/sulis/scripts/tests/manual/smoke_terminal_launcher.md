@@ -3,33 +3,29 @@
 > Launcher mechanism (WP-001..WP-003 + WP-006). Not run in CI (CI has no
 > desktop). Run by hand on macOS and Linux.
 
-> **DEPRECATED FALLBACK (WP-009 Strangle).** The OS-window launch this smoke
-> exercises is now a *deprecated fallback*. "Open this change's terminal"
-> defaults to the in-cockpit live terminal (the cockpit's Terminal tab); the
-> OS-window path is opt-in behind `SULIS_TERMINAL_OS_WINDOW=1` (default off)
-> and is tracked for removal (see the `removal_plan` in
-> `WP-009-change-terminal-launcher-repoint.md`, target 2026-07-31). To run this
-> smoke you MUST export the flag first; without it a visible launch returns
-> `{"status": "failed", "error": "the OS-window terminal launch is deprecated
-> (WP-009); … set SULIS_TERMINAL_OS_WINDOW=1."}` and no window opens.
+> **Default-on (CH-01KTK7).** A visible launch opens the change's terminal by
+> default — no environment flag is required. This is the sanctioned
+> change-start launcher (`sulis-change start --spawn`). The
+> `SULIS_TERMINAL_OS_WINDOW` flag remains only as an explicit override knob; it
+> does NOT gate the default-on behaviour. The in-cockpit live terminal (the
+> cockpit's Terminal tab) is a separate, browser-rendered capability — not a
+> replacement for popping a focused terminal here.
 
 ## Goal
 
-Confirm the OS-window fallback (`launch_change_terminal(..., visible=True)`
-with `SULIS_TERMINAL_OS_WINDOW=1`) still opens a NEW terminal window, cd's to
-the worktree, exports `SULIS_CHANGE_ID`, and runs the entry command.
+Confirm a visible launch (`launch_change_terminal(..., visible=True)`) opens a
+NEW terminal window by default, cd's to the worktree, exports
+`SULIS_CHANGE_ID`, and runs the entry command.
 
 ## Pre-conditions
 
 - A real directory to use as the worktree (any existing dir works for the
   smoke; use a change worktree for realism).
 - A valid 26-char Crockford-base32 ULID (any change's `change_id`).
-- `SULIS_TERMINAL_OS_WINDOW=1` exported (the OS-window fallback opt-in, WP-009).
 
 ## Procedure (macOS)
 
 ```bash
-export SULIS_TERMINAL_OS_WINDOW=1   # WP-009: opt into the deprecated OS-window fallback
 python3 - <<'PY'
 import sys
 sys.path.insert(0, "plugins/sulis/scripts")
@@ -50,8 +46,9 @@ PY
   an int `pid`, and a `session_json_path`.
 - `cat ~/.sulis/changes/01HYQC71000000000000000000/launch.sh` shows the
   env-scrub line, the `export SULIS_CHANGE_ID=...` line, the `cd "/tmp"`
-  line, and the `exec claude --agent sulis "$(cat <<'SULIS_PROMPT_EOF' ...`
-  heredoc.
+  line, and an `exec ... "$(cat <sidecar>)"` line that reads the pre_prompt
+  from the `pre_prompt.txt` sidecar (#86 — the brief is delivered via a file,
+  never inline in the script).
 - In the new window: `echo $SULIS_CHANGE_ID` prints the ULID.
 
 ## Procedure (Linux)
@@ -63,9 +60,9 @@ Same script. Expected `terminal_app_used` is the first available of
 
 ## Fail signals
 
-- `status="failed"` with `deprecated (WP-009)` → you forgot to
-  `export SULIS_TERMINAL_OS_WINDOW=1`; the OS-window path is opt-in (the
-  cockpit live terminal is the default).
 - `status="failed"` with `unsupported platform` → not macOS/Linux.
-- The heredoc body shows `$HOME` expanded to a path → the tag was not
-  single-quoted (regression against ADR-003).
+- `status="failed"` with `no supported terminal app found` (Linux) → install
+  `gnome-terminal` / `konsole` / `xterm`, or pass `visible=False` for headless.
+- The pre_prompt body appears inline in `launch.sh` with `$HOME` expanded →
+  the brief was embedded instead of read from the sidecar (regression against
+  the #86 sidecar-delivery fix).
