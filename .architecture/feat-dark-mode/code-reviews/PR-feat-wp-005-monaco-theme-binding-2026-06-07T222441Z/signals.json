@@ -1,0 +1,34 @@
+{
+  "review": {
+    "target": "feat/wp-005-monaco-theme-binding",
+    "base": "change/feat-dark-mode",
+    "project": "feat-dark-mode",
+    "timestamp": "2026-06-07T222441Z",
+    "verdict": "PASS",
+    "outcome_plain": "Ready to merge"
+  },
+  "build_verification": {
+    "typecheck_exit": 0,
+    "lint_exit": 0,
+    "pr_introduced_errors": 0
+  },
+  "findings": {
+    "in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+    "in_neighbours": { "total": 0 },
+    "draft_deltas": 0
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "ran": true },
+    "security": { "findings": 0, "ran": true },
+    "quality": { "findings": 0, "ran": true }
+  },
+  "pr_hygiene": {
+    "scope": { "severity": "none", "commit_types": ["feat"], "module_fan_out": 1 },
+    "size": { "severity": "none", "lines_added": 243, "lines_removed": 35, "files_changed": 8 },
+    "safety": { "severity": "none", "migrations": 0, "schemas": 0, "secrets": 0, "infra": 0 },
+    "completeness": { "severity": "none", "new_source_without_test": 0 }
+  },
+  "auto_downgrade_triggers_fired": [],
+  "cr10_performance": { "matches": 0 },
+  "jsx_identifier_scan": { "introduced": ["client", "toggle", "null"], "unresolved": 0 }
+}

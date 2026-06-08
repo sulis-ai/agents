@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sulis chat redesign — Direction B · Turn Cards (balanced)</title>
+<!--
+  ============================================================================
+  REVIEW MOCKUP (not the signed contract) · Sulis cockpit chat surface
+  DIRECTION B — "Turn Cards" (balanced · the recommendation)
+  ----------------------------------------------------------------------------
+  Each agent turn = ONE card: a bold plain-English summary headline, a collapsed
+  "3 steps ›" disclosure, and real outcomes (a "checkpoint made · revert" card)
+  inline. You scroll summaries, not raw steps. A slim STICKY stage/status bar
+  pinned at the top of the conversation column. Composer floats inset with a
+  "working · pause · stop" status chip just above it. Steps collapsed by default.
+
+  Bound strictly to the SIGNED design instance (sulis-app.html / tokens.css):
+  every colour is a var(--*); nothing new in palette or type. LAYOUT/INTERACTION
+  exploration only (UXD-15). Fonts loaded as the signed contract does.
+  ============================================================================
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet">
+<style>
+/* ===== TOKENS — verbatim from apps/cockpit/client/src/tokens.css :root (light) ===== */
+:root{
+  --background:#fafafa; --foreground:#171717;
+  --card:#ffffff; --card-foreground:#171717;
+  --popover:#ffffff; --popover-foreground:#171717;
+  --muted:#f5f5f5; --muted-foreground:#737373;
+  --secondary:#f5f5f5; --secondary-foreground:#171717;
+  --border:#e5e5e5; --border-muted:#f0f0f0; --input:#e5e5e5;
+  --primary:#2563EB; --primary-foreground:#FFFFFF;
+  --accent:#2D7D90; --accent-foreground:#FFFFFF;
+  --destructive:#DC2626; --destructive-foreground:#FFFFFF;
+  --positive:#16A34A; --positive-foreground:#FFFFFF;
+  --warning:#F59E0B; --warning-foreground:#121212;
+  --ring:#2563EB; --brand-gold:#C9A962; --brand-depth:#1E3A5F;
+  --bg-positive:#F0FDF4; --bg-positive-border:#BBF7D0;
+  --bg-destructive:#FEF2F2; --bg-destructive-border:#FECACA;
+  --bg-warning:#FFFBEB; --bg-warning-border:#FDE68A;
+  --stage-recon:#8B7355; --stage-specify:#6366F1; --stage-design:#2D7D90;
+  --stage-implement:#2563EB; --stage-review:#9333EA; --stage-ship:#15803D;
+  --radius-interactive:4px; --radius-button:9999px; --radius-container:4px;
+  --radius-badge:9999px; --radius-media:4px;
+  --font-sans:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-display:'Satoshi',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono','SF Mono','Monaco','Inconsolata','Fira Mono',monospace;
+  --weight-body:400; --weight-heading:300; --weight-label:500;
+  --bg-card:var(--card); --bg-muted:var(--muted); --border-light:var(--border-muted);
+  --font:var(--font-sans); --radius:var(--radius-container);
+  --text:var(--foreground); --text-secondary:#525252; --text-muted:var(--muted-foreground);
+  --attn-icon:#B45309;
+  --shadow-float:0 6px 20px rgba(23,23,23,.08), 0 1px 3px rgba(23,23,23,.06);
+}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#EDEAE3;color:var(--text);font-family:var(--font-sans);font-weight:var(--weight-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+:focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:var(--radius)}
+button{appearance:none;-webkit-appearance:none;background:none;border:0;margin:0;padding:0;font:inherit;color:inherit;line-height:inherit;text-align:inherit}
+button,[role="button"],[tabindex],a{cursor:pointer}
+
+.docnote{max-width:1440px;margin:0 auto;padding:18px 28px 6px;color:var(--text-secondary);font-size:12.5px}
+.docnote b{color:var(--text);font-weight:600}
+
+.frame{width:1440px;height:900px;margin:8px auto 28px;background:var(--background);border-radius:10px;overflow:hidden;border:1px solid var(--border);box-shadow:0 1px 3px rgba(23,23,23,.07);display:grid;grid-template-columns:240px 1fr}
+
+/* sidebar (shared) */
+.sidebar{background:var(--card);border-right:1px solid var(--border);padding:18px 12px;overflow:auto;display:flex;flex-direction:column}
+.brandrow{display:flex;align-items:center;gap:11px;padding:4px 8px 18px}
+.brandrow .mark{width:26px;height:26px;flex:none;border-radius:50%;background:conic-gradient(from 200deg,#C9A962,#1E3A5F,#2D7D90,#C9A962)}
+.brandname{font-family:var(--font-display);font-weight:700;font-size:18px;letter-spacing:-.01em;color:var(--text)}
+.sidebar h4{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin:16px 8px 8px;font-weight:600}
+.navitem{display:flex;align-items:center;gap:9px;padding:9px 8px;border-radius:var(--radius);color:var(--text-secondary);font-size:13px;border:1px solid transparent;text-decoration:none}
+.navitem:hover{background:var(--bg-muted);color:var(--text)}
+.navitem.active{background:var(--bg-muted);color:var(--text);font-weight:var(--weight-label)}
+.navitem .ic{width:15px;height:15px;flex:none;color:var(--text-muted)}
+.navitem.active .ic{color:var(--accent)}
+.sidefoot{margin-top:auto;padding:12px 8px 2px;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:7px}
+.sidefoot .g{width:8px;height:8px;border-radius:50%;background:var(--positive);flex:none;box-shadow:0 0 0 2px var(--bg-positive)}
+
+.work{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.head{flex:0 0 auto;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:16px 24px 12px;border-bottom:1px solid var(--border);background:var(--card)}
+.head .kicker{font-family:var(--font-mono);font-size:11.5px;color:var(--text-muted)}
+.head h1{font-size:19px;font-weight:600;line-height:1.25;color:var(--text);margin-top:3px;letter-spacing:-.01em}
+.headmeta{flex:none;display:flex;align-items:center;gap:8px}
+.stagebadge{padding:3px 9px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;border-radius:var(--radius);background:color-mix(in srgb,var(--accent) 8%,#fff);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 28%,var(--border))}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary);font-weight:var(--weight-label)}
+.live .g{width:9px;height:9px;border-radius:50%;background:var(--positive);box-shadow:0 0 0 2px var(--bg-positive)}
+
+.spine{flex:0 0 auto;padding:14px 24px 10px;border-bottom:1px solid var(--border-muted);background:var(--card)}
+.track{list-style:none;display:flex;align-items:flex-start}
+.step{flex:1;text-align:center;position:relative;padding-top:22px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:var(--weight-label)}
+.step .dot{position:absolute;top:3px;left:50%;width:10px;height:10px;border-radius:50%;background:var(--input);transform:translateX(-50%);z-index:2;border:2px solid var(--card)}
+.step::after{content:"";position:absolute;top:8px;left:50%;width:100%;height:1px;background:var(--border);z-index:1}
+.step:last-child::after{display:none}
+.step[data-state="done"]{color:var(--text-secondary)}
+.step[data-state="done"] .dot{background:var(--text-secondary)}
+.step[data-state="now"]{color:var(--accent);font-weight:700}
+.step[data-state="now"] .dot{background:var(--accent);width:13px;height:13px;top:2px;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,#fff)}
+.step .sw{display:block;font-size:8px;margin-top:3px;font-weight:600}
+.step[data-state="now"] .sw{color:var(--accent)}
+.step[data-state="done"] .sw{color:var(--text-muted)}
+.step[data-state="pending"] .sw{color:var(--text-muted)}
+
+.body{flex:1 1 auto;min-height:0;display:flex}
+.convocol{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;position:relative;min-height:0}
+
+/* SLIM STICKY stage/status bar pinned to top of the conversation column */
+.stickybar{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:9px 24px;background:color-mix(in srgb,var(--accent) 5%,#fff);border-bottom:1px solid color-mix(in srgb,var(--accent) 18%,var(--border));font-size:12px;color:var(--text)}
+.stickybar .sd{width:9px;height:9px;border-radius:50%;background:var(--accent);flex:none;position:relative}
+.stickybar .sd::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1px solid var(--accent);opacity:.4;animation:ping 1.6s ease-out infinite}
+@keyframes ping{0%{transform:scale(.6);opacity:.6}100%{transform:scale(1.5);opacity:0}}
+.stickybar b{font-weight:600;color:var(--accent)}
+.stickybar .sep{color:var(--text-muted)}
+.stickybar .msg{color:var(--text-secondary)}
+.stickybar .when{margin-left:auto;color:var(--text-muted);font-size:11px}
+
+.scroll{flex:1 1 auto;min-height:0;overflow-y:auto;padding:18px 24px 8px;scrollbar-width:thin}
+.day{display:flex;align-items:center;gap:12px;margin:0 0 14px;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.day::before,.day::after{content:"";height:1px;background:var(--border-muted);flex:1}
+
+/* user message — neutral bubble */
+.msg.user{margin:0 0 16px auto;max-width:80%}
+.who{font-size:10px;color:var(--text-muted);margin:0 2px 5px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.msg.user .who{text-align:right}
+.msg.user .say{background:var(--muted);border:1px solid var(--border);border-radius:10px 10px 3px 10px;padding:11px 14px;font-size:13.5px;line-height:1.55;color:var(--text)}
+.msg.user .time{font-size:11px;color:var(--text-muted);margin:5px 2px 0;text-align:right}
+
+/* TURN CARD — one card per agent turn */
+.turn{border:1px solid var(--border);border-radius:10px;background:var(--card);margin:0 0 16px;overflow:hidden;box-shadow:0 1px 2px rgba(23,23,23,.04)}
+.turn .thead{display:flex;align-items:flex-start;gap:11px;padding:14px 16px 12px}
+.turn .av{width:24px;height:24px;border-radius:50%;flex:none;background:conic-gradient(from 200deg,#C9A962,#1E3A5F,#2D7D90,#C9A962);margin-top:1px}
+.turn .hl{flex:1;min-width:0}
+.turn .hl .summary{font-size:15px;font-weight:600;line-height:1.4;color:var(--text);letter-spacing:-.005em}
+.turn .hl .said{font-size:13.5px;color:var(--text-secondary);line-height:1.6;margin-top:6px}
+.turn .hl .time{font-size:11px;color:var(--text-muted);margin-top:8px}
+
+/* collapsed "N steps ›" disclosure */
+.steps-toggle{display:inline-flex;align-items:center;gap:8px;margin:0 16px 12px;padding:7px 11px;border:1px solid var(--border);border-radius:var(--radius-button);background:var(--bg-muted);font-size:12px;font-weight:var(--weight-label);color:var(--text-secondary)}
+.steps-toggle:hover{background:var(--card);border-color:var(--input);color:var(--text)}
+.steps-toggle .n{font-weight:700;color:var(--text)}
+.steps-toggle .chev{font-size:10px;color:var(--text-muted)}
+.steps-toggle .ok{display:inline-flex;align-items:center;gap:4px;color:var(--text-secondary)}
+.steps-toggle .ok .d{width:7px;height:7px;border-radius:50%;background:var(--positive)}
+
+/* expanded steps (one card shown expanded so the founder sees the disclosure) */
+.steps{margin:0 16px 12px;border:1px solid var(--border-muted);border-radius:var(--radius);background:var(--bg-muted)}
+.steps .srow{display:flex;align-items:center;gap:9px;padding:8px 12px;font-size:12px;color:var(--text-secondary);border-bottom:1px solid var(--border-muted)}
+.steps .srow:last-child{border-bottom:0}
+.steps .srow .si{width:14px;height:14px;flex:none;color:var(--text-muted)}
+.steps .srow .obj{font-family:var(--font-mono);font-size:11px;color:var(--text);background:var(--card);border:1px solid var(--border-muted);border-radius:3px;padding:0 5px}
+.steps .srow .ok{margin-left:auto;display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--text-secondary)}
+.steps .srow .ok .d{width:7px;height:7px;border-radius:50%;background:var(--positive)}
+
+/* outcome — checkpoint card inline inside the turn */
+.turn .outcome{margin:0 16px 14px;display:flex;align-items:center;gap:11px;border:1px solid color-mix(in srgb,var(--accent) 20%,var(--border));border-radius:var(--radius);background:color-mix(in srgb,var(--accent) 5%,#fff);padding:11px 13px}
+.turn .outcome .ck{width:24px;height:24px;border-radius:50%;flex:none;display:inline-flex;align-items:center;justify-content:center;background:var(--card);border:1px solid color-mix(in srgb,var(--accent) 22%,var(--border));color:var(--accent)}
+.turn .outcome .cb{flex:1;min-width:0}
+.turn .outcome .ct{font-size:12.5px;font-weight:600;color:var(--text)}
+.turn .outcome .cm{font-size:11px;color:var(--text-muted);margin-top:1px}
+.turn .outcome .rb{flex:none;border:1px solid var(--border);background:var(--card);border-radius:var(--radius);padding:6px 11px;font-size:11px;font-weight:var(--weight-label);color:var(--text)}
+.turn .outcome .rb:hover{background:var(--bg-muted)}
+
+/* composer dock with a working status chip above */
+.composer-dock{flex:0 0 auto;padding:6px 24px 18px}
+.statuschip{display:flex;align-items:center;gap:10px;margin:0 4px 9px;padding:8px 13px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-button);font-size:12px;color:var(--text-secondary);width:fit-content;box-shadow:0 1px 2px rgba(23,23,23,.04)}
+.statuschip .wd{width:8px;height:8px;border-radius:50%;background:var(--positive);flex:none}
+.statuschip b{font-weight:600;color:var(--text)}
+.statuschip .ctl{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);border-radius:var(--radius);padding:4px 9px;font-size:11px;font-weight:var(--weight-label);color:var(--text);background:var(--bg-muted)}
+.statuschip .ctl:hover{background:var(--card)}
+.statuschip .ctl.stop{color:var(--destructive);border-color:var(--bg-destructive-border)}
+.statuschip .ctl.stop:hover{background:var(--bg-destructive)}
+.composer{background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-float);padding:12px 12px 10px}
+.composer .row{display:flex;gap:10px;align-items:flex-end}
+.composer textarea{flex:1;resize:none;border:0;outline:0;padding:8px 6px;font-family:var(--font-sans);font-size:14px;min-height:26px;color:var(--text);background:transparent;line-height:1.5}
+.composer textarea::placeholder{color:var(--text-muted)}
+.send{flex:none;background:var(--primary);color:var(--primary-foreground);border-radius:var(--radius-button);padding:11px 22px;font-weight:600;font-size:13px;height:42px}
+.send:hover{filter:brightness(.94)}
+.composer .foot{display:flex;align-items:center;gap:8px;margin-top:7px;padding:0 4px;font-size:11px;color:var(--text-muted)}
+.composer .foot kbd{font-family:var(--font-mono);font-size:10px;background:var(--bg-muted);border:1px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--text)}
+
+/* right rail (shared) */
+.rail{flex:0 0 384px;min-width:0;display:flex;flex-direction:column;border-left:1px solid var(--border);background:var(--background);overflow:hidden}
+.railtabs{flex:0 0 auto;display:flex;gap:4px;padding:14px 16px 0;border-bottom:1px solid var(--border-muted)}
+.railtab{display:inline-flex;align-items:center;gap:6px;padding:9px 11px;font-size:13px;font-weight:var(--weight-label);color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.railtab svg{width:14px;height:14px}
+.railtab:hover{color:var(--text)}
+.railtab.active{color:var(--text);border-bottom-color:var(--accent)}
+.railbody{flex:1 1 auto;min-height:0;overflow-y:auto;padding:16px}
+.pbar{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--border);border-bottom:0;border-radius:var(--radius) var(--radius) 0 0;padding:10px 12px;background:var(--bg-muted)}
+.pbar .fn{font-family:var(--font-mono);font-size:12px;display:flex;align-items:center;gap:7px;color:var(--text)}
+.pbar .fn svg{width:13px;height:13px;color:var(--text-muted)}
+.toggle{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.toggle button{padding:5px 11px;font-size:11px;font-weight:var(--weight-label);color:var(--text-muted);background:var(--card)}
+.toggle button.on{background:var(--text);color:var(--card)}
+.rendered{border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);padding:18px;background:var(--card)}
+.rendered h2{font-family:var(--font-display);font-weight:700;font-size:17px;margin-bottom:9px;letter-spacing:-.01em;color:var(--text)}
+.rendered h3{font-size:13px;font-weight:600;margin:14px 0 6px;color:var(--text)}
+.rendered p{font-size:13px;color:var(--text-secondary);margin-bottom:8px;line-height:1.65}
+.signoff{margin-top:14px;border:1px solid color-mix(in srgb,var(--accent) 22%,var(--border));background:color-mix(in srgb,var(--accent) 5%,#fff);border-radius:var(--radius);padding:12px 13px}
+.signoff p{font-size:12.5px;color:var(--text);margin-bottom:9px}
+.signoff .act{display:flex;gap:8px}
+.signoff .yes{background:var(--primary);color:var(--primary-foreground);border-radius:var(--radius);padding:8px 14px;font-size:12px;font-weight:600}
+.signoff .wait{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:8px 14px;font-size:12px;font-weight:var(--weight-label)}
+</style>
+</head>
+<body>
+<div class="docnote"><b>Direction B — Turn Cards (balanced · the recommendation).</b> Each agent turn is one card: a bold plain-English headline, a collapsed “steps” disclosure, and outcomes inline. A slim sticky stage/status bar sits at the top; the composer floats inset with a working chip above it. Review mockup, real tokens, light theme.</div>
+
+<div class="frame">
+  <nav class="sidebar" aria-label="Primary">
+    <div class="brandrow"><span class="mark" aria-hidden="true"></span><span class="brandname">Sulis</span></div>
+    <h4>Workspace</h4>
+    <a class="navitem" href="#"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="2" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>Board</a>
+    <a class="navitem active" href="#" aria-current="page"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3.5h12v7H6l-3 3v-3H2Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>Conversation</a>
+    <a class="navitem" href="#"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 1.5h6L13 5.5V14.5H3Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M9 1.5V5.5H13" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>Files</a>
+    <a class="navitem" href="#"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 14.5 8 8 14.5 1.5 8Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>Brain</a>
+    <h4>Recent changes</h4>
+    <a class="navitem" href="#"><span class="ic"></span>Add the sign-off button</a>
+    <a class="navitem" href="#"><span class="ic"></span>Tidy the morning digest</a>
+    <div class="sidefoot"><span class="g" aria-hidden="true"></span>Agent running</div>
+  </nav>
+
+  <div class="work">
+    <header class="head">
+      <div>
+        <div class="kicker">add-signoff-button · design</div>
+        <h1>Add the “sign off” button to the checkout screen</h1>
+      </div>
+      <div class="headmeta">
+        <span class="stagebadge">Design</span>
+        <span class="live"><span class="g" aria-hidden="true"></span>Running</span>
+      </div>
+    </header>
+
+    <div class="spine">
+      <ol class="track" aria-label="Change progress">
+        <li class="step" data-state="done"><span class="dot" aria-hidden="true"></span>Recon<span class="sw">Done</span></li>
+        <li class="step" data-state="done"><span class="dot" aria-hidden="true"></span>Specify<span class="sw">Done</span></li>
+        <li class="step" data-state="now" aria-current="step"><span class="dot" aria-hidden="true"></span>Design<span class="sw">Now</span></li>
+        <li class="step" data-state="pending"><span class="dot" aria-hidden="true"></span>Implement<span class="sw">Pending</span></li>
+        <li class="step" data-state="pending"><span class="dot" aria-hidden="true"></span>Review<span class="sw">Pending</span></li>
+        <li class="step" data-state="pending"><span class="dot" aria-hidden="true"></span>Ship<span class="sw">Pending</span></li>
+      </ol>
+    </div>
+
+    <div class="body">
+      <section class="convocol" aria-label="Conversation">
+        <!-- SLIM STICKY stage/status bar -->
+        <div class="stickybar">
+          <span class="sd" aria-hidden="true"></span>
+          <b>Design</b><span class="sep">·</span><span class="msg">running — designing the sign-off button and checking the colours read clearly</span>
+          <span class="when">updated just now</span>
+        </div>
+
+        <div class="scroll">
+          <div class="day">Today</div>
+
+          <div class="msg user">
+            <div class="who">You</div>
+            <div class="say">Can you add a clear “sign off” button to the checkout screen? It should feel like the obvious next step once everything looks right.</div>
+            <div class="time">9:41 AM</div>
+          </div>
+
+          <!-- TURN CARD — expanded steps (so the disclosure is visible) -->
+          <article class="turn">
+            <div class="thead">
+              <span class="av" aria-hidden="true"></span>
+              <div class="hl">
+                <div class="summary">Added the sign-off button — tests pass</div>
+                <div class="said">I put it as the primary action under the order total, in your brand blue, and made it light up only once the order’s valid. Everything checks out.</div>
+                <div class="time">9:43 AM</div>
+              </div>
+            </div>
+            <button class="steps-toggle" type="button" aria-expanded="true">
+              <span class="n">4 steps</span><span class="chev" aria-hidden="true">⌄</span>
+              <span class="ok"><span class="d" aria-hidden="true"></span>all clear</span>
+            </button>
+            <div class="steps">
+              <div class="srow"><svg class="si" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 1.5h6L13 5.5V14.5H3Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>Read the checkout layout <span class="obj">Checkout.tsx</span></div>
+              <div class="srow"><svg class="si" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 11.5 11 2.5l2.5 2.5L4.5 14H2Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>Edited the composer <span class="obj">Composer.tsx</span><span class="ok"><span class="d" aria-hidden="true"></span>saved</span></div>
+              <div class="srow"><svg class="si" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Ran the tests<span class="ok"><span class="d" aria-hidden="true"></span>28 passed</span></div>
+              <div class="srow"><svg class="si" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="3" width="11" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="7.5" r="2" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>Took a screenshot of the new button</div>
+            </div>
+            <div class="outcome">
+              <span class="ck" aria-hidden="true"><svg viewBox="0 0 16 16" width="13" height="13"><path d="M2 8.5 6 12.5l8-9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              <div class="cb">
+                <div class="ct">Checkpoint made — “Sign-off button added, tests pass”</div>
+                <div class="cm">safe to return to this exact point</div>
+              </div>
+              <button class="rb" type="button">Revert to here</button>
+            </div>
+          </article>
+
+          <div class="msg user">
+            <div class="who">You</div>
+            <div class="say">Nice. Can you also double-check it’s easy to read for someone with low vision?</div>
+            <div class="time">9:45 AM</div>
+          </div>
+
+          <!-- second turn card — steps collapsed by default -->
+          <article class="turn">
+            <div class="thead">
+              <span class="av" aria-hidden="true"></span>
+              <div class="hl">
+                <div class="summary">Checked the button for low-vision readability — it passes</div>
+                <div class="said">The blue-on-white text clears the accessibility contrast bar comfortably, it’s reachable by keyboard, and the meaning doesn’t rely on colour alone. I’ve put a live preview in the right rail.</div>
+                <div class="time">9:46 AM</div>
+              </div>
+            </div>
+            <button class="steps-toggle" type="button" aria-expanded="false">
+              <span class="n">3 steps</span><span class="chev" aria-hidden="true">›</span>
+              <span class="ok"><span class="d" aria-hidden="true"></span>all clear</span>
+            </button>
+          </article>
+        </div>
+
+        <div class="composer-dock">
+          <div class="statuschip">
+            <span class="wd" aria-hidden="true"></span><b>Working</b> · finishing the contrast check
+            <button class="ctl" type="button">Pause</button>
+            <button class="ctl stop" type="button">Stop</button>
+          </div>
+          <div class="composer">
+            <div class="row">
+              <textarea rows="1" placeholder="Reply to Sulis, or type / for a command…" aria-label="Message Sulis"></textarea>
+              <button class="send" type="button">Send</button>
+            </div>
+            <div class="foot"><kbd>/</kbd> for commands · <kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="rail" aria-label="Files, brain and previews">
+        <div class="railtabs" role="tablist" aria-label="Context panel">
+          <button class="railtab active" role="tab" aria-selected="true" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8Z" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="1.8" fill="currentColor"/></svg>Preview</button>
+          <button class="railtab" role="tab" aria-selected="false" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 1.5h6L13 5.5V14.5H3Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M9 1.5V5.5H13" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>Files</button>
+          <button class="railtab" role="tab" aria-selected="false" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 14.5 8 8 14.5 1.5 8Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>Brain</button>
+        </div>
+        <div class="railbody" role="tabpanel" aria-label="Preview">
+          <div class="pbar">
+            <span class="fn"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8Z" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>Checkout screen</span>
+            <span class="toggle"><button class="on" type="button">Rendered</button><button type="button">Raw</button></span>
+          </div>
+          <div class="rendered">
+            <h2>Your order</h2>
+            <p>1 × Annual plan — £180.00</p>
+            <p>VAT (20%) — £36.00</p>
+            <h3>Total — £216.00</h3>
+            <p style="color:var(--text-muted);font-size:12px;margin-top:14px">The new primary action:</p>
+            <button class="send" type="button" style="width:100%;margin-top:4px">Sign off &amp; pay £216.00</button>
+            <div class="signoff">
+              <p><b>Ready to lock this design?</b> Once you sign off, the team can build the button exactly as shown.</p>
+              <div class="act">
+                <button class="yes" type="button">Yes, sign off</button>
+                <button class="wait" type="button">Wait</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+</body>
+</html>

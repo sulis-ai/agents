@@ -3,6 +3,10 @@
     "mobbin": {
       "type": "http",
       "url": "https://api.mobbin.com/mcp"
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
     }
   }
 }

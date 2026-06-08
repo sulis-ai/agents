@@ -54,6 +54,13 @@ verification:
   artifact: tests/infrastructure/persistence/postgres-order-repository.test.ts::respects_5s_transaction_timeout
 ---
 
+**Key spelling — MUST use camelCase (#104).** The dependency key is
+`dependsOn`, **never** `depends_on` (snake) or `depends-on` (kebab). The
+parser aliases snake/kebab to camel as a defensive net, but the canonical
+spelling the readers and human reviewers expect is `dependsOn`. Inline
+`# comments` after a value are tolerated (stripped at parse time); a `#`
+glued to a value (e.g. `title: Honest #1`) stays intact.
+
 ## Context
 
 What part of the architecture this WP touches. One paragraph. Link to the
@@ -276,6 +283,16 @@ These standards shape the WP set's *shape*, not just the content:
       `dependsOn` the backend WP. Both build in parallel (CF-05 parallel-
       not-sequential) — the consumer against a mock generated from the
       contract.
+    - **Shared producer-side artifacts: pin filename + merge semantics in
+      the contract WP (#107, CF-11 MUST).** When two or more producer WPs
+      emit into the same logical artifact (a manifest, registry, codegen
+      output), the contract WP declares the artifact's **filename, path,
+      schema, and merge semantics** as an explicit shared constant.
+      Producers reference the constant verbatim — they do NOT independently
+      choose a filename. Anchor case CH-01KSSV: WP-001 and WP-002 each
+      picked their own name (`CONTRACT.manifest.json` vs `manifest.json`),
+      one clobbered the other, the shared manifest split silently.
+      Decompose-validation rubric P6 check **6.06** enforces it.
     - **Emit an integration WP last.** `kind: composite` (or `kind: docs`
       with `produces: integration-check`) that `dependsOn` all the per-kind
       siblings and runs the conformance check (CF-07) — swap mock for real
@@ -455,6 +472,58 @@ These standards shape the WP set's *shape*, not just the content:
     Decompose Validation Rubric as **Phase 8 — Cross-WP identifier
     canonicalisation**.
 
+7d. **Scenario-coverage gate (MUST when the change is user-facing / has a
+    journey).** A change that builds *some* of a journey must still *check
+    all* of it — every scenario in the journey is either already proven
+    (observed-green), planned (a WP in this set builds it), or consciously
+    recorded out-of-scope. A not-green journey scenario that no WP covers
+    and no out-of-scope record names is a silent hole — exactly the
+    "login shipped green but never worked" failure: the consumption half of
+    a round-trip had no scenario walking it, so nothing planned it.
+
+    This gate is the plan-stage twin of the requirement-coverage gate, and
+    the downstream enforcement of the design-stage journey walk (step 8.5 of
+    `draft-architecture`). The objective classification comes from the brain
+    — not an agent's claim:
+
+    1. **Resolve the journey's Workflow id** from the TDD `## Journey Walk`
+       section (the design stage recorded it) or the change's scenario set.
+       If the change has no journey (pure-internal refactor with no
+       user-facing surface), record "N/A — no journey" and skip.
+
+    2. **Run the coverage checker** over the full scenario set, passing the
+       scenario ids this WP set plans and any consciously out-of-scope ids:
+
+       ```bash
+       python3 -c "
+       import sys; sys.path.insert(0, '$WPX_DIR')
+       from pathlib import Path
+       from _verify_scenario_coverage import verify_scenario_coverage
+       import json
+       r = verify_scenario_coverage(
+           '<journey-workflow-id>',
+           base_dir=Path('.brain/instances'),
+           planned={<scenario ids a WP in this set builds>},
+           out_of_scope={<scenario ids consciously deferred>},
+       )
+       print(json.dumps(r.as_dict(), indent=2))
+       "
+       ```
+
+       It splits the journey's full scenario set into `green` (already
+       proven — no work needed), `planned`, `out-of-scope`, and `GAP`.
+
+    3. **GATE.** Verdict `gaps` → the decompose is **NOT done**. Each GAP
+       is a journey scenario with no WP and no out-of-scope record. Either
+       add a WP that builds it, or record it out-of-scope with a reason
+       (and re-run). Only a `covered` verdict (every not-green scenario
+       planned-or-out-of-scope) proceeds to step 8. Surface GAPs to the
+       founder in plain English — *"the journey has 3 steps nothing is
+       building yet: {plain titles}"* — never the scenario ids.
+
+    The mechanical analog lives in the Decompose Validation Rubric as
+    **P9 — Journey scenario coverage** (step 11 below).
+
 8. **Write WPs** — one file per WP, using the template above.
 9. **Write `INDEX.md`** — list all WPs, their statuses, primitive
    distribution, the dependency graph (as a markdown table and a Mermaid
@@ -467,7 +536,7 @@ These standards shape the WP set's *shape*, not just the content:
    (`flip-status`, `list-ready`, `lint`, etc.) and bricks run-all at
    dispatch time (`Could not find WP table (no | ID | header)`).
 
-9.5. **Decompose-time INDEX shape gate (#103 — MUST).** After writing
+9.5. **Decompose-time INDEX gate (#103/#222 — MUST).** After writing
     `INDEX.md`, run `wpx-index lint` and treat a non-zero exit as a
     BLOCKING gate failure of the decompose:
 
@@ -476,15 +545,29 @@ These standards shape the WP set's *shape*, not just the content:
     ```
 
     On non-zero exit the decompose is **NOT done**. Read the lint
-    error, fix the INDEX (typically: convert a bullet list to the
-    canonical table, or correct a column-order typo per
-    `## INDEX.md Structure` below), and re-run lint. Only proceed to
-    Step 10 (Report) when lint exits 0.
+    error, fix the INDEX, and re-run lint. Only proceed to Step 10
+    (Report) when lint exits 0.
 
-    This catches the #103 class — a list-shape INDEX surfacing as a
-    cryptic "no | ID | header" error at run-all dispatch time, hours
-    after the architect finished. Failing at authoring time is
-    surgical; failing at run-all is a hard recovery.
+    The gate runs two checks. First it checks the WP table's **header
+    shape** — a list-shape or drifted-header INDEX (the #103 class) is
+    invisible to the run-all loop and would otherwise surface as a
+    cryptic "no | ID | header" error at dispatch time, hours after the
+    architect finished. Second, it runs a **list-ready round-trip**: it
+    drives the exact same reader the builder uses and confirms the
+    to-do list is actually runnable. The header check alone is just a
+    proxy — it can't see an INDEX that has a perfect header but no
+    runnable work, so the round-trip additionally fails the decompose
+    when:
+
+    - there are no WP rows the builder can read (header present, rows
+      missing or unparseable);
+    - there are WP rows but **none are `pending`** (every status is
+      already `ready`/`blocked`/`done`, so the builder sees nothing to
+      run — the #222 class the header check cannot catch);
+    - a `pending` WP exists that the builder cannot account for at all.
+
+    Failing at authoring time is surgical; failing at run-all is a hard
+    recovery.
 
 10. **Report** — total WP count, critical path length, parallelisation
     opportunity (how many WPs can be implemented simultaneously at peak),
@@ -526,6 +609,13 @@ These standards shape the WP set's *shape*, not just the content:
       resolves to an authoritative upstream source (TDD section, ADR,
       or instance file). The mechanical analog of step 7c above;
       anchor case CH-01KSZ4 release-train tenant-ULID divergence.
+    - **P9 Journey scenario coverage** — for a user-facing change with a
+      journey, every scenario in the journey's full set is observed-green,
+      planned (a WP builds it), or recorded out-of-scope. Run
+      `_verify_scenario_coverage.verify_scenario_coverage`; a `gaps`
+      verdict (≥1 journey scenario with no WP and no out-of-scope record)
+      is a MUST failure. The mechanical analog of step 7d above; prevents
+      the half-built-round-trip class (login shipped green, never worked).
 
     Verdict is computed deterministically:
     - **PASS** — every MUST passes; no SHOULD failures

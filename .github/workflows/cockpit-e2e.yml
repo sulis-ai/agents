@@ -48,6 +48,14 @@ jobs:
         with:
           python-version: "3.11"
 
+      # The server shells out to the vendored spine-emitter scripts during the
+      # real-mint integration tests (discovery.mint-real). Those scripts import
+      # jsonschema + PyYAML; without them the emitters exit non-zero and the
+      # mint tests fail. Install them explicitly so CI doesn't depend on the
+      # runner image happening to pre-provide them.
+      - name: Install Python deps for the spine emitters
+        run: python -m pip install --quiet jsonschema PyYAML
+
       - name: Install workspace deps
         run: npm install
 
@@ -79,6 +87,11 @@ jobs:
         with:
           python-version: "3.11"
 
+      # The onboarding mint in the e2e journey shells out to the vendored
+      # spine-emitter scripts, which import jsonschema + PyYAML.
+      - name: Install Python deps for the spine emitters
+        run: python -m pip install --quiet jsonschema PyYAML
+
       - name: Configure git identity (the e2e fixture inits a temp git repo)
         run: |
           git config --global user.email "ci@sulis-ai.invalid"
@@ -99,6 +112,14 @@ jobs:
       - name: Playwright end-to-end smoke
         if: steps.browsers.outcome == 'success'
         run: npm run test:e2e
+
+      # WP-007 — the load-bearing PRODUCTION proof: the full acceptance journey
+      # driven against the REAL server endpoint (startProductionServer → spawned
+      # host + attached sidecar), via the WP-006 same-origin default. Supersedes
+      # the harness-proxy terminal e2e as the production proof; runs on branch-ci.
+      - name: Playwright live-terminal e2e against the real server
+        if: steps.browsers.outcome == 'success'
+        run: npm run test:e2e:terminal-real
 
       - name: Note skipped e2e (browser unavailable)
         if: steps.browsers.outcome != 'success'

@@ -273,7 +273,7 @@ provide signature-hash dedup so iterations converge.
   judgement filters.
 - **Skipping the iteration boundary.** Don't run codebase-assess +
   promote + train + re-assess in one session loop. Each iteration's
-  remediation needs to actually SHIP to dev before the next assess
+  remediation needs to actually SHIP to main before the next assess
   can see the fix.
 - **Ignoring CRITICAL findings.** CRITICAL must be addressed before
   any other work proceeds. If the founder defers a CRITICAL because

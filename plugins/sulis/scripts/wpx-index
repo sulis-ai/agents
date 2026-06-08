@@ -28,6 +28,8 @@ from _wpxlib import (  # noqa: E402
     compute_wp_status,
     emit_error,
     emit_ok,
+    interaction_flow_exercised,
+    is_interaction_contract_wp,
     is_visual_contract_wp,
     parse_index_md,
     parse_md_table,
@@ -400,8 +402,38 @@ def _enforce_visual_contract_signoff_on_done(args: argparse.Namespace) -> None:
         emit_error(f"{args.wp}: {err}")
 
 
+def _enforce_interaction_flow_on_done(args: argparse.Namespace) -> None:
+    """CH-01KT9H runtime gate — an interaction-contract WP cannot be flipped to
+    `done` until its multi-step flow's exercise evidence is recorded. No-op for
+    any other WP / status. Direct sibling of
+    :func:`_enforce_visual_contract_signoff_on_done`.
+
+    The gate trusts the recorded evidence (`exercised_at` / `exercised_by` /
+    `exercised_attestation`) and does NOT re-run the flow (ADR-003).
+    """
+    if args.to != "done":
+        return
+    paths = paths_from_args(args)
+    try:
+        wp_path = paths.wp_file(args.wp)
+    except (FileNotFoundError, ValueError):
+        return  # no WP file → not a checkable interaction-contract WP
+    fm = read_frontmatter(wp_path)
+    if not is_interaction_contract_wp(fm):
+        return
+    err = interaction_flow_exercised(fm)
+    if err is not None:
+        emit_error(f"{args.wp}: {err}")
+
+
 def cmd_flip_status(args: argparse.Namespace) -> None:
+    # Both done-gates run at this single chokepoint. They are independent and
+    # order-insensitive: each fires only for the contract_type its predicate
+    # matches (visual vs interaction), so an ordinary WP is a double no-op —
+    # the regression-safety guarantee that ordinary flips behave exactly as
+    # before. A WP that is somehow both kinds is gated by both.
     _enforce_visual_contract_signoff_on_done(args)
+    _enforce_interaction_flow_on_done(args)
     text = _read_index(args)
 
     # Iterate ALL WP sub-tables (#50). The contract-first decompose
@@ -794,24 +826,102 @@ def cmd_audit_contracts(args: argparse.Namespace) -> None:
     emit_ok(data={"violations": [], "wp_count": len(wps)})
 
 
+def _roundtrip_accounting(
+    args: argparse.Namespace, text: str,
+) -> tuple[dict[str, str], list[str], set[str]]:
+    """Run the EXACT parse `list-ready` runs against ``text`` and report
+    what the real builder consumer sees (WP-001).
+
+    Reuses ``_collect_status_across_tables`` + ``_resolve_deps`` — the same
+    helpers ``cmd_list_ready`` calls — so the gate can never disagree with
+    ``list-ready`` about what counts as a runnable INDEX (EP-03 single
+    source of truth). It MUST NOT re-implement INDEX parsing.
+
+    Returns ``(status_by_id, pending, unaccounted)``:
+
+    * ``status_by_id`` — WP-ID → live status across every WP sub-table.
+      Empty means the consumer can parse no WP table at all.
+    * ``pending`` — the authored ``pending`` WP-IDs.
+    * ``unaccounted`` — authored ``pending`` WPs the consumer cannot see at
+      all. A pending WP is "accounted for" when the consumer SEES it —
+      whether it is immediately ready (all deps done) or dependency-blocked
+      (≥1 dep not done); either way ``list-ready`` will surface it. The
+      failure mode is the consumer being *blind* to a pending WP, NOT the
+      consumer reporting it as not-yet-ready (Contract invariant 2). Because
+      ``_resolve_deps`` is keyed over the same WP set, every pending WP is
+      seen, so this is empty in practice — it is computed (not assumed) so
+      the gate names any future divergence rather than silently passing.
+    """
+    status_by_id = _collect_status_across_tables(text)
+    pending = [wp for wp, status in status_by_id.items() if status == "pending"]
+    depends_by_id = _resolve_deps(args, text, set(status_by_id))
+    seen = set(depends_by_id)
+    unaccounted = {wp for wp in pending if wp not in seen}
+    return status_by_id, pending, unaccounted
+
+
 def cmd_lint(args: argparse.Namespace) -> None:
-    """#60 — fail loudly if INDEX.md's WP table header drifted.
+    """#60/#218/#222/#233 — fail loudly when the decompose gate's INDEX is
+    not actually runnable by the real builder consumer.
 
-    Decompose-time gate: a non-canonical header (e.g.
-    ``| WP | Title | kind | Primitive | ... |``) is invisible to
-    ``_WP_TABLE_HEADER_RE`` and so vanishes from the run-all loop, where
-    flip-status / list-ready then fail silently mid-run. Running this at
-    decompose time converts that silent failure into a surgical error.
+    Two checks, run in order, both BLOCKING (non-zero exit) so plan-work's
+    existing Step 9.5 wiring ("lint non-zero exit = decompose NOT done")
+    enforces them for free:
 
-    Reuses ``validate_wp_index_header`` (which keys off the SAME regex
-    ``parse_index_md`` uses), so the lint can never disagree with the
-    parser about what counts as a WP table.
+    1. **Header shape** (``validate_wp_index_header``, keyed off the SAME
+       regex ``parse_index_md`` uses). A drifted header (e.g.
+       ``| WP | Title | kind | Primitive | ... |``) is invisible to the
+       run-all loop and fails silently mid-run; this turns it surgical.
+
+    2. **List-ready round-trip** (WP-001). The header check is a *proxy* —
+       it is blind to a canonical-header INDEX whose Status cells are all
+       ``ready``/``blocked`` (never ``pending``): the consumer then returns
+       an empty pending set and the break surfaces mid-build. So after the
+       header passes, drive the REAL consumer: run the exact parse
+       ``list-ready`` runs (``_collect_status_across_tables`` +
+       ``_resolve_deps``, via ``_roundtrip_accounting``) and assert every
+       authored ``pending`` WP is accounted for (ready ∪ dependency-blocked).
+       A 0-WP / parse-fail result while WPs exist is BLOCKING.
     """
     text = _read_index(args)
+
+    # (1) header-shape check — keep, runs first.
     error = validate_wp_index_header(text)
     if error is not None:
         emit_error(error)
-    emit_ok(data={"header": "canonical"})
+
+    # (2) round-trip: what does the real builder consumer actually see?
+    status_by_id, pending, unaccounted = _roundtrip_accounting(args, text)
+
+    if not status_by_id:
+        emit_error(
+            "INDEX.md has a canonical header but no WP rows the builder can "
+            "read (its ID/Status cells parse to nothing). The decompose is "
+            "not done — author the WP rows under the canonical header."
+        )
+
+    if not pending:
+        emit_error(
+            "INDEX.md has WP rows but none are `pending` — every Status cell "
+            "is already `ready`/`blocked`/`done`, so the builder sees no work "
+            "to run. The decompose is not done — author the to-do list with "
+            "`pending` WPs."
+        )
+
+    if unaccounted:
+        names = ", ".join(sorted(unaccounted))
+        emit_error(
+            f"INDEX.md has `pending` WPs the builder cannot account for: "
+            f"{names}. The decompose is not done — fix the WP table so every "
+            f"pending WP is readable by the to-do tracker."
+        )
+
+    emit_ok(data={
+        "header": "canonical",
+        "round_trip": "ok",
+        "pending": len(pending),
+        "accounted": len(pending) - len(unaccounted),
+    })
 
 
 # ─────────────────────────────────────────────────────────────────────────

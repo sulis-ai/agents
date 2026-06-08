@@ -185,6 +185,36 @@ Read back the result and tell the founder the shape of it in their words —
 the few gaps that actually matter for this change, and what closing them
 involves. Don't dump the full report verbatim.
 
+### Step 2.5 — Walk the journey (MUST for any user-facing / behavioural change)
+
+The brownfield twin of the design-stage journey-walk (draft-architecture step
+8.5): for a change that touches a user round-trip, the gap audit must **walk
+each verification `Scenario`'s journey hop-by-hop against the existing code** —
+outside-in, the user's first action → every hop → the observable result — and
+for **every hop** confirm the handling component **exists** (cite file +
+function) or record it as a **GAP → fix**. This is exactly the "the consumption
+half of the journey was never built" failure (four green-but-broken login
+attempts) caught by walking the *whole* round-trip rather than auditing pieces.
+
+Pull the journey's **complete** scenario set so all are checked even when only
+some are in scope (`find_scenarios_for_journey` /
+`find_passing_testresults_for_scenario` — `plugins/sulis/scripts/_brain_query.py`):
+classify each as **already-green** / **GAP → fix** / **out-of-scope (recorded)**.
+A bare GAP (a journey hop with no existing component and no drafted fix) blocks
+the audit from being "done" — turn it into a hardening delta or a recorded
+out-of-scope decision. (Pure non-user-facing change: exempt — log
+`journey-walk: exempt — <reason>`.)
+
+**Sharper "exists" for a host-rendered / integration hop (MUST).** For a hop that
+crosses into a host/platform you don't control (a host-rendered surface — MCP
+App / OpenAI App / figma-plugin / browser-extension — or a third-party protocol
+round-trip), "exists" is **not** an HTML page that serves. It requires the
+protocol binding present in code on **both** sides of the seam **and** the
+round-trip observed (or attested via `sulis-attest-scenario`) in the real host.
+A surface that serves but isn't bound, or whose buttons only flip local state, is
+a GAP. See [`mcp-ui-surface-patterns.md`](../../references/mcp-ui-surface-patterns.md)
+§ "Done = wired + legible" (incl. the legibility metadata bar).
+
 ## Step 3 — offer the to-do list (route to plan-work)
 
 The hardening deltas are the proposed fixes; they become the change's to-do

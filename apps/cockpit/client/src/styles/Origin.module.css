@@ -1,0 +1,561 @@
+/* WP-P10/P11 — change-origin surfaces (the signed `origin-badge-and-lens.html`
+ * + the file-provenance panel in `end-to-end-journey.html`).
+ *
+ * Three surfaces, one idiom:
+ *   - <OriginBadge>          the worded badge (Autonomous / Assisted·likely /
+ *                            Origin unknown), never colour-alone.
+ *   - <HowThisFileCameToBe>  the open-file "How this file came to be" panel.
+ *   - <HowItCameToBeLens>    the Provenance "How it came to be" grouped lens.
+ *
+ * Bound to the SIGNED design instance: every colour a var(--*) from tokens.css;
+ * worded status never colour-alone; AA-internal ink shades live in the
+ * :where(:root) block below, flagged pending token regen (each becomes a named
+ * semantic token next regeneration). The `:where(.x) button` reset avoids grey
+ * UA buttons (chat-B2 / Files / Provenance idiom). */
+
+/* AA-internal ink shades — same hue family as their base hue, darkened so
+ * text/numerals clear WCAG AA *as text* on their own 8–10% tint. NOTE: pending
+ * token regen — each becomes a named semantic token next regeneration. */
+/* Dark-mode re-fit (CH-01KTHP): the AA-internal ink shades are redefined as
+ * DERIVATIONS of their signed base tokens so they re-theme under
+ * data-theme="dark" (no light-only literal). Original light literals kept here
+ * for provenance:
+ *   --origin-accent-ink   was #246676 (accent family)  -> --accent
+ *   --origin-specify-ink  was #4338ca (specify-indigo)  -> --stage-specify
+ *   --origin-attn-icon    was #b45309 (honesty ink)     -> --warning */
+:where(:root) {
+  --origin-accent-ink: var(--accent);
+  --origin-specify-ink: var(--stage-specify);
+  --origin-attn-icon: var(--warning);
+  --origin-bg-accent: color-mix(in srgb, var(--accent) 8%, var(--card));
+  --origin-bg-accent-border: color-mix(in srgb, var(--accent) 28%, var(--border));
+  --origin-bg-specify: color-mix(in srgb, var(--stage-specify) 9%, var(--card));
+  --origin-bg-specify-border: color-mix(in srgb, var(--stage-specify) 26%, var(--border));
+}
+
+/* UA button reset, scoped — keeps native buttons from going grey. */
+.root :where(button) {
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  line-height: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+.root :where(svg) {
+  display: block;
+}
+
+/* ============================================================================
+   ORIGIN BADGE — the shared idiom (worded, never colour-alone)
+   ============================================================================ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 11px 3px 9px;
+  border-radius: var(--radius-button);
+  font-size: 11.5px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.badge svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+.badge .qual {
+  font-weight: 500;
+  opacity: 0.85;
+}
+.badge.auto {
+  background: var(--origin-bg-accent);
+  border-color: var(--origin-bg-accent-border);
+  color: var(--origin-accent-ink);
+}
+.badge.assist {
+  background: var(--origin-bg-specify);
+  border-color: var(--origin-bg-specify-border);
+  color: var(--origin-specify-ink);
+}
+.badge.unknown {
+  background: var(--bg-muted);
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+.badge.btn {
+  cursor: pointer;
+}
+.badge.btn:hover {
+  filter: brightness(0.97);
+}
+.badge.btn .caret {
+  width: 13px;
+  height: 13px;
+  margin-left: 1px;
+  transition: transform 0.15s ease;
+}
+.badge.btn[aria-expanded="true"] .caret {
+  transform: rotate(180deg);
+}
+
+/* ============================================================================
+   FILE-PROVENANCE PANEL — "How this file came to be"
+   ============================================================================ */
+.panel {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+}
+.panelHead {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 11px 18px;
+  text-align: left;
+}
+.panelHead:hover {
+  background: var(--bg-muted);
+}
+.panelHead .pk {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.panelHead .pt {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.panelHead .ps {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.panelHead .badgeWrap {
+  margin-left: auto;
+  flex: none;
+}
+.panelHead .caret {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+.panelHead[aria-expanded="true"] .caret {
+  transform: rotate(180deg);
+}
+.panelBody {
+  padding: 0 18px 16px;
+}
+.loadnote {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 18px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* trace card (shared by panel + lens detail) */
+.tracecard {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--card);
+  overflow: hidden;
+}
+.tracecard .th {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 13px;
+  border-bottom: 1px solid var(--border-muted);
+}
+.tracecard .th svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--origin-specify-ink);
+}
+.tracecard.autoT .th svg {
+  color: var(--origin-accent-ink);
+}
+.tracecard .th .tk {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  color: var(--origin-specify-ink);
+}
+.tracecard.autoT .th .tk {
+  color: var(--origin-accent-ink);
+}
+.tracecard .th .tt {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: var(--weight-label);
+}
+.tracecard .body {
+  padding: 12px 14px;
+}
+
+/* Turn Card — the assisted summary (reuses the chat Turn Card idiom) */
+.turncard {
+  display: flex;
+  gap: 11px;
+}
+.turncard .av {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--origin-bg-specify);
+  border: 1px solid var(--origin-bg-specify-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--origin-specify-ink);
+}
+.turncard .av svg {
+  width: 14px;
+  height: 14px;
+}
+.turncard .tcx .q {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.5;
+}
+.turncard .tcx .meta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+.traceact {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 14px 12px;
+}
+.openconv {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: var(--weight-label);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  border-radius: var(--radius-button);
+  padding: 7px 14px;
+  cursor: pointer;
+}
+.openconv:hover {
+  filter: brightness(0.95);
+}
+.openconv svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* autonomous run row inside a trace */
+.runrow {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 14px;
+}
+.runrow .ri {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 7px;
+  background: var(--origin-bg-accent);
+  border: 1px solid var(--origin-bg-accent-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--origin-accent-ink);
+}
+.runrow .ri svg {
+  width: 16px;
+  height: 16px;
+}
+.runrow .rx {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.runrow .rx .rn {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 600;
+}
+.runrow .rx .rm {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.minichips {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+}
+.mchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--radius-button);
+  font-size: 10.5px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+}
+.mchip svg {
+  width: 12px;
+  height: 12px;
+}
+.mchip.done {
+  background: var(--bg-positive);
+  border-color: var(--bg-positive-border);
+  color: var(--stage-ship);
+}
+.mchip.conf {
+  background: var(--origin-bg-accent);
+  border-color: var(--origin-bg-accent-border);
+  color: var(--origin-accent-ink);
+}
+.runlink {
+  cursor: pointer;
+}
+.runlink:hover {
+  background: var(--bg-muted);
+}
+
+/* unknown / honest "couldn't match" message */
+.unkmsg {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 11px 14px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.unkmsg svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--text-muted);
+}
+
+/* honest "inferred from timing" note */
+.tip {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.tip svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+/* ============================================================================
+   PROVENANCE LENS — "How it came to be" (grouped, progressive disclosure)
+   ============================================================================ */
+.lens {
+  display: flex;
+  flex-direction: column;
+}
+.honesty {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-warning);
+  border: 1px solid var(--bg-warning-border);
+  border-radius: 9px;
+  padding: 9px 13px;
+  margin-bottom: 14px;
+}
+.honesty svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: var(--origin-attn-icon);
+}
+.honesty b {
+  color: var(--text);
+  font-weight: 600;
+}
+.lensgroup {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  overflow: hidden;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--foreground) 4%, transparent);
+  margin-bottom: 14px;
+}
+.grouphead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--border-muted);
+  background: var(--bg-muted);
+}
+.grouphead .gi {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+.grouphead .gi svg {
+  width: 15px;
+  height: 15px;
+}
+.grouphead.auto .gi {
+  background: var(--origin-bg-accent);
+  border-color: var(--origin-bg-accent-border);
+  color: var(--origin-accent-ink);
+}
+.grouphead.assist .gi {
+  background: var(--origin-bg-specify);
+  border-color: var(--origin-bg-specify-border);
+  color: var(--origin-specify-ink);
+}
+.grouphead .gt {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.grouphead .gsub {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  margin-top: 1px;
+}
+.grouphead .pill {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 11px;
+  border-radius: var(--radius-button);
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+.grouphead.auto .pill {
+  background: var(--origin-bg-accent);
+  border-color: var(--origin-bg-accent-border);
+  color: var(--origin-accent-ink);
+}
+.grouphead.assist .pill {
+  background: var(--origin-bg-specify);
+  border-color: var(--origin-bg-specify-border);
+  color: var(--origin-specify-ink);
+}
+.lensrowwrap {
+  border-bottom: 1px solid var(--border-muted);
+}
+.lensrowwrap:last-child {
+  border-bottom: 0;
+}
+.lensrow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  text-align: left;
+}
+.lensrow:hover {
+  background: var(--bg-muted);
+}
+.lensrow .lfn {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text);
+  flex: none;
+  min-width: 108px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lensrow .lsum {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lensrow .lwhen {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  flex: none;
+}
+.lensrow .caret {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+.lensrow[aria-expanded="true"] .caret {
+  transform: rotate(180deg);
+}
+.lensrow[aria-expanded="true"] {
+  background: var(--bg-muted);
+}
+.lensrowstatic {
+  cursor: default;
+}
+.lensrowstatic:hover {
+  background: transparent;
+}
+.lensdetail {
+  background: var(--bg-muted);
+  padding: 0 16px 14px 16px;
+  border-top: 1px dashed var(--border);
+}
+.lensdetail .inner {
+  border: 1px solid var(--origin-bg-specify-border);
+  border-radius: 9px;
+  background: var(--card);
+  padding: 13px 15px;
+  margin-top: 12px;
+}
+.lensdetail .inner.autoD {
+  border-color: var(--origin-bg-accent-border);
+}
+
+/* empty / loading for the lens */
+.empty {
+  padding: 18px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}

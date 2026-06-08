@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Tell it you don't have a repo yet (or point it at your folders).",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:KWFGVM4GDRPJBAXW7H6JR8SZY0",
+  "input_artifacts": [
+    "518jnqev-open-sulis-with-nothing-set-up-and-say-w-1-result"
+  ],
+  "mechanism": "human",
+  "name": "518jnqev-tell-it-you-don-t-have-a-repo-yet-or-poi-2",
+  "output_artifacts": [
+    "518jnqev-tell-it-you-don-t-have-a-repo-yet-or-poi-2-result"
+  ],
+  "postconditions": [
+    "if none, it offers to create a repo and asks you to confirm first",
+    "if folders exist, it finds and configures them"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

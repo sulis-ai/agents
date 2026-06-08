@@ -3,17 +3,16 @@
 .card {
   display: block;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-container);
   padding: 16px;
   background: var(--card);
   text-decoration: none;
   color: inherit;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  transition: border-color 120ms ease;
 }
 
 .card:hover {
-  border-color: var(--primary);
-  box-shadow: 0 1px 4px rgba(3, 102, 214, 0.12);
+  border-color: var(--input);
 }
 
 .headerRow {
@@ -25,10 +24,18 @@
 }
 
 .handle {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--primary);
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--weight-body);
+  color: var(--muted-foreground);
+  /* keep the handle on one line; the card stays a calm fixed shape even
+   * when the slug/handle is long. flex:1 + min-width:0 lets it shrink and
+   * ellipsise instead of pushing the stage badge off the card. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .slug {
@@ -36,11 +43,23 @@
   color: var(--muted-foreground);
 }
 
+/* Intent — CLAMPED to 2 lines (matches the SIGNED visual contract's
+ * single-line-ish card; the card must stay a calm, fixed shape no matter
+ * how long the change's description is). A long intent is truncated with an
+ * ellipsis; the full text is available via the card's aria-label + title.
+ * Without the clamp a long intent dumps a wall of text and blows the card
+ * out — the render defect this fix-forward closes. */
 .intent {
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: var(--weight-label);
   color: var(--foreground);
-  margin: 0 0 12px;
-  line-height: 1.4;
+  margin: 8px 0 14px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 
 .footerRow {
@@ -50,6 +69,27 @@
   gap: 8px;
   font-size: 12px;
   color: var(--muted-foreground);
+}
+
+/* WP-009 — "Open terminal" action row (the cockpit-rendered terminal path). */
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.openTerminal {
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  border-radius: var(--radius-interactive);
+  cursor: pointer;
+}
+
+.openTerminal:hover {
+  border-color: var(--primary);
 }
 
 .livenessGroup {

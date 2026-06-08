@@ -1,0 +1,19 @@
+{
+  "pr": "feat/wp-006-repoint-launcher-to-viewer",
+  "base": "change/create-change-owned-terminal-shared-session",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "none" },
+    "size": { "lines_added": 379, "lines_removed": 34, "files_changed": 3, "severity": "low" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none" },
+    "completeness": { "new_source_without_test": 0, "new_test_files": 1, "api_change_without_schema": false, "severity": "none" }
+  },
+  "findings": { "changes": { "critical": 0, "high": 0, "medium": 0, "low": 0 }, "neighbours": { "total": 0 } },
+  "lenses": {
+    "architecture": { "findings": 0, "note": "pure stdlib exec-line builder; no infra-into-domain import, no new singletons, no circular imports, no network calls needing timeout/CB" },
+    "security": { "findings": 0, "note": "viewer exec line shlex.quote-d on every arg; change_id ULID-validated upstream; bash -n parse test with metachar worktree path passes; no secrets" },
+    "quality": { "findings": 0, "note": "ruff clean, mypy clean on module, 95 tests pass, 95% module coverage (new code fully covered), no dead surface, no CR-10 perf patterns (no loops/IO)" }
+  },
+  "draft_fixes": 0
+}

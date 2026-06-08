@@ -19,7 +19,9 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
-from _scenario_dispatch import execute_step
+import pytest
+
+from _scenario_dispatch import _default_http, _default_run, execute_step
 from _scenario_runtime import ResolvedStep
 
 
@@ -187,3 +189,128 @@ def test_browser_step_echoes_scripted_tier_and_captures_record():
     assert out.status == "pass", out
     assert out.tier == "scripted", out
     assert out.saved_record == record, out
+
+
+# ─── _default_run: runs argv-split, NOT via a shell ─────────────────────────
+
+
+def test_default_run_executes_a_real_command():
+    # A plain command runs and reports its exit code (no shell needed).
+    result = _default_run("true")
+    assert result.returncode == 0
+
+
+def test_default_run_honours_posix_quoting_like_authored_scenarios():
+    # Authored scenario cmds carry quoted args with spaces (e.g.
+    # --what 'a probe with spaces'). shlex.split must keep that one argv item
+    # whole, exactly as a shell would word-split it — this is the only
+    # "shell-like" feature any scenario relies on.
+    result = _default_run(
+        "python3 -c \"import sys; print(len(sys.argv)); sys.exit(len(sys.argv) - 3)\" "
+        "--what 'a probe with spaces'"
+    )
+    # argv = [-c prog, --what, 'a probe with spaces'] → 3 → exit 0
+    assert result.returncode == 0
+
+
+def test_default_run_does_not_invoke_a_shell():
+    # With shell=False, a shell metacharacter is an INERT argument byte, never
+    # an operator. `echo` simply prints the literal string; the `; touch …`
+    # cannot run as a second command. We assert the metachars survive verbatim
+    # in stdout (proof no shell parsed them).
+    result = _default_run("echo a;b|c")
+    assert result.returncode == 0
+    assert result.stdout.strip() == "a;b|c"
+
+
+def test_default_run_empty_cmd_fails_cleanly_not_via_shell():
+    # An empty cmd splits to [] — there is no program to exec. This must raise
+    # (IndexError / ValueError), which execute_step catches as a fail; it must
+    # NOT silently spawn a shell that exits 0.
+    with pytest.raises(Exception):
+        _default_run("")
+
+
+# ─── _default_http: scheme guard (no file:// local reads) ───────────────────
+
+
+def test_default_http_rejects_file_scheme():
+    with pytest.raises(ValueError):
+        _default_http("GET", "file:///etc/passwd")
+
+
+def test_default_http_rejects_non_http_scheme():
+    with pytest.raises(ValueError):
+        _default_http("GET", "ftp://example.com/x")
+# ── browser driver (deterministic — journey-rigor #6 machine-half) ─────────────
+
+from _scenario_dispatch import BrowserUnavailable  # noqa: E402
+
+
+def _browser_step(detail: dict, **kw) -> ResolvedStep:
+    return ResolvedStep(
+        step_id="s", name="land on dashboard", driver="browser",
+        mechanism="deterministic", mechanism_detail=json.dumps(detail), **kw,
+    )
+
+
+def test_browser_pass_when_assert_holds():
+    step = _browser_step({"url": "/login", "actions": [{"fill": "#email", "value": "a@b.c"},
+                          {"click": "#submit"}], "assert": {"visible": "Dashboard"}})
+    fake = lambda url, actions, a: SimpleNamespace(ok=True, detail="visible(Dashboard)")
+    out = execute_step(step, base_url="http://local", browser=fake)
+    assert out.status == "pass", out
+
+
+def test_browser_fail_when_assert_misses():
+    step = _browser_step({"url": "/login", "assert": {"visible": "Dashboard"}})
+    fake = lambda url, actions, a: SimpleNamespace(ok=False, detail="not visible")
+    out = execute_step(step, base_url="http://local", browser=fake)
+    assert out.status == "fail"
+    assert "not visible" in out.detail
+
+
+def test_browser_joins_base_url_and_passes_actions_assert():
+    seen = {}
+    def fake(url, actions, a):
+        seen.update(url=url, actions=actions, assert_spec=a)
+        return SimpleNamespace(ok=True, detail="ok")
+    step = _browser_step({"url": "app/home", "actions": [{"click": "#go"}],
+                          "assert": {"url_contains": "/home"}})
+    execute_step(step, base_url="http://local:3000", browser=fake)
+    assert seen["url"] == "http://local:3000/app/home"
+    assert seen["actions"] == [{"click": "#go"}]
+    assert seen["assert_spec"] == {"url_contains": "/home"}
+
+
+def test_browser_absolute_url_not_rejoined():
+    seen = {}
+    def fake(url, actions, a):
+        seen["url"] = url
+        return SimpleNamespace(ok=True)
+    step = _browser_step({"url": "https://dev.example.app/login", "assert": {"visible": "X"}})
+    execute_step(step, base_url="http://ignored", browser=fake)
+    assert seen["url"] == "https://dev.example.app/login"
+
+
+def test_browser_unavailable_defers_never_fakes():
+    # the transport can't run (e.g. Playwright absent) → DEFER with the need,
+    # never a fake pass. Routes to the agent / human-attest path.
+    def fake(url, actions, a):
+        raise BrowserUnavailable("playwright not installed")
+    step = _browser_step({"url": "/login", "assert": {"visible": "Dashboard"}})
+    out = execute_step(step, base_url="http://local", browser=fake)
+    assert out.status == "deferred"
+    assert "playwright" in (out.need or "")
+
+
+def test_browser_real_default_degrades_gracefully_without_playwright():
+    # With no transport injected, the real default lazily imports Playwright;
+    # it's an OPTIONAL extra (stdlib-only contract), so when absent the step
+    # DEFERS — it does not crash and does not fake green.
+    step = _browser_step({"url": "/login", "assert": {"visible": "Dashboard"}})
+    out = execute_step(step, base_url="http://local")
+    assert out.status in {"deferred", "pass", "fail"}
+    # in CI/dev without Playwright installed, it's deferred-with-need:
+    if out.status == "deferred":
+        assert "playwright" in (out.need or "")

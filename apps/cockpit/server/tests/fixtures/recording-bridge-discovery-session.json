@@ -1,0 +1,67 @@
+{
+  "_comment": "WP-009 — recorded discovery/concierge session (ADR-006; MEA-09 recorded, not a mock). Replayed by RecordedSessionBridge so the concierge read-only round-trip is CI-testable + recorded-observable WITHOUT a live agent. The LIVE concierge answer is the BLOCK-and-hand-to-founder observation. The same stream-json line shapes the chat fixture uses (system/init, stream_event content_block_delta, result/success) — the concierge maps the resulting ChatStreamEvents to ConciergeStreamEvents at the route. Carries no question or reply text that reveals founder data: a generic read-only answer.",
+  "cases": {
+    "live": {
+      "resolution": "live",
+      "events": [
+        { "type": "system", "subtype": "init" },
+        {
+          "type": "stream_event",
+          "event": {
+            "type": "content_block_delta",
+            "delta": { "text": "Looking across your changes — " }
+          }
+        },
+        {
+          "type": "stream_event",
+          "event": {
+            "type": "content_block_delta",
+            "delta": { "text": "fix-login-redirect is in Implement and stopped mid-reply; it needs you." }
+          }
+        },
+        { "type": "result", "subtype": "success" }
+      ]
+    },
+    "resumable": {
+      "resolution": "live",
+      "events": [
+        { "type": "system", "subtype": "init" },
+        {
+          "type": "stream_event",
+          "event": {
+            "type": "content_block_delta",
+            "delta": { "text": "Here's where things are up to." }
+          }
+        },
+        { "type": "result", "subtype": "success" }
+      ]
+    },
+    "fresh": {
+      "resolution": "live",
+      "events": [
+        { "type": "system", "subtype": "init" },
+        {
+          "type": "stream_event",
+          "event": {
+            "type": "content_block_delta",
+            "delta": { "text": "I can help you find a change or get you set up." }
+          }
+        },
+        { "type": "result", "subtype": "success" }
+      ]
+    },
+    "mid-step": {
+      "resolution": "live",
+      "events": [
+        { "type": "system", "subtype": "init" },
+        {
+          "type": "stream_event",
+          "event": {
+            "type": "content_block_delta",
+            "delta": { "text": "Looking…" }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Apply the stage filter.",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:Z9V4YRTKYKH6Y3ZR7VDVBJPWB5",
+  "input_artifacts": [
+    "mcb8vdsg-type-a-word-into-search-that-appears-ins-1-result"
+  ],
+  "mechanism": "human",
+  "name": "mcb8vdsg-apply-the-stage-filter-2",
+  "output_artifacts": [
+    "mcb8vdsg-apply-the-stage-filter-2-result"
+  ],
+  "postconditions": [
+    "only changes in the chosen stage are shown"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

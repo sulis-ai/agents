@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Apply the 'needs attention' filter.",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:9W8X3KEGGG97K4BRWKSAMTGQPE",
+  "input_artifacts": [
+    "mcb8vdsg-apply-the-stage-filter-2-result"
+  ],
+  "mechanism": "human",
+  "name": "mcb8vdsg-apply-the-needs-attention-filter-3",
+  "output_artifacts": [
+    "mcb8vdsg-apply-the-needs-attention-filter-3-result"
+  ],
+  "postconditions": [
+    "only changes that are blocked, waiting on a decision, or whose agent stopped mid-reply are shown"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

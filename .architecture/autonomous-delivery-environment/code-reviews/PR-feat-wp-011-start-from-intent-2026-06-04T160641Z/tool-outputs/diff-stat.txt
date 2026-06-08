@@ -1,0 +1,24 @@
+ .../contracts/DATA-CONTRACT-GUIDE.md               |   3 +-
+ apps/cockpit/README.md                             |   6 +-
+ apps/cockpit/client/src/App.tsx                    |   3 +
+ apps/cockpit/client/src/api/client.ts              |  55 +++
+ apps/cockpit/client/src/api/useStartFromIntent.ts  | 184 ++++++++
+ .../client/src/components/StartFromIntent.tsx      | 185 ++++++++
+ .../client/src/pages/StartFromIntentPage.tsx       |  37 ++
+ .../client/src/styles/StartFromIntent.module.css   | 222 +++++++++
+ .../client/src/tests/StartFromIntent.test.tsx      | 170 +++++++
+ apps/cockpit/scripts/check-read-only.sh            |  10 +-
+ apps/cockpit/server/adapters/SpineEmitterMinter.ts |  65 +--
+ apps/cockpit/server/adapters/SulisChangeStarter.ts | 227 ++++++++++
+ .../server/adapters/resolvePluginScripts.ts        |  98 ++++
+ apps/cockpit/server/app.ts                         |  59 +++
+ .../server/lib/discovery/startFromIntent.ts        | 502 +++++++++++++++++++++
+ .../server/lib/products/resolveProjectRepo.ts      | 103 +++++
+ apps/cockpit/server/ports/StartChangeRunner.ts     |  75 +++
+ apps/cockpit/server/routes/chat.ts                 | 145 +++++-
+ .../server/tests/read-only-inventory.test.ts       |  46 ++
+ .../server/tests/resolveProjectRepo.test.ts        | 112 +++++
+ .../server/tests/routes.startChange.test.ts        | 400 ++++++++++++++++
+ .../server/tests/startChangeRunner.real.test.ts    | 191 ++++++++
+ .../server/tests/startFromIntent.classify.test.ts  | 102 +++++
+ 23 files changed, 2940 insertions(+), 60 deletions(-)

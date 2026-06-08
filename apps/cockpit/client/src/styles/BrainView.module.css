@@ -1,0 +1,146 @@
+/* WP-006 — BrainView styles (FR-06/07).
+ *
+ * Matches the SIGNED visual contract panel "Brain" (`.bgroup`/`.bitem`):
+ * grouped-by-kind, each group a kind label + a count chip, each item a
+ * readable title + a kind line, with an openable detail. Colour is
+ * decorative only — labels + counts + titles carry the meaning (WCAG
+ * 1.4.1). Consumes tokens.css only — no raw hex. */
+
+.brain {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 14px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: var(--weight-label);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+}
+
+.kind {
+  font-family: var(--font-sans);
+}
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--radius-badge);
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: var(--weight-label);
+}
+
+.items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--card);
+  overflow: hidden;
+}
+
+.itemHead {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+
+.itemHead:hover {
+  background: var(--muted);
+}
+
+.itemHead:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.title {
+  font-size: 13px;
+  font-weight: var(--weight-body);
+  color: var(--card-foreground);
+  line-height: 1.4;
+}
+
+.itemKind {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.detail {
+  margin: 0;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border-muted);
+  background: var(--muted);
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detailRow {
+  display: grid;
+  grid-template-columns: minmax(70px, 28%) 1fr;
+  gap: 10px;
+}
+
+.detailLabel {
+  margin: 0;
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+}
+
+.detailValue {
+  margin: 0;
+  color: var(--foreground);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.empty {
+  padding: 22px 16px;
+  color: var(--muted-foreground);
+}
+
+.empty p {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.emptyDetail {
+  font-size: 12px;
+  line-height: 1.6;
+}

@@ -1,0 +1,14 @@
+{
+  "exercises": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+  "id": "dna:scenario:Y6Z1EJPF6GY1BAQ96WGA86TDHS",
+  "journey": "dna:workflow:7Q30CXS4H1A9F94G5SQE5W2ERY",
+  "name": "See everything in flight at a glance",
+  "state": "draft",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:WP1D55HXWYPQ0QE1JFSJ6R38AW",
+    "dna:requirement:XAGQS26PTRB6R219C72SX1J0YD",
+    "dna:requirement:HB1NP6C7TSBQ4HR0SG0PRBTAXR",
+    "dna:requirement:Y9KFTYBT08BGNVJ1PM7TTZ503A"
+  ]
+}

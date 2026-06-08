@@ -14,6 +14,7 @@
 // References: WP-014 Contract (<CopyPathButton>).
 
 import { useEffect, useRef, useState } from "react";
+import { ClipboardIcon } from "@heroicons/react/20/solid";
 import styles from "../styles/FilesPanel.module.css";
 
 interface Props {
@@ -58,13 +59,13 @@ export function CopyPathButton({ absolutePath }: Props) {
   return (
     <button
       type="button"
-      className={styles.copyPathButton}
+      className={styles.act}
       onClick={handleCopy}
       disabled={!ready}
       title={absolutePath}
       data-testid="copy-path-button"
     >
-      <span aria-hidden="true">📋</span>
+      <ClipboardIcon aria-hidden="true" />
       <span>{copied ? "Copied" : "Copy path"}</span>
     </button>
   );

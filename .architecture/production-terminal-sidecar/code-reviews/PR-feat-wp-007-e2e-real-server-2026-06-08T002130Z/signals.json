@@ -1,0 +1,27 @@
+{
+  "pr": "feat/wp-007-e2e-real-server",
+  "timestamp": "2026-06-08T002130Z",
+  "base": "change/create-production-terminal-sidecar",
+  "verdict": "PASS",
+  "build_verification": {
+    "typecheck": { "command": "npm run typecheck", "exit": 0, "new_errors": 0 },
+    "lint": { "command": "npx eslint --ext .ts,.tsx e2e server/index.ts", "exit": 0, "new_errors": 0 }
+  },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["test"], "severity": "none" },
+    "size": { "lines_added": 779, "lines_removed": 2, "files_changed": 10, "severity": "none" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 1, "secret_pattern_hits": 0, "severity": "none" },
+    "completeness": { "new_source_without_test": "n/a (WP is the test)", "api_change_without_schema": false, "severity": "none" }
+  },
+  "findings": {
+    "in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 1 },
+    "in_neighbours": { "critical": 0, "high": 0, "medium": 0, "low": 0 }
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "surfaced": "nothing" },
+    "security": { "findings": 0, "surfaced": "nothing" },
+    "quality": { "findings": 1, "surfaced": "1 low (awareness): per-harness NDJSON rpc helpers intentionally not unified" }
+  },
+  "draft_fixes": 0,
+  "auto_downgrade_triggers": []
+}

@@ -56,6 +56,7 @@ def assemble_scenario_graph(
     tenant: str,
     seed: str,
     steps: list[dict],
+    require_verifiable: bool = True,
 ) -> dict:
     """Assemble a plain-English journey into a Scenario + Workflow + Steps.
 
@@ -75,6 +76,13 @@ def assemble_scenario_graph(
                                                   #   http_call  → {"method","path","expect_status"}
              "input_artifacts": list[str] = []}  # EXTRA external needs (credentials/
                                                   #   fixtures) beyond the data-flow chain
+        require_verifiable: when True (the default), the journey MUST be
+            verifiable — at least one beat carries an observable check
+            (``asserts``) AND the final (outcome) beat carries one. A journey
+            with no checks, or whose outcome isn't observable, can report green
+            while the feature is broken (the green-but-broken-login class
+            journey-rigor #5 closes). Pass False only for structural tests of
+            properties orthogonal to verifiability.
 
     Returns the emitter-ready bundle: {"scenarios", "workflows", "steps"}.
 
@@ -90,6 +98,28 @@ def assemble_scenario_graph(
     """
     if not steps:
         raise ValueError("a scenario journey needs at least one step")
+
+    # Verifiability gate (journey-rigor #5). A *verification* journey that
+    # carries no observable check is just a description of clicks — it can pass
+    # while the feature is broken. The outcome (final beat) MUST be provable, or
+    # the whole journey proves nothing. This is the "verifiable at specify"
+    # mechanical tooth: a journey can't be authored unverifiable.
+    if require_verifiable:
+        total_asserts = sum(len(beat.get("asserts") or []) for beat in steps)
+        if total_asserts == 0:
+            raise ValueError(
+                "a verification journey needs at least one observable check — "
+                "every journey must carry an 'asserts' entry (what the user "
+                "should see / what proves it worked). A journey with no checks "
+                "can report green while the feature is broken."
+            )
+        if not (steps[-1].get("asserts") or []):
+            raise ValueError(
+                "the outcome of a verification journey must be observable — the "
+                "final step needs an 'asserts' entry (what proves the journey "
+                "succeeded). Without it the journey can pass while the feature "
+                "is broken."
+            )
 
     # Step names are the linkage the Workflow uses (workflow.steps holds
     # Step.name slugs, not ULIDs) — and the flat brain store keys files by

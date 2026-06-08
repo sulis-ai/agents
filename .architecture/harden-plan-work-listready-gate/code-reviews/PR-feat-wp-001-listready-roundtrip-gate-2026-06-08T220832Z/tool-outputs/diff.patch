@@ -1,0 +1,423 @@
+diff --git a/plugins/sulis/scripts/tests/unit/test_wpx_index_roundtrip.py b/plugins/sulis/scripts/tests/unit/test_wpx_index_roundtrip.py
+new file mode 100644
+index 00000000..e839d6c1
+--- /dev/null
++++ b/plugins/sulis/scripts/tests/unit/test_wpx_index_roundtrip.py
+@@ -0,0 +1,247 @@
++"""Unit tests for the list-ready round-trip gate folded into `wpx-index lint`
++(WP-001 / #60/#218/#222/#233, meta-diagnosis #97).
++
++Today's `cmd_lint` only checks the WP table HEADER shape
++(`validate_wp_index_header`, keyed off `_WP_TABLE_HEADER_RE`). That is a
++*proxy* for "the builder can read the to-do list": it is structurally blind
++to a canonical-header INDEX whose Status cells are all `ready`/`blocked`
++(never `pending`). The real builder consumer (`list-ready` →
++`_collect_status_across_tables` + `_resolve_deps`) then returns an empty
++ready/pending set and the break surfaces mid-build, not at decompose time.
++
++These tests pin the round-trip: after the header check passes, `cmd_lint`
++runs the SAME parse `list-ready` runs and asserts every authored `pending`
++WP is accounted for (the consumer SEES it — ready ∪ dependency-blocked). A
++0-WP / parse-fail result while WPs exist is a non-zero exit.
++
++Cases 1–3 MUST be red against today's gate (the bug); cases 4–5 MUST be
++green throughout (no false-positive). The wiring test pins the exit-code
++contract Step 9.5 reads.
++
++Fixture/helper shape reused from `test_wpx_index_multitable.py` (EP-03 — the
++established pattern in this dir).
++"""
++
++from __future__ import annotations
++
++import argparse
++import importlib.util
++import io
++import json
++from contextlib import redirect_stdout
++from importlib.machinery import SourceFileLoader
++from pathlib import Path
++
++_SCRIPTS = Path(__file__).resolve().parents[2]
++_WPX_INDEX = _SCRIPTS / "wpx-index"
++
++
++def _load_wpx_index():
++    loader = SourceFileLoader("wpx_index_mod_rt", str(_WPX_INDEX))
++    spec = importlib.util.spec_from_loader("wpx_index_mod_rt", loader)
++    mod = importlib.util.module_from_spec(spec)
++    loader.exec_module(mod)
++    return mod
++
++
++wpx = _load_wpx_index()
++
++
++# ─── fixtures ────────────────────────────────────────────────────────────────
++
++# (1) No WP table at all — "readable layout" prose only. The consumer can
++# parse nothing; the break would surface mid-build.
++_NO_WP_TABLE_INDEX = """# Work Package Index
++
++## Orchestrator Config
++max_parallel: 3
++
++## Plan
++
++We will decompose into a readable layout of work, addressed in order. No
++machine-readable table is emitted here.
++"""
++
++# (2) Canonical-shaped rows under a NON-canonical header (`| WP |` + a
++# duplicate `kind` column) — the #60/#218/#233 drift. Invisible to
++# `_WP_TABLE_HEADER_RE`.
++_NONCANONICAL_HEADER_INDEX = """# Work Package Index
++
++## WP table
++
++| WP | Title | kind | Primitive | Status | Depends On | Blocks |
++|---|---|---|---|---|---|---|
++| WP-001 | Foundation | backend | create | pending | — | WP-002 |
++| WP-002 | Builds on it | backend | create | pending | WP-001 | — |
++"""
++
++# (3) Canonical header, but every Status cell is `ready`/`blocked` — none
++# `pending`. The load-bearing #222 case: the header lint passes, yet the
++# consumer's pending set is empty (decompose NOT actually done).
++_ALL_NONPENDING_INDEX = """# Work Package Index
++
++## WP table
++
++| ID | Title | Primitive | Status | Depends On | Blocks |
++|---|---|---|---|---|---|
++| WP-001 | Foundation | create | ready | — | WP-002 |
++| WP-002 | Builds on it | create | blocked | WP-001 | — |
++"""
++
++# (4) Canonical header, ≥1 `pending` WP — a mix of immediately-ready
++# (no deps) and dependency-blocked (dep on a pending WP). Healthy INDEX.
++_CANONICAL_PENDING_INDEX = """# Work Package Index
++
++## WP table
++
++| ID | Title | Primitive | Status | Depends On | Blocks |
++|---|---|---|---|---|---|
++| WP-001 | Foundation | create | pending | — | WP-002 |
++| WP-002 | Builds on it | create | pending | WP-001 | — |
++"""
++
++# (5) Canonical header, every WP `pending` but every WP depends on another
++# pending WP → 0 immediately ready. The consumer still SEES all of them
++# (dependency-blocked), so the round-trip property "accounted for" holds.
++# (A pathological cycle is fine for this property test — it proves the gate
++# does not require ready ≥ 1.)
++_FULLY_DEPCHAINED_INDEX = """# Work Package Index
++
++## WP table
++
++| ID | Title | Primitive | Status | Depends On | Blocks |
++|---|---|---|---|---|---|
++| WP-001 | A | create | pending | WP-002 | — |
++| WP-002 | B | create | pending | WP-001 | — |
++"""
++
++
++def _write_index(tmp_path: Path, index_text: str) -> Path:
++    """Create .architecture/proj/work-packages/INDEX.md (no WP files →
++    deps resolve from the table dep column, the single-table fallback path)."""
++    wp_dir = tmp_path / ".architecture" / "proj" / "work-packages"
++    wp_dir.mkdir(parents=True)
++    (wp_dir / "INDEX.md").write_text(index_text, encoding="utf-8")
++    return tmp_path
++
++
++def _ns(tmp_path: Path, **kw) -> argparse.Namespace:
++    base = {"repo_root": str(tmp_path), "project": "proj"}
++    base.update(kw)
++    return argparse.Namespace(**base)
++
++
++def _run(fn, ns) -> dict:
++    """Invoke a cmd_* function; capture the emit JSON + SystemExit code."""
++    buf = io.StringIO()
++    code = None
++    with redirect_stdout(buf):
++        try:
++            fn(ns)
++        except SystemExit as exc:
++            code = exc.code
++    out = buf.getvalue().strip()
++    data = json.loads(out) if out else {}
++    data["_exit"] = code
++    return data
++
++
++# ─── case 1: no WP table → gate FAILS (#97) ──────────────────────────────────
++
++
++def test_missing_wp_table_fails_gate(tmp_path):
++    """An INDEX with no WP table (prose only) must fail the gate. The
++    consumer can parse nothing — a non-zero exit at decompose time, not a
++    silent mid-build break."""
++    _write_index(tmp_path, _NO_WP_TABLE_INDEX)
++    result = _run(wpx.cmd_lint, _ns(tmp_path))
++    assert result["ok"] is False
++    assert result["_exit"] != 0
++
++
++# ─── case 2: non-canonical header → gate FAILS (#218/#233) ────────────────────
++
++
++def test_noncanonical_header_fails_gate(tmp_path):
++    """Canonical-shaped rows under a `| WP |` / duplicate-`kind` header are
++    invisible to the consumer. The gate must fail."""
++    _write_index(tmp_path, _NONCANONICAL_HEADER_INDEX)
++    result = _run(wpx.cmd_lint, _ns(tmp_path))
++    assert result["ok"] is False
++    assert result["_exit"] != 0
++
++
++# ─── case 3: all-non-pending statuses → gate FAILS (#222, LOAD-BEARING) ───────
++
++
++def test_status_vocab_all_nonpending_fails_gate(tmp_path):
++    """The case the header lint CANNOT catch: canonical header passes, but
++    every Status cell is `ready`/`blocked` (none `pending`). The consumer's
++    pending set is empty → decompose NOT done. MUST be red against today's
++    gate (which only checks the header) and green after this WP's change."""
++    _write_index(tmp_path, _ALL_NONPENDING_INDEX)
++    result = _run(wpx.cmd_lint, _ns(tmp_path))
++    assert result["ok"] is False, (
++        "all-non-pending INDEX passed the gate — the header lint is blind to "
++        "this (#222); the round-trip must catch it"
++    )
++    assert result["_exit"] != 0
++
++
++# ─── case 4: canonical + ≥1 pending → gate PASSES (no false-positive) ─────────
++
++
++def test_canonical_with_pending_passes_gate(tmp_path):
++    """A healthy INDEX (canonical header, ≥1 pending WP, mix of ready and
++    dependency-blocked) must pass and report round_trip ok."""
++    _write_index(tmp_path, _CANONICAL_PENDING_INDEX)
++    result = _run(wpx.cmd_lint, _ns(tmp_path))
++    assert result["ok"] is True, f"healthy INDEX wrongly failed: {result}"
++    assert result["_exit"] == 0
++    assert result["data"]["round_trip"] == "ok"
++
++
++# ─── case 5: fully dep-chained, 0 ready, all accounted → PASSES ───────────────
++
++
++def test_fully_depchained_zero_ready_still_passes(tmp_path):
++    """Every WP `pending` but each depends on another pending WP → 0
++    immediately ready, yet the consumer SEES every WP (dependency-blocked).
++    The property is "accounted for", not "ready ≥ 1" (Contract invariant 2),
++    so the gate must pass."""
++    _write_index(tmp_path, _FULLY_DEPCHAINED_INDEX)
++    result = _run(wpx.cmd_lint, _ns(tmp_path))
++    assert result["ok"] is True, (
++        f"fully dep-chained INDEX wrongly failed — gate is requiring ready>=1 "
++        f"instead of accounted-for: {result}"
++    )
++    assert result["_exit"] == 0
++
++
++# ─── wiring: Step 9.5 exit-code contract ("non-zero = not done") ──────────────
++
++
++def test_step95_treats_variants_as_done_state(tmp_path):
++    """The SPEC "Wiring check" as a test over `cmd_lint`'s exit code — which
++    is exactly what plan-work Step 9.5 reads: cases 1–3 non-zero (decompose
++    NOT done), cases 4–5 zero (done)."""
++    # cases 1-3 → non-zero
++    for index_text in (_NO_WP_TABLE_INDEX, _NONCANONICAL_HEADER_INDEX,
++                       _ALL_NONPENDING_INDEX):
++        sub = tmp_path / f"p{abs(hash(index_text))}"
++        _write_index(sub, index_text)
++        result = _run(wpx.cmd_lint, _ns(sub))
++        assert result["_exit"] != 0, (
++            f"expected non-zero (not-done) exit for fixture, got "
++            f"{result['_exit']}: {result}"
++        )
++
++    # cases 4-5 → zero
++    for index_text in (_CANONICAL_PENDING_INDEX, _FULLY_DEPCHAINED_INDEX):
++        sub = tmp_path / f"q{abs(hash(index_text))}"
++        _write_index(sub, index_text)
++        result = _run(wpx.cmd_lint, _ns(sub))
++        assert result["_exit"] == 0, (
++            f"expected zero (done) exit for healthy fixture, got "
++            f"{result['_exit']}: {result}"
++        )
+diff --git a/plugins/sulis/scripts/wpx-index b/plugins/sulis/scripts/wpx-index
+index 714a2fcf..d385df0b 100755
+--- a/plugins/sulis/scripts/wpx-index
++++ b/plugins/sulis/scripts/wpx-index
+@@ -794,24 +794,102 @@ def cmd_audit_contracts(args: argparse.Namespace) -> None:
+     emit_ok(data={"violations": [], "wp_count": len(wps)})
+ 
+ 
+-def cmd_lint(args: argparse.Namespace) -> None:
+-    """#60 — fail loudly if INDEX.md's WP table header drifted.
++def _roundtrip_accounting(
++    args: argparse.Namespace, text: str,
++) -> tuple[dict[str, str], list[str], set[str]]:
++    """Run the EXACT parse `list-ready` runs against ``text`` and report
++    what the real builder consumer sees (WP-001).
++
++    Reuses ``_collect_status_across_tables`` + ``_resolve_deps`` — the same
++    helpers ``cmd_list_ready`` calls — so the gate can never disagree with
++    ``list-ready`` about what counts as a runnable INDEX (EP-03 single
++    source of truth). It MUST NOT re-implement INDEX parsing.
++
++    Returns ``(status_by_id, pending, unaccounted)``:
++
++    * ``status_by_id`` — WP-ID → live status across every WP sub-table.
++      Empty means the consumer can parse no WP table at all.
++    * ``pending`` — the authored ``pending`` WP-IDs.
++    * ``unaccounted`` — authored ``pending`` WPs the consumer cannot see at
++      all. A pending WP is "accounted for" when the consumer SEES it —
++      whether it is immediately ready (all deps done) or dependency-blocked
++      (≥1 dep not done); either way ``list-ready`` will surface it. The
++      failure mode is the consumer being *blind* to a pending WP, NOT the
++      consumer reporting it as not-yet-ready (Contract invariant 2). Because
++      ``_resolve_deps`` is keyed over the same WP set, every pending WP is
++      seen, so this is empty in practice — it is computed (not assumed) so
++      the gate names any future divergence rather than silently passing.
++    """
++    status_by_id = _collect_status_across_tables(text)
++    pending = [wp for wp, status in status_by_id.items() if status == "pending"]
++    depends_by_id = _resolve_deps(args, text, set(status_by_id))
++    seen = set(depends_by_id)
++    unaccounted = {wp for wp in pending if wp not in seen}
++    return status_by_id, pending, unaccounted
+ 
+-    Decompose-time gate: a non-canonical header (e.g.
+-    ``| WP | Title | kind | Primitive | ... |``) is invisible to
+-    ``_WP_TABLE_HEADER_RE`` and so vanishes from the run-all loop, where
+-    flip-status / list-ready then fail silently mid-run. Running this at
+-    decompose time converts that silent failure into a surgical error.
+ 
+-    Reuses ``validate_wp_index_header`` (which keys off the SAME regex
+-    ``parse_index_md`` uses), so the lint can never disagree with the
+-    parser about what counts as a WP table.
++def cmd_lint(args: argparse.Namespace) -> None:
++    """#60/#218/#222/#233 — fail loudly when the decompose gate's INDEX is
++    not actually runnable by the real builder consumer.
++
++    Two checks, run in order, both BLOCKING (non-zero exit) so plan-work's
++    existing Step 9.5 wiring ("lint non-zero exit = decompose NOT done")
++    enforces them for free:
++
++    1. **Header shape** (``validate_wp_index_header``, keyed off the SAME
++       regex ``parse_index_md`` uses). A drifted header (e.g.
++       ``| WP | Title | kind | Primitive | ... |``) is invisible to the
++       run-all loop and fails silently mid-run; this turns it surgical.
++
++    2. **List-ready round-trip** (WP-001). The header check is a *proxy* —
++       it is blind to a canonical-header INDEX whose Status cells are all
++       ``ready``/``blocked`` (never ``pending``): the consumer then returns
++       an empty pending set and the break surfaces mid-build. So after the
++       header passes, drive the REAL consumer: run the exact parse
++       ``list-ready`` runs (``_collect_status_across_tables`` +
++       ``_resolve_deps``, via ``_roundtrip_accounting``) and assert every
++       authored ``pending`` WP is accounted for (ready ∪ dependency-blocked).
++       A 0-WP / parse-fail result while WPs exist is BLOCKING.
+     """
+     text = _read_index(args)
++
++    # (1) header-shape check — keep, runs first.
+     error = validate_wp_index_header(text)
+     if error is not None:
+         emit_error(error)
+-    emit_ok(data={"header": "canonical"})
++
++    # (2) round-trip: what does the real builder consumer actually see?
++    status_by_id, pending, unaccounted = _roundtrip_accounting(args, text)
++
++    if not status_by_id:
++        emit_error(
++            "INDEX.md has a canonical header but no WP rows the builder can "
++            "read (its ID/Status cells parse to nothing). The decompose is "
++            "not done — author the WP rows under the canonical header."
++        )
++
++    if not pending:
++        emit_error(
++            "INDEX.md has WP rows but none are `pending` — every Status cell "
++            "is already `ready`/`blocked`/`done`, so the builder sees no work "
++            "to run. The decompose is not done — author the to-do list with "
++            "`pending` WPs."
++        )
++
++    if unaccounted:
++        names = ", ".join(sorted(unaccounted))
++        emit_error(
++            f"INDEX.md has `pending` WPs the builder cannot account for: "
++            f"{names}. The decompose is not done — fix the WP table so every "
++            f"pending WP is readable by the to-do tracker."
++        )
++
++    emit_ok(data={
++        "header": "canonical",
++        "round_trip": "ok",
++        "pending": len(pending),
++        "accounted": len(pending) - len(unaccounted),
++    })
+ 
+ 
+ # ─────────────────────────────────────────────────────────────────────────
+diff --git a/plugins/sulis/skills/plan-work/SKILL.md b/plugins/sulis/skills/plan-work/SKILL.md
+index d0d934ff..d17b3f49 100644
+--- a/plugins/sulis/skills/plan-work/SKILL.md
++++ b/plugins/sulis/skills/plan-work/SKILL.md
+@@ -467,7 +467,7 @@ These standards shape the WP set's *shape*, not just the content:
+    (`flip-status`, `list-ready`, `lint`, etc.) and bricks run-all at
+    dispatch time (`Could not find WP table (no | ID | header)`).
+ 
+-9.5. **Decompose-time INDEX shape gate (#103 — MUST).** After writing
++9.5. **Decompose-time INDEX gate (#103/#222 — MUST).** After writing
+     `INDEX.md`, run `wpx-index lint` and treat a non-zero exit as a
+     BLOCKING gate failure of the decompose:
+ 
+@@ -476,15 +476,29 @@ These standards shape the WP set's *shape*, not just the content:
+     ```
+ 
+     On non-zero exit the decompose is **NOT done**. Read the lint
+-    error, fix the INDEX (typically: convert a bullet list to the
+-    canonical table, or correct a column-order typo per
+-    `## INDEX.md Structure` below), and re-run lint. Only proceed to
+-    Step 10 (Report) when lint exits 0.
+-
+-    This catches the #103 class — a list-shape INDEX surfacing as a
+-    cryptic "no | ID | header" error at run-all dispatch time, hours
+-    after the architect finished. Failing at authoring time is
+-    surgical; failing at run-all is a hard recovery.
++    error, fix the INDEX, and re-run lint. Only proceed to Step 10
++    (Report) when lint exits 0.
++
++    The gate runs two checks. First it checks the WP table's **header
++    shape** — a list-shape or drifted-header INDEX (the #103 class) is
++    invisible to the run-all loop and would otherwise surface as a
++    cryptic "no | ID | header" error at dispatch time, hours after the
++    architect finished. Second, it runs a **list-ready round-trip**: it
++    drives the exact same reader the builder uses and confirms the
++    to-do list is actually runnable. The header check alone is just a
++    proxy — it can't see an INDEX that has a perfect header but no
++    runnable work, so the round-trip additionally fails the decompose
++    when:
++
++    - there are no WP rows the builder can read (header present, rows
++      missing or unparseable);
++    - there are WP rows but **none are `pending`** (every status is
++      already `ready`/`blocked`/`done`, so the builder sees nothing to
++      run — the #222 class the header check cannot catch);
++    - a `pending` WP exists that the builder cannot account for at all.
++
++    Failing at authoring time is surgical; failing at run-all is a hard
++    recovery.
+ 
+ 10. **Report** — total WP count, critical path length, parallelisation
+     opportunity (how many WPs can be implemented simultaneously at peak),

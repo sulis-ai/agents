@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Switch to another product.",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:64116R38DS2BX2Z64KC10YSGZN",
+  "input_artifacts": [
+    "fbe7b1nz-with-more-than-one-product-open-the-boar-1-result"
+  ],
+  "mechanism": "human",
+  "name": "fbe7b1nz-switch-to-another-product-2",
+  "output_artifacts": [
+    "fbe7b1nz-switch-to-another-product-2-result"
+  ],
+  "postconditions": [
+    "the board (and search/filters) re-scope to that product",
+    "no other product's changes are shown"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

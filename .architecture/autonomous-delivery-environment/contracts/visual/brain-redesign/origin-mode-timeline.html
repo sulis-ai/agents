@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Change origin — mode timeline (UNSIGNED)</title>
+<!--
+  ============================================================================
+  REVIEW MOCKUP (UNSIGNED — for founder choice) · Sulis cockpit
+  CHANGE ORIGIN / ATTRIBUTION — Mockup 2 of 2 · "origin-mode-timeline"
+  ----------------------------------------------------------------------------
+  The ambitious C fork: THE STORY OF THE WORK. In Provenance, a horizontal
+  MODE TIMELINE strip across the top — time-ordered bands showing where work
+  was Autonomous vs Assisted; the seam between bands is where the mode shifted.
+    - Solid fill  = recorded (exact, stamped at source)
+    - Hatched/lighter fill = approximate (inferred from timing)
+    A one-line legend explains the two fills.
+  Clicking a band reveals what happened in that stretch (below the strip):
+    - Autonomous band → the runs + confidence
+    - Assisted band  → the conversation summaries + "Open conversation →"
+  One Assisted band is shown clicked-open.
+
+  The per-file ORIGIN BADGE from Mockup 1 is REUSED below the timeline, so the
+  two ideas visibly share the badge idiom.
+
+  Bound to the SIGNED design instance (apps/cockpit/client/src/tokens.css /
+  sulis-app.html): every colour a var(--*); fonts loaded (L-13). Heroicons
+  (MIT): bolt = Autonomous, chat-bubble = Assisted, clock = timeline,
+  arrow-uturn-left = trace-back, question-mark-circle = unknown. Worded status
+  never colour-alone. AA pairs. Progressive disclosure: band → detail on click.
+  AA-internal ink shades in :root, flagged pending token regen. UNSIGNED.
+  ============================================================================
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet">
+<style>
+/* ===== TOKENS — verbatim from apps/cockpit/client/src/tokens.css :root (light) ===== */
+:root{
+  --background:#fafafa; --foreground:#171717;
+  --card:#ffffff; --card-foreground:#171717;
+  --popover:#ffffff; --popover-foreground:#171717;
+  --muted:#f5f5f5; --muted-foreground:#737373;
+  --secondary:#f5f5f5; --secondary-foreground:#171717;
+  --border:#e5e5e5; --border-muted:#f0f0f0; --input:#e5e5e5;
+  --primary:#2563EB; --primary-foreground:#FFFFFF;
+  --accent:#2D7D90; --accent-foreground:#FFFFFF;
+  --destructive:#DC2626; --destructive-foreground:#FFFFFF;
+  --positive:#16A34A; --positive-foreground:#FFFFFF;
+  --warning:#F59E0B; --warning-foreground:#121212;
+  --ring:#2563EB; --brand-gold:#C9A962; --brand-depth:#1E3A5F;
+  --bg-positive:#F0FDF4; --bg-positive-border:#BBF7D0;
+  --bg-destructive:#FEF2F2; --bg-destructive-border:#FECACA;
+  --bg-warning:#FFFBEB; --bg-warning-border:#FDE68A;
+  --stage-recon:#8B7355; --stage-specify:#6366F1; --stage-design:#2D7D90;
+  --stage-implement:#2563EB; --stage-review:#9333EA; --stage-ship:#15803D;
+  --radius-interactive:4px; --radius-button:9999px; --radius-container:4px;
+  --radius-badge:9999px; --radius-media:4px;
+  --font-sans:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-display:'Satoshi',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono','SF Mono','Monaco','Inconsolata','Fira Mono',monospace;
+  --weight-body:400; --weight-heading:300; --weight-label:500;
+  --bg-card:var(--card); --bg-muted:var(--muted); --border-light:var(--border-muted);
+  --font:var(--font-sans); --radius:var(--radius-container);
+  --text:var(--foreground); --text-secondary:#525252; --text-muted:var(--muted-foreground);
+  --attn-icon:#B45309;
+  --bg-accent:color-mix(in srgb,var(--accent) 8%,#fff);
+  --bg-accent-border:color-mix(in srgb,var(--accent) 28%,var(--border));
+  --accent-ink:#246676;     /* on --bg-accent (~5.9:1) — pending token regen */
+  --specify-ink:#4338CA;    /* assisted = specify-indigo family (~7.1:1) */
+  --bg-specify:color-mix(in srgb,var(--stage-specify) 9%,#fff);
+  --bg-specify-border:color-mix(in srgb,var(--stage-specify) 26%,var(--border));
+  /* timeline band fills — recorded = solid tint; approx = lighter + hatched */
+  --band-auto-solid:color-mix(in srgb,var(--accent) 16%,#fff);
+  --band-auto-line:color-mix(in srgb,var(--accent) 30%,#fff);
+  --band-assist-solid:color-mix(in srgb,var(--stage-specify) 16%,#fff);
+  --band-assist-line:color-mix(in srgb,var(--stage-specify) 30%,#fff);
+  --shadow-float:0 6px 20px rgba(23,23,23,.08), 0 1px 3px rgba(23,23,23,.06);
+}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#EDEAE3;color:var(--text);font-family:var(--font-sans);font-weight:var(--weight-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+:focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:var(--radius)}
+button{appearance:none;-webkit-appearance:none;background:none;border:0;margin:0;padding:0;font:inherit;color:inherit;line-height:inherit;text-align:inherit}
+button,[role="button"],[tabindex],a{cursor:pointer}
+svg{display:block}
+[hidden]{display:none!important}
+
+.docnote{max-width:1440px;margin:0 auto;padding:18px 28px 6px;color:var(--text-secondary);font-size:12.5px}
+.docnote b{color:var(--text);font-weight:600}
+.frame{width:1440px;height:1220px;margin:8px auto 28px;background:var(--background);border-radius:10px;overflow:hidden;border:1px solid var(--border);box-shadow:0 1px 3px rgba(23,23,23,.07);display:flex;flex-direction:column}
+
+/* ===== WORKSPACE TOP BAR (verbatim shell) ===== */
+.topbar{flex:0 0 auto;display:flex;align-items:stretch;background:var(--card);border-bottom:1px solid var(--border);height:48px}
+.prodswitch{display:flex;align-items:center;gap:9px;padding:0 14px;border-right:1px solid var(--border);min-width:210px}
+.prodswitch .tile{width:28px;height:28px;flex:none;border-radius:7px;background:var(--brand-depth);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:12px;letter-spacing:.02em}
+.prodswitch .pn{font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--text);letter-spacing:-.01em}
+.prodswitch .chev{margin-left:auto;color:var(--text-muted)}
+.prodswitch:hover{background:var(--bg-muted)}
+.tabstrip{display:flex;align-items:stretch;gap:0;flex:1;min-width:0;overflow:hidden}
+.gtab{display:flex;align-items:center;gap:8px;padding:0 14px;border-right:1px solid var(--border);color:var(--text-secondary);font-size:13px;font-weight:var(--weight-label);position:relative;white-space:nowrap;max-width:280px}
+.gtab .ic{width:18px;height:18px;flex:none;color:var(--text-muted)}
+.gtab:hover{background:var(--bg-muted);color:var(--text)}
+.gtab .nm{overflow:hidden;text-overflow:ellipsis}
+.gtab .sdot{width:8px;height:8px;border-radius:50%;flex:none}
+.gtab .x{width:18px;height:18px;flex:none;display:inline-flex;align-items:center;justify-content:center;border-radius:5px;color:var(--text-muted);margin-left:2px}
+.gtab .x:hover{background:var(--border);color:var(--text)}
+.gtab .x svg{width:13px;height:13px}
+.gtab.active{background:var(--background);color:var(--text);font-weight:600}
+.gtab.active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--accent)}
+.tabstrip .newtab{display:inline-flex;align-items:center;justify-content:center;width:42px;color:var(--text-muted);border-right:1px solid var(--border)}
+.tabstrip .newtab:hover{background:var(--bg-muted);color:var(--text)}
+.tabstrip .newtab svg{width:18px;height:18px}
+
+/* ===== THE OPEN CHANGE — left nav + full-width main (verbatim shell) ===== */
+.change{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:248px 1fr}
+.leftnav{background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:auto;padding:16px 12px 12px}
+.cn-head{padding:2px 8px 14px;border-bottom:1px solid var(--border-muted);margin-bottom:6px}
+.cn-kicker{font-family:var(--font-mono);font-size:11px;color:var(--text-muted)}
+.cn-name{font-size:15px;font-weight:600;line-height:1.3;color:var(--text);margin-top:4px;letter-spacing:-.01em}
+.cn-meta{display:flex;align-items:center;gap:7px;margin-top:9px}
+.stagebadge{padding:3px 9px;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;border-radius:var(--radius);background:var(--bg-accent);color:var(--accent-ink);border:1px solid var(--bg-accent-border)}
+.cn-live{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary);font-weight:var(--weight-label)}
+.cn-live .g{width:8px;height:8px;border-radius:50%;background:var(--positive);box-shadow:0 0 0 2px var(--bg-positive)}
+.cn-sectionlabel{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin:14px 8px 8px;font-weight:600}
+.vtrack{list-style:none;margin:0 4px 4px;padding:0}
+.vstep{display:flex;align-items:center;gap:10px;padding:4px 8px;font-size:12px;color:var(--text-muted);position:relative}
+.vstep .vd{width:10px;height:10px;border-radius:50%;background:var(--input);flex:none;border:2px solid var(--card);z-index:2}
+.vstep:not(:last-child)::before{content:"";position:absolute;left:13px;top:18px;width:1px;height:14px;background:var(--border);z-index:1}
+.vstep[data-state="done"]{color:var(--text-secondary)}
+.vstep[data-state="done"] .vd{background:var(--text-secondary)}
+.vstep[data-state="now"]{color:var(--accent);font-weight:700}
+.vstep[data-state="now"] .vd{background:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,#fff)}
+.vstep .vw{margin-left:auto;font-size:9px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;color:var(--text-muted)}
+.vstep[data-state="now"] .vw{color:var(--accent)}
+.navitem{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:var(--radius);color:var(--text-secondary);font-size:13px;border:1px solid transparent;text-decoration:none;font-weight:var(--weight-label);width:100%}
+.navitem:hover{background:var(--bg-muted);color:var(--text)}
+.navitem.active{background:var(--bg-muted);color:var(--text)}
+.navitem .ic{width:20px;height:20px;flex:none;color:var(--text-muted)}
+.navitem.active .ic{color:var(--accent)}
+.navitem .cnt{margin-left:auto;font-size:11px;color:var(--text-muted);font-family:var(--font-mono)}
+.leftnav-foot{margin-top:auto;padding:12px 8px 2px;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:7px;border-top:1px solid var(--border-muted)}
+.leftnav-foot .g{width:8px;height:8px;border-radius:50%;background:var(--positive);flex:none;box-shadow:0 0 0 2px var(--bg-positive)}
+
+/* ===== MAIN AREA ===== */
+.main{display:flex;flex-direction:column;min-width:0;overflow-y:auto;background:var(--background);scrollbar-width:thin}
+.wrap{max-width:1000px;margin:0 auto;width:100%;padding:10px 28px 40px}
+.dhead{display:flex;align-items:flex-end;gap:12px;margin-bottom:16px}
+.dhead .ttl{font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:-.015em;color:var(--text)}
+.dhead .sub{font-size:13px;color:var(--text-secondary);margin-top:3px}
+.dhead .conf{margin-left:auto;display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:var(--weight-label);color:var(--accent-ink);background:var(--bg-accent);border:1px solid var(--bg-accent-border);border-radius:var(--radius-button);padding:5px 12px}
+.dhead .conf svg{width:14px;height:14px}
+
+/* ===== THE MODE TIMELINE STRIP ===== */
+.tlcard{border:1px solid var(--border);border-radius:12px;background:var(--card);box-shadow:0 1px 2px rgba(23,23,23,.04);padding:16px 18px 18px;margin-bottom:8px}
+.tlhead{display:flex;align-items:center;gap:9px;margin-bottom:13px}
+.tlhead .ti{width:28px;height:28px;flex:none;border-radius:8px;background:var(--bg-accent);border:1px solid var(--bg-accent-border);color:var(--accent-ink);display:inline-flex;align-items:center;justify-content:center}
+.tlhead .ti svg{width:15px;height:15px}
+.tlhead .tt{font-size:14px;font-weight:600;color:var(--text)}
+.tlhead .tsub{font-size:11.5px;color:var(--text-secondary);margin-top:1px}
+
+/* the band strip */
+.strip{display:flex;align-items:stretch;gap:3px;height:58px;border-radius:9px;overflow:hidden;border:1px solid var(--border)}
+.band{position:relative;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;padding:0 13px;border:0;text-align:left;color:var(--text);overflow:hidden}
+.band .bl{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;position:relative;z-index:2}
+.band .bl svg{width:13px;height:13px;flex:none}
+.band .bw{font-size:10.5px;color:var(--text-secondary);margin-top:2px;position:relative;z-index:2}
+.band.auto{background:var(--band-auto-solid)}
+.band.assist{background:var(--band-assist-solid)}
+.band.auto .bl{color:var(--accent-ink)} .band.auto .bl svg{color:var(--accent-ink)}
+.band.assist .bl{color:var(--specify-ink)} .band.assist .bl svg{color:var(--specify-ink)}
+/* approx (inferred) = lighter base + diagonal hatch overlay */
+.band.approx::before{content:"";position:absolute;inset:0;z-index:1;
+  background-image:repeating-linear-gradient(45deg, transparent 0 6px, color-mix(in srgb,var(--foreground) 7%,transparent) 6px 7px);}
+.band.approx.auto{background:color-mix(in srgb,var(--accent) 8%,#fff)}
+.band.approx.assist{background:color-mix(in srgb,var(--stage-specify) 8%,#fff)}
+.band.sel{outline:2px solid var(--accent);outline-offset:-2px}
+.band:hover{filter:brightness(.985)}
+/* seam marker between two bands of different mode */
+.seam{width:3px;flex:none;background:repeating-linear-gradient(to bottom, var(--text-muted) 0 3px, transparent 3px 6px)}
+/* time axis under the strip */
+.axis{display:flex;justify-content:space-between;margin-top:7px;font-family:var(--font-mono);font-size:10px;color:var(--text-muted)}
+/* legend */
+.legend{display:flex;align-items:center;gap:18px;margin-top:13px;flex-wrap:wrap}
+.lg{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--text-secondary)}
+.lg .sw{width:26px;height:14px;border-radius:4px;border:1px solid var(--border);flex:none}
+.lg .sw.solid{background:var(--band-auto-solid)}
+.lg .sw.hatch{background:color-mix(in srgb,var(--accent) 8%,#fff);background-image:repeating-linear-gradient(45deg, transparent 0 5px, color-mix(in srgb,var(--foreground) 9%,transparent) 5px 6px)}
+.lg b{color:var(--text);font-weight:600}
+
+/* ===== BAND DETAIL (revealed on click) ===== */
+.banddetail{margin-top:14px;border:1px solid var(--bg-specify-border);border-radius:11px;background:var(--card);overflow:hidden}
+.banddetail.autoD{border-color:var(--bg-accent-border)}
+.bd-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border-muted);background:var(--bg-specify)}
+.banddetail.autoD .bd-head{background:var(--bg-accent)}
+.bd-head .bi{width:28px;height:28px;flex:none;border-radius:7px;background:var(--card);border:1px solid var(--bg-specify-border);color:var(--specify-ink);display:inline-flex;align-items:center;justify-content:center}
+.banddetail.autoD .bd-head .bi{border-color:var(--bg-accent-border);color:var(--accent-ink)}
+.bd-head .bi svg{width:15px;height:15px}
+.bd-head .bt{font-size:13.5px;font-weight:600;color:var(--text)}
+.bd-head .bm{font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);margin-top:1px}
+.bd-head .approxtag{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:600;color:var(--attn-icon);background:var(--bg-warning);border:1px solid var(--bg-warning-border);border-radius:var(--radius-button);padding:3px 10px}
+.bd-head .approxtag svg{width:12px;height:12px}
+.bd-body{padding:8px 10px 10px}
+.bditem{display:flex;align-items:flex-start;gap:11px;padding:10px 12px;border-radius:9px}
+.bditem + .bditem{border-top:1px solid var(--border-muted)}
+.bditem .bav{width:28px;height:28px;flex:none;border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
+.bditem .bav.conv{background:var(--bg-specify);border:1px solid var(--bg-specify-border);color:var(--specify-ink)}
+.bditem .bav.run{background:var(--bg-accent);border:1px solid var(--bg-accent-border);color:var(--accent-ink);border-radius:7px}
+.bditem .bav svg{width:15px;height:15px}
+.bditem .bx{flex:1;min-width:0}
+.bditem .bx .q{font-size:13px;color:var(--text);line-height:1.5}
+.bditem .bx .bmeta{font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);margin-top:5px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.bditem .bx .files{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap}
+.fchip{font-family:var(--font-mono);font-size:10.5px;color:var(--text-secondary);background:var(--bg-muted);border:1px solid var(--border);border-radius:var(--radius-button);padding:2px 9px}
+.bditem .openconv{margin-top:9px;display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:var(--weight-label);color:var(--accent-foreground);background:var(--accent);border-radius:var(--radius-button);padding:7px 14px}
+.bditem .openconv:hover{filter:brightness(.95)}
+.bditem .openconv svg{width:14px;height:14px}
+.mchip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:var(--radius-button);font-size:10.5px;font-weight:600;border:1px solid var(--border)}
+.mchip svg{width:12px;height:12px}
+.mchip.done{background:var(--bg-positive);border-color:var(--bg-positive-border);color:var(--stage-ship)}
+.mchip.conf{background:var(--bg-accent);border-color:var(--bg-accent-border);color:var(--accent-ink)}
+
+.hint{font-size:11.5px;color:var(--text-muted);margin:8px 2px 0;display:flex;align-items:center;gap:7px}
+.hint svg{width:14px;height:14px;flex:none}
+
+/* ===== REUSED PER-FILE BADGE BLOCK (shared idiom with Mockup 1) ===== */
+.sec2{margin-top:26px}
+.sec2 .s2h{display:flex;align-items:baseline;gap:10px;margin-bottom:4px}
+.sec2 .s2t{font-family:var(--font-display);font-size:16px;font-weight:700;letter-spacing:-.01em;color:var(--text)}
+.sec2 .s2s{font-size:12px;color:var(--text-secondary)}
+.secdiv{height:1px;background:var(--border-muted);margin:8px 0 14px}
+.obadge{display:inline-flex;align-items:center;gap:6px;padding:3px 11px 3px 9px;border-radius:var(--radius-button);font-size:11.5px;font-weight:600;border:1px solid var(--border);white-space:nowrap}
+.obadge svg{width:13px;height:13px;flex:none}
+.obadge .qual{font-weight:500;opacity:.85}
+.obadge.auto{background:var(--bg-accent);border-color:var(--bg-accent-border);color:var(--accent-ink)}
+.obadge.assist{background:var(--bg-specify);border-color:var(--bg-specify-border);color:var(--specify-ink)}
+.obadge.unknown{background:var(--bg-muted);border-color:var(--border);color:var(--text-secondary)}
+.filelist{border:1px solid var(--border);border-radius:10px;background:var(--card);overflow:hidden;box-shadow:0 1px 2px rgba(23,23,23,.04)}
+.filerow{display:flex;align-items:center;gap:13px;padding:12px 16px;border-bottom:1px solid var(--border-muted)}
+.filerow:last-child{border-bottom:0}
+.fr-ic{width:30px;height:30px;flex:none;border-radius:7px;background:var(--bg-muted);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;color:var(--text-secondary)}
+.fr-ic svg{width:16px;height:16px}
+.fr-tx{flex:1;min-width:0}
+.fr-tx .fn{font-family:var(--font-mono);font-size:13px;color:var(--text);font-weight:500}
+.fr-tx .fm{font-size:11.5px;color:var(--text-muted);margin-top:2px}
+.fr-stat{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;font-family:var(--font-mono);margin-right:4px}
+.fr-stat .add{color:var(--stage-ship)} .fr-stat .del{color:var(--destructive)}
+</style>
+</head>
+<body>
+<div class="docnote"><b>Change origin — Mockup 2 of 2: mode timeline (UNSIGNED).</b> The ambitious fork — the story of the work. A horizontal strip shows time-ordered bands where work was Autonomous vs Assisted; the seam between bands is where the mode shifted. Solid fill = recorded exactly; hatched fill = inferred (“approx”). Click any band to see what happened in that stretch (one Assisted band is shown open). The per-file origin badge from Mockup 1 is reused below so the two ideas share one idiom. Real tokens, fonts loaded, Heroicons.</div>
+
+<div class="frame">
+
+  <!-- ===== WORKSPACE TOP BAR (verbatim shell) ===== -->
+  <div class="topbar">
+    <button class="prodswitch" type="button" aria-label="Switch product — Clinics">
+      <span class="tile" aria-hidden="true">CL</span>
+      <span class="pn">Clinics</span>
+      <svg class="chev" width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
+    </button>
+    <div class="tabstrip" role="tablist" aria-label="Open tabs">
+      <button class="gtab board" role="tab" aria-selected="false" type="button">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"/></svg>
+        <span class="nm">Board</span>
+      </button>
+      <div class="gtab active" role="tab" aria-selected="true" tabindex="0">
+        <span class="sdot" style="background:var(--stage-design)" aria-hidden="true"></span>
+        <span class="nm">Set up the autonomous delivery environment</span>
+        <span class="x" role="button" tabindex="0" aria-label="Close tab"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg></span>
+      </div>
+      <button class="gtab" role="tab" aria-selected="false" type="button">
+        <span class="sdot" style="background:var(--stage-implement)" aria-hidden="true"></span>
+        <span class="nm">Tidy the morning digest</span>
+        <span class="x" role="button" tabindex="0" aria-label="Close tab"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg></span>
+      </button>
+      <button class="newtab" type="button" aria-label="Open a new change tab"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg></button>
+    </div>
+  </div>
+
+  <!-- ===== THE OPEN CHANGE ===== -->
+  <div class="change">
+
+    <!-- LEFT NAV — Provenance selected -->
+    <nav class="leftnav" aria-label="Change navigation">
+      <div class="cn-head">
+        <div class="cn-kicker">autonomous-delivery-env</div>
+        <div class="cn-name">Set up the autonomous delivery environment</div>
+        <div class="cn-meta"><span class="stagebadge">Design</span><span class="cn-live"><span class="g" aria-hidden="true"></span>Running</span></div>
+      </div>
+      <div class="cn-sectionlabel">Stage</div>
+      <ol class="vtrack" aria-label="Change progress">
+        <li class="vstep" data-state="done"><span class="vd" aria-hidden="true"></span>Recon<span class="vw">Done</span></li>
+        <li class="vstep" data-state="done"><span class="vd" aria-hidden="true"></span>Specify<span class="vw">Done</span></li>
+        <li class="vstep" data-state="now" aria-current="step"><span class="vd" aria-hidden="true"></span>Design<span class="vw">Now</span></li>
+        <li class="vstep" data-state="pending"><span class="vd" aria-hidden="true"></span>Implement<span class="vw">Pending</span></li>
+        <li class="vstep" data-state="pending"><span class="vd" aria-hidden="true"></span>Review<span class="vw">Pending</span></li>
+        <li class="vstep" data-state="pending"><span class="vd" aria-hidden="true"></span>Ship<span class="vw">Pending</span></li>
+      </ol>
+      <div class="cn-sectionlabel">Views</div>
+      <a class="navitem" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 0 1-.825-.242m9.345-8.334a2.126 2.126 0 0 0-.476-.095 48.64 48.64 0 0 0-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0 0 11.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155"/></svg>Conversation</a>
+      <a class="navitem" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>Files <span class="cnt">16</span></a>
+      <button class="navitem active" aria-current="page"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m21 7.5-2.25-1.313M21 7.5v2.25m0-2.25-2.25 1.313M3 7.5l2.25-1.313M3 7.5l2.25 1.313M3 7.5v2.25m9 3 2.25-1.313M12 12.75l-2.25-1.313M12 12.75V15m0 6.75 2.25-1.313M12 21.75V19.5m0 2.25-2.25-1.313m0-16.875L12 2.25l2.25 1.313M21 14.25v2.25l-2.25 1.313m-13.5 0L3 16.5v-2.25"/></svg>Provenance <span class="cnt">119</span></button>
+      <a class="navitem" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>Preview</a>
+      <div class="leftnav-foot"><span class="g" aria-hidden="true"></span>Agent running in this change</div>
+    </nav>
+
+    <!-- ===== MAIN AREA ===== -->
+    <div class="main">
+      <div class="wrap">
+
+        <div class="dhead">
+          <div class="htxt">
+            <div class="ttl">How it came to be — the story of the work</div>
+            <div class="sub">Time runs left to right. Each band is a stretch of work; the seam is where the way of working changed.</div>
+          </div>
+          <span class="conf">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.403 12.652a3 3 0 0 0 0-5.304 3 3 0 0 0-3.75-3.751 3 3 0 0 0-5.305 0 3 3 0 0 0-3.751 3.75 3 3 0 0 0 0 5.305 3 3 0 0 0 3.75 3.751 3 3 0 0 0 5.305 0 3 3 0 0 0 3.751-3.75Zm-2.546-4.46a.75.75 0 0 0-1.214-.883l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+            88% confident overall
+          </span>
+        </div>
+
+        <!-- ===== THE MODE TIMELINE STRIP ===== -->
+        <div class="tlcard">
+          <div class="tlhead">
+            <span class="ti" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg></span>
+            <div><div class="tt">Mode timeline</div><div class="tsub">16 changes across two ways of working — click a band to see what happened.</div></div>
+          </div>
+
+          <!-- the strip: Autonomous (recorded) → seam → Assisted (approx) → seam → Autonomous (recorded) -->
+          <div class="strip" role="group" aria-label="Mode timeline — click a band">
+            <button class="band auto" type="button" data-band="b1" style="flex:6" aria-label="Autonomous stretch, recorded, 12 changes">
+              <span class="bl"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M11.983 1.907a.75.75 0 0 0-1.292-.657l-8.5 9.5A.75.75 0 0 0 2.75 12h6.572l-1.305 6.093a.75.75 0 0 0 1.292.657l8.5-9.5A.75.75 0 0 0 17.25 8h-6.572l1.305-6.093Z" clip-rule="evenodd"/></svg>Autonomous</span>
+              <span class="bw">12 changes · recorded</span>
+            </button>
+            <span class="seam" aria-hidden="true" title="the way of working changed here"></span>
+            <button class="band assist approx sel" type="button" data-band="b2" style="flex:4" aria-expanded="true" aria-label="Assisted stretch, approximate, 4 changes — open">
+              <span class="bl"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 2c-2.236 0-4.43.18-6.57.524C1.993 2.755 1 4.014 1 5.426v5.148c0 1.413.993 2.67 2.43 2.902.848.137 1.705.248 2.57.331v3.443a.75.75 0 0 0 1.28.53l3.58-3.579a.78.78 0 0 1 .527-.224 41.202 41.202 0 0 0 5.183-.5c1.437-.232 2.43-1.49 2.43-2.903V5.426c0-1.413-.993-2.67-2.43-2.902A41.289 41.289 0 0 0 10 2Z" clip-rule="evenodd"/></svg>Assisted</span>
+              <span class="bw">4 changes · approx</span>
+            </button>
+            <span class="seam" aria-hidden="true" title="the way of working changed here"></span>
+            <button class="band auto" type="button" data-band="b3" style="flex:3" aria-label="Autonomous stretch, recorded, verify pass">
+              <span class="bl"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M11.983 1.907a.75.75 0 0 0-1.292-.657l-8.5 9.5A.75.75 0 0 0 2.75 12h6.572l-1.305 6.093a.75.75 0 0 0 1.292.657l8.5-9.5A.75.75 0 0 0 17.25 8h-6.572l1.305-6.093Z" clip-rule="evenodd"/></svg>Autonomous</span>
+              <span class="bw">Verify · recorded</span>
+            </button>
+          </div>
+          <div class="axis"><span>09:12 — work began</span><span>now</span></div>
+
+          <!-- legend -->
+          <div class="legend">
+            <span class="lg"><span class="sw solid" aria-hidden="true"></span><b>Solid</b> = recorded exactly</span>
+            <span class="lg"><span class="sw hatch" aria-hidden="true"></span><b>Hatched</b> = inferred from timing (approx)</span>
+            <span class="lg"><span class="sw" style="background:repeating-linear-gradient(to bottom,var(--text-muted) 0 2px,transparent 2px 4px);width:5px;border:0;height:16px" aria-hidden="true"></span>Seam = the way of working changed</span>
+          </div>
+
+          <!-- BAND DETAIL — the Assisted band (b2), shown OPEN -->
+          <div class="banddetail" id="b2-detail">
+            <div class="bd-head">
+              <span class="bi" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2c-2.236 0-4.43.18-6.57.524C1.993 2.755 1 4.014 1 5.426v5.148c0 1.413.993 2.67 2.43 2.902.848.137 1.705.248 2.57.331v3.443a.75.75 0 0 0 1.28.53l3.58-3.579a.78.78 0 0 1 .527-.224 41.202 41.202 0 0 0 5.183-.5c1.437-.232 2.43-1.49 2.43-2.903V5.426c0-1.413-.993-2.67-2.43-2.902A41.289 41.289 0 0 0 10 2Z" clip-rule="evenodd"/></svg></span>
+              <div><div class="bt">Assisted stretch — shaped with you in a chat session</div><div class="bm">~3h ago · 4 changes</div></div>
+              <span class="approxtag"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/></svg>Approx — inferred from timing</span>
+            </div>
+            <div class="bd-body">
+              <div class="bditem">
+                <span class="bav conv" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.465 14.493a1.23 1.23 0 0 0 .41 1.412A9.957 9.957 0 0 0 10 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 0 0-13.074.003Z"/></svg></span>
+                <div class="bx">
+                  <div class="q">“Reworked the cart total so discounts apply before tax.”</div>
+                  <div class="bmeta"><span>turn 14 · you + the agent</span><span>~3h ago</span></div>
+                  <div class="files"><span class="fchip">cart.ts</span><span class="fchip">pricing.ts</span></div>
+                  <button class="openconv" type="button">Open conversation<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd"/></svg></button>
+                </div>
+              </div>
+              <div class="bditem">
+                <span class="bav conv" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.465 14.493a1.23 1.23 0 0 0 .41 1.412A9.957 9.957 0 0 0 10 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 0 0-13.074.003Z"/></svg></span>
+                <div class="bx">
+                  <div class="q">“Added a guard so an empty cart can’t reach checkout, and noted it in the README.”</div>
+                  <div class="bmeta"><span>turn 18 · you + the agent</span><span>~2h ago</span></div>
+                  <div class="files"><span class="fchip">cart.ts</span><span class="fchip">README.md</span></div>
+                  <button class="openconv" type="button">Open conversation<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd"/></svg></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BAND DETAIL — the first Autonomous band (b1), hidden until clicked -->
+          <div class="banddetail autoD" id="b1-detail" hidden>
+            <div class="bd-head">
+              <span class="bi" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.983 1.907a.75.75 0 0 0-1.292-.657l-8.5 9.5A.75.75 0 0 0 2.75 12h6.572l-1.305 6.093a.75.75 0 0 0 1.292.657l8.5-9.5A.75.75 0 0 0 17.25 8h-6.572l1.305-6.093Z" clip-rule="evenodd"/></svg></span>
+              <div><div class="bt">Autonomous stretch — runs, no human in the loop</div><div class="bm">09:12 → 11:40 · 12 changes</div></div>
+            </div>
+            <div class="bd-body">
+              <div class="bditem">
+                <span class="bav run" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.983 1.907a.75.75 0 0 0-1.292-.657l-8.5 9.5A.75.75 0 0 0 2.75 12h6.572l-1.305 6.093a.75.75 0 0 0 1.292.657l8.5-9.5A.75.75 0 0 0 17.25 8h-6.572l1.305-6.093Z" clip-rule="evenodd"/></svg></span>
+                <div class="bx">
+                  <div class="q">Specify pass — turned the brief into a written spec and built the payment flow against it.</div>
+                  <div class="bmeta"><span>16 steps · completed</span></div>
+                  <div class="files" style="margin-top:8px"><span class="mchip done"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>Completed</span><span class="mchip conf">88% confident</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BAND DETAIL — the second Autonomous band (b3), hidden until clicked -->
+          <div class="banddetail autoD" id="b3-detail" hidden>
+            <div class="bd-head">
+              <span class="bi" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.983 1.907a.75.75 0 0 0-1.292-.657l-8.5 9.5A.75.75 0 0 0 2.75 12h6.572l-1.305 6.093a.75.75 0 0 0 1.292.657l8.5-9.5A.75.75 0 0 0 17.25 8h-6.572l1.305-6.093Z" clip-rule="evenodd"/></svg></span>
+              <div><div class="bt">Autonomous stretch — the Verify pass</div><div class="bm">~1h ago · checked the work against the spec</div></div>
+            </div>
+            <div class="bd-body">
+              <div class="bditem">
+                <span class="bav run" aria-hidden="true"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.983 1.907a.75.75 0 0 0-1.292-.657l-8.5 9.5A.75.75 0 0 0 2.75 12h6.572l-1.305 6.093a.75.75 0 0 0 1.292.657l8.5-9.5A.75.75 0 0 0 17.25 8h-6.572l1.305-6.093Z" clip-rule="evenodd"/></svg></span>
+                <div class="bx">
+                  <div class="q">Verify pass — added the checkout scenario harness and ran the suite.</div>
+                  <div class="bmeta"><span>12 steps · completed</span></div>
+                  <div class="files" style="margin-top:8px"><span class="mchip done"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>Completed</span><span class="mchip conf">88% confident</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="hint"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm-.25-9.25a.75.75 0 1 1 0-1.5h.5a.75.75 0 0 1 .75.75v3.25h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2.5h-.25Z" clip-rule="evenodd"/></svg>Hatched bands are inferred from timing — they’ll turn solid once changes are stamped at their source.</div>
+        </div>
+
+        <!-- ===== REUSED PER-FILE BADGE BLOCK (shared idiom with Mockup 1) ===== -->
+        <section class="sec2" aria-label="The same files, with their origin badge">
+          <div class="s2h"><span class="s2t">The same files, badged</span><span class="s2s">the per-file origin badge, reused — the timeline and the badge are one idiom.</span></div>
+          <div class="secdiv" aria-hidden="true"></div>
+          <div class="filelist">
+            <div class="filerow">
+              <span class="fr-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776"/></svg></span>
+              <span class="fr-tx"><span class="fn">checkout.ts</span><span class="fm">src/checkout</span></span>
+              <span class="fr-stat"><span class="add">+118</span><span class="del">−9</span></span>
+              <span class="obadge auto"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M11.983 1.907a.75.75 0 0 0-1.292-.657l-8.5 9.5A.75.75 0 0 0 2.75 12h6.572l-1.305 6.093a.75.75 0 0 0 1.292.657l8.5-9.5A.75.75 0 0 0 17.25 8h-6.572l1.305-6.093Z" clip-rule="evenodd"/></svg>Autonomous</span>
+            </div>
+            <div class="filerow">
+              <span class="fr-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776"/></svg></span>
+              <span class="fr-tx"><span class="fn">cart.ts</span><span class="fm">src/checkout</span></span>
+              <span class="fr-stat"><span class="add">+34</span><span class="del">−12</span></span>
+              <span class="obadge assist"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 2c-2.236 0-4.43.18-6.57.524C1.993 2.755 1 4.014 1 5.426v5.148c0 1.413.993 2.67 2.43 2.902.848.137 1.705.248 2.57.331v3.443a.75.75 0 0 0 1.28.53l3.58-3.579a.78.78 0 0 1 .527-.224 41.202 41.202 0 0 0 5.183-.5c1.437-.232 2.43-1.49 2.43-2.903V5.426c0-1.413-.993-2.67-2.43-2.902A41.289 41.289 0 0 0 10 2Z" clip-rule="evenodd"/></svg>Assisted <span class="qual">· likely</span></span>
+            </div>
+            <div class="filerow">
+              <span class="fr-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776"/></svg></span>
+              <span class="fr-tx"><span class="fn">README.md</span><span class="fm">root</span></span>
+              <span class="fr-stat"><span class="add">+6</span><span class="del">−1</span></span>
+              <span class="obadge unknown"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0ZM8.94 6.94a.75.75 0 1 1-1.061-1.061 3 3 0 1 1 2.871 5.026v.345a.75.75 0 0 1-1.5 0v-.5c0-.72.57-1.172 1.081-1.287A1.5 1.5 0 1 0 8.94 6.94ZM10 15a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>Origin unknown</span>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// click a band → reveal its detail below, hide the others, mark selection
+var bands=document.querySelectorAll('.band[data-band]');
+var details={b1:'b1-detail',b2:'b2-detail',b3:'b3-detail'};
+bands.forEach(function(band){
+  band.addEventListener('click', function(){
+    var id=band.getAttribute('data-band');
+    bands.forEach(function(b){b.classList.remove('sel');b.setAttribute('aria-expanded','false');});
+    Object.values(details).forEach(function(d){var el=document.getElementById(d);if(el)el.hidden=true;});
+    band.classList.add('sel');
+    band.setAttribute('aria-expanded','true');
+    var det=document.getElementById(details[id]);
+    if(det) det.hidden=false;
+  });
+});
+</script>
+</body>
+</html>

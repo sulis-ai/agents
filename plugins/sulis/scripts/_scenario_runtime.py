@@ -28,6 +28,7 @@ IMPLEMENTATION_KINDS: frozenset[str] = frozenset(
         "subprocess",
         "python_import",
         "http_call",
+        "browser",
         "claude_code_tool",
         "skill_invocation",
         "workflow_dispatch",
@@ -44,7 +45,9 @@ UNRESOLVED_DRIVER = "unresolved"
 # The tier is a DERIVED surfacing of ``implementation_kind`` — not a stored
 # field and not a new engine. It mirrors the deterministic-vs-probabilistic
 # mechanism split so the run report carries *which kind of thing ran*:
-#   ``scripted``   ← deterministic drivers (executed today).
+#   ``scripted``   ← deterministic drivers (executed today): ``http_call``,
+#                    ``subprocess``, and ``browser`` (main #207's deterministic
+#                    browser driver — scripted actions + an observable assert).
 #   ``agent-step`` ← probabilistic drivers (DECLARED here; EXECUTION is #92's,
 #                    surfaced as a named ``deferred`` need by the dispatcher).
 #   ``""``         ← python_import / workflow_dispatch / human / unresolved:
@@ -52,7 +55,7 @@ UNRESOLVED_DRIVER = "unresolved"
 #                    label — forcing them into the binary would misreport them.
 # Deriving from the already-stored ``implementation_kind`` keeps one source of
 # truth, with no stored copy to drift.
-SCRIPTED_KINDS: frozenset[str] = frozenset({"http_call", "subprocess"})
+SCRIPTED_KINDS: frozenset[str] = frozenset({"http_call", "subprocess", "browser"})
 AGENT_STEP_KINDS: frozenset[str] = frozenset(
     {"mcp_server", "claude_code_tool", "skill_invocation"}
 )

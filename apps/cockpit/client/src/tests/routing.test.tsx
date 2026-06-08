@@ -1,7 +1,7 @@
 // WP-011 — Routing test.
 //
 // Asserts the three routes per the WP Contract:
-//   /              → <Dashboard> placeholder
+//   /              → <Board>      (WP-003 stage-column board; was Dashboard)
 //   /c/:changeId   → <ThreadView> placeholder
 //   /garbage       → <NotFound>
 //
@@ -17,6 +17,11 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppRoutes } from "../App";
+// WP-004 — the Shell now hosts the ThemeToggle (a useTheme() consumer), so the
+// routes must be mounted inside a ThemeProvider, mirroring App.tsx's
+// production wiring (ADR-001 — the provider wraps every route).
+import { ThemeProvider } from "../theme/ThemeProvider";
+import { stubMatchMedia } from "./helpers/stubMatchMedia";
 
 function freshClient() {
   return new QueryClient({
@@ -37,36 +42,41 @@ function renderAt(path: string) {
   // freshClient() gives test-friendly defaults (retry off, focus-refetch off).
   return render(
     <QueryClientProvider client={freshClient()}>
-      <MemoryRouter initialEntries={[path]}>
-        <AppRoutes />
-      </MemoryRouter>
+      <ThemeProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <AppRoutes />
+        </MemoryRouter>
+      </ThemeProvider>
     </QueryClientProvider>,
   );
 }
 
 describe("App routes", () => {
   beforeEach(() => {
+    stubMatchMedia(false);
     vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, []));
   });
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    delete document.documentElement.dataset.theme;
   });
 
-  it("renders Dashboard at /", () => {
+  it("renders the Board at /", () => {
     renderAt("/");
-    expect(screen.getByTestId("page-dashboard")).toBeInTheDocument();
-    expect(screen.getByTestId("shell-sidebar")).toBeInTheDocument();
+    expect(screen.getByTestId("page-board")).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-topbar")).toBeInTheDocument();
   });
 
   it("renders ThreadView at /c/:changeId", () => {
     renderAt("/c/CH-01KSJA");
     expect(screen.getByTestId("page-thread")).toBeInTheDocument();
-    expect(screen.getByTestId("shell-sidebar")).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-topbar")).toBeInTheDocument();
   });
 
   it("renders NotFound for an unknown path", () => {
     renderAt("/garbage");
     expect(screen.getByTestId("page-not-found")).toBeInTheDocument();
-    expect(screen.getByTestId("shell-sidebar")).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-topbar")).toBeInTheDocument();
   });
 });

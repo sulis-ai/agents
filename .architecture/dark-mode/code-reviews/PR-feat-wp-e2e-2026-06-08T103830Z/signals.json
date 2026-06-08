@@ -1,0 +1,50 @@
+{
+  "review": {
+    "target": "HEAD (working tree) on branch fix-e2e-tabbed-cockpit vs origin/main",
+    "timestamp": "2026-06-08T103830Z",
+    "verdict": "PASS",
+    "kind": "frontend"
+  },
+  "build_verification": {
+    "typecheck_introduced_errors": 0,
+    "lint_introduced_errors": 0,
+    "playwright_typecheck": "clean (all specs executed)"
+  },
+  "pr_hygiene": {
+    "scope": { "commit_type_spread": ["test"], "module_fan_out": 1, "severity": "low" },
+    "size": { "lines_added": 130, "lines_removed": 58, "files_changed": 4, "severity": "low" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "low" },
+    "completeness": { "new_source_without_test": 0, "note": "diff is test-only (e2e specs + playwright config); adapts tests to #216 UI", "severity": "low" }
+  },
+  "findings": {
+    "in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+    "resolved_inline": [
+      {
+        "id": "F-01",
+        "lens": "quality",
+        "severity_before_fix": "medium",
+        "file": "apps/cockpit/e2e/happy-path.spec.ts",
+        "what": "Async race: one-shot `await fullToggle.count()` raced the background Haiku-summary poll that controls when the full-reply toggle appears, risking a flake where the verbatim reply text lands behind a still-closed toggle.",
+        "fix": "Replaced the one-shot check with `expect(async () => {...}).toPass({ timeout: 15000 })` — idempotent expand-then-assert that converges in both summary-fallback and generated-summary modes.",
+        "status": "fixed-inline"
+      }
+    ],
+    "in_neighbours": []
+  },
+  "lenses": {
+    "architecture": "nothing surfaced. Test-only diff; no domain/infrastructure imports, no resilience or verification primitives added.",
+    "security": "nothing surfaced. No auth/injection/secrets/SSRF surface in e2e test specs; no new dependencies.",
+    "quality": "1 finding (F-01, medium) — fixed inline. JSX-ident scan: N/A (no .tsx/.jsx in diff). Test-coverage: diff IS test work. CR-10 perf: no anti-pattern matches (test specs)."
+  },
+  "self_attestation": {
+    "CR-01_mechanical_baseline": true,
+    "CR-02_dispatch": "single-reader justified (4 files, 130 lines — within carve-out)",
+    "CR-03_full_file_reads": true,
+    "CR-04_evidence": true,
+    "CR-05_severity": true,
+    "CR-06_verdict_computed": "PASS",
+    "CR-07_lens_completion": true,
+    "CR-09_pr_hygiene": "all primitives low"
+  },
+  "draft_hardening_deltas": []
+}

@@ -1,0 +1,32 @@
+{
+  "target": "feat/wp-001-session-manager-host",
+  "base": "change/create-production-terminal-sidecar",
+  "project": "production-terminal-sidecar",
+  "timestamp": "2026-06-07T204250Z",
+  "verdict": "PASS",
+  "build_verification": {
+    "introduced_errors": 0,
+    "commands": ["uv run ruff check", "uv run python -m py_compile", "uv run python -c import"]
+  },
+  "pr_hygiene": {
+    "scope": {"commit_types": ["feat"], "module_fan_out": 1, "severity": "none"},
+    "size": {"lines_added": 654, "lines_removed": 0, "files_changed": 3, "severity": "none"},
+    "safety": {"migrations": 0, "schemas": 0, "secrets": 0, "infra": 0, "severity": "none"},
+    "completeness": {"new_source_without_test": 0, "api_change_without_schema": false, "severity": "none"}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"critical": 0, "high": 0, "medium": 0, "low": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "surfaced": false},
+    "security": {"findings": 0, "surfaced": false},
+    "quality": {"findings": 0, "surfaced": false}
+  },
+  "watch_list": [
+    "Shared pty --cwd default (WP-004 wires per-change cwd; contracted WP-001 behaviour)",
+    "Thread-identity binding (deliberate, given socket-only resolver signature + ThreadingMixIn)"
+  ],
+  "hardening_deltas": [],
+  "auto_downgrade_fired": []
+}

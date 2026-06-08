@@ -150,6 +150,7 @@ def run_scenario(
     available_artifacts=frozenset(),
     http=None,
     run=None,
+    browser=None,
 ) -> AcceptanceResult:
     """Resolve + execute a Scenario's journey; return the aggregated result.
 
@@ -177,7 +178,7 @@ def run_scenario(
         outcome = execute_step(
             rs, base_url=target_base_url,
             available_artifacts=frozenset(available_artifacts) | produced,
-            http=http, run=run,
+            http=http, run=run, browser=browser,
         )
         produced.update(rs.output_artifacts)
         step_rows.append({
@@ -218,6 +219,7 @@ def run_bundle(
     available_artifacts=frozenset(),
     http=None,
     run=None,
+    browser=None,
 ) -> AcceptanceResult:
     """Run a self-contained Scenario bundle — ``{scenario, workflow, steps[],
     tools[]}`` — the input shape the `sulis-verify-acceptance` CLI loads. (Once
@@ -228,7 +230,7 @@ def run_bundle(
     return run_scenario(
         bundle["scenario"], bundle["workflow"], steps_by_id, tools_by_id,
         target_base_url=target_base_url, available_artifacts=available_artifacts,
-        http=http, run=run,
+        http=http, run=run, browser=browser,
     )
 
 

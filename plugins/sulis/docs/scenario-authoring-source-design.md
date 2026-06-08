@@ -29,17 +29,19 @@ A journey step invokes a **typed `Tool`**, not a free-text driver:
 
 - `Step.tool_ref → Tool` (foundation entity).
 - `Tool.implementation_kind` ∈ `{mcp_server, subprocess, python_import,
-  http_call, claude_code_tool, skill_invocation, workflow_dispatch}` — **this
-  enum IS the invocation contract** (how the step is actually executed), with
-  `inputs_schema_ref` / `outputs_schema_ref` typing the call.
+  http_call, browser, claude_code_tool, skill_invocation, workflow_dispatch}` —
+  **this enum IS the invocation contract** (how the step is actually executed),
+  with `inputs_schema_ref` / `outputs_schema_ref` typing the call.
 - `_scenario_runtime.driver_for_step` already dispatches on exactly this enum.
 - `_scenario_runtime.tier_for_kind` **derives** a driver *tier* from the same
   enum (it is not a stored field): `scripted` for the deterministic drivers
-  (`http_call`, `subprocess`), `agent-step` for the probabilistic ones
-  (`mcp_server`, `claude_code_tool`, `skill_invocation`), and `""` for
+  (`http_call`, `subprocess`, `browser`), `agent-step` for the probabilistic
+  ones (`mcp_server`, `claude_code_tool`, `skill_invocation`), and `""` for
   `python_import` / `workflow_dispatch` / human / unresolved. `ResolvedStep.tier`
   carries it so a run report says *which kind of thing ran*. `agent-step`
-  execution is declared-only (deferred to #92); only `scripted` runs today.
+  execution is declared-only (deferred to #92); the `scripted` drivers run today
+  (`browser` is the deterministic, Playwright-backed one folded in from main #207
+  — agent-driven browser + human-attest remain the probabilistic half).
 
 So the earlier sketch's `(driver: http_call POST /pay)` was an ad-hoc render of
 `Step.tool_ref → Tool{ implementation_kind: http_call, inputs_schema_ref: … }`.

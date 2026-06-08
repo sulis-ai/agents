@@ -130,6 +130,31 @@ def test_build_launch_script_inserts_extra_env_shlex_quoted(tmp_path):
     assert "export FOO='bar; rm -rf /'" in script
 
 
+def test_build_launch_script_wires_origin_hook(tmp_path):
+    """WP-P12 — the executor session launch wires the prepare-commit-msg hook
+    so commits the session makes carry the Sulis-Origin trailer. The hook path
+    is set via GIT_CONFIG_* env (no .git/config mutation) and SULIS_SCRIPTS_DIR
+    lets the hook locate _origin_stamp."""
+    script = tl._build_launch_script(_GOOD_ULID, tmp_path, enable_origin_hook=True)
+    assert "GIT_CONFIG_COUNT" in script
+    assert "core.hooksPath" in script
+    assert "GIT_CONFIG_VALUE_0" in script
+    # The configured hooks dir is the scripts/hooks dir holding the hook.
+    assert "hooks" in script
+    assert "export SULIS_SCRIPTS_DIR=" in script
+    # The exports come AFTER the env-scrub (which would otherwise strip them).
+    scrub_idx = script.index("compgen -v")
+    cfg_idx = script.index("GIT_CONFIG_COUNT")
+    assert scrub_idx < cfg_idx
+
+
+def test_build_launch_script_omits_origin_hook_by_default(tmp_path):
+    """Default (no flag) is byte-compatible with the prior baseline."""
+    script = tl._build_launch_script(_GOOD_ULID, tmp_path)
+    assert "GIT_CONFIG_COUNT" not in script
+    assert "core.hooksPath" not in script
+
+
 def test_build_launch_script_cd_then_exec_order(tmp_path):
     script = tl._build_launch_script(_GOOD_ULID, tmp_path)
     cd_idx = script.index('cd "')
@@ -565,8 +590,14 @@ def test_build_launch_script_no_pre_prompt_byte_identical_to_baseline(tmp_path):
 
 
 def test_build_launch_script_with_pre_prompt_reads_sidecar(tmp_path):
+    # The sidecar-`cat` brief-delivery lives on the chat-style entry_command
+    # path (the default path now runs the viewer, WP-006, which takes the brief
+    # via the daemon — see test_terminal_launcher_runs_viewer.py). Pass an
+    # explicit chat-style command to exercise the cat delivery.
     script = tl._build_launch_script(
-        _GOOD_ULID, tmp_path, pre_prompt="hello world",
+        _GOOD_ULID, tmp_path,
+        entry_command="claude --dangerously-skip-permissions --agent sulis",
+        pre_prompt="hello world",
     )
     # Delivered via a sidecar file read at runtime, NOT a heredoc (#86).
     assert "<<'SULIS_PROMPT_EOF'" not in script
@@ -621,6 +652,60 @@ def test_launch_change_terminal_forwards_pre_prompt(tmp_path, monkeypatch):
     assert b.call_args.kwargs.get("pre_prompt") == "hello" or "hello" in b.call_args[0]
 
 
+# ─── #93: default opening prompt so a re-spawned session never sits idle ──────
+
+
+def test_default_change_pre_prompt_is_change_oriented():
+    body = tl._default_change_pre_prompt(_GOOD_ULID)
+    assert _GOOD_ULID in body              # binds the brief to this change
+    assert "CONTEXT.md" in body            # points at the pre-spawn recon
+    assert "change-context" in body        # tells Sulis to greet in change-context mode
+    assert "route" in body.lower()         # and route to the right stage
+
+
+def test_launch_change_terminal_defaults_opening_prompt_when_none(tmp_path, monkeypatch):
+    # The #93 bug: focus/recreate re-spawn with pre_prompt=None → claude came up
+    # bound to the change but idle (no opening turn; the agent never reads
+    # SULIS_CHANGE_ID until the user types). The launcher must default a
+    # change-context opening prompt so ANY caller's session auto-starts.
+    # The default-prompt behaviour lives on the launch-script path, which a
+    # visible launch reaches by default (CH-01KTK7) — no flag required.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl, "_launch_macos",
+                              side_effect=lambda sp, cid, vis: _spawned_dict(sp)):
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path, pre_prompt=None)
+    # the sidecar carrying the opening prompt was written...
+    sidecar = tl._change_dir(_GOOD_ULID) / tl._PRE_PROMPT_SIDECAR
+    assert sidecar.exists(), "no opening prompt delivered — the session would sit idle"
+    assert _GOOD_ULID in sidecar.read_text()
+    # ...and the default window runs the viewer (WP-006), which attaches the
+    # change's shared session over the daemon. The daemon's interactive pty
+    # adapter reads this same sidecar via SULIS_CHANGE_ID and briefs the
+    # session's claude on its first turn — so the brief is delivered through the
+    # daemon, not via the launch-script `cat` (that path is now the explicit
+    # chat-style entry_command only). The launch script still exports
+    # SULIS_CHANGE_ID so the adapter can find the sidecar.
+    script = Path(result["script_path"]).read_text()
+    assert "session_viewer.py" in script
+    assert f'export SULIS_CHANGE_ID="{_GOOD_ULID}"' in script
+
+
+def test_launch_change_terminal_explicit_pre_prompt_not_overridden(tmp_path, monkeypatch):
+    # start --spawn passes a rich brief; the default must never clobber it.
+    # The sidecar write lives on the launch-script path, which a visible launch
+    # reaches by default (CH-01KTK7) — no flag required.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl, "_launch_macos",
+                              side_effect=lambda sp, cid, vis: _spawned_dict(sp)):
+        tl.launch_change_terminal(
+            _GOOD_ULID, tmp_path, pre_prompt="custom brief from start --spawn",
+        )
+    sidecar = tl._change_dir(_GOOD_ULID) / tl._PRE_PROMPT_SIDECAR
+    assert sidecar.read_text() == "custom brief from start --spawn"
+
+
 def test_launch_change_terminal_writes_pre_prompt_sidecar(tmp_path, monkeypatch):
     # The brief lands in the sidecar file the exec line reads, with its exact
     # bytes (apostrophes/quotes/backticks included) — never inline (#86).
@@ -632,3 +717,115 @@ def test_launch_change_terminal_writes_pre_prompt_sidecar(tmp_path, monkeypatch)
         tl.launch_change_terminal(_GOOD_ULID, tmp_path, pre_prompt=body)
     sidecar = tl._change_dir(_GOOD_ULID) / tl._PRE_PROMPT_SIDECAR
     assert sidecar.read_text() == body
+
+
+# ─── CH-01KTK7: visible launch opens a terminal by DEFAULT (reverse-strangle) ─
+#
+# WP-009 had Strangled the OS-window path to a deprecated, flag-gated fallback:
+# a visible launch returned a _failed pointer to the in-cockpit <LiveTerminal/>
+# unless SULIS_TERMINAL_OS_WINDOW=1 was set. CH-01KTK7 reverses that DEFAULT:
+# `start --spawn` wants a real terminal to open, so a VISIBLE launch now
+# dispatches to the platform launcher by default — no flag required. The
+# SULIS_TERMINAL_OS_WINDOW flag remains as an explicit override knob but is no
+# longer needed for the default-on behaviour. The in-cockpit <LiveTerminal/> is
+# a SEPARATE browser-rendering capability, untouched.
+
+
+def test_os_window_enabled_helper_still_reads_flag(monkeypatch):
+    # The flag helper is retained as an explicit override knob. With no flag set
+    # it reports False; the DEFAULT-ON spawn behaviour no longer depends on it.
+    monkeypatch.delenv(tl._OS_WINDOW_FLAG, raising=False)
+    assert tl._os_window_enabled() is False
+
+
+@pytest.mark.parametrize("value", ["1", "true", "TRUE", "yes", "on"])
+def test_os_window_enabled_by_truthy_flag(monkeypatch, value):
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, value)
+    assert tl._os_window_enabled() is True
+
+
+@pytest.mark.parametrize("value", ["", "0", "false", "no", "off"])
+def test_os_window_disabled_by_falsey_flag(monkeypatch, value):
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, value)
+    assert tl._os_window_enabled() is False
+
+
+def test_visible_launch_spawns_by_default_no_flag(tmp_path, monkeypatch):
+    # CH-01KTK7 reversal: with NO SULIS_TERMINAL_OS_WINDOW set, a visible launch
+    # OPENS the terminal by default — it dispatches to the platform launcher and
+    # returns "spawned". No "open it in the cockpit" _failed pointer.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv(tl._OS_WINDOW_FLAG, raising=False)
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl, "_launch_macos",
+                              side_effect=lambda sp, cid, vis: _spawned_dict(sp)) as m:
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path, visible=True)
+    assert result["status"] == "spawned"
+    assert m.call_count == 1
+
+
+def test_visible_launch_no_cockpit_pointer_when_flag_off(tmp_path, monkeypatch):
+    # The deprecated suppression path is gone: a visible launch with the flag
+    # off MUST NOT return a _failed dict pointing at the cockpit. (Regression
+    # guard for the exact behaviour CH-01KTK7 removes.)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv(tl._OS_WINDOW_FLAG, raising=False)
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl, "_launch_macos",
+                              side_effect=lambda sp, cid, vis: _spawned_dict(sp)):
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path, visible=True)
+    assert result["status"] != "failed"
+    err = (result.get("error") or "")
+    assert "cockpit" not in err.lower()
+    assert "deprecated" not in err.lower()
+
+
+def test_visible_launch_still_dispatches_when_flag_on(tmp_path, monkeypatch):
+    # The override flag remains harmless: with it on, a visible launch still
+    # dispatches to the platform launcher (same default-on behaviour).
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(tl._OS_WINDOW_FLAG, "1")
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl, "_launch_macos",
+                              side_effect=lambda sp, cid, vis: _spawned_dict(sp)) as m:
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path, visible=True)
+    assert m.call_count == 1
+    assert result["status"] == "spawned"
+
+
+def test_visible_launch_linux_spawns_by_default_no_flag(tmp_path, monkeypatch):
+    # The default-on reversal applies on Linux too — no flag needed to reach the
+    # gnome-terminal/konsole/xterm dispatch.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv(tl._OS_WINDOW_FLAG, raising=False)
+    with mock.patch.object(tl.platform, "system", return_value="Linux"), \
+            mock.patch.object(tl, "_launch_linux",
+                              side_effect=lambda sp, cid, vis: _spawned_dict(sp)) as m:
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path, visible=True)
+    assert m.call_count == 1
+    assert result["status"] == "spawned"
+
+
+def test_headless_launch_spawns_regardless_of_flag(tmp_path, monkeypatch):
+    # The headless (visible=False) path is unaffected — it spawns regardless of
+    # the flag (used by automation), exactly as before.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv(tl._OS_WINDOW_FLAG, raising=False)
+    with mock.patch.object(tl.platform, "system", return_value="Linux"), \
+            mock.patch.object(tl, "_launch_headless",
+                              side_effect=lambda sp, cid: _spawned_dict(sp)) as m:
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path, visible=False)
+    assert m.call_count == 1
+    assert result["status"] == "spawned"
+
+
+def test_module_un_deprecated_for_change_start():
+    # CH-01KTK7: the direct terminal is the sanctioned change-start launcher
+    # again — the module must NOT frame the change-start spawn path as a
+    # deprecated fallback. (The in-cockpit <LiveTerminal/> is a separate
+    # browser-rendering capability and may still be mentioned as such.)
+    src = Path(tl.__file__).read_text()
+    assert "DEPRECATED(strangle)" not in src
+    # The launcher's purpose statement should describe the sanctioned spawn,
+    # not a deprecated-in-favour-of-cockpit posture.
+    assert "launch_change_terminal" in src

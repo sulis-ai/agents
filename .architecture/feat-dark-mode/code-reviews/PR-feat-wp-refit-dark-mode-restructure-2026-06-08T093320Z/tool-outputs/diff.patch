@@ -1,0 +1,643 @@
+diff --git a/apps/cockpit/README.md b/apps/cockpit/README.md
+index 417f48b7..650a6dcf 100644
+--- a/apps/cockpit/README.md
++++ b/apps/cockpit/README.md
+@@ -420,7 +420,7 @@ apps/cockpit/
+ │   │   ├── components/     # shells, panels (WP-011/013/014), ConciergeChat (the read-only front door, WP-009); LiveTerminal — the xterm.js terminal view (WP-008); ThemeToggle — light/dark control, mounted in WorkspaceTopBar (WP-004)
+ │   │   ├── terminal/       # client TerminalBridge factory — reuses the WP-007 port (WP-008)
+ │   │   ├── api/            # TanStack Query hooks (WP-011)
+-│   │   ├── layouts/        # Shell — sidebar + top-bar (theme toggle) + outlet (WP-011, WP-004)
++│   │   ├── layouts/        # WorkspaceShell — tabbed top bar (WorkspaceTopBar: product switcher + tab strip + theme toggle) + outlet (#216, WP-004)
+ │   │   ├── theme/          # ThemeProvider, useTheme(), resolveInitialTheme (WP-003)
+ │   │   └── tests/
+ ├── shared/                 # types + constants both halves import
+diff --git a/apps/cockpit/client/src/components/ProductSwitcher.module.css b/apps/cockpit/client/src/components/ProductSwitcher.module.css
+index 2fe0d01e..e5d39938 100644
+--- a/apps/cockpit/client/src/components/ProductSwitcher.module.css
++++ b/apps/cockpit/client/src/components/ProductSwitcher.module.css
+@@ -92,7 +92,9 @@
+   background: var(--bg-card);
+   border: 1px solid var(--border);
+   border-radius: var(--radius);
+-  box-shadow: 0 8px 24px rgba(28, 28, 28, 0.12);
++  /* Menu drop shadow — derived from --foreground so it reads on both themes
++   * (CH-01KTHP). Was: rgba(28, 28, 28, 0.12). */
++  box-shadow: 0 8px 24px color-mix(in srgb, var(--foreground) 12%, transparent);
+   padding: 6px;
+   overflow: hidden;
+ }
+diff --git a/apps/cockpit/client/src/components/WorkspaceTopBar.tsx b/apps/cockpit/client/src/components/WorkspaceTopBar.tsx
+index f6775e35..a0a63fee 100644
+--- a/apps/cockpit/client/src/components/WorkspaceTopBar.tsx
++++ b/apps/cockpit/client/src/components/WorkspaceTopBar.tsx
+@@ -15,6 +15,10 @@ import { useActiveProduct } from "../api/activeProduct";
+ import { useChangesWithLiveness } from "../api/useChangesWithLiveness";
+ import { useOpenTabs } from "../api/openTabs";
+ import { ProductSwitcher } from "./ProductSwitcher";
++// CH-01KTHP — the light/dark toggle is re-homed here. #216 deleted the old
++// <Shell /> top bar that used to host it; the workspace top bar is the new
++// always-present chrome, so the toggle lives top-right of it.
++import { ThemeToggle } from "./ThemeToggle";
+ import styles from "../layouts/WorkspaceShell.module.css";
+ 
+ /** "deploy-founder-web" → "Deploy founder web" — a readable tab name. */
+@@ -112,6 +116,12 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
+           );
+         })}
+       </nav>
++
++      {/* Light/dark toggle — pushed to the far right (CH-01KTHP). Reachable
++          from every route because the top bar is persistent chrome. */}
++      <div className={styles.toggleSlot}>
++        <ThemeToggle />
++      </div>
+     </header>
+   );
+ }
+diff --git a/apps/cockpit/client/src/layouts/WorkspaceShell.module.css b/apps/cockpit/client/src/layouts/WorkspaceShell.module.css
+index f3d7152a..4ebcdf27 100644
+--- a/apps/cockpit/client/src/layouts/WorkspaceShell.module.css
++++ b/apps/cockpit/client/src/layouts/WorkspaceShell.module.css
+@@ -44,6 +44,17 @@
+   overflow-x: auto;
+ }
+ 
++/* Theme toggle slot — pushed to the far right of the top bar (CH-01KTHP).
++ * margin-left:auto consumes the free space after the tab strip so the toggle
++ * sits top-right, matching the signed-off mockup's toggle placement. */
++.toggleSlot {
++  margin-left: auto;
++  flex: 0 0 auto;
++  display: flex;
++  align-items: center;
++  padding-left: 8px;
++}
++
+ /* A tab — Board or an open change. Bottom-border highlight when active. */
+ .tab {
+   display: inline-flex;
+diff --git a/apps/cockpit/client/src/styles/ChangeWorkspace.module.css b/apps/cockpit/client/src/styles/ChangeWorkspace.module.css
+index f6ceac53..f87a157f 100644
+--- a/apps/cockpit/client/src/styles/ChangeWorkspace.module.css
++++ b/apps/cockpit/client/src/styles/ChangeWorkspace.module.css
+@@ -57,7 +57,7 @@
+   text-transform: uppercase;
+   letter-spacing: 0.04em;
+   border-radius: var(--radius-container);
+-  background: color-mix(in srgb, var(--accent) 8%, #fff);
++  background: color-mix(in srgb, var(--accent) 8%, var(--card));
+   color: var(--accent);
+   border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+ }
+@@ -132,7 +132,7 @@
+ }
+ .vstep[data-state="now"] .vd {
+   background: var(--accent);
+-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, #fff);
++  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, var(--card));
+ }
+ .vstep .vw {
+   margin-left: auto;
+@@ -240,7 +240,7 @@
+   align-items: center;
+   gap: 10px;
+   padding: 10px 32px;
+-  background: color-mix(in srgb, var(--accent) 5%, #fff);
++  background: color-mix(in srgb, var(--accent) 5%, var(--card));
+   border-bottom: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+   font-size: 12px;
+   color: var(--foreground);
+diff --git a/apps/cockpit/client/src/styles/Conversation.module.css b/apps/cockpit/client/src/styles/Conversation.module.css
+index b8af64ea..0cfe75be 100644
+--- a/apps/cockpit/client/src/styles/Conversation.module.css
++++ b/apps/cockpit/client/src/styles/Conversation.module.css
+@@ -60,7 +60,7 @@
+   background: var(--card);
+   margin: 0 0 18px;
+   overflow: hidden;
+-  box-shadow: 0 1px 2px rgba(23, 23, 23, 0.04);
++  box-shadow: 0 1px 2px color-mix(in srgb, var(--foreground) 4%, transparent);
+ }
+ .thead {
+   display: flex;
+@@ -73,7 +73,9 @@
+   height: 26px;
+   border-radius: 50%;
+   flex: none;
+-  background: conic-gradient(from 200deg, #c9a962, #1e3a5f, #2d7d90, #c9a962);
++  /* Brand-spectrum avatar ring — tokenised to the signed brand tokens so it
++   * re-themes (CH-01KTHP). Was: #c9a962, #1e3a5f, #2d7d90, #c9a962. */
++  background: conic-gradient(from 200deg, var(--brand-gold), var(--brand-depth), var(--accent), var(--brand-gold));
+   margin-top: 1px;
+ }
+ .hl {
+diff --git a/apps/cockpit/client/src/styles/Origin.module.css b/apps/cockpit/client/src/styles/Origin.module.css
+index fe193d62..16ca54da 100644
+--- a/apps/cockpit/client/src/styles/Origin.module.css
++++ b/apps/cockpit/client/src/styles/Origin.module.css
+@@ -16,13 +16,20 @@
+ /* AA-internal ink shades — same hue family as their base hue, darkened so
+  * text/numerals clear WCAG AA *as text* on their own 8–10% tint. NOTE: pending
+  * token regen — each becomes a named semantic token next regeneration. */
++/* Dark-mode re-fit (CH-01KTHP): the AA-internal ink shades are redefined as
++ * DERIVATIONS of their signed base tokens so they re-theme under
++ * data-theme="dark" (no light-only literal). Original light literals kept here
++ * for provenance:
++ *   --origin-accent-ink   was #246676 (accent family)  -> --accent
++ *   --origin-specify-ink  was #4338ca (specify-indigo)  -> --stage-specify
++ *   --origin-attn-icon    was #b45309 (honesty ink)     -> --warning */
+ :where(:root) {
+-  --origin-accent-ink: #246676; /* autonomous: accent family on --bg-accent (~5.9:1) */
+-  --origin-specify-ink: #4338ca; /* assisted: specify-indigo family (~7.1:1) */
+-  --origin-attn-icon: #b45309; /* honesty banner ink on --bg-warning */
+-  --origin-bg-accent: color-mix(in srgb, var(--accent) 8%, #fff);
++  --origin-accent-ink: var(--accent);
++  --origin-specify-ink: var(--stage-specify);
++  --origin-attn-icon: var(--warning);
++  --origin-bg-accent: color-mix(in srgb, var(--accent) 8%, var(--card));
+   --origin-bg-accent-border: color-mix(in srgb, var(--accent) 28%, var(--border));
+-  --origin-bg-specify: color-mix(in srgb, var(--stage-specify) 9%, #fff);
++  --origin-bg-specify: color-mix(in srgb, var(--stage-specify) 9%, var(--card));
+   --origin-bg-specify-border: color-mix(in srgb, var(--stage-specify) 26%, var(--border));
+ }
+ 
+@@ -399,7 +406,7 @@
+   border-radius: 10px;
+   background: var(--card);
+   overflow: hidden;
+-  box-shadow: 0 1px 2px rgba(23, 23, 23, 0.04);
++  box-shadow: 0 1px 2px color-mix(in srgb, var(--foreground) 4%, transparent);
+   margin-bottom: 14px;
+ }
+ .grouphead {
+diff --git a/apps/cockpit/client/src/styles/ProvenanceView.module.css b/apps/cockpit/client/src/styles/ProvenanceView.module.css
+index 6fee49c2..abed11c0 100644
+--- a/apps/cockpit/client/src/styles/ProvenanceView.module.css
++++ b/apps/cockpit/client/src/styles/ProvenanceView.module.css
+@@ -11,18 +11,26 @@
+  * named semantic tokens next instance regeneration). The `:where(.x) button`
+  * reset avoids grey UA buttons (chat-B2 / Files idiom). */
+ 
+-/* AA-internal ink shades — same hue family as their base stage hue, darkened
+- * so text/numerals clear WCAG AA *as text* on their own 8–10% tint. NOTE:
+- * pending token regen — each becomes a named semantic token next regeneration. */
++/* AA-internal ink shades — same hue family as their base stage/semantic token.
++ * Dark-mode re-fit (CH-01KTHP): redefined as DERIVATIONS of those signed
++ * tokens so they re-theme under data-theme="dark" instead of staying a
++ * light-only literal, and so the no-raw-colours guard passes. Original light
++ * literals kept in this block comment for provenance:
++ *   --prov-accent-ink   was #246676 (accent ink, ~5.9:1 on tint)  -> --accent
++ *   --prov-recon-ink    was #6b4f2e (recon labels)                -> --stage-recon
++ *   --prov-specify-ink  was #4338ca (specify labels)              -> --stage-specify
++ *   --prov-attn-icon    was #b45309 (warning ink)                 -> --warning
++ * --prov-shadow-float colour derived from --foreground so the elevation reads
++ * on both themes (light foreground ≈ rgb(23,23,23), the original literal). */
+ :where(:root) {
+-  --prov-accent-ink: #246676; /* on --bg-accent (~5.9:1) */
+-  --prov-recon-ink: #6b4f2e; /* recon count-pill / labels (~6.7:1) */
+-  --prov-specify-ink: #4338ca; /* specify count-pill / labels (~7.1:1) */
+-  --prov-attn-icon: #b45309; /* warning ink on --bg-warning */
+-  --prov-bg-accent: color-mix(in srgb, var(--accent) 8%, #fff);
++  --prov-accent-ink: var(--accent);
++  --prov-recon-ink: var(--stage-recon);
++  --prov-specify-ink: var(--stage-specify);
++  --prov-attn-icon: var(--warning);
++  --prov-bg-accent: color-mix(in srgb, var(--accent) 8%, var(--card));
+   --prov-bg-accent-border: color-mix(in srgb, var(--accent) 28%, var(--border));
+-  --prov-shadow-float: 0 6px 20px rgba(23, 23, 23, 0.08),
+-    0 1px 3px rgba(23, 23, 23, 0.06);
++  --prov-shadow-float: 0 6px 20px color-mix(in srgb, var(--foreground) 8%, transparent),
++    0 1px 3px color-mix(in srgb, var(--foreground) 6%, transparent);
+ }
+ 
+ /* UA button reset, scoped — keeps native buttons from going grey. */
+@@ -72,7 +80,7 @@
+   padding: 6px 13px 6px 10px;
+ }
+ .backbtn:hover {
+-  background: color-mix(in srgb, var(--accent) 13%, #fff);
++  background: color-mix(in srgb, var(--accent) 13%, var(--card));
+ }
+ .backbtn svg {
+   width: 15px;
+@@ -114,7 +122,7 @@
+ .lens button[aria-pressed="true"] {
+   background: var(--card);
+   color: var(--foreground);
+-  box-shadow: 0 1px 2px rgba(23, 23, 23, 0.06);
++  box-shadow: 0 1px 2px color-mix(in srgb, var(--foreground) 6%, transparent);
+ }
+ .lens button[aria-pressed="true"] svg {
+   color: var(--accent);
+@@ -179,7 +187,7 @@
+   border-radius: 12px;
+   background: var(--card);
+   padding: 16px 17px;
+-  box-shadow: 0 1px 2px rgba(23, 23, 23, 0.04);
++  box-shadow: 0 1px 2px color-mix(in srgb, var(--foreground) 4%, transparent);
+   text-align: left;
+   display: block;
+   width: 100%;
+@@ -222,7 +230,7 @@
+   height: 16px;
+ }
+ .tile.did .th .ti {
+-  background: color-mix(in srgb, var(--stage-specify) 10%, #fff);
++  background: color-mix(in srgb, var(--stage-specify) 10%, var(--card));
+   color: var(--stage-specify);
+ }
+ .tile.cov .th .ti {
+@@ -230,7 +238,7 @@
+   color: var(--stage-ship);
+ }
+ .tile.dec .th .ti {
+-  background: color-mix(in srgb, var(--stage-review) 10%, #fff);
++  background: color-mix(in srgb, var(--stage-review) 10%, var(--card));
+   color: var(--stage-review);
+ }
+ .tile.flag .th .ti {
+@@ -303,7 +311,7 @@
+   height: 18px;
+   flex: none;
+   border-radius: 5px;
+-  background: color-mix(in srgb, var(--stage-review) 10%, #fff);
++  background: color-mix(in srgb, var(--stage-review) 10%, var(--card));
+   color: var(--stage-review);
+   display: inline-flex;
+   align-items: center;
+@@ -337,7 +345,7 @@
+   width: 100%;
+ }
+ .door:hover {
+-  background: color-mix(in srgb, var(--accent) 13%, #fff);
++  background: color-mix(in srgb, var(--accent) 13%, var(--card));
+ }
+ .door .di {
+   width: 38px;
+@@ -472,7 +480,7 @@
+   border: 1px solid var(--border);
+   border-radius: 10px;
+   background: var(--card);
+-  box-shadow: 0 1px 2px rgba(23, 23, 23, 0.04);
++  box-shadow: 0 1px 2px color-mix(in srgb, var(--foreground) 4%, transparent);
+ }
+ .run .card.open {
+   border-color: var(--prov-bg-accent-border);
+@@ -842,7 +850,7 @@
+   color: var(--prov-recon-ink);
+ }
+ .col.why .pill {
+-  background: color-mix(in srgb, var(--stage-recon) 10%, #fff);
++  background: color-mix(in srgb, var(--stage-recon) 10%, var(--card));
+   border-color: color-mix(in srgb, var(--stage-recon) 26%, var(--border));
+   color: var(--prov-recon-ink);
+ }
+@@ -850,7 +858,7 @@
+   color: var(--prov-specify-ink);
+ }
+ .col.what .pill {
+-  background: color-mix(in srgb, var(--stage-specify) 9%, #fff);
++  background: color-mix(in srgb, var(--stage-specify) 9%, var(--card));
+   border-color: color-mix(in srgb, var(--stage-specify) 26%, var(--border));
+   color: var(--prov-specify-ink);
+ }
+@@ -866,7 +874,7 @@
+   color: var(--stage-review);
+ }
+ .col.tested .pill {
+-  background: color-mix(in srgb, var(--stage-review) 9%, #fff);
++  background: color-mix(in srgb, var(--stage-review) 9%, var(--card));
+   border-color: color-mix(in srgb, var(--stage-review) 26%, var(--border));
+   color: var(--stage-review);
+ }
+@@ -1054,7 +1062,7 @@
+ .tnode.focusnode {
+   border-color: var(--prov-bg-accent-border);
+   background: var(--prov-bg-accent);
+-  box-shadow: 0 1px 3px rgba(23, 23, 23, 0.06);
++  box-shadow: 0 1px 3px color-mix(in srgb, var(--foreground) 6%, transparent);
+ }
+ .tnode .tk {
+   display: flex;
+diff --git a/apps/cockpit/client/src/tests/RenderedPreview.test.tsx b/apps/cockpit/client/src/tests/RenderedPreview.test.tsx
+index 5a2e354f..c11dbd61 100644
+--- a/apps/cockpit/client/src/tests/RenderedPreview.test.tsx
++++ b/apps/cockpit/client/src/tests/RenderedPreview.test.tsx
+@@ -28,15 +28,24 @@ vi.mock("@monaco-editor/react", () => ({
+ }));
+ 
+ import { RenderedPreview } from "../components/RenderedPreview";
++// CH-01KTHP — a code file delegates to MonacoFileInner, which consumes
++// useTheme() (dark-mode WP-005 theme binding). Render through a ThemeProvider so
++// that path has theme context, mirroring App.tsx production composition.
++import { ThemeProvider } from "../theme/ThemeProvider";
++import type { ReactElement } from "react";
+ 
+ const MD = "# Heading\n\nA paragraph with **bold**.\n\n- one\n- two";
+ 
++/** Render a preview wrapped in the theme context the code-file path needs. */
++function renderPreview(ui: ReactElement) {
++  return render(<ThemeProvider>{ui}</ThemeProvider>);
++}
++
+ describe("<RenderedPreview /> (FR-08/09)", () => {
+   beforeEach(() => editorProps.mockClear());
+ 
+   it("renders a .md document as HTML by default", () => {
+-    render(
+-      <RenderedPreview path="docs/SRD.md" content={MD} language="markdown" />,
++    renderPreview(<RenderedPreview path="docs/SRD.md" content={MD} language="markdown" />,
+     );
+     const rendered = screen.getByTestId("preview-rendered");
+     expect(rendered.querySelector("h1")?.textContent).toBe("Heading");
+@@ -45,8 +54,7 @@ describe("<RenderedPreview /> (FR-08/09)", () => {
+   });
+ 
+   it("offers a Rendered ↔ Raw toggle and flips to raw source and back", async () => {
+-    render(
+-      <RenderedPreview path="docs/SRD.md" content={MD} language="markdown" />,
++    renderPreview(<RenderedPreview path="docs/SRD.md" content={MD} language="markdown" />,
+     );
+     // Starts rendered.
+     expect(screen.getByTestId("preview-rendered")).toBeInTheDocument();
+@@ -64,7 +72,7 @@ describe("<RenderedPreview /> (FR-08/09)", () => {
+   });
+ 
+   it("marks the active toggle for assistive tech (aria-pressed)", () => {
+-    render(<RenderedPreview path="x.md" content={MD} language="markdown" />);
++    renderPreview(<RenderedPreview path="x.md" content={MD} language="markdown" />);
+     const renderedBtn = screen.getByRole("button", { name: /rendered/i });
+     const rawBtn = screen.getByRole("button", { name: /raw/i });
+     expect(renderedBtn).toHaveAttribute("aria-pressed", "true");
+@@ -75,8 +83,7 @@ describe("<RenderedPreview /> (FR-08/09)", () => {
+   });
+ 
+   it("renders a .html document inside a sandboxed iframe (no scripts)", () => {
+-    render(
+-      <RenderedPreview
++    renderPreview(<RenderedPreview
+         path="report.html"
+         content="<h1>Report</h1>"
+         language="html"
+@@ -90,8 +97,7 @@ describe("<RenderedPreview /> (FR-08/09)", () => {
+   });
+ 
+   it("does not offer a toggle for a non-renderable code file (stays source)", async () => {
+-    render(
+-      <RenderedPreview
++    renderPreview(<RenderedPreview
+         path="server/app.ts"
+         content="const x = 1;"
+         language="typescript"
+@@ -107,7 +113,7 @@ describe("<RenderedPreview /> (FR-08/09)", () => {
+   });
+ 
+   it("treats a .md file as renderable even when the language hint is absent", () => {
+-    render(<RenderedPreview path="NOTES.md" content={MD} language={null} />);
++    renderPreview(<RenderedPreview path="NOTES.md" content={MD} language={null} />);
+     expect(screen.getByTestId("preview-rendered")).toBeInTheDocument();
+     expect(screen.getByRole("button", { name: /raw/i })).toBeInTheDocument();
+   });
+diff --git a/apps/cockpit/client/src/tests/WorkspaceShell.test.tsx b/apps/cockpit/client/src/tests/WorkspaceShell.test.tsx
+index 4153b5ac..b5d38e1b 100644
+--- a/apps/cockpit/client/src/tests/WorkspaceShell.test.tsx
++++ b/apps/cockpit/client/src/tests/WorkspaceShell.test.tsx
+@@ -16,6 +16,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+ import { ActiveProductProvider } from "../api/activeProduct";
+ import { OpenTabsProvider } from "../api/openTabs";
+ import { WorkspaceShell } from "../layouts/WorkspaceShell";
++// CH-01KTHP — the workspace top bar now hosts the ThemeToggle (a useTheme()
++// consumer), so the shell mount wraps in a ThemeProvider, mirroring App.tsx
++// production composition.
++import { ThemeProvider } from "../theme/ThemeProvider";
+ 
+ function freshClient() {
+   return new QueryClient({
+@@ -33,20 +37,22 @@ function jsonResponse(status: number, body: unknown): Response {
+ function renderShell(path = "/") {
+   return render(
+     <QueryClientProvider client={freshClient()}>
+-      <ActiveProductProvider>
+-        <OpenTabsProvider>
+-          <MemoryRouter initialEntries={[path]}>
+-            <Routes>
+-              <Route element={<WorkspaceShell />}>
+-                <Route
+-                  path="/"
+-                  element={<div data-testid="route-marker">child</div>}
+-                />
+-              </Route>
+-            </Routes>
+-          </MemoryRouter>
+-        </OpenTabsProvider>
+-      </ActiveProductProvider>
++      <ThemeProvider>
++        <ActiveProductProvider>
++          <OpenTabsProvider>
++            <MemoryRouter initialEntries={[path]}>
++              <Routes>
++                <Route element={<WorkspaceShell />}>
++                  <Route
++                    path="/"
++                    element={<div data-testid="route-marker">child</div>}
++                  />
++                </Route>
++              </Routes>
++            </MemoryRouter>
++          </OpenTabsProvider>
++        </ActiveProductProvider>
++      </ThemeProvider>
+     </QueryClientProvider>,
+   );
+ }
+diff --git a/apps/cockpit/client/src/tests/no-raw-colours.badges.test.ts b/apps/cockpit/client/src/tests/no-raw-colours.badges.test.ts
+index fc03e86c..7cbdc5ff 100644
+--- a/apps/cockpit/client/src/tests/no-raw-colours.badges.test.ts
++++ b/apps/cockpit/client/src/tests/no-raw-colours.badges.test.ts
+@@ -29,7 +29,11 @@ import path from "node:path";
+ const SRC = path.resolve(__dirname, "..");
+ const TOKENS_CSS = path.join(SRC, "tokens.css");
+ const STAGE_BADGE_CSS = path.join(SRC, "components", "StageBadge.module.css");
+-const DASHBOARD_CSS = path.join(SRC, "pages", "Dashboard.module.css");
++// CH-01KTHP re-fit: #216 replaced pages/Dashboard.module.css with
++// pages/Board.module.css (dashboard → stage board). The error-chrome
++// assertions follow the surface to Board, whose .errorBox now consumes the
++// --bg-destructive* tint tokens (destructive token family).
++const BOARD_CSS = path.join(SRC, "pages", "Board.module.css");
+ 
+ // The six active workflow stages this WP tokenises (terminal shipped/unknown
+ // already use tokens and are excluded).
+@@ -222,28 +226,30 @@ describe("no raw colours — dashboard change-card surface (WP-006)", () => {
+     }
+   });
+ 
+-  it("Dashboard.module.css: the error chrome uses only var(--*) (no raw literal)", async () => {
+-    const css = await fs.readFile(DASHBOARD_CSS, "utf8");
++  it("Board.module.css: the error chrome uses only var(--*) (no raw literal)", async () => {
++    const css = await fs.readFile(BOARD_CSS, "utf8");
+     const offenders: Record<string, string[]> = {};
+     for (const cls of ["errorBox", "errorMessage"]) {
+       const body = classBody(css, cls);
+-      expect(body, `expected a .${cls} class in Dashboard.module.css`).not.toBeNull();
++      expect(body, `expected a .${cls} class in Board.module.css`).not.toBeNull();
+       const raw = rawColourLiterals(body as string);
+       if (raw.length) offenders[cls] = raw;
+     }
+     expect(
+       offenders,
+-      `dashboard error chrome still contains raw colour literals: ${JSON.stringify(offenders)}`,
++      `board error chrome still contains raw colour literals: ${JSON.stringify(offenders)}`,
+     ).toEqual({});
+   });
+ 
+-  it("Dashboard.module.css: error chrome maps to the existing --destructive* tokens", async () => {
+-    const css = await fs.readFile(DASHBOARD_CSS, "utf8");
++  it("Board.module.css: error chrome maps to the destructive token family", async () => {
++    const css = await fs.readFile(BOARD_CSS, "utf8");
+     const errorBox = classBody(css, "errorBox");
+     expect(errorBox).not.toBeNull();
+-    // The error surface must reference the destructive token family rather
+-    // than raw literals (the exact mapping is bg/border/text → destructive*).
+-    expect(errorBox as string).toContain("var(--destructive");
++    // The error surface must reference the destructive token family rather than
++    // raw literals. Post-#216 it rides the --bg-destructive* tint tokens (whose
++    // dark values are the signed soft-tint recipe), not a bare var(--destructive)
++    // fill — so we accept either member of the destructive family.
++    expect(errorBox as string).toMatch(/var\(--(bg-)?destructive/);
+   });
+ 
+   it("tokens.css: all 18 LIGHT stage-badge tokens are defined with the exact Contract values (pixel-unchanged baseline)", async () => {
+diff --git a/apps/cockpit/client/src/tests/no-raw-colours.banner-sidebar-reconcile.test.ts b/apps/cockpit/client/src/tests/no-raw-colours.banner-sidebar-reconcile.test.ts
+index d0f26e47..e4bdd870 100644
+--- a/apps/cockpit/client/src/tests/no-raw-colours.banner-sidebar-reconcile.test.ts
++++ b/apps/cockpit/client/src/tests/no-raw-colours.banner-sidebar-reconcile.test.ts
+@@ -37,7 +37,15 @@ import { readFileSync } from "node:fs";
+ import path from "node:path";
+ 
+ const SRC = path.resolve(__dirname, "..");
+-const DASHBOARD_CSS = path.join(SRC, "pages", "Dashboard.module.css");
++// CH-01KTHP re-fit: #216 replaced pages/Dashboard.module.css with
++// pages/Board.module.css (the dashboard became the stage board). The signed
++// soft-tint error-banner contract migrated to the token layer: Board's
++// `.errorBox` consumes --bg-destructive / --bg-destructive-border, whose DARK
++// values are the mockup's `color-mix(... var(--destructive) 16%/45%,
++// var(--card))` recipe (tokens.css dark block). The two banner assertions
++// below were re-pointed accordingly; the sidebar assertions are unchanged.
++const BOARD_CSS = path.join(SRC, "pages", "Board.module.css");
++const TOKENS_CSS = path.join(SRC, "tokens.css");
+ const SIDEBAR_ITEM_CSS = path.join(SRC, "components", "SidebarItem.module.css");
+ 
+ /** Extract the declaration block body for a CSS-module class `.name { ... }`. */
+@@ -90,53 +98,67 @@ function norm(s: string): string {
+ const HEX_RE = /#[0-9a-fA-F]{3,8}\b/;
+ const RGB_HSL_RE = /\b(?:rgba?|hsla?)\s*\(/i;
+ 
+-describe("WP-009 — reconcile Dashboard banner + active sidebar item to the signed mockup", () => {
+-  it("Dashboard .errorBox uses the color-mix soft tint over var(--destructive)/var(--card) (not a solid fill)", () => {
+-    const css = readFileSync(DASHBOARD_CSS, "utf8");
+-    const body = classBody(css, "errorBox");
+-    expect(body, "expected a .errorBox class in Dashboard.module.css").not.toBeNull();
+-    const b = norm(body as string);
++/** Body of the dark-theme block `:root[data-theme="dark"] { ... }`. */
++function darkBlockBody(css: string): string | null {
++  const idx = css.indexOf('[data-theme="dark"]');
++  if (idx === -1) return null;
++  const open = css.indexOf("{", idx);
++  if (open === -1) return null;
++  let depth = 0;
++  for (let i = open; i < css.length; i++) {
++    const ch = css[i];
++    if (ch === "{") depth++;
++    else if (ch === "}") {
++      depth--;
++      if (depth === 0) return css.slice(open + 1, i);
++    }
++  }
++  return null;
++}
++
++describe("WP-009 — reconcile board banner + active sidebar item to the signed mockup", () => {
++  // CH-01KTHP re-fit: the soft-tint error-banner contract migrated from the
++  // deleted pages/Dashboard.module.css to the token layer. The DARK values of
++  // --bg-destructive / --bg-destructive-border ARE the mockup's
++  // `color-mix(... var(--destructive) 16%/45%, var(--card))` recipe, and the
++  // board's .errorBox consumes those tokens (a tint, never a solid fill).
++  it("the dark --bg-destructive tokens encode the mockup's soft-tint recipe (16% fill / 45% border over the card)", () => {
++    const dark = norm(darkBlockBody(readFileSync(TOKENS_CSS, "utf8")) as string);
++    expect(dark, "tokens.css must carry a dark theme block").not.toBeNull();
+ 
+-    // Background must be the 16% destructive tint over the card surface.
+     expect(
+-      b,
+-      "errorBox background must be the mockup's color-mix soft tint, not a solid var(--destructive) fill",
++      dark,
++      "dark --bg-destructive must be the 16% destructive tint over the card",
+     ).toMatch(
+-      /background:\s*color-mix\(\s*in srgb\s*,\s*var\(--destructive\)\s*16%\s*,\s*var\(--card\)\s*\)/,
++      /--bg-destructive:\s*color-mix\(\s*in srgb\s*,\s*var\(--destructive\)\s*16%\s*,\s*var\(--card\)\s*\)/,
+     );
+-
+-    // Border must be the 45% destructive tint over the card surface.
+     expect(
+-      b,
+-      "errorBox border must be the mockup's 45% color-mix tint",
++      dark,
++      "dark --bg-destructive-border must be the 45% destructive tint over the card",
+     ).toMatch(
+-      /border:\s*1px solid color-mix\(\s*in srgb\s*,\s*var\(--destructive\)\s*45%\s*,\s*var\(--card\)\s*\)/,
++      /--bg-destructive-border:\s*color-mix\(\s*in srgb\s*,\s*var\(--destructive\)\s*45%\s*,\s*var\(--card\)\s*\)/,
+     );
+-
+-    // It must NOT carry a bare solid destructive background (the drifted state).
+-    expect(
+-      /background:\s*var\(--destructive\)\s*;/.test(body as string),
+-      "errorBox must no longer use the solid var(--destructive) background",
+-    ).toBe(false);
+   });
+ 
+-  it("Dashboard error text uses readable var(--foreground) over the tint (matches the mockup)", () => {
+-    const css = readFileSync(DASHBOARD_CSS, "utf8");
+-    const box = norm(classBody(css, "errorBox") as string);
+-    const msg = norm(classBody(css, "errorMessage") as string);
++  it("the board .errorBox consumes the soft-tint tokens (not a solid var(--destructive) fill)", () => {
++    const css = readFileSync(BOARD_CSS, "utf8");
++    const body = classBody(css, "errorBox");
++    expect(body, "expected a .errorBox class in Board.module.css").not.toBeNull();
++    const b = norm(body as string);
++
++    expect(
++      b,
++      "errorBox background must be the --bg-destructive tint token",
++    ).toMatch(/background:\s*var\(--bg-destructive\)\s*;/);
++    expect(
++      b,
++      "errorBox border must use the --bg-destructive-border tint token",
++    ).toMatch(/border:\s*1px solid var\(--bg-destructive-border\)\s*;/);
+ 
+-    // The mockup sets the whole .banner.error to color: var(--foreground).
+-    expect(box, "errorBox text colour must be var(--foreground)").toContain(
+-      "color: var(--foreground)",
+-    );
+-    // errorMessage must read over the tint too — foreground (not the solid
+-    // destructive-foreground pairing that only works on a solid fill).
+-    expect(msg, "errorMessage text colour must be var(--foreground)").toContain(
+-      "color: var(--foreground)",
+-    );
++    // It must NOT carry a bare solid destructive background (the drifted state).
+     expect(
+-      msg.includes("var(--destructive-foreground)"),
+-      "errorMessage must not keep the solid-fill var(--destructive-foreground)",
++      /background:\s*var\(--destructive\)\s*;/.test(body as string),
++      "errorBox must not use a solid var(--destructive) background fill",
+     ).toBe(false);
+   });
+ 
+@@ -181,7 +203,7 @@ describe("WP-009 — reconcile Dashboard banner + active sidebar item to the sig
+   });
+ 
+   it("neither reconciled surface introduces a raw colour literal (keeps the no-raw-colours guards green)", () => {
+-    for (const file of [DASHBOARD_CSS, SIDEBAR_ITEM_CSS]) {
++    for (const file of [BOARD_CSS, SIDEBAR_ITEM_CSS]) {
+       const css = readFileSync(file, "utf8")
+         // strip comments so prose colour words don't false-positive
+         .replace(/\/\*[\s\S]*?\*\//g, "");

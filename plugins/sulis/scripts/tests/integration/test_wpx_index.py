@@ -357,6 +357,72 @@ def test_non_contract_wp_done_flip_is_unaffected(
     assert result.ok, f"ordinary WP done-flip must be unaffected: {result.error}"
 
 
+# ─── CH-01KT9H: interaction-flow done-gate (sibling of the visual gate) ────
+
+
+def test_interaction_contract_wp_cannot_go_done_unexercised(
+    tmp_project, seed_index, run_tool,
+):
+    """CH-01KT9H runtime gate: an interaction-contract WP whose flow has not
+    been exercised over stubs must be refused at flip-status --to done (so the
+    WPs depending on it stay undispatchable). Sibling of the visual gate."""
+    seed_index("INDEX-minimal.md")
+    # WP-001 exists in INDEX-minimal; make it the (un-exercised) interaction
+    # contract.
+    _write_wp(tmp_project.wp_dir, "WP-001", "interaction", [
+        "id: WP-001",
+        "title: Interaction contract — clinics scheme",
+        "kind: contract",
+        "contract_type: interaction",
+        "exercised_at:",          # not exercised
+        "exercised_by:",
+        "exercised_attestation:",
+    ])
+    result = run_tool(
+        "wpx-index", "flip-status", "--wp", "WP-001", "--to", "done",
+        *_common(tmp_project),
+    )
+    assert not result.ok, "un-exercised interaction contract must not reach done"
+    assert "exercised" in (result.error or "").lower()
+
+
+def test_interaction_contract_wp_goes_done_when_exercised(
+    tmp_project, seed_index, run_tool,
+):
+    """Once exercised (agent-observed, with who/when + attestation), the
+    interaction-contract WP flips to done normally."""
+    seed_index("INDEX-minimal.md")
+    _write_wp(tmp_project.wp_dir, "WP-001", "interaction", [
+        "id: WP-001",
+        "title: Interaction contract — clinics scheme",
+        "kind: contract",
+        "contract_type: interaction",
+        "exercised_at: 2026-06-04T15:40:00Z",
+        "exercised_by: agent-observed",
+        "exercised_attestation: stub run transcript at "
+        "contracts/interaction/clinics-scheme.run.txt",
+    ])
+    result = run_tool(
+        "wpx-index", "flip-status", "--wp", "WP-001", "--to", "done",
+        *_common(tmp_project),
+    )
+    assert result.ok, f"exercised interaction contract should flip to done: {result.error}"
+
+
+def test_non_interaction_wp_done_flip_is_unaffected(
+    tmp_project, seed_index, run_tool,
+):
+    """Regression oracle: a non-interaction WP (no WP file) flips to done
+    untouched — the interaction gate is a no-op for anything that isn't an
+    interaction-contract WP, exactly as today."""
+    seed_index("INDEX-minimal.md")
+    result = run_tool(
+        "wpx-index", "flip-status", "--wp", "WP-002", "--to", "done",
+        *_common(tmp_project),
+    )
+    assert result.ok, f"ordinary WP done-flip must be unaffected: {result.error}"
+
+
 # ─── #48: audit-contracts (graph-level data-contract wiring) ──────────────
 
 
