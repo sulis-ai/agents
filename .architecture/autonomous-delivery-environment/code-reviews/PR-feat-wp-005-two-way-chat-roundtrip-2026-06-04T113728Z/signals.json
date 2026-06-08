@@ -1,0 +1,19 @@
+{
+  "pr": "feat/wp-005-two-way-chat-roundtrip",
+  "base": "change/create-autonomous-delivery-environment",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["feat"], "severity": "clean" },
+    "size": { "lines_added": 3385, "lines_removed": 35, "files_changed": 30, "severity": "medium-by-size-but-irreducible-vertical-slice" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "secret_pattern_hits": 0, "infra_files": 0, "process_start_sites": 1, "severity": "clean" },
+    "completeness": { "new_source_files": 10, "new_test_files": 9, "new_source_without_test": 0, "severity": "clean" }
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "note": "binding guard fail-closed before any process start (ADR-004); read-only gate extended with the new process-start rule + relay allow-list (ADR-003); SessionBridge is an EXPAND-Create port, CLI called by the adapter not wrapped (ADR-002); shared stream-json mapper extracted at the 2-consumer threshold" },
+    "security": { "findings": 0, "note": "no secrets; SESSION_CHANGE_MISMATCH refuses with zero bytes + no process touched; structured relay log carries no prompt/reply body (NFR-SEC-03); process-start confined to the one sanctioned adapter; localhost-only bind unchanged" },
+    "quality": { "findings": 0, "note": "no as-any / : any in production source; no empty catches (parse-skip blocks are documented + intentional); 10 new source files covered by 9 dedicated test files + the contract suite; typecheck + eslint clean" }
+  },
+  "findings": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+  "hardening_deltas": 0
+}

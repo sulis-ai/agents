@@ -15,6 +15,7 @@ def _write_bundle(tmp_path: Path) -> tuple[Path, str]:
         name="pay with saved card", verifies=[f"dna:requirement:{_ulid('rq')}"],
         exercises=f"dna:design:{_ulid('placeholder')}", tenant=_TENANT, seed="pay",
         steps=[{"instruction": "Sign in"}, {"instruction": "Pay"}],
+        require_verifiable=False,  # this test exercises design re-pointing, not verifiability
     )
     path = tmp_path / "x.scenarios.jsonld"
     path.write_text(json.dumps(bundle))

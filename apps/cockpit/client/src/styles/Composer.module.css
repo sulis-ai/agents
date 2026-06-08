@@ -1,0 +1,224 @@
+/* Composer — the floating chat dock (chat-B2 signed contract).
+ * Lifted off the bottom edge: a centred, rounded, shadowed box with a
+ * "working · pause · stop" status chip above it (so the live action and the
+ * input sit in the same comfortable reach). Tokens only — no raw hex. */
+
+.composerDock {
+  flex: 0 0 auto;
+  padding: 6px 32px 20px;
+  background: var(--background);
+}
+.composerInner {
+  max-width: 780px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* The founder's own in-flight message — neutral bubble, right-aligned. */
+.userMessage {
+  align-self: flex-end;
+  max-width: 80%;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 10px 10px 3px 10px;
+  padding: 10px 13px;
+  font-size: 13px;
+  color: var(--foreground);
+  white-space: pre-wrap;
+}
+
+/* The streamed agent reply — plain card bubble, left-aligned. */
+.agentReply {
+  align-self: flex-start;
+  max-width: 85%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--foreground);
+  white-space: pre-wrap;
+}
+
+/* The one tiny teal pulse — "the agent is alive right now". */
+.caret {
+  display: inline-block;
+  width: 6px;
+  height: 14px;
+  background: var(--accent);
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  animation: composerBlink 1s steps(2) infinite;
+}
+@keyframes composerBlink {
+  50% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .caret { animation: none; }
+}
+
+/* Notes (resumed / interrupted / failed) — worded, never colour alone. */
+.resumedNote {
+  align-self: flex-start;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  padding: 2px 4px;
+}
+.interruptedNote {
+  background: var(--bg-warning);
+  border: 1px solid var(--bg-warning-border);
+  border-radius: var(--radius-container);
+  padding: 9px 12px;
+  font-size: 12px;
+  color: var(--foreground);
+}
+.chatError {
+  background: var(--bg-destructive);
+  border: 1px solid var(--bg-destructive-border);
+  border-radius: var(--radius-container);
+  padding: 9px 12px;
+  font-size: 12px;
+  color: var(--foreground);
+}
+
+/* suggestion chips — subtle, above the box. */
+.chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sugchip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-button);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.sugchip:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.sugchip:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* The floating composer card. Bigger by default; expands to a tall draft. */
+.composer {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-float);
+  padding: 12px 12px 10px;
+}
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+.textarea {
+  flex: 1;
+  resize: none;
+  border: 0;
+  outline: 0;
+  padding: 8px 6px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  /* roomier default (~3 lines); auto-grows with content */
+  min-height: 64px;
+  max-height: 200px;
+  color: var(--foreground);
+  background: transparent;
+  line-height: 1.55;
+  overflow-y: auto;
+}
+
+/* Slack-style expanded draft — a tall editor for longer messages. */
+.composer.expanded .textarea {
+  min-height: 280px;
+  max-height: 560px;
+}
+
+/* the expand / shrink control, top-right of the box */
+.expandBtn {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-container);
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  z-index: 1;
+}
+.expandBtn:hover {
+  background: var(--bg-muted);
+  color: var(--foreground);
+}
+.expandBtn svg {
+  width: 15px;
+  height: 15px;
+}
+.textarea::placeholder { color: var(--muted-foreground); }
+.textarea:disabled { color: var(--muted-foreground); }
+
+.send {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: 0;
+  border-radius: var(--radius-button);
+  padding: 0 20px;
+  font-weight: 600;
+  font-size: 13px;
+  height: 42px;
+  cursor: pointer;
+}
+.send svg { width: 16px; height: 16px; }
+.send:hover:not(:disabled) { filter: brightness(0.94); }
+.busy .send,
+.send:disabled {
+  background: var(--muted);
+  color: var(--muted-foreground);
+  cursor: not-allowed;
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  flex-wrap: wrap;
+}
+.foot kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--foreground);
+}
+
+.busynote {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  padding: 0 4px;
+}

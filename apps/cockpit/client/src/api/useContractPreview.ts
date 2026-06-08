@@ -10,14 +10,11 @@
 // change is selected.
 
 import { useQuery } from "@tanstack/react-query";
-import type { ContractAvailability } from "../../../shared/api-types";
-import { apiGet } from "./client";
+import { contractPreviewQuery } from "./viewQueries";
 
 export function useContractPreview(changeId: string) {
   return useQuery({
-    queryKey: ["contract-preview", changeId],
-    queryFn: () =>
-      apiGet<ContractAvailability>(`/api/changes/${changeId}/contract`),
+    ...contractPreviewQuery(changeId),
     enabled: changeId.length > 0,
   });
 }

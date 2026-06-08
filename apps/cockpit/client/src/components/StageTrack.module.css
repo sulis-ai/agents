@@ -1,0 +1,98 @@
+/* WP-004 — StageTrack styles.
+ *
+ * Matches the SIGNED visual contract (sulis-app.html, thread stage track):
+ * a horizontal row of six stage steps, each a small stage-colour dot + the
+ * stage name + a quiet state word. Colour appears only on the dot (the
+ * shared --stage-* scale, tokens.css — no parallel palette); the stage and
+ * its state are ALSO carried by the name + the state word, so colour is
+ * never the sole cue (WCAG 1.4.1). Consumes tokens.css only — no raw hex.
+ *
+ * Step states:
+ *   - done    → full-strength dot, muted name, "Done" word
+ *   - now     → full-strength dot + ring, full-strength name, "Now" word
+ *   - pending → hollow dot, muted name, "Pending" word
+ */
+
+.track {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+  border: 2px solid var(--border);
+  background: var(--card);
+}
+
+/* Per-stage dot colour — the one shared stage scale (tokens.css). Applied
+ * to done + now steps; pending steps stay hollow (neutral) so the eye
+ * reads progress left-to-right without depending on hue. */
+.step[data-state="done"] .dot,
+.step[data-state="now"] .dot {
+  border-color: transparent;
+}
+.step[data-stage="recon"][data-state="done"] .dot,
+.step[data-stage="recon"][data-state="now"] .dot {
+  background: var(--stage-recon);
+}
+.step[data-stage="specify"][data-state="done"] .dot,
+.step[data-stage="specify"][data-state="now"] .dot {
+  background: var(--stage-specify);
+}
+.step[data-stage="design"][data-state="done"] .dot,
+.step[data-stage="design"][data-state="now"] .dot {
+  background: var(--stage-design);
+}
+.step[data-stage="implement"][data-state="done"] .dot,
+.step[data-stage="implement"][data-state="now"] .dot {
+  background: var(--stage-implement);
+}
+.step[data-stage="review"][data-state="done"] .dot,
+.step[data-stage="review"][data-state="now"] .dot {
+  background: var(--stage-review);
+}
+.step[data-stage="ship"][data-state="done"] .dot,
+.step[data-stage="ship"][data-state="now"] .dot {
+  background: var(--stage-ship);
+}
+
+/* The current step gets a focus ring so "now" is unmistakable beyond hue. */
+.step[data-state="now"] .dot {
+  box-shadow: 0 0 0 3px var(--muted);
+}
+
+.name {
+  font-size: 12px;
+  font-weight: var(--weight-label);
+  color: var(--muted-foreground);
+}
+.step[data-state="now"] .name {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.stateWord {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+}
+.step[data-state="now"] .stateWord {
+  color: var(--primary);
+  font-weight: 600;
+}

@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+"""sulis-working-set — manage the live reasoning-state file for a change/session.
+
+The agent triggers this (via the `working-set` SKILL) at three moments:
+  init   — at the start of a change/session: create the six-section Working Set
+           from the template (idempotent — never clobbers an existing one).
+  show   — at the START of every turn: print the current Working Set so the
+           agent re-grounds in the locked thinking (this read-every-turn habit is
+           what keeps it alive; a Working Set that isn't read rots).
+  log    — append a timestamped one-liner to the append-only Working log.
+
+The judgement-heavy section edits (record a decision, a rejected alternative, an
+open question) are done by the agent editing the file directly per the SKILL —
+they need reasoning, not a CLI. This tool owns only the deterministic parts.
+
+JSON envelope: {"ok": true, "data": {...}} | {"ok": false, "error": "..."}.
+Exit 0 on success, 1 on failure. Stdlib only. Python 3.11-safe.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _working_set import (  # noqa: E402
+    append_log_line,
+    render_initial,
+    working_set_path,
+)
+
+
+def _ok(data: dict) -> int:
+    print(json.dumps({"ok": True, "data": data}, ensure_ascii=False))
+    return 0
+
+
+def _err(msg: str) -> int:
+    print(json.dumps({"ok": False, "error": msg}, ensure_ascii=False))
+    return 1
+
+
+def _resolve(args) -> Path:
+    if args.path:
+        return Path(args.path)
+    if not args.stem:
+        raise ValueError("provide --stem ({primitive}-{slug}) or --path")
+    return working_set_path(args.repo_root, args.stem)
+
+
+def main(argv=None) -> int:
+    p = argparse.ArgumentParser(
+        prog="sulis-working-set",
+        description="Manage the live reasoning-state Working Set for a change/session.",
+    )
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    for name in ("init", "show", "log"):
+        sp = sub.add_parser(name)
+        sp.add_argument("--stem", help="the change's {primitive}-{slug}")
+        sp.add_argument("--repo-root", default=".", help="repo root holding .changes/")
+        sp.add_argument("--path", help="explicit Working Set path (overrides --stem)")
+        if name == "init":
+            sp.add_argument("--intent", default="", help="seed the Problem section")
+            sp.add_argument("--at", help="ISO timestamp (default: now)")
+        if name == "log":
+            sp.add_argument("--message", required=True, help="the log line to append")
+            sp.add_argument("--at", help="ISO timestamp (default: now)")
+
+    args = p.parse_args(argv)
+
+    try:
+        ws = _resolve(args)
+    except ValueError as exc:
+        return _err(str(exc))
+
+    if args.cmd == "init":
+        if ws.exists():
+            return _ok({"path": str(ws), "created": False,
+                        "note": "Working Set already exists — left untouched."})
+        ws.parent.mkdir(parents=True, exist_ok=True)
+        stem = args.stem or ws.stem.replace(".WORKING-SET", "")
+        ws.write_text(render_initial(stem, intent=args.intent, at=args.at),
+                      encoding="utf-8")
+        return _ok({"path": str(ws), "created": True})
+
+    if args.cmd == "show":
+        if not ws.exists():
+            return _err(f"no Working Set at {ws} — run `init` first")
+        return _ok({"path": str(ws), "content": ws.read_text(encoding="utf-8")})
+
+    if args.cmd == "log":
+        if not ws.exists():
+            return _err(f"no Working Set at {ws} — run `init` first")
+        try:
+            updated = append_log_line(ws.read_text(encoding="utf-8"),
+                                      args.message, at=args.at)
+        except ValueError as exc:
+            return _err(str(exc))
+        ws.write_text(updated, encoding="utf-8")
+        return _ok({"path": str(ws), "appended": args.message.strip()})
+
+    return _err(f"unknown command: {args.cmd}")
+
+
+if __name__ == "__main__":
+    sys.exit(main())

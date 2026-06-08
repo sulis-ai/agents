@@ -1,5 +1,17 @@
 """Cross-platform terminal launcher for the change-as-primitive flow.
 
+DEPRECATED(strangle): the OS-window launch path (Terminal.app / gnome-terminal
+spawning ``claude`` directly, NOT backed by the session manager) is a
+deprecated FALLBACK as of WP-009. "Open this change's terminal" now defaults to
+the in-cockpit ``<LiveTerminal/>`` path (a pty-mode session in the manager,
+rendered in the browser). The OS-window path here is reachable ONLY when the
+``SULIS_TERMINAL_OS_WINDOW`` environment flag is set (default off), retained as
+an offline / no-cockpit fallback until the cockpit path is proven. Removal is
+tracked: see the ``removal_plan`` in
+``.architecture/interactive-terminal-sessions/work-packages/WP-009-change-terminal-launcher-repoint.md``
+(deletion target 2026-07-31, gated on WP-010 e2e green + a founder dogfood run).
+Do NOT extend this path; new terminal work belongs on the cockpit-rendered seam.
+
 Port of `ae_task_executor/terminal_launcher.py` (504 LOC) stripped to the
 load-bearing cross-platform spawn path for sulis's single-founder,
 single-machine v1 use case. See:
@@ -24,6 +36,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import platform
 import re
 import shlex
@@ -41,6 +54,14 @@ logger = logging.getLogger("sulis.terminal_launcher")
 
 
 # ─── Module-level constants ────────────────────────────────────────────────
+
+# DEPRECATED(strangle, WP-009) — opt-in flag for the OS-window fallback.
+# The visible OS-window launch (Terminal.app / gnome-terminal) is reachable
+# ONLY when this env var is truthy. Default off: the in-cockpit <LiveTerminal/>
+# path is the default "open this change's terminal". Removal tracked in WP-009's
+# removal_plan (target 2026-07-31).
+_OS_WINDOW_FLAG = "SULIS_TERMINAL_OS_WINDOW"
+_OS_WINDOW_TRUTHY = frozenset({"1", "true", "yes", "on"})
 
 # entry_command whitelist: lower-case letters/digits, spaces, dashes.
 _ENTRY_COMMAND_RE = re.compile(r"^[a-z][a-z0-9 \-]+$")
@@ -74,6 +95,20 @@ _LINUX_TERMINAL_APPS = ("gnome-terminal", "konsole", "xterm")
 _PRE_PROMPT_HEREDOC_TAG = "SULIS_PROMPT_EOF"
 _PRE_PROMPT_SIDECAR = "pre_prompt.txt"  # co-located with launch.sh in the change dir
 _PRE_PROMPT_MAX_BYTES = 50_000
+
+
+# ─── Strangle gate (WP-009) ────────────────────────────────────────────────
+
+
+def _os_window_enabled() -> bool:
+    """Return True when the OS-window fallback is opted into via the flag.
+
+    DEPRECATED(strangle, WP-009). Default off: when ``SULIS_TERMINAL_OS_WINDOW``
+    is absent or not truthy, the visible OS-window launch is suppressed in
+    favour of the in-cockpit ``<LiveTerminal/>`` path. Truthy values: ``1``,
+    ``true``, ``yes``, ``on`` (case-insensitive).
+    """
+    return os.environ.get(_OS_WINDOW_FLAG, "").strip().lower() in _OS_WINDOW_TRUTHY
 
 
 # ─── Validators (pure functions, no subprocess) ────────────────────────────
@@ -152,6 +187,7 @@ def _build_launch_script(
     entry_command: str = "claude --dangerously-skip-permissions --agent sulis",
     extra_env: dict[str, str] | None = None,
     pre_prompt: str | None = None,
+    enable_origin_hook: bool = False,
 ) -> str:
     """Return the bash script body (string).
 
@@ -193,7 +229,12 @@ def _build_launch_script(
         # has no heredoc nesting (parses clean under bash 3.2), and the
         # pre_prompt bytes are never shell-parsed — so there is no injection
         # surface either (what the old heredoc's single-quoted tag guarded).
-        sidecar = _change_dir(change_id) / _PRE_PROMPT_SIDECAR
+        # Path only — do NOT mkdir here. _build_launch_script is pure (no file
+        # I/O); launch_change_terminal creates the dir + writes the sidecar
+        # inside its I/O-failure try-block. (Using _change_dir here would mkdir
+        # before that try, so an unwritable ~/.sulis would escape as a raw
+        # OSError instead of the structured _failed dict.)
+        sidecar = Path.home() / ".sulis" / "changes" / change_id / _PRE_PROMPT_SIDECAR
         exec_line = f'exec {entry_command} "$(cat {shlex.quote(str(sidecar))})"'
     else:
         exec_line = f"exec {entry_command}"
@@ -205,6 +246,21 @@ def _build_launch_script(
         _ENV_SCRUB_LINE,
         f'export SULIS_CHANGE_ID="{change_id}"',
     ]
+    if enable_origin_hook:
+        # WP-P12 (ADR-013) — wire the origin-stamp `prepare-commit-msg` hook for
+        # the executor session, so any commit it makes carries the Sulis-Origin
+        # trailer. The hook dir is set via GIT_CONFIG_* env (a per-session
+        # override; NO `.git/config` mutation, so it leaves the worktree
+        # untouched and reversible). SULIS_SCRIPTS_DIR lets the hook locate
+        # `_origin_stamp`. The hook itself is a no-op unless SULIS_ORIGIN is set
+        # at commit time (the run-ulid + confidence the executor supplies for
+        # the autonomous stamp), so wiring it is harmless when no origin is set.
+        scripts_dir = Path(__file__).resolve().parent
+        hooks_dir = scripts_dir / "hooks"
+        lines.append(f"export SULIS_SCRIPTS_DIR={shlex.quote(str(scripts_dir))}")
+        lines.append("export GIT_CONFIG_COUNT=1")
+        lines.append("export GIT_CONFIG_KEY_0=core.hooksPath")
+        lines.append(f"export GIT_CONFIG_VALUE_0={shlex.quote(str(hooks_dir))}")
     if extra_env_block:
         lines.append(extra_env_block)
     lines.append(f'cd "{worktree_path}"')
@@ -374,6 +430,32 @@ def _change_dir(change_id: str) -> Path:
     return change_dir
 
 
+def _default_change_pre_prompt(change_id: str) -> str:
+    """Opening prompt used when a caller spawns a change terminal without one.
+
+    Without an opening turn, ``claude --agent sulis`` comes up correctly bound
+    to the change (``SULIS_CHANGE_ID`` exported, cwd = the worktree) but sits
+    idle: the agent never reads the env var until the founder types something,
+    so it never self-orients. ``sulis-change start --spawn`` avoids this by
+    passing a rich brief; the ``focus`` / ``recreate`` re-spawn paths (and any
+    direct caller) historically passed ``None`` and hit the idle-session bug
+    (#93). Defaulting here makes an auto-starting session the floor for EVERY
+    caller — an explicit ``pre_prompt`` still wins.
+
+    Deterministic (a pure function of ``change_id``) so the sidecar write and
+    the launch script's ``cat`` of it always agree on the same bytes.
+    """
+    recon = Path.home() / ".sulis" / "changes" / change_id / "CONTEXT.md"
+    return (
+        f"You are Sulis, focused on the change bound to this session "
+        f"(id: {change_id}). Your working directory is the change worktree. "
+        f"Read the pre-spawn recon at {recon} for the change identity, git "
+        f"state, and suggested next step — and any .changes/*.HANDOFF.md or "
+        f".changes/*.WORKING-SET.md in the worktree — then greet me in "
+        f"change-context mode and route to the right stage."
+    )
+
+
 def _write_session_json(
     change_dir: Path,
     change_id: str,
@@ -433,6 +515,7 @@ def launch_change_terminal(
     entry_command: str = "claude --dangerously-skip-permissions --agent sulis",
     extra_env: dict[str, str] | None = None,
     pre_prompt: str | None = None,
+    enable_origin_hook: bool = True,
 ) -> dict:
     """Spawn a new terminal in the change worktree with SULIS_CHANGE_ID set.
 
@@ -465,9 +548,33 @@ def launch_change_terminal(
     if not ok:
         raise ValueError(f"worktree_path is not an existing directory: {worktree_path}")
 
+    # DEPRECATED(strangle, WP-009) gate. A VISIBLE launch is the OS-window path
+    # — now a deprecated fallback. Unless the founder opts in via the flag, the
+    # in-cockpit <LiveTerminal/> path is the default, so suppress the OS window
+    # and return a structured pointer to it (no window spawns, no launch.sh
+    # written). The headless path (visible=False) is NOT the OS-window path and
+    # is not gated — automation that needs a background session still works.
+    if visible and not _os_window_enabled():
+        result = _failed(
+            "the OS-window terminal launch is deprecated (WP-009); open this "
+            "change's terminal in the cockpit instead. To use the OS-window "
+            f"fallback, set {_OS_WINDOW_FLAG}=1.",
+            "",  # no launch.sh written on the suppressed path
+        )
+        result["session_json_path"] = ""
+        return result
+
+    # Default an opening prompt so the spawned session auto-starts rather than
+    # sitting idle at an empty claude prompt (#93). start --spawn passes a rich
+    # brief; focus / recreate / direct callers historically passed None. An
+    # explicit pre_prompt still wins — we only fill the gap.
+    if pre_prompt is None:
+        pre_prompt = _default_change_pre_prompt(change_id)
+
     script_body = _build_launch_script(
         change_id, resolved, entry_command=entry_command,
         extra_env=extra_env, pre_prompt=pre_prompt,
+        enable_origin_hook=enable_origin_hook,
     )
 
     # File-I/O hardening: an unwritable change dir / launch.sh (permission

@@ -1,0 +1,172 @@
+/* WP-006 — RenderedPreview styles (FR-08/09).
+ *
+ * Matches the SIGNED visual contract panel 6 (`.previewbar`, `.toggle`,
+ * `.rendered`, `.raw`): a bar with the filename + a Rendered/Raw segmented
+ * toggle, the rendered document body, and the raw mono source. Consumes
+ * tokens.css only — no raw hex. */
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: var(--radius-container) var(--radius-container) 0 0;
+  background: var(--muted);
+}
+
+.filename {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toggle {
+  display: inline-flex;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-button);
+  overflow: hidden;
+}
+
+.toggle button {
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: var(--weight-label);
+  font-family: var(--font-sans);
+  color: var(--muted-foreground);
+  background: var(--card);
+  border: 0;
+  cursor: pointer;
+}
+
+.toggle button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.toggle button.on {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.rendered {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-container) var(--radius-container);
+  padding: 22px;
+  background: var(--card);
+  color: var(--card-foreground);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.rendered h1 {
+  font-weight: var(--weight-heading);
+  font-size: 20px;
+  margin: 0 0 10px;
+  letter-spacing: -0.02em;
+}
+
+.rendered h2 {
+  font-size: 15px;
+  font-weight: var(--weight-heading);
+  margin: 16px 0 7px;
+}
+
+.rendered h3,
+.rendered h4,
+.rendered h5,
+.rendered h6 {
+  font-size: 13px;
+  font-weight: var(--weight-heading);
+  margin: 14px 0 6px;
+}
+
+.rendered p {
+  margin: 0 0 9px;
+  color: var(--secondary-foreground);
+}
+
+.rendered ul,
+.rendered ol {
+  margin: 0 0 9px 18px;
+  color: var(--secondary-foreground);
+}
+
+.rendered li {
+  margin-bottom: 3px;
+}
+
+.rendered a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.rendered code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--muted);
+  padding: 1px 5px;
+  border-radius: var(--radius-badge);
+}
+
+.rendered pre {
+  background: var(--muted);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-media);
+  padding: 12px;
+  overflow: auto;
+  margin: 0 0 9px;
+}
+
+.rendered pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.raw {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-container) var(--radius-container);
+  padding: 16px;
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--foreground);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.htmlFrame {
+  flex: 1;
+  min-height: 320px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-container) var(--radius-container);
+  background: var(--card);
+}
+
+.loading {
+  padding: 16px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}

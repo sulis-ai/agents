@@ -1,0 +1,161 @@
+#!/usr/bin/env python3
+"""sulis-attest-scenario — a human attests they walked the real flow.
+
+Journey-rigor #6, the human-handoff. Some journeys can't be machine-run (a
+browser login, a payment with a real card). Since journey-rigor #1 those
+correctly BLOCK — safe, but with no path to green. This is the path: a person
+runs the real flow, confirms each observable check the journey carries, and
+records it. A pass deposits a REAL human-attested TestRun + TestResult — the same
+evidence the coverage gate reads from an automated run — so the blocked scenario
+goes genuinely green by observation, stamped honestly as human-attested.
+
+Two moves:
+
+  --list                 print the checklist the founder runs by hand (what to
+                         do + what to look for per step). Deposits nothing.
+  --attester NAME ...    record the attestation. Either --all-observed ("I ran
+                         it, every check passed") or per-check --observed /
+                         --not-observed. Any unobserved check fails the
+                         attestation (you can't attest to what you didn't see).
+
+The automated *browser* driver (Playwright/CDP) — the machine half of "drives
+the real flow" — is the named follow-on; until it lands the human is the driver
+and this is how their observation becomes evidence the gate trusts.
+
+Exit: 0 = attestation recorded PASS (or --list); 1 = attestation recorded FAIL;
+2 = invocation error (scenario not found, no observations). Stdlib only. 3.11-safe.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _scenario_attest import attest_scenario  # noqa: E402
+from _scenario_graph_load import JourneyNotFound, load_scenario_journey  # noqa: E402
+
+
+def _checklist(loaded) -> list[dict]:
+    """The ordered journey as a founder checklist: per step, what to do +
+    the observable checks (postconditions) to confirm."""
+    ordered = (loaded.workflow or {}).get("steps", []) or []
+    out: list[dict] = []
+    for name in ordered:
+        step = loaded.steps_by_name.get(name)
+        if step is None:
+            continue
+        out.append({
+            "do": step.get("agent_instructions") or name,
+            "look_for": list(step.get("postconditions", []) or []),
+        })
+    return out
+
+
+def _all_checks(checklist: list[dict]) -> list[str]:
+    return [c for item in checklist for c in item["look_for"]]
+
+
+def main(argv=None) -> int:
+    p = argparse.ArgumentParser(
+        prog="sulis-attest-scenario",
+        description="Record a human's first-hand attestation of a scenario run.",
+    )
+    p.add_argument("--scenario", required=True, help="scenario id in the brain graph")
+    p.add_argument("--base-dir",
+                   help="brain store dir (default {repo-root}/.brain/instances)")
+    p.add_argument("--repo-root", default=".", help="repo root holding .brain/")
+    p.add_argument("--list", action="store_true", dest="list_only",
+                   help="print the founder checklist and exit (deposit nothing)")
+    p.add_argument("--attester", default="",
+                   help="who ran it (required to record an attestation)")
+    p.add_argument("--all-observed", action="store_true",
+                   help="confirm every observable check in the journey was observed")
+    p.add_argument("--observed", action="append", default=[], metavar="CHECK",
+                   help="a check you confirmed you saw (repeatable)")
+    p.add_argument("--not-observed", action="append", default=[], metavar="CHECK",
+                   help="a check that did NOT hold (repeatable; fails the attestation)")
+    p.add_argument("--ran-at", help="ISO-8601 timestamp of the run (optional)")
+    p.add_argument("--json", action="store_true", help="emit the machine envelope")
+    args = p.parse_args(argv)
+
+    base_dir = (Path(args.base_dir) if args.base_dir
+                else Path(args.repo_root) / ".brain" / "instances")
+    try:
+        loaded = load_scenario_journey(base_dir, args.scenario)
+    except JourneyNotFound as exc:
+        print(f"Couldn't load the Scenario from the brain graph: {exc}", file=sys.stderr)
+        return 2
+
+    checklist = _checklist(loaded)
+    all_checks = _all_checks(checklist)
+
+    if args.list_only:
+        if args.json:
+            print(json.dumps({"scenario": loaded.scenario.get("name"),
+                              "checklist": checklist}, ensure_ascii=False))
+        else:
+            print(f"To verify “{loaded.scenario.get('name')}”, run this by hand:\n")
+            for i, item in enumerate(checklist, 1):
+                print(f"  {i}. {item['do']}")
+                for chk in item["look_for"]:
+                    print(f"       ✓ you should see: {chk}")
+            print("\nThen record what you saw:")
+            print(f"  sulis-attest-scenario --scenario {args.scenario} "
+                  f"--attester YOUR_NAME --all-observed   # if every check held")
+        return 0
+
+    # Build the observation list.
+    observations: list[dict] = []
+    if args.all_observed:
+        observations = [{"check": c, "observed": True} for c in all_checks]
+        # subtract any explicitly-failed checks
+        failed = set(args.not_observed)
+        for o in observations:
+            if o["check"] in failed:
+                o["observed"] = False
+        for c in args.not_observed:
+            if c not in all_checks:
+                observations.append({"check": c, "observed": False})
+    else:
+        for c in args.observed:
+            observations.append({"check": c, "observed": True})
+        for c in args.not_observed:
+            observations.append({"check": c, "observed": False})
+
+    if not observations:
+        print(
+            "Nothing recorded. Run the flow, then either confirm every check with "
+            "--all-observed, or name each check with --observed / --not-observed. "
+            "See the checklist with --list.",
+            file=sys.stderr,
+        )
+        return 2
+
+    try:
+        res = attest_scenario(
+            base_dir=base_dir, scenario=loaded.scenario, attester=args.attester,
+            observations=observations, ran_at=args.ran_at,
+        )
+    except ValueError as exc:
+        print(f"Couldn't record the attestation: {exc}", file=sys.stderr)
+        return 2
+
+    if args.json:
+        print(json.dumps({"ok": True, "data": res.as_dict()}, ensure_ascii=False))
+    else:
+        if res.verdict == "pass":
+            print(f"✓ Recorded: {args.attester} confirmed “{loaded.scenario.get('name')}” "
+                  f"works. This is now real, recorded evidence the build is verified.")
+        else:
+            not_seen = [o["check"] for o in observations if not o["observed"]]
+            print(f"✗ Recorded as NOT working — these checks didn't hold: {not_seen}. "
+                  f"The scenario stays blocked until they do.")
+    return 0 if res.verdict == "pass" else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -84,7 +84,8 @@ class TestLoadFromStore:
         bundle = assemble_scenario_graph(
             name="pay via API", verifies=[f"dna:requirement:{_ulid('rq')}"],
             exercises=f"dna:design:{_ulid('ds')}", tenant=_TENANT, seed="pay-api",
-            steps=[{"instruction": "POST a payment", "mechanism": "mixed", "tool_ref": tool_id}],
+            steps=[{"instruction": "POST a payment", "mechanism": "mixed", "tool_ref": tool_id,
+                    "asserts": ["the payment is accepted"]}],
         )
         _emit(base, bundle, tools=[tool])
 

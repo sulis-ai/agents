@@ -1,0 +1,26 @@
+id: autonomous-delivery-environment
+handle: CH-01KT50
+change_id: 01KT500K2JTE2EGW6TPPQ4D4VN
+status: decomposed
+sourced_from: .changes/create-autonomous-delivery-environment.SPEC.md
+spec_dir: .specifications/autonomous-delivery-environment
+branch: change/create-autonomous-delivery-environment
+tier: L
+extends_app: apps/cockpit
+adrs:
+  - ADR-001-sse-for-chat-stream
+  - ADR-002-session-bridge-port-resume-spawn
+  - ADR-003-chat-is-the-single-sanctioned-write-path
+  - ADR-004-session-to-change-binding-guard
+  - ADR-005-one-coherent-surface-board-thread-shell
+  - ADR-006-concierge-rides-bridge-coordinates-only
+  - ADR-007-discovery-orchestrates-skills-and-spine-emitters
+  - ADR-008-repo-find-or-create-local-first-no-dangling-config
+  - ADR-009-board-is-product-scoped-with-server-side-rollup
+contracts:
+  data: contracts/openapi.yaml
+  data_guide: contracts/DATA-CONTRACT-GUIDE.md
+  visual: contracts/visual/sulis-app.contract.md   # SIGNED — supersedes the rough mockups/ stand-in
+work_packages: work-packages/INDEX.md
+work_package_count: 11   # re-sliced 2026-06-04 from 27 horizontal layers to 11 vertical observable round-trips (2 foundation + 9 journey)
+decomposition: vertical-observable-roundtrips   # each journey WP delivers data+route+bridge+UI together; DoD is observed-not-green

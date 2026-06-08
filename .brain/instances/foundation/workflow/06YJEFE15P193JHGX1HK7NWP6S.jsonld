@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:06YJEFE15P193JHGX1HK7NWP6S",
+  "initial_steps": [
+    "ep08yjmf-open-a-markdown-or-html-file-inside-a-ch-1"
+  ],
+  "name": "Read a document the way it's meant to be seen",
+  "state": "draft",
+  "steps": [
+    "ep08yjmf-open-a-markdown-or-html-file-inside-a-ch-1",
+    "ep08yjmf-toggle-to-source-and-then-back-to-render-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "ep08yjmf-toggle-to-source-and-then-back-to-render-2"
+  ],
+  "transitions": [
+    "ep08yjmf-open-a-markdown-or-html-file-inside-a-ch-1 -> ep08yjmf-toggle-to-source-and-then-back-to-render-2"
+  ],
+  "type": "review"
+}

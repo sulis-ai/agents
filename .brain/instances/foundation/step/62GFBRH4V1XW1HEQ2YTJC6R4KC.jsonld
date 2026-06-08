@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Toggle to source and then back to rendered.",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:62GFBRH4V1XW1HEQ2YTJC6R4KC",
+  "input_artifacts": [
+    "ep08yjmf-open-a-markdown-or-html-file-inside-a-ch-1-result"
+  ],
+  "mechanism": "human",
+  "name": "ep08yjmf-toggle-to-source-and-then-back-to-render-2",
+  "output_artifacts": [
+    "ep08yjmf-toggle-to-source-and-then-back-to-render-2-result"
+  ],
+  "postconditions": [
+    "the raw text is shown when toggled to source",
+    "the rendered view returns when toggled back"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

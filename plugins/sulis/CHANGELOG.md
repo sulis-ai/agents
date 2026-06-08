@@ -1,3 +1,176 @@
+## v0.118.0 — 2026-06-08
+
+**Minor — release-train batch.**
+
+- Production terminal sidecar: the cockpit server now spawns the session-manager host and bridges the browser to it over a localhost WebSocket (origin-checked, per-change binding guard ON, resource-capped), so the live interactive terminal actually opens and responds in the running cockpit. Independent of the chat path.
+
+## v0.117.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- Interactive/visible terminal sessions: the session manager owns a PTY from birth with a terminal-scrollback model and an attach/viewer mechanism, served over a local socket, so the cockpit renders a live, watch-and-type change-session terminal in the browser (the change-terminal launcher opens it as a left-nav view). Headless chat path unchanged.
+
+## v0.116.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- Autonomous Delivery Environment — cockpit (chat, Files repo-browser, Provenance view, change-origin tracing) + provenance/origin backend + performance pass.
+
+## v0.115.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- wire browser-proving into the plugin: declare the Playwright MCP as a dependent MCP server (.mcp.json, alongside mobbin) + add an opt-in --with-browser layer to install-sulis.sh that installs the playwright extra + chromium + checks Node. Graceful-degrade (optional, never fails the install), matching the code-health layer; not pulled by --all (heavy + opt-in). This is the install + MCP half of the browser-proving machinery (#92).
+- Installer now covers two Sulis-own tool deps that slipped the net: yq (required by /sulis:index-specifications — installs mikefarah yq via brew, points Linux at the right release, never apt the wrong yq) and testssl.sh (audited in the code-health layer, Docker-fallback). Conditional project toolchains (node/pytest/eslint/etc.) deliberately stay the project job.
+- Reopening a change (focus/recreate) now auto-starts the session instead of sitting idle at an empty prompt. The terminal launcher defaults a change-context opening prompt whenever a caller omits one, so a re-spawned claude --agent sulis reads its recon + handoff and self-orients; start --spawn richer brief still wins. Also made _build_launch_script pure (no mkdir side-effect).
+
+## v0.114.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- wire browser-proving into the plugin: declare the Playwright MCP as a dependent MCP server (.mcp.json, alongside mobbin) + add an opt-in --with-browser layer to install-sulis.sh that installs the playwright extra + chromium + checks Node. Graceful-degrade (optional, never fails the install), matching the code-health layer; not pulled by --all (heavy + opt-in). This is the install + MCP half of the browser-proving machinery (#92).
+- Installer now covers two Sulis-own tool deps that slipped the net: yq (required by /sulis:index-specifications — installs mikefarah yq via brew, points Linux at the right release, never apt the wrong yq) and testssl.sh (audited in the code-health layer, Docker-fallback). Conditional project toolchains (node/pytest/eslint/etc.) deliberately stay the project job.
+
+## v0.113.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- wire browser-proving into the plugin: declare the Playwright MCP as a dependent MCP server (.mcp.json, alongside mobbin) + add an opt-in --with-browser layer to install-sulis.sh that installs the playwright extra + chromium + checks Node. Graceful-degrade (optional, never fails the install), matching the code-health layer; not pulled by --all (heavy + opt-in). This is the install + MCP half of the browser-proving machinery (#92).
+
+## v0.112.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- Provider-neutral warm-session foundation: a session manager that keeps a warm Claude (or other agent) alive per key and streams replies, with restart/eviction/guards — the engine for fast cockpit chat and the future agentic CLI.
+
+## v0.111.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- real-browser integration proof for the deterministic browser driver: a skip-gated integration test drives an actual headless chromium against real DOM (visible/url_contains/fill+click), closing the /sulis:prove blocked item (the real browser drive was never exercised). Playwright is an OPTIONAL extra (browser) — core stays stdlib-only + jsonschema/pyyaml; CI without the extra skips the test.
+
+## v0.110.0 — 2026-06-07
+
+**Minor — release-train batch.**
+
+- deterministic browser driver: the scenario dispatcher gains a browser driver (url/actions/assert) that drives a real browser via lazy/optional Playwright, so a machine can prove auth/UI flows as a regression gate. Stdlib-only contract kept (Playwright is an opt-in lazy default; absent -> the step DEFERS with the need, never a fake green). First slice of the journey-rigor #88 machine-half; agent-driven driver + dev session-mint are the next slices.
+
+## v0.109.0 — 2026-06-06
+
+**Minor — release-train batch.**
+
+- /sulis:prove — point it at a built thing and it reports what is genuinely working vs stubbed/faked: finds the critical scenarios (user journeys + non-functional/production mechanisms), drives each for real against the real interface as a consumer (no stubs), validates the actual saved output by inspecting it, and returns an observed-or-blocked verdict with evidence. The reusable form of the is-it-real-or-vibe-coded check.
+
+## v0.108.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- wire /sulis:working-set into the Sulis agent body so it is actually maintained when working a change — init at binding, show at the start of every turn (the read-every-turn habit), edit+log as decisions land, crystallize at stage boundaries. Closes the built-but-not-wired gap: the skill shipped but nothing triggered it.
+
+## v0.107.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- the Working Set: an agent-triggered skill (/sulis:working-set) + helper that keeps current thinking (problem/solution/decisions, and the why — rejected alternatives + rationale) in a small live file that is read at the start of every turn and carries across session boundaries. The fix for long-session drift; the staging area that crystallizes into Opportunity/Design/Decision.
+
+## v0.106.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- Interaction-flow done-gate: block a founder-facing capability from being marked done until its multi-step flow is exercised end-to-end over stub adapters (agent-observed or human-attested). Adds contract_type: interaction, mirrors the visual-contract gate, documents its home in WP decomposition (SHOULD), and spikes it on the clinics-scheme flow. Structural fix for watch #200 (built-but-not-clickable).
+
+## v0.105.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- host-rendered surface contract: a surface a host renders for us (MCP App / OpenAI App / figma-plugin / browser-extension) is not done when its HTML merely serves — it must be bound on both sides + observed in the real host + legible (friendly name, one-line description, icon — not a technical name alone). Closes the recurring looks-built-but-not-wired failure (the Cowork MCP App that narrated tool data as text). Extends mcp-ui-surface-patterns + CONTRACT_FIRST CF-08 + the design/audit journey-walk; no new standard.
+
+## v0.104.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- a human can drive a blocked journey to real green: sulis-attest-scenario records a first-hand walk of the flow (a browser login, a real-card checkout) as a real human-attested TestResult the coverage gate reads. Closes the journey-rigor loop — a blocked manual journey now has an honest, recorded path to verified, never a fake pass.
+
+## v0.103.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- specify authors the user journey FIRST (Work-Backwards/Outside-In) so it drives the requirements, and every journey must be verifiable — sulis-author-scenario rejects a journey with no observable check or an unobservable outcome. Closes the reverse-engineered-scenario hole where only the requirement is checked, never the round-trip the user walks.
+
+## v0.102.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- plan-work scenario-coverage gate: every journey scenario is observed-green, planned, or recorded out-of-scope — a not-green journey scenario with no WP blocks the decompose (check ALL, build some). Closes the half-built-round-trip hole behind green-but-broken login.
+
+## v0.101.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- Journey-rigor #3 (the main upstream fix): a walk-the-journey step at design. draft-architecture step 8.5 + audit step 2.5 now require, for any user-facing/behavioural change, walking each verification Scenarios journey OUTSIDE-IN hop-by-hop against the actual code — every hop must point at a component that EXISTS or is a planned WP, else it is a GAP that BLOCKS design completion (plan-work does not start). Pulls the journeys COMPLETE scenario set (find_scenarios_for_journey, #84) so ALL are checked even when only some are built — classified covered/already-green/GAP/out-of-scope. Catches the consumption-half-never-built failure (four green-but-broken login attempts) at design, not after deploys. The mechanical form of Outside-In (OI prose) + Work-Backwards. Pinned by a structural test.
+
+## v0.100.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- Journey-rigor #2 (enabler): enumerate a journeys full scenario set + per-scenario verification state. Three _brain_query helpers — find_scenarios_for_journey(workflow_id), find_scenarios_verifying(requirement_id), find_passing_testresults_for_scenario(scenario_id) (the is-this-scenario-green check via the TestResult.scenario back-link). Built on the existing iter_entities + predicate primitives; no new traversal. This is the substrate the journey-walk (#85) + scenario-coverage check (#86) call to check ALL scenarios in a journey even when building only some.
+
+## v0.99.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- Journey-rigor #1: the acceptance gate is now observed-or-blocked. A deferred Scenario (the real outcome never driven) BLOCKS done by default instead of passing as a recorded gap — closing the hole behind four login attempts that shipped green/merged while no human ever signed in. gate_decision gains require_observed=True (default); deferred → blocking + the need surfaced + the escape named. The conscious opt-out is sulis-verify-acceptance --allow-deferred (require_observed=False) for genuinely non-user-facing scenarios. The change-ship gate 4.8 prose rewritten to teach observed-or-blocked. Gives the Outcome Test (v0.97.2 prose) its first mechanical teeth.
+
+## v0.98.0 — 2026-06-04
+
+**Minor — release-train batch.**
+
+- discover-brand translator (foundation): the load-bearing bridge that turns a design generator TOKEN_MAP into authored Brand + DesignSystem records the emitters ingest. A URL scrape produces a full DTCG DesignSystem + a PARTIAL Brand (visual_identity only, state=Researched) — the judged identity (voice/values/positioning) is left absent for the founder to articulate, never invented. E2E-tested: translator output flows through the real sulis-emit-brand/design-system into the brain, link surviving the round-trip. The full self-contained URL→brand skill (generator-into-plugin + SKILL.md front door) is the remaining build on this core.
+
+## v0.97.5 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- Skills + scripts audit: repoint residual dev references to the trunk that the cutover missed. Scripts (runtime-breaking now that dev is deleted): wpx-train + wpx-pipeline + _change_context base-branch defaults dev→main; revert_train_on_dev (the train rollback path) parameterised to base_branch=main; back_integrate_change_branch + wpx-preflight defaults dev→main; wpx-pipeline log strings. Skills: resolve-lessons (rebase change branches onto main, was back-integrate dev), run-all (BASE_BRANCH else-default + founder messages + fetch-base + review prompts), run-wp, backfill-gates/code-review. Tests reconciled to the trunk base. release-train SKILL.md rewrite is a separate follow-up (broken-but-superseded by the auto-robot).
+
+## v0.97.4 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- CI workflows repointed to the trunk: deploy-staging fires on push to main (was dev); branch-ci pull_request targets main (was dev); version-check resolves its diff base against origin/main only (dropped the origin/dev preference). Completes the two-branch decommission — no workflow references dev. Unblocks lossless deletion of the dev branch.
+
+## v0.97.3 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- Decommission the two-branch (dev/main) machinery left over from the trunk cutover. Deleted drift_check.sh + the dead drift/GIT-12 test suite + promote-dev-to-main.yml; severed the dev/back-merge constants from abm_canonical.sh (kept path helpers for the trunk tests); repointed wpx-arrival-check repo-contract rules to the trunk (RC-01 default=main + main-only existence, RC-02 protection on main, RC-03 merge-queue on main, RC-04 required workflow release-on-merge); rewrote git-workflow-standard GIT-01 to single-trunk, reframed GIT-06 to release-on-trunk, RETIRED GIT-12, bumped 0.3.0→0.4.0. Net -1026 lines. dev branch deletion is the separate final step.
+
+## v0.97.2 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- Sulis agent: add The Outcome Test — one unifying principle (the founder measures the outcome they can use, not the artifact you produced) that consolidates three repeat watchlist strikes (#81 done-against-wrong-gate, #173 deferred-the-wanted-slice, #174 menu-instead-of-demonstrate). Placed at the turn-end chokepoint + wired as self-check step 8 so it fires mechanically; DoD generalised from CI-gate to capability-exercisable; GATHER now routes a confused founder to PROCEED-and-show; Scope Posture phase-1 must reach the usable capability. Consolidation not accretion (+52 lines).
+
+## v0.97.1 — 2026-06-03
+
+**Patch — release-train batch.**
+
+- wpx-findings: SF + WP-AUTO ids now derive from the finding signature hash (SF-{sig[:8]} / WP-AUTO-{sig[:8]}) instead of a racy max(existing)+1 counter. Collision-free under parallel run-all security reviews, dedup-unified (same finding always → same id), 1:1-traceable SF↔WP-AUTO. Regexes widened decimal→hex (back-compatible: legacy SF-001 still parses). First fix in the multi-agent numbering strategy; the plugins-repo DR/L counters are the paired change.
+
+## v0.97.0 — 2026-06-03
+
+**Minor — release-train batch.**
+
+- Vendor the brand-identity domain (Brand + DesignSystem + Tenant mirror,
+  sulis-brain v0.15.0 / DR-030) into plugins/sulis/brain/compiled/brand-identity/,
+  and wire the ux-designer agent to it: Section 0 now READs an existing
+  DesignSystem instance (binding the mockup to its real DTCG tokens) and EMITs a
+  Brand + DesignSystem when it establishes a design language. Adds two emit shims
+  (sulis-emit-brand, sulis-emit-design-system) over the generic ingest, with the
+  UXD-04 primitive/semantic/component -> DTCG global/alias/component tier mapping
+  baked into the agent body. CI-locked by 3 new emitter tests (valid Brand, valid
+  DesignSystem-realizing-Brand, and missing-realizes_identity rejects).
+
 ## v0.96.0 — 2026-06-03
 
 **Minor — release-train batch.**

@@ -29,3 +29,17 @@ body {
 *::after {
   box-sizing: border-box;
 }
+
+/* Stop the brief giant-icon flash on load. An inline <svg> with no width/height
+ * attribute and no applied CSS renders at the replaced-element default
+ * (~300×150) — so for the split second before a component's CSS-module chunk
+ * injects (most visible on the Files view, which pulls in the most chunks: the
+ * file panels + Monaco), every Heroicon flashes huge, then snaps small once its
+ * sizing class lands. This gives unsized icons a sane default at ZERO
+ * specificity (:where), so the real sizing class (.ic/.ti/.tw/… — higher
+ * specificity) still wins the instant its CSS loads; only the pre-load frame is
+ * affected. Icons with explicit width/height attributes are left untouched. */
+:where(svg:not([width]):not([height])) {
+  width: 1rem;
+  height: 1rem;
+}

@@ -275,6 +275,7 @@ or auto-resolve (poorly).
 | **6.03** | SHOULD | Shared scaffolding (`__init__.py`, `index.ts`, `mod.rs`) is created by a foundation WP that other WPs depend on; not co-created by peers | Scan for scaffolding files; assert single creator | Contract parse |
 | **6.04** | SHOULD | Each WP's `Contract` explicitly distinguishes `files.create` from `files.modify` | Sections structured per the contract template | Contract template check |
 | **6.05** | MAY | The Recommended Implementation Order surfaces peer-collision-risk WPs sequentially (not in parallel) | Cross-check 6.01/6.02 results against the order | Order analysis |
+| **6.06** | MUST | When ≥2 producer WPs emit into the **same logical artifact** (manifest, registry, codegen output), the artifact's identity — filename, path, and merge semantics — is pinned as an **explicit shared constant in the contract WP** they all `dependsOn`. Producers reference the constant verbatim; they do NOT independently choose a filename. (CF-11, anchor #107.) | Scan producer Contracts for shared logical outputs; assert each is sourced from a single named constant declared in the contract WP | Contract parse + cross-WP constant-import audit |
 
 ---
 

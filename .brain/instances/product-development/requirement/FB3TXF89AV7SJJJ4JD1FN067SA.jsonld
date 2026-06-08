@@ -1,0 +1,13 @@
+{
+  "acceptance_criteria": [
+    "see SRD body"
+  ],
+  "id": "dna:requirement:FB3TXF89AV7SJJJ4JD1FN067SA",
+  "priority": "must",
+  "rationale": "Extracted from FR-18 of /Users/iain/.sulis/changes/01KT500K2JTE2EGW6TPPQ4D4VN/worktree/.specifications/autonomous-delivery-environment/SRD.md. The `source` ref is a synthetic Opportunity placeholder generated from the SRD path; replace when Opportunity emission lands (queued follow-on slice). Defaults applied for SRD-absent fields: priority=must, verification_method=test, state=draft.",
+  "source": "dna:opportunity:BG8E0H5JPPWEK3G3B26T3H087A",
+  "state": "draft",
+  "statement": "A completed reply becomes part of the change's conversation. When a streamed reply completes, it SHALL be presented as part of the change's conversation history alongside prior messages. - *Acceptance:* After completion, the new exchange appears in the same conversation view as the existing transcript, in order",
+  "sys_status": "active",
+  "verification_method": "test"
+}

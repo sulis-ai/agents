@@ -163,7 +163,7 @@ def cmd_queue_list(args: argparse.Namespace) -> None:
         wps, repo, paths.wp_dir, overrides,
         strict_ci=getattr(args, "strict_ci", False),
         paths=paths,
-        base_branch=getattr(args, "base_branch", None) or "dev",
+        base_branch=getattr(args, "base_branch", None) or "main",
     )
 
     eligible = [r for r in results if r.eligible]
@@ -280,7 +280,7 @@ def cmd_status(args: argparse.Namespace) -> None:
         wps, repo, paths.wp_dir, overrides,
         strict_ci=getattr(args, "strict_ci", False),
         paths=paths,
-        base_branch=getattr(args, "base_branch", None) or "dev",
+        base_branch=getattr(args, "base_branch", None) or "main",
     )
 
     eligible = [r for r in results if r.eligible]
@@ -595,9 +595,10 @@ def cmd_abort(args: argparse.Namespace) -> None:
                     f"Train aborted by founder via `wpx-train abort` "
                     f"at phase {phase}"
                 )
-                # Revert + restore + flip
+                # Revert + restore + flip (revert on the trunk / change base)
                 revert_ok, revert_msg = revert_train_on_dev(
                     repo, clone_dir, bundle, reason, args.train_id,
+                    base_branch=getattr(args, "base_branch", None) or "main",
                 )
                 abort_result["revert"] = {"ok": revert_ok, "detail": revert_msg}
                 for entry in bundle:
@@ -1035,7 +1036,7 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     # `wpx-index flip-status --wp WP-NNN --to step-7-blocked --expected done`
     # per-WP after reviewing each case. The per-WP CAS check (--expected)
     # is the safety primitive; bulk auto-flip would bypass it.
-    base_branch = getattr(args, "base_branch", None) or "dev"
+    base_branch = getattr(args, "base_branch", None) or "main"
     for wp in wps:
         if wp.status != TRAIN_DONE_STATUS:
             continue
@@ -1972,7 +1973,7 @@ def cmd_run(args: argparse.Namespace) -> None:
         wps, repo, paths.wp_dir, overrides,
         strict_ci=getattr(args, "strict_ci", False),
         paths=paths,
-        base_branch=getattr(args, "base_branch", None) or "dev",
+        base_branch=getattr(args, "base_branch", None) or "main",
     )
     eligible = [r for r in results if r.eligible]
 

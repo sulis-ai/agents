@@ -259,6 +259,13 @@ say so plainly and offer `list`:
   "
   ```
 
+  No `pre_prompt` is passed here on purpose: `launch_change_terminal`
+  **defaults a change-context opening prompt** when a caller omits one (so
+  the re-spawned session reads its recon + handoff and self-orients rather
+  than sitting idle at an empty claude prompt — #93). `start --spawn` passes
+  a richer brief, which still wins. If you ever want a custom reopen brief,
+  pass `pre_prompt="…"`; otherwise the default auto-start is the floor.
+
   Then:
 
   > *"Reopening **fix the login bug** (`CH-01HQ8X`) — a fresh terminal is
@@ -403,7 +410,7 @@ critical findings block the merge rather than land on `dev`.
 
 *CW-05 size carve-out — skip review when the change is genuinely
 trivial:* before invoking the review, parse the diff size against
-`origin/dev`:
+`origin/main`:
 
 ```bash
 git fetch origin main -q
@@ -557,17 +564,52 @@ deposits the TestRun/TestResult evidence the next gate reads — pass
 the `deployed` leg once that target is reachable — both per the repo-contract
 `targets:` + `commands.standup`. Read the gate verdict:
 
-- **pass** → every Scenario passed, or is deferred-with-need. Done is
-  honest. Log it.
-- **blocked** → a step failed, or a manual check is unconfirmed. **STOP** —
-  surface the founder-English gap (which Scenario, what's broken). Do not
-  call the change done.
-- **deferred-with-need** → a recorded gap (a credential / infra absent);
-  non-blocking, but surface the needs so they're visible.
+**Observed-or-blocked (the default — the gate now refuses deferred-as-done).**
+A user-facing outcome is done only when it was actually *observed* green:
 
-Advisory when it can't run (no Scenarios authored — pure docs/infra change;
-or no target URL yet): like 4.9, the founder owns proceed-anyway, and
-block-by-default applies only to a real `blocked`.
+- **pass** → every Scenario was driven and passed. Done is honest. Log it.
+- **blocked** → a step failed, a manual check is unconfirmed, **OR a Scenario
+  was `deferred` (the real outcome was never driven — a credential / infra /
+  third-party hop absent).** **STOP** — surface the founder-English gap (which
+  Scenario, what wasn't driven, the exact need). Do not call the change done.
+  *"I couldn't verify it" reads as blocked, never done* — this is the lesson
+  from four login attempts that shipped green-but-never-signed-in.
+
+The **human-handoff path (journey-rigor #6).** A `manual-pending` block means
+the journey can't be machine-driven in this run — a browser login, a checkout
+with a real card, anything whose only honest check is a person looking at the
+screen. That's not a dead end: the founder (or you, with them) **drives the real
+flow by hand** and records what they saw, turning the block into genuine green.
+
+1. Show the checklist — what to do, what to look for, per step:
+   ```bash
+   "$SCRIPTS_DIR/sulis-attest-scenario" --scenario <scenario-id> \
+     --repo-root "$REPO_ROOT" --list
+   ```
+2. The founder runs the flow, then records the outcome:
+   ```bash
+   "$SCRIPTS_DIR/sulis-attest-scenario" --scenario <scenario-id> \
+     --repo-root "$REPO_ROOT" --attester "<who ran it>" --all-observed
+   ```
+   (or per-check `--observed "…"` / `--not-observed "…"` for a partial run).
+
+A pass deposits a **real** TestResult stamped `harness="human-attested"` — the
+same evidence the gate reads from an automated run, honest about who observed it.
+Any unobserved check records a fail and the scenario stays blocked. This is the
+opposite of waving it through: it forces a person to look at the real thing and
+keeps the record. (The *automated* browser driver is the named follow-on; until
+it lands, the human is the verifier-of-last-resort and this is how their
+observation becomes evidence the gate trusts.)
+
+The **conscious escape**: if a `deferred` is genuinely acceptable — a
+*non-user-facing* Scenario whose infra leg is unavailable in this run — re-run
+with `--allow-deferred`, which lets that deferral pass as a recorded gap. This
+is a deliberate, logged choice (surface it to the founder), never the default.
+
+Advisory when it can't run at all (no Scenarios authored — pure docs/infra
+change; or no target URL for an http journey): like 4.9, the founder owns
+proceed-anyway. But a `deferred` is no longer a quiet pass — it blocks unless
+`--allow-deferred` is consciously chosen.
 
 **4.9. DoD verification gate — run `sulis-verify-requirements` (MUST when
 an SRD is touched).** This asks the brain whether every Requirement the
@@ -713,7 +755,7 @@ import json
 r = back_integrate_change_branch(
     repo_root=Path('/abs/path/to/worktree'),
     change_branch='change/fix-login-bug',
-    dev_ref='origin/dev',
+    dev_ref='origin/main',
 )
 print(json.dumps(r))
 "
@@ -800,7 +842,7 @@ yes** (MUC-F3 — never act on vague phrasing like "get rid of this"):
 
 Do not proceed without an affirmative. If the founder is currently *in* the
 change's workspace, the tool refuses (you can't nuke the change you're on) —
-relay that and tell them to switch away first (`git checkout dev`).
+relay that and tell them to switch away first (`git checkout main`).
 
 **4. Delete (only after an explicit yes):**
 
@@ -898,10 +940,10 @@ them the dashboard updates on its own as work progresses, and point them at
   file movement (`transfer_worktree_changes`), never the shared stash stack.
   If you ever need to park transient state, make a throwaway WIP commit —
   don't reach for `git stash`.
-- **Never `git checkout dev` inside a change worktree (issue #56).** A change
+- **Never `git checkout main` inside a change worktree (issue #56).** A change
   worktree only ever holds its OWN `change/*` branch. In the multi-worktree
   model `dev` is checked out elsewhere and git forbids the same branch in two
-  worktrees — `git checkout dev` returns *"fatal: 'dev' is already checked
+  worktrees — `git checkout main` returns *"fatal: 'main' is already checked
   out"*. To sync `dev`, operate in whatever worktree holds it (`git worktree
   list --porcelain`). `sulis-change finish --merge` already does this for you.
 - **Ship removes the worktree but keeps the branch — that's intended (issue

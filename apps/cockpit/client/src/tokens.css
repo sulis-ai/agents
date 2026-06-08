@@ -34,6 +34,33 @@
   --brand-gold: #C9A962;
   --brand-depth: #1E3A5F;
 
+  /* Status tints (light) — functional tint background + matching border for
+   * the one state-pattern set's error/empty/server-down surfaces (ADR-005).
+   * Lifted verbatim from the SIGNED visual contract (sulis-app.html, light).
+   * Status colour rides the tint + a dark-neutral label, never coloured text
+   * on a saturated fill (the contract's status-label readability fix). */
+  --bg-positive: #F0FDF4;
+  --bg-positive-border: #BBF7D0;
+  --bg-destructive: #FEF2F2;
+  --bg-destructive-border: #FECACA;
+  --bg-warning: #FFFBEB;
+  --bg-warning-border: #FDE68A;
+
+  /* Stage scale (light) — the one shared stage palette (ADR-005). Used
+   * identically in the board column-header dot, the card badge, and the
+   * thread stage track; the board never invents a parallel palette. The
+   * stage is ALSO carried by the column's label + left-to-right position,
+   * so colour is decorative reinforcement, never the sole cue (WCAG 1.4.1).
+   * Values lifted verbatim from the SIGNED visual contract (sulis-app.html,
+   * light theme): recon stone · specify indigo · design teal · implement
+   * blue · review violet · ship green. All clear the 3:1 non-text bar. */
+  --stage-recon: #8B7355;
+  --stage-specify: #6366F1;
+  --stage-design: #2D7D90;
+  --stage-implement: #2563EB;
+  --stage-review: #9333EA;
+  --stage-ship: #15803D;
+
   /* Stage-badge tints (light) — all SIX active workflow stages
    * (recon/specify/design/implement/review/ship). Genuinely-new semantic
    * tokens added per TDD §2 remediation route (b): each trio exists in BOTH
@@ -64,6 +91,23 @@
   --weight-body: 400;
   --weight-heading: 300;
   --weight-label: 500;
+
+  /* Compatibility aliases — components authored against the experience-fragments
+   * token vocabulary (--bg-card / --bg-muted / --text / --radius / --font …)
+   * map onto the cockpit's defined v4.2.0 tokens. Without these the referencing
+   * components (e.g. ProductSwitcher) resolved to nothing → transparent menu /
+   * unstyled surfaces. (CH-01KT50 integration fix; see task #4.) */
+  --bg-card: var(--card);
+  --bg-muted: var(--muted);
+  --border-light: var(--border-muted);
+  --font: var(--font-sans);
+  --radius: var(--radius-container);
+  --text: var(--foreground);
+  --text-secondary: #525252;
+  --text-muted: var(--muted-foreground);
+
+  /* Float shadow for the docked composer + raised cards (chat-B2). */
+  --shadow-float: 0 6px 20px rgba(23, 23, 23, 0.08);
 
 }
 
@@ -115,4 +159,42 @@
   --stage-implement-bg: #1a3014; --stage-implement-fg: #9bd86a; --stage-implement-border: #345526;
   --stage-review-bg: #3a2310;    --stage-review-fg: #f2a368;    --stage-review-border: #63401f;
   --stage-ship-bg: #13301d;      --stage-ship-fg: #73d391;      --stage-ship-border: #245636;
+
+  /* ---- Dark re-fit of the surfaces #216 introduced AFTER the dark mockup ----
+   * #216 ("Autonomous Delivery Environment") landed a tabbed cockpit with a
+   * new single --stage-* scale, status-tint tokens (--bg-*), and
+   * --text-secondary. The signed dark mockup (mockup/dark-theme.html)
+   * pre-dates #216, so it carries no literals for these. Rather than invent
+   * UNSIGNED dark colours, we DERIVE each from values the mockup already
+   * signed off:
+   *
+   *  - Single --stage-* → the matching signed dark badge foreground
+   *    (--stage-*-fg). Same hue the founder approved; reused, not re-picked.
+   *  - --bg-* status tints → the mockup's signed soft-tint recipe
+   *    (color-mix var(--semantic) N%, var(--card)) — its .banner.error /
+   *    .banner.warn use exactly 16% / 18% fills with 45% borders. Positive
+   *    follows the same 16%/45% shape. These are theme-derived, not new
+   *    literals: in dark they read the dark --destructive/--positive/--warning
+   *    + dark --card, so they re-theme correctly.
+   *  - --text-secondary → --muted-foreground (the dark neutral the mockup
+   *    already uses for secondary text). */
+  --stage-recon: var(--stage-recon-fg);
+  --stage-specify: var(--stage-specify-fg);
+  --stage-design: var(--stage-design-fg);
+  --stage-implement: var(--stage-implement-fg);
+  --stage-review: var(--stage-review-fg);
+  --stage-ship: var(--stage-ship-fg);
+
+  --bg-positive: color-mix(in srgb, var(--positive) 16%, var(--card));
+  --bg-positive-border: color-mix(in srgb, var(--positive) 45%, var(--card));
+  --bg-destructive: color-mix(in srgb, var(--destructive) 16%, var(--card));
+  --bg-destructive-border: color-mix(in srgb, var(--destructive) 45%, var(--card));
+  --bg-warning: color-mix(in srgb, var(--warning) 18%, var(--card));
+  --bg-warning-border: color-mix(in srgb, var(--warning) 45%, var(--card));
+
+  --text-secondary: var(--muted-foreground);
+
+  /* Float shadow — deepen for dark surfaces (the light 8%-black shadow is
+   * invisible on a dark background; a stronger black reads as elevation). */
+  --shadow-float: 0 6px 20px rgba(0, 0, 0, 0.45);
 }

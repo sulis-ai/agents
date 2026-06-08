@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Open a change whose agent is currently running and type a message.",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:S6D1R35BAR89PK7CB5KV1BJ1WX",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "ggh0aqmx-open-a-change-whose-agent-is-currently-r-1",
+  "output_artifacts": [
+    "ggh0aqmx-open-a-change-whose-agent-is-currently-r-1-result"
+  ],
+  "postconditions": [
+    "the agent's reply appears live as it is written"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

@@ -47,13 +47,99 @@ const SCANNED_DIRS = [
   "ports",
 ];
 
-// Mutation HTTP verbs registered on an Express app/router.
+// Mutation HTTP verbs registered on an Express app/router. Scoped to the
+// `app.`/`router.` receiver so unrelated method calls (e.g. `Set.delete`,
+// `Map.delete`) are not false-positives — parity with the shell gate's rule 5.
 const MUTATION_VERB_PATTERNS = [
-  /\.post\s*\(/,
-  /\.put\s*\(/,
-  /\.patch\s*\(/,
-  /\.delete\s*\(/,
+  /\b(app|router)\.post\s*\(/,
+  /\b(app|router)\.put\s*\(/,
+  /\b(app|router)\.patch\s*\(/,
+  /\b(app|router)\.delete\s*\(/,
 ];
+
+// WP-005 (ADR-003) — the chat relay is the ONE sanctioned write path; the
+// SessionBridge prod adapter is the ONE sanctioned process-start site. These
+// two files are allow-listed by PATH; every other file must still be clean.
+// The relay registers a mutation verb (`router.post`); the bridge calls
+// `spawn` (the process start). Anything else with either shape is a violation.
+const RELAY_ROUTE_BASENAME = "chat.ts";
+const BRIDGE_ADAPTER_BASENAME = "StreamJsonSessionBridge.ts";
+// WP-010 fix-forward (ADR-007 amended) — the deterministic cold-start mint's
+// confirm-gated ACT path. It is the SECOND sanctioned process-start AND the
+// sanctioned filesystem-write site (invokes the validated spine emitters +
+// `git init`, writes the emitter config yaml + stages entities). Allow-listed
+// BY PATH — parity with the chat relay's write-verb exception (ADR-003).
+const SPINE_MINTER_BASENAME = "SpineEmitterMinter.ts";
+// WP-011 — the deterministic server-side change-start's confirm-gated ACT path.
+// It execFiles `sulis-change start` + `git clone` directly (the WP-010 lesson:
+// never delegate the consequential act to the bridge agent). It is the THIRD
+// sanctioned process-start site, allow-listed BY PATH — parity with the bridge
+// + mint adapters. It registers NO new write-verb file: the route lives in
+// chat.ts (the one sanctioned relay file, ADR-006).
+const STARTER_BASENAME = "SulisChangeStarter.ts";
+
+// ADR-015 (keep-the-gate-with-named-exception) — four operator-action +
+// summary-cache sites, each allow-listed BY PATH (parity with the relay/mint
+// exceptions above). These are the ONLY additions; any OTHER file with the
+// same shape still trips the gate (the negative tests below prove it).
+//   - advanced.ts        — the two operator POST routes (reveal + stop-process).
+//   - changeAdvanced.ts  — the operator "stop a process" SIGTERM/SIGKILL.
+//   - turnSummaries.ts    — the turn-summary disk cache (writeFile) + the Haiku
+//                           `claude` spawn that produces the cached summary.
+const ADVANCED_ROUTE_BASENAME = "advanced.ts";
+const CHANGE_ADVANCED_BASENAME = "changeAdvanced.ts";
+const TURN_SUMMARIES_BASENAME = "turnSummaries.ts";
+
+// WP-004 (ADR-010/ADR-011) — the server entry spawns the ONE long-lived
+// Python session-manager host at boot (`startSessionManagerHost` →
+// `spawn(python, session_manager_host.py)`). This is the new sanctioned
+// process-start site the terminal composition introduces; allow-listed BY PATH
+// (parity with the bridge/mint/starter exceptions above). The HTTP surface
+// stays GET-only — the WS endpoint rides `upgrade`, never `app.post`.
+//   WP-005 (ADR-010) — this file is also the TERMINAL HOST start site: it is
+//   the ONLY file that starts the session-manager host process. It is named as
+//   one of the two terminal write seams (the other is the sidecar bridge's
+//   WS-attachment, below) in `test_terminal_seams_are_named_exceptions`.
+const HOST_BOOT_BASENAME = "index.ts";
+
+// WP-005 (ADR-010) — the terminal sidecar bridge is the SECOND founder-intended
+// write path's transport seam. It registers NO `app.post` and starts NO process
+// (the host spawn lives in index.ts); instead it attaches a WebSocket upgrade
+// handler to the existing HTTP server's `upgrade` event — the WS-ATTACHMENT
+// seam. A keystroke written into a live PTY through this seam is a sanctioned
+// write, gated at attach authorisation in the engine (ADR-010 §1). The gate
+// allow-lists this ONE file BY PATH for WS-attachment — every other file that
+// attaches a WS upgrade handler is a violation, the literal analogue of the
+// process-start rule. This keeps the GET-only HTTP surface provable AND names
+// the new write transport as an audited exception (not a silent bypass).
+//   INDEPENDENCE (founder directive): the terminal sidecar is its OWN bridge —
+//   it does not depend on, and is not coupled to, the chat relay/bridge. The
+//   allow-list ADDS the terminal seams alongside chat's; it does not couple them.
+const TERMINAL_SIDECAR_BASENAME = "TerminalSidecar.ts";
+
+// WS-attachment shapes — attaching a WebSocket upgrade handler to the HTTP
+// server. This is the terminal's write-transport seam (browser keystroke →
+// live PTY). Forbidden everywhere except the allow-listed sidecar bridge
+// (the ADR-010 WS-attachment rule), parity with PROCESS_START_PATTERNS.
+const WS_ATTACHMENT_PATTERNS = [
+  /\bnew\s+WebSocketServer\s*\(/,
+  /\.handleUpgrade\s*\(/,
+  /\.on\s*\(\s*["']upgrade["']/,
+];
+
+// Process-start shapes — spawn/exec of a child process. Forbidden everywhere
+// except the allow-listed bridge adapter (the new ADR-003 process-start rule).
+const PROCESS_START_PATTERNS = [
+  /\bspawn\s*\(/,
+  /\bspawnSync\s*\(/,
+  /\bexecFile\s*\(/,
+  /\bexecFileSync\s*\(/,
+];
+
+function basename(file: string): string {
+  const parts = file.split("/");
+  return parts[parts.length - 1] ?? file;
+}
 
 // Filesystem mutation tokens. `mkdir` is intentionally permitted (no
 // content written; only used by some helpers' test fixtures, never in
@@ -178,33 +264,99 @@ function stripComments(src: string): string {
 }
 
 describe("read-only inventory (TDD §13.7)", () => {
-  it("registers no POST / PUT / PATCH / DELETE routes", async () => {
+  it("registers no POST / PUT / PATCH / DELETE routes — except the sanctioned relay + operator-action routes (ADR-003/015)", async () => {
     const files = await collectSourceFiles();
     expect(files.length).toBeGreaterThan(0);
+    // The chat relay (ADR-003) and the operator-action routes (ADR-015) are the
+    // ONLY allow-listed write-verb files.
+    const WRITE_VERB_ALLOW = new Set([
+      RELAY_ROUTE_BASENAME,
+      ADVANCED_ROUTE_BASENAME,
+    ]);
     const offenders: string[] = [];
+    const writeVerbFiles = new Set<string>();
     for (const f of files) {
       const src = stripComments(await readSource(f));
-      for (const pat of MUTATION_VERB_PATTERNS) {
-        if (pat.test(src)) {
-          offenders.push(`${f} :: ${pat}`);
-        }
-      }
+      const hasVerb = MUTATION_VERB_PATTERNS.some((p) => p.test(src));
+      if (!hasVerb) continue;
+      writeVerbFiles.add(basename(f));
+      if (WRITE_VERB_ALLOW.has(basename(f))) continue;
+      offenders.push(`${f} :: HTTP mutation verb outside the allow-list`);
     }
-    expect(offenders).toEqual([]);
+    expect(offenders, JSON.stringify(offenders)).toEqual([]);
+    // The EXACT exception set: exactly the relay + the operator-action route
+    // register a write verb — no more, no less.
+    expect([...writeVerbFiles].sort()).toEqual(
+      [RELAY_ROUTE_BASENAME, ADVANCED_ROUTE_BASENAME].sort(),
+    );
   });
 
-  it("calls no filesystem-mutating APIs", async () => {
+  it("starts no child process — except the one sanctioned SessionBridge adapter (ADR-003 new rule)", async () => {
     const files = await collectSourceFiles();
     const offenders: string[] = [];
+    const starters: string[] = [];
     for (const f of files) {
       const src = stripComments(await readSource(f));
-      for (const pat of FS_MUTATION_PATTERNS) {
-        if (pat.test(src)) {
-          offenders.push(`${f} :: ${pat}`);
-        }
+      const startsProcess = PROCESS_START_PATTERNS.some((p) => p.test(src));
+      if (!startsProcess) continue;
+      starters.push(basename(f));
+      // The sanctioned process-start set (path allow-list; parity with the
+      // shell gate's rule 2b): the ONE session bridge (NEW), plus the existing
+      // audited read/recreate subprocess sites (gitShow's `git show`, the
+      // change-store list helper, the recreate-on-demand CLI). Every OTHER file
+      // that starts a process is a violation — the new ADR-003 guarantee.
+      const SANCTIONED_PROCESS_STARTERS = new Set([
+        BRIDGE_ADAPTER_BASENAME,
+        "gitShow.ts",
+        "SulisChangeStoreReader.ts",
+        "SulisChangeRecreator.ts",
+        SPINE_MINTER_BASENAME,
+        STARTER_BASENAME,
+        // ADR-015 — turnSummaries.ts spawns `claude` headless for the Haiku
+        // one-line turn summary it caches on disk (a derived-summary helper).
+        TURN_SUMMARIES_BASENAME,
+        // WP-004 (ADR-010/011) — index.ts spawns the session-manager host at
+        // boot (the terminal engine owner). WP-005 owns the full gate
+        // reconciliation; this entry keeps WP-004's suite green.
+        HOST_BOOT_BASENAME,
+      ]);
+      if (SANCTIONED_PROCESS_STARTERS.has(basename(f))) {
+        continue;
       }
+      offenders.push(`${f} :: process start outside the sanctioned bridge`);
     }
-    expect(offenders).toEqual([]);
+    expect(offenders, JSON.stringify(offenders)).toEqual([]);
+    // Positive assertion: the sanctioned bridge IS present and IS the only
+    // session process-start site (a relay with no bridge is half-built).
+    expect(starters).toContain(BRIDGE_ADAPTER_BASENAME);
+    // ADR-015 positive assertion: the summary helper IS exception-listed and IS
+    // a real process-start site (it spawns the Haiku summariser).
+    expect(starters).toContain(TURN_SUMMARIES_BASENAME);
+  });
+
+  it("calls no filesystem-mutating APIs — except the sanctioned mint adapter + summary cache (ADR-007 amended / ADR-015)", async () => {
+    const files = await collectSourceFiles();
+    // The mint adapter (ADR-007) and the turn-summary disk cache (ADR-015) are
+    // the ONLY allow-listed write sites — each BY PATH.
+    const FS_WRITE_ALLOW = new Set([
+      SPINE_MINTER_BASENAME,
+      TURN_SUMMARIES_BASENAME,
+    ]);
+    const offenders: string[] = [];
+    const writeFiles = new Set<string>();
+    for (const f of files) {
+      const src = stripComments(await readSource(f));
+      const hasWrite = FS_MUTATION_PATTERNS.some((p) => p.test(src));
+      if (!hasWrite) continue;
+      writeFiles.add(basename(f));
+      if (FS_WRITE_ALLOW.has(basename(f))) continue;
+      offenders.push(`${f} :: filesystem write outside the allow-list`);
+    }
+    expect(offenders, JSON.stringify(offenders)).toEqual([]);
+    // The EXACT exception set: only the mint adapter + the summary cache write.
+    expect([...writeFiles].sort()).toEqual(
+      [SPINE_MINTER_BASENAME, TURN_SUMMARIES_BASENAME].sort(),
+    );
   });
 
   it("invokes no mutating git verbs (add / commit / reset / checkout)", async () => {
@@ -221,15 +373,194 @@ describe("read-only inventory (TDD §13.7)", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("sends only signal 0 to other processes (liveness probe)", async () => {
+  it("sends only signal 0 to other processes — except the operator stop-process site (ADR-005 / ADR-015)", async () => {
     const files = await collectSourceFiles();
+    // changeAdvanced.ts is the ONLY allow-listed non-zero-signal site (ADR-015):
+    // the operator "stop a process" action sends SIGTERM → SIGKILL.
     const offenders: string[] = [];
+    const nonZeroSignalFiles = new Set<string>();
     for (const f of files) {
       const src = stripComments(await readSource(f));
-      if (NON_ZERO_KILL_PATTERN.test(src)) {
-        offenders.push(`${f} :: process.kill with non-zero signal`);
+      if (!NON_ZERO_KILL_PATTERN.test(src)) continue;
+      nonZeroSignalFiles.add(basename(f));
+      if (basename(f) === CHANGE_ADVANCED_BASENAME) continue;
+      offenders.push(`${f} :: process.kill with non-zero signal outside the allow-list`);
+    }
+    expect(offenders, JSON.stringify(offenders)).toEqual([]);
+    // The EXACT exception set: only the operator stop-process site signals.
+    expect([...nonZeroSignalFiles]).toEqual([CHANGE_ADVANCED_BASENAME]);
+  });
+
+  // WP-009 (ADR-006) — the concierge is READ-ONLY: it rides the SAME bridge as
+  // the chat and reaches consequence ONLY through the already-sanctioned paths.
+  // It must add NO new file-level write/process exception (WP-009 AC#3): the
+  // write-verb allow-list stays exactly {chat.ts} and the process-start
+  // allow-list stays exactly the audited bridge/git/recreate set. The concierge
+  // read lib (lib/concierge/conciergeRead.ts) must itself be clean.
+  it("adds NO new write-verb file for the concierge — the allow-list stays {chat.ts, advanced.ts} (FR-N8/ADR-006/015)", async () => {
+    const files = await collectSourceFiles();
+    const writeVerbFiles: string[] = [];
+    for (const f of files) {
+      const src = stripComments(await readSource(f));
+      if (MUTATION_VERB_PATTERNS.some((p) => p.test(src))) {
+        writeVerbFiles.push(basename(f));
       }
     }
-    expect(offenders).toEqual([]);
+    // The concierge POST rides the sanctioned relay (chat.ts) — it adds NO new
+    // write-verb file. The write-verb allow-list is exactly the relay + the
+    // operator-action route (advanced.ts, ADR-015).
+    expect(writeVerbFiles.sort()).toEqual(
+      [RELAY_ROUTE_BASENAME, ADVANCED_ROUTE_BASENAME].sort(),
+    );
+  });
+
+  it("the concierge read lib starts no process and writes nothing (FR-N8)", async () => {
+    const conciergeLib = join(serverRoot, "lib", "concierge", "conciergeRead.ts");
+    const src = stripComments(await readSource(conciergeLib));
+    expect(PROCESS_START_PATTERNS.some((p) => p.test(src))).toBe(false);
+    expect(FS_MUTATION_PATTERNS.some((p) => p.test(src))).toBe(false);
+    expect(MUTATION_VERB_PATTERNS.some((p) => p.test(src))).toBe(false);
+  });
+
+  // WP-011 (ADR-006) — start-from-intent's consequential act reaches consequence
+  // ONLY through the sanctioned `sulis-change start` path (the new
+  // SulisChangeStarter adapter). It must add NO new write-verb file: the route
+  // lives in chat.ts (the one sanctioned relay), and the orchestration lib stays
+  // process-free (the adapter is the one audited process-start site).
+  it("adds NO new write-verb file for start-from-intent — the allow-list stays {chat.ts, advanced.ts} (ADR-006/015)", async () => {
+    const files = await collectSourceFiles();
+    const writeVerbFiles: string[] = [];
+    for (const f of files) {
+      const src = stripComments(await readSource(f));
+      if (MUTATION_VERB_PATTERNS.some((p) => p.test(src))) {
+        writeVerbFiles.push(basename(f));
+      }
+    }
+    // The start-from-intent POST rides the sanctioned relay (chat.ts) — it adds
+    // NO new write-verb file. The write-verb allow-list is exactly the relay +
+    // the operator-action route (advanced.ts, ADR-015).
+    expect(writeVerbFiles.sort()).toEqual(
+      [RELAY_ROUTE_BASENAME, ADVANCED_ROUTE_BASENAME].sort(),
+    );
+  });
+
+  it("the start-from-intent orchestration lib starts no process and writes nothing (the act is the adapter's)", async () => {
+    const startLib = join(serverRoot, "lib", "discovery", "startFromIntent.ts");
+    const src = stripComments(await readSource(startLib));
+    expect(PROCESS_START_PATTERNS.some((p) => p.test(src))).toBe(false);
+    expect(FS_MUTATION_PATTERNS.some((p) => p.test(src))).toBe(false);
+    expect(MUTATION_VERB_PATTERNS.some((p) => p.test(src))).toBe(false);
+  });
+
+  it("the SulisChangeStarter adapter IS the only new process-start site (deterministic server-side act)", async () => {
+    const files = await collectSourceFiles();
+    const starter = files.find((f) => basename(f) === STARTER_BASENAME);
+    expect(starter, "SulisChangeStarter.ts must exist (the deterministic act)").toBeDefined();
+    if (starter) {
+      const src = stripComments(await readSource(starter));
+      // It DOES start a process (that is its sanctioned job).
+      expect(PROCESS_START_PATTERNS.some((p) => p.test(src))).toBe(true);
+    }
+  });
+
+  // WP-005 (ADR-010) — the interactive terminal is a SANCTIONED write path, not
+  // a read-only bypass. It introduces EXACTLY two write seams, each named and
+  // path-scoped (parity with ADR-003's chat relay/bridge pairing):
+  //   1. the terminal sidecar bridge's WS-ATTACHMENT (TerminalSidecar.ts) — the
+  //      browser-keystroke → live-PTY transport, gated at attach authorisation;
+  //   2. the session-manager host PROCESS-START (index.ts) — the one site that
+  //      spawns the Python host that owns the pty + AF_UNIX socket.
+  // This test is the positive proof: those two files are the ONLY terminal
+  // seams, every OTHER file that attaches a WS upgrade handler is a violation,
+  // and the chat seams (ADR-003) are untouched alongside them.
+  it("test_terminal_seams_are_named_exceptions — the sidecar WS-attachment + host start are the ONLY two terminal seams (ADR-010)", async () => {
+    const files = await collectSourceFiles();
+    expect(files.length).toBeGreaterThan(0);
+
+    // (a) WS-attachment is allow-listed BY PATH in exactly the sidecar bridge.
+    // Every other file that attaches a WS upgrade handler is a violation — the
+    // literal analogue of the process-start rule (the terminal's write is the
+    // keystroke that reaches the PTY through this attached socket).
+    const wsOffenders: string[] = [];
+    const wsAttachers = new Set<string>();
+    for (const f of files) {
+      const src = stripComments(await readSource(f));
+      const attachesWs = WS_ATTACHMENT_PATTERNS.some((p) => p.test(src));
+      if (!attachesWs) continue;
+      wsAttachers.add(basename(f));
+      if (basename(f) === TERMINAL_SIDECAR_BASENAME) continue;
+      wsOffenders.push(`${f} :: WS-attachment outside the sanctioned terminal sidecar`);
+    }
+    expect(wsOffenders, JSON.stringify(wsOffenders)).toEqual([]);
+    // The EXACT WS-attachment exception set: exactly the sidecar bridge attaches
+    // a WS upgrade handler — no more, no less. (A terminal view that mounted a
+    // second WS-attachment file would fail here.)
+    expect([...wsAttachers]).toEqual([TERMINAL_SIDECAR_BASENAME]);
+
+    // (b) The sidecar bridge itself starts NO process and registers NO write
+    // verb — its only write seam is the WS-attachment. The host spawn lives in
+    // index.ts; the two seams are deliberately separate files (ADR-010 §2).
+    const sidecar = files.find((f) => basename(f) === TERMINAL_SIDECAR_BASENAME);
+    expect(sidecar, "TerminalSidecar.ts must exist (the WS-attachment seam)").toBeDefined();
+    if (sidecar) {
+      const src = stripComments(await readSource(sidecar));
+      expect(PROCESS_START_PATTERNS.some((p) => p.test(src))).toBe(false);
+      expect(MUTATION_VERB_PATTERNS.some((p) => p.test(src))).toBe(false);
+      // It IS the WS-attachment seam (that is its sanctioned job).
+      expect(WS_ATTACHMENT_PATTERNS.some((p) => p.test(src))).toBe(true);
+    }
+
+    // (c) The session-manager host start is named in index.ts (the host PROCESS-
+    // start seam) and nowhere else — the host spawn is the second terminal seam.
+    const host = files.find((f) => basename(f) === HOST_BOOT_BASENAME);
+    expect(host, "index.ts must exist (the host process-start seam)").toBeDefined();
+    if (host) {
+      const src = stripComments(await readSource(host));
+      expect(PROCESS_START_PATTERNS.some((p) => p.test(src))).toBe(true);
+    }
+
+    // (d) INDEPENDENCE (founder directive): the terminal sidecar does NOT import
+    // the chat relay/bridge — the terminal seams are added alongside chat's, not
+    // coupled to them. The bridge stands up with no chat present.
+    if (sidecar) {
+      const raw = await readSource(sidecar);
+      expect(raw).not.toMatch(/from\s+["'][^"']*routes\/chat["']/);
+      expect(raw).not.toMatch(/from\s+["'][^"']*StreamJsonSessionBridge["']/);
+    }
+  });
+
+  // WP-005 (ADR-010 §3 / NFR-SEC-05) — reading a surface still starts NOTHING.
+  // The host process is started at server boot (the one audited index.ts site),
+  // never on a read. No read-view file (route/lib that serves a GET surface)
+  // starts a process or attaches a WS write seam. This extends the existing
+  // NFR-SEC-05 "loading a read view starts no session" assertion to cover the
+  // terminal's two new seam shapes (process-start + WS-attachment).
+  it("test_read_views_start_no_session — mounting a read view spawns no host / attaches no write seam (NFR-SEC-05)", async () => {
+    const files = await collectSourceFiles();
+    // The ONLY files permitted to start a process OR attach a WS write seam are
+    // the audited seams; a read view (everything else) does neither.
+    const SANCTIONED_SEAM_FILES = new Set([
+      BRIDGE_ADAPTER_BASENAME,
+      "gitShow.ts",
+      "SulisChangeStoreReader.ts",
+      "SulisChangeRecreator.ts",
+      SPINE_MINTER_BASENAME,
+      STARTER_BASENAME,
+      TURN_SUMMARIES_BASENAME,
+      HOST_BOOT_BASENAME,
+      TERMINAL_SIDECAR_BASENAME,
+    ]);
+    const readViewOffenders: string[] = [];
+    for (const f of files) {
+      if (SANCTIONED_SEAM_FILES.has(basename(f))) continue;
+      const src = stripComments(await readSource(f));
+      if (PROCESS_START_PATTERNS.some((p) => p.test(src))) {
+        readViewOffenders.push(`${f} :: read view starts a process`);
+      }
+      if (WS_ATTACHMENT_PATTERNS.some((p) => p.test(src))) {
+        readViewOffenders.push(`${f} :: read view attaches a WS write seam`);
+      }
+    }
+    expect(readViewOffenders, JSON.stringify(readViewOffenders)).toEqual([]);
   });
 });

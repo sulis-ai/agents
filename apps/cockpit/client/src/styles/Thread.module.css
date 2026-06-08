@@ -1,4 +1,10 @@
-/* WP-013 — Thread page + header + tab styles. */
+/* WP-004 — Thread page + header + rail styles.
+ *
+ * Two-part layout (SIGNED visual contract): the page fills the viewport and
+ * does NOT scroll as a whole — the conversation column and the context rail
+ * each scroll internally. This is what stops the composer overflowing onto
+ * the file tree (the prior single-scroll stack had no internal scroll, so
+ * sections fought for height and overlapped). (CH-01KT50 IA fix.) */
 
 .page {
   flex: 1 1 auto;
@@ -6,6 +12,8 @@
   display: flex;
   flex-direction: column;
   padding: 0 24px;
+  /* Columns scroll internally; the page itself never scrolls. */
+  overflow: hidden;
 }
 
 .status {
@@ -15,56 +23,191 @@
   text-align: center;
 }
 
+/* 404-gone reuses the one state-pattern set's destructive tint (ADR-005);
+ * tokens.css only — no raw hex (WP-004 Boy Scout, scoped to this file). */
 .goneOrMoved {
   padding: 32px 16px;
-  background: color-mix(in srgb, var(--destructive) 16%, var(--card));
-  border: 1px solid color-mix(in srgb, var(--destructive) 45%, var(--card));
-  border-radius: 8px;
-  color: var(--destructive);
+  background: var(--bg-destructive);
+  border: 1px solid var(--bg-destructive-border);
+  border-radius: var(--radius-container);
+  color: var(--foreground);
 }
 
 .goneOrMovedDetail {
   margin-top: 8px;
   font-size: 13px;
-  color: var(--destructive);
-  opacity: 0.85;
+  color: var(--muted-foreground);
 }
 
 .header {
   flex: 0 0 auto;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 16px;
-  padding: 12px 0;
+  padding: 14px 0 12px;
   border-bottom: 1px solid var(--border);
   background: var(--card);
 }
 
-.left {
+/* LEFT — lead with the plain-English headline (the change's intent); the
+ * code-y bits (slug · primitive) sit above it as a quiet mono kicker. This
+ * is the signed mockup's treatment — the founder reads the sentence, not the
+ * ID. (CH-01KT50 copy fix.) */
+.headLeft {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.kicker {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* RIGHT — stage badge + liveness + the one canonical handle, demoted to a
+ * small muted reference (no longer the headline). */
+.headMeta {
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .handle {
-  font-weight: 600;
-  font-size: 16px;
-  color: var(--foreground);
-}
-
-.slug {
-  font-size: 13px;
+  font-size: 11px;
   color: var(--muted-foreground);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-.center {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* WP-004 — the coherent "where am I" spine: stage track + read-time status,
+ * sitting directly under the header (ADR-005). */
+.spine {
   flex: 0 0 auto;
+  padding: 14px 0 4px;
+  border-bottom: 1px solid var(--border-muted);
 }
+
+/* ── Two-part body ─────────────────────────────────────────────────────── */
+
+/* The working area: conversation LEFT, context rail RIGHT (signed contract). */
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+  padding-bottom: 16px;
+}
+
+/* LEFT — the persistent conversation column. */
+.main {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding-top: 12px;
+}
+
+/* The transcript scrolls; the composer below it stays docked at the foot. */
+.conversationScroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* RIGHT — the context rail (Preview / Files / Brain, one at a time).
+ * min-width:0 + overflow:hidden PIN the rail at its 384px basis: without
+ * them a wide child (the file tree's long names, a code pane) forces the
+ * flex item past its basis and STEALS width from the conversation — which
+ * is the "page moves around when I switch tabs" jank. (CH-01KT50.) */
+.rail {
+  flex: 0 0 384px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0 0 20px;
+  border-left: 1px solid var(--border);
+}
+
+.railTabs {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-muted);
+  margin-bottom: 12px;
+}
+
+.railTab {
+  appearance: none;
+  background: none;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: var(--font-sans);
+  color: var(--muted-foreground);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.railTabIcon {
+  display: inline-flex;
+  align-items: center;
+  color: currentColor;
+}
+
+.railTab:hover {
+  color: var(--foreground);
+}
+
+/* Active rail tab — underlined in accent (the contract's active rail-tab
+ * underline; colour is reinforcement, the label still carries the state). */
+.railTabActive {
+  color: var(--foreground);
+  font-weight: var(--weight-label);
+  border-bottom-color: var(--accent);
+}
+
+.railTab:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-interactive);
+}
+
+.railBody {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ── Header sub-parts ──────────────────────────────────────────────────── */
 
 .stage {
   padding: 2px 8px;
@@ -72,12 +215,14 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--primary) 10%, var(--card));
+  border-radius: var(--radius-interactive);
+  background: var(--muted);
   color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--card));
+  border: 1px solid var(--border);
 }
 
+/* Liveness dot — one shared status vocabulary (ADR-005); tokens.css only.
+ * running = positive, unknown = warning, not-running = neutral border. */
 .liveness {
   width: 10px;
   height: 10px;
@@ -86,6 +231,9 @@
 }
 .liveness[data-status="running"] {
   background: var(--positive);
+  /* The signed mockup's .dot.live glow — a translucent ring of the live
+   * colour (mockup/dark-theme.html line 187). Theme-derived, re-themes with
+   * --positive; transparent so it never paints an opaque tint band. */
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--positive) 25%, transparent);
 }
 .liveness[data-status="not-running"] {

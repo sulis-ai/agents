@@ -71,7 +71,7 @@ def cmd_run(args: argparse.Namespace) -> None:
     ci_interval = args.ci_poll_interval or CI_DEFAULT_INTERVAL
     deploy_interval = args.deploy_poll_interval or DEPLOY_DEFAULT_INTERVAL
     deploy_cap = args.deploy_cap or DEPLOY_DEFAULT_CAP
-    base_branch = args.base_branch or "dev"
+    base_branch = args.base_branch or "main"
 
     result: dict = {
         "wp": args.wp,
@@ -110,11 +110,11 @@ def cmd_run(args: argparse.Namespace) -> None:
         # or --base-branch doesn't start with "change/" — CW-05 trivial
         # carve-out).
         if args.change_worktree_path and base_branch.startswith("change/"):
-            _log(f"Step 0: arrival check — back-integrating {base_branch} from origin/dev")
+            _log(f"Step 0: arrival check — back-integrating {base_branch} from origin/{base_branch}")
             arrival = back_integrate_change_branch(
                 Path(args.change_worktree_path),
                 base_branch,
-                dev_ref="origin/dev",
+                dev_ref="origin/main",
             )
             result["step_0_arrival_check"] = arrival["status"]
             if arrival["status"] == "merge_conflict":
@@ -136,9 +136,9 @@ def cmd_run(args: argparse.Namespace) -> None:
                 )
                 emit_result(result, exit_code=1)
             elif arrival["status"] == "merged_ok":
-                _log(f"Step 0: merged {arrival.get('merged_commits', '?')} commits from origin/dev into {base_branch}")
+                _log(f"Step 0: merged {arrival.get('merged_commits', '?')} commits from origin/{base_branch} into {base_branch}")
             else:
-                _log(f"Step 0: {base_branch} already current with origin/dev (no-op)")
+                _log(f"Step 0: {base_branch} already current with origin/{base_branch} (no-op)")
         else:
             result["step_0_arrival_check"] = "skipped"
 
@@ -244,11 +244,11 @@ def cmd_run(args: argparse.Namespace) -> None:
         # Surface the conflict as a warning and let the founder resolve at
         # next Step 0 (defence in depth).
         if args.change_worktree_path and base_branch.startswith("change/") and not result.get("merge_already_complete"):
-            _log(f"Step 12.5: post-WP back-integration of {base_branch} from origin/dev")
+            _log(f"Step 12.5: post-WP back-integration of {base_branch} from origin/{base_branch}")
             post_merge = back_integrate_change_branch(
                 Path(args.change_worktree_path),
                 base_branch,
-                dev_ref="origin/dev",
+                dev_ref="origin/main",
             )
             result["step_12_5_back_integration"] = post_merge["status"]
             if post_merge["status"] == "merge_conflict":
@@ -264,9 +264,9 @@ def cmd_run(args: argparse.Namespace) -> None:
             elif post_merge["status"] in ("fetch_failed", "internal_error"):
                 _log(f"WARNING: Step 12.5 {post_merge['status']}: {post_merge.get('error', '')}. Continuing — defence in depth at next Step 0.")
             elif post_merge["status"] == "merged_ok":
-                _log(f"Step 12.5: merged {post_merge.get('merged_commits', '?')} commits from origin/dev into {base_branch}")
+                _log(f"Step 12.5: merged {post_merge.get('merged_commits', '?')} commits from origin/{base_branch} into {base_branch}")
             else:
-                _log(f"Step 12.5: {base_branch} already current with origin/dev (no-op)")
+                _log(f"Step 12.5: {base_branch} already current with origin/{base_branch} (no-op)")
         else:
             result["step_12_5_back_integration"] = "skipped"
 
@@ -387,7 +387,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--worktree-path", default=None,
                        help="Path to worktree (defaults to repo root)")
     p_run.add_argument("--dev-sha-at-creation", required=True,
-                       help="origin/dev SHA when worktree was created (from sidecar)")
+                       help="origin/<base> SHA when worktree was created (from sidecar)")
     p_run.add_argument("--deploy-workflow", default=None,
                        help="Deploy workflow name (e.g. 'Deploy to Dev "
                             "Environment'). Required for a deployable-web-app "

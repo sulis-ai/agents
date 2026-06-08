@@ -1,18 +1,22 @@
 // WP-011 — smoke test for <App />.
 //
-// Replaces WP-001's "cockpit booting" placeholder assertion now that
-// WP-011 has landed the real Router + Shell + TanStack Query wiring.
-// We assert <App /> mounts without throwing AND the dashboard route
-// renders inside the persistent Shell. Detailed route + layout
-// behaviour lives in routing.test.tsx + Shell.test.tsx.
+// Asserts <App /> mounts without throwing AND the board route (WP-003)
+// renders inside the persistent workspace shell. Detailed route + layout
+// behaviour lives in routing.test.tsx + WorkspaceShell.test.tsx.
+//
+// The chat-B2 redesign replaced the sidebar shell with the tabbed workspace
+// top bar; the smoke test asserts the topbar (testid "workspace-topbar")
+// renders, matching WorkspaceShell.test.tsx.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AppRoutes } from "../App";
-// WP-004 — the Shell now hosts the ThemeToggle (a useTheme() consumer), so the
-// smoke mount wraps AppRoutes in a ThemeProvider, mirroring App.tsx production.
+import { renderWithClient } from "./_renderWithClient";
+// WP-004 — the workspace top bar now hosts the ThemeToggle (a useTheme()
+// consumer), so the smoke mount wraps AppRoutes in a ThemeProvider, mirroring
+// App.tsx production. Composed with main's shared renderWithClient harness
+// (EP-03 reuse).
 import { ThemeProvider } from "../theme/ThemeProvider";
 import { stubMatchMedia } from "./helpers/stubMatchMedia";
 
@@ -26,19 +30,14 @@ describe("App smoke", () => {
   });
 
   it("mounts AppRoutes with a router + query client without throwing", () => {
-    const client = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    render(
-      <QueryClientProvider client={client}>
-        <ThemeProvider>
-          <MemoryRouter initialEntries={["/"]}>
-            <AppRoutes />
-          </MemoryRouter>
-        </ThemeProvider>
-      </QueryClientProvider>,
+    renderWithClient(
+      <ThemeProvider>
+        <MemoryRouter initialEntries={["/"]}>
+          <AppRoutes />
+        </MemoryRouter>
+      </ThemeProvider>,
     );
-    expect(screen.getByTestId("page-dashboard")).toBeInTheDocument();
-    expect(screen.getByTestId("shell-sidebar")).toBeInTheDocument();
+    expect(screen.getByTestId("page-board")).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-topbar")).toBeInTheDocument();
   });
 });
