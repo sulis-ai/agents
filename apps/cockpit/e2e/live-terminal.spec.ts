@@ -1,6 +1,14 @@
 // WP-010 — end-to-end live-terminal round-trip (Spec §Acceptance #1/#2/#3,
 // TDD §3 / §6.4, contract §2.12–§2.13).
 //
+// SUPERSEDED AS THE PRODUCTION PROOF BY live-terminal-real.spec.ts (CH-01KTHV
+// WP-007): that sibling drives the SAME acceptance journey against the REAL
+// server endpoint (startProductionServer → spawned host + attached sidecar, via
+// the WP-006 same-origin default), with NO harness proxy in the loop. THIS spec
+// stays intact — it proved CH-01KTGY's round-trip — but the harness proxy +
+// backend (terminal-proxy.ts / terminal-backend.py) it depends on may be retired
+// in a later change now that the production proof exists.
+//
 // THE proof of the whole change: the founder's acceptance journey, driven
 // through the REAL interface (Playwright clicking the cockpit) against a REAL
 // AF_UNIX socket served over a REAL SessionManager + a REAL pty-backed fake

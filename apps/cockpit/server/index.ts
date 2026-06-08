@@ -250,6 +250,10 @@ export interface ProductionServerHandle {
   sidecar: TerminalSidecar;
   /** The spawned Python session-manager host process. */
   host: ChildProcess;
+  /** The AF_UNIX socket path the host's `SocketServer` serves on (a per-run temp
+   *  unless a fixed `socketPath` was injected). Exposed so a test/e2e harness can
+   *  pre-seed the same socket the server serves. */
+  socketPath: string;
   /** The bound port (resolves an ephemeral `port: 0` to the actual port). */
   port: number;
   /** The `ws://host:port` base URL the terminal endpoint rides (`/terminal`). */
@@ -272,6 +276,12 @@ export interface StartProductionServerOptions {
   originAllowList?: string[];
   /** python executable for the host (defaults to `python3`). */
   python?: string;
+  /** The AF_UNIX socket path the host serves on (defaults to a fresh per-run
+   *  temp inside {@link startSessionManagerHost}). Test-injection only — the e2e
+   *  passes a fixed path so its setup can pre-seed the change's scrollback over
+   *  the SAME socket the running server serves (the production host seeds no
+   *  banner). Mirrors the existing `python` test-injection option. */
+  socketPath?: string;
 }
 
 /**
@@ -322,7 +332,10 @@ export async function startProductionServer(
   //    tear down the HTTP server we already bound so we leak nothing.
   let hostHandle: SessionManagerHostHandle;
   try {
-    hostHandle = await startSessionManagerHost({ python: opts.python });
+    hostHandle = await startSessionManagerHost({
+      python: opts.python,
+      socketPath: opts.socketPath,
+    });
   } catch (err) {
     await new Promise<void>((res) => httpServer.close(() => res()));
     throw err;
@@ -366,6 +379,7 @@ export async function startProductionServer(
     httpServer,
     sidecar,
     host: hostHandle.host,
+    socketPath: hostHandle.socketPath,
     port: boundPort,
     url: `ws://${CONFIG.bindAddress}:${boundPort}`,
     close,
