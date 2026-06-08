@@ -1,0 +1,33 @@
+{
+  "review_target": "feat/wp-009-banner-sidebar-reconcile",
+  "base": "change/feat-dark-mode",
+  "timestamp": "2026-06-08T081206Z",
+  "verdict": "PASS",
+  "verdict_plain": "Ready to merge",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "hygiene": {
+    "scope": { "severity": "none" },
+    "size": { "files_changed": 3, "lines_added": 221, "lines_removed": 10, "severity": "none" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none" },
+    "completeness": { "new_source_without_test": 0, "severity": "none" }
+  },
+  "lenses": {
+    "architecture": { "in_changes": 0, "in_neighbours": 0 },
+    "security": { "in_changes": 0, "in_neighbours": 0 },
+    "quality": { "in_changes": 1, "in_neighbours": 0 }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "lens": "quality",
+      "severity": "low",
+      "ring": "changes",
+      "file": "apps/cockpit/client/src/tests/no-raw-colours.banner-sidebar-reconcile.test.ts",
+      "summary": "no-raw-literal assertion overlaps in intent with existing WP-006/008 guard specs; retained deliberately as a self-contained local invariant.",
+      "action": "none",
+      "delta": null
+    }
+  ],
+  "draft_deltas": [],
+  "auto_downgrade_triggers": []
+}

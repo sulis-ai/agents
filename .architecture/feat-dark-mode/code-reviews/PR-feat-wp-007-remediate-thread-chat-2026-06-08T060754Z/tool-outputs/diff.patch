@@ -1,0 +1,112 @@
+diff --git a/apps/cockpit/client/src/styles/Chat.module.css b/apps/cockpit/client/src/styles/Chat.module.css
+index 6e53d62e..04e7acad 100644
+--- a/apps/cockpit/client/src/styles/Chat.module.css
++++ b/apps/cockpit/client/src/styles/Chat.module.css
+@@ -45,8 +45,8 @@
+ 
+ .bubbleUser {
+   align-self: flex-end;
+-  background: #ddf4ff;
+-  color: var(--primary);
++  background: var(--primary);
++  color: var(--primary-foreground);
+ }
+ 
+ .bubbleAssistant {
+@@ -109,7 +109,7 @@
+ .collapsedBody {
+   padding: 8px 10px;
+   border-top: 1px solid var(--border);
+-  background: #fff;
++  background: var(--card);
+ }
+ 
+ .collapsedJson {
+@@ -126,11 +126,11 @@
+   align-items: center;
+   gap: 8px;
+   padding: 6px 10px;
+-  background: #fff8c5;
+-  border: 1px solid #f0d77a;
++  background: color-mix(in srgb, var(--warning) 18%, var(--card));
++  border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--card));
+   border-radius: 6px;
+   font-size: 12px;
+-  color: #735c0f;
++  color: var(--warning);
+   align-self: stretch;
+ }
+ 
+@@ -148,7 +148,7 @@
+ 
+ .systemTime {
+   font-size: 11px;
+-  color: #735c0f;
++  color: var(--warning);
+   opacity: 0.7;
+ }
+ 
+diff --git a/apps/cockpit/client/src/styles/Thread.module.css b/apps/cockpit/client/src/styles/Thread.module.css
+index 30d25632..fa1019c5 100644
+--- a/apps/cockpit/client/src/styles/Thread.module.css
++++ b/apps/cockpit/client/src/styles/Thread.module.css
+@@ -17,16 +17,16 @@
+ 
+ .goneOrMoved {
+   padding: 32px 16px;
+-  background: #fff5f5;
+-  border: 1px solid #ffd6d6;
++  background: color-mix(in srgb, var(--destructive) 16%, var(--card));
++  border: 1px solid color-mix(in srgb, var(--destructive) 45%, var(--card));
+   border-radius: 8px;
+-  color: #86181d;
++  color: var(--destructive);
+ }
+ 
+ .goneOrMovedDetail {
+   margin-top: 8px;
+   font-size: 13px;
+-  color: #86181d;
++  color: var(--destructive);
+   opacity: 0.85;
+ }
+ 
+@@ -37,7 +37,7 @@
+   gap: 16px;
+   padding: 12px 0;
+   border-bottom: 1px solid var(--border);
+-  background: #fff;
++  background: var(--card);
+ }
+ 
+ .left {
+@@ -73,9 +73,9 @@
+   text-transform: uppercase;
+   letter-spacing: 0.04em;
+   border-radius: 4px;
+-  background: #f1f8ff;
++  background: color-mix(in srgb, var(--primary) 10%, var(--card));
+   color: var(--primary);
+-  border: 1px solid #c8e1ff;
++  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--card));
+ }
+ 
+ .liveness {
+@@ -85,14 +85,14 @@
+   background: var(--border);
+ }
+ .liveness[data-status="running"] {
+-  background: #28a745;
+-  box-shadow: 0 0 0 2px #d4f4dd;
++  background: var(--positive);
++  box-shadow: 0 0 0 2px color-mix(in srgb, var(--positive) 25%, transparent);
+ }
+ .liveness[data-status="not-running"] {
+   background: var(--border);
+ }
+ .liveness[data-status="unknown"] {
+-  background: #ffd33d;
++  background: var(--warning);
+ }
+ 
+ .right {

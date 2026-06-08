@@ -53,6 +53,22 @@ export const CONFIG = Object.freeze({
   /** 5 s — the WP-008 git timeout. (TDD §13.6) */
   gitTimeoutMs: 5_000,
   /**
+   * Per-call budget for the change-LISTING path
+   * (`sulis-list-changes list` via SulisChangeStoreReader). Its OWN
+   * config — NEVER reuse `gitTimeoutMs`: enumerating MANY changes (40+ in
+   * a busy repo) legitimately takes longer than a single git op, so a 5 s
+   * budget false-fails the dashboard's first load (the founder sees
+   * "Something went wrong loading your changes" even though a retry
+   * succeeds). 30 s matches the I/O-heavy precedent already set by the
+   * recreate / starter adapters. Overridable via CHANGE_LIST_TIMEOUT_MS.
+   * The single-git-op paths (diff, origin attribution) keep `gitTimeoutMs`
+   * — only the listing gets the generous budget.
+   */
+  changeListTimeoutMs: parsePositiveIntEnv(
+    process.env.CHANGE_LIST_TIMEOUT_MS,
+    30_000,
+  ),
+  /**
    * WP-005 — startup budget for the chat bridge child (the headless
    * `claude` session), from spawn to its FIRST stream-json output. A cold
    * headless `claude -p --output-format stream-json --include-partial-messages`

@@ -8,18 +8,34 @@
 // top bar; the smoke test asserts the topbar (testid "workspace-topbar")
 // renders, matching WorkspaceShell.test.tsx.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AppRoutes } from "../App";
 import { renderWithClient } from "./_renderWithClient";
+// WP-004 — the workspace top bar now hosts the ThemeToggle (a useTheme()
+// consumer), so the smoke mount wraps AppRoutes in a ThemeProvider, mirroring
+// App.tsx production. Composed with main's shared renderWithClient harness
+// (EP-03 reuse).
+import { ThemeProvider } from "../theme/ThemeProvider";
+import { stubMatchMedia } from "./helpers/stubMatchMedia";
 
 describe("App smoke", () => {
+  beforeEach(() => {
+    stubMatchMedia(false);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete document.documentElement.dataset.theme;
+  });
+
   it("mounts AppRoutes with a router + query client without throwing", () => {
     renderWithClient(
-      <MemoryRouter initialEntries={["/"]}>
-        <AppRoutes />
-      </MemoryRouter>,
+      <ThemeProvider>
+        <MemoryRouter initialEntries={["/"]}>
+          <AppRoutes />
+        </MemoryRouter>
+      </ThemeProvider>,
     );
     expect(screen.getByTestId("page-board")).toBeInTheDocument();
     expect(screen.getByTestId("workspace-topbar")).toBeInTheDocument();

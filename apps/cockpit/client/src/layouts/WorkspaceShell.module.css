@@ -44,6 +44,17 @@
   overflow-x: auto;
 }
 
+/* Theme toggle slot — pushed to the far right of the top bar (CH-01KTHP).
+ * margin-left:auto consumes the free space after the tab strip so the toggle
+ * sits top-right, matching the signed-off mockup's toggle placement. */
+.toggleSlot {
+  margin-left: auto;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  padding-left: 8px;
+}
+
 /* A tab — Board or an open change. Bottom-border highlight when active. */
 .tab {
   display: inline-flex;

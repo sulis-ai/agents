@@ -28,15 +28,24 @@ vi.mock("@monaco-editor/react", () => ({
 }));
 
 import { RenderedPreview } from "../components/RenderedPreview";
+// CH-01KTHP — a code file delegates to MonacoFileInner, which consumes
+// useTheme() (dark-mode WP-005 theme binding). Render through a ThemeProvider so
+// that path has theme context, mirroring App.tsx production composition.
+import { ThemeProvider } from "../theme/ThemeProvider";
+import type { ReactElement } from "react";
 
 const MD = "# Heading\n\nA paragraph with **bold**.\n\n- one\n- two";
+
+/** Render a preview wrapped in the theme context the code-file path needs. */
+function renderPreview(ui: ReactElement) {
+  return render(<ThemeProvider>{ui}</ThemeProvider>);
+}
 
 describe("<RenderedPreview /> (FR-08/09)", () => {
   beforeEach(() => editorProps.mockClear());
 
   it("renders a .md document as HTML by default", () => {
-    render(
-      <RenderedPreview path="docs/SRD.md" content={MD} language="markdown" />,
+    renderPreview(<RenderedPreview path="docs/SRD.md" content={MD} language="markdown" />,
     );
     const rendered = screen.getByTestId("preview-rendered");
     expect(rendered.querySelector("h1")?.textContent).toBe("Heading");
@@ -45,8 +54,7 @@ describe("<RenderedPreview /> (FR-08/09)", () => {
   });
 
   it("offers a Rendered ↔ Raw toggle and flips to raw source and back", async () => {
-    render(
-      <RenderedPreview path="docs/SRD.md" content={MD} language="markdown" />,
+    renderPreview(<RenderedPreview path="docs/SRD.md" content={MD} language="markdown" />,
     );
     // Starts rendered.
     expect(screen.getByTestId("preview-rendered")).toBeInTheDocument();
@@ -64,7 +72,7 @@ describe("<RenderedPreview /> (FR-08/09)", () => {
   });
 
   it("marks the active toggle for assistive tech (aria-pressed)", () => {
-    render(<RenderedPreview path="x.md" content={MD} language="markdown" />);
+    renderPreview(<RenderedPreview path="x.md" content={MD} language="markdown" />);
     const renderedBtn = screen.getByRole("button", { name: /rendered/i });
     const rawBtn = screen.getByRole("button", { name: /raw/i });
     expect(renderedBtn).toHaveAttribute("aria-pressed", "true");
@@ -75,8 +83,7 @@ describe("<RenderedPreview /> (FR-08/09)", () => {
   });
 
   it("renders a .html document inside a sandboxed iframe (no scripts)", () => {
-    render(
-      <RenderedPreview
+    renderPreview(<RenderedPreview
         path="report.html"
         content="<h1>Report</h1>"
         language="html"
@@ -90,8 +97,7 @@ describe("<RenderedPreview /> (FR-08/09)", () => {
   });
 
   it("does not offer a toggle for a non-renderable code file (stays source)", async () => {
-    render(
-      <RenderedPreview
+    renderPreview(<RenderedPreview
         path="server/app.ts"
         content="const x = 1;"
         language="typescript"
@@ -107,7 +113,7 @@ describe("<RenderedPreview /> (FR-08/09)", () => {
   });
 
   it("treats a .md file as renderable even when the language hint is absent", () => {
-    render(<RenderedPreview path="NOTES.md" content={MD} language={null} />);
+    renderPreview(<RenderedPreview path="NOTES.md" content={MD} language={null} />);
     expect(screen.getByTestId("preview-rendered")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /raw/i })).toBeInTheDocument();
   });

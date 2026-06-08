@@ -11,12 +11,12 @@
   line-height: 16px;
 }
 
-.recon       { background: #f1f8ff; color: var(--primary); border: 1px solid #c8e1ff; }
-.specify     { background: #fff5b1; color: #735c0f; border: 1px solid #ffd33d; }
-.design      { background: #e6e6fa; color: #4b0082; border: 1px solid #c5c5e6; }
-.implement   { background: #e1ffe1; color: #22863a; border: 1px solid #c0e6c0; }
-.review      { background: #fff0e6; color: #c04a00; border: 1px solid #ffd0b0; }
-.ship        { background: #d4edda; color: #155724; border: 1px solid #a5d6a7; }
+.recon       { background: var(--stage-recon-bg);     color: var(--stage-recon-fg);     border: 1px solid var(--stage-recon-border); }
+.specify     { background: var(--stage-specify-bg);   color: var(--stage-specify-fg);   border: 1px solid var(--stage-specify-border); }
+.design      { background: var(--stage-design-bg);    color: var(--stage-design-fg);    border: 1px solid var(--stage-design-border); }
+.implement   { background: var(--stage-implement-bg); color: var(--stage-implement-fg); border: 1px solid var(--stage-implement-border); }
+.review      { background: var(--stage-review-bg);    color: var(--stage-review-fg);    border: 1px solid var(--stage-review-border); }
+.ship        { background: var(--stage-ship-bg);      color: var(--stage-ship-fg);      border: 1px solid var(--stage-ship-border); }
 /* #38: terminal stage — muted on purpose. Shipped changes are the audit
  * trail; the badge signals "archived", not "active step". */
 .shipped     { background: var(--muted); color: var(--muted-foreground); border: 1px solid var(--border); }

@@ -1,0 +1,19 @@
+id: feat-dark-mode
+title: Dark mode for the cockpit
+change_handle: CH-01KTHP
+primitive: feat
+status: draft            # draft → designed → decomposed → implemented → verified
+sourced_from: .changes/feat-dark-mode.SPEC.md
+tier: S
+artifacts:
+  tdd: TDD.md
+  sizing: SIZING.md
+  adrs:
+    - adrs/ADR-001-theme-mechanism.md
+    - adrs/ADR-002-monaco-theme-binding.md
+  mockup: mockup/dark-theme.html
+  work_packages:
+    - work-packages/WP-001-visual-contract.md   # stub — visual contract only (#45 / UXD-14)
+notes:
+  - Full Work Package decomposition deferred to the plan-work pass.
+  - Audit finding: 32 raw colour literals outside tokens.css will not re-theme.

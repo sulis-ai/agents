@@ -22,6 +22,10 @@ import { ConciergePage } from "./pages/ConciergePage";
 import { OnboardingPage } from "./pages/OnboardingPage";
 import { StartFromIntentPage } from "./pages/StartFromIntentPage";
 import { NotFound } from "./pages/NotFound";
+// WP-003 — the theme context layer wraps the whole app so every route is
+// inside it. AppRoutes stays bare so MemoryRouter-based tests keep mounting
+// it directly without needing the provider.
+import { ThemeProvider } from "./theme/ThemeProvider";
 
 export function AppRoutes() {
   return (
@@ -42,15 +46,20 @@ export function AppRoutes() {
 
 export function App() {
   return (
-    // The active-Product UI scope wraps the whole app so the product switcher
-    // and the board share one scope; switching re-scopes the board (ADR-009).
-    // OpenTabsProvider holds which changes have an open tab (chat-B2).
-    <ActiveProductProvider>
-      <OpenTabsProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </OpenTabsProvider>
-    </ActiveProductProvider>
+    // ThemeProvider (WP-003) wraps the whole app so every route is inside the
+    // theme context (sets root data-theme; first visit follows the OS, choice
+    // persists). The active-Product UI scope wraps the app so the product
+    // switcher and the board share one scope; switching re-scopes the board
+    // (ADR-009). OpenTabsProvider holds which changes have an open tab
+    // (chat-B2).
+    <ThemeProvider>
+      <ActiveProductProvider>
+        <OpenTabsProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </OpenTabsProvider>
+      </ActiveProductProvider>
+    </ThemeProvider>
   );
 }

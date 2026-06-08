@@ -33,6 +33,7 @@ vi.mock("@monaco-editor/react", () => ({
 }));
 
 import { FilePane } from "../components/FilePane";
+import { ThemeProvider } from "../theme/ThemeProvider";
 
 function freshClient() {
   return new QueryClient({
@@ -58,13 +59,15 @@ function renderPaneDiff(filePath: string) {
   const entry = `/c/abc?file=${encodeURIComponent(filePath)}&diff=1`;
   const client = freshClient();
   return render(
-    <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[entry]}>
-        <Routes>
-          <Route path="/c/:changeId" element={<FilePane changeId="abc" />} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <ThemeProvider>
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={[entry]}>
+          <Routes>
+            <Route path="/c/:changeId" element={<FilePane changeId="abc" />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    </ThemeProvider>,
   );
 }
 

@@ -1976,6 +1976,65 @@ def _branch_name(wp_id: str, slug: str) -> str:
     return f"feat/wp-{wp_id.lower().removeprefix('wp-')}-{slug}"
 
 
+# Matches a Step-7 trace Outcome that records the exact pushed branch, e.g.:
+#   "Pushed to feat/wp-002-dark-token-block at SHA abc1234 (commit: ...)"
+# Tolerant of casing ("Pushed"/"pushed") and the "to" being optional, so it
+# also catches "success — pushed feat/wp-5-... after rebase". The branch token
+# is the first ``feat/...`` run of non-whitespace following "push(ed)".
+_JOURNAL_PUSHED_BRANCH_RE = re.compile(
+    r"push(?:ed)?\s+(?:to\s+)?(feat/\S+)",
+    re.IGNORECASE,
+)
+
+
+def _journal_pushed_branch(wp_dir: Path, wp_id: str) -> str | None:
+    """Return the exact feat-branch the executor recorded pushing for ``wp_id``.
+
+    Reads the per-WP executor journal at ``wp_dir/.executor-{wp_id}.md`` and
+    parses the Step-7 trace row's Outcome cell for the canonical
+    ``Pushed to <branch> at SHA ...`` phrasing (see ``wpx-journal
+    complete-step --step 7``).
+
+    This is the authoritative source for which branch belongs to THIS change's
+    WP — unlike the ``feat/wp-NNN-*`` glob, which collides across changes when
+    WP numbers are recycled (#229).
+
+    Robust to a missing or malformed journal: any read/parse failure, or a
+    Step-7 row that doesn't name a ``feat/...`` branch, returns ``None`` so the
+    caller falls through to the literal → glob order.
+    """
+    journal = wp_dir / f".executor-{wp_id}.md"
+    try:
+        text = journal.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+    in_trace = False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("## "):
+            in_trace = line.lower().startswith("## step trace")
+            continue
+        if not in_trace or not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        # Step-trace rows are: | Step | Started | Completed | Outcome |
+        if len(cells) < 4:
+            continue
+        if cells[0] != "7":
+            continue
+        outcome = cells[3]
+        m = _JOURNAL_PUSHED_BRANCH_RE.search(outcome)
+        if m:
+            # Strip trailing punctuation the regex's \S+ may have swept up
+            # (e.g. a comma before "(commit: ...)").
+            return m.group(1).rstrip(".,;)")
+        # A Step-7 row exists but names no branch (blocked, in-flight, …) →
+        # treat as no record and fall through.
+        return None
+    return None
+
+
 def _gh_branch_exists(repo: str, branch: str,
                       *, gh: GHClient | None = None) -> bool:
     """True if origin/{branch} exists. Best-effort; returns False on gh error."""
@@ -2011,6 +2070,14 @@ def resolve_wp_branch(
 
     Resolution order:
 
+      0. **Journal-recorded branch (#229).** If the executor journal
+         (``wp_dir/.executor-NNN.md``) records an exact pushed branch in its
+         Step-7 trace AND that branch exists on origin, return it. This scopes
+         resolution to what THIS change's executor actually pushed, eliminating
+         the cross-change ambiguity that arises when WP numbers are recycled
+         (the glob below would otherwise match unrelated past changes' branches
+         and pick the wrong one by recency). A missing/malformed journal, or a
+         recorded branch no longer on origin, falls through to step 1.
       1. **Slug-literal match.** If ``feat/wp-NNN-<slug-from-file>`` exists
          on origin, return it. Byte-for-byte preservation of the
          historical happy path.
@@ -2032,6 +2099,23 @@ def resolve_wp_branch(
         # No WP file → caller already handles this case via its own
         # "no WP file found" branch. Return None to be consistent.
         return None
+
+    # Step 0 (#229): the executor journal is authoritative for this change's
+    # WP. Trust it over the recycled-number-prone glob, but only if the
+    # recorded branch still exists on origin (guards stale/deleted refs).
+    journal_branch = _journal_pushed_branch(wp_dir, wp_id)
+    if journal_branch is not None:
+        if gh is None:
+            present = _gh_branch_exists(repo, journal_branch)
+        else:
+            present = _gh_branch_exists(repo, journal_branch, gh=gh)
+        if present:
+            return journal_branch
+        _log(
+            f"resolve_wp_branch: {wp_id} — journal recorded "
+            f"'{journal_branch}' but it is not on origin; falling back to "
+            f"slug-literal / fuzzy match."
+        )
 
     literal = _branch_name(wp_id, slug)
     # Only forward ``gh`` when the caller explicitly supplied one; passing
@@ -4691,9 +4775,14 @@ def back_integrate_change_branch(
 ) -> dict:
     """Auto back-integration mechanic per CW-04 + lifecycle Step 0 / Step 12.5.
 
-    Runs `git fetch origin dev` (unless fetch_first=False) + checks whether
-    `dev_ref` is ancestor of the change branch HEAD; if not, runs
-    `git merge --no-edit origin/dev` to bring the change branch current.
+    Fetches the trunk (unless fetch_first=False) + checks whether ``dev_ref``
+    is an ancestor of the change branch HEAD; if not, runs ``git merge
+    --no-edit <dev_ref>`` to bring the change branch current. The ref to fetch
+    + merge is derived from the ``dev_ref`` parameter, which defaults to the
+    trunk (``origin/main``); e.g. with the default it runs ``git fetch origin
+    main`` + ``git merge origin/main``. (The parameter name is kept for
+    back-compatibility with existing callers — see #228; the repo retired the
+    dev branch in #177.)
 
     Per CW-04: merge-not-rebase (preserves commit SHAs so in-flight WP
     worktrees stay valid).
