@@ -1,7 +1,0 @@
-change_id: 01KTMKAZDV03Z12AT0VAH5BH3T
-primitive: feat
-tier: minor
-touches_plugin: true
-summary: |
-  Provider-neutral reliability layer: unattended automation survives transient API failures — classify stoppages into transient-blip (retry with backoff) / dead-end (abandon) / login-expired (pause, re-login link, resume), behind the existing session-manager adapter seam.
-created_at: 2026-06-09T06:46:24Z

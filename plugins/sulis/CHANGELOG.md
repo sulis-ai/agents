@@ -1,3 +1,9 @@
+## v0.124.0 — 2026-06-09
+
+**Minor — release-train batch.**
+
+- Provider-neutral reliability layer: unattended automation survives transient API failures — classify stoppages into transient-blip (retry with backoff) / dead-end (abandon) / login-expired (pause, re-login link, resume), behind the existing session-manager adapter seam.
+
 ## v0.123.0 — 2026-06-08
 
 **Minor — release-train batch.**
