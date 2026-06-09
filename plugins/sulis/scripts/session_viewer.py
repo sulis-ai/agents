@@ -407,12 +407,21 @@ def main(
             timeout=_REQUEST_TIMEOUT,
         )
         # 4. resize from the current terminal size (sent once at startup).
+        #    Best-effort, exactly like the SIGWINCH resize below (step 7): a
+        #    declined resize MUST NOT tear the viewer down. The daemon may
+        #    decline it Expected (e.g. §2.13.4 NOT_AUTHORIZED, or a stale/peer
+        #    daemon) — that is benign sizing, not a fatal condition. Swallowing
+        #    it here lets the attach proceed instead of crashing the window with
+        #    a traceback (the unguarded call was the bug).
         rows, cols = _terminal_size(out_fd)
-        conn.request(
-            "resize",
-            {"key": change_id, "rows": rows, "cols": cols},
-            timeout=_REQUEST_TIMEOUT,
-        )
+        try:
+            conn.request(
+                "resize",
+                {"key": change_id, "rows": rows, "cols": cols},
+                timeout=_REQUEST_TIMEOUT,
+            )
+        except (ViewerError, OSError):
+            pass
         # 5. attach: register the term sink (snapshot then live → stdout) and
         #    begin the stream. The reader (already running) routes term lines to
         #    the sink once the attach id is set.
