@@ -16,9 +16,9 @@ foundational fixture/assertion harness the scenarios drive.
 
 | Status | Count |
 |---|---|
-| pending | 13 |
+| pending | 10 |
 | in_progress | 0 |
-| done | 0 |
+| done | 3 |
 | blocked | 0 |
 
 ## Phase Split
@@ -118,9 +118,9 @@ graph TD
 
 | ID | Title | Primitive | Status | Depends On | Blocks | Token (in/out) | TDD § |
 |---|---|---|---|---|---|---|---|
-| WP-001 | Build the drive-specify fixture harness | create | pending | — | WP-006, WP-011, WP-012 | 6k / 4k | 7.4 |
-| WP-002 | Build the drive-journey-walk fixture harness | create | pending | — | WP-009, WP-013 | 6k / 4k | 7.4 |
-| WP-003 | Build the document-section assertion scripts | create | pending | — | WP-005, WP-006 | 5k / 5k | 7.4 |
+| WP-001 | Build the drive-specify fixture harness | create | done | — | WP-006, WP-011, WP-012 | 6k / 4k | 7.4 |
+| WP-002 | Build the drive-journey-walk fixture harness | create | done | — | WP-009, WP-013 | 6k / 4k | 7.4 |
+| WP-003 | Build the document-section assertion scripts | create | done | — | WP-005, WP-006 | 5k / 5k | 7.4 |
 | WP-004 | Reword the depth proposal phrases to describe interview size | refactor | pending | — | — | 4k / 2k | 7.4 |
 | WP-005 | Sever the depth-to-document-shape branch in specify and the analyst path | refactor | pending | WP-003 | WP-006 | 7k / 4k | 7.3 |
 | WP-006 | Add the comprehensive DESIGN.md template and always-comprehensive emitter | create | pending | WP-001, WP-003, WP-005 | WP-009, WP-011 | 9k / 7k | 7.4 |

@@ -1,0 +1,17 @@
+# wpx-train overrides — force-include / hold-back markers
+# Managed by wpx-train queue-add / queue-remove subcommands.
+# Eligibility derives from INDEX.md + origin branches + CI status;
+# overrides here are the explicit founder layer on top.
+
+holds:
+  - WP-004
+  - WP-005
+  - WP-006
+  - WP-007
+  - WP-008
+  - WP-009
+  - WP-010
+  - WP-011
+  - WP-012
+  - WP-013
+
