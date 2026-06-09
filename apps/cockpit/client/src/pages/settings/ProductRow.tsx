@@ -25,7 +25,10 @@ interface Props {
   onRenameProduct?: (product: SettingsProduct) => void;
   onRemoveProduct?: (product: SettingsProduct) => void;
   onAddProject?: (product: SettingsProduct) => void;
-  onEditProject?: (project: SettingsProject) => void;
+  // Edit carries the parent product id: a ProjectWrite needs a non-blank parent
+  // even on edit, where it is immutable (ADR-020). ProductRow supplies it from
+  // the product it already owns, so ProjectRow's callback stays project-only.
+  onEditProject?: (project: SettingsProject, productId: string) => void;
   onChangeRepo?: (project: SettingsProject) => void;
   onAttachRepo?: (project: SettingsProject) => void;
   onRemoveProject?: (project: SettingsProject) => void;
@@ -73,7 +76,11 @@ export function ProductRow({
             key={project.projectId}
             project={project}
             readOnly={readOnly}
-            onEdit={onEditProject}
+            onEdit={
+              onEditProject
+                ? (proj) => onEditProject(proj, product.productId)
+                : undefined
+            }
             onChangeRepo={onChangeRepo}
             onAttachRepo={onAttachRepo}
             onRemove={onRemoveProject}
