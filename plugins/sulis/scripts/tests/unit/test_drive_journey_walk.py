@@ -99,7 +99,7 @@ def test_tool_serving_no_binding_is_gap(tmp_path: Path) -> None:
 def test_clean_tool_surface_with_binding_passes(tmp_path: Path) -> None:
     """A tool surface whose operations cite BOTH handler and binding walks clean."""
     out = tmp_path / "DESIGN.md"
-    result = _run("sample-tool-surface", "tool", out)
+    result = _run("tool-surface-bound", "tool", out)
 
     assert result.returncode == 0, (
         f"a fully-bound tool surface must exit 0; stderr={result.stderr}"
