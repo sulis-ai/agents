@@ -29,6 +29,19 @@
 // record degrades INDEPENDENTLY: it never drops a sibling or breaks the lane
 // (BR-26). The unknown reads REUSE the WP-005 components — no second unknown
 // implementation (EP-03).
+//
+// WP-012 — the SHIPPED / TERMINAL composition (FR-56 / BR-27 / BR-28 / S-36).
+// A change in the terminal stage (`stage === "shipped"`, the SAME predicate the
+// Sidebar split + StageBadge use — BR-27, reused not reinvented) reads as
+// ARCHIVED, not active. The card is MUTED; the LivenessProbe is REPLACED by a
+// static "Shipped" marker (no working/live/idle, no pulse); BOTH live feet are
+// suppressed (BR-28 MUST — neither "Waiting on you" nor the change-health badge
+// renders); and recency reads "shipped Nd ago" (the Q-7 one-constant archival
+// wording from formatShippedRecency), NOT a live-activity age. Shipped wins the
+// foot/probe treatment over the degraded reads (SRD §7c precedence), but any
+// unreadable IDENTITY field (slug/intent) still falls to its WP-011 unknown
+// read + the degraded notice — the per-field honesty is orthogonal to the
+// terminal treatment.
 
 import { Link } from "react-router-dom";
 import type { Change } from "../../../shared/api-types";
@@ -36,6 +49,7 @@ import { stageStepNumber, STAGE_COUNT } from "./StageBadge";
 import { LivenessProbe } from "./LivenessProbe";
 import { ChangeHealthBadge } from "./ChangeHealthBadge";
 import { WaitingOnYou } from "./WaitingOnYou";
+import { formatShippedRecency } from "../utils/relativeTime";
 import styles from "./ChangeCard.module.css";
 
 export interface ChangeCardProps {
@@ -45,6 +59,10 @@ export interface ChangeCardProps {
    *  Terminal tab via this callback. Omitted → no terminal action rendered
    *  (existing dashboard usages unchanged). */
   onOpenTerminal?: (changeId: string) => void;
+  /** "now" override for deterministic tests; defaults to the real clock.
+   *  Forwarded to the live probe (the working/live recency split) and the
+   *  shipped-recency ("shipped Nd ago") read so both bucket against one clock. */
+  now?: Date;
 }
 
 /** The slim "·N/6" step dots — the one non-redundant part of the old stage
@@ -103,6 +121,49 @@ export function isDegraded(change: Change): boolean {
   return missingContent || bothUnknown;
 }
 
+/**
+ * WP-012 — the TERMINAL predicate (BR-27). A change in the terminal stage reads
+ * as ARCHIVED, not active. This is the SAME `stage === "shipped"` test the
+ * Sidebar split + StageBadge already use — reused, never a second detector.
+ * Exported so the card test and any future consumer share ONE definition.
+ */
+export function isShipped(change: Change): boolean {
+  return change.stage === "shipped";
+}
+
+/**
+ * WP-012 — the static "Shipped" marker that REPLACES the LivenessProbe on a
+ * terminal card (FR-56 / BR-28). It carries NO probe dot, NO motion, NO
+ * working/live/idle state — a shipped change has no live session to read. The
+ * word "Shipped" carries the meaning in text (never colour/placement alone), so
+ * a screen reader hears "archived", not silence.
+ */
+function ShippedMarker() {
+  return (
+    <span
+      className={styles.shippedMarker}
+      data-testid="shipped-marker"
+      data-shipped-marker
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.9}
+        aria-hidden="true"
+      >
+        {/* an archive box — the calm "filed away" glyph */}
+        <path
+          d="M3 7h18M5 7v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7M3 7l2-3h14l2 3M10 12h4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      Shipped
+    </span>
+  );
+}
+
 /** Plain-English why-text for the waiting chip, from the fixed reason set.
  *  Never echoes any reply body (NFR-SEC-03) — these are enumerable shapes. */
 function attentionWhy(reason: Change["needsAttention"]["reason"]): string {
@@ -119,10 +180,14 @@ function attentionWhy(reason: Change["needsAttention"]["reason"]): string {
   }
 }
 
-export function ChangeCard({ change, onOpenTerminal }: ChangeCardProps) {
+export function ChangeCard({ change, onOpenTerminal, now }: ChangeCardProps) {
   const step = stageStepNumber(change.stage);
   const flagged = change.needsAttention.flagged;
   const degraded = isDegraded(change);
+  // WP-012 — terminal/archived treatment. Shipped wins the foot/probe over the
+  // live + degraded reads (SRD §7c precedence); the per-field identity reads
+  // below still apply (an unreadable slug/intent still falls to its placeholder).
+  const shipped = isShipped(change);
 
   // Per-field degraded fallbacks (FR-54): readable fields render verbatim;
   // unreadable content fields fall to a FIXED placeholder — never blank, never
@@ -139,17 +204,25 @@ export function ChangeCard({ change, onOpenTerminal }: ChangeCardProps) {
   return (
     <Link
       to={`/c/${change.changeId}`}
-      className={`${styles.card} ${degraded ? styles.degraded : ""}`}
+      className={`${styles.card} ${degraded ? styles.degraded : ""} ${shipped ? styles.shipped : ""}`}
       data-testid="change-card"
       data-degraded={degraded ? "true" : undefined}
+      data-shipped={shipped ? "true" : undefined}
       aria-label={`Change ${change.handle}: ${ariaIntent}`}
     >
       <div className={styles.topLine}>
         <span className={styles.handle}>{change.handle}</span>
-        <LivenessProbe
-          liveness={change.liveness}
-          lastActivityAt={change.lastActivityAt}
-        />
+        {/* WP-012 — a shipped card REPLACES the live probe with the static
+         * "Shipped" marker (BR-28 — no live signal on a terminal card). */}
+        {shipped ? (
+          <ShippedMarker />
+        ) : (
+          <LivenessProbe
+            liveness={change.liveness}
+            lastActivityAt={change.lastActivityAt}
+            now={now}
+          />
+        )}
       </div>
 
       <StepDots step={step} />
@@ -162,16 +235,31 @@ export function ChangeCard({ change, onOpenTerminal }: ChangeCardProps) {
 
       <div className={styles.cardMeta}>
         <span className={styles.slug}>{slugText}</span>
+        {/* WP-012 — shipped recency: the archival "shipped Nd ago" read (Q-7),
+         * NOT a live age. Derived from `updatedAt` (the shipped-at time; always
+         * present, unlike the nullable lastActivityAt). */}
+        {shipped ? (
+          <span className={styles.shippedRecency} data-testid="shipped-recency">
+            {formatShippedRecency(change.updatedAt, now)}
+          </span>
+        ) : null}
       </div>
 
-      {/* THE ONE FOOT VERDICT — waiting XOR health, never both (single branch). */}
-      <div className={`${styles.footRow} ${flagged ? styles.waitingFoot : ""}`}>
-        {flagged ? (
-          <WaitingOnYou why={attentionWhy(change.needsAttention.reason)} />
-        ) : (
-          <ChangeHealthBadge health={change.health} />
-        )}
-      </div>
+      {/* THE ONE FOOT VERDICT — waiting XOR health, never both (single branch).
+       * WP-012 — SUPPRESSED entirely on a shipped card: a terminal change shows
+       * NEITHER live foot (BR-28 mutual suppression). The static "Shipped"
+       * marker + the shipped recency are its only status reads. */}
+      {shipped ? null : (
+        <div
+          className={`${styles.footRow} ${flagged ? styles.waitingFoot : ""}`}
+        >
+          {flagged ? (
+            <WaitingOnYou why={attentionWhy(change.needsAttention.reason)} />
+          ) : (
+            <ChangeHealthBadge health={change.health} />
+          )}
+        </div>
+      )}
 
       {/* WP-011 — the quiet, FIXED-STRING degraded notice (FR-55). Reinforcement
        * of the per-field unknown reads (BR-3); role="status" announces it so it
