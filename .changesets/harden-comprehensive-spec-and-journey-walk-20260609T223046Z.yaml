@@ -1,0 +1,7 @@
+change_id: 01KTPWDWJ7CQRWWRGPQEQ22P1M
+primitive: harden
+tier: minor
+touches_plugin: true
+summary: |
+  Always produce a comprehensive design document (use cases with flows, NFR, threat model, layered architecture) regardless of depth; walk both the UI and API/SDK/MCP-tool consumer surfaces at design time; derive verifiable scenarios from use-case flows for both surfaces; enforce flow-level coverage as a gate; make the interface contract a first-class design-doc section.
+created_at: 2026-06-09T22:30:46Z
