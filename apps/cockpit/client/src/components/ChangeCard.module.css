@@ -123,6 +123,37 @@
   justify-content: center;
 }
 
+/* ── WP-011 — DEGRADED / PARTIAL ──
+ * A malformed/partial record. A faint DASHED top edge marks the whole card as
+ * "partially read" — echoing the dashed "no signal yet" language, applied to
+ * the card itself. The other three sides keep the normal card border so it is
+ * not alarmed; only the top edge goes dashed as the marker. Transcribed from
+ * the production-approved MOCKUP (.card.degraded). Tokens only. */
+.degraded {
+  border-top: 1px dashed var(--border);
+}
+
+/* The quiet "Some details couldn't be read" line — the FIXED-STRING notice
+ * (FR-55). Reinforcement of the per-field unknown reads (BR-3): small, muted,
+ * italic, with a leading info glyph. Neutral tokens only — never alarmed. */
+.degradedNote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 11px;
+  padding-top: 11px;
+  border-top: 1px solid var(--border-muted);
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+.degradedNote svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  color: var(--muted-foreground);
+}
+
 /* WP-009 — "Open terminal" action row (the cockpit-rendered terminal path). */
 .actions {
   display: flex;
