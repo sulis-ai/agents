@@ -156,7 +156,18 @@ def scenarios_present_for_change(repo_root: Path, stem: str) -> bool:
         data = json.loads(f.read_text(encoding="utf-8"))
     except (ValueError, OSError):
         return False
-    nodes = data.get("@graph", data) if isinstance(data, dict) else data
+    if isinstance(data, dict):
+        # Canonical authored shape (specify deep mode): a top-level
+        # ``{"scenarios": [...]}`` list — scenario nodes here carry an
+        # ``SC-NN`` id, not a ``dna:scenario:`` @id, so a non-empty list IS
+        # "scenarios authored". Fall back to JSON-LD ``@graph`` / bare-list
+        # shapes for files that use them.
+        scen = data.get("scenarios")
+        if isinstance(scen, list):
+            return any(isinstance(n, dict) for n in scen)
+        nodes = data.get("@graph", data)
+    else:
+        nodes = data
     if not isinstance(nodes, list):
         return False
     for node in nodes:
