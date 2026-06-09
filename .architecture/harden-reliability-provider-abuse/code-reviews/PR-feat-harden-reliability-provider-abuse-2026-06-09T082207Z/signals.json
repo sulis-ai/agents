@@ -1,0 +1,48 @@
+{
+  "pr": "feat/harden-reliability-provider-abuse",
+  "timestamp": "2026-06-09T082207Z",
+  "base": "change/harden-reliability-provider-abuse",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "scope": {
+    "commit_type_spread": ["feat (single, hardening)"],
+    "module_fan_out": 1,
+    "severity": "none",
+    "note": "single concern: provider-abuse hardening of the reliability layer"
+  },
+  "size": {
+    "lines_added": 596,
+    "lines_removed": 25,
+    "files_changed": 6,
+    "source_files_changed": 2,
+    "test_files_changed": 3,
+    "doc_files_changed": 1,
+    "severity": "low",
+    "note": "596 insertions but ~165 net source lines (rest are tests + docstrings); two source files, single concern"
+  },
+  "safety": {
+    "migration_count": 0,
+    "schema_idl_count": 0,
+    "infra_files": 0,
+    "secret_pattern_hits": 0,
+    "severity": "none"
+  },
+  "completeness": {
+    "new_source_without_test": 0,
+    "api_change_without_schema": false,
+    "tests_added": true,
+    "severity": "none",
+    "note": "new RetryPolicy field + driver guard fully covered at unit/wiring/contract/e2e; recovery.py 98%"
+  },
+  "findings": {
+    "build_verification": 0,
+    "in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 1 },
+    "in_neighbours": { "total": 0 }
+  },
+  "lenses": {
+    "architecture": { "findings": 0 },
+    "security": { "findings": 0 },
+    "quality": { "findings": 1 }
+  },
+  "draft_deltas": 0
+}

@@ -107,12 +107,45 @@ new code). The shapes, all using `events.py`'s existing `Event` +
 | Retry scheduled (transient-blip) | `error` | `protocol` | the observed code (reused) | "transient failure; retry N in ~Ms" |
 | Abandon (dead-end) | `error` | the observed category | the observed code (reused) | "abandoned: <reason>" |
 | Abandon (budget exhausted) | `error` | `expected` | the observed code (reused) | "retry budget exhausted (~12 min); abandoned as dead-end" |
+| Abandon (absolute ceiling) | `error` | the observed category | the observed code (reused) | "abandoned: absolute retry ceiling exceeded (...)" |
 | Login-expired notification | `error` | `expected` | `NOT_AUTHORIZED` (reused) | "login expired — re-login: <link>" |
 | Resume after re-auth | `result`/`chunk` | — | — | normal turn stream (no fabricated completion) |
 
 **No new error code is introduced** — every row reuses an existing
 `events.py` constant (the spec's "add a new code only where none fits";
-none is needed).
+none is needed). The absolute-ceiling abandon (below) likewise reuses the
+observed code.
+
+## Provider-abuse hardening (CH-01KTMK ship-gate)
+
+Two invariants harden the layer against a pathological/adversarial provider;
+both are additive and preserve every recovery-class behaviour above.
+
+**One recovery thread in flight per session (CONCERN-1).** The manager
+dispatches recovery off the pump thread on a daemon thread. Dispatch is gated
+on a per-driver in-flight guard (`try_begin_recovery` / `end_recovery`): at most
+one recovery thread drives a session's sequence at a time. A fresh error
+arriving while a recovery thread is in flight (notably while it sleeps on the
+backoff curve) is **coalesced** into the existing sequence — the driver's
+`observe` already serialises the sequence state under its lock — rather than
+spawning its own thread, so a rapid error stream cannot pile up sleeping
+recovery threads (thread/memory exhaustion). The slot is released immediately
+before the fire-and-forget re-submit, so the replay's re-error always finds the
+slot open and the never-clearing sequence still walks to exhaustion. The
+WP-007/WP-008 deadlock fixes are untouched (the slot release stays on the pump
+thread; the driver lock is never held across an injected call).
+
+**Absolute, turn-clear-proof retry ceiling (CONCERN-2).** The per-sequence
+wall-clock window (`total_budget_seconds`, ~12 min) resets on every genuine
+clear, so a provider alternating result/error refunds it every cycle and the
+give-up guarantee was evadable over a long-lived session. `RetryPolicy` gains
+a `max_lifetime_retries` knob (defaulted to **200** — generous for legitimate
+use, finite for abuse) and the driver accumulates a `_lifetime_retries` counter
+across sequences that `note_turn_cleared` does **not** reset. When the lifetime
+count reaches the cap the driver abandons with the typed "absolute retry ceiling
+exceeded" Event (the row above). The normal case is preserved: each genuine blip
+still recovers on a fresh per-sequence window; only the absolute lifetime bound
+survives a clear.
 
 ## Conformance check (CF-07)
 

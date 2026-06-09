@@ -72,9 +72,33 @@ class RetryPolicy:
     shared provider outage."""
 
     total_budget_seconds: float
-    """The wall-clock cap (~10-15 min). When the *next* backoff would push
-    cumulative elapsed past this, the run is reclassified dead-end and
-    abandoned."""
+    """The *per-sequence* wall-clock cap (~10-15 min). When the *next* backoff
+    would push the current retry sequence's cumulative elapsed past this, the
+    sequence is reclassified dead-end and abandoned. **Reset on every genuine
+    clear** (``note_turn_cleared``) so a later, unrelated blip gets a fresh
+    window — which is exactly why it cannot, alone, bound a pathological provider
+    that alternates result/error (each clear refunds the window). The absolute,
+    non-resettable bound is :attr:`max_lifetime_retries`."""
+
+    max_lifetime_retries: int = 200
+    """The ABSOLUTE per-session retry ceiling a turn-clear does **not** reset
+    (CH-01KTMK hardening FIX 2). Where :attr:`total_budget_seconds` bounds one
+    *sequence*, this bounds the *lifetime* retry count across all sequences on a
+    single long-lived session, accumulated on the driver (``_lifetime_retries``)
+    and never refunded by ``note_turn_cleared``.
+
+    Without it the ~12-min give-up guarantee is evadable: a provider alternating
+    result/error refunds the per-sequence window every cycle, so total retries are
+    unbounded even though each window honours its cap. With it, such abuse is
+    bounded to a finite total and abandoned with a typed "absolute retry ceiling"
+    Event.
+
+    Defaulted (so the field is backward-compatible — existing constructions need
+    not pass it) to **200**: deliberately generous for legitimate use (a healthy
+    long-lived session retries a handful of times per genuine blip, nowhere near
+    200 lifetime retries) while bounding a pathological alternating provider to a
+    finite total. The per-sequence wall-clock cap stays the primary give-up
+    mechanism for the common single-incident case; this is the abuse backstop."""
 
 
 DEFAULT_RETRY_POLICY = RetryPolicy(
@@ -83,6 +107,7 @@ DEFAULT_RETRY_POLICY = RetryPolicy(
     multiplier=2.0,
     jitter="full",
     total_budget_seconds=720.0,  # 12 min — mid of the ~10-15 min band
+    max_lifetime_retries=200,  # the absolute, turn-clear-proof abuse backstop
 )
 """The persistent-default policy (ADR-002). The *fallback* the driver uses
 when the composition root injects nothing — not a hardcoded literal in the
@@ -280,7 +305,62 @@ class RecoveryDriver:
         # both touch it.
         self._retry_started_at: float | None = None
         self._retry_attempt: int = 0
+        # CH-01KTMK FIX 2 — the ABSOLUTE lifetime retry counter. Accumulates the
+        # number of retries scheduled across ALL sequences on this session and is
+        # **never** reset by ``note_turn_cleared`` (unlike the per-sequence start/
+        # attempt above). When it reaches ``policy.max_lifetime_retries`` the
+        # driver abandons with a typed "absolute retry ceiling" Event — the
+        # turn-clear-proof give-up guarantee. Guarded by ``_retry_lock`` (same
+        # read-modify-write as the sequence state).
+        self._lifetime_retries: int = 0
         self._retry_lock = threading.Lock()
+        # CH-01KTMK FIX 1 — the one-recovery-thread-in-flight-per-session guard.
+        # ``_on_error_event`` (the manager) spawns a daemon thread per routed
+        # error; left unbounded, a pathological provider's error stream piles up
+        # sleeping recovery threads (they sleep on the backoff curve) → thread/
+        # memory exhaustion. This Event is the in-flight flag: the manager calls
+        # :meth:`try_begin_recovery` before dispatching and only spawns a thread
+        # if it wins the slot; a fresh error arriving while a recovery thread is
+        # already driving the sequence is COALESCED (the existing sequence already
+        # handles it — ``observe`` serialises the state under ``_retry_lock``),
+        # not given its own thread. :meth:`end_recovery` clears it when the
+        # recovery thread finishes (in a ``finally``, so a faulting recovery never
+        # wedges the slot shut). Guarded by the same lock so begin/end is atomic.
+        self._recovery_in_flight = threading.Event()
+
+    # ── CH-01KTMK FIX 1 — the one-thread-in-flight dispatch guard ──────────
+
+    def try_begin_recovery(self) -> bool:
+        """Try to claim the single recovery slot for this session (FIX 1).
+
+        Returns ``True`` if the caller won the slot and should dispatch a
+        recovery thread; ``False`` if a recovery thread is already in flight for
+        this session and the caller should **coalesce** — i.e. let the existing
+        sequence handle the error rather than spawn a second thread. Atomic
+        under ``_retry_lock`` so two pump threads racing to route concurrent
+        errors cannot both win.
+
+        Coalescing is correct because the driver's :meth:`observe` already
+        serialises the retry-sequence state under the same lock: a transient blip
+        in flight is already being retried on the accumulating budget, so a fresh
+        transient error for the same session is the SAME condition the in-flight
+        sequence is handling. A genuinely different condition (e.g. a login-expiry
+        while a transient retry is in flight) is not lost: the in-flight retry
+        thread, on its next observation of the re-submitted turn's outcome, will
+        observe and route it through the same serialised pipeline. The simplest
+        correct rule — one recovery thread per session — holds."""
+        with self._retry_lock:
+            if self._recovery_in_flight.is_set():
+                return False
+            self._recovery_in_flight.set()
+            return True
+
+    def end_recovery(self) -> None:
+        """Release the single recovery slot (FIX 1) — called by the manager in a
+        ``finally`` on the recovery thread, so even a faulting ``observe`` frees
+        the slot and never wedges the session's recovery shut. Idempotent."""
+        with self._retry_lock:
+            self._recovery_in_flight.clear()
 
     def observe(self, error: EventError) -> None:
         """Observe one ``error``-kind failure and drive recovery (the §3.1
@@ -318,12 +398,19 @@ class RecoveryDriver:
         memory and **re-runs the incomplete step** — the driver only triggers
         the resume; it never fabricates a ``result`` (ADE ADR-002 / NFR-REL-04
         discipline, inherited not reimplemented). A completion for a ticket the
-        driver is not waiting on is ignored (idempotent, §Q10)."""
-        if self._pending_ticket is None:
-            return
-        if ticket.completion_handle != self._pending_ticket.completion_handle:
-            return
-        self._pending_ticket = None
+        driver is not waiting on is ignored (idempotent, §Q10).
+
+        **``_pending_ticket`` is read+cleared under ``_retry_lock`` (CH-01KTMK
+        ADVISORY-1).** The small read-modify-write is held under the lock for
+        symmetry with the rest of the driver's shared state; the injected
+        ``_resume`` is then called OUTSIDE the lock, so the lock is never held
+        across an injected call (the WP-007 no-deadlock invariant)."""
+        with self._retry_lock:
+            if self._pending_ticket is None:
+                return
+            if ticket.completion_handle != self._pending_ticket.completion_handle:
+                return
+            self._pending_ticket = None
         self._resume()
 
     def note_turn_cleared(self) -> None:
@@ -335,7 +422,15 @@ class RecoveryDriver:
         accumulated budget here is what gives a LATER, unrelated blip a fresh
         wall-clock budget — the "transient blip that clears → survives" semantics
         across a long-lived session. Idempotent: a clear with no retry in
-        progress is a harmless no-op."""
+        progress is a harmless no-op.
+
+        **Resets the per-sequence window only, NOT the absolute lifetime ceiling
+        (CH-01KTMK FIX 2).** ``_reset_retry_sequence`` clears the per-sequence
+        start/attempt so the next blip gets a fresh wall-clock window; it
+        deliberately leaves ``_lifetime_retries`` untouched, so a provider
+        alternating result/error cannot refund the absolute ceiling by clearing.
+        The normal case is preserved (each genuine blip recovers on a fresh
+        window); only the turn-clear-proof abuse bound survives the clear."""
         self._reset_retry_sequence()
 
     # ── observability seam ─────────────────────────────────────────────────
@@ -383,13 +478,22 @@ class RecoveryDriver:
             start = self._retry_started_at
             attempt = self._retry_attempt
 
+        # CH-01KTMK FIX 2 — the ABSOLUTE lifetime ceiling, checked BEFORE the
+        # per-sequence window. A turn-clear refunds the window (``_reset_retry_\
+        # sequence``) but never the lifetime counter, so a provider alternating
+        # result/error cannot evade this bound. When the lifetime retry count has
+        # reached the cap, abandon with a typed "absolute retry ceiling" Event and
+        # end the sequence — the turn-clear-proof give-up guarantee.
+        if self._lifetime_retries >= self._policy.max_lifetime_retries:
+            self._abandon_sequence(error, reason="absolute retry ceiling exceeded")
+            return
+
         elapsed = self._clock() - start
         delay = next_delay(attempt, elapsed, self._policy, rng=self._rng)
         if delay is None:
-            # Budget exhausted — abandon and end the sequence (a later, unrelated
-            # blip starts a fresh budget).
-            self._reset_retry_sequence()
-            self._abandon(error, reason="retry budget exhausted")
+            # Per-sequence wall-clock budget exhausted — abandon and end the
+            # sequence (a later, unrelated blip starts a fresh window).
+            self._abandon_sequence(error, reason="retry budget exhausted")
             return
 
         self._surface(
@@ -400,15 +504,35 @@ class RecoveryDriver:
                 f"in {delay:.2f}s ({error.message})"
             ),
         )
+        with self._retry_lock:
+            # Count this scheduled retry against the ABSOLUTE lifetime ceiling
+            # BEFORE the fire-and-forget ``send`` — accumulated across sequences,
+            # never reset by a turn-clear (FIX 2). Counting before the send (not
+            # after) is what makes the ceiling robust to the fire-and-forget
+            # re-entry: the re-submitted turn's outcome arrives as a *later*
+            # observation, so a retry must be counted at the point it is
+            # dispatched, not after its outcome is known.
+            self._lifetime_retries += 1
+            # Advance only if the sequence is still the one we were driving — a
+            # racing clear could have reset it while we computed the delay.
+            if self._retry_started_at == start:
+                self._retry_attempt = attempt + 1
         self._sleep(delay)
+        # Release the recovery slot BEFORE the fire-and-forget re-submit (FIX 1,
+        # load-bearing for the never-clearing sequence). The re-submitted turn's
+        # re-error arrives as a *fresh* routed event that must be able to win the
+        # slot and advance the SAME sequence; if the slot were only released after
+        # ``_send`` (by the manager's ``finally``), a re-error landing in that
+        # race window would coalesce-and-drop, stalling the sequence instead of
+        # walking it to budget/ceiling exhaustion. Releasing here, before the
+        # send, guarantees the slot is open when the replay errors back. The
+        # manager's ``finally`` ``end_recovery`` remains an idempotent backstop
+        # for the non-retry branches (dead-end abandon, login pause) that never
+        # re-submit.
+        self.end_recovery()
         # Fire-and-forget re-submit: the FIFO serialises it (one-in-flight
         # untouched); the turn's outcome comes back as a fresh observe / clear.
         self._send()
-        with self._retry_lock:
-            # Advance only if the sequence is still the one we were driving — a
-            # racing clear could have reset it while we waited/sent.
-            if self._retry_started_at == start:
-                self._retry_attempt = attempt + 1
 
     def _reset_retry_sequence(self) -> None:
         """Clear the current retry sequence's accumulated budget state (start +
@@ -418,6 +542,19 @@ class RecoveryDriver:
         with self._retry_lock:
             self._retry_started_at = None
             self._retry_attempt = 0
+
+    def _abandon_sequence(self, error: EventError, *, reason: str) -> None:
+        """End the current retry sequence and give up: reset the per-sequence
+        window, then surface a typed, observable abandon Event (§3.1).
+
+        The shared "give up on this sequence" step both give-up branches of
+        :meth:`_drive_retry` take — the per-sequence wall-clock budget exhaustion
+        and the absolute lifetime ceiling (CH-01KTMK FIX 2). Resetting the window
+        before abandoning lets a later, unrelated blip start fresh; the lifetime
+        counter is deliberately NOT reset here (it persists across sequences —
+        that is what makes the absolute ceiling turn-clear-proof)."""
+        self._reset_retry_sequence()
+        self._abandon(error, reason=reason)
 
     def _drive_login_expired(self, error: EventError) -> None:
         """Pause→notify the run on a login-expiry (ADR-004).
@@ -429,9 +566,17 @@ class RecoveryDriver:
         budget (login-expiry is not a blip). Resume happens later via
         :meth:`complete_reauth`. If the session is already paused on a pending
         ticket, this is a no-op (one ticket per session, §Q10).
+
+        **``_pending_ticket`` is read+written under ``_retry_lock`` (CH-01KTMK
+        ADVISORY-1).** The lock guards only the small reads/writes — the injected
+        ``_reauth`` and the ``_surface`` log append run OUTSIDE the lock, so the
+        lock is never held across an injected call (the WP-007 no-deadlock
+        invariant). The pending-ticket idempotency check and the eventual store
+        are each a lock-guarded read-modify-write.
         """
-        if self._pending_ticket is not None:
-            return
+        with self._retry_lock:
+            if self._pending_ticket is not None:
+                return
         try:
             ticket = self._reauth()
         except Exception as exc:  # noqa: BLE001 - any reauth failure is fail-safe
@@ -439,7 +584,8 @@ class RecoveryDriver:
             # dead-end with a typed, observable Event — contained, never a hang.
             self._abandon(error, reason=f"re-auth failed: {exc}")
             return
-        self._pending_ticket = ticket
+        with self._retry_lock:
+            self._pending_ticket = ticket
         self._surface(
             category=error.category,
             code=NOT_AUTHORIZED,
