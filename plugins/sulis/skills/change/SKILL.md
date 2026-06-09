@@ -551,6 +551,45 @@ does NOT bump any version** — the version is computed and applied once, for th
 whole batch, when `dev` is released to production. Read the `wrote` field of the
 JSON to know what to say in the ship report (step 7).
 
+**4.7.5. Scenario-required gate — run `sulis-verify-scenarios-required`
+(MUST — the #103 enforcement; closes the "advisory when absent" bypass).**
+The downstream gates (design journey-walk, plan-work coverage, the 4.8
+acceptance run below) all fire only *IF scenarios already exist* — so a
+user-facing change that never authored any sailed through every one of them as
+"advisory / nothing to verify". This gate flips the test from *exists* to
+*required*: a user-facing change MUST have authored verifiable scenarios (or
+carry a logged explicit exemption) before it ships.
+
+```bash
+"$SCRIPTS_DIR/sulis-verify-scenarios-required" \
+  --repo-root <change-worktree> --stem {primitive}-{slug} --base origin/main
+```
+
+It reads the change's touched paths (vs `origin/main`), determines user-facing-
+ness via the same founder-surface signal the specify sizer uses (`.tsx` /
+`/components/` / `/pages/` / `.html` … — so it does NOT fire on tooling /
+plugin-authoring / library changes), and checks for an authored
+`.changes/{primitive}-{slug}.scenarios.jsonld` + a logged exemption marker
+(`.changes/{primitive}-{slug}.scenarios-exempt`). Verdict → exit code:
+
+- **exit 0 (`ok`)** — not user-facing (scenarios N/A), OR user-facing with
+  scenarios present, OR explicitly exempted. Log it and continue to 4.8.
+- **exit 1 (`required_missing`)** — user-facing + zero scenarios + no
+  exemption. **STOP. Do NOT merge.** Surface the gap in plain English + the
+  two paths the founder owns:
+
+  > *"This change touches a user-visible surface but no verification scenarios
+  > were authored — so there's no testable proof the journey works. A
+  > user-facing journey must be testable. Either author the scenarios now
+  > (route back to `/sulis:specify` to write the 'do X, observe Y' journeys),
+  > or record an explicit exemption with a reason (rare — drop the reason in
+  > `.changes/{primitive}-{slug}.scenarios-exempt` and re-run the ship).
+  > Which?"*
+
+  Do not proceed without one of those two. This is the structural fix for
+  "user-facing work ships green but was never made testable" — it is a BLOCK,
+  not an advisory.
+
 **4.8. Testable-state acceptance gate — run `sulis-verify-acceptance`
 (MUST for a user-facing / behavioural change).** A change that authored
 verification `Scenario`s at specify (`/sulis:specify` deep mode) is not
@@ -630,7 +669,11 @@ is a deliberate, logged choice (surface it to the founder), never the default.
 Advisory when it can't run at all (no Scenarios authored — pure docs/infra
 change; or no target URL for an http journey): like 4.9, the founder owns
 proceed-anyway. But a `deferred` is no longer a quiet pass — it blocks unless
-`--allow-deferred` is consciously chosen.
+`--allow-deferred` is consciously chosen. **Note (#103): "no Scenarios
+authored" is only reachable here for a NON-user-facing change — the 4.7.5
+scenario-required gate already BLOCKED the user-facing-with-zero-scenarios case
+upstream. So this advisory branch is correctly scoped to non-user-facing /
+infra work, not an escape hatch for an untested user surface.**
 
 **4.9. DoD verification gate — run `sulis-verify-requirements` (MUST when
 an SRD is touched).** This asks the brain whether every Requirement the
