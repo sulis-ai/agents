@@ -126,11 +126,15 @@ will recognise — derive it from the intent ("fix the login bug" →
 
 **3. Preflight — cut the change branch off the latest `main` (FR-010, ADR-003).**
 On the trunk model there is one integration line — `main` — so the only
-staleness that matters is a *local* `main` lagging `origin/main`. The branch
-is always cut off the freshest `origin/main`; `sulis-change start` fetches
-`origin/main` before branching, so there is nothing to gate here — a fresh
-clone, a behind-by-N local, and an up-to-date local all resolve to the same
-freshly-fetched base.
+staleness that matters is a *local* `main` lagging `origin/main`.
+`sulis-change start` fetches `origin/{base}` (best-effort) and cuts the change
+branch off the fetched `origin/{base}` tip, so a behind-by-N local and an
+up-to-date local resolve to the same freshly-fetched base — there is nothing
+to gate here. The fetch is best-effort, not a hard precondition: an offline
+start (no remote / no network) degrades gracefully to the local `{base}` with
+a logged note, so a founder can still start a change on a plane. The same
+fetch-then-prefer-remote resolution applies to an explicit `--base <branch>`,
+not just `main`.
 
 ```bash
 git fetch origin main -q 2>/dev/null || true   # best-effort; branch is cut off origin/main
