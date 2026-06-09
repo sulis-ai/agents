@@ -30,6 +30,30 @@ The fix:
        "origin branch missing" path).
 
 The tests below cover all four branches plus the warning surface.
+
+Dual-prefix fixture inventory (WP-006, change wp-branch-collision)
+-----------------------------------------------------------------
+The branch-namespacing fix retains the legacy ``feat/wp-NNN-*`` path for one
+release AND adds the scoped ``wp/{scope}/wp-NNN-*`` path. Both must stay
+covered. Test roles across the ~16 files that carry ``feat/wp-`` fixtures:
+
+* SCOPED-PATH coverage (assert ``wp/{scope}/`` resolution; pass change_scope):
+    - test_wpx_train_branch_resolution.py — ``test_resolve_scoped_*`` +
+      ``test_scoped_glob_does_not_match_foreign_change_branch`` (#105/#106 repro)
+    - test_wpx_train_eligibility.py — ``test_eligibility_uses_scoped_resolution``
+    - test_compute_wp_status.py — ``test_compute_status_threads_scope``
+    - test_wpx_wp.py — ``test_branch_name_subcommand_emits_scoped_then_legacy``
+* LEGACY-PATH characterisation (no change_scope; assert ``feat/wp-NNN-*``;
+  KEEP byte-for-byte — they are the oracle for the retained fallback):
+    every other ``feat/wp-`` fixture (eligibility no-scope cases, failure-paths,
+    patch-id, inspect, run, state-machine, paused-state, drift-detection,
+    worktree, change). None migrated; none deleted.
+
+Follow-up (legacy-fallback removal, next release): the suppress-when-scoped
+behaviour means scoped callers never touch ``feat/``. When the legacy glob is
+removed, the no-scope ``feat/`` characterisation tests are what to delete;
+they are greppable by their lack of ``change_scope`` + their ``feat/wp-``
+assertions. The scoped tests (``_scoped_`` / ``change_scope=``) stay.
 """
 
 from __future__ import annotations
