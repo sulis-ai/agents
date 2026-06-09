@@ -1,0 +1,11 @@
+{
+  "exercises": "dna:design:EEDCDTT7F40JPMXZBV2KRP1ARS",
+  "id": "dna:scenario:SW5W39JKSWQPXTSGXQCWZY8VTR",
+  "journey": "dna:workflow:E1GWJ8CD2N178AX0EE8GSNEXSV",
+  "name": "SC-04: No document-emission branch is gated on depth",
+  "state": "draft",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:X9T8HPQJZ66C2RN87K9T9B413S"
+  ]
+}

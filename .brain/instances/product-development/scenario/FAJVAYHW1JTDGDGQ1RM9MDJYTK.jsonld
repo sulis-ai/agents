@@ -1,0 +1,11 @@
+{
+  "exercises": "dna:design:EEDCDTT7F40JPMXZBV2KRP1ARS",
+  "id": "dna:scenario:FAJVAYHW1JTDGDGQ1RM9MDJYTK",
+  "journey": "dna:workflow:J3DWMH380RQ52YXXX4XWWEJZ3C",
+  "name": "SC-10: Every use-case flow has at least one covering scenario",
+  "state": "draft",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:3W9T2N8E32AW12ZBYXWDGZXZZ4"
+  ]
+}

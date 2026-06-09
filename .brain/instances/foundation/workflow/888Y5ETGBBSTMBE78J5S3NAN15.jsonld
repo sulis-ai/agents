@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:888Y5ETGBBSTMBE78J5S3NAN15",
+  "initial_steps": [
+    "n69np4fd-run-sulis-specify-at-lite-depth-on-a-fix-1"
+  ],
+  "name": "SC-03: An unpopulated section is marked n/a, never silently omitted",
+  "state": "draft",
+  "steps": [
+    "n69np4fd-run-sulis-specify-at-lite-depth-on-a-fix-1",
+    "n69np4fd-assert-the-dependencies-section-is-prese-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "n69np4fd-assert-the-dependencies-section-is-prese-2"
+  ],
+  "transitions": [
+    "n69np4fd-run-sulis-specify-at-lite-depth-on-a-fix-1 -> n69np4fd-assert-the-dependencies-section-is-prese-2"
+  ],
+  "type": "review"
+}

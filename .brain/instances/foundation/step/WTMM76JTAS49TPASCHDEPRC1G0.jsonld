@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Run /sulis:specify on the same fixture at lite, standard, and deep depth",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:WTMM76JTAS49TPASCHDEPRC1G0",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"for d in lite standard deep; do python3 plugins/sulis/scripts/_drive_specify.py --fixture sample-user-facing --depth $d --out /tmp/sc02-$d.md; done\", \"expect_exit\": 0}",
+  "name": "pxxb9s84-run-sulis-specify-on-the-same-fixture-at-1",
+  "output_artifacts": [
+    "pxxb9s84-run-sulis-specify-on-the-same-fixture-at-1-result"
+  ],
+  "postconditions": [
+    "three documents are produced, one per depth"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

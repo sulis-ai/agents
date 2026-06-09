@@ -1,0 +1,337 @@
+{
+  "@context": "https://sulis.ai/schemas/scenario-authoring/v1",
+  "change_id": "01KTPWDWJ7CQRWWRGPQEQ22P1M",
+  "change_handle": "CH-CQRWWR",
+  "primitive": "harden",
+  "slug": "comprehensive-spec-and-journey-walk",
+  "note": "Authored journey-spec source. Each scenario is drivable (carries a real driver via mechanism + mechanism_detail) and observable (every journey carries an asserts check, and its final step's outcome is observable). `sulis-author-scenario --emit` assembles each into a Scenario + Workflow + Steps graph in the brain. Tool-surface scenarios drive the real specify/design/gate stages end-to-end via the #98 substrate (subprocess + http_call drivers).",
+  "scenarios": [
+    {
+      "id": "SC-01",
+      "name": "Comprehensive doc is produced even at lite depth",
+      "surface": "tool",
+      "verifies": ["FR-01", "FR-02", "FR-11"],
+      "covers_flow": "UC-01 main",
+      "seed": "comprehensive-spec-and-journey-walk:SC-01",
+      "steps": [
+        {
+          "instruction": "Create a fixture behavioural change and run /sulis:specify forcing depth=lite",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_drive_specify.py --fixture sample-user-facing --depth lite --out /tmp/sc01-doc.md", "expect_exit": 0},
+          "asserts": ["the specify stage completes at lite depth", "a design document is written to /tmp/sc01-doc.md"],
+          "input_artifacts": ["methodology-fixture-change"]
+        },
+        {
+          "instruction": "Assert the produced document contains every mandatory section regardless of the lite depth",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_assert_doc_sections.py /tmp/sc01-doc.md --require exec-summary,problem-discovery,stakeholders,functional-requirements,nfr,constraints,assumptions,dependencies,threat-model,scope,use-cases,solution-design,verification-plan", "expect_exit": 0},
+          "asserts": ["all mandatory sections present at lite depth", "no section was skipped because depth was lite"]
+        }
+      ]
+    },
+    {
+      "id": "SC-02",
+      "name": "The section set is identical across all three depths",
+      "surface": "tool",
+      "verifies": ["FR-02"],
+      "covers_flow": "UC-01 2a",
+      "seed": "comprehensive-spec-and-journey-walk:SC-02",
+      "steps": [
+        {
+          "instruction": "Run /sulis:specify on the same fixture at lite, standard, and deep depth",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "for d in lite standard deep; do python3 plugins/sulis/scripts/_drive_specify.py --fixture sample-user-facing --depth $d --out /tmp/sc02-$d.md; done", "expect_exit": 0},
+          "asserts": ["three documents are produced, one per depth"]
+        },
+        {
+          "instruction": "Diff the SECTION SET (headers only) across the three documents",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_assert_same_section_set.py /tmp/sc02-lite.md /tmp/sc02-standard.md /tmp/sc02-deep.md", "expect_exit": 0},
+          "asserts": ["the mandatory section set is identical across lite/standard/deep", "only interview-derived detail differs, not which sections exist"]
+        }
+      ]
+    },
+    {
+      "id": "SC-03",
+      "name": "An unpopulated section is marked n/a, never silently omitted",
+      "surface": "tool",
+      "verifies": ["FR-11"],
+      "covers_flow": "UC-01 5a",
+      "seed": "comprehensive-spec-and-journey-walk:SC-03",
+      "steps": [
+        {
+          "instruction": "Run /sulis:specify at lite depth on a fixture whose intake cannot populate the dependencies section",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_drive_specify.py --fixture no-dependencies --depth lite --out /tmp/sc03-doc.md", "expect_exit": 0},
+          "asserts": ["the document is produced"]
+        },
+        {
+          "instruction": "Assert the dependencies section is present and carries an explicit n/a justification, not a missing heading",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_assert_section_na.py /tmp/sc03-doc.md --section dependencies", "expect_exit": 0},
+          "asserts": ["the dependencies heading is present", "it reads 'n/a — <justification>' with a substantive reason", "the section was not silently dropped"]
+        }
+      ]
+    },
+    {
+      "id": "SC-04",
+      "name": "No document-emission branch is gated on depth",
+      "surface": "tool",
+      "verifies": ["FR-03"],
+      "covers_flow": "UC-02 2a",
+      "seed": "comprehensive-spec-and-journey-walk:SC-04",
+      "steps": [
+        {
+          "instruction": "Statically inspect the specify/design emission path for any branch on classify_depth that decides section existence",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_assert_no_depth_doc_gate.py plugins/sulis/skills/specify/SKILL.md plugins/sulis/skills/draft-architecture/SKILL.md plugins/sulis/agents/requirements-analyst.md", "expect_exit": 0},
+          "asserts": ["zero emission branches condition section existence on depth", "depth feeds the interview sizer only"]
+        }
+      ]
+    },
+    {
+      "id": "SC-05",
+      "name": "NFR section is always present with measurable targets",
+      "surface": "tool",
+      "verifies": ["FR-06"],
+      "covers_flow": "UC-02 main",
+      "seed": "comprehensive-spec-and-journey-walk:SC-05",
+      "steps": [
+        {
+          "instruction": "Produce the comprehensive document for a fixture change",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_drive_specify.py --fixture sample-user-facing --depth lite --out /tmp/sc05-doc.md", "expect_exit": 0},
+          "asserts": ["the document is produced"]
+        },
+        {
+          "instruction": "Assert the NFR section carries at least one measurable target (a threshold, not an adjective) for performance, security and reliability",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_assert_measurable_nfr.py /tmp/sc05-doc.md --categories performance,security,reliability", "expect_exit": 0},
+          "asserts": ["each category has a numeric/threshold target", "no NFR is stated only as an adjective like 'fast' or 'secure'"]
+        }
+      ]
+    },
+    {
+      "id": "SC-06",
+      "name": "UI surface walk classifies every hop",
+      "surface": "UI",
+      "verifies": ["FR-07"],
+      "covers_flow": "UC-03 main",
+      "seed": "comprehensive-spec-and-journey-walk:SC-06",
+      "steps": [
+        {
+          "instruction": "Run the design stage journey walk on a fixture change with a UI surface",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_drive_journey_walk.py --fixture sample-user-facing --surface ui --out /tmp/sc06-tdd.md", "expect_exit": 0},
+          "asserts": ["the design stage writes a Journey Walk section"]
+        },
+        {
+          "instruction": "Assert the UI Journey Walk table classifies every hop as EXISTS, planned-WP, or out-of-scope (no bare GAP, no unclassified hop)",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_assert_walk_table.py /tmp/sc06-tdd.md --surface ui --no-bare-gap", "expect_exit": 0},
+          "asserts": ["every UI hop carries a classification", "no hop is left unclassified"]
+        }
+      ]
+    },
+    {
+      "id": "SC-07",
+      "name": "A bare GAP in the UI walk blocks design completion",
+      "surface": "UI",
+      "verifies": ["FR-07"],
+      "covers_flow": "UC-03 3b",
+      "seed": "comprehensive-spec-and-journey-walk:SC-07",
+      "steps": [
+        {
+          "instruction": "Run the design stage on a fixture whose UI journey has one hop with neither a component nor a planned WP",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_drive_journey_walk.py --fixture ui-with-gap --surface ui --out /tmp/sc07-tdd.md", "expect_exit": 1},
+          "asserts": ["the design stage does NOT complete (non-zero exit)", "the bare GAP is reported as blocking"]
+        }
+      ]
+    },
+    {
+      "id": "SC-08",
+      "name": "Tool surface walk produces a second table covering every operation",
+      "surface": "tool",
+      "verifies": ["FR-08"],
+      "covers_flow": "UC-04 main",
+      "seed": "comprehensive-spec-and-journey-walk:SC-08",
+      "steps": [
+        {
+          "instruction": "Run the design stage journey walk on a fixture change that exposes API/MCP tool operations",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_drive_journey_walk.py --fixture sample-tool-surface --surface tool --out /tmp/sc08-tdd.md", "expect_exit": 0},
+          "asserts": ["the design stage writes a tool-surface Journey Walk table"]
+        },
+        {
+          "instruction": "Assert the Journey Walk section carries TWO tables (UI + tool) and the tool table classifies every tool operation in the journey",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_assert_walk_table.py /tmp/sc08-tdd.md --surface tool --require-two-tables", "expect_exit": 0},
+          "asserts": ["a tool-surface table is present alongside the UI table", "every tool operation is classified"]
+        }
+      ]
+    },
+    {
+      "id": "SC-09",
+      "name": "A tool handler without a ServiceSpec binding is a GAP, not EXISTS",
+      "surface": "tool",
+      "verifies": ["FR-09"],
+      "covers_flow": "UC-04 3a",
+      "seed": "comprehensive-spec-and-journey-walk:SC-09",
+      "steps": [
+        {
+          "instruction": "Run the tool-surface walk on a fixture where the handler exists and serves but has no ServiceSpec binding",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_drive_journey_walk.py --fixture tool-serving-no-binding --surface tool --out /tmp/sc09-tdd.md", "expect_exit": 1},
+          "asserts": ["the serving-but-unbound operation is classified GAP, not EXISTS", "the design stage is blocked by the GAP (non-zero exit)", "the looks-built-but-isnt-wired case is caught"]
+        }
+      ]
+    },
+    {
+      "id": "SC-10",
+      "name": "Every use-case flow has at least one covering scenario",
+      "surface": "tool",
+      "verifies": ["FR-10"],
+      "covers_flow": "UC-05 main",
+      "seed": "comprehensive-spec-and-journey-walk:SC-10",
+      "steps": [
+        {
+          "instruction": "Enumerate every flow (main/alternate/exception) of the fixture's use cases and the scenarios derived from them",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_assert_flow_scenario_map.py --fixture sample-user-facing --require-each-flow-covered", "expect_exit": 0},
+          "asserts": ["each main flow maps to >= 1 scenario", "each alternate flow maps to >= 1 scenario", "each exception flow maps to >= 1 scenario"]
+        }
+      ]
+    },
+    {
+      "id": "SC-11",
+      "name": "An undrivable tool scenario is recorded as a deferred infra need, not dropped",
+      "surface": "tool",
+      "verifies": ["FR-10"],
+      "covers_flow": "UC-05 3a",
+      "seed": "comprehensive-spec-and-journey-walk:SC-11",
+      "steps": [
+        {
+          "instruction": "Author a tool scenario whose real drive needs a sandbox/credential that is absent, then run it",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_drive_scenario.py --scenario tool-needs-sandbox --out /tmp/sc11-result.json", "expect_exit": 0},
+          "asserts": ["the scenario is NOT marked green", "it is recorded as a deferred infrastructure need with an identifier", "it is not silently dropped"]
+        }
+      ]
+    },
+    {
+      "id": "SC-12",
+      "name": "Full flow coverage yields verdict covered",
+      "surface": "tool",
+      "verifies": ["FR-12", "FR-13"],
+      "covers_flow": "UC-06 main",
+      "seed": "comprehensive-spec-and-journey-walk:SC-12",
+      "steps": [
+        {
+          "instruction": "Run the UC-flow-coverage gate on a fixture where every flow has a covering scenario",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_verify_uc_flow_coverage.py --fixture fully-covered", "expect_exit": 0},
+          "asserts": ["verdict is 'covered'", "the scenario-required (#103) and journey-coverage (#86) gates also pass", "the change may ship"]
+        }
+      ]
+    },
+    {
+      "id": "SC-13",
+      "name": "One uncovered flow yields verdict gaps and blocks the ship",
+      "surface": "tool",
+      "verifies": ["FR-12"],
+      "covers_flow": "UC-06 2b",
+      "seed": "comprehensive-spec-and-journey-walk:SC-13",
+      "steps": [
+        {
+          "instruction": "Run the UC-flow-coverage gate on a fixture with one flow that has no covering scenario and no out-of-scope record",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_verify_uc_flow_coverage.py --fixture one-uncovered-flow", "expect_exit": 1},
+          "asserts": ["verdict is 'gaps'", "the gate BLOCKS the ship (non-zero exit)", "the uncovered flow is reported in plain English"]
+        }
+      ]
+    },
+    {
+      "id": "SC-14",
+      "name": "Happy-path-only scenarios leave exception flows flagged as gaps",
+      "surface": "tool",
+      "verifies": ["FR-12"],
+      "covers_flow": "UC-06 3a",
+      "seed": "comprehensive-spec-and-journey-walk:SC-14",
+      "steps": [
+        {
+          "instruction": "Run the gate on a fixture where only the main flow is covered and an exception flow is uncovered",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_verify_uc_flow_coverage.py --fixture happy-path-only", "expect_exit": 1},
+          "asserts": ["the uncovered exception flow is flagged as a gap", "verdict is 'gaps'", "the happy-path-only bypass is closed"]
+        }
+      ]
+    },
+    {
+      "id": "SC-15",
+      "name": "The produced document always carries a STRIDE threat model",
+      "surface": "tool",
+      "verifies": ["FR-15"],
+      "covers_flow": "UC-02 main (Phase 3)",
+      "seed": "comprehensive-spec-and-journey-walk:SC-15",
+      "steps": [
+        {
+          "instruction": "Produce the comprehensive document for a fixture change",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_drive_specify.py --fixture sample-user-facing --depth lite --out /tmp/sc15-doc.md", "expect_exit": 0},
+          "asserts": ["the document is produced"]
+        },
+        {
+          "instruction": "Assert the threat-model section has the STRIDE table, trust boundaries, attack surface, and summary",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_assert_stride.py /tmp/sc15-doc.md --require stride-table,trust-boundaries,attack-surface,summary", "expect_exit": 0},
+          "asserts": ["a STRIDE analysis table is present", "trust boundaries and attack surface are documented", "the threat model is present even at lite depth"]
+        }
+      ]
+    },
+    {
+      "id": "SC-16",
+      "name": "The produced document carries architecture at three C4 levels",
+      "surface": "tool",
+      "verifies": ["FR-16"],
+      "covers_flow": "UC-02 main (Phase 3)",
+      "seed": "comprehensive-spec-and-journey-walk:SC-16",
+      "steps": [
+        {
+          "instruction": "Produce the comprehensive document for a fixture change",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_drive_specify.py --fixture sample-user-facing --depth standard --out /tmp/sc16-doc.md", "expect_exit": 0},
+          "asserts": ["the document is produced"]
+        },
+        {
+          "instruction": "Assert the solution-design section carries a context diagram, a container diagram, and a component diagram (three distinct C4 levels)",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_assert_c4_levels.py /tmp/sc16-doc.md --require context,container,component", "expect_exit": 0},
+          "asserts": ["three distinct architecture levels are present", "this goes beyond the 5 flat Mermaid types Sulis had"]
+        }
+      ]
+    },
+    {
+      "id": "SC-17",
+      "name": "A business decision is recorded as a BDR, distinct from an ADR",
+      "surface": "tool",
+      "verifies": ["FR-17"],
+      "covers_flow": "UC-02 main (Phase 3)",
+      "seed": "comprehensive-spec-and-journey-walk:SC-17",
+      "steps": [
+        {
+          "instruction": "Drive the design stage on a fixture that makes one business/product decision (a scope cut) and one technical decision",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_drive_decisions.py --fixture scope-cut-plus-tech --out /tmp/sc17", "expect_exit": 0},
+          "asserts": ["both a decision record for the business choice and one for the technical choice are produced"]
+        },
+        {
+          "instruction": "Assert the business decision is recorded as a BDR and the technical one as an ADR, with the distinction documented",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_assert_bdr_adr.py /tmp/sc17 --require bdr,adr,distinct", "expect_exit": 0},
+          "asserts": ["the scope cut is a BDR with context+decision+consequences", "the technical choice is an ADR", "BDR and ADR are distinct record types"]
+        }
+      ]
+    }
+  ]
+}

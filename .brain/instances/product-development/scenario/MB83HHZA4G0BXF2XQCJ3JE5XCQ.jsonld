@@ -1,0 +1,11 @@
+{
+  "exercises": "dna:design:EEDCDTT7F40JPMXZBV2KRP1ARS",
+  "id": "dna:scenario:MB83HHZA4G0BXF2XQCJ3JE5XCQ",
+  "journey": "dna:workflow:MRFWDBKZSHADWHRCGW0YJ69EGN",
+  "name": "SC-16: The produced document carries architecture at three C4 levels",
+  "state": "draft",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:PH9JQK4VWHFFV1753VPKHACW9V"
+  ]
+}

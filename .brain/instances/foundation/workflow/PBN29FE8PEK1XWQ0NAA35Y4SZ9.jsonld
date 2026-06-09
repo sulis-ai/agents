@@ -1,0 +1,21 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:PBN29FE8PEK1XWQ0NAA35Y4SZ9",
+  "initial_steps": [
+    "mnhbv3yq-author-a-tool-scenario-whose-real-drive-1"
+  ],
+  "name": "SC-11: An undrivable tool scenario is recorded as a deferred infra need, not dropped",
+  "state": "draft",
+  "steps": [
+    "mnhbv3yq-author-a-tool-scenario-whose-real-drive-1"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "mnhbv3yq-author-a-tool-scenario-whose-real-drive-1"
+  ],
+  "transitions": [
+    "mnhbv3yq-author-a-tool-scenario-whose-real-drive-1 -> end"
+  ],
+  "type": "review"
+}

@@ -1,0 +1,21 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:RSA6PGNC8YBE5YGS3BY54HV327",
+  "initial_steps": [
+    "jkb0m7m4-run-the-design-stage-on-a-fixture-whose-1"
+  ],
+  "name": "SC-07: A bare GAP in the UI walk blocks design completion",
+  "state": "draft",
+  "steps": [
+    "jkb0m7m4-run-the-design-stage-on-a-fixture-whose-1"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "jkb0m7m4-run-the-design-stage-on-a-fixture-whose-1"
+  ],
+  "transitions": [
+    "jkb0m7m4-run-the-design-stage-on-a-fixture-whose-1 -> end"
+  ],
+  "type": "review"
+}

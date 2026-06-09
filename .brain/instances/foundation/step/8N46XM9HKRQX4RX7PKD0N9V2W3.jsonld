@@ -1,0 +1,22 @@
+{
+  "agent_instructions": "Assert the business decision is recorded as a BDR and the technical one as an ADR, with the distinction documented",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:8N46XM9HKRQX4RX7PKD0N9V2W3",
+  "input_artifacts": [
+    "ca1rnprv-drive-the-design-stage-on-a-fixture-that-1-result"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_assert_bdr_adr.py /tmp/sc17 --require bdr,adr,distinct\", \"expect_exit\": 0}",
+  "name": "ca1rnprv-assert-the-business-decision-is-recorded-2",
+  "output_artifacts": [
+    "ca1rnprv-assert-the-business-decision-is-recorded-2-result"
+  ],
+  "postconditions": [
+    "the scope cut is a BDR with context+decision+consequences",
+    "the technical choice is an ADR",
+    "BDR and ADR are distinct record types"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

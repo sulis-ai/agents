@@ -1,0 +1,21 @@
+{
+  "agent_instructions": "Run the design stage on a fixture whose UI journey has one hop with neither a component nor a planned WP",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:GSR22856992XH65R56Z0KAV1VW",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_drive_journey_walk.py --fixture ui-with-gap --surface ui --out /tmp/sc07-tdd.md\", \"expect_exit\": 1}",
+  "name": "jkb0m7m4-run-the-design-stage-on-a-fixture-whose-1",
+  "output_artifacts": [
+    "jkb0m7m4-run-the-design-stage-on-a-fixture-whose-1-result"
+  ],
+  "postconditions": [
+    "the design stage does NOT complete (non-zero exit)",
+    "the bare GAP is reported as blocking"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

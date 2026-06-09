@@ -1,0 +1,21 @@
+{
+  "agent_instructions": "Assert the produced document contains every mandatory section regardless of the lite depth",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:M3FQRZZ2STZTZEVVE1179QYHA8",
+  "input_artifacts": [
+    "h3hdwy2t-create-a-fixture-behavioural-change-and-1-result"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_assert_doc_sections.py /tmp/sc01-doc.md --require exec-summary,problem-discovery,stakeholders,functional-requirements,nfr,constraints,assumptions,dependencies,threat-model,scope,use-cases,solution-design,verification-plan\", \"expect_exit\": 0}",
+  "name": "h3hdwy2t-assert-the-produced-document-contains-ev-2",
+  "output_artifacts": [
+    "h3hdwy2t-assert-the-produced-document-contains-ev-2-result"
+  ],
+  "postconditions": [
+    "all mandatory sections present at lite depth",
+    "no section was skipped because depth was lite"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

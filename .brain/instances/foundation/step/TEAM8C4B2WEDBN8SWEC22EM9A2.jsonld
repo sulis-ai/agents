@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Drive the design stage on a fixture that makes one business/product decision (a scope cut) and one technical decision",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:TEAM8C4B2WEDBN8SWEC22EM9A2",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_drive_decisions.py --fixture scope-cut-plus-tech --out /tmp/sc17\", \"expect_exit\": 0}",
+  "name": "ca1rnprv-drive-the-design-stage-on-a-fixture-that-1",
+  "output_artifacts": [
+    "ca1rnprv-drive-the-design-stage-on-a-fixture-that-1-result"
+  ],
+  "postconditions": [
+    "both a decision record for the business choice and one for the technical choice are produced"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

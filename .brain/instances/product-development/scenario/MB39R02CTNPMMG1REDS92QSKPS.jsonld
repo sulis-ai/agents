@@ -1,0 +1,11 @@
+{
+  "exercises": "dna:design:EEDCDTT7F40JPMXZBV2KRP1ARS",
+  "id": "dna:scenario:MB39R02CTNPMMG1REDS92QSKPS",
+  "journey": "dna:workflow:81KWXE9JKJF8NKMH7AX2T1EN8B",
+  "name": "SC-02: The section set is identical across all three depths",
+  "state": "draft",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:8XCWN8SN48N4FE5FBX9X03SGXY"
+  ]
+}

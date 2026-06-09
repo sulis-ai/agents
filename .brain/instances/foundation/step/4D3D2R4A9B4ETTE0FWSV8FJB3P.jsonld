@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Produce the comprehensive document for a fixture change",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:4D3D2R4A9B4ETTE0FWSV8FJB3P",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_drive_specify.py --fixture sample-user-facing --depth lite --out /tmp/sc05-doc.md\", \"expect_exit\": 0}",
+  "name": "nnq39n2s-produce-the-comprehensive-document-for-a-1",
+  "output_artifacts": [
+    "nnq39n2s-produce-the-comprehensive-document-for-a-1-result"
+  ],
+  "postconditions": [
+    "the document is produced"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

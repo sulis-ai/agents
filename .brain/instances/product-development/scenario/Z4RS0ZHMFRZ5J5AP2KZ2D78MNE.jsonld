@@ -1,0 +1,11 @@
+{
+  "exercises": "dna:design:EEDCDTT7F40JPMXZBV2KRP1ARS",
+  "id": "dna:scenario:Z4RS0ZHMFRZ5J5AP2KZ2D78MNE",
+  "journey": "dna:workflow:QKRAFPAXA6PQBENPK4BYV0B6MY",
+  "name": "SC-14: Happy-path-only scenarios leave exception flows flagged as gaps",
+  "state": "draft",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:VFJ0EMVN7ZJBK27J2B4HNFETG9"
+  ]
+}
