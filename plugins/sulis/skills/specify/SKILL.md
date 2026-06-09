@@ -42,26 +42,35 @@ related_skills:
 
 ## Conclusion (lead with the answer)
 
-`/sulis:specify` captures what a piece of work should do, at a depth that
-matches the work. It looks at the change you're in, **picks** one of three
-depths (a deterministic call the agent owns), announces it in plain English,
-and runs it — writing a `SPEC.md` next to the change. You can redirect the
-depth any time ("keep it light" / "go deeper"); you're never asked to ratify
-it up front.
+`/sulis:specify` captures what a piece of work should do. It looks at the
+change you're in, **picks** one of three depths (a deterministic call the agent
+owns), announces it in plain English, and runs it — writing a `SPEC.md` next to
+the change. You can redirect the depth any time ("keep it light" / "go deeper");
+you're never asked to ratify it up front.
 
-| Depth | What you do | What you get | Good for |
-|---|---|---|---|
-| **Lite** | Answer three short prompts (~30 seconds) | A ten-line `SPEC.md` | A typo, a one-file fix, a small mechanical change |
-| **Standard** (default) | A few questions, back and forth (~3 minutes) | A `SPEC.md` with the goal, what's in and out, how you'll know it's done, and what to avoid | Most work |
-| **Deep** | A full guided requirements session | A `SPEC.md` plus flow diagrams (the requirements specialist runs this) | A new feature, a new system, anything your users will see |
+**Depth sizes the interview, not the document.** Whatever the depth, you get
+the same complete spec — the same sections, in the same order. Depth decides
+how many questions the agent asks and how much detail each section is filled
+with; it never decides which sections exist. A small change still produces a
+full, reviewable spec — its sections are just shorter (a section with nothing
+to say is marked `n/a — <reason>`, never silently dropped). The smallest
+changes get the same structure as the largest; only the conversation is
+shorter.
+
+| Depth | The interview | Good for |
+|---|---|---|
+| **Lite** | Three short prompts (~30 seconds) | A typo, a one-file fix, a small mechanical change |
+| **Standard** (default) | A few questions, back and forth (~3 minutes) | Most work |
+| **Deep** | A full guided requirements session (the requirements specialist runs this) | A new feature, a new system, anything your users will see |
 
 The skill **decides** the depth and announces it (e.g. *"This is a small,
-contained change, so I'll write a quick lite spec — shout if you'd rather a
-fuller one."*), then runs. The depth is the agent's call, not a question put
-to you — a non-technical founder has no basis to ratify "lite vs standard",
-and asking would be permission-theatre. Only a *deep* spec (a ~20-min guided
-session) gets a one-line heads-up before it starts, since that's real time of
-yours — and even then it starts, it doesn't block.
+contained change, so I'll just ask a few quick questions — shout if you'd
+rather talk it through in more depth."*), then runs. The depth is the agent's
+call, not a question put to you — a non-technical founder has no basis to
+ratify "lite vs standard", and asking would be permission-theatre. Only a
+*deep* spec (a ~20-min guided session) gets a one-line heads-up before it
+starts, since that's real time of yours — and even then it starts, it doesn't
+block.
 
 Founder-mode is the default: plain English, no jargon. You can ask for the
 raw output any time (*"show me the technical version"* / `--raw`) and get the
@@ -287,14 +296,18 @@ Two rules, both MUST:
 
 ### Lite mode
 
-Three short prompts, conversational, ~30 seconds total:
+A short interview — three prompts, conversational, ~30 seconds total:
 
 1. **What do you want this to do?** (the intent — one or two sentences)
 2. **How will you know it's done?** (acceptance — what's observably true after)
 3. **What should this NOT touch / what to avoid?** (the guardrail)
 
-Write a ~10-line `SPEC.md` (see Output below) with exactly those three
-fields. Do not pad it with empty sections — lite is lite on purpose.
+Those three answers fill the spec's core sections. The spec still carries the
+full structure (see Output below) — the answers drive the sections that have
+something to say, and any section the change doesn't touch is marked
+`n/a — <reason>`, never silently dropped. Lite means a short *interview*, not a
+thin document: the smallest change gets the same reviewable structure as the
+largest.
 
 **After a lite spec, design is optional.** Decomposition is usually obvious
 for a small change (one Work Package). Offer the shortcut:
@@ -368,9 +381,12 @@ owns this** — do not re-implement SRD facilitation here.
    name, the missing piece, the next step) and re-enter Phase 3 of the
    requirements-analyst's facilitation against the unresolved questions
    — do not stamp the specify stage as complete. P-VER PASS is the
-   gate that lets `/sulis:draft-architecture` start. Lite specs skip
-   this step (their verification posture lives in the three-field
-   shape; the rubric's grandfather sub-phase applies).
+   gate that lets `/sulis:draft-architecture` start. At lite the
+   verification posture is captured lightly — from the short "How
+   we'll know it's done" answer — so the full P-VER rubric pass is not
+   required (the rubric's grandfather sub-phase applies); the
+   `## Verification Plan` section is still present in the spec, just
+   sized to what the lite interview surfaced.
 
 ## Step 5 — flag any third-party platform touch (detect + ask; do NOT run the harness)
 
@@ -435,26 +451,14 @@ founder_facing: true   # or false — from the Step 1 classifier
 ---
 ```
 
-### SPEC.md shapes
+### SPEC.md shape — one structure, always
 
-**Lite** (~10 lines):
-
-```markdown
-# Spec — {intent}
-
-**Change:** {handle} · {primitive}
-
-## What this should do
-{intent, one or two sentences}
-
-## How we'll know it's done
-{acceptance}
-
-## What to avoid
-{guardrail}
-```
-
-**Standard:**
+There is **one** spec structure, emitted at every depth. Depth does not pick a
+shape — it sizes the interview that fills the shape. Route the emission to the
+comprehensive structure regardless of depth; depth tunes how much detail each
+section carries, never which sections exist. A section the change genuinely
+doesn't touch is marked `n/a — <reason>`, never silently dropped (so a thin
+section is always distinguishable from a missing one):
 
 ```markdown
 # Spec — {intent}
@@ -468,17 +472,24 @@ founder_facing: true   # or false — from the Step 1 classifier
 - {in-scope item}
 
 ## Non-goals
-- {explicitly out}
+- {explicitly out, or `n/a — <reason>` when the change has none}
 
 ## Acceptance
 - {observable, testable}
 
 ## Constraints
-- {must respect / must not break}
+- {must respect / must not break, or `n/a — <reason>`}
 ```
 
-**Deep:** a short front-door SPEC.md (Intent + Acceptance summary) that links
-to the `.specifications/{name}/` folder the requirements-analyst produced.
+At **lite** the three short answers (intent / acceptance / guardrail) fill
+Intent, Acceptance, and Non-goals; the remaining sections are populated from
+what's known or marked `n/a — <reason>`. At **standard** the facilitated
+conversation fills every section with detail. At **deep** the
+requirements-analyst produces the full comprehensive document (use cases, NFR,
+threat model, personas, contract) into the `.specifications/{name}/` folder,
+and the change's `SPEC.md` is the short front door (Intent + Acceptance summary)
+that links to it. In every case the structure is the same; only the depth of
+the interview — and so the richness of the detail — changes.
 
 After writing, report in plain English (Rule 1 — lead with the outcome):
 
@@ -542,9 +553,12 @@ or, after lite:
   says "defaulting to standard when it's not clear-cut." Surface that
   reasoning; don't present a guess as a confident call (no-hyperbole / honest
   uncertainty).
-- **Lite means lite.** Don't pad a lite SPEC.md with empty Scope / Non-goals
-  sections to look thorough. Three fields is the contract; a fuller spec means
-  the founder should have picked standard.
+- **Lite means a short interview, not a thin document.** Don't manufacture
+  detail a lite interview didn't surface — keep each section as short as the
+  answers warrant, and mark a section the change genuinely doesn't touch
+  `n/a — <reason>`. But never drop a section to "keep it lite": the structure
+  is the same at every depth (ADR-001); only the interview — and so the
+  richness of each section — is shorter.
 - **`SULIS_CHANGE_ID` must resolve to a real change.** If
   `resolve_current_change()` returns `null`, stop and route to
   `/sulis:change start`. Do not write a SPEC.md into the current directory as
@@ -552,14 +566,17 @@ or, after lite:
 
 ## Vocabulary
 
-- **Depth mode** — one of three Specify levels: lite / standard / deep. The
-  amount of specifying the work warrants.
-- **Lite spec** — a three-field SPEC.md (intent / acceptance / what-to-avoid)
-  for small mechanical changes.
-- **Standard spec** — a SPEC.md from a short facilitated conversation
-  (intent / scope / non-goals / acceptance / constraints); the default.
-- **Deep spec** — a full SRD (use cases + Mermaid diagrams) produced by the
-  requirements-analyst, fronted by a short change SPEC.md.
+- **Depth mode** — one of three Specify levels: lite / standard / deep. It
+  sizes the *interview* — how many questions get asked and how much detail
+  each section carries — never which sections the spec has (ADR-001).
+- **Lite spec** — the same full spec structure produced from a three-prompt
+  interview (intent / acceptance / what-to-avoid); untouched sections are
+  marked `n/a — <reason>`. For small mechanical changes.
+- **Standard spec** — the same full spec structure produced from a short
+  facilitated conversation; the default.
+- **Deep spec** — the same full spec structure backed by a full SRD (use
+  cases + Mermaid diagrams) produced by the requirements-analyst, fronted by
+  a short change SPEC.md.
 - **Depth classifier** — the deterministic helper
   (`_specify_classifier.py`) that proposes a depth from file count +
   primitive + founder-facing flag; defaults to standard on uncertainty.
@@ -604,10 +621,12 @@ and you proceed. The host SRD write has already succeeded; emission is a
 side-effect and never blocks the stage from completing. Don't narrate the
 emission to the founder (FE-09) — the brain simply stays current.
 
-For **lite** and **standard** modes (which write a short SPEC.md, not a
-full SRD with FR/NFR blocks), skip the emission — there are no
-Requirement entities to extract. The SPEC.md is the founder-facing
-shorthand; the brain only gets the structured FR/NFR form.
+For **lite** and **standard** modes (which don't dispatch the
+requirements-analyst, so there's no structured FR/NFR SRD to read from),
+skip the emission — there are no Requirement entities to extract. The
+brain only gets the structured FR/NFR form, which the deep-mode SRD
+produces; the spec itself still carries the full section structure at
+every depth.
 
 ## Author the verification journey (the testable-state intake — authored first for user-facing changes)
 

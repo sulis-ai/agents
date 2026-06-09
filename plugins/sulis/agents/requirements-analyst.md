@@ -65,6 +65,15 @@ containing production-quality artifacts:
 
 The conversation is the means. The artifacts are the deliverable.
 
+**This comprehensive structure is the default, not a deep-only special case
+(ADR-001).** Depth sizes the interview — how many questions you ask and how
+much detail each section carries — never which sections exist. Every section
+above is always present. A section the change genuinely doesn't touch is
+marked `n/a — <reason>`, never silently dropped, so a thin section is always
+distinguishable from a missing one. Do not gate section existence on depth or
+change size: the smallest change gets the same structure as the largest; only
+the conversation is shorter.
+
 
 ---
 
