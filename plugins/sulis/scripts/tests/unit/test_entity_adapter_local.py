@@ -151,3 +151,87 @@ class TestLocalFileEntityAdapterMissing:
         )
 
         assert retrieved is None
+
+
+class TestLocalFileEntityAdapterPathConfinement:
+    """Defense-in-depth: a traversal-laden id / entity_type cannot escape the
+    store, on either the read or the write path (the file-write primitive is
+    self-defending — it does not trust an upstream caller's validation)."""
+
+    @pytest.fixture
+    def adapter(self, tmp_path: Path) -> LocalFileEntityAdapter:
+        return LocalFileEntityAdapter(
+            base_dir=tmp_path / ".brain" / "instances",
+            domain="product-development",
+        )
+
+    @pytest.mark.parametrize(
+        "evil_id",
+        [
+            "dna:decision:../../../../etc/passwd",
+            "dna:decision:..",
+            "dna:decision:/etc/passwd",
+            "dna:decision:a/b",
+            "dna:decision:a\x00b",
+        ],
+    )
+    def test_find_by_id_with_traversal_segment_raises(
+        self, adapter: LocalFileEntityAdapter, evil_id: str, tmp_path: Path
+    ) -> None:
+        # find_by_id builds the instance path from the raw id — a traversal
+        # segment must be rejected, not read.
+        with pytest.raises(EntityValidationError):
+            adapter.find_by_id("decision", evil_id)
+
+    def test_save_with_traversal_id_raises_and_writes_nothing_outside_base(
+        self, adapter: LocalFileEntityAdapter, tmp_path: Path
+    ) -> None:
+        evil = _valid_decision()
+        evil["id"] = "dna:decision:../../../../tmp/escaped"
+
+        with pytest.raises(EntityValidationError):
+            adapter.save("decision", evil)
+
+        # Nothing escaped to the parent of base_dir.
+        escaped = tmp_path.parent / "tmp" / "escaped.jsonld"
+        assert not escaped.exists()
+
+    def test_traversal_in_entity_type_raises(
+        self, adapter: LocalFileEntityAdapter
+    ) -> None:
+        with pytest.raises(EntityValidationError):
+            adapter.find_by_id("../decision", "dna:decision:01JX0AAAAAAAAAAAAAAAAAAAAA")
+
+
+class TestLocalFileEntityAdapterAtomicWrite:
+    """save() is atomic: a temp file in the same dir is os.replace'd into place,
+    leaving no partial / leftover temp file even across re-saves."""
+
+    @pytest.fixture
+    def adapter(self, tmp_path: Path) -> LocalFileEntityAdapter:
+        return LocalFileEntityAdapter(
+            base_dir=tmp_path / ".brain" / "instances",
+            domain="product-development",
+        )
+
+    def test_save_leaves_no_temp_file_and_content_is_complete(
+        self, adapter: LocalFileEntityAdapter, tmp_path: Path
+    ) -> None:
+        d = _valid_decision()
+        adapter.save("decision", d)
+        # re-save (the upsert path) to exercise replace-over-existing.
+        adapter.save("decision", d)
+
+        decision_dir = (
+            tmp_path / ".brain" / "instances" / "product-development" / "decision"
+        )
+        # exactly one .jsonld, and NO leftover .tmp files.
+        jsonld = list(decision_dir.glob("*.jsonld"))
+        temps = list(decision_dir.glob(".*tmp")) + list(decision_dir.glob("*.tmp"))
+        assert len(jsonld) == 1, f"expected one entity file, got {jsonld}"
+        assert temps == [], f"leftover temp file(s): {temps}"
+
+        # content is the full, valid JSON (not truncated).
+        import json as _json
+
+        assert _json.loads(jsonld[0].read_text()) == d

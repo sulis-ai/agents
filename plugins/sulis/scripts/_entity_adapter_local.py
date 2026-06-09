@@ -22,6 +22,8 @@ identical. That's the convergence point.
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Final
 
@@ -72,7 +74,26 @@ class LocalFileEntityAdapter(EntityRepository):
         path.parent.mkdir(parents=True, exist_ok=True)
         # `sort_keys=True` + `indent=2` keeps git diffs stable across saves
         # of the same entity, which matters when these files are tracked.
-        path.write_text(json.dumps(instance, indent=2, sort_keys=True))
+        data = json.dumps(instance, indent=2, sort_keys=True)
+
+        # Atomic write: write to a temp file in the SAME directory (so the
+        # rename stays on one filesystem) then `os.replace`, which is an atomic
+        # rename. A plain `write_text` can leave a truncated `.jsonld` if the
+        # process is killed mid-write — a corrupt entity in the durable store.
+        # The temp file is cleaned up on any failure before the rename lands.
+        fd, tmp_name = tempfile.mkstemp(
+            dir=path.parent, prefix=f".{path.name}.", suffix=".tmp"
+        )
+        try:
+            with os.fdopen(fd, "w") as fh:
+                fh.write(data)
+            os.replace(tmp_name, path)
+        except BaseException:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
 
     def find_by_id(self, entity_type: str, instance_id: str) -> dict | None:
         path = self._instance_path(entity_type, instance_id)
@@ -113,7 +134,41 @@ class LocalFileEntityAdapter(EntityRepository):
 
     def _instance_path(self, entity_type: str, instance_id: str) -> Path:
         ulid = self._ulid_from_id(instance_id)
-        return self.base_dir / self.domain / entity_type / f"{ulid}.jsonld"
+        # Defense-in-depth (does not trust an upstream caller's validation): the
+        # ULID, entity_type, and domain become directory/file path segments, so
+        # a `..` / separator / null byte in any of them could escape the store.
+        # Reject unsafe segments, then assert the resolved path stays under
+        # base_dir. The TS SpineSettingsAdapter validates ids too, but this makes
+        # the file-write primitive self-defending against ANY future caller.
+        self._reject_unsafe_segment(ulid, "id")
+        self._reject_unsafe_segment(entity_type, "entity_type")
+        self._reject_unsafe_segment(self.domain, "domain")
+
+        path = self.base_dir / self.domain / entity_type / f"{ulid}.jsonld"
+        base_resolved = self.base_dir.resolve()
+        if not path.resolve().is_relative_to(base_resolved):
+            raise EntityValidationError(
+                f"resolved instance path escapes base_dir: {instance_id!r}"
+            )
+        return path
+
+    @staticmethod
+    def _reject_unsafe_segment(segment: str, label: str) -> None:
+        """Reject a path segment that could traverse out of the store.
+
+        A safe segment is non-empty and contains no `..`, no path separator
+        (`/` or `\\`), and no null byte. The schema's id pattern is the primary
+        guard; this is the file-write primitive's own backstop.
+        """
+        if (
+            not segment
+            or segment in (".", "..")
+            or "/" in segment
+            or "\\" in segment
+            or "\x00" in segment
+            or segment.startswith((os.sep, "/"))
+        ):
+            raise EntityValidationError(f"unsafe {label} path segment: {segment!r}")
 
     @staticmethod
     def _ulid_from_id(instance_id: str) -> str:

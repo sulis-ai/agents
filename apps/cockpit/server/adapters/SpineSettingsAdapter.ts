@@ -79,6 +79,9 @@ const EMPTY_SOURCE = { repo: "", path: "", primary_branch: "" };
 const PRODUCT_ID_RE = /^dna:product:[0-9A-HJKMNP-TV-Z]{26}$/;
 const PROJECT_ID_RE = /^dna:project:[0-9A-HJKMNP-TV-Z]{26}$/;
 
+/** A structured log entry the adapter emits per write (and on a write error). */
+export type SettingsLogEntry = Record<string, unknown>;
+
 export interface SpineSettingsAdapterOptions {
   /** The vendored adapter scripts dir (`_entity_adapter_local.py` lives here). */
   scriptsDir: string;
@@ -88,6 +91,19 @@ export interface SpineSettingsAdapterOptions {
   spineDir?: string;
   /** Per-call timeout (ms). Defaults to 30s. */
   timeoutMs?: number;
+  /** Sink for the per-write structured log line. Defaults to a JSON line on
+   *  stderr. Injected by tests to assert the audit trail. */
+  log?: (entry: SettingsLogEntry) => void;
+}
+
+/** Default log sink: one JSON line per entry on stderr (fail-soft — a logging
+ *  failure must never break a write). */
+function defaultLog(entry: SettingsLogEntry): void {
+  try {
+    process.stderr.write(`${JSON.stringify(entry)}\n`);
+  } catch {
+    /* logging is best-effort; never throw out of the write path */
+  }
 }
 
 /** One captured exec result. */
@@ -105,12 +121,14 @@ export class SpineSettingsAdapter implements SettingsStore {
   private readonly baseDir: string;
   private readonly spineDir: string;
   private readonly timeoutMs: number;
+  private readonly log: (entry: SettingsLogEntry) => void;
 
   constructor(opts: SpineSettingsAdapterOptions) {
     this.scriptsDir = opts.scriptsDir;
     this.baseDir = path.resolve(opts.baseDir);
     this.spineDir = opts.spineDir ?? defaultSpineDir();
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.log = opts.log ?? defaultLog;
   }
 
   // ─── reads ─────────────────────────────────────────────────────────────
@@ -142,12 +160,7 @@ export class SpineSettingsAdapter implements SettingsStore {
 
   async upsertProduct(input: ProductWrite): Promise<SettingsProduct> {
     const name = input.name.trim();
-    if (!name) {
-      throw new SettingsStoreError(
-        "VALIDATION_FAILED",
-        "a non-empty product name is required",
-      );
-    }
+    this.assertName(name, "product");
 
     if (input.productId !== undefined) {
       this.assertId(input.productId, PRODUCT_ID_RE, "product");
@@ -157,8 +170,10 @@ export class SpineSettingsAdapter implements SettingsStore {
         "--id", input.productId,
         "--name", name,
       ]);
+      this.logWrite("edit-product", { productId: input.productId });
     } else {
       await this.mintProduct(name);
+      this.logWrite("create-product", { name });
     }
 
     return this.requireProductInTree(input.productId, name);
@@ -167,18 +182,14 @@ export class SpineSettingsAdapter implements SettingsStore {
   async removeProduct(productId: string): Promise<void> {
     this.assertId(productId, PRODUCT_ID_RE, "product");
     await this.setStatus(PRODUCT_DOMAIN, "product", productId, "deleted");
+    this.logWrite("remove-product", { productId });
   }
 
   // ─── project writes ──────────────────────────────────────────────────────
 
   async upsertProject(input: ProjectWrite): Promise<SettingsProject> {
     const name = input.name.trim();
-    if (!name) {
-      throw new SettingsStoreError(
-        "VALIDATION_FAILED",
-        "a non-empty project name is required",
-      );
-    }
+    this.assertName(name, "project");
 
     if (input.projectId !== undefined) {
       this.assertId(input.projectId, PROJECT_ID_RE, "project");
@@ -188,6 +199,7 @@ export class SpineSettingsAdapter implements SettingsStore {
         "--id", input.projectId,
         "--name", name,
       ]);
+      this.logWrite("edit-project", { projectId: input.projectId });
       return this.requireProject(input.projectId);
     }
 
@@ -207,12 +219,14 @@ export class SpineSettingsAdapter implements SettingsStore {
         "project emit returned no id",
       );
     }
+    this.logWrite("create-project", { projectId, productId: input.productId });
     return this.requireProject(projectId);
   }
 
   async removeProject(projectId: string): Promise<void> {
     this.assertId(projectId, PROJECT_ID_RE, "project");
     await this.setStatus(PROJECT_DOMAIN, "project", projectId, "deleted");
+    this.logWrite("remove-project", { projectId });
   }
 
   // ─── repo link ────────────────────────────────────────────────────────────
@@ -259,12 +273,14 @@ export class SpineSettingsAdapter implements SettingsStore {
       primary_branch: DEFAULT_PRIMARY_BRANCH,
     });
     await this.editProjectSource(input.projectId, source);
+    this.logWrite("attach-repo", { projectId: input.projectId, localPath });
     return this.requireProject(input.projectId);
   }
 
   async unlinkRepo(projectId: string): Promise<SettingsProject> {
     this.assertId(projectId, PROJECT_ID_RE, "project");
     await this.editProjectSource(projectId, JSON.stringify(EMPTY_SOURCE));
+    this.logWrite("unlink-repo", { projectId });
     return this.requireProject(projectId);
   }
 
@@ -408,13 +424,23 @@ export class SpineSettingsAdapter implements SettingsStore {
   }
 
   /** Map an ExecResult to stdout or a typed WRITE_FAILED. A helper emits a
-   *  `{"ok": false}` envelope on a schema reject (exit 1) — also WRITE_FAILED,
-   *  carrying the helper's error message. */
+   *  `{"ok": false}` envelope on a schema reject (exit 1) — also WRITE_FAILED.
+   *
+   *  SECURITY (CWE-209): the raw helper stderr can carry absolute filesystem
+   *  paths, tracebacks, and internal exception text. It is logged server-side
+   *  (the audit trail) but NEVER returned to the client — the client message is
+   *  a fixed, opaque string so no internal detail leaks over the HTTP envelope. */
   private unwrap(result: ExecResult, label: string): string {
     if (!result.ok) {
+      const detail = result.stderr.trim() || result.stdout.trim();
+      this.log({
+        evt: "settings-write-error",
+        op: path.basename(label),
+        detail,
+      });
       throw new SettingsStoreError(
         "WRITE_FAILED",
-        `${path.basename(label)} failed: ${result.stderr.trim() || result.stdout.trim()}`,
+        "the settings write failed — see the server log for details",
       );
     }
     return result.stdout;
@@ -445,6 +471,33 @@ export class SpineSettingsAdapter implements SettingsStore {
   /** Absolute path of a bundled spine helper. */
   private spineScript(name: string): string {
     return path.join(this.spineDir, name);
+  }
+
+  /** Emit one structured audit line per successful write op. Fail-soft. */
+  private logWrite(op: string, fields: SettingsLogEntry): void {
+    this.log({ evt: "settings-write", op, ...fields });
+  }
+
+  /**
+   * Validate a request-controlled display name. Empty (after trim) is a typed
+   * VALIDATION_FAILED. A LEADING HYPHEN is also rejected: the python helper's
+   * argparse would read `--name -Foo` as a flag (exit 2 → an opaque
+   * WRITE_FAILED), so we reject it up front with a clear, founder-readable
+   * message instead of letting it fail obscurely downstream.
+   */
+  private assertName(name: string, kind: string): void {
+    if (!name) {
+      throw new SettingsStoreError(
+        "VALIDATION_FAILED",
+        `a non-empty ${kind} name is required`,
+      );
+    }
+    if (name.startsWith("-")) {
+      throw new SettingsStoreError(
+        "VALIDATION_FAILED",
+        `a ${kind} name cannot start with a hyphen: ${name}`,
+      );
+    }
   }
 
   /**
