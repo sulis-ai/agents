@@ -1,0 +1,15 @@
+{
+  "journey": "sign-in round-trip",
+  "scenarios": [
+    {
+      "id": "SC-06",
+      "surface": "ui",
+      "hops": [
+        {"name": "click sign-in", "component": "apps/cockpit/SignIn.tsx#onClick"},
+        {"name": "redirect to provider", "component": "apps/cockpit/auth.ts#redirect"},
+        {"name": "callback exchanges code for token", "planned_wp": "WP-101"},
+        {"name": "authenticated call returns real data", "component": "apps/cockpit/api.ts#me"}
+      ]
+    }
+  ]
+}
