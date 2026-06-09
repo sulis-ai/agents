@@ -342,6 +342,29 @@ def _remove_shipped_worktree(repo_root: Path, change_id: str,
     return out
 
 
+def _change_own_commit_count(repo_root: Path, base_sha: str,
+                             branch: str) -> int | None:
+    """Number of commits the change branch carries of its OWN, beyond its base.
+
+    `git rev-list --count <base_sha>..<branch>` — commits reachable from the
+    branch tip but not from the fork point. Returns the count, or ``None`` when
+    it can't be determined (no ``base_sha`` recorded, or the rev-list fails —
+    e.g. the branch or base is gone). ``None`` means "undeterminable", which the
+    caller treats as "don't block" — the guard only fires on a POSITIVE zero.
+    """
+    if not base_sha:
+        return None
+    rc, out, _ = _run(
+        ["git", "rev-list", "--count", f"{base_sha}..refs/heads/{branch}"],
+        cwd=repo_root, timeout=10)
+    if rc != 0:
+        return None
+    try:
+        return int(out.strip())
+    except ValueError:
+        return None
+
+
 def _archive_after_ship(repo_root: Path, change_id: str, branch: str,
                         worktree_dest: Path, *, remove_worktree: bool) -> dict:
     """Mark a change shipped (+ pin shipped_sha) and optionally remove its
@@ -353,6 +376,25 @@ def _archive_after_ship(repo_root: Path, change_id: str, branch: str,
     we shipped"). Keeps the branch + record (the audit trail). Returns the
     ``archived`` dict for the command's JSON output.
     """
+    # #272 — refuse to ship an EMPTY change. A change whose branch carries zero
+    # commits of its own beyond its base built nothing; marking it shipped (and
+    # removing its worktree) is never right. This is the harm a stacked change
+    # hit when its base merged. Guard on a POSITIVE zero only — an undeterminable
+    # count (no base_sha, branch gone) never blocks a legitimate ship.
+    record = read_change_record(str(change_id)) or {}
+    base_sha = str(record.get("base_sha") or "").strip()
+    own_commits = _change_own_commit_count(repo_root, base_sha, branch)
+    if own_commits == 0:
+        emit_error(
+            f"Refusing to mark change {change_id} shipped: its branch "
+            f"({branch}) has no commits of its own beyond its base "
+            f"({base_sha[:8]}) — nothing was built, so there is nothing to "
+            f"ship. (An empty change is never 'shipped' — this guards the "
+            f"stacked-change false-shipped case, #272.)",
+            context={"change_id": change_id, "branch": branch,
+                     "base_sha": base_sha, "own_commits": own_commits},
+        )
+
     rc, sha_out, _ = _run(["git", "rev-parse", f"refs/heads/{branch}"],
                           cwd=repo_root, timeout=10)
     shipped_sha = sha_out.strip() if rc == 0 else ""
