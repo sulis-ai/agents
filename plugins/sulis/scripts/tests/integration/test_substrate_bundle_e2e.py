@@ -44,17 +44,16 @@ Real-data-not-mock guard (ADR-003): the ``saved_record`` the invariant
 evaluates is the artifact the (faked-transport-but-real-shape) browser step
 produced — never a mock of the record itself.
 
-Schema-enum note (registered finding, NOT this WP's fix): the vendored
-``foundation/tool.schema.json`` ``implementation_kind`` enum does not yet carry
-``browser`` (main added the driver to the Python runtime ``IMPLEMENTATION_KINDS``
-during back-integration, but the compiled tool schema enum was not reconciled).
-So a ``browser``-kind foundation Tool cannot be PERSISTED through the adapter
-today. The runner does not validate Tools against the schema, so the browser
-step is driven from an in-memory ``tools_by_id`` (the legitimate injected seam
-this WP prescribes); the new SCENARIO fields — the round-trip this WP must prove
-— live on ``scenario.schema.json``, which DOES support them, and so go through
-the real emit → load adapter path. Reconciling the tool-schema enum is WP-007's
-scope, captured as a finding.
+Schema-enum note: the vendored ``foundation/tool.schema.json``
+``implementation_kind`` enum now carries ``browser`` (reconciled in this change,
+closing finding SF-164c3e5f — main added the driver to the Python runtime
+``IMPLEMENTATION_KINDS`` during back-integration but had not updated the compiled
+tool schema enum). A ``browser``-kind foundation Tool can now be persisted
+through the adapter. This test still drives the browser step from an in-memory
+``tools_by_id`` — a legitimate injected seam that keeps the drive unit-pure and
+independent of tool persistence; the new SCENARIO fields (the round-trip this
+test must prove) live on ``scenario.schema.json`` and go through the real
+emit → load adapter path.
 
 Stdlib + pytest + jsonschema (via the adapter). Builds its whole world in a temp
 store (bootstrap-from-zero); never touches the real repo ``.brain``.
