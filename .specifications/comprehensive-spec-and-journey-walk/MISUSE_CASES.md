@@ -9,7 +9,9 @@ the **bypasses** by which a change advances while skipping the discipline. Each
 misuse case below is a way the old (backwards) behaviour or a careless agent
 could let an incomplete change through, and the **system response** that closes
 it. The bypasses named in the brief — skip use cases, one-surface walk,
-happy-path-only scenarios — map to MUC-01, MUC-05, and MUC-03/04.
+happy-path-only scenarios — map to MUC-01, MUC-05, and MUC-03/04. The
+contract-as-afterthought bypass (a tool surface designed with no reviewable
+interface contract) is MUC-07.
 
 The "abusive actor" is usually the **agent under shortcut pressure** (token
 budget, time, or the path of least resistance) or the **founder who doesn't know
@@ -136,6 +138,34 @@ dropped).
 
 ---
 
+### MUC-07: Contract-as-afterthought — describe the solution but ship no reviewable interface contract
+
+**Abusive actor:** Agent that designs the solution and walks the tool surface but
+treats the contract as something to discover at integration time — or emits a
+schema-only contract that two engineers could integrate against but a founder
+cannot review.
+**Targets:** UC-02, UC-04; FR-18, FR-19.
+**Misuse flow:**
+1. A change exposes a tool surface (a producer/consumer seam — the thing Phase 2 is fundamentally about).
+2. The agent writes the Solution Design and even walks the tool operations, but ships no interface-contract section — or a schema-only contract (operations + types + errors) with none of the CF-10 founder-facing dimensions (auth, audience, plain-language guide, error fixes).
+3. The seam is built backwards: the backend is written, then the consumer is "designed" against whatever it returned (the CF-01 anti-pattern). The founder who has to greenlight the work cannot review the seam — it is integratable but not reviewable. Gaps a contract would have caught (a missing `list` behind a list view, an unflagged auth requirement) surface only at integration.
+
+**System response (REQUIRED):** For a change with a tool surface, the system MUST
+produce an interface-contract section carrying the schema layer AND all four CF-10
+dimensions (NR-07, FR-18); the contract MUST be authored first for cross-kind
+seams and referenced by both producer and consumer (NR-08, FR-19, CF-01/CF-05);
+the tool-surface walk's operations MUST be a subset of the contract's operations
+(NR-08, FR-19). A tool surface with no contract section, or a contract missing the
+founder-facing dimensions, MUST NOT complete the design stage (the structure check
+/ P-VER blocks it). Where the project already produces ServiceSpecs, the
+ServiceSpec IS the contract (CF-10).
+
+**Related NFRs:** NFR-D02 (the contract section, like both walk tables, is
+persisted in the design document, not transient), NFR-S02 (the ServiceSpec
+binding cited for tool EXISTS is the wiring of a contract operation).
+
+---
+
 ## Pre-mortem (top failure scenarios, 6 months live)
 
 1. **Cost backlash.** The always-comprehensive document makes lite changes feel
@@ -148,6 +178,12 @@ dropped).
    produce confusing multi-block verdicts. → HANDOVER recommends a unified verdict
    surface; the three gates stay distinct in logic but report as one founder-facing
    result.
+4. **Hollow contracts.** Agents emit a contract section to satisfy the structure
+   check but fill the CF-10 founder-facing dimensions (audience, plain-language
+   guide, error fixes) with thin boilerplate — the letter of FR-18 without the
+   substance, so the founder still can't really review the seam. → The Lovable Test
+   (CF-10) is the substantive bar; SEA's decompose-validation P7 will enforce it
+   mechanically. Until then it is a HANDOVER risk + a hand-held review bar.
 
 ## Coverage check
 
@@ -158,3 +194,4 @@ dropped).
 | UC-04 (tool walk) | MUC-02, MUC-05 |
 | UC-05 (scenario derivation) | MUC-03, MUC-06 |
 | UC-06 (coverage gate) | MUC-03, MUC-04 |
+| UC-02 (always-produce doc) / UC-04 (tool walk) | MUC-07 |

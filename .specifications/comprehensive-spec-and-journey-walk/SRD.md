@@ -80,6 +80,8 @@ surface*, *journey walk*, *EXISTS/planned-WP/GAP*, *UC-flow-coverage gate*,
 - Current scenario coverage gate: `plugins/sulis/scripts/_verify_scenario_coverage.py`
 - Verification substrate (#98): `plugins/sulis/scripts/sulis-verify-acceptance`, `_scenario_authoring.py`
 - Verification Plan section name: ADR-001 (`.architecture/verification-by-design/`)
+- Contract-first doctrine: `plugins/sulis/references/standards/CONTRACT_FIRST_STANDARD.md` (CF-01..CF-12) — CF-01/CF-05 (contract authored first, producer + consumer build to it in parallel), CF-10 (founder-reviewable ServiceSpec dimensions). The interface contract (FR-18) is the artifact the tool surface (Phase 2) is built around.
+- ServiceSpec reference shape: `architecture/SERVICE_SPECIFICATION.md` (platform repo) — where present, the ServiceSpec IS the contract.
 
 ---
 
@@ -105,6 +107,7 @@ completeness.
 - **F-08** — Always include a STRIDE threat model section.
 - **F-09** — Produce architecture-at-levels (context/container/component).
 - **F-10** — Produce Business Decision Records (BDR) alongside ADRs.
+- **F-11** — Carry the interface contract / ServiceSpec (schema layer + CF-10 founder-reviewable dimensions) as a mandatory part of Solution Design when the change has a tool surface; author it first for cross-kind seams (contract-first).
 
 #### 2.3 User Classes and Characteristics
 
@@ -200,6 +203,13 @@ round-trips (HTTP / subprocess / MCP tool calls) via the verification substrate
 | FR-16 | The comprehensive design document MUST produce architecture-at-levels: a context diagram, a container diagram, and a component diagram (C4 levels). | Must | The produced document's solution-design section carries three distinct diagrams at the three levels, beyond the existing 5 flat Mermaid types. |
 | FR-17 | The methodology MUST support Business Decision Records (BDR) alongside ADRs: a business/product decision (scope cut, sequencing, pricing) is recorded as a BDR, distinct from a technical ADR. | Must | A sample business decision is recorded as a BDR with context + decision + consequences; the ADR/BDR distinction is documented and the templates support both. |
 
+> Phase 2 — Contract-first interface artifact (the seam the tool surface is built around)
+
+| ID | Requirement | Priority | Acceptance criterion (testable) |
+|----|-------------|----------|---------------------------------|
+| FR-18 | The comprehensive design document MUST carry an **interface contract** section (the ServiceSpec / schema-layer artifact) as a MANDATORY part of the Solution Design (§7), for any change that introduces or modifies a tool surface. The contract MUST carry, per operation, the schema layer (operations, input/output types, three-category errors per CONTRACT_FIRST_STANDARD CF-03) AND the CF-10 founder-reviewable dimensions: **auth/permissions**, **audience** (admin/operator vs founder/end-user), a **plain-language user guide** (one-sentence purpose, when to use, prerequisites, next steps), and **error fixes** (per error: cause + user-fix vs developer-fix). | Must | The produced document's Solution Design carries an interface-contract subsection; for every operation it lists schema (operations/types/errors) AND all four CF-10 dimensions. A change with no tool surface carries an explicit `n/a — <justification>` for the section, never a bare omission. |
+| FR-19 | When a change spans a **producer** and a **consumer** of a tool/API/SDK seam, the methodology MUST specify the interface contract FIRST and require BOTH sides to reference it (CONTRACT_FIRST_STANDARD CF-01, CF-05). The tool-surface journey walk (FR-08/FR-09) MUST treat the FR-18 contract section as the **source of the operations it walks** — every tool-surface hop names an operation defined in the contract, and the ServiceSpec binding cited for EXISTS (FR-09) is the wiring of a contract operation. | Must | For a sample cross-kind change: the contract section exists before any producer/consumer detail; the tool-surface walk table's operations are a subset of the contract's operations (no walked operation absent from the contract); a producer or consumer specified without a contract reference is flagged. |
+
 ##### Target Structure (the comprehensive design document) — FR-11 expanded
 
 The document MUST carry these sections, in this order, modelled on
@@ -217,7 +227,7 @@ The document MUST carry these sections, in this order, modelled on
    - §4.6 STRIDE Threat Model (STRIDE table, trust boundaries, attack surface, summary)
 5. **§5 Scope** — in scope, out of scope, MVP vs future
 6. **§6 Use Cases** — UC-NN with Actor / Trigger / Preconditions / Main Flow / Alternate Flows / Exception Flows (numbered 3a/6a/7a branches)
-7. **§7 Solution Design** — solution overview, architecture-at-levels (context/container/component), data flow, component model
+7. **§7 Solution Design** — solution overview, architecture-at-levels (context/container/component), data flow, component model, **§7.x Interface Contract / ServiceSpec** (FR-18 — MANDATORY when the change has a tool surface): the schema layer (operations, input/output types, three-category errors per CF-03) PLUS the CF-10 founder-reviewable dimensions (auth/permissions, audience, plain-language user guide, error fixes) for every operation. This is the artifact the tool-surface journey walk (FR-08/FR-09) walks its operations against and that producer/consumer WPs both build to (FR-19, CF-01/CF-05). Where the project already produces ServiceSpecs (`architecture/SERVICE_SPECIFICATION.md`), that IS the contract; elsewhere the contract is enriched with these fields. `n/a — <justification>` only when the change has no tool surface.
 8. **Technical Decisions (ADRs) + Business Decisions (BDRs)**
 9. **Migration / Rollback / Security / Performance**
 10. **`## Verification Plan`** (verbatim heading per ADR-001; six required subsections)
@@ -271,6 +281,7 @@ treatment is in [MISUSE_CASES.md](MISUSE_CASES.md). Summary STRIDE table:
 | **I**nformation disclosure | N/A — methodology produces design docs, no sensitive runtime data. | N/A | Founder English already strips internal IDs from founder-facing output. | N/A |
 | **D**enial of service | The always-comprehensive document makes specify so slow/expensive founders skip it. | Yes | Bounded token cost (NFR); depth still sizes the interview to keep small changes light. | Mitigated |
 | **E**levation of privilege | A change skips the design stage entirely (no walk, no scenarios). | Yes | Gates are companions and run on every behavioural change; pure-docs exemption is explicit + recorded. | Mitigated |
+| **S**poofing (contract) | A tool surface ships with no interface contract, or a contract integratable-but-not-reviewable (missing the CF-10 founder-facing dimensions) — it *looks* designed but the founder can't actually review the seam. | Yes | The interface contract is a mandatory Solution-Design section carrying the CF-10 dimensions (FR-18); the walk's operations must be a subset of the contract (FR-19); absence ⇒ design stage does not complete (NR-07/NR-08, MUC-07). | Mitigated |
 
 Trust boundary (methodology terms): the boundary is between the **founder's
 stated intent** (untrusted-for-completeness — they may not know what to ask for)
@@ -296,6 +307,14 @@ outside-in; each hop EXISTS/planned-WP/GAP; a bare GAP blocks.
 
 Scenarios are derived from every UC flow for both surfaces (FR-10), driven via
 #98 (FR-14), and a UC-flow-coverage gate enforces completeness (FR-12, FR-13).
+
+#### 4.5 Interface Contract / ServiceSpec [F-11]
+
+The comprehensive document carries an interface-contract section (FR-18) as a
+mandatory part of Solution Design for any change with a tool surface. The
+contract carries the schema layer plus the CF-10 founder-reviewable dimensions,
+is authored first for cross-kind seams, and is the source of the operations the
+tool-surface walk classifies (FR-19, CF-01/CF-05).
 
 #### 4.4 Rounded-Out Document [F-08, F-09, F-10]
 
@@ -361,6 +380,7 @@ more verifiable scenarios (see [scenarios](#7-scenario-derivation)).
 **Exception Flows:**
 - **2a.** A doc-emission branch is found to be gated on `classify_depth` output: this is a defect (violates FR-03); the gate must be removed.
 - **4a.** The produced document is missing a mandatory section: the design stage does not complete (P-VER + structure check block it).
+- **4b.** The change has a tool surface but the produced document carries no interface-contract section (or a contract missing the CF-10 founder-facing dimensions — integratable but not reviewable): this is the "contract-as-afterthought" defect (MUC-07); the design stage does not complete (FR-18 + structure check block it).
 
 ---
 
@@ -396,21 +416,24 @@ more verifiable scenarios (see [scenarios](#7-scenario-derivation)).
 
 **Preconditions:**
 - The change exposes or consumes API/SDK/MCP tool operations.
+- The interface contract section (FR-18) has been produced — it defines the operations, types, errors, and CF-10 dimensions. The walk's operations are drawn from it (FR-19).
 - The journey's tool operations are enumerable.
 
 **Main Flow:**
-1. Agent identifies the machine consumer's path through the tool operations.
-2. For each operation, agent cites the tool/handler AND its ServiceSpec binding ⇒ EXISTS.
-3. An operation whose handler exists but ServiceSpec binding is absent ⇒ GAP (FR-09).
-4. An operation with neither handler nor planned WP ⇒ GAP; with a planned WP ⇒ planned-WP.
-5. Agent writes the tool-surface `## Journey Walk` table (second table).
+1. Agent reads the interface contract section (§7.x) as the **source of the operations** to walk (FR-19, CF-05).
+2. Agent identifies the machine consumer's path through the contract's tool operations.
+3. For each operation, agent cites the tool/handler AND its ServiceSpec binding ⇒ EXISTS. The binding cited is the wiring of a contract operation.
+4. An operation whose handler exists but ServiceSpec binding is absent ⇒ GAP (FR-09).
+5. An operation with neither handler nor planned WP ⇒ GAP; with a planned WP ⇒ planned-WP.
+6. Agent writes the tool-surface `## Journey Walk` table (second table), each row naming a contract operation.
 
 **Alternate Flows:**
-- **2a.** The operation is provided by an external system (Stripe, AWS): classified EXISTS by external-system reference, no local binding required.
+- **3a.** The operation is provided by an external system (Stripe, AWS): classified EXISTS by external-system reference, no local binding required (the contract references it as external).
 
 **Exception Flows:**
-- **3a.** A tool serves an interface but has no ServiceSpec binding ("looks-built-but-isn't-wired"): classified GAP; blocks completion.
-- **5a.** No tool surface exists and the change is not pure-docs/infra: the agent surfaces this as a gap in surface coverage (a behavioural change should have at least one walkable surface).
+- **2a.** A walked tool operation is absent from the interface contract (the walk would invent an operation the contract never declared): this is a contract gap; the operation MUST be added to the contract first (FR-19) before the hop is classified.
+- **4a.** A tool serves an interface but has no ServiceSpec binding ("looks-built-but-isn't-wired"): classified GAP; blocks completion.
+- **6a.** No tool surface exists and the change is not pure-docs/infra: the agent surfaces this as a gap in surface coverage (a behavioural change should have at least one walkable surface).
 
 ---
 
@@ -474,6 +497,8 @@ more verifiable scenarios (see [scenarios](#7-scenario-derivation)).
 | NR-04 | The system MUST NOT walk only one surface for a behavioural change that has both. | UC-03/UC-04 / MUC-05 |
 | NR-05 | The system MUST NOT drop a use-case flow silently; an out-of-scope flow MUST be recorded. | UC-06 / MUC-04 |
 | NR-06 | The system MUST NOT mark a tool scenario green without a real driven round-trip (observed-or-blocked). | UC-05 / MUC-06 |
+| NR-07 | The system MUST NOT complete the design stage for a change with a tool surface when the comprehensive document carries no interface-contract section, or carries one missing the CF-10 founder-facing dimensions (auth, audience, plain-language guide, error fixes) — integratable-but-not-reviewable is incomplete. | UC-02, UC-04 / MUC-07 |
+| NR-08 | The system MUST NOT walk a tool-surface operation that is absent from the interface contract; for a cross-kind (producer + consumer) change it MUST NOT specify either side without a reference to the contract authored first. | UC-04 / MUC-07 |
 
 ---
 
@@ -502,6 +527,8 @@ Coverage matrix (flow → scenario → surface):
 | FR-15 | threat model always-on | SC-15 stride-section-present | tool | produced doc has STRIDE section |
 | FR-16 | architecture-at-levels | SC-16 c4-three-levels-present | tool | doc has context+container+component diagrams |
 | FR-17 | BDR alongside ADR | SC-17 bdr-recorded-distinct-from-adr | tool | a business decision ⇒ BDR, distinct from ADR |
+| UC-04 | main / UC-02 4b | SC-18 contract-section-carries-cf10 | tool | tool-surface change ⇒ doc has interface-contract section with all 4 CF-10 dimensions; absence/missing-dimension ⇒ incomplete |
+| UC-04 | 2a (contract-first) | SC-19 walk-operations-subset-of-contract | tool | every walked tool operation is defined in the contract; cross-kind side without a contract reference ⇒ flagged |
 
 ---
 
@@ -526,6 +553,7 @@ Coverage matrix (flow → scenario → surface):
 | Two-surface walk | UC-03, UC-04 | FR-07, FR-08, FR-09 | SC-06..SC-09 | NFR-04 | MUC-02, MUC-05 |
 | UC-derived scenarios + gate | UC-05, UC-06 | FR-10, FR-12, FR-13, FR-14 | SC-10..SC-14 | NFR-03 | MUC-03, MUC-04, MUC-06 |
 | Rounded-out doc | UC-02 | FR-15, FR-16, FR-17 | SC-15..SC-17 | NFR-02 | MUC-01 |
+| Interface contract (contract-first seam) | UC-02, UC-04 | FR-18, FR-19 | SC-18, SC-19 | NFR-D02 | MUC-07 |
 
 ---
 
@@ -574,6 +602,8 @@ the sulis plugin installed; `SCRIPTS_DIR` resolvable.
 | Scenario coverage (`_verify_scenario_coverage.py`) | Real — feed a journey with one uncovered flow; assert `gaps` | existing |
 | Brain instance store | Real — author scenarios; read them back via `_brain_query` | existing |
 | Canonical `entity-crud/DESIGN.md` target | Reference only — compare produced section set against it | out-of-scope (read-only reference) |
+| Interface-contract section (FR-18/FR-19) | Real — drive specify on a tool-surface fixture; assert the contract section carries the four CF-10 dimensions per operation and the tool walk's operations ⊆ contract (`_assert_interface_contract.py`, `_assert_walk_subset_of_contract.py`) | existing |
+| `CONTRACT_FIRST_STANDARD.md` (CF-01..CF-12) | Reference only — the doctrine FR-18/FR-19 ground in (contract-first, CF-10 dimensions) | out-of-scope (read-only reference) |
 | Tool endpoint (dev tier, real call) | Real where credentials exist; recorded otherwise | deferred (sandbox-dependent) |
 
 ### Per-kind verification adapter

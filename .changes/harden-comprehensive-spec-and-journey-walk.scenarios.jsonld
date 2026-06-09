@@ -332,6 +332,50 @@
           "asserts": ["the scope cut is a BDR with context+decision+consequences", "the technical choice is an ADR", "BDR and ADR are distinct record types"]
         }
       ]
+    },
+    {
+      "id": "SC-18",
+      "name": "A tool-surface change's doc carries an interface-contract section with all CF-10 dimensions",
+      "surface": "tool",
+      "verifies": ["FR-18"],
+      "covers_flow": "UC-04 main / UC-02 4b",
+      "seed": "comprehensive-spec-and-journey-walk:SC-18",
+      "steps": [
+        {
+          "instruction": "Produce the comprehensive document for a fixture change that exposes a tool surface (a producer/consumer seam)",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_drive_specify.py --fixture sample-tool-surface --depth standard --out /tmp/sc18-doc.md", "expect_exit": 0},
+          "asserts": ["the document is produced", "the change has a tool surface"]
+        },
+        {
+          "instruction": "Assert the Solution Design carries an interface-contract section and that every operation lists the schema (operations/types/errors) AND all four CF-10 founder-facing dimensions; a missing section or a missing dimension fails",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_assert_interface_contract.py /tmp/sc18-doc.md --require schema,auth,audience,user-guide,error-fixes", "expect_exit": 0},
+          "asserts": ["an interface-contract section is present in the Solution Design", "every operation carries the schema layer with three-category errors", "every operation carries auth, audience, plain-language guide, and error-fixes (CF-10)", "a schema-only contract (no CF-10 dimensions) is rejected as incomplete"]
+        }
+      ]
+    },
+    {
+      "id": "SC-19",
+      "name": "The tool-surface walk's operations are a subset of the interface contract (contract-first)",
+      "surface": "tool",
+      "verifies": ["FR-19"],
+      "covers_flow": "UC-04 2a",
+      "seed": "comprehensive-spec-and-journey-walk:SC-19",
+      "steps": [
+        {
+          "instruction": "Produce the comprehensive document and tool-surface walk for a cross-kind (producer + consumer) fixture change",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_drive_journey_walk.py --fixture cross-kind-producer-consumer --surface tool --out /tmp/sc19-doc.md", "expect_exit": 0},
+          "asserts": ["the document carries both an interface-contract section and a tool-surface walk table"]
+        },
+        {
+          "instruction": "Assert every operation in the tool walk table is defined in the interface contract (walk operations subset of contract), and that a producer or consumer side specified without a contract reference is flagged",
+          "mechanism": "deterministic",
+          "mechanism_detail": {"cmd": "python3 plugins/sulis/scripts/_assert_walk_subset_of_contract.py /tmp/sc19-doc.md --flag-side-without-contract-ref", "expect_exit": 0},
+          "asserts": ["every walked tool operation appears in the contract (walk operations subset of contract)", "a walked operation absent from the contract is a contract gap (UC-04 2a)", "the contract precedes the producer/consumer detail (contract-first, CF-01/CF-05)", "a producer or consumer side without a contract reference is flagged"]
+        }
+      ]
     }
   ]
 }

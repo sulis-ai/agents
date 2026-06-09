@@ -1,0 +1,22 @@
+{
+  "agent_instructions": "Assert the Solution Design carries an interface-contract section and that every operation lists the schema (operations/types/errors) AND all four CF-10 founder-facing dimensions; a missing section or a missing dimension fails",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:H33RWE3SE3F7B8J9XBBQ66Z4E8",
+  "input_artifacts": [
+    "m8c28pc7-produce-the-comprehensive-document-for-a-1-result"
+  ],
+  "mechanism": "human",
+  "name": "m8c28pc7-assert-the-solution-design-carries-an-in-2",
+  "output_artifacts": [
+    "m8c28pc7-assert-the-solution-design-carries-an-in-2-result"
+  ],
+  "postconditions": [
+    "an interface-contract section is present in the Solution Design",
+    "every operation carries the schema layer with three-category errors",
+    "every operation carries auth, audience, plain-language guide, and error-fixes (CF-10)",
+    "a schema-only contract (no CF-10 dimensions) is rejected as incomplete"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

@@ -48,6 +48,7 @@ real round-trips. Every target is measurable.
 |----|-------------|--------|--------------|
 | NFR-D01 | The scenario set + coverage truth MUST be sourced from the brain, not an agent claim. | Coverage verdict derives from `find_scenarios_for_journey` + `find_passing_testresults_for_scenario`; no agent-asserted coverage. | Code inspection + a driven check that the verdict changes only when brain state changes. |
 | NFR-D02 | Both journey-walk tables MUST be persisted in the design document (`## Journey Walk`), not transient. | The produced document contains a UI table AND a tool table, each with every hop classified. | Parse the produced `## Journey Walk` section; assert two tables, all hops classified. |
+| NFR-D03 | The interface contract / ServiceSpec section MUST be persisted in the design document's Solution Design (not transient), and the tool-surface walk's operations MUST be a subset of the contract's operations. | For a tool-surface change, the produced document carries an interface-contract section; every operation in the tool walk table appears in the contract (0 walked operations absent from the contract). | Parse the produced Solution Design; assert the contract section is present with the four CF-10 dimensions per operation; diff walk-operations against contract-operations ⇒ walk ⊆ contract. |
 
 ---
 
@@ -68,3 +69,4 @@ real round-trips. Every target is measurable.
 | NFR-R02 | FR-10 | UC-05 |
 | NFR-D01 | FR-12, FR-14 | UC-06 |
 | NFR-D02 | FR-07, FR-08 | UC-03, UC-04 |
+| NFR-D03 | FR-18, FR-19 | UC-02, UC-04 |

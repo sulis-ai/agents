@@ -1,0 +1,22 @@
+{
+  "agent_instructions": "Assert every operation in the tool walk table is defined in the interface contract (walk operations subset of contract), and that a producer or consumer side specified without a contract reference is flagged",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:5FKPKKXE3ZE9CHQA4CG032CYA8",
+  "input_artifacts": [
+    "x8jbk3yx-produce-the-comprehensive-document-and-t-1-result"
+  ],
+  "mechanism": "human",
+  "name": "x8jbk3yx-assert-every-operation-in-the-tool-walk-2",
+  "output_artifacts": [
+    "x8jbk3yx-assert-every-operation-in-the-tool-walk-2-result"
+  ],
+  "postconditions": [
+    "every walked tool operation appears in the contract (walk operations subset of contract)",
+    "a walked operation absent from the contract is a contract gap (UC-04 2a)",
+    "the contract precedes the producer/consumer detail (contract-first, CF-01/CF-05)",
+    "a producer or consumer side without a contract reference is flagged"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

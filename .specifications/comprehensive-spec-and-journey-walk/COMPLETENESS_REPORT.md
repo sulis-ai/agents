@@ -1,10 +1,25 @@
 # Requirements Completeness Assessment
 
 **Specification:** comprehensive-spec-and-journey-walk (CH-CQRWWR)
-**Date:** 2026-06-09
-**Passes completed:** 1 (clean)
+**Date:** 2026-06-09 (amended 2026-06-09 — contract-first interface artifact)
+**Passes completed:** 1 (clean) + 1 amendment re-check (clean)
 
 ## VERDICT: PASS
+
+> **Amendment re-check (contract-first interface artifact).** Added FR-18
+> (interface contract / ServiceSpec as a mandatory Solution-Design section
+> carrying the CF-10 founder-reviewable dimensions) and FR-19 (contract-first
+> for cross-kind seams; the tool walk's operations ⊆ contract), NR-07/NR-08,
+> NFR-D03, MUC-07 (contract-as-afterthought), SC-18/SC-19, and the glossary
+> "interface contract / ServiceSpec artifact" entry (distinct from "ServiceSpec
+> binding"). Re-ran all eight perspectives + P-VER mechanically: FR/SC/MUC/NR
+> ID sets reconcile across SRD, NFR, MISUSE_CASES, GLOSSARY, and the
+> scenarios.jsonld (FR-01..19, SC-01..19, MUC-01..07, NR-01..08); the §9
+> traceability matrix carries the new "Interface contract" row; the `##
+> Verification Plan` six subsections remain verbatim and in order with the
+> canonical citation; all 8 per-integration rows classified. Brain re-emitted:
+> 2 new Requirement + 2 Scenario + 2 Workflow + 4 Step entities (19 CQRWWR
+> requirements, 19 scenarios exercising the design). Verdict unchanged: **PASS**.
 
 All eight perspectives satisfied, content-quality checks pass, and **P-VER passes**
 against the SRD: the `## Verification Plan` section carries the verbatim ADR-001
@@ -105,6 +120,11 @@ the handover would otherwise draw from the tree.
 - `NOT the Same As` distinctions (depth vs doc-existence; UI vs tool; journey walk
   vs scenario; the three gates; ADR vs BDR; UI-EXISTS vs tool-EXISTS) are honoured —
   no artifact conflates them.
+- **Amendment:** "interface contract / ServiceSpec artifact" added as a preferred
+  term, with its AKA row and a `NOT the Same As` row distinguishing it from
+  "ServiceSpec binding" (AGREEMENT vs WIRING). The contract artifact (the
+  agreement) and the binding (the wiring) are used consistently and never
+  conflated across SRD/MISUSE_CASES/GLOSSARY.
 
 ### Need your input — none.
 
@@ -120,6 +140,11 @@ the handover would otherwise draw from the tree.
 - Pre-mortem run (3 scenarios: cost backlash, tool-walk theatre, gate fatigue) —
   recorded in MISUSE_CASES.md and HANDOVER risks.
 - STRIDE-lite run over the methodology (SRD §4.6 summary table).
+- **Amendment:** MUC-07 (contract-as-afterthought — tool surface with no reviewable
+  interface contract, or a schema-only contract missing the CF-10 founder-facing
+  dimensions) added with a populated `System response (REQUIRED)` mapped to NR-07/NR-08
+  and propagated to SRD §6.1, UC-02 4b, UC-04 2a, and the §4.6 STRIDE table
+  (Spoofing-contract row). Pre-mortem extended with a 4th scenario (hollow contracts).
 
 ### Need your input — none.
 
