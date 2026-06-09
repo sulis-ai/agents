@@ -1,6 +1,11 @@
 // WP-010 — GET /api/changes/:id.
+// WP-002 — the single-change detail carries the SAME enrichment the board
+//   list does (ADR-002): liveness + the FR-12 attention verdict + the new
+//   health verdict + lastActivityAt, gathered by the shared
+//   `gatherChangeEnrichment` helper so list and detail agree. Best-effort /
+//   never-throws (BR-11): a degraded change still returns its detail.
 //
-// Returns one ChangeDetail = Change (with liveness) + transcriptPaths.
+// Returns one ChangeDetail = enriched Change + transcriptPaths.
 // 404 if the change id is unknown.
 
 import { Router } from "express";
@@ -9,7 +14,7 @@ import { Router } from "express";
 import type { ChangeDetail } from "../../shared/api-types";
 import type { ChangeStoreReader } from "../ports/ChangeStoreReader";
 import { locateTranscripts } from "../lib/locateTranscripts";
-import { probeLiveness } from "../lib/probeLiveness";
+import { gatherChangeEnrichment } from "../lib/gatherChangeEnrichment";
 
 import { asyncHandler } from "./_async";
 import { requireChange, toWireChange } from "./_change-lookup";
@@ -27,12 +32,12 @@ export function createChangeDetailRouter(deps: ChangeDetailRouterDeps): Router {
     asyncHandler(async (req, res) => {
       const { id } = req.params as { id: string };
       const record = await requireChange(deps.changeStore, id);
-      const [liveness, transcriptPaths] = await Promise.all([
-        probeLiveness(deps.sulisStateDir, id),
+      const [enriched, transcriptPaths] = await Promise.all([
+        gatherChangeEnrichment(deps, record),
         locateTranscripts(record.worktreePath, deps.claudeProjectsDir),
       ]);
       const body: ChangeDetail = {
-        ...toWireChange(record, liveness),
+        ...toWireChange(record, enriched.liveness, enriched.enrichment),
         transcriptPaths,
       };
       res.json(body);

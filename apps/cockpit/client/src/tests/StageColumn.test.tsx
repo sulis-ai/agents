@@ -46,6 +46,13 @@ function makeChange(overrides: Partial<Change> = {}): Change {
     updatedAt: "2026-05-26T11:55:00Z",
     stage: "recon",
     liveness: { status: "unknown", reason: "no session" },
+    // WP-001 widened the wire `Change` with these required fields; this older
+    // fixture predates them. Honest defaults (a fresh/idle change) so the
+    // shape compiles — the card-consumer tests (WP-005/007) drive the real
+    // values.
+    needsAttention: { flagged: false, reason: null },
+    health: { state: "unknown", reason: "too early to tell" },
+    lastActivityAt: null,
     ...overrides,
   };
 }

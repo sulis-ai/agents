@@ -1,0 +1,12 @@
+{
+  "pr": "feat/wp-002-server-health-enrich-feed",
+  "base": "change/feat-cockpit-board-refresh",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "scope": { "commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "low" },
+  "size": { "lines_added": 1866, "lines_removed": 47, "files_changed": 21, "severity": "medium" },
+  "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "low" },
+  "completeness": { "new_source_without_test": 0, "new_source_files": 5, "new_test_files": 9, "severity": "low" },
+  "findings": { "critical": 0, "high": 0, "medium": 0, "low": 1, "watch_list": 1 },
+  "lenses": { "architecture": "clean", "security": "clean", "quality": "1 low (search survivor double-read)" }
+}
