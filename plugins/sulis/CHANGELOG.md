@@ -1,3 +1,9 @@
+## v0.128.1 — 2026-06-09
+
+**Patch — release-train batch.**
+
+- Refuse to mark an empty change shipped (a change with no commits of its own beyond its base can no longer be flipped to shipped / have its worktree removed); and the seam-close gate degrades open on a malformed requirement id instead of crashing.
+
 ## v0.128.0 — 2026-06-09
 
 **Minor — release-train batch.**
