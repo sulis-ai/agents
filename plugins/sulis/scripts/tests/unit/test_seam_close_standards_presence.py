@@ -23,11 +23,17 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parents[5]
 _STANDARDS = _REPO_ROOT / "plugins" / "sulis" / "references" / "standards"
 _CONTRACT_FIRST = _STANDARDS / "CONTRACT_FIRST_STANDARD.md"
+_WORK_PACKAGE = _STANDARDS / "WORK_PACKAGE_STANDARD.md"
 
 
 def _contract_first_text() -> str:
     assert _CONTRACT_FIRST.is_file(), f"missing {_CONTRACT_FIRST}"
     return _CONTRACT_FIRST.read_text(encoding="utf-8")
+
+
+def _work_package_text() -> str:
+    assert _WORK_PACKAGE.is_file(), f"missing {_WORK_PACKAGE}"
+    return _WORK_PACKAGE.read_text(encoding="utf-8")
 
 
 def test_contract_first_standard_has_cf12() -> None:
@@ -81,4 +87,73 @@ def test_contract_first_standard_has_cf12() -> None:
     )
     assert "observed-or-blocked" in lowered, (
         "CF-12 must name the observed-or-blocked Definition-of-Done discipline"
+    )
+
+
+def test_work_package_standard_seam_close_dod() -> None:
+    """WORK_PACKAGE_STANDARD.md carries the seam-close DoD wording **and** the
+    contract-WP ``implements:`` SHOULD clause (the requirement bridge, ADR-004).
+
+    Two additive amendments land here (WP-006):
+
+    1. The seam-close DoD wording — a seam-spanning (``kind: contract`` /
+       integration ``kind: composite``) WP is not ``done`` until the seam-close
+       gate reports ``observed``, or a conscious ``--allow-deferred`` was
+       recorded; a seam with no covering Scenario (or one needing a tier not yet
+       live) is blocked. It cross-references CF-12 (the timing rule it enforces).
+    2. The contract-WP ``implements:`` field — a ``kind: contract`` WP SHOULD
+       carry ``implements: [dna:requirement:…]`` so the seam-close gate resolves
+       the seam to its covering Scenarios directly, with a journey-filtered
+       fallback when absent.
+    """
+    text = _work_package_text()
+    lowered = text.lower()
+
+    # --- Amendment 1: the seam-close DoD wording ---------------------------
+    assert "seam-close" in lowered, (
+        "WORK_PACKAGE_STANDARD.md must state the seam-close DoD timing"
+    )
+    assert "observed" in lowered, (
+        "the seam-close DoD wording must name the `observed` verdict the gate "
+        "must report before a seam-spanning WP is done"
+    )
+    assert "--allow-deferred" in text, (
+        "the seam-close DoD wording must name the conscious --allow-deferred "
+        "escape hatch"
+    )
+    assert "no covering scenario" in lowered, (
+        "the seam-close DoD wording must state that a seam with no covering "
+        "Scenario is blocked (not silently passed)"
+    )
+    assert "blocked" in lowered, (
+        "the seam-close DoD wording must state the no-covering-Scenario / "
+        "tier-not-live seam is blocked"
+    )
+    # Cross-references the timing rule it enforces (CF-12 by id).
+    assert "CF-12" in text, (
+        "the seam-close DoD wording must cross-reference CF-12 (the timing rule "
+        "it enforces)"
+    )
+
+    # --- Amendment 2: the contract-WP `implements:` SHOULD clause -----------
+    assert "implements:" in text, (
+        "WORK_PACKAGE_STANDARD.md must document the contract-WP `implements:` "
+        "field (the requirement bridge, ADR-004)"
+    )
+    assert "dna:requirement" in lowered, (
+        "the `implements:` clause must name the `dna:requirement:…` ids the "
+        "seam satisfies"
+    )
+    # SHOULD, not MUST — the journey-filtered fallback keeps legacy WPs working.
+    assert "SHOULD" in text, (
+        "the `implements:` clause must be SHOULD strength (the journey-filtered "
+        "fallback keeps older WPs working)"
+    )
+    assert "fallback" in lowered, (
+        "the `implements:` clause must name the journey-filtered fallback used "
+        "when the field is absent"
+    )
+    assert "ADR-004" in text, (
+        "the `implements:` clause must anchor to ADR-004 (the requirement-bridge "
+        "decision it implements)"
     )

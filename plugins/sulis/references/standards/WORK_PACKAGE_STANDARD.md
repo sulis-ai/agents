@@ -101,6 +101,16 @@ Every WP cites which verification gates apply, determined by `kind:`. The comple
 
 The executor reads `kind:` and refuses to mark a WP done until its gates pass.
 
+**Seam-close DoD (seam-spanning WPs).** A seam-spanning (`kind: contract` /
+integration `kind: composite`) WP is not `done` until the seam-close gate
+reports `observed` for the seam — its covering Scenarios drove the real data
+across the seam, or a conscious `--allow-deferred` was recorded. A seam with no
+covering Scenario, or one needing an execution tier not yet live, is blocked
+(per CF-12). This re-times the real-data acceptance from the ship stage to the
+moment the seam closes — see `CONTRACT_FIRST_STANDARD.md` CF-12 for the timing
+rule this DoD enforces, and WP-08.5 for the contract-WP `implements:` field that
+lets the seam-close gate resolve the seam to its covering Scenarios.
+
 ### WP-06: Lineage (PROV-O-aligned)
 
 Every WP MUST record lineage — what produced it, what it addresses, what activity created it, what agent authored it. Field names borrow the W3C PROV-O vocabulary but the format stays YAML (no JSON-LD machinery; no tooling tax). Migration path to JSON-LD is preserved by the field-name alignment.
@@ -204,6 +214,20 @@ tool + caller) the children MUST be decomposed contract-first per
    producer and runs the conformance check (CF-07). The parent composite's
    merge gate is this integration's pass.
 
+**The contract WP carries `implements:` (the requirement bridge, ADR-004).** A
+`kind: contract` WP **SHOULD** carry `implements: [dna:requirement:…]` — the
+requirement ids the seam satisfies — so the seam-close gate can resolve the
+seam to its covering Scenarios directly. When absent, the gate falls back to
+the change's Scenario set filtered by journey. SHOULD (not MUST) because the
+journey-filtered fallback keeps older WPs working; the explicit field is the
+clean path `/sulis:plan-work` populates going forward (ADR-004).
+
+**Seam-close DoD.** The contract WP and its integration WP are seam-spanning:
+neither is `done` until the seam-close gate reports `observed` (or a conscious
+`--allow-deferred` was recorded). A seam with no covering Scenario, or one
+needing an execution tier not yet live, is blocked — per CF-12 and the
+seam-close DoD wording under WP-05.
+
 Worked shape:
 
 ```yaml
@@ -213,6 +237,7 @@ kind: composite
 title: "Add orders API + UI"
 child_wps:
   - WP-100a    # kind: contract  — orders API schema + stubs (FIRST)
+                #                  implements: [dna:requirement:orders-crud]  (SHOULD — the requirement bridge, ADR-004)
   - WP-100b    # kind: backend   — implement endpoints   (dependsOn: WP-100a)
   - WP-100c    # kind: frontend  — orders view           (dependsOn: WP-100a)
   - WP-100d    # kind: composite — integration: mock→real + conformance check
@@ -493,3 +518,4 @@ The chain is the empirical proof. No human attestation needed at any step — th
 | 1.0.0 | 2026-05-24 | Initial sulis-local definition. 11 requirements (WP-01..WP-11). Codifies the WP primitive that `sulis-execution` uses informally; documents the kind-based executor dispatch contract; introduces lineage (PROV-O-aligned vocabulary, no JSON-LD machinery), loop-closed verification, INDEX.md derivation, and composite/multi-kind composition rules. Per-kind execution details deferred to companion standards (WP_BACKEND_STANDARD, WP_FRONTEND_STANDARD, WP_ASYNC_STANDARD, WP_DOCS_STANDARD, WP_INFRA_STANDARD) — authored as each kind's executor is built. |
 | 1.1.0 | 2026-05-25 | Added the `change_id:` field to WP-01 Identity as part of Phase 4 of the change-as-primitive build (sulis v0.41.0). Optional for backwards-compat with legacy WPs; required for WPs created via `/sulis:change start` post-Phase 5. Field is a 26-character Crockford-base32 ULID linking the WP to its parent change. Per-change WP-NNN sequencing now disambiguated by change_id (cross-change collisions OK). |
 | 1.2.0 | 2026-05-26 | Wired CONTRACT_FIRST_STANDARD into decomposition. Added `contract` to the `kind:` enum + its WP-05 gates row (schema lints, examples cover happy/error/empty, ≥1 consumer mock). Added WP-08.5 — contract-first cross-kind decomposition: cross-kind composites MUST emit a `kind: contract` child first, kind-specific children depend on it (parallel, not sequential), integration child closes with the conformance check. User-facing seams pair the data contract with the visual contract (design artifact per UX_VISUAL_DESIGN_STANDARD UXD-14). Single-kind + `--prototype` exempt. |
+| 1.3.0 | 2026-06-09 | Seam-close DoD gate (CH-01KTP7). Added the seam-close DoD wording to WP-05: a seam-spanning (`kind: contract` / integration `kind: composite`) WP is not `done` until the seam-close gate reports `observed` (or a conscious `--allow-deferred` was recorded); a seam with no covering Scenario, or one needing a tier not yet live, is blocked (per CONTRACT_FIRST_STANDARD CF-12). Added the contract-WP `implements: [dna:requirement:…]` SHOULD field to WP-08.5 (the requirement bridge, ADR-004) — the seam-close gate resolves the seam to its covering Scenarios directly, with a journey-filtered fallback when the field is absent (SHOULD-not-MUST keeps legacy WPs working; `/sulis:plan-work` populates it going forward). Worked-shape contract child gains an `implements:` example line. Additive only — no existing requirement changed in meaning. |
