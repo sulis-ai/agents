@@ -16,9 +16,9 @@ foundational fixture/assertion harness the scenarios drive.
 
 | Status | Count |
 |---|---|
-| pending | 1 |
+| pending | 0 |
 | in_progress | 0 |
-| done | 12 |
+| done | 13 |
 | blocked | 0 |
 
 ## Phase Split
@@ -130,7 +130,7 @@ graph TD
 | WP-010 | Surface the tool scenarios and UC-flow coverage in the scenarios report | extend | done | WP-008 | — | 5k / 3k | 7.4 |
 | WP-011 | Add STRIDE, C4, BDR, and the CF-10 interface-contract sub-templates | extend | done | WP-001, WP-006 | WP-013 | 8k / 6k | 7.4 |
 | WP-012 | Add the ADR/BDR kind discriminator and fix the multi-decision id collision | extend | done | WP-001 | — | 7k / 5k | 7.4 |
-| WP-013 | Build the walk-operations-subset-of-contract assertion (contract-first integration) | create | pending | WP-009, WP-011 | — | 6k / 4k | 7.4 |
+| WP-013 | Build the walk-operations-subset-of-contract assertion (contract-first integration) | create | done | WP-009, WP-011 | — | 6k / 4k | 7.4 |
 
 ## Recommended Implementation Order
 
