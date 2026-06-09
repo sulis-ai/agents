@@ -65,16 +65,24 @@ a project-relative path. Resolve the tool directory ONCE at the start of
 any change subcommand and capture it as `$SCRIPTS_DIR`:
 
 ```bash
-SCRIPTS_DIR=$(
-  find ~/.claude/plugins/cache \
-    -name sulis-change -type f \
-    -path '*/sulis/*/scripts/*' \
-    2>/dev/null \
-  | sort -r | head -1 | xargs -I{} dirname {} 2>/dev/null
-)
-# Dev fallback: marketplace repo cwd
+# Resolve from the ACTIVE plugin version (its bin/ is on PATH) — avoids the
+# lexical-sort cache pick that mis-ranks 0.98.0 above 0.126.0 (#49).
+SCRIPTS_DIR=""
+_sulis_bin=$(printf '%s\n' "$PATH" | tr ':' '\n' | grep -E 'sulis-ai-agents/sulis/[^/]+/bin$' | head -1)
+if [ -n "$_sulis_bin" ] && [ -d "$(dirname "$_sulis_bin")/scripts" ]; then
+  SCRIPTS_DIR="$(dirname "$_sulis_bin")/scripts"
+fi
+# Dev fallback: marketplace repo cwd.
 if [ -z "$SCRIPTS_DIR" ] && [ -f "plugins/sulis/scripts/sulis-change" ]; then
   SCRIPTS_DIR="$(pwd)/plugins/sulis/scripts"
+fi
+# Last-resort fallback ONLY if PATH anchor + dev both miss: a PORTABLE
+# version-aware cache pick (numeric, NOT lexical, NOT `sort -V`).
+if [ -z "$SCRIPTS_DIR" ]; then
+  SCRIPTS_DIR=$(find ~/.claude/plugins/cache -name sulis-change -type f -path '*/sulis/*/scripts/*' 2>/dev/null \
+    | sed -E 's#(.*/sulis/)([^/]+)(/scripts/.*)#\2 &#' \
+    | sort -t. -k1,1n -k2,2n -k3,3n \
+    | tail -1 | cut -d' ' -f2- | xargs -I{} dirname {} 2>/dev/null)
 fi
 if [ -z "$SCRIPTS_DIR" ]; then
   echo "ERROR: cannot find the change tools. Run: claude plugin install sulis@sulis-ai-agents" >&2
@@ -118,11 +126,15 @@ will recognise — derive it from the intent ("fix the login bug" →
 
 **3. Preflight — cut the change branch off the latest `main` (FR-010, ADR-003).**
 On the trunk model there is one integration line — `main` — so the only
-staleness that matters is a *local* `main` lagging `origin/main`. The branch
-is always cut off the freshest `origin/main`; `sulis-change start` fetches
-`origin/main` before branching, so there is nothing to gate here — a fresh
-clone, a behind-by-N local, and an up-to-date local all resolve to the same
-freshly-fetched base.
+staleness that matters is a *local* `main` lagging `origin/main`.
+`sulis-change start` fetches `origin/{base}` (best-effort) and cuts the change
+branch off the fetched `origin/{base}` tip, so a behind-by-N local and an
+up-to-date local resolve to the same freshly-fetched base — there is nothing
+to gate here. The fetch is best-effort, not a hard precondition: an offline
+start (no remote / no network) degrades gracefully to the local `{base}` with
+a logged note, so a founder can still start a change on a plane. The same
+fetch-then-prefer-remote resolution applies to an explicit `--base <branch>`,
+not just `main`.
 
 ```bash
 git fetch origin main -q 2>/dev/null || true   # best-effort; branch is cut off origin/main

@@ -1,3 +1,21 @@
+## v0.126.3 — 2026-06-09
+
+**Patch — release-train batch.**
+
+- Fix the desktop workspace window crashing on open when the session view is declined a resize — a benign decline now degrades instead of taking the window down.
+
+## v0.126.2 — 2026-06-09
+
+**Patch — release-train batch.**
+
+- sulis-change start now fetches origin/{base} and branches off the fetched tip (degrading gracefully offline), so new work is never cut from a stale local main; corrects the change-flow doc that wrongly claimed this already happened.
+
+## v0.126.1 — 2026-06-09
+
+**Patch — release-train batch.**
+
+- Fix version-correct tool resolution: skills now bind to the active plugin version (its bin on PATH) instead of a lexical cache sort that mis-ranked 0.98.0 above 0.126.0; real scripts self-locate; portable numeric version-pick as last resort. Adds sulis-prune-cache. Fixes #49.
+
 ## v0.126.0 — 2026-06-09
 
 **Minor — release-train batch.**

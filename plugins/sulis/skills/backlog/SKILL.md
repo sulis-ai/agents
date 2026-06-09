@@ -74,15 +74,24 @@ The brain query tool lives inside the sulis plugin. Resolve the directory
 ONCE and capture it as `$SCRIPTS_DIR` (same resolver the other skills use):
 
 ```bash
-SCRIPTS_DIR=$(
-  find ~/.claude/plugins/cache \
-    -name sulis-brain-query -type f \
-    -path '*/sulis/*/scripts/*' \
-    2>/dev/null \
-  | sort -r | head -1 | xargs -I{} dirname {} 2>/dev/null
-)
+# Resolve from the ACTIVE plugin version (its bin/ is on PATH) — avoids the
+# lexical-sort cache pick that mis-ranks 0.98.0 above 0.126.0 (#49).
+SCRIPTS_DIR=""
+_sulis_bin=$(printf '%s\n' "$PATH" | tr ':' '\n' | grep -E 'sulis-ai-agents/sulis/[^/]+/bin$' | head -1)
+if [ -n "$_sulis_bin" ] && [ -d "$(dirname "$_sulis_bin")/scripts" ]; then
+  SCRIPTS_DIR="$(dirname "$_sulis_bin")/scripts"
+fi
+# Dev fallback: marketplace repo cwd.
 if [ -z "$SCRIPTS_DIR" ] && [ -f "plugins/sulis/scripts/sulis-brain-query" ]; then
   SCRIPTS_DIR="$(pwd)/plugins/sulis/scripts"
+fi
+# Last-resort fallback ONLY if PATH anchor + dev both miss: a PORTABLE
+# version-aware cache pick (numeric, NOT lexical, NOT `sort -V`).
+if [ -z "$SCRIPTS_DIR" ]; then
+  SCRIPTS_DIR=$(find ~/.claude/plugins/cache -name sulis-brain-query -type f -path '*/sulis/*/scripts/*' 2>/dev/null \
+    | sed -E 's#(.*/sulis/)([^/]+)(/scripts/.*)#\2 &#' \
+    | sort -t. -k1,1n -k2,2n -k3,3n \
+    | tail -1 | cut -d' ' -f2- | xargs -I{} dirname {} 2>/dev/null)
 fi
 if [ -z "$SCRIPTS_DIR" ]; then
   echo "ERROR: cannot find the brain tools. Run: claude plugin install sulis@sulis-ai-agents" >&2

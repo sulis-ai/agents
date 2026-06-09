@@ -150,6 +150,108 @@ def test_start_degrades_gracefully_with_no_remote(tmp_path, run_tool):
     assert branch in branches
 
 
+def _advance_origin_branch(repo: Path, branch: str, filename: str) -> str:
+    """Advance ``origin/{branch}`` one commit AHEAD of the fixture's local
+    copy, via a sibling clone of the bare ``origin`` — without touching the
+    fixture repo's local refs.
+
+    Mirrors the ``_origin_advancer`` sibling-clone pattern used by
+    ``_force_conflicting_local_commit`` above. Returns the advanced
+    ``origin/{branch}`` tip SHA so the caller can assert the change branch
+    was cut from it (NOT the stale local tip).
+    """
+    origin = repo.parent / "_origin.git"
+    other = repo.parent / f"_origin_advancer_{branch.replace('/', '_')}"
+    _run(["git", "clone", "-q", "-b", branch, str(origin), str(other)],
+         cwd=repo.parent)
+    _run(["git", "config", "user.email", "t@e.com"], cwd=other)
+    _run(["git", "config", "user.name", "T"], cwd=other)
+    (other / filename).write_text("remote advance\n")
+    _run(["git", "add", filename], cwd=other)
+    _run(["git", "commit", "-qm", f"remote advances {branch}"], cwd=other)
+    _run(["git", "push", "-q", "origin", branch], cwd=other)
+    return _git(other, "rev-parse", "HEAD")
+
+
+def test_start_branches_off_fetched_origin_when_local_main_stale(
+    local_git_repo, run_tool,
+):
+    """`start` fetches origin/main and cuts the change branch off the FETCHED
+    tip — not the stale local main (the bug this WP fixes).
+
+    Setup: advance origin/main one commit ahead of the fixture's local main
+    (the fixture pushed local==origin at creation, so without a fetch `start`
+    would branch off the now-stale local tip). After the fix, `start` must
+    fetch origin/main first and base the change branch on the advanced remote
+    tip.
+    """
+    repo = local_git_repo
+    local_main_tip = _git(repo, "rev-parse", "main")
+    advanced_origin_tip = _advance_origin_branch(repo, "main", "remote-main.txt")
+    assert advanced_origin_tip != local_main_tip, (
+        "fixture sanity: origin/main must be ahead of local main"
+    )
+
+    result = run_tool(
+        "sulis-change", "start",
+        "--repo-root", str(repo),
+        "--slug", "fetch-base-test",
+        "--primitive", "fix",
+    )
+    assert result.ok, f"start failed: stderr={result.stderr}"
+
+    metadata = read_change_metadata(
+        Path(result.data["worktree_path"]) / ".changes" / "fix-fetch-base-test.yaml",
+    )
+    assert metadata["base_sha"] == advanced_origin_tip, (
+        f"change branch was cut off the stale local main "
+        f"({local_main_tip[:8]}) instead of the fetched origin/main tip "
+        f"({advanced_origin_tip[:8]}); base_sha={metadata['base_sha'][:8]}"
+    )
+
+
+def test_start_with_explicit_base_branches_off_fetched_origin(
+    local_git_repo, run_tool,
+):
+    """`start --base <branch>` gets the SAME fetch-then-remote-preferred
+    resolution as the default main — no special-casing of main.
+
+    Setup: create a `release` branch, push it to origin, then advance
+    origin/release one commit ahead of the fixture's local release. `start
+    --base release` must branch off the advanced origin/release tip.
+    """
+    repo = local_git_repo
+    # Create `release` locally and push it so origin has it, then let the
+    # sibling clone advance origin/release past the fixture's local copy.
+    _run(["git", "branch", "release", "main"], cwd=repo)
+    _run(["git", "push", "-q", "-u", "origin", "release"], cwd=repo)
+    local_release_tip = _git(repo, "rev-parse", "release")
+    advanced_origin_tip = _advance_origin_branch(
+        repo, "release", "remote-release.txt",
+    )
+    assert advanced_origin_tip != local_release_tip, (
+        "fixture sanity: origin/release must be ahead of local release"
+    )
+
+    result = run_tool(
+        "sulis-change", "start",
+        "--repo-root", str(repo),
+        "--slug", "base-flag-test",
+        "--primitive", "fix",
+        "--base", "release",
+    )
+    assert result.ok, f"start failed: stderr={result.stderr}"
+
+    metadata = read_change_metadata(
+        Path(result.data["worktree_path"]) / ".changes" / "fix-base-flag-test.yaml",
+    )
+    assert metadata["base_sha"] == advanced_origin_tip, (
+        f"--base release was cut off the stale local release "
+        f"({local_release_tip[:8]}) instead of the fetched origin/release tip "
+        f"({advanced_origin_tip[:8]}); base_sha={metadata['base_sha'][:8]}"
+    )
+
+
 def test_start_rejects_existing_branch(local_git_repo, run_tool):
     """Starting twice with the same slug fails the second time."""
     run_tool("sulis-change", "start",

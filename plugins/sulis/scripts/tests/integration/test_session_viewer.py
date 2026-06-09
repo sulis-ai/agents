@@ -45,6 +45,7 @@ from pathlib import Path
 import pytest
 
 from _session_manager.adapter import SessionSpec
+from _session_manager.binding import BindingManager, ConnectionBindingRegistry
 from _session_manager.manager import SessionManager
 from _session_manager.socket_server import SocketServer
 
@@ -639,3 +640,134 @@ def test_viewer_exits_when_session_closes_server_side(running_server, tmp_path):
     finally:
         os.close(master_fd)
         os.close(slave_fd)
+
+
+# ─── the §2.13.4 binding guard ON (production wiring) — regression for the ─────
+#     startup-resize crash.
+#
+# The production daemon builds its server WITH the binding guard
+# (``session_manager_daemon._build_server`` → ``bound_key_for=registry.resolve``).
+# Every OTHER viewer test above uses ``running_server``, which builds it with the
+# guard OFF — so the viewer's startup ``resize`` (``main`` step 4) was never
+# exercised against a server that can DECLINE it. In production a declined
+# startup resize crashed the desktop window with a ``NOT_AUTHORIZED`` traceback,
+# because that one call was unguarded while its SIGWINCH twin (step 7) was not.
+# These two tests run the viewer behind the REAL guard: one proves the authorised
+# path still renders (closing the guard-on coverage gap); one proves a DECLINED
+# startup resize no longer tears the viewer down.
+
+
+@pytest.fixture
+def running_server_guarded(tmp_path: Path):
+    """A real manager + ``SocketServer`` with the §2.13.4 binding guard ON — the
+    production daemon's exact wiring (``BindingManager`` records each connection's
+    first-opened change on its handler thread; ``bound_key_for`` resolves it).
+    Yields ``(socket_path, manager)``."""
+    child = fake_claude_child.write_child(tmp_path)
+    mgr = SessionManager({"pty": _PtyChildAdapter(child)}, start_maintenance=False)
+    registry = ConnectionBindingRegistry()
+    socket_path = str(tmp_path / "sm-guarded.sock")
+    server = SocketServer(
+        BindingManager(mgr, registry), socket_path, bound_key_for=registry.resolve
+    )
+    server.start()
+    try:
+        yield socket_path, mgr
+    finally:
+        server.stop()
+        mgr.shutdown()
+
+
+def test_guarded_authorised_path_renders_snapshot(
+    running_server_guarded, tmp_path: Path
+) -> None:
+    """With the binding guard ON (production wiring), the viewer's own ``open``
+    binds its connection to its change, so the subsequent guarded ``resize`` +
+    ``attach`` are authorised and the snapshot renders. This is the path the
+    desktop window actually runs — previously covered only with the guard OFF."""
+    socket_path, mgr = running_server_guarded
+
+    # Pre-seed scrollback (get-or-spawn: the viewer re-opens the same key).
+    session = mgr.open(
+        "chg_GA", SessionSpec(provider="pty", cwd=str(tmp_path), io_mode="pty")
+    )
+    os.write(session.pty_master_fd, b"SNAP_GUARDED\n")
+    deadline = time.monotonic() + _WAIT
+    while time.monotonic() < deadline:
+        if b"SNAP_GUARDED" in session.scrollback.snapshot():
+            break
+        time.sleep(0.01)
+
+    master_fd, slave_fd = os.openpty()
+    try:
+        thread, result = _run_viewer_in_thread(
+            change_id="chg_GA",
+            worktree=str(tmp_path),
+            socket_path=socket_path,
+            stdin_fd=slave_fd,
+            stdout_fd=slave_fd,
+        )
+        out = _drain_for(master_fd, b"SNAP_GUARDED")
+        assert b"SNAP_GUARDED" in out, (
+            f"guard-on snapshot not rendered (authorised attach failed?): {out!r}"
+        )
+        master_fd = _stop_viewer(thread, master_fd)
+        assert result.get("rc") == 0
+    finally:
+        if master_fd != -1:
+            os.close(master_fd)
+        os.close(slave_fd)
+
+
+def test_guarded_declined_startup_resize_does_not_crash(tmp_path: Path) -> None:
+    """A DECLINED startup resize must NOT tear the viewer down (the bug: the
+    desktop window crashed with a ``NOT_AUTHORIZED`` traceback). Reproduce the
+    production decline by wiring a binding resolver that authorises a DIFFERENT
+    change than the viewer opens (the stale / peer-daemon condition), so every
+    guarded method on the viewer's key is declined ``NOT_AUTHORIZED``. Assert the
+    viewer survives: it swallows the declined startup resize, runs to a clean
+    detach-on-exit, and returns rc 0.
+
+    RED before the fix: ``main`` step 4's unguarded ``conn.request("resize", …)``
+    raised ``ViewerError`` out of ``main`` (only a ``finally``, no ``except``), so
+    the thread died and ``result['rc']`` was never set.
+    """
+    child = fake_claude_child.write_child(tmp_path)
+    mgr = SessionManager({"pty": _PtyChildAdapter(child)}, start_maintenance=False)
+    socket_path = str(tmp_path / "sm-decline.sock")
+    # Resolver authorises a DIFFERENT change than the viewer opens → the guarded
+    # resize (and attach) on the viewer's own key are declined NOT_AUTHORIZED.
+    # ``open`` is ungated (not in _GUARDED_METHODS), so the session still spawns.
+    server = SocketServer(
+        mgr, socket_path, bound_key_for=lambda _sock: "some-other-change"
+    )
+    server.start()
+    master_fd, slave_fd = os.openpty()
+    try:
+        thread, result = _run_viewer_in_thread(
+            change_id="chg_DECL",
+            worktree=str(tmp_path),
+            socket_path=socket_path,
+            stdin_fd=slave_fd,
+            stdout_fd=slave_fd,
+        )
+        # Wait until the (ungated) open created the session — we are now past the
+        # startup resize. With the fix the viewer swallowed the decline and is
+        # pumping; without it the thread already died at the resize.
+        deadline = time.monotonic() + _WAIT
+        while time.monotonic() < deadline:
+            if mgr._sessions.get("chg_DECL") is not None:
+                break
+            time.sleep(0.02)
+        assert mgr._sessions.get("chg_DECL") is not None, "viewer never opened"
+        master_fd = _stop_viewer(thread, master_fd)
+        assert result.get("rc") == 0, (
+            "viewer did not exit cleanly — a declined startup resize crashed it "
+            f"(result={result!r})"
+        )
+    finally:
+        if master_fd != -1:
+            os.close(master_fd)
+        os.close(slave_fd)
+    server.stop()
+    mgr.shutdown()
