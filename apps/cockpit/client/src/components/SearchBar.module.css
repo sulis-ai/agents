@@ -92,3 +92,167 @@
   border-color: var(--input);
   color: var(--foreground);
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   WP-008 — RESPONSIVE: the toolbar condenses on tablet; the MOBILE lane
+   switcher replaces it (ADR-004 / IDEAS.md Concern 4, signed MOCKUP.html).
+   The .laneSwitcher rail is part of the SAME component (one width-conditional
+   role, not a parallel widget — EP-03); CSS swaps which of .toolbar /
+   .laneSwitcher is shown by breakpoint. Tokens only — no raw hex (WPF-07).
+   ════════════════════════════════════════════════════════════════════ */
+
+/* The mobile rail is hidden by default (desktop + tablet show the .toolbar). */
+.laneSwitcher {
+  display: none;
+}
+
+/* ─── TABLET (600–1099px): the chip row scrolls horizontally so no chip is
+   clipped, and the search stops stealing all the width. ─── */
+@media (max-width: 1099px) {
+  .toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    padding-bottom: 4px;
+  }
+  .search {
+    flex: 0 0 220px;
+  }
+  .chip {
+    flex: 0 0 auto;
+  }
+}
+
+/* ─── MOBILE (<600px): the desktop search+filter row is replaced by the
+   lane switcher rail (the stage chips become an ARIA tablist). ─── */
+@media (max-width: 599px) {
+  /* hide the desktop toolbar; show the switcher rail */
+  .toolbar {
+    display: none;
+  }
+  .laneSwitcher {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    padding: 2px 2px 10px;
+    margin-bottom: 4px;
+    scrollbar-width: thin;
+  }
+  /* the inner tablist lays its tabs out in the same scrolling row */
+  .switchTabs {
+    display: contents;
+  }
+
+  /* the search collapses to an icon-only ≥44px tap target */
+  .switchSearch {
+    flex: 0 0 auto;
+    min-width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--input);
+    border-radius: var(--radius-interactive);
+    background: var(--card);
+    color: var(--muted-foreground);
+    cursor: pointer;
+  }
+  .switchSearch:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  .switchSearch svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* a switcher chip — a tab (or the needs-attention toggle); ≥44px tall */
+  .switchChip {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    min-height: 44px;
+    padding: 0 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-button);
+    background: var(--card);
+    color: var(--muted-foreground);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: var(--weight-label);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .switchChip:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  .switchChip .sdot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex: none;
+    /* neutral fallback; per-stage classes override below */
+    background: var(--muted-foreground);
+  }
+  .switchChip .switchCount {
+    font-size: 11px;
+    font-weight: var(--weight-label);
+    color: var(--muted-foreground);
+    background: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-badge);
+    padding: 1px 7px;
+  }
+
+  /* the selected tab — stands out by WEIGHT + fill + the stage dot + an inset
+     bottom bar, never colour alone; aria-selected carries it for assistive
+     tech. (Mirrors the mockup's switchChip[aria-selected="true"].) */
+  .switchOn {
+    color: var(--foreground);
+    background: var(--muted);
+    border-color: var(--input);
+    box-shadow: inset 0 -2px 0 var(--primary);
+  }
+
+  /* "Needs attention" keeps its warning vocabulary in the rail (same idea as
+     the card flag), still distinguished by icon + label, not colour alone. */
+  .attn {
+    border-color: var(--bg-warning-border);
+  }
+  .attn svg {
+    color: var(--warning);
+    width: 15px;
+    height: 15px;
+  }
+  .attn.switchOn {
+    color: var(--foreground);
+    background: var(--bg-warning);
+  }
+
+  /* per-stage dot colour — the one shared stage scale (tokens.css), the same
+     palette the lane headers + tabs use. */
+  .recon .sdot {
+    background: var(--stage-recon);
+  }
+  .specify .sdot {
+    background: var(--stage-specify);
+  }
+  .design .sdot {
+    background: var(--stage-design);
+  }
+  .implement .sdot {
+    background: var(--stage-implement);
+  }
+  .review .sdot {
+    background: var(--stage-review);
+  }
+  .ship .sdot {
+    background: var(--stage-ship);
+  }
+}

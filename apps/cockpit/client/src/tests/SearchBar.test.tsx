@@ -161,9 +161,10 @@ describe("<SearchBar> (controlled component)", () => {
         onToggleNeedsAttention={onToggleNeedsAttention}
       />,
     );
-    expect(
-      getByRole("button", { name: /needs attention/i }),
-    ).toHaveAttribute("aria-pressed", "true");
+    expect(getByRole("button", { name: /needs attention/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
   it("has no WCAG AA violations (jest-axe, WPF-06)", async () => {
@@ -176,6 +177,168 @@ describe("<SearchBar> (controlled component)", () => {
         onToggleStage={noop}
         onToggleNeedsAttention={noop}
       />,
+    );
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+});
+
+// ─── Layer 1b: <SearchBar> mobile lane-switcher tablist (WP-008, ADR-004) ────
+//
+// The SAME stage chips gain a width-conditional dual role: filter chips on
+// desktop (Layer 1 above — aria-pressed toggles, preserved) AND an ARIA
+// tablist lane switcher on mobile (role="tablist" / role="tab" /
+// aria-selected). jsdom can't compute the media-query breakpoint, so BOTH
+// containers are in the DOM and CSS hides one per width; these tests pin the
+// tablist's ARIA contract + behaviour. The selected-tab↔visible-lane scroll
+// sync + swipe-follows-rail are browser-only and covered by the Playwright
+// journey (S-8). Counts come from the board (one feed, no extra request).
+
+describe("<SearchBar> mobile lane-switcher tablist (WP-008 / S-29)", () => {
+  function noop() {}
+
+  const counts = {
+    recon: 5,
+    specify: 1,
+    design: 0,
+    implement: 3,
+    review: 2,
+    ship: 3,
+  } as const;
+
+  function renderSwitcher(
+    props: Partial<Parameters<typeof SearchBar>[0]> = {},
+  ) {
+    return render(
+      <SearchBar
+        query=""
+        stages={[]}
+        needsAttention={false}
+        onQueryChange={noop}
+        onToggleStage={noop}
+        onToggleNeedsAttention={noop}
+        counts={counts}
+        selectedStage="recon"
+        onSelectStage={noop}
+        {...props}
+      />,
+    );
+  }
+
+  it("renders a role=tablist labelled 'Pick a stage to view'", () => {
+    const { getByRole } = renderSwitcher();
+    expect(
+      getByRole("tablist", { name: /pick a stage to view/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("exposes each stage chip as a role=tab carrying aria-selected + aria-controls=lane-<stage>, with its lane count", () => {
+    const { getByRole } = renderSwitcher();
+    const tablist = getByRole("tablist", { name: /pick a stage to view/i });
+    const recon = within(tablist).getByRole("tab", { name: /recon/i });
+    expect(recon).toHaveAttribute("aria-selected", "true");
+    expect(recon).toHaveAttribute("aria-controls", "lane-recon");
+    expect(recon).toHaveTextContent("5"); // the lane's count is on the chip
+    const design = within(tablist).getByRole("tab", { name: /design/i });
+    expect(design).toHaveAttribute("aria-selected", "false");
+    expect(design).toHaveTextContent("0"); // a zero-change lane still shows its count
+  });
+
+  it("activating a tab selects its lane (calls onSelectStage with that stage)", () => {
+    const onSelectStage = vi.fn();
+    const { getByRole } = renderSwitcher({ onSelectStage });
+    const tablist = getByRole("tablist", { name: /pick a stage to view/i });
+    fireEvent.click(within(tablist).getByRole("tab", { name: /implement/i }));
+    expect(onSelectStage).toHaveBeenCalledWith("implement");
+  });
+
+  it("reflects the currently-selected lane: only that stage's tab is aria-selected", () => {
+    const { getByRole } = renderSwitcher({ selectedStage: "review" });
+    const tablist = getByRole("tablist", { name: /pick a stage to view/i });
+    expect(
+      within(tablist).getByRole("tab", { name: /review/i }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(
+      within(tablist).getByRole("tab", { name: /recon/i }),
+    ).toHaveAttribute("aria-selected", "false");
+  });
+
+  it("keeps 'Needs attention' in the rail as an aria-pressed toggle (not a tab)", () => {
+    // The toggle lives in the switcher RAIL but OUTSIDE the role=tablist (a
+    // tablist may only own tabs — W3C ARIA; a non-tab child would break
+    // aria-required-children). So it is scoped to the rail container, not the
+    // tablist element.
+    const onToggleNeedsAttention = vi.fn();
+    const { getByTestId, rerender } = renderSwitcher({
+      onToggleNeedsAttention,
+    });
+    const rail = getByTestId("lane-switcher");
+    const attn = within(rail).getByRole("button", {
+      name: /needs attention/i,
+    });
+    // It is a toggle, NOT a tab (tabs pick a lane; this filters).
+    expect(attn).toHaveAttribute("aria-pressed", "false");
+    expect(attn).not.toHaveAttribute("role", "tab");
+    fireEvent.click(attn);
+    expect(onToggleNeedsAttention).toHaveBeenCalledTimes(1);
+    rerender(
+      <SearchBar
+        query=""
+        stages={[]}
+        needsAttention={true}
+        onQueryChange={noop}
+        onToggleStage={noop}
+        onToggleNeedsAttention={onToggleNeedsAttention}
+        counts={counts}
+        selectedStage="recon"
+        onSelectStage={noop}
+      />,
+    );
+    expect(
+      within(getByTestId("lane-switcher")).getByRole("button", {
+        name: /needs attention/i,
+      }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("collapses the search to a reachable icon tap-target in the rail", () => {
+    const { getByTestId } = renderSwitcher();
+    const rail = getByTestId("lane-switcher");
+    // The collapsed search affordance has an accessible name and is a button,
+    // in the rail (outside the tablist, like the needs-attention toggle).
+    expect(
+      within(rail).getByRole("button", { name: /search/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("has no WCAG AA violations in the tablist role (jest-axe, WPF-06 — the dual role's mobile half)", async () => {
+    // The tabs' aria-controls point at the lane elements (id=lane-<stage>),
+    // which live in StageColumn — rendered separately in the real Board. Render
+    // stub lane targets alongside so the ARIA association resolves (a dangling
+    // aria-controls is itself an axe violation), mirroring the assembled board.
+    const { container } = render(
+      <div>
+        <SearchBar
+          query=""
+          stages={[]}
+          needsAttention={false}
+          onQueryChange={noop}
+          onToggleStage={noop}
+          onToggleNeedsAttention={noop}
+          counts={counts}
+          selectedStage="recon"
+          onSelectStage={noop}
+        />
+        {(
+          ["recon", "specify", "design", "implement", "review", "ship"] as const
+        ).map((stage) => (
+          <section
+            key={stage}
+            id={`lane-${stage}`}
+            aria-label={`${stage} lane`}
+          />
+        ))}
+      </div>,
     );
     const results = await axe(container);
     expect(results).toHaveNoViolations();
@@ -205,7 +368,10 @@ function renderBoard(client: QueryClient) {
       <MemoryRouter initialEntries={["/"]}>
         <Routes>
           <Route path="/" element={<Board />} />
-          <Route path="/c/:changeId" element={<div data-testid="thread-view" />} />
+          <Route
+            path="/c/:changeId"
+            element={<div data-testid="thread-view" />}
+          />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -221,17 +387,19 @@ function mockApi(opts: {
   changes: Change[];
   onSearch: (url: URL) => Change[];
 }) {
-  vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
-    const raw = typeof input === "string" ? input : input.toString();
-    const url = new URL(raw, "http://localhost");
-    if (url.pathname === "/api/search") {
-      return Promise.resolve(
-        jsonResponse(200, { results: opts.onSearch(url) }),
-      );
-    }
-    // default: the full board list
-    return Promise.resolve(jsonResponse(200, opts.changes));
-  });
+  vi.spyOn(globalThis, "fetch").mockImplementation(
+    (input: RequestInfo | URL) => {
+      const raw = typeof input === "string" ? input : input.toString();
+      const url = new URL(raw, "http://localhost");
+      if (url.pathname === "/api/search") {
+        return Promise.resolve(
+          jsonResponse(200, { results: opts.onSearch(url) }),
+        );
+      }
+      // default: the full board list
+      return Promise.resolve(jsonResponse(200, opts.changes));
+    },
+  );
 }
 
 describe("Board wiring — the toolbar narrows the SAME board (ADR-005)", () => {
@@ -259,13 +427,10 @@ describe("Board wiring — the toolbar narrows the SAME board (ADR-005)", () => 
     mockApi({
       changes: all,
       onSearch: (url) =>
-        url.searchParams.get("q") === "marshmallow"
-          ? [all[0]!]
-          : all,
+        url.searchParams.get("q") === "marshmallow" ? [all[0]!] : all,
     });
-    const { findByText, getByRole, queryByText, getByTestId } = renderBoard(
-      freshClient(),
-    );
+    const { findByText, getByRole, queryByText, getByTestId } =
+      renderBoard(freshClient());
     // Full board first.
     await findByText("CH-01HIT");
     expect(getByText0(queryByText, "CH-01MISS")).toBe(true);
@@ -282,7 +447,9 @@ describe("Board wiring — the toolbar narrows the SAME board (ADR-005)", () => 
       expect(queryByText("CH-01MISS")).not.toBeInTheDocument();
     });
     expect(getByTestId("board")).toBeInTheDocument();
-    expect(within(getByTestId("board")).getByText("CH-01HIT")).toBeInTheDocument();
+    expect(
+      within(getByTestId("board")).getByText("CH-01HIT"),
+    ).toBeInTheDocument();
   });
 
   it("the needs-attention filter narrows the board to flagged changes (FR-12)", async () => {
@@ -297,7 +464,15 @@ describe("Board wiring — the toolbar narrows the SAME board (ADR-005)", () => 
     });
     const { findByText, getByRole, queryByText } = renderBoard(freshClient());
     await findByText("CH-01IDLE");
-    fireEvent.click(getByRole("button", { name: /needs attention/i }));
+    // The board now renders BOTH the desktop filter toolbar and the mobile
+    // lane-switcher rail (CSS shows one per breakpoint; jsdom renders both), so
+    // "Needs attention" appears twice. Click the DESKTOP filter chip — it lives
+    // in the role="search" toolbar — to exercise the filter path under test.
+    fireEvent.click(
+      within(getByRole("search")).getByRole("button", {
+        name: /needs attention/i,
+      }),
+    );
     // The board narrows to the one flagged change; wait for the positive
     // condition (the loading flicker between the two queries can briefly
     // hide both, so assert on the result, not the absence).
@@ -315,8 +490,7 @@ describe("Board wiring — the toolbar narrows the SAME board (ADR-005)", () => 
     ];
     mockApi({
       changes: all,
-      onSearch: (url) =>
-        url.searchParams.get("q") ? [all[0]!] : all,
+      onSearch: (url) => (url.searchParams.get("q") ? [all[0]!] : all),
     });
     const { findByText, getByRole, queryByText } = renderBoard(freshClient());
     await findByText("CH-01MISS");

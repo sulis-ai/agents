@@ -75,10 +75,17 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
       {/* The one front door (ADR-003). The single primary action in the chrome:
           navigates to the existing /start route — no network, no mutation, no
           start-state. The ⌘N hint mirrors the global hotkey (useStartHotkey). */}
+      {/* WP-008 — the full action name is pinned on the button's accessible
+          name (aria-label), independent of the VISIBLE label span. At tablet/
+          mobile widths CSS collapses the visible "Start something new" text to
+          a compact "+ New" so the bar never wraps/clips — but assistive tech
+          still announces the full "Start something new" because the name rides
+          aria-label, not the (CSS-hideable) label text. */}
       <button
         type="button"
         className={styles.startBtn}
         data-testid="start-change-button"
+        aria-label="Start something new"
         onClick={() => navigate("/start")}
       >
         <span className={styles.startBtnIcon}>
@@ -102,10 +109,16 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
       )}
 
       <nav className={styles.tabs} aria-label="Open tabs">
+        {/* WP-008 — the visible "Board" label folds to its icon at tablet/mobile
+            widths (CSS hides .tabLabel) so the bar never wraps. The accessible
+            name is pinned on aria-label so the icon-only collapsed form is still
+            announced "Board" (a link with only an aria-hidden icon would have no
+            accessible name otherwise). */}
         <NavLink
           to="/"
           end
           data-testid="tab-board"
+          aria-label="Board"
           className={({ isActive }) =>
             isActive ? `${styles.tab} ${styles.tabActive}` : styles.tab
           }
@@ -125,6 +138,10 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
               to={`/c/${id}`}
               data-testid="tab-change"
               data-change-id={id}
+              // WP-008 — the visible change-name label also folds to its dot at
+              // narrow widths; pin the name on aria-label so the tab is still
+              // announced by its change name when the text is hidden.
+              aria-label={label}
               className={({ isActive }) =>
                 isActive ? `${styles.tab} ${styles.tabActive}` : styles.tab
               }

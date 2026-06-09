@@ -15,6 +15,8 @@
 // element that only appears once the click has navigated (the route probe the
 // WP Contract calls for).
 
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { axe } from "jest-axe";
@@ -141,5 +143,61 @@ describe("WorkspaceTopBar — front-door 'Start something new' button (WP-001)",
     const { container } = renderTopBar();
     const results = await axe(container);
     expect(results).toHaveNoViolations();
+  });
+
+  // WP-008 — at tablet/mobile widths the visible label condenses to "+ New" so
+  // the top bar never wraps/clips (IDEAS.md Concern 4). The FULL action must
+  // still be announced: the accessible name stays "Start something new" even
+  // when the visible text is the compact form. jsdom can't apply the media
+  // query, so we pin the contract that makes the collapse safe: the button
+  // carries an explicit accessible name independent of its visible label text,
+  // so hiding the label via CSS can never strip the action's name from the
+  // accessibility tree. (The visible collapse itself is a CSS-pin below + the
+  // Playwright 390px journey.)
+  it("the Start button's accessible name stays 'Start something new' independent of the visible label (so the '+ New' collapse keeps the full name)", () => {
+    renderTopBar();
+    const topbar = screen.getByTestId("workspace-topbar");
+    const startButton = within(topbar).getByTestId("start-change-button");
+    // An explicit aria-label pins the full name on the element itself — it does
+    // NOT depend on the visible <span> label (which CSS hides at narrow widths).
+    expect(startButton).toHaveAttribute("aria-label", "Start something new");
+    // And it is still findable by that accessible name (the role+name contract
+    // the journey + the WP-001 tests rely on).
+    expect(
+      within(topbar).getByRole("button", { name: /start something new/i }),
+    ).toBe(startButton);
+  });
+
+  describe("WorkspaceShell.module.css encodes the responsive top-bar collapse (WP-008)", () => {
+    const TOPBAR_CSS = resolve(
+      __dirname,
+      "..",
+      "layouts",
+      "WorkspaceShell.module.css",
+    );
+    const css = existsSync(TOPBAR_CSS) ? readFileSync(TOPBAR_CSS, "utf8") : "";
+
+    it("collapses the Start button's visible label and shows a compact '+ New' at narrow widths", () => {
+      // A media query exists for the condensed chrome, and within it the long
+      // label is hidden while a compact "New" affordance appears.
+      expect(css).toMatch(/@media[^{]*max-width:\s*(1099|599)px/);
+      expect(css).toMatch(/startBtnLabel[\s\S]*?display:\s*none/);
+      // The compact form surfaces "New" (the visible "+ New" text) at narrow
+      // widths — via a ::after content rule on the button.
+      expect(css).toMatch(/content:\s*["']\+?\s*New["']/);
+    });
+
+    it("the top bar stays one fixed-height row that never wraps (no flex-wrap at narrow widths)", () => {
+      // The bar's height is fixed (48px) and it must not wrap — pinned so a
+      // 390px viewport can't push controls onto a second row or off-screen.
+      const block = css.slice(css.indexOf(".topbar"));
+      expect(block).toMatch(/height:\s*48px/);
+      expect(block).not.toMatch(/flex-wrap:\s*wrap/);
+    });
+
+    it("carries no raw colour literals in the new responsive rules — tokens only (WPF-07)", () => {
+      const hexMatches = css.match(/#[0-9a-fA-F]{3,8}\b/g) ?? [];
+      expect(hexMatches).toEqual([]);
+    });
   });
 });

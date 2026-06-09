@@ -196,6 +196,12 @@ export function StageColumn({ stage, changes }: StageColumnProps) {
   const name = STAGE_NAME[stage];
   return (
     <section
+      // WP-008 — the lane exposes id=lane-<stage> so the mobile lane-switcher's
+      // tab chips (role="tab" aria-controls="lane-<stage>", in SearchBar) point
+      // at a real element (W3C tablist pattern, ADR-004). The id is stable and
+      // present at every breakpoint; it does nothing on desktop and anchors the
+      // tab→lane association + the scroll-into-view target on mobile.
+      id={`lane-${stage}`}
       className={`${styles.lane} ${styles[stage]}`}
       data-testid="stage-column"
       data-stage={stage}

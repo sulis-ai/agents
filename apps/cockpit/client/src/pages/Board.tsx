@@ -44,7 +44,7 @@
 // active Product server-side (ADR-009); the client groups the scoped set
 // into columns.
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { WorkflowStage } from "../../../shared/api-types";
 import { useChangesWithLiveness } from "../api/useChangesWithLiveness";
 import { hasActiveFilter, useSearch } from "../api/useSearch";
@@ -53,7 +53,11 @@ import { RefreshButton } from "../components/RefreshButton";
 import { SearchBar } from "../components/SearchBar";
 import { StageColumn } from "../components/StageColumn";
 import { useActiveProduct } from "../api/activeProduct";
-import { BOARD_STAGES, groupChangesByStage } from "../lib/groupChangesByStage";
+import {
+  BOARD_STAGES,
+  type BoardStage,
+  groupChangesByStage,
+} from "../lib/groupChangesByStage";
 import styles from "./Board.module.css";
 
 export function Board() {
@@ -61,6 +65,62 @@ export function Board() {
   const [query, setQuery] = useState("");
   const [stages, setStages] = useState<WorkflowStage[]>([]);
   const [needsAttention, setNeedsAttention] = useState(false);
+
+  // WP-008 — the mobile lane switcher's selected lane (the one full-width lane
+  // shown < 600px). Tapping a switcher tab scroll-snaps that lane into view;
+  // swiping the board updates the selection so the rail always reflects the
+  // landed lane (S-8). The board grid is the horizontal-snap scroll container.
+  const [selectedStage, setSelectedStage] = useState<BoardStage>("recon");
+  const boardRef = useRef<HTMLDivElement>(null);
+
+  // Activate a switcher tab → snap its lane into view. (CSS scroll-snap also
+  // lets the founder swipe directly; the scroll handler below keeps the
+  // selected tab in sync either way — one source of truth: which lane is
+  // centred in the board's viewport.)
+  const onSelectStage = useCallback((stage: BoardStage) => {
+    setSelectedStage(stage);
+    const lane = boardRef.current?.querySelector<HTMLElement>(`#lane-${stage}`);
+    lane?.scrollIntoView({
+      behavior: "smooth",
+      inline: "start",
+      block: "nearest",
+    });
+  }, []);
+
+  // Swipe → keep the selected chip in sync with the lane nearest the viewport
+  // centre (the rail reflects position). rAF-coalesced so a fling doesn't spam
+  // state. No-op above the mobile breakpoint (the board doesn't snap-scroll
+  // there), so it's cheap on desktop.
+  useEffect(() => {
+    const board = boardRef.current;
+    if (!board) return;
+    let raf: number | null = null;
+    const onScroll = () => {
+      if (raf !== null) return;
+      raf = requestAnimationFrame(() => {
+        raf = null;
+        const mid = board.scrollLeft + board.clientWidth / 2;
+        let nearest: BoardStage | null = null;
+        let best = Infinity;
+        for (const stage of BOARD_STAGES) {
+          const lane = board.querySelector<HTMLElement>(`#lane-${stage}`);
+          if (!lane) continue;
+          const centre = lane.offsetLeft + lane.offsetWidth / 2;
+          const d = Math.abs(centre - mid);
+          if (d < best) {
+            best = d;
+            nearest = stage;
+          }
+        }
+        if (nearest) setSelectedStage(nearest);
+      });
+    };
+    board.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      board.removeEventListener("scroll", onScroll);
+      if (raf !== null) cancelAnimationFrame(raf);
+    };
+  }, []);
 
   // WP-008 — the board (and its filters) are scoped to the active Product
   // (FR-37/38, ADR-009): the active-Product id threads into both reads as
@@ -98,11 +158,21 @@ export function Board() {
   const columns = hasData ? groupChangesByStage(data) : [];
   const inFlightCount = columns.reduce((n, c) => n + c.changes.length, 0);
 
+  // WP-008 — per-lane counts for the mobile switcher's tab chips (the count
+  // does double duty as a "how full is this stage" read). Derived from the
+  // same grouped columns the board renders — one feed, no extra request.
+  const stageCounts = Object.fromEntries(
+    columns.map((c) => [c.stage, c.changes.length]),
+  ) as Record<BoardStage, number>;
+
   return (
     <section className={styles.page} data-testid="page-board">
       <div className={styles.header}>
         <h1 className={styles.title}>Changes in flight</h1>
-        <RefreshButton queryKey={["changes"]} isFetching={fullList.isFetching} />
+        <RefreshButton
+          queryKey={["changes"]}
+          isFetching={fullList.isFetching}
+        />
       </div>
 
       <SearchBar
@@ -112,6 +182,12 @@ export function Board() {
         onQueryChange={setQuery}
         onToggleStage={toggleStage}
         onToggleNeedsAttention={() => setNeedsAttention((v) => !v)}
+        // WP-008 — the mobile lane-switcher inputs. The chips become an ARIA
+        // tablist < 600px (ADR-004); the counts + selected lane + select
+        // callback drive that role. (Hidden by CSS at wider widths.)
+        counts={stageCounts}
+        selectedStage={selectedStage}
+        onSelectStage={onSelectStage}
       />
 
       {active.isLoading && (
@@ -157,7 +233,7 @@ export function Board() {
       {hasData && inFlightCount === 0 && !filtering && <EmptyState />}
 
       {hasData && (inFlightCount > 0 || filtering) && (
-        <div className={styles.board} data-testid="board">
+        <div className={styles.board} data-testid="board" ref={boardRef}>
           {columns.map((col) => (
             <StageColumn
               key={col.stage}
