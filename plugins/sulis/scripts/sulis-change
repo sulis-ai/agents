@@ -482,6 +482,29 @@ def cmd_start(args: argparse.Namespace) -> None:
                              f"or `sulis-change finish --slug {slug}` to ship it."},
         )
 
+    # Fetch the latest base ref from origin and branch off the FETCHED tip, so
+    # a local `{base_ref}` that lags `origin/{base_ref}` never produces a stale
+    # base. Mirrors the `finish` subcommand's `git fetch origin {base_ref}` and
+    # `wpx-worktree`'s prefer-remote / fall-back-to-local resolution — but,
+    # unlike `finish`, degrades gracefully on fetch failure rather than
+    # `emit_error`-ing: a founder starting a change offline (no remote / no
+    # network) must still get a local branch + worktree off the local ref.
+    branch_base = base_ref
+    fetch_rc, _, fetch_err = _run(["git", "fetch", "origin", base_ref],
+                                  cwd=repo_root, timeout=60)
+    if fetch_rc == 0:
+        # Prefer the freshly-fetched remote tip when it resolves cleanly.
+        remote_rc, _, _ = _run(
+            ["git", "rev-parse", "--verify", "--quiet", f"origin/{base_ref}"],
+            cwd=repo_root, timeout=10,
+        )
+        if remote_rc == 0:
+            branch_base = f"origin/{base_ref}"
+    else:
+        _log(f"Could not fetch origin/{base_ref} "
+             f"({fetch_err.strip() or 'no remote/offline?'}); starting from "
+             f"the local {base_ref}.")
+
     # Generate ULID + handle FIRST (Phase 5 of change-as-primitive build —
     # WORK_PACKAGE_STANDARD v1.1.0 `change_id:` field). The worktree is now
     # co-located under the change's own state dir
@@ -495,13 +518,14 @@ def cmd_start(args: argparse.Namespace) -> None:
     worktree_dest = change_worktree_dir(change_id)
     worktree_dest.parent.mkdir(parents=True, exist_ok=True)
 
-    # Create the worktree + branch
-    ok, msg = git_worktree_add(repo_root, branch, worktree_dest, base_ref)
+    # Create the worktree + branch off the resolved base (remote tip on the
+    # happy path; local ref on the offline fallback).
+    ok, msg = git_worktree_add(repo_root, branch, worktree_dest, branch_base)
     if not ok:
         emit_error(f"Worktree creation failed: {msg}")
 
-    # Get the SHA we branched off
-    rc, base_sha_out, _ = _run(["git", "rev-parse", base_ref],
+    # Pin base_sha to the SAME ref the branch was actually cut from.
+    rc, base_sha_out, _ = _run(["git", "rev-parse", branch_base],
                                cwd=repo_root, timeout=10)
     base_sha = base_sha_out.strip() if rc == 0 else ""
 
