@@ -140,6 +140,13 @@ def load_fixture(name: str) -> FixtureManifest:
 # requirements-templates target structure. Ordering is invariant; the §10
 # `## Verification Plan` heading is fixed verbatim (ADR-001 of the
 # verification-by-design change).
+#
+# WP-006 makes this emitter *always-comprehensive*: every mandatory section is
+# present at every depth (FR-01/02/11). The top-level §1..§10 spine matches the
+# canonical; the always-on measurable NFR section, the STRIDE/Constraints/
+# Assumptions/Dependencies sub-sections, and the interface-contract skeleton
+# stub (CF-05 — WP-011 fills it to full CF-10) live beneath §4 Requirements and
+# §7 Solution Design as named sub-headings the document inspectors anchor on.
 _SECTIONS: Final[tuple[tuple[str, str], ...]] = (
     ("1", "Executive Summary"),
     ("2", "Problem Discovery"),
@@ -205,6 +212,126 @@ def render_document(
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
+# Always-on measurable NFR targets (FR-06, SC-05). Structure is invariant —
+# every comprehensive document carries a measurable target per category at every
+# depth; depth tunes only how much *additional* interview-derived detail is
+# layered on. A category with no fixture-specific target still states the
+# methodology's own measurable floor, so `_assert_measurable_nfr` always passes.
+_NFR_BASELINE: Final[tuple[tuple[str, str], ...]] = (
+    (
+        "Performance",
+        "Producing the comprehensive document at lite depth adds ≤ 1.6× the "
+        "legacy lite cost (NFR-02); section emission completes in < 5 s.",
+    ),
+    (
+        "Security",
+        "100% of mandatory sections are present or carry an explicit "
+        "`n/a — <reason>`; 0 silent drops (NFR-R01). No false completeness.",
+    ),
+    (
+        "Reliability",
+        "Under token pressure all mandatory sections remain present — detail "
+        "degrades, existence does not; ≥ 99% of drives keep the full section "
+        "set (NFR-R01).",
+    ),
+)
+
+
+def _subsection(heading: str, body: str, *, level: int = 3) -> list[str]:
+    """Render one named sub-section as a list of lines: a blank-line separator,
+    the ATX heading at ``level``, a blank line, then the body.
+
+    The single source of the sub-section shape the document inspectors anchor
+    on — extracted so the §4 Requirements and §7 Solution Design renderers don't
+    each repeat the `["", "### Name", "", body]` pattern (Blue refactor,
+    2-consumer threshold).
+    """
+    return ["", f"{'#' * level} {heading}", "", body]
+
+
+def _requirements_body(manifest: FixtureManifest) -> str:
+    """The §4 Requirements body — functional summary plus the always-on
+    measurable NFR section and the Threat Model / Constraints / Assumptions /
+    Dependencies sub-sections.
+
+    Each sub-section is a named heading the document inspectors anchor on
+    (FR-06 / SC-03 / SC-05). A sub-section a fixture cannot populate carries an
+    explicit `n/a — <reason>` (NFR-R01), never a bare omission.
+    """
+    if manifest.paths:
+        functional = "Touches:\n" + "\n".join(f"- `{p}`" for p in manifest.paths)
+    else:
+        functional = "n/a — no source paths declared in the fixture manifest."
+
+    nfr_intro = (
+        "Always-on, measurable targets per category (FR-06). Structure is "
+        "invariant across depth; detail is interview-sized."
+    )
+
+    if manifest.dependencies:
+        dependencies = "Dependencies:\n" + "\n".join(
+            f"- {d}" for d in manifest.dependencies
+        )
+    else:
+        dependencies = "n/a — this fixture declares no dependencies."
+
+    # The leading blank from the first _subsection separator is stripped by the
+    # final "\n".join — the heading is the first line of the rendered body.
+    parts: list[str] = []
+    parts += _subsection("Functional Requirements", functional)
+    parts += _subsection("Non-Functional Requirements", nfr_intro)
+    for category, target in _NFR_BASELINE:
+        parts += _subsection(category, target, level=4)
+    parts += _subsection(
+        "Threat Model",
+        "STRIDE skeleton — the methodology's threat actors are the bypasses "
+        "that ship incomplete work. Filled to a full STRIDE matrix by the "
+        "downstream design stage (FR-15).",
+    )
+    parts += _subsection(
+        "Constraints",
+        "The document MUST match the canonical Target Structure (C-01); the "
+        "`## Verification Plan` heading is fixed verbatim (C-02).",
+    )
+    parts += _subsection(
+        "Assumptions",
+        f"This `{manifest.primitive}` change assumes its declared paths and "
+        "dependencies are accurate as captured in the fixture manifest.",
+    )
+    parts += _subsection("Dependencies", dependencies)
+
+    return "\n".join(parts).lstrip("\n")
+
+
+def _solution_design_body(manifest: FixtureManifest) -> str:
+    """The §7 Solution Design body, including the mandatory Interface Contract
+    section skeleton stub (CF-05, ADR-007).
+
+    This WP lands the *skeleton*; WP-011 fills it to the full CF-10 founder-
+    reviewable dimensions. The skeleton is present at every depth so WP-009's
+    tool-walk has a target and contract-first ordering holds (BDR-001).
+    """
+    if manifest.tool_operations:
+        ops = "\n".join(
+            f"- `{op.get('name', '?')}` "
+            f"(in: {', '.join(op.get('inputs', []))}; "
+            f"out: {', '.join(op.get('outputs', []))})"
+            for op in manifest.tool_operations
+        )
+        contract = "Interface contract — tool operations:\n" + ops
+    else:
+        contract = (
+            "n/a — this change exposes no tool surface; the interface-contract "
+            "skeleton stands ready for any operation a tool surface would add "
+            "(CF-05; WP-011 fills the full CF-10 dimensions)."
+        )
+
+    parts: list[str] = []
+    parts += _subsection("Solution Overview", "Implementation follows the paths in §4.")
+    parts += _subsection("Interface Contract", contract)
+    return "\n".join(parts).lstrip("\n")
+
+
 def _section_body(number: str, manifest: FixtureManifest) -> str:
     """Deterministic body for one section, marking the unpopulated ones n/a."""
     if number == "1":
@@ -212,36 +339,28 @@ def _section_body(number: str, manifest: FixtureManifest) -> str:
     if number == "2":
         return f"This change is a `{manifest.primitive}` on: {manifest.intent}"
     if number == "4":
-        if manifest.paths:
-            return "Touches:\n" + "\n".join(f"- `{p}`" for p in manifest.paths)
-        return "n/a — no source paths declared in the fixture manifest."
+        return _requirements_body(manifest)
     if number == "5":
         return (
             "In scope: the paths in §4. "
             "Out of scope: anything not named by this fixture."
         )
     if number == "7":
-        if manifest.tool_operations:
-            ops = "\n".join(
-                f"- `{op.get('name', '?')}` "
-                f"(in: {', '.join(op.get('inputs', []))}; "
-                f"out: {', '.join(op.get('outputs', []))})"
-                for op in manifest.tool_operations
-            )
-            return "Interface contract — tool operations:\n" + ops
-        return "Implementation follows the paths in §4."
+        return _solution_design_body(manifest)
     if number == "9":
-        if manifest.dependencies:
-            return "Dependencies:\n" + "\n".join(
-                f"- {d}" for d in manifest.dependencies
-            )
-        return "n/a — this fixture declares no dependencies."
+        return (
+            "Migration: the comprehensive structure applies to changes "
+            "specified after this ships; existing artifacts are not rewritten. "
+            "Rollback: revert the change branch. Security + performance "
+            "targets are stated in §4 Non-Functional Requirements."
+        )
     if number == "10":
         return (
             "Methodology adapter: drive this fixture via `_drive_specify.py` "
             "and assert the produced document's section set."
         )
-    # Sections 3, 6, 8 are not populated by the minimal fixture shape.
+    # Sections 3 and 6 are not populated by the minimal fixture shape; §8
+    # (ADRs + BDRs) likewise carries no fixture-derived decisions.
     return "n/a — not populated by this fixture."
 
 

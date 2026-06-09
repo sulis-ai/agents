@@ -156,6 +156,147 @@ See [HANDOVER.md](HANDOVER.md) for the execution agent handover.
 
 ---
 
+## Comprehensive DESIGN.md Target-Structure Template
+
+This is the **always-comprehensive** design-document template (FR-01/FR-11,
+ADR-002). The design artifact carries this full Target Structure for **every**
+behavioural change, regardless of depth — depth sizes only the interview, never
+which sections exist (FR-02). Section names and ordering follow the canonical
+`features/entity-crud/DESIGN.md` (C-01); the `## Verification Plan` heading is
+fixed verbatim (C-02 / ADR-001) so the P-VER section-presence check anchors on
+it.
+
+**The invariants this template encodes:**
+
+- Every mandatory section is present. A section a change cannot populate carries
+  an explicit `n/a — <justification>`, **never** a bare omission (SC-03,
+  NFR-R01 — "degrade detail, not existence").
+- The Non-Functional Requirements section is **always on** and states a
+  **measurable** target per category — Performance, Security, Reliability — not
+  an adjective like "fast" (SC-05, FR-06).
+- The §7 Solution Design carries an **Interface Contract** section. This WP
+  lands the *skeleton stub* (CF-05); WP-011 fills it to the full CF-10
+  founder-reviewable dimensions (Schema + three-category errors + Audience +
+  User guide + Error fixes). The skeleton is present even when a change exposes
+  no tool surface (marked `n/a — <reason>`), so a tool-walk always has a target
+  and contract-first ordering holds (BDR-001, ADR-007).
+
+The deterministic emitter that produces this structure from a depth-sized
+intake is `plugins/sulis/scripts/_drive_specify.py` (the methodology adapter the
+SC-01/02/03/05 scenarios drive); the WP-003 inspectors
+(`_assert_doc_sections`, `_assert_same_section_set`, `_assert_section_na`,
+`_assert_measurable_nfr`) verify the produced document against these invariants.
+
+```markdown
+# Design — {change slug}
+
+## 1. Executive Summary
+
+{1–3 paragraphs: what changes, why now, the load-bearing decisions. Depth
+sizes how much detail; the section is always present.}
+
+## 2. Problem Discovery
+
+{Problem statement, current behaviour, desired behaviour, why-now, impact of
+not doing. `n/a — <reason>` only for a pure-mechanical change with no problem
+to discover.}
+
+## 3. Stakeholders / Personas
+
+{The actors and their interests. `n/a — <reason>` if the change has no distinct
+stakeholders beyond the implementing agent.}
+
+## 4. Requirements
+
+### Functional Requirements
+
+{The functional requirements — recap by phase or table. `n/a — <reason>` if none.}
+
+### Non-Functional Requirements
+
+Always-on, measurable targets per category (FR-06). Structure is invariant
+across depth; detail is interview-sized. **Each category MUST state a number /
+threshold, not an adjective.**
+
+#### Performance
+
+{A measurable target — e.g. `< 5 ms`, `≤ 1.6×`, `1000 calls < 5 s`.}
+
+#### Security
+
+{A measurable target — e.g. `100%` of inputs validated, `0` unauthenticated
+paths.}
+
+#### Reliability
+
+{A measurable target — e.g. `≥ 99.9%` availability, `0` silent section drops.}
+
+### Threat Model
+
+{STRIDE skeleton — the threats the change must withstand. Filled to a full
+STRIDE matrix at the design stage (FR-15). `n/a — <reason>` for a surfaceless
+change.}
+
+### Constraints
+
+{Hard constraints — standards to match, headings fixed verbatim, purity
+requirements. `n/a — <reason>` if none.}
+
+### Assumptions
+
+{What must be true for the design to hold. `n/a — <reason>` if none.}
+
+### Dependencies
+
+{Internal / external dependencies and their classification. `n/a — <reason>`
+when the change declares no dependencies (SC-03).}
+
+## 5. Scope
+
+{In scope / out of scope / MVP-vs-future.}
+
+## 6. Use Cases
+
+{Use cases with main / alternate / exception flows. `n/a — <reason>` if the
+change has no user-facing or machine-facing use case.}
+
+## 7. Solution Design
+
+### Solution Overview
+
+{The composition / architecture-at-levels narrative.}
+
+### Interface Contract
+
+{**Skeleton stub (CF-05; WP-011 fills the full CF-10 dimensions).** For a tool
+surface: one entry per operation with its inputs/outputs. When the change
+exposes no tool surface: `n/a — <reason>`, with the skeleton standing ready.
+Per FR-19 the tool-walk's operations must be a subset of this contract.}
+
+## 8. ADRs + BDRs
+
+{Technical decisions (ADR) and business decisions (BDR). `n/a — <reason>` if
+none recorded.}
+
+## 9. Migration / Rollback / Security / Performance
+
+{How the change is migrated, rolled back, and the security + performance posture
+recap (targets stated in §4 Non-Functional Requirements).}
+
+## Verification Plan
+
+{The verbatim `## Verification Plan` heading (C-02 / ADR-001). Populated per the
+Verification Plan section template below.}
+```
+
+**No reordering, no omissions.** Inapplicable sections carry `n/a —
+<justification>`; the structure is invariant (ADR-002). The numbered §1..§10
+spine matches the canonical; the always-on NFR / Threat Model / Constraints /
+Assumptions / Dependencies sub-sections and the Interface Contract skeleton are
+named sub-headings beneath the spine that the document inspectors anchor on.
+
+---
+
 ## Verification Plan section template
 
 This block is the skeleton for the SRD's `## Verification Plan` section
