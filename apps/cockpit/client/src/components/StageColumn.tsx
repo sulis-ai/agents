@@ -146,8 +146,11 @@ function LaneCardList({
   const virtualizer = useVirtualizer({
     count: changes.length,
     getScrollElement: () => scrollRef.current,
-    // Fixed row height — the card's shape is constant, so the total scroll
-    // size is exactly count × CARD_ROW_PX with no per-card measurement pass.
+    // CARD_ROW_PX is only the INITIAL estimate; the real height of each row is
+    // measured below (cards are NOT a fixed height — a degraded card's extra
+    // notice and a full-width "Waiting on you" foot make some taller). Without
+    // measurement, taller cards overflowed their fixed slot and overlapped the
+    // card below.
     estimateSize: () => CARD_ROW_PX,
     overscan: OVERSCAN,
     // Identity by changeId so a re-poll that reorders cards keeps stable keys.
@@ -159,6 +162,13 @@ function LaneCardList({
     // falls back to a fixed height only where there is no layout (jsdom / SSR),
     // so the virtualiser always computes a real window and mounts rows.
     observeElementRect: observeLaneRect,
+    // Measure each rendered row's REAL height so variable-height cards never
+    // overlap. Falls back to the estimate where there's no layout (jsdom / SSR
+    // report 0), keeping unit tests deterministic.
+    measureElement: (el) => {
+      const h = el?.getBoundingClientRect().height ?? 0;
+      return h > 0 ? h : CARD_ROW_PX;
+    },
   });
 
   const items = virtualizer.getVirtualItems();
@@ -185,9 +195,9 @@ function LaneCardList({
             <div
               key={item.key}
               data-index={item.index}
+              ref={virtualizer.measureElement}
               className={styles.laneVirtualRow}
               style={{
-                height: `${item.size}px`,
                 transform: `translateY(${item.start}px)`,
               }}
             >
