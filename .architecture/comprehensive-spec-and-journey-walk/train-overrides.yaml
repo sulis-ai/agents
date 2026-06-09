@@ -1,17 +1,21 @@
-# wpx-train overrides — force-include / hold-back markers
-# Managed by wpx-train queue-add / queue-remove subcommands.
-# Eligibility derives from INDEX.md + origin branches + CI status;
-# overrides here are the explicit founder layer on top.
-
-holds:
+# wpx-train overrides — workaround for cross-project WP-id glob collision (#105).
+# The computed-status model breaks once a WP's branch is deleted post-merge:
+# done deps compute as "not merged" and done WPs re-eligible onto FOREIGN globbed
+# branches. So each wave: force-INCLUDE this wave's genuinely-built WPs (verified
+# by hand: step-7-complete + deps truly in change-branch history; bundled-tip CI
+# still gates them), and HOLD everything else.
+includes:
   - WP-004
   - WP-005
-  - WP-006
   - WP-007
+holds:
+  - WP-001
+  - WP-002
+  - WP-003
+  - WP-006
   - WP-008
   - WP-009
   - WP-010
   - WP-011
   - WP-012
   - WP-013
-

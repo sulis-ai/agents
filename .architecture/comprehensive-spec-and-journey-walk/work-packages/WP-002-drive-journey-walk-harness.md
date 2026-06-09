@@ -89,3 +89,9 @@ Invariants:
 - Builds the green/red driver every P2 walk WP needs.
 - The `--surface tool` path exercises the WP-009 second-table walk once that
   lands; until then it exercises the existing single-surface walk.
+
+## Acceptance Evidence
+
+- Branch: feat/wp-002-drive-journey-walk-harness (deleted post-merge)
+- Squash-merge SHA on dev: `58ce728185be51d2c25fd8b08d080b56ce7b9a66`
+- Completed: `2026-06-09T20:51:36Z` (Step 12 by calling session)

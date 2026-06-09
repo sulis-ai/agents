@@ -16,9 +16,9 @@ foundational fixture/assertion harness the scenarios drive.
 
 | Status | Count |
 |---|---|
-| pending | 10 |
+| pending | 7 |
 | in_progress | 0 |
-| done | 3 |
+| done | 6 |
 | blocked | 0 |
 
 ## Phase Split
@@ -121,10 +121,10 @@ graph TD
 | WP-001 | Build the drive-specify fixture harness | create | done | — | WP-006, WP-011, WP-012 | 6k / 4k | 7.4 |
 | WP-002 | Build the drive-journey-walk fixture harness | create | done | — | WP-009, WP-013 | 6k / 4k | 7.4 |
 | WP-003 | Build the document-section assertion scripts | create | done | — | WP-005, WP-006 | 5k / 5k | 7.4 |
-| WP-004 | Reword the depth proposal phrases to describe interview size | refactor | pending | — | — | 4k / 2k | 7.4 |
-| WP-005 | Sever the depth-to-document-shape branch in specify and the analyst path | refactor | pending | WP-003 | WP-006 | 7k / 4k | 7.3 |
+| WP-004 | Reword the depth proposal phrases to describe interview size | refactor | done | — | — | 4k / 2k | 7.4 |
+| WP-005 | Sever the depth-to-document-shape branch in specify and the analyst path | refactor | done | WP-003 | WP-006 | 7k / 4k | 7.3 |
 | WP-006 | Add the comprehensive DESIGN.md template and always-comprehensive emitter | create | pending | WP-001, WP-003, WP-005 | WP-009, WP-011 | 9k / 7k | 7.4 |
-| WP-007 | Add a first-class surface tag to scenario authoring | extend | pending | — | WP-008, WP-009 | 5k / 3k | 7.4 |
+| WP-007 | Add a first-class surface tag to scenario authoring | extend | done | — | WP-008, WP-009 | 5k / 3k | 7.4 |
 | WP-008 | Build the UC-flow-coverage gate | create | pending | WP-007 | WP-010 | 7k / 5k | 7.4 |
 | WP-009 | Extend step 8.5 to a two-surface walk with the tool-surface binding bar | extend | pending | WP-002, WP-006, WP-007 | WP-013 | 9k / 6k | 7.4 |
 | WP-010 | Surface the tool scenarios and UC-flow coverage in the scenarios report | extend | pending | WP-008 | — | 5k / 3k | 7.4 |

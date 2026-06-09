@@ -98,3 +98,9 @@ Invariants the contract must preserve:
 - The `methodology-fixture-change` deferred infra need (DESIGN.md Verification
   Plan) is partially satisfied here — the reusable fixture spin-up lands with
   this WP.
+
+## Acceptance Evidence
+
+- Branch: feat/wp-001-drive-specify-harness (deleted post-merge)
+- Squash-merge SHA on dev: `58ce728185be51d2c25fd8b08d080b56ce7b9a66`
+- Completed: `2026-06-09T20:51:35Z` (Step 12 by calling session)
