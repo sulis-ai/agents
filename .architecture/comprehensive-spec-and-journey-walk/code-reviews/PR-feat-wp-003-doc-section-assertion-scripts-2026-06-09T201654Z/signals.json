@@ -1,0 +1,22 @@
+{
+  "pr": "feat/wp-003-doc-section-assertion-scripts",
+  "base": "change/harden-comprehensive-spec-and-journey-walk",
+  "verdict": "PASS",
+  "build_verification": {"pr_introduced_errors": 0},
+  "hygiene": {
+    "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "none"},
+    "size": {"lines_added": 878, "files_changed": 7, "generated_ratio": 0.0, "severity": "low"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+    "completeness": {"new_source_without_test": 0, "new_source_files": 6, "new_test_files": 1, "severity": "none"}
+  },
+  "findings": {
+    "changes": {"critical": 0, "high": 0, "medium": 0, "low": 0, "note": 1},
+    "neighbours": {"count": 0, "note": "leaf modules — no neighbour ring"}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "status": "nothing surfaced"},
+    "security": {"findings": 0, "status": "nothing surfaced"},
+    "quality": {"findings": 0, "notes": 1}
+  },
+  "draft_hardening_deltas": 0
+}
