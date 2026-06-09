@@ -153,3 +153,70 @@ def test_proposal_sentence_for_deep_offers_override():
     d = sc.classify_depth(primitive="create", file_count=5, founder_facing=True)
     sentence = sc.proposal_sentence(d)
     assert "?" in sentence
+
+
+# ─── FR-04: depth phrases describe interview size, not document shape ──────────
+#
+# WP-004 (REORGANISE/Refactor). _DEPTH_PHRASE / _DEPTH_ALT are the founder-facing
+# strings proposal_sentence() renders. FR-04 requires them to describe the
+# *interview* size (how many questions), never *document* completeness ("three
+# lines", "the flows drawn out"). Per EP-07 the characterisation test pins the
+# current strings (it is UPDATED, not deleted, after the reword); the second
+# test asserts the post-reword shape and fails until the strings are reworded.
+
+
+def test_proposal_sentence_current_wording():
+    """Characterisation pin for the depth phrases this WP rewords.
+
+    Pins the exact `_DEPTH_PHRASE` / `_DEPTH_ALT` strings proposal_sentence()
+    composes, so the reword is a deliberate, reviewed diff (REORGANISE
+    doctrine). Updated to the new wording in the same WP's Green step.
+    """
+    # The phrase rendered per depth (the part this WP rewords). Updated to the
+    # post-FR-04 wording: interview size only, no document-shape language.
+    assert sc._DEPTH_PHRASE["lite"] == (
+        "a few quick questions (about thirty seconds)"
+    )
+    assert sc._DEPTH_PHRASE["standard"] == (
+        "a few questions (a couple of minutes)"
+    )
+    assert sc._DEPTH_PHRASE["deep"] == (
+        "a fuller set of questions (a longer conversation)"
+    )
+    # The alternate-depth nudge.
+    assert sc._DEPTH_ALT["lite"] == "answer a few more questions"
+    assert sc._DEPTH_ALT["standard"] == "fewer questions or a fuller conversation"
+    assert sc._DEPTH_ALT["deep"] == "a shorter set of questions"
+
+
+def test_depth_phrase_describes_interview_not_doc_shape():
+    """Every depth phrase + alt talks about the interview, not the document.
+
+    FR-04: the founder-facing proposal must describe interview size — questions
+    asked — and must NOT describe document completeness (lines, sections, the
+    document itself, "drawn out" flows).
+    """
+    interview_words = ("question", "questions", "conversation", "ask")
+    doc_shape_words = (
+        "line",
+        "lines",
+        "section",
+        "sections",
+        "document",
+        "doc ",
+        "drawn out",
+        "three lines",
+    )
+    for depth in ("lite", "standard", "deep"):
+        phrase = sc._DEPTH_PHRASE[depth].lower()
+        alt = sc._DEPTH_ALT[depth].lower()
+        # Mentions the interview.
+        assert any(w in phrase for w in interview_words), (
+            depth,
+            "phrase",
+            phrase,
+        )
+        # Never mentions document shape.
+        for bad in doc_shape_words:
+            assert bad not in phrase, (depth, "phrase", bad, phrase)
+            assert bad not in alt, (depth, "alt", bad, alt)

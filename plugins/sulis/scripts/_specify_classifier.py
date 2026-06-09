@@ -233,16 +233,20 @@ def classify_depth(
 # ─── Plain-English proposal sentence (founder-mode) ─────────────────────────
 
 
+# FR-04: these describe the INTERVIEW size (how many questions I'll ask), never
+# the document's completeness. The document is always the full, comprehensive
+# one; depth only sizes the conversation. So no "three lines" / "flows drawn
+# out" / section talk here — just how long the chat will be.
 _DEPTH_PHRASE = {
-    "lite": "a quick lite spec (three lines, about thirty seconds)",
-    "standard": "the standard spec (a few questions, a couple of minutes)",
-    "deep": "the full spec (the deep version, with the flows drawn out)",
+    "lite": "a few quick questions (about thirty seconds)",
+    "standard": "a few questions (a couple of minutes)",
+    "deep": "a fuller set of questions (a longer conversation)",
 }
 
 _DEPTH_ALT = {
-    "lite": "the fuller version",
-    "standard": "the quick version or the full version",
-    "deep": "a lighter version",
+    "lite": "answer a few more questions",
+    "standard": "fewer questions or a fuller conversation",
+    "deep": "a shorter set of questions",
 }
 
 
