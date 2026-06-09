@@ -21,7 +21,9 @@ const STAGE_CLASS: Record<WorkflowStage, string> = {
 // The six-stage workflow, in order. Used to render a stage as its
 // position in the journey ("Review · 5/6") so it reads as a recognisable
 // step rather than a bare enum the reader might think is invalid.
-const STAGE_ORDER: WorkflowStage[] = [
+// Exported so the redesigned card's step dots (WP-005) derive the same
+// "N of 6" position from one source of truth (EP-03 — no second copy).
+export const STAGE_ORDER: WorkflowStage[] = [
   "recon",
   "specify",
   "design",
@@ -29,6 +31,19 @@ const STAGE_ORDER: WorkflowStage[] = [
   "review",
   "ship",
 ];
+
+/** Total number of active workflow steps (terminal stages sit past this). */
+export const STAGE_COUNT = STAGE_ORDER.length;
+
+/**
+ * The 1-based position of a stage within the six-stage workflow, or `null` for
+ * a terminal stage (e.g. "shipped") that is *past* the workflow, not a step in
+ * it (#38). The redesigned card's step dots consume this.
+ */
+export function stageStepNumber(stage: WorkflowStage): number | null {
+  const i = STAGE_ORDER.indexOf(stage);
+  return i >= 0 ? i + 1 : null;
+}
 
 const STAGE_NAME: Record<WorkflowStage, string> = {
   recon: "Recon",

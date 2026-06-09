@@ -36,6 +36,11 @@ function makeChange(overrides: Partial<Change> = {}): Change {
     updatedAt: "2026-05-26T11:55:00Z",
     stage: "design",
     liveness: { status: "not-running" },
+    // WP-001 widened the Change contract with these required fields; the
+    // fixture carries them so it conforms to the wire type.
+    needsAttention: { flagged: false, reason: null },
+    health: { state: "unknown", reason: "too early to tell" },
+    lastActivityAt: null,
     ...overrides,
   };
 }
