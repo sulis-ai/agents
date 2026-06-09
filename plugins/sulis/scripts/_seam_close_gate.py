@@ -168,7 +168,17 @@ def _covering_scenarios(requirements: list, brain_base_dir: Path) -> list:
     seen: set = set()
     scenarios: list = []
     for req in requirements:
-        for scen in _brain_query.find_scenarios_verifying(brain_base_dir, req):
+        # Degrade-open on a malformed / unresolvable requirement id: the brain
+        # query validates the id shape and raises on a bad ref. A detection-side
+        # crash must never propagate (it would surface as a machinery error
+        # rather than an honest verdict) and must never fabricate green — treat
+        # the offending requirement as having no covering Scenario, so an
+        # un-covered seam still blocks.
+        try:
+            covering = _brain_query.find_scenarios_verifying(brain_base_dir, req)
+        except (ValueError, OSError):
+            covering = []
+        for scen in covering:
             sid = scen.get("id")
             if sid not in seen:
                 seen.add(sid)

@@ -537,3 +537,28 @@ def test_gate_decision_is_reused_not_reimplemented(tmp_path, monkeypatch):
     # Same observed-or-blocked outcome through both paths: blocked maps to blocked.
     assert via_gate.verdict == "blocked"
     assert (direct.verdict == "blocked") == (via_gate.verdict == "blocked")
+
+
+def test_malformed_requirement_id_degrades_open_not_raises(tmp_path):
+    """Robustness: a malformed requirement id (from a bad `implements` ref) must
+    NOT crash `evaluate()`. The real `_brain_query.find_scenarios_verifying`
+    validates the id shape and raises `ValueError`; the gate must catch it and
+    treat that requirement as having no covering Scenario (→ blocked), never
+    propagate the crash and never fabricate green. (Task: degrade-open in
+    `_covering_scenarios`.)"""
+    from _seam_close_gate import evaluate
+
+    index = _write_index(tmp_path, _closed_seam_rows())
+    # Deliberately NO _seed_brain — the REAL _brain_query runs, so a malformed
+    # requirement id reaches its ULID validation and raises ValueError.
+    result = evaluate(
+        "WP-X",
+        index_path=index,
+        brain_base_dir=tmp_path,   # empty brain dir
+        repo_root=tmp_path,
+        implements={"WP-C": ["dna:requirement:NOT-A-VALID-ULID"]},
+    )
+    assert result.verdict != "observed", "must never fabricate green on a bad req id"
+    assert result.verdict in ("blocked", "not-closed"), (
+        f"expected a degraded verdict (blocked/not-closed), got {result.verdict!r}"
+    )
