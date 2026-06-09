@@ -81,11 +81,20 @@ echo "SCRIPTS_DIR=$SCRIPTS_DIR"
    change's journey (`find_scenarios_for_journey` in `_brain_query.py`),
    that's the **"none defined"** case — see rendering below.
 
-3. **Read each scenario's pass condition + drive status.** For each
+3. **Read each scenario's pass condition + surface + drive status.** For each
    scenario:
    - **Pass condition** — the observable outcome on the scenario / its
      terminal Step (what you'd see if it works). It's in the scenarios
      file; render it in plain English.
+   - **Surface** — the consumer surface this scenario exercises: `ui` (the
+     screen / CLI / host-rendered surface a human drives) or `tool` (the
+     API / SDK / MCP surface a machine consumer drives). It's the `surface`
+     tag authored on the scenario (WP-007, ADR-005; a closed `{ui, tool}`
+     enum) — read it straight off the entry. Group the per-scenario report
+     **by surface** so the founder sees per-surface flow coverage (DESIGN
+     §6.5 hop A6): which UI flows are verified, and — separately — which
+     **tool** flows are. A change with a tool surface that walked only its UI
+     is the gap this surfaces.
    - **Drive status** — has it actually been run green? Read the deposited
      evidence from the brain: for the Requirements the scenario `verifies`,
      `find_passing_testresults_verifying` in `_brain_query.py` returns the
@@ -113,26 +122,70 @@ echo "SCRIPTS_DIR=$SCRIPTS_DIR"
    each gap plainly ("the *checkout* step has no scenario — nothing
    verifies it").
 
+5. **Read the three gate verdicts and roll them up (BDR-002).** The report's
+   honest headline unifies **three distinct gates** — each asks a different
+   question, and the rollup must keep them distinct (never collapse their
+   logic). Read each verdict; do not re-derive any of them (read-only — the
+   brain + gates are truth):
+   - **Scenarios-required (#103)** — *is this change in scope for scenarios at
+     all?* If it is and none are defined, that's the "none defined" case
+     above.
+   - **Journey-coverage (#86)** — *is every hop of an existing scenario's
+     journey covered?* This is the per-hop gap read in step 4
+     (`_verify_scenario_coverage.py`).
+   - **UC-flow-coverage (WP-008)** — *does every use-case flow (main +
+     alternate + exception), on each surface, have a covering scenario at
+     all?* Read the verdict from the WP-008 gate
+     (`_verify_uc_flow_coverage.py`); it returns `covered` (every flow has a
+     covering scenario, or a planned WP, or a recorded out-of-scope decision)
+     or `gaps` (≥1 flow with none — fail-closed). Surface its
+     `uncovered_flows` as **plain titles**, never scenario or flow ids
+     ("3 flows nothing covers yet: *cancel mid-checkout*, *expired card*,
+     *retry after timeout*").
+
+     ```bash
+     python3 "$SCRIPTS_DIR/_verify_uc_flow_coverage.py" \
+       --uc-flows @{worktree_path}/.changes/uc-flows.json \
+       --journey '<dna:workflow:…>' \
+       --base-dir '{worktree_path}/.brain/instances'
+     # verdict: covered | gaps ; uncovered_flows lists the GAP flows
+     ```
+
+   These three roll up into **one** founder-facing result — distinct gates,
+   one rollup (BDR-002). The headline names all three so the founder sees
+   *which* gate is unhappy, not a single merged pass/fail.
+
 ## How to render (founder English, scannable)
 
-Lead with the headline count, then one short block per scenario, then the
-gaps. No internal ids in the founder's face — translate `dna:scenario:…`
-to the journey's plain name.
+Lead with the headline count, then the per-scenario blocks **grouped by
+surface** (UI scenarios, then tool scenarios), then the gaps, then the
+three-gate rollup. No internal ids in the founder's face — translate
+`dna:scenario:…` to the journey's plain name, and show uncovered UC flows as
+**plain titles** (never `SC-NN` / flow ids).
 
 ```
 Verifiable scenarios for {change name} ({CH-XXXXXX}):
 
-✓ Driven & green (N)
-  • Sign in with email — you reach the dashboard.  (run green)
-• Not yet run (N)
+Screen surface (what a person drives)
+  ✓ Sign in with email — you reach the dashboard.  (run green)
   • Checkout with a saved card — an order confirmation appears.  (defined, not driven)
-✗ Blocked (N)
-  • Password reset — the reset email is never observed.  (blocked: email step unconfirmed)
+  ✗ Password reset — the reset email is never observed.  (blocked: email step unconfirmed)
+
+Tool surface (what a machine consumer drives)
+  ✓ Create order via the API — the order id comes back.  (run green)
+  • Cancel order via the API — the order shows cancelled.  (defined, not driven)
 
 Gaps — journey steps with NO scenario:
   • "Delete account" — nothing verifies this path.
 
-Honest headline: {M} scenarios defined, {green} proven real, {gaps} gap(s).
+The three checks:
+  • Scenarios expected here? Yes (this change touches a user journey).
+  • Every step of each scenario covered? Yes.
+  • Every use-case flow has a scenario (both surfaces)? No — 3 flows nothing
+    covers yet: "cancel mid-checkout", "expired card", "retry after timeout".
+
+Honest headline: {M} scenarios defined, {green} proven real, {gaps} gap(s);
+UC-flow coverage: gaps (3 flows uncovered).
 ```
 
 When nothing is defined:
@@ -183,6 +236,9 @@ at specify (/sulis:specify deep mode) and the journey walked at design.
 - `../../scripts/_brain_query.py` — `find_scenarios_for_journey`,
   `find_scenarios_verifying`, `find_passing_testresults_verifying`.
 - `../../scripts/_verify_scenario_coverage.py` — the plan-work coverage
-  read (journey hops with no covering scenario).
+  read (journey hops with no covering scenario, the #86 gate).
+- `../../scripts/_verify_uc_flow_coverage.py` — the UC-flow-coverage gate
+  (WP-008): does every use-case flow, on each surface, have a covering
+  scenario? The `covered | gaps` verdict this report rolls up.
 - `../../scripts/sulis-verify-acceptance` — drives authored scenarios (the
   ship-time gate); the source of the green/blocked evidence this reads.
