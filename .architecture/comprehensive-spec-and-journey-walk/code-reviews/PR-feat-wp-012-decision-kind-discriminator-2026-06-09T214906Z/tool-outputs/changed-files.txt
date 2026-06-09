@@ -1,0 +1,12 @@
+.architecture/comprehensive-spec-and-journey-walk/work-packages/.executor-WP-012.md
+plugins/sulis/brain/compiled/product-development/decision.schema.json
+plugins/sulis/scripts/_assert_bdr_adr.py
+plugins/sulis/scripts/_decision_emission.py
+plugins/sulis/scripts/_drive_decisions.py
+plugins/sulis/scripts/sulis-emit-decision
+plugins/sulis/scripts/tests/methodology/test_bdr_distinct_from_adr.py
+plugins/sulis/scripts/tests/unit/test_decision_emission.py
+plugins/sulis/scripts/tests/unit/test_drive_assert_bdr_adr.py
+plugins/sulis/scripts/tests/unit/test_golden_thread_integration.py
+plugins/sulis/scripts/tests/unit/test_sulis_emit_decision_cli.py
+plugins/sulis/skills/draft-architecture/SKILL.md
