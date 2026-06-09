@@ -1,3 +1,9 @@
+## v0.132.0 — 2026-06-09
+
+**Minor — release-train batch.**
+
+- Always produce a comprehensive design document (use cases with flows, NFR, threat model, layered architecture) regardless of depth; walk both the UI and API/SDK/MCP-tool consumer surfaces at design time; derive verifiable scenarios from use-case flows for both surfaces; enforce flow-level coverage as a gate; make the interface contract a first-class design-doc section.
+
 ## v0.131.0 — 2026-06-09
 
 **Minor — release-train batch.**
