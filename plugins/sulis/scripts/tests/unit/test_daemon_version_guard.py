@@ -22,24 +22,27 @@ def _reply(version, pid=4321, ok=True):
 
 
 def test_version_match_is_ok(monkeypatch):
-    monkeypatch.setattr(dc, "plugin_version", lambda *a, **k: "0.130.0")
+    monkeypatch.setattr(dc, "_own_plugin_version", lambda *a, **k: "0.130.0")
     assert dc._version_ok(_reply("0.130.0")) is True
 
 
 def test_version_mismatch_is_not_ok(monkeypatch):
-    monkeypatch.setattr(dc, "plugin_version", lambda *a, **k: "0.130.0")
+    monkeypatch.setattr(dc, "_own_plugin_version", lambda *a, **k: "0.130.0")
     assert dc._version_ok(_reply("0.126.1")) is False
 
 
-def test_missing_version_stamp_is_not_ok(monkeypatch):
-    # An old daemon (no version in meta) IS running old code → restart.
-    monkeypatch.setattr(dc, "plugin_version", lambda *a, **k: "0.130.0")
-    assert dc._version_ok({"ok": True, "result": []}) is False
+def test_missing_version_stamp_reuses(monkeypatch):
+    # Conservative: a live daemon with NO version stamp (a pre-guard daemon, or
+    # a test fake) is REUSED, not restarted — we only restart on a confirmed
+    # mismatch. (Churning fakes / legit non-stamping servers would be worse than
+    # the one-time manual restart the pre-guard→guarded transition needs.)
+    monkeypatch.setattr(dc, "_own_plugin_version", lambda *a, **k: "0.130.0")
+    assert dc._version_ok({"ok": True, "result": []}) is True
 
 
 def test_unknown_own_version_reuses(monkeypatch):
     # Dev / non-cache layout: can't compare → reuse, never spuriously restart.
-    monkeypatch.setattr(dc, "plugin_version", lambda *a, **k: None)
+    monkeypatch.setattr(dc, "_own_plugin_version", lambda *a, **k: None)
     assert dc._version_ok(_reply("anything")) is True
 
 
@@ -67,7 +70,7 @@ def test_stop_stale_daemon_no_pid_is_safe(monkeypatch):
 
 
 def test_ensure_daemon_reuses_on_version_match(monkeypatch):
-    monkeypatch.setattr(dc, "plugin_version", lambda *a, **k: "0.130.0")
+    monkeypatch.setattr(dc, "_own_plugin_version", lambda *a, **k: "0.130.0")
     monkeypatch.setattr(dc, "_status_reply", lambda *a, **k: _reply("0.130.0"))
     stopped = {"n": 0}
     monkeypatch.setattr(dc, "_stop_stale_daemon", lambda *a, **k: stopped.__setitem__("n", stopped["n"] + 1))
@@ -78,7 +81,7 @@ def test_ensure_daemon_reuses_on_version_match(monkeypatch):
 
 
 def test_ensure_daemon_restarts_on_version_skew(monkeypatch):
-    monkeypatch.setattr(dc, "plugin_version", lambda *a, **k: "0.130.0")
+    monkeypatch.setattr(dc, "_own_plugin_version", lambda *a, **k: "0.130.0")
     # Warm probe → skewed daemon; after stop, in-lock probe → gone (None).
     replies = iter([_reply("0.126.1"), None])
     monkeypatch.setattr(dc, "_status_reply", lambda *a, **k: next(replies, None))

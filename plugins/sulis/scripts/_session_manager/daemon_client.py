@@ -38,12 +38,6 @@ import threading
 import time
 from pathlib import Path
 
-try:  # the daemon version-skew guard (#102); degrade safely if absent
-    from _plugin_version import plugin_version
-except Exception:  # noqa: BLE001 - never let an import break daemon liveness
-    def plugin_version(start: "str | None" = None) -> "str | None":  # type: ignore
-        return None
-
 # The real daemon entrypoint (WP-003) lives beside this package's parent — the
 # scripts dir that already hosts ``session_manager_host.py``. The default spawn
 # argv points at it; tests inject ``spawn_command`` instead, so this WP does not
@@ -136,22 +130,44 @@ def _status_probe(socket_path: str, timeout: float) -> bool:
     return bool(reply) and reply.get("ok") is True
 
 
+def _own_plugin_version() -> "str | None":
+    """This client's plugin version, from the nearest ``.claude-plugin/
+    plugin.json`` above this file. Inlined (stdlib-only: json + Path) rather
+    than imported — ``daemon_client`` MUST stay terminal-only/self-contained
+    with no cross-module imports (ADR-003 independence; enforced by
+    test_ensure_daemon). Mirrors ``_plugin_version.plugin_version``."""
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        cand = parent / ".claude-plugin" / "plugin.json"
+        if cand.is_file():
+            try:
+                ver = json.loads(cand.read_text(encoding="utf-8")).get("version")
+            except (ValueError, OSError):
+                return None
+            return str(ver) if ver else None
+    return None
+
+
 def _version_ok(reply: "dict | None") -> bool:
     """Whether the live daemon's plugin version matches ours (#102).
 
+    Conservative — only restart on a CONFIRMED mismatch:
     - Our own version unknown (dev / non-cache layout) → ``True`` (can't
       compare; never spuriously restart).
-    - Live daemon carries NO version stamp → it predates this guard, i.e. it is
-      running old code → ``False`` (restart).
-    - Otherwise → exact match.
+    - Live daemon carries NO version stamp → ``True`` (reuse). Could be a
+      pre-guard daemon or a test fake; we don't restart on absence (that would
+      churn fakes + any legit non-stamping server). The one-time pre-guard→
+      guarded transition is handled by a manual restart; every update BETWEEN
+      guarded versions is caught by the exact-mismatch branch below.
+    - Both versions known and differ → ``False`` (restart).
     """
-    own = plugin_version()
+    own = _own_plugin_version()
     if not own:
         return True
     meta = (reply or {}).get("meta") or {}
     running = meta.get("daemon_version")
     if not running:
-        return False
+        return True
     return running == own
 
 
