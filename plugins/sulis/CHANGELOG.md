@@ -1,3 +1,9 @@
+## v0.126.3 — 2026-06-09
+
+**Patch — release-train batch.**
+
+- Fix the desktop workspace window crashing on open when the session view is declined a resize — a benign decline now degrades instead of taking the window down.
+
 ## v0.126.2 — 2026-06-09
 
 **Patch — release-train batch.**
