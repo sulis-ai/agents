@@ -1,60 +1,117 @@
-// WP-012 — <ChangeCard> — one card per change on the dashboard grid.
+// WP-005 — <ChangeCard> — the redesigned change card (production-approved
+// MOCKUP). One card per change on the board; click navigates to /c/:changeId.
 //
-// Per WP Contract + TDD §1.1: handle + slug + intent + stage badge +
-// relative-time + liveness dot. Click navigates to /c/:changeId.
-// A11y: rendered as a <Link> with an aria-label describing what opens.
+// EVERY card has the SAME reading order, top to bottom (identical every card):
+//   topLine : handle (left) · LivenessProbe = probe dot + bare time (right)
+//   steps   : slim ·N/6 step dots (role="img" aria-label="Step N of 6")
+//   intent  : clamped to 2 lines (the calm fixed shape)
+//   slug    : the meta line (the time lives on the top line, not duplicated)
+//   foot    : EXACTLY ONE verdict — WaitingOnYou (flagged) XOR ChangeHealthBadge
+//             (not flagged). Never both (the founder's load-bearing rule, TDD §5
+//             / BR-1), enforced by a single branch.
+//
+// Dropped from the old card: the StageBadge pill (the lane already says the
+// stage), the top banner, the left colour stripe.
+//
+// A11y: rendered as a <Link> whose accessible name carries the FULL handle +
+// intent ("Change CH-… : <intent>"). The intent is clamped visually only — the
+// full text stays reachable via the aria-label + title.
 
 import { Link } from "react-router-dom";
 import type { Change } from "../../../shared/api-types";
-import { StageBadge } from "./StageBadge";
-import { LivenessDot } from "./LivenessDot";
-import { RelativeTime } from "./RelativeTime";
+import { stageStepNumber, STAGE_COUNT } from "./StageBadge";
+import { LivenessProbe } from "./LivenessProbe";
+import { ChangeHealthBadge } from "./ChangeHealthBadge";
+import { WaitingOnYou } from "./WaitingOnYou";
 import styles from "./ChangeCard.module.css";
 
 export interface ChangeCardProps {
   change: Change;
-  /** Optional pidKind from the session record (TDD §8); when present
-   *  and equal to "terminal", the liveness dot renders amber. */
-  pidKind?: string | null;
   /** WP-009 — "open this change's terminal" action. When provided, the card
    *  renders an "Open terminal" button that opens the change's in-cockpit
-   *  Terminal tab (the cockpit-rendered <LiveTerminal/> path) via this
-   *  callback — the SUBSTITUTE-Strangle of the OS-window launcher
-   *  (_terminal_launcher.py, now a deprecated fallback). The page wires this
-   *  to launchChangeTerminal (WPF-03 — the card stays presentational). Omitted
-   *  → no terminal action rendered (existing dashboard usages unchanged). */
+   *  Terminal tab via this callback. Omitted → no terminal action rendered
+   *  (existing dashboard usages unchanged). */
   onOpenTerminal?: (changeId: string) => void;
 }
 
-export function ChangeCard({
-  change,
-  pidKind,
-  onOpenTerminal,
-}: ChangeCardProps) {
+/** The slim "·N/6" step dots — the one non-redundant part of the old stage
+ *  pill, kept as a tiny progress indicator with an SR text label. A terminal
+ *  stage (no step number) renders the rail with no current dot. */
+function StepDots({ step }: { step: number | null }) {
+  const label =
+    step !== null ? `Step ${step} of ${STAGE_COUNT}` : "Past the workflow";
+  return (
+    <div className={styles.steps} role="img" aria-label={label}>
+      {Array.from({ length: STAGE_COUNT }, (_, i) => {
+        const n = i + 1;
+        const cls =
+          step !== null && n === step
+            ? `${styles.step} ${styles.stepCur}`
+            : step !== null && n < step
+              ? `${styles.step} ${styles.stepOn}`
+              : styles.step;
+        return <span key={n} className={cls} />;
+      })}
+    </div>
+  );
+}
+
+/** Plain-English why-text for the waiting chip, from the fixed reason set.
+ *  Never echoes any reply body (NFR-SEC-03) — these are enumerable shapes. */
+function attentionWhy(reason: Change["needsAttention"]["reason"]): string {
+  switch (reason) {
+    case "blocked":
+      return "blocked — needs a decision";
+    case "waiting-on-decision":
+      return "picking an approach";
+    case "stopped-mid-reply":
+      return "stopped mid-reply";
+    case null:
+    default:
+      return "needs you";
+  }
+}
+
+export function ChangeCard({ change, onOpenTerminal }: ChangeCardProps) {
+  const step = stageStepNumber(change.stage);
+  const flagged = change.needsAttention.flagged;
+
   return (
     <Link
       to={`/c/${change.changeId}`}
       className={styles.card}
       data-testid="change-card"
-      aria-label={`Open ${change.handle}: ${change.intent}`}
+      aria-label={`Change ${change.handle}: ${change.intent}`}
     >
-      <div className={styles.headerRow}>
+      <div className={styles.topLine}>
         <span className={styles.handle}>{change.handle}</span>
-        <StageBadge stage={change.stage} />
+        <LivenessProbe
+          liveness={change.liveness}
+          lastActivityAt={change.lastActivityAt}
+        />
       </div>
+
+      <StepDots step={step} />
+
       {/* Intent is clamped to 2 lines in CSS so the card stays a calm fixed
-       * shape; the full text stays reachable via the title tooltip and the
-       * card aria-label above. */}
+       * shape; the full text stays reachable via the title + the card aria-label. */}
       <p className={styles.intent} title={change.intent}>
         {change.intent}
       </p>
-      <div className={styles.footerRow}>
+
+      <div className={styles.cardMeta}>
         <span className={styles.slug}>{change.slug}</span>
-        <span className={styles.livenessGroup}>
-          <RelativeTime iso={change.updatedAt} />
-          <LivenessDot liveness={change.liveness} pidKind={pidKind} />
-        </span>
       </div>
+
+      {/* THE ONE FOOT VERDICT — waiting XOR health, never both (single branch). */}
+      <div className={`${styles.footRow} ${flagged ? styles.waitingFoot : ""}`}>
+        {flagged ? (
+          <WaitingOnYou why={attentionWhy(change.needsAttention.reason)} />
+        ) : (
+          <ChangeHealthBadge health={change.health} />
+        )}
+      </div>
+
       {onOpenTerminal ? (
         <div className={styles.actions}>
           <button

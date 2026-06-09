@@ -1,0 +1,35 @@
+{
+  "pr": "feat/wp-005-redesigned-card",
+  "project": "cockpit-board-refresh",
+  "timestamp": "2026-06-09T203813Z",
+  "base": "change/feat-cockpit-board-refresh",
+  "verdict": "PASS",
+  "outcome_plain": "Ready to merge",
+  "build_verification": {
+    "tsc_exit": 0,
+    "eslint_exit": 0,
+    "pr_introduced_errors": 0,
+    "pre_existing_errors_cleared": 1
+  },
+  "findings": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 2,
+    "in_changes": 2,
+    "in_neighbours": 0
+  },
+  "hygiene": {
+    "scope_severity": "none",
+    "size_severity": "none",
+    "safety_severity": "none",
+    "completeness_severity": "none"
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "surfaced": false },
+    "security": { "findings": 0, "surfaced": false },
+    "quality": { "findings": 2, "surfaced": true }
+  },
+  "draft_deltas": 0,
+  "auto_downgrade_fired": false
+}

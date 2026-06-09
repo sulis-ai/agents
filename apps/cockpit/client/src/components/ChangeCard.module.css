@@ -1,10 +1,15 @@
-/* WP-012 — ChangeCard styles. */
+/* WP-005 — ChangeCard styles (redesigned card).
+ *
+ * Transcribed from the production-approved MOCKUP (.card / .topLine / .steps /
+ * .footRow rules). Tokens only — no raw colour. The probe + health + waiting
+ * reads live in their own component stylesheets; this file owns the card frame,
+ * the top line, the step dots, the meta line, and the foot row. */
 
 .card {
   display: block;
   border: 1px solid var(--border);
   border-radius: var(--radius-container);
-  padding: 16px;
+  padding: 14px;
   background: var(--card);
   text-decoration: none;
   color: inherit;
@@ -14,46 +19,70 @@
 .card:hover {
   border-color: var(--input);
 }
-
-.headerRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
+.card:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+/* DARK ONLY: a soft drop shadow reinforces that the card is a raised surface
+ * above the lane. Light theme is untouched. Uses the existing --shadow-float
+ * token, not an invented value. */
+:root[data-theme="dark"] .card {
+  box-shadow: var(--shadow-float);
 }
 
+/* ── TOP LINE: handle (left) · probe + time (right) ── */
+.topLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 11px;
+  min-width: 0;
+}
 .handle {
-  flex: 1;
+  flex: 0 0 auto;
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: var(--weight-body);
+  letter-spacing: 0.01em;
   color: var(--muted-foreground);
-  /* keep the handle on one line; the card stays a calm fixed shape even
-   * when the slug/handle is long. flex:1 + min-width:0 lets it shrink and
-   * ellipsise instead of pushing the stage badge off the card. */
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
   min-width: 0;
 }
-
-.slug {
-  font-size: 12px;
-  color: var(--muted-foreground);
+/* the LivenessProbe is pinned to the RIGHT of the top line */
+.topLine > :last-child {
+  margin-left: auto;
 }
 
-/* Intent — CLAMPED to 2 lines (matches the SIGNED visual contract's
- * single-line-ish card; the card must stay a calm, fixed shape no matter
- * how long the change's description is). A long intent is truncated with an
- * ellipsis; the full text is available via the card's aria-label + title.
- * Without the clamp a long intent dumps a wall of text and blows the card
- * out — the render defect this fix-forward closes. */
+/* ── the slim "· N/6" step dots ── */
+.steps {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-bottom: 11px;
+}
+.step {
+  width: 13px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.stepOn {
+  background: var(--muted-foreground);
+}
+.stepCur {
+  background: var(--foreground);
+}
+
+/* Intent — CLAMPED to 2 lines (the calm fixed card shape, matching the signed
+ * visual contract). A long intent truncates with an ellipsis; the full text is
+ * available via the card's aria-label + title. */
 .intent {
   font-size: 13px;
   font-weight: var(--weight-label);
   color: var(--foreground);
-  margin: 8px 0 14px;
+  margin: 0 0 12px;
   line-height: 1.45;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -62,13 +91,36 @@
   overflow: hidden;
 }
 
-.footerRow {
+/* the meta line — just the slug now (the relative time lives on the top line,
+ * so it's not duplicated here). */
+.cardMeta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   font-size: 12px;
   color: var(--muted-foreground);
+}
+.slug {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* ── THE ONE-LINE FOOT (every card, exactly one read) ──
+ * Default (health): left-aligned, content-width — the quiet default.
+ * Waiting: full-width + centered (the .waitingFoot modifier). Never both. */
+.footRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 11px;
+  padding-top: 11px;
+  border-top: 1px solid var(--border-muted);
+  min-width: 0;
+}
+.waitingFoot {
+  justify-content: center;
 }
 
 /* WP-009 — "Open terminal" action row (the cockpit-rendered terminal path). */
@@ -77,7 +129,6 @@
   justify-content: flex-end;
   margin-top: 12px;
 }
-
 .openTerminal {
   font-size: 12px;
   padding: 4px 10px;
@@ -87,13 +138,6 @@
   border-radius: var(--radius-interactive);
   cursor: pointer;
 }
-
 .openTerminal:hover {
   border-color: var(--primary);
-}
-
-.livenessGroup {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }

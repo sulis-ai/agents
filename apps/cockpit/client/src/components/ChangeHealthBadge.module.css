@@ -1,0 +1,80 @@
+/* WP-005 — <ChangeHealthBadge> styles.
+ *
+ * Transcribed from the production-approved MOCKUP (.health* rules). Tokens
+ * only — no raw colour. The status tints ride the --bg-* recipe; the unknown
+ * read uses NEUTRAL tokens (not the success / warning tints) so it can never
+ * read as on-track or off-track (FR-31). Quieter than the waiting chip
+ * (1px border, normal label weight), left-aligned + content-width. */
+
+.health {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: var(--weight-label);
+  padding: 2px 8px 2px 6px;
+  border-radius: var(--radius-badge);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.health svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
+
+/* the reason, appended SR-only so the visible foot stays one calm line */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* On track — a check. Calm, the resting state. */
+.onTrack {
+  color: var(--text-secondary);
+  border-color: var(--bg-positive-border);
+  background: var(--bg-positive);
+}
+.onTrack svg {
+  color: var(--positive);
+}
+
+/* Worth a look — a dash. Neutral nudge: not wrong, but check it. */
+.look {
+  color: var(--foreground);
+  border-color: var(--border);
+  background: var(--muted);
+}
+.look svg {
+  color: var(--muted-foreground);
+}
+
+/* Off track — a warning triangle. The change is drifting. */
+.offTrack {
+  color: var(--foreground);
+  border-color: var(--bg-destructive-border);
+  background: var(--bg-destructive);
+}
+.offTrack svg {
+  color: var(--destructive);
+}
+
+/* NOT ASSESSED YET (FR-31) — the honest NEUTRAL read: not the positive
+ * "On track" (a green lie on a fresh change), not the destructive "Off track"
+ * (it isn't failing, it just hasn't started). Same muted surface as "Worth a
+ * look" but a DIFFERENT shape (hollow circle) + a DIFFERENT word, plus a dashed
+ * edge echoing the unknown probe — "no signal yet". --text-secondary keeps it
+ * the calmest, most provisional read. NOT green, NOT red, never colour-alone. */
+.unassessed {
+  color: var(--text-secondary);
+  border-color: var(--border);
+  background: var(--muted);
+  border-style: dashed;
+}
+.unassessed svg {
+  color: var(--muted-foreground);
+}

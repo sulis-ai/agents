@@ -46,6 +46,12 @@ function makeChange(overrides: Partial<Change> = {}): Change {
     updatedAt: "2026-05-26T11:55:00Z",
     stage: "recon",
     liveness: { status: "unknown", reason: "no session" },
+    // WP-001 widened the Change contract with these required fields; the
+    // fixture must carry them so it conforms (the redesigned card consumes
+    // needsAttention.flagged + health on the single foot verdict).
+    needsAttention: { flagged: false, reason: null },
+    health: { state: "unknown", reason: "too early to tell" },
+    lastActivityAt: null,
     ...overrides,
   };
 }

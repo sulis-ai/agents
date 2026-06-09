@@ -49,3 +49,33 @@ export function formatRelativeTime(iso: string, now: Date = new Date()): string 
   const weeks = Math.floor(deltaMs / WEEK_MS);
   return `${weeks} ${weeks === 1 ? "week" : "weeks"} ago`;
 }
+
+/**
+ * Compact relative-time form for the card's top-line probe — "now", "12m",
+ * "6h", "1w" (the production-approved MOCKUP form; no "ago", no spelled-out
+ * unit). The card stays calm and one-line, so the recency is a glanceable
+ * token, not a sentence.
+ *
+ * Falsy / invalid inputs and future times resolve to "—" so a malformed
+ * payload never prints a bogus value (FR-42's discipline at the formatter
+ * level; the caller separately renders "—" for a null `lastActivityAt`).
+ *
+ * @param iso  ISO-8601 timestamp string.
+ * @param now  optional "now" override (tests pass a fixed Date).
+ */
+export function formatCompactRelativeTime(
+  iso: string,
+  now: Date = new Date(),
+): string {
+  const past = new Date(iso);
+  if (Number.isNaN(past.getTime())) return "—";
+
+  const deltaMs = now.getTime() - past.getTime();
+  if (deltaMs < 0) return "—";
+
+  if (deltaMs < MINUTE_MS) return "now";
+  if (deltaMs < HOUR_MS) return `${Math.floor(deltaMs / MINUTE_MS)}m`;
+  if (deltaMs < DAY_MS) return `${Math.floor(deltaMs / HOUR_MS)}h`;
+  if (deltaMs < WEEK_MS) return `${Math.floor(deltaMs / DAY_MS)}d`;
+  return `${Math.floor(deltaMs / WEEK_MS)}w`;
+}

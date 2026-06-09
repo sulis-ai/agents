@@ -1,0 +1,120 @@
+/* WP-005 — <LivenessProbe> styles.
+ *
+ * Transcribed verbatim from the production-approved MOCKUP (.live* rules).
+ * Tokens only — no raw colour. The probe encodes its state by FILL / MOTION /
+ * SHAPE so it reads in greyscale and for a colour-blind founder:
+ *   working → filled + pulse · live → solid fill · idle → hollow ring ·
+ *   unknown → dashed "?" ring (distinct from idle). */
+
+.probe {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: var(--weight-body);
+  color: var(--text-secondary);
+  min-width: 0;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+  position: relative;
+}
+
+/* the relative time — the only visible text of the probe */
+.ago {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* NO RECENCY (FR-42) — the em-dash stands in for an absent time; muted so it
+ * reads as "no time recorded", not a value. */
+.noRecency {
+  color: var(--muted-foreground);
+}
+
+/* screen-reader-only label naming the state (the visible word is dropped) */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* WORKING — filled dot with a subtle PULSE. Motion is the distinguishing cue. */
+.dotWorking {
+  background: var(--positive);
+}
+.dotWorking::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--positive);
+  opacity: 0.5;
+  animation: probePulse 1.6s ease-out infinite;
+}
+@keyframes probePulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+/* Reduced-motion fallback (S-30): drop the pulse, keep a static ring. The SR
+ * label still names the state. Covers both the real media query AND the
+ * test-only [data-reduced-motion] hook. */
+@media (prefers-reduced-motion: reduce) {
+  .dotWorking::after {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+.probe[data-reduced-motion="true"] .dotWorking::after {
+  animation: none;
+  opacity: 0.5;
+}
+
+/* LIVE — session open but quiet: a SOLID filled dot, steady (no motion). */
+.dotLive {
+  background: var(--accent);
+}
+
+/* IDLE — nothing running: a HOLLOW / outline ring (no fill). The shape itself
+ * tells it apart from the filled states, in greyscale too. */
+.dotIdle {
+  background: transparent;
+  border: 1.5px solid var(--muted-foreground);
+}
+
+/* UNKNOWN (FR-41) — a DISTINCT dashed ring with a centred "?" glyph: a
+ * deliberately uncertain mark, never the crisp solid ring of Idle. Relies on
+ * shape, not colour. */
+.dotUnknown {
+  background: transparent;
+  border: 1.5px dashed var(--muted-foreground);
+  opacity: 0.85;
+}
+.dotUnknown::before {
+  content: "?";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-sans);
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--muted-foreground);
+}
