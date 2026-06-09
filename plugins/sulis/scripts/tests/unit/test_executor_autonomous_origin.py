@@ -37,6 +37,19 @@ _HOOK = Path(__file__).resolve().parents[2] / "hooks" / "prepare-commit-msg"
 _ULID = "01KT500K2JTE2EGW6TPPQ4D4VN"
 
 
+@pytest.fixture(autouse=True)
+def _isolate_sulis_origin(monkeypatch):
+    """#245 — clear the ambient `SULIS_ORIGIN` for every test in this file.
+
+    `_commit` snapshots `dict(os.environ)`, so running the suite inside a
+    Sulis-assisted session (which exports `SULIS_ORIGIN`) made the
+    unstamped-path assertion fail (the hook stamped the session's origin).
+    The stamped-path tests pass their own env via `autonomous_env(...)`, which
+    re-adds the var after this clear, so they are unaffected.
+    """
+    monkeypatch.delenv("SULIS_ORIGIN", raising=False)
+
+
 # ─── the env-builder: run-only ─────────────────────────────────────────────
 
 
