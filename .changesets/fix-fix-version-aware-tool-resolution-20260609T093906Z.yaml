@@ -1,7 +1,0 @@
-change_id: 01KTNTQ1KYTJT8JMT9ZFTEZBK4
-primitive: fix
-tier: patch
-touches_plugin: true
-summary: |
-  Fix version-correct tool resolution: skills now bind to the active plugin version (its bin on PATH) instead of a lexical cache sort that mis-ranked 0.98.0 above 0.126.0; real scripts self-locate; portable numeric version-pick as last resort. Adds sulis-prune-cache. Fixes #49.
-created_at: 2026-06-09T09:39:06Z

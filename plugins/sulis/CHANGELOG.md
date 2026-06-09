@@ -1,3 +1,9 @@
+## v0.126.1 — 2026-06-09
+
+**Patch — release-train batch.**
+
+- Fix version-correct tool resolution: skills now bind to the active plugin version (its bin on PATH) instead of a lexical cache sort that mis-ranked 0.98.0 above 0.126.0; real scripts self-locate; portable numeric version-pick as last resort. Adds sulis-prune-cache. Fixes #49.
+
 ## v0.126.0 — 2026-06-09
 
 **Minor — release-train batch.**
