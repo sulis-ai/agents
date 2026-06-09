@@ -91,16 +91,25 @@ INDEX or doing anything else, and capture the result as
 `$WPX_DIR`:
 
 ```bash
-WPX_DIR=$(
-  find ~/.claude/plugins/cache \
-    -name wpx-journal -type f \
-    -path '*/sulis/*/scripts/*' \
-    2>/dev/null \
-  | sort -r | head -1 | xargs -I{} dirname {} 2>/dev/null
-)
-# Dev fallback: marketplace repo cwd
+# Resolve the wpx-* tools dir from the ACTIVE plugin version (the one Claude
+# Code loaded — its bin/ is on PATH). Avoids the lexical-sort cache pick that
+# mis-ranks 0.98.0 above 0.126.0 (#49).
+WPX_DIR=""
+_sulis_bin=$(printf '%s\n' "$PATH" | tr ':' '\n' | grep -E 'sulis-ai-agents/sulis/[^/]+/bin$' | head -1)
+if [ -n "$_sulis_bin" ] && [ -d "$(dirname "$_sulis_bin")/scripts" ]; then
+  WPX_DIR="$(dirname "$_sulis_bin")/scripts"
+fi
+# Dev fallback: marketplace repo cwd.
 if [ -z "$WPX_DIR" ] && [ -f "plugins/sulis/scripts/wpx-journal" ]; then
   WPX_DIR="$(pwd)/plugins/sulis/scripts"
+fi
+# Last-resort fallback ONLY if PATH anchor + dev both miss: a PORTABLE
+# version-aware cache pick (numeric, NOT lexical, NOT `sort -V`).
+if [ -z "$WPX_DIR" ]; then
+  WPX_DIR=$(find ~/.claude/plugins/cache -name wpx-journal -type f -path '*/sulis/*/scripts/*' 2>/dev/null \
+    | sed -E 's#(.*/sulis/)([^/]+)(/scripts/.*)#\2 &#' \
+    | sort -t. -k1,1n -k2,2n -k3,3n \
+    | tail -1 | cut -d' ' -f2- | xargs -I{} dirname {} 2>/dev/null)
 fi
 if [ -z "$WPX_DIR" ]; then
   echo "ERROR: cannot locate wpx-* scripts. Run: claude plugin install sulis@sulis-ai-agents" >&2
@@ -1192,13 +1201,19 @@ that the change has reached the **implement** stage so `/sulis:dashboard`
 reflects it. Resolve the tool path, then stamp:
 
 ```bash
-SCRIPTS_DIR=$(
-  find ~/.claude/plugins/cache -name sulis-change -type f \
-    -path '*/sulis/*/scripts/*' 2>/dev/null | sort -r | head -1 \
-  | xargs -I{} dirname {} 2>/dev/null
-)
+# Resolve from the ACTIVE plugin version (its bin/ is on PATH) — avoids the
+# lexical-sort cache pick that mis-ranks 0.98.0 above 0.126.0 (#49).
+SCRIPTS_DIR=""
+_sulis_bin=$(printf '%s\n' "$PATH" | tr ':' '\n' | grep -E 'sulis-ai-agents/sulis/[^/]+/bin$' | head -1)
+[ -n "$_sulis_bin" ] && [ -d "$(dirname "$_sulis_bin")/scripts" ] \
+  && SCRIPTS_DIR="$(dirname "$_sulis_bin")/scripts"
 [ -z "$SCRIPTS_DIR" ] && [ -f "plugins/sulis/scripts/sulis-change" ] \
   && SCRIPTS_DIR="$(pwd)/plugins/sulis/scripts"
+# Last-resort: PORTABLE numeric (NOT lexical, NOT `sort -V`) cache pick.
+[ -z "$SCRIPTS_DIR" ] && SCRIPTS_DIR=$(find ~/.claude/plugins/cache -name sulis-change -type f \
+  -path '*/sulis/*/scripts/*' 2>/dev/null \
+  | sed -E 's#(.*/sulis/)([^/]+)(/scripts/.*)#\2 &#' \
+  | sort -t. -k1,1n -k2,2n -k3,3n | tail -1 | cut -d' ' -f2- | xargs -I{} dirname {} 2>/dev/null)
 [ -n "$SCRIPTS_DIR" ] && [ -n "$SULIS_CHANGE_ID" ] \
   && "$SCRIPTS_DIR/sulis-change" stage implement
 ```

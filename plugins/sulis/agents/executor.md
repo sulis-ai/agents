@@ -179,16 +179,26 @@ operation.
 before initialising any worktree, before doing anything else:
 
 ```bash
-WPX_DIR=$(
-  find ~/.claude/plugins/cache \
-    -name wpx-journal -type f \
-    -path '*/sulis/*/scripts/*' \
-    2>/dev/null \
-  | sort -r | head -1 | xargs -I{} dirname {} 2>/dev/null
-)
-# Dev fallback: marketplace repo cwd
+# Resolve the wpx-* tools dir from the ACTIVE plugin version (the one Claude
+# Code loaded — its bin/ is on PATH). Avoids the lexical-sort cache pick that
+# mis-ranks 0.98.0 above 0.126.0 (#49).
+WPX_DIR=""
+_sulis_bin=$(printf '%s\n' "$PATH" | tr ':' '\n' | grep -E 'sulis-ai-agents/sulis/[^/]+/bin$' | head -1)
+if [ -n "$_sulis_bin" ] && [ -d "$(dirname "$_sulis_bin")/scripts" ]; then
+  WPX_DIR="$(dirname "$_sulis_bin")/scripts"
+fi
+# Dev fallback: marketplace repo cwd.
 if [ -z "$WPX_DIR" ] && [ -f "plugins/sulis/scripts/wpx-journal" ]; then
   WPX_DIR="$(pwd)/plugins/sulis/scripts"
+fi
+# Last-resort fallback ONLY if PATH anchor + dev both miss: a PORTABLE
+# version-aware cache pick (numeric, NOT lexical, NOT `sort -V` — BSD sort
+# lacks -V). Pick the max semver among cached versions.
+if [ -z "$WPX_DIR" ]; then
+  WPX_DIR=$(find ~/.claude/plugins/cache -name wpx-journal -type f -path '*/sulis/*/scripts/*' 2>/dev/null \
+    | sed -E 's#(.*/sulis/)([^/]+)(/scripts/.*)#\2 &#' \
+    | sort -t. -k1,1n -k2,2n -k3,3n \
+    | tail -1 | cut -d' ' -f2- | xargs -I{} dirname {} 2>/dev/null)
 fi
 if [ -z "$WPX_DIR" ]; then
   echo "ERROR: cannot locate wpx-* scripts. Run: claude plugin install sulis@sulis-ai-agents" >&2
@@ -203,10 +213,11 @@ subsequent wpx-* invocation in this prompt uses `"$WPX_DIR/wpx-NAME"`
 (environment variables do NOT persist between Bash tool invocations
 in Claude Code).
 
-The `sort -r` ensures the latest installed plugin version wins (the
-cache directory is versioned). The dev fallback covers the case
-where you are running against a marketplace-repo checkout (e.g.,
-during plugin development before publishing).
+The PATH anchor binds to the plugin version Claude Code actually
+activated (its `bin/` is on `$PATH`), so the resolved tools always
+match the running prompt. The dev fallback covers a marketplace-repo
+checkout; the last-resort cache pick is numeric (never lexical) so it
+can never regress to the #49 mis-rank.
 
 If WPX_DIR resolution fails entirely, halt and escalate via BLOCKER
 with the verbatim `ERROR: cannot locate wpx-* scripts` observation
