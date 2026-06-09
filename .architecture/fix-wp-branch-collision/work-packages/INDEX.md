@@ -88,7 +88,7 @@ parallel; merge both, then run the suite once before Wave 2.
 |---|---|
 | WP no longer resolves to / false-eligibled onto a foreign change's branch | WP-003 (`test_scoped_glob_does_not_match_foreign_change_branch`), WP-004 |
 | Newly minted WP branches carry the change-scoped name | WP-001, WP-005 |
-| Old-shape branch still resolves via legacy fallback for this release | WP-003 (`test_resolve_scoped_fuzzy_then_legacy_fallback`), WP-006 |
+| Old-shape branch still resolves (via journal Step-0; legacy glob only for no-scope callers) | WP-003 (`test_resolve_scoped_inflight_legacy_branch_resolves_via_journal`, `test_resolve_scoped_suppresses_legacy_glob_when_no_journal`), WP-006 |
 | Step-7 traces recording a `change/...` pushed branch parsed correctly | WP-002 |
 | Full unit suite passes; both paths explicitly covered | WP-006 |
 | Standards describe the implemented hierarchy, no contradiction | WP-007 |
