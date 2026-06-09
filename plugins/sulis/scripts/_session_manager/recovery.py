@@ -38,6 +38,7 @@ code from ``events.py``; this module declares no code constants.
 from __future__ import annotations
 
 import random
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -182,10 +183,14 @@ class RecoveryDriver:
 
     Injected capabilities (the ``LifecycleManager`` convention, ADR-001/002):
 
-    - ``send`` — re-submit the stopped turn. The manager's FIFO serialises it,
-      so a retry is just another turn, never a second in-flight turn. Returns
-      ``True`` when the re-submitted turn cleared, ``False`` when it failed
-      again (the blip-clears / never-clears distinction the driver loops on).
+    - ``send`` — re-submit the stopped turn **fire-and-forget** (the WP-007 wired
+      contract). The manager's FIFO serialises it, so a retry is just another
+      turn, never a second in-flight turn. The ack is the *enqueue*, NOT the
+      outcome: the re-submitted turn's result arrives LATER as a brand-new
+      ``error`` Event → a fresh :meth:`observe` (the blip failed again) or a
+      genuine ``result`` Event → :meth:`note_turn_cleared` (the blip cleared).
+      The driver therefore does NOT treat the ``send`` ack as "cleared"; it
+      drives recovery as an event-driven state machine across observations.
     - ``log_append`` — surface a recovery action as an :class:`EventError` on
       the **existing** log (no new stream, §3.5): every retry / abandon /
       pause is observable in ``read(follow=True)``.
@@ -214,10 +219,29 @@ class RecoveryDriver:
       in the per-class driver tests, swapped back to the real one at Blue
       (the CF-07 mock→real conformance step).
 
-    Recovery is per-session: one ``RecoveryDriver`` instance drives the one
-    session whose error it observed; it holds at most one pending re-auth
-    ticket (it does not re-fire ``reauth`` on every observation). It never
-    touches another session (isolation, ADR-001 §3.4 / NFR-SEC-06 analogue).
+    Recovery is per-session and **stateful across observations**: one
+    ``RecoveryDriver`` instance drives the one session whose error it observed.
+    Because the wired ``send`` is fire-and-forget, a never-clearing blip's
+    re-submitted turn fails again as a *fresh* ``observe`` call — so the
+    wall-clock retry budget cannot live inside one ``observe`` (it would reset
+    every time). Instead the driver holds the current retry sequence's
+    wall-clock start (``_retry_started_at``) and attempt count (``_retry_attempt``)
+    on the instance; each transient-blip observation advances the SAME sequence,
+    the budget accumulates, and a never-clearing blip abandons exactly when
+    ``next_delay`` returns ``None``. A genuine clear (:meth:`note_turn_cleared`)
+    resets the sequence so a later, unrelated blip gets a fresh budget. The
+    driver also holds at most one pending re-auth ticket (it does not re-fire
+    ``reauth`` on every observation). It never touches another session
+    (isolation, ADR-001 §3.4 / NFR-SEC-06 analogue).
+
+    **Thread-safety.** ``observe`` runs on the manager's short-lived recovery
+    thread (off the pump, §3.1) while ``note_turn_cleared`` runs on the stdout
+    pump thread that appended the clearing ``result``. Both mutate the retry
+    sequence state, so the small read-modify-write of (``_retry_started_at``,
+    ``_retry_attempt``) is guarded by a lock. The lock is held only around the
+    state transition — never across the injected ``sleep`` or ``send`` — so it
+    cannot reintroduce the WP-007 self-deadlock (the pump's slot-release path is
+    never blocked on a recovery wait).
     """
 
     def __init__(
@@ -248,6 +272,15 @@ class RecoveryDriver:
         # At most one pending re-auth ticket per session (idempotency, §Q10):
         # a login-expiry observed while already paused does not re-fire reauth.
         self._pending_ticket: ReauthTicket | None = None
+        # The current transient-blip retry sequence, accumulated ACROSS
+        # observations (the fire-and-forget wiring): the wall-clock start of the
+        # first failure in the sequence, and the attempt count. ``None`` start
+        # means no retry is in progress. Guarded by ``_retry_lock`` because
+        # ``observe`` (recovery thread) and ``note_turn_cleared`` (pump thread)
+        # both touch it.
+        self._retry_started_at: float | None = None
+        self._retry_attempt: int = 0
+        self._retry_lock = threading.Lock()
 
     def observe(self, error: EventError) -> None:
         """Observe one ``error``-kind failure and drive recovery (the §3.1
@@ -293,6 +326,18 @@ class RecoveryDriver:
         self._pending_ticket = None
         self._resume()
 
+    def note_turn_cleared(self) -> None:
+        """A turn genuinely completed (a ``result``) — end the retry sequence.
+
+        Wired from the manager's event fan-out: when a session's turn produces a
+        ``result`` (``adapter.turn_complete`` is True), the run survived, so the
+        current transient-blip retry sequence (if any) is over. Resetting the
+        accumulated budget here is what gives a LATER, unrelated blip a fresh
+        wall-clock budget — the "transient blip that clears → survives" semantics
+        across a long-lived session. Idempotent: a clear with no retry in
+        progress is a harmless no-op."""
+        self._reset_retry_sequence()
+
     # ── observability seam ─────────────────────────────────────────────────
 
     def _surface(self, *, category: str, code: str, message: str) -> None:
@@ -305,38 +350,74 @@ class RecoveryDriver:
     # ── branch implementations ────────────────────────────────────────────
 
     def _drive_retry(self, error: EventError) -> None:
-        """Retry a transient blip with full-jitter backoff against the
-        wall-clock budget; abandon as dead-end on exhaustion (§3.1, ADR-002).
+        """Advance the transient-blip retry sequence by ONE step against the
+        wall-clock budget that accumulates ACROSS observations; abandon on
+        exhaustion (§3.1, ADR-002).
 
-        The wait is the injected ``sleep`` against the injected ``clock`` — no
-        bare ``time.sleep`` (MEA-09). A re-submit that clears ends the loop
-        (the run survives, no human restart); one that fails again advances the
-        attempt. When ``next_delay`` returns ``None`` (the next backoff would
-        push cumulative elapsed past the budget) the blip is reclassified
-        dead-end and abandoned with a typed Event — not a silent hang.
+        Event-driven, not a blocking loop (the WP-007 fire-and-forget wiring):
+        the re-submitted turn's outcome arrives later as a *fresh* observation,
+        so each call schedules at most one retry and then **returns** — the next
+        failure re-enters :meth:`observe` and advances the SAME sequence. The
+        budget therefore must live on the instance:
+
+        - If no sequence is in progress (``_retry_started_at is None``) this is
+          the first failure: stamp the wall-clock start and reset the attempt to
+          0.
+        - Compute ``elapsed`` from that start and ``delay = next_delay(attempt,
+          elapsed, …)``. ``None`` ⇒ the budget is exhausted: abandon with a
+          typed Event (not a silent hang) and reset the sequence.
+        - Otherwise surface a "retry scheduled" Event, wait the jittered delay on
+          the injected ``sleep`` against the injected ``clock`` (no bare
+          ``time.sleep``, MEA-09), fire the **fire-and-forget** ``send`` (the ack
+          is the enqueue, never "cleared"), advance the attempt, and return.
+
+        The injected fake ``sleep`` advances the fake ``clock`` in tests, so a
+        never-clearing blip walks the curve to genuine budget exhaustion
+        deterministically. A genuine clear resets the sequence via
+        :meth:`note_turn_cleared`.
         """
-        start = self._clock()
-        attempt = 0
-        while True:
-            elapsed = self._clock() - start
-            delay = next_delay(attempt, elapsed, self._policy, rng=self._rng)
-            if delay is None:
-                self._abandon(error, reason="retry budget exhausted")
-                return
-            self._surface(
-                category=error.category,
-                code=error.code,
-                message=(
-                    f"retry scheduled: transient blip, attempt {attempt + 1} "
-                    f"in {delay:.2f}s ({error.message})"
-                ),
-            )
-            self._sleep(delay)
-            if self._send():
-                # The re-submitted turn cleared — the run survived. The FIFO
-                # serialised the retry; one-in-flight is untouched.
-                return
-            attempt += 1
+        with self._retry_lock:
+            if self._retry_started_at is None:
+                self._retry_started_at = self._clock()
+                self._retry_attempt = 0
+            start = self._retry_started_at
+            attempt = self._retry_attempt
+
+        elapsed = self._clock() - start
+        delay = next_delay(attempt, elapsed, self._policy, rng=self._rng)
+        if delay is None:
+            # Budget exhausted — abandon and end the sequence (a later, unrelated
+            # blip starts a fresh budget).
+            self._reset_retry_sequence()
+            self._abandon(error, reason="retry budget exhausted")
+            return
+
+        self._surface(
+            category=error.category,
+            code=error.code,
+            message=(
+                f"retry scheduled: transient blip, attempt {attempt + 1} "
+                f"in {delay:.2f}s ({error.message})"
+            ),
+        )
+        self._sleep(delay)
+        # Fire-and-forget re-submit: the FIFO serialises it (one-in-flight
+        # untouched); the turn's outcome comes back as a fresh observe / clear.
+        self._send()
+        with self._retry_lock:
+            # Advance only if the sequence is still the one we were driving — a
+            # racing clear could have reset it while we waited/sent.
+            if self._retry_started_at == start:
+                self._retry_attempt = attempt + 1
+
+    def _reset_retry_sequence(self) -> None:
+        """Clear the current retry sequence's accumulated budget state (start +
+        attempt), so the next transient blip begins a fresh wall-clock budget.
+        Lock-guarded — called from both the recovery thread (on abandon) and the
+        pump thread (on a genuine clear, :meth:`note_turn_cleared`)."""
+        with self._retry_lock:
+            self._retry_started_at = None
+            self._retry_attempt = 0
 
     def _drive_login_expired(self, error: EventError) -> None:
         """Pause→notify the run on a login-expiry (ADR-004).

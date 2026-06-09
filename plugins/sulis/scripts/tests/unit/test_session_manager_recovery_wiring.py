@@ -185,12 +185,20 @@ class _SpyDriver:
     def __init__(self, **kwargs: object) -> None:
         self.kwargs = kwargs
         self.observed: list[EventError] = []
+        self.cleared_count = 0
         self._lock = threading.Lock()
         _SpyDriver.instances.append(self)
 
     def observe(self, error: EventError) -> None:
         with self._lock:
             self.observed.append(error)
+
+    def note_turn_cleared(self) -> None:
+        # The manager fires this on a genuine ``result`` (turn_complete True) so
+        # the driver can reset its accumulated retry budget. Recorded so a wiring
+        # test can assert the reset hook is actually wired.
+        with self._lock:
+            self.cleared_count += 1
 
 
 @pytest.fixture(autouse=True)
@@ -367,6 +375,33 @@ def test_non_error_events_not_routed_to_driver(child, tmp_path):
         driver = _SpyDriver.instances[-1]
         # Give any stray routing a beat to land, then assert nothing did.
         time.sleep(0.1)
+        assert driver.observed == []
+    finally:
+        mgr.close("k")
+
+
+# ─── the turn-cleared reset hook fires on a genuine result ──────────────────
+
+
+def test_result_event_resets_retry_budget(child, tmp_path):
+    """A healthy turn's ``result`` (``turn_complete`` True) fires the driver's
+    ``note_turn_cleared`` reset hook — the fire-and-forget ``send`` counterpart
+    that ends the accumulated retry sequence so a LATER, unrelated blip gets a
+    fresh wall-clock budget (the budget-accumulation reconciliation).
+
+    Proven against the spy: a clean turn drives ``note_turn_cleared`` exactly
+    once and routes NOTHING to ``observe`` (a ``result`` is not an error)."""
+    mgr = _spy_manager(child)
+    try:
+        mgr.open("k", _spec(tmp_path))
+        off = mgr.send("k", "hello")
+        for ev in mgr.read("k", since=off, follow=True):
+            if ev.kind == "result":
+                break
+        driver = _SpyDriver.instances[-1]
+        # The result fired the reset hook (the run survived → the budget resets).
+        assert _wait_for(lambda: driver.cleared_count >= 1)
+        # …and the result was NOT mis-routed to observe (error-only routing).
         assert driver.observed == []
     finally:
         mgr.close("k")

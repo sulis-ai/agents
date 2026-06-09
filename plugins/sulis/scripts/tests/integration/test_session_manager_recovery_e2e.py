@@ -14,28 +14,43 @@ acceptance-critical, founder-visible behaviour of all four recovery classes:
 
 1. a transient blip that **clears** is retried and the run **survives**
    (acceptance #1);
-2. a never-clearing transient blip **retries without deadlocking** — each replay
-   genuinely promotes onto the live process (acceptance #2, the post-fix-honest
-   half). Its **budget-exhausted abandonment** is tracked as a known gap
-   (``test_budget_exhausted_abandon_known_gap``, xfail, SF-8bad33b8): it holds in
-   the WP-005 driver unit test but not yet end-to-end through the wired manager,
-   because the wired fire-and-forget ``send`` never accumulates the wall-clock
-   budget across re-observations — a WP-005/WP-007 reconciliation beyond this
-   WP's authorised slot-release-deadlock-fix scope;
+2. a never-clearing transient blip **retries without deadlocking** AND is
+   **abandoned at the wall-clock budget** with a typed Event (acceptance #2,
+   both halves — fail cleanly, never hang). Each replay genuinely promotes onto
+   the live process, and the driver's wall-clock budget accumulates ACROSS the
+   re-observations, so the run walks the backoff curve to genuine exhaustion and
+   abandons (``test_never_clearing_blip_retries_without_deadlock`` +
+   ``test_budget_exhausted_abandon_at_wall_clock``);
 3. a dead-end is **abandoned immediately**;
 4. a login-expired surfaces a ``NOT_AUTHORIZED`` Event carrying the re-login
    link and, after a simulated re-auth ticket completion, the run **resumes**
    and re-runs the step (no fabricated completion).
 
-**The fix this WP lands.** An ``error`` Event does not free the one-in-flight
+**The two fixes this WP lands.**
+
+*Slot-release (deadlock).* An ``error`` Event does not free the one-in-flight
 slot (only a ``result`` does), so before this WP a transient-blip retry
 deadlocked: the errored turn held the slot and the driver's replay could never
 promote (BLOCKER-WP-008). The fix adds
 :meth:`~_session_manager.session.Session.release_turn_for_retry` — a slot-release
 seam that frees the slot on the SAME live process WITHOUT terminating it — and
 calls it from :meth:`~_session_manager.manager.SessionManager._on_error_event`
-for a transient-blip error before the driver replays. Acceptance #1 + #2's
-no-deadlock half are the proof.
+for a transient-blip error before the driver replays.
+
+*Budget accumulation (never hang).* The WP-005 driver originally walked the
+budget inside ONE blocking ``observe()`` whose ``send()`` reported the turn
+outcome; but the WP-007 wired ``send()`` is fire-and-forget, so each replay's
+failure re-entered as a fresh ``observe()`` with ``attempt=0``/``elapsed=0`` and
+the budget never accumulated — a never-clearing blip retried forever (the #2
+core promise broken through the live wiring, SF-8bad33b8). The fix makes the
+per-session driver **stateful across observations**: it holds the current retry
+sequence's wall-clock start + attempt on the instance, so each re-observed
+failure advances the SAME sequence and the budget accumulates to genuine
+exhaustion. A genuine ``result`` resets the sequence (via
+:meth:`~_session_manager.recovery.RecoveryDriver.note_turn_cleared`, wired from
+``_on_error_event`` on a ``turn_complete`` event) so a later, unrelated blip
+gets a fresh budget. All four acceptance classes are now proven end-to-end with
+NO ``xfail`` remaining.
 
 **Verification posture (MEA-09, no mocks of the engine).** Every test boots a
 **real** ``SessionManager`` over a **real** scripted-child subprocess behind a
@@ -421,7 +436,7 @@ def test_transient_clears_survives_observable(child, tmp_path) -> None:
 def test_never_clearing_blip_retries_without_deadlock(child, tmp_path) -> None:
     """A never-clearing transient blip RETRIES (each replay genuinely promotes
     onto the live process) instead of deadlocking — the slot-release fix applied
-    to the retry path (acceptance #2, the post-fix-honest half).
+    to the retry path (acceptance #2, the no-deadlock half).
 
     Before the fix this deadlocked at attempt 1 exactly like acceptance #1 (the
     held slot blocked the first replay). After the fix the slot is freed before
@@ -429,13 +444,12 @@ def test_never_clearing_blip_retries_without_deadlock(child, tmp_path) -> None:
     repeated "retry scheduled" notices on the existing stream — proving the
     deadlock is gone and recovery is actively driving.
 
-    **Budget-exhausted abandonment is NOT asserted here** — see
-    :func:`test_budget_exhausted_abandon_known_gap` (xfail, SF-8bad33b8): the
-    wired fire-and-forget ``send`` model means the driver's wall-clock budget
-    loop never accumulates elapsed across re-observations, so a never-clearing
-    blip does not yet abandon at budget through the wired manager. That is a
-    WP-005/WP-007 design reconciliation tracked separately; this test pins the
-    behaviour the WP-008 slot-release fix actually delivers."""
+    This test pins the *no-deadlock, keeps-retrying* behaviour; its companion
+    :func:`test_budget_exhausted_abandon_at_wall_clock` pins the *abandon at
+    budget* half (the two together are acceptance #2 in full — fail cleanly,
+    never hang). The budget now accumulates ACROSS observations on the stateful
+    driver, so a never-clearing blip both keeps promoting AND eventually abandons
+    — there is no remaining known gap."""
     clock = _FakeClock()
     mgr = _make_manager(child, clock)
     try:
@@ -479,28 +493,29 @@ def test_never_clearing_blip_retries_without_deadlock(child, tmp_path) -> None:
         mgr.close("k")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "SF-8bad33b8 / WP-AUTO-8bad33b8: through the WIRED manager a "
-        "never-clearing transient blip does not yet abandon at the wall-clock "
-        "budget. The WP-005 driver walks the budget inside ONE observe() via a "
-        "BLOCKING outcome-reporting send(); the WP-007 wired send() is "
-        "fire-and-forget, so each replay's error re-enters as a fresh observe() "
-        "with attempt=0/elapsed=0 and the budget never accumulates. Acceptance "
-        "#2's budget-abandon half holds in the WP-005 unit test but NOT "
-        "end-to-end through the wired manager — a design reconciliation beyond "
-        "WP-008's authorised slot-release-deadlock-fix scope. This xfail tracks "
-        "the gap: it will fail loudly (strict) once the reconciliation lands, "
-        "prompting its removal."
-    ),
-)
-def test_budget_exhausted_abandon_known_gap(child, tmp_path) -> None:
-    """KNOWN-GAP (xfail, SF-8bad33b8): a never-clearing blip SHOULD be abandoned
-    at the wall-clock budget with a typed ``error`` Event reusing the observed
-    code (contract budget-exhausted row). It is not, through the wired manager —
-    see the ``xfail`` reason. Kept as an honest, strict marker of the open
-    reliability gap surfaced by this WP's end-to-end test."""
+def test_budget_exhausted_abandon_at_wall_clock(child, tmp_path) -> None:
+    """A never-clearing transient blip, driven through the WIRED manager, IS
+    abandoned at the wall-clock budget with a typed ``error`` Event reusing the
+    observed code (acceptance #2's budget-abandon half; contract budget-exhausted
+    row).
+
+    This is the #2 core promise — *fail cleanly, never hang* — proven end-to-end
+    through the live wiring. The fix (this WP's reconciliation) makes the
+    per-session driver **stateful across observations**: it holds the wall-clock
+    start + attempt of the current retry sequence on the driver instance, so each
+    fire-and-forget replay's re-observed error advances the SAME sequence rather
+    than resetting ``attempt=0``/``elapsed=0``. The injected fake clock is
+    advanced by the no-op ``sleep`` on every backoff, so the never-clearing blip
+    walks the real backoff curve to genuine budget exhaustion in microseconds and
+    the driver emits the typed "retry budget exhausted" abandon Event, then stops
+    retrying.
+
+    Before the fix this was a known gap (SF-8bad33b8, an ``xfail``): the WP-005
+    driver walked the budget inside ONE blocking ``observe()`` whose ``send()``
+    reported the turn outcome, but the WP-007 wired ``send()`` is fire-and-forget,
+    so each replay re-entered as a fresh ``observe()`` and the budget never
+    accumulated — the run retried forever and never abandoned. This test is the
+    honest passing proof that the gap is closed."""
     clock = _FakeClock()
     mgr = _make_manager(child, clock)
     try:
@@ -526,7 +541,10 @@ def test_budget_exhausted_abandon_known_gap(child, tmp_path) -> None:
             "the never-clearing blip was not abandoned at budget with a typed "
             f"Event: {[e.message for e in _errors(events)]}"
         )
+        # The abandon Event is a typed, observable "abandoned" reusing the
+        # observed code (429) on the existing stream — not a silent hang.
         assert "abandoned" in abandon[-1].message.lower(), abandon[-1]
+        assert abandon[-1].code == "429", abandon[-1]
     finally:
         mgr.close("k")
 

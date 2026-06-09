@@ -607,8 +607,19 @@ class SessionManager:
         ADR-001). Routes a live turn's ``error`` Event to the session's recovery
         driver — and **only** an error event that is not a process-death.
 
-        - **Error-only.** Non-``error`` kinds (``chunk`` / ``result`` /
-          ``tool_use``) are not the driver's concern — return immediately.
+        - **Turn-cleared reset (load-bearing for the budget).** A ``result`` that
+          satisfies ``adapter.turn_complete`` means the turn genuinely completed
+          — the run survived. If a transient-blip retry sequence was in progress,
+          it is now over, so the driver's accumulated wall-clock budget is reset
+          via :meth:`RecoveryDriver.note_turn_cleared` so a LATER, unrelated blip
+          gets a fresh budget. This is the counterpart to the fire-and-forget
+          ``send``: because the driver no longer treats a ``send`` ack as
+          "cleared", the *clear* must be signalled by the genuine ``result``
+          event. The reset is a cheap, lock-guarded state mutation on the pump
+          thread — it never re-enters the FIFO, so it cannot self-deadlock.
+        - **Error-only routing.** Past the turn-cleared reset, only an ``error``
+          kind is routed to ``observe``; other kinds (``chunk`` / ``tool_use``,
+          or a ``result`` that already triggered the reset) return.
         - **No double-handling (TDD §3.1 step 1).** A process-death
           ``STDIN_BROKEN`` error is the :class:`LifecycleManager`'s seam
           (restart-on-death); the driver must never also act on it. Filtered
@@ -653,11 +664,18 @@ class SessionManager:
         event (which would wedge the stdout reader), so a driver fault is
         swallowed on the recovery thread — the failure is already in the log;
         recovery is the only casualty."""
+        driver = self._recovery_drivers.get(session.key)
+        # Turn-cleared reset: a genuine ``result`` ends any in-progress retry
+        # sequence so a later, unrelated blip gets a fresh budget (the
+        # fire-and-forget ``send`` counterpart). Cheap + lock-guarded; no FIFO
+        # re-entry, so it runs inline on the pump thread without deadlock risk.
+        if driver is not None and session.adapter.turn_complete(event):
+            driver.note_turn_cleared()
+            return
         if event.kind != "error" or event.error is None:
             return
         if event.error.code == STDIN_BROKEN:
             return
-        driver = self._recovery_drivers.get(session.key)
         if driver is None:
             return
         error = event.error
