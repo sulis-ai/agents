@@ -1,3 +1,9 @@
+## v0.126.0 — 2026-06-09
+
+**Minor — release-train batch.**
+
+- Harden the reliability layer against a pathological/adversarial provider: cap per-session recovery-thread spawn (coalesce under an error storm) and add an absolute retry ceiling (max_lifetime_retries) that a turn-clear cannot reset, so interleaved result/error events cannot evade the give-up budget.
+
 ## v0.125.0 — 2026-06-09
 
 **Minor — release-train batch.**
