@@ -50,29 +50,35 @@ All tools share these conventions:
 
 The tools are plain Python 3 files with `#!/usr/bin/env python3` shebang. Dependencies: **stdlib only**. No `click`, no `pyyaml` required — frontmatter is parsed with a tiny inline parser sufficient for the executor's needs.
 
-When the sulis-execution plugin is installed via the Claude Code marketplace, the scripts land at:
+When the sulis plugin is installed via the Claude Code marketplace, the scripts land at:
 
 ```
-~/.claude/plugins/cache/sulis-ai-agents/sulis-execution/<version>/scripts/
+~/.claude/plugins/cache/sulis-ai-agents/sulis/<version>/scripts/
 ```
 
 The version directory changes with each plugin upgrade, so callers cannot hard-code the path.
 
 ### Agent invocation (automatic)
 
-The executor agent and the `run-all` / `run-wp` skills resolve the tool directory automatically at session start. The first Bash call in every session is a path-resolution preamble:
+The executor agent and the `run-all` / `run-wp` skills resolve the tool directory automatically at session start. The first Bash call in every session is a path-resolution preamble. It anchors to the plugin version Claude Code **actually activated** — that version's `bin/` is on `$PATH` — instead of globbing the cache and `sort -r`'ing (a TEXT sort that mis-ranks `0.98.0` above `0.126.0`, #49):
 
 ```bash
-WPX_DIR=$(
-  find ~/.claude/plugins/cache \
-    -name wpx-journal -type f \
-    -path '*/sulis-execution/*/scripts/*' \
-    2>/dev/null \
-  | sort -r | head -1 | xargs -I{} dirname {} 2>/dev/null
-)
-# Dev fallback: marketplace repo cwd
-if [ -z "$WPX_DIR" ] && [ -f "plugins/sulis-execution/scripts/wpx-journal" ]; then
-  WPX_DIR="$(pwd)/plugins/sulis-execution/scripts"
+# Resolve from the ACTIVE plugin version (its bin/ is on PATH).
+WPX_DIR=""
+_sulis_bin=$(printf '%s\n' "$PATH" | tr ':' '\n' | grep -E 'sulis-ai-agents/sulis/[^/]+/bin$' | head -1)
+if [ -n "$_sulis_bin" ] && [ -d "$(dirname "$_sulis_bin")/scripts" ]; then
+  WPX_DIR="$(dirname "$_sulis_bin")/scripts"
+fi
+# Dev fallback: marketplace repo cwd.
+if [ -z "$WPX_DIR" ] && [ -f "plugins/sulis/scripts/wpx-journal" ]; then
+  WPX_DIR="$(pwd)/plugins/sulis/scripts"
+fi
+# Last-resort fallback: PORTABLE version-aware cache pick (numeric, NOT lexical,
+# NOT `sort -V` — BSD sort lacks -V). Picks the max semver among cached versions.
+if [ -z "$WPX_DIR" ]; then
+  WPX_DIR=$(find ~/.claude/plugins/cache -name wpx-journal -type f -path '*/sulis/*/scripts/*' 2>/dev/null \
+    | sed -E 's#(.*/sulis/)([^/]+)(/scripts/.*)#\2 &#' \
+    | sort -t. -k1,1n -k2,2n -k3,3n | tail -1 | cut -d' ' -f2- | xargs -I{} dirname {} 2>/dev/null)
 fi
 ```
 
@@ -80,11 +86,21 @@ All subsequent invocations use `"$WPX_DIR/wpx-NAME"`. See `agents/executor.md` a
 
 ### Human invocation via the `wpx` wrapper (one-time setup, opt-in)
 
-For ad-hoc human use — manual journal reads, recovery, debugging, exploration — install the `wpx` dispatcher to your PATH:
+For ad-hoc human use — manual journal reads, recovery, debugging, exploration — install the `wpx` dispatcher to your PATH. The dispatcher **self-locates** its sibling `wpx-*` tools relative to its own path (via `realpath`), so the symlink just needs to point at the `wpx` of the active plugin version:
 
 ```bash
 mkdir -p ~/.local/bin
-ln -sf "$(find ~/.claude/plugins/cache -name wpx -path '*/sulis-execution/*/scripts/*' -type f | sort -r | head -1)" ~/.local/bin/wpx
+# Resolve the active version's scripts dir from PATH (its bin/ is on PATH);
+# fall back to a PORTABLE numeric cache pick if not running under Claude Code.
+_sulis_bin=$(printf '%s\n' "$PATH" | tr ':' '\n' | grep -E 'sulis-ai-agents/sulis/[^/]+/bin$' | head -1)
+if [ -n "$_sulis_bin" ]; then
+  _wpx="$(dirname "$_sulis_bin")/scripts/wpx"
+else
+  _wpx=$(find ~/.claude/plugins/cache -name wpx -path '*/sulis/*/scripts/*' -type f 2>/dev/null \
+    | sed -E 's#(.*/sulis/)([^/]+)(/scripts/.*)#\2 &#' \
+    | sort -t. -k1,1n -k2,2n -k3,3n | tail -1 | cut -d' ' -f2-)
+fi
+ln -sf "$_wpx" ~/.local/bin/wpx
 
 # Verify (should print the resolved scripts directory)
 wpx resolve
@@ -111,10 +127,34 @@ The wrapper does its own resolution at each invocation (same logic as the agent 
 If you are working inside the marketplace repo itself (this repository), the scripts are at their checked-in location:
 
 ```bash
-./plugins/sulis-execution/scripts/wpx-journal init --wp WP-7 --project <slug>
+./plugins/sulis/scripts/wpx-journal init --wp WP-7 --project <slug>
 ```
 
 The agent preamble's dev-fallback branch handles this case automatically.
+
+## Cache maintenance — `sulis-prune-cache`
+
+Each plugin upgrade leaves the previous version's directory behind under
+`~/.claude/plugins/cache/sulis-ai-agents/sulis/<version>/`. Over many
+upgrades these accumulate. The resolution preambles always anchor to the
+**active** version (its `bin/` is on `$PATH`), so a stale directory can't be
+picked by accident — but `sulis-prune-cache` keeps the cache tidy as
+defence-in-depth so old versions can never pile up to bite a mis-resolution:
+
+```bash
+sulis-prune-cache              # dry-run: list what WOULD be removed (keep newest 3)
+sulis-prune-cache --keep 5     # dry-run, keep newest 5
+sulis-prune-cache --force      # actually delete everything older than newest 3
+```
+
+It ranks versions **numerically** (the same portable comparison the
+resolution fallbacks use — never lexical, never `sort -V`), so it correctly
+keeps `0.126.0` over `0.98.0`. It is **dry-run by default** and is NOT wired
+into any automatic hook — run it by hand, or schedule it yourself, as
+maintenance. The version-comparison core lives in `_version_pick.py` and is
+unit-tested (`tests/unit/test_version_pick.py`,
+`tests/unit/test_prune_cache.py`), including the `0.98.0` vs `0.126.0`
+regression that motivated it (#49).
 
 ## Project-relative path resolution
 
@@ -257,7 +297,7 @@ may be empty.
 
 ## Versioning
 
-Tools version-locked with the sulis-execution plugin. Tool-internal
+Tools version-locked with the sulis plugin. Tool-internal
 contracts (CLI args + JSON output shape) follow SemVer:
 
 - **Patch**: bug fixes, new commands.
@@ -272,14 +312,14 @@ The wpx-* tools have a pytest suite at `tests/`. From the marketplace repo root:
 
 ```bash
 pip install pytest
-pytest plugins/sulis-execution/scripts/tests/ -v
+pytest plugins/sulis/scripts/tests/ -v
 ```
 
 See `tests/README.md` for what's covered, the mock conventions, and the
 two regression locks (Bug 1: already-merged branch detection; Bug 2:
 multi-table INDEX.md parsing). The suite runs in CI via
-`.github/workflows/sulis-execution-tests.yml` on every push and PR
-touching `plugins/sulis-execution/scripts/**`.
+`.github/workflows/sulis-executor-tests.yml` on every push and PR
+touching `plugins/sulis/scripts/**`.
 
 ## See also
 

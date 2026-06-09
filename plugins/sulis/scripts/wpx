@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# wpx — dispatch to the latest installed wpx-<subtool>.
+# wpx — dispatch to a wpx-<subtool> that lives alongside this script.
 #
-# Resolves the wpx-* tool directory by searching the Claude Code plugin
-# cache (~/.claude/plugins/cache/.../sulis-execution/<version>/scripts/),
-# then exec's the requested subtool with the remaining arguments.
+# `wpx` ships IN scripts/ next to every wpx-* sibling, so it resolves its
+# tool directory relative to ITSELF (`realpath` of $0) — never by globbing
+# the plugin cache. Globbing + `sort -r` is a lexical sort that mis-ranks
+# 0.98.0 above 0.126.0 (#49); self-location sidesteps that entirely and is
+# correct whether installed in the cache, symlinked onto $PATH, or run from
+# the marketplace repo. It then exec's the requested subtool with the
+# remaining arguments.
 #
 # Usage:
 #   wpx <subtool> [args...]
@@ -50,33 +54,32 @@ fi
 
 shift  # drop the subtool name from $@
 
-# Resolution — installed cache wins; dev cwd as fallback.
-WPX_DIR=$(
-  find "$HOME/.claude/plugins/cache" \
-    -name wpx-journal -type f \
-    -path '*/sulis-execution/*/scripts/*' \
-    2>/dev/null \
-  | sort -r | head -1 | xargs -I{} dirname {} 2>/dev/null
-)
-
-# Dev fallback: if `wpx` is being run from within the marketplace repo
-# (i.e., the script lives next to the other wpx-* tools), prefer that.
-if [ -z "$WPX_DIR" ] && [ -f "$(dirname "$0")/wpx-journal" ]; then
-  WPX_DIR="$(dirname "$0")"
+# Resolution — self-locate relative to THIS script (#49). `wpx` lives in
+# scripts/ alongside every wpx-* sibling, so the tool dir is simply the
+# directory of the resolved (symlink-followed) path of $0. No cache glob,
+# no lexical sort. `realpath` follows symlinks on both Linux and modern
+# macOS; if it is somehow unavailable we fall back to a Python resolve.
+_self="$0"
+if command -v realpath >/dev/null 2>&1; then
+  _self="$(realpath "$0")"
+else
+  _self="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$0")"
 fi
+WPX_DIR="$(cd "$(dirname "$_self")" && pwd)"
 
-if [ -z "$WPX_DIR" ]; then
-  cat >&2 <<'EOF'
-wpx: cannot locate wpx-* scripts.
+if [ ! -f "$WPX_DIR/wpx-journal" ]; then
+  cat >&2 <<EOF
+wpx: cannot locate wpx-* scripts next to this dispatcher.
 
-The sulis-execution plugin is either not installed or its cache is in
-an unexpected location. To install:
+Resolved tool dir: $WPX_DIR
+Expected to find: \$WPX_DIR/wpx-journal
+
+This dispatcher resolves its siblings relative to its own path. If you see
+this, the install is corrupt or the script was copied away from its
+wpx-* siblings. Reinstall:
 
   claude plugin marketplace add https://github.com/sulis-ai/agents
-  claude plugin install sulis-execution@sulis-ai-agents
-
-If you are developing the plugin locally, run `wpx` from the
-marketplace repo root so it can find its sibling scripts.
+  claude plugin install sulis@sulis-ai-agents
 EOF
   exit 127
 fi
