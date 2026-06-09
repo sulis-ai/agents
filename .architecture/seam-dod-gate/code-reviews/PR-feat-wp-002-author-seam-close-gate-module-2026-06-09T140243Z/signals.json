@@ -1,0 +1,12 @@
+{
+  "build_verification": {"pr_introduced_errors": 0, "py_compile": "ok", "ruff_check": "clean"},
+  "pr_hygiene": {
+    "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "low"},
+    "size": {"lines_added": 337, "lines_removed": 0, "files_changed": 1, "generated_ratio": 0.0, "severity": "low", "note": "single new pure-decision module; ~120 lines are docstring/comments"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+    "completeness": {"new_source_without_test": 0, "note": "covered by WP-001's 12 tests already on base; 90% coverage", "api_change_without_schema": false, "severity": "none"}
+  },
+  "findings": {"changes": {"critical": 0, "high": 0, "medium": 0, "low": 0}, "neighbours": {"total": 0}},
+  "draft_fixes": 0,
+  "verdict": "PASS"
+}
