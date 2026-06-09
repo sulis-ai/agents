@@ -1,0 +1,11 @@
+{
+  "exercises": "dna:design:EEDCDTT7F40JPMXZBV2KRP1ARS",
+  "id": "dna:scenario:1E5HST68E4EN3XD9VK7DDF65QK",
+  "journey": "dna:workflow:888Y5ETGBBSTMBE78J5S3NAN15",
+  "name": "SC-03: An unpopulated section is marked n/a, never silently omitted",
+  "state": "draft",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:N6DGEBSABJ47SFHFJDVTJ7KV1V"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:QKRAFPAXA6PQBENPK4BYV0B6MY",
+  "initial_steps": [
+    "4k6svneh-run-the-gate-on-a-fixture-where-only-the-1"
+  ],
+  "name": "SC-14: Happy-path-only scenarios leave exception flows flagged as gaps",
+  "state": "draft",
+  "steps": [
+    "4k6svneh-run-the-gate-on-a-fixture-where-only-the-1"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "4k6svneh-run-the-gate-on-a-fixture-where-only-the-1"
+  ],
+  "transitions": [
+    "4k6svneh-run-the-gate-on-a-fixture-where-only-the-1 -> end"
+  ],
+  "type": "review"
+}

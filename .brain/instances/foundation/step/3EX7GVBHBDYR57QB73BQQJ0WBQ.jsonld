@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Produce the comprehensive document for a fixture change that exposes a tool surface (a producer/consumer seam)",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:3EX7GVBHBDYR57QB73BQQJ0WBQ",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "m8c28pc7-produce-the-comprehensive-document-for-a-1",
+  "output_artifacts": [
+    "m8c28pc7-produce-the-comprehensive-document-for-a-1-result"
+  ],
+  "postconditions": [
+    "the document is produced",
+    "the change has a tool surface"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

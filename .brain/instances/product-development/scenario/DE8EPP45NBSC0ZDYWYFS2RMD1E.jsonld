@@ -1,0 +1,11 @@
+{
+  "exercises": "dna:design:EEDCDTT7F40JPMXZBV2KRP1ARS",
+  "id": "dna:scenario:DE8EPP45NBSC0ZDYWYFS2RMD1E",
+  "journey": "dna:workflow:MSDT5KW190T3J9J9T9D69JGRJ4",
+  "name": "SC-18: A tool-surface change's doc carries an interface-contract section with all CF-10 dimensions",
+  "state": "draft",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:K85KHQ9YZJVEM5Y2QX3K2CGBFY"
+  ]
+}

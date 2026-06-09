@@ -1,0 +1,22 @@
+{
+  "agent_instructions": "Create a fixture behavioural change and run /sulis:specify forcing depth=lite",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:C7G1N70Z8Y04C9VXFGX2J1Y57F",
+  "input_artifacts": [
+    "test-target",
+    "methodology-fixture-change"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_drive_specify.py --fixture sample-user-facing --depth lite --out /tmp/sc01-doc.md\", \"expect_exit\": 0}",
+  "name": "h3hdwy2t-create-a-fixture-behavioural-change-and-1",
+  "output_artifacts": [
+    "h3hdwy2t-create-a-fixture-behavioural-change-and-1-result"
+  ],
+  "postconditions": [
+    "the specify stage completes at lite depth",
+    "a design document is written to /tmp/sc01-doc.md"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

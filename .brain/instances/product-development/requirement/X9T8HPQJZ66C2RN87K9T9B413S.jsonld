@@ -1,0 +1,13 @@
+{
+  "acceptance_criteria": [
+    "see SRD body"
+  ],
+  "id": "dna:requirement:X9T8HPQJZ66C2RN87K9T9B413S",
+  "priority": "must",
+  "rationale": "Extracted from FR-03 of .specifications/comprehensive-spec-and-journey-walk/SRD.md. Change CH-CQRWWR (01KTPWDWJ7CQRWWRGPQEQ22P1M).",
+  "source": "dna:change:01KTPWDWJ7CQRWWRGPQEQ22P1M",
+  "state": "draft",
+  "statement": "FR-03 \u2014 The depth classifier MUST NOT be consulted to decide whether use cases / NFR / threat model / diagrams are produced.",
+  "sys_status": "active",
+  "verification_method": "test"
+}

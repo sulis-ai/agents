@@ -1,0 +1,22 @@
+{
+  "agent_instructions": "Run the tool-surface walk on a fixture where the handler exists and serves but has no ServiceSpec binding",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:A4AVN65KWEYHW7G6P14FRVJA2P",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_drive_journey_walk.py --fixture tool-serving-no-binding --surface tool --out /tmp/sc09-tdd.md\", \"expect_exit\": 1}",
+  "name": "dg6zkaan-run-the-tool-surface-walk-on-a-fixture-w-1",
+  "output_artifacts": [
+    "dg6zkaan-run-the-tool-surface-walk-on-a-fixture-w-1-result"
+  ],
+  "postconditions": [
+    "the serving-but-unbound operation is classified GAP, not EXISTS",
+    "the design stage is blocked by the GAP (non-zero exit)",
+    "the looks-built-but-isnt-wired case is caught"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

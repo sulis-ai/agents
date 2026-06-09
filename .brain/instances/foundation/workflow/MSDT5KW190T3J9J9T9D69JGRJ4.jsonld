@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:MSDT5KW190T3J9J9T9D69JGRJ4",
+  "initial_steps": [
+    "m8c28pc7-produce-the-comprehensive-document-for-a-1"
+  ],
+  "name": "SC-18: A tool-surface change's doc carries an interface-contract section with all CF-10 dimensions",
+  "state": "draft",
+  "steps": [
+    "m8c28pc7-produce-the-comprehensive-document-for-a-1",
+    "m8c28pc7-assert-the-solution-design-carries-an-in-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "m8c28pc7-assert-the-solution-design-carries-an-in-2"
+  ],
+  "transitions": [
+    "m8c28pc7-produce-the-comprehensive-document-for-a-1 -> m8c28pc7-assert-the-solution-design-carries-an-in-2"
+  ],
+  "type": "review"
+}

@@ -1,0 +1,22 @@
+{
+  "agent_instructions": "Author a tool scenario whose real drive needs a sandbox/credential that is absent, then run it",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:H254GCSEPYSCY8TNYEF8N42PQD",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_drive_scenario.py --scenario tool-needs-sandbox --out /tmp/sc11-result.json\", \"expect_exit\": 0}",
+  "name": "mnhbv3yq-author-a-tool-scenario-whose-real-drive-1",
+  "output_artifacts": [
+    "mnhbv3yq-author-a-tool-scenario-whose-real-drive-1-result"
+  ],
+  "postconditions": [
+    "the scenario is NOT marked green",
+    "it is recorded as a deferred infrastructure need with an identifier",
+    "it is not silently dropped"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

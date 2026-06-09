@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:81KWXE9JKJF8NKMH7AX2T1EN8B",
+  "initial_steps": [
+    "pxxb9s84-run-sulis-specify-on-the-same-fixture-at-1"
+  ],
+  "name": "SC-02: The section set is identical across all three depths",
+  "state": "draft",
+  "steps": [
+    "pxxb9s84-run-sulis-specify-on-the-same-fixture-at-1",
+    "pxxb9s84-diff-the-section-set-headers-only-across-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "pxxb9s84-diff-the-section-set-headers-only-across-2"
+  ],
+  "transitions": [
+    "pxxb9s84-run-sulis-specify-on-the-same-fixture-at-1 -> pxxb9s84-diff-the-section-set-headers-only-across-2"
+  ],
+  "type": "review"
+}

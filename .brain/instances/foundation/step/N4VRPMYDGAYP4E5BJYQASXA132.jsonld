@@ -1,0 +1,22 @@
+{
+  "agent_instructions": "Assert the threat-model section has the STRIDE table, trust boundaries, attack surface, and summary",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:N4VRPMYDGAYP4E5BJYQASXA132",
+  "input_artifacts": [
+    "68zma829-produce-the-comprehensive-document-for-a-1-result"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_assert_stride.py /tmp/sc15-doc.md --require stride-table,trust-boundaries,attack-surface,summary\", \"expect_exit\": 0}",
+  "name": "68zma829-assert-the-threat-model-section-has-the-2",
+  "output_artifacts": [
+    "68zma829-assert-the-threat-model-section-has-the-2-result"
+  ],
+  "postconditions": [
+    "a STRIDE analysis table is present",
+    "trust boundaries and attack surface are documented",
+    "the threat model is present even at lite depth"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

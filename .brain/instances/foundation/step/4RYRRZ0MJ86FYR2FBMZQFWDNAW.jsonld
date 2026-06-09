@@ -1,0 +1,22 @@
+{
+  "agent_instructions": "Enumerate every flow (main/alternate/exception) of the fixture's use cases and the scenarios derived from them",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:4RYRRZ0MJ86FYR2FBMZQFWDNAW",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_assert_flow_scenario_map.py --fixture sample-user-facing --require-each-flow-covered\", \"expect_exit\": 0}",
+  "name": "9e3zczqh-enumerate-every-flow-main-alternate-exce-1",
+  "output_artifacts": [
+    "9e3zczqh-enumerate-every-flow-main-alternate-exce-1-result"
+  ],
+  "postconditions": [
+    "each main flow maps to >= 1 scenario",
+    "each alternate flow maps to >= 1 scenario",
+    "each exception flow maps to >= 1 scenario"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

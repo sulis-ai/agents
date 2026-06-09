@@ -1,0 +1,21 @@
+{
+  "agent_instructions": "Statically inspect the specify/design emission path for any branch on classify_depth that decides section existence",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:396BPVMNZGBGV9NWG9JE0FHBR3",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_assert_no_depth_doc_gate.py plugins/sulis/skills/specify/SKILL.md plugins/sulis/skills/draft-architecture/SKILL.md plugins/sulis/agents/requirements-analyst.md\", \"expect_exit\": 0}",
+  "name": "d3sjp2a3-statically-inspect-the-specify-design-em-1",
+  "output_artifacts": [
+    "d3sjp2a3-statically-inspect-the-specify-design-em-1-result"
+  ],
+  "postconditions": [
+    "zero emission branches condition section existence on depth",
+    "depth feeds the interview sizer only"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

@@ -1,0 +1,13 @@
+{
+  "acceptance_criteria": [
+    "see SRD body"
+  ],
+  "id": "dna:requirement:598EXEKB11TBGK0YY43HKK8V8H",
+  "priority": "must",
+  "rationale": "Extracted from FR-19 of .specifications/comprehensive-spec-and-journey-walk/SRD.md. Change CH-CQRWWR (01KTPWDWJ7CQRWWRGPQEQ22P1M). Contract-first amendment grounded in CONTRACT_FIRST_STANDARD CF-01/CF-05.",
+  "source": "dna:change:01KTPWDWJ7CQRWWRGPQEQ22P1M",
+  "state": "draft",
+  "statement": "FR-19 — When a change spans a producer and a consumer of a tool/API/SDK seam, the methodology MUST specify the interface contract FIRST and require both sides to reference it (CF-01/CF-05); the tool-surface journey walk MUST treat the FR-18 contract section as the source of the operations it walks (walk operations subset of contract).",
+  "sys_status": "active",
+  "verification_method": "test"
+}

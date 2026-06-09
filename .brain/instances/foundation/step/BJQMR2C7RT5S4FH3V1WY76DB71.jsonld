@@ -1,0 +1,21 @@
+{
+  "agent_instructions": "Assert the UI Journey Walk table classifies every hop as EXISTS, planned-WP, or out-of-scope (no bare GAP, no unclassified hop)",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:BJQMR2C7RT5S4FH3V1WY76DB71",
+  "input_artifacts": [
+    "a2k1mcf5-run-the-design-stage-journey-walk-on-a-f-1-result"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_assert_walk_table.py /tmp/sc06-tdd.md --surface ui --no-bare-gap\", \"expect_exit\": 0}",
+  "name": "a2k1mcf5-assert-the-ui-journey-walk-table-classif-2",
+  "output_artifacts": [
+    "a2k1mcf5-assert-the-ui-journey-walk-table-classif-2-result"
+  ],
+  "postconditions": [
+    "every UI hop carries a classification",
+    "no hop is left unclassified"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}
