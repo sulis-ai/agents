@@ -384,6 +384,52 @@ class Session:
             if self.state_machine.can_transition(terminal):
                 self.state_machine.transition(terminal)
 
+    def release_turn_for_retry(self) -> None:
+        """Free the one-in-flight slot for a turn that ended in a **retryable**
+        ``error`` — on the SAME live process, WITHOUT terminating it (recovery
+        slot-release seam).
+
+        The retry sibling of :meth:`force_terminate_turn`. An ``error`` Event
+        does not satisfy the adapter's ``turn_complete`` (only a ``result``
+        does), so the stdout pump never frees the slot for an errored turn — the
+        stdin pump stays parked on ``_turn_done.wait()`` (§2.6). When the
+        manager routes a transient-blip ``error`` to the recovery driver, the
+        driver re-submits the stopped turn through the manager's FIFO; that
+        re-submit can only promote once the held slot is freed. This method frees
+        it through the **same** ``_turn_done.set()`` the normal completion path
+        uses (§2.6 — one free-the-slot, not a forked one), so the parked stdin
+        pump wakes and the replay promotes onto the still-live process.
+
+        **Distinct from :meth:`force_terminate_turn`.** A transient blip is an
+        API-level failure, not a dead process: the process, its pumps, and its
+        log are all kept. So this does *not* SIGKILL the child, does *not* bump
+        the pump generation, and does *not* drive restart-on-death; it only ends
+        the *turn* (EXECUTING → READY, best-effort under the session lock — a
+        racing death owns the state, so an illegal transition is a no-op) and
+        frees the slot. The one-in-flight invariant is preserved: the errored
+        turn is logically handed back, and the driver's replay re-acquires the
+        slot as just-another-turn — at no point are two turns genuinely in
+        flight on the same process.
+
+        **``_process_ended`` is deliberately NOT set.** Unlike the EOF death
+        path, the process is alive, so the stdin pump woken by the
+        ``_turn_done.set()`` below must NOT see a "process gone" flag — it pulls
+        the replayed command and writes it to the live child. (The guard-kill /
+        mid-turn-death path sets ``_process_ended`` to *stop* a write into a
+        corpse; here the opposite is required — the replayed write must land.)
+
+        Safe from the short-lived recovery daemon thread the manager's
+        ``_on_error_event`` dispatches on: it touches only the threading-primitive
+        slot + the lock-guarded state machine, never the process or the pumps.
+
+        End the turn (EXECUTING → READY) via the shared best-effort
+        :meth:`_try_transition` — the same racing-death-safe, lock-guarded
+        transition the normal turn cycle uses (Blue: one transition helper, not a
+        re-spelled lock block) — then free the slot through the existing
+        ``_turn_done.set()`` seam."""
+        self._try_transition(SessionState.READY)
+        self._turn_done.set()
+
     def kill_process(self) -> None:
         """Hard-kill the child so a hung / runaway turn actually stops, then reap
         it (WP-007).
