@@ -13,9 +13,11 @@
 //
 // The create/edit/attach/remove FORMS + the confirm-remove DIALOG are a sibling
 // WP (WP-009): this page renders the tree + the affordance buttons and wires
-// them via callbacks; WP-009 owns the form/dialog components, and WP-010 wires
-// them into the page. Until then the affordance callbacks are unset (the
-// buttons render per the mockup; clicking is wired in WP-010).
+// them via callbacks; WP-009 owns the form/dialog components. WP-010 wires them
+// in: `useSettingsActions` owns "which form is open against which entity" and
+// `<SettingsActionOverlay/>` renders the matching WP-009 form, driving the
+// WP-007 fetchers and invalidating SETTINGS_QUERY_KEY + PRODUCTS_QUERY_KEY on
+// success so the tree + product switcher refresh with no page reload.
 //
 // Render-failure error boundary (WPF-08): the cockpit has no app-wide error
 // boundary today (no page mounts one — Board/ThreadView rely on the query
@@ -31,10 +33,15 @@
 import type { SettingsProduct } from "../../../shared/api-types";
 import { useSettings } from "../api/useSettings";
 import { ProductRow } from "./settings/ProductRow";
+import {
+  useSettingsActions,
+  SettingsActionOverlay,
+} from "./settings/SettingsActions";
 import styles from "./settings/Settings.module.css";
 
 export function SettingsPage() {
   const settings = useSettings();
+  const actions = useSettingsActions();
 
   const products: SettingsProduct[] = settings.data?.products ?? [];
   // First-run / empty: a genuinely empty store, OR the synthesised implicit
@@ -95,6 +102,7 @@ export function SettingsPage() {
               <button
                 type="button"
                 className={`${styles.btn} ${styles.btnPrimary}`}
+                onClick={actions.handlers.onAddProduct}
               >
                 + Add product
               </button>
@@ -110,17 +118,36 @@ export function SettingsPage() {
               <button
                 type="button"
                 className={`${styles.btn} ${styles.btnPrimary}`}
+                onClick={actions.handlers.onAddProduct}
               >
                 + Add your first product
               </button>
             </div>
           ) : (
             products.map((product) => (
-              <ProductRow key={product.productId} product={product} />
+              <ProductRow
+                key={product.productId}
+                product={product}
+                onRenameProduct={actions.handlers.onRenameProduct}
+                onRemoveProduct={actions.handlers.onRemoveProduct}
+                onAddProject={actions.handlers.onAddProject}
+                onEditProject={actions.handlers.onEditProject}
+                onChangeRepo={actions.handlers.onChangeRepo}
+                onAttachRepo={actions.handlers.onAttachRepo}
+                onRemoveProject={actions.handlers.onRemoveProject}
+              />
             ))
           )}
         </div>
       )}
+
+      {/* The write-affordance overlay: renders the WP-009 form/dialog for the
+          active affordance, invalidating the tree + switcher on success. */}
+      <SettingsActionOverlay
+        active={actions.active}
+        close={actions.close}
+        invalidate={actions.invalidate}
+      />
     </section>
   );
 }

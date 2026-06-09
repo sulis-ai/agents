@@ -49,12 +49,16 @@
 }
 
 /* ── buttons ────────────────────────────────────────────────────────────── */
+/* .btn is aligned to the SettingsForms.module.css form variant (WP-010
+ * integration touch): both surfaces' buttons share padding + radius so the tree
+ * affordances and the forms/dialogs they open read as one set. The form variant
+ * (8px 14px / --radius-interactive) is the chosen baseline. */
 .btn {
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: var(--weight-label);
-  padding: 7px 14px;
-  border-radius: var(--radius-button);
+  padding: 8px 14px;
+  border-radius: var(--radius-interactive);
   border: 1px solid transparent;
   cursor: pointer;
 }
