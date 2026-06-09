@@ -211,6 +211,16 @@ TERMINAL_SIDECAR_REL="server/adapters/TerminalSidecar.ts"  # the ONE WS-attachme
 # process and writes no file itself — it delegates to this one adapter.
 SETTINGS_ADAPTER_REL="server/adapters/SpineSettingsAdapter.ts"
 
+# WP-006 (ADR-019) — the Settings router is the THIRD sanctioned write-verb file
+# (parity with the chat relay + the operator-action route). It registers the
+# settings CRUD mutation verbs (`router.post` / `router.delete`) BUT starts no
+# process and writes no file itself: every mutation delegates to the SettingsStore
+# port, whose sole adapter (SpineSettingsAdapter, above) is the one allow-listed
+# writer. Allow-listed BY PATH for the HTTP mutation-verb rule (rule 5) ONLY —
+# it gains NO filesystem-write or process-start exception. Every OTHER file with
+# a mutation verb is still a violation.
+SETTINGS_ROUTE_REL="server/routes/settings.ts"
+
 # Accumulate per-rule hits across all files.
 declare -a fs_hits=() git_spawn_hits=() git_verb_hits=() kill_hits=() http_hits=() bind_hits=() proc_hits=() ws_hits=()
 
@@ -362,7 +372,10 @@ for f in "${SOURCE_FILES[@]}"; do
       #    ADR-015 also allow-lists advanced.ts: its two operator POST routes
       #    (reveal-in-finder + stop-process) are explicit operator actions, not
       #    edits to any read surface. Allow-listed BY PATH alongside the relay.
-      if [ "$rel" != "$RELAY_ROUTE_REL" ] && [ "$rel" != "$ADVANCED_ROUTE_REL" ]; then
+      #    WP-006 (ADR-019) also allow-lists settings.ts: the THIRD sanctioned
+      #    write surface — its settings CRUD verbs delegate to the one allow-
+      #    listed adapter (it starts no process, writes no file itself).
+      if [ "$rel" != "$RELAY_ROUTE_REL" ] && [ "$rel" != "$ADVANCED_ROUTE_REL" ] && [ "$rel" != "$SETTINGS_ROUTE_REL" ]; then
         while IFS= read -r line; do
           [ -n "$line" ] && http_hits+=("$rel: $line")
         done < <(printf '%s\n' "$stripped" | grep -nE \

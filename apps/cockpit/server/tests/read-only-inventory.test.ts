@@ -88,6 +88,16 @@ const STARTER_BASENAME = "SulisChangeStarter.ts";
 // process and writes no file itself; it delegates to this one adapter.
 const SETTINGS_ADAPTER_BASENAME = "SpineSettingsAdapter.ts";
 
+// WP-006 (ADR-019) — the Settings router is the THIRD sanctioned write-verb
+// file (parity with the chat relay + the operator-action route). It carries the
+// mutating verbs (`router.post` / `router.delete`) for the settings CRUD seam
+// BUT starts no process and writes no file itself: every mutation delegates to
+// the SettingsStore port, whose sole adapter (SpineSettingsAdapter, above) is
+// the one allow-listed writer. Allow-listed BY PATH for the write-verb rule —
+// the same single-audited-surface discipline as chat.ts. Every OTHER file with
+// a mutation verb is still a violation.
+const SETTINGS_ROUTE_BASENAME = "settings.ts";
+
 // ADR-015 (keep-the-gate-with-named-exception) — four operator-action +
 // summary-cache sites, each allow-listed BY PATH (parity with the relay/mint
 // exceptions above). These are the ONLY additions; any OTHER file with the
@@ -280,11 +290,13 @@ describe("read-only inventory (TDD §13.7)", () => {
   it("registers no POST / PUT / PATCH / DELETE routes — except the sanctioned relay + operator-action routes (ADR-003/015)", async () => {
     const files = await collectSourceFiles();
     expect(files.length).toBeGreaterThan(0);
-    // The chat relay (ADR-003) and the operator-action routes (ADR-015) are the
-    // ONLY allow-listed write-verb files.
+    // The chat relay (ADR-003), the operator-action routes (ADR-015), and the
+    // settings router (WP-006, ADR-019) are the ONLY allow-listed write-verb
+    // files.
     const WRITE_VERB_ALLOW = new Set([
       RELAY_ROUTE_BASENAME,
       ADVANCED_ROUTE_BASENAME,
+      SETTINGS_ROUTE_BASENAME,
     ]);
     const offenders: string[] = [];
     const writeVerbFiles = new Set<string>();
@@ -297,11 +309,36 @@ describe("read-only inventory (TDD §13.7)", () => {
       offenders.push(`${f} :: HTTP mutation verb outside the allow-list`);
     }
     expect(offenders, JSON.stringify(offenders)).toEqual([]);
-    // The EXACT exception set: exactly the relay + the operator-action route
-    // register a write verb — no more, no less.
+    // The EXACT exception set: exactly the relay + the operator-action route +
+    // the settings router register a write verb — no more, no less.
     expect([...writeVerbFiles].sort()).toEqual(
-      [RELAY_ROUTE_BASENAME, ADVANCED_ROUTE_BASENAME].sort(),
+      [
+        RELAY_ROUTE_BASENAME,
+        ADVANCED_ROUTE_BASENAME,
+        SETTINGS_ROUTE_BASENAME,
+      ].sort(),
     );
+  });
+
+  // WP-006 (ADR-019) — the settings router IS a write-verb file (its sanctioned
+  // job), but it is the load-bearing ADR-019 proof that it starts NO process and
+  // writes NO file itself: every mutation delegates to the SettingsStore port,
+  // whose sole adapter (SpineSettingsAdapter) is the one allow-listed writer.
+  it("the settings router carries write verbs but starts no process and writes no file (ADR-019)", async () => {
+    const files = await collectSourceFiles();
+    const router = files.find((f) => basename(f) === SETTINGS_ROUTE_BASENAME);
+    expect(
+      router,
+      "routes/settings.ts must exist (the THIRD sanctioned write surface)",
+    ).toBeDefined();
+    if (router) {
+      const src = stripComments(await readSource(router));
+      // It DOES register mutation verbs (that is its sanctioned job).
+      expect(MUTATION_VERB_PATTERNS.some((p) => p.test(src))).toBe(true);
+      // But it starts NO process and writes NO file — the delegation invariant.
+      expect(PROCESS_START_PATTERNS.some((p) => p.test(src))).toBe(false);
+      expect(FS_MUTATION_PATTERNS.some((p) => p.test(src))).toBe(false);
+    }
   });
 
   it("starts no child process — except the one sanctioned SessionBridge adapter (ADR-003 new rule)", async () => {
@@ -436,9 +473,14 @@ describe("read-only inventory (TDD §13.7)", () => {
     }
     // The concierge POST rides the sanctioned relay (chat.ts) — it adds NO new
     // write-verb file. The write-verb allow-list is exactly the relay + the
-    // operator-action route (advanced.ts, ADR-015).
+    // operator-action route (advanced.ts, ADR-015) + the settings router
+    // (settings.ts, WP-006/ADR-019).
     expect(writeVerbFiles.sort()).toEqual(
-      [RELAY_ROUTE_BASENAME, ADVANCED_ROUTE_BASENAME].sort(),
+      [
+        RELAY_ROUTE_BASENAME,
+        ADVANCED_ROUTE_BASENAME,
+        SETTINGS_ROUTE_BASENAME,
+      ].sort(),
     );
   });
 
@@ -466,9 +508,14 @@ describe("read-only inventory (TDD §13.7)", () => {
     }
     // The start-from-intent POST rides the sanctioned relay (chat.ts) — it adds
     // NO new write-verb file. The write-verb allow-list is exactly the relay +
-    // the operator-action route (advanced.ts, ADR-015).
+    // the operator-action route (advanced.ts, ADR-015) + the settings router
+    // (settings.ts, WP-006/ADR-019).
     expect(writeVerbFiles.sort()).toEqual(
-      [RELAY_ROUTE_BASENAME, ADVANCED_ROUTE_BASENAME].sort(),
+      [
+        RELAY_ROUTE_BASENAME,
+        ADVANCED_ROUTE_BASENAME,
+        SETTINGS_ROUTE_BASENAME,
+      ].sort(),
     );
   });
 

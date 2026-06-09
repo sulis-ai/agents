@@ -1,0 +1,18 @@
+{
+  "pr": "feat/wp-006-settings-router",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0, "tsc": "clean", "eslint": "clean" },
+  "hygiene": {
+    "scope": { "severity": "low", "note": "single concern: the settings write surface (WP-006)" },
+    "size": { "lines_added": 765, "lines_removed": 15, "files_changed": 6, "severity": "low" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "low" },
+    "completeness": { "new_source": 1, "new_tests": 1, "api_change_without_schema": false, "severity": "low" }
+  },
+  "findings": { "in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 0 }, "in_neighbours": 0 },
+  "lenses": {
+    "architecture": { "findings": 0, "note": "dependency direction correct (router->port; concrete adapter only at composition root); ADR-019 gate extension tested both directions" },
+    "security": { "findings": 0, "note": "no auth surface added (local 127.0.0.1); router delegates path/id validation to adapter, never bypasses; boundary rejects malformed bodies; no secrets; gate proves no new process-start/write" },
+    "quality": { "findings": 0, "note": "tsc+eslint clean; tests cover all 7 routes + all 6 error codes + boundary validation + real round trips; STATUS_BY_CODE exhaustive (tsc-enforced); no dead surface; CR-10 no anti-patterns" }
+  },
+  "draft_fixes": 0
+}
