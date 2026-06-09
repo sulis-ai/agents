@@ -1,0 +1,43 @@
+{
+  "pr": "feat/wp-004-validated-emit-helpers",
+  "base": "change/feat-user-level-product-store-settings",
+  "timestamp": "2026-06-09T112355Z",
+  "verdict": "PASS",
+  "build_verification": {
+    "errors": 0,
+    "tools": {
+      "tsc": { "command": "tsc --noEmit -p server", "exit": 0, "errors": 0 },
+      "eslint": { "command": "eslint server/tests/emit-helpers.test.ts", "exit": 0, "errors": 0 },
+      "ruff": { "command": "ruff check apps/cockpit/server/adapters/spine/", "exit": 0, "errors": 0 },
+      "py_compile": { "command": "py_compile spine/*.py", "exit": 0, "errors": 0 }
+    }
+  },
+  "hygiene": {
+    "scope": { "severity": "low", "commit_types": ["feat"], "module_fan_out": 1 },
+    "size": { "severity": "low", "lines_added": 734, "source_lines_approx": 390, "files_changed": 6 },
+    "safety": { "severity": "none", "migrations": 0, "schema_idl": 0, "infra": 0, "secrets": 0 },
+    "completeness": { "severity": "none", "new_source_without_test": 0 }
+  },
+  "findings": {
+    "in_changes": [
+      {
+        "id": "F-001",
+        "severity": "low",
+        "lens": "security",
+        "file": "apps/cockpit/server/adapters/spine/list-entities.py",
+        "line": 43,
+        "summary": "--domain/--kind interpolated into a filesystem path; benign under current server-literal callers; read-only helper.",
+        "disposition": "watch-list",
+        "delta": null
+      }
+    ],
+    "in_neighbours": []
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "status": "nothing-surfaced" },
+    "security": { "findings": 1, "status": "surfaced" },
+    "quality": { "findings": 0, "status": "nothing-surfaced" }
+  },
+  "deltas": [],
+  "counts": { "critical": 0, "high": 0, "medium": 0, "low": 1 }
+}
