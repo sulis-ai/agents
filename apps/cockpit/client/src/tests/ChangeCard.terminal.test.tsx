@@ -34,6 +34,10 @@ const fixture: Change = {
   updatedAt: "2026-06-07T00:00:00Z",
   stage: "implement",
   liveness: { status: "not-running" },
+  // WP-001 widened fields — fixture defaults.
+  needsAttention: { flagged: false, reason: null },
+  health: { state: "unknown", reason: "too early to tell" },
+  lastActivityAt: null,
 };
 
 function renderCard(onOpenTerminal: (changeId: string) => void) {

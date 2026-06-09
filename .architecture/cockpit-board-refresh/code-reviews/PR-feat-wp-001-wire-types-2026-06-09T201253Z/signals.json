@@ -1,0 +1,27 @@
+{
+  "pr": "feat/wp-001-wire-types",
+  "base": "change/feat-cockpit-board-refresh",
+  "timestamp": "2026-06-09T201253Z",
+  "build_verification": {
+    "tsc_head": "clean",
+    "eslint_head": "clean",
+    "pr_introduced_errors": 0
+  },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "none" },
+    "size": { "lines_added": 131, "lines_removed": 5, "files_changed": 16, "severity": "none" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none" },
+    "completeness": { "new_source_without_test": 0, "api_change_without_schema": false, "severity": "none" }
+  },
+  "findings": {
+    "changes": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+    "neighbours": { "critical": 0, "high": 0, "medium": 0, "low": 0 }
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "note": "new wire types in shared/ — correct layer; toWireChange placeholders follow A-1 never-throw; no new external calls/secrets/singletons" },
+    "security": { "findings": 0, "note": "type-only; no endpoints/auth/injection/secrets; health.reason JSDoc cites NFR-SEC-03 no-reply-body-leakage" },
+    "quality": { "findings": 0, "note": "build clean; no dead surface; worth-a-look carried-not-emitted is documented forward-compat (ADR-001), not drift; new test pins all 4 assertions" }
+  },
+  "draft_fixes": 0,
+  "verdict": "PASS"
+}
