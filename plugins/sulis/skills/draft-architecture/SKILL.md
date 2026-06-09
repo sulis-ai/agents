@@ -654,6 +654,12 @@ If extending or superseding, reference the existing ADR by path.}
    # Assert both tables present + no bare GAP on the tool surface:
    python3 <SCRIPTS_DIR>/_assert_walk_table.py --surface tool --require-two-tables --no-bare-gap DESIGN.md
    python3 <SCRIPTS_DIR>/_assert_walk_table.py --surface ui   --no-bare-gap DESIGN.md
+
+   # Assert the tool walk is a SUBSET of the interface contract (FR-19): every
+   # walked operation must be declared in the §7.6 contract — a walked op the
+   # contract never declared is OperationNotInContract (add it to the contract
+   # first). Exempt when there is no tool surface (no tool walk ⇒ passes).
+   python3 <SCRIPTS_DIR>/_assert_walk_subset_of_contract.py DESIGN.md
    ```
 
    The tool pass adds **≤ 1 agent turn** over the single-surface walk (NFR-S01)

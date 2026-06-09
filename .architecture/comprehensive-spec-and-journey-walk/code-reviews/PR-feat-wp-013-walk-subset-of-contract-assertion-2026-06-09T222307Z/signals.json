@@ -1,0 +1,29 @@
+{
+  "pr": "feat/wp-013-walk-subset-of-contract-assertion",
+  "base": "change/harden-comprehensive-spec-and-journey-walk",
+  "timestamp": "2026-06-09T222307Z",
+  "verdict": "PASS",
+  "verdict_plain": "Ready to merge",
+  "build_verification": {
+    "tools": ["ruff check", "py_compile"],
+    "pr_introduced_errors": 0
+  },
+  "hygiene": {
+    "scope": {"severity": "low", "commit_types": ["feat"], "module_fan_out": 1},
+    "size": {"severity": "low", "lines_added": 480, "lines_removed": 6, "files_changed": 4},
+    "safety": {"severity": "low", "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0},
+    "completeness": {"severity": "low", "new_source_without_test": 0, "api_change_without_schema": false}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "note": "one-direction reuse of sibling parsers; no singletons; no circular imports; pure inspector"},
+    "security": {"findings": 0, "primitives_checked": ["SEC-01", "SEC-02", "SEC-03", "SEC-04", "SEC-05", "SEC-06", "SEC-07"], "note": "read-only inspector, no auth/injection/secret surface"},
+    "quality": {"findings": 0, "tests_present": true, "test_count": 11, "cr10_matches": 0, "dead_surface": 0, "contract_drift": 0}
+  },
+  "findings": {
+    "in_changes": [],
+    "in_neighbours": [],
+    "watch_list": []
+  },
+  "hardening_deltas": [],
+  "auto_downgrade_fired": false
+}
