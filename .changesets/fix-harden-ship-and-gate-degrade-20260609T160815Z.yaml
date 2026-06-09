@@ -1,0 +1,7 @@
+change_id: 01KTPHN5FEZ899WSTDN5RZHR3G
+primitive: fix
+tier: patch
+touches_plugin: true
+summary: |
+  Refuse to mark an empty change shipped (a change with no commits of its own beyond its base can no longer be flipped to shipped / have its worktree removed); and the seam-close gate degrades open on a malformed requirement id instead of crashing.
+created_at: 2026-06-09T16:08:15Z
