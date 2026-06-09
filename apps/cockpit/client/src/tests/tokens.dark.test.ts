@@ -172,3 +172,108 @@ describe("tokens.css — dark token block (WP-002)", () => {
     ).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// WP-003 — dark-mode token VALUE changes (elevation + sharpened amber).
+//
+// WP-002 above pins the dark-block *shape* (which colour tokens exist). This
+// block pins the *values* the cockpit-board-refresh design signed off
+// (TDD §3 / IDEAS.md "Dark-mode token changes"): the three-step surface
+// elevation (page → lane → card, card lightest), the brightened border, the
+// deeper float shadow, the sharper waiting amber + its tint mixes, and the
+// single light `--warning` darken.
+//
+// The load-bearing assertion is the luminance ORDERING: in the prior values
+// the card (#1e2127) was DARKER than the lane (#20232a) — cards sank into the
+// board. The refresh inverts that so page < lane < card. This spec fails
+// against the current (inverted) values and passes once the edits land (S-31).
+
+/** Read the declared value of `--name` from a CSS block body (first match). */
+function tokenValue(body: string, name: string): string | null {
+  const re = new RegExp(
+    `(?:^|[;{\\s])${name.replace(/[-]/g, "\\-")}\\s*:\\s*([^;]+);`,
+  );
+  const m = body.match(re);
+  const captured = m?.[1];
+  return captured !== undefined ? captured.trim() : null;
+}
+
+/** Relative luminance (WCAG 2.x) of a `#rrggbb` hex, 0 (black) … 1 (white). */
+function relativeLuminance(hex: string): number {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16) / 255;
+  const g = parseInt(h.slice(2, 4), 16) / 255;
+  const b = parseInt(h.slice(4, 6), 16) / 255;
+  const lin = (c: number) =>
+    c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+describe("tokens.css — WP-003 dark elevation + amber values", () => {
+  // The exact dark `:root[data-theme="dark"]` values from TDD §3.
+  const DARK_EXPECTED: Record<string, string> = {
+    "--background": "#121419",
+    "--muted": "#1b1e24",
+    "--card": "#262a32",
+    "--border": "#3a3f4a",
+    "--input": "#3a3f4a",
+    "--popover": "#2b3038",
+    "--secondary": "#2f343d",
+    "--warning": "#ffb627",
+  };
+
+  async function darkBody(): Promise<string> {
+    const css = await fs.readFile(TOKENS_CSS, "utf8");
+    const dark = blockBody(css, ':root[data-theme="dark"]');
+    expect(dark, 'expected a :root[data-theme="dark"] block').not.toBeNull();
+    return dark as string;
+  }
+
+  it("sets each dark surface/amber token to its TDD §3 value", async () => {
+    const body = await darkBody();
+    for (const [name, expected] of Object.entries(DARK_EXPECTED)) {
+      expect(
+        tokenValue(body, name)?.toLowerCase(),
+        `dark ${name} should be ${expected}`,
+      ).toBe(expected.toLowerCase());
+    }
+  });
+
+  it("deepens the dark --shadow-float opacity to 0.55", async () => {
+    const body = await darkBody();
+    const v = tokenValue(body, "--shadow-float") ?? "";
+    expect(v, `dark --shadow-float was: ${v}`).toContain("0.55");
+    expect(v).not.toContain("0.45");
+  });
+
+  it("bumps the dark waiting-amber tint mixes (18→24%, 45→60%)", async () => {
+    const body = await darkBody();
+    const bg = tokenValue(body, "--bg-warning") ?? "";
+    const border = tokenValue(body, "--bg-warning-border") ?? "";
+    expect(bg, `--bg-warning was: ${bg}`).toContain("24%");
+    expect(bg).not.toContain("18%");
+    expect(border, `--bg-warning-border was: ${border}`).toContain("60%");
+    expect(border).not.toContain("45%");
+  });
+
+  it("orders dark surface elevation page < lane < card (S-31)", async () => {
+    const body = await darkBody();
+    const page = relativeLuminance(tokenValue(body, "--background") as string);
+    const lane = relativeLuminance(tokenValue(body, "--muted") as string);
+    const card = relativeLuminance(tokenValue(body, "--card") as string);
+    // Card is the lightest (raised) surface, lane sits between, page darkest.
+    expect(page, "page (--background) must be darkest").toBeLessThan(lane);
+    expect(lane, "lane (--muted) must sit between page and card").toBeLessThan(
+      card,
+    );
+  });
+
+  it("darkens the light --warning to #B45309 (graphical-contrast fix)", async () => {
+    const css = await fs.readFile(TOKENS_CSS, "utf8");
+    const light = blockBody(css, ":root {");
+    expect(light).not.toBeNull();
+    expect(tokenValue(light as string, "--warning")?.toLowerCase()).toBe(
+      "#b45309",
+    );
+  });
+});
