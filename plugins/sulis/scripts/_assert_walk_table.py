@@ -73,13 +73,19 @@ def _section_surface(body: list[str]) -> str | None:
     return None
 
 
-def _table_hop_statuses(body: list[str]) -> list[str]:
-    """Return the status cell of every hop row in the section's tables.
+def hop_rows(body: list[str]) -> list[list[str]]:
+    """Return the cells of every hop row in the section's walk tables.
 
     A hop row is a Markdown table row ``| hop | evidence | status |`` that is
-    neither the header (``| hop |``) nor the divider (``| --- |``).
+    neither the header (``| hop |``) nor the divider (``| --- |``). Each
+    returned row is its three stripped cells ``[hop, evidence, status]``.
+
+    This is the single owner of the walk-table row grammar (WP-013 Blue): both
+    this module's status reader and the walk-⊆-contract check's operation
+    reader (``_assert_walk_subset_of_contract``) derive from it, so the two
+    consumers never drift on what "a hop row" is.
     """
-    statuses: list[str] = []
+    rows: list[list[str]] = []
     for line in body:
         stripped = line.strip()
         if not (stripped.startswith("|") and stripped.endswith("|")):
@@ -91,8 +97,13 @@ def _table_hop_statuses(body: list[str]) -> list[str]:
             continue
         if set(cells[2]) <= {"-"}:  # divider row
             continue
-        statuses.append(cells[2])
-    return statuses
+        rows.append(cells)
+    return rows
+
+
+def _table_hop_statuses(body: list[str]) -> list[str]:
+    """Return the status cell of every hop row in the section's tables."""
+    return [row[2] for row in hop_rows(body)]
 
 
 def surfaces_present(text: str) -> set[str]:
