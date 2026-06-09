@@ -1,0 +1,49 @@
+id: ARCH-comprehensive-spec-and-journey-walk
+change_id: 01KTPWDWJ7CQRWWRGPQEQ22P1M
+handle: CH-CQRWWR
+slug: comprehensive-spec-and-journey-walk
+primitive: harden
+mode: brownfield
+status: designed          # draft → designed → decomposed → implemented → verified
+
+sourced_from:
+  srd: .specifications/comprehensive-spec-and-journey-walk/SRD.md
+  nfr: .specifications/comprehensive-spec-and-journey-walk/NFR.md
+  misuse_cases: .specifications/comprehensive-spec-and-journey-walk/MISUSE_CASES.md
+  glossary: .specifications/comprehensive-spec-and-journey-walk/GLOSSARY.md
+
+target_model: features/entity-crud/DESIGN.md   # platform repo (read-only reference)
+
+sizing:
+  tier: L                 # sFPC 17 → M; ASR 36 → L; take higher
+  file: SIZING.md
+
+artifacts:
+  design: DESIGN.md
+  adrs:
+    - adrs/ADR-001-depth-decouples-by-removing-branch.md
+    - adrs/ADR-002-one-comprehensive-structure-always.md
+    - adrs/ADR-003-tool-surface-second-walk-pass.md
+    - adrs/ADR-004-uc-flow-coverage-third-companion-gate.md
+    - adrs/ADR-005-tool-scenarios-reuse-98-substrate-surface-tag.md
+    - adrs/ADR-006-adr-bdr-kind-discriminator.md
+    - adrs/ADR-007-contract-is-mandatory-doc-section-walk-reads-from.md
+  bdrs:
+    - bdrs/BDR-001-ship-three-phases-in-sequence.md
+    - bdrs/BDR-002-three-gates-one-rollup.md
+  index: adrs/INDEX.md
+
+brain_entities:
+  design: dna:design:4SFEN26WYWYMT9D69QSJRM4BEJ
+  decisions:
+    - dna:decision:01KTPZ0HP73S9G3Y5CPHG7MHNF   # ADR-001
+    - dna:decision:01KTPZ0HXRA1ZW2KZPC3G60QPM   # ADR-002
+    - dna:decision:01KTPZ0J5E3R4JAZMMH67VAMRK   # ADR-003
+    - dna:decision:01KTPZ0JCTNRPCS9AP41BNGF0F   # ADR-004
+    - dna:decision:01KTPZ0JM6GMTPP2FHXR7B66YK   # ADR-005
+    - dna:decision:01KTPZ0JVCMBAPT56AHCW1KB8Z   # ADR-006
+    - dna:decision:01KTPZ0K3CH1PSNRMD639VJ0ZZ   # ADR-007
+    - dna:decision:01KTPZ0KBYY5WPGH96NVAWV4XH   # BDR-001
+    - dna:decision:01KTPZ0KK2C7Z8JFJJQH0V9NNN   # BDR-002
+
+next: /sulis:plan-work    # decompose the §6.5 gap analysis into Work Packages

@@ -1,0 +1,14 @@
+{
+  "consequences": "- **Positive:** one structure to maintain, matching the canonical; downstream SEA always receives use cases + NFR + contract + threat model. The structure is the same one P-VER's `## Verification Plan` check already anchors on (C-02). - **Negative:** the legacy TDD shape is retired for new changes; the template is sizeable net-new authoring (Phase 1 + Phase 3 sub-templates for STRIDE/C4/BDR/contract). - **Neutral:** existing `TDD.md` artifacts are not rewritten \u2014 the new structure applies to changes specified after this ships (\u00a79.1 migration).",
+  "context": "FR-05/FR-11 require the design artifact to be restructured from the legacy seven-part TDD shape (Overview/Form/Armor/Proof/Trade-offs/Open-questions/ Verification-Plan) toward the comprehensive `DESIGN.md` shape, matching the canonical `features/entity-crud/DESIGN.md` (C-01). Today `requirements-templates/SKILL.md` has SRD / UC / NFR / Verification-Plan templates but **no comprehensive DESIGN.md template** \u2014 there is nothing to emit the Target Structure from. The `## Verification Plan` heading is fixed verbatim by ADR-001 of the verification-by-design change (C-02).",
+  "decision": "Add a single comprehensive **DESIGN.md Target-Structure template** to `requirements-templates/SKILL.md` carrying \u00a71 Executive Summary, \u00a72 Problem Discovery, \u00a73 Stakeholders/Personas, \u00a74 Requirements (incl. \u00a74.2 measurable NFR and \u00a74.6 STRIDE), \u00a75 Scope, \u00a76 Use Cases (main/alternate/exception), \u00a77 Solution Design (incl. architecture-at-levels and the \u00a77.x interface contract), \u00a78 ADRs+BDRs, \u00a79 Migration/Rollback/Security/Performance, and the verbatim \u00a710 `## Verification Plan`. Section names and ordering follow the canonical (C-01), not invented. Inapplicable sections carry `n/a \u2014 <justification>`, never a bare omission. Detail is depth-sized (ADR-001); the structure is invariant.",
+  "id": "dna:decision:01KTPZ0HXRA1ZW2KZPC3G60QPM",
+  "options_considered": [
+    "**One canonical-matching template, always emitted (CHOSEN).** Single source of structure truth; matches the agreed target (A-01); the dogfood proof is that this very design follows it.",
+    "**Keep the legacy TDD shape, bolt STRIDE/C4/BDR on** \u2014 rejected: the Form/Armor/Proof shape doesn't map cleanly to the canonical's problem- discovery / use-case / solution-design spine; bolting on produces a hybrid that matches neither (C-01 violated).",
+    "**Per-depth templates** \u2014 rejected: reintroduces the doc-shape-on-depth coupling ADR-001 removes."
+  ],
+  "state": "accepted",
+  "sys_status": "active",
+  "title": "One comprehensive-document structure, emitted always, modelled on the canonical"
+}
