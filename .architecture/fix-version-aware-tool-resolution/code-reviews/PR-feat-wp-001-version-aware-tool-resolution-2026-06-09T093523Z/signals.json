@@ -1,0 +1,27 @@
+{
+  "pr": "feat/wp-001-version-aware-tool-resolution",
+  "base": "change/fix-version-aware-tool-resolution",
+  "timestamp": "2026-06-09T093523Z",
+  "verdict": "PASS",
+  "build_verification": {
+    "errors_introduced": 0,
+    "tools": ["ruff check", "bash -n"]
+  },
+  "hygiene": {
+    "scope": {"severity": "low", "commit_types": ["fix"], "module_fan_out": 1},
+    "size": {"severity": "note", "lines_added": 877, "lines_removed": 166, "files_changed": 24, "repeated_transform_files": 18},
+    "safety": {"severity": "low", "migrations": 0, "schemas": 0, "infra": 0, "secrets": 0, "destructive_ops": 1, "destructive_default_dry_run": true},
+    "completeness": {"severity": "clean", "new_source_without_test": 0}
+  },
+  "findings": {
+    "changes": {"critical": 0, "high": 0, "medium": 0, "low": 1},
+    "neighbours": {"critical": 0, "high": 0, "medium": 0, "low": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "surfaced": false},
+    "security": {"findings": 0, "surfaced": false},
+    "quality": {"findings": 1, "surfaced": true}
+  },
+  "hardening_deltas": 0,
+  "auto_downgrade_triggers": []
+}

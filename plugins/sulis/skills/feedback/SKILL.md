@@ -59,14 +59,21 @@ lives in `../../scripts/_anonymiser.py` (pinned in
 ## Resolving the tool path (MUST — first action)
 
 ```bash
-SCRIPTS_DIR=$(
-  find ~/.claude/plugins/cache -name sulis-issues -type f \
-    -path '*/sulis/*/scripts/*' 2>/dev/null | sort -r | head -1 \
-  | xargs -I{} dirname {} 2>/dev/null
-)
+# Resolve from the ACTIVE plugin version (its bin/ is on PATH) — avoids the
+# lexical-sort cache pick that mis-ranks 0.98.0 above 0.126.0 (#49).
+SCRIPTS_DIR=""
+_sulis_bin=$(printf '%s\n' "$PATH" | tr ':' '\n' | grep -E 'sulis-ai-agents/sulis/[^/]+/bin$' | head -1)
+[ -n "$_sulis_bin" ] && [ -d "$(dirname "$_sulis_bin")/scripts" ] \
+  && SCRIPTS_DIR="$(dirname "$_sulis_bin")/scripts"
+# Dev fallback: marketplace repo cwd.
 if [ -z "$SCRIPTS_DIR" ] && [ -f "plugins/sulis/scripts/sulis-issues" ]; then
   SCRIPTS_DIR="$(pwd)/plugins/sulis/scripts"
 fi
+# Last-resort: PORTABLE numeric (NOT lexical, NOT `sort -V`) cache pick.
+[ -z "$SCRIPTS_DIR" ] && SCRIPTS_DIR=$(find ~/.claude/plugins/cache -name sulis-issues -type f \
+  -path '*/sulis/*/scripts/*' 2>/dev/null \
+  | sed -E 's#(.*/sulis/)([^/]+)(/scripts/.*)#\2 &#' \
+  | sort -t. -k1,1n -k2,2n -k3,3n | tail -1 | cut -d' ' -f2- | xargs -I{} dirname {} 2>/dev/null)
 [ -z "$SCRIPTS_DIR" ] && { echo "ERROR: cannot find sulis-issues" >&2; exit 1; }
 ```
 

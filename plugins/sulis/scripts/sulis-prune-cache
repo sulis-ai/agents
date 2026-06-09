@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""sulis-prune-cache — keep the newest N cached sulis plugin versions (#49).
+
+Defence-in-depth for the version-aware resolution fix. Old cached
+``~/.claude/plugins/cache/sulis-ai-agents/sulis/<version>`` directories pile
+up over time; this tool removes all but the newest N (default 3) so a stale
+copy can never accumulate to bite a mis-resolution.
+
+Version ranking is PORTABLE and NUMERIC (shared with `_version_pick`): it
+correctly keeps 0.126.0 over 0.98.0 — never the lexical `sort -r` ranking
+that caused #49, and never `sort -V` (BSD `sort` on macOS lacks it).
+
+DRY-RUN BY DEFAULT — prints what it would remove and changes nothing. Pass
+`--force` to actually delete. This tool is NOT wired into any automatic hook;
+run it by hand (or schedule it yourself) as maintenance.
+
+Usage:
+  sulis-prune-cache                 # dry-run, keep newest 3
+  sulis-prune-cache --keep 5        # dry-run, keep newest 5
+  sulis-prune-cache --force         # delete older than newest 3
+  sulis-prune-cache --cache-root P  # operate on an alternate cache root
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import _prune_cache as pc  # noqa: E402
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="sulis-prune-cache",
+        description="Keep the newest N cached sulis plugin versions; dry-run by default.",
+    )
+    parser.add_argument(
+        "--keep",
+        type=int,
+        default=pc.DEFAULT_KEEP,
+        help=f"Number of newest versions to retain (default: {pc.DEFAULT_KEEP}).",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Actually delete older versions (otherwise dry-run).",
+    )
+    parser.add_argument(
+        "--cache-root",
+        type=Path,
+        default=None,
+        help="Plugin cache root (default: ~/.claude/plugins/cache).",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    if args.keep < 1:
+        print("sulis-prune-cache: --keep must be >= 1", file=sys.stderr)
+        return 2
+
+    cache_root = args.cache_root or pc.default_cache_root()
+    plan = pc.plan_prune(cache_root, keep=args.keep)
+
+    if not plan.sulis_dir.is_dir():
+        print(f"No sulis cache found at {plan.sulis_dir} — nothing to do.")
+        return 0
+
+    print(f"Cache: {plan.sulis_dir}")
+    print(f"Keeping {len(plan.keep)} newest: {', '.join(plan.keep) or '(none)'}")
+
+    if not plan.remove:
+        print("Nothing to prune.")
+        return 0
+
+    removed = pc.apply_prune(plan, force=args.force)
+    verb = "Removed" if args.force else "Would remove (dry-run; pass --force)"
+    print(f"{verb} {len(removed)}: {', '.join(removed)}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
