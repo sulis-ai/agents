@@ -924,6 +924,31 @@ loop:
         a `--critical-found` finalise — those WPs got BLOCKERs, not a
         clean ship.
 
+   14.7. **Worktree cleanup safety — scope to THIS change only (#211/#253 — MUST).**
+        Remove ONLY the worktrees this run-all batch created for the
+        current change. Each is an explicit path you already hold (the
+        `--worktree-path` you passed to `wpx-step12 wrap` / `wpx-worktree
+        create`, co-located under the current change's worktree parent
+        `~/.sulis/changes/<this-change-id>/`). Always remove by **explicit
+        path**, via `wpx-worktree remove --worktree-path <path>` or
+        `git worktree remove <explicit-path>`.
+
+        **NEVER** clean up by enumerating + name-globbing the worktree
+        list. A `git worktree list | grep …`-style sweep matched and
+        removed **4 worktrees belonging to other in-flight changes**
+        (different change IDs) in CH-01KT61 — uncommitted work in them
+        would have been lost (#211). Other changes' worktrees live under
+        their own `~/.sulis/changes/<other-id>/` parents and are never
+        yours to remove.
+
+        ✓ `wpx-worktree remove --wp <wp> --project <slug> --worktree-path <path>`
+        ✗ `for w in $(git worktree list | grep wp- | awk …); do git worktree remove "$w"; done`
+
+        If a worktree path you expect is already gone, that's fine
+        (idempotent) — never widen the match to "find" it. This composes
+        with the #106 base-pin discipline: a batch operates entirely
+        within its own change's worktree parent.
+
        ---
 
        **(v0.10.7 fallback — preserved for reference)**
