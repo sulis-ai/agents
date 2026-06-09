@@ -252,7 +252,21 @@ pairing, never a blanket waiver):
   view); the daemon's own idle-empty auto-exit bounds it.
 
 The terminal is its OWN bridge — added alongside chat's seams, never coupled to
-them (it does not import the chat relay or the chat bridge). Run
+them (it does not import the chat relay or the chat bridge).
+
+The **Settings** screen is a THIRD sanctioned write surface (ADR-019) — it
+adds / edits / removes products, projects, and repo links. All settings
+mutations live in one router (`routes/settings.ts`) which starts no process and
+writes no file itself; it delegates to one new adapter,
+`adapters/SpineSettingsAdapter.ts` — the ONLY new process-start site in the
+settings change. The adapter execFiles the validated Python entity helpers
+(`adapters/spine/edit-*.py`, `set-entity-status.py`, `list-entities.py`,
+`emit-project.py`) so every write goes through schema validation
+(reject-on-invalid); it is allow-listed BY PATH for both the filesystem-write
+and process-start rules, parity with `SpineEmitterMinter`. Remove is a
+soft-delete (`sys_status="deleted"`, ADR-020) — the brain `.jsonld` file stays
+on disk and the founder's folder is never a write target (proven by the
+disk-safety sentinel test). Run
 `npm run check:read-only -- --explain` for the full rule catalogue.
 
 ### Cold-start onboarding (WP-010)
