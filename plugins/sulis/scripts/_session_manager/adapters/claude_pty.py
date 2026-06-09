@@ -66,7 +66,9 @@ from pathlib import Path
 
 import _terminal_launcher
 from _session_manager.adapter import Capabilities, SessionSpec
-from _session_manager.events import Event
+from _session_manager.classifier import RecoveryClass
+from _session_manager.events import Event, EventError
+from _session_manager.recovery import ReauthTicket
 from _wpxlib import validate_change_ulid
 
 # The interactive argv (§2.4 / ADR-004). cwd is NOT here — the CLI is launched
@@ -154,6 +156,28 @@ class InteractiveClaudePtyAdapter:
         """Unused on the pty path — a terminal has no structured turn-done
         signal, so the one-in-flight slot model (§2.6) does not apply."""
         return False
+
+    def classify_failure(self, error: EventError) -> RecoveryClass | None:
+        """Provider detection hint (WP-004 seam; defer-to-neutral).
+
+        Returns ``None`` so the shared classifier applies its category-based
+        default (ADR-003). The interactive pty path surfaces failures as raw
+        terminal output rather than a structured ``error`` Event stream, so any
+        provider-specific detection it gains is WP-006's concern; until then the
+        neutral default is correct."""
+        return None
+
+    def reauth(self) -> ReauthTicket:
+        """Begin re-auth (WP-004 seam stub; ADR-003/004).
+
+        Wired into the conformance shape by WP-004; the real re-login flow for
+        the interactive pty path is WP-006. Raising keeps the stub honest — the
+        driver only calls ``reauth`` after ``classify_failure`` yields
+        ``LOGIN_EXPIRED``, which this adapter does not do until WP-006."""
+        raise NotImplementedError(
+            "Interactive-pty reauth() is implemented in WP-006; the WP-004 seam "
+            "only establishes the Protocol shape."
+        )
 
     # ── internal: pre-prompt sidecar resolution ───────────────────────────
 

@@ -65,6 +65,67 @@ change X may not attach change Y) — declined as Expected ``NOT_AUTHORIZED``, n
 auth invented. The headless chat path over the socket behaves exactly as the base
 contract (acceptance #4 regression gate).
 
+Reliability layer (CH-01KTMK, automation-reliability-recovery): WP-001 lands
+the shared recovery data contract — ``classifier.py`` (``RecoveryClass``, the
+provider-neutral verdict vocabulary ``TRANSIENT_BLIP`` / ``DEAD_END`` /
+``LOGIN_EXPIRED``, ADR-003) and ``recovery.py`` (``RetryPolicy`` frozen
+dataclass + the ``DEFAULT_RETRY_POLICY`` 12-min full-jitter fallback constant,
+ADR-002; ``next_delay_ceiling``, the jitter-free backoff-ceiling core, and
+``next_delay`` (WP-003), the full-jitter curve — ``random_between(0, ceiling)``
+with an injectable RNG, ``None`` on budget exhaustion — the driver schedules
+on; and ``ReauthTicket``, the
+re-login-link + completion-handle value object ``adapter.reauth()`` returns,
+ADR-003/004). These are pure, frozen value objects — the producer/consumer
+seam the classifier (WP-002), the policy (WP-003), and the recovery driver
+(WP-005) are all built against in parallel. No new error code is introduced:
+login-expiry rides the existing ``NOT_AUTHORIZED`` code. The contract's
+example tables (the classification truth table + the ``next_delay`` stubs)
+live as a single shared test fixture (``tests/unit/_recovery_contract_\
+fixtures.py``) the downstream WP suites consume, so the verdict vocabulary is
+never re-spelled on either side of the seam (CF-11). WP-002 adds the producer:
+``classifier.classify(error, adapter_hint) -> RecoveryClass`` — the pure,
+total neutral arbiter that maps an observed ``EventError`` to a verdict, using
+the per-provider hint when present and the category default otherwise
+(``protocol`` → transient-blip, ``internal`` → dead-end, ``expected`` →
+dead-end except ``NOT_AUTHORIZED`` → login-expired; an unknown code with no
+hint falls through to the safe dead-end rather than raising). It imports
+``events.py`` only — never the provider seam (ADR-003), so a provider's raw
+``"401"`` interpretation stays in that provider's ``classify_failure`` hint.
+WP-005 adds the consumer: ``recovery.RecoveryDriver`` — the turn-level Armor
+primitive (ADR-001), the sibling of ``LifecycleManager`` (process-death) for a
+*live session's turn* that ended in an ``error`` Event. Built against injected
+manager capabilities (``send`` to re-submit, ``log_append`` to surface every
+action on the existing log, ``reauth`` + ``resume`` for login-expiry, the
+adapter's ``classify_failure`` hint) plus an injected ``clock`` / ``sleep`` /
+``rng`` so the wall-clock retry budget is exercised deterministically and
+sleep-free (MEA-09). ``observe(error)`` runs the §3.1 pipeline: skip a
+``STDIN_BROKEN`` process-death (the lifecycle owns it — no double-handling),
+classify, then branch — **transient-blip** retries with full-jitter backoff via
+the existing ``send`` until it clears or ``next_delay`` returns ``None`` (budget
+exhausted → abandoned with a typed Event, never a silent hang); **dead-end**
+abandons immediately without consulting the budget; **login-expired** calls
+``reauth()`` once, surfaces a ``NOT_AUTHORIZED`` notification carrying the
+re-login link, pauses (budget NOT burned), and on ``complete_reauth`` resumes
+via the **existing** ``supports_resume`` + ``resume_ref`` path so the agent
+re-runs the incomplete step (no fabricated completion, ADR-004). WP-007 wires
+it to the live manager: ``manager.py`` constructs a **per-session**
+``RecoveryDriver`` at the composition root (beside the ``LifecycleManager``
+wiring) — its capabilities bound to that session (``send`` replays the last
+recorded command through the FIFO, ``log_append`` surfaces on the existing log,
+``reauth`` / ``resume`` drive login-expiry pause→resume) with the default policy
++ a monotonic clock + the neutral classifier + the adapter's ``classify_failure``
+hint. The driver attaches at the manager's **error-event observation seam** —
+the ``_on_error_event`` hook, a sibling of ``_on_process_death`` (ADR-001) —
+which chains additively onto the existing ``on_event`` callback the per-turn
+guard already owns (the guard's observation is byte-unchanged). Each live
+``error`` Event that is not a process-death ``STDIN_BROKEN`` is routed to the
+driver on an isolated daemon thread (so the driver's FIFO-re-entrant recovery
+never blocks the pump thread that observed the error); a ``STDIN_BROKEN`` is
+filtered at the seam (the lifecycle owns process death — no double-handling).
+The wiring is additive: the existing turn-complete / one-in-flight / state-
+machine behaviour is untouched, guarded by the session-manager unit + integration
+suite staying green.
+
 The leading underscore signals "foundation-internal" — exactly as ``_discovery``
 and ``_canonical_drift`` do. The public surface is re-exported here so callers
 import from the package, not its sub-modules.
@@ -78,6 +139,7 @@ from _session_manager.adapter import (
     SessionSpec,
 )
 from _session_manager.adapters.claude import ClaudeAdapter
+from _session_manager.classifier import RecoveryClass, classify
 from _session_manager.event_log import (
     EventLog,
     OffsetEvictedError,
@@ -129,6 +191,14 @@ from _session_manager.maintenance import (
     derive_cap,
 )
 from _session_manager.manager import SessionManager
+from _session_manager.recovery import (
+    DEFAULT_RETRY_POLICY,
+    ReauthTicket,
+    RecoveryDriver,
+    RetryPolicy,
+    next_delay,
+    next_delay_ceiling,
+)
 from _session_manager.session import Session
 from _session_manager.socket_server import SocketServer
 from _session_manager.state import (
@@ -181,6 +251,17 @@ __all__ = [
     "DEFAULT_MAX_TOOL_CALLS",
     # §2.8 Unix-domain NDJSON socket-serving layer (chat + terminal) — WP-005
     "SocketServer",
+    # reliability layer: recovery vocabulary + retry policy (CH-01KTMK WP-001)
+    "RecoveryClass",
+    # reliability layer: provider-neutral classifier (CH-01KTMK WP-002)
+    "classify",
+    "RetryPolicy",
+    "DEFAULT_RETRY_POLICY",
+    "next_delay_ceiling",
+    "next_delay",
+    "ReauthTicket",
+    # reliability layer: the turn-level recovery driver (CH-01KTMK WP-005)
+    "RecoveryDriver",
     # error model (§2.9)
     "SessionError",
     "ProtocolError",
