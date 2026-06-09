@@ -533,3 +533,22 @@ def test_resolve_malformed_journal_falls_through(tmp_project, monkeypatch):
         wp_dir=tmp_project.wp_dir,
     )
     assert branch == "feat/wp-008-wire-drift-detector"
+
+
+# ─── WP-001: _branch_name change-identity threading (ADR-001) ──────────────
+
+
+def test_branch_name_scoped_and_legacy():
+    """_branch_name composes the ADR-001 scoped shape when a change_scope is
+    given, and the byte-for-byte legacy shape when it is not.
+
+    Scoped:  wp/{change_scope}/wp-{id-lower}-{slug}
+    Legacy:  feat/wp-{id-lower}-{slug}   (change_scope None/empty)
+    The WP- prefix strip + lowercase are preserved in both shapes.
+    """
+    # Scoped — change identity known
+    assert _wpxlib._branch_name("WP-001", "foo", "fix-x") == "wp/fix-x/wp-001-foo"
+    # Legacy — change identity unresolvable (default arg)
+    assert _wpxlib._branch_name("WP-001", "foo") == "feat/wp-001-foo"
+    # Legacy — prefix-strip + lowercase preserved for a bare numeric id
+    assert _wpxlib._branch_name("wp-7", "bar") == "feat/wp-7-bar"

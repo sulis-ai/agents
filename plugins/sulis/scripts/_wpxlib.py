@@ -1968,12 +1968,29 @@ def _wp_slug_from_file(wp_dir: Path, wp_id: str) -> str | None:
     return name[len(prefix):]
 
 
-def _branch_name(wp_id: str, slug: str) -> str:
-    """Compose the feature-branch name from WP id + slug.
+def _branch_name(wp_id: str, slug: str, change_scope: str | None = None) -> str:
+    """Compose the WP feature-branch name from WP id + slug.
 
-    Convention: `feat/wp-{id-lower}-{slug}`.
+    With ``change_scope`` (the change's ``"{primitive}-{slug}"``, e.g.
+    ``"fix-wp-branch-collision"``) the branch is namespaced under the change
+    so WP numbers cannot collide across changes (the #105/#106 root cause):
+
+        wp/{change_scope}/wp-{id-lower}-{slug}     ← ADR-001 scoped scheme
+
+    Without it (change identity unresolvable, or a caller that hasn't been
+    threaded yet) the byte-for-byte legacy shape is returned, which the
+    dual-prefix resolver still matches for one release:
+
+        feat/wp-{id-lower}-{slug}                  ← legacy fallback
+
+    The ``wp/`` prefix is a disjoint top-level segment chosen to avoid a git
+    directory/file ref conflict with the change branch ``change/{scope}`` —
+    see ``adrs/ADR-001-wp-branch-naming-scheme.md``.
     """
-    return f"feat/wp-{wp_id.lower().removeprefix('wp-')}-{slug}"
+    nnn = wp_id.lower().removeprefix("wp-")
+    if change_scope:
+        return f"wp/{change_scope}/wp-{nnn}-{slug}"
+    return f"feat/wp-{nnn}-{slug}"
 
 
 # Matches a Step-7 trace Outcome that records the exact pushed branch, e.g.:
