@@ -1,3 +1,9 @@
+## v0.126.2 — 2026-06-09
+
+**Patch — release-train batch.**
+
+- sulis-change start now fetches origin/{base} and branches off the fetched tip (degrading gracefully offline), so new work is never cut from a stale local main; corrects the change-flow doc that wrongly claimed this already happened.
+
 ## v0.126.1 — 2026-06-09
 
 **Patch — release-train batch.**
