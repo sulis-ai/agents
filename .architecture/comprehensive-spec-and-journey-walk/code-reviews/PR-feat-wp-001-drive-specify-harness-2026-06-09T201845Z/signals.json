@@ -1,0 +1,16 @@
+{
+  "pr": "feat/wp-001-drive-specify-harness",
+  "base": "change/harden-comprehensive-spec-and-journey-walk",
+  "verdict": "PASS",
+  "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "none"},
+  "size": {"lines_added": 571, "lines_removed": 0, "files_changed": 6, "generated_ratio": 0.0, "severity": "low"},
+  "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+  "completeness": {"new_source_without_test": 0, "new_tests": 1, "api_change_without_schema": false, "severity": "none"},
+  "build_verification": {"ruff_check": "pass", "ruff_format": "pass", "import": "pass", "errors_introduced": 0},
+  "findings": {"critical": 0, "high": 0, "medium": 0, "low": 0, "notes": 1},
+  "lenses": {
+    "architecture": "nothing surfaced",
+    "security": "nothing surfaced (one awareness note: --out / --fixture path handling in a dev harness)",
+    "quality": "nothing surfaced (tests present, full coverage, no CR-10 perf patterns)"
+  }
+}

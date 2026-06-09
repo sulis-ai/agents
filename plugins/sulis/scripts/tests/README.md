@@ -12,6 +12,28 @@ tests/
 ├── integration/       # wpx-* invoked via subprocess; cross-tool flows
 ├── e2e/               # Full calling-session Step 8-12 simulation (future)
 └── fixtures/          # INDEX.md / WP.md / journal templates + gh response JSON
+    └── methodology/   # change-manifest fixtures driven by the harness scripts
+```
+
+## Methodology harness (`_drive_specify.py` + fixtures)
+
+Methodology changes are verified by *driving the real stage on a fixture* and
+asserting the produced artifact. `plugins/sulis/scripts/_drive_specify.py` is
+the shared driver: given a named fixture and a forced `--depth`, it reuses the
+real specify path (`_specify_classifier.classify_depth`) and writes a
+comprehensive design document to `--out`. It is deterministic (same fixture +
+depth ⇒ byte-identical output) and non-interactive (the depth is an explicit
+input, never negotiated).
+
+The fixtures live under `fixtures/methodology/<name>/manifest.json`:
+
+- `sample-user-facing` — a user-visible change (the surface heuristic fires).
+- `no-dependencies` — drives the n/a-marking path for an unpopulated section.
+- `sample-tool-surface` — exposes tool operations for the interface contract.
+
+```bash
+python3 plugins/sulis/scripts/_drive_specify.py \
+  --fixture sample-user-facing --depth lite --out /tmp/design.md
 ```
 
 ## Running
