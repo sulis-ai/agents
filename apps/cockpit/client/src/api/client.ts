@@ -117,6 +117,27 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
   }
 }
 
+/**
+ * DELETE helper for the settings management routes (WP-007; ADR-019). It lives
+ * HERE so it stays inside the client `fetch` funnel — the inventory gate
+ * allow-lists exactly api/client.ts as a fetch caller. Returns the parsed JSON
+ * body on 2xx (or `undefined` when the route returns no body); throws ApiError
+ * on non-2xx (the same error contract as apiGet/apiPost).
+ */
+export async function apiDelete<T>(path: string): Promise<T> {
+  const res = await fetch(path, { method: "DELETE" });
+  if (!res.ok) {
+    const { code, message } = await readErrorBody(res);
+    throw new ApiError(res.status, code, message);
+  }
+  // A delete route may return `{ ok: true }` or no body; tolerate both.
+  try {
+    return (await res.json()) as T;
+  } catch {
+    return undefined as T;
+  }
+}
+
 // ─── WP-005 — the chat relay funnel (the ONE write path; ADR-001/003) ────────
 //
 // `streamChat` POSTs the founder's prompt to the relay and reads the SSE reply

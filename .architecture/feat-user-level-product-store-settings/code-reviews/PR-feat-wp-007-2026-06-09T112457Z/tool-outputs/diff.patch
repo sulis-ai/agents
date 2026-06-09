@@ -1,0 +1,409 @@
+diff --git a/apps/cockpit/client/src/api/client.ts b/apps/cockpit/client/src/api/client.ts
+index 31b2f856..161543a3 100644
+--- a/apps/cockpit/client/src/api/client.ts
++++ b/apps/cockpit/client/src/api/client.ts
+@@ -117,6 +117,27 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
+   }
+ }
+ 
++/**
++ * DELETE helper for the settings management routes (WP-007; ADR-019). It lives
++ * HERE so it stays inside the client `fetch` funnel — the inventory gate
++ * allow-lists exactly api/client.ts as a fetch caller. Returns the parsed JSON
++ * body on 2xx (or `undefined` when the route returns no body); throws ApiError
++ * on non-2xx (the same error contract as apiGet/apiPost).
++ */
++export async function apiDelete<T>(path: string): Promise<T> {
++  const res = await fetch(path, { method: "DELETE" });
++  if (!res.ok) {
++    const { code, message } = await readErrorBody(res);
++    throw new ApiError(res.status, code, message);
++  }
++  // A delete route may return `{ ok: true }` or no body; tolerate both.
++  try {
++    return (await res.json()) as T;
++  } catch {
++    return undefined as T;
++  }
++}
++
+ // ─── WP-005 — the chat relay funnel (the ONE write path; ADR-001/003) ────────
+ //
+ // `streamChat` POSTs the founder's prompt to the relay and reads the SSE reply
+diff --git a/apps/cockpit/client/src/api/settings.test.ts b/apps/cockpit/client/src/api/settings.test.ts
+new file mode 100644
+index 00000000..64e3ae6f
+--- /dev/null
++++ b/apps/cockpit/client/src/api/settings.test.ts
+@@ -0,0 +1,228 @@
++// WP-007 — typed settings client fetcher (errors-are-values; WPF-02).
++//
++// The fetcher turns each settings route into a Promise<Result<T>> that NEVER
++// throws for an EXPECTED settings error (a non-2xx carrying a SettingsErrorCode
++// in the ApiError envelope) — it returns { ok:false, error } instead, so the
++// page (WP-008) and forms (WP-009) render VALIDATION_FAILED / PATH_NOT_FOUND
++// inline. Only a genuine TRANSPORT failure (the network rejects, no ApiError)
++// rejects — the one throw path.
++//
++// The fetcher does NOT call fetch directly (the client inventory gate allow-
++// lists only api/client.ts); it goes through the apiGet/apiPost/apiDelete
++// funnel, which throws ApiError on non-2xx. We mock globalThis.fetch so the
++// whole funnel + fetcher path is exercised against the WP-001 fixtures.
++//
++// References:
++//   - WP-007 Contract (the seven typed methods + invariants).
++//   - TDD §8 (Client design — errors are values).
++//   - shared/__fixtures__/settings.fixtures.ts (WP-001 canonical stubs).
++
++import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
++import {
++  happySettingsTree,
++  settingsErrorFixtures,
++} from "../../../shared/__fixtures__/settings.fixtures";
++import {
++  getSettings,
++  writeProduct,
++  removeProduct,
++  writeProject,
++  removeProject,
++  attachRepo,
++  unlinkRepo,
++} from "./settings";
++
++function jsonResponse(status: number, body: unknown): Response {
++  return new Response(JSON.stringify(body), {
++    status,
++    headers: { "content-type": "application/json" },
++  });
++}
++
++describe("settings fetcher — errors are values (WPF-02)", () => {
++  beforeEach(() => {
++    vi.spyOn(globalThis, "fetch").mockReset();
++  });
++  afterEach(() => {
++    vi.restoreAllMocks();
++  });
++
++  it("getSettings_parses_tree_happy — returns ok:true with the typed tree", async () => {
++    vi.spyOn(globalThis, "fetch").mockResolvedValue(
++      jsonResponse(200, happySettingsTree),
++    );
++
++    const result = await getSettings();
++
++    expect(result).toEqual({ ok: true, value: happySettingsTree });
++  });
++
++  it("returns_typed_result_not_thrown_on_VALIDATION_FAILED — a 422 ApiError becomes ok:false, no throw", async () => {
++    vi.spyOn(globalThis, "fetch").mockResolvedValue(
++      jsonResponse(422, settingsErrorFixtures.VALIDATION_FAILED),
++    );
++
++    // The promise RESOLVES (does not reject) with a typed error value.
++    const result = await writeProduct({ name: "" });
++
++    expect(result).toEqual({
++      ok: false,
++      error: {
++        code: "VALIDATION_FAILED",
++        message: settingsErrorFixtures.VALIDATION_FAILED.error,
++      },
++    });
++  });
++
++  it("maps_PATH_NOT_FOUND_from_attach — a 404 PATH_NOT_FOUND becomes ok:false", async () => {
++    vi.spyOn(globalThis, "fetch").mockResolvedValue(
++      jsonResponse(404, settingsErrorFixtures.PATH_NOT_FOUND),
++    );
++
++    const result = await attachRepo({
++      projectId: "dna:project:01HAPPYPROJECT",
++      localPath: "/does/not/exist",
++    });
++
++    expect(result).toEqual({
++      ok: false,
++      error: {
++        code: "PATH_NOT_FOUND",
++        message: settingsErrorFixtures.PATH_NOT_FOUND.error,
++      },
++    });
++  });
++
++  it("transport_failure_rejects — a network error rejects (the one throw path)", async () => {
++    vi.spyOn(globalThis, "fetch").mockRejectedValue(
++      new TypeError("Failed to fetch"),
++    );
++
++    await expect(getSettings()).rejects.toThrow("Failed to fetch");
++  });
++
++  it("removeProduct — a 200 delete returns ok:true with void value", async () => {
++    vi.spyOn(globalThis, "fetch").mockResolvedValue(
++      jsonResponse(200, { ok: true }),
++    );
++
++    const result = await removeProduct("dna:product:01HAPPYPRODUCT");
++
++    expect(result.ok).toBe(true);
++  });
++
++  it("removeProduct — a non-transport error (404 NOT_FOUND) returns ok:false, no throw", async () => {
++    vi.spyOn(globalThis, "fetch").mockResolvedValue(
++      jsonResponse(404, settingsErrorFixtures.NOT_FOUND),
++    );
++
++    const result = await removeProduct("dna:product:missing");
++
++    expect(result).toEqual({
++      ok: false,
++      error: {
++        code: "NOT_FOUND",
++        message: settingsErrorFixtures.NOT_FOUND.error,
++      },
++    });
++  });
++
++  it("falls back to a WRITE_FAILED-shaped error when the body carries no recognised code", async () => {
++    // A 500 with a non-JSON body: the funnel yields code:null. The fetcher must
++    // still return a typed value (never throw for a server error) — it maps the
++    // unknown code to WRITE_FAILED (the Internal-category settings code).
++    vi.spyOn(globalThis, "fetch").mockResolvedValue(
++      new Response("upstream exploded", { status: 500 }),
++    );
++
++    const result = await writeProduct({ name: "Alpha" });
++
++    expect(result.ok).toBe(false);
++    if (!result.ok) {
++      expect(result.error.code).toBe("WRITE_FAILED");
++    }
++  });
++
++  it("getSettings maps an expected ApiError to ok:false (IMMUTABLE_IMPLICIT path)", async () => {
++    vi.spyOn(globalThis, "fetch").mockResolvedValue(
++      jsonResponse(409, settingsErrorFixtures.IMMUTABLE_IMPLICIT),
++    );
++
++    const result = await getSettings();
++
++    expect(result).toEqual({
++      ok: false,
++      error: {
++        code: "IMMUTABLE_IMPLICIT",
++        message: settingsErrorFixtures.IMMUTABLE_IMPLICIT.error,
++      },
++    });
++  });
++
++  it("writeProject returns ok:true with the typed project on 200", async () => {
++    const project = happySettingsTree.products[0]!.projects[0]!;
++    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, project));
++
++    const result = await writeProject({
++      productId: "dna:product:01HAPPYPRODUCT",
++      name: "Alpha web",
++    });
++
++    expect(result).toEqual({ ok: true, value: project });
++  });
++
++  it("writeProject maps a VALIDATION_FAILED to ok:false, no throw", async () => {
++    vi.spyOn(globalThis, "fetch").mockResolvedValue(
++      jsonResponse(422, settingsErrorFixtures.VALIDATION_FAILED),
++    );
++
++    const result = await writeProject({ productId: "p", name: "" });
++
++    expect(result.ok).toBe(false);
++    if (!result.ok) expect(result.error.code).toBe("VALIDATION_FAILED");
++  });
++
++  it("removeProject returns ok:true on a 200 delete", async () => {
++    vi.spyOn(globalThis, "fetch").mockResolvedValue(
++      jsonResponse(200, { ok: true }),
++    );
++
++    const result = await removeProject("dna:project:01HAPPYPROJECT");
++
++    expect(result.ok).toBe(true);
++  });
++
++  it("unlinkRepo returns the updated project (repo cleared) on 200", async () => {
++    const cleared: (typeof happySettingsTree.products)[0]["projects"][0] = {
++      projectId: "dna:project:01HAPPYPROJECT",
++      name: "Alpha web",
++      repo: null,
++    };
++    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, cleared));
++
++    const result = await unlinkRepo("dna:project:01HAPPYPROJECT");
++
++    expect(result).toEqual({ ok: true, value: cleared });
++  });
++
++  it("unlinkRepo maps a NOT_FOUND to ok:false, no throw", async () => {
++    vi.spyOn(globalThis, "fetch").mockResolvedValue(
++      jsonResponse(404, settingsErrorFixtures.NOT_FOUND),
++    );
++
++    const result = await unlinkRepo("dna:project:missing");
++
++    expect(result.ok).toBe(false);
++    if (!result.ok) expect(result.error.code).toBe("NOT_FOUND");
++  });
++
++  it("transport failure on a write rejects too (the one throw path applies to every method)", async () => {
++    vi.spyOn(globalThis, "fetch").mockRejectedValue(
++      new TypeError("Failed to fetch"),
++    );
++
++    await expect(writeProject({ productId: "p", name: "x" })).rejects.toThrow(
++      "Failed to fetch",
++    );
++  });
++});
+diff --git a/apps/cockpit/client/src/api/settings.ts b/apps/cockpit/client/src/api/settings.ts
+new file mode 100644
+index 00000000..5e389717
+--- /dev/null
++++ b/apps/cockpit/client/src/api/settings.ts
+@@ -0,0 +1,137 @@
++// WP-007 — the typed settings client fetcher (errors-are-values; WPF-02).
++//
++// The consumer-side typed client for the settings seam: a thin fetcher that
++// turns each settings route into a Promise<Result<T>> returning a typed value
++// or a typed SettingsError — NEVER a thrown opaque for an EXPECTED error. The
++// page (WP-008) and forms (WP-009) depend on this: they render
++// VALIDATION_FAILED / PATH_NOT_FOUND inline and never catch a thrown settings
++// error.
++//
++// It does NOT call fetch directly (the client inventory gate allow-lists only
++// api/client.ts); it goes through the apiGet/apiPost/apiDelete funnel, which
++// throws ApiError on non-2xx. This module catches that ApiError and converts it
++// into { ok:false, error }. Only a genuine TRANSPORT failure (the network
++// rejects with a non-ApiError) propagates — the page treats that as a generic
++// retry-able state.
++//
++// All wire shapes are imported verbatim from shared/api-types (CF-02/06); none
++// are redeclared here.
++//
++// References:
++//   - WP-007 Contract (the seven typed methods + invariants).
++//   - TDD §8 (Client design — errors are values).
++//   - ADR-019 (settings write surface), ADR-021 (local-path-only attach).
++
++// eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (TDD §9 permits)
++import type {
++  SettingsTree,
++  ProductWrite,
++  ProjectWrite,
++  RepoAttachWrite,
++  SettingsProduct,
++  SettingsProject,
++  SettingsErrorCode,
++} from "../../../shared/api-types";
++import { ApiError, apiGet, apiPost, apiDelete } from "./client";
++
++/** A typed settings error (the SettingsErrorCode subset + a human message). */
++export type SettingsError = { code: SettingsErrorCode; message: string };
++
++/** Errors-are-values: a typed success value OR a typed error, never a throw. */
++export type Result<T> =
++  | { ok: true; value: T }
++  | { ok: false; error: SettingsError };
++
++// The settings error codes that may travel in the ApiError envelope. A non-2xx
++// whose code isn't one of these (or a non-JSON body → code:null) is mapped to
++// WRITE_FAILED — the Internal-category settings code — so the fetcher still
++// returns a typed value rather than leaking an opaque code to the UI.
++const SETTINGS_ERROR_CODES: readonly SettingsErrorCode[] = [
++  "NOT_FOUND",
++  "VALIDATION_FAILED",
++  "PATH_NOT_FOUND",
++  "PATH_NOT_A_REPO",
++  "WRITE_FAILED",
++  "IMMUTABLE_IMPLICIT",
++];
++
++function toSettingsError(err: ApiError): SettingsError {
++  const code: SettingsErrorCode =
++    err.code !== null &&
++    (SETTINGS_ERROR_CODES as readonly string[]).includes(err.code)
++      ? (err.code as SettingsErrorCode)
++      : "WRITE_FAILED";
++  return { code, message: err.message };
++}
++
++/**
++ * The ONE place ApiError → Result mapping lives (EP-03 — the 7 methods are the
++ * consumers). Runs the funnel call; an EXPECTED settings error (a thrown
++ * ApiError) becomes { ok:false, error }; a genuine transport failure (any
++ * non-ApiError rejection) propagates — the page's generic retry state. Every
++ * method below is a thin one-liner over this wrapper, so it carries no
++ * behaviour of its own (errors-are-values, WPF-02).
++ */
++async function request<T>(call: () => Promise<T>): Promise<Result<T>> {
++  try {
++    return { ok: true, value: await call() };
++  } catch (err) {
++    if (err instanceof ApiError) {
++      return { ok: false, error: toSettingsError(err) };
++    }
++    throw err;
++  }
++}
++
++export function getSettings(): Promise<Result<SettingsTree>> {
++  return request(() => apiGet<SettingsTree>("/api/settings"));
++}
++
++export function writeProduct(
++  input: ProductWrite,
++): Promise<Result<SettingsProduct>> {
++  return request(() =>
++    apiPost<SettingsProduct>("/api/settings/products", input),
++  );
++}
++
++export function removeProduct(id: string): Promise<Result<void>> {
++  return request(() =>
++    apiDelete<void>(`/api/settings/products/${encodeURIComponent(id)}`),
++  );
++}
++
++export function writeProject(
++  input: ProjectWrite,
++): Promise<Result<SettingsProject>> {
++  return request(() =>
++    apiPost<SettingsProject>("/api/settings/projects", input),
++  );
++}
++
++export function removeProject(id: string): Promise<Result<void>> {
++  return request(() =>
++    apiDelete<void>(`/api/settings/projects/${encodeURIComponent(id)}`),
++  );
++}
++
++export function attachRepo(
++  input: RepoAttachWrite,
++): Promise<Result<SettingsProject>> {
++  return request(() =>
++    apiPost<SettingsProject>(
++      `/api/settings/projects/${encodeURIComponent(input.projectId)}/repo`,
++      input,
++    ),
++  );
++}
++
++export function unlinkRepo(
++  projectId: string,
++): Promise<Result<SettingsProject>> {
++  return request(() =>
++    apiDelete<SettingsProject>(
++      `/api/settings/projects/${encodeURIComponent(projectId)}/repo`,
++    ),
++  );
++}
