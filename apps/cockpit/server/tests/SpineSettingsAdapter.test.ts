@@ -418,3 +418,73 @@ describe("SpineSettingsAdapter (real temp brain, no mocks)", { timeout: 60_000 }
     expect(countKind(base, PROJECT_DOMAIN, "project")).toBe(0);
   });
 });
+
+// ── Hardening follow-ups (CH-01KTPD) ───────────────────────────────────────
+describe("SpineSettingsAdapter — hardening follow-ups", { timeout: 60_000 }, () => {
+  // A well-formed-but-nonexistent product id (passes the pattern, has no entity)
+  // — editing it makes the helper fail, exercising the WRITE_FAILED path.
+  const MISSING_PRODUCT_ID = "dna:product:01HZZZZZZZZZZZZZZZZZZZG010";
+
+  // #4 — a leading-hyphen name is rejected up front (pure validation, no python).
+  it("rejects a product name starting with a hyphen (VALIDATION_FAILED)", async () => {
+    const adapter = makeAdapter(tmpBrain());
+    await expect(
+      adapter.upsertProduct({ name: "-Acme" }),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  });
+
+  it("rejects a project name starting with a hyphen (VALIDATION_FAILED)", async () => {
+    const adapter = makeAdapter(tmpBrain());
+    await expect(
+      adapter.upsertProject({ productId: MISSING_PRODUCT_ID, name: "-Proj" }),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  });
+
+  // #5 — a successful write emits one structured audit log line.
+  it("emits a structured per-write log line on create (audit trail)", async () => {
+    if (unavailable()) return;
+    const entries: Record<string, unknown>[] = [];
+    const adapter = new SpineSettingsAdapter({
+      scriptsDir: SCRIPTS_DIR,
+      baseDir: tmpBrain(),
+      log: (e) => entries.push(e),
+    });
+
+    await adapter.upsertProduct({ name: "Logged Co" });
+
+    const writes = entries.filter((e) => e.evt === "settings-write");
+    expect(writes.length).toBeGreaterThanOrEqual(1);
+    expect(writes.some((e) => e.op === "create-product")).toBe(true);
+  });
+
+  // #6 — a write failure returns an OPAQUE client message; the raw helper detail
+  // (paths / tracebacks) goes only to the server-side log (CWE-209).
+  it("WRITE_FAILED is opaque to the client; raw detail goes to the log", async () => {
+    if (unavailable()) return;
+    const entries: Record<string, unknown>[] = [];
+    const adapter = new SpineSettingsAdapter({
+      scriptsDir: SCRIPTS_DIR,
+      baseDir: tmpBrain(),
+      log: (e) => entries.push(e),
+    });
+
+    let caught: SettingsStoreError | undefined;
+    try {
+      await adapter.upsertProduct({ productId: MISSING_PRODUCT_ID, name: "Ghost" });
+    } catch (e) {
+      caught = e as SettingsStoreError;
+    }
+
+    expect(caught).toBeInstanceOf(SettingsStoreError);
+    expect(caught?.code).toBe("WRITE_FAILED");
+    // The client-facing message is fixed + opaque — no filesystem path, no
+    // traceback, no scripts dir leaking through.
+    expect(caught?.message).not.toContain("/");
+    expect(caught?.message).not.toContain("Traceback");
+    expect(caught?.message).not.toContain(SCRIPTS_DIR);
+    // The full detail still reached the server-side log (the audit trail).
+    const errs = entries.filter((e) => e.evt === "settings-write-error");
+    expect(errs.length).toBeGreaterThanOrEqual(1);
+    expect(String(errs[0]?.detail ?? "")).not.toBe("");
+  });
+});

@@ -8,27 +8,35 @@
 // no duplicated status list).
 //
 // Back-compat invariant: an entity with no `sys_status` field (legacy) is
-// treated as ACTIVE — absence ≠ deleted. Only the explicit removed statuses
-// hide an entity.
+// treated as ACTIVE — absence ≠ deleted. This is the one deliberate exception
+// (legacy rows minted before sys_status was stamped); every sanctioned emitter
+// now writes `sys_status: "active"` on emission.
+//
+// HARDENING (allow-list, not deny-list): a PRESENT `sys_status` is shown ONLY
+// when it is the explicit active sentinel. Any other present value — a known
+// removed status (deleted/purged/archived) OR an unrecognised/typo'd one — is
+// hidden. A deny-list would let a crafted or misspelled status sail through as
+// "active"; the allow-list closes that. This matches the Python read helper
+// (`list-entities.py`, `sys_status == "active"`) and `settingsActiveSort.ts`, so
+// all three active-status definitions agree by construction.
 //
 // ADR-020 consequence: ANY future reader of `dna:product` / `dna:project`
 // entities added later must apply this same filter, or soft-deleted entities
-// will leak back into that read path.
+// will leak back into that read path (e.g. the per-change Brain view, which now
+// also filters through this predicate).
 
-/** The `sys_status` values that mean "removed" — hidden from every read path. */
-const REMOVED_STATUSES: ReadonlySet<string> = new Set([
-  "deleted",
-  "purged",
-  "archived",
-]);
+/** The single `sys_status` value that means "active" — the only present status
+ *  shown on a read path (allow-list). */
+const ACTIVE_STATUS = "active";
 
 /**
  * True when a raw brain entity should be shown on a read path — i.e. it is not
  * soft-deleted. An entity with no `sys_status` (legacy) is active; an entity
- * whose `sys_status` is one of the removed values is hidden.
+ * with a present `sys_status` is active ONLY when it equals the active sentinel
+ * (allow-list) — any other present value is hidden.
  */
 export function isActiveStatus(entity: Record<string, unknown>): boolean {
   const status = entity.sys_status;
   if (typeof status !== "string") return true; // legacy / absent ⇒ active
-  return !REMOVED_STATUSES.has(status);
+  return status === ACTIVE_STATUS; // allow-list: only explicit "active" is shown
 }

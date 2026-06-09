@@ -156,6 +156,31 @@ describe("readBrain (FR-06/07)", () => {
     expect(workflows[0]!.items).toHaveLength(2);
   });
 
+  it("hides soft-deleted entities (sys_status not active) — ADR-020 invariant", async () => {
+    await writeEntity("product-development", "product", "01ACTIVE", {
+      id: "dna:product:01ACTIVE",
+      name: "Live product",
+      sys_status: "active",
+    });
+    await writeEntity("product-development", "product", "01GONE", {
+      id: "dna:product:01GONE",
+      name: "Removed product",
+      sys_status: "deleted",
+    });
+    await writeEntity("product-development", "product", "01LEGACY", {
+      // legacy entity with no sys_status → still active (absence ≠ deleted).
+      id: "dna:product:01LEGACY",
+      name: "Legacy product",
+    });
+
+    const view = await readBrain(root, "01XYZ");
+    const products = view.groups.find((g) => g.kind === "product");
+    const ids = (products?.items ?? []).map((i) => i.id).sort();
+
+    // The soft-deleted one is gone; active + legacy remain.
+    expect(ids).toEqual(["dna:product:01ACTIVE", "dna:product:01LEGACY"]);
+  });
+
   it("tolerates a malformed entity file without failing the whole read", async () => {
     await writeEntity("product-development", "requirement", "01GOOD", {
       id: "dna:requirement:01GOOD",

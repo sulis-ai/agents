@@ -200,4 +200,20 @@ describe("readProducts sys_status filter (WP-003, ADR-020)", () => {
     const names = result.list.products.map((p) => p.name);
     expect(names).toContain("Legacy Product");
   });
+
+  it("allow-list hardening: a PRESENT but unrecognised sys_status is hidden (not shown)", async () => {
+    // A crafted / typo'd status must NOT slip through as active — the read side
+    // shows a present status only when it is exactly "active" (allow-list), so
+    // an unknown value is treated as not-active and hidden.
+    await seedProduct(dir, "01ACME00000000000000000000", "Acme Checkout");
+    await seedProductRaw(dir, "01WEIRD0000000000000000000", {
+      name: "Crafted Status Product",
+      sys_status: "actiVe", // not the exact sentinel; a deny-list would leak it
+    });
+
+    const result = await readProducts({ sulisStateDir: dir });
+    const names = result.list.products.map((p) => p.name);
+    expect(names).toContain("Acme Checkout");
+    expect(names).not.toContain("Crafted Status Product");
+  });
 });
