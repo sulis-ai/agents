@@ -77,6 +77,57 @@ def _read_textish(value: str) -> str:
     return value
 
 
+def _run_seam_close_gate(args: argparse.Namespace, paths) -> dict:
+    """Step 12.2a — the seam-close DoD gate at the WP done-transition (ADR-003).
+
+    Called immediately AFTER the in_progress→done flip (step 12.2): the
+    seam-close predicate ("are all WPs on both sides of this seam now done?")
+    must read post-flip INDEX state. Returns a dict threaded into the wrap
+    envelope under ``seam_close``. On a ``blocked`` verdict the caller also
+    surfaces a ``gate_block`` so the calling session halts seam-close as
+    "not done" — WITHOUT rolling back the flip (the WP genuinely reached done;
+    it is the *seam* that is not done, mirroring the ship gate).
+
+    Best-effort-never-fatal for EVIDENCE, decisive for the VERDICT. The gate's
+    runner already inherits never-fatal evidence semantics (a brain-store write
+    failure does not change the wrap's success). The two are not conflated: a
+    ``blocked`` *decision* DOES set ``gate_block``; an evidence-deposit hiccup
+    inside the runner does NOT. If the gate machinery itself cannot run at all
+    (module absent, INDEX unreadable beyond the gate's own degrade-open), that
+    is a detection failure, not a seam block — degrade-open to ``not-closed`` so
+    the wrap still succeeds and never fabricates a block or a green.
+    """
+    try:
+        from _seam_close_gate import evaluate  # local import: keeps wrap import-light
+
+        brain_base_dir = paths.repo_root / ".brain" / "instances"
+        result = evaluate(
+            args.wp,
+            index_path=paths.index_md,
+            brain_base_dir=brain_base_dir,
+            repo_root=paths.repo_root,
+            allow_deferred=args.allow_deferred,
+        )
+        return {
+            "verdict": result.verdict,   # observed | blocked | not-closed
+            "seam": result.seam_title,   # founder-facing title; "" when not-closed
+            "reason": result.reason,     # founder-English; empty when silent
+        }
+    except Exception as exc:  # noqa: BLE001 — machinery failure must never fail the wrap
+        # The gate machinery itself could not run (module absent, an unexpected
+        # error past the gate's own degrade-open). This is a DETECTION failure,
+        # not a seam decision: degrade-open to `not-closed` so the wrap still
+        # succeeds. We never fabricate `blocked` (a false halt) or `observed`
+        # (a false green) on a machinery error — the seam is simply re-evaluated
+        # at the next WP done-transition (and the ship gate is the backstop).
+        return {
+            "verdict": "not-closed",
+            "seam": "",
+            "reason": "",
+            "gate_error": f"{type(exc).__name__}: {exc}",
+        }
+
+
 def cmd_wrap(args: argparse.Namespace) -> None:
     paths = paths_from_args(args)
 
@@ -125,6 +176,18 @@ def cmd_wrap(args: argparse.Namespace) -> None:
     ])
     summary["steps"]["flip_status"] = result_2.get("data", {})
 
+    # Step 12.2a — seam-close DoD gate (ADR-003), AFTER the flip so the
+    # seam-close predicate reads post-flip INDEX state. A `blocked` seam emits
+    # a `gate_block` the calling session reads to halt seam-close as "not done"
+    # — the flip is NOT rolled back (the WP reached done; the *seam* did not).
+    seam_close = _run_seam_close_gate(args, paths)
+    summary["seam_close"] = seam_close
+    if seam_close["verdict"] == "blocked":
+        summary["gate_block"] = {
+            "stage": "seam-close",
+            "message": seam_close["reason"],
+        }
+
     # Step 12.3 — remove worktree (tolerate-missing for idempotency)
     if args.worktree_path:
         result_3 = _call_tool("wpx-worktree", [
@@ -167,6 +230,11 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Worktree path to remove (omit to skip removal)")
     p_wrap.add_argument("--post-deploy-verification", default=None,
                         help="Optional post-deploy verification string for WP frontmatter compatibility")
+    p_wrap.add_argument("--allow-deferred", action="store_true", default=False,
+                        help="Seam-close gate (12.2a): treat a knowingly-deferred "
+                             "seam as passing (recorded) instead of blocking. "
+                             "Default OFF = observed-or-blocked. Mirrors "
+                             "sulis-verify-acceptance's conscious, logged escape.")
 
     return parser
 

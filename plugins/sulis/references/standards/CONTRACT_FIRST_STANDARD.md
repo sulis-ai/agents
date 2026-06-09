@@ -300,6 +300,34 @@ rubric P6 enforces this mechanically (check 6.06 — see
 
 ---
 
+### CF-12 — Real-data acceptance is driven at seam-close, not at ship · MUST
+
+A contract-first seam's **real-data behaviour** (the producer's actual output
+crossing to the real consumer) MUST be driven the moment the seam closes — when
+the integration WP completes, or when the contract WP and all the producer +
+consumer WPs that `dependsOn` it reach `done` — **not** deferred to the ship
+stage. The drive uses the change's covering Scenarios (the Scenarios that
+verify the requirements the seam's two sides implement) against a standing app,
+reading the observed-or-blocked verdict over the **real saved record**. A seam
+with **no covering Scenario** is **blocked** (its real-data behaviour was never
+driven), not silently passed. A seam needing an execution tier that isn't live
+yet (e.g. agent-step) is **blocked** until it is, escapable only by a conscious,
+recorded deferral.
+
+CF-07 says *what* "done at the seam" means (wired + conformant). CF-12 says
+*when* it is checked (seam-close, the moment it is cheap to fix) — re-timing the
+catch earlier than the ship-stage backstop. This is the contract-first
+application of the **observed-or-blocked** Definition-of-Done discipline. The
+ship-stage acceptance gate stays in place as the **backstop** (ADR-002): the
+seam-close gate moves the *primary* catch earlier; it does not remove the
+ship-stage drive.
+
+**Anti-pattern:** letting both sides pass hermetically against fixtures, merging
+them adjacent, and discovering at ship that the real data never crossed the seam
+— the slow find-one-fix-one tail this rule exists to kill.
+
+---
+
 ## Tiers (scope the rigor to the case)
 
 | Tier | When | What's required |
@@ -357,3 +385,4 @@ the in-repo reference implementation of the subprocess+JSON transport binding.
 | 0.1.0 | 2026-05-26 | Initial sulis-local definition. 9 requirements (CF-01..CF-09) on the two-axis + three-category-error backbone. Two tiers (lightweight internal seam / full published SDK). Sits between WP_BACKEND and WP_FRONTEND; amends WORK_PACKAGE_STANDARD cross-kind decomposition (parallel via contract dependency — to be reflected there). SHOULD-tier requirements (CF-08/09) carry 90-day calibration. |
 | 0.2.0 | 2026-06-03 | Added CF-11 (MUST) — shared producer-side artifacts must be pinned in the contract WP with filename + path + schema + merge semantics as an explicit shared constant; producer WPs reference the constant verbatim and never independently choose a filename. Mechanically enforced by decompose-validation rubric P6 check 6.06. Provenance: lesson #107 (anchor case CH-01KSSV — two producer WPs picked `CONTRACT.manifest.json` vs `manifest.json` and one clobbered the other). |
 | 0.3.0 | 2026-06-04 | CF-08 host-rendered surface clause promoted from SHOULD to **MUST-when-building**, generalised beyond MCP-Apps (OpenAI Apps SDK / figma-plugin / browser-extension are instances), MIME widened to the host's accepted value (`text/html+skybridge` / `text/html+mcp` alongside `text/html;profile=mcp-app`), and its CF-07 conformance check named as **the real-host round-trip** (observed or human-attested, never a mock). Provenance: host-rendered-surface critical-thinking analysis (2026-06-04, spiral-converged) — a Cowork MCP App shipped "built" with its HTML serving but unbound (`_meta.ui` + client runtime absent), so the host narrated tool data as text. Companion edits: `mcp-ui-surface-patterns.md` § "Done = wired + legible" (the fail-closed gate) + the design/audit journey-walk's sharper "exists" for host-rendered hops. |
+| 0.4.0 | 2026-06-09 | Added CF-12 (MUST) — a contract-first seam's real-data behaviour is driven **at seam-close** (the integration WP completes, or the contract WP + all `dependsOn` producer/consumer WPs reach `done`), **not** deferred to ship; the drive reads the observed-or-blocked verdict over the real saved record using the change's covering Scenarios. A seam with no covering Scenario is **blocked** (never silently passed), and a seam needing an execution tier not yet live is blocked until it is — escapable only by a conscious recorded deferral. CF-12 re-times the catch earlier than CF-07's ship-stage check; the ship gate stays as the **backstop** (ADR-002). Provenance: CH-01KTP7 seam-DoD gate (the contract-first application of the observed-or-blocked Definition-of-Done discipline). |

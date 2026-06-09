@@ -1067,6 +1067,18 @@ loop:
             Security: PASS (N CONCERN, M ADVISORY auto-drafted as
             WP-AUTO-XXX for founder review)."
 
+       **Step 12a: seam-close gate (fires inside wpx-step12 wrap).**
+       The wrap above runs the seam-close gate at the WP-done flip. You
+       do not call it — it is internal to wrap. When a **seam-spanning
+       WP completes** (an integration / composite WP, or the last WP of
+       a contract fan-out reaching done), the gate drives the closing
+       seam's covering Scenarios and reads observed-or-blocked over the
+       real saved record. On a `blocked` seam the wrap envelope carries
+       a `gate_block` field — surface that founder-English message
+       verbatim and treat the seam as not-done (do NOT roll back the
+       flip; the WP is done, the seam is not). See the
+       **"Seam-close gate"** subsection below for the full discipline.
+
    13. Emit per-batch plain-English status to the founder /
        concierge / calling session:
        - "Starting N in parallel: WP-A (title), WP-B (title), ..."
@@ -1079,6 +1091,61 @@ loop:
 
    14. Goto step 1.
 ```
+
+### Seam-close gate — fires when a seam-spanning WP completes
+
+The seam-close gate runs **inside `wpx-step12 wrap`** at each WP's
+done-transition (step 12.2a, right after the `in_progress → done`
+flip). Because run-all finalises every WP — single or batched —
+through `wpx-step12 wrap`, the gate fires on this path automatically.
+You do not invoke it; you surface its result.
+
+**When it fires.** Once per WP, at the WP-done transition. The gate
+first asks *did a seam just close?* The case that matters for run-all
+is a **seam-spanning WP completing**: an integration / `kind:
+composite` WP reaching done, or the last producer/consumer WP of a
+contract fan-out reaching done so that the contract WP and all the WPs
+that depend on it are now done. When a WP is part of no seam — the
+common single-kind case — the gate is silent.
+
+**What it does.** For the closing seam it drives the covering
+Scenarios (the end-to-end checks that exercise the real data crossing
+the seam) through the acceptance runner and reads the verdict over the
+**real saved record**: **observed** or **blocked**. Same
+observed-or-blocked rule the ship-stage check uses, re-timed to the
+moment the seam closes — when the two slices are freshly adjacent and
+cheap to unwind — instead of waiting for ship.
+
+**What `blocked` means.** Seam-close halts as "not done". The done
+flip is **not** rolled back: the WP genuinely reached done; it is the
+*seam* that is not done. `wpx-step12 wrap` emits a `gate_block` field
+in its JSON envelope. Surface that message to the founder **verbatim**
+— do not invent your own. It is written in founder English and names
+the seam by its title and what wasn't driven, for example:
+
+```
+The "checkout-to-ledger" handover isn't done yet. Nothing has driven a
+real order all the way through to a saved ledger entry, so we can't
+confirm the two halves actually work together. Holding this as not-done
+until that end-to-end path runs for real.
+```
+
+In a batch, a blocked seam means that seam is held as not-done; the
+other WPs in the batch are unaffected, and the calling session reports
+it alongside the per-batch status (step 13).
+
+**The escape — `--allow-deferred`.** A seam whose only honest check
+needs a capability that isn't live yet can proceed as a **conscious,
+recorded deferral** by threading `--allow-deferred` through the wrap.
+The deferral is logged. The default is observed-or-blocked: the escape
+is a deliberate, recorded choice, never the silent path.
+
+> Cross-refs: the seam-close timing rule is **CF-12** in
+> `CONTRACT_FIRST_STANDARD.md`; the ship-stage acceptance check (gate
+> 4.8) stays as a backstop per **ADR-002** (defence in depth — the
+> seam-close gate is the primary, earlier catch). The gate logic lives
+> in `_seam_close_gate`, wired at `wpx-step12 wrap` per ADR-003; this
+> skill only surfaces the wrap envelope's `gate_block`.
 
 ### v0.9.0 sequencing — sequential post-push, parallel pre-push
 

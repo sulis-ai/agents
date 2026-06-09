@@ -1,0 +1,28 @@
+{
+  "pr": "feat/wp-005-cf12-seam-close-timing",
+  "base": "change/feat-seam-dod-gate",
+  "timestamp": "2026-06-09T134659Z",
+  "verdict": "PASS",
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "commands": ["ruff check", "mypy", "pytest"],
+    "result": "clean"
+  },
+  "pr_hygiene": {
+    "scope": {"severity": "none", "commit_types": ["feat"], "module_fan_out": 2},
+    "size": {"severity": "none", "lines_added": 113, "lines_removed": 0, "files_changed": 2},
+    "safety": {"severity": "none", "migrations": 0, "schema_idl": 0, "secrets": 0, "infra": 0},
+    "completeness": {"severity": "none", "new_source_without_test": 0}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"total": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "status": "nothing-surfaced"},
+    "security": {"findings": 0, "status": "nothing-surfaced"},
+    "quality": {"findings": 0, "status": "nothing-surfaced"}
+  },
+  "draft_fixes": 0,
+  "auto_downgrade_fired": false
+}

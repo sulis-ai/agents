@@ -1,0 +1,21 @@
+id: ARCH-seam-dod-gate
+status: designed
+change_id: 01KTP7KVS9CTPPQ1D752EX46KA
+change_handle: CH-01KTP7
+primitive: feat
+slug: seam-dod-gate
+sourced_from:
+  spec: .changes/feat-seam-dod-gate.SPEC.md
+  handoff: .changes/feat-seam-dod-gate.HANDOFF.md
+  working_set: .changes/feat-seam-dod-gate.WORKING-SET.md
+  recon: .changes/feat-seam-dod-gate.RECON.md
+upstream:
+  substrate_pr: 259            # #98 verdict-invariant substrate (SHIPPED) — consumed, not rebuilt
+  agent_step_execution: 92     # deferred tier — seams needing it report blocked
+tier: S                        # focused internal methodology machinery; see SIZING note in TDD
+adrs:
+  - ADR-001-gate-unit-is-the-seam-not-the-scenario
+  - ADR-002-keep-ship-gate-as-backstop
+  - ADR-003-seam-close-hook-at-wp-done-transition
+  - ADR-004-seam-to-scenario-resolution-via-requirement-bridge
+  - ADR-005-no-covering-scenario-is-blocked-distinct-from-deferred

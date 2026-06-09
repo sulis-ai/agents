@@ -1,0 +1,199 @@
+diff --git a/plugins/sulis/scripts/tests/unit/test_seam_close_gate_wiring.py b/plugins/sulis/scripts/tests/unit/test_seam_close_gate_wiring.py
+new file mode 100644
+index 00000000..25f6f5d5
+--- /dev/null
++++ b/plugins/sulis/scripts/tests/unit/test_seam_close_gate_wiring.py
+@@ -0,0 +1,114 @@
++"""WP-003 wiring — the WP done-transition runs the seam-close gate.
++
++The seam-close gate must actually fire at the `wpx-step12 wrap`
++done-transition (step 12.2a, immediately after the `in_progress→done`
++flip), or it's a gate in name only. These are structural assertions over
++the live tool/skill text — the same shape as
++`test_ship_acceptance_gate_wiring.py` asserts over `change/SKILL.md`.
++
++Two layers (mirrors TDD §Test surface File 2):
++  - `wpx-step12` invokes `_seam_close_gate.evaluate(...)` after the flip,
++    emits a `gate_block` on a `blocked` seam, and threads `--allow-deferred`
++    (observed-or-blocked) — **made green by WP-003 (this WP).**
++  - `run-wp`/`run-all` SKILL.md document the seam-close gate at WP-done —
++    **made green by WP-004.** Authored failing-first here; WP-004 appends
++    its run-wp/run-all assertions to this same file (it is the sole appender,
++    `dependsOn` WP-003).
++
++Stdlib + pytest. Python 3.11-safe.
++"""
++
++from __future__ import annotations
++
++from pathlib import Path
++
++_REPO_ROOT = Path(__file__).resolve().parents[5]
++_STEP12 = _REPO_ROOT / "plugins" / "sulis" / "scripts" / "wpx-step12"
++_RUNWP = _REPO_ROOT / "plugins" / "sulis" / "skills" / "run-wp" / "SKILL.md"
++_RUNALL = _REPO_ROOT / "plugins" / "sulis" / "skills" / "run-all" / "SKILL.md"
++
++
++def _step12_text() -> str:
++    assert _STEP12.is_file(), f"missing {_STEP12}"
++    return _STEP12.read_text(encoding="utf-8")
++
++
++def _runwp_text() -> str:
++    assert _RUNWP.is_file(), f"missing {_RUNWP}"
++    return _RUNWP.read_text(encoding="utf-8")
++
++
++def _runall_text() -> str:
++    assert _RUNALL.is_file(), f"missing {_RUNALL}"
++    return _RUNALL.read_text(encoding="utf-8")
++
++
++# ── wpx-step12 wiring (made green by WP-003) ─────────────────────────────────
++
++
++def test_wpx_step12_invokes_seam_close_gate() -> None:
++    """The done-transition must reference + call the seam-close gate, and do so
++    AFTER the status flip (step 12.2a) — not a gate in name only."""
++    text = _step12_text()
++    assert "_seam_close_gate" in text, (
++        "wpx-step12 must reference the seam-close gate module (_seam_close_gate)"
++    )
++    assert "evaluate(" in text, (
++        "wpx-step12 must call _seam_close_gate.evaluate(...) at the done-transition"
++    )
++    # The gate fires AFTER the flip (12.2a), not before — the seam-close
++    # predicate must read post-flip INDEX state (ADR-003).
++    flip_pos = text.find("flip-status")
++    eval_pos = text.find("evaluate(")
++    assert flip_pos != -1, "wpx-step12 must still perform the status flip (12.2)"
++    assert eval_pos > flip_pos, (
++        "the seam-close gate (evaluate) must be invoked AFTER the status flip "
++        "(step 12.2a is after 12.2) — ADR-003"
++    )
++
++
++def test_seam_gate_blocks_on_blocked_verdict() -> None:
++    """A `blocked` seam must emit a gate-block signal the calling session reads
++    to halt seam-close — mirrors test_ship_blocks_on_blocked_verdict."""
++    text = _step12_text()
++    assert "gate_block" in text, (
++        "wpx-step12 must emit a gate_block field on a blocked seam so the "
++        "calling session halts seam-close as 'not done'"
++    )
++    assert "blocked" in text, (
++        "wpx-step12 must branch on the gate's blocked verdict"
++    )
++    # The flip is NOT rolled back on a block (ADR-003): the wrap still emits ok.
++    assert "seam_close" in text, (
++        "wpx-step12 must thread the seam_close result into the wrap envelope"
++    )
++
++
++def test_seam_gate_treats_deferred_as_blocking_by_default() -> None:
++    """Observed-or-blocked by default, with the conscious --allow-deferred
++    escape threaded through — mirrors test_ship_treats_deferred_as_blocking."""
++    text = _step12_text()
++    assert "allow-deferred" in text or "allow_deferred" in text, (
++        "wpx-step12 must thread the --allow-deferred escape through to the gate"
++    )
++    assert "allow_deferred" in text, (
++        "wpx-step12 must pass allow_deferred to _seam_close_gate.evaluate(...)"
++    )
++
++
++# ── run-wp / run-all documentation (made green by WP-004) ────────────────────
++
++
++def test_runwp_documents_seam_close_gate() -> None:
++    text = _runwp_text().lower()
++    assert "seam-close" in text or "seam close" in text, (
++        "run-wp/SKILL.md must document the seam-close gate at WP-done (WP-004)"
++    )
++
++
++def test_runall_documents_seam_close_gate() -> None:
++    text = _runall_text().lower()
++    assert "seam-close" in text or "seam close" in text, (
++        "run-all/SKILL.md must document the seam-close gate firing when a "
++        "seam-spanning WP completes (WP-004)"
++    )
+diff --git a/plugins/sulis/scripts/wpx-step12 b/plugins/sulis/scripts/wpx-step12
+index 92f17105..2295234d 100755
+--- a/plugins/sulis/scripts/wpx-step12
++++ b/plugins/sulis/scripts/wpx-step12
+@@ -77,6 +77,43 @@ def _read_textish(value: str) -> str:
+     return value
+ 
+ 
++def _run_seam_close_gate(args: argparse.Namespace, paths) -> dict:
++    """Step 12.2a — the seam-close DoD gate at the WP done-transition (ADR-003).
++
++    Called immediately AFTER the in_progress→done flip (step 12.2): the
++    seam-close predicate ("are all WPs on both sides of this seam now done?")
++    must read post-flip INDEX state. Returns a dict threaded into the wrap
++    envelope under ``seam_close``. On a ``blocked`` verdict the caller also
++    surfaces a ``gate_block`` so the calling session halts seam-close as
++    "not done" — WITHOUT rolling back the flip (the WP genuinely reached done;
++    it is the *seam* that is not done, mirroring the ship gate).
++
++    Best-effort-never-fatal for EVIDENCE, decisive for the VERDICT. The gate's
++    runner already inherits never-fatal evidence semantics (a brain-store write
++    failure does not change the wrap's success). The two are not conflated: a
++    ``blocked`` *decision* DOES set ``gate_block``; an evidence-deposit hiccup
++    inside the runner does NOT. If the gate machinery itself cannot run at all
++    (module absent, INDEX unreadable beyond the gate's own degrade-open), that
++    is a detection failure, not a seam block — degrade-open to ``not-closed`` so
++    the wrap still succeeds and never fabricates a block or a green.
++    """
++    from _seam_close_gate import evaluate  # local import: keeps wrap import-light
++
++    brain_base_dir = paths.repo_root / ".brain" / "instances"
++    result = evaluate(
++        args.wp,
++        index_path=paths.index_md,
++        brain_base_dir=brain_base_dir,
++        repo_root=paths.repo_root,
++        allow_deferred=args.allow_deferred,
++    )
++    return {
++        "verdict": result.verdict,   # observed | blocked | not-closed
++        "seam": result.seam_title,   # founder-facing title; "" when not-closed
++        "reason": result.reason,     # founder-English; empty when silent
++    }
++
++
+ def cmd_wrap(args: argparse.Namespace) -> None:
+     paths = paths_from_args(args)
+ 
+@@ -125,6 +162,18 @@ def cmd_wrap(args: argparse.Namespace) -> None:
+     ])
+     summary["steps"]["flip_status"] = result_2.get("data", {})
+ 
++    # Step 12.2a — seam-close DoD gate (ADR-003), AFTER the flip so the
++    # seam-close predicate reads post-flip INDEX state. A `blocked` seam emits
++    # a `gate_block` the calling session reads to halt seam-close as "not done"
++    # — the flip is NOT rolled back (the WP reached done; the *seam* did not).
++    seam_close = _run_seam_close_gate(args, paths)
++    summary["seam_close"] = seam_close
++    if seam_close["verdict"] == "blocked":
++        summary["gate_block"] = {
++            "stage": "seam-close",
++            "message": seam_close["reason"],
++        }
++
+     # Step 12.3 — remove worktree (tolerate-missing for idempotency)
+     if args.worktree_path:
+         result_3 = _call_tool("wpx-worktree", [
+@@ -167,6 +216,11 @@ def build_parser() -> argparse.ArgumentParser:
+                         help="Worktree path to remove (omit to skip removal)")
+     p_wrap.add_argument("--post-deploy-verification", default=None,
+                         help="Optional post-deploy verification string for WP frontmatter compatibility")
++    p_wrap.add_argument("--allow-deferred", action="store_true", default=False,
++                        help="Seam-close gate (12.2a): treat a knowingly-deferred "
++                             "seam as passing (recorded) instead of blocking. "
++                             "Default OFF = observed-or-blocked. Mirrors "
++                             "sulis-verify-acceptance's conscious, logged escape.")
+ 
+     return parser
+ 
