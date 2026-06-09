@@ -12,25 +12,25 @@ import { useNavigate } from "react-router-dom";
 
 import { StartFromIntent } from "../components/StartFromIntent";
 import { useActiveProduct } from "../api/activeProduct";
+import { useProducts } from "../api/useProducts";
 
 export function StartFromIntentPage() {
   const navigate = useNavigate();
   const { activeProductId } = useActiveProduct();
+  const products = useProducts();
 
-  // The start needs a Product to start a change against (UC-08 precondition —
-  // onboarding mints one). Until one is active, send the founder to onboarding.
-  if (!activeProductId) {
-    return (
-      <StartFromIntent
-        productId=""
-        onStarted={() => navigate("/")}
-      />
-    );
-  }
+  // The client-side active-product context is `null` until the founder
+  // explicitly switches product; `null` means "use the server's active
+  // Product" (the single-Product trivial case / the tenant default) — the SAME
+  // fallback the top bar applies (`activeProductId ?? serverActiveProductId`).
+  // Resolve the EFFECTIVE active Product so the start always carries a real id:
+  // an empty id can't resolve a Project repo and 502s the start (CH-01KTPF).
+  const effectiveProductId =
+    activeProductId ?? products.data?.activeProductId ?? "";
 
   return (
     <StartFromIntent
-      productId={activeProductId}
+      productId={effectiveProductId}
       onStarted={() => navigate("/")}
     />
   );
