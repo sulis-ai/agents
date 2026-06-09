@@ -49,3 +49,4 @@ English (which seam, what wasn't driven). Ship-stage gate 4.8 stays as a backsto
 - 2026-06-09T13:07:30Z — Working Set created.
 - 2026-06-09T13:10:43Z — Specify (standard): gate unit resolved = seam not Scenario (Scenarios don't tile seams 1:1, verified in code). SPEC.md written, 6 test-first acceptance criteria.
 - 2026-06-09T13:35:45Z — Design complete: TDD + 5 ADRs + 6 WPs (2 parallel tracks: code WP-001..004, standards WP-005..006). Hook = wpx-step12 done-transition. Open Qs resolved: rely on journey-filtered fallback (no implements: backfill); brain-evidence as already-driven signal. Rubric PASS.
+- 2026-06-09T14:34:06Z — Implement complete: all 6 WPs merged to change branch (37b092ac). Two test-first pairs (WP-001/002 gate module, WP-003/004 wiring+docs) landed sequentially; standards track (WP-005/006) parallel. Full tests/unit/ suite green (2338 passed), compileall + routing-coverage + change-branch branch-ci all green. Ready for Review stage.

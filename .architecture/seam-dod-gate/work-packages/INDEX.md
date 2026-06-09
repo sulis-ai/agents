@@ -16,9 +16,9 @@
 
 | Status | Count |
 |---|---|
-| pending | 6 |
+| pending | 0 |
 | in_progress | 0 |
-| done | 0 |
+| done | 6 |
 | blocked | 0 |
 
 ## Contract-First / Cross-Kind Exemption (CF)
@@ -129,12 +129,12 @@ graph TD
 
 | ID | Title | Primitive | Group | Kind | Status | Depends On | Blocks | Token (in/out) | TDD § |
 |---|---|---|---|---|---|---|---|---|---|
-| WP-001 | Author the failing decision-unit tests (6 ACs + correctness cases) | create | GENERATE | methodology | pending | — | WP-002 | 8k / 6k | §Proof; §Test surface File 1 |
-| WP-002 | Author the pure-decision seam-close gate module `_seam_close_gate.py` | create | GENERATE | methodology | pending | WP-001 | WP-003, WP-004 | 9k / 7k | §Form (the one new module); §Detection + Resolution; §Verdict semantics |
-| WP-003 | Wire the seam-close gate into `wpx-step12 wrap` (step 12.2a) | extend | EXPAND | methodology | pending | WP-002 | — | 7k / 5k | §How the gate hooks into the build loop; §Test surface File 2 |
-| WP-004 | Document the seam-close gate in the build-loop skills (run-wp, run-all) | extend | EXPAND | methodology | pending | WP-002, WP-003 | — | 5k / 4k | §How the gate hooks (skills document); §Test surface File 2 (two doc assertions) |
-| WP-005 | Add CF-12 (seam-close DoD timing rule) to CONTRACT_FIRST_STANDARD.md | extend | EXPAND | methodology | pending | — | WP-006 | 4k / 3k | §Where the standards changes land — CF-12 |
-| WP-006 | Amend WORK_PACKAGE_STANDARD.md — seam-close DoD wording + contract-WP `implements:` | extend | EXPAND | methodology | pending | WP-005 | — | 4k / 3k | §Where the standards changes land — WP standard |
+| WP-001 | Author the failing decision-unit tests (6 ACs + correctness cases) | create | GENERATE | methodology | done | — | WP-002 | 8k / 6k | §Proof; §Test surface File 1 |
+| WP-002 | Author the pure-decision seam-close gate module `_seam_close_gate.py` | create | GENERATE | methodology | done | WP-001 | WP-003, WP-004 | 9k / 7k | §Form (the one new module); §Detection + Resolution; §Verdict semantics |
+| WP-003 | Wire the seam-close gate into `wpx-step12 wrap` (step 12.2a) | extend | EXPAND | methodology | done | WP-002 | — | 7k / 5k | §How the gate hooks into the build loop; §Test surface File 2 |
+| WP-004 | Document the seam-close gate in the build-loop skills (run-wp, run-all) | extend | EXPAND | methodology | done | WP-002, WP-003 | — | 5k / 4k | §How the gate hooks (skills document); §Test surface File 2 (two doc assertions) |
+| WP-005 | Add CF-12 (seam-close DoD timing rule) to CONTRACT_FIRST_STANDARD.md | extend | EXPAND | methodology | done | — | WP-006 | 4k / 3k | §Where the standards changes land — CF-12 |
+| WP-006 | Amend WORK_PACKAGE_STANDARD.md — seam-close DoD wording + contract-WP `implements:` | extend | EXPAND | methodology | done | WP-005 | — | 4k / 3k | §Where the standards changes land — WP standard |
 
 **Totals:** ~37k input + ~28k output ≈ 65k tokens for the full WP set
 (comfortably small; tier S).
