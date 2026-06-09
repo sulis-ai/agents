@@ -614,6 +614,69 @@ If extending or superseding, reference the existing ADR by path.}
    change with no user-facing surface: exempt — log `journey-walk: exempt —
    <reason>`, mirroring the scenario-authoring exemption in step 3d.)
 
+   **(f) SECOND PASS — walk the TOOL surface (MUST for any change with a tool
+   surface).** Steps (a)–(e) above walk the **UI** surface — the human
+   consumer's path. Now run the *same procedure a second time* over the **tool**
+   surface — the machine consumer's path (the API / SDK / MCP operations the
+   change exposes). This is the second pass of ADR-003: not a new walk
+   mechanism, the *same* outside-in, hop-by-hop existence check applied to the
+   machine consumer.
+
+   - **Source of operations:** the walk's tool operations are drawn from the
+     **interface-contract section** (`## Interface Contract` / ServiceSpec,
+     FR-18). Per FR-19 every walked operation MUST appear in the contract — the
+     walk is a *subset* of the contract, never inventing an operation the
+     contract never declared. (`plan-work`'s WP-013 enforces walk ⊆ contract
+     mechanically; here you draw *from* the contract.)
+   - **The sharper "exists" bar for a tool hop (FR-09 / NFR-S02, MUST).** A tool
+     operation is **exists** only when **BOTH** are cited: (1) the **handler**
+     (the file + function that serves the operation) **AND** (2) its
+     **ServiceSpec binding** (the `bindings:` entry — host/basePath/method/auth —
+     that wires the handler into the contract). A handler that merely *serves* —
+     with no binding — is a **GAP**, never exists. This is the **generalisation
+     of the host-rendered bar** in (b): the same "wired, not just serving"
+     discipline, applied to every tool operation (so the false-EXISTS bypass is
+     closed on the machine path too, MUC-02). A planned WP for a still-unbuilt
+     operation is **planned-WP**.
+
+   **(g) Write the SECOND table + GATE (MUST).** Write a **second**
+   `## Journey Walk` table for the tool surface alongside the UI one — **both
+   tables persist** in the document (NFR-D02). The same gate applies: a bare
+   `GAP` in *either* table (UI or tool) blocks design completion. Mechanise the
+   check with the walk scripts:
+
+   ```
+   # Drive each surface (writes a `## Journey Walk` section per surface):
+   python3 <SCRIPTS_DIR>/_drive_journey_walk.py --fixture <walk> --surface ui   --out DESIGN.md
+   python3 <SCRIPTS_DIR>/_drive_journey_walk.py --fixture <walk> --surface tool --out tool-walk.md
+   #   (append the tool section into the document so both tables persist)
+
+   # Assert both tables present + no bare GAP on the tool surface:
+   python3 <SCRIPTS_DIR>/_assert_walk_table.py --surface tool --require-two-tables --no-bare-gap DESIGN.md
+   python3 <SCRIPTS_DIR>/_assert_walk_table.py --surface ui   --no-bare-gap DESIGN.md
+   ```
+
+   The tool pass adds **≤ 1 agent turn** over the single-surface walk (NFR-S01)
+   — it reuses the contract operations as its source, so the agent doesn't
+   re-derive the path. (A change with **no** tool surface is exempt from the
+   second pass — log `tool-walk: exempt — no tool surface`, mirroring the (e)
+   UI exemption.)
+
+   **(h) Cover every flow on both surfaces; an undrivable tool scenario is
+   recorded deferred, never skipped (MUST).** Every UC flow (main / alternate /
+   exception) maps to ≥ 1 verifiable scenario on the appropriate surface (FR-10)
+   — check it with `_assert_flow_scenario_map.py`. When a tool scenario cannot be
+   driven in this environment (no dev-tier endpoint / credential — the
+   `tool-drive-sandbox` deferred infrastructure need), it is **recorded
+   deferred** via `_drive_scenario.py` (a visible deferred record, NFR-R02),
+   never a silent skip and never a fake green:
+
+   ```
+   python3 <SCRIPTS_DIR>/_assert_flow_scenario_map.py <flow-map.json>
+   python3 <SCRIPTS_DIR>/_drive_scenario.py --scenario <scenario.json> --out <record.json>
+   #   exit 0 = observed; exit 3 = recorded deferred (NOT a pass); never a skip
+   ```
+
 9. **Extract ADRs** — for each non-trivial decision in the TDD, factor it out into an ADR file. The TDD references the ADR by ID. **Before writing each ADR**, check the External ADR Registry — if an existing ADR covers the same decision, reference it instead. New ADR numbering starts at one past the registry's highest. Do not write ADRs to fill a quota.
 
     **After writing each ADR file (MUST)**, emit the paired Decision entity through the Brain↔OS port:

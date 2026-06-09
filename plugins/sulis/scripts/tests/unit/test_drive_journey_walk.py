@@ -183,3 +183,132 @@ def test_load_fixture_from_directory_and_name(tmp_path: Path) -> None:
 def test_load_fixture_empty_directory_raises(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         djw.load_fixture(tmp_path)
+
+
+# ─── WP-009 — the tool-surface second-table walk + the _assert_walk_table gate ──
+
+_ASSERT_WALK = _SCRIPTS_DIR / "_assert_walk_table.py"
+
+
+def _drive(fixture: str, surface: str, out: Path) -> int:
+    """Drive the WP-002 walk for one surface into ``out``; return the exit code."""
+    return djw.main(
+        ["--fixture", str(_FIXTURES / fixture), "--surface", surface, "--out", str(out)]
+    )
+
+
+def _two_table_doc(tmp_path: Path) -> Path:
+    """Assemble a design doc carrying BOTH a UI walk table and a tool walk table.
+
+    This mirrors how step 8.5 assembles the document: the single-surface driver
+    runs once per surface and both ``## Journey Walk`` sections are persisted in
+    the produced doc (NFR-D02).
+    """
+    ui = tmp_path / "ui.md"
+    tool = tmp_path / "tool.md"
+    _drive("ui-clean", "ui", ui)
+    _drive("tool-surface-bound", "tool", tool)
+    doc = tmp_path / "DESIGN.md"
+    doc.write_text(
+        ui.read_text(encoding="utf-8") + "\n" + tool.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    return doc
+
+
+def _assert_walk(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(_ASSERT_WALK), *args],
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_tool_surface_second_table_present(tmp_path: Path) -> None:
+    """SC-08 — a doc with both surface tables passes the two-table tool gate.
+
+    The verification artifact named in the WP frontmatter: a design doc that
+    carries the SECOND (tool-surface) ``## Journey Walk`` table alongside the UI
+    one is accepted by ``_assert_walk_table --surface tool --require-two-tables``.
+    """
+    doc = _two_table_doc(tmp_path)
+    result = _assert_walk(
+        "--surface", "tool", "--require-two-tables", str(doc)
+    )
+    assert result.returncode == 0, (
+        f"a doc with both UI and tool walk tables must pass --require-two-tables; "
+        f"rc={result.returncode} stderr={result.stderr}"
+    )
+
+
+def test_require_two_tables_fails_when_tool_table_absent(tmp_path: Path) -> None:
+    """SC-08 (negative) — a UI-only doc fails the two-table requirement."""
+    ui_only = tmp_path / "DESIGN.md"
+    _drive("ui-clean", "ui", ui_only)
+    result = _assert_walk(
+        "--surface", "tool", "--require-two-tables", str(ui_only)
+    )
+    assert result.returncode == 1, (
+        "a doc missing the tool-surface table must fail --require-two-tables "
+        f"(NFR-D02); rc={result.returncode} stderr={result.stderr}"
+    )
+
+
+def test_ui_walk_classifies_all_hops(tmp_path: Path) -> None:
+    """SC-06 — the UI walk table classifies every hop with no bare GAP."""
+    doc = tmp_path / "DESIGN.md"
+    _drive("ui-clean", "ui", doc)
+    result = _assert_walk("--surface", "ui", "--no-bare-gap", str(doc))
+    assert result.returncode == 0, (
+        f"a clean UI walk must classify every hop with no bare GAP; "
+        f"rc={result.returncode} stderr={result.stderr}"
+    )
+
+
+def test_serving_no_binding_is_gap(tmp_path: Path) -> None:
+    """SC-09 — a serving-but-unbound tool operation is a GAP, blocking --no-bare-gap.
+
+    The tool-serving-no-binding fixture has a handler with no ServiceSpec binding;
+    the WP-002 driver classifies it GAP (FR-09). The gate must reject it under
+    ``--no-bare-gap`` (exit 1) — never a false EXISTS.
+    """
+    doc = tmp_path / "DESIGN.md"
+    _drive("tool-serving-no-binding", "tool", doc)
+    result = _assert_walk("--surface", "tool", "--no-bare-gap", str(doc))
+    assert result.returncode == 1, (
+        f"a serving-without-binding tool hop is a GAP and must fail --no-bare-gap "
+        f"(FR-09 / NFR-S02); rc={result.returncode} stderr={result.stderr}"
+    )
+    # And it must be classified GAP, never EXISTS.
+    text = doc.read_text(encoding="utf-8")
+    assert "| GAP |" in text
+    assert "no ServiceSpec binding" in text
+
+
+def test_assert_walk_table_unreadable_doc_is_bad_input() -> None:
+    """A missing doc is bad input (exit 2), distinct from a failed check (exit 1)."""
+    result = _assert_walk("--surface", "ui", "/no/such/design.md")
+    assert result.returncode == 2
+
+
+def test_assert_walk_table_unknown_status_rejected(tmp_path: Path) -> None:
+    """A hop row with an unrecognised status cell fails the gate (exit 1)."""
+    doc = tmp_path / "DESIGN.md"
+    doc.write_text(
+        "## Journey Walk\n\nSurface: ui\n\n"
+        "| hop | evidence | status |\n| --- | --- | --- |\n"
+        "| do a thing | x | maybe |\n",
+        encoding="utf-8",
+    )
+    result = _assert_walk("--surface", "ui", str(doc))
+    assert result.returncode == 1
+    assert "unrecognised status" in result.stderr
+
+
+def test_assert_walk_table_missing_surface_section(tmp_path: Path) -> None:
+    """Asking for a surface with no walk section fails the gate (exit 1)."""
+    doc = tmp_path / "DESIGN.md"
+    _drive("ui-clean", "ui", doc)
+    result = _assert_walk("--surface", "tool", str(doc))
+    assert result.returncode == 1
+    assert "no `tool`-surface" in result.stderr
