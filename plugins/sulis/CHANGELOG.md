@@ -1,3 +1,9 @@
+## v0.128.2 — 2026-06-09
+
+**Patch — release-train batch.**
+
+- Change tooling can no longer silently act on the wrong change: short handles are now collision-safe, and ship/nuke/recreate refuse (rather than guess) when a handle is ambiguous or an explicit handle clashes with the session you are in.
+
 ## v0.128.1 — 2026-06-09
 
 **Patch — release-train batch.**

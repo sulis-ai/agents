@@ -1,7 +1,0 @@
-change_id: 01KTPKCKQD2DE9GMPY57A1ZKGX
-primitive: fix
-tier: patch
-touches_plugin: true
-summary: |
-  Change tooling can no longer silently act on the wrong change: short handles are now collision-safe, and ship/nuke/recreate refuse (rather than guess) when a handle is ambiguous or an explicit handle clashes with the session you are in.
-created_at: 2026-06-09T17:08:04Z
