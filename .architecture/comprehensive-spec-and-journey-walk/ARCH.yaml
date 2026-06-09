@@ -4,7 +4,7 @@ handle: CH-CQRWWR
 slug: comprehensive-spec-and-journey-walk
 primitive: harden
 mode: brownfield
-status: designed          # draft → designed → decomposed → implemented → verified
+status: decomposed        # draft → designed → decomposed → implemented → verified
 
 sourced_from:
   srd: .specifications/comprehensive-spec-and-journey-walk/SRD.md
