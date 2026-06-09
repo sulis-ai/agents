@@ -554,21 +554,30 @@ JSON to know what to say in the ship report (step 7).
 **4.7.5. Scenario-required gate — run `sulis-verify-scenarios-required`
 (MUST — the #103 enforcement; closes the "advisory when absent" bypass).**
 The downstream gates (design journey-walk, plan-work coverage, the 4.8
-acceptance run below) all fire only *IF scenarios already exist* — so a
-user-facing change that never authored any sailed through every one of them as
-"advisory / nothing to verify". This gate flips the test from *exists* to
-*required*: a user-facing change MUST have authored verifiable scenarios (or
-carry a logged explicit exemption) before it ships.
+acceptance run below) all fire only *IF scenarios already exist* — so a change
+that never authored any sailed through every one of them as "advisory /
+nothing to verify". This gate flips the test from *exists* to *required*: a
+change that is **user-facing OR declares non-functional requirements** MUST
+have authored verifiable scenarios (or carry a logged explicit exemption)
+before it ships.
+
+NFRs are in scope on purpose: the production muscles (cost, storage limits,
+resumability, latency, throughput, data integrity) are exactly what gets
+stubbed when nothing forces a scenario — and a unit test can't prove "survives
+a 100 MB file" or "stays under the cost budget"; only a *driven* scenario can.
+So NFRs need verifiable scenarios more than UI, not less.
 
 ```bash
 "$SCRIPTS_DIR/sulis-verify-scenarios-required" \
   --repo-root <change-worktree> --stem {primitive}-{slug} --base origin/main
 ```
 
-It reads the change's touched paths (vs `origin/main`), determines user-facing-
-ness via the same founder-surface signal the specify sizer uses (`.tsx` /
-`/components/` / `/pages/` / `.html` … — so it does NOT fire on tooling /
-plugin-authoring / library changes), and checks for an authored
+It reads the change's touched paths (vs `origin/main`), determines scope from
+two signals — the founder-surface signal the specify sizer uses (`.tsx` /
+`/components/` / `/pages/` / `.html` …) **and** whether the change declares
+non-functional requirements (touches an `NFR.md` / non-functional spec) — so
+it fires on user-facing OR NFR work but does NOT fire on tooling /
+plugin-authoring / library changes, and checks for an authored
 `.changes/{primitive}-{slug}.scenarios.jsonld` + a logged exemption marker
 (`.changes/{primitive}-{slug}.scenarios-exempt`). Verdict → exit code:
 

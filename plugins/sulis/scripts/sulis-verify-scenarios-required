@@ -80,6 +80,7 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps({
         "verdict": v.verdict,
         "user_facing": v.user_facing,
+        "nfr_scope": v.nfr_scope,
         "scenarios_present": v.scenarios_present,
         "exempted": v.exempted,
         "exemption_reason": v.exemption_reason,

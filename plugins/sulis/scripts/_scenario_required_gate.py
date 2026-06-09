@@ -35,12 +35,42 @@ from pathlib import Path
 from _specify_classifier import paths_touch_founder_surface
 
 
+# Path fragments that mark a NON-FUNCTIONAL-requirements artifact — when a
+# change declares/modifies NFRs (cost, storage, latency, throughput,
+# resumability, data integrity, …) it MUST make them verifiable too, not just
+# user-facing UI (the Capsule-Clinics lesson: production mechanisms get stubbed
+# because nothing forced a scenario that drives the real condition). A unit
+# test can't prove "survives a 100 MB file" or "stays under the cost budget" —
+# only a driven scenario can — so NFRs need scenarios MORE than UI, not less.
+_NFR_SPEC_FRAGMENTS: tuple[str, ...] = (
+    "nfr.md",
+    "/nfr/",
+    "/nfrs/",
+    "non-functional",
+    "nonfunctional",
+    "non_functional",
+)
+
+
+def paths_declare_nfrs(paths: list[str]) -> bool:
+    """True if any touched path is a non-functional-requirements artifact.
+
+    Conservative substring match (e.g. ``.specifications/{p}/NFR.md``). A
+    change that declares or edits NFRs is in scope for required scenarios."""
+    for path in paths:
+        low = path.lower()
+        if any(frag in low for frag in _NFR_SPEC_FRAGMENTS):
+            return True
+    return False
+
+
 @dataclass(frozen=True)
 class ScenarioGateVerdict:
     """The gate's decision + the founder-English reason for it."""
 
     verdict: str               # "ok" | "required_missing"
     user_facing: bool
+    nfr_scope: bool            # the change declares non-functional requirements
     scenarios_present: bool
     exempted: bool
     reason: str                # founder-readable
@@ -55,38 +85,58 @@ def scenario_gate(
 ) -> ScenarioGateVerdict:
     """Decide whether a change may ship w.r.t. verifiable-scenario coverage.
 
-    - Not user-facing → ``ok`` (scenarios don't apply; unit tests cover it).
-    - User-facing + scenarios present → ``ok``.
-    - User-facing + no scenarios + a non-empty exemption reason → ``ok`` (the
-      conscious, logged escape — rare, the founder owns it).
-    - User-facing + no scenarios + no exemption → ``required_missing`` (BLOCK).
+    Scenarios are REQUIRED when the change is **user-facing** (UI surface) OR
+    **declares non-functional requirements** (NFRs need a driven scenario — a
+    unit test can't prove the real production condition). When required:
+
+    - scenarios present → ``ok``.
+    - no scenarios + a non-empty exemption reason → ``ok`` (the conscious,
+      logged escape — rare, the founder owns it).
+    - no scenarios + no exemption → ``required_missing`` (BLOCK).
+
+    Not user-facing AND no NFRs → ``ok`` (tooling/library — unit tests cover it).
     """
-    user_facing = paths_touch_founder_surface(list(touched_paths))
+    paths = list(touched_paths)
+    user_facing = paths_touch_founder_surface(paths)
+    nfr_scope = paths_declare_nfrs(paths)
+    in_scope = user_facing or nfr_scope
     exempted = bool(exemption_reason and exemption_reason.strip())
 
-    if not user_facing:
+    if not in_scope:
         return ScenarioGateVerdict(
-            "ok", False, scenarios_present, exempted,
-            "Not a user-facing surface — verifiable scenarios are not required "
-            "(covered by unit tests).",
+            "ok", False, False, scenarios_present, exempted,
+            "Not a user-facing surface and declares no non-functional "
+            "requirements — verifiable scenarios are not required (covered by "
+            "unit tests).",
         )
     if scenarios_present:
         return ScenarioGateVerdict(
-            "ok", True, True, exempted,
-            "User-facing change with verifiable scenarios authored.",
+            "ok", user_facing, nfr_scope, True, exempted,
+            "Change in scope for verifiable scenarios, and scenarios are "
+            "authored.",
         )
     if exempted:
         return ScenarioGateVerdict(
-            "ok", True, False, True,
-            "User-facing change with no scenarios — explicitly exempted.",
+            "ok", user_facing, nfr_scope, False, True,
+            "In scope for scenarios with none authored — explicitly exempted.",
             exemption_reason.strip(),
         )
+
+    if user_facing and nfr_scope:
+        trigger = "a user-visible surface and non-functional requirements"
+    elif nfr_scope:
+        trigger = ("non-functional requirements (e.g. cost / storage / "
+                   "resilience / performance / data integrity)")
+    else:
+        trigger = "a user-visible surface"
     return ScenarioGateVerdict(
-        "required_missing", True, False, False,
-        "This change touches a user-visible surface but has no verifiable "
-        "scenarios. A user-facing journey must be testable — author the "
-        "verification scenarios at specify (do X, observe Y), or record an "
-        "explicit exemption with a reason.",
+        "required_missing", user_facing, nfr_scope, False, False,
+        f"This change touches {trigger} but has no verifiable scenarios. "
+        "It must be testable — author the verification scenarios at specify "
+        "(do X, observe Y), or record an explicit exemption with a reason. "
+        "For non-functional requirements especially, a unit test can't prove "
+        "the real condition (survives a large file, stays under budget, "
+        "resumes after a crash) — only a driven scenario can.",
     )
 
 

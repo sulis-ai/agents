@@ -67,6 +67,55 @@ def test_empty_diff_is_not_user_facing():
     v = scenario_gate(touched_paths=[], scenarios_present=False)
     assert v.verdict == "ok"
     assert v.user_facing is False
+    assert v.nfr_scope is False
+
+
+# ─── NFR trigger (#103 widening — scenarios for non-functional requirements) ─
+
+
+def test_nfr_change_with_no_scenarios_blocks():
+    # A change that declares/edits non-functional requirements (NFR.md) needs a
+    # DRIVEN scenario too — a unit test can't prove the real production
+    # condition. Not user-facing, but still in scope.
+    v = scenario_gate(
+        touched_paths=[".specifications/payments/NFR.md"], scenarios_present=False)
+    assert v.verdict == "required_missing"
+    assert v.user_facing is False
+    assert v.nfr_scope is True
+    assert "non-functional" in v.reason.lower()
+
+
+def test_nfr_change_with_scenarios_present_is_ok():
+    v = scenario_gate(
+        touched_paths=[".specifications/payments/NFR.md"], scenarios_present=True)
+    assert v.verdict == "ok"
+    assert v.nfr_scope is True
+
+
+def test_nfr_change_exempted_is_ok():
+    v = scenario_gate(
+        touched_paths=[".specifications/payments/NFR.md"], scenarios_present=False,
+        exemption_reason="perf budget verified manually in staging; tracked #777")
+    assert v.verdict == "ok"
+    assert v.exempted is True
+
+
+def test_user_facing_and_nfr_both_in_scope():
+    v = scenario_gate(
+        touched_paths=[_UI_PATH, ".specifications/p/NFR.md"], scenarios_present=False)
+    assert v.verdict == "required_missing"
+    assert v.user_facing is True
+    assert v.nfr_scope is True
+
+
+def test_tooling_with_nfr_substring_does_not_false_fire():
+    # Guard: a tooling path that merely contains 'nfr' as part of another word
+    # should not trip the NFR trigger. The fragments are specific (nfr.md,
+    # /nfr/, non-functional) — a plain script path stays out of scope.
+    v = scenario_gate(
+        touched_paths=["plugins/sulis/scripts/_conform.py"], scenarios_present=False)
+    assert v.verdict == "ok"
+    assert v.nfr_scope is False
 
 
 # ─── scenarios_present_for_change (presence detection) ─────────────────────
