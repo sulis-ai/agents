@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+"""sulis-verify-scenarios-required — the #103 scenario-required ship gate.
+
+For a change, decide whether verifiable scenarios are REQUIRED-but-MISSING:
+user-facing (per the change's touched paths) + zero authored scenarios + no
+logged exemption → BLOCK (exit 1). The ship flow (/sulis:change ship gate 4.8)
+calls this BEFORE the acceptance run and stops on a non-zero exit.
+
+  --repo-root    the change worktree (default: cwd)
+  --stem         {primitive}-{slug} (the change's artifact stem)
+  --base         the merge base to diff against (default: origin/main)
+  --exempt-reason  an explicit, logged exemption (overrides the marker file)
+
+Exit codes: 0 ok · 1 required_missing (BLOCK) · 3 error.
+Stdlib only. Python 3.11-safe.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+from _scenario_required_gate import (
+    exemption_reason_for_change,
+    scenario_gate,
+    scenarios_present_for_change,
+)
+
+
+def _touched_paths(repo_root: Path, base: str) -> list[str]:
+    """Paths changed on this branch vs ``base`` (three-dot: the branch's own
+    work since it diverged). Best-effort: an unresolvable base returns []."""
+    try:
+        out = subprocess.run(
+            ["git", "diff", "--name-only", f"{base}...HEAD"],
+            cwd=str(repo_root), capture_output=True, text=True, timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    if out.returncode != 0:
+        # Fall back to a two-dot diff (base not an ancestor / shallow clone).
+        try:
+            out = subprocess.run(
+                ["git", "diff", "--name-only", base],
+                cwd=str(repo_root), capture_output=True, text=True, timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return []
+        if out.returncode != 0:
+            return []
+    return [p for p in out.stdout.splitlines() if p.strip()]
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description="The #103 scenario-required ship gate.")
+    ap.add_argument("--repo-root", default=".")
+    ap.add_argument("--stem", required=True, help="{primitive}-{slug}")
+    ap.add_argument("--base", default="origin/main")
+    ap.add_argument("--exempt-reason", default=None,
+                    help="explicit logged exemption (overrides the marker file)")
+    args = ap.parse_args(argv)
+
+    repo_root = Path(args.repo_root).resolve()
+    if not repo_root.exists():
+        print(json.dumps({"ok": False, "error": f"repo-root not found: {repo_root}"}))
+        return 3
+
+    touched = _touched_paths(repo_root, args.base)
+    present = scenarios_present_for_change(repo_root, args.stem)
+    exemption = args.exempt_reason or exemption_reason_for_change(repo_root, args.stem)
+
+    v = scenario_gate(
+        touched_paths=touched,
+        scenarios_present=present,
+        exemption_reason=exemption,
+    )
+    print(json.dumps({
+        "verdict": v.verdict,
+        "user_facing": v.user_facing,
+        "nfr_scope": v.nfr_scope,
+        "scenarios_present": v.scenarios_present,
+        "exempted": v.exempted,
+        "exemption_reason": v.exemption_reason,
+        "reason": v.reason,
+        "touched_path_count": len(touched),
+    }, indent=2))
+    return 1 if v.verdict == "required_missing" else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
