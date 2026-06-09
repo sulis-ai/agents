@@ -1,0 +1,41 @@
+{
+  "pr": "feat/wp-008-budget-accumulation",
+  "base": "change/feat-automation-reliability-recovery",
+  "timestamp": "2026-06-09T004643Z",
+  "verdict": "PASS",
+  "outcome": "Ready to merge",
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "ruff": "clean",
+    "mypy": "12 errors, all pre-existing on BASE, not a configured gate",
+    "build_test_suite": "29 passed (recovery e2e + unit + wiring)"
+  },
+  "pr_hygiene": {
+    "scope": {"commit_type_spread": ["fix"], "module_fan_out": 1, "severity": "low"},
+    "size": {"lines_added": 385, "lines_removed": 109, "total": 494, "files_changed": 5, "severity": "low"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+    "completeness": {"new_source_without_test": 0, "api_change_without_schema": false, "test_files_updated": 3, "xfail_flipped_to_pass": 1, "severity": "none"}
+  },
+  "findings": {
+    "in_changes": [
+      {
+        "id": "F-01",
+        "severity": "low",
+        "lens": "quality",
+        "file": "_session_manager/recovery.py",
+        "line": 410,
+        "summary": "Post-send attempt-advance guards on float equality of _retry_started_at; correct but a reset-predicate reads clearer",
+        "delta": null,
+        "watch_list": true
+      }
+    ],
+    "in_neighbours": []
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "note": "fix removes an unbounded-retry hang (Armor improvement); lock held only around state RMW, deadlock-safe"},
+    "security": {"findings": 0, "note": "no new external calls, secrets, or auth/injection surface; pure in-process state machine"},
+    "quality": {"findings": 1, "note": "1 low (readability); strong test coverage incl xfail->pass; CR-10 no anti-patterns"}
+  },
+  "draft_deltas": 0,
+  "closes": "SF-8bad33b8"
+}
