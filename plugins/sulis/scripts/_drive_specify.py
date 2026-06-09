@@ -282,12 +282,7 @@ def _requirements_body(manifest: FixtureManifest) -> str:
     parts += _subsection("Non-Functional Requirements", nfr_intro)
     for category, target in _NFR_BASELINE:
         parts += _subsection(category, target, level=4)
-    parts += _subsection(
-        "Threat Model",
-        "STRIDE skeleton — the methodology's threat actors are the bypasses "
-        "that ship incomplete work. Filled to a full STRIDE matrix by the "
-        "downstream design stage (FR-15).",
-    )
+    parts += _subsection("Threat Model", _stride_matrix(manifest))
     parts += _subsection(
         "Constraints",
         "The document MUST match the canonical Target Structure (C-01); the "
@@ -303,31 +298,150 @@ def _requirements_body(manifest: FixtureManifest) -> str:
     return "\n".join(parts).lstrip("\n")
 
 
-def _solution_design_body(manifest: FixtureManifest) -> str:
-    """The §7 Solution Design body, including the mandatory Interface Contract
-    section skeleton stub (CF-05, ADR-007).
+# ─── STRIDE / C4 / interface-contract sub-templates (WP-011) ─────────────────
+#
+# These three always-on sub-templates round out the comprehensive document
+# (FR-15/16/18). They render at every depth so the document inspectors
+# (_assert_stride / _assert_c4_levels / _assert_interface_contract) always have
+# a populated target — depth tunes detail, never existence (NFR-R01).
 
-    This WP lands the *skeleton*; WP-011 fills it to the full CF-10 founder-
-    reviewable dimensions. The skeleton is present at every depth so WP-009's
-    tool-walk has a target and contract-first ordering holds (BDR-001).
+# The six STRIDE categories, in canonical order, with the methodology-integrity
+# framing DESIGN §4.6 uses (the "attackers" are the bypasses that ship
+# incomplete work). Each row is always present; a category that does not apply
+# to a given change is stated `n/a — <reason>` rather than dropped.
+_STRIDE_ROWS: Final[tuple[tuple[str, str], ...]] = (
+    ("Spoofing", "A hop claims EXISTS without being wired (false EXISTS)."),
+    ("Tampering", "A flow is silently dropped so no scenario is required for it."),
+    ("Repudiation", "A business decision is made with no record (BDR captures it)."),
+    (
+        "Information disclosure",
+        "n/a — the methodology produces design docs, no sensitive runtime data.",
+    ),
+    ("Denial of service", "The always-comprehensive document is too slow to run."),
+    ("Elevation of privilege", "A change skips the design stage entirely."),
+)
+
+
+def _stride_matrix(manifest: FixtureManifest) -> str:
+    """Render the always-on STRIDE threat matrix (FR-15, SC-15).
+
+    The methodology's threat actors are the bypasses that ship incomplete work
+    (DESIGN §4.6). The matrix names all six STRIDE categories so the threat
+    model is genuinely present, not a one-line stub — a category that does not
+    apply to this change carries an explicit `n/a — <reason>` (NFR-R01).
     """
+    lines = [
+        "STRIDE analysis — the threat actors are the bypasses that ship "
+        f"incomplete work for this `{manifest.primitive}` change:",
+        "",
+        "| Category | Threat (against the methodology) |",
+        "|----------|----------------------------------|",
+    ]
+    lines += [f"| {category} | {threat} |" for category, threat in _STRIDE_ROWS]
+    lines += [
+        "",
+        "Trust boundary: the agent always produces the full document, so "
+        "completeness never depends on the founder thinking to ask.",
+    ]
+    return "\n".join(lines)
+
+
+# The three C4 levels (FR-16, SC-16). Each level is an always-on sub-heading so
+# the architecture-at-levels section documents context, container, AND component
+# — a two-level section is incomplete (DESIGN §7.2).
+_C4_LEVELS: Final[tuple[tuple[str, str], ...]] = (
+    (
+        "Level 1 — System Context",
+        "The change in its environment: the founder + agent actors, the "
+        "specify→design→gate pipeline, and the brain / verification substrate "
+        "it depends on.",
+    ),
+    (
+        "Level 2 — Container",
+        "The deployable / maintainable units: the specify skill + classifier, "
+        "the design stage + templates, the gate layer, and the scenario "
+        "substrate.",
+    ),
+    (
+        "Level 3 — Component",
+        "The load-bearing internals of the newest container — here, the "
+        "section renderers + the document inspectors that gate completeness.",
+    ),
+)
+
+
+def _c4_levels() -> str:
+    """Render the always-on architecture-at-levels (C4) sub-section (FR-16).
+
+    Three distinct levels — context, container, component — each a ####
+    sub-heading the `_assert_c4_levels` inspector anchors on. Present at every
+    depth (structure invariant, ADR-002).
+    """
+    parts: list[str] = []
+    for heading, body in _C4_LEVELS:
+        parts += _subsection(heading, body, level=4)
+    return "\n".join(parts).lstrip("\n")
+
+
+def _contract_operation(op: dict) -> list[str]:
+    """Render one interface-contract operation with the full CF-10 dimensions
+    (FR-18, SC-18) plus the CF-03 three-category errors.
+
+    Per CONTRACT_FIRST_STANDARD CF-10 every operation carries the four founder-
+    reviewable dimensions — auth/permissions, audience, plain-language user
+    guide, error fixes — in addition to its schema + three-category errors
+    (CF-03). A missing dimension makes the contract incomplete (the
+    `_assert_interface_contract` inspector fails it).
+    """
+    name = op.get("name", "?")
+    inputs = ", ".join(op.get("inputs", [])) or "none"
+    outputs = ", ".join(op.get("outputs", [])) or "none"
+    return [
+        "",
+        f"#### Operation: `{name}`",
+        "",
+        "| Dimension | Value |",
+        "|-----------|-------|",
+        f"| **Schema** | in: {inputs}; out: {outputs} |",
+        "| **Errors** | Protocol: transport failure ⇒ retry/escalate. "
+        "Expected: a deterministic validation/not-found failure. "
+        "Internal: an unexpected crash ⇒ log + escalate. |",
+        f"| **Auth / permissions** | none — `{name}` is an internal tool "
+        "operation (library / in-process binding). |",
+        "| **Audience** | operator / agent. |",
+        f"| **User guide** | Runs `{name}` over its inputs and returns its "
+        "outputs; use it at the matching stage of the specify/design pipeline. |",
+        "| **Error fixes** | Expected — adjust the inputs and re-run; "
+        "Internal — file the crash, do not retry unchanged. |",
+    ]
+
+
+def _solution_design_body(manifest: FixtureManifest) -> str:
+    """The §7 Solution Design body: the solution overview, the always-on C4
+    architecture-at-levels sub-section (FR-16), and the interface-contract
+    section filled to the full CF-10 dimensions (FR-18, ADR-007).
+
+    WP-006 landed the contract *skeleton*; WP-011 fills it — every tool
+    operation now carries its schema, three-category errors (CF-03), and the
+    four CF-10 founder-reviewable dimensions. The tool-walk (WP-009) draws its
+    operations from this section; per FR-19 the walk is a subset of it.
+    """
+    parts: list[str] = []
+    parts += _subsection("Solution Overview", "Implementation follows the paths in §4.")
+    parts += _subsection("Architecture-at-Levels (C4)", _c4_levels())
+
     if manifest.tool_operations:
-        ops = "\n".join(
-            f"- `{op.get('name', '?')}` "
-            f"(in: {', '.join(op.get('inputs', []))}; "
-            f"out: {', '.join(op.get('outputs', []))})"
-            for op in manifest.tool_operations
-        )
-        contract = "Interface contract — tool operations:\n" + ops
+        contract_lines = ["Interface contract — tool operations:"]
+        for op in manifest.tool_operations:
+            contract_lines += _contract_operation(op)
+        contract = "\n".join(contract_lines)
     else:
         contract = (
             "n/a — this change exposes no tool surface; the interface-contract "
             "skeleton stands ready for any operation a tool surface would add "
-            "(CF-05; WP-011 fills the full CF-10 dimensions)."
+            "(CF-05; the full CF-10 dimensions are rendered per operation when "
+            "a tool surface is present)."
         )
-
-    parts: list[str] = []
-    parts += _subsection("Solution Overview", "Implementation follows the paths in §4.")
     parts += _subsection("Interface Contract", contract)
     return "\n".join(parts).lstrip("\n")
 

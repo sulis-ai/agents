@@ -174,12 +174,15 @@ it.
 - The Non-Functional Requirements section is **always on** and states a
   **measurable** target per category — Performance, Security, Reliability — not
   an adjective like "fast" (SC-05, FR-06).
-- The §7 Solution Design carries an **Interface Contract** section. This WP
-  lands the *skeleton stub* (CF-05); WP-011 fills it to the full CF-10
-  founder-reviewable dimensions (Schema + three-category errors + Audience +
-  User guide + Error fixes). The skeleton is present even when a change exposes
-  no tool surface (marked `n/a — <reason>`), so a tool-walk always has a target
-  and contract-first ordering holds (BDR-001, ADR-007).
+- The §7 Solution Design carries an **always-on STRIDE threat model** (FR-15),
+  an **architecture-at-levels (C4)** sub-section with three distinct levels —
+  context, container, component (FR-16) — and an **Interface Contract** section
+  filled to the full CF-10 founder-reviewable dimensions (Schema +
+  three-category errors per CF-03 + Auth/permissions + Audience + User guide +
+  Error fixes). A contract operation missing any CF-10 dimension is incomplete
+  (the design stage does not complete, MUC-07). The contract is present even
+  when a change exposes no tool surface (marked `n/a — <reason>`), so a
+  tool-walk always has a target and contract-first ordering holds (ADR-007).
 
 The deterministic emitter that produces this structure from a depth-sized
 intake is `plugins/sulis/scripts/_drive_specify.py` (the methodology adapter the
@@ -233,9 +236,20 @@ paths.}
 
 ### Threat Model
 
-{STRIDE skeleton — the threats the change must withstand. Filled to a full
-STRIDE matrix at the design stage (FR-15). `n/a — <reason>` for a surfaceless
-change.}
+{**Always-on STRIDE threat model (FR-15).** Name all six STRIDE categories in a
+matrix — a category that does not apply to this change carries an explicit
+`n/a — <reason>` rather than being dropped (NFR-R01). Add trust boundaries and
+the attack surface where the change has them.
+
+| Category | Threat | Applicable? | Mitigation |
+|----------|--------|-------------|------------|
+| **S**poofing | {threat or `n/a — <reason>`} | {Yes/No} | {mitigation} |
+| **T**ampering | {…} | {…} | {…} |
+| **R**epudiation | {…} | {…} | {…} |
+| **I**nformation disclosure | {…} | {…} | {…} |
+| **D**enial of service | {…} | {…} | {…} |
+| **E**levation of privilege | {…} | {…} | {…} |
+}
 
 ### Constraints
 
@@ -264,19 +278,71 @@ change has no user-facing or machine-facing use case.}
 
 ### Solution Overview
 
-{The composition / architecture-at-levels narrative.}
+{The composition narrative — what is built / reused / extended, and the
+load-bearing decisions.}
+
+### Architecture-at-Levels (C4)
+
+{**Always-on, three distinct C4 levels (FR-16).** Each level is its own
+sub-heading — a two-level section (e.g. context + container, no component) is
+incomplete. A thin change still states each level (a one-line `n/a — <reason>`
+where it has nothing to add), never drops one.}
+
+#### Level 1 — System Context
+
+{The change in its environment: the actors and the systems it talks to. A
+mermaid `graph` is ideal; prose is acceptable.}
+
+#### Level 2 — Container
+
+{The deployable / maintainable units the change spans.}
+
+#### Level 3 — Component
+
+{The load-bearing internals of the newest / most-changed container.}
 
 ### Interface Contract
 
-{**Skeleton stub (CF-05; WP-011 fills the full CF-10 dimensions).** For a tool
-surface: one entry per operation with its inputs/outputs. When the change
-exposes no tool surface: `n/a — <reason>`, with the skeleton standing ready.
-Per FR-19 the tool-walk's operations must be a subset of this contract.}
+{**MANDATORY for a tool surface; filled to the full CF-10 dimensions (FR-18).**
+When the change exposes no tool surface: `n/a — <reason>`, with the skeleton
+standing ready. Per FR-19 the tool-walk's operations must be a subset of this
+contract. Render one block per operation carrying the schema, the CF-03
+three-category errors, AND the four CF-10 founder-reviewable dimensions — a
+missing dimension makes the contract incomplete (the design stage does not
+complete, MUC-07):
+
+#### Operation: `<name>`
+
+| Dimension | Value |
+|-----------|-------|
+| **Schema** | in: `<input types>`; out: `<output types>` |
+| **Errors** | Protocol: `<transport failure>`. Expected: `<deterministic failure>`. Internal: `<unexpected crash>`. (CF-03) |
+| **Auth / permissions** | {does it require sign-in / a permission?} |
+| **Audience** | {operator / agent vs founder / end-user} |
+| **User guide** | {one plain-language sentence: what it does + when to use it} |
+| **Error fixes** | {per error: the cause + the user-fix and/or developer-fix} |
+}
 
 ## 8. ADRs + BDRs
 
-{Technical decisions (ADR) and business decisions (BDR). `n/a — <reason>` if
-none recorded.}
+{Technical decisions (ADR) and business decisions (BDR), recorded with distinct
+shapes (FR-17). `n/a — <reason>` if none recorded.
+
+An **ADR** records a *technical* decision — Context / Decision / Options
+considered / Consequences — answering "how do we build it?".
+
+A **BDR** records a *business* decision — a scope cut, a sequencing call, a
+cost/benefit trade — answering "what do we choose to do, and why is that worth
+it?". Same skeleton (Context / Decision / Options / Consequences) but the
+options and consequences are framed in business terms (cost, risk, founder
+value), and it carries `kind: bdr` so it is distinguishable from a technical
+ADR.
+
+| ID | Title | Kind |
+|----|-------|------|
+| ADR-001 | {technical decision} | technical |
+| BDR-001 | {business decision} | business |
+}
 
 ## 9. Migration / Rollback / Security / Performance
 
