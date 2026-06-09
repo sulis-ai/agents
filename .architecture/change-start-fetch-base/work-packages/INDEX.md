@@ -11,8 +11,8 @@
 | Status | Count |
 |---|---|
 | pending | 0 |
-| in_progress | 1 |
-| done | 0 |
+| in_progress | 0 |
+| done | 1 |
 | blocked | 0 |
 
 ## Primitive Distribution
@@ -68,7 +68,7 @@ Single node; no edges.
 
 | ID | Title | Primitive | Kind | Status | Depends On | Blocks | Token (in/out) | Spec § |
 |---|---|---|---|---|---|---|---|---|
-| WP-001 | sulis-change start fetches origin/{base_ref} before cutting the change branch | fix | backend | in_progress | — | — | 6k / 7k | SPEC §What this should do; §How we'll know it's done; §What to avoid |
+| WP-001 | sulis-change start fetches origin/{base_ref} before cutting the change branch | fix | backend | done | — | — | 6k / 7k | SPEC §What this should do; §How we'll know it's done; §What to avoid |
 
 **Totals:** ~6k input + ~7k output ≈ 13k tokens for the WP set.
 
