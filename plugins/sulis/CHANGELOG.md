@@ -1,3 +1,9 @@
+## v0.131.0 — 2026-06-09
+
+**Minor — release-train batch.**
+
+- The background session server now restarts itself automatically when it is left running old code after a plugin update, instead of leaving a workspace window crashing or frozen — no more manual restart.
+
 ## v0.130.0 — 2026-06-09
 
 **Minor — release-train batch.**

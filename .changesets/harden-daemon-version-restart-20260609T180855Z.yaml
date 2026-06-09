@@ -1,7 +1,0 @@
-change_id: 01KTPR3GF4WYFJYYPZHRFNF2SN
-primitive: harden
-tier: minor
-touches_plugin: true
-summary: |
-  The background session server now restarts itself automatically when it is left running old code after a plugin update, instead of leaving a workspace window crashing or frozen — no more manual restart.
-created_at: 2026-06-09T18:08:55Z
