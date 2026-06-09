@@ -685,15 +685,38 @@ class SessionManager:
         # classified with the same arbiter + adapter hint the driver uses, so the
         # manager and the driver agree on which errors are replayed. Dead-end and
         # login-expiry do not replay, so their slot is left for their own path.
+        #
+        # The release runs UNCONDITIONALLY for a transient-blip error (before the
+        # FIX 1 coalescing gate below), even when this error is coalesced into an
+        # already-in-flight sequence: the errored turn holds the slot and must
+        # hand it back so SOME replay (this sequence's) can promote. The release
+        # is the same idempotent ``_turn_done.set()`` the normal completion path
+        # uses, so freeing an already-freed slot is harmless.
         hint = session.adapter.classify_failure(error)
         if classify(error, hint) is RecoveryClass.TRANSIENT_BLIP:
             session.release_turn_for_retry()
+
+        # CH-01KTMK FIX 1 — one recovery thread in flight per session. Gate the
+        # daemon-thread dispatch on the driver's in-flight guard: if a recovery
+        # thread is already driving this session's sequence, COALESCE — the
+        # existing sequence already handles the error (``observe`` serialises the
+        # state under the driver's lock), so spawning a second thread would only
+        # pile up sleeping recovery threads on a pathological provider's error
+        # stream (thread/memory exhaustion, CONCERN-1). The slot was already freed
+        # above, so the in-flight sequence's replay still promotes.
+        if not driver.try_begin_recovery():
+            return
 
         def _drive() -> None:
             try:
                 driver.observe(error)
             except Exception:  # noqa: BLE001 — a recovery fault must not propagate
                 pass
+            finally:
+                # Release the single recovery slot whatever happens (even on a
+                # faulting ``observe``), so a fault never wedges recovery shut and
+                # the next error is dispatched again (FIX 1).
+                driver.end_recovery()
 
         threading.Thread(
             target=_drive,

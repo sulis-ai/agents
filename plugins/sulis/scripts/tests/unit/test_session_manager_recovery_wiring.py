@@ -187,7 +187,23 @@ class _SpyDriver:
         self.observed: list[EventError] = []
         self.cleared_count = 0
         self._lock = threading.Lock()
+        # CH-01KTMK FIX 1 — the spy honours the in-flight guard contract the
+        # manager now calls (``try_begin_recovery`` / ``end_recovery``). The base
+        # spy never coalesces (each observe is recorded), so it always wins the
+        # slot; subclasses override to model coalescing / fault-release.
+        self._in_flight = threading.Event()
         _SpyDriver.instances.append(self)
+
+    def try_begin_recovery(self) -> bool:
+        with self._lock:
+            if self._in_flight.is_set():
+                return False
+            self._in_flight.set()
+            return True
+
+    def end_recovery(self) -> None:
+        with self._lock:
+            self._in_flight.clear()
 
     def observe(self, error: EventError) -> None:
         with self._lock:
@@ -697,3 +713,163 @@ def test_recovery_driver_dropped_on_close(child, tmp_path):
     mgr.close("k")
     assert "k" not in mgr._recovery_drivers
     assert "k" not in mgr._last_command
+
+
+# ── CH-01KTMK hardening FIX 1 — one recovery thread in flight per session ──
+#
+# ``_on_error_event`` spawned a fresh unbounded daemon thread on EVERY routed
+# error Event. A pathological provider emitting a rapid error stream piled up
+# sleeping recovery threads (they sleep on the backoff curve) → thread/memory
+# exhaustion. The fix gates dispatch on a per-driver in-flight guard
+# (``try_begin_recovery`` / ``end_recovery``): at most ONE recovery thread drives
+# a session's sequence at a time; a fresh error arriving while a recovery thread
+# is already in flight is COALESCED into the existing sequence (the driver's
+# ``observe`` already serialises the sequence state under its lock), not given
+# its own thread.
+
+
+class _BlockingDriver(_SpyDriver):
+    """A spy whose ``observe`` blocks until released, so a test can hold one
+    recovery thread "in flight" and prove that a flood of further errors does
+    NOT spawn more threads (they coalesce). Honours the in-flight guard the
+    manager calls (``try_begin_recovery`` / ``end_recovery``)."""
+
+    def __init__(self, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self.release = threading.Event()
+        self.entered = threading.Event()
+        self.concurrent = 0
+        self.max_concurrent = 0
+        self._in_flight = threading.Event()
+
+    def try_begin_recovery(self) -> bool:
+        # One-in-flight guard: the first caller wins; subsequent callers are told
+        # to coalesce (return False) until ``end_recovery`` clears the flag.
+        with self._lock:
+            if self._in_flight.is_set():
+                return False
+            self._in_flight.set()
+            return True
+
+    def end_recovery(self) -> None:
+        with self._lock:
+            self._in_flight.clear()
+
+    def observe(self, error: EventError) -> None:  # type: ignore[override]
+        with self._lock:
+            self.concurrent += 1
+            self.max_concurrent = max(self.max_concurrent, self.concurrent)
+            self.observed.append(error)
+        self.entered.set()
+        # Block here, holding the recovery thread "in flight", until released.
+        self.release.wait(_WAIT)
+        with self._lock:
+            self.concurrent -= 1
+
+
+def test_recovery_dispatch_capped_at_one_thread_per_session(child, tmp_path):
+    """A flood of routed error events for one session spawns AT MOST ONE recovery
+    thread at a time: while a recovery thread is in flight (blocked in
+    ``observe``), further errors are COALESCED via the driver's in-flight guard
+    rather than each getting its own thread (FIX 1 — bounds the pathological
+    thread/memory pile-up).
+
+    Proven against a blocking spy that records peak concurrency: even with many
+    rapid ``_on_error_event`` calls, never more than one ``observe`` runs at once,
+    and once the in-flight thread is released the guard re-opens for the next."""
+    mgr = SessionManager(
+        {"fake": FakeAdapter(child)},
+        recovery_driver_factory=lambda **kw: _BlockingDriver(**kw),
+        start_maintenance=False,
+    )
+    try:
+        session = mgr.open("k", _spec(tmp_path))
+        assert _wait_for(lambda: "k" in mgr._recovery_drivers)
+        driver = mgr._recovery_drivers["k"]
+        assert isinstance(driver, _BlockingDriver)
+
+        err = Event(
+            offset=-1,
+            key="k",
+            turn=session.turn,
+            kind="error",
+            error=EventError(category="protocol", code="SOCKET_CLOSED", message="x"),
+        )
+        # Flood the hook: 20 rapid routed errors for the same session.
+        for _ in range(20):
+            mgr._on_error_event(session, err)
+
+        # One recovery thread entered and is blocked in observe …
+        assert driver.entered.wait(_WAIT)
+        # … and despite 20 routed errors, no more than one observe ran at a time
+        # (the rest coalesced — the guard refused them a thread).
+        time.sleep(0.1)  # let any wrongly-spawned thread reach observe
+        assert driver.max_concurrent == 1, driver.max_concurrent
+        # Release the in-flight thread; the guard re-opens for the next error
+        # once that thread finishes and the manager's finally clears the slot.
+        driver.entered.clear()
+        driver.release.set()
+        assert _wait_for(lambda: not driver._in_flight.is_set())
+        # A subsequent error now gets a thread again (the guard is not stuck shut).
+        driver.release.clear()
+        mgr._on_error_event(session, err)
+        assert driver.entered.wait(_WAIT)
+        driver.release.set()
+    finally:
+        mgr.close("k")
+
+
+def test_in_flight_guard_released_after_recovery_completes(child, tmp_path):
+    """The in-flight guard is RELEASED when a recovery thread finishes, even if
+    the driver's ``observe`` raised — so a single faulting recovery never wedges
+    the session's recovery shut forever (FIX 1 — the guard's ``end_recovery``
+    runs in a finally on the recovery thread)."""
+
+    class _BoomGuardedDriver(_SpyDriver):
+        def __init__(self, **kwargs: object) -> None:
+            super().__init__(**kwargs)
+            self._in_flight = threading.Event()
+            self.ended = 0
+
+        def try_begin_recovery(self) -> bool:
+            with self._lock:
+                if self._in_flight.is_set():
+                    return False
+                self._in_flight.set()
+                return True
+
+        def end_recovery(self) -> None:
+            with self._lock:
+                self._in_flight.clear()
+                self.ended += 1
+
+        def observe(self, error: EventError) -> None:  # type: ignore[override]
+            with self._lock:
+                self.observed.append(error)
+            raise RuntimeError("boom in recovery")
+
+    mgr = SessionManager(
+        {"fake": FakeAdapter(child)},
+        recovery_driver_factory=lambda **kw: _BoomGuardedDriver(**kw),
+        start_maintenance=False,
+    )
+    try:
+        session = mgr.open("k", _spec(tmp_path))
+        assert _wait_for(lambda: "k" in mgr._recovery_drivers)
+        driver = mgr._recovery_drivers["k"]
+        err = Event(
+            offset=-1,
+            key="k",
+            turn=session.turn,
+            kind="error",
+            error=EventError(category="protocol", code="SOCKET_CLOSED", message="x"),
+        )
+        mgr._on_error_event(session, err)
+        # The faulting recovery still released the guard (end_recovery ran) …
+        assert _wait_for(lambda: driver.ended >= 1)
+        # … so a fresh error is dispatched again (the guard was not left shut).
+        before = len(driver.observed)
+        mgr._on_error_event(session, err)
+        assert _wait_for(lambda: len(driver.observed) > before)
+    finally:
+        mgr.close("k")
