@@ -158,12 +158,18 @@ body {
   font-family: var(--font-sans);
   background: var(--background);
   color: var(--foreground);
-  /* full-height app shell: top bar + board fill the viewport */
+  /* full-height app shell: top bar + board fill the first viewport. In the
+     REAL app the body is height:100vh / overflow:hidden (one screen, the live
+     board owns all scroll). For THIS mockup only, the body is allowed to scroll
+     so the demo-only whole-board state frames below the live board are
+     reachable; the live board itself still fills the first viewport exactly as
+     in the app (.boardPage min-height fills the remaining screen). */
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
 }
+/* the live app-shell board fills the first screen below the 48px top bar */
+.boardPage { min-height: calc(100vh - 48px); }
 
 /* ─── persistent top bar (mirrors WorkspaceTopBar / WorkspaceShell) ─── */
 
@@ -388,10 +394,22 @@ body {
   background: var(--border); border-radius: 8px;
 }
 
+/* EMPTY LANE — a stage with zero changes inside an otherwise-populated board.
+   The lane is NOT collapsed or hidden: it keeps its full height, its header and
+   its count (0), and shows a quiet "Nothing here yet" placeholder so the board's
+   shape stays stable and the founder can see the stage is simply empty (not
+   broken). A faint dashed outline reads as "an empty slot", echoing the other
+   "no signal yet" marks (unknown probe, unassessed health). Purely muted — no
+   status colour, because an empty lane is neither good nor bad. */
 .laneEmpty {
-  margin: 0; padding: 20px 12px; text-align: center;
+  margin: 16px 12px; padding: 22px 12px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  text-align: center;
   font-size: 12px; color: var(--muted-foreground);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-container);
 }
+.laneEmpty svg { width: 20px; height: 20px; color: var(--border); }
 
 /* optional pinned bottom action — ONLY under Recon (changes start at Recon).
    Quiet outline secondary so it never competes with the top-bar primary. */
@@ -517,6 +535,32 @@ body {
    shape itself distinguishes it from the two filled states, in greyscale too. */
 .live.idle .ldot { background: transparent; border: 1.5px solid var(--muted-foreground); }
 
+/* UNKNOWN (FR-41) — the session record is missing or malformed, so we genuinely
+   DON'T KNOW the liveness. This must NOT look like a confident Idle. It is a
+   DISTINCT shape: a faint DASHED ring with a centred "?" glyph — a deliberately
+   uncertain mark, not the crisp solid ring of Idle. It carries the SR label
+   "status unknown" so assistive tech is told the truth too. Lower opacity +
+   the dashed edge + the "?" together read as "no signal" in greyscale and for a
+   colour-blind founder — it relies on shape, not colour. */
+.live.unknown .ldot {
+  background: transparent;
+  border: 1.5px dashed var(--muted-foreground);
+  opacity: 0.85;
+}
+.live.unknown .ldot::before {
+  content: "?";
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  font-family: var(--font-sans);
+  font-size: 7px; font-weight: 700; line-height: 1;
+  color: var(--muted-foreground);
+}
+/* NO RECENCY (FR-42) — lastActivityAt is null, so there is no honest relative
+   time to show. We NEVER print "now" (that would be a lie). The time slot is
+   replaced by a muted em-dash, or omitted entirely. This .noRecency modifier
+   styles the em-dash so it reads as "no time recorded", not a value. */
+.live .lago.noRecency { color: var(--muted-foreground); }
+
 /* ───────────── THE ONE-LINE FOOT (every card, exactly one read) ─────────────
    The foot is a SINGLE line carrying EXACTLY ONE triage read — the two are
    MUTUALLY EXCLUSIVE:
@@ -616,6 +660,23 @@ body {
   background: var(--bg-destructive);
 }
 .health.off svg { color: var(--destructive); }
+/* NOT ASSESSED YET (FR-31) — a brand-new change with no tests run and none of
+   the artifacts its stage expects: we have NOTHING to judge health on yet. The
+   honest read is NEUTRAL — not the positive "On track" (a green lie on a fresh
+   change), not the destructive "Off track" (it isn't failing, it just hasn't
+   started). It uses the SAME muted/neutral surface as "Worth a look" but a
+   DIFFERENT shape — a hollow/outline circle (an empty gauge: "nothing measured
+   yet") — plus a clearly different word, so the two neutrals never blur. The
+   text is --text-secondary (one notch quieter than the foreground used by the
+   actionable neutrals) so it reads as the calmest, most provisional state on
+   the board. Carries an SR reason. NOT green, NOT red, never colour-alone. */
+.health.unassessed {
+  color: var(--text-secondary);
+  border-color: var(--border);
+  background: var(--muted);
+  border-style: dashed;          /* the dashed edge echoes the unknown probe — "no signal yet" */
+}
+.health.unassessed svg { color: var(--muted-foreground); }
 
 .intent {
   font-size: 13px; font-weight: var(--weight-label);
@@ -654,6 +715,336 @@ body {
   background: none; border: none; color: var(--primary);
   font: inherit; cursor: pointer; padding: 0; margin-left: 6px;
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   THE WHOLE-BOARD STATES — empty board (first run) + feed failed to load.
+   These replace the lane grid entirely (you can't have lanes AND an empty
+   board), so they're centred panels that fill the same board region. In this
+   mockup they live in their own clearly-labelled demo frames beneath the live
+   board so the founder can compare; in the app exactly one of these OR the
+   populated board shows at a time.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* a labelled demo frame — mockup scaffolding only, not part of the product UI */
+.demoFrame {
+  border-top: 1px solid var(--border);
+  background: var(--background);
+  padding: 0;
+}
+.demoFrameLabel {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 24px;
+  font-size: 11px; font-weight: var(--weight-label);
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  border-bottom: 1px solid var(--border-muted);
+}
+.demoFrameLabel .tagx {
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--text-secondary);
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius-badge); padding: 1px 7px;
+}
+
+/* the centred state panel shared by empty-board + feed-error */
+.boardState {
+  min-height: 360px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center;
+  padding: 48px 24px;
+  gap: 14px;
+}
+.boardStateIcon {
+  width: 52px; height: 52px;
+  display: grid; place-items: center;
+  border-radius: var(--radius-container);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
+}
+.boardStateIcon svg { width: 26px; height: 26px; }
+.boardStateTitle {
+  font-family: var(--font-display);
+  font-size: 19px; font-weight: var(--weight-heading);
+  color: var(--foreground);
+  margin: 0;
+}
+.boardStateBody {
+  font-size: 13px; color: var(--text-secondary);
+  max-width: 30rem; line-height: 1.5; margin: 0;
+}
+
+/* EMPTY BOARD (J-8) — zero changes at all: the first-run experience. The
+   "Start something new" front door is the HERO — the only prominent action,
+   a filled primary pill (the same affordance as the top bar, given centre
+   stage), under a one-line plain-English invite. Nothing else competes. */
+.heroStart {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 44px; padding: 0 22px;          /* ≥44px touch target */
+  margin-top: 4px;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-button);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-family: var(--font-sans);
+  font-size: 14px; font-weight: var(--weight-label);
+  cursor: pointer;
+}
+.heroStart:hover { filter: brightness(1.05); }
+.heroStart:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.heroStart svg { width: 17px; height: 17px; }
+
+/* FEED FAILED TO LOAD — a CALM error, not an alarm. Neutral icon, plain
+   "Couldn't load your changes", and a single outline Retry. It deliberately
+   does NOT use the destructive red as a full-bleed alarm — a transient load
+   failure isn't a crisis; the word "Couldn't load" + the Retry carry it. The
+   icon sits on the destructive tint (word + the tint, never colour alone). */
+.boardState.feedError .boardStateIcon {
+  background: var(--bg-destructive);
+  border-color: var(--bg-destructive-border);
+  color: var(--destructive);
+}
+.retryBtn {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 38px; padding: 0 18px;
+  margin-top: 4px;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-button);
+  background: var(--card);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 13px; font-weight: var(--weight-label);
+  cursor: pointer;
+}
+.retryBtn:hover { border-color: var(--foreground); }
+.retryBtn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.retryBtn svg { width: 15px; height: 15px; }
+
+/* ════════════════════════════════════════════════════════════════════
+   ALTERNATE CARD STATES — the OTHER states a card can be in (not its
+   content). The content states (stage / foot verdict / liveness / recency)
+   live on the live board above; these are: SELECTED (currently-open in a
+   tab), the INTERACTION states (hover / focus / pressed), LOADING (skeleton),
+   DEGRADED (a malformed/partial record), and SHIPPED (terminal / archived).
+   All ride the real tokens; each is distinguishable by SHAPE / MARKER + a
+   LABEL, never by colour alone; correct in both light and dark.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. SELECTED / CURRENTLY-OPEN ──────────────────────────────────────
+   When a change is open in a tab (the active route), its board card is the
+   one the founder is "in". It is marked the active card by THREE cues, so it
+   never relies on colour:
+     • a 3px accent LEFT-MARKER (a solid bar) — a SHAPE on the edge;
+     • the whole card border tints to --primary + a subtle raise (shadow);
+     • an "Open" pill, top-right area, naming the state in WORDS.
+   The left bar uses padding so the card content doesn't shift vs a normal
+   card. It must coexist with the focus ring: the ring is outline (drawn
+   outside the border), the selected state is border + inset marker, so a
+   selected card that ALSO has keyboard focus shows both at once.
+   SR: the card's accessible name is suffixed "— currently open", and it
+   carries aria-current="true" so assistive tech announces it as the active
+   one. */
+.card.selected {
+  border-color: var(--primary);
+  /* the left accent marker — an inset bar, drawn with box-shadow so it never
+     shifts the 14px padding / content. Pairs with the border + the "Open"
+     pill so the state is shape + word, not colour. */
+  box-shadow: inset 3px 0 0 0 var(--primary);
+  background: var(--card);
+}
+/* dark keeps its raised drop-shadow AND gains the inset accent bar */
+:root[data-theme="dark"] .card.selected {
+  box-shadow: inset 3px 0 0 0 var(--primary), var(--shadow-float);
+}
+/* a subtle raise on the selected card (light gets a soft float; dark already
+   floats, handled above) */
+:root[data-theme="light"] .card.selected,
+:root:not([data-theme="dark"]) .card.selected {
+  box-shadow: inset 3px 0 0 0 var(--primary), var(--shadow-float);
+}
+/* the "Open" pill — names the active state in words, sits inline on the top
+   line. Quiet primary outline so it reads as a marker, not an action. */
+.openPill {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-badge);
+  background: color-mix(in srgb, var(--primary) 12%, var(--card));
+  color: var(--primary);
+  font-size: 10px; font-weight: var(--weight-label);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.openPill .odot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); flex: none; }
+/* when the selected card carries the Open pill, the liveness read no longer
+   needs margin-left:auto to push right — the pill already occupies that slot,
+   so the live read sits beside it. */
+.card.selected .topLine .live { margin-left: 8px; }
+
+/* ── 2. INTERACTION STATES — hover / keyboard-focus / pressed ──────────
+   • HOVER  → a subtle surface lift: the bg shifts up one step + the border
+     firms. The base card already does `border-color: var(--input)` on hover;
+     this demo class .isHover pins that look statically so it's visible in the
+     frame without a real pointer.
+   • FOCUS  → the visible ring (already on .card:focus-visible). .isFocus pins
+     it statically for the frame.
+   • PRESSED/ACTIVE → a slight depress: a 1px downward nudge + an inset shadow
+     so the card reads as pushed in. Real :active rule + an .isPressed pinned
+     demo class. */
+/* HOVER: the settled `.card:hover { border-color: var(--input) }` above already
+   firms the border; this ADDS a one-step surface lift (the muted bg) so hover
+   reads as a gentle "this is pointable". Additive — the settled border rule is
+   untouched. */
+.card:hover { background: var(--muted); }
+.card:active { transform: translateY(1px); box-shadow: inset 0 1px 3px rgba(0,0,0,0.10); }
+:root[data-theme="dark"] .card:active { box-shadow: inset 0 1px 3px rgba(0,0,0,0.40); }
+/* statically-pinned demo variants (so the frame shows each without a pointer) */
+.card.isHover { border-color: var(--input); background: var(--muted); }
+.card.isFocus { outline: 2px solid var(--ring); outline-offset: 2px; }
+.card.isPressed { transform: translateY(1px); box-shadow: inset 0 1px 3px rgba(0,0,0,0.10); border-color: var(--input); }
+:root[data-theme="dark"] .card.isPressed { box-shadow: inset 0 1px 3px rgba(0,0,0,0.40); }
+
+/* ── 3. LOADING / SKELETON ─────────────────────────────────────────────
+   What a card looks like WHILE the feed is loading, before data arrives. A
+   calm placeholder — bars where the handle / probe / title / foot will be —
+   NOT a spinner. A gentle left-to-right shimmer sweeps across the bars to
+   read as "loading", with a STATIC fallback under prefers-reduced-motion (no
+   shimmer, just the calm placeholder bars). The skeleton is aria-hidden and
+   the lane/region carries aria-busy="true" + an SR "Loading your changes…"
+   line, so a screen reader is told it's loading without reading meaningless
+   bars. The skeleton is NOT focusable (it's not a real card yet). */
+.skeleton {
+  /* same box as a real card so the layout doesn't jump when data lands */
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  padding: 14px;
+  background: var(--card);
+}
+:root[data-theme="dark"] .skeleton { box-shadow: var(--shadow-float); }
+.skeleton .sk {
+  display: block;
+  border-radius: var(--radius-badge);
+  /* the placeholder fill is the muted surface; the shimmer rides a gradient
+     built from existing tokens (muted → border → muted), so no invented hue. */
+  background: var(--muted);
+  position: relative;
+  overflow: hidden;
+}
+.skeleton .sk::after {
+  content: "";
+  position: absolute; inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--border) 70%, var(--muted)) 50%,
+    transparent 100%);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  /* static placeholder — drop the sweep entirely, leave the calm muted bars */
+  .skeleton .sk::after { animation: none; display: none; }
+}
+/* the skeleton's internal bars, echoing the real card's structure:
+   top line (handle + probe), step dots, two title bars, a foot bar. */
+.skeleton .skTop { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.skeleton .skHandle { height: 9px; width: 64px; }
+.skeleton .skProbe  { height: 9px; width: 40px; margin-left: auto; }
+.skeleton .skSteps  { height: 4px; width: 84px; margin-bottom: 12px; border-radius: 2px; }
+.skeleton .skTitle  { height: 11px; width: 100%; margin-bottom: 7px; }
+.skeleton .skTitle.short { width: 62%; margin-bottom: 14px; }
+.skeleton .skFoot   { height: 20px; width: 50%; border-radius: var(--radius-badge); margin-top: 12px; }
+
+/* ── 4. DEGRADED / PARTIAL ─────────────────────────────────────────────
+   A change whose record is malformed / partial — the board must NEVER break
+   over one bad record. The card renders MINIMALLY and HONESTLY: the handle +
+   whatever fields ARE readable, and the unreadable fields fall back to the
+   SAME "no signal yet" language used elsewhere — the dashed "?" probe, the
+   em-dash time, the dashed "Not assessed yet" health. A quiet
+   "Some details couldn't be read" line names the partial state in words. The
+   card STILL links/opens (so the founder can go investigate) — never a crash,
+   never a blank. The dashed-edge "no signal" vocabulary is deliberately the
+   same as the unknown-probe / unassessed-health states. */
+.card.degraded {
+  /* a faint dashed top edge marks the whole card as "partially read" —
+     echoing the dashed "no signal yet" language, applied to the card itself.
+     Border stays the normal card border on the other three sides so it's not
+     alarmed; only the top edge goes dashed as the marker. */
+  border-top: 1px dashed var(--border);
+}
+.degradedNote {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 11px; padding-top: 11px;
+  border-top: 1px solid var(--border-muted);
+  font-size: 10.5px; color: var(--text-secondary);
+  font-style: italic;
+}
+.degradedNote svg { width: 12px; height: 12px; flex: none; color: var(--muted-foreground); }
+
+/* ── 5. SHIPPED / TERMINAL ─────────────────────────────────────────────
+   A shipped change's card reads as ARCHIVED — done, quiet, out of the active
+   triage. The whole card is MUTED (lower opacity + the muted surface) so the
+   live board still dominates. The liveness probe is replaced by a STATIC
+   "Shipped" marker (a check-in-circle + the word — no working/idle, because
+   nothing runs on a shipped change). There is NO waiting / health foot (it's
+   done — neither read applies); the foot instead shows the ship recency
+   ("shipped 3d ago"). Distinct-but-quiet. The card still opens. */
+.card.shipped {
+  background: var(--muted);
+  border-color: var(--border-muted);
+  /* archived: present but receded. Opacity kept at 0.9 (not lower) so the foot
+     recency text — --muted-foreground on --muted, ~4.6:1 at full strength —
+     stays at/above AA once dimmed; the "receded" read comes from the muted
+     surface + the static marker, not from crushing the text contrast. */
+  opacity: 0.9;
+}
+.card.shipped:hover { opacity: 1; background: var(--muted); border-color: var(--border); }
+:root[data-theme="dark"] .card.shipped { box-shadow: none; }   /* archived cards don't float */
+/* the static "Shipped" marker replacing the liveness probe, top-right */
+.shippedMark {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: var(--weight-label);
+  color: var(--text-secondary);
+}
+.shippedMark svg { width: 13px; height: 13px; flex: none; color: var(--positive); }
+/* the foot of a shipped card — just the ship recency, the quietest read */
+.shippedFoot {
+  margin-top: 11px; padding-top: 11px;
+  border-top: 1px solid var(--border-muted);
+  font-size: 11px; color: var(--muted-foreground);
+  display: flex; align-items: center; gap: 6px;
+}
+.shippedFoot svg { width: 12px; height: 12px; flex: none; }
+
+/* a horizontal rail to hold the alternate-state demo cards at a real card
+   width, on the board background, so each reads exactly as it would in a lane. */
+.altStates {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: 16px;
+  padding: 20px 24px 28px;
+}
+.altCell { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.altLabel {
+  font-size: 11px; font-weight: var(--weight-label);
+  color: var(--text-secondary);
+  display: flex; align-items: center; gap: 6px;
+}
+.altLabel .tagx {
+  font-family: var(--font-mono); font-size: 9px;
+  color: var(--muted-foreground);
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius-badge); padding: 1px 6px;
+}
+.altSub { font-size: 10.5px; color: var(--muted-foreground); line-height: 1.45; }
+/* the skeleton demo cell holds a short stack of skeleton cards (a "lane" of
+   them) so the loading state reads as a loading lane, not one stray card. */
+.altCell.skeletonCell { gap: 12px; }
+.altCell.skeletonCell .skStack { display: flex; flex-direction: column; gap: 12px; }
 
 /* ════════════════════════════════════════════════════════════════════
    RESPONSIVE BEHAVIOUR — three breakpoints, board adapts at each.
@@ -902,13 +1293,13 @@ body {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="18" height="18"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3" stroke-linecap="round"/></svg>
     </button>
     <button class="switchChip recon" type="button" role="tab" aria-selected="true" aria-controls="lane-recon">
-      <span class="sdot" aria-hidden="true"></span>Recon<span class="switchCount">4</span>
+      <span class="sdot" aria-hidden="true"></span>Recon<span class="switchCount">5</span>
     </button>
     <button class="switchChip specify" type="button" role="tab" aria-selected="false" aria-controls="lane-specify">
       <span class="sdot" aria-hidden="true"></span>Specify<span class="switchCount">1</span>
     </button>
     <button class="switchChip design" type="button" role="tab" aria-selected="false" aria-controls="lane-design">
-      <span class="sdot" aria-hidden="true"></span>Design<span class="switchCount">1</span>
+      <span class="sdot" aria-hidden="true"></span>Design<span class="switchCount">0</span>
     </button>
     <button class="switchChip implement" type="button" role="tab" aria-selected="false" aria-controls="lane-implement">
       <span class="sdot" aria-hidden="true"></span>Implement<span class="switchCount">3</span>
@@ -928,13 +1319,48 @@ body {
   <div class="board">
 
     <!-- ── RECON ── -->
-    <section class="lane recon" id="lane-recon" aria-label="Recon — 4 changes">
+    <section class="lane recon" id="lane-recon" aria-label="Recon — 5 changes">
       <header class="laneHead">
         <span class="sdot" aria-hidden="true"></span>
         <span class="laneName">Recon</span>
-        <span class="laneCount">4</span>
+        <span class="laneCount">5</span>
       </header>
       <div class="laneList">
+
+        <!-- ╔═══ FRESH / UNKNOWN-STATE CARD (FR-31 / FR-41 / FR-42) ═══╗
+             A brand-new Recon change with NO signal yet, placed next to the
+             known-state cards for comparison. It honestly shows THREE "no
+             signal yet" reads at once:
+               • liveness UNKNOWN  → dashed "?" probe (not a confident Idle dot)
+               • NO recency        → an em-dash, never "now"
+               • health NOT ASSESSED → neutral dashed badge, NOT green/On track
+             Every one of these is muted + word/shape + an SR label — never a
+             colour-only or falsely-positive cue. -->
+        <a class="card" href="#" aria-label="Change CH-01KTPT: Tidy the recon intake checklist — brand new, status not yet assessed">
+          <div class="topLine">
+            <span class="handle">CH-01KTPT</span>
+            <!-- liveness UNKNOWN (FR-41): dashed "?" probe + SR label; NO recency
+                 (FR-42): an em-dash stands in for the time, never "now". -->
+            <span class="live unknown">
+              <span class="ldot" aria-hidden="true"></span>
+              <span class="sr">status unknown · </span>
+              <span class="lago noRecency" aria-hidden="true">—</span>
+            </span>
+          </div>
+          <div class="steps" role="img" aria-label="Step 1 of 6">
+            <span class="step cur"></span><span class="step"></span><span class="step"></span><span class="step"></span><span class="step"></span><span class="step"></span>
+          </div>
+          <p class="intent">Tidy the recon intake checklist</p>
+          <div class="cardMeta">
+            <span class="slug">recon-intake-checklist</span>
+          </div>
+          <!-- health NOT ASSESSED YET (FR-31): no tests run, no stage artifacts
+               yet → an honest NEUTRAL read. Not "On track" (a green lie), not
+               "Off track" (it isn't failing). Muted, dashed, distinct word. -->
+          <div class="footRow">
+            <span class="health unassessed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>Not assessed yet<span class="sr"> — no checks have run for this stage yet</span></span>
+          </div>
+        </a>
 
         <!-- WAITING ON YOU — the chip leads the consistent foot row; card has
              the same structure as every other card (no banner, no stripe). -->
@@ -1070,35 +1496,22 @@ body {
       </div>
     </section>
 
-    <!-- ── DESIGN ── -->
-    <section class="lane design" id="lane-design" aria-label="Design — 1 change">
+    <!-- ── DESIGN — an EMPTY LANE inside a populated board ──
+         Zero changes currently sit in Design. The lane is NOT collapsed or
+         missing: it keeps its full height, its header, and its count (0), and
+         shows a quiet "Nothing here yet" placeholder so the board's shape stays
+         stable. Muted only — an empty stage is neither good nor bad. -->
+    <section class="lane design" id="lane-design" aria-label="Design — 0 changes">
       <header class="laneHead">
         <span class="sdot" aria-hidden="true"></span>
         <span class="laneName">Design</span>
-        <span class="laneCount">1</span>
+        <span class="laneCount">0</span>
       </header>
       <div class="laneList">
-        <a class="card" href="#" aria-label="Change CH-01KM9E: Expand the definition of done for testable states">
-          <div class="topLine">
-            <span class="handle">CH-01KM9E</span>
-            <span class="live idle">
-              <span class="ldot" aria-hidden="true"></span>
-              <span class="sr">idle, not running · </span>
-              <span class="lago">1w</span>
-            </span>
-          </div>
-          <div class="steps" role="img" aria-label="Step 3 of 6">
-            <span class="step on"></span><span class="step on"></span><span class="step cur"></span><span class="step"></span><span class="step"></span><span class="step"></span>
-          </div>
-          <p class="intent">Expand the definition of done for testable states</p>
-          <div class="cardMeta">
-            <span class="slug">testable-state-done</span>
-          </div>
-          <!-- NOT waiting on you → the foot shows change-health -->
-          <div class="footRow">
-            <span class="health look"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12h14" stroke-linecap="round"/></svg>Worth a look<span class="sr"> — no design recorded for this stage</span></span>
-          </div>
-        </a>
+        <p class="laneEmpty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18" stroke-linecap="round"/></svg>
+          Nothing here yet
+        </p>
       </div>
     </section>
 
@@ -1310,6 +1723,268 @@ body {
 
   </div>
 </main>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     WHOLE-BOARD STATE FRAMES — shown here BENEATH the live board, each in a
+     clearly-labelled demo frame, so the founder can see them next to the
+     populated board. In the real app exactly ONE of these OR the populated
+     board renders at a time (they replace the lane grid entirely).
+     ════════════════════════════════════════════════════════════════════ -->
+
+<!-- EMPTY BOARD (J-8) — the first-run experience: zero changes anywhere. -->
+<section class="demoFrame" aria-label="Empty board state — first run">
+  <div class="demoFrameLabel">
+    <span class="tagx">state</span> Empty board — first run (zero changes anywhere)
+  </div>
+  <div class="boardState">
+    <div class="boardStateIcon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    </div>
+    <h2 class="boardStateTitle">Your board is empty</h2>
+    <p class="boardStateBody">Every piece of work begins as a change. Start your first one and it will appear here, moving across the board as it goes.</p>
+    <button class="heroStart" type="button" aria-label="Start something new">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+      Start something new
+    </button>
+  </div>
+</section>
+
+<!-- FEED FAILED TO LOAD — a calm "couldn't load · Retry", not an alarm. -->
+<section class="demoFrame" aria-label="Board failed to load state">
+  <div class="demoFrameLabel">
+    <span class="tagx">state</span> Couldn't load — the changes feed failed to load
+  </div>
+  <div class="boardState feedError" role="alert">
+    <div class="boardStateIcon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 8v4M12 16h.01" stroke-linecap="round"/><circle cx="12" cy="12" r="9"/></svg>
+    </div>
+    <h2 class="boardStateTitle">Couldn't load your changes</h2>
+    <p class="boardStateBody">Something went wrong fetching your board. This is usually temporary — try again in a moment.</p>
+    <button class="retryBtn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 3v5h5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Retry
+    </button>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     ALTERNATE CARD STATES — the OTHER states a card can be in (not its
+     content). The live board above shows the content states (stage / foot
+     verdict / liveness / recency); this frame shows: a SELECTED (open-in-tab)
+     card, the INTERACTION states (hover / focus / pressed), a short lane of
+     LOADING skeleton cards, a DEGRADED (partial-record) card, and a SHIPPED
+     (terminal / archived) card. Each is labelled; each is distinguishable by
+     shape/marker + a word, never colour alone; all correct in light + dark.
+     ════════════════════════════════════════════════════════════════════ -->
+<section class="demoFrame" aria-label="Alternate card states">
+  <div class="demoFrameLabel">
+    <span class="tagx">states</span> Alternate card states — selected · hover/focus/pressed · loading · degraded · shipped
+  </div>
+
+  <div class="altStates">
+
+    <!-- 1. SELECTED / CURRENTLY-OPEN — the card whose change is open in a tab.
+         Marked active by an accent left-bar (shape) + a primary border + an
+         "Open" pill (word), and aria-current. Coexists with the focus ring. -->
+    <div class="altCell">
+      <div class="altLabel"><span class="tagx">1</span> Selected — open in a tab</div>
+      <a class="card selected" href="#" aria-current="true" aria-label="Change CH-01KL1F: Add a 'Start something new' button to the top bar — currently open">
+        <div class="topLine">
+          <span class="handle">CH-01KL1F</span>
+          <span class="openPill"><span class="odot" aria-hidden="true"></span>Open</span>
+          <span class="live working">
+            <span class="ldot" aria-hidden="true"></span>
+            <span class="sr">actively working · </span>
+            <span class="lago">now</span>
+          </span>
+        </div>
+        <div class="steps" role="img" aria-label="Step 4 of 6">
+          <span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step cur"></span><span class="step"></span><span class="step"></span>
+        </div>
+        <p class="intent">Add a 'Start something new' button to the top bar</p>
+        <div class="cardMeta"><span class="slug">cockpit-start-change-button</span></div>
+        <div class="footRow">
+          <span class="health ontrack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>On track<span class="sr"> — tests green, on plan</span></span>
+        </div>
+      </a>
+      <p class="altSub">Accent left-bar + primary border + an "Open" pill, so it's the active card by shape + word, not colour. Shown here with focus too →</p>
+    </div>
+
+    <!-- 2a. HOVER — subtle surface lift (bg shift + firmer border). -->
+    <div class="altCell">
+      <div class="altLabel"><span class="tagx">2a</span> Hover — surface lift</div>
+      <a class="card isHover" href="#" aria-label="Change CH-01KP7C: Scope brain reads to the active tenant">
+        <div class="topLine">
+          <span class="handle">CH-01KP7C</span>
+          <span class="live idle">
+            <span class="ldot" aria-hidden="true"></span>
+            <span class="sr">idle, not running · </span>
+            <span class="lago">6h</span>
+          </span>
+        </div>
+        <div class="steps" role="img" aria-label="Step 1 of 6">
+          <span class="step cur"></span><span class="step"></span><span class="step"></span><span class="step"></span><span class="step"></span><span class="step"></span>
+        </div>
+        <p class="intent">Scope brain reads to the active tenant</p>
+        <div class="cardMeta"><span class="slug">brain-read-tenant-scope</span></div>
+        <div class="footRow">
+          <span class="health ontrack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>On track<span class="sr"> — tests green, on plan</span></span>
+        </div>
+      </a>
+      <p class="altSub">Hover lifts the surface (bg shifts to the muted step, border firms) — a quiet "this is pointable", no colour cue needed.</p>
+    </div>
+
+    <!-- 2b. KEYBOARD FOCUS — the visible ring (confirming the already-present
+         :focus-visible), here pinned statically so the frame shows it. -->
+    <div class="altCell">
+      <div class="altLabel"><span class="tagx">2b</span> Keyboard focus — the ring</div>
+      <a class="card isFocus" href="#" aria-label="Change CH-01KQ2B: Write the contribution / onboarding guide">
+        <div class="topLine">
+          <span class="handle">CH-01KQ2B</span>
+          <span class="live idle">
+            <span class="ldot" aria-hidden="true"></span>
+            <span class="sr">idle, not running · </span>
+            <span class="lago">4h</span>
+          </span>
+        </div>
+        <div class="steps" role="img" aria-label="Step 1 of 6">
+          <span class="step cur"></span><span class="step"></span><span class="step"></span><span class="step"></span><span class="step"></span><span class="step"></span>
+        </div>
+        <p class="intent">Write the contribution / onboarding guide</p>
+        <div class="cardMeta"><span class="slug">contribution-guide</span></div>
+        <div class="footRow">
+          <span class="health look"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12h14" stroke-linecap="round"/></svg>Worth a look<span class="sr"> — missing tests for its stage</span></span>
+        </div>
+      </a>
+      <p class="altSub">The 2px focus ring (var(--ring)), drawn outside the border — so it coexists with the selected card's border + left-bar.</p>
+    </div>
+
+    <!-- 2c. PRESSED / ACTIVE — a slight depress (down-nudge + inset shadow). -->
+    <div class="altCell">
+      <div class="altLabel"><span class="tagx">2c</span> Pressed — slight depress</div>
+      <a class="card isPressed" href="#" aria-label="Change CH-01KJ3H: Realize the change-owned working brief">
+        <div class="topLine">
+          <span class="handle">CH-01KJ3H</span>
+          <span class="live idle">
+            <span class="ldot" aria-hidden="true"></span>
+            <span class="sr">idle, not running · </span>
+            <span class="lago">2d</span>
+          </span>
+        </div>
+        <div class="steps" role="img" aria-label="Step 4 of 6">
+          <span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step cur"></span><span class="step"></span><span class="step"></span>
+        </div>
+        <p class="intent">Realize the change-owned working brief</p>
+        <div class="cardMeta"><span class="slug">change-owned-brief</span></div>
+        <div class="footRow">
+          <span class="health ontrack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>On track<span class="sr"> — tests green, on plan</span></span>
+        </div>
+      </a>
+      <p class="altSub">On press the card nudges down 1px with an inset shadow — it reads as pushed in (tactile, not a new colour).</p>
+    </div>
+
+    <!-- 3. LOADING / SKELETON — a short lane of calm placeholder cards shown
+         WHILE the feed loads. Shimmer sweep (reduced-motion → static). The
+         region is aria-busy + carries an SR "Loading…" line; the bars
+         themselves are aria-hidden and not focusable. -->
+    <div class="altCell skeletonCell">
+      <div class="altLabel"><span class="tagx">3</span> Loading — skeleton lane</div>
+      <div class="skStack" aria-busy="true" aria-label="Loading your changes">
+        <span class="sr">Loading your changes…</span>
+        <div class="skeleton" aria-hidden="true">
+          <div class="skTop"><span class="sk skHandle"></span><span class="sk skProbe"></span></div>
+          <span class="sk skSteps"></span>
+          <span class="sk skTitle"></span>
+          <span class="sk skTitle short"></span>
+          <span class="sk skFoot"></span>
+        </div>
+        <div class="skeleton" aria-hidden="true">
+          <div class="skTop"><span class="sk skHandle"></span><span class="sk skProbe"></span></div>
+          <span class="sk skSteps"></span>
+          <span class="sk skTitle"></span>
+          <span class="sk skTitle short"></span>
+          <span class="sk skFoot"></span>
+        </div>
+        <div class="skeleton" aria-hidden="true">
+          <div class="skTop"><span class="sk skHandle"></span><span class="sk skProbe"></span></div>
+          <span class="sk skSteps"></span>
+          <span class="sk skTitle"></span>
+          <span class="sk skTitle short"></span>
+          <span class="sk skFoot"></span>
+        </div>
+      </div>
+      <p class="altSub">Calm placeholder bars (handle · probe · title · foot), a gentle shimmer — never a spinner. Reduced-motion → the bars stay, the shimmer stops. The region is announced "Loading your changes…".</p>
+    </div>
+
+    <!-- 4. DEGRADED / PARTIAL — a malformed/partial record. The board never
+         breaks: render the handle + whatever's readable, fall the rest back to
+         the SAME "no signal yet" language (dashed "?" probe, em-dash, dashed
+         "Not assessed yet"), and a quiet "some details couldn't be read" line.
+         Still links/opens. Never a crash, never a blank. -->
+    <div class="altCell">
+      <div class="altLabel"><span class="tagx">4</span> Degraded — partial record</div>
+      <a class="card degraded" href="#" aria-label="Change CH-01KR4T: details partly unreadable — some fields could not be read; opens for a closer look">
+        <div class="topLine">
+          <span class="handle">CH-01KR4T</span>
+          <!-- liveness unreadable → the SAME unknown "?" probe; no recency → em-dash -->
+          <span class="live unknown">
+            <span class="ldot" aria-hidden="true"></span>
+            <span class="sr">status unknown · </span>
+            <span class="lago noRecency" aria-hidden="true">—</span>
+          </span>
+        </div>
+        <!-- stage unreadable → dashed/empty step track, labelled honestly -->
+        <div class="steps" role="img" aria-label="Stage not readable">
+          <span class="step"></span><span class="step"></span><span class="step"></span><span class="step"></span><span class="step"></span><span class="step"></span>
+        </div>
+        <!-- the one field that WAS readable: the handle (in the title slot we
+             show the slug we could read; if even the intent is missing we say so) -->
+        <p class="intent">recovery-orchestrator</p>
+        <div class="cardMeta"><span class="slug">slug unavailable</span></div>
+        <!-- health unreadable → the SAME dashed "Not assessed yet" neutral -->
+        <div class="footRow">
+          <span class="health unassessed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>Not assessed yet<span class="sr"> — this field could not be read</span></span>
+        </div>
+        <!-- the honest "partial" line -->
+        <div class="degradedNote">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01" stroke-linecap="round"/></svg>
+          Some details couldn't be read
+        </div>
+      </a>
+      <p class="altSub">The handle + whatever's readable; the rest falls back to the dashed "no signal yet" marks. A quiet "some details couldn't be read" line — and it still opens.</p>
+    </div>
+
+    <!-- 5. SHIPPED / TERMINAL — an archived, done change. Muted overall; the
+         liveness probe replaced by a static "Shipped" marker (no working/idle);
+         no waiting/health foot — instead the ship recency. Distinct-but-quiet
+         so the active board still dominates. Still opens. -->
+    <div class="altCell">
+      <div class="altLabel"><span class="tagx">5</span> Shipped — archived</div>
+      <a class="card shipped" href="#" aria-label="Change CH-01KF7L: dev-session-mint — shipped 3 days ago, archived">
+        <div class="topLine">
+          <span class="handle">CH-01KF7L</span>
+          <!-- the static "Shipped" marker REPLACES the liveness probe -->
+          <span class="shippedMark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5 11 15l4.5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Shipped
+          </span>
+        </div>
+        <div class="steps" role="img" aria-label="Step 6 of 6 — complete">
+          <span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step on"></span>
+        </div>
+        <p class="intent">dev-session-mint</p>
+        <div class="cardMeta"><span class="slug">dev-session-mint</span></div>
+        <!-- NO waiting/health foot — it's done. Just the ship recency. -->
+        <div class="shippedFoot">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Shipped 3d ago
+        </div>
+      </a>
+      <p class="altSub">Muted + receded; a static "Shipped" marker instead of the liveness probe; no waiting/health foot — just "shipped 3d ago". Still opens.</p>
+    </div>
+
+  </div>
+</section>
 
 <div class="note">
   Board refresh — resize the window to see it adapt: wide = 6 lanes; narrower = lanes scroll sideways; phone-width = one lane at a time, switched by the stage chips. Top line: handle (left) · probe + relative time (right). Foot: a full-width "Waiting on you" OR change-health, never both. Real Sulis tokens; dark layers page → lane → card.

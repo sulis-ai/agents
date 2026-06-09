@@ -1,0 +1,46 @@
+id: cockpit-board-refresh
+handle: CH-084CAN
+status: decomposed                                # re-planned off the complete spec; 13 WPs
+mode: brownfield-refresh
+tier: M
+sourced_from:
+  spec: .specifications/cockpit-board-refresh/   # SRD + SCENARIOS (36) + NFR + MISUSE + EXISTING_VS_GAP + OPEN_DECISIONS
+  design: .design/cockpit-board-refresh/         # MOCKUP.html + IDEAS.md (visual contract, production-approved)
+  code: apps/cockpit/                            # the board being refreshed
+replan:
+  reason: >
+    The first 8 WPs were decomposed from the design alone, before the
+    requirements pass. Re-planned to 13 WPs off the complete spec: added the
+    unknown/degraded states (FR-31/41/42), the five alternate card states
+    (§7c CS-1..5), the empty/loading/error/degraded behaviour, never-500
+    degradation (BR-11), and the NFRs folded into each WP's Definition of Done.
+  scenario_coverage: all-36-mapped                # every S-1..S-36 → ≥1 WP (INDEX.md)
+  wp_count: { before: 8, after: 13 }
+  extended_in_place: [WP-001, WP-002, WP-003, WP-004, WP-005, WP-006, WP-007, WP-008]
+  added: [WP-009, WP-010, WP-011, WP-012, WP-013]
+visual_contract:
+  status: production-approved                    # founder signed off the mockup; no new visual-contract WP
+  artifact: .design/cockpit-board-refresh/MOCKUP.html
+reuses:
+  start_button:
+    from_branch: change/feat-cockpit-start-change-button
+    arch: .architecture/cockpit-start-change-button/
+    components:
+      - apps/cockpit/client/src/components/WorkspaceTopBar.tsx   # Start-button variant
+      - apps/cockpit/client/src/api/useStartHotkey.ts           # ⌘N / ⌘K accelerant
+      - cold-start chips on the /start screen
+defers:
+  - scope-drift detection + the "Worth a look" middle state → consume the
+    in-flight `change-stage-ooda-spiral` drift signal later; do NOT build a
+    parallel drift detector now (IDEAS.md "Overlap to flag"; ADR-001).
+adrs:
+  - ADR-001-change-health-scope-tests-and-rigor-only.md
+  - ADR-002-enrich-board-feed-not-new-endpoint.md
+  - ADR-003-revive-start-button-by-porting-parked-components.md
+  - ADR-004-responsive-lane-switcher-reuses-stage-chips-as-tabs.md
+work_packages_dir: work-packages/
+notes: >
+  Read-only refresh. The board feed gains derived reads (needsAttention,
+  health, liveness "working" sub-state) but introduces no new write path and
+  no new mutating endpoint. Tokens.css dark-block edits are the only
+  cross-app-surface change.

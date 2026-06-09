@@ -684,6 +684,343 @@ dark both stay correct at every width.
 
 ---
 
+## Unknown + empty states (the honest ends the first draft missed)
+
+The first pass only drew the **healthy, populated** board — every card had a
+real liveness, a real recency, and a confident health verdict, and every lane
+had cards in it. A real board doesn't always look like that. A brand-new change
+has **no signal yet**; a session record can go **missing**; a lane or the whole
+board can be **empty**; the feed can **fail to load**. If we render those as if
+they were the healthy ends — a fresh change showing a green "On track", a
+missing session showing a confident "Idle", a null timestamp showing "now" — the
+board *lies*. This section adds the missing states, and the guiding rule for all
+of them is the same: **when we don't know, the board says so — quietly,
+honestly, and never with a falsely-positive (green) or falsely-confident cue.**
+
+Every one of these reads is built the same accessible way as the rest of the
+card: a **word + a shape**, a **screen-reader label**, **muted/neutral** colour
+that's distinct from both the positive and the destructive states, and **never
+colour alone**. All values are the real `tokens.css` — nothing invented — and
+each was contrast-checked in **both** light and dark.
+
+### 1. Health "not assessed yet" (FR-31)
+
+**When:** a change with **no tests run and none of the artifacts its stage
+expects** — e.g. a freshly-created Recon change. There is genuinely nothing to
+judge health on yet.
+
+**Treatment + wording:** a neutral badge reading **"Not assessed yet"** with a
+**hollow outline circle** (an empty gauge — "nothing measured yet"), on the muted
+surface with a **dashed** border. It is deliberately **NOT** the positive "On
+track" (a green tick on a change that's done nothing is a lie) and **NOT** the
+destructive "Off track" (it isn't failing — it simply hasn't started). It shares
+the muted surface with "Worth a look" but is told apart by a **different word**
+and a **different shape** (hollow circle vs. the dash), and its label uses the
+quieter `--text-secondary` so it reads as the calmest, most provisional state on
+the board. SR reason: *"no checks have run for this stage yet"*.
+
+**Why it's honest:** it names the absence of a verdict instead of inventing one.
+A founder scanning the board can tell a brand-new change apart from a genuinely
+healthy one at a glance — which a fake "On track" would actively hide.
+
+### 2. Liveness unknown (FR-41)
+
+**When:** the session record is **missing or malformed** — we can't tell whether
+anything is running.
+
+**Treatment:** a **distinct "unknown" probe** — a **faint dashed ring with a
+centred "?"** — clearly different from Idle's crisp solid outline dot. It must
+**not** look like a confident Idle, because "we don't know" and "nothing is
+running" are different facts. SR label: **"status unknown"**. The dashed edge +
+the "?" + the lowered opacity carry the meaning in greyscale and for a
+colour-blind founder; colour does no work here.
+
+**Why it's honest:** Idle is a *confident* read ("a session exists and it's
+quiet"). Unknown is the *absence* of a read. Giving them different shapes stops
+a missing/broken session masquerading as a calm, healthy idle change.
+
+### 3. No recency (FR-42)
+
+**When:** `lastActivityAt` is **null** — there's no last-activity timestamp.
+
+**Treatment:** **omit the time entirely.** The probe shows alone, with a muted
+**em-dash** ("—") standing in for the time slot (the dash is `aria-hidden` so a
+screen reader simply hears the probe's state with no time). We **never** print
+"now" — "now" is a positive recency claim, and a null timestamp is the opposite
+of a claim.
+
+**Why it's honest:** "now" would tell the founder the change was just active when
+in fact we have no idea. An em-dash reads as "no time recorded", which is the
+truth. (The fresh Recon card shows this paired with the unknown probe.)
+
+### 4. Empty board — first run (J-8)
+
+**When:** **zero changes anywhere** — the first thing a brand-new user sees.
+
+**Treatment:** the lane grid is replaced by a centred empty state that makes the
+**"Start something new"** front door the **hero** — a single prominent filled
+primary pill (the same affordance as the top bar, given centre stage), under a
+one-line plain-English invite: *"Your board is empty. Every piece of work begins
+as a change — start your first one and it will appear here."* Nothing else
+competes for attention; there's exactly one thing to do.
+
+**Why it's honest (and kind):** an empty board isn't an error — it's the
+beginning. Treating it as the first-run moment (one clear call to action, warm
+copy) turns "there's nothing here" into "here's how to start", which is what a
+first-time founder needs.
+
+### 5. Empty lane (a stage with zero changes in a populated board)
+
+**When:** the board has changes, but **one stage is empty** (in the mockup,
+Design).
+
+**Treatment:** the lane is **never collapsed or hidden**. It keeps its full
+height, its header (dot + name), and its **count badge showing 0**, and shows a
+quiet **"Nothing here yet"** placeholder in a faint dashed outline. Muted only —
+no status colour, because an empty stage is neither good nor bad.
+
+**Why it's honest:** a missing lane would make the board's shape jump around as
+work flows through, and would hide the fact that a stage is simply empty (vs.
+broken). A stable, full-height lane with a visible "0" tells the founder exactly
+what's true: this stage has no work right now.
+
+### 6. Feed failed to load (the bonus state)
+
+**When:** the changes feed **errors out**.
+
+**Treatment:** a **calm** centred panel — a neutral alert icon on the destructive
+tint (word + tint, never the red as a full-bleed alarm), **"Couldn't load your
+changes"**, a one-line plain reassurance that it's usually temporary, and a
+single outline **Retry** button. It uses `role="alert"` so assistive tech is
+told, but it deliberately doesn't shout — a transient load failure isn't a
+crisis.
+
+**Why it's honest:** it distinguishes "we couldn't load" from "you have no
+changes" — two very different facts that a naïve empty state would conflate. The
+founder gets the truth (load failed) and the one action that fixes it (Retry),
+without alarm.
+
+### Accessibility note (all six, both themes)
+
+- **Never colour alone.** Every state carries a **word + a shape**: "Not
+  assessed yet" + hollow circle; the unknown probe's dashed "?" ring; the empty
+  lane's "Nothing here yet" + dashed slot; the empty board's title + hero
+  button; the feed error's title + Retry. Strip all colour and each is still
+  legible.
+- **The "no signal yet" states are muted, not coloured** — distinct from both
+  the positive (green "On track") and destructive (red "Off track") ends, so
+  none of them can be mistaken for a healthy or a failing read. A dashed edge is
+  the shared visual language of "no signal yet" (unknown probe, unassessed
+  health, empty lane, empty slot).
+- **Screen-reader truth.** The unknown probe announces *"status unknown"*; the
+  unassessed badge appends *"no checks have run for this stage yet"*; the null
+  recency em-dash is `aria-hidden` (the reader hears the probe state with no
+  time, never "now"); the feed error is a `role="alert"`.
+- **AA contrast — verified light + dark against the real tokens.** Every text
+  label clears AA (4.5:1) and every graphical cue clears the 3:1 bar (WCAG
+  1.4.11), in **both** themes:
+
+| Element | Light | Dark |
+|---|---:|---:|
+| "Not assessed yet" label (`--text-secondary` on muted) | 7.2:1 ✓ | 6.4:1 ✓ |
+| "Not assessed yet" hollow-circle icon (graphical, 3:1 bar) | 4.4:1 ✓ | 6.4:1 ✓ |
+| Unknown probe — dashed "?" ring (graphical, 3:1 bar, on card) | 4.7:1 ✓ | 5.5:1 ✓ |
+| "Nothing here yet" placeholder (muted-fg on muted) | 4.4:1 ✓ | 6.4:1 ✓ |
+| Empty-board title (foreground on bg) | 17.2:1 ✓ | 14.8:1 ✓ |
+| Empty-board body copy (`--text-secondary` on bg) | 7.5:1 ✓ | 7.1:1 ✓ |
+| "Start something new" hero (fg on primary) | 5.2:1 ✓ | 6.8:1 ✓ |
+| Feed-error title / body (as above) | 17.2 / 7.5:1 ✓ | 14.8 / 7.1:1 ✓ |
+| "Retry" button label (foreground on card) | 17.9:1 ✓ | 11.6:1 ✓ |
+
+- **Keyboard + focus.** The hero "Start something new" and the "Retry" button
+  are real buttons with the same visible `:focus-visible` ring (`--ring`) as the
+  rest of the board; both are ≥38–44px tall.
+- **Nothing already-settled regresses.** These are purely *additive* — new probe
+  / health / lane / board variants. The healthy card, the full-height lanes, the
+  dark elevation, the responsive breakpoints and the existing AA-verified reads
+  are all untouched.
+
+**Where these land when built:** all six are rendered with existing `tokens.css`
+values — no new colours. The fresh-card states (FR-31/41/42) need three small
+feed additions the build note already flagged (a `health: "unassessed"`
+possibility, a `liveness: "unknown"` value — which the feed *already* carries —
+and a nullable `lastActivityAt`); the empty-board, empty-lane and feed-error
+states are pure client render branches off "how many changes / did the fetch
+fail", needing no new server data.
+
+---
+
+## Alternate card states (the OTHER states a card can be in)
+
+The content states above (stage, foot verdict, liveness, recency) describe what a
+card *says*. These five are the other states a card can be *in* — selected,
+interacting, loading, degraded, shipped. They're shown in their own labelled
+**"Alternate card states"** frame beneath the live board in `MOCKUP.html` (the
+live board already shows the content states). Like everything else on the board,
+each is distinguishable by **shape / marker + a word**, never colour alone, and
+each is correct in **both** light and dark on the real `tokens.css`. Nothing
+already-settled changes — these are purely additive.
+
+### 1. Selected / currently-open
+
+**When:** the change is open in a tab (the active route) — the card the founder
+is currently "in".
+
+**Treatment:** marked the active card by **three** redundant cues so it never
+leans on colour: (a) a **3px accent left-marker** — a solid `--primary` bar
+inset on the card's left edge (a *shape* on the edge, drawn with an inset
+box-shadow so the card's content doesn't shift versus a normal card); (b) the
+card **border tints to `--primary`** with a **subtle raise** (the existing
+`--shadow-float`); and (c) an **"Open" pill** on the top line naming the state in
+a *word*. It carries `aria-current="true"` and its accessible name is suffixed
+"— currently open".
+
+**Coexists with the focus ring:** the focus ring is an `outline` (drawn *outside*
+the border), while selected is border + an *inset* left-bar + the pill — so a
+selected card that *also* has keyboard focus shows **both** at once with no
+clash. (The selected demo card is shown alongside the focus demo so you can see
+they're independent.)
+
+**Accessibility:** shape (left-bar) + word ("Open") + `aria-current`, so it's the
+active card in greyscale, for a colour-blind founder, and for a screen reader —
+the primary tint is reinforcement only.
+
+### 2. Interaction states — hover / keyboard-focus / pressed
+
+**When:** pointer or keyboard interaction with a card.
+
+**Treatment:**
+- **Hover** — a **subtle surface lift**: the settled `.card:hover` already firms
+  the border to `--input`; this *adds* a one-step background shift to `--muted`,
+  so hover reads as a gentle "this is pointable". (Additive — the settled border
+  rule is untouched.)
+- **Keyboard focus** — the **visible ring** already present
+  (`.card:focus-visible { outline: 2px solid var(--ring) }`). **Confirmed and
+  unchanged**; the frame pins it statically (`.isFocus`) so it's visible without
+  a real focus.
+- **Pressed / active** — a **slight depress**: a 1px downward nudge + an inset
+  shadow, so the card reads as pushed in (tactile, not a new colour).
+
+The frame shows one hover card, one focused card, and one pressed card, each
+labelled, using the static `.isHover / .isFocus / .isPressed` demo classes (the
+real `:hover / :focus-visible / :active` rules drive the live board).
+
+**Accessibility:** none of the three depends on hover to convey *information* —
+they're affordance feedback, not signals. The focus ring is the load-bearing one
+(keyboard reachability) and is unchanged. Hover/pressed are progressive polish on
+top of the always-present focus ring; nothing is keyboard-unreachable.
+
+### 3. Loading / skeleton
+
+**When:** the feed is loading, before data arrives.
+
+**Treatment:** a **calm placeholder skeleton card** — bars where the handle,
+probe, two title lines, and the foot will be — **not a spinner**. A gentle
+left-to-right **shimmer** sweeps across the bars to read as "loading". The bars
+and the sweep are built from existing tokens only (`--muted` fill, a
+`--border`→`--muted` gradient for the sweep) — no invented hue. The frame shows a
+**short lane of three** skeleton cards (loading reads as a loading *lane*, not
+one stray card), at real card width so the layout doesn't jump when data lands.
+
+**Reduced motion:** under `prefers-reduced-motion: reduce` the **shimmer is
+dropped entirely** and the calm muted placeholder bars remain — a static
+skeleton, no movement.
+
+**Accessibility:** the skeleton region carries `aria-busy="true"` and an
+`.sr` **"Loading your changes…"** line, so a screen reader is told it's loading;
+the placeholder bars themselves are `aria-hidden` (no meaningless bar
+announcements) and the skeleton is **not focusable** (it isn't a real card yet).
+
+### 4. Degraded / partial
+
+**When:** a change's record is **malformed or partial** — the board must never
+break over one bad record.
+
+**Treatment:** render the card **minimally and honestly** — the **handle** plus
+whatever fields *are* readable, and every unreadable field falls back to the
+**same "no signal yet" language** used elsewhere on the board: the dashed **"?"
+probe** (liveness unreadable), an **em-dash** (no recency), an empty/dashed step
+track ("Stage not readable"), and the dashed **"Not assessed yet"** neutral
+(health unreadable). A faint **dashed top edge** marks the whole card as
+partially-read, and a quiet italic **"Some details couldn't be read"** line names
+the partial state in words. The card **still links / opens**, so the founder can
+go investigate — **never a crash, never a blank**.
+
+**Consistency:** this deliberately reuses the **dashed-edge "no signal yet"
+vocabulary** already established by the unknown probe and the unassessed-health
+badge — a degraded record is just "no signal yet" applied to several fields at
+once, so it speaks the same visual language.
+
+**Accessibility:** every fallback is the existing word+shape+SR-label pattern
+(the "?" probe announces "status unknown", the em-dash is `aria-hidden` so no
+false "now", the health says "this field could not be read"); the card's
+accessible name says "details partly unreadable… opens for a closer look". Muted
+throughout — distinct from both the positive and destructive ends, so a partial
+record can't be mistaken for healthy *or* failing.
+
+### 5. Shipped / terminal
+
+**When:** the change is **shipped** — done, terminal.
+
+**Treatment:** the card reads as **archived** — quiet and out of the active
+triage so the live board still dominates. The whole card is **muted** (the
+`--muted` surface, the muted border, and a light `opacity` recede). The
+**liveness probe is replaced by a static "Shipped" marker** — a check-in-circle +
+the word "Shipped" — because nothing runs on a shipped change (no working / idle
+to show). There is **no waiting / health foot** (neither read applies once it's
+done); the foot instead carries the **ship recency** — "Shipped 3d ago". On
+hover the card returns to full strength (it's still openable). Distinct-but-quiet.
+
+**Accessibility:** the "Shipped" marker is a *shape* (check-in-circle) + a *word*,
+not a colour; the card's accessible name says "shipped 3 days ago, archived". The
+`opacity` is kept at **0.9** (not lower) on purpose so the foot recency text
+(`--muted-foreground` on `--muted`, ~4.6:1 at full strength) stays **at/above
+AA** once dimmed — the "receded" read comes from the muted surface + the static
+marker, **not** from crushing text contrast. The 6/6 step track is filled and
+labelled "Step 6 of 6 — complete".
+
+### Accessibility note (all five, both themes)
+
+- **Never colour alone — shape/marker + word on every state.** Selected = accent
+  left-bar + "Open" pill + `aria-current`; hover/pressed = surface/depress
+  feedback (not signals) over the always-present focus ring; skeleton = calm
+  bars + `aria-busy` + an SR "Loading…" line; degraded = the dashed "no signal
+  yet" marks + a "some details couldn't be read" line; shipped = the static
+  "Shipped" check-marker + word. Strip all colour and each is still legible.
+- **Selected coexists with focus** — outline (focus) vs border + inset bar
+  (selected) never clash; a selected, focused card shows both.
+- **Skeleton screen-reader truth** — the region is `aria-busy` and announces
+  "Loading your changes…"; the bars are `aria-hidden` and not focusable.
+- **Reduced motion** — the skeleton shimmer has a `prefers-reduced-motion`
+  fallback to a **static** placeholder (no sweep), matching the card's existing
+  reduced-motion discipline (the "Working" pulse already falls back to a static
+  ring).
+- **Degraded keeps the "dashed edge = no signal yet" language** consistent with
+  the unknown probe and unassessed health — one shared vocabulary for "we
+  couldn't read this".
+- **AA holds in both themes.** All five ride existing `tokens.css` values; the
+  only contrast-sensitive choice is the shipped card's dim, deliberately held at
+  0.9 so its recency text stays ≥ AA. The selected `--primary` border/bar clears
+  the 3:1 graphical bar in both themes (it's the same `--primary`/`--ring` the
+  board already uses for the focus ring and the top-bar button), and the skeleton
+  bars are non-informational so carry no contrast requirement.
+- **Nothing already-settled regresses.** These are purely additive new card
+  variants + one labelled demo frame; the healthy card, the unknown/empty states,
+  the full-height lanes, the dark elevation, the responsive breakpoints and every
+  existing AA-verified read are untouched. (The one settled rule touched —
+  `.card:hover` — is *added to*, not changed: the border firm stays, a muted-bg
+  lift is appended.)
+
+**Where these land when built:** all five are pure client render states needing
+no new server data — *selected* keys off the active route/open tab, *hover/
+focus/pressed* are CSS, *skeleton* is the loading branch of the feed fetch,
+*degraded* is the render fallback when a record fails to parse (the board catches
+the bad record and renders the minimal honest card instead of throwing), and
+*shipped* keys off the change's terminal stage (already on the feed). No invented
+colours — every value is `tokens.css`.
+
+---
+
 ## The three cross-cutting principles (carried from the inspiration board)
 
 1. **Full-height lanes** with sticky headers and internal scroll — the board
