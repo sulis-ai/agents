@@ -1,0 +1,6 @@
+.architecture/automation-reliability-recovery/contracts/reliability-layer.contract.md
+plugins/sulis/scripts/_session_manager/manager.py
+plugins/sulis/scripts/_session_manager/recovery.py
+plugins/sulis/scripts/tests/unit/test_session_manager_recovery.py
+plugins/sulis/scripts/tests/unit/test_session_manager_recovery_contract.py
+plugins/sulis/scripts/tests/unit/test_session_manager_recovery_wiring.py

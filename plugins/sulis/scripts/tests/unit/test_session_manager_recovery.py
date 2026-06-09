@@ -513,3 +513,179 @@ def test_resume_emits_no_result_before_the_rerun_produces_one() -> None:
     # … and the driver fabricated nothing: every Event it appended is an
     # EventError (an error-kind payload), never a TurnResult.
     assert all(isinstance(e, ev.EventError) for e in manager.appended)
+
+
+# ── CH-01KTMK hardening FIX 2 — the absolute (lifetime) retry ceiling ──────
+#
+# The per-sequence wall-clock window (``total_budget_seconds``) is reset on
+# every genuine clear (``note_turn_cleared``). A pathological provider that
+# alternates result/error therefore resets that window every cycle, so the
+# ~12-min give-up guarantee is evadable over a long-lived session — each window
+# honours the cap, but the total retry count is unbounded. The fix adds an
+# ABSOLUTE ceiling a turn-clear does NOT reset: a per-session ``_lifetime_retries``
+# counter that accumulates across sequences, capped by
+# ``RetryPolicy.max_lifetime_retries``. When the lifetime cap is hit the driver
+# abandons with a typed, observable "absolute retry ceiling exceeded" Event.
+
+
+class AlternatingProvider(FakeManager):
+    """A pathological provider that alternates result/error to try to evade the
+    per-sequence wall-clock window (the FIX 2 abuse case).
+
+    Each fire-and-forget ``send`` "clears" the replayed turn immediately
+    (``note_turn_cleared`` — the per-sequence window resets), then, while the
+    abuse budget remains, re-feeds a *fresh* error into ``observe`` — modelling a
+    provider that lets one retry succeed, then fails the very next turn. Without
+    an absolute ceiling this loops forever (every clear refunds the window); with
+    the ceiling it must abandon once the lifetime retry count is exhausted."""
+
+    cycles_remaining: int = 50
+
+    def send(self) -> bool:
+        self.send_count += 1
+        if self.driver is None or self.observed_error is None:
+            return True
+        # The replayed turn clears (the per-sequence window resets) …
+        self.driver.note_turn_cleared()
+        # … then the provider fails the very next turn (a fresh, unrelated blip)
+        # for as long as the abuse budget remains. A safety bound on the re-entry
+        # depth so a non-abandoning driver bug fails the test instead of hanging.
+        if self.cycles_remaining > 0:
+            self.cycles_remaining -= 1
+            self.driver.observe(self.observed_error)
+        return True
+
+
+def test_absolute_ceiling_survives_turn_clears_and_abandons() -> None:
+    """A provider that alternates result/error — refunding the per-sequence
+    wall-clock window on every clear — is STILL bounded by the absolute lifetime
+    retry ceiling, which ``note_turn_cleared`` does NOT reset. The driver abandons
+    with a typed, observable "absolute retry ceiling" Event once the lifetime cap
+    is hit, instead of retrying unboundedly over a long-lived session.
+
+    This is the FIX 2 core promise: the ~12-min per-window give-up guarantee is no
+    longer evadable by alternating result/error — there is a hard lifetime bound a
+    turn-clear cannot reset."""
+    # A generous per-sequence window (never the binding constraint here) + a tiny
+    # absolute lifetime ceiling so the abuse loop terminates fast and deterministically.
+    policy = RetryPolicy(
+        base_delay_seconds=1.0,
+        max_delay_seconds=4.0,
+        multiplier=2.0,
+        jitter="full",
+        total_budget_seconds=10_000.0,  # huge: the per-window cap never binds
+        max_lifetime_retries=5,  # the binding absolute ceiling
+    )
+    manager = AlternatingProvider()
+    clock = FakeClock()
+    driver = make_driver(
+        manager,
+        classifier=fixed_classifier(RecoveryClass.TRANSIENT_BLIP),
+        policy=policy,
+        clock=clock,
+    )
+
+    observed = ev.EventError(
+        category="protocol", code=ev.SOCKET_CLOSED, message="reset"
+    )
+    manager.observed_error = observed
+    driver.observe(observed)
+
+    # The absolute ceiling fired: a typed "absolute retry ceiling" abandon Event
+    # was emitted exactly once, reusing the observed code — the give-up guarantee
+    # held despite every per-sequence window being refunded by a clear.
+    ceiling_abandons = [
+        e
+        for e in manager.appended
+        if "abandon" in e.message.lower()
+        and "absolute" in e.message.lower()
+        and "ceiling" in e.message.lower()
+    ]
+    assert len(ceiling_abandons) == 1, [e.message for e in manager.appended]
+    assert ceiling_abandons[0].code == observed.code
+    # The driver stopped retrying at the cap (it did not loop forever): the number
+    # of scheduled retries is bounded by the lifetime ceiling, not the 50-cycle
+    # abuse budget.
+    retries = [e for e in manager.appended if "retry scheduled" in e.message.lower()]
+    assert len(retries) <= policy.max_lifetime_retries
+
+
+def test_turn_clear_still_refunds_the_per_window_budget_normally() -> None:
+    """The normal-case semantics are PRESERVED (FIX 2 must not break recovery): a
+    genuine transient blip that clears, followed much later by an unrelated blip,
+    still recovers normally — the per-sequence wall-clock window still resets on a
+    clear. Only the absolute lifetime ceiling is non-resettable, and with a
+    generous default it never binds for legitimate use.
+
+    Here two independent blips each clear on their first replay, well under the
+    lifetime ceiling: neither is abandoned, and the absolute ceiling never fires."""
+    policy = RetryPolicy(
+        base_delay_seconds=1.0,
+        max_delay_seconds=4.0,
+        multiplier=2.0,
+        jitter="full",
+        total_budget_seconds=10.0,
+        max_lifetime_retries=100,  # generous: never binds for two clean blips
+    )
+    manager = FakeManager(clears_after=1)
+    clock = FakeClock()
+    driver = make_driver(
+        manager,
+        classifier=fixed_classifier(RecoveryClass.TRANSIENT_BLIP),
+        policy=policy,
+        clock=clock,
+    )
+
+    first = ev.EventError(category="protocol", code=ev.SOCKET_CLOSED, message="one")
+    manager.observed_error = first
+    driver.observe(first)
+    # The first blip cleared: the per-sequence window reset, nothing abandoned.
+    assert driver._retry_started_at is None
+    assert [e for e in manager.appended if "abandon" in e.message.lower()] == []
+
+    # A LATER, unrelated blip clears on its first replay too — still no abandon,
+    # the absolute ceiling did not fire (a legitimate run is unbounded by it).
+    later = ev.EventError(category="protocol", code=ev.SOCKET_CLOSED, message="two")
+    manager.observed_error = later
+    manager.clears_after = manager.send_count + 1
+    driver.observe(later)
+    assert [e for e in manager.appended if "abandon" in e.message.lower()] == []
+
+
+def test_in_flight_guard_admits_one_then_coalesces_until_released() -> None:
+    """The driver's one-recovery-thread-in-flight guard (FIX 1) admits the first
+    caller, COALESCES every subsequent caller (returns ``False`` — no second
+    thread) while a recovery is in flight, and re-opens once ``end_recovery``
+    releases the slot. This is the driver-level contract the manager's
+    ``_on_error_event`` dispatch gate calls."""
+    manager = FakeManager()
+    driver = make_driver(
+        manager, classifier=fixed_classifier(RecoveryClass.TRANSIENT_BLIP)
+    )
+
+    # First caller wins the slot …
+    assert driver.try_begin_recovery() is True
+    # … every concurrent caller coalesces (no second recovery thread spawned).
+    assert driver.try_begin_recovery() is False
+    assert driver.try_begin_recovery() is False
+    # Releasing re-opens the slot for the next recovery.
+    driver.end_recovery()
+    assert driver.try_begin_recovery() is True
+    # end_recovery is idempotent (safe to call from the manager's finally even on
+    # a path that did not win the slot).
+    driver.end_recovery()
+    driver.end_recovery()
+    assert driver.try_begin_recovery() is True
+
+
+def test_default_policy_has_a_generous_absolute_ceiling() -> None:
+    """``DEFAULT_RETRY_POLICY`` carries a sensible absolute ceiling that bounds
+    abuse while being generous for legitimate use (FIX 2 default choice).
+
+    The default is in the low hundreds — enough that no legitimate long-lived
+    session ever hits it, small enough that a pathological alternating provider is
+    bounded to a finite total retry count."""
+    from _session_manager.recovery import DEFAULT_RETRY_POLICY
+
+    assert DEFAULT_RETRY_POLICY.max_lifetime_retries >= 50
+    assert DEFAULT_RETRY_POLICY.max_lifetime_retries <= 1000

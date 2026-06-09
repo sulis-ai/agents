@@ -73,8 +73,10 @@ def test_recovery_class_importable_from_package_and_classifier():
 
 
 def test_retry_policy_is_frozen_dataclass_with_contracted_fields():
-    """The five contracted knobs, frozen so the injected policy can't drift
-    under the driver."""
+    """The six contracted knobs, frozen so the injected policy can't drift
+    under the driver. ``max_lifetime_retries`` (CH-01KTMK hardening FIX 2) is the
+    absolute, turn-clear-proof retry ceiling — a defaulted sixth knob added
+    backward-compatibly alongside the original five."""
     assert dataclasses.is_dataclass(RetryPolicy)
     field_names = {f.name for f in dataclasses.fields(RetryPolicy)}
     assert field_names == {
@@ -83,7 +85,19 @@ def test_retry_policy_is_frozen_dataclass_with_contracted_fields():
         "multiplier",
         "jitter",
         "total_budget_seconds",
+        "max_lifetime_retries",
     }
+    # The new knob is DEFAULTED so existing constructions (the original five
+    # positional/keyword knobs) keep working without passing it — backward
+    # compatible (CH-01KTMK FIX 2 constraint).
+    five_knob = RetryPolicy(
+        base_delay_seconds=1.0,
+        max_delay_seconds=60.0,
+        multiplier=2.0,
+        jitter="full",
+        total_budget_seconds=720.0,
+    )
+    assert five_knob.max_lifetime_retries >= 1
     # Frozen: assignment raises.
     policy = RetryPolicy(
         base_delay_seconds=1.0,
@@ -104,6 +118,9 @@ def test_default_retry_policy_constants():
     assert DEFAULT_RETRY_POLICY.multiplier == 2.0
     assert DEFAULT_RETRY_POLICY.jitter == "full"
     assert DEFAULT_RETRY_POLICY.total_budget_seconds == 720.0
+    # CH-01KTMK FIX 2: the absolute lifetime retry ceiling — generous for
+    # legitimate use, finite for a pathological alternating provider.
+    assert DEFAULT_RETRY_POLICY.max_lifetime_retries == 200
 
 
 # ── ReauthTicket value object (ADR-003/004) ───────────────────────────────
