@@ -1,0 +1,27 @@
+{
+  "pr": "feat/wp-009-settings-forms-and-remove-confirm",
+  "base": "change/feat-user-level-product-store-settings",
+  "timestamp": "2026-06-09T115813Z",
+  "build_verification": {
+    "typecheck_new_errors": 0,
+    "lint_new_errors": 0,
+    "verdict_contribution": "empty"
+  },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "clean" },
+    "size": { "lines_added": 928, "lines_removed": 0, "files_changed": 8, "severity": "low" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "clean" },
+    "completeness": { "new_source": 4, "new_tests": 4, "new_source_without_test": 0, "api_change_without_schema": false, "severity": "clean" }
+  },
+  "findings": {
+    "in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+    "in_neighbours": { "total": 0 }
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "note": "props-driven DI (WPF-09); no domain->infra imports; no singletons; no network in components (WPF-02); shared CSS module is the extracted primitive" },
+    "security": { "findings": 0, "scanners_run": ["grep-secrets", "grep-fetch", "grep-dangerouslySetInnerHTML"], "note": "no secrets; React text-node escaping for all server-provided error strings; no injection surface; no client-side auth gate" },
+    "quality": { "findings": 0, "jsx_ident_scan": "all identifiers in lexical scope", "dead_surface": 0, "contract_drift": 0, "test_coverage": "4 source + 4 tests; every Result branch exercised", "cr10_perf": "no anti-pattern matches" }
+  },
+  "verdict": "PASS",
+  "draft_deltas": 0
+}

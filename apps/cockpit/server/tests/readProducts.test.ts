@@ -15,7 +15,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readProducts } from "../lib/products/readProducts";
+import { readProducts, IMPLICIT_PRODUCT_ID } from "../lib/products/readProducts";
 
 let dir: string;
 
@@ -33,6 +33,19 @@ async function seedProduct(
   ulid: string,
   name: string,
 ): Promise<void> {
+  await seedProductRaw(stateDir, ulid, { name, sys_status: "active" });
+}
+
+/**
+ * Write a product entity with caller-controlled fields — used by the WP-003
+ * sys_status filter tests to plant a `deleted` entity, or one with no
+ * `sys_status` at all (legacy back-compat).
+ */
+async function seedProductRaw(
+  stateDir: string,
+  ulid: string,
+  fields: Record<string, unknown>,
+): Promise<void> {
   const productDir = join(
     stateDir,
     ".brain",
@@ -43,7 +56,7 @@ async function seedProduct(
   await mkdir(productDir, { recursive: true });
   await writeFile(
     join(productDir, `${ulid}.jsonld`),
-    JSON.stringify({ id: `dna:product:${ulid}`, name, sys_status: "active" }),
+    JSON.stringify({ id: `dna:product:${ulid}`, ...fields }),
     "utf8",
   );
 }
@@ -114,5 +127,93 @@ describe("readProducts (FR-38 — list Products, mark active, build roll-up)", (
     await writeFile(join(productDir, "broken.jsonld"), "{ not json", "utf8");
     const result = await readProducts({ sulisStateDir: dir });
     expect(result.list.products.map((p) => p.name)).toEqual(["Acme Checkout"]);
+  });
+});
+
+// WP-003 (ADR-020) — Remove = soft-delete via sys_status. The read side must
+// hide entities whose sys_status ∈ {deleted, purged, archived}, while a
+// legacy entity with no sys_status stays active (absence ≠ deleted).
+//
+// Characterisation-test-first (EP-07 / Non-Negotiable 3): this is a behaviour
+// change to a read path. `shows_deleted_entity_today_characterisation` pins
+// today's behaviour (a deleted entity IS shown) and must pass against the code
+// BEFORE the filter is added; `hides_sys_status_deleted_entity` asserts the new
+// behaviour and fails before the change. After GREEN, the characterisation's
+// job (pinning the old behaviour) is done and it is inverted to assert the
+// post-change reality — keeping the suite green.
+describe("readProducts sys_status filter (WP-003, ADR-020)", () => {
+  it("characterisation (post-change): a lone deleted Product yields the implicit single Product, not the removed one", async () => {
+    // CHARACTERISATION (EP-07): in RED this pinned today's UNFILTERED behaviour
+    // (the deleted Product was returned, confirmed passing against pre-change
+    // code). After the filter landed (GREEN) its job is done, so it is inverted
+    // to the post-change reality: a brain whose only Product is soft-deleted
+    // surfaces zero real Products — the read falls back to the implicit single
+    // Product (the existing empty-brain branch), and the removed one is gone.
+    await seedProductRaw(dir, "01GONE00000000000000000000", {
+      name: "Removed Product",
+      sys_status: "deleted",
+    });
+
+    const result = await readProducts({ sulisStateDir: dir });
+    const names = result.list.products.map((p) => p.name);
+    expect(names).not.toContain("Removed Product");
+    expect(result.list.products).toHaveLength(1);
+    expect(result.list.products[0]?.productId).toBe(IMPLICIT_PRODUCT_ID);
+  });
+
+  it("hides_sys_status_deleted_entity: a soft-deleted Product is NOT returned", async () => {
+    await seedProduct(dir, "01ACME00000000000000000000", "Acme Checkout");
+    await seedProductRaw(dir, "01GONE00000000000000000000", {
+      name: "Removed Product",
+      sys_status: "deleted",
+    });
+
+    const result = await readProducts({ sulisStateDir: dir });
+    const names = result.list.products.map((p) => p.name);
+    expect(names).toContain("Acme Checkout");
+    expect(names).not.toContain("Removed Product");
+  });
+
+  it("hides purged and archived entities too (the full removed set)", async () => {
+    await seedProduct(dir, "01ACME00000000000000000000", "Acme Checkout");
+    await seedProductRaw(dir, "01PURG00000000000000000000", {
+      name: "Purged Product",
+      sys_status: "purged",
+    });
+    await seedProductRaw(dir, "01ARCH00000000000000000000", {
+      name: "Archived Product",
+      sys_status: "archived",
+    });
+
+    const result = await readProducts({ sulisStateDir: dir });
+    const names = result.list.products.map((p) => p.name);
+    expect(names).toEqual(["Acme Checkout"]);
+  });
+
+  it("treats_missing_sys_status_as_active: a legacy entity with no sys_status still appears", async () => {
+    await seedProductRaw(dir, "01LEGACY000000000000000000", {
+      name: "Legacy Product",
+      // no sys_status field at all
+    });
+
+    const result = await readProducts({ sulisStateDir: dir });
+    const names = result.list.products.map((p) => p.name);
+    expect(names).toContain("Legacy Product");
+  });
+
+  it("allow-list hardening: a PRESENT but unrecognised sys_status is hidden (not shown)", async () => {
+    // A crafted / typo'd status must NOT slip through as active — the read side
+    // shows a present status only when it is exactly "active" (allow-list), so
+    // an unknown value is treated as not-active and hidden.
+    await seedProduct(dir, "01ACME00000000000000000000", "Acme Checkout");
+    await seedProductRaw(dir, "01WEIRD0000000000000000000", {
+      name: "Crafted Status Product",
+      sys_status: "actiVe", // not the exact sentinel; a deny-list would leak it
+    });
+
+    const result = await readProducts({ sulisStateDir: dir });
+    const names = result.list.products.map((p) => p.name);
+    expect(names).toContain("Acme Checkout");
+    expect(names).not.toContain("Crafted Status Product");
   });
 });

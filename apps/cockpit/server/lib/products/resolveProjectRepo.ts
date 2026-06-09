@@ -16,6 +16,7 @@ import { join } from "node:path";
 
 import type { ResolvedProject } from "../discovery/startFromIntent";
 import { listDirs, listEntityFiles, readJsonldEntity } from "../brainFs";
+import { isActiveStatus } from "./isActiveStatus";
 
 /** The brain layout the Tenant's entities live under (mirrors readProducts). */
 const BRAIN_INSTANCES = [".brain", "instances"];
@@ -86,7 +87,15 @@ function parseSource(
   }
 }
 
-/** Read every `.jsonld` entity of one kind across every brain domain (read-only). */
+/**
+ * Read every `.jsonld` entity of one kind across every brain domain (read-only).
+ *
+ * WP-003 / ADR-020: soft-deleted entities (`sys_status ∈ {deleted, purged,
+ * archived}`) are filtered out here via the shared `isActiveStatus` predicate,
+ * so a removed Project no longer resolves a repo. A legacy entity with no
+ * `sys_status` is active (absence ≠ deleted). Any future reader of these
+ * entities MUST apply the same filter.
+ */
 async function readEntitiesOfKind(
   instancesDir: string,
   kind: string,
@@ -96,7 +105,7 @@ async function readEntitiesOfKind(
     const kindDir = join(instancesDir, domain, kind);
     for (const file of await listEntityFiles(kindDir)) {
       const parsed = await readJsonldEntity(join(kindDir, file));
-      if (parsed !== null) out.push(parsed);
+      if (parsed !== null && isActiveStatus(parsed)) out.push(parsed);
     }
   }
   return out;

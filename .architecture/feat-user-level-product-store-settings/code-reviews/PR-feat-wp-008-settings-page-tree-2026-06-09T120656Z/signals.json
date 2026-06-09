@@ -1,0 +1,22 @@
+{
+  "pr": "feat/wp-008-settings-page-tree",
+  "timestamp": "2026-06-09T120656Z",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0, "typecheck": "clean", "lint": "clean" },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["feat"], "severity": "low" },
+    "size": { "lines_added": 1310, "lines_removed": 10, "files_changed": 14, "severity": "medium" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "low" },
+    "completeness": { "new_source_without_test": 0, "new_source": 6, "new_tests": 3, "severity": "low" }
+  },
+  "findings": {
+    "changes": { "critical": 0, "high": 0, "medium": 0, "low": 1 },
+    "neighbours": { "critical": 0, "high": 0, "medium": 0, "low": 0 }
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "status": "nothing-surfaced" },
+    "security": { "findings": 0, "status": "nothing-surfaced" },
+    "quality": { "findings": 1, "status": "surfaced" }
+  },
+  "draft_fixes": 0
+}

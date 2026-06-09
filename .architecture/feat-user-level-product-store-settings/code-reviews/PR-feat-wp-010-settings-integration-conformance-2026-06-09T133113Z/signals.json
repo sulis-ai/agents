@@ -1,0 +1,46 @@
+{
+  "review": "WP-010 settings integration/conformance",
+  "timestamp": "2026-06-09T133113Z",
+  "target": "feat/wp-010-settings-integration-conformance",
+  "base": "change/feat-user-level-product-store-settings",
+  "verdict": "PASS",
+  "outcome_plain": "Ready to merge",
+  "files_changed": 8,
+  "build_verification": {
+    "typecheck_errors": 0,
+    "lint_errors": 0,
+    "prettier_clean": true
+  },
+  "hygiene": {
+    "scope": "low",
+    "size": "low",
+    "safety": "clean",
+    "completeness": "clean",
+    "ph03_high": false
+  },
+  "findings": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 1,
+    "neighbour": 0
+  },
+  "findings_detail": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "lens": "quality",
+      "file": "apps/cockpit/client/src/pages/settings/SettingsActions.tsx",
+      "line": 87,
+      "summary": "handlers object literal re-allocated per render; members are useCallback-stable; no memoized consumer, so benign. Watch-list, no delta.",
+      "action": "none"
+    }
+  ],
+  "draft_deltas": 0,
+  "lenses": {
+    "architecture": "nothing surfaced",
+    "security": "nothing surfaced",
+    "quality": "1 low"
+  },
+  "auto_downgrade_fired": false
+}

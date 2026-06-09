@@ -44,7 +44,22 @@ import type {
   // The typed error envelope (all three code categories)
   ApiError,
   ApiErrorCode,
+  // Settings (the management surface; ADR-019/020/021)
+  RepoLink,
+  SettingsProject,
+  SettingsProduct,
+  SettingsTree,
+  ProductWrite,
+  ProjectWrite,
+  RepoAttachWrite,
+  SettingsErrorCode,
 } from "../../shared/api-types";
+
+import {
+  happySettingsTree,
+  emptySettingsTree,
+  settingsErrorFixtures,
+} from "../../shared/__fixtures__/settings.fixtures";
 
 // ── a generic no-snake_case wire-shape assertion (anti-hardwiring) ──────────
 // Reuses the established "camelCase on the wire" invariant: every property key
@@ -390,5 +405,145 @@ describe("shared/api-types — the typed error envelope (all three code categori
       expect(err.code).toBe(code);
       assertNoSnakeCase(err);
     }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WP-001 — Settings wire contract (TDD §5.1; ADR-019/020/021; CF-03/04).
+//
+// The settings management surface adds the products/projects/repo-links tree
+// shapes plus the three error categories. These are camelCase wire shapes —
+// the ONE sanctioned snake_case exception (ProjectSource) is NOT among them:
+// RepoLink exposes `primaryBranch` (camelCase), the producer maps it to the
+// snake_case `primary_branch` of Project.source at the boundary (WP-006).
+//
+// This block is the WP's named verification
+// (settings_shapes_round_trip_happy_error_empty): it pins the happy / empty /
+// error fixtures against the new shapes and asserts they serialise/parse
+// losslessly. The compile is the real gate (tsc --noEmit): a drifted field or
+// invented property stops these fixtures compiling.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("shared/api-types — SETTINGS wire shapes (ADR-019/020/021)", () => {
+  it("settings_shapes_round_trip_happy_error_empty: happy / empty / error fixtures round-trip losslessly (CF-04)", () => {
+    // HAPPY — one editable product, one project, one present:true repo.
+    const happy: SettingsTree = happySettingsTree;
+    expect(happy.products).toHaveLength(1);
+    const product = happy.products[0];
+    expect(product?.editable).toBe(true);
+    const project = product?.projects[0];
+    expect(project).toBeDefined();
+    const repo: RepoLink | null | undefined = project?.repo;
+    expect(repo?.present).toBe(true);
+    expect(repo?.localPath).not.toBeNull();
+    expect(typeof repo?.primaryBranch).toBe("string");
+
+    // EMPTY — the single implicit product (editable:false, no projects).
+    const empty: SettingsTree = emptySettingsTree;
+    expect(empty.products).toHaveLength(1);
+    expect(empty.products[0]?.editable).toBe(false);
+    expect(empty.products[0]?.projects).toEqual([]);
+
+    // ERROR — one ApiError per SettingsErrorCode value (all three categories).
+    const errorCodes: SettingsErrorCode[] = [
+      "NOT_FOUND",
+      "VALIDATION_FAILED",
+      "PATH_NOT_FOUND",
+      "PATH_NOT_A_REPO",
+      "WRITE_FAILED",
+      "IMMUTABLE_IMPLICIT",
+    ];
+    for (const code of errorCodes) {
+      const err = settingsErrorFixtures[code];
+      expect(err.code).toBe(code);
+      expect(typeof err.error).toBe("string");
+      assertNoSnakeCase(err);
+    }
+
+    // Lossless JSON round-trip for the tree fixtures (the wire is JSON).
+    for (const tree of [happy, empty]) {
+      const round = JSON.parse(JSON.stringify(tree)) as SettingsTree;
+      expect(round).toEqual(tree);
+      // No snake_case leaks onto settings wire keys (RepoLink is camelCase).
+      assertNoSnakeCase(round);
+    }
+  });
+
+  it("every SettingsErrorCode member is reachable in the ApiError envelope (CF-03 type-level)", () => {
+    // Type-level: a SettingsErrorCode value is assignable to ApiError.code,
+    // i.e. SettingsErrorCode ⊆ ApiErrorCode (reuse, not redeclare). If a
+    // settings code were missing from ApiErrorCode this stops compiling.
+    const asApiCode: (c: SettingsErrorCode) => ApiErrorCode = (c) => c;
+    const envelope = (c: SettingsErrorCode): ApiError => ({
+      error: "x",
+      code: asApiCode(c),
+    });
+    const codes: SettingsErrorCode[] = [
+      "NOT_FOUND",
+      "VALIDATION_FAILED",
+      "PATH_NOT_FOUND",
+      "PATH_NOT_A_REPO",
+      "WRITE_FAILED",
+      "IMMUTABLE_IMPLICIT",
+    ];
+    for (const c of codes) {
+      expect(envelope(c).code).toBe(c);
+    }
+  });
+
+  it("the write shapes carry the upsert-by-id invariant (id present ⇒ edit, absent ⇒ create)", () => {
+    const create: ProductWrite = { name: "Alpha" };
+    const edit: ProductWrite = {
+      productId: "dna:product:01A",
+      name: "Alpha v2",
+    };
+    expect(create.productId).toBeUndefined();
+    expect(edit.productId).toBe("dna:product:01A");
+
+    const projectCreate: ProjectWrite = {
+      productId: "dna:product:01A",
+      name: "proj",
+    };
+    const projectEdit: ProjectWrite = {
+      projectId: "dna:project:01A",
+      productId: "dna:product:01A",
+      name: "proj v2",
+    };
+    expect(projectCreate.projectId).toBeUndefined();
+    expect(projectEdit.projectId).toBe("dna:project:01A");
+
+    // Attach is local-path-only (ADR-021): an absolute path, no URL/create.
+    const attach: RepoAttachWrite = {
+      projectId: "dna:project:01A",
+      localPath: "/Users/founder/code/proj",
+    };
+    expect(attach.localPath.startsWith("/")).toBe(true);
+    assertNoSnakeCase(attach);
+  });
+
+  it("SettingsProject.repo is null when no repo is attached yet, and RepoLink.localPath is null when unlinked", () => {
+    const unattached: SettingsProject = {
+      projectId: "dna:project:01B",
+      name: "no-repo",
+      repo: null,
+    };
+    expect(unattached.repo).toBeNull();
+
+    const unlinked: RepoLink = {
+      localPath: null,
+      primaryBranch: "main",
+      present: false,
+    };
+    expect(unlinked.localPath).toBeNull();
+    expect(unlinked.present).toBe(false);
+
+    const productNode: SettingsProduct = {
+      productId: "dna:product:01A",
+      name: "Alpha",
+      editable: true,
+      projects: [unattached],
+    };
+    expect(productNode.projects[0]?.repo).toBeNull();
+    assertNoSnakeCase(productNode);
   });
 });

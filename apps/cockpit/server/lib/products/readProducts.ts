@@ -24,6 +24,7 @@ import { join } from "node:path";
 import type { Product, ProductList } from "../../../shared/api-types";
 import type { ChangeStoreRecord } from "../../ports/ChangeStoreReader";
 import { listDirs, listEntityFiles, readJsonldEntity } from "../brainFs";
+import { isActiveStatus } from "./isActiveStatus";
 import type { ProductRollup } from "./productScope";
 
 /** The brain layout the Tenant's entities live under (mirrors readBrain). */
@@ -185,6 +186,12 @@ function parseSourcePath(source: unknown): string | null {
  * kind may live under more than one domain folder (product-development,
  * foundation, …); we scan them all. Fail-soft: an absent brain returns [], a
  * malformed file is skipped.
+ *
+ * WP-003 / ADR-020: soft-deleted entities (`sys_status ∈ {deleted, purged,
+ * archived}`) are filtered out here via the shared `isActiveStatus` predicate,
+ * so a removed entity disappears from the cockpit. A legacy entity with no
+ * `sys_status` is active (absence ≠ deleted). Any future reader of these
+ * entities MUST apply the same filter.
  */
 async function readEntitiesOfKind(
   instancesDir: string,
@@ -197,7 +204,7 @@ async function readEntitiesOfKind(
     const files = await listEntityFiles(kindDir);
     for (const file of files) {
       const parsed = await readJsonldEntity(join(kindDir, file));
-      if (parsed !== null) out.push(parsed);
+      if (parsed !== null && isActiveStatus(parsed)) out.push(parsed);
     }
   }
   return out;

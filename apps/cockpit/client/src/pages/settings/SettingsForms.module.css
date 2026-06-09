@@ -1,0 +1,166 @@
+/* WP-009 — Settings write-surface styling (forms + remove dialog).
+ *
+ * Tokens-only (var(--*); WPF-07) — mirrors the founder-signed mockup
+ * (.architecture/feat-user-level-product-store-settings/mockup/settings.html:
+ * .formCard / .field / .safeNote / .dialog / .btn*). Light + dark are handled
+ * by tokens.css's data-theme blocks; this module never hard-codes a colour, so
+ * theming is free. The SettingsForms.tokens.test.ts scan asserts no raw hex /
+ * rgb() literal lives here. */
+
+.formCard {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-float);
+  padding: 18px;
+  max-width: 440px;
+}
+
+.dialog {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-float);
+  padding: 20px;
+  max-width: 420px;
+}
+
+.cardTitle {
+  margin: 0 0 14px;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: var(--weight-label);
+  color: var(--foreground);
+}
+
+.dialogBody {
+  margin: 0 0 8px;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+
+.field {
+  margin-bottom: 14px;
+}
+
+.label {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: var(--weight-label);
+  color: var(--text-secondary);
+  margin-bottom: 5px;
+}
+
+.input {
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  padding: 9px 11px;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-interactive);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.input:focus {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+  border-color: var(--ring);
+}
+
+.hint {
+  margin: 5px 0 0;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  color: var(--muted-foreground);
+}
+
+/* Inline, blocking validation / path error (errors-are-values). */
+.error {
+  margin: 6px 0 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--destructive);
+}
+
+/* Non-blocking "not a git repo yet" note (ADR-021 warning — the attach still
+ * succeeded). */
+.warningNote {
+  margin: 6px 0 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--warning-foreground);
+  background: var(--bg-warning);
+  border: 1px solid var(--bg-warning-border);
+  border-radius: var(--radius-interactive);
+  padding: 8px 10px;
+}
+
+/* The disk-safety promise — positive tint (ADR-020 / WP-VIS item 8). */
+.safeNote {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  background: var(--bg-positive);
+  border: 1px solid var(--bg-positive-border);
+  border-radius: var(--radius-interactive);
+  padding: 10px 12px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--foreground);
+  margin: 12px 0 16px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.btn {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: var(--weight-label);
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-interactive);
+  cursor: pointer;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.btnPrimary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.btnGhost {
+  background: transparent;
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
+.btnGhost:hover {
+  background: var(--muted);
+}
+
+.btnDanger {
+  background: transparent;
+  color: var(--destructive);
+  border-color: var(--bg-destructive-border);
+}
+
+.btnDanger:hover {
+  background: var(--bg-destructive);
+}

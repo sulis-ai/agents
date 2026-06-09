@@ -115,7 +115,11 @@ export interface ProvenanceDigest {
   /** decision entities ("what it decided"). */
   decided: number;
   /** the agent's own gaps + self-critique ("what it flagged") — the trust tile. */
-  flagged: { count: number; topGap: string | null; selfCritique: string | null };
+  flagged: {
+    count: number;
+    topGap: string | null;
+    selfCritique: string | null;
+  };
 }
 
 /** One step within an autonomous run (from a lifecyclerun's _step_runs). */
@@ -727,10 +731,111 @@ export type ApiErrorCode =
   // start-from-intent
   | "INTENT_AMBIGUOUS"
   | "START_CONFIRM_STALE"
-  | "REPO_UNREACHABLE";
+  | "REPO_UNREACHABLE"
+  // settings management surface (WP-001; ADR-019/020/021). NOT_FOUND above is
+  // shared (Protocol). These five are the settings-specific Expected/Internal
+  // codes so `SettingsErrorCode` is a SUBSET of `ApiErrorCode` — the settings
+  // seam REUSES this envelope (CF-03), never redeclares one.
+  | "VALIDATION_FAILED"
+  | "PATH_NOT_FOUND"
+  | "PATH_NOT_A_REPO"
+  | "WRITE_FAILED"
+  | "IMMUTABLE_IMPLICIT";
 
 /** The typed error envelope (the OpenAPI `Error` schema). */
 export interface ApiError {
   error: string;
   code: ApiErrorCode;
 }
+
+// ─── Settings (the management surface; WP-001; ADR-019/020/021) ──────────────
+//
+// The wire shapes for the Settings screen — the products/projects/repo-links
+// management tree (read), the create/edit/attach writes, and the typed error
+// codes. Per CF-02 these are the single source of truth the producer (WP-006)
+// and consumers (WP-007/008/009) import verbatim; none redeclare them.
+//
+// camelCase on the wire (anti-hardwiring): `RepoLink.primaryBranch` is
+// camelCase here; the producer maps it to the snake_case `primary_branch` of
+// `Project.source` at the persistence boundary (ADR-020). The snake_case
+// `ProjectSource` above remains the ONE sanctioned snake_case wire shape — the
+// settings shapes are NOT exceptions.
+
+/**
+ * One repo link as the Settings screen shows it (mirrors `Project.source`;
+ * ADR-021 local-path-only attach).
+ */
+export interface RepoLink {
+  /** Absolute local path the project points at, or null when unlinked. */
+  localPath: string | null;
+  primaryBranch: string;
+  /** True when localPath exists on disk with a .git dir (ADR-021 read-only check). */
+  present: boolean;
+}
+
+/** One project node in the Settings tree (ADR-019). */
+export interface SettingsProject {
+  projectId: string;
+  name: string;
+  /** null = no repo attached yet. */
+  repo: RepoLink | null;
+}
+
+/** One product node in the Settings tree, with its projects (ADR-019). */
+export interface SettingsProduct {
+  productId: string;
+  name: string;
+  /** false for the synthesised implicit single product (read-only until real; ADR-020). */
+  editable: boolean;
+  projects: SettingsProject[];
+}
+
+/** GET /api/settings — the whole editable store, active entities only (ADR-019/020). */
+export interface SettingsTree {
+  products: SettingsProduct[];
+}
+
+/**
+ * Create or edit a product (ADR-020 edit = validated re-save). `productId`
+ * present ⇒ edit (upsert by id); absent ⇒ create.
+ */
+export interface ProductWrite {
+  productId?: string;
+  name: string;
+}
+
+/**
+ * Create or edit a project under a product (ADR-020). `projectId` present ⇒
+ * edit; `productId` required on create, immutable parent on edit (v1).
+ */
+export interface ProjectWrite {
+  projectId?: string;
+  productId: string;
+  name: string;
+}
+
+/**
+ * Attach an existing local folder to a project (ADR-021 local-path-only v1):
+ * an absolute path to an EXISTING local folder. No URL, no create.
+ */
+export interface RepoAttachWrite {
+  projectId: string;
+  localPath: string;
+}
+
+/**
+ * The settings error codes, across all three CF-03 categories:
+ *   - Protocol: `NOT_FOUND`.
+ *   - Expected: `VALIDATION_FAILED`, `PATH_NOT_FOUND`, `PATH_NOT_A_REPO`,
+ *     `IMMUTABLE_IMPLICIT`.
+ *   - Internal: `WRITE_FAILED`.
+ * A SUBSET of `ApiErrorCode` — settings errors travel in the existing
+ * `ApiError` envelope, reused not redeclared (CF-03).
+ */
+export type SettingsErrorCode =
+  | "NOT_FOUND"
+  | "VALIDATION_FAILED"
+  | "PATH_NOT_FOUND"
+  | "PATH_NOT_A_REPO"
+  | "WRITE_FAILED"
+  | "IMMUTABLE_IMPLICIT";

@@ -1,0 +1,264 @@
+/* WP-008 — Settings tree surface styling.
+ *
+ * Lifted verbatim (token references only) from the signed WP-VIS mockup
+ * (.architecture/feat-user-level-product-store-settings/mockup/settings.html).
+ * Every colour / spacing / radius / font is a var(--*) from tokens.css v4.2.0
+ * (signed) — no raw hex (WPF-07). Light + dark theming rides the existing
+ * data-theme mechanism via the tokens; no new token is invented here. */
+
+/* ── page ───────────────────────────────────────────────────────────────── */
+.page {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+  font-family: var(--font-sans);
+  color: var(--foreground);
+}
+.pageHead {
+  margin-bottom: 8px;
+}
+.pageHead h1 {
+  font-family: var(--font-display);
+  font-weight: var(--weight-heading);
+  font-size: 26px;
+  margin: 0 0 4px;
+}
+.pageHead p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  max-width: 62ch;
+}
+
+.section {
+  margin-top: 28px;
+}
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.sectionHead h2 {
+  font-size: 13px;
+  font-weight: var(--weight-label);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted-foreground);
+  margin: 0;
+}
+
+/* ── buttons ────────────────────────────────────────────────────────────── */
+/* .btn is aligned to the SettingsForms.module.css form variant (WP-010
+ * integration touch): both surfaces' buttons share padding + radius so the tree
+ * affordances and the forms/dialogs they open read as one set. The form variant
+ * (8px 14px / --radius-interactive) is the chosen baseline. */
+.btn {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: var(--weight-label);
+  padding: 8px 14px;
+  border-radius: var(--radius-interactive);
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+.btnPrimary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.btnPrimary:hover {
+  filter: brightness(1.05);
+}
+.btnGhost {
+  background: transparent;
+  color: var(--foreground);
+  border-color: var(--border);
+}
+.btnGhost:hover {
+  background: var(--muted);
+}
+.btnDanger {
+  background: transparent;
+  color: var(--destructive);
+  border-color: var(--bg-destructive-border);
+}
+.btnDanger:hover {
+  background: var(--bg-destructive);
+}
+.btnSmall {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+/* ── product card ───────────────────────────────────────────────────────── */
+.product {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.productHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-muted);
+}
+.productName {
+  font-size: 16px;
+  font-weight: var(--weight-label);
+}
+.spacer {
+  flex: 1 1 auto;
+}
+.rowActions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ── projects ───────────────────────────────────────────────────────────── */
+.projects {
+  padding: 6px 16px 14px;
+}
+.project {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-muted);
+}
+.project:last-child {
+  border-bottom: none;
+}
+.projIcon {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-interactive);
+  background: color-mix(in srgb, var(--stage-design) 16%, var(--card));
+  color: var(--stage-design);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+.projBody {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.projName {
+  font-size: 14px;
+  font-weight: var(--weight-label);
+}
+.repoLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.repoPath {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--foreground);
+  background: var(--muted);
+  padding: 2px 7px;
+  border-radius: var(--radius-interactive);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 340px;
+}
+
+/* ── repo-state pills (colour never the sole cue — each carries a label) ──── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: var(--weight-label);
+  padding: 2px 8px;
+  border-radius: var(--radius-badge);
+  border: 1px solid;
+}
+.pillOk {
+  background: var(--bg-positive);
+  border-color: var(--bg-positive-border);
+  color: var(--foreground);
+}
+.pillWarn {
+  background: var(--bg-warning);
+  border-color: var(--bg-warning-border);
+  color: var(--foreground);
+}
+.pillNone {
+  background: var(--muted);
+  border-color: var(--border);
+  color: var(--muted-foreground);
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-badge);
+}
+.dotOk {
+  background: var(--positive);
+}
+.dotWarn {
+  background: var(--warning);
+}
+
+.addProject {
+  margin: 8px 0 2px;
+}
+
+/* ── implicit / first-run (read-only) ───────────────────────────────────── */
+.implicit {
+  background: color-mix(in srgb, var(--warning) 7%, var(--card));
+  border: 1px dashed var(--bg-warning-border);
+  border-radius: var(--radius-container);
+  padding: 18px;
+  text-align: center;
+}
+.implicit p {
+  margin: 0 0 12px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* ── async states (loading / error — ADR-005 / WPF-05) ──────────────────── */
+.loading {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 28px;
+}
+.skeletonCard {
+  height: 96px;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-container);
+  background: var(--muted);
+}
+.errorBox {
+  margin-top: 28px;
+  background: var(--bg-destructive);
+  border: 1px solid var(--bg-destructive-border);
+  border-radius: var(--radius-container);
+  padding: 18px;
+}
+.errorHeading {
+  margin: 0 0 6px;
+  font-weight: var(--weight-label);
+  color: var(--foreground);
+}
+.errorMessage {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}

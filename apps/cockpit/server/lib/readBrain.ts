@@ -28,6 +28,7 @@ import type {
   BrainView,
 } from "../../shared/api-types";
 import { listDirs, listEntityFiles, readJsonldEntity } from "./brainFs";
+import { isActiveStatus } from "./products/isActiveStatus";
 
 /** The conventional brain layout under a change worktree. */
 const BRAIN_INSTANCES = [".brain", "instances"];
@@ -86,6 +87,13 @@ async function readEntity(
 ): Promise<BrainEntity | null> {
   const parsed = await readJsonldEntity(path);
   if (parsed === null) return null;
+
+  // ADR-020 soft-delete invariant: a removed entity (sys_status not active)
+  // must not surface in the cockpit — the Brain view is a cockpit surface, so
+  // it filters through the same shared predicate as readProducts /
+  // resolveProjectRepo. Without this, a soft-deleted product/project would
+  // still appear here.
+  if (!isActiveStatus(parsed)) return null;
 
   const id = typeof parsed.id === "string" ? parsed.id : `dna:${kind}:unknown`;
   return {

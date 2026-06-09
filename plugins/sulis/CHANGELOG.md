@@ -1,3 +1,15 @@
+## v0.127.0 — 2026-06-09
+
+**Minor — release-train batch.**
+
+- Harden the user-level product/project store + settings adapter: allow-list active-status filter, hide soft-deleted entities in the Brain view, defense-in-depth path-traversal guard + atomic writes in the shared brain adapter, reject leading-hyphen names, per-write audit log, and an opaque WRITE_FAILED message (7 follow-ups from the settings feature).
+
+## v0.126.3 — 2026-06-09
+
+**Patch — release-train batch.**
+
+- Fix the desktop workspace window crashing on open when the session view is declined a resize — a benign decline now degrades instead of taking the window down.
+
 ## v0.126.2 — 2026-06-09
 
 **Patch — release-train batch.**
