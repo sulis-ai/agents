@@ -1,7 +1,0 @@
-change_id: 01KTP7KVS9CTPPQ1D752EX46KA
-primitive: feat
-tier: minor
-touches_plugin: true
-summary: |
-  Seam-close DoD gate: drive real-data Scenario acceptance (observed-or-blocked) at seam-close instead of only at ship, so an un-driven seam between two pieces of work is caught when cheap to fix. Adds the _seam_close_gate decision module wired into the WP done-transition, CF-12, and the seam-close DoD wording in the WP standard.
-created_at: 2026-06-09T15:28:09Z

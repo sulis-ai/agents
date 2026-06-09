@@ -1,3 +1,9 @@
+## v0.128.0 — 2026-06-09
+
+**Minor — release-train batch.**
+
+- Seam-close DoD gate: drive real-data Scenario acceptance (observed-or-blocked) at seam-close instead of only at ship, so an un-driven seam between two pieces of work is caught when cheap to fix. Adds the _seam_close_gate decision module wired into the WP done-transition, CF-12, and the seam-close DoD wording in the WP standard.
+
 ## v0.127.0 — 2026-06-09
 
 **Minor — release-train batch.**
