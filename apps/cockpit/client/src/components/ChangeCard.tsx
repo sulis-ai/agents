@@ -17,6 +17,25 @@
 // intent ("Change CH-… : <intent>"). The intent is clamped visually only — the
 // full text stays reachable via the aria-label + title.
 //
+// WP-009 — the SELECTED + INTERACTION states (CS-1 / CS-2, SRD §7c; FR-50/51,
+// BR-20..23; S-32 / S-33). Both are ALTERNATE states that compose ADDITIVELY
+// onto any content/degraded/shipped card — they never hide a verdict.
+//   - SELECTED (route-derived): the card whose change is the open route
+//     (`/c/:changeId`) marks itself selected via the `selected` prop. The
+//     parent (Board) reads the active change the SAME way the shell does
+//     (`useMatch("/c/:changeId")` → `activeChangeId`) and threads it
+//     Board → StageColumn → card; the card passes nothing about selection to
+//     the feed (route-derived, never stored — survives a re-poll). The marker
+//     is NOT colour-alone: `aria-current="true"` + a persistent non-colour
+//     inset left-edge bar + ring (greyscale-distinguishable). At most one card
+//     is selected; on a non-change route none is.
+//   - INTERACTION/FOCUS: the card-as-<Link> is natively focusable and
+//     Enter-activates (ARIA link pattern); this WP pins the visible
+//     `:focus-visible` ring (coexists with the selected marker) and a small
+//     pressed (`:active`) feedback. No signal depends on hover. The inner
+//     "Open terminal" control is a SEPARATE tab stop (stopPropagation) — its
+//     own focusable button, distinct from the card link.
+//
 // WP-011 — the DEGRADED / PARTIAL composition (FR-54 / FR-55 / BR-26 / S-35).
 // A malformed or partial record renders PER-FIELD: every readable field renders
 // normally; every unreadable field falls to its EXISTING unknown read (health →
@@ -54,6 +73,15 @@ import styles from "./ChangeCard.module.css";
 
 export interface ChangeCardProps {
   change: Change;
+  /** WP-009 — the card is SELECTED when its change is the one open in the
+   *  active route (`/c/:changeId`). The parent derives this the SAME way the
+   *  shell does — `useMatch("/c/:changeId")` → `activeChangeId` — and passes
+   *  `change.changeId === activeChangeId` (CS-1 / FR-50 / BR-20 / BR-21).
+   *  Selection is ROUTE-DERIVED, never stored on the feed or the card, so it
+   *  survives a feed re-poll. The marker is additive — it never hides health,
+   *  waiting, the probe, recency, or a degraded notice (SRD §7c precedence).
+   *  Defaults to false → existing usages render unchanged. */
+  selected?: boolean;
   /** WP-009 — "open this change's terminal" action. When provided, the card
    *  renders an "Open terminal" button that opens the change's in-cockpit
    *  Terminal tab via this callback. Omitted → no terminal action rendered
@@ -180,7 +208,12 @@ function attentionWhy(reason: Change["needsAttention"]["reason"]): string {
   }
 }
 
-export function ChangeCard({ change, onOpenTerminal, now }: ChangeCardProps) {
+export function ChangeCard({
+  change,
+  selected = false,
+  onOpenTerminal,
+  now,
+}: ChangeCardProps) {
   const step = stageStepNumber(change.stage);
   const flagged = change.needsAttention.flagged;
   const degraded = isDegraded(change);
@@ -204,8 +237,14 @@ export function ChangeCard({ change, onOpenTerminal, now }: ChangeCardProps) {
   return (
     <Link
       to={`/c/${change.changeId}`}
-      className={`${styles.card} ${degraded ? styles.degraded : ""} ${shipped ? styles.shipped : ""}`}
+      className={`${styles.card} ${selected ? styles.selected : ""} ${degraded ? styles.degraded : ""} ${shipped ? styles.shipped : ""}`}
       data-testid="change-card"
+      // WP-009 — route-derived selection marker. data-selected drives the CSS
+      // and test selection (mirrors SidebarItem's data-active); aria-current
+      // announces it to assistive tech so it's never colour-/placement-alone
+      // (NFR-A11Y-1). Additive — it sits alongside the degraded/shipped reads.
+      data-selected={selected ? "true" : undefined}
+      aria-current={selected ? "true" : undefined}
       data-degraded={degraded ? "true" : undefined}
       data-shipped={shipped ? "true" : undefined}
       aria-label={`Change ${change.handle}: ${ariaIntent}`}

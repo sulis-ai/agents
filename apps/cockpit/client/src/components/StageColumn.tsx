@@ -118,6 +118,12 @@ const observeLaneRect: VirtualizerOptions<
 export interface StageColumnProps {
   stage: BoardStage;
   changes: Change[];
+  /** WP-009 — the change open in the active route (`/c/:changeId`), read once
+   *  at the board via `useMatch` and threaded down so each card can mark itself
+   *  selected when `change.changeId === activeChangeId`. Route-derived, never
+   *  stored on the feed. `null` (the default) → no card in the lane is
+   *  selected (the non-change route, or a lane the active change isn't in). */
+  activeChangeId?: string | null;
 }
 
 /**
@@ -130,9 +136,11 @@ export interface StageColumnProps {
 function LaneCardList({
   stage,
   changes,
+  activeChangeId,
 }: {
   stage: BoardStage;
   changes: Change[];
+  activeChangeId: string | null;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
@@ -183,7 +191,10 @@ function LaneCardList({
                 transform: `translateY(${item.start}px)`,
               }}
             >
-              <ChangeCard change={change} />
+              <ChangeCard
+                change={change}
+                selected={change.changeId === activeChangeId}
+              />
             </div>
           );
         })}
@@ -192,7 +203,11 @@ function LaneCardList({
   );
 }
 
-export function StageColumn({ stage, changes }: StageColumnProps) {
+export function StageColumn({
+  stage,
+  changes,
+  activeChangeId = null,
+}: StageColumnProps) {
   const name = STAGE_NAME[stage];
   return (
     <section
@@ -232,7 +247,11 @@ export function StageColumn({ stage, changes }: StageColumnProps) {
           </p>
         </div>
       ) : (
-        <LaneCardList stage={stage} changes={changes} />
+        <LaneCardList
+          stage={stage}
+          changes={changes}
+          activeChangeId={activeChangeId}
+        />
       )}
 
       {/* Pinned bottom action — RECON ONLY, because changes start at Recon.

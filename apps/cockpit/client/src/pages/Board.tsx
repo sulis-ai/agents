@@ -45,6 +45,7 @@
 // into columns.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useMatch } from "react-router-dom";
 import type { WorkflowStage } from "../../../shared/api-types";
 import { useChangesWithLiveness } from "../api/useChangesWithLiveness";
 import { hasActiveFilter, useSearch } from "../api/useSearch";
@@ -67,6 +68,15 @@ import styles from "./Board.module.css";
 const SKELETON_CARDS_PER_LANE = 3;
 
 export function Board() {
+  // WP-009 — the SELECTED card is route-derived (CS-1 / FR-50). Read the active
+  // change the SAME way the shell does — useMatch("/c/:changeId") → activeChangeId
+  // (WorkspaceShell.tsx) — and thread it to each lane → card, so the card whose
+  // change is the open route marks itself selected. Never stored on the feed, so
+  // it survives a re-poll (carry-over of EF-3's last-good discipline). On a
+  // non-change route the match is null → no card is selected.
+  const changeRouteMatch = useMatch("/c/:changeId");
+  const activeChangeId = changeRouteMatch?.params.changeId ?? null;
+
   // The board owns the filter state; the toolbar is controlled (ADR-005).
   const [query, setQuery] = useState("");
   const [stages, setStages] = useState<WorkflowStage[]>([]);
@@ -271,6 +281,7 @@ export function Board() {
               key={col.stage}
               stage={col.stage}
               changes={col.changes}
+              activeChangeId={activeChangeId}
             />
           ))}
         </div>
