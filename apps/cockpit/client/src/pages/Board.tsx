@@ -37,9 +37,10 @@
 // Clearing every filter restores the full board. A change re-seeded as
 // shipped drops off the in-flight board on the next poll (AF-5 / FR-15).
 //
-// Data is fetched through the typed client (useChangesWithLiveness /
-// useSearch → apiGet) — never `fetch` in the component (WPF-02), one feed
-// poll, no per-card fetch (NFR-POLL-1). The seam scopes the list to the
+// Data is loaded through the typed client (useChangesWithLiveness /
+// useSearch → apiGet) — never a direct network call in the component
+// (WPF-02), one feed poll, no per-card request (NFR-POLL-1). The seam
+// scopes the list to the
 // active Product server-side (ADR-009); the client groups the scoped set
 // into columns.
 
