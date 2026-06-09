@@ -200,6 +200,17 @@ TURN_SUMMARIES_REL="server/lib/turnSummaries.ts"        # turn-summary disk cach
 # there from index.ts's retired ephemeral host). No exception beyond these.
 TERMINAL_SIDECAR_REL="server/adapters/TerminalSidecar.ts"  # the ONE WS-attachment seam (ADR-010)
 
+# WP-005 (ADR-019) — the Settings write surface's sanctioned writer. The
+# SpineSettingsAdapter is the ONLY new process-start site in the settings change:
+# it execFiles the validated python helpers (edit / set-status / list / emit) and
+# writes a temp emitter-config yaml on a fresh-brain product mint (mkdtemp /
+# writeFile / rm under tmpdir — NEVER the founder's folder). It is allow-listed
+# BY PATH for both the filesystem-write rule (1) and the process-start rule (2b),
+# the same single-audited-site discipline as SpineEmitterMinter. The settings
+# router (server/routes/settings.ts) carries the mutation verbs but starts no
+# process and writes no file itself — it delegates to this one adapter.
+SETTINGS_ADAPTER_REL="server/adapters/SpineSettingsAdapter.ts"
+
 # Accumulate per-rule hits across all files.
 declare -a fs_hits=() git_spawn_hits=() git_verb_hits=() kill_hits=() http_hits=() bind_hits=() proc_hits=() ws_hits=()
 
@@ -224,7 +235,7 @@ for f in "${SOURCE_FILES[@]}"; do
   #    it writes a hashed cache file of Haiku-generated turn summaries. This is
   #    a derived cache outside the cockpit's read surface — never a worktree or
   #    transcript write.
-  if [ "$rel" != "server/adapters/SpineEmitterMinter.ts" ] && [ "$rel" != "$TURN_SUMMARIES_REL" ]; then
+  if [ "$rel" != "server/adapters/SpineEmitterMinter.ts" ] && [ "$rel" != "$TURN_SUMMARIES_REL" ] && [ "$rel" != "$SETTINGS_ADAPTER_REL" ]; then
     while IFS= read -r line; do
       [ -n "$line" ] && fs_hits+=("$rel: $line")
     done < <(printf '%s\n' "$stripped" | grep -nE \
@@ -278,8 +289,12 @@ for f in "${SOURCE_FILES[@]}"; do
     server/adapters/SpineEmitterMinter.ts | \
     server/adapters/SulisChangeStarter.ts | \
     server/lib/ensureDaemon.ts | \
+    "$SETTINGS_ADAPTER_REL" | \
     "$TURN_SUMMARIES_REL")
       ;; # sanctioned process-start site — skip
+      #   - SpineSettingsAdapter.ts (WP-005, ADR-019) — the Settings write
+      #     surface's sanctioned writer; execFiles the validated python helpers.
+      #     The only new process-start site in the settings change.
       #   - turnSummaries.ts (ADR-015) — spawns `claude` headless to produce the
       #     Haiku one-line turn summary cached on disk. A derived-summary helper,
       #     not a session start; the summary is best-effort + the spawn is the

@@ -303,6 +303,74 @@ describe(
       expect(after.sys_status).toBe("deleted");
     });
 
+    it("edit_project_source_json_overwrites_source_preserving_other_fields", async () => {
+      // MANDATORY FIX 1 (composition CONCERN) — the port's attachRepo/unlinkRepo
+      // mutate Project.source, but edit-project.py originally exposed only --name
+      // / --branch-policy. It is extended with an optional --source-json routed
+      // through the SAME validated _entity_edit upsert, so the adapter never
+      // hand-builds an entity (ADR-007). This Red case proves the source edit.
+      if (unavailable()) return;
+      const base = tmpBrain();
+      seedProject(base);
+      const before = readEntity(base, PROJECT_DOMAIN, "project", PROJECT_ID);
+      expect(before.source).toBe(
+        JSON.stringify({ repo: "/x", path: "/x", primary_branch: "main" }),
+      );
+
+      const newSource = JSON.stringify({
+        repo: "/home/founder/acme",
+        path: "/home/founder/acme",
+        primary_branch: "main",
+      });
+      const r = await runHelper("edit-project.py", [
+        "--base-dir",
+        base,
+        "--domain",
+        PROJECT_DOMAIN,
+        "--id",
+        PROJECT_ID,
+        "--source-json",
+        newSource,
+      ]);
+      expect(r.ok).toBe(true);
+
+      // Same id ⇒ overwrites in place (no count growth); source replaced; every
+      // other field preserved via {**existing, **changes}.
+      expect(countKind(base, PROJECT_DOMAIN, "project")).toBe(1);
+      const after = readEntity(base, PROJECT_DOMAIN, "project", PROJECT_ID);
+      expect(after.source).toBe(newSource);
+      expect(after.name).toBe(before.name);
+      expect(after.belongs_to_product_ref).toBe(PRODUCT_ID);
+      expect(after.belongs_to_tenant).toBe(TENANT_ID);
+      expect(after.sys_status).toBe("active");
+    });
+
+    it("edit_project_source_json_only_does_not_require_name", async () => {
+      // The adapter's attach/unlink edits ONLY source — it must not be forced to
+      // restate the name. --name becomes optional when --source-json is given.
+      if (unavailable()) return;
+      const base = tmpBrain();
+      seedProject(base);
+
+      const r = await runHelper("edit-project.py", [
+        "--base-dir",
+        base,
+        "--domain",
+        PROJECT_DOMAIN,
+        "--id",
+        PROJECT_ID,
+        "--source-json",
+        JSON.stringify({ repo: "", path: "", primary_branch: "" }),
+      ]);
+      expect(r.ok).toBe(true);
+      const after = readEntity(base, PROJECT_DOMAIN, "project", PROJECT_ID);
+      // Unlink shape persisted; name untouched.
+      expect(after.source).toBe(
+        JSON.stringify({ repo: "", path: "", primary_branch: "" }),
+      );
+      expect(after.name).toBe("original-project");
+    });
+
     it("list_entities_returns_active_only", async () => {
       if (unavailable()) return;
       const base = tmpBrain();
