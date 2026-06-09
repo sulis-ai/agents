@@ -1,0 +1,109 @@
+/* WP-010 — SkeletonCard styles: the per-card LOADING placeholder.
+ *
+ * Transcribed from the production-approved visual contract
+ * (.design/cockpit-board-refresh/MOCKUP.html — .skeleton / .sk / .skTop /
+ * .skHandle / .skProbe / .skSteps / .skTitle / .skFoot). Tokens only — no raw
+ * colour, no invented hue: the shimmer gradient is built from the existing
+ * --border / --muted tokens via color-mix, exactly as the signed mockup.
+ *
+ * NO LAYOUT JUMP (BR-24 / NFR-PERF-5): the .skeleton box mirrors the real
+ * <ChangeCard> frame EXACTLY — same 1px border, --radius-container, 14px
+ * padding, --card background — so when a real card replaces the skeleton the
+ * box does not move. These are the same card-box values ChangeCard.module.css
+ * uses for .card; they are the one source of truth for "a card-shaped box".
+ *
+ * The shimmer respects prefers-reduced-motion: reduce → the sweep is removed
+ * and the calm muted bars stay (BR-25). */
+
+/* Same box as a real card so the layout doesn't jump when data lands. */
+.skeleton {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  padding: 14px;
+  background: var(--card);
+}
+
+/* DARK ONLY: the real card carries a soft float shadow in dark; the skeleton
+ * mirrors it so the raised-surface read (and the box) is identical. */
+:root[data-theme="dark"] .skeleton {
+  box-shadow: var(--shadow-float);
+}
+
+/* A placeholder bar. The fill is the muted surface; the shimmer rides a
+ * gradient built from existing tokens (transparent → border-blend → transparent),
+ * so no invented hue. */
+.sk {
+  display: block;
+  border-radius: var(--radius-badge);
+  background: var(--muted);
+  position: relative;
+  overflow: hidden;
+}
+
+.sk::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--border) 70%, var(--muted)) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Reduced motion — drop the sweep entirely, leave the calm muted bars (BR-25). */
+@media (prefers-reduced-motion: reduce) {
+  .sk::after {
+    animation: none;
+    display: none;
+  }
+}
+
+/* The internal bars echo the real card's structure: top line (handle + probe),
+ * step dots, two title lines, a foot bar — so the box reads as a card. */
+.skTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.skHandle {
+  height: 9px;
+  width: 64px;
+}
+.skProbe {
+  height: 9px;
+  width: 40px;
+  margin-left: auto;
+}
+.skSteps {
+  height: 4px;
+  width: 84px;
+  margin-bottom: 12px;
+  border-radius: 2px;
+}
+.skTitle {
+  height: 11px;
+  width: 100%;
+  margin-bottom: 7px;
+}
+.skTitleShort {
+  width: 62%;
+  margin-bottom: 14px;
+}
+.skFoot {
+  height: 20px;
+  width: 50%;
+  border-radius: var(--radius-badge);
+  margin-top: 12px;
+}

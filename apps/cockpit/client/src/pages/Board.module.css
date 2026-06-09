@@ -97,31 +97,65 @@
   }
 }
 
-/* Loading skeleton — one placeholder column per stage, mirroring the
- * board grid so the layout doesn't jump when data arrives. */
-.skeletonCol {
+/* WP-010 — LOADING SKELETON BOARD. Per-card skeletons (FR-53) inside the SAME
+ * lane scaffold a loaded board uses, so the swap to real data is in-place with
+ * no layout jump (BR-24 / NFR-PERF-5). The loading region reuses `.board` (the
+ * grid + the three responsive breakpoints), so the lanes lay out identically;
+ * each `.skeletonLane` mirrors the loaded StageColumn lane's frame (the same
+ * --muted lane on a hairline border + a 2px top hairline + the
+ * --radius-container), its `.skeletonHead` holds the same band height as the
+ * real sticky laneHead, and `.skeletonList` matches the lane list's padding +
+ * 12px inter-card gap — so the FIRST skeleton card sits at the same x/y the
+ * first real card will. The skeleton card box itself is owned by
+ * SkeletonCard.module.css (the one card-box source of truth). */
+.skeletonLane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   background: var(--muted);
   border: 1px solid var(--border-muted);
-  /* mirror the real column's 2px top hairline so the layout doesn't jump
-   * when data replaces the skeleton. */
   border-top: 2px solid var(--border);
   border-radius: var(--radius-container);
-  padding: 12px;
 }
 
+/* Same height band as the real lane's sticky header (13px padding + a ~16px
+ * label row + the 1px bottom hairline) so the card list below starts at the
+ * same y as a loaded lane — the cards don't shift down when the header gains
+ * its real name/count. A quiet muted band, no placeholder bar (the loading
+ * read is carried by the cards + the SR line, not a fake header label). */
 .skeletonHead {
-  height: 16px;
-  width: 60%;
-  background: var(--border-muted);
-  border-radius: var(--radius-interactive);
-  margin-bottom: 12px;
+  flex: 0 0 auto;
+  height: 43px;
+  background: var(--muted);
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius-container) var(--radius-container) 0 0;
 }
 
-.skeletonCard {
-  height: 88px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-container);
+/* Matches the loaded lane list: the internal-scroll container's padding + the
+ * 12px inter-card gap, so the skeleton cards stack exactly where real cards
+ * will. */
+.skeletonList {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  overflow: hidden;
+}
+
+/* Screen-reader-only loading line. The visible skeleton bars are aria-hidden,
+ * so the SR line is what announces "loading" (with the region's aria-busy).
+ * Mirrors the per-module .sr / .srOnly pattern used elsewhere in the app
+ * (LivenessProbe, ChangeHealthBadge, StartFromIntent) — a shared utility is a
+ * cross-file extraction tracked separately (out of this WP's lane scope). */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .errorBox {

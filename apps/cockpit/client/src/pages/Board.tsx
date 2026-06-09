@@ -51,6 +51,7 @@ import { hasActiveFilter, useSearch } from "../api/useSearch";
 import { EmptyState } from "../components/EmptyState";
 import { RefreshButton } from "../components/RefreshButton";
 import { SearchBar } from "../components/SearchBar";
+import { SkeletonCard } from "../components/SkeletonCard";
 import { StageColumn } from "../components/StageColumn";
 import { useActiveProduct } from "../api/activeProduct";
 import {
@@ -59,6 +60,11 @@ import {
   groupChangesByStage,
 } from "../lib/groupChangesByStage";
 import styles from "./Board.module.css";
+
+/** How many skeleton placeholder cards each lane shows while the feed loads. A
+ *  small fixed count (FR-53 — per-card, not one block per column): enough to
+ *  read as "a lane of cards is coming", not so many it implies a count. */
+const SKELETON_CARDS_PER_LANE = 3;
 
 export function Board() {
   // The board owns the filter state; the toolbar is controlled (ADR-005).
@@ -190,18 +196,44 @@ export function Board() {
         onSelectStage={onSelectStage}
       />
 
+      {/* LOADING ≠ EMPTY (FR-52). While the feed is unresolved the board shows
+       * PER-CARD skeletons (FR-53) inside the SAME six-lane scaffold a loaded
+       * board uses — so the swap to real data is in-place with no layout jump
+       * (BR-24 / NFR-PERF-5). The region is a live `status` (a valid role, so
+       * its aria-label/aria-busy are permitted) carrying an SR "Loading your
+       * changes…" line; the skeleton cards are inert (aria-hidden, not
+       * focusable — §7c precedence, no real card exists yet). The skeleton path
+       * is the INITIAL load only: a background poll keeps last-good data and
+       * never re-enters here (EF-3, gated on `isLoading` not `isFetching`). */}
       {active.isLoading && (
         <div
           className={styles.board}
           data-testid="board-loading"
+          role="status"
           aria-busy="true"
           aria-label="Loading changes"
         >
+          <span className={styles.srOnly}>Loading your changes…</span>
           {BOARD_STAGES.map((stage) => (
-            <div key={stage} className={styles.skeletonCol}>
-              <div className={styles.skeletonHead} />
-              <div className={styles.skeletonCard} />
-            </div>
+            <section
+              key={stage}
+              id={`lane-${stage}`}
+              className={styles.skeletonLane}
+              data-testid="stage-column"
+              data-stage={stage}
+            >
+              {/* The lane scaffold (a quiet sticky header band + an internal
+               * list) mirrors the loaded lane's metrics so the board shape is
+               * identical loading vs loaded. The header is intentionally bare —
+               * no stage name yet — but holds the same height as the real
+               * laneHead so the cards below sit at the same y. */}
+              <div className={styles.skeletonHead} aria-hidden="true" />
+              <div className={styles.skeletonList}>
+                {Array.from({ length: SKELETON_CARDS_PER_LANE }, (_, i) => (
+                  <SkeletonCard key={i} />
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}
