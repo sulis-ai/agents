@@ -125,10 +125,18 @@ def evaluate_invariant(
 
     if kind == "property":
         poll = invariant.get("poll") or {}
-        attempts = int(poll.get("attempts", _POLL_ATTEMPTS_DEFAULT))
+        # Fail-closed honestly: a hand-built bundle can bypass schema validation
+        # and carry a non-numeric poll value (e.g. attempts="abc"). A verification
+        # engine must not CRASH on malformed input — surface "blocked" (the honest
+        # "couldn't confirm"), never a raised ValueError/TypeError.
+        try:
+            attempts = int(poll.get("attempts", _POLL_ATTEMPTS_DEFAULT))
+            interval_ms = int(poll.get("interval_ms", 0))
+        except (ValueError, TypeError):
+            return "blocked"
         # Clamp to [1, hard max] so a misauthored scenario cannot spin.
         attempts = max(1, min(attempts, _POLL_ATTEMPTS_MAX))
-        interval_s = max(0, int(poll.get("interval_ms", 0))) / 1000.0
+        interval_s = max(0, interval_ms) / 1000.0
         for attempt in range(attempts):
             if _matches(expected, _resolve_record(saved_record)):
                 return "observed"

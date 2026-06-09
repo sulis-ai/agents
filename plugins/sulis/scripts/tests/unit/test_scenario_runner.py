@@ -225,6 +225,42 @@ def test_invariant_result_empty_when_absent():
     assert evaluate_invariant({}, {"any": "record"}) == ""
 
 
+def test_verdict_invariant_malformed_poll_fails_closed_blocked():
+    """A verification engine FAILS CLOSED HONESTLY — it never crashes. The pure
+    `evaluate_invariant` can be called directly with a hand-built bundle that
+    bypassed schema validation, so a `property` poll may carry a non-numeric
+    `attempts`/`interval_ms` (e.g. `"abc"`). Such a malformed poll value must
+    yield `"blocked"` (the honest "couldn't confirm"), NEVER a raised
+    ValueError/TypeError that takes the whole run down."""
+    expected = {"status": "saved"}
+
+    # Non-numeric `attempts` → blocked, no exception.
+    bad_attempts = {"kind": "property", "expected": expected,
+                    "poll": {"attempts": "abc", "interval_ms": 0}}
+    assert evaluate_invariant(bad_attempts, {"status": "saved"}) == "blocked"
+
+    # Non-numeric `interval_ms` → blocked, no exception.
+    bad_interval = {"kind": "property", "expected": expected,
+                    "poll": {"attempts": 3, "interval_ms": "soon"}}
+    assert evaluate_invariant(bad_interval, {"status": "saved"}) == "blocked"
+
+    # Both malformed → blocked.
+    both_bad = {"kind": "property", "expected": expected,
+                "poll": {"attempts": None, "interval_ms": []}}
+    assert evaluate_invariant(both_bad, {"status": "saved"}) == "blocked"
+
+    # A malformed poll must not even invoke the saved-record fetcher down a
+    # path that would otherwise observe — fail-closed precedes the poll.
+    reads = {"n": 0}
+
+    def count_reads():
+        reads["n"] += 1
+        return {"status": "saved"}
+
+    assert evaluate_invariant(bad_attempts, count_reads) == "blocked"
+    assert reads["n"] == 0  # never polled — bailed before the loop
+
+
 def test_disposition_precedence_unchanged():
     """Characterisation: the worst-wins fold (fail > unresolved > deferred >
     manual > pass) produces the SAME `verdict` as today. The additive
