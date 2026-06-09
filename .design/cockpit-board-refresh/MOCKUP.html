@@ -1,0 +1,1370 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cockpit board refresh — recommended mockup</title>
+
+<!-- Real type tokens reference Inter (sans) + Satoshi (display). Load Inter
+     from Google Fonts so the mockup renders with the actual brand type, not a
+     fallback (a mockup whose fonts don't load isn't a real preview). Satoshi
+     isn't on Google Fonts; the token stack falls back to system-ui for the
+     display face, exactly as the app does when Satoshi is absent. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- The REAL cockpit tokens, verbatim from apps/cockpit/client/src/tokens.css.
+     The mockup invents no colours, spacing, or fonts — every value below is a
+     var(--*) from this block. -->
+<style>
+:root {
+  --background: #fafafa;
+  --foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+  --muted: #f5f5f5;
+  --muted-foreground: #737373;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #171717;
+  --border: #e5e5e5;
+  --border-muted: #f0f0f0;
+  --input: #e5e5e5;
+
+  --primary: #2563EB;
+  --primary-foreground: #FFFFFF;
+  --accent: #2D7D90;
+  --accent-foreground: #FFFFFF;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --positive: #16A34A;
+  --positive-foreground: #FFFFFF;
+  /* --warning was #F59E0B: a low-contrast amber whose ICON form (the
+     waiting-on-you / off-track triangle) measured ~2.2:1 on its light tint —
+     under the 3:1 graphical-object bar (WCAG 1.4.11). Darkened one step to
+     #B45309 (amber-700), which clears 3:1 as a graphical cue on both the
+     --bg-warning tint and the card, in the light theme. Dark theme already
+     cleared it, so the dark --warning is unchanged below. */
+  --warning: #B45309;
+  --warning-foreground: #FFFFFF;
+  --ring: #2563EB;
+  --brand-gold: #C9A962;
+  --brand-depth: #1E3A5F;
+
+  --bg-positive: #F0FDF4;
+  --bg-positive-border: #BBF7D0;
+  --bg-destructive: #FEF2F2;
+  --bg-destructive-border: #FECACA;
+  --bg-warning: #FFFBEB;
+  --bg-warning-border: #FDE68A;
+
+  --stage-recon: #8B7355;
+  --stage-specify: #6366F1;
+  --stage-design: #2D7D90;
+  --stage-implement: #2563EB;
+  --stage-review: #9333EA;
+  --stage-ship: #15803D;
+
+  --radius-interactive: 4px;
+  --radius-button: 9999px;
+  --radius-container: 4px;
+  --radius-badge: 9999px;
+  --radius-media: 4px;
+
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Satoshi', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
+
+  --weight-body: 400;
+  --weight-heading: 300;
+  --weight-label: 500;
+
+  --bg-card: var(--card);
+  --bg-muted: var(--muted);
+  --border-light: var(--border-muted);
+  --font: var(--font-sans);
+  --radius: var(--radius-container);
+  --text: var(--foreground);
+  --text-secondary: #525252;
+  --text-muted: var(--muted-foreground);
+
+  --shadow-float: 0 6px 20px rgba(23, 23, 23, 0.08);
+}
+:root[data-theme="dark"] {
+  /* DARK SURFACE ELEVATION FIX (founder feedback: dark was too flat).
+     Old values had page #16181d, lane #20232a, card #1e2127 — and the card
+     was actually DARKER than the lane, so cards sank into the board instead of
+     rising. New scale is a clear, progressive lift:
+        page/board  #121419  (darkest)
+        lane        #1b1e24  (a step up — this is --muted, what the lane uses)
+        card        #262a32  (a clear step up — reads as a raised surface)
+     bg→lane 1.10:1, lane→card 1.16:1, bg→card 1.28:1 of luminance — each step
+     is visible while the whole board stays calm and dark. */
+  --background: #121419;            /* was #16181d — board/page, now darkest */
+  --foreground: #e8e6e3;
+  --card: #262a32;                  /* was #1e2127 — clearly the LIGHTEST surface now */
+  --card-foreground: #e8e6e3;
+  --popover: #2b3038;               /* lifted in step with --card */
+  --muted: #1b1e24;                 /* was #20232a — the LANE surface, sits between bg and card */
+  --muted-foreground: #a3a09b;
+  --secondary: #2f343d;             /* lifted to sit just above the new card */
+  --secondary-foreground: #e8e6e3;
+  --border: #3a3f4a;                /* was #343842 — brightened so the card edge reads against the lighter card */
+  --border-muted: #2a2e36;
+  --input: #3a3f4a;
+  --primary: #5b9bff;
+  --primary-foreground: #0b1220;
+  --accent: #4fb3c9;
+  --destructive: #f0686b;
+  --positive: #4caf68;
+  --warning: #ffb627;               /* was #f5b342 — sharper, more saturated amber so "Waiting on you" is unmistakably the loudest element on dark */
+  --ring: #5b9bff;
+  --stage-recon: #7fb0ff;
+  --stage-specify: #f0c75a;
+  --stage-design: #b79cff;
+  --stage-implement: #9bd86a;
+  --stage-review: #f2a368;
+  --stage-ship: #73d391;
+
+  /* Status tints re-derive from the (now lighter) --card automatically.
+     The WAITING tint is pushed louder than the generic 18%/45% recipe — 24%
+     fill + a 60% border — so the amber waiting chip clears the 3:1 graphical
+     bar against the lighter card (a 45% border would only hit 2.8:1) and reads
+     as the single loudest thing on the board. The other status tints keep the
+     standard recipe. */
+  --bg-positive: color-mix(in srgb, var(--positive) 16%, var(--card));
+  --bg-positive-border: color-mix(in srgb, var(--positive) 45%, var(--card));
+  --bg-destructive: color-mix(in srgb, var(--destructive) 16%, var(--card));
+  --bg-destructive-border: color-mix(in srgb, var(--destructive) 45%, var(--card));
+  --bg-warning: color-mix(in srgb, var(--warning) 24%, var(--card));
+  --bg-warning-border: color-mix(in srgb, var(--warning) 60%, var(--card));
+
+  --text-secondary: var(--muted-foreground);
+  --shadow-float: 0 6px 20px rgba(0, 0, 0, 0.55);
+}
+
+/* ───────────────────────── layout shell ───────────────────────── */
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--background);
+  color: var(--foreground);
+  /* full-height app shell: top bar + board fill the viewport */
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ─── persistent top bar (mirrors WorkspaceTopBar / WorkspaceShell) ─── */
+
+.topbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 48px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding-right: 8px;
+  border-right: 1px solid var(--border-muted);
+  margin-right: 4px;
+}
+.brandMark {
+  width: 26px; height: 26px;
+  border-radius: var(--radius-interactive);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  display: grid; place-items: center;
+  font-family: var(--font-mono);
+  font-size: 10px; font-weight: 600;
+  color: var(--muted-foreground);
+}
+.brandText { line-height: 1.1; }
+.brandKicker {
+  font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.brandName { font-size: 13px; font-weight: var(--weight-label); }
+
+.tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 12px;
+  border-radius: var(--radius-interactive);
+  font-size: 13px; color: var(--muted-foreground);
+  text-decoration: none;
+}
+.tabActive {
+  color: var(--foreground);
+  background: var(--muted);
+  box-shadow: inset 0 -2px 0 var(--primary);
+}
+
+/* THE NEW AFFORDANCE — global "Start something new" primary button.
+   Sits just after the Board tab so it reads as the main action. Filled
+   primary, pill radius — the only filled button in the bar, so it stands
+   out by weight + shape, not colour alone. */
+.startNew {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 32px; padding: 0 14px;
+  margin-left: 6px;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-button);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-family: var(--font-sans);
+  font-size: 13px; font-weight: var(--weight-label);
+  cursor: pointer;
+}
+.startNew:hover { filter: brightness(1.05); }
+.startNew:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.startNew svg { width: 15px; height: 15px; }
+
+.topbarRight {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 6px;
+}
+.iconBtn {
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border-radius: var(--radius-interactive);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.iconBtn:hover { background: var(--muted); }
+.iconBtn svg { width: 17px; height: 17px; }
+
+/* ───────────────────────── board region ───────────────────────── */
+
+.boardPage {
+  flex: 1 1 auto;
+  min-height: 0;          /* lets the inner board own the scroll */
+  display: flex;
+  flex-direction: column;
+  padding: 20px 24px 0;
+}
+
+.boardHeader {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.boardTitle {
+  font-family: var(--font-display);
+  font-size: 20px; font-weight: var(--weight-heading);
+  margin: 0;
+}
+.refreshBtn {
+  height: 30px; padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-interactive);
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 13px; cursor: pointer;
+}
+
+/* search + filter row (kept light — mirrors the real SearchBar) */
+.toolbar {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 16px;
+}
+.search {
+  flex: 1 1 auto; min-width: 0;
+  height: 38px; padding: 0 14px;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-interactive);
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: 13px;
+  display: flex; align-items: center; gap: 8px;
+}
+.chip {
+  height: 32px; padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-interactive);
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: 12px; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+/* the "Needs attention" filter wears the SAME warning vocabulary as the
+   card's "Waiting on you" flag — so the founder reads filter + card flag
+   as one concept (they share the server's needs-attention signal). */
+.chip.attn { border-color: var(--bg-warning-border); color: var(--foreground); }
+.chip.attn svg { color: var(--warning); }
+
+/* THE BOARD — six FULL-HEIGHT lanes. The board row fills the remaining
+   viewport height and each lane scrolls INTERNALLY. */
+.board {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(190px, 1fr));
+  gap: 16px;
+  padding-bottom: 20px;
+  overflow-x: auto;
+}
+
+/* ───────────────────────── a lane ───────────────────────── */
+
+.lane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;                 /* full-height; header + list + foot stack */
+  background: var(--muted);
+  border: 1px solid var(--border-muted);
+  border-top: 2px solid var(--border);
+  border-radius: var(--radius-container);
+}
+
+/* sticky header — stays put while the lane's cards scroll */
+.laneHead {
+  position: sticky; top: 0;
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 8px;
+  padding: 13px 14px;
+  background: var(--muted);
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius-container) var(--radius-container) 0 0;
+  z-index: 1;
+}
+.sdot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.laneName {
+  flex: 1;
+  font-size: 11px; font-weight: var(--weight-label);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+}
+.laneCount {
+  font-size: 11px; font-weight: var(--weight-label);
+  color: var(--muted-foreground);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-badge);
+  padding: 1px 8px;
+}
+
+.recon  .sdot { background: var(--stage-recon); }
+.specify  .sdot { background: var(--stage-specify); }
+.design  .sdot { background: var(--stage-design); }
+.implement  .sdot { background: var(--stage-implement); }
+.review  .sdot { background: var(--stage-review); }
+.ship  .sdot { background: var(--stage-ship); }
+
+/* the scrolling card list */
+.laneList {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 12px;
+}
+.laneList::-webkit-scrollbar { width: 8px; }
+.laneList::-webkit-scrollbar-thumb {
+  background: var(--border); border-radius: 8px;
+}
+
+.laneEmpty {
+  margin: 0; padding: 20px 12px; text-align: center;
+  font-size: 12px; color: var(--muted-foreground);
+}
+
+/* optional pinned bottom action — ONLY under Recon (changes start at Recon).
+   Quiet outline secondary so it never competes with the top-bar primary. */
+.laneFoot {
+  flex: 0 0 auto;
+  padding: 8px 12px 12px;
+}
+.startHere {
+  width: 100%;
+  height: 34px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-interactive);
+  background: transparent;
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 12px; cursor: pointer;
+}
+.startHere:hover { border-color: var(--stage-recon); color: var(--foreground); }
+.startHere:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.startHere svg { width: 14px; height: 14px; }
+
+/* ───────────────────────── a card ───────────────────────── */
+/* EVERY card has the SAME structure, top to bottom:
+   TOP LINE (handle left · probe+time right) · step dots · intent · slug ·
+   FOOT (waiting-on-you XOR health).
+   The handle (CH-XXXXXX) is back on the card, top-LEFT, small and muted. On the
+   SAME top line, pinned RIGHT, sits the stripped-down liveness — JUST the probe
+   dot + the relative time (no state word, no "last active" prefix) — so the top
+   line reads: CH-… (left) ···· ● now (right). The probe carries its state by
+   fill/motion/shape + a screen-reader label, not by a word or by colour.
+   The foot carries EXACTLY ONE triage read: if the change is waiting on you it
+   shows a FULL-WIDTH, CENTERED "Waiting on you — why" spanning the card (health
+   is HIDDEN); if it is not, it shows the change-health state (the quieter
+   default — left-aligned, content-width). Never both. No top banner, no left
+   stripe. */
+
+.card {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  padding: 14px;
+  background: var(--card);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 120ms ease;
+}
+.card:hover { border-color: var(--input); }
+.card:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+/* DARK ONLY: a soft drop shadow under each card reinforces that it's a raised
+   surface above the lane. Light theme is untouched (no shadow on cards), so it
+   stays exactly as-is. Uses the existing --shadow-float token, not an invented
+   value. */
+:root[data-theme="dark"] .card { box-shadow: var(--shadow-float); }
+
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ───────── THE TOP LINE: handle (left) · probe + time (right) ─────────
+   One line at the very top of every card. On the LEFT, the change handle
+   (CH-XXXXXX) — small, muted, monospace — so each card is identifiable at a
+   glance. Pushed to the RIGHT on the SAME line, the liveness is stripped down to
+   JUST the probe dot + the relative time: "● now", "● 12m", "● 6h", "● 1w".
+   The state WORD ("Working/Live/Idle") and the "last active" prefix are GONE
+   from the visible UI — only the probe + the relative time show.
+
+   ACCESSIBILITY (the word is dropped, so the probe MUST carry the state without
+   relying on colour OR a word):
+     • The probe encodes its state by FILL / MOTION / SHAPE, not colour alone:
+         - WORKING  → a pulsing dot (the only motion on the card).
+         - LIVE     → a solid filled dot, steady (no motion).
+         - IDLE     → a hollow / outline dot (ring only, no fill).
+       So in greyscale / for a colour-blind founder the three states are still
+       told apart by motion + fill + shape.
+     • Each probe carries a screen-reader-only label naming the state
+       ("actively working" / "session live" / "idle, not running"), so assistive
+       tech still gets the state even though no word is shown visually.
+   The "Working" pulse keeps its reduced-motion static-ring fallback. */
+.topLine {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 11px;
+  min-width: 0;
+}
+.handle {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 11px; font-weight: var(--weight-body);
+  letter-spacing: 0.01em;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.live {
+  margin-left: auto;            /* pin the probe + time to the RIGHT */
+  display: flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: var(--weight-body);
+  color: var(--text-secondary);
+  min-width: 0;
+}
+.live .ldot { width: 9px; height: 9px; border-radius: 50%; flex: none; position: relative; }
+.live .lago {                            /* the relative time — the only visible text */
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* WORKING — live and actively moving: a FILLED dot with a subtle PULSE. Motion
+   is the distinguishing cue (not colour, not a word). */
+.live.working .ldot { background: var(--positive); }
+.live.working .ldot::after {
+  content: ""; position: absolute; inset: -4px;
+  border-radius: 50%; border: 2px solid var(--positive);
+  opacity: 0.5; animation: pulse 1.6s ease-out infinite;
+}
+@keyframes pulse {
+  0%   { transform: scale(0.6); opacity: 0.6; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live.working .ldot::after { animation: none; opacity: 0.5; }
+}
+/* LIVE — session open but quiet: a SOLID filled dot, steady (no motion). Fill
+   tells it apart from idle's hollow ring. */
+.live.liveq .ldot { background: var(--accent); }
+/* IDLE — nothing running: a HOLLOW / outline dot (ring only, no fill) — the
+   shape itself distinguishes it from the two filled states, in greyscale too. */
+.live.idle .ldot { background: transparent; border: 1.5px solid var(--muted-foreground); }
+
+/* ───────────── THE ONE-LINE FOOT (every card, exactly one read) ─────────────
+   The foot is a SINGLE line carrying EXACTLY ONE triage read — the two are
+   MUTUALLY EXCLUSIVE:
+     • if the change is WAITING ON YOU → the foot shows "Waiting on you — why"
+       (it leads, prominent) and the change-health state is HIDDEN; or
+     • if it is NOT waiting on you → the foot shows the change-health state
+       (On track / Worth a look / Off track + its reason).
+   Never both. The founder's rule: when a card needs you, "needs you" is the only
+   status that matters — health is secondary and lives on the card detail/hover.
+   Showing one read keeps the foot comfortably on one line, no wrapping, no cram.
+   Hierarchy is carried by weight/border/icon, never by a colour stripe. */
+.footRow {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 11px;
+  padding-top: 11px;
+  border-top: 1px solid var(--border-muted);
+  min-width: 0;
+}
+/* When the foot carries the WAITING-ON-YOU read it goes FULL-WIDTH + CENTERED
+   (see .footRow.waitingFoot below). When it carries health it stays the quieter
+   default: left-aligned, content-width. */
+.footRow.waitingFoot {
+  justify-content: center;       /* center the full-width waiting element */
+}
+/* whichever single read is shown, its trailing *why* / reason truncates first so
+   the line never wraps; the icon + the lead words are never dropped. */
+.footRow .waiting .why {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+
+/* ── THE WAITING-ON-YOU READ: shown ONLY when the change needs the founder ──
+   When present it is the ONLY thing in the foot (health is hidden) AND it goes
+   FULL-WIDTH, horizontally CENTERED — spanning the whole card foot so it's loud
+   and unmistakable. It carries the warning-triangle icon + the words "Waiting on
+   you" (never colour alone) + a short *why*, all centered. Stands out by WEIGHT
+   — a 1.5px solid warning border + a bold label — so even in greyscale it reads
+   as the loud "act on me" state. The *why* truncates first; icon + words never
+   drop. */
+.waiting {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%;                   /* full-width, spanning the card foot */
+  min-width: 0;
+  padding: 5px 10px;
+  border: 1.5px solid var(--warning);
+  border-radius: var(--radius-badge);
+  background: var(--bg-warning);
+  color: var(--foreground);
+  font-size: 11px; font-weight: 600;
+  white-space: nowrap;
+  text-align: center;
+}
+.waiting svg { width: 13px; height: 13px; flex: none; color: var(--warning); }
+.waiting .why {
+  /* lighter WEIGHT keeps the why subordinate to the bold label; it uses the
+     full --foreground (not --text-secondary) so it clears AA on the louder,
+     more-saturated dark warning tint — text-secondary would only reach 3.2:1
+     there. In light theme --foreground on the pale tint is far above AA, so
+     light is unaffected. */
+  font-weight: var(--weight-body);
+  color: var(--foreground); font-size: 10.5px;
+}
+
+/* THE CHANGE-HEALTH READ: shown ONLY when the change is NOT waiting on you.
+   "is this on track or going sideways?".
+   Three levels, each a WORD + a SHAPE (check / dash / warning) — never colour
+   alone. Derived from quality checks against the change's stage (rigor-for-
+   stage, tests, scope drift), NOT activity volume. Quieter than the waiting
+   chip (1px border, normal label weight), louder than the activity dot. */
+.health {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10.5px; font-weight: var(--weight-label);
+  padding: 2px 8px 2px 6px;
+  border-radius: var(--radius-badge);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.health svg { width: 12px; height: 12px; flex: none; }
+/* On track — a check. Calm, the resting state; reads as "no need to look". */
+.health.ontrack {
+  color: var(--text-secondary);
+  border-color: var(--bg-positive-border);
+  background: var(--bg-positive);
+}
+.health.ontrack svg { color: var(--positive); }
+/* Worth a look — a dash / minus. Neutral nudge: not wrong, but check it. */
+.health.look {
+  color: var(--foreground);
+  border-color: var(--border);
+  background: var(--muted);
+}
+.health.look svg { color: var(--muted-foreground); }
+/* Off track — a warning triangle. The change is drifting (failing tests,
+   missing the artifacts it should have for its stage, or scope-creeping). */
+.health.off {
+  color: var(--foreground);
+  border-color: var(--bg-destructive-border);
+  background: var(--bg-destructive);
+}
+.health.off svg { color: var(--destructive); }
+
+.intent {
+  font-size: 13px; font-weight: var(--weight-label);
+  color: var(--foreground);
+  margin: 0 0 12px;
+  line-height: 1.45;
+  display: -webkit-box; -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+
+/* the slim "· N/6" step dots — the one non-redundant part of the old pill,
+   kept as a tiny progress indicator with a text label for screen readers. */
+.steps { display: inline-flex; align-items: center; gap: 3px; margin-bottom: 11px; }
+.step { width: 13px; height: 3px; border-radius: 2px; background: var(--border); }
+.step.on { background: var(--muted-foreground); }
+.step.cur { background: var(--foreground); }
+
+/* the meta line — just the slug now. The relative time lives in the
+   liveness+recency read on the top line, so it's not duplicated here. Sits
+   above the one-line foot. */
+.cardMeta {
+  display: flex; align-items: center;
+  gap: 8px; font-size: 12px; color: var(--muted-foreground);
+}
+.slug { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+/* a small compare note pinned bottom-left, just for this mockup */
+.note {
+  position: fixed; left: 14px; bottom: 12px;
+  font-size: 11px; color: var(--muted-foreground);
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius-badge); padding: 5px 12px;
+  box-shadow: var(--shadow-float);
+}
+.note button {
+  background: none; border: none; color: var(--primary);
+  font: inherit; cursor: pointer; padding: 0; margin-left: 6px;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   RESPONSIVE BEHAVIOUR — three breakpoints, board adapts at each.
+   Nothing above changes for DESKTOP: the default rules ARE the desktop
+   layout (6 full-height lanes side by side). The media queries below only
+   ADD behaviour at narrower widths, so desktop is untouched and the card,
+   tokens, dark elevation + accessibility all carry through every width.
+
+     DESKTOP  ≥ 1100px : 6 full-height lanes, side by side (unchanged).
+     TABLET   600–1099 : lanes stay side-by-side but the board scrolls
+                         horizontally at a comfortable lane min-width
+                         (not squished); top bar condenses; chip row
+                         scrolls horizontally.
+     MOBILE   < 600px  : ONE lane, full-width, at a time. The existing
+                         stage chips become the lane switcher (tap a stage
+                         → that lane fills the width); horizontal swipe/
+                         snap between lanes. Card design unchanged, just
+                         full-width.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* The mobile lane-switcher rail and its count badge only show < 600px. */
+.laneSwitcher { display: none; }
+
+/* ─────────────────────── TABLET (600–1099px) ─────────────────────── */
+@media (max-width: 1099px) {
+
+  /* Board now scrolls horizontally; lanes hold a comfortable min-width so
+     they're never squished. 1fr is dropped so lanes keep their width and
+     the row overflows rather than compressing six lanes into the viewport. */
+  .board {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(260px, 1fr);
+    grid-template-columns: none;
+    scroll-snap-type: x proximity;
+  }
+  .lane { scroll-snap-align: start; }
+
+  /* Top bar condenses so nothing wraps/clips. The brand kicker + name and
+     the Board tab label fold away; the brand mark + icons remain. */
+  .brandText { display: none; }
+  .brand { padding-right: 6px; margin-right: 2px; }
+  .tab span.tabLabel { display: none; }      /* Board tab → icon only */
+  .tab { padding: 0 8px; }
+
+  /* "Start something new" stays a real primary action but loses its long
+     label, becoming a compact "+ New" so it can never wrap the bar. */
+  .startNew .startNewLabel { display: none; }
+  .startNew::after { content: "New"; }
+  .startNew { padding: 0 12px; }
+
+  /* The board page gets a touch more breathing room at the edges. */
+  .boardPage { padding: 16px 16px 0; }
+
+  /* The filter / stage chip row scrolls horizontally so no chip is clipped;
+     the search field stops stealing all the width. */
+  .toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    padding-bottom: 4px;
+  }
+  .toolbar .search { flex: 0 0 220px; }
+  .toolbar .chip { flex: 0 0 auto; }
+}
+
+/* ─────────────────────── MOBILE (< 600px) ─────────────────────── */
+@media (max-width: 599px) {
+
+  /* Top bar: pure essentials, fixed height, nothing wraps. The brand mark,
+     the compact primary action, settings + theme icons — all fit on one row
+     and never clip. (brandText + tab label already hidden from the tablet
+     rules above; they stay hidden here.) */
+  .topbar { gap: 6px; padding: 0 10px; }
+  .startNew { margin-left: auto; }           /* push primary action to the right edge cluster */
+  .topbarRight { gap: 4px; margin-left: 6px; }
+
+  /* The board page hosts a single full-width lane. */
+  .boardPage { padding: 12px 12px 0; }
+  .boardHeader { margin-bottom: 10px; }
+  .boardTitle { font-size: 18px; }
+
+  /* ── The stage chip row BECOMES the lane switcher ──
+     Same chips the founder already knows (Recon … Ship) now act as tabs that
+     pick which single lane is shown. "Needs attention" stays in the same rail
+     as a reachable filter. The rail scrolls horizontally and snaps so every
+     chip is reachable and never clipped. */
+  .toolbar { display: none; }                /* the desktop search+filter row is replaced on mobile */
+
+  .laneSwitcher {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    padding: 2px 2px 10px;
+    margin-bottom: 4px;
+    scrollbar-width: thin;
+  }
+  /* the search collapses to an icon-only tap target that opens search */
+  .laneSwitcher .searchBtn {
+    flex: 0 0 auto;
+    min-width: 44px; height: 44px;            /* ≥44px touch target */
+    display: grid; place-items: center;
+    border: 1px solid var(--input);
+    border-radius: var(--radius-interactive);
+    background: var(--card);
+    color: var(--muted-foreground);
+    cursor: pointer;
+  }
+  .laneSwitcher .switchChip {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    min-height: 44px;                         /* ≥44px touch target */
+    padding: 0 14px;
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-button);
+    background: var(--card);
+    color: var(--muted-foreground);
+    font-family: var(--font-sans);
+    font-size: 13px; font-weight: var(--weight-label);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .laneSwitcher .switchChip:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  .laneSwitcher .switchChip .sdot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .laneSwitcher .switchChip .switchCount {
+    font-size: 11px; font-weight: var(--weight-label);
+    color: var(--muted-foreground);
+    background: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-badge);
+    padding: 1px 7px;
+  }
+  /* the active lane's chip — the selected tab. Stands out by weight + fill +
+     the stage dot, not colour alone; carries aria-selected for assistive tech. */
+  .laneSwitcher .switchChip[aria-selected="true"] {
+    color: var(--foreground);
+    background: var(--muted);
+    border-color: var(--input);
+    box-shadow: inset 0 -2px 0 var(--primary);
+  }
+  /* the "Needs attention" filter chip keeps its warning vocabulary in the rail */
+  .laneSwitcher .switchChip.attn { border-color: var(--bg-warning-border); }
+  .laneSwitcher .switchChip.attn svg { color: var(--warning); width: 15px; height: 15px; }
+  .laneSwitcher .switchChip.attn[aria-pressed="true"] {
+    color: var(--foreground); background: var(--bg-warning);
+  }
+
+  /* The board is now a single horizontally-snapping track of full-width lanes.
+     Tapping a switcher chip scrolls its lane into view; the user can also
+     swipe between lanes and the active chip follows. Only one lane fills the
+     viewport width at a time. */
+  .board {
+    grid-auto-flow: column;
+    grid-auto-columns: 100%;                  /* one full-width lane per screen */
+    grid-template-columns: none;
+    gap: 0;
+    scroll-snap-type: x mandatory;            /* firm snap, one lane at a time */
+    -webkit-overflow-scrolling: touch;
+  }
+  .lane {
+    scroll-snap-align: start;
+    border-radius: var(--radius-container);
+  }
+  /* the per-lane sticky header still names the lane + count at the top of the
+     full-width lane — redundant with the switcher but reassuring while swiping. */
+
+  /* the card is UNCHANGED — it simply fills the wider lane. No card rule here. */
+
+  /* the floating compare note shrinks so it doesn't cover a full-width card */
+  .note { left: 8px; right: 8px; bottom: 8px; font-size: 10px; text-align: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- ───────────── persistent top bar ───────────── -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brandMark">SU</div>
+    <div class="brandText">
+      <div class="brandKicker">Product</div>
+      <div class="brandName">Sulis</div>
+    </div>
+  </div>
+
+  <a class="tab tabActive" href="#" aria-label="Board">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="16" height="16"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    <span class="tabLabel">Board</span>
+  </a>
+
+  <!-- THE PARKED-BUT-REAL AFFORDANCE, given its home. The long label folds to
+       a compact "+ New" at tablet/mobile widths so the bar never wraps; the
+       full label stays on the accessible name. -->
+  <button class="startNew" type="button" aria-label="Start something new">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+    <span class="startNewLabel">Start something new</span>
+  </button>
+
+  <div class="topbarRight">
+    <button class="iconBtn" aria-label="Settings" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 6 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 1.6 14H1.5a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 3 8.6a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 9 3.6V3.5a2 2 0 1 1 4 0v.1A1.7 1.7 0 0 0 18 6a1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1H21"/></svg>
+    </button>
+    <button class="iconBtn" id="themeBtn" aria-label="Toggle theme" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- ───────────── board ───────────── -->
+<main class="boardPage">
+  <div class="boardHeader">
+    <h1 class="boardTitle">Changes in flight</h1>
+    <button class="refreshBtn" type="button">Refresh</button>
+  </div>
+
+  <div class="toolbar">
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="15" height="15"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3" stroke-linecap="round"/></svg>
+      Search inside your changes — conversations and created items
+    </div>
+    <span class="chip">Recon</span>
+    <span class="chip">Specify</span>
+    <span class="chip">Design</span>
+    <span class="chip">Implement</span>
+    <span class="chip">Review</span>
+    <span class="chip">Ship</span>
+    <span class="chip attn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" width="13" height="13"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke-linejoin="round"/></svg>
+      Needs attention
+    </span>
+  </div>
+
+  <!-- ───────────── MOBILE lane switcher (shown < 600px only) ─────────────
+       Reuses the SAME stage chips the founder already knows (Recon…Ship) as
+       a tab rail that picks which single full-width lane is shown. The chips
+       are real tabs (role="tab", aria-selected) so keyboard + screen-reader
+       users get proper state; each is ≥44px tall and shows the lane's count.
+       "Needs attention" stays in the rail as a reachable filter toggle. The
+       rail scrolls + snaps horizontally so no chip is ever clipped. -->
+  <div class="laneSwitcher" role="tablist" aria-label="Pick a stage to view">
+    <button class="searchBtn" type="button" aria-label="Search your changes">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="18" height="18"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3" stroke-linecap="round"/></svg>
+    </button>
+    <button class="switchChip recon" type="button" role="tab" aria-selected="true" aria-controls="lane-recon">
+      <span class="sdot" aria-hidden="true"></span>Recon<span class="switchCount">4</span>
+    </button>
+    <button class="switchChip specify" type="button" role="tab" aria-selected="false" aria-controls="lane-specify">
+      <span class="sdot" aria-hidden="true"></span>Specify<span class="switchCount">1</span>
+    </button>
+    <button class="switchChip design" type="button" role="tab" aria-selected="false" aria-controls="lane-design">
+      <span class="sdot" aria-hidden="true"></span>Design<span class="switchCount">1</span>
+    </button>
+    <button class="switchChip implement" type="button" role="tab" aria-selected="false" aria-controls="lane-implement">
+      <span class="sdot" aria-hidden="true"></span>Implement<span class="switchCount">3</span>
+    </button>
+    <button class="switchChip review" type="button" role="tab" aria-selected="false" aria-controls="lane-review">
+      <span class="sdot" aria-hidden="true"></span>Review<span class="switchCount">2</span>
+    </button>
+    <button class="switchChip ship" type="button" role="tab" aria-selected="false" aria-controls="lane-ship">
+      <span class="sdot" aria-hidden="true"></span>Ship<span class="switchCount">3</span>
+    </button>
+    <button class="switchChip attn" type="button" aria-pressed="false" aria-label="Filter: needs attention">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" width="15" height="15"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke-linejoin="round"/></svg>
+      Needs attention
+    </button>
+  </div>
+
+  <div class="board">
+
+    <!-- ── RECON ── -->
+    <section class="lane recon" id="lane-recon" aria-label="Recon — 4 changes">
+      <header class="laneHead">
+        <span class="sdot" aria-hidden="true"></span>
+        <span class="laneName">Recon</span>
+        <span class="laneCount">4</span>
+      </header>
+      <div class="laneList">
+
+        <!-- WAITING ON YOU — the chip leads the consistent foot row; card has
+             the same structure as every other card (no banner, no stripe). -->
+        <a class="card" href="#" aria-label="Change CH-01KTMF: make change resolution refuse a dirty worktree">
+          <div class="topLine">
+            <span class="handle">CH-01KTMF</span>
+            <span class="live idle">
+              <span class="ldot" aria-hidden="true"></span>
+              <span class="sr">idle, not running · </span>
+              <span class="lago">15m</span>
+            </span>
+          </div>
+          <div class="steps" role="img" aria-label="Step 1 of 6">
+            <span class="step cur"></span><span class="step"></span><span class="step"></span><span class="step"></span><span class="step"></span><span class="step"></span>
+          </div>
+          <p class="intent">make change resolution refuse a dirty worktree</p>
+          <div class="cardMeta">
+            <span class="slug">safe-change-resolution</span>
+          </div>
+          <!-- WAITING ON YOU → health hidden; the waiting read goes FULL-WIDTH + CENTERED -->
+          <div class="footRow waitingFoot">
+            <span class="waiting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke-linejoin="round"/></svg>Waiting on you<span class="why">— picking an approach</span></span>
+          </div>
+        </a>
+
+        <!-- WORKING — no founder input owed, so the foot shows change-health. -->
+        <a class="card" href="#" aria-label="Change CH-01KSJA: Fix the cockpit start-from-intent product scoping">
+          <div class="topLine">
+            <span class="handle">CH-01KSJA</span>
+            <span class="live working">
+              <span class="ldot" aria-hidden="true"></span>
+              <span class="sr">actively working · </span>
+              <span class="lago">now</span>
+            </span>
+          </div>
+          <div class="steps" role="img" aria-label="Step 1 of 6">
+            <span class="step cur"></span><span class="step"></span><span class="step"></span><span class="step"></span><span class="step"></span><span class="step"></span>
+          </div>
+          <p class="intent">Fix the cockpit start-from-intent product scoping</p>
+          <div class="cardMeta">
+            <span class="slug">cockpit-start-active-product</span>
+          </div>
+          <!-- NOT waiting on you → the foot shows change-health -->
+          <div class="footRow">
+            <span class="health ontrack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>On track<span class="sr"> — tests green, on plan</span></span>
+          </div>
+        </a>
+
+        <a class="card" href="#" aria-label="Change CH-01KQ2B: Write the contribution / onboarding guide">
+          <div class="topLine">
+            <span class="handle">CH-01KQ2B</span>
+            <span class="live idle">
+              <span class="ldot" aria-hidden="true"></span>
+              <span class="sr">idle, not running · </span>
+              <span class="lago">4h</span>
+            </span>
+          </div>
+          <div class="steps" role="img" aria-label="Step 1 of 6">
+            <span class="step cur"></span><span class="step"></span><span class="step"></span><span class="step"></span><span class="step"></span><span class="step"></span>
+          </div>
+          <p class="intent">Write the contribution / onboarding guide</p>
+          <div class="cardMeta">
+            <span class="slug">contribution-guide</span>
+          </div>
+          <!-- NOT waiting on you → the foot shows change-health -->
+          <div class="footRow">
+            <span class="health look"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12h14" stroke-linecap="round"/></svg>Worth a look<span class="sr"> — missing tests for its stage</span></span>
+          </div>
+        </a>
+
+        <a class="card" href="#" aria-label="Change CH-01KP7C: Scope brain reads to the active tenant">
+          <div class="topLine">
+            <span class="handle">CH-01KP7C</span>
+            <span class="live idle">
+              <span class="ldot" aria-hidden="true"></span>
+              <span class="sr">idle, not running · </span>
+              <span class="lago">6h</span>
+            </span>
+          </div>
+          <div class="steps" role="img" aria-label="Step 1 of 6">
+            <span class="step cur"></span><span class="step"></span><span class="step"></span><span class="step"></span><span class="step"></span><span class="step"></span>
+          </div>
+          <p class="intent">Scope brain reads to the active tenant</p>
+          <div class="cardMeta">
+            <span class="slug">brain-read-tenant-scope</span>
+          </div>
+          <!-- NOT waiting on you → the foot shows change-health -->
+          <div class="footRow">
+            <span class="health ontrack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>On track<span class="sr"> — tests green, on plan</span></span>
+          </div>
+        </a>
+
+      </div>
+      <!-- pinned bottom action — RECON ONLY, because changes start here -->
+      <div class="laneFoot">
+        <button class="startHere" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+          Start here
+        </button>
+      </div>
+    </section>
+
+    <!-- ── SPECIFY ── -->
+    <section class="lane specify" id="lane-specify" aria-label="Specify — 1 change">
+      <header class="laneHead">
+        <span class="sdot" aria-hidden="true"></span>
+        <span class="laneName">Specify</span>
+        <span class="laneCount">1</span>
+      </header>
+      <div class="laneList">
+        <!-- WAITING ON YOU — an open BLOCKER parks this change. -->
+        <a class="card" href="#" aria-label="Change CH-01KN4D: Add a stage-level OODA feedback loop to the spec">
+          <div class="topLine">
+            <span class="handle">CH-01KN4D</span>
+            <span class="live idle">
+              <span class="ldot" aria-hidden="true"></span>
+              <span class="sr">idle, not running · </span>
+              <span class="lago">1d</span>
+            </span>
+          </div>
+          <div class="steps" role="img" aria-label="Step 2 of 6">
+            <span class="step on"></span><span class="step cur"></span><span class="step"></span><span class="step"></span><span class="step"></span><span class="step"></span>
+          </div>
+          <p class="intent">Add a stage-level OODA feedback loop to the spec</p>
+          <div class="cardMeta">
+            <span class="slug">change-stage-ooda-spiral</span>
+          </div>
+          <!-- WAITING ON YOU → health hidden; the waiting read goes FULL-WIDTH + CENTERED -->
+          <div class="footRow waitingFoot">
+            <span class="waiting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke-linejoin="round"/></svg>Waiting on you<span class="why">— blocked</span></span>
+          </div>
+        </a>
+      </div>
+    </section>
+
+    <!-- ── DESIGN ── -->
+    <section class="lane design" id="lane-design" aria-label="Design — 1 change">
+      <header class="laneHead">
+        <span class="sdot" aria-hidden="true"></span>
+        <span class="laneName">Design</span>
+        <span class="laneCount">1</span>
+      </header>
+      <div class="laneList">
+        <a class="card" href="#" aria-label="Change CH-01KM9E: Expand the definition of done for testable states">
+          <div class="topLine">
+            <span class="handle">CH-01KM9E</span>
+            <span class="live idle">
+              <span class="ldot" aria-hidden="true"></span>
+              <span class="sr">idle, not running · </span>
+              <span class="lago">1w</span>
+            </span>
+          </div>
+          <div class="steps" role="img" aria-label="Step 3 of 6">
+            <span class="step on"></span><span class="step on"></span><span class="step cur"></span><span class="step"></span><span class="step"></span><span class="step"></span>
+          </div>
+          <p class="intent">Expand the definition of done for testable states</p>
+          <div class="cardMeta">
+            <span class="slug">testable-state-done</span>
+          </div>
+          <!-- NOT waiting on you → the foot shows change-health -->
+          <div class="footRow">
+            <span class="health look"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12h14" stroke-linecap="round"/></svg>Worth a look<span class="sr"> — no design recorded for this stage</span></span>
+          </div>
+        </a>
+      </div>
+    </section>
+
+    <!-- ── IMPLEMENT ── -->
+    <section class="lane implement" id="lane-implement" aria-label="Implement — 3 changes">
+      <header class="laneHead">
+        <span class="sdot" aria-hidden="true"></span>
+        <span class="laneName">Implement</span>
+        <span class="laneCount">3</span>
+      </header>
+      <div class="laneList">
+        <!-- WORKING — actively building right now; no founder input owed. -->
+        <a class="card" href="#" aria-label="Change CH-01KL1F: Add a 'Start something new' button to the top bar">
+          <div class="topLine">
+            <span class="handle">CH-01KL1F</span>
+            <span class="live working">
+              <span class="ldot" aria-hidden="true"></span>
+              <span class="sr">actively working · </span>
+              <span class="lago">now</span>
+            </span>
+          </div>
+          <div class="steps" role="img" aria-label="Step 4 of 6">
+            <span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step cur"></span><span class="step"></span><span class="step"></span>
+          </div>
+          <p class="intent">Add a 'Start something new' button to the top bar</p>
+          <div class="cardMeta">
+            <span class="slug">cockpit-start-change-button</span>
+          </div>
+          <!-- NOT waiting on you → the foot shows change-health -->
+          <div class="footRow">
+            <span class="health ontrack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>On track<span class="sr"> — tests green, on plan</span></span>
+          </div>
+        </a>
+        <!-- WAITING ON YOU — agent asked a question and stopped. -->
+        <a class="card" href="#" aria-label="Change CH-01KK8G: Fix the change-owned terminal per change brief">
+          <div class="topLine">
+            <span class="handle">CH-01KK8G</span>
+            <span class="live liveq">
+              <span class="ldot" aria-hidden="true"></span>
+              <span class="sr">session live · </span>
+              <span class="lago">12m</span>
+            </span>
+          </div>
+          <div class="steps" role="img" aria-label="Step 4 of 6">
+            <span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step cur"></span><span class="step"></span><span class="step"></span>
+          </div>
+          <p class="intent">Fix: the change-owned terminal per change brief</p>
+          <div class="cardMeta">
+            <span class="slug">terminal-per-change-brief</span>
+          </div>
+          <!-- WAITING ON YOU → health hidden; the waiting read goes FULL-WIDTH + CENTERED -->
+          <div class="footRow waitingFoot">
+            <span class="waiting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke-linejoin="round"/></svg>Waiting on you<span class="why">— a question</span></span>
+          </div>
+        </a>
+        <a class="card" href="#" aria-label="Change CH-01KJ3H: Realize the change-owned working brief">
+          <div class="topLine">
+            <span class="handle">CH-01KJ3H</span>
+            <span class="live idle">
+              <span class="ldot" aria-hidden="true"></span>
+              <span class="sr">idle, not running · </span>
+              <span class="lago">2d</span>
+            </span>
+          </div>
+          <div class="steps" role="img" aria-label="Step 4 of 6">
+            <span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step cur"></span><span class="step"></span><span class="step"></span>
+          </div>
+          <p class="intent">Realize the change-owned working brief</p>
+          <div class="cardMeta">
+            <span class="slug">change-owned-brief</span>
+          </div>
+          <!-- NOT waiting on you → the foot shows change-health -->
+          <div class="footRow">
+            <span class="health ontrack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>On track<span class="sr"> — tests green, on plan</span></span>
+          </div>
+        </a>
+      </div>
+    </section>
+
+    <!-- ── REVIEW ── -->
+    <section class="lane review" id="lane-review" aria-label="Review — 2 changes">
+      <header class="laneHead">
+        <span class="sdot" aria-hidden="true"></span>
+        <span class="laneName">Review</span>
+        <span class="laneCount">2</span>
+      </header>
+      <div class="laneList">
+        <!-- WAITING ON YOU — review needs the founder's sign-off, so "Waiting on
+             you" is the only read shown; the change's health (it happens to be
+             on track) is hidden here and lives on the card detail. -->
+        <a class="card" href="#" aria-label="Change CH-01KH5J: plan-work DoD drives the real definition of done">
+          <div class="topLine">
+            <span class="handle">CH-01KH5J</span>
+            <span class="live idle">
+              <span class="ldot" aria-hidden="true"></span>
+              <span class="sr">idle, not running · </span>
+              <span class="lago">19h</span>
+            </span>
+          </div>
+          <div class="steps" role="img" aria-label="Step 5 of 6">
+            <span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step cur"></span><span class="step"></span>
+          </div>
+          <p class="intent">plan-work DoD drives the real definition of done</p>
+          <div class="cardMeta">
+            <span class="slug">plan-work-listready-gate</span>
+          </div>
+          <!-- WAITING ON YOU → health hidden; the waiting read goes FULL-WIDTH + CENTERED -->
+          <div class="footRow waitingFoot">
+            <span class="waiting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke-linejoin="round"/></svg>Waiting on you<span class="why">— a decision</span></span>
+          </div>
+        </a>
+        <a class="card" href="#" aria-label="Change CH-01KG6K: Pick up the Product / Project verify gate">
+          <div class="topLine">
+            <span class="handle">CH-01KG6K</span>
+            <span class="live idle">
+              <span class="ldot" aria-hidden="true"></span>
+              <span class="sr">idle, not running · </span>
+              <span class="lago">6d</span>
+            </span>
+          </div>
+          <div class="steps" role="img" aria-label="Step 5 of 6">
+            <span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step cur"></span><span class="step"></span>
+          </div>
+          <p class="intent">Pick up the Product / Project verify gate</p>
+          <div class="cardMeta">
+            <span class="slug">product-project-opportunity-evolution</span>
+          </div>
+          <!-- NOT waiting on you → the foot shows change-health -->
+          <div class="footRow">
+            <span class="health look"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12h14" stroke-linecap="round"/></svg>Worth a look<span class="sr"> — scope grew past the plan</span></span>
+          </div>
+        </a>
+      </div>
+    </section>
+
+    <!-- ── SHIP ── -->
+    <section class="lane ship" id="lane-ship" aria-label="Ship — 3 changes">
+      <header class="laneHead">
+        <span class="sdot" aria-hidden="true"></span>
+        <span class="laneName">Ship</span>
+        <span class="laneCount">3</span>
+      </header>
+      <div class="laneList">
+        <a class="card" href="#" aria-label="Change CH-01KF7L: dev-session-mint">
+          <div class="topLine">
+            <span class="handle">CH-01KF7L</span>
+            <span class="live idle">
+              <span class="ldot" aria-hidden="true"></span>
+              <span class="sr">idle, not running · </span>
+              <span class="lago">2d</span>
+            </span>
+          </div>
+          <div class="steps" role="img" aria-label="Step 6 of 6">
+            <span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step cur"></span>
+          </div>
+          <p class="intent">dev-session-mint</p>
+          <div class="cardMeta">
+            <span class="slug">dev-session-mint</span>
+          </div>
+          <!-- NOT waiting on you → the foot shows change-health -->
+          <div class="footRow">
+            <span class="health ontrack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>On track<span class="sr"> — tests green, on plan</span></span>
+          </div>
+        </a>
+        <a class="card" href="#" aria-label="Change CH-01KE8M: Block 'done' on a founder-facing visual gate">
+          <div class="topLine">
+            <span class="handle">CH-01KE8M</span>
+            <span class="live idle">
+              <span class="ldot" aria-hidden="true"></span>
+              <span class="sr">idle, not running · </span>
+              <span class="lago">5d</span>
+            </span>
+          </div>
+          <div class="steps" role="img" aria-label="Step 6 of 6">
+            <span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step cur"></span>
+          </div>
+          <p class="intent">Block 'done' on a founder-facing visual gate</p>
+          <div class="cardMeta">
+            <span class="slug">interaction-flow-gate</span>
+          </div>
+          <!-- NOT waiting on you → the foot shows change-health -->
+          <div class="footRow">
+            <span class="health ontrack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>On track<span class="sr"> — tests green, on plan</span></span>
+          </div>
+        </a>
+        <a class="card" href="#" aria-label="Change CH-01KD9N: Fix /sulis:discover-project verify gate">
+          <div class="topLine">
+            <span class="handle">CH-01KD9N</span>
+            <span class="live idle">
+              <span class="ldot" aria-hidden="true"></span>
+              <span class="sr">idle, not running · </span>
+              <span class="lago">1w</span>
+            </span>
+          </div>
+          <div class="steps" role="img" aria-label="Step 6 of 6">
+            <span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step on"></span><span class="step cur"></span>
+          </div>
+          <p class="intent">Fix /sulis:discover-project verify gate</p>
+          <div class="cardMeta">
+            <span class="slug">discover-verify-scope</span>
+          </div>
+          <!-- NOT waiting on you → the foot shows change-health -->
+          <div class="footRow">
+            <span class="health ontrack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>On track<span class="sr"> — tests green, on plan</span></span>
+          </div>
+        </a>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<div class="note">
+  Board refresh — resize the window to see it adapt: wide = 6 lanes; narrower = lanes scroll sideways; phone-width = one lane at a time, switched by the stage chips. Top line: handle (left) · probe + relative time (right). Foot: a full-width "Waiting on you" OR change-health, never both. Real Sulis tokens; dark layers page → lane → card.
+  <button id="themeToggle" type="button">Toggle dark</button>
+</div>
+
+<script>
+  const root = document.documentElement;
+  function flip() {
+    root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  }
+  document.getElementById('themeToggle').addEventListener('click', flip);
+  document.getElementById('themeBtn').addEventListener('click', flip);
+
+  /* ── Mobile lane switcher ──────────────────────────────────────────────
+     The stage chips act as a tab rail over the single-lane mobile board.
+     Tapping a chip snap-scrolls its lane into view; swiping the board updates
+     which chip reads as selected. Pure progressive enhancement — with JS off,
+     CSS scroll-snap still lets the user swipe between lanes, and the chips are
+     still real <button>s. */
+  const board = document.querySelector('.board');
+  const tabs = Array.from(document.querySelectorAll('.laneSwitcher [role="tab"]'));
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const lane = document.getElementById(tab.getAttribute('aria-controls'));
+      if (lane) lane.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+      tabs.forEach(t => t.setAttribute('aria-selected', String(t === tab)));
+    });
+  });
+
+  /* swipe → keep the selected chip in sync with the lane in view */
+  let raf = null;
+  board.addEventListener('scroll', () => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = null;
+      const mid = board.scrollLeft + board.clientWidth / 2;
+      let nearest = null, best = Infinity;
+      tabs.forEach(t => {
+        const lane = document.getElementById(t.getAttribute('aria-controls'));
+        if (!lane) return;
+        const c = lane.offsetLeft + lane.offsetWidth / 2;
+        const d = Math.abs(c - mid);
+        if (d < best) { best = d; nearest = t; }
+      });
+      if (nearest) tabs.forEach(t => t.setAttribute('aria-selected', String(t === nearest)));
+    });
+  }, { passive: true });
+
+  /* "Needs attention" filter toggle in the rail (visual state only here) */
+  const attn = document.querySelector('.laneSwitcher .attn');
+  if (attn) attn.addEventListener('click', () => {
+    attn.setAttribute('aria-pressed', attn.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+  });
+</script>
+</body>
+</html>
