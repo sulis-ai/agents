@@ -628,6 +628,27 @@ class SessionManager:
         re-entering the FIFO as just-another-turn (§2.6, one-in-flight intact).
         Daemon so a hard interpreter exit never hangs on an in-flight recovery.
 
+        **Free the held slot before a retry replay (load-bearing).** An ``error``
+        Event does not satisfy ``adapter.turn_complete`` (only a ``result``
+        does), so the stdout pump never frees the one-in-flight slot for an
+        errored turn — the stdin pump stays parked on ``_turn_done.wait()``
+        (§2.6). For a **retryable** (transient-blip) error the driver re-submits
+        the stopped turn through the FIFO, but that replay can never promote
+        while the errored turn still holds the slot — the run deadlocks instead
+        of recovering (BLOCKER-WP-008). So, for a transient-blip error only, the
+        slot is freed here via :meth:`Session.release_turn_for_retry` (the same
+        ``_turn_done.set()`` the normal completion path uses) BEFORE the driver
+        is dispatched, so the parked stdin pump wakes and the replay promotes
+        onto the still-live process. This runs on the **stdout** pump thread
+        (which fired this event); the *stdin* pump is the one waiting, so freeing
+        the slot here wakes it — no self-deadlock. A dead-end (abandoned, never
+        replayed) and a login-expiry (paused, resumed via the existing same-key
+        restart which frees the slot through ``replace_process``) do NOT replay
+        the turn, so their held slot is harmless and is deliberately left for
+        their own path — the release is surgical to the retry case, preserving
+        the one-in-flight invariant (the replay re-acquires the slot as
+        just-another-turn).
+
         Best-effort: routing must never crash the pump thread that fired the
         event (which would wedge the stdout reader), so a driver fault is
         swallowed on the recovery thread — the failure is already in the log;
@@ -640,6 +661,15 @@ class SessionManager:
         if driver is None:
             return
         error = event.error
+
+        # Free the held one-in-flight slot for a transient-blip retry BEFORE the
+        # driver replays the stopped turn, so the replay can promote (§2.6) —
+        # classified with the same arbiter + adapter hint the driver uses, so the
+        # manager and the driver agree on which errors are replayed. Dead-end and
+        # login-expiry do not replay, so their slot is left for their own path.
+        hint = session.adapter.classify_failure(error)
+        if classify(error, hint) is RecoveryClass.TRANSIENT_BLIP:
+            session.release_turn_for_retry()
 
         def _drive() -> None:
             try:
