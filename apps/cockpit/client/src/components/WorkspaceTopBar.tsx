@@ -7,7 +7,7 @@
 // a change's own nav lives inside the change (ThreadView), not here.
 
 import { NavLink, useNavigate } from "react-router-dom";
-import { Squares2X2Icon } from "@heroicons/react/24/outline";
+import { Squares2X2Icon, Cog6ToothIcon } from "@heroicons/react/24/outline";
 import { XMarkIcon } from "@heroicons/react/20/solid";
 import type { Change } from "../../../shared/api-types";
 import { useProducts } from "../api/useProducts";
@@ -44,7 +44,10 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
   const serverActiveProductId = products.data?.activeProductId ?? null;
 
   const byId = new Map<string, Change>(
-    (changesQuery.isSuccess ? changesQuery.data : []).map((c) => [c.changeId, c]),
+    (changesQuery.isSuccess ? changesQuery.data : []).map((c) => [
+      c.changeId,
+      c,
+    ]),
   );
 
   function onCloseTab(changeId: string, e: React.MouseEvent) {
@@ -117,9 +120,23 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
         })}
       </nav>
 
-      {/* Light/dark toggle — pushed to the far right (CH-01KTHP). Reachable
-          from every route because the top bar is persistent chrome. */}
+      {/* Settings gear + light/dark toggle — pushed to the far right
+          (CH-01KTHP / WP-008). Reachable from every route because the top bar
+          is persistent chrome. */}
       <div className={styles.toggleSlot}>
+        <NavLink
+          to="/settings"
+          data-testid="tab-settings"
+          aria-label="Settings"
+          title="Settings"
+          className={({ isActive }) =>
+            isActive
+              ? `${styles.settingsGear} ${styles.settingsGearActive}`
+              : styles.settingsGear
+          }
+        >
+          <Cog6ToothIcon aria-hidden="true" />
+        </NavLink>
         <ThemeToggle />
       </div>
     </header>

@@ -52,7 +52,40 @@
   flex: 0 0 auto;
   display: flex;
   align-items: center;
+  gap: 6px;
   padding-left: 8px;
+}
+
+/* Settings gear — the /settings affordance, right slot near the theme toggle
+ * (WP-008). Mirrors the mockup's .iconBtn (tokens-only). Active = on /settings;
+ * the accent border marks the current route the way the tab strip does. */
+.settingsGear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted-foreground);
+  border-radius: var(--radius-interactive);
+  cursor: pointer;
+}
+.settingsGear:hover {
+  color: var(--foreground);
+  background: var(--muted);
+}
+.settingsGear:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+.settingsGearActive {
+  color: var(--foreground);
+  border-color: var(--accent);
+}
+.settingsGear svg {
+  width: 18px;
+  height: 18px;
 }
 
 /* A tab — Board or an open change. Bottom-border highlight when active. */
@@ -104,12 +137,24 @@
   flex: 0 0 auto;
   background: var(--border);
 }
-.tabDot[data-stage="recon"] { background: var(--stage-recon); }
-.tabDot[data-stage="specify"] { background: var(--stage-specify); }
-.tabDot[data-stage="design"] { background: var(--stage-design); }
-.tabDot[data-stage="implement"] { background: var(--stage-implement); }
-.tabDot[data-stage="review"] { background: var(--stage-review); }
-.tabDot[data-stage="ship"] { background: var(--stage-ship); }
+.tabDot[data-stage="recon"] {
+  background: var(--stage-recon);
+}
+.tabDot[data-stage="specify"] {
+  background: var(--stage-specify);
+}
+.tabDot[data-stage="design"] {
+  background: var(--stage-design);
+}
+.tabDot[data-stage="implement"] {
+  background: var(--stage-implement);
+}
+.tabDot[data-stage="review"] {
+  background: var(--stage-review);
+}
+.tabDot[data-stage="ship"] {
+  background: var(--stage-ship);
+}
 
 /* Close affordance — appears on hover/active; a real focusable button. */
 .tabClose {
