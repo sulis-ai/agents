@@ -1,0 +1,7 @@
+change_id: 01KTP2EA90VM797BXBWTYMCEB4
+primitive: fix
+tier: patch
+touches_plugin: true
+summary: |
+  sulis-change start now fetches origin/{base} and branches off the fetched tip (degrading gracefully offline), so new work is never cut from a stale local main; corrects the change-flow doc that wrongly claimed this already happened.
+created_at: 2026-06-09T12:02:49Z
