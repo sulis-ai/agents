@@ -1,0 +1,7 @@
+change_id: 01KTP87JTARR2GV3K95J54AN9F
+primitive: fix
+tier: patch
+touches_plugin: true
+summary: |
+  Fix the desktop workspace window crashing on open when the session view is declined a resize — a benign decline now degrades instead of taking the window down.
+created_at: 2026-06-09T13:28:24Z
