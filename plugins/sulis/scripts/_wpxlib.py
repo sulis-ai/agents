@@ -2301,6 +2301,7 @@ def find_eligible_branches(
     *,
     paths: "WpxPaths | None" = None,
     base_branch: str = "main",
+    change_scope: str | None = None,
 ) -> list[EligibilityResult]:
     """Discover which WPs are eligible for the next train.
 
@@ -2342,6 +2343,16 @@ def find_eligible_branches(
       (``test_wpx_train_eligibility.py``) which stubs WPRow.status
       directly and doesn't need network access.
 
+    Scoped resolution (ADR-001):
+
+      Pass ``change_scope`` (the change's ``"{primitive}-{slug}"``) to confine
+      branch resolution to this change's ``wp/{scope}/`` namespace, so a WP can
+      never be false-eligibled onto a foreign change's recycled-number branch
+      (#105/#106). It is threaded into ``compute_wp_status``, the reported
+      ``_branch_name``, and ``resolve_wp_branch``. ``change_scope=None`` (the
+      default) is byte-for-byte the legacy ``feat/...`` behaviour, so existing
+      callers and the in-memory eligibility test suite are unaffected.
+
     Returns one EligibilityResult per WP — both eligible and ineligible
     are returned so the caller (queue-list / status / doctor) can show
     the founder the full picture.
@@ -2360,6 +2371,7 @@ def find_eligible_branches(
             wp.id: compute_wp_status(
                 wp.id, paths, repo, base_branch,
                 stored_status=wp.status,
+                change_scope=change_scope,
             )
             for wp in wps
         }
@@ -2392,7 +2404,7 @@ def find_eligible_branches(
         # Reported branch defaults to the slug-literal for messaging; the
         # actual resolved branch (which may be fuzzy-matched) replaces it
         # once we know we have a hit on origin.
-        branch = _branch_name(wp.id, slug)
+        branch = _branch_name(wp.id, slug, change_scope)
 
         if is_held:
             results.append(EligibilityResult(
@@ -2415,7 +2427,7 @@ def find_eligible_branches(
         # the literal when it exists on origin, or a fuzzy ``feat/wp-NNN-*``
         # match (single → use; multi → most-recent-by-committerdate with
         # a warning), or None when no branch matches.
-        resolved = resolve_wp_branch(wp.id, repo, wp_dir)
+        resolved = resolve_wp_branch(wp.id, repo, wp_dir, change_scope=change_scope)
         if resolved is None:
             results.append(EligibilityResult(
                 wp=wp.id, branch=branch, eligible=False,
@@ -3746,6 +3758,7 @@ def compute_wp_status(
     *,
     gh: GHClient | None = None,
     stored_status: str | None = None,
+    change_scope: str | None = None,
 ) -> str:
     """Return the computed status for ``wp_id``.
 
@@ -3793,6 +3806,11 @@ def compute_wp_status(
         stored_status: The INDEX.md cell value to fall back to when no
             authoritative signal is present. Pass the parsed cell from
             ``parse_index_md``; defaults to ``None`` → ``"pending"``.
+        change_scope: The change's ``"{primitive}-{slug}"`` (ADR-001).
+            Threaded to ``resolve_wp_branch`` so the step-7-complete check is
+            confined to this change's ``wp/{scope}/`` namespace and never
+            matches a foreign change's branch. ``None`` (default) = legacy
+            ``feat/...`` resolution, byte-for-byte.
 
     Returns:
         One of: ``"done"``, ``"step-7-shipping"``, ``"step-7-complete"``,
@@ -3812,7 +3830,9 @@ def compute_wp_status(
     # Case 3: step-7-complete — origin branch exists, no train signal.
     # Use resolve_wp_branch so a fuzzy-matched (short-slug) push counts
     # as step-7-complete just the same as a literal-slug push.
-    if resolve_wp_branch(wp_id, repo, paths.wp_dir, gh=gh) is not None:
+    if resolve_wp_branch(
+        wp_id, repo, paths.wp_dir, gh=gh, change_scope=change_scope,
+    ) is not None:
         return "step-7-complete"
 
     # Case 4: fall-through — defer to the stored cell (operator intent).
@@ -4860,6 +4880,27 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
         file=sys.stderr,
     )
     return None
+
+
+def current_change_scope(repo_root: Path | None = None) -> str | None:
+    """Return ``"{primitive}-{slug}"`` for the current change, or ``None``.
+
+    The single derivation point for the ADR-001 branch-naming scope (EP-03):
+    CLI entrypoints call this once and thread the result into
+    ``find_eligible_branches`` / ``compute_wp_status`` as ``change_scope``.
+    Returns ``None`` when no change context is resolvable (``SULIS_CHANGE_ID``
+    unset, or set with no matching manifest), so callers fall back to the
+    byte-for-byte legacy ``feat/...`` behaviour. No CLI command should
+    hand-build ``"{primitive}-{slug}"`` inline.
+    """
+    meta = resolve_current_change(repo_root)
+    if not meta:
+        return None
+    primitive = meta.get("primitive")
+    slug = meta.get("slug")
+    if not primitive or not slug:
+        return None
+    return f"{primitive}-{slug}"
 
 
 def back_integrate_change_branch(
