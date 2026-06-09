@@ -69,6 +69,14 @@ _KIND_KEY = "Kind"
 # child). `produces: integration-check` is the same signal carried on the row.
 _INTEGRATION_KINDS = {"composite"}
 _DONE_STATUS = "done"
+# Wall-clock bound on the default scenario runner subprocess. The gate fires at
+# every seam-closing WP done-transition (build-loop machinery), so an unbounded
+# runner call would hang the whole transition indefinitely on a stuck runner. On
+# timeout, `subprocess.run` raises `TimeoutExpired`, which propagates to the
+# wpx-step12 machinery wrapper's degrade-open catch → `not-closed` + a
+# `gate_error` naming the timeout (never a fabricated green or block). Generous
+# (10 min) so a legitimately slow scripted scenario is not false-timed-out.
+_RUNNER_TIMEOUT_SECONDS = 600
 
 
 @dataclass
@@ -186,6 +194,7 @@ def _default_run_scenario(scenario_id: str, *, repo_root: Path, **_kwargs) -> di
         capture_output=True,
         text=True,
         check=False,
+        timeout=_RUNNER_TIMEOUT_SECONDS,
     )
     return json.loads(proc.stdout)
 
