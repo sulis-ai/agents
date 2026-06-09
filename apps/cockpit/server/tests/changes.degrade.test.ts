@@ -75,8 +75,11 @@ describe("GET /api/changes — degradation (S-23: gone worktree)", () => {
       const gone = body.find((r) => r.changeId === "01GONE")!;
       const good = body.find((r) => r.changeId === "01GOOD")!;
 
-      // Gone row: best-effort unknown reads, not-flagged, no recency.
-      expect(gone.liveness.status).toBe("unknown");
+      // Gone row: a gone worktree doesn't make liveness ambiguous — with no
+      // session.json the change is simply not running (idle); HEALTH is what
+      // degrades to unknown (rigor can't read the gone worktree). Not-flagged,
+      // no recency.
+      expect(gone.liveness.status).toBe("not-running");
       expect(gone.health.state).toBe("unknown");
       expect(gone.needsAttention.flagged).toBe(false);
 
