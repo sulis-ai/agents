@@ -1,7 +1,0 @@
-change_id: 01KTMA9RVWP41Z0J67D07Y3NRF
-primitive: feat
-tier: minor
-touches_plugin: true
-summary: |
-  Context-scoped verification substrate: tiered driver (scripted/agent-step), isolation ladder, and an equality|property verdict-invariant on the scenario runner — the upstream the seam-DoD gate (#95) consumes.
-created_at: 2026-06-09T08:19:08Z

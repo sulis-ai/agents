@@ -1,3 +1,9 @@
+## v0.125.0 — 2026-06-09
+
+**Minor — release-train batch.**
+
+- Context-scoped verification substrate: tiered driver (scripted/agent-step), isolation ladder, and an equality|property verdict-invariant on the scenario runner — the upstream the seam-DoD gate (#95) consumes.
+
 ## v0.124.0 — 2026-06-09
 
 **Minor — release-train batch.**
