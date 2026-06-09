@@ -98,3 +98,91 @@ def test_squash_message_omits_empty_intent_but_keeps_coauthor():
     msg = _compose_squash_message("chore", "bump-deps", {"intent": ""})
     assert msg.splitlines()[0] == "chore: bump-deps"
     assert "Co-Authored-By:" in msg
+
+
+# ─── #272: refuse to mark an EMPTY change shipped (the stacked-change harm) ──
+
+import subprocess  # noqa: E402
+
+import pytest  # noqa: E402
+
+
+def _git(repo, *args):
+    return subprocess.run(["git", *args], cwd=str(repo), capture_output=True, text=True)
+
+
+def _init_repo(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "config", "user.email", "t@t")
+    _git(repo, "config", "user.name", "t")
+    (repo / "f.txt").write_text("base")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "base")
+    base = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    return repo, base
+
+
+def test_own_commit_count_zero_for_branch_at_base(tmp_path):
+    repo, base = _init_repo(tmp_path)
+    _git(repo, "checkout", "-qb", "change/empty")  # at base — zero own commits
+    assert _mod._change_own_commit_count(repo, base, "change/empty") == 0
+
+
+def test_own_commit_count_positive_when_ahead(tmp_path):
+    repo, base = _init_repo(tmp_path)
+    _git(repo, "checkout", "-qb", "change/work")
+    (repo / "g.txt").write_text("x")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "work")
+    assert _mod._change_own_commit_count(repo, base, "change/work") == 1
+
+
+def test_own_commit_count_none_when_base_unknown(tmp_path):
+    repo, _ = _init_repo(tmp_path)
+    # No base_sha to compare against → undeterminable (never blocks a ship).
+    assert _mod._change_own_commit_count(repo, "", "change/work") is None
+
+
+def test_archive_after_ship_refuses_empty_change(tmp_path, monkeypatch):
+    """The #272 guard: a change whose branch has zero commits beyond its base
+    is empty — nothing was built — and must NOT be markable as shipped."""
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path / "state"))
+    import _change_state as cs
+
+    repo, base = _init_repo(tmp_path)
+    _git(repo, "checkout", "-qb", "change/fix-empty")  # at base — empty
+    cid = "01J0000000000000000000000X"  # valid 26-char ULID
+    cs.write_change_record(cid, {
+        "change_id": cid, "handle": "CH-01J000", "slug": "empty",
+        "primitive": "fix", "branch": "change/fix-empty",
+        "base_sha": base, "worktree_path": str(tmp_path / "wt"),
+    })
+    with pytest.raises(SystemExit):  # emit_error → sys.exit(1)
+        _mod._archive_after_ship(repo, cid, "change/fix-empty",
+                                 tmp_path / "wt", remove_worktree=False)
+    # And it did NOT flip the record to shipped.
+    rec = cs.read_change_record(cid) or {}
+    assert rec.get("stage") != "shipped"
+
+
+def test_archive_after_ship_allows_nonempty_change(tmp_path, monkeypatch):
+    """A change with real commits of its own ships normally (guard doesn't fire)."""
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path / "state"))
+    import _change_state as cs
+
+    repo, base = _init_repo(tmp_path)
+    _git(repo, "checkout", "-qb", "change/fix-real")
+    (repo / "g.txt").write_text("x")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "real work")
+    cid = "01J0000000000000000000000Y"
+    cs.write_change_record(cid, {
+        "change_id": cid, "handle": "CH-01J000", "slug": "real",
+        "primitive": "fix", "branch": "change/fix-real",
+        "base_sha": base, "worktree_path": str(tmp_path / "wt"),
+    })
+    out = _mod._archive_after_ship(repo, cid, "change/fix-real",
+                                   tmp_path / "wt", remove_worktree=False)
+    assert out["stage"] == "shipped"
