@@ -1,0 +1,4 @@
+ apps/cockpit/client/src/pages/SettingsPage.tsx     | 35 +++++++++++++++++++---
+ .../client/src/pages/settings/ProductRow.tsx       | 11 +++++--
+ .../client/src/pages/settings/Settings.module.css  |  8 +++--
+ 3 files changed, 46 insertions(+), 8 deletions(-)

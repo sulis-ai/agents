@@ -19,7 +19,12 @@ mutation or process start anywhere else. The interactive terminal is a SECOND
 sanctioned write path (ADR-010) — it adds exactly two more named, audited gate
 exceptions (the sidecar bridge's WebSocket attachment + the shared session-manager
 daemon start in `lib/ensureDaemon.ts`), detailed in the read-only gate section
-below. It binds to `127.0.0.1` only.
+below. The Settings management surface is a THIRD sanctioned write path
+(`server/routes/settings.ts`, ADR-019) — it carries the products/projects/repo
+CRUD verbs but starts no process and writes no file itself: every mutation
+delegates to the `SettingsStore` port, whose sole adapter
+(`SpineSettingsAdapter`) is the one allow-listed writer. It binds to
+`127.0.0.1` only.
 
 This README covers the workspace shape, the dev-run flow, and the
 HTTP surface that ships with WP-001 + WP-010. The React components
@@ -76,6 +81,13 @@ and the ports (the change-store reader, WP-003; the `SessionBridge`, WP-005).
 | `POST /api/changes/:id/chat`         | **The one write/act path (WP-005).** Delivers a message to the change's agent (resume-or-spawn) and streams the reply as SSE. Refuses with `SESSION_BUSY` (409), `SESSION_CHANGE_MISMATCH` (422, zero bytes), or `SESSION_UNREACHABLE` (502, not delivered).        | SSE `ChatStreamEvent` (`state` → `chunk*` → `complete`) |
 | `POST /api/concierge/query`          | **The concierge front door (WP-009, read-only).** Answers plain-English nav / status / Q&A over the change store + brain, streaming SSE; it rides the SAME bridge as the chat (no second bridge, ADR-006) and performs ZERO writes/mints/starts (FR-N8). Intent is classified by a DETERMINISTIC pre-classifier (`detectRoute`), not the LLM: when intent is consequential (investigate / start-work / empty-world set-up) the inline bridge is **short-circuited entirely** — `complete` carries a `route` hint and the concierge OFFERS the confirm-gated next step, never investigates inline (FR-N9 — investigation is contained in a change, never run loose). The bridge is reached ONLY for a genuine read-only question (`route === null`). 502 `SESSION_UNREACHABLE` if the bridge can't be reached. | SSE `ConciergeStreamEvent` (`state` → `chunk*` → `complete{route}`) |
 | `POST /api/onboarding/session`       | **Cold-start onboarding (WP-010, confirm-gated act).** One turn in the setup conversation for an EMPTY graph (UC-07): `phase: "search"` runs discovery in the founder's CHOSEN area only (bounded — `chosenArea` outside the permitted root ⇒ 422 `DISCOVERY_SCOPE_VIOLATION`, FR-N7); `phase: "ask"` answers a clarifying question; `phase: "confirm"` (with the live `confirmToken`) performs the ACT — repo find-or-create (local-only `git init` by default, ADR-008) then mint via the validated spine emitters. Streams SSE `state` → `chunk*` → `proposal` (awaiting confirm) → `minted`. Idempotent (an already-minted entity is surfaced, not duplicated, FR-31); all-or-nothing (a stale confirm ⇒ 422 `DISCOVERY_CONFIRM_STALE`; a failed create ⇒ `REPO_CREATE_FAILED` with NO dangling config, FR-N10/N11); one Product per conversation (409 `SESSION_BUSY` on a second concurrent session, founder-locked). Registered in `chat.ts` so it adds no new write-gate exception (ADR-006). | SSE `OnboardingStreamEvent` (`state` → `chunk*` → `proposal` → `minted`) |
+| `GET /api/settings`                  | **The Settings management tree (WP-006, ADR-019).** The whole editable store — every Product, its Projects, and each Project's repo link — active entities only, sorted by name. Read-only. | `SettingsTree` |
+| `POST /api/settings/products`        | **Create or edit a Product (WP-006 write surface).** No `productId` ⇒ create; with `productId` ⇒ edit in place. Delegates to the `SettingsStore` port (the router writes nothing itself). A malformed body ⇒ 422 `VALIDATION_FAILED` (never reaches the port); editing the synthesised implicit Product ⇒ 409 `IMMUTABLE_IMPLICIT`; a failed write ⇒ 502 `WRITE_FAILED`. | `SettingsProduct` |
+| `DELETE /api/settings/products/:id`  | **Remove a Product (soft-delete).** Flips `sys_status` so the next `GET /api/settings` omits it; no file is deleted from disk. | `{ ok: true }` |
+| `POST /api/settings/projects`        | **Create or edit a Project (WP-006).** `productId` required; no `projectId` ⇒ create; with `projectId` ⇒ edit. Same validation + error envelope as products. | `SettingsProject` |
+| `DELETE /api/settings/projects/:id`  | **Remove a Project (soft-delete).** | `{ ok: true }` |
+| `POST /api/settings/projects/:id/repo` | **Attach a local repo to a Project (WP-006, ADR-021 local-path-only).** Body `{ localPath }`; the path param is the authoritative `projectId`. A missing folder ⇒ 404 `PATH_NOT_FOUND`; a folder without a `.git` still attaches with `present:false`. The founder's folder is only ever read, never written. | `SettingsProject` |
+| `DELETE /api/settings/projects/:id/repo` | **Unlink a Project's repo (WP-006).** Clears the link; the founder's folder and its `.git` are never a write target. | `SettingsProject` |
 | `POST /api/changes/start-from-intent` | **Start from intent (WP-011, confirm-gated act).** Say what you want in plain English → a change starts at Recon (Journeys H + J). `phase: "propose"` classifies the intent to a change **primitive + slug** via a DETERMINISTIC server-side classifier (the change-primitives vocabulary, FR-29) and streams a `proposal` (mints/starts nothing); an ambiguous intent ⇒ 422 `INTENT_AMBIGUOUS` (asks ONE clarifying question, never guesses). `phase: "confirm"` (with the live `confirmToken`) performs the ACT: it maps the active Product's `Project.source` → `--repo-root`, clones the repo first if absent (local-first, FR-30 — a broken clone ⇒ 502 `REPO_UNREACHABLE` with NO change started), then runs `sulis-change start` so the change lands at Recon. An **investigation** (`kind: "investigation"`) becomes a CONTAINED change, never inline work (FR-34/FR-N9). The change-start is a DETERMINISTIC SERVER action behind the `StartChangeRunner` port (the WP-010 lesson: the act is never delegated to the bridge agent). Stale confirm ⇒ 422 `START_CONFIRM_STALE`; a second concurrent start ⇒ 409 `SESSION_BUSY`. Registered in `chat.ts` so it adds no new write-gate exception (ADR-006). | SSE `StartFromIntentStreamEvent` (`state` → `proposal` → `started`) |
 
 ### Two-way chat relay (WP-005)
@@ -252,7 +264,21 @@ pairing, never a blanket waiver):
   view); the daemon's own idle-empty auto-exit bounds it.
 
 The terminal is its OWN bridge — added alongside chat's seams, never coupled to
-them (it does not import the chat relay or the chat bridge). Run
+them (it does not import the chat relay or the chat bridge).
+
+The **Settings** screen is a THIRD sanctioned write surface (ADR-019) — it
+adds / edits / removes products, projects, and repo links. All settings
+mutations live in one router (`routes/settings.ts`) which starts no process and
+writes no file itself; it delegates to one new adapter,
+`adapters/SpineSettingsAdapter.ts` — the ONLY new process-start site in the
+settings change. The adapter execFiles the validated Python entity helpers
+(`adapters/spine/edit-*.py`, `set-entity-status.py`, `list-entities.py`,
+`emit-project.py`) so every write goes through schema validation
+(reject-on-invalid); it is allow-listed BY PATH for both the filesystem-write
+and process-start rules, parity with `SpineEmitterMinter`. Remove is a
+soft-delete (`sys_status="deleted"`, ADR-020) — the brain `.jsonld` file stays
+on disk and the founder's folder is never a write target (proven by the
+disk-safety sentinel test). Run
 `npm run check:read-only -- --explain` for the full rule catalogue.
 
 ### Cold-start onboarding (WP-010)
@@ -416,8 +442,8 @@ apps/cockpit/
 │   ├── index.ts            # bootstrap — binds 127.0.0.1:5174
 │   ├── app.ts              # createApp(deps) Express factory (testable)
 │   ├── config.ts           # CONFIG — bindAddress is hard-coded
-│   ├── ports/              # ChangeStoreReader + RecreateRunner (WP-004) + SessionBridge (the chat seam, WP-005) + TerminalBridge (typed terminal socket-client seam, WP-007) + ConversationIdentity (the assisted-origin seam: resolved session → Thread id + Message ordinal, ADR-016/018)
-│   ├── adapters/           # SulisChangeStoreReader (Python helper bridge); SulisChangeRecreator + FakeRecreateRunner (WP-004); StreamJsonSessionBridge (prod) + RecordedSessionBridge (recorded fixture) (WP-005); LocalTranscriptConversationIdentity (derives the assisted Thread identity locally/read-only — no cross-service call, ADR-018)
+│   ├── ports/              # ChangeStoreReader + RecreateRunner (WP-004) + SessionBridge (the chat seam, WP-005) + TerminalBridge (typed terminal socket-client seam, WP-007) + ConversationIdentity (the assisted-origin seam: resolved session → Thread id + Message ordinal, ADR-016/018) + SettingsStore (the settings write seam — domain-owned port + shared contract test, CH-01KTNS WP-002, ADR-019/020)
+│   ├── adapters/           # SulisChangeStoreReader (Python helper bridge); SulisChangeRecreator + FakeRecreateRunner (WP-004); StreamJsonSessionBridge (prod) + RecordedSessionBridge (recorded fixture) (WP-005); LocalTranscriptConversationIdentity (derives the assisted Thread identity locally/read-only — no cross-service call, ADR-018); FakeSettingsStore (in-memory SettingsStore for router/client tests, CH-01KTNS WP-002)
 │   ├── routes/             # GET read handlers + chat relay + concierge query + cold-start onboarding (all POST/SSE in the ONE sanctioned file chat.ts — WP-005/009/010)
 │   ├── middleware/         # request-log + typed-error → JSON mapper
 │   ├── lib/                # domain logic — no framework imports

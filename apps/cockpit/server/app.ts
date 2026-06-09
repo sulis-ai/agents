@@ -18,6 +18,7 @@
 // read-only-inventory.test.ts gate enforces this by grep.
 
 import { homedir } from "node:os";
+import { join } from "node:path";
 
 import express, { type Application } from "express";
 import cors from "cors";
@@ -66,6 +67,10 @@ import { createStatusRouter } from "./routes/status";
 import { createBrainRouter } from "./routes/brain";
 import { createSearchRouter } from "./routes/search";
 import { createProductsRouter } from "./routes/products";
+import { settingsRouter } from "./routes/settings";
+import type { SettingsStore } from "./ports/SettingsStore";
+import { SpineSettingsAdapter } from "./adapters/SpineSettingsAdapter";
+import { resolvePluginScriptsDir } from "./adapters/resolvePluginScripts";
 
 import { errorMiddleware } from "./middleware/errors";
 import { requestLogMiddleware } from "./middleware/request-log";
@@ -137,6 +142,17 @@ export interface CreateAppDeps {
    * never the intent text). Defaults to no-op.
    */
   startChangeLogSink?: (line: StartChangeLogLine) => void;
+  /**
+   * WP-006 (ADR-019) — the SettingsStore the Settings router (the THIRD
+   * sanctioned write surface) delegates to. Production defaults to the real
+   * `SpineSettingsAdapter` (the one allow-listed writer — it execFiles the
+   * validated python helpers; the router itself starts no process and writes no
+   * file). Tests inject a `FakeSettingsStore` to exercise the routes without
+   * shelling out. The router is ALWAYS mounted (settings is a first-class
+   * surface, not bridge-gated like chat) — when no store is injected the real
+   * adapter is constructed from `sulisStateDir`.
+   */
+  settingsStore?: SettingsStore;
   sulisStateDir: string;
   claudeProjectsDir: string;
   /** Optional override for the 1 MiB file cap (tests + future tuning). */
@@ -150,13 +166,15 @@ export interface CreateAppDeps {
 export function createApp(deps: CreateAppDeps): Application {
   const app = express();
 
-  // 1. CORS — single allowed origin. POST is allowed for the ONE sanctioned
-  //    write path (the chat relay, ADR-001/003); every other route is GET-only
-  //    and the read-only gate proves no other mutation verb exists.
+  // 1. CORS — single allowed origin. POST is allowed for the sanctioned write
+  //    paths (the chat relay, ADR-001/003; the operator-action routes, ADR-015;
+  //    the settings router, WP-006/ADR-019). DELETE is allowed for the settings
+  //    CRUD removes (ADR-019). Every OTHER route is GET-only and the read-only
+  //    gate proves no other mutation verb exists.
   app.use(
     cors({
       origin: deps.clientOrigin ?? "http://127.0.0.1:5173",
-      methods: ["GET", "POST", "OPTIONS"],
+      methods: ["GET", "POST", "DELETE", "OPTIONS"],
     }),
   );
 
@@ -429,6 +447,30 @@ export function createApp(deps: CreateAppDeps): Application {
     createProductsRouter({
       changeStore: deps.changeStore,
       sulisStateDir: deps.sulisStateDir,
+    }),
+  );
+
+  // WP-006 — the Settings management surface (FR settings; ADR-019/020/021). THE
+  // THIRD SANCTIONED WRITE SURFACE: the only place outside the chat relay +
+  // operator-action routes that carries mutation verbs. Every mutation delegates
+  // to the SettingsStore port, whose sole real adapter (SpineSettingsAdapter) is
+  // the one allow-listed writer; the router itself starts no process and writes
+  // no file (the read-only gate proves it). Always mounted (a first-class
+  // surface, not bridge-gated): when no store is injected, the real adapter is
+  // built from `sulisStateDir` (its `_entity_adapter_local.py` resolved from the
+  // installed plugin / in-repo checkout, the same walk the emitter/starter use).
+  app.use(
+    "/api/settings",
+    settingsRouter({
+      store:
+        deps.settingsStore ??
+        new SpineSettingsAdapter({
+          scriptsDir: resolvePluginScriptsDir({
+            scriptName: "_entity_adapter_local.py",
+            envOverride: process.env.SULIS_ADAPTER_SCRIPTS_DIR,
+          }),
+          baseDir: join(deps.sulisStateDir, ".brain", "instances"),
+        }),
     }),
   );
 

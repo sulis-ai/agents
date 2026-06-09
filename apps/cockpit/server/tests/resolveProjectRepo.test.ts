@@ -34,17 +34,18 @@ function seedProject(
   stateDir: string,
   productRef: string,
   source: { repo: string; path: string; primary_branch: string },
+  extra: { sys_status?: string; file?: string } = {},
 ): void {
   const dir = join(stateDir, ".brain", "instances", "product-development", "project");
   mkdirSync(dir, { recursive: true });
-  writeFileSync(
-    join(dir, "p1.jsonld"),
-    JSON.stringify({
-      "@id": "dna:project:p1",
-      belongs_to_product_ref: productRef,
-      source: JSON.stringify(source),
-    }),
-  );
+  const file = extra.file ?? "p1.jsonld";
+  const entity: Record<string, unknown> = {
+    "@id": `dna:project:${file.replace(/\.jsonld$/, "")}`,
+    belongs_to_product_ref: productRef,
+    source: JSON.stringify(source),
+  };
+  if (extra.sys_status !== undefined) entity.sys_status = extra.sys_status;
+  writeFileSync(join(dir, file), JSON.stringify(entity));
 }
 
 describe("resolveProjectRepo", () => {
@@ -106,6 +107,26 @@ describe("resolveProjectRepo", () => {
     const resolved = await resolveProjectRepo({
       sulisStateDir: stateDir,
       productId: "dna:product:nope",
+    });
+    expect(resolved).toBeNull();
+  });
+
+  // WP-003 (ADR-020) — a removed Project is soft-deleted via sys_status; the
+  // resolver must skip it so a removed Project no longer resolves a repo.
+  it("skips_deleted_project: a soft-deleted Project resolves null", async () => {
+    const stateDir = tmp("rpr-state-");
+    const repo = tmp("rpr-repo-");
+    mkdirSync(join(repo, ".git"), { recursive: true });
+    seedProject(
+      stateDir,
+      "dna:product:acme",
+      { repo: "git@github.com:acme/checkout.git", path: repo, primary_branch: "main" },
+      { sys_status: "deleted", file: "deleted.jsonld" },
+    );
+
+    const resolved = await resolveProjectRepo({
+      sulisStateDir: stateDir,
+      productId: "dna:product:acme",
     });
     expect(resolved).toBeNull();
   });

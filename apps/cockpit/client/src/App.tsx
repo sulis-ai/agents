@@ -7,6 +7,7 @@
 //   /                → <Board>          (inside <WorkspaceShell>) — the stage board
 //   /c/:changeId     → <ThreadView>     (inside <WorkspaceShell>) — a change, in its own tab
 //   /concierge       → <ConciergePage>  (inside <WorkspaceShell>) — the front door
+//   /settings        → <SettingsPage>   (inside <WorkspaceShell>) — products/projects/repos tree (WP-008)
 //   /*               → <NotFound>       (inside <WorkspaceShell>)
 //
 // Chat-redesign (chat-B2): the persistent left Sidebar is replaced by the
@@ -21,6 +22,7 @@ import { ThreadView } from "./pages/ThreadView";
 import { ConciergePage } from "./pages/ConciergePage";
 import { OnboardingPage } from "./pages/OnboardingPage";
 import { StartFromIntentPage } from "./pages/StartFromIntentPage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { NotFound } from "./pages/NotFound";
 // WP-003 — the theme context layer wraps the whole app so every route is
 // inside it. AppRoutes stays bare so MemoryRouter-based tests keep mounting
@@ -38,6 +40,8 @@ export function AppRoutes() {
         <Route path="/onboarding" element={<OnboardingPage />} />
         {/* start-from-intent (UC-08) + investigation→change (UC-10). */}
         <Route path="/start" element={<StartFromIntentPage />} />
+        {/* Settings — products/projects/repos tree (WP-008). */}
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

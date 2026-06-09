@@ -1,0 +1,402 @@
+diff --git a/apps/cockpit/server/tests/api-types.contract.test.ts b/apps/cockpit/server/tests/api-types.contract.test.ts
+index aa0578de..2f54ebc2 100644
+--- a/apps/cockpit/server/tests/api-types.contract.test.ts
++++ b/apps/cockpit/server/tests/api-types.contract.test.ts
+@@ -44,8 +44,23 @@ import type {
+   // The typed error envelope (all three code categories)
+   ApiError,
+   ApiErrorCode,
++  // Settings (the management surface; ADR-019/020/021)
++  RepoLink,
++  SettingsProject,
++  SettingsProduct,
++  SettingsTree,
++  ProductWrite,
++  ProjectWrite,
++  RepoAttachWrite,
++  SettingsErrorCode,
+ } from "../../shared/api-types";
+ 
++import {
++  happySettingsTree,
++  emptySettingsTree,
++  settingsErrorFixtures,
++} from "../../shared/__fixtures__/settings.fixtures";
++
+ // ── a generic no-snake_case wire-shape assertion (anti-hardwiring) ──────────
+ // Reuses the established "camelCase on the wire" invariant: every property key
+ // of a wire object (recursively) must be camelCase, never snake_case. The ONE
+@@ -392,3 +407,143 @@ describe("shared/api-types — the typed error envelope (all three code categori
+     }
+   });
+ });
++
++// ═══════════════════════════════════════════════════════════════════════════
++// WP-001 — Settings wire contract (TDD §5.1; ADR-019/020/021; CF-03/04).
++//
++// The settings management surface adds the products/projects/repo-links tree
++// shapes plus the three error categories. These are camelCase wire shapes —
++// the ONE sanctioned snake_case exception (ProjectSource) is NOT among them:
++// RepoLink exposes `primaryBranch` (camelCase), the producer maps it to the
++// snake_case `primary_branch` of Project.source at the boundary (WP-006).
++//
++// This block is the WP's named verification
++// (settings_shapes_round_trip_happy_error_empty): it pins the happy / empty /
++// error fixtures against the new shapes and asserts they serialise/parse
++// losslessly. The compile is the real gate (tsc --noEmit): a drifted field or
++// invented property stops these fixtures compiling.
++// ═══════════════════════════════════════════════════════════════════════════
++
++describe("shared/api-types — SETTINGS wire shapes (ADR-019/020/021)", () => {
++  it("settings_shapes_round_trip_happy_error_empty: happy / empty / error fixtures round-trip losslessly (CF-04)", () => {
++    // HAPPY — one editable product, one project, one present:true repo.
++    const happy: SettingsTree = happySettingsTree;
++    expect(happy.products).toHaveLength(1);
++    const product = happy.products[0];
++    expect(product?.editable).toBe(true);
++    const project = product?.projects[0];
++    expect(project).toBeDefined();
++    const repo: RepoLink | null | undefined = project?.repo;
++    expect(repo?.present).toBe(true);
++    expect(repo?.localPath).not.toBeNull();
++    expect(typeof repo?.primaryBranch).toBe("string");
++
++    // EMPTY — the single implicit product (editable:false, no projects).
++    const empty: SettingsTree = emptySettingsTree;
++    expect(empty.products).toHaveLength(1);
++    expect(empty.products[0]?.editable).toBe(false);
++    expect(empty.products[0]?.projects).toEqual([]);
++
++    // ERROR — one ApiError per SettingsErrorCode value (all three categories).
++    const errorCodes: SettingsErrorCode[] = [
++      "NOT_FOUND",
++      "VALIDATION_FAILED",
++      "PATH_NOT_FOUND",
++      "PATH_NOT_A_REPO",
++      "WRITE_FAILED",
++      "IMMUTABLE_IMPLICIT",
++    ];
++    for (const code of errorCodes) {
++      const err = settingsErrorFixtures[code];
++      expect(err.code).toBe(code);
++      expect(typeof err.error).toBe("string");
++      assertNoSnakeCase(err);
++    }
++
++    // Lossless JSON round-trip for the tree fixtures (the wire is JSON).
++    for (const tree of [happy, empty]) {
++      const round = JSON.parse(JSON.stringify(tree)) as SettingsTree;
++      expect(round).toEqual(tree);
++      // No snake_case leaks onto settings wire keys (RepoLink is camelCase).
++      assertNoSnakeCase(round);
++    }
++  });
++
++  it("every SettingsErrorCode member is reachable in the ApiError envelope (CF-03 type-level)", () => {
++    // Type-level: a SettingsErrorCode value is assignable to ApiError.code,
++    // i.e. SettingsErrorCode ⊆ ApiErrorCode (reuse, not redeclare). If a
++    // settings code were missing from ApiErrorCode this stops compiling.
++    const asApiCode: (c: SettingsErrorCode) => ApiErrorCode = (c) => c;
++    const envelope = (c: SettingsErrorCode): ApiError => ({
++      error: "x",
++      code: asApiCode(c),
++    });
++    const codes: SettingsErrorCode[] = [
++      "NOT_FOUND",
++      "VALIDATION_FAILED",
++      "PATH_NOT_FOUND",
++      "PATH_NOT_A_REPO",
++      "WRITE_FAILED",
++      "IMMUTABLE_IMPLICIT",
++    ];
++    for (const c of codes) {
++      expect(envelope(c).code).toBe(c);
++    }
++  });
++
++  it("the write shapes carry the upsert-by-id invariant (id present ⇒ edit, absent ⇒ create)", () => {
++    const create: ProductWrite = { name: "Alpha" };
++    const edit: ProductWrite = {
++      productId: "dna:product:01A",
++      name: "Alpha v2",
++    };
++    expect(create.productId).toBeUndefined();
++    expect(edit.productId).toBe("dna:product:01A");
++
++    const projectCreate: ProjectWrite = {
++      productId: "dna:product:01A",
++      name: "proj",
++    };
++    const projectEdit: ProjectWrite = {
++      projectId: "dna:project:01A",
++      productId: "dna:product:01A",
++      name: "proj v2",
++    };
++    expect(projectCreate.projectId).toBeUndefined();
++    expect(projectEdit.projectId).toBe("dna:project:01A");
++
++    // Attach is local-path-only (ADR-021): an absolute path, no URL/create.
++    const attach: RepoAttachWrite = {
++      projectId: "dna:project:01A",
++      localPath: "/Users/founder/code/proj",
++    };
++    expect(attach.localPath.startsWith("/")).toBe(true);
++    assertNoSnakeCase(attach);
++  });
++
++  it("SettingsProject.repo is null when no repo is attached yet, and RepoLink.localPath is null when unlinked", () => {
++    const unattached: SettingsProject = {
++      projectId: "dna:project:01B",
++      name: "no-repo",
++      repo: null,
++    };
++    expect(unattached.repo).toBeNull();
++
++    const unlinked: RepoLink = {
++      localPath: null,
++      primaryBranch: "main",
++      present: false,
++    };
++    expect(unlinked.localPath).toBeNull();
++    expect(unlinked.present).toBe(false);
++
++    const productNode: SettingsProduct = {
++      productId: "dna:product:01A",
++      name: "Alpha",
++      editable: true,
++      projects: [unattached],
++    };
++    expect(productNode.projects[0]?.repo).toBeNull();
++    assertNoSnakeCase(productNode);
++  });
++});
+diff --git a/apps/cockpit/shared/__fixtures__/settings.fixtures.ts b/apps/cockpit/shared/__fixtures__/settings.fixtures.ts
+new file mode 100644
+index 00000000..d5ff688c
+--- /dev/null
++++ b/apps/cockpit/shared/__fixtures__/settings.fixtures.ts
+@@ -0,0 +1,94 @@
++// WP-001 — Settings wire-contract example stubs (CF-04; ADR-019/020/021).
++//
++// CF-04 requires the contract ship example stubs covering happy AND error AND
++// empty cases. These are the canonical settings fixtures every consumer mock
++// (e.g. the WP-007 client contract test) and producer test reuses — one place
++// the example shapes live, so no two tests hand-roll a divergent SettingsTree.
++//
++// No runtime behaviour — pure typed literals against the shapes in
++// `../api-types`. If a shape drifts, these stop compiling (the tsc gate).
++//
++// References:
++// - ../api-types.ts (the shapes these fixtures instantiate).
++// - CONTRACT_FIRST_STANDARD CF-04 (stubs include happy + error + empty).
++
++import type {
++  ApiError,
++  RepoLink,
++  SettingsErrorCode,
++  SettingsProduct,
++  SettingsProject,
++  SettingsTree,
++} from "../api-types";
++
++// ── HAPPY — one editable product, one project, one present:true repo ─────────
++
++const happyRepo: RepoLink = {
++  localPath: "/Users/founder/code/alpha",
++  primaryBranch: "main",
++  present: true,
++};
++
++const happyProject: SettingsProject = {
++  projectId: "dna:project:01HAPPYPROJECT",
++  name: "Alpha web",
++  repo: happyRepo,
++};
++
++const happyProduct: SettingsProduct = {
++  productId: "dna:product:01HAPPYPRODUCT",
++  name: "Alpha",
++  editable: true,
++  projects: [happyProject],
++};
++
++/** A populated, editable settings tree (the happy case). */
++export const happySettingsTree: SettingsTree = {
++  products: [happyProduct],
++};
++
++// ── EMPTY — the single implicit product (editable:false, no projects) ────────
++
++const implicitProduct: SettingsProduct = {
++  productId: "dna:product:01IMPLICITSINGLE",
++  name: "My product",
++  // The synthesised implicit single product is read-only until it becomes real
++  // (ADR-020). A write against it returns IMMUTABLE_IMPLICIT.
++  editable: false,
++  projects: [],
++};
++
++/** The empty case — only the implicit, non-editable product exists. */
++export const emptySettingsTree: SettingsTree = {
++  products: [implicitProduct],
++};
++
++// ── ERROR — one ApiError per SettingsErrorCode value (all three categories) ──
++
++/**
++ * One `ApiError` envelope per settings error code (CF-03/04). Keyed by code so
++ * a consumer test can assert the exact envelope it expects per failure.
++ */
++export const settingsErrorFixtures: Record<SettingsErrorCode, ApiError> = {
++  // Protocol.
++  NOT_FOUND: { error: "No such product or project.", code: "NOT_FOUND" },
++  // Expected.
++  VALIDATION_FAILED: {
++    error: "That name didn't pass validation.",
++    code: "VALIDATION_FAILED",
++  },
++  PATH_NOT_FOUND: {
++    error: "That folder doesn't exist on disk.",
++    code: "PATH_NOT_FOUND",
++  },
++  PATH_NOT_A_REPO: {
++    error: "That folder isn't a git repo yet.",
++    code: "PATH_NOT_A_REPO",
++  },
++  IMMUTABLE_IMPLICIT: {
++    error: "The default product can't be edited yet.",
++    code: "IMMUTABLE_IMPLICIT",
++  },
++  // Internal.
++  WRITE_FAILED: { error: "Saving that change failed.", code: "WRITE_FAILED" },
++};
+diff --git a/apps/cockpit/shared/api-types.ts b/apps/cockpit/shared/api-types.ts
+index a226f7c8..be6ca64f 100644
+--- a/apps/cockpit/shared/api-types.ts
++++ b/apps/cockpit/shared/api-types.ts
+@@ -115,7 +115,11 @@ export interface ProvenanceDigest {
+   /** decision entities ("what it decided"). */
+   decided: number;
+   /** the agent's own gaps + self-critique ("what it flagged") — the trust tile. */
+-  flagged: { count: number; topGap: string | null; selfCritique: string | null };
++  flagged: {
++    count: number;
++    topGap: string | null;
++    selfCritique: string | null;
++  };
+ }
+ 
+ /** One step within an autonomous run (from a lifecyclerun's _step_runs). */
+@@ -727,10 +731,111 @@ export type ApiErrorCode =
+   // start-from-intent
+   | "INTENT_AMBIGUOUS"
+   | "START_CONFIRM_STALE"
+-  | "REPO_UNREACHABLE";
++  | "REPO_UNREACHABLE"
++  // settings management surface (WP-001; ADR-019/020/021). NOT_FOUND above is
++  // shared (Protocol). These five are the settings-specific Expected/Internal
++  // codes so `SettingsErrorCode` is a SUBSET of `ApiErrorCode` — the settings
++  // seam REUSES this envelope (CF-03), never redeclares one.
++  | "VALIDATION_FAILED"
++  | "PATH_NOT_FOUND"
++  | "PATH_NOT_A_REPO"
++  | "WRITE_FAILED"
++  | "IMMUTABLE_IMPLICIT";
+ 
+ /** The typed error envelope (the OpenAPI `Error` schema). */
+ export interface ApiError {
+   error: string;
+   code: ApiErrorCode;
+ }
++
++// ─── Settings (the management surface; WP-001; ADR-019/020/021) ──────────────
++//
++// The wire shapes for the Settings screen — the products/projects/repo-links
++// management tree (read), the create/edit/attach writes, and the typed error
++// codes. Per CF-02 these are the single source of truth the producer (WP-006)
++// and consumers (WP-007/008/009) import verbatim; none redeclare them.
++//
++// camelCase on the wire (anti-hardwiring): `RepoLink.primaryBranch` is
++// camelCase here; the producer maps it to the snake_case `primary_branch` of
++// `Project.source` at the persistence boundary (ADR-020). The snake_case
++// `ProjectSource` above remains the ONE sanctioned snake_case wire shape — the
++// settings shapes are NOT exceptions.
++
++/**
++ * One repo link as the Settings screen shows it (mirrors `Project.source`;
++ * ADR-021 local-path-only attach).
++ */
++export interface RepoLink {
++  /** Absolute local path the project points at, or null when unlinked. */
++  localPath: string | null;
++  primaryBranch: string;
++  /** True when localPath exists on disk with a .git dir (ADR-021 read-only check). */
++  present: boolean;
++}
++
++/** One project node in the Settings tree (ADR-019). */
++export interface SettingsProject {
++  projectId: string;
++  name: string;
++  /** null = no repo attached yet. */
++  repo: RepoLink | null;
++}
++
++/** One product node in the Settings tree, with its projects (ADR-019). */
++export interface SettingsProduct {
++  productId: string;
++  name: string;
++  /** false for the synthesised implicit single product (read-only until real; ADR-020). */
++  editable: boolean;
++  projects: SettingsProject[];
++}
++
++/** GET /api/settings — the whole editable store, active entities only (ADR-019/020). */
++export interface SettingsTree {
++  products: SettingsProduct[];
++}
++
++/**
++ * Create or edit a product (ADR-020 edit = validated re-save). `productId`
++ * present ⇒ edit (upsert by id); absent ⇒ create.
++ */
++export interface ProductWrite {
++  productId?: string;
++  name: string;
++}
++
++/**
++ * Create or edit a project under a product (ADR-020). `projectId` present ⇒
++ * edit; `productId` required on create, immutable parent on edit (v1).
++ */
++export interface ProjectWrite {
++  projectId?: string;
++  productId: string;
++  name: string;
++}
++
++/**
++ * Attach an existing local folder to a project (ADR-021 local-path-only v1):
++ * an absolute path to an EXISTING local folder. No URL, no create.
++ */
++export interface RepoAttachWrite {
++  projectId: string;
++  localPath: string;
++}
++
++/**
++ * The settings error codes, across all three CF-03 categories:
++ *   - Protocol: `NOT_FOUND`.
++ *   - Expected: `VALIDATION_FAILED`, `PATH_NOT_FOUND`, `PATH_NOT_A_REPO`,
++ *     `IMMUTABLE_IMPLICIT`.
++ *   - Internal: `WRITE_FAILED`.
++ * A SUBSET of `ApiErrorCode` — settings errors travel in the existing
++ * `ApiError` envelope, reused not redeclared (CF-03).
++ */
++export type SettingsErrorCode =
++  | "NOT_FOUND"
++  | "VALIDATION_FAILED"
++  | "PATH_NOT_FOUND"
++  | "PATH_NOT_A_REPO"
++  | "WRITE_FAILED"
++  | "IMMUTABLE_IMPLICIT";
