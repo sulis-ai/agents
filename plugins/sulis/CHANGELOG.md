@@ -1,3 +1,9 @@
+## v0.129.0 — 2026-06-09
+
+**Minor — release-train batch.**
+
+- New /sulis:scenarios command shows the verifiable scenarios defined for a change — the journey each checks, what you would observe if it works, and whether it has been driven green, blocked, or not yet run — plus any journey step with no scenario covering it.
+
 ## v0.128.2 — 2026-06-09
 
 **Patch — release-train batch.**

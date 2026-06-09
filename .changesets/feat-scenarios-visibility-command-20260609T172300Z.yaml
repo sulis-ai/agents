@@ -1,7 +1,0 @@
-change_id: 01KTPPC9HCC0WECTQ2YPWKJ89X
-primitive: feat
-tier: minor
-touches_plugin: true
-summary: |
-  New /sulis:scenarios command shows the verifiable scenarios defined for a change — the journey each checks, what you would observe if it works, and whether it has been driven green, blocked, or not yet run — plus any journey step with no scenario covering it.
-created_at: 2026-06-09T17:23:00Z
