@@ -156,6 +156,213 @@ See [HANDOVER.md](HANDOVER.md) for the execution agent handover.
 
 ---
 
+## Comprehensive DESIGN.md Target-Structure Template
+
+This is the **always-comprehensive** design-document template (FR-01/FR-11,
+ADR-002). The design artifact carries this full Target Structure for **every**
+behavioural change, regardless of depth — depth sizes only the interview, never
+which sections exist (FR-02). Section names and ordering follow the canonical
+`features/entity-crud/DESIGN.md` (C-01); the `## Verification Plan` heading is
+fixed verbatim (C-02 / ADR-001) so the P-VER section-presence check anchors on
+it.
+
+**The invariants this template encodes:**
+
+- Every mandatory section is present. A section a change cannot populate carries
+  an explicit `n/a — <justification>`, **never** a bare omission (SC-03,
+  NFR-R01 — "degrade detail, not existence").
+- The Non-Functional Requirements section is **always on** and states a
+  **measurable** target per category — Performance, Security, Reliability — not
+  an adjective like "fast" (SC-05, FR-06).
+- The §7 Solution Design carries an **always-on STRIDE threat model** (FR-15),
+  an **architecture-at-levels (C4)** sub-section with three distinct levels —
+  context, container, component (FR-16) — and an **Interface Contract** section
+  filled to the full CF-10 founder-reviewable dimensions (Schema +
+  three-category errors per CF-03 + Auth/permissions + Audience + User guide +
+  Error fixes). A contract operation missing any CF-10 dimension is incomplete
+  (the design stage does not complete, MUC-07). The contract is present even
+  when a change exposes no tool surface (marked `n/a — <reason>`), so a
+  tool-walk always has a target and contract-first ordering holds (ADR-007).
+
+The deterministic emitter that produces this structure from a depth-sized
+intake is `plugins/sulis/scripts/_drive_specify.py` (the methodology adapter the
+SC-01/02/03/05 scenarios drive); the WP-003 inspectors
+(`_assert_doc_sections`, `_assert_same_section_set`, `_assert_section_na`,
+`_assert_measurable_nfr`) verify the produced document against these invariants.
+
+```markdown
+# Design — {change slug}
+
+## 1. Executive Summary
+
+{1–3 paragraphs: what changes, why now, the load-bearing decisions. Depth
+sizes how much detail; the section is always present.}
+
+## 2. Problem Discovery
+
+{Problem statement, current behaviour, desired behaviour, why-now, impact of
+not doing. `n/a — <reason>` only for a pure-mechanical change with no problem
+to discover.}
+
+## 3. Stakeholders / Personas
+
+{The actors and their interests. `n/a — <reason>` if the change has no distinct
+stakeholders beyond the implementing agent.}
+
+## 4. Requirements
+
+### Functional Requirements
+
+{The functional requirements — recap by phase or table. `n/a — <reason>` if none.}
+
+### Non-Functional Requirements
+
+Always-on, measurable targets per category (FR-06). Structure is invariant
+across depth; detail is interview-sized. **Each category MUST state a number /
+threshold, not an adjective.**
+
+#### Performance
+
+{A measurable target — e.g. `< 5 ms`, `≤ 1.6×`, `1000 calls < 5 s`.}
+
+#### Security
+
+{A measurable target — e.g. `100%` of inputs validated, `0` unauthenticated
+paths.}
+
+#### Reliability
+
+{A measurable target — e.g. `≥ 99.9%` availability, `0` silent section drops.}
+
+### Threat Model
+
+{**Always-on STRIDE threat model (FR-15).** Name all six STRIDE categories in a
+matrix — a category that does not apply to this change carries an explicit
+`n/a — <reason>` rather than being dropped (NFR-R01). Add trust boundaries and
+the attack surface where the change has them.
+
+| Category | Threat | Applicable? | Mitigation |
+|----------|--------|-------------|------------|
+| **S**poofing | {threat or `n/a — <reason>`} | {Yes/No} | {mitigation} |
+| **T**ampering | {…} | {…} | {…} |
+| **R**epudiation | {…} | {…} | {…} |
+| **I**nformation disclosure | {…} | {…} | {…} |
+| **D**enial of service | {…} | {…} | {…} |
+| **E**levation of privilege | {…} | {…} | {…} |
+}
+
+### Constraints
+
+{Hard constraints — standards to match, headings fixed verbatim, purity
+requirements. `n/a — <reason>` if none.}
+
+### Assumptions
+
+{What must be true for the design to hold. `n/a — <reason>` if none.}
+
+### Dependencies
+
+{Internal / external dependencies and their classification. `n/a — <reason>`
+when the change declares no dependencies (SC-03).}
+
+## 5. Scope
+
+{In scope / out of scope / MVP-vs-future.}
+
+## 6. Use Cases
+
+{Use cases with main / alternate / exception flows. `n/a — <reason>` if the
+change has no user-facing or machine-facing use case.}
+
+## 7. Solution Design
+
+### Solution Overview
+
+{The composition narrative — what is built / reused / extended, and the
+load-bearing decisions.}
+
+### Architecture-at-Levels (C4)
+
+{**Always-on, three distinct C4 levels (FR-16).** Each level is its own
+sub-heading — a two-level section (e.g. context + container, no component) is
+incomplete. A thin change still states each level (a one-line `n/a — <reason>`
+where it has nothing to add), never drops one.}
+
+#### Level 1 — System Context
+
+{The change in its environment: the actors and the systems it talks to. A
+mermaid `graph` is ideal; prose is acceptable.}
+
+#### Level 2 — Container
+
+{The deployable / maintainable units the change spans.}
+
+#### Level 3 — Component
+
+{The load-bearing internals of the newest / most-changed container.}
+
+### Interface Contract
+
+{**MANDATORY for a tool surface; filled to the full CF-10 dimensions (FR-18).**
+When the change exposes no tool surface: `n/a — <reason>`, with the skeleton
+standing ready. Per FR-19 the tool-walk's operations must be a subset of this
+contract. Render one block per operation carrying the schema, the CF-03
+three-category errors, AND the four CF-10 founder-reviewable dimensions — a
+missing dimension makes the contract incomplete (the design stage does not
+complete, MUC-07):
+
+#### Operation: `<name>`
+
+| Dimension | Value |
+|-----------|-------|
+| **Schema** | in: `<input types>`; out: `<output types>` |
+| **Errors** | Protocol: `<transport failure>`. Expected: `<deterministic failure>`. Internal: `<unexpected crash>`. (CF-03) |
+| **Auth / permissions** | {does it require sign-in / a permission?} |
+| **Audience** | {operator / agent vs founder / end-user} |
+| **User guide** | {one plain-language sentence: what it does + when to use it} |
+| **Error fixes** | {per error: the cause + the user-fix and/or developer-fix} |
+}
+
+## 8. ADRs + BDRs
+
+{Technical decisions (ADR) and business decisions (BDR), recorded with distinct
+shapes (FR-17). `n/a — <reason>` if none recorded.
+
+An **ADR** records a *technical* decision — Context / Decision / Options
+considered / Consequences — answering "how do we build it?".
+
+A **BDR** records a *business* decision — a scope cut, a sequencing call, a
+cost/benefit trade — answering "what do we choose to do, and why is that worth
+it?". Same skeleton (Context / Decision / Options / Consequences) but the
+options and consequences are framed in business terms (cost, risk, founder
+value), and it carries `kind: bdr` so it is distinguishable from a technical
+ADR.
+
+| ID | Title | Kind |
+|----|-------|------|
+| ADR-001 | {technical decision} | technical |
+| BDR-001 | {business decision} | business |
+}
+
+## 9. Migration / Rollback / Security / Performance
+
+{How the change is migrated, rolled back, and the security + performance posture
+recap (targets stated in §4 Non-Functional Requirements).}
+
+## Verification Plan
+
+{The verbatim `## Verification Plan` heading (C-02 / ADR-001). Populated per the
+Verification Plan section template below.}
+```
+
+**No reordering, no omissions.** Inapplicable sections carry `n/a —
+<justification>`; the structure is invariant (ADR-002). The numbered §1..§10
+spine matches the canonical; the always-on NFR / Threat Model / Constraints /
+Assumptions / Dependencies sub-sections and the Interface Contract skeleton are
+named sub-headings beneath the spine that the document inspectors anchor on.
+
+---
+
 ## Verification Plan section template
 
 This block is the skeleton for the SRD's `## Verification Plan` section

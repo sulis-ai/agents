@@ -207,6 +207,67 @@ class TestAssembledEntitiesValidate:
                 / f"{sc_id}.jsonld").exists()
 
 
+class TestSurfaceTag:
+    """WP-007 (FR-10, ADR-005) — a scenario carries a first-class `surface`
+    tag (ui | tool) so the verification set can be partitioned by the consumer
+    surface it exercises.
+
+    Additive-optional (DESIGN.md §9.1): absent reads as `ui` (the current
+    single-surface default), so existing scenarios + their seed-derived IDs are
+    unchanged (NFR-05). The tag persists on the Scenario node and round-trips
+    through the real schema-validating adapter (NFR-D01 — brain is truth).
+    No new driver mechanism is introduced (FR-14).
+    """
+
+    def _surface_journey(self, surface: str | None) -> dict:
+        kwargs: dict = dict(
+            name="A user can run a tool against the brain",
+            verifies=[_ref("requirement", "req-tool")],
+            exercises=_ref("design", "des-tool"),
+            tenant=_TENANT,
+            seed="tool-surface-journey",
+            steps=[
+                {"instruction": "Invoke the tool",
+                 "asserts": ["the tool returns a result"]},
+            ],
+        )
+        if surface is not None:
+            kwargs["surface"] = surface
+        return assemble_scenario_graph(**kwargs)
+
+    def test_assemble_scenario_graph_tags_surface(self, tmp_path: Path) -> None:
+        # surface="tool" => the Scenario node carries surface: tool, and the
+        # tagged scenario still validates through the real adapter (brain truth).
+        g = self._surface_journey("tool")
+        assert g["scenarios"][0]["surface"] == "tool"
+        adapter = LocalFileEntityAdapter(
+            base_dir=tmp_path / ".brain" / "instances", domain="product-development"
+        )
+        adapter.save("scenario", g["scenarios"][0])  # must not raise
+
+    def test_surface_defaults_to_ui(self) -> None:
+        # omit surface => reads "ui" (back-compat with the single-surface default)
+        g = self._surface_journey(None)
+        assert g["scenarios"][0]["surface"] == "ui"
+
+    def test_seed_stability_preserved(self) -> None:
+        # NFR-05: the same seed yields an identical scenario id whether or not a
+        # surface is supplied — surface must not feed any _ulid seed.
+        without = self._surface_journey(None)
+        with_tool = self._surface_journey("tool")
+        assert without["scenarios"][0]["id"] == with_tool["scenarios"][0]["id"]
+        assert without["workflows"][0]["id"] == with_tool["workflows"][0]["id"]
+        assert [s["id"] for s in without["steps"]] == [
+            s["id"] for s in with_tool["steps"]
+        ]
+
+    def test_invalid_surface_is_rejected(self) -> None:
+        # the tag is a closed enum (ui | tool); anything else is a typo, not a
+        # third surface — fail loud at authoring rather than persist a bad tag.
+        with pytest.raises(ValueError, match="surface"):
+            self._surface_journey("api")
+
+
 def test_single_step_journey_has_no_transitions_issue(tmp_path: Path) -> None:
     # a 1-step journey: terminal==initial, transitions may be empty BUT schema
     # requires minItems:1 on transitions — assembler must emit a self/sentinel edge.

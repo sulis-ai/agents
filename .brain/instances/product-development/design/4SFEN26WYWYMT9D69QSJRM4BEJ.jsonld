@@ -1,0 +1,45 @@
+{
+  "decisions": [
+    "dna:decision:JY9Y25PKKQXRQNYM6RVDWQX08Q",
+    "dna:decision:PCZ27ZWQVDTH65YYP4BVG0CSQD",
+    "dna:decision:R88Y4NTY1ZM0Y7S72P2MDQSKM3",
+    "dna:decision:5FQ8ADFPZ1K37XWYVGFHHVD1N7",
+    "dna:decision:7A2TZVW0FTYSGMW0GCENYPFQE6",
+    "dna:decision:J2G665MJN958EBSA7B0W9ZF9B3",
+    "dna:decision:ZJP77FJJ66BVCPJ5GSYDGS6VET"
+  ],
+  "id": "dna:design:4SFEN26WYWYMT9D69QSJRM4BEJ",
+  "satisfies": [
+    "dna:requirement:SX8Z1FC0FA84NAAPX3P41EP1V5",
+    "dna:requirement:PGR41EQAD7DDRKBEX1RYVBDT49",
+    "dna:requirement:V4MWMD0SRY4AHMXHS6WYY5X6P1",
+    "dna:requirement:G6M17N94GWAXY937TN5JSKWBWH",
+    "dna:requirement:FCKXFZ8D8Y1XVTE55K17869EW9",
+    "dna:requirement:3GWG092V5M4YJD557J1AF6A7D6",
+    "dna:requirement:GR3JKVRQ5NDVYFVJ52QN324TMQ",
+    "dna:requirement:Z5J56NW0CEW0XYB9A8A9366SHE",
+    "dna:requirement:HFW2Y45D26ZXV61XPJKVQV0TCR",
+    "dna:requirement:SHB912XHTZHE9EE0S0H9YJM1H0",
+    "dna:requirement:Q1WYZE1H4YVG3QTH02Z8DVZH4M",
+    "dna:requirement:51GPNXPF6WA34CNM89JXD7GPMX",
+    "dna:requirement:ZWM0FRDWM3W7F22BGY1YRKQNVD",
+    "dna:requirement:1QRZXCGTMYDQEDGDTYAKH2C59G",
+    "dna:requirement:XETAJ1MJCDQST3HQDEPZZ3E6RM",
+    "dna:requirement:VADEF0QJYG2KJW80YP73ABB0EQ",
+    "dna:requirement:7A5K615ASKXFKCWB56HSF15RFC",
+    "dna:requirement:RC0WZKSBXEXV70TQ48DQCKMW0E",
+    "dna:requirement:RG1A21XEGS5WYE7WD0G75ZTMBE",
+    "dna:requirement:7CB29K7VGRDBPWRB343RZA5FQB",
+    "dna:requirement:RV1QCPX3S5VKAB29Q0D5K8FPNH",
+    "dna:requirement:DQAVBSNDXC12CVAB6YFPFW7B67",
+    "dna:requirement:A9WAMN5C70XVW806PXKF5BM2QF",
+    "dna:requirement:S0ED02A1CTMFC3Q0EMZ124KM6R"
+  ],
+  "state": "draft",
+  "sys_status": "active",
+  "views": [
+    "context",
+    "container",
+    "component"
+  ]
+}

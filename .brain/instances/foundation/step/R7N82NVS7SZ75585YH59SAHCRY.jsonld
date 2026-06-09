@@ -1,0 +1,21 @@
+{
+  "agent_instructions": "Assert the NFR section carries at least one measurable target (a threshold, not an adjective) for performance, security and reliability",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:R7N82NVS7SZ75585YH59SAHCRY",
+  "input_artifacts": [
+    "nnq39n2s-produce-the-comprehensive-document-for-a-1-result"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_assert_measurable_nfr.py /tmp/sc05-doc.md --categories performance,security,reliability\", \"expect_exit\": 0}",
+  "name": "nnq39n2s-assert-the-nfr-section-carries-at-least-2",
+  "output_artifacts": [
+    "nnq39n2s-assert-the-nfr-section-carries-at-least-2-result"
+  ],
+  "postconditions": [
+    "each category has a numeric/threshold target",
+    "no NFR is stated only as an adjective like 'fast' or 'secure'"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

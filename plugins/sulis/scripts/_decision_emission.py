@@ -13,10 +13,21 @@ The two halves are deliberate:
 
 Decisions baked in (per founder confirmation, 2026-05-30):
 
-  - **ID strategy.** Reuse the ADR's `change_id` frontmatter field (so the
-    Decision's id is `dna:decision:{change_id}`, giving natural traceability
-    from a Change to the Decisions it produced). Fall back to a fresh ULID
-    when `change_id` is absent.
+  - **ID strategy (WP-012, FR-17).** Each emitted Decision gets a freshly-
+    minted ULID `@id` (`dna:decision:{ulid}`). The earlier strategy reused the
+    ADR's `change_id` frontmatter (`dna:decision:{change_id}`), but a change
+    that produces more than one decision then collapsed every decision onto a
+    single `@id` — the second emission silently overwrote the first on disk.
+    A fresh ULID per emission guarantees distinctness; change→decision
+    traceability moves off the primary id (a `prov:wasDerivedFrom` relation,
+    deferred to the SPARQL runtime — see below — rather than overloading the
+    storage identity).
+  - **Kind discriminator (WP-012, ADR-006).** A Decision carries
+    `kind ∈ {adr, bdr}` — a technical architecture decision (ADR) vs a
+    business decision (BDR). It is a discriminator on the existing decision
+    entity, not a new entity type. The caller supplies the kind (the CLI's
+    `--kind` / `--from-bdr`); absent, it defaults to `adr`, so existing
+    `decision/*.jsonld` need no rewrite (§9.1).
   - **Status → state translation.** ADR frontmatter has `status: accepted`
     (old marketplace vocabulary, predating the two-lifecycle model). The
     Decision entity wants `state: accepted` (business state) + a separate
@@ -120,39 +131,64 @@ def _extract_list_items(section: str) -> list[str]:
     return [item for item in items if item]
 
 
-def _resolve_decision_id(frontmatter: dict) -> str:
-    """Compose the Decision's `@id`.
+_VALID_KINDS: Final[tuple[str, ...]] = ("adr", "bdr")
+_DEFAULT_KIND: Final[str] = "adr"
 
-    Uses the ADR's `change_id` if present (so a Decision's id is
-    deterministically tied to the Change that produced it); generates a
-    fresh ULID otherwise. Both shapes pass the schema's id pattern.
+
+def _mint_decision_id() -> str:
+    """Mint a fresh, distinct Decision `@id` (`dna:decision:{ulid}`).
+
+    The single id-minting site. Every emitted Decision gets its own freshly-
+    generated ULID, so two decisions produced by the same change (which share
+    a `change_id` in their source frontmatter) never collide on the same `@id`
+    — the WP-012 collision fix. The ULID is the storage identity; change→
+    decision traceability lives in a relation, not the primary id.
     """
-    change_id = frontmatter.get("change_id")
-    if isinstance(change_id, str) and change_id:
-        return f"dna:decision:{change_id}"
     return f"dna:decision:{generate_change_ulid()}"
+
+
+def _normalise_kind(kind: str | None) -> str:
+    """Validate + default the decision-kind discriminator.
+
+    Absent (`None`) reads as `adr` — the additive-optional migration default
+    (§9.1), so existing decisions and callers that don't pass a kind are
+    unaffected. An explicit out-of-enum value is a caller error.
+    """
+    if kind is None:
+        return _DEFAULT_KIND
+    if kind not in _VALID_KINDS:
+        raise ValueError(
+            f"kind must be one of {_VALID_KINDS}, got {kind!r}"
+        )
+    return kind
 
 
 # ─── public API ───────────────────────────────────────────────────────────
 
 
-def compose_decision_from_adr(adr_text: str) -> dict:
-    """Compose a Decision entity dict from ADR markdown.
+def compose_decision_from_adr(adr_text: str, *, kind: str | None = None) -> dict:
+    """Compose a Decision entity dict from ADR (or BDR) markdown.
 
-    Pure transformation: text in, dict out. No I/O, no validation —
-    validation happens at the repository boundary on save (which is where
-    rejection semantics live).
+    Pure transformation: text in, dict out (modulo the freshly-minted ULID id).
+    No file I/O, no schema validation — validation happens at the repository
+    boundary on save (which is where rejection semantics live).
+
+    `kind` is the ADR/BDR discriminator (ADR-006): `"adr"` for a technical
+    architecture decision (the default — absent reads as `adr`, §9.1), `"bdr"`
+    for a business decision. The body shape is identical; the kind is supplied
+    by the caller, not inferred from the markdown.
 
     The returned dict has the shape the vendored `decision.schema.json`
     expects. Optional fields (`context`, `consequences`, `options_considered`)
-    are omitted when the source ADR doesn't contain them rather than
-    emitted-empty, so the schema's `unevaluatedProperties:false` doesn't
-    reject a sparse-but-valid input.
+    are omitted when the source doesn't contain them rather than emitted-empty,
+    so the schema's `unevaluatedProperties:false` doesn't reject a
+    sparse-but-valid input.
     """
     frontmatter, body = parse_frontmatter(adr_text)
 
     decision: dict = {
-        "id": _resolve_decision_id(frontmatter),
+        "id": _mint_decision_id(),
+        "kind": _normalise_kind(kind),
         "title": str(frontmatter.get("title", "")),
         "state": str(frontmatter.get("status", "proposed")),
         "sys_status": "active",
@@ -182,8 +218,13 @@ def compose_decision_from_adr(adr_text: str) -> dict:
 def emit_decision_from_adr(
     adr_path: Path,
     repo: EntityRepository,
+    *,
+    kind: str | None = None,
 ) -> dict:
-    """Read an ADR markdown file and emit its Decision entity through `repo`.
+    """Read an ADR (or BDR) markdown file and emit its Decision through `repo`.
+
+    `kind` is the ADR/BDR discriminator (ADR-006), threaded to
+    `compose_decision_from_adr`; absent defaults to `adr`.
 
     Returns the persisted Decision dict (caller can use it for cross-
     referencing).
@@ -193,6 +234,6 @@ def emit_decision_from_adr(
             validation. The repository never persists an invalid instance.
     """
     adr_text = Path(adr_path).read_text(encoding="utf-8")
-    decision = compose_decision_from_adr(adr_text)
+    decision = compose_decision_from_adr(adr_text, kind=kind)
     repo.save("decision", decision)
     return decision

@@ -1,0 +1,38 @@
+{
+  "review": {
+    "wp": "WP-012",
+    "project": "comprehensive-spec-and-journey-walk",
+    "branch": "feat/wp-012-decision-kind-discriminator",
+    "base": "change/harden-comprehensive-spec-and-journey-walk",
+    "timestamp": "2026-06-09T214906Z",
+    "verdict": "PASS",
+    "files_changed": 12,
+    "lines_added": 836,
+    "lines_removed": 41
+  },
+  "build_verification": {
+    "tool": "ruff check + compileall",
+    "base_errors": 0,
+    "head_errors": 0,
+    "pr_introduced_errors": 0,
+    "coverage_gaps": ["no mypy/pyright configured — repo uses stdlib-only py_compile gate"]
+  },
+  "hygiene": {
+    "scope": {"severity": "none", "commit_types": ["feat"], "module_fan_out": 1},
+    "size": {"severity": "none", "lines": 877, "files": 12},
+    "safety": {"severity": "none", "migrations": 0, "schema_idl": 1, "secrets": 0, "infra": 0},
+    "completeness": {"severity": "none", "new_source_without_test": 0, "api_change_without_schema": false}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "status": "nothing surfaced"},
+    "security": {"findings": 0, "status": "nothing surfaced"},
+    "quality": {"findings": 0, "status": "nothing surfaced"}
+  },
+  "findings": {
+    "in_changes": [],
+    "in_neighbours": [],
+    "watch_list": []
+  },
+  "hardening_deltas": [],
+  "auto_downgrade_triggers": []
+}

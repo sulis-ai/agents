@@ -1,0 +1,12 @@
+{
+  "exercises": "dna:design:EEDCDTT7F40JPMXZBV2KRP1ARS",
+  "id": "dna:scenario:AVQFDDBK7X9RPZY3DDSF9Q89A1",
+  "journey": "dna:workflow:TMSNMT87659FVESMR4J91TTWYM",
+  "name": "SC-12: Full flow coverage yields verdict covered",
+  "state": "draft",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:VFJ0EMVN7ZJBK27J2B4HNFETG9",
+    "dna:requirement:QZRC1JJ7ZP7TK9P0QTASS87N7C"
+  ]
+}

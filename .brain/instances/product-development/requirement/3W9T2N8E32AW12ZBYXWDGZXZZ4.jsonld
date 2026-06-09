@@ -1,0 +1,13 @@
+{
+  "acceptance_criteria": [
+    "see SRD body"
+  ],
+  "id": "dna:requirement:3W9T2N8E32AW12ZBYXWDGZXZZ4",
+  "priority": "must",
+  "rationale": "Extracted from FR-10 of .specifications/comprehensive-spec-and-journey-walk/SRD.md. Change CH-CQRWWR (01KTPWDWJ7CQRWWRGPQEQ22P1M).",
+  "source": "dna:change:01KTPWDWJ7CQRWWRGPQEQ22P1M",
+  "state": "draft",
+  "statement": "FR-10 \u2014 Verifiable scenarios MUST be derived from the use-case flows for BOTH surfaces; every main/alternate/exception flow yields >=1 scenario.",
+  "sys_status": "active",
+  "verification_method": "test"
+}

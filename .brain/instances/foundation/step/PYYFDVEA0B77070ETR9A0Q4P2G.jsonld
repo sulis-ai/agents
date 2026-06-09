@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Produce the comprehensive document and tool-surface walk for a cross-kind (producer + consumer) fixture change",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:PYYFDVEA0B77070ETR9A0Q4P2G",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "x8jbk3yx-produce-the-comprehensive-document-and-t-1",
+  "output_artifacts": [
+    "x8jbk3yx-produce-the-comprehensive-document-and-t-1-result"
+  ],
+  "postconditions": [
+    "the document carries both an interface-contract section and a tool-surface walk table"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

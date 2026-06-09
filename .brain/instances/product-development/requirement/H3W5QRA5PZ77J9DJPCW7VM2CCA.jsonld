@@ -1,0 +1,13 @@
+{
+  "acceptance_criteria": [
+    "see SRD body"
+  ],
+  "id": "dna:requirement:H3W5QRA5PZ77J9DJPCW7VM2CCA",
+  "priority": "must",
+  "rationale": "Extracted from FR-14 of .specifications/comprehensive-spec-and-journey-walk/SRD.md. Change CH-CQRWWR (01KTPWDWJ7CQRWWRGPQEQ22P1M).",
+  "source": "dna:change:01KTPWDWJ7CQRWWRGPQEQ22P1M",
+  "state": "draft",
+  "statement": "FR-14 \u2014 Tool-surface scenarios MUST be driven via the existing #98 verification substrate, not a new mechanism.",
+  "sys_status": "active",
+  "verification_method": "test"
+}

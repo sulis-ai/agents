@@ -1,0 +1,21 @@
+{
+  "agent_instructions": "Assert the solution-design section carries a context diagram, a container diagram, and a component diagram (three distinct C4 levels)",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:H29AFRTK4HJ1CYY0VHPM313HRY",
+  "input_artifacts": [
+    "4spt36x8-produce-the-comprehensive-document-for-a-1-result"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_assert_c4_levels.py /tmp/sc16-doc.md --require context,container,component\", \"expect_exit\": 0}",
+  "name": "4spt36x8-assert-the-solution-design-section-carri-2",
+  "output_artifacts": [
+    "4spt36x8-assert-the-solution-design-section-carri-2-result"
+  ],
+  "postconditions": [
+    "three distinct architecture levels are present",
+    "this goes beyond the 5 flat Mermaid types Sulis had"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

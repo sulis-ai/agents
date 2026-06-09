@@ -1,0 +1,11 @@
+{
+  "exercises": "dna:design:EEDCDTT7F40JPMXZBV2KRP1ARS",
+  "id": "dna:scenario:VR6CJNEFY5AAMKKQ8SQWK63M6M",
+  "journey": "dna:workflow:Q42DK37AJNDCDT6Z7T4BHXNYMX",
+  "name": "SC-05: NFR section is always present with measurable targets",
+  "state": "draft",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:4AEB908CJKX2PM1Z2X2FH6KFWB"
+  ]
+}

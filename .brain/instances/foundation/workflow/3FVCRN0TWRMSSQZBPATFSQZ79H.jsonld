@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:3FVCRN0TWRMSSQZBPATFSQZ79H",
+  "initial_steps": [
+    "2kjwzrz3-run-the-design-stage-journey-walk-on-a-f-1"
+  ],
+  "name": "SC-08: Tool surface walk produces a second table covering every operation",
+  "state": "draft",
+  "steps": [
+    "2kjwzrz3-run-the-design-stage-journey-walk-on-a-f-1",
+    "2kjwzrz3-assert-the-journey-walk-section-carries-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "2kjwzrz3-assert-the-journey-walk-section-carries-2"
+  ],
+  "transitions": [
+    "2kjwzrz3-run-the-design-stage-journey-walk-on-a-f-1 -> 2kjwzrz3-assert-the-journey-walk-section-carries-2"
+  ],
+  "type": "review"
+}

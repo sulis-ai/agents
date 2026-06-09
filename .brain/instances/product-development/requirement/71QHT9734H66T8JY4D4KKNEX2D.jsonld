@@ -1,0 +1,13 @@
+{
+  "acceptance_criteria": [
+    "see SRD body"
+  ],
+  "id": "dna:requirement:71QHT9734H66T8JY4D4KKNEX2D",
+  "priority": "must",
+  "rationale": "Extracted from FR-07 of .specifications/comprehensive-spec-and-journey-walk/SRD.md. Change CH-CQRWWR (01KTPWDWJ7CQRWWRGPQEQ22P1M).",
+  "source": "dna:change:01KTPWDWJ7CQRWWRGPQEQ22P1M",
+  "state": "draft",
+  "statement": "FR-07 \u2014 The design stage MUST walk the UI surface journey outside-in, each hop EXISTS/planned-WP/GAP.",
+  "sys_status": "active",
+  "verification_method": "test"
+}

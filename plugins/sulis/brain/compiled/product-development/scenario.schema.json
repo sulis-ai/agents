@@ -80,6 +80,13 @@
       ],
       "description": "cheapest-sufficient state-isolation rung for a run; default reset (reset fixture/state in the existing worktree). NOT a new workspace per run."
     },
+    "surface": {
+      "enum": [
+        "ui",
+        "tool"
+      ],
+      "description": "the consumer surface this scenario exercises (ADR-005, FR-10). Additive-optional: absent reads as `ui` (the single-surface default), so existing scenarios are unaffected and seed-derived IDs are stable (NFR-05)."
+    },
     "verdict_invariant": {
       "type": "object",
       "unevaluatedProperties": false,

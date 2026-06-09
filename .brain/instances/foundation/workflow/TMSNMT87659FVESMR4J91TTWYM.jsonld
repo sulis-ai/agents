@@ -1,0 +1,21 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:TMSNMT87659FVESMR4J91TTWYM",
+  "initial_steps": [
+    "0dttfckv-run-the-uc-flow-coverage-gate-on-a-fixtu-1"
+  ],
+  "name": "SC-12: Full flow coverage yields verdict covered",
+  "state": "draft",
+  "steps": [
+    "0dttfckv-run-the-uc-flow-coverage-gate-on-a-fixtu-1"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "0dttfckv-run-the-uc-flow-coverage-gate-on-a-fixtu-1"
+  ],
+  "transitions": [
+    "0dttfckv-run-the-uc-flow-coverage-gate-on-a-fixtu-1 -> end"
+  ],
+  "type": "review"
+}

@@ -1,0 +1,21 @@
+{
+  "agent_instructions": "Diff the SECTION SET (headers only) across the three documents",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:60RHWR68EWVGC4VRYASGKXHDFF",
+  "input_artifacts": [
+    "pxxb9s84-run-sulis-specify-on-the-same-fixture-at-1-result"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_assert_same_section_set.py /tmp/sc02-lite.md /tmp/sc02-standard.md /tmp/sc02-deep.md\", \"expect_exit\": 0}",
+  "name": "pxxb9s84-diff-the-section-set-headers-only-across-2",
+  "output_artifacts": [
+    "pxxb9s84-diff-the-section-set-headers-only-across-2-result"
+  ],
+  "postconditions": [
+    "the mandatory section set is identical across lite/standard/deep",
+    "only interview-derived detail differs, not which sections exist"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

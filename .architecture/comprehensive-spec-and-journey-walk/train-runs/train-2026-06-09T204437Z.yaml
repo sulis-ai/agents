@@ -1,0 +1,26 @@
+train_id: "train-2026-06-09T204437Z"
+started_at: "2026-06-09T20:44:37Z"
+completed_at: "2026-06-09T20:50:57Z"
+outcome: "success"
+batch_size: 3
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-09T20:49:52Z"
+bundle:
+  - wp: WP-001
+    branch: feat/wp-001-drive-specify-harness
+    pre_train_sha: 3cde68662f3de5249fecebb704b77356730adf08
+    rebased_to_sha: 3cde68662f3de5249fecebb704b77356730adf08
+    merge_sha_on_dev: 59402fd679619a507a59d325086369ef1b3252f1
+  - wp: WP-002
+    branch: feat/wp-002-drive-journey-walk-harness
+    pre_train_sha: a1ac80e300b7f41a1e263c4e8e0bf9c453a0f7d0
+    rebased_to_sha: a1ac80e300b7f41a1e263c4e8e0bf9c453a0f7d0
+    merge_sha_on_dev: cfde2e889b4f94189e9f06784d44e10349b8b6f1
+  - wp: WP-003
+    branch: feat/wp-003-doc-section-assertion-scripts
+    pre_train_sha: ceaea6daa61a6e6dc66981c19223a16bef41ce09
+    rebased_to_sha: 6c8184e23c973dd3a784fa89d5287016fbdf8994
+    merge_sha_on_dev: 58ce728185be51d2c25fd8b08d080b56ce7b9a66

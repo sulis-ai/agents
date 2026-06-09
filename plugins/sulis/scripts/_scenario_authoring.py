@@ -30,6 +30,11 @@ from typing import Final
 
 _CROCKFORD: Final[str] = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"  # no I/L/O/U
 
+# The consumer surfaces a scenario can exercise (ADR-005, FR-10). A closed
+# enum: a typo'd surface is a bug, not a third surface, so reject it at
+# authoring rather than persist a tag the brain schema would later refuse.
+_SURFACES: Final[frozenset[str]] = frozenset({"ui", "tool"})
+
 
 def _ulid(seed: str) -> str:
     n = int.from_bytes(hashlib.sha256(seed.encode()).digest()[:17], "big") & ((1 << 130) - 1)
@@ -56,6 +61,7 @@ def assemble_scenario_graph(
     tenant: str,
     seed: str,
     steps: list[dict],
+    surface: str = "ui",
     require_verifiable: bool = True,
 ) -> dict:
     """Assemble a plain-English journey into a Scenario + Workflow + Steps.
@@ -66,6 +72,13 @@ def assemble_scenario_graph(
         exercises: the `dna:design:<ulid>` ref it runs against.
         tenant: the owning `dna:tenant:<ulid>` (Step/Workflow `for_domain`).
         seed: a stable string for deterministic ULIDs (idempotent re-author).
+        surface: the consumer surface this scenario exercises — ``"ui"`` (the
+            default) or ``"tool"`` (ADR-005, FR-10). Persisted first-class on
+            the Scenario node so the verification set can be partitioned by
+            surface. Additive-optional: it does NOT feed any ULID seed, so the
+            same ``seed`` yields the same scenario id with or without a surface
+            (NFR-05). A surface outside the closed ``{ui, tool}`` enum is a
+            typo, not a third surface, and raises ``ValueError`` at authoring.
         steps: ordered journey beats, each a dict:
             {"instruction": str,                 # plain-English; → agent_instructions
              "asserts": list[str] = [],          # "see X" checks → postconditions
@@ -98,6 +111,13 @@ def assemble_scenario_graph(
     """
     if not steps:
         raise ValueError("a scenario journey needs at least one step")
+
+    if surface not in _SURFACES:
+        raise ValueError(
+            f"surface must be one of {sorted(_SURFACES)} (ADR-005); got "
+            f"{surface!r}. The surface tag is a closed enum — a value outside "
+            "it is a typo, not a third consumer surface."
+        )
 
     # Verifiability gate (journey-rigor #5). A *verification* journey that
     # carries no observable check is just a description of clicks — it can pass
@@ -194,6 +214,7 @@ def assemble_scenario_graph(
         "verifies": list(verifies),
         "exercises": exercises,
         "journey": workflow_id,
+        "surface": surface,
         "state": "draft",
         "sys_status": "active",
     }

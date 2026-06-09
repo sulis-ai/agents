@@ -1,0 +1,18 @@
+{
+  "slug": "sample-tool-surface",
+  "primitive": "create",
+  "intent": "Expose a new tool operation that exports a report as CSV.",
+  "paths": [
+    "plugins/sulis/scripts/sulis-export-report"
+  ],
+  "dependencies": [
+    "The report store must expose a read API the export operation can call."
+  ],
+  "tool_operations": [
+    {
+      "name": "export_report",
+      "inputs": ["report_id", "format"],
+      "outputs": ["file_path"]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "exercises": "dna:design:EEDCDTT7F40JPMXZBV2KRP1ARS",
+  "id": "dna:scenario:8C0A3WXFT9911KK6RVA0XK1CE0",
+  "journey": "dna:workflow:RSA6PGNC8YBE5YGS3BY54HV327",
+  "name": "SC-07: A bare GAP in the UI walk blocks design completion",
+  "state": "draft",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:71QHT9734H66T8JY4D4KKNEX2D"
+  ]
+}

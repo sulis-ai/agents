@@ -1,0 +1,12 @@
+{
+  "slug": "sample-user-facing",
+  "primitive": "create",
+  "intent": "Add a user-visible greeting banner to the dashboard.",
+  "paths": [
+    "apps/cockpit/src/components/GreetingBanner.tsx",
+    "apps/cockpit/src/styles/banner.css"
+  ],
+  "dependencies": [
+    "The cockpit app shell must already render a dashboard route."
+  ]
+}

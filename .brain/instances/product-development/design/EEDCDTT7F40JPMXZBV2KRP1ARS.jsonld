@@ -1,0 +1,9 @@
+{
+  "id": "dna:design:EEDCDTT7F40JPMXZBV2KRP1ARS",
+  "name": "Comprehensive Spec & Two-Surface Journey Walk",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "summary": "Methodology change: depth sizes intake only; comprehensive design document always produced; two-surface (UI + tool) outside-in journey walk; UC-flow-coverage gate; STRIDE + C4 architecture-at-levels + BDR.",
+  "source": "dna:change:01KTPWDWJ7CQRWWRGPQEQ22P1M",
+  "state": "draft",
+  "sys_status": "active"
+}
