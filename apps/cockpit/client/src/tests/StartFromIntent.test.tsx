@@ -172,3 +172,117 @@ describe("<StartFromIntent /> — propose → confirm → started at Recon", () 
     expect(results).toHaveNoViolations();
   });
 });
+
+// WP-003 — Cold-start chips + soft welcome on the empty/idle state.
+//
+// The one genuinely-new piece of the start screen (ADR-001: added INSIDE the
+// existing component, not a new surface). A first-timer on the idle/empty state
+// sees a soft welcome + example chips instead of a blank wall. Clicking a chip
+// prefills the intent box (and may submit) through the EXISTING draft/propose()
+// path — no new lifecycle. The block disappears the moment the box is non-empty
+// or a proposal is shown. Chips are real focusable <button>s with a visible
+// focus ring; nothing is signalled by colour alone (each chip carries a label).
+describe("<StartFromIntent /> — cold-start chips + welcome (WP-003)", () => {
+  it("cold_start_chips_render_on_empty_idle: on idle with an empty box and no proposal, the chips + welcome render", () => {
+    const stream = fakeStart({ propose: PROPOSAL });
+    render(<StartFromIntent productId="dna:product:acme" streamStartFromIntent={stream} />);
+
+    const coldStart = screen.getByTestId("cold-start");
+    expect(coldStart).toBeInTheDocument();
+    // The soft welcome line is present.
+    expect(within(coldStart).getByText(/welcome/i)).toBeInTheDocument();
+    // The example chips are real buttons carrying text labels.
+    expect(
+      within(coldStart).getByRole("button", { name: /fix something that's broken/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(coldStart).getByRole("button", { name: /add a new feature/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(coldStart).getByRole("button", { name: /i'm not sure yet/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("chip_click_fills_intent_box: clicking a chip puts its text in the intent box and reaches propose() via the injected fake", async () => {
+    const stream = fakeStart({ propose: PROPOSAL });
+    render(<StartFromIntent productId="dna:product:acme" streamStartFromIntent={stream} />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /fix something that's broken/i }),
+    );
+
+    // The intent box is prefilled with the chip's text (rides the existing draft state).
+    const box = screen.getByRole("textbox") as HTMLTextAreaElement;
+    expect(box.value).toMatch(/fix something that's broken/i);
+
+    // It rode the EXISTING propose() path — the injected fake was called with
+    // the propose phase carrying the chip's intent.
+    await waitFor(() => {
+      expect(stream).toHaveBeenCalled();
+    });
+    const [request] = stream.mock.calls[0]!;
+    expect(request.phase).toBe("propose");
+    expect(request.intent).toMatch(/fix something that's broken/i);
+  });
+
+  it("chips_hidden_when_draft_non_empty: typing in the box hides the chips/welcome", () => {
+    const stream = fakeStart({ propose: PROPOSAL });
+    render(<StartFromIntent productId="dna:product:acme" streamStartFromIntent={stream} />);
+
+    expect(screen.getByTestId("cold-start")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "fix the login bug" },
+    });
+    expect(screen.queryByTestId("cold-start")).not.toBeInTheDocument();
+  });
+
+  it("chips_hidden_when_proposal_shown: once a proposal is shown, the chips are gone", async () => {
+    const stream = fakeStart({ propose: PROPOSAL });
+    render(<StartFromIntent productId="dna:product:acme" streamStartFromIntent={stream} />);
+
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "fix the login bug" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /propose|see|continue|next/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("start-proposal")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("cold-start")).not.toBeInTheDocument();
+  });
+
+  it("the open-ended \"I'm not sure yet\" chip prefills only (no concrete intent to propose yet)", () => {
+    const stream = fakeStart({ propose: PROPOSAL });
+    render(<StartFromIntent productId="dna:product:acme" streamStartFromIntent={stream} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /i'm not sure yet/i }));
+
+    // It prefills the box (so the cold-start block hides) but does NOT submit —
+    // there is no concrete intent yet, so the propose() path is not reached.
+    const box = screen.getByRole("textbox") as HTMLTextAreaElement;
+    expect(box.value).toMatch(/i'm not sure yet/i);
+    expect(stream).not.toHaveBeenCalled();
+  });
+
+  it("chips_keyboard_focusable_with_visible_focus: chips are Tab-reachable real buttons", () => {
+    const stream = fakeStart({ propose: PROPOSAL });
+    render(<StartFromIntent productId="dna:product:acme" streamStartFromIntent={stream} />);
+
+    const chip = screen.getByRole("button", { name: /fix something that's broken/i });
+    // A native <button> is keyboard-focusable by default (no tabIndex=-1 trap).
+    expect(chip.tagName).toBe("BUTTON");
+    expect(chip).not.toHaveAttribute("tabindex", "-1");
+    chip.focus();
+    expect(chip).toHaveFocus();
+  });
+
+  it("cold-start state is accessible (axe-core clean)", async () => {
+    const stream = fakeStart({ propose: PROPOSAL });
+    const { container } = render(
+      <StartFromIntent productId="dna:product:acme" streamStartFromIntent={stream} />,
+    );
+    expect(screen.getByTestId("cold-start")).toBeInTheDocument();
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+});

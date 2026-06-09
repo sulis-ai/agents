@@ -7,7 +7,11 @@
 // a change's own nav lives inside the change (ThreadView), not here.
 
 import { NavLink, useNavigate } from "react-router-dom";
-import { Squares2X2Icon, Cog6ToothIcon } from "@heroicons/react/24/outline";
+import {
+  PlusIcon,
+  Squares2X2Icon,
+  Cog6ToothIcon,
+} from "@heroicons/react/24/outline";
 import { XMarkIcon } from "@heroicons/react/20/solid";
 import type { Change } from "../../../shared/api-types";
 import { useProducts } from "../api/useProducts";
@@ -20,6 +24,12 @@ import { ProductSwitcher } from "./ProductSwitcher";
 // always-present chrome, so the toggle lives top-right of it.
 import { ThemeToggle } from "./ThemeToggle";
 import styles from "../layouts/WorkspaceShell.module.css";
+
+// ADR-003 — the visible keyboard hint on the front-door button. The same flow
+// is also reachable via the global hotkey (useStartHotkey); this constant is
+// exported so the button hint and the hotkey stay in sync — one source of truth
+// for the "⌘N" string, never two copies that can drift.
+export const START_HOTKEY_HINT = "⌘N";
 
 /** "deploy-founder-web" → "Deploy founder web" — a readable tab name. */
 function changeName(change: Change): string {
@@ -62,6 +72,24 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
 
   return (
     <header className={styles.topbar} data-testid="workspace-topbar">
+      {/* The one front door (ADR-003). The single primary action in the chrome:
+          navigates to the existing /start route — no network, no mutation, no
+          start-state. The ⌘N hint mirrors the global hotkey (useStartHotkey). */}
+      <button
+        type="button"
+        className={styles.startBtn}
+        data-testid="start-change-button"
+        onClick={() => navigate("/start")}
+      >
+        <span className={styles.startBtnIcon}>
+          <PlusIcon aria-hidden="true" />
+        </span>
+        <span className={styles.startBtnLabel}>Start something new</span>
+        <span className={styles.startBtnHint} aria-hidden="true">
+          {START_HOTKEY_HINT}
+        </span>
+      </button>
+
       {productList.length > 0 && (
         <div className={styles.brand}>
           <ProductSwitcher

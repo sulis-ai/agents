@@ -25,6 +25,19 @@ import { useStartFromIntent } from "../api/useStartFromIntent";
 import type { StreamStartFromIntentFn } from "../api/client";
 import styles from "../styles/StartFromIntent.module.css";
 
+// ADR-003 — the cold-start example chips (from the SIGNED visual contract,
+// MOCKUP state 2). A first-timer on the empty/idle state taps one to get
+// going instead of facing a blank wall. A chip with a concrete intent
+// prefills the box AND submits (rides the existing propose() path); the
+// open-ended "I'm not sure yet" chip prefills only (it has no concrete
+// intent to propose yet). One declarative source — no copy-pasted markup.
+const COLD_START_CHIPS: ReadonlyArray<{ text: string; submitOnPick: boolean }> = [
+  { text: "Fix something that's broken", submitOnPick: true },
+  { text: "Add a new feature", submitOnPick: true },
+  { text: "Improve how something looks", submitOnPick: true },
+  { text: "I'm not sure yet", submitOnPick: false },
+];
+
 interface Props {
   /** The Product whose Project repo the change starts against (FR-29). */
   productId: string;
@@ -69,6 +82,22 @@ export function StartFromIntent({
     await start.confirm();
   };
 
+  // ADR-003 — tapping a cold-start chip prefills the intent box (the existing
+  // draft state) and, for the concrete chips, submits through the existing
+  // propose() path — no new lifecycle. We propose(text) directly rather than
+  // relying on submit() reading the just-set draft (setState is async).
+  const pickChip = (chip: (typeof COLD_START_CHIPS)[number]) => {
+    if (busy) return;
+    setDraft(chip.text);
+    if (chip.submitOnPick) void start.propose(chip.text);
+  };
+
+  // The cold-start block (welcome + chips) shows ONLY on the untouched
+  // idle/empty state, and disappears the moment the box is non-empty or a
+  // proposal is shown. One readable predicate (the contract's visibility rule).
+  const showColdStart =
+    start.state === "idle" && draft === "" && start.proposal === null;
+
   // Surface the started change once it lands (the host wires onStarted to nav).
   // In an effect — never in the render body — so it fires exactly once per
   // started change and never triggers a parent state update during render.
@@ -89,6 +118,33 @@ export function StartFromIntent({
               : "Say what you'd like to do, in plain English. I'll work out what it is and start a change — nothing happens until you confirm."}
           </p>
         </header>
+
+        {/* ADR-003 — the cold-start empty state: a soft welcome + example chips,
+            shown only before the founder has typed anything (the one genuinely
+            new piece of the start screen; added INSIDE this component, not a
+            new surface). */}
+        {showColdStart && (
+          <div className={styles.coldStart} data-testid="cold-start">
+            <p className={styles.coldStartWelcome}>
+              {isInvestigation
+                ? "Welcome — not sure where to start? Try one of these:"
+                : "Welcome — new here? Pick one to get going, or just say what you'd like to do:"}
+            </p>
+            <div className={styles.chips}>
+              {COLD_START_CHIPS.map((chip) => (
+                <button
+                  key={chip.text}
+                  type="button"
+                  className={styles.chip}
+                  onClick={() => pickChip(chip)}
+                  disabled={busy}
+                >
+                  {chip.text}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* The PROPOSAL — shown before any change starts (the confirm gate). */}
         {start.proposal && start.state !== "started" && (
