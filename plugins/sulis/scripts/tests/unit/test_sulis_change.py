@@ -278,7 +278,30 @@ def test_ulid_handle_returns_ch_prefix_plus_six():
     h = ulid_handle(u)
     assert h.startswith("CH-")
     assert len(h) == 9, f"expected 9-char handle (CH- + 6), got {h!r}"
-    assert h[3:] == u[:6]
+    # The handle is drawn from the RANDOM tail (positions 10-15), NOT the
+    # timestamp head — see test_ulid_handle_distinct_for_same_timestamp (#101).
+    assert h[3:] == u[10:16]
+
+
+def test_ulid_handle_distinct_for_same_timestamp():
+    """#101: two changes minted in the SAME millisecond (identical timestamp
+    prefix) must get DIFFERENT handles — the bug was that the handle came from
+    the timestamp head, so same-window changes collided and resolution could
+    target the wrong change. Tail-derivation fixes this."""
+    same_ms = 1_700_000_000_000
+    # Vary the HIGH bytes of the 80-bit random part — the handle is drawn from
+    # the top of the random tail (ulid[10:16]). Real ULIDs randomise all 80
+    # bits via secrets.token_bytes, so any two differ here overwhelmingly.
+    u1 = generate_change_ulid(_now_ms=same_ms, _random_bytes=b"\x11" + b"\x00" * 9)
+    u2 = generate_change_ulid(_now_ms=same_ms, _random_bytes=b"\x99" + b"\x00" * 9)
+    assert u1[:10] == u2[:10], "fixture sanity: identical timestamp prefix"
+    assert u1 != u2, "fixture sanity: different randomness → different ULIDs"
+    # The old head-derived handle WOULD have collided (u1[:6] == u2[:6]); the
+    # tail-derived handle must not.
+    assert u1[:6] == u2[:6], "fixture sanity: head WOULD collide"
+    assert ulid_handle(u1) != ulid_handle(u2), (
+        "same-timestamp changes must get distinct handles (#101)"
+    )
 
 
 def test_ulid_handle_rejects_wrong_length():
