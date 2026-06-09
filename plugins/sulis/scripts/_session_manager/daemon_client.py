@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import socket
 import subprocess
 import threading
@@ -98,13 +99,12 @@ def resolve_default_socket() -> str:
 DEFAULT_SOCKET: str = resolve_default_socket()
 
 
-def _status_probe(socket_path: str, timeout: float) -> bool:
-    """Connect and run one ``status`` round-trip; True iff it returns ok:true.
-
-    Any transport failure (missing socket, refused connect, timeout, malformed
-    reply) is mapped to False — the contract's Protocol/Expected categories both
-    mean "not live → the caller should (re)start". The short timeout makes a
-    dead-but-present socket file fail fast instead of blocking.
+def _status_reply(socket_path: str, timeout: float) -> "dict | None":
+    """One ``status`` round-trip → the parsed reply dict, or ``None`` on any
+    transport failure (missing socket, refused connect, timeout, malformed
+    reply). Carries ``meta.daemon_version`` + ``meta.daemon_pid`` (#102) so a
+    single probe yields liveness AND the version-skew signal — no second
+    round-trip to race. The short timeout fails a dead-but-present socket fast.
     """
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
@@ -116,13 +116,84 @@ def _status_probe(socket_path: str, timeout: float) -> bool:
             while b"\n" not in buf:
                 chunk = sock.recv(65536)
                 if not chunk:
-                    return False
+                    return None
                 buf += chunk
             line, _ = buf.split(b"\n", 1)
-            reply = json.loads(line)
-            return reply.get("ok") is True
+            return json.loads(line)
     except (OSError, json.JSONDecodeError):
-        return False
+        return None
+
+
+def _status_probe(socket_path: str, timeout: float) -> bool:
+    """True iff a ``status`` round-trip returns ``ok:true`` (the liveness check)."""
+    reply = _status_reply(socket_path, timeout)
+    return bool(reply) and reply.get("ok") is True
+
+
+def _own_plugin_version() -> "str | None":
+    """This client's plugin version, from the nearest ``.claude-plugin/
+    plugin.json`` above this file. Inlined (stdlib-only: json + Path) rather
+    than imported — ``daemon_client`` MUST stay terminal-only/self-contained
+    with no cross-module imports (ADR-003 independence; enforced by
+    test_ensure_daemon). Mirrors ``_plugin_version.plugin_version``."""
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        cand = parent / ".claude-plugin" / "plugin.json"
+        if cand.is_file():
+            try:
+                ver = json.loads(cand.read_text(encoding="utf-8")).get("version")
+            except (ValueError, OSError):
+                return None
+            return str(ver) if ver else None
+    return None
+
+
+def _version_ok(reply: "dict | None") -> bool:
+    """Whether the live daemon's plugin version matches ours (#102).
+
+    Conservative — only restart on a CONFIRMED mismatch:
+    - Our own version unknown (dev / non-cache layout) → ``True`` (can't
+      compare; never spuriously restart).
+    - Live daemon carries NO version stamp → ``True`` (reuse). Could be a
+      pre-guard daemon or a test fake; we don't restart on absence (that would
+      churn fakes + any legit non-stamping server). The one-time pre-guard→
+      guarded transition is handled by a manual restart; every update BETWEEN
+      guarded versions is caught by the exact-mismatch branch below.
+    - Both versions known and differ → ``False`` (restart).
+    """
+    own = _own_plugin_version()
+    if not own:
+        return True
+    meta = (reply or {}).get("meta") or {}
+    running = meta.get("daemon_version")
+    if not running:
+        return True
+    return running == own
+
+
+def _stop_stale_daemon(socket_path: str, reply: "dict | None", timeout: float) -> None:
+    """Stop a version-skewed daemon so a fresh, matching one can cold-start
+    (#102). SIGTERM its pid (from the status meta — the daemon stops cleanly on
+    SIGTERM: it unlinks its socket + releases its lock), wait bounded for it to
+    clear the socket, then unlink any lingering stale socket as belt-and-braces
+    (the new daemon's bind unlinks stale too). Best-effort throughout."""
+    meta = (reply or {}).get("meta") or {}
+    pid = meta.get("daemon_pid")
+    if isinstance(pid, int):
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+    deadline = time.monotonic() + max(timeout, 5.0)
+    while time.monotonic() < deadline:
+        if not daemon_is_live(socket_path, timeout=min(0.5, max(timeout, 0.1))):
+            break
+        time.sleep(0.1)
+    try:
+        if os.path.exists(socket_path) and not daemon_is_live(socket_path, timeout=0.3):
+            os.unlink(socket_path)
+    except OSError:
+        pass
 
 
 def daemon_is_live(socket_path: str = DEFAULT_SOCKET, timeout: float = 1.0) -> bool:
@@ -231,18 +302,30 @@ def ensure_daemon(
     probe_timeout = min(1.0, ready_timeout)
 
     # 1. Warm path: a daemon already serves the socket (no lock needed).
-    if daemon_is_live(socket_path, timeout=probe_timeout):
-        return socket_path
+    #    #102 version-skew guard: the daemon is a singleton that survives plugin
+    #    updates, so a live daemon may be running OLD code. One status probe
+    #    carries both liveness and the daemon's version stamp — reuse it only
+    #    when the version matches ours; otherwise stop it and cold-start a match.
+    reply = _status_reply(socket_path, probe_timeout)
+    if reply and reply.get("ok") is True:
+        if _version_ok(reply):
+            return socket_path
+        _stop_stale_daemon(socket_path, reply, probe_timeout)
+        # fall through to spawn a fresh, version-matched daemon
 
     deadline = time.monotonic() + ready_timeout
 
     # Serialise the probe→spawn critical section across in-process callers so
     # concurrent threads collapse to one spawn. A caller that blocks here and
     # then finds the daemon already live (the winner started it) returns without
-    # spawning — the double-checked probe below.
+    # spawning — the double-checked probe below (version-checked too, so a
+    # racing caller never reuses a skewed daemon another thread is tearing down).
     with _spawn_lock_for(socket_path):
-        if daemon_is_live(socket_path, timeout=probe_timeout):
-            return socket_path
+        reply = _status_reply(socket_path, probe_timeout)
+        if reply and reply.get("ok") is True:
+            if _version_ok(reply):
+                return socket_path
+            _stop_stale_daemon(socket_path, reply, probe_timeout)
         return _spawn_and_wait(
             socket_path,
             python=python,

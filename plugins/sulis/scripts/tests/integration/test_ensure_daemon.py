@@ -282,6 +282,7 @@ def test_module_is_terminal_only_no_chat_or_platform_import() -> None:
         "__future__",
         "json",
         "os",
+        "signal",  # #102: SIGTERM a version-skewed daemon (still stdlib-only)
         "socket",
         "subprocess",
         "threading",

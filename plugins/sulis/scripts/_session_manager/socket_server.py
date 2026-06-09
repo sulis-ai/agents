@@ -278,11 +278,24 @@ class _Handler(socketserver.BaseRequestHandler):
 
     def _status(self, state: _ConnectionState, req_id: object, params: dict) -> None:
         snapshot = self.server.manager.status()
+        # #102: stamp the daemon's plugin version + pid so ensure_daemon can
+        # detect a version-skewed singleton (a daemon still running old code
+        # after a plugin update) and restart it. Lazy import keeps this
+        # cycle-safe and a missing helper degrades to None (reuse, not crash).
+        try:
+            from _plugin_version import plugin_version
+            daemon_version = plugin_version()
+        except Exception:  # noqa: BLE001 - never let the status probe fail on this
+            daemon_version = None
         self._send(
             state,
             {
                 "id": req_id,
                 "ok": True,
+                "meta": {
+                    "daemon_version": daemon_version,
+                    "daemon_pid": os.getpid(),
+                },
                 "result": [
                     {
                         "key": s.key,
