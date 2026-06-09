@@ -154,6 +154,50 @@
   color: var(--muted-foreground);
 }
 
+/* ── WP-012 — SHIPPED / TERMINAL (archived) ──
+ * A shipped change reads as ARCHIVED, not active: the whole card is MUTED so it
+ * recedes from the live cards. The mute is a token-only treatment — a muted
+ * surface + dimmed text + a calm border — never a literal colour. The static
+ * "Shipped" marker + the "shipped Nd ago" recency are the only status reads;
+ * the live probe + both feet are suppressed in the markup (FR-56 / BR-28). */
+.shipped {
+  background: var(--muted);
+  border-color: var(--border-muted);
+  /* dim the whole archived card a touch so it sits behind the live cards. */
+  opacity: 0.82;
+}
+.shipped .handle,
+.shipped .intent,
+.shipped .slug {
+  color: var(--muted-foreground);
+}
+
+/* The static "Shipped" marker — sits in the live probe's slot on the top line.
+ * Muted, calm, with a small archive glyph. No motion, no state colour. */
+.shippedMarker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: var(--weight-label);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.shippedMarker svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+
+/* The archival "shipped Nd ago" recency on the meta line — quiet + muted, the
+ * companion read to the static marker. Pushed to the right of the slug. */
+.shippedRecency {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
 /* WP-009 — "Open terminal" action row (the cockpit-rendered terminal path). */
 .actions {
   display: flex;
