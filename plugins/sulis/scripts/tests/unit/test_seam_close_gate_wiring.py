@@ -100,15 +100,48 @@ def test_seam_gate_treats_deferred_as_blocking_by_default() -> None:
 
 
 def test_runwp_documents_seam_close_gate() -> None:
+    """run-wp/SKILL.md documents the seam-close gate: it names a seam-close
+    subsection, the WP-done firing point (the wpx-step12 done-transition), the
+    observed-or-blocked discipline, and the --allow-deferred escape (WP-004)."""
     text = _runwp_text().lower()
     assert "seam-close" in text or "seam close" in text, (
         "run-wp/SKILL.md must document the seam-close gate at WP-done (WP-004)"
     )
+    # Names the WP-done firing point (the done-transition / wpx-step12 wrap).
+    assert (
+        "wpx-step12" in text or "done-transition" in text or "done transition" in text
+    ), (
+        "run-wp/SKILL.md must name the WP-done firing point (the wpx-step12 "
+        "done-transition) where the seam-close gate runs"
+    )
+    # The observed-or-blocked discipline + the --allow-deferred escape.
+    assert "observed" in text and "blocked" in text, (
+        "run-wp/SKILL.md must state the seam-close observed-or-blocked verdict"
+    )
+    assert "allow-deferred" in text or "allow_deferred" in text, (
+        "run-wp/SKILL.md must document the --allow-deferred escape (the "
+        "conscious, recorded deferral; default is observed-or-blocked)"
+    )
 
 
 def test_runall_documents_seam_close_gate() -> None:
+    """run-all/SKILL.md documents the seam-close gate firing when a
+    seam-spanning WP completes, with the observed-or-blocked discipline and the
+    --allow-deferred escape (WP-004)."""
     text = _runall_text().lower()
     assert "seam-close" in text or "seam close" in text, (
         "run-all/SKILL.md must document the seam-close gate firing when a "
         "seam-spanning WP completes (WP-004)"
+    )
+    # The seam-spanning-WP completion trigger.
+    assert "seam-spanning" in text or "seam spanning" in text, (
+        "run-all/SKILL.md must name the seam-spanning-WP completion as the "
+        "seam-close gate's firing trigger"
+    )
+    # The observed-or-blocked discipline + the --allow-deferred escape.
+    assert "observed" in text and "blocked" in text, (
+        "run-all/SKILL.md must state the seam-close observed-or-blocked verdict"
+    )
+    assert "allow-deferred" in text or "allow_deferred" in text, (
+        "run-all/SKILL.md must document the --allow-deferred escape"
     )

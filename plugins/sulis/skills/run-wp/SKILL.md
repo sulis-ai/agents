@@ -367,6 +367,58 @@ Security: PASS (N CONCERN, M ADVISORY auto-drafted as WP-AUTO-XXX for
 founder review).
 ```
 
+#### The seam-close gate (at the WP-done transition)
+
+`wpx-step12 wrap` runs the **seam-close gate** at the moment this WP
+becomes done — step 12.2a, immediately after the `in_progress → done`
+status flip. You do not call the gate yourself; it fires inside the
+wrap above. This subsection tells you what it does and how to surface
+its result.
+
+**When it fires.** At the WP-done transition (the `wpx-step12 wrap`
+done-transition), once per WP. For a single-WP run that is right here
+at Step 4. The gate first asks: *did a seam just close?* A seam closes
+when the contract WP and all the producer + consumer WPs that depend on
+it have reached done (or when an integration WP completes). If this WP
+is part of no seam — the common case — the gate is silent and the wrap
+proceeds untouched.
+
+**What it does when a seam closes.** It drives the closing seam's
+covering Scenarios — the end-to-end checks that exercise the real data
+crossing the seam — through the acceptance runner, and reads the
+verdict over the **real saved record**: **observed** or **blocked**.
+This is the same observed-or-blocked discipline the ship-stage check
+uses, re-timed to the moment the seam closes (cheap to fix) rather than
+deferred to ship.
+
+**What `blocked` means.** Seam-close halts as "not done". The done flip
+is **not** rolled back — this WP genuinely reached done; it is the
+*seam* that is not done. `wpx-step12 wrap` emits a `gate_block` field in
+its JSON envelope. Surface that field's message to the founder verbatim
+— **do not invent your own**. The block is written in founder English
+and names the seam by its title and what wasn't driven, for example:
+
+```
+The "checkout-to-ledger" handover isn't done yet. Nothing has driven a
+real order all the way through to a saved ledger entry, so we can't
+confirm the two halves actually work together. Holding this as not-done
+until that end-to-end path runs for real.
+```
+
+**The escape — `--allow-deferred`.** A seam whose only honest check
+needs a capability that isn't live yet (e.g. a real browser-driven
+step) can proceed as a **conscious, recorded deferral** by threading
+`--allow-deferred` through the wrap. The deferral is logged. The default
+is observed-or-blocked: the escape is a deliberate choice, never the
+silent path.
+
+> Cross-refs: the seam-close timing rule is **CF-12** in
+> `CONTRACT_FIRST_STANDARD.md`; the ship-stage acceptance check (gate
+> 4.8) remains as a backstop per **ADR-002** (defence in depth — the
+> seam-close gate is the primary, earlier catch). The gate logic lives
+> in `_seam_close_gate` and is wired at `wpx-step12 wrap` per ADR-003;
+> this skill only surfaces the wrap envelope's `gate_block`.
+
 ## What you do NOT do in this skill's session
 
 - **Do not write tests, code, lint, commit, or push.** Those are the

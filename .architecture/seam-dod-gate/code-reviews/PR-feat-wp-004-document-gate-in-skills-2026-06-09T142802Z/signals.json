@@ -1,0 +1,36 @@
+{
+  "pr": "feat/wp-004-document-gate-in-skills",
+  "base": "change/feat-seam-dod-gate",
+  "timestamp": "2026-06-09T142802Z",
+  "verdict": "PASS",
+  "outcome_plain": "Ready to merge",
+  "build_verification": {
+    "errors_introduced": 0,
+    "ruff_check": "clean",
+    "ast_parse": "ok"
+  },
+  "pr_hygiene": {
+    "scope_severity": "none",
+    "size_severity": "none",
+    "safety_severity": "none",
+    "completeness_severity": "none",
+    "lines_added": 152,
+    "lines_removed": 0,
+    "files_changed": 3,
+    "migrations": 0,
+    "schema_idl": 0,
+    "infra_files": 0,
+    "secret_pattern_hits": 0
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"critical": 0, "high": 0, "medium": 0, "low": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "ran": true},
+    "security": {"findings": 0, "ran": true},
+    "quality": {"findings": 0, "ran": true}
+  },
+  "draft_deltas": 0,
+  "auto_downgrade_triggers": []
+}
