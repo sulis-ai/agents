@@ -26,6 +26,61 @@
   background: var(--card);
 }
 
+/* The "Start something new" front door (ADR-003). The single primary action in
+ * the chrome — a filled --primary button, so it reads as the way in (signed-off
+ * MOCKUP state 1). Token-only (WPF-07). Vertically centred in the 48px bar; sits
+ * left of the product switcher. */
+.startBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  align-self: center;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: var(--radius-button);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: var(--weight-label);
+  cursor: pointer;
+  transition: filter 0.12s ease;
+}
+.startBtn:hover {
+  filter: brightness(1.06);
+}
+/* Visible focus ring (WPF-06 — never outline:none). Uses the theme's --ring so
+ * the indicator is legible in both light and dark. */
+.startBtn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.startBtnIcon {
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+.startBtnIcon svg {
+  width: 15px;
+  height: 15px;
+}
+.startBtnLabel {
+  white-space: nowrap;
+}
+/* The quiet ⌘N hint — JetBrains Mono via --font-mono, on a subtle wash of the
+ * button's own foreground colour (token-derived via color-mix; no raw rgba, so
+ * it re-themes with --primary-foreground). */
+.startBtnHint {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: var(--radius-badge);
+  background: color-mix(in srgb, var(--primary-foreground) 18%, transparent);
+  color: var(--primary-foreground);
+}
+
 /* The product switcher sits at the far left, vertically centred. */
 .brand {
   display: flex;
