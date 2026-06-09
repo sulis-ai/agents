@@ -22,6 +22,20 @@ _HOOK = (
 )
 
 
+@pytest.fixture(autouse=True)
+def _isolate_sulis_origin(monkeypatch):
+    """#245 — clear the ambient `SULIS_ORIGIN` for every test in this file.
+
+    `_commit` snapshots `dict(os.environ)` into the commit's environment, so a
+    developer running the suite inside a Sulis-assisted session (which exports
+    `SULIS_ORIGIN`) had the hook stamp the 'no env → no-op' commits — a
+    false-red on `main`'s own tests. The stamped-path tests pass their own
+    `SULIS_ORIGIN` via the `env=` arg, which re-adds it after this clear, so
+    they are unaffected. CI (no `SULIS_ORIGIN`) is unchanged.
+    """
+    monkeypatch.delenv("SULIS_ORIGIN", raising=False)
+
+
 def _install_hook(repo: Path) -> None:
     """Wire the hook the way it actually ships: point git's `core.hooksPath`
     at the scripts `hooks/` dir, so the hook runs in place with its sibling
