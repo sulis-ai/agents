@@ -94,6 +94,31 @@
   border-radius: 8px;
 }
 
+/* WP-013 — virtualised lane list. The spacer is sized to the FULL card count
+ * (so the lane's internal scroll covers all N changes — the header count's
+ * truth) while only the windowed rows mount inside it. It is the one flex
+ * child of .laneList; rows are absolutely positioned within it by transform,
+ * so the list's flex `gap` does not apply to them — the 12px inter-card gap is
+ * folded into each row's padding-bottom so measured row heights include it. */
+.laneVirtualSpacer {
+  position: relative;
+  width: 100%;
+  /* The spacer must not stretch under flex; its height is set inline to the
+   * virtualiser's total size. */
+  flex: 0 0 auto;
+}
+
+.laneVirtualRow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  /* The inter-card gap (matches .laneList's 12px gap) lives on the row so the
+   * measured height the virtualiser records includes it — no overlap, no
+   * cumulative drift. */
+  padding-bottom: 12px;
+}
+
 /* EMPTY LANE — a stage with zero changes inside an otherwise-populated board.
  * The lane is NOT collapsed or hidden: it keeps its full height, its header
  * and its count (0), and shows this quiet placeholder so the board's shape
