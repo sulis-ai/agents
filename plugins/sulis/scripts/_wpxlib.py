@@ -3974,16 +3974,23 @@ def generate_change_ulid(*, _now_ms: int | None = None,
 def ulid_handle(ulid: str) -> str:
     """Return the 6-character display handle for a ULID.
 
-    The handle is `CH-{first-6-chars}` — "CH" for "change", then the
-    first 6 Crockford-base32 characters of the ULID. The first 6 are
-    derived from the timestamp portion (28 bits encoded across 6
-    chars), so handles sort chronologically + collisions are rare in
-    practice (would require two changes started in the same ~1-second
-    window).
+    The handle is `CH-{6 chars from the ULID's RANDOM tail}` — "CH" for
+    "change", then 6 Crockford-base32 characters taken from the 80-bit
+    random portion (positions 10-15), NOT the timestamp prefix.
+
+    Why the tail, not the head (#101): the first 10 ULID chars are the
+    48-bit millisecond timestamp, so `ulid[:6]` encodes only the high
+    timestamp bits — two changes started in the same coarse (~minutes)
+    window collide on the same handle. That silently let `nuke` / `ship`
+    / `mark-shipped` resolve a handle to the WRONG change. The random
+    tail gives ~30 bits of entropy (~1e9 space), so collisions are
+    astronomically unlikely at any realistic change count, while the
+    full ULID remains the canonical, chronologically-sortable id.
     """
     if len(ulid) != 26:
         raise ValueError(f"ULID must be 26 characters, got {len(ulid)}: {ulid!r}")
-    return "CH-" + ulid[:6]
+    # Positions 0-9 = timestamp, 10-25 = randomness. Take the first 6 of the tail.
+    return "CH-" + ulid[10:16]
 
 
 def validate_change_ulid(ulid: str) -> tuple[bool, str]:

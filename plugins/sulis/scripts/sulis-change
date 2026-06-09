@@ -1294,6 +1294,100 @@ def _resolve_change_id(repo_root: Path, primitive: str, slug: str,
     return "", "unresolved"
 
 
+def _changes_matching_handle(handle: str, records: list) -> list:
+    """Every record whose handle matches `handle` (case-insensitive).
+
+    Matches on the STORED handle OR a recomputed ``ulid_handle(change_id)`` —
+    migration-robust across the head→tail handle derivation change (#101), so a
+    pre-change record (head-derived stored handle) and a post-change record
+    (tail-derived) both resolve. Returns ALL matches so callers REFUSE on
+    ambiguity rather than silently picking the first (the #101 danger:
+    resolving a handle to the WRONG change).
+    """
+    h = (handle or "").strip().upper()
+    if not h:
+        return []
+    out = []
+    for r in records:
+        cid = str(r.get("change_id") or "")
+        stored = str(r.get("handle") or "").upper()
+        recomputed = ulid_handle(cid).upper() if len(cid) == 26 else ""
+        if h == stored or (recomputed and h == recomputed):
+            out.append(r)
+    return out
+
+
+def _emit_ambiguous_match(selector: str, matches: list) -> None:
+    """REFUSE rather than guess when a selector matches >1 change (#101).
+
+    The whole point of the safe-resolution fix: never silently act on one of
+    several candidates. Surface the candidates (full id / branch / stage) and
+    make the operator disambiguate.
+    """
+    emit_error(
+        f"{selector} matches {len(matches)} changes — refusing to guess which "
+        f"one. Disambiguate with --change-id <full ULID> or --slug <slug>.",
+        context={
+            "hint": "Run `sulis-change list` to see the full ids.",
+            "candidates": [
+                {
+                    "change_id": m.get("change_id"),
+                    "branch": m.get("branch"),
+                    "slug": m.get("slug"),
+                    "stage": m.get("stage"),
+                }
+                for m in matches
+            ],
+        },
+    )
+
+
+def _select_change_id_refusing_conflict(
+    *,
+    explicit_change_id: "str | None",
+    explicit_handle: "str | None",
+    env_change_id: "str | None",
+    records: list,
+) -> str:
+    """Resolve the change id for a session-bindable command (ship/mark-shipped),
+    refusing on ambiguity (#101) and on an explicit-vs-session conflict (#274).
+
+    Precedence is NOT "session silently wins" (the #274 bug) and NOT "explicit
+    silently wins" — when an explicit selector and the session binding disagree
+    we REFUSE and make the operator resolve it (founder-chosen). Returns the
+    resolved 26-char change id, or calls ``emit_error`` (exits) on
+    not-found / ambiguous / conflict / nothing-given.
+    """
+    resolved_explicit = explicit_change_id
+    if not resolved_explicit and explicit_handle:
+        matches = _changes_matching_handle(explicit_handle, records)
+        if not matches:
+            emit_error(f"no change found for handle {explicit_handle!r}")
+        if len(matches) > 1:
+            _emit_ambiguous_match(f"Handle {explicit_handle.upper()}", matches)
+        resolved_explicit = str(matches[0].get("change_id") or "")
+
+    # #274: an explicit selector must never be silently overridden by the
+    # session's active change. Disagreement → refuse, operator resolves.
+    if resolved_explicit and env_change_id and resolved_explicit != env_change_id:
+        sel = (f"--handle {explicit_handle.upper()}" if explicit_handle
+               else f"--change-id {resolved_explicit}")
+        env_h = (ulid_handle(env_change_id)
+                 if len(env_change_id) == 26 else env_change_id)
+        emit_error(
+            f"{sel} conflicts with the session's active change ({env_h}).",
+            context={
+                "hint": "Re-run without the session binding (unset "
+                        "SULIS_CHANGE_ID), or pass the session's own change.",
+            },
+        )
+
+    change_id = resolved_explicit or env_change_id
+    if not change_id:
+        emit_error("--change-id, --handle, or SULIS_CHANGE_ID required")
+    return str(change_id)
+
+
 def _resolve_nuke_target(repo_root: Path, args: argparse.Namespace) -> dict:
     """Resolve --slug or --handle to a change-branch descriptor.
 
@@ -1324,6 +1418,7 @@ def _resolve_nuke_target(repo_root: Path, args: argparse.Namespace) -> dict:
         )
 
     candidates = find_change_branches(repo_root)
+    matches = []
     for c in candidates:
         dest = change_worktree_path(repo_root, c["primitive"], c["slug"])
         change_id, resolution = _resolve_change_id(
@@ -1334,10 +1429,10 @@ def _resolve_nuke_target(repo_root: Path, args: argparse.Namespace) -> dict:
         matched = False
         if slug and c["slug"] == slug.lower():
             matched = True
-        if handle and change_handle and change_handle == handle:
+        if handle and change_handle and change_handle == handle.strip().upper():
             matched = True
         if matched:
-            return {
+            matches.append({
                 "branch": c["branch"],
                 "primitive": c["primitive"],
                 "slug": c["slug"],
@@ -1349,7 +1444,16 @@ def _resolve_nuke_target(repo_root: Path, args: argparse.Namespace) -> dict:
                 "worktree_path": dest,
                 "manifest_path": _metadata_path(repo_root, c["primitive"],
                                                 c["slug"]),
-            }
+            })
+
+    # REFUSE on ambiguity rather than nuking the WRONG change (#101). A handle
+    # collision (or a slug shared across primitives) must never resolve to a
+    # silent first-match for a destructive op.
+    if len(matches) > 1:
+        selector = f"--slug {slug}" if slug else f"Handle {handle.strip().upper()}"
+        _emit_ambiguous_match(selector, matches)
+    if matches:
+        return matches[0]
 
     selector = f"--slug {slug}" if slug else f"--handle {handle}"
     emit_error(
@@ -1689,18 +1793,15 @@ def cmd_mark_shipped(args: argparse.Namespace) -> None:
     repeat call preserves the first shipped_at + shipped_sha.
     """
     repo_root = Path(getattr(args, "repo_root", None) or os.getcwd()).resolve()
-    change_id = args.change_id or os.environ.get("SULIS_CHANGE_ID")
-    if not change_id and args.handle:
-        # Resolve a handle → change_id via the global store.
-        handle = args.handle.upper()
-        for record in list_all_changes():
-            if str(record.get("handle", "")).upper() == handle:
-                change_id = record.get("change_id")
-                break
-        if not change_id:
-            emit_error(f"no change found for handle {args.handle!r}")
-    if not change_id:
-        emit_error("--change-id, --handle, or SULIS_CHANGE_ID required")
+    # Safe resolution (#101 + #274): an explicit --handle resolves through the
+    # ambiguity-refusing matcher, and an explicit selector that disagrees with
+    # the session's SULIS_CHANGE_ID is REFUSED (never silently overridden).
+    change_id = _select_change_id_refusing_conflict(
+        explicit_change_id=args.change_id,
+        explicit_handle=getattr(args, "handle", None),
+        env_change_id=os.environ.get("SULIS_CHANGE_ID"),
+        records=list_all_changes(),
+    )
     record = read_change_record(str(change_id))
     if record is None:
         emit_error(f"no change record found for change_id={change_id!r}")
@@ -1750,14 +1851,15 @@ def cmd_recreate(args: argparse.Namespace) -> None:
 
     record: dict | None = None
     if args.handle:
-        handle = args.handle.upper()
-        for r in list_all_changes():
-            if str(r.get("handle", "")).upper() == handle:
-                record = r
-                break
-        if record is None:
+        # Safe resolution (#101): refuse on ambiguity rather than recreating the
+        # WRONG change's workspace from a silent first-match.
+        matches = _changes_matching_handle(args.handle, list_all_changes())
+        if not matches:
             emit_error(f"no change found for handle {args.handle!r}")
             return  # for type checker
+        if len(matches) > 1:
+            _emit_ambiguous_match(f"Handle {args.handle.upper()}", matches)
+        record = matches[0]
         primitive = str(record.get("primitive") or "feat")
         slug = str(record.get("slug") or "")
         branch = str(record.get("branch")
