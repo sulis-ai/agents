@@ -224,9 +224,13 @@ class TestGoldenThreadEndToEnd:
         foundation_adapter: LocalFileEntityAdapter,
         pd_adapter: LocalFileEntityAdapter,
     ) -> None:
-        """Re-running every emitter on the same source produces the same
-        graph — same IDs, no duplicates. Confirms the deterministic-ID
-        strategy across all five emitters with sources."""
+        """Re-running each emitter on the same source confirms its ID
+        strategy. Four emitters (tenant, product, opportunity, requirement)
+        are deterministic — same source ⇒ same IDs, no duplicates. The
+        decision emitter is intentionally NOT idempotent by @id (WP-012): each
+        emission mints a fresh ULID so two decisions from the same change
+        never collide on one @id, so a re-run yields a distinct decision @id.
+        """
         paths = _layout(tmp_path)
 
         # First pass
@@ -247,4 +251,6 @@ class TestGoldenThreadEndToEnd:
         assert p1[0]["id"] == p2[0]["id"]
         assert o1[0]["id"] == o2[0]["id"]
         assert [r["id"] for r in r1] == [r["id"] for r in r2]
-        assert d1["id"] == d2["id"]
+        # Decision is intentionally per-emission distinct (WP-012 collision
+        # fix): a re-run mints a fresh ULID, so the @ids differ.
+        assert d1["id"] != d2["id"]

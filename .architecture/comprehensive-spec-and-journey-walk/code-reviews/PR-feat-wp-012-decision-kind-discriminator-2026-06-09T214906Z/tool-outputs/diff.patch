@@ -1,0 +1,1097 @@
+diff --git a/.architecture/comprehensive-spec-and-journey-walk/work-packages/.executor-WP-012.md b/.architecture/comprehensive-spec-and-journey-walk/work-packages/.executor-WP-012.md
+new file mode 100644
+index 00000000..f9d78c73
+--- /dev/null
++++ b/.architecture/comprehensive-spec-and-journey-walk/work-packages/.executor-WP-012.md
+@@ -0,0 +1,55 @@
++# Executor journal — WP-012
++
++> Started: 2026-06-09T21:33:08Z
++> Lifecycle step: 6.5
++> Status: in_progress
++
++## Pre-flight checks
++
++| Tool / Check | Status | Fallback |
++|---|---|---|
++| uv + pytest | present | — |
++| ruff (lint/format) | present | — |
++
++## Plan
++
++**Approach.** Extend primitive (FR-17, ADR-006). Add additive-optional kind enum {adr,bdr} (default adr) to the vendored decision.schema.json, mirroring WP-007's surface addition; teach _decision_emission.py + sulis-emit-decision a --kind / --from-bdr source-dir inference. BUNDLED FIX: the @id was derived from change_id frontmatter, so a change with >1 decision overwrote itself — fix by minting a distinct ULID @id per decision via a single helper (this also touches the two existing tests + draft-architecture SKILL.md doc that encoded the old change_id-reuse). Key risk: branch-CI runs only tests/unit/ (lesson #60) so load-bearing assertions go there; the methodology-tier test_bdr_distinct_from_adr.py re-exports them so SC-17 names them without orphaning CI coverage.
++
++| # | Item | Step | Status | Notes |
++|---:|---|---|---|---|
++| 1 | Write test_emit_bdr_carries_kind_bdr + test_absent_kind_reads_as_adr in plugins/sulis/scripts/tests/unit/test_decision_emission.py (CI-run tier; methodology file re-exports) | 2 (RED) | done | — |
++| 2 | Write test_multi_decision_emit_no_id_collision in plugins/sulis/scripts/tests/unit/test_decision_emission.py | 2 (RED) | done | — |
++| 3 | Add tests/methodology/test_bdr_distinct_from_adr.py SC-17 verification artifact (re-exports the unit assertions so CI runs them, methodology tier names them) | 2 (RED) | done | — |
++| 4 | Add kind enum (adr,bdr default adr) to decision.schema.json (additive-optional, mirrors WP-007 surface addition) | 3 (GREEN) | done | — |
++| 5 | Implement --kind + source-dir inference + distinct @id minting in _decision_emission.py | 3 (GREEN) | done | — |
++| 6 | Surface --kind / --from-bdr in sulis-emit-decision | 3 (GREEN) | done | — |
++| 7 | Create _drive_decisions.py (drives emit of a BDR + an ADR) + _assert_bdr_adr.py (SC-17 exit-0 gate) | 3 (GREEN) | done | — |
++| 8 | Extract @id minting into a single helper; confirm no per-call-site id generation can re-collide | 4 (BLUE) | done | @id minting is the single _mint_decision_id() helper, called once; old per-frontmatter _resolve_decision_id fully removed, no re-collision possible. No further extraction: BDR fixture bodies differ by layer (driver source-of-truth vs test fixture); coupling script to test module would be worse |
++| 9 | Update draft-architecture/SKILL.md decision-emit doc to reflect corrected @id strategy + new --kind/--from-bdr surface | 5 (DOCS) | done | — |
++| 10 | Run ruff check + format + py_compile + full unit suite | 6 (LINT) | done | ruff check passes; py_compile + manifest validity + routing-coverage (CI lint gates) all green; ruff format intentionally not applied — repo has no [tool.ruff] config + pristine files predate it, so formatting would be out-of-scope churn |
++| 11 | Run /code-review against local diff; address every finding | 6.5 (REVIEW) | pending | — |
++| 12 | Commit (Conventional Commits) + push feat/wp-012-decision-kind-discriminator | 7 (COMMIT) | pending | — |
++
++## Step trace
++
++| Step | Started | Completed | Outcome |
++|---:|---|---|---|
++| 2 | 2026-06-09T21:33:54Z | 2026-06-09T21:37:23Z | RED: 13 new/updated unit tests + methodology re-export all fail for the right reason (kind absent, --kind kwarg unknown, change_id-derived @id collides) |
++| 3 | 2026-06-09T21:37:27Z | 2026-06-09T21:45:40Z | GREEN: kind enum added to schema; --kind/--from-bdr + distinct-ULID @id minting in emitter/CLI; _drive_decisions.py + _assert_bdr_adr.py ship + pass. Full unit suite 2449 passed, 9 skipped (1 in-scope golden-thread idempotency assertion updated to new contract) |
++| 4 | 2026-06-09T21:45:46Z | 2026-06-09T21:46:25Z | BLUE: single id-minting helper confirmed (no per-call-site generation); no new behaviour; 38 affected tests green |
++| 5 | 2026-06-09T21:46:31Z | 2026-06-09T21:46:58Z | DOCS: draft-architecture/SKILL.md step-9 decision-emit doc updated — --from-bdr/--kind surface + corrected fresh-ULID-per-decision @id strategy (collision gone) |
++| 6 | 2026-06-09T21:47:04Z | 2026-06-09T21:47:47Z | LINT: ruff check clean; py_compile + manifest JSON + routing-coverage gates green; ruff format not a repo gate (no config) |
++| 6.5 | 2026-06-09T21:47:53Z | (in flight) | — |
++
++## Self-heal attempts
++
++| Step | Attempt | Failure (1-line summary) | Root cause | Change applied | Outcome |
++|---:|---:|---|---|---|---|
++| 3 | 1 | test_golden_thread_integration::test_chain_is_idempotent_under_re_run asserts d1[id]==d2[id] | Test encoded the pre-fix change_id-derived decision idempotency; the WP-012 collision fix intentionally mints a fresh ULID per emission, so decision @ids now differ across runs (in-scope behaviour change) | Update the decision assertion in that test to require DISTINCT @ids across runs (the new contract), keeping the other four emitters idempotent | pending re-run |
++
++## Post-deploy verification
++
++(Not yet recorded — Step 11 fills this in.)
++
++## Notes
++
+diff --git a/plugins/sulis/brain/compiled/product-development/decision.schema.json b/plugins/sulis/brain/compiled/product-development/decision.schema.json
+index 5709ff9e..e21623e8 100644
+--- a/plugins/sulis/brain/compiled/product-development/decision.schema.json
++++ b/plugins/sulis/brain/compiled/product-development/decision.schema.json
+@@ -42,6 +42,14 @@
+       "type": "string",
+       "pattern": "^dna:decision:[0-9A-HJKMNP-TV-Z]{26}$"
+     },
++    "kind": {
++      "enum": [
++        "adr",
++        "bdr"
++      ],
++      "default": "adr",
++      "description": "decision-kind discriminator — 'adr' (technical architecture decision) or 'bdr' (business decision); additive-optional, absent reads as 'adr' (§9.1)"
++    },
+     "title": {
+       "type": "string"
+     },
+diff --git a/plugins/sulis/scripts/_assert_bdr_adr.py b/plugins/sulis/scripts/_assert_bdr_adr.py
+new file mode 100755
+index 00000000..61e585ef
+--- /dev/null
++++ b/plugins/sulis/scripts/_assert_bdr_adr.py
+@@ -0,0 +1,118 @@
++#!/usr/bin/env python3
++"""_assert_bdr_adr.py — assert a BDR is recorded distinct from an ADR (SC-17).
++
++Reads the persisted-path manifest written by `_drive_decisions.py` (one
++`kind=<adr|bdr>\\t<path>` line per emitted decision) and verifies the SC-17
++contract (FR-17, ADR-006):
++
++  1. The decision driven as a BDR carries `kind: bdr`.
++  2. The decision driven as an ADR carries `kind: adr`.
++  3. The two decisions have distinct `@id`s — the bundled multi-decision @id
++     collision fix (both sources shared a `change_id`, the pre-fix trigger).
++
++Usage:
++    _assert_bdr_adr.py --manifest <path>
++
++Exit codes:
++  0 — the BDR is kind:bdr, the ADR is kind:adr, and their @ids differ (SC-17).
++  1 — at least one assertion failed (the failing check is printed to stderr).
++  2 — bad input (manifest unreadable/malformed, or a persisted file missing).
++
++Pure inspector — reads the manifest + the persisted instances, no other I/O.
++Stdlib only. Python 3.11-safe.
++"""
++
++from __future__ import annotations
++
++import argparse
++import json
++import sys
++from pathlib import Path
++
++
++def _load_manifest(manifest_path: Path) -> dict[str, Path]:
++    """Parse the `kind=<k>\\t<path>` manifest into a {kind: path} mapping.
++
++    Raises ValueError on a malformed line or a missing kind.
++    """
++    by_kind: dict[str, Path] = {}
++    for raw in manifest_path.read_text(encoding="utf-8").splitlines():
++        line = raw.strip()
++        if not line:
++            continue
++        if "\t" not in line or not line.startswith("kind="):
++            raise ValueError(f"malformed manifest line: {raw!r}")
++        kind_token, path_str = line.split("\t", 1)
++        kind = kind_token[len("kind=") :]
++        by_kind[kind] = Path(path_str)
++    for required in ("adr", "bdr"):
++        if required not in by_kind:
++            raise ValueError(f"manifest missing a {required!r} decision")
++    return by_kind
++
++
++def _load_decision(path: Path) -> dict:
++    """Load a persisted decision instance. Raises on missing/malformed file."""
++    if not path.is_file():
++        raise FileNotFoundError(f"persisted decision not found: {path}")
++    return json.loads(path.read_text(encoding="utf-8"))
++
++
++def check(by_kind: dict[str, Path]) -> list[str]:
++    """Return a list of failure messages (empty ⇒ SC-17 holds)."""
++    adr = _load_decision(by_kind["adr"])
++    bdr = _load_decision(by_kind["bdr"])
++
++    failures: list[str] = []
++    if bdr.get("kind") != "bdr":
++        failures.append(
++            f"BDR carries kind={bdr.get('kind')!r}, expected 'bdr'"
++        )
++    if adr.get("kind") != "adr":
++        failures.append(
++            f"ADR carries kind={adr.get('kind')!r}, expected 'adr'"
++        )
++    if adr.get("id") == bdr.get("id"):
++        failures.append(
++            f"ADR and BDR collided on the same @id: {adr.get('id')!r}"
++        )
++    return failures
++
++
++def _parse_args(argv: list[str]) -> argparse.Namespace:
++    parser = argparse.ArgumentParser(
++        prog="_assert_bdr_adr.py",
++        description="Exit 0 iff the BDR is kind:bdr and distinct from the ADR.",
++    )
++    parser.add_argument(
++        "--manifest",
++        required=True,
++        type=Path,
++        help="path to the decisions.manifest written by _drive_decisions.py",
++    )
++    return parser.parse_args(argv)
++
++
++def main(argv: list[str] | None = None) -> int:
++    args = _parse_args(sys.argv[1:] if argv is None else argv)
++    try:
++        by_kind = _load_manifest(args.manifest)
++    except (OSError, ValueError) as exc:
++        print(f"assert-bdr-adr: bad manifest: {exc}", file=sys.stderr)
++        return 2
++
++    try:
++        failures = check(by_kind)
++    except (FileNotFoundError, json.JSONDecodeError) as exc:
++        print(f"assert-bdr-adr: bad input: {exc}", file=sys.stderr)
++        return 2
++
++    if failures:
++        for f in failures:
++            print(f"assert-bdr-adr: {f}", file=sys.stderr)
++        return 1
++    return 0
++
++
++if __name__ == "__main__":  # pragma: no cover
++    sys.exit(main())
+diff --git a/plugins/sulis/scripts/_decision_emission.py b/plugins/sulis/scripts/_decision_emission.py
+index 7d95ae64..39cf8b47 100644
+--- a/plugins/sulis/scripts/_decision_emission.py
++++ b/plugins/sulis/scripts/_decision_emission.py
+@@ -13,10 +13,21 @@ The two halves are deliberate:
+ 
+ Decisions baked in (per founder confirmation, 2026-05-30):
+ 
+-  - **ID strategy.** Reuse the ADR's `change_id` frontmatter field (so the
+-    Decision's id is `dna:decision:{change_id}`, giving natural traceability
+-    from a Change to the Decisions it produced). Fall back to a fresh ULID
+-    when `change_id` is absent.
++  - **ID strategy (WP-012, FR-17).** Each emitted Decision gets a freshly-
++    minted ULID `@id` (`dna:decision:{ulid}`). The earlier strategy reused the
++    ADR's `change_id` frontmatter (`dna:decision:{change_id}`), but a change
++    that produces more than one decision then collapsed every decision onto a
++    single `@id` — the second emission silently overwrote the first on disk.
++    A fresh ULID per emission guarantees distinctness; change→decision
++    traceability moves off the primary id (a `prov:wasDerivedFrom` relation,
++    deferred to the SPARQL runtime — see below — rather than overloading the
++    storage identity).
++  - **Kind discriminator (WP-012, ADR-006).** A Decision carries
++    `kind ∈ {adr, bdr}` — a technical architecture decision (ADR) vs a
++    business decision (BDR). It is a discriminator on the existing decision
++    entity, not a new entity type. The caller supplies the kind (the CLI's
++    `--kind` / `--from-bdr`); absent, it defaults to `adr`, so existing
++    `decision/*.jsonld` need no rewrite (§9.1).
+   - **Status → state translation.** ADR frontmatter has `status: accepted`
+     (old marketplace vocabulary, predating the two-lifecycle model). The
+     Decision entity wants `state: accepted` (business state) + a separate
+@@ -120,39 +131,64 @@ def _extract_list_items(section: str) -> list[str]:
+     return [item for item in items if item]
+ 
+ 
+-def _resolve_decision_id(frontmatter: dict) -> str:
+-    """Compose the Decision's `@id`.
++_VALID_KINDS: Final[tuple[str, ...]] = ("adr", "bdr")
++_DEFAULT_KIND: Final[str] = "adr"
+ 
+-    Uses the ADR's `change_id` if present (so a Decision's id is
+-    deterministically tied to the Change that produced it); generates a
+-    fresh ULID otherwise. Both shapes pass the schema's id pattern.
++
++def _mint_decision_id() -> str:
++    """Mint a fresh, distinct Decision `@id` (`dna:decision:{ulid}`).
++
++    The single id-minting site. Every emitted Decision gets its own freshly-
++    generated ULID, so two decisions produced by the same change (which share
++    a `change_id` in their source frontmatter) never collide on the same `@id`
++    — the WP-012 collision fix. The ULID is the storage identity; change→
++    decision traceability lives in a relation, not the primary id.
+     """
+-    change_id = frontmatter.get("change_id")
+-    if isinstance(change_id, str) and change_id:
+-        return f"dna:decision:{change_id}"
+     return f"dna:decision:{generate_change_ulid()}"
+ 
+ 
++def _normalise_kind(kind: str | None) -> str:
++    """Validate + default the decision-kind discriminator.
++
++    Absent (`None`) reads as `adr` — the additive-optional migration default
++    (§9.1), so existing decisions and callers that don't pass a kind are
++    unaffected. An explicit out-of-enum value is a caller error.
++    """
++    if kind is None:
++        return _DEFAULT_KIND
++    if kind not in _VALID_KINDS:
++        raise ValueError(
++            f"kind must be one of {_VALID_KINDS}, got {kind!r}"
++        )
++    return kind
++
++
+ # ─── public API ───────────────────────────────────────────────────────────
+ 
+ 
+-def compose_decision_from_adr(adr_text: str) -> dict:
+-    """Compose a Decision entity dict from ADR markdown.
++def compose_decision_from_adr(adr_text: str, *, kind: str | None = None) -> dict:
++    """Compose a Decision entity dict from ADR (or BDR) markdown.
+ 
+-    Pure transformation: text in, dict out. No I/O, no validation —
+-    validation happens at the repository boundary on save (which is where
+-    rejection semantics live).
++    Pure transformation: text in, dict out (modulo the freshly-minted ULID id).
++    No file I/O, no schema validation — validation happens at the repository
++    boundary on save (which is where rejection semantics live).
++
++    `kind` is the ADR/BDR discriminator (ADR-006): `"adr"` for a technical
++    architecture decision (the default — absent reads as `adr`, §9.1), `"bdr"`
++    for a business decision. The body shape is identical; the kind is supplied
++    by the caller, not inferred from the markdown.
+ 
+     The returned dict has the shape the vendored `decision.schema.json`
+     expects. Optional fields (`context`, `consequences`, `options_considered`)
+-    are omitted when the source ADR doesn't contain them rather than
+-    emitted-empty, so the schema's `unevaluatedProperties:false` doesn't
+-    reject a sparse-but-valid input.
++    are omitted when the source doesn't contain them rather than emitted-empty,
++    so the schema's `unevaluatedProperties:false` doesn't reject a
++    sparse-but-valid input.
+     """
+     frontmatter, body = parse_frontmatter(adr_text)
+ 
+     decision: dict = {
+-        "id": _resolve_decision_id(frontmatter),
++        "id": _mint_decision_id(),
++        "kind": _normalise_kind(kind),
+         "title": str(frontmatter.get("title", "")),
+         "state": str(frontmatter.get("status", "proposed")),
+         "sys_status": "active",
+@@ -182,8 +218,13 @@ def compose_decision_from_adr(adr_text: str) -> dict:
+ def emit_decision_from_adr(
+     adr_path: Path,
+     repo: EntityRepository,
++    *,
++    kind: str | None = None,
+ ) -> dict:
+-    """Read an ADR markdown file and emit its Decision entity through `repo`.
++    """Read an ADR (or BDR) markdown file and emit its Decision through `repo`.
++
++    `kind` is the ADR/BDR discriminator (ADR-006), threaded to
++    `compose_decision_from_adr`; absent defaults to `adr`.
+ 
+     Returns the persisted Decision dict (caller can use it for cross-
+     referencing).
+@@ -193,6 +234,6 @@ def emit_decision_from_adr(
+             validation. The repository never persists an invalid instance.
+     """
+     adr_text = Path(adr_path).read_text(encoding="utf-8")
+-    decision = compose_decision_from_adr(adr_text)
++    decision = compose_decision_from_adr(adr_text, kind=kind)
+     repo.save("decision", decision)
+     return decision
+diff --git a/plugins/sulis/scripts/_drive_decisions.py b/plugins/sulis/scripts/_drive_decisions.py
+new file mode 100644
+index 00000000..9aa118bc
+--- /dev/null
++++ b/plugins/sulis/scripts/_drive_decisions.py
+@@ -0,0 +1,189 @@
++"""drive-decisions fixture harness (WP-012, SC-17).
++
++A deterministic, non-interactive driver that drives the real decision-emit path
++(`emit_decision_from_adr`, the same function `/sulis:draft-architecture` shells
++out to via `sulis-emit-decision`) for a business decision (BDR) and a technical
++decision (ADR), persisting both through the real `LocalFileEntityAdapter` (which
++validates against the vendored compiled `decision.schema.json` on save).
++
++It is the first step of SC-17 (a BDR is recorded distinct from an ADR): drive
++the emit, then `_assert_bdr_adr.py` reads the two persisted instances and
++verifies the discriminator + @id distinctness.
++
++CLI
++---
++    python3 _drive_decisions.py --out <dir> [--base-dir <dir>]
++
++  --out       directory the driver writes the two persisted instance paths to,
++              one per line, as `kind=<adr|bdr>\\t<path>` (the asserter reads it).
++  --base-dir  brain instances base dir (default: <out>/.brain/instances). Each
++              invocation uses a fresh dir so the drive is hermetic.
++
++Exit codes
++----------
++  0  both decisions were emitted + persisted.
++  1  a stage failure (validation rejection, write error) — surfaced loudly so
++     the scenario fails rather than silently producing a half-result.
++
++Design contracts
++----------------
++  - Reuses the real emit path: `emit_decision_from_adr` + the validating
++    adapter. This is a harness over the real path, not a fork of it.
++  - The BDR and ADR carry the SAME `change_id` in their source frontmatter — a
++    change that produced two decisions. The pre-WP-012 @id strategy collapsed
++    both onto one @id; the harness exercises that the collision fix holds (the
++    two persist as distinct files).
++
++See:
++  - plugins/sulis/scripts/_decision_emission.py (the real emit path)
++  - plugins/sulis/scripts/_assert_bdr_adr.py (the SC-17 asserter)
++  - .architecture/comprehensive-spec-and-journey-walk/adrs/ADR-006-*.md
++"""
++
++from __future__ import annotations
++
++import argparse
++import sys
++from pathlib import Path
++from typing import Final
++
++from _decision_emission import emit_decision_from_adr
++from _entity_adapter_local import LocalFileEntityAdapter
++from _entity_repository import EntityValidationError
++
++# Both source decisions share this change_id — a change that produced two
++# decisions, the exact collision trigger the WP-012 fix addresses.
++_SHARED_CHANGE_ID: Final[str] = "01KSWBWMCFTVB52NGGVAAQBA7R"
++
++_ADR_SOURCE: Final[str] = f"""---
++id: ADR-001
++title: Use a discriminator field, not a new entity type
++status: accepted
++change_id: {_SHARED_CHANGE_ID}
++date: 2026-05-30
++---
++
++# ADR-001 — Use a discriminator field
++
++## Decision
++
++Model ADR vs BDR as a `kind` discriminator on the existing decision entity.
++
++## Context
++
++A new entity type would duplicate the whole decision shape for no gain.
++
++## Options Considered
++
++- New `business_decision` entity — rejected; duplicates the shape.
++- A `kind` discriminator — chosen; additive-optional, no migration.
++
++## Consequences
++
++One entity, one schema, one emit path.
++"""
++
++_BDR_SOURCE: Final[str] = f"""---
++id: BDR-001
++title: Ship the three phases in sequence
++status: accepted
++change_id: {_SHARED_CHANGE_ID}
++date: 2026-05-30
++---
++
++# BDR-001 — Ship the three phases in sequence
++
++## Decision
++
++Ship P1, then P2, then P3 — each phase independently reversible.
++
++## Context
++
++A single big-bang cutover couples three unrelated risk surfaces.
++
++## Options Considered
++
++- Big-bang all three phases at once — rejected; couples risk.
++- Phased P1 → P2 → P3 — chosen; each phase reverts independently.
++
++## Consequences
++
++Slower to full feature, but each phase de-risks the next.
++"""
++
++
++class DriveDecisionsError(Exception):
++    """A stage failure the driver surfaces as a non-zero exit."""
++
++
++def drive(*, out_dir: Path, base_dir: Path) -> list[tuple[str, Path]]:
++    """Drive the real emit path for an ADR + a BDR; persist both.
++
++    Returns a list of `(kind, persisted_path)` pairs. Raises
++    DriveDecisionsError on any stage failure (validation rejection, write).
++    """
++    adapter = LocalFileEntityAdapter(
++        base_dir=base_dir, domain="product-development"
++    )
++    out_dir.mkdir(parents=True, exist_ok=True)
++
++    results: list[tuple[str, Path]] = []
++    for kind, source, src_name in (
++        ("adr", _ADR_SOURCE, "ADR-001.md"),
++        ("bdr", _BDR_SOURCE, "BDR-001.md"),
++    ):
++        src_path = out_dir / src_name
++        src_path.write_text(source, encoding="utf-8")
++        try:
++            decision = emit_decision_from_adr(src_path, adapter, kind=kind)
++        except (EntityValidationError, OSError) as exc:
++            raise DriveDecisionsError(
++                f"emit failed for {kind} from {src_name}: {exc}"
++            ) from exc
++        ulid = decision["id"].rsplit(":", 1)[-1]
++        persisted = (
++            base_dir / "product-development" / "decision" / f"{ulid}.jsonld"
++        )
++        results.append((kind, persisted))
++    return results
++
++
++def _parse_args(argv: list[str]) -> argparse.Namespace:
++    parser = argparse.ArgumentParser(
++        prog="_drive_decisions.py",
++        description="Drive the real decision-emit path for an ADR + a BDR.",
++    )
++    parser.add_argument(
++        "--out",
++        required=True,
++        type=Path,
++        help="directory to write the persisted-path manifest to",
++    )
++    parser.add_argument(
++        "--base-dir",
++        type=Path,
++        help="brain instances base dir (default: <out>/.brain/instances)",
++    )
++    return parser.parse_args(argv)
++
++
++def main(argv: list[str]) -> int:
++    args = _parse_args(argv)
++    base_dir = args.base_dir or (args.out / ".brain" / "instances")
++    try:
++        results = drive(out_dir=args.out, base_dir=base_dir)
++    except DriveDecisionsError as exc:
++        print(f"drive-decisions: stage failure: {exc}", file=sys.stderr)
++        return 1
++
++    # Write the persisted-path manifest the asserter reads.
++    manifest = args.out / "decisions.manifest"
++    manifest.write_text(
++        "".join(f"kind={kind}\t{path}\n" for kind, path in results),
++        encoding="utf-8",
++    )
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main(sys.argv[1:]))
+diff --git a/plugins/sulis/scripts/sulis-emit-decision b/plugins/sulis/scripts/sulis-emit-decision
+index bc744264..71fe2786 100755
+--- a/plugins/sulis/scripts/sulis-emit-decision
++++ b/plugins/sulis/scripts/sulis-emit-decision
+@@ -9,10 +9,18 @@ lands).
+ 
+ Usage:
+     sulis-emit-decision --from-adr <path>
++                        [--kind {adr,bdr}]
++                        [--from-bdr]
+                         [--base-dir <dir>]
+                         [--domain <domain>]
+                         [--repo-root <dir>]
+ 
++Kind discriminator (ADR-006, FR-17):
++    A Decision carries `kind ∈ {adr, bdr}` — a technical architecture decision
++    (ADR) or a business decision (BDR). `--kind` sets it explicitly (default
++    `adr`); `--from-bdr` is the convenience alias for `--kind bdr`. The two
++    are mutually exclusive.
++
+ Defaults:
+     --base-dir   <repo-root>/.brain/instances
+     --domain     product-development
+@@ -80,7 +88,18 @@ def main() -> int:
+     parser.add_argument(
+         "--from-adr",
+         required=True,
+-        help="path to the ADR markdown file",
++        help="path to the ADR (or BDR) markdown file",
++    )
++    kind_group = parser.add_mutually_exclusive_group()
++    kind_group.add_argument(
++        "--kind",
++        choices=("adr", "bdr"),
++        help="decision-kind discriminator (default: adr)",
++    )
++    kind_group.add_argument(
++        "--from-bdr",
++        action="store_true",
++        help="read the decision as a business decision (alias for --kind bdr)",
+     )
+     parser.add_argument(
+         "--base-dir",
+@@ -110,8 +129,11 @@ def main() -> int:
+ 
+     adapter = LocalFileEntityAdapter(base_dir=base_dir, domain=args.domain)
+ 
++    # --from-bdr is the convenience alias for --kind bdr; default is adr.
++    kind = "bdr" if args.from_bdr else args.kind
++
+     try:
+-        decision = emit_decision_from_adr(adr_path, adapter)
++        decision = emit_decision_from_adr(adr_path, adapter, kind=kind)
+     except EntityValidationError as e:
+         return _err(str(e))
+     except FileNotFoundError as e:
+diff --git a/plugins/sulis/scripts/tests/methodology/test_bdr_distinct_from_adr.py b/plugins/sulis/scripts/tests/methodology/test_bdr_distinct_from_adr.py
+new file mode 100644
+index 00000000..4e801bbd
+--- /dev/null
++++ b/plugins/sulis/scripts/tests/methodology/test_bdr_distinct_from_adr.py
+@@ -0,0 +1,38 @@
++"""SC-17 — a business decision (BDR) is recorded distinct from a technical ADR.
++
++This is the methodology-tier verification artifact named by WP-012's
++`verification.artifact` field. The load-bearing behavioural assertions live in
++`tests/unit/test_decision_emission.py` (branch-CI runs only `tests/unit/` —
++lesson #60), so this module re-exports the SC-17 cases by name rather than
++duplicating them. Binding the SC-17 verification name to the unit-tier cases
++means SC-17 resolves under the methodology tier AND runs under the unit tier
++where CI exercises it.
++
++SC-17 (DESIGN.md §6.5 T11, FR-17): emitting a BDR carries `kind: bdr`, distinct
++from an emitted ADR (`kind: adr`); the absent-kind migration default reads as
++`adr` (§9.1); and ≥2 decisions in one run get distinct `@id`s (the bundled
++collision fix).
++"""
++
++from __future__ import annotations
++
++import importlib.util
++from pathlib import Path
++
++# Load the unit-tier module by file path so this works under any pytest import
++# mode (the `tests` package has no top-level __init__.py, so a `tests.unit.*`
++# package import is not reliable across rootdir/import-mode permutations).
++_UNIT_MODULE_PATH = (
++    Path(__file__).resolve().parent.parent / "unit" / "test_decision_emission.py"
++)
++_spec = importlib.util.spec_from_file_location(
++    "_sc17_decision_emission_cases", _UNIT_MODULE_PATH
++)
++assert _spec is not None and _spec.loader is not None
++_mod = importlib.util.module_from_spec(_spec)
++_spec.loader.exec_module(_mod)
++
++# Re-export the SC-17 behavioural cases so they collect + run here under the
++# methodology tier too. Canonical definitions stay unit-tier (CI runs that).
++TestKindDiscriminator = _mod.TestKindDiscriminator
++TestMultiDecisionNoIdCollision = _mod.TestMultiDecisionNoIdCollision
+diff --git a/plugins/sulis/scripts/tests/unit/test_decision_emission.py b/plugins/sulis/scripts/tests/unit/test_decision_emission.py
+index e6749265..72994708 100644
+--- a/plugins/sulis/scripts/tests/unit/test_decision_emission.py
++++ b/plugins/sulis/scripts/tests/unit/test_decision_emission.py
+@@ -124,6 +124,38 @@ Reason for the choice.
+ Mostly positive.
+ """
+ 
++# A business decision (BDR). The body shape matches an ADR — the
++# discriminator is the `kind`, supplied by the caller (`--from-bdr` /
++# `--kind bdr`), not inferred from the markdown. ADR-006: `kind` is a
++# discriminator on the existing decision entity, not a new entity type.
++_BDR_BODY = """---
++id: BDR-001
++title: Ship the three phases in sequence
++status: accepted
++change_id: 01KSWBWMCFTVB52NGGVAAQBA7R
++date: 2026-05-30
++---
++
++# BDR-001 — Ship the three phases in sequence
++
++## Decision
++
++Ship P1, then P2, then P3 — each phase independently reversible.
++
++## Context
++
++A single big-bang cutover couples three unrelated risk surfaces.
++
++## Options Considered
++
++- Big-bang all three phases at once — rejected; couples risk.
++- Phased P1 → P2 → P3 — chosen; each phase reverts independently.
++
++## Consequences
++
++Slower to full feature, but each phase de-risks the next.
++"""
++
+ 
+ # ─── pure-transformation tests ────────────────────────────────────────────
+ 
+@@ -131,10 +163,22 @@ Mostly positive.
+ class TestComposeDecisionFromAdr:
+     """`compose_decision_from_adr` is pure — text in, Decision dict out. No I/O."""
+ 
+-    def test_reuses_change_id_from_frontmatter_when_present(self) -> None:
++    def test_mints_a_fresh_ulid_id_even_when_change_id_present(self) -> None:
++        # WP-012 collision fix: the @id used to be derived from `change_id`
++        # (`dna:decision:{change_id}`), so two decisions in the same change
++        # collapsed to the same @id and overwrote each other on disk. Each
++        # emitted decision now gets its OWN fresh ULID — distinctness is the
++        # invariant, change-traceability moves off the primary id.
+         d = compose_decision_from_adr(_ADR_WITH_CHANGE_ID)
+ 
+-        assert d["id"] == "dna:decision:01KSQNPBPN7W74QVAZ25F79RNH"
++        # The @id is a fresh ULID, NOT the change_id verbatim.
++        assert d["id"] != "dna:decision:01KSQNPBPN7W74QVAZ25F79RNH"
++        # Schema pattern: dna:decision:<26 Crockford-base32 chars>
++        import re
++
++        assert re.fullmatch(
++            r"^dna:decision:[0-9A-HJKMNP-TV-Z]{26}$", d["id"]
++        ), f"id failed schema pattern: {d['id']}"
+ 
+     def test_generates_fresh_ulid_when_change_id_missing(self) -> None:
+         d = compose_decision_from_adr(_ADR_NO_CHANGE_ID)
+@@ -212,17 +256,22 @@ class TestEmitDecisionFromAdr:
+ 
+         decision = emit_decision_from_adr(adr_path, adapter)
+ 
+-        # Returned decision dict matches what got persisted.
+-        assert decision["id"] == "dna:decision:01KSQNPBPN7W74QVAZ25F79RNH"
++        # The @id is a fresh ULID (WP-012 collision fix), not the change_id.
++        import re
+ 
+-        # And the file is on disk under the canonical path.
++        assert re.fullmatch(
++            r"^dna:decision:[0-9A-HJKMNP-TV-Z]{26}$", decision["id"]
++        ), f"id failed schema pattern: {decision['id']}"
++
++        # And the file is on disk under the canonical path derived from that id.
++        ulid = decision["id"].rsplit(":", 1)[-1]
+         written = (
+             tmp_path
+             / ".brain"
+             / "instances"
+             / "product-development"
+             / "decision"
+-            / "01KSQNPBPN7W74QVAZ25F79RNH.jsonld"
++            / f"{ulid}.jsonld"
+         )
+         assert written.exists(), f"expected file at {written}"
+ 
+@@ -249,3 +298,113 @@ Something.
+ 
+         # The error must surface that the required `decision` field is missing.
+         assert "decision" in str(exc_info.value).lower()
++
++
++# ─── WP-012 — ADR/BDR kind discriminator (FR-17, ADR-006) ──────────────────
++
++
++class TestKindDiscriminator:
++    """A decision carries `kind ∈ {adr, bdr}`; absent reads as `adr` (§9.1)."""
++
++    def test_emit_bdr_carries_kind_bdr(self) -> None:
++        # SC-17 core: a business decision composed with kind=bdr carries
++        # `kind: bdr`, distinct from a technical ADR (kind defaults to adr).
++        bdr = compose_decision_from_adr(_BDR_BODY, kind="bdr")
++        adr = compose_decision_from_adr(_ADR_WITH_CHANGE_ID)
++
++        assert bdr["kind"] == "bdr"
++        assert adr["kind"] == "adr"
++        assert bdr["kind"] != adr["kind"]
++
++    def test_explicit_kind_adr_round_trips(self) -> None:
++        adr = compose_decision_from_adr(_ADR_WITH_CHANGE_ID, kind="adr")
++
++        assert adr["kind"] == "adr"
++
++    def test_absent_kind_reads_as_adr(self) -> None:
++        # Migration §9.1: a decision composed without a kind defaults to `adr`,
++        # so existing decision/*.jsonld need no rewrite.
++        d = compose_decision_from_adr(_ADR_WITH_CHANGE_ID)
++
++        assert d["kind"] == "adr"
++
++    def test_out_of_enum_kind_is_rejected(self) -> None:
++        with pytest.raises(ValueError, match="kind must be one of"):
++            compose_decision_from_adr(_ADR_WITH_CHANGE_ID, kind="strategy")
++
++    def test_emitted_bdr_persists_and_validates_against_schema(
++        self, tmp_path: Path
++    ) -> None:
++        # The additive-optional `kind` enum must pass the vendored compiled
++        # schema's validation (the validating adapter reads it on save).
++        adapter = LocalFileEntityAdapter(
++            base_dir=tmp_path / ".brain" / "instances",
++            domain="product-development",
++        )
++        bdr_path = tmp_path / "BDR-001.md"
++        bdr_path.write_text(_BDR_BODY)
++
++        decision = emit_decision_from_adr(bdr_path, adapter, kind="bdr")
++
++        assert decision["kind"] == "bdr"
++        ulid = decision["id"].rsplit(":", 1)[-1]
++        written = (
++            tmp_path
++            / ".brain"
++            / "instances"
++            / "product-development"
++            / "decision"
++            / f"{ulid}.jsonld"
++        )
++        assert written.exists(), f"expected persisted BDR at {written}"
++
++
++class TestMultiDecisionNoIdCollision:
++    """The bundled fix: ≥2 decisions in one run get distinct `@id`s."""
++
++    def test_multi_decision_emit_no_id_collision(self, tmp_path: Path) -> None:
++        # Two ADRs sharing the SAME change_id used to collapse to one @id
++        # (`dna:decision:{change_id}`) and overwrite each other on disk. After
++        # the fix each emission mints its own ULID, so both persist distinctly.
++        adapter = LocalFileEntityAdapter(
++            base_dir=tmp_path / ".brain" / "instances",
++            domain="product-development",
++        )
++
++        # Both ADRs carry the SAME change_id frontmatter (a change that
++        # produced two ADRs) — the exact pre-fix collision trigger.
++        shared_change_id_adr_a = _ADR_WITH_CHANGE_ID
++        shared_change_id_adr_b = _ADR_WITH_CHANGE_ID.replace(
++            "title: Decouple integration from release via changesets",
++            "title: A second decision in the same change",
++        )
++        assert "01KSQNPBPN7W74QVAZ25F79RNH" in shared_change_id_adr_b
++
++        adr_a = tmp_path / "ADR-A.md"
++        adr_a.write_text(shared_change_id_adr_a)
++        adr_b = tmp_path / "ADR-B.md"
++        adr_b.write_text(shared_change_id_adr_b)
++
++        d_a = emit_decision_from_adr(adr_a, adapter)
++        d_b = emit_decision_from_adr(adr_b, adapter)
++
++        # Distinct @ids.
++        assert d_a["id"] != d_b["id"], "two decisions collided on the same @id"
++
++        # Both files survive on disk (no overwrite).
++        decision_dir = (
++            tmp_path / ".brain" / "instances" / "product-development" / "decision"
++        )
++        persisted = sorted(decision_dir.glob("*.jsonld"))
++        assert len(persisted) == 2, (
++            f"expected 2 distinct decision files, found {len(persisted)}: "
++            f"{[p.name for p in persisted]}"
++        )
++
++    def test_compose_twice_same_source_yields_distinct_ids(self) -> None:
++        # Even composing the identical ADR text twice yields distinct @ids —
++        # id minting is per-emission, never a function of the source content.
++        first = compose_decision_from_adr(_ADR_WITH_CHANGE_ID)
++        second = compose_decision_from_adr(_ADR_WITH_CHANGE_ID)
++
++        assert first["id"] != second["id"]
+diff --git a/plugins/sulis/scripts/tests/unit/test_drive_assert_bdr_adr.py b/plugins/sulis/scripts/tests/unit/test_drive_assert_bdr_adr.py
+new file mode 100644
+index 00000000..6bec3746
+--- /dev/null
++++ b/plugins/sulis/scripts/tests/unit/test_drive_assert_bdr_adr.py
+@@ -0,0 +1,106 @@
++"""SC-17 driver round-trip — `_drive_decisions.py` + `_assert_bdr_adr.py`.
++
++These exercise the two SC-17 scripts the WP-012 Contract ships:
++
++  - `_drive_decisions.py` drives the real emit path for an ADR + a BDR (both
++    sharing a `change_id`, the pre-fix collision trigger) and persists both.
++  - `_assert_bdr_adr.py` reads the persisted instances and exits 0 iff the BDR
++    is `kind: bdr`, the ADR is `kind: adr`, and their `@id`s differ.
++
++Together they are the SC-17 gate: a business decision is recorded distinct from
++a technical ADR. The asserter's failure paths are covered too, so a regression
++(kind dropped, @id collision reintroduced) flips the gate red.
++"""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import _assert_bdr_adr
++import _drive_decisions
++
++
++class TestDriveDecisions:
++    """`_drive_decisions.py` drives the real emit path for an ADR + a BDR."""
++
++    def test_drive_persists_two_distinct_decisions(self, tmp_path: Path) -> None:
++        rc = _drive_decisions.main(["--out", str(tmp_path)])
++
++        assert rc == 0
++        manifest = tmp_path / "decisions.manifest"
++        assert manifest.exists()
++
++        by_kind = _assert_bdr_adr._load_manifest(manifest)
++        assert set(by_kind) == {"adr", "bdr"}
++
++        adr = json.loads(by_kind["adr"].read_text())
++        bdr = json.loads(by_kind["bdr"].read_text())
++        assert adr["kind"] == "adr"
++        assert bdr["kind"] == "bdr"
++        # Both sources shared a change_id — the @ids must still differ.
++        assert adr["id"] != bdr["id"]
++
++
++class TestAssertBdrAdr:
++    """`_assert_bdr_adr.py` is the SC-17 verdict gate."""
++
++    def test_passes_on_a_clean_drive(self, tmp_path: Path) -> None:
++        assert _drive_decisions.main(["--out", str(tmp_path)]) == 0
++
++        rc = _assert_bdr_adr.main(
++            ["--manifest", str(tmp_path / "decisions.manifest")]
++        )
++
++        assert rc == 0
++
++    def test_fails_when_bdr_kind_is_wrong(self, tmp_path: Path) -> None:
++        # Drive, then corrupt the BDR's kind on disk → the gate must go red.
++        _drive_decisions.main(["--out", str(tmp_path)])
++        manifest = tmp_path / "decisions.manifest"
++        by_kind = _assert_bdr_adr._load_manifest(manifest)
++
++        bdr = json.loads(by_kind["bdr"].read_text())
++        bdr["kind"] = "adr"  # regression: BDR mis-recorded as an ADR
++        by_kind["bdr"].write_text(json.dumps(bdr))
++
++        rc = _assert_bdr_adr.main(["--manifest", str(manifest)])
++
++        assert rc == 1
++
++    def test_fails_when_ids_collide(self, tmp_path: Path) -> None:
++        # Force the ADR's @id to equal the BDR's → the collision the fix
++        # prevents; the gate must catch it.
++        _drive_decisions.main(["--out", str(tmp_path)])
++        manifest = tmp_path / "decisions.manifest"
++        by_kind = _assert_bdr_adr._load_manifest(manifest)
++
++        bdr = json.loads(by_kind["bdr"].read_text())
++        adr = json.loads(by_kind["adr"].read_text())
++        adr["id"] = bdr["id"]
++        by_kind["adr"].write_text(json.dumps(adr))
++
++        rc = _assert_bdr_adr.main(["--manifest", str(manifest)])
++
++        assert rc == 1
++
++    def test_bad_manifest_exits_2(self, tmp_path: Path) -> None:
++        bad = tmp_path / "bad.manifest"
++        bad.write_text("this is not a valid manifest line\n")
++
++        rc = _assert_bdr_adr.main(["--manifest", str(bad)])
++
++        assert rc == 2
++
++    def test_missing_persisted_file_exits_2(self, tmp_path: Path) -> None:
++        # A well-formed manifest pointing at a decision file that isn't there
++        # (e.g. a deleted instance) is a bad-input failure, not a verdict.
++        manifest = tmp_path / "decisions.manifest"
++        manifest.write_text(
++            f"kind=adr\t{tmp_path / 'missing-adr.jsonld'}\n"
++            f"kind=bdr\t{tmp_path / 'missing-bdr.jsonld'}\n"
++        )
++
++        rc = _assert_bdr_adr.main(["--manifest", str(manifest)])
++
++        assert rc == 2
+diff --git a/plugins/sulis/scripts/tests/unit/test_golden_thread_integration.py b/plugins/sulis/scripts/tests/unit/test_golden_thread_integration.py
+index 99bd7497..ed19a01b 100644
+--- a/plugins/sulis/scripts/tests/unit/test_golden_thread_integration.py
++++ b/plugins/sulis/scripts/tests/unit/test_golden_thread_integration.py
+@@ -224,9 +224,13 @@ class TestGoldenThreadEndToEnd:
+         foundation_adapter: LocalFileEntityAdapter,
+         pd_adapter: LocalFileEntityAdapter,
+     ) -> None:
+-        """Re-running every emitter on the same source produces the same
+-        graph — same IDs, no duplicates. Confirms the deterministic-ID
+-        strategy across all five emitters with sources."""
++        """Re-running each emitter on the same source confirms its ID
++        strategy. Four emitters (tenant, product, opportunity, requirement)
++        are deterministic — same source ⇒ same IDs, no duplicates. The
++        decision emitter is intentionally NOT idempotent by @id (WP-012): each
++        emission mints a fresh ULID so two decisions from the same change
++        never collide on one @id, so a re-run yields a distinct decision @id.
++        """
+         paths = _layout(tmp_path)
+ 
+         # First pass
+@@ -247,4 +251,6 @@ class TestGoldenThreadEndToEnd:
+         assert p1[0]["id"] == p2[0]["id"]
+         assert o1[0]["id"] == o2[0]["id"]
+         assert [r["id"] for r in r1] == [r["id"] for r in r2]
+-        assert d1["id"] == d2["id"]
++        # Decision is intentionally per-emission distinct (WP-012 collision
++        # fix): a re-run mints a fresh ULID, so the @ids differ.
++        assert d1["id"] != d2["id"]
+diff --git a/plugins/sulis/scripts/tests/unit/test_sulis_emit_decision_cli.py b/plugins/sulis/scripts/tests/unit/test_sulis_emit_decision_cli.py
+index 379de669..e593c909 100644
+--- a/plugins/sulis/scripts/tests/unit/test_sulis_emit_decision_cli.py
++++ b/plugins/sulis/scripts/tests/unit/test_sulis_emit_decision_cli.py
+@@ -9,8 +9,11 @@ rely on.
+ from __future__ import annotations
+ 
+ import json
++import re
+ from pathlib import Path
+ 
++_DECISION_ID_RE = re.compile(r"^dna:decision:[0-9A-HJKMNP-TV-Z]{26}$")
++
+ 
+ _VALID_ADR = """---
+ id: ADR-001
+@@ -75,9 +78,13 @@ class TestSulisEmitDecisionCli:
+             f"expected ok=true, got returncode={result.returncode}\n"
+             f"stdout: {result.stdout!r}\nstderr: {result.stderr!r}"
+         )
+-        # The CLI returns the persisted instance's id + on-disk path.
++        # The CLI returns the persisted instance's id + on-disk path. The @id
++        # is a freshly-minted ULID (WP-012 collision fix), not the change_id.
+         decision_id = result.data["decision_id"]
+-        assert decision_id == "dna:decision:01KSQNPBPN7W74QVAZ25F79RNH"
++        assert _DECISION_ID_RE.fullmatch(decision_id), (
++            f"id failed schema pattern: {decision_id}"
++        )
++        assert decision_id != "dna:decision:01KSQNPBPN7W74QVAZ25F79RNH"
+ 
+         written = Path(result.data["path"])
+         assert written.exists(), f"expected file at {written}"
+@@ -106,11 +113,15 @@ class TestSulisEmitDecisionCli:
+         written = Path(result.data["path"])
+ 
+         # Default layout: <repo-root>/.brain/instances/<domain>/<entity>/<ulid>.jsonld
++        # The ULID is freshly minted per emission (WP-012), so assert the
++        # directory shape + filename pattern rather than a fixed ULID.
+         rel = written.relative_to(tmp_path)
+-        assert rel == Path(
+-            ".brain/instances/product-development/decision/"
+-            "01KSQNPBPN7W74QVAZ25F79RNH.jsonld"
++        assert rel.parent == Path(
++            ".brain/instances/product-development/decision"
+         )
++        assert re.fullmatch(
++            r"[0-9A-HJKMNP-TV-Z]{26}\.jsonld", rel.name
++        ), f"unexpected decision filename: {rel.name}"
+ 
+     def test_respects_explicit_base_dir(self, tmp_path: Path, run_tool) -> None:
+         adr_path = tmp_path / "ADR-001.md"
+@@ -129,6 +140,42 @@ class TestSulisEmitDecisionCli:
+         assert custom in written.parents
+         assert written.exists()
+ 
++    def test_kind_bdr_flag_persists_a_business_decision(
++        self, tmp_path: Path, run_tool
++    ) -> None:
++        # WP-012: the CLI surfaces `--kind bdr` so a business decision persists
++        # with `kind: bdr`, distinct from a default ADR.
++        bdr_path = tmp_path / "BDR-001.md"
++        bdr_path.write_text(_VALID_ADR)  # body shape is identical; kind differs
++
++        result = run_tool(
++            "sulis-emit-decision",
++            "--from-adr", str(bdr_path),
++            "--kind", "bdr",
++            "--repo-root", str(tmp_path),
++        )
++
++        assert result.ok, (
++            f"expected ok=true, got returncode={result.returncode}\n"
++            f"stdout: {result.stdout!r}\nstderr: {result.stderr!r}"
++        )
++        loaded = json.loads(Path(result.data["path"]).read_text())
++        assert loaded["kind"] == "bdr"
++
++    def test_default_kind_is_adr(self, tmp_path: Path, run_tool) -> None:
++        adr_path = tmp_path / "ADR-001.md"
++        adr_path.write_text(_VALID_ADR)
++
++        result = run_tool(
++            "sulis-emit-decision",
++            "--from-adr", str(adr_path),
++            "--repo-root", str(tmp_path),
++        )
++
++        assert result.ok
++        loaded = json.loads(Path(result.data["path"]).read_text())
++        assert loaded["kind"] == "adr"
++
+     def test_rejects_invalid_adr_with_clear_error_envelope(
+         self, tmp_path: Path, run_tool
+     ) -> None:
+diff --git a/plugins/sulis/skills/draft-architecture/SKILL.md b/plugins/sulis/skills/draft-architecture/SKILL.md
+index 1c9dedba..c77703e7 100644
+--- a/plugins/sulis/skills/draft-architecture/SKILL.md
++++ b/plugins/sulis/skills/draft-architecture/SKILL.md
+@@ -622,7 +622,13 @@ If extending or superseding, reference the existing ADR by path.}
+     plugins/sulis/scripts/sulis-emit-decision --from-adr <path-to-adr>
+     ```
+ 
+-    This persists a validated structured Decision instance under `.brain/instances/product-development/decision/{ulid}.jsonld` — the machine-readable spine of which the `.md` is the human view. The emitter parses `## Context` / `## Decision` / `## Options Considered` (with `## Alternatives Considered` synonym) / `## Consequences` from the body, plus `title` + `status` from frontmatter (translated to entity `state`). The Decision's `@id` reuses the change's `change_id` when present in frontmatter (giving natural traceability from a Change to the Decisions it produced); fresh ULID otherwise. **Validation is real**: a malformed ADR is rejected at write (no partial persistence). Skipping this step leaves the Brain↔OS graph incomplete for downstream tooling — the cockpit's golden-thread view, lineage queries, and the Storage Service substrate (Track 2) all read instances, not the `.md`.
++    For a **business decision** (a BDR — a non-technical, business-level choice) pass `--from-bdr` (or `--kind bdr`) so it is recorded with `kind: bdr`, distinct from a technical ADR (`kind: adr`, the default):
++
++    ```
++    plugins/sulis/scripts/sulis-emit-decision --from-adr <path-to-bdr> --from-bdr
++    ```
++
++    This persists a validated structured Decision instance under `.brain/instances/product-development/decision/{ulid}.jsonld` — the machine-readable spine of which the `.md` is the human view. The emitter parses `## Context` / `## Decision` / `## Options Considered` (with `## Alternatives Considered` synonym) / `## Consequences` from the body, plus `title` + `status` from frontmatter (translated to entity `state`); the `kind` discriminator (`adr`/`bdr`) is supplied by the flag, not the markdown (absent reads as `adr`). **Each emitted Decision gets its own freshly-minted ULID `@id`**, so a change that produces more than one decision records every one distinctly — there is no `@id` collision when a single change emits two ADRs (or an ADR plus a BDR). **Validation is real**: a malformed ADR is rejected at write (no partial persistence). Skipping this step leaves the Brain↔OS graph incomplete for downstream tooling — the cockpit's golden-thread view, lineage queries, and the Storage Service substrate (Track 2) all read instances, not the `.md`.
+ 10. **Emit a ServiceSpec manifest for every service the design introduces or modifies (MUST).** The third design-stage structured deliverable — alongside the visual contract (`UX_VISUAL_DESIGN_STANDARD`, #45) and the data contract (`CONTRACT_FIRST_STANDARD`, #48). Without it, the design has no machine-readable service contract and downstream — agent integration, SDK generation, MCP routing, the cockpit's service view — has nothing to bind to.
+ 
+     Write one manifest per service to `.architecture/{project}/service-specs/{service-name}.servicespec.yaml`. Format follows the platform's **SPEC-006 / Service Registration** spec (the canonical contract every Sulis service registers via). Each manifest declares at minimum:

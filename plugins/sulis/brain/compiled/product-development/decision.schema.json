@@ -42,6 +42,14 @@
       "type": "string",
       "pattern": "^dna:decision:[0-9A-HJKMNP-TV-Z]{26}$"
     },
+    "kind": {
+      "enum": [
+        "adr",
+        "bdr"
+      ],
+      "default": "adr",
+      "description": "decision-kind discriminator — 'adr' (technical architecture decision) or 'bdr' (business decision); additive-optional, absent reads as 'adr' (§9.1)"
+    },
     "title": {
       "type": "string"
     },
