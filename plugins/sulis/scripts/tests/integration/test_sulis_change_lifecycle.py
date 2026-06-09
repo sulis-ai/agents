@@ -1015,6 +1015,15 @@ def test_mark_shipped_via_handle_flips_stage(local_git_repo, run_tool):
     assert start.ok
     handle = start.data["handle"]
 
+    # The #272 guard refuses to ship an EMPTY change (no commits beyond its
+    # base). A real change builds something first, so put one real commit on
+    # the change branch before shipping — this also exercises the handle→change
+    # resolution on a realistic change.
+    worktree = Path(start.data["worktree_path"])
+    (worktree / "built.txt").write_text("real work\n")
+    _run(["git", "add", "built.txt"], cwd=worktree)
+    _run(["git", "commit", "-qm", "feat: built something"], cwd=worktree)
+
     result = run_tool("sulis-change", "mark-shipped",
                       "--handle", handle,
                       "--repo-root", str(local_git_repo))
