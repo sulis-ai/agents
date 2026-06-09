@@ -130,6 +130,30 @@ describe("<StageColumn> full-height lane (WP-004)", () => {
     expect(getByText(/nothing here yet/i)).toBeInTheDocument();
   });
 
+  // WP-008 — the mobile lane switcher's tab chips carry aria-controls="lane-<stage>",
+  // so each lane <section> must expose the matching id for the ARIA tab→lane
+  // association to resolve (W3C tablist pattern, ADR-004). This is the lane half
+  // of the switcher contract; the SearchBar half lives in SearchBar.test.tsx.
+  it.each([
+    "recon",
+    "specify",
+    "design",
+    "implement",
+    "review",
+    "ship",
+  ] as const)(
+    "the %s lane exposes id=lane-<stage> so the switcher's aria-controls resolves (WP-008 / S-29)",
+    (stage) => {
+      const { getByTestId } = renderColumn(stage, [
+        makeChange({ changeId: "01X", handle: "CH-01X", stage }),
+      ]);
+      expect(getByTestId("stage-column")).toHaveAttribute(
+        "id",
+        `lane-${stage}`,
+      );
+    },
+  );
+
   it("RECON lane renders a 'Start here' foot affordance that routes to /start", () => {
     const { getByRole } = renderColumn("recon", [
       makeChange({ changeId: "01R", handle: "CH-01R", stage: "recon" }),
@@ -194,10 +218,7 @@ describe("<StageColumn> full-height lane (WP-004)", () => {
       // anchoring on the rule opener and reading to its closing brace.
       const ruleStart = css.indexOf(".lane {");
       expect(ruleStart).toBeGreaterThan(-1);
-      const laneBlock = css.slice(
-        ruleStart,
-        css.indexOf("}", ruleStart) + 1,
-      );
+      const laneBlock = css.slice(ruleStart, css.indexOf("}", ruleStart) + 1);
       // The old col had a max-height: 560px cap; the full-height lane must not.
       expect(laneBlock).not.toMatch(/max-height:\s*\d/);
       expect(laneBlock).toMatch(/min-height:\s*0/);

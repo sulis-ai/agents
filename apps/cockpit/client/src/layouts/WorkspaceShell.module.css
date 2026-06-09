@@ -242,3 +242,53 @@
   flex-direction: column;
   overflow: hidden;
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   WP-008 — RESPONSIVE TOP-BAR COLLAPSE (ADR-004 / IDEAS.md Concern 4).
+   The persistent top bar stays ONE fixed-height row (.topbar height: 48px,
+   no flex-wrap) at every width, so it can never wrap or clip — confirmed
+   broken at 390px before this WP (the long label wrapped + the right cluster
+   was pushed off-screen). At tablet/mobile the chrome condenses: the long
+   "Start something new" label folds to a compact "+ New", the Board tab label
+   folds to its icon, and the ⌘N hint drops. The action stays the one filled
+   primary, keyboard-reachable, with the full name on its aria-label (set in
+   WorkspaceTopBar.tsx) so the collapse never strips the accessible name.
+   Tokens only — no raw hex (WPF-07).
+   ════════════════════════════════════════════════════════════════════ */
+@media (max-width: 1099px) {
+  /* The Board tab folds to its icon (the icon stays; the text label hides). */
+  .tab .tabLabel {
+    display: none;
+  }
+
+  /* "Start something new" → compact "+ New". The long visible label hides and a
+     ::after surfaces the short text; the FULL name stays on the button's
+     aria-label so assistive tech still announces it. The ⌘N hint drops too so
+     the button stays a tidy single token. */
+  .startBtnLabel {
+    display: none;
+  }
+  .startBtnHint {
+    display: none;
+  }
+  .startBtn::after {
+    content: "+ New";
+    font-size: 13px;
+    font-weight: var(--weight-label);
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 599px) {
+  /* Pure-essentials row at phone width: tighten gaps + padding so the brand
+     mark, the compact primary action, and the settings + theme icons all sit
+     on the one fixed-height row and never clip at 390px. */
+  .topbar {
+    gap: 6px;
+    padding: 0 10px;
+  }
+  .toggleSlot {
+    gap: 4px;
+    padding-left: 6px;
+  }
+}
