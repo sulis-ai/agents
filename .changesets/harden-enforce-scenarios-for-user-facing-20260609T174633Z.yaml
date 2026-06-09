@@ -1,7 +1,0 @@
-change_id: 01KTPPZP0SSQBBENB6XNFM4759
-primitive: harden
-tier: minor
-touches_plugin: true
-summary: |
-  Shipping a user-facing change (a screen/journey) or one that declares non-functional requirements (cost, storage, resilience, performance) now requires verifiable scenarios — the ship gate blocks instead of waving it through, so untested user surfaces and stubbed production mechanisms can no longer slip through.
-created_at: 2026-06-09T17:46:33Z

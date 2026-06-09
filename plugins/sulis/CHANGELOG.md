@@ -1,3 +1,9 @@
+## v0.130.0 — 2026-06-09
+
+**Minor — release-train batch.**
+
+- Shipping a user-facing change (a screen/journey) or one that declares non-functional requirements (cost, storage, resilience, performance) now requires verifiable scenarios — the ship gate blocks instead of waving it through, so untested user surfaces and stubbed production mechanisms can no longer slip through.
+
 ## v0.129.0 — 2026-06-09
 
 **Minor — release-train batch.**
