@@ -16,9 +16,9 @@ foundational fixture/assertion harness the scenarios drive.
 
 | Status | Count |
 |---|---|
-| pending | 7 |
+| pending | 4 |
 | in_progress | 0 |
-| done | 6 |
+| done | 9 |
 | blocked | 0 |
 
 ## Phase Split
@@ -123,13 +123,13 @@ graph TD
 | WP-003 | Build the document-section assertion scripts | create | done | — | WP-005, WP-006 | 5k / 5k | 7.4 |
 | WP-004 | Reword the depth proposal phrases to describe interview size | refactor | done | — | — | 4k / 2k | 7.4 |
 | WP-005 | Sever the depth-to-document-shape branch in specify and the analyst path | refactor | done | WP-003 | WP-006 | 7k / 4k | 7.3 |
-| WP-006 | Add the comprehensive DESIGN.md template and always-comprehensive emitter | create | pending | WP-001, WP-003, WP-005 | WP-009, WP-011 | 9k / 7k | 7.4 |
+| WP-006 | Add the comprehensive DESIGN.md template and always-comprehensive emitter | create | done | WP-001, WP-003, WP-005 | WP-009, WP-011 | 9k / 7k | 7.4 |
 | WP-007 | Add a first-class surface tag to scenario authoring | extend | done | — | WP-008, WP-009 | 5k / 3k | 7.4 |
-| WP-008 | Build the UC-flow-coverage gate | create | pending | WP-007 | WP-010 | 7k / 5k | 7.4 |
+| WP-008 | Build the UC-flow-coverage gate | create | done | WP-007 | WP-010 | 7k / 5k | 7.4 |
 | WP-009 | Extend step 8.5 to a two-surface walk with the tool-surface binding bar | extend | pending | WP-002, WP-006, WP-007 | WP-013 | 9k / 6k | 7.4 |
 | WP-010 | Surface the tool scenarios and UC-flow coverage in the scenarios report | extend | pending | WP-008 | — | 5k / 3k | 7.4 |
 | WP-011 | Add STRIDE, C4, BDR, and the CF-10 interface-contract sub-templates | extend | pending | WP-001, WP-006 | WP-013 | 8k / 6k | 7.4 |
-| WP-012 | Add the ADR/BDR kind discriminator and fix the multi-decision id collision | extend | pending | WP-001 | — | 7k / 5k | 7.4 |
+| WP-012 | Add the ADR/BDR kind discriminator and fix the multi-decision id collision | extend | done | WP-001 | — | 7k / 5k | 7.4 |
 | WP-013 | Build the walk-operations-subset-of-contract assertion (contract-first integration) | create | pending | WP-009, WP-011 | — | 6k / 4k | 7.4 |
 
 ## Recommended Implementation Order
