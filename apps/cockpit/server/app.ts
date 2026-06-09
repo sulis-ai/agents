@@ -292,6 +292,7 @@ export function createApp(deps: CreateAppDeps): Application {
     createChangesRouter({
       changeStore: deps.changeStore,
       sulisStateDir: deps.sulisStateDir,
+      claudeProjectsDir: deps.claudeProjectsDir,
     }),
   );
 

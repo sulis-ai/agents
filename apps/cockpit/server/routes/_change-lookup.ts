@@ -45,33 +45,31 @@ export async function requireChange(
   return record;
 }
 
-// WP-001 placeholder enrichment defaults. The wire now carries
-// `needsAttention` / `health` / `lastActivityAt`, but DERIVING them (the
-// open-blocker probe, the health computation, the last-activity read) is
-// WP-002's scope. Until WP-002 lands, `toWireChange` emits the honest
-// absence-defaults the never-throw degradation discipline already mandates
-// (A-1): not-flagged attention, `unknown` health ("too early to tell"), and
-// no recorded recency. WP-002 replaces these with the derived values.
-const PLACEHOLDER_NEEDS_ATTENTION: NeedsAttention = {
-  flagged: false,
-  reason: null,
-};
-const PLACEHOLDER_HEALTH: ChangeHealth = {
-  state: "unknown",
-  reason: "too early to tell",
-};
+/**
+ * The derived enrichment a route gathers per record and hands to
+ * `toWireChange` (WP-002 / ADR-002). Keeping these OUT of the shaper keeps
+ * it a pure projection: the route does the best-effort reads (attention,
+ * health, last-activity), the shaper just carries them onto the wire.
+ */
+export interface ChangeEnrichment {
+  needsAttention: NeedsAttention;
+  health: ChangeHealth;
+  lastActivityAt: string | null;
+}
 
 /**
- * Project a ChangeStoreRecord + Liveness into the wire-shape `Change`.
- * The single-record route (`/api/changes/:id`) extends this with
- * `transcriptPaths`; the list route returns the raw shape.
+ * Project a ChangeStoreRecord + Liveness + derived enrichment into the
+ * wire-shape `Change`. The single-record route (`/api/changes/:id`) extends
+ * this with `transcriptPaths`; the list + search routes return the raw shape.
  *
- * The attention/health/last-activity fields carry WP-001 placeholder
- * defaults; WP-002 enriches them from the per-record signals.
+ * Pure shaper: it derives NOTHING itself (the route gathers the enrichment
+ * via `gatherChangeEnrichment`); it carries the values it is handed. This is
+ * the REORGANISE invariant — gathering lives in the route, shaping here.
  */
 export function toWireChange(
   record: ChangeStoreRecord,
   liveness: Liveness,
+  enrichment: ChangeEnrichment,
 ): Change {
   return {
     changeId: record.changeId,
@@ -87,9 +85,8 @@ export function toWireChange(
     updatedAt: record.updatedAt,
     stage: record.stage,
     liveness,
-    // WP-001 placeholder enrichment (WP-002 derives these — see above).
-    needsAttention: PLACEHOLDER_NEEDS_ATTENTION,
-    health: PLACEHOLDER_HEALTH,
-    lastActivityAt: null,
+    needsAttention: enrichment.needsAttention,
+    health: enrichment.health,
+    lastActivityAt: enrichment.lastActivityAt,
   };
 }

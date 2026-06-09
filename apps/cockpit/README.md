@@ -65,9 +65,9 @@ and the ports (the change-store reader, WP-003; the `SessionBridge`, WP-005).
 
 | Method + path                        | Purpose                                                                                                                                                                                                                                                             | Wire shape                                              |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `GET /api/changes?product=`          | List the **active Product's** in-flight changes with liveness. Scoped server-side via the `change → Project → Product` roll-up (FR-37, ADR-009); the optional `?product=<id>` selects the active Product (the stateless all-GET scope variant). The single-Product Tenant is the trivial case — every change is in scope (WP-008).                                                                       | `Change[]`                                              |
+| `GET /api/changes?product=`          | List the **active Product's** in-flight changes, each row **enriched** (ADR-002): liveness + the needs-attention verdict + a cheap **health** read (on-track / off-track / unknown, from tests + rigor-for-stage; ADR-001) + `lastActivityAt`. The enrichment is best-effort and **never throws** — a gone/malformed worktree degrades to honest unknown reads, never a 500 (BR-11). Scoped server-side via the `change → Project → Product` roll-up (FR-37, ADR-009); the optional `?product=<id>` selects the active Product (the stateless all-GET scope variant). The single-Product Tenant is the trivial case — every change is in scope (WP-008).                                                                       | `Change[]`                                              |
 | `GET /api/products`                  | The Tenant's Products with the active one marked, for the product switcher (FR-38, WP-008). The single-Product Tenant is the trivial case — one Product, shown active (synthesised when the brain has none). Read-only.                                              | `ProductList`                                           |
-| `GET /api/changes/:id`               | One change + the resolved transcript file paths.                                                                                                                                                                                                                    | `ChangeDetail`                                          |
+| `GET /api/changes/:id`               | One change (same enrichment as the board list — liveness + needs-attention + health + `lastActivityAt`) + the resolved transcript file paths.                                                                                                                        | `ChangeDetail`                                          |
 | `GET /api/changes/:id/status`        | Read-time plain-English status + needs-attention flag, computed on each read from the record + transcript + liveness (never a stored post).                                                                                                                         | `ChangeStatus`                                          |
 | `GET /api/changes/:id/brain`         | The entities the agent created for the change (requirements, designs, decisions, workflows…), grouped by kind off the worktree's `.brain/instances` tree; empty groups omitted; a change with none returns `{ groups: [] }` (WP-006). Reading it starts no process. | `BrainView`                                             |
 | `GET /api/search?product=&q=&stage=&needsAttention=` | Search + filter the active Product's changes by **content** (conversation + created entities — not just titles, FR-10), by `stage` (repeatable param → array, FR-11), and by `needsAttention` (blocked / waiting-on-decision / stopped-mid-reply; idle-but-fine is NOT flagged — FR-12, reuses `needsAttention`). The set is scoped to the active Product (`?product=<id>`) BEFORE the content filter, so a filter never surfaces another Product's change (FR-37). Filters compose; same row shape as the board list. Reading it starts no process (WP-007/008). | `{ results: Change[] }`                                 |
@@ -147,6 +147,36 @@ uiContract }` (the links read this to decide what to show) or
 `{ status: "unavailable", note }` (a shipped change that couldn't be
 reached). `/contract/data` and `/contract/ui` add `CONTRACT_UNAVAILABLE`
 (404) and `CONTRACT_NOT_RENDERED` (404) to the `code` set below.
+
+### Enriched board feed (WP-002)
+
+The board feed (`GET /api/changes`) carries, per change, everything the
+card needs in **one** read (ADR-002 — no second poll, no per-card request):
+
+- **needs-attention** — the FR-12 verdict, gathered via the shared
+  `lib/gatherChangeStatus.ts` and reusing `lib/needsAttention.ts` (the
+  single source of truth the status + search routes also use).
+- **health** — a cheap on-track / off-track / **unknown** read from
+  `lib/computeHealth.ts` (pure; ADR-001), fed by two best-effort reads:
+  `lib/readTestsState.ts` (the change's recorded CI state from a
+  `.sulis/ci-state.json` sidecar) and `lib/readRigorForStage.ts` (does the
+  change have the artifacts its stage needs — spec before design, a
+  design/plan before implement, tests alongside code at review/ship; Recon
+  has none). A fresh change with no test run and nothing to determine reads
+  **unknown** ("too early to tell"), never a false on-track (FR-31).
+- **lastActivityAt** — `lib/deriveLastActivityAt.ts` (the last transcript
+  timestamp, else the record's `updatedAt`, else `null` — FR-42).
+
+`lib/gatherChangeEnrichment.ts` composes all of this per record; the list,
+detail and search routes shape through it so they agree by construction.
+Every derived read is **read-only and never-throws** (mirroring
+`lib/detectOpenBlocker.ts`): a gone or malformed worktree degrades to
+honest unknown reads and the feed still returns **200** — no record can
+500 the board (BR-11). All worktree reads are contained to the change's own
+tree via `lib/safeJoin.ts` (MUC-4), and the health/attention `reason`
+strings are a **fixed enumerable set** — never interpolated from transcript
+or reply text (FR-32). The per-record fan-out stays inside the one bounded
+`Promise.all` the feed already used (no N+1).
 
 ### Brain + rendered previews (WP-006)
 
