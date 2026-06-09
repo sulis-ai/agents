@@ -552,3 +552,26 @@ def test_branch_name_scoped_and_legacy():
     assert _wpxlib._branch_name("WP-001", "foo") == "feat/wp-001-foo"
     # Legacy — prefix-strip + lowercase preserved for a bare numeric id
     assert _wpxlib._branch_name("wp-7", "bar") == "feat/wp-7-bar"
+
+
+# ─── WP-002: journal pushed-branch regex widening (wp/ + change/) ───────────
+
+
+def test_journal_regex_matches_wp_and_change_prefixes(tmp_project):
+    """_JOURNAL_PUSHED_BRANCH_RE accepts the new wp/... and change/... pushed
+    branch tokens in a Step-7 trace, not just legacy feat/... — otherwise #229
+    Step-0 resolution silently falls through for namespaced branches.
+    """
+    cases = [
+        ("WP-001", "Pushed to wp/fix-x/wp-001-foo at SHA abc1234 (commit: x)",
+         "wp/fix-x/wp-001-foo"),
+        ("WP-002", "pushed change/fix-x at SHA def5678",
+         "change/fix-x"),
+        ("WP-003", "Pushed to feat/wp-003-bar at SHA 9999abc",
+         "feat/wp-003-bar"),
+    ]
+    for wp_id, outcome, expected in cases:
+        _seed_journal(tmp_project.wp_dir, wp_id, None, step7_outcome=outcome)
+        assert (
+            _wpxlib._journal_pushed_branch(tmp_project.wp_dir, wp_id) == expected
+        ), f"{outcome!r} should parse to {expected!r}"

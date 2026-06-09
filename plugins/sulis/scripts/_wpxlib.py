@@ -1994,12 +1994,16 @@ def _branch_name(wp_id: str, slug: str, change_scope: str | None = None) -> str:
 
 
 # Matches a Step-7 trace Outcome that records the exact pushed branch, e.g.:
-#   "Pushed to feat/wp-002-dark-token-block at SHA abc1234 (commit: ...)"
+#   "Pushed to wp/fix-x/wp-002-dark-token-block at SHA abc1234 (commit: ...)"
 # Tolerant of casing ("Pushed"/"pushed") and the "to" being optional, so it
-# also catches "success — pushed feat/wp-5-... after rebase". The branch token
-# is the first ``feat/...`` run of non-whitespace following "push(ed)".
+# also catches "success — pushed wp/fix-x/wp-5-... after rebase". The branch
+# token is the first matching run of non-whitespace following "push(ed)".
+# Three prefixes are accepted:
+#   wp/      — the ADR-001 per-change WP-branch scheme (the new default mint)
+#   change/  — the change branch itself, occasionally recorded as a push target
+#   feat/    — the retained legacy WP-branch shape (one-release fallback)
 _JOURNAL_PUSHED_BRANCH_RE = re.compile(
-    r"push(?:ed)?\s+(?:to\s+)?(feat/\S+)",
+    r"push(?:ed)?\s+(?:to\s+)?((?:feat|wp|change)/\S+)",
     re.IGNORECASE,
 )
 
