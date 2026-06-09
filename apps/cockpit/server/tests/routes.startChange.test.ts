@@ -65,6 +65,10 @@ function recordedChange(slug: string, primitive: string): Change {
     updatedAt: "2026-06-04T00:00:00Z",
     stage: "recon",
     liveness: { status: "not-running" },
+    // WP-001 widened fields — fixture defaults.
+    needsAttention: { flagged: false, reason: null },
+    health: { state: "unknown", reason: "too early to tell" },
+    lastActivityAt: null,
   };
 }
 

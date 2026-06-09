@@ -27,6 +27,10 @@ function makeChange(overrides: Partial<Change> = {}): Change {
     updatedAt: "2026-05-26T11:55:00Z",
     stage: "implement",
     liveness: { status: "unknown", reason: "no session" },
+    // WP-001 widened fields — fixture defaults (override per test as needed).
+    needsAttention: { flagged: false, reason: null },
+    health: { state: "unknown", reason: "too early to tell" },
+    lastActivityAt: null,
     ...overrides,
   };
 }
