@@ -1,0 +1,28 @@
+id: automation-reliability-recovery
+change_id: 01KTMKAZDV03Z12AT0VAH5BH3T
+handle: CH-01KTMK
+primitive: feat
+status: designed
+kind: backend
+founder_facing: false
+tier: M
+sourced_from: .changes/feat-automation-reliability-recovery.SPEC.md
+extends:
+  # external prior art — the existing platform + ADE design this conforms to
+  - .architecture/autonomous-delivery-environment/  # ADE ADR-002/003/005 (resume, write path, surface)
+  - plugins/sulis/scripts/_session_manager/          # the ProviderAdapter seam + events.py + lifecycle
+adrs:
+  - ADR-001-classifier-and-recovery-driver-sit-around-the-lifecycle.md
+  - ADR-002-retry-budget-as-an-injected-policy-value-object.md
+  - ADR-003-classification-is-provider-neutral-detection-is-a-thin-adapter-hint.md
+  - ADR-004-login-expired-pause-resume-reuses-ade-adr-002-and-the-existing-message-surface.md
+contracts:
+  - contracts/reliability-layer.contract.md   # CONTRACT_FIRST lightweight (internal library seam)
+deferred_needs:
+  - live-reauth-resume-claude   # manual: live claude + expired credential round-trip
+notes: >
+  Brownfield-with-spec. Reliability layer sits AROUND the existing session
+  lifecycle (ADR-001), reuses events.py codes + the resume path (no new
+  store, no new error stream, no new surface). Tier M is ASR-driven
+  (recovery correctness); TDD length is ~tier-S because Form/Proof are
+  largely covered by the existing platform.
