@@ -916,8 +916,16 @@ loop:
               --wp <wp> --project <slug> \
               --branch <branch> \
               --pipeline-result @<batch deploy/verify result JSON> \
-              --worktree-path <worktree>
+              --worktree-path <worktree> \
+              --from-gate-handoff
             git branch -D <branch>   # merged to main; safe to delete
+
+        **Pass `--from-gate-handoff` (#267).** On this path the WPs were
+        flipped to `step-7-complete` before the train (not `in_progress`),
+        so the wrap's INDEX flip must expect `step-7-complete`. Without the
+        flag the wrap fails (`status is 'step-7-complete', expected
+        'in_progress'`) and you end up doing its three jobs — flip,
+        worktree-remove, branch-delete — by hand for every WP.
 
         Only the calling run-all session has the per-WP worktree paths,
         so this step lives here, not in `mark-gates-complete`. Skip it on
