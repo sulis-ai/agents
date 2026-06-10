@@ -752,7 +752,10 @@ class SessionManager:
           routes it through :meth:`_on_process_death` (recovery is WP-005's —
           this WP only *detects in the tick*); else
         - **idle-evicts** a session idle past the timeout via :meth:`close`
-          (graceful: SIGTERM→SIGKILL, log closed, registry entry removed).
+          (graceful: SIGTERM→SIGKILL, log closed, registry entry removed) —
+          **unless it has an attached viewer**, in which case it is in-use by
+          definition and exempt (#108). The in-use signal is the WP-004-owned
+          :meth:`_viewer_count`, injected the same way :meth:`is_alive` is.
 
         Called on the background maintenance thread, and directly by tests for
         deterministic, sleep-free verification (MEA-09)."""
@@ -763,6 +766,7 @@ class SessionManager:
             is_alive=self.is_alive,
             on_death=self._on_process_death,
             evict=self.close,
+            viewer_count=self._viewer_count,
         )
 
     def _enforce_cap_for_new(self, key: str) -> None:

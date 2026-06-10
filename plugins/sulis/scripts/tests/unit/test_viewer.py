@@ -351,6 +351,12 @@ class _WritableFdSession:
     def __init__(self) -> None:
         self.scrollback = _StubScrollback(b"")
         self._read_fd, self.pty_master_fd = os.pipe()
+        self.mark_active_calls = 0
+
+    def mark_active(self) -> None:
+        # ``feed`` bumps the idle clock on a successful write (#108); record the
+        # call so the feed test can assert keystrokes register as activity.
+        self.mark_active_calls += 1
 
     def read_all(self) -> bytes:
         # Drain whatever feed wrote (non-blocking read of buffered bytes).
@@ -392,6 +398,11 @@ def test_feed_writes_verbatim_then_chunks_oversize() -> None:
         v.feed(payload)
         got = session.read_all()
         assert got == payload, f"feed did not write verbatim: {got!r} != {payload!r}"
+        # A successful keystroke feed registers as in-use activity so the idle
+        # clock is bumped (#108) — a session being typed into is not "idle".
+        assert session.mark_active_calls == 1, (
+            "feed did not mark the session active on a successful write (#108)"
+        )
     finally:
         viewer_module._FEED_CHUNK_BYTES = original
         session.cleanup()
@@ -409,6 +420,11 @@ def test_feed_after_detach_is_noop() -> None:
         v.detach()
         v.feed(b"ignored")  # must not raise
         assert session.read_all() == b"", "detached feed wrote to the master"
+        # A detached feed writes nothing, so it is not activity either — the idle
+        # clock must not be bumped by a dropped-auth feed (#108).
+        assert session.mark_active_calls == 0, (
+            "detached feed must not register as activity"
+        )
     finally:
         session.cleanup()
 

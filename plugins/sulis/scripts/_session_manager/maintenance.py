@@ -37,12 +37,20 @@ Read via the stdlib (``os.sysconf``) so a tuning floor adds no dependency
 
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 import time
 from collections.abc import Callable, Iterable
 
 from _session_manager.session import Session
+
+#: Module logger for the maintenance tick. An idle-eviction is a real
+#: side-effect on a session the consumer cares about (it terminates a warm
+#: child), so a reap must never be invisible (#108): every eviction is logged
+#: with the key, idle seconds, and attached-viewer count so a reap that killed
+#: a window mid-work is diagnosable from the daemon log, not silent.
+_log = logging.getLogger("sulis.session_manager.maintenance")
 
 # ── memory-cap derivation (decided default: derive-from-RAM, floored) ───────
 
@@ -239,6 +247,7 @@ class MaintenanceManager:
         is_alive: Callable[[Session], bool],
         on_death: Callable[[Session], None],
         evict: Callable[[str], None],
+        viewer_count: Callable[[str], int],
     ) -> None:
         """One maintenance pass over a snapshot of the live sessions (§2.7).
 
@@ -250,7 +259,13 @@ class MaintenanceManager:
            session is not also idle-evicted in the same pass — recovery owns it).
         2. **Idle-eviction** — a live session idle past the timeout is reaped
            via ``evict`` (the manager's ``close``: SIGTERM→SIGKILL, log closed,
-           registry entry removed — graceful).
+           registry entry removed — graceful) **only if it has no attached
+           viewers**. An in-use session with a live viewer (an attached desktop
+           window) is definitionally in-use and is NEVER idle-evicted (#108): a
+           pty session bumps ``last_activity`` only on output bytes, so a turn
+           that is quiet for longer than the timeout (claude thinking, a long
+           quiet tool) would otherwise look idle and be killed mid-work. The
+           attached-viewer registry is the in-use signal the idle clock can miss.
 
         The caller passes a *snapshot* (not the live registry) so eviction
         mutating the registry mid-pass is safe.
@@ -260,6 +275,9 @@ class MaintenanceManager:
             is_alive: WP-004's liveness predicate (consumed, not re-implemented).
             on_death: WP-004/005's death-recovery routing (consumed).
             evict: the manager's graceful close, ``evict(key) -> None``.
+            viewer_count: WP-004's attached-viewer count for a key — the in-use
+                signal injected the same way ``is_alive`` is (consumed, not
+                re-implemented). ``> 0`` ⇔ visible ⇔ in-use ⇒ never idle-evicted.
         """
         for key, session in sessions:
             if not is_alive(session):
@@ -268,8 +286,31 @@ class MaintenanceManager:
                 # idle-evicted in the same pass — the death path owns it.
                 on_death(session)
                 continue
-            if self.is_idle(last_activity=session.last_activity):
-                evict(key)
+            if not self.is_idle(last_activity=session.last_activity):
+                continue
+            # A turn in flight means the session is actively WORKING (claude
+            # thinking, a long quiet tool) — in-use by definition even with no
+            # attached viewer and no recent output, so it is never reaped
+            # mid-work (#108). This is the detached-but-running liveness signal
+            # the output-bytes idle clock cannot see.
+            if session.turn_in_flight():
+                continue
+            # An attached viewer means a desktop window is live on this session —
+            # in-use by definition, never reaped, even if the output-bytes idle
+            # clock thinks it has gone quiet (#108).
+            attached = viewer_count(key)
+            if attached > 0:
+                continue
+            idle_seconds = self._clock() - session.last_activity
+            # A reap must never be invisible (#108): record key + idle seconds +
+            # viewer count so a window that dropped to a bare shell is traceable.
+            _log.info(
+                "idle-evicting session key=%s idle_seconds=%.1f viewer_count=%d",
+                key,
+                idle_seconds,
+                attached,
+            )
+            evict(key)
 
     # ── LRU memory-cap (eviction victims when admitting a new session) ─────
 
