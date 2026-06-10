@@ -1008,7 +1008,15 @@ def test_mark_shipped_via_handle_flips_stage(local_git_repo, run_tool):
     `gh pr merge` succeeds. It must resolve the change via --handle, flip
     stage='shipped', and persist shipped_at on the change record so the
     cockpit's 'Shipped' section can read it AND cmd_nuke's protection
-    fires."""
+    fires.
+
+    Since the #111 ship-integrity guard, mark-shipped refuses to flip a
+    change to shipped unless the merge into main is confirmed (a merged PR
+    or an explicit --merge-sha). This test exercises the handle→flip
+    mechanics in a local repo with no real PR/merge, so it uses the
+    documented --force escape (which records the override on the record).
+    The guard's confirm/refuse behaviour is covered by
+    test_sulis_change_ship_integrity.py."""
     start = run_tool("sulis-change", "start",
                      "--repo-root", str(local_git_repo),
                      "--slug", "mark-shipped-test", "--primitive", "feat")
@@ -1026,7 +1034,8 @@ def test_mark_shipped_via_handle_flips_stage(local_git_repo, run_tool):
 
     result = run_tool("sulis-change", "mark-shipped",
                       "--handle", handle,
-                      "--repo-root", str(local_git_repo))
+                      "--repo-root", str(local_git_repo),
+                      "--force")  # #111: no real PR/merge in this local-repo test
     assert result.ok, f"mark-shipped failed: {result.error}; stderr={result.stderr}"
     assert result.data["stage"] == "shipped"
     assert result.data["shipped_at"]  # non-empty ISO timestamp
