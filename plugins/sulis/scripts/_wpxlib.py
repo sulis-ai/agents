@@ -682,6 +682,113 @@ def validate_cross_kind_contract_wiring(wps: list[dict]) -> list[str]:
     return violations
 
 
+def _fixture_logical_name(path: str) -> str:
+    """Normalise a fixture path to its LOGICAL name so dir-vs-file forms of
+    the same fixture compare equal.
+
+    The fixture-shape-collision class (#106): one WP authors `x/` (a
+    directory + manifest), another authors `x.json` (a flat file) — the same
+    logical fixture under divergent conventions. To detect the collision we
+    strip a trailing slash and a single file extension, so
+    ``sample-tool-surface/`` and ``sample-tool-surface.json`` both normalise
+    to ``.../sample-tool-surface``. Directory separators are preserved, so two
+    fixtures of the same basename in different directories do NOT collide.
+    """
+    name = path.strip().rstrip("/")
+    base = name.rsplit("/", 1)[-1]
+    if "." in base:
+        # Strip exactly ONE trailing extension (the dir-vs-file equaliser);
+        # a leading-dot dotfile (no name before the dot) keeps its name.
+        stem, _, _ext = base.rpartition(".")
+        if stem:
+            prefix = name[: len(name) - len(base)]
+            name = prefix + stem
+    return name
+
+
+def validate_fixture_collisions(wps: list[dict]) -> list[str]:
+    """Return a list of shared-fixture collision violations for a WP set
+    (empty = pass). Pure; operates on WP frontmatter dicts ({id, dependsOn,
+    fixtures_created}).
+
+    The peer-collision check for TEST FIXTURES — the same structural defect as
+    the contract-seam check (two parallel WPs independently authoring one
+    logical thing), but with the contract seam removed: same-kind WPs, no
+    producer/consumer contract. Anchor case #106 / CH-01KTRJ: WP-001 authored
+    ``tests/fixtures/methodology/sample-tool-surface/`` (dir + manifest) while
+    WP-002 authored ``tests/fixtures/methodology/sample-tool-surface.json``
+    (flat file); the loader silently resolved the dir form and broke WP-002's
+    test at bundled-tip CI.
+
+    Two WPs COLLIDE on a fixture when:
+      1. both declare a ``fixtures_created`` path that normalises to the same
+         logical name (``_fixture_logical_name`` strips a trailing slash + a
+         single extension, so dir-vs-file forms compare equal), AND
+      2. neither WP (transitively) ``dependsOn`` the other — i.e. they are
+         parallel-batch peers, not a serialised author→consumer pair.
+
+    Remedy (surfaced in the rubric): serialize (one WP ``dependsOn`` the
+    other) or hoist a single fixture-authoring upstream WP both consumers
+    ``dependsOn``.
+    """
+    # Build id -> fixtures and id -> direct deps.
+    fixtures_by_id: dict[str, set[str]] = {}
+    deps_by_id: dict[str, list[str]] = {}
+    for wp in wps:
+        wid = str(wp.get("id", "")).strip()
+        if not wid:
+            continue
+        deps_by_id[wid] = _as_str_list(wp.get("dependsOn"))
+        logical = {
+            _fixture_logical_name(p)
+            for p in _as_str_list(wp.get("fixtures_created"))
+            if _fixture_logical_name(p)
+        }
+        if logical:
+            fixtures_by_id[wid] = logical
+
+    def _reachable(start: str) -> set[str]:
+        """Transitive dependency closure of ``start`` (the WPs it waits on)."""
+        seen: set[str] = set()
+        stack = list(deps_by_id.get(start, []))
+        while stack:
+            dep = stack.pop()
+            if dep in seen:
+                continue
+            seen.add(dep)
+            stack.extend(deps_by_id.get(dep, []))
+        return seen
+
+    def _serialised(a: str, b: str) -> bool:
+        return b in _reachable(a) or a in _reachable(b)
+
+    # logical fixture name -> WP ids that author it.
+    authors_by_fixture: dict[str, list[str]] = {}
+    for wid, logical in fixtures_by_id.items():
+        for name in logical:
+            authors_by_fixture.setdefault(name, []).append(wid)
+
+    violations: list[str] = []
+    for name, authors in authors_by_fixture.items():
+        if len(authors) < 2:
+            continue
+        ordered = sorted(authors)
+        for i, a in enumerate(ordered):
+            for b in ordered[i + 1:]:
+                if _serialised(a, b):
+                    continue
+                violations.append(
+                    f"{a} and {b} both author the fixture `{name}` under "
+                    f"divergent conventions (dir-vs-file forms resolve to the "
+                    f"same logical name) and neither dependsOn the other. Two "
+                    f"parallel WPs MUST NOT independently author one logical "
+                    f"fixture (#106). Remedy: serialize (one dependsOn the "
+                    f"other) or hoist a single fixture-authoring upstream WP "
+                    f"both consumers dependsOn."
+                )
+    return violations
+
+
 # ─── Repository contract (RC v0.3.0 profile model) — L-05 ───────────────
 #
 # Promoted from wpx-arrival-check._read_contract so the pipeline, the train,
