@@ -1,0 +1,7 @@
+change_id: 01KTRT211TRJ3AQPR47GF4ZP5W
+primitive: harden
+tier: minor
+touches_plugin: true
+summary: |
+  sulis-change mark-shipped now refuses to flip a change to shipped unless the merge to main is confirmed (merged-PR signal, or an explicit --merge-sha verified against origin/main), pins shipped_sha to the real merge commit, and records any --force override. Shipped can no longer mean not-actually-on-main.
+created_at: 2026-06-10T13:12:13Z

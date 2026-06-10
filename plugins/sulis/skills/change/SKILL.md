@@ -828,16 +828,26 @@ git -C "$(git worktree list --porcelain | awk '/^worktree /{p=$2} /^branch refs\
   || { git checkout main && git pull origin main; }
 ```
 
-**6. Mark the change as shipped, and tidy the workspace (#38/#56).** Flips
-`stage='shipped'`, pins `shipped_sha` (the branch tip — "the state it was in
-when we shipped"), and **removes the now-redundant worktree** (kept if a live
-session is bound or if there's uncommitted work). The branch + record stay;
+**6. Mark the change as shipped, and tidy the workspace (#38/#56/#111).** First
+the tool **confirms the change actually merged to `main`** — it looks for the
+merged PR from step 5 (`gh pr list --head <branch> --base main --state merged`)
+and pins `shipped_sha` to the **merge commit on `main`** (the true shipped
+state, not the local branch tip — a squash-merge orphans the branch tip). Then
+it flips `stage='shipped'` and **removes the now-redundant worktree** (kept if a
+live session is bound or if there's uncommitted work). The branch + record stay;
 `recreate` brings the worktree back on demand:
 
 ```bash
 "$SCRIPTS_DIR/sulis-change" mark-shipped --handle CH-01HQ8X \
   --repo-root <main-repo-root>
 ```
+
+If the merge can't be confirmed (no merged PR), the tool **refuses** and exits
+non-zero — it will not mark a change shipped that never landed (the #110 harm:
+a change marked shipped + branch deleted while the merge never landed). For a
+**manual** merge with no PR, pass `--merge-sha <the merge commit on main>` (it's
+verified to be an ancestor of `origin/main`). Only for genuine edge cases,
+`--force` overrides the guard and records the override on the change record.
 
 **7. Report** (include the lessons captured at step 4.6 and the release note
 recorded at step 4.7, if any):
