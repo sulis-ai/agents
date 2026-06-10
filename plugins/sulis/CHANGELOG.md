@@ -1,3 +1,9 @@
+## v0.132.2 — 2026-06-10
+
+**Patch — release-train batch.**
+
+- Spawned change sessions no longer bind to a stale SULIS_CHANGE_ID: the launcher sets the new id authoritatively on the launched process (env on exec + unset-before-export) so an inherited cockpit/parent value cannot shadow it, and the agent now trusts the worktree over the env when they disagree.
+
 ## v0.132.1 — 2026-06-10
 
 **Patch — release-train batch.**
