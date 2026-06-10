@@ -17,12 +17,18 @@
 // _product-scope helper) → gather liveness + enrichment per record → shape
 // into the wire `Change[]`.
 
+import path from "node:path";
+
 import { Router } from "express";
 
 // eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (TDD §9 permits; the rule's `../../*` pattern is intended to block escapes out of apps/cockpit/, which `import/no-restricted-paths` already enforces correctly)
 import type { Change } from "../../shared/api-types";
 import type { ChangeStoreReader } from "../ports/ChangeStoreReader";
 import { gatherChangeEnrichment } from "../lib/gatherChangeEnrichment";
+import {
+  livenessFromDaemon,
+  readDaemonLiveSessions,
+} from "../lib/readDaemonSessions";
 
 import { asyncHandler } from "./_async";
 import { toWireChange } from "./_change-lookup";
@@ -48,11 +54,25 @@ export function createChangesRouter(deps: ChangesRouterDeps): Router {
         deps.sulisStateDir,
         readProductQuery(req.query.product),
       );
+      // Liveness authority: read the session-manager daemon's live sessions
+      // ONCE for the whole feed (one socket round-trip, never per-card). The
+      // daemon owns the per-change pty sessions, so it — not the signal-0
+      // probe — is the truth about what's running (the probe can't see a macOS
+      // session's tty/null-pid). `null` means the daemon's unreachable → each
+      // row falls back to its signal-0 probe. (#liveness)
+      const daemonSessions = await readDaemonLiveSessions(
+        path.join(deps.sulisStateDir, "session-manager.sock"),
+      );
       const enriched: Change[] = await Promise.all(
         records.map(async (record) => {
-          const { liveness, enrichment } = await gatherChangeEnrichment(
+          const { liveness: probed, enrichment } = await gatherChangeEnrichment(
             deps,
             record,
+          );
+          const liveness = livenessFromDaemon(
+            record.changeId,
+            daemonSessions,
+            probed,
           );
           return toWireChange(record, liveness, enrichment);
         }),
