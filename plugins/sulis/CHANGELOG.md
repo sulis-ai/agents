@@ -1,3 +1,9 @@
+## v0.136.0 — 2026-06-10
+
+**Minor — release-train batch.**
+
+- sulis-change now honours the host repo branch convention: an optional branch_convention key in the repo-contract shapes new change branch names (e.g. feature/{slug}); with no key it stays byte-for-byte change/{primitive}-{slug}. Change identity is store-backed so dual-prefix discovery keeps in-flight change/* changes resolving, the back-integration gates no longer key off the change/ prefix, and Work-Package branches stay under wp/.
+
 ## v0.135.0 — 2026-06-10
 
 **Minor — release-train batch.**
