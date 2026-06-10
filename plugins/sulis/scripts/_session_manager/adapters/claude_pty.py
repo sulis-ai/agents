@@ -64,6 +64,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import _change_session
 import _terminal_launcher
 from _session_manager.adapter import Capabilities, SessionSpec
 from _session_manager.classifier import RecoveryClass
@@ -133,6 +134,7 @@ class InteractiveClaudePtyAdapter:
         apostrophes/quotes/backticks are safe; #86 / MUC-2) without depending on
         a shell that is not in this spawn path."""
         argv = list(_BASE_ARGV)
+        argv.extend(self._conversation_flags(spec))
         pre_prompt = self._read_pre_prompt(spec)
         if pre_prompt is not None:
             argv.append(pre_prompt)
@@ -178,6 +180,42 @@ class InteractiveClaudePtyAdapter:
             "Interactive-pty reauth() is implemented in WP-006; the WP-004 seam "
             "only establishes the Protocol shape."
         )
+
+    # ── internal: conversation pinning / resume (focus-resumes-prior-session) ─
+
+    def _conversation_flags(self, spec: SessionSpec) -> list[str]:
+        """Return the ``--resume``/``--session-id`` flags for this spawn.
+
+        Two mutually-exclusive cases (``claude`` rejects both at once):
+
+        - ``spec.resume_ref`` set → ``["--resume", <ref>]``. The FOCUS path: the
+          consumer passes the change's pinned session id when a prior transcript
+          exists, so the session picks up where the founder left off.
+        - else, ``spec.brief_change_id`` a valid change ULID → ``["--session-id",
+          <derived-uuid>]``. The FIRST spawn: pin a deterministic id (a pure
+          function of the change, ``_change_session.change_session_id``) so focus
+          can later resume that exact conversation by the same derived id — no
+          need to scrape the id claude assigned (the pinned-id design, recorded
+          in ``_change_session``).
+        - else (no change context, or a malformed change id that cannot derive a
+          valid uuid) → ``[]``: the bare interactive argv, unchanged for every
+          frozen non-change caller.
+
+        ``resume_ref`` already passed ``SessionSpec.__post_init__``'s shape guard
+        (no leading ``-``, no control chars); the derived id is a valid UUID by
+        construction.
+        """
+        if spec.resume_ref:
+            return ["--resume", spec.resume_ref]
+        change_id = (spec.brief_change_id or "").strip()
+        if not change_id:
+            return []
+        try:
+            return ["--session-id", _change_session.change_session_id(change_id)]
+        except ValueError:
+            # Malformed change id — degrade to a fresh, un-pinned session rather
+            # than crash the spawn (mirrors _read_pre_prompt's ignore-on-bad-id).
+            return []
 
     # ── internal: pre-prompt sidecar resolution ───────────────────────────
 

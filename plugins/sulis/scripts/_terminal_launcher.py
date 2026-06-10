@@ -66,6 +66,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).parent))
+import _change_session  # noqa: E402
 from _wpxlib import validate_change_ulid  # noqa: E402
 
 logger = logging.getLogger("sulis.terminal_launcher")
@@ -565,8 +566,19 @@ def _write_session_json(
     consumer should fall back to ``tty`` (``ps -t <tty>``) if present, or treat
     the session as unknown rather than dead.
     """
+    # The change's deterministic pinned Claude session id (focus-resumes-prior-
+    # session). The pty adapter pins it via ``--session-id`` at first spawn and
+    # the focus path resumes it via ``--resume``; it is a pure function of the
+    # change id, so recording it is a discoverable/auditable mirror of the
+    # binding, not a separate source of truth. A malformed change id (cannot
+    # derive an id) records ``None`` rather than failing the session.json write.
+    try:
+        claude_session_id = _change_session.change_session_id(change_id)
+    except ValueError:
+        claude_session_id = None
     payload = {
         "change_id": change_id,
+        "claude_session_id": claude_session_id,
         "pid": pid,
         "pid_kind": pid_kind,
         "tty": tty,
