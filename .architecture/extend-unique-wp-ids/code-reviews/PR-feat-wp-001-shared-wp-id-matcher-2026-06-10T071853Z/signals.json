@@ -1,0 +1,24 @@
+{
+  "pr": "feat/wp-001-shared-wp-id-matcher",
+  "base": "change/extend-unique-wp-ids",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "hygiene": {
+    "scope": { "commit_type_spread": [], "module_fan_out": 1, "severity": "low" },
+    "size": { "lines_added": 366, "lines_removed": 9, "files_changed": 8, "severity": "low" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "low" },
+    "completeness": { "new_source_without_test": 0, "api_change_without_schema": false, "severity": "low",
+      "note": "tests added to 6 existing unit-test files alongside the source change" }
+  },
+  "findings": {
+    "in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+    "in_neighbours": { "total": 0 },
+    "watch_list": 1
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "note": "single-source extraction (EP-03); dependency direction _p_ver_rubric->_wpxlib correct, no cycle" },
+    "security": { "findings": 0, "note": "ReDoS-safe anchored regexes; no secrets/injection/auth surface; inputs are trusted WP ids" },
+    "quality": { "findings": 0, "note": "full test coverage on new funcs + 5 seams; parity verified vs legacy removeprefix; no perf anti-patterns" }
+  },
+  "draft_hardening_deltas": 0
+}

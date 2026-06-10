@@ -378,3 +378,148 @@ def test_partial_wp_files_present_file_with_empty_deps_is_ready(tmp_path):
     result = _run(wpx.cmd_list_ready, _ns(tmp_path))
     # Frontmatter [] beats the table's bogus WP-999 dep → WP-001 ready.
     assert "WP-001" in result["data"]["ready"]
+
+
+# ─── WP-001 (CH-5DMB1N): widened WP-id matcher + back-compat guard ────────────
+#
+# WP ids gain a change-handle prefix `{CH-HANDLE}-WP-NNN` (e.g.
+# CH-5DMB1N-WP-001) alongside the retained legacy bare `WP-NNN` and the existing
+# source-tagged `WP-{SOURCE}-{NNN}`. The recognition is defined ONCE in
+# _wpxlib.py (`_WP_ID_RE` + `is_wp_id` + `wp_nnn_suffix`) and every caller reuses
+# it — mirroring the `_WP_TABLE_HEADER_RE` / `validate_wp_index_header`
+# single-source-of-truth discipline (#60, EP-03; ADR-001/ADR-002).
+
+import _wpxlib  # noqa: E402  (sys.path wired by tests/conftest.py)
+
+
+# An INDEX carrying BOTH a prefixed row and a legacy bare row in the SAME table.
+# The load-bearing back-compat fixture: parse_index_md must return both.
+_BOTH_SHAPES_INDEX = """# Work Package Index — both shapes
+
+## WP table
+
+| ID | Title | Primitive | Status | Depends On | Blocks |
+|---|---|---|---|---|---|
+| CH-5DMB1N-WP-001 | Prefixed mint | extend | pending | — | — |
+| WP-002 | Legacy bare | create | pending | — | — |
+| WP-HD-AA-001 | Source-tagged | create | pending | — | — |
+"""
+
+
+@pytest.mark.parametrize(
+    "wp_id",
+    ["CH-5DMB1N-WP-001", "WP-002", "WP-HD-AA-001"],
+)
+def test_parse_index_keeps_prefixed_and_bare_ids(tmp_path, wp_id):
+    """LOAD-BEARING regression guard (ADR-002 one-release back-compat).
+
+    A single parse of an INDEX containing one prefixed `CH-…-WP-NNN` row, one
+    legacy bare `WP-NNN` row, and one source-tagged `WP-{SOURCE}-{NNN}` row must
+    return ALL of them with their ids intact. FAILS today: the prefixed row is
+    silently dropped by the `startswith("WP-")` row-filter in parse_index_md —
+    proving the silent-drop the widened matcher closes.
+    """
+    wp_dir = tmp_path / ".architecture" / "proj" / "work-packages"
+    wp_dir.mkdir(parents=True)
+    index_path = wp_dir / "INDEX.md"
+    index_path.write_text(_BOTH_SHAPES_INDEX, encoding="utf-8")
+
+    rows = _wpxlib.parse_index_md(index_path)
+    ids = {row.id for row in rows}
+    assert wp_id in ids, (
+        f"{wp_id!r} dropped by parse_index_md — both shapes must survive one "
+        f"release (got ids: {sorted(ids)})"
+    )
+
+
+def test_parse_index_both_shapes_in_one_parse(tmp_path):
+    """The same guard stated as a single both-shapes assertion: a prefixed and a
+    legacy bare row survive the SAME parse."""
+    wp_dir = tmp_path / ".architecture" / "proj" / "work-packages"
+    wp_dir.mkdir(parents=True)
+    index_path = wp_dir / "INDEX.md"
+    index_path.write_text(_BOTH_SHAPES_INDEX, encoding="utf-8")
+
+    ids = {row.id for row in _wpxlib.parse_index_md(index_path)}
+    assert {"CH-5DMB1N-WP-001", "WP-002"} <= ids
+
+
+# ─── is_wp_id — the single recogniser ────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    [
+        "CH-5DMB1N-WP-001",   # prefixed (the new mint)
+        "WP-001",             # legacy bare
+        "WP-002",
+        "WP-HD-AA-001",       # source-tagged
+        "WP-S2-PERMS",        # source-tagged, alpha suffix
+    ],
+)
+def test_is_wp_id_accepts_all_three_shapes(candidate):
+    assert _wpxlib.is_wp_id(candidate) is True
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    [
+        "",                    # blank
+        "Totals",              # a summary row
+        "SRD-001",             # a different artifact id
+        "CH-5DMB1N",           # a change handle, not a WP id
+        "WP",                  # bare prefix, no number
+        "notes",
+    ],
+)
+def test_is_wp_id_rejects_non_wp_strings(candidate):
+    assert _wpxlib.is_wp_id(candidate) is False
+
+
+# ─── wp_nnn_suffix — the clean-tail extractor (branch cleanliness) ───────────
+
+
+@pytest.mark.parametrize(
+    "wp_id,expected",
+    [
+        # Prefixed id: CH-<HANDLE>- AND the wp- prefix stripped → clean NNN tail
+        # (the `wp-` is re-added by _branch_name's f-string, exactly as for a
+        # bare id — so the branch is `wp/{scope}/wp-001-{slug}`, not the doubled
+        # `wp/{scope}/wp-ch-5dmb1n-wp-001-{slug}`).
+        ("CH-5DMB1N-WP-001", "001"),
+        # Legacy bare: byte-for-byte what `wp_id.lower().removeprefix("wp-")`
+        # produced before this change.
+        ("WP-001", "001"),
+        ("wp-7", "7"),
+        # Source-tagged: tail unchanged (no CH- prefix to strip; the `wp-` is
+        # stripped just as today).
+        ("WP-HD-AA-001", "hd-aa-001"),
+    ],
+)
+def test_wp_nnn_suffix_strips_change_prefix_only(wp_id, expected):
+    """`wp_nnn_suffix` returns the NNN tail (lowercased, `wp-` stripped) that
+    `_branch_name` re-prefixes with `wp-`. For a prefixed id the CH-<HANDLE>-
+    prefix is stripped FIRST so the branch stays clean. For bare/source-tagged
+    ids the result is byte-for-byte today's `removeprefix("wp-")` output."""
+    assert _wpxlib.wp_nnn_suffix(wp_id) == expected
+
+
+# ─── _normalise_wp_reference — prefixed full-id detection ────────────────────
+
+
+def test_normalise_recognises_prefixed_full_id():
+    """A prefixed ref is recognised as a FULL id (passthrough/unknown), not
+    mistaken for a short suffix to resolve."""
+    known = {"WP-002"}
+    resolved, status = _wpxlib._normalise_wp_reference("CH-5DMB1N-WP-001", known)
+    assert resolved == "CH-5DMB1N-WP-001"
+    assert status == "unknown"
+
+
+def test_normalise_short_suffix_resolves_to_prefixed_known_id():
+    """The retained short-suffix path still resolves `PERMS` → a prefixed known
+    id (the `endswith` logic is prefix-agnostic and untouched)."""
+    known = {"CH-5DMB1N-WP-PERMS"}
+    resolved, status = _wpxlib._normalise_wp_reference("PERMS", known)
+    assert resolved == "CH-5DMB1N-WP-PERMS"
+    assert status == "normalised"

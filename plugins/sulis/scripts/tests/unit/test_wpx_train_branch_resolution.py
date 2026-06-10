@@ -578,6 +578,26 @@ def test_branch_name_scoped_and_legacy():
     assert _wpxlib._branch_name("wp-7", "bar") == "feat/wp-7-bar"
 
 
+def test_branch_name_prefixed_id_carries_clean_tail():
+    """WP-001 (CH-5DMB1N): a prefixed id must yield a CLEAN branch tail.
+
+    `removeprefix("wp-")` is a no-op on `ch-5dmb1n-wp-001` (it doesn't start
+    with `wp-`), so without `wp_nnn_suffix` the scoped branch would carry the
+    doubled, leaked id `wp/{scope}/wp-ch-5dmb1n-wp-001-foo`. The shared suffix
+    extractor strips the `CH-<HANDLE>-` prefix, keeping #283's per-change branch
+    scheme clean. FAILS today (the doubled prefix leaks).
+    """
+    # Scoped — clean wp-001 tail, NOT wp-ch-5dmb1n-wp-001.
+    assert (
+        _wpxlib._branch_name("CH-5DMB1N-WP-001", "foo", "fix-x")
+        == "wp/fix-x/wp-001-foo"
+    )
+    # Legacy fallback — same clean tail.
+    assert (
+        _wpxlib._branch_name("CH-5DMB1N-WP-001", "foo") == "feat/wp-001-foo"
+    )
+
+
 # ─── WP-002: journal pushed-branch regex widening (wp/ + change/) ───────────
 
 
