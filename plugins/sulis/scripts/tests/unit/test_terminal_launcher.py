@@ -515,6 +515,22 @@ def test_launch_change_terminal_writes_session_json_on_spawn(tmp_path, monkeypat
     assert payload["tty"] == "/dev/ttys009"
 
 
+def test_session_json_records_claude_session_id(tmp_path, monkeypatch):
+    """At first spawn the change's deterministic pinned Claude session id is
+    recorded in session.json (focus-resumes-prior-session, Step 2c). It is the
+    same id the pty adapter pins via ``--session-id`` and the focus path resumes
+    via ``--resume`` — recording it makes the binding auditable/discoverable."""
+    import _change_session as cs
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl, "_launch_macos",
+                              side_effect=lambda sp, cid, vis: _spawned_dict(sp)):
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path)
+    payload = json.loads(Path(result["session_json_path"]).read_text())
+    assert payload["claude_session_id"] == cs.change_session_id(_GOOD_ULID)
+
+
 def test_launch_change_terminal_does_not_write_session_json_on_failure(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     failed = {

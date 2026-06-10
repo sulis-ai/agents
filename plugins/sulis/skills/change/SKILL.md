@@ -96,7 +96,8 @@ literal path at each `"$SCRIPTS_DIR/sulis-change"` call — environment
 variables do NOT persist between Bash tool invocations in Claude Code.
 
 The Python helpers `launch_change_terminal` (in `_terminal_launcher.py`),
-`resolve_current_change` + `back_integrate_change_branch` (in `_wpxlib.py`)
+`resolve_current_change` + `back_integrate_change_branch` (in `_wpxlib.py`),
+and `has_resumable_transcript` (in `_change_session.py`, used by `focus`)
 are invoked via a `python3 -c` one-liner with `sys.path` pointed at
 `$SCRIPTS_DIR` (examples in each subcommand below).
 
@@ -262,8 +263,12 @@ say so plainly and offer `list`:
   > terminal (started 12 min ago). Switch to that window to pick up where
   > you left off."*
 
-- **No live session** (no `session.json`, or the `pid` is dead): re-spawn
-  with the same change context. Echo first (Rule 3), then call
+- **No live session** (no `session.json`, or the `pid` is dead): re-open
+  with the same change context. **If you worked on this before, it picks up
+  right where you left off** — the same conversation, history and all —
+  instead of starting over. The first time round (or if there's nothing to
+  pick up from), it starts fresh and orients itself from the change's notes.
+  This happens automatically; you don't choose. Echo first (Rule 3), then call
   `launch_change_terminal` directly:
 
   ```bash
@@ -287,7 +292,35 @@ say so plainly and offer `list`:
   a richer brief, which still wins. If you ever want a custom reopen brief,
   pass `pre_prompt="…"`; otherwise the default auto-start is the floor.
 
-  Then:
+  **Resume happens automatically when there's a prior conversation.** The
+  reopened window resumes the change's previous conversation when one exists
+  on disk, so the founder picks up where they left off (full history); when
+  there's none, it's the fresh self-orienting start above. This is decided by
+  the desktop viewer at attach time (it sets the resume handle on the session
+  it spawns), so the focus path does not pass anything extra — the same call
+  covers both cases.
+
+  To choose which message to show, check whether there's a prior conversation
+  to resume (the same signal the viewer uses):
+
+  ```bash
+  python3 -c "
+  import sys; sys.path.insert(0, '$SCRIPTS_DIR')
+  import _change_session as cs
+  print(cs.has_resumable_transcript('01HQ8XQM8G5KZGZQXPZD8H6PJ7', '/abs/path/to/worktree'))
+  "
+  ```
+
+  `True` → resuming; `False` → fresh start. (The viewer makes the real
+  decision at attach time on the same signal; this check is only so the
+  founder-facing line matches what's about to happen.)
+
+  Then, when it's resuming a prior conversation:
+
+  > *"Picking up **fix the login bug** (`CH-01HQ8X`) right where you left
+  > off — your last conversation is coming back up."*
+
+  …or, the first time round (nothing to resume):
 
   > *"Reopening **fix the login bug** (`CH-01HQ8X`) — a fresh terminal is
   > coming up, focused on this work."*
