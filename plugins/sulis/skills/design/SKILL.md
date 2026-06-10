@@ -305,10 +305,12 @@ The next stage after design is execution (`/sulis:run-all` ships the tasks).
   something that isn't there). If the work is changing code that already
   exists and needs understanding first, that's `/sulis:audit` — don't force a
   greenfield design onto a brownfield change.
-- **Operator vocabulary must not leak.** ADR, TDD, WP-NNN, `worktree_path`,
-  the design-doc filenames — none are the founder's words. Lead with the
-  readable name + handle and the plain-English decision; keep the artefacts
-  for the `--raw` / technical version. (MUC-F1)
+- **Operator vocabulary must not leak.** ADR, TDD, the WP id (now minted as
+  the prefixed `{CH-HANDLE}-WP-NNN`, e.g. `CH-5DMB1N-WP-001`; legacy bare
+  `WP-NNN` still understood for one release), `worktree_path`, the design-doc
+  filenames — none are the founder's words. Lead with the readable name +
+  handle and the plain-English decision; keep the artefacts for the `--raw` /
+  technical version. (MUC-F1)
 - **Don't narrate the dispatch.** The founder doesn't need to hear which
   specialist you'll spawn or what `subagent_type` you'll pass. Surface what's
   now decided and what they should do next (FE-09).
