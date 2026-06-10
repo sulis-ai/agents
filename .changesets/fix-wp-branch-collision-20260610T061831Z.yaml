@@ -1,7 +1,0 @@
-change_id: 01KTQ950H47BF1VZ6Z51ZHFCAB
-primitive: fix
-tier: patch
-touches_plugin: true
-summary: |
-  Scope Work Package branch refs per-change (wp/{primitive}-{slug}/wp-NNN) so cross-change WP-id collisions can no longer misroute the integration train (root cause of #105/#106).
-created_at: 2026-06-10T06:18:31Z
