@@ -249,6 +249,18 @@ Read frontmatter for pipeline arguments:
 wpx-wp read-frontmatter --wp WP-NNN --project <slug> --field '*'
 ```
 
+**Resolve the branch name from the canonical emitter — do NOT hand-template
+it (ADR-001).** In a change this yields the scoped `wp/{primitive}-{slug}/
+wp-NNN-<slug>` shape; outside one, the legacy `feat/wp-NNN-<slug>`. Using the
+emitter is what makes newly minted branches collision-safe (#105/#106):
+
+```bash
+BRANCH=$("$WPX_DIR/wpx-wp" branch-name --wp WP-NNN --project <slug> \
+  --repo-root <repo-root> | jq -r '.data.branch')
+```
+
+Use `"$BRANCH"` for every subsequent `--branch` below.
+
 Capture: branch, smoke_test, deploy_workflow, staging_url,
 post_deploy_verification, security_model. Read the dev-SHA-at-creation
 from the sidecar at `.architecture/{project}/work-packages/
@@ -263,7 +275,7 @@ Typical wall time: 15-45 min.
 Bash({
   command: """"$WPX_DIR/wpx-pipeline" run \
      --wp WP-NNN --project <slug> \
-     --branch feat/wp-NNN-<slug> \
+     --branch "$BRANCH" \
      --worktree-path ../wp-NNN-worktree \
      --dev-sha-at-creation <sha> \
      --base-branch <BASE_BRANCH> \
@@ -354,7 +366,7 @@ jq '.' /tmp/pipeline-WP-NNN.json > /tmp/pipeline-result-WP-NNN.json
 
 "$WPX_DIR/wpx-step12" wrap \
   --wp WP-NNN --project <slug> \
-  --branch feat/wp-NNN-<slug> \
+  --branch "$BRANCH" \
   --pipeline-result @/tmp/pipeline-result-WP-NNN.json \
   --worktree-path ../wp-NNN-worktree
 ```

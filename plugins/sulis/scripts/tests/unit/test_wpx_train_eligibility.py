@@ -425,3 +425,43 @@ def test_train_statuses_are_in_the_canonical_set():
     ):
         assert status in _wpxlib.CANONICAL_WP_STATUSES
         assert _wpxlib.validate_wp_status(status) is None
+
+
+# ─── WP-004: scoped resolution through find_eligible_branches ──────────────
+
+
+def test_eligibility_uses_scoped_resolution(tmp_project, monkeypatch):
+    """With change_scope passed, find_eligible_branches resolves the WP onto
+    its scoped wp/{scope}/ branch and never false-eligibles it onto a foreign
+    change's recycled-number feat/ branch (#105/#106 through the train path)."""
+    _write_index(tmp_project.wp_dir, [
+        ("WP-001", "Ready", "create", "step-7-complete", "—", "—"),
+    ])
+    _seed_wp_files(tmp_project.wp_dir, [("WP-001", "mine")])
+
+    def fake_branch_exists(repo, branch):
+        return False  # no literal hit → exercise the glob path
+
+    def fake_list_matching(repo, pattern):
+        return {
+            "wp/change-a/wp-001-*": [
+                {"name": "wp/change-a/wp-001-mine",
+                 "committerdate": "2026-06-02T00:00:00Z"},
+            ],
+            "feat/wp-001-*": [
+                {"name": "feat/wp-001-foreign",
+                 "committerdate": "2026-06-09T00:00:00Z"},
+            ],
+        }.get(pattern, [])
+
+    monkeypatch.setattr(_wpxlib, "_gh_branch_exists", fake_branch_exists)
+    monkeypatch.setattr(_wpxlib, "_gh_list_matching_branches", fake_list_matching)
+
+    rows = parse_index_md(tmp_project.index_md)
+    results = find_eligible_branches(
+        rows, repo="acme/x", wp_dir=tmp_project.wp_dir, change_scope="change-a",
+    )
+    eligible = [r for r in results if r.eligible]
+    assert len(eligible) == 1
+    assert eligible[0].branch == "wp/change-a/wp-001-mine"
+    assert eligible[0].branch != "feat/wp-001-foreign"

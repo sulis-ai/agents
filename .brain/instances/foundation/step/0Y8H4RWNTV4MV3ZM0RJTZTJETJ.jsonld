@@ -1,0 +1,22 @@
+{
+  "agent_instructions": "Run the UC-flow-coverage gate on a fixture where every flow has a covering scenario",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:0Y8H4RWNTV4MV3ZM0RJTZTJETJ",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_verify_uc_flow_coverage.py --fixture fully-covered\", \"expect_exit\": 0}",
+  "name": "0dttfckv-run-the-uc-flow-coverage-gate-on-a-fixtu-1",
+  "output_artifacts": [
+    "0dttfckv-run-the-uc-flow-coverage-gate-on-a-fixtu-1-result"
+  ],
+  "postconditions": [
+    "verdict is 'covered'",
+    "the scenario-required (#103) and journey-coverage (#86) gates also pass",
+    "the change may ship"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

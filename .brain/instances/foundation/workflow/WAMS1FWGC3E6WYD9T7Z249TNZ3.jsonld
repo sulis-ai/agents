@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:WAMS1FWGC3E6WYD9T7Z249TNZ3",
+  "initial_steps": [
+    "68zma829-produce-the-comprehensive-document-for-a-1"
+  ],
+  "name": "SC-15: The produced document always carries a STRIDE threat model",
+  "state": "draft",
+  "steps": [
+    "68zma829-produce-the-comprehensive-document-for-a-1",
+    "68zma829-assert-the-threat-model-section-has-the-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "68zma829-assert-the-threat-model-section-has-the-2"
+  ],
+  "transitions": [
+    "68zma829-produce-the-comprehensive-document-for-a-1 -> 68zma829-assert-the-threat-model-section-has-the-2"
+  ],
+  "type": "review"
+}

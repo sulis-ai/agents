@@ -1,0 +1,13 @@
+{
+  "journey": "agent creates an order via the tool surface",
+  "scenarios": [
+    {
+      "id": "SC-08",
+      "surface": "tool",
+      "hops": [
+        {"name": "create_order operation", "handler": "services/orders/handlers.py#create", "binding": "orders.servicespec.yaml#createOrder"},
+        {"name": "get_order operation", "handler": "services/orders/handlers.py#get", "binding": "orders.servicespec.yaml#getOrder"}
+      ]
+    }
+  ]
+}

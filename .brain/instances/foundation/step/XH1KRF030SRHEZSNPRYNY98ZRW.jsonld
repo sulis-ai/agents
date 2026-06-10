@@ -1,0 +1,22 @@
+{
+  "agent_instructions": "Run the gate on a fixture where only the main flow is covered and an exception flow is uncovered",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:XH1KRF030SRHEZSNPRYNY98ZRW",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_verify_uc_flow_coverage.py --fixture happy-path-only\", \"expect_exit\": 1}",
+  "name": "4k6svneh-run-the-gate-on-a-fixture-where-only-the-1",
+  "output_artifacts": [
+    "4k6svneh-run-the-gate-on-a-fixture-where-only-the-1-result"
+  ],
+  "postconditions": [
+    "the uncovered exception flow is flagged as a gap",
+    "verdict is 'gaps'",
+    "the happy-path-only bypass is closed"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

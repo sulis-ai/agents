@@ -253,6 +253,36 @@ jobs:
           git push origin "v${NEW_META}"
           echo "released sulis v${NEW_PLUGIN} (v${NEW_META}); tag v${NEW_META} pushed"
 
+      # Publish the GitHub Release HERE, not via the tag-triggered
+      # release-prod.yml (#110 / #148). GitHub's recursion guard deliberately
+      # does NOT fire `on: push: tags` workflows for a tag pushed with the
+      # default GITHUB_TOKEN, so release-prod never ran for these bot-pushed
+      # tags — ~48 tags landed with no Release page (latest published was
+      # v1.132.0 while tags reached v1.180.0). Publishing inline (same step's
+      # already-authenticated GITHUB_TOKEN can create a Release via the API,
+      # which is NOT gated by the workflow-recursion guard) closes that gap on
+      # every release. release-prod.yml stays as the fallback for a manual /
+      # PAT tag push; it simply no-ops here because the Release already exists
+      # (its `gh release create ... || gh release edit` is idempotent).
+      # Mirrors release-prod's notes derivation (CHANGELOG top section).
+      - name: Publish GitHub Release
+        if: steps.detect.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_META: ${{ steps.compute.outputs.new_meta }}
+        run: |
+          set -euo pipefail
+          TAG="v${NEW_META}"
+          NOTES_FILE=$(mktemp)
+          if [ -f plugins/sulis/CHANGELOG.md ]; then
+            awk '/^## /{c++} c==1{print} c==2{exit}' plugins/sulis/CHANGELOG.md > "$NOTES_FILE"
+          else
+            echo "Release $TAG" > "$NOTES_FILE"
+          fi
+          gh release create "$TAG" --title "$TAG" --notes-file "$NOTES_FILE" --verify-tag || \
+            gh release edit "$TAG" --notes-file "$NOTES_FILE"
+          echo "published GitHub Release $TAG"
+
       # Brain emission — Release entity for this tag-cut. Best-effort: a
       # missing brain dir / unavailable jsonschema MUST NOT unwind the
       # already-published release. The comprises[] list is empty for now

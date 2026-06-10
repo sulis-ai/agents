@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:SSP7FK3RTNHRF2FNH63BM44D9T",
+  "initial_steps": [
+    "a2k1mcf5-run-the-design-stage-journey-walk-on-a-f-1"
+  ],
+  "name": "SC-06: UI surface walk classifies every hop",
+  "state": "draft",
+  "steps": [
+    "a2k1mcf5-run-the-design-stage-journey-walk-on-a-f-1",
+    "a2k1mcf5-assert-the-ui-journey-walk-table-classif-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "a2k1mcf5-assert-the-ui-journey-walk-table-classif-2"
+  ],
+  "transitions": [
+    "a2k1mcf5-run-the-design-stage-journey-walk-on-a-f-1 -> a2k1mcf5-assert-the-ui-journey-walk-table-classif-2"
+  ],
+  "type": "review"
+}

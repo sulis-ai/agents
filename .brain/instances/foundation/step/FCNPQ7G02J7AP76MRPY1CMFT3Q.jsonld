@@ -1,0 +1,21 @@
+{
+  "agent_instructions": "Assert the Journey Walk section carries TWO tables (UI + tool) and the tool table classifies every tool operation in the journey",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:FCNPQ7G02J7AP76MRPY1CMFT3Q",
+  "input_artifacts": [
+    "2kjwzrz3-run-the-design-stage-journey-walk-on-a-f-1-result"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_assert_walk_table.py /tmp/sc08-tdd.md --surface tool --require-two-tables\", \"expect_exit\": 0}",
+  "name": "2kjwzrz3-assert-the-journey-walk-section-carries-2",
+  "output_artifacts": [
+    "2kjwzrz3-assert-the-journey-walk-section-carries-2-result"
+  ],
+  "postconditions": [
+    "a tool-surface table is present alongside the UI table",
+    "every tool operation is classified"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

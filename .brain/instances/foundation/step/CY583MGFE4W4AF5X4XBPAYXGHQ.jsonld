@@ -1,0 +1,22 @@
+{
+  "agent_instructions": "Run the UC-flow-coverage gate on a fixture with one flow that has no covering scenario and no out-of-scope record",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:CY583MGFE4W4AF5X4XBPAYXGHQ",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_verify_uc_flow_coverage.py --fixture one-uncovered-flow\", \"expect_exit\": 1}",
+  "name": "h2j8aqy6-run-the-uc-flow-coverage-gate-on-a-fixtu-1",
+  "output_artifacts": [
+    "h2j8aqy6-run-the-uc-flow-coverage-gate-on-a-fixtu-1-result"
+  ],
+  "postconditions": [
+    "verdict is 'gaps'",
+    "the gate BLOCKS the ship (non-zero exit)",
+    "the uncovered flow is reported in plain English"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

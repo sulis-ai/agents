@@ -9,9 +9,17 @@ lands).
 
 Usage:
     sulis-emit-decision --from-adr <path>
+                        [--kind {adr,bdr}]
+                        [--from-bdr]
                         [--base-dir <dir>]
                         [--domain <domain>]
                         [--repo-root <dir>]
+
+Kind discriminator (ADR-006, FR-17):
+    A Decision carries `kind ∈ {adr, bdr}` — a technical architecture decision
+    (ADR) or a business decision (BDR). `--kind` sets it explicitly (default
+    `adr`); `--from-bdr` is the convenience alias for `--kind bdr`. The two
+    are mutually exclusive.
 
 Defaults:
     --base-dir   <repo-root>/.brain/instances
@@ -80,7 +88,18 @@ def main() -> int:
     parser.add_argument(
         "--from-adr",
         required=True,
-        help="path to the ADR markdown file",
+        help="path to the ADR (or BDR) markdown file",
+    )
+    kind_group = parser.add_mutually_exclusive_group()
+    kind_group.add_argument(
+        "--kind",
+        choices=("adr", "bdr"),
+        help="decision-kind discriminator (default: adr)",
+    )
+    kind_group.add_argument(
+        "--from-bdr",
+        action="store_true",
+        help="read the decision as a business decision (alias for --kind bdr)",
     )
     parser.add_argument(
         "--base-dir",
@@ -110,8 +129,11 @@ def main() -> int:
 
     adapter = LocalFileEntityAdapter(base_dir=base_dir, domain=args.domain)
 
+    # --from-bdr is the convenience alias for --kind bdr; default is adr.
+    kind = "bdr" if args.from_bdr else args.kind
+
     try:
-        decision = emit_decision_from_adr(adr_path, adapter)
+        decision = emit_decision_from_adr(adr_path, adapter, kind=kind)
     except EntityValidationError as e:
         return _err(str(e))
     except FileNotFoundError as e:

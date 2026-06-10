@@ -44,7 +44,7 @@ Every WP MUST have:
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `id` | yes | Globally unique within the project. Format: `WP-NNN` (sequential within a change) or `WP-{SOURCE}-{NNN}` (e.g., `WP-HD-AA-001`). Conventional, not enforced — IDs in the same project just have to be unique. With `change_id:` populated, WP-NNN sequencing is per-change; cross-change collisions don't matter because the change_id disambiguates. |
+| `id` | yes | Globally unique within the project. Format: `WP-NNN` (sequential within a change) or `WP-{SOURCE}-{NNN}` (e.g., `WP-HD-AA-001`). Conventional, not enforced — IDs in the same project just have to be unique. With `change_id:` populated, WP-NNN sequencing is per-change; cross-change collisions don't matter because the change_id disambiguates. The branch ref realises this disambiguation: a WP's feature branch is `wp/{primitive}-{slug}/wp-{nnn}-{slug}`, scoping the branch to its change so the train resolver cannot match a foreign change's recycled WP number. See `change-work-standard.md` CW-04 and ADR-001 (change `wp-branch-collision`). |
 | `title` | yes | One-line plain-English summary. Founder-readable. |
 | `kind` | yes | One of: `backend` / `frontend` / `async` / `docs` / `infra` / `contract` / `composite`. Determines which executor + which verification gates apply. (`contract` is the producer/consumer seam — see WP-08.5.) |
 | `source` | yes | Where this WP came from: `hardening` / `feature` / `migration` / `refactor` / `observability` / `bug` / `manual`. Determines where the WP file lives within `.architecture/{project}/`. |
@@ -282,6 +282,33 @@ child_wps:
 > **Exemption.** Single-kind work and `--prototype` changes are exempt from
 > contract-first decomposition (`CONTRACT_FIRST_STANDARD.md` tier carve-out).
 
+### WP-08.6: Shared test fixtures (MUST)
+
+WP-08.5 pins the rule for shared *producer* artifacts across a contract
+seam. Test fixtures are the **same defect class with the seam removed** —
+two same-kind WPs can each author one logical fixture under divergent
+conventions (a directory + manifest vs a flat file) with no contract to
+serialise them. So fixtures get their own MUST:
+
+- **A test fixture consumed by more than one WP MUST be authored by exactly
+  ONE upstream WP.** Every consuming WP `dependsOn` that author. Two parallel
+  WPs MUST NOT independently author the same logical fixture.
+- **Every WP MUST list each new fixture path it creates** under a
+  `**Files created:**` entry in its `## Contract` (and as a
+  `fixtures_created:` frontmatter list — the machine-readable seam the
+  decompose-validation gate reads). This follows the same Contract
+  file-convention as any other created file: a WP declares what it brings
+  into existence so peers can see the overlap before it ships.
+
+The collision is invisible until bundled-tip CI, because a loader silently
+resolves one form (e.g. the directory) and the other WP's test breaks.
+`/sulis:plan-work` hoists a shared fixture to one upstream author exactly as
+it hoists a shared producer artifact (step 11, WP-08.5), and the
+decompose-validation rubric Phase 6 check **6.07** enforces it mechanically
+(dir-vs-file forms are normalised to a logical name before comparison).
+Anchor case #106: WP-001 authored `tests/fixtures/methodology/sample-tool-surface/`
+(dir + manifest) while WP-002 authored `sample-tool-surface.json` (flat file).
+
 ### WP-09: Loop-closed verification
 
 A WP MUST close its loop — i.e., prove the original finding is gone — before status advances from `done` → `closed`. The mechanism:
@@ -518,4 +545,6 @@ The chain is the empirical proof. No human attestation needed at any step — th
 | 1.0.0 | 2026-05-24 | Initial sulis-local definition. 11 requirements (WP-01..WP-11). Codifies the WP primitive that `sulis-execution` uses informally; documents the kind-based executor dispatch contract; introduces lineage (PROV-O-aligned vocabulary, no JSON-LD machinery), loop-closed verification, INDEX.md derivation, and composite/multi-kind composition rules. Per-kind execution details deferred to companion standards (WP_BACKEND_STANDARD, WP_FRONTEND_STANDARD, WP_ASYNC_STANDARD, WP_DOCS_STANDARD, WP_INFRA_STANDARD) — authored as each kind's executor is built. |
 | 1.1.0 | 2026-05-25 | Added the `change_id:` field to WP-01 Identity as part of Phase 4 of the change-as-primitive build (sulis v0.41.0). Optional for backwards-compat with legacy WPs; required for WPs created via `/sulis:change start` post-Phase 5. Field is a 26-character Crockford-base32 ULID linking the WP to its parent change. Per-change WP-NNN sequencing now disambiguated by change_id (cross-change collisions OK). |
 | 1.2.0 | 2026-05-26 | Wired CONTRACT_FIRST_STANDARD into decomposition. Added `contract` to the `kind:` enum + its WP-05 gates row (schema lints, examples cover happy/error/empty, ≥1 consumer mock). Added WP-08.5 — contract-first cross-kind decomposition: cross-kind composites MUST emit a `kind: contract` child first, kind-specific children depend on it (parallel, not sequential), integration child closes with the conformance check. User-facing seams pair the data contract with the visual contract (design artifact per UX_VISUAL_DESIGN_STANDARD UXD-14). Single-kind + `--prototype` exempt. |
+| 1.4.0 | 2026-06-10 | Branch-ref realisation of change_id disambiguation (change `wp-branch-collision`, #105/#106). The `id` row now states the WP feature-branch shape `wp/{primitive}-{slug}/wp-{nnn}-{slug}` and cross-references CW-04 + ADR-001. Backward-compatible: documents the implemented branch hierarchy; legacy `feat/wp-{nnn}-{slug}` branches still resolve via the journal + a one-release glob fallback. |
+| 1.5.0 | 2026-06-10 | Added WP-08.6 — shared test fixtures (MUST). A test fixture consumed by >1 WP is authored by exactly ONE upstream WP that consumers `dependsOn`; every WP MUST list new fixture paths it creates under `**Files created:**` in its Contract (and as a `fixtures_created:` frontmatter list). Same defect class as WP-08.5's shared producer artifacts, contract seam removed (test fixtures, same-kind WPs). Enforced mechanically by decompose-validation rubric Phase 6 check 6.07 (dir-vs-file forms normalised to a logical name). Anchor case #106: WP-001 `sample-tool-surface/` (dir+manifest) vs WP-002 `sample-tool-surface.json` (flat file). Additive only. |
 | 1.3.0 | 2026-06-09 | Seam-close DoD gate (CH-01KTP7). Added the seam-close DoD wording to WP-05: a seam-spanning (`kind: contract` / integration `kind: composite`) WP is not `done` until the seam-close gate reports `observed` (or a conscious `--allow-deferred` was recorded); a seam with no covering Scenario, or one needing a tier not yet live, is blocked (per CONTRACT_FIRST_STANDARD CF-12). Added the contract-WP `implements: [dna:requirement:…]` SHOULD field to WP-08.5 (the requirement bridge, ADR-004) — the seam-close gate resolves the seam to its covering Scenarios directly, with a journey-filtered fallback when the field is absent (SHOULD-not-MUST keeps legacy WPs working; `/sulis:plan-work` populates it going forward). Worked-shape contract child gains an `implements:` example line. Additive only — no existing requirement changed in meaning. |

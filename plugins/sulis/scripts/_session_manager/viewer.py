@@ -206,6 +206,10 @@ class _Viewer:
             # The master end is closed/torn down (the session ended) — a closed
             # PTY swallows the write rather than raising into the caller (§2.12.2).
             return
+        # A keystroke fed into the session is genuine in-use activity (#108): bump
+        # the idle clock so a session being actively typed into is not reaped by
+        # the maintenance tick just because it produced no OUTPUT in the window.
+        self._session.mark_active()
 
     def detach(self) -> None:
         """Detach this viewer; idempotent; LEAVES THE SESSION RUNNING (§2.12.3).

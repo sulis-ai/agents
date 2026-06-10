@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:Z3GK2ZMYWYVT3KA3TD8NKK6FF9",
+  "initial_steps": [
+    "h3hdwy2t-create-a-fixture-behavioural-change-and-1"
+  ],
+  "name": "SC-01: Comprehensive doc is produced even at lite depth",
+  "state": "draft",
+  "steps": [
+    "h3hdwy2t-create-a-fixture-behavioural-change-and-1",
+    "h3hdwy2t-assert-the-produced-document-contains-ev-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "h3hdwy2t-assert-the-produced-document-contains-ev-2"
+  ],
+  "transitions": [
+    "h3hdwy2t-create-a-fixture-behavioural-change-and-1 -> h3hdwy2t-assert-the-produced-document-contains-ev-2"
+  ],
+  "type": "review"
+}

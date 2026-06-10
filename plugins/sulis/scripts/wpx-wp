@@ -20,10 +20,13 @@ sys.path.insert(0, str(Path(__file__).parent))
 from _wpxlib import (  # noqa: E402
     add_common_args,
     cli_main,
+    current_change_scope,
     emit_error,
     emit_ok,
     paths_from_args,
     read_frontmatter,
+    _branch_name,
+    _wp_slug_from_file,
 )
 
 
@@ -91,6 +94,24 @@ def cmd_append_evidence(args: argparse.Namespace) -> None:
     emit_ok(data={"wp": args.wp, "path": str(wp_path)})
 
 
+def cmd_branch_name(args: argparse.Namespace) -> None:
+    """Emit the canonical WP feature-branch name (ADR-001).
+
+    Single source of truth for the MINTED branch: the executor skill
+    (run-wp / run-all) calls this instead of hand-templating ``feat/wp-NNN``,
+    so newly minted branches carry the change-scoped ``wp/{scope}/`` shape and
+    the resolver scoping (WP-003/004) actually engages. Resolves the change
+    identity via ``current_change_scope`` (None → legacy ``feat/...`` shape).
+    """
+    paths = paths_from_args(args)
+    slug = _wp_slug_from_file(paths.wp_dir, args.wp)
+    if slug is None:
+        emit_error(f"no WP file found at {paths.wp_dir}/{args.wp}-*.md")
+        return  # for type-checker; emit_error sys.exits
+    scope = current_change_scope(paths.repo_root)
+    emit_ok(data={"branch": _branch_name(args.wp, slug, scope)})
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Read WP frontmatter; append acceptance evidence."
@@ -114,12 +135,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Evidence as JSON (or @/path/to/file.json)"
     )
 
+    p_branch = sub.add_parser(
+        "branch-name",
+        help="Emit the canonical WP branch name (ADR-001): "
+             "wp/{primitive}-{slug}/wp-NNN-<slug> in a change, else "
+             "legacy feat/wp-NNN-<slug>",
+    )
+    add_common_args(p_branch)
+    p_branch.add_argument("--wp", required=True)
+
     return parser
 
 
 HANDLERS = {
     "read-frontmatter": cmd_read_frontmatter,
     "append-evidence": cmd_append_evidence,
+    "branch-name": cmd_branch_name,
 }
 
 

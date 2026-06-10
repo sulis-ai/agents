@@ -205,6 +205,22 @@ commands:
 - `deploy_target` is retained as a back-compat alias (`none` ⟺ a
   non-deployable single profile) so existing checker code and external
   scripts keep reading; but `profile` / `artifacts` is authoritative.
+- `branch_convention` (**optional**) declares how `sulis-change` names the
+  branch it cuts for a new change. A repo MAY set it to match its existing
+  branch-naming convention (CP-01 priority-0: defer to the host repo's prior
+  art). It accepts a template with `{primitive}` and `{slug}` placeholders —
+  e.g. `feature/{slug}` or `work/{primitive}-{slug}` — or a bare prefix
+  ending in `/` (e.g. `feature/`), which composes `<prefix>{slug}`.
+  **Default when absent: `change/{primitive}-{slug}`** — byte-for-byte the
+  legacy CW-02 name, so a repo that does not set the key (including this
+  marketplace) sees **zero** behaviour change. Change identity is
+  store-backed (each change has a ULID + a recorded `branch` field), so the
+  `change/` prefix is an annotation/discovery fallback, not the source of
+  truth: change tooling discovers branches under BOTH the configured prefix
+  and the legacy `change/*` prefix (dual-prefix, mirroring the WP-branch
+  resolution). WP branches are unaffected — they keep their
+  `wp/{change_scope}/wp-NNN-…` naming regardless of this key (the
+  `change_scope` derives from the change's primitive+slug, not its branch).
 
 ### Rule Applicability Matrix (the heart of the contract)
 

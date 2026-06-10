@@ -1,0 +1,15 @@
+{
+  "journey": "sign-in round-trip (gap)",
+  "scenarios": [
+    {
+      "id": "SC-07",
+      "surface": "ui",
+      "hops": [
+        {"name": "click sign-in", "component": "apps/cockpit/SignIn.tsx#onClick"},
+        {"name": "redirect to provider", "component": "apps/cockpit/auth.ts#redirect"},
+        {"name": "callback exchanges code for token"},
+        {"name": "authenticated call returns real data", "component": "apps/cockpit/api.ts#me"}
+      ]
+    }
+  ]
+}

@@ -17,6 +17,7 @@ Subprocess + platform are mocked throughout — no real terminal is spawned.
 from __future__ import annotations
 
 import json
+import shlex
 import stat
 import subprocess
 from pathlib import Path
@@ -224,6 +225,81 @@ def test_generated_script_scrub_does_not_spam_readonly_errors(tmp_path):
         f"env-scrub spammed readonly-var errors: stderr={result.stderr!r}"
     )
     assert "cannot unset" not in result.stderr
+
+
+# ─── #107: a stale inherited SULIS_CHANGE_ID must never win ────────────────
+# The bug: a newly-spawned change window inherited a STALE SULIS_CHANGE_ID
+# (from the cockpit's background service env / Terminal.app retained env). The
+# launch.sh `export SULIS_CHANGE_ID=...` set it in the shell env, but the
+# inherited value re-shadowed it inside claude's interactive shell, so the
+# session bound to the WRONG change. Fix: set the new id DIRECTLY on the
+# exec'd process via `env SULIS_CHANGE_ID=<id> ...`, plus `unset` before the
+# export — so nothing inherited can shadow it.
+
+
+def test_build_launch_script_unsets_before_exporting_change_id(tmp_path):
+    """Belt-and-braces: the stale value is unset before the authoritative
+    export, so a re-shadowed inherited value can't survive the export line."""
+    script = tl._build_launch_script(_GOOD_ULID, tmp_path)
+    unset_idx = script.index("unset SULIS_CHANGE_ID")
+    export_idx = script.index(f'export SULIS_CHANGE_ID="{_GOOD_ULID}"')
+    assert unset_idx < export_idx
+
+
+def test_exec_line_sets_change_id_on_the_process_default_viewer(tmp_path):
+    """The viewer (default) exec line must carry `env SULIS_CHANGE_ID=<new>` so
+    the id is set on the viewer's OWN process, not just an env a child shell can
+    re-shadow."""
+    script = tl._build_launch_script(_GOOD_ULID, tmp_path)
+    exec_line = next(ln for ln in script.splitlines() if ln.startswith("exec "))
+    assert f"env SULIS_CHANGE_ID={shlex.quote(_GOOD_ULID)}" in exec_line
+
+
+def test_exec_line_sets_change_id_on_the_process_chat_style(tmp_path):
+    """The chat-style claude exec line must likewise carry
+    `env SULIS_CHANGE_ID=<new>` on claude's own process."""
+    script = tl._build_launch_script(
+        _GOOD_ULID, tmp_path,
+        entry_command="claude --dangerously-skip-permissions --agent sulis",
+    )
+    exec_line = next(ln for ln in script.splitlines() if ln.startswith("exec "))
+    assert f"env SULIS_CHANGE_ID={shlex.quote(_GOOD_ULID)}" in exec_line
+    assert "claude" in exec_line
+
+
+def test_generated_script_binds_new_id_even_with_stale_in_env(tmp_path):
+    """End-to-end RED→GREEN: run the generated script under bash with a STALE
+    SULIS_CHANGE_ID pre-set and a stubbed `claude` that echoes the id its own
+    process sees. The process MUST see the NEW id, not the stale one."""
+    stale = "01HSTALE00000000000000000Z"
+    # A stub `claude` on PATH that prints whatever SULIS_CHANGE_ID its process
+    # was launched with. entry_command must pass the lowercase whitelist.
+    stub_dir = tmp_path / "bin"
+    stub_dir.mkdir()
+    stub = stub_dir / "claude"
+    stub.write_text('#!/usr/bin/env bash\nprintf "id=%s\\n" "$SULIS_CHANGE_ID"\n')
+    stub.chmod(0o755)
+    script = tl._build_launch_script(
+        _GOOD_ULID, tmp_path, entry_command="claude",
+    )
+    script_path = tmp_path / "launch.sh"
+    script_path.write_text(script)
+    env = {
+        "SULIS_CHANGE_ID": stale,
+        "PATH": f"{stub_dir}:/usr/bin:/bin",
+        "HOME": str(tmp_path),
+    }
+    result = subprocess.run(
+        ["bash", str(script_path)],
+        capture_output=True, text=True, cwd=str(tmp_path), env=env,
+    )
+    assert result.returncode == 0, f"script aborted: stderr={result.stderr!r}"
+    assert f"id={_GOOD_ULID}" in result.stdout, (
+        f"claude bound to the wrong change; stdout={result.stdout!r}"
+    )
+    assert stale not in result.stdout, (
+        f"stale id leaked into claude's process; stdout={result.stdout!r}"
+    )
 
 
 # ─── WP-002: _launch_macos ────────────────────────────────────────────────
@@ -437,6 +513,22 @@ def test_launch_change_terminal_writes_session_json_on_spawn(tmp_path, monkeypat
     # has a real handle and never trusts a known-dead launcher pid.
     assert payload["pid_kind"] == "session"
     assert payload["tty"] == "/dev/ttys009"
+
+
+def test_session_json_records_claude_session_id(tmp_path, monkeypatch):
+    """At first spawn the change's deterministic pinned Claude session id is
+    recorded in session.json (focus-resumes-prior-session, Step 2c). It is the
+    same id the pty adapter pins via ``--session-id`` and the focus path resumes
+    via ``--resume`` — recording it makes the binding auditable/discoverable."""
+    import _change_session as cs
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    with mock.patch.object(tl.platform, "system", return_value="Darwin"), \
+            mock.patch.object(tl, "_launch_macos",
+                              side_effect=lambda sp, cid, vis: _spawned_dict(sp)):
+        result = tl.launch_change_terminal(_GOOD_ULID, tmp_path)
+    payload = json.loads(Path(result["session_json_path"]).read_text())
+    assert payload["claude_session_id"] == cs.change_session_id(_GOOD_ULID)
 
 
 def test_launch_change_terminal_does_not_write_session_json_on_failure(tmp_path, monkeypatch):

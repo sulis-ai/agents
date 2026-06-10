@@ -124,6 +124,38 @@ Reason for the choice.
 Mostly positive.
 """
 
+# A business decision (BDR). The body shape matches an ADR — the
+# discriminator is the `kind`, supplied by the caller (`--from-bdr` /
+# `--kind bdr`), not inferred from the markdown. ADR-006: `kind` is a
+# discriminator on the existing decision entity, not a new entity type.
+_BDR_BODY = """---
+id: BDR-001
+title: Ship the three phases in sequence
+status: accepted
+change_id: 01KSWBWMCFTVB52NGGVAAQBA7R
+date: 2026-05-30
+---
+
+# BDR-001 — Ship the three phases in sequence
+
+## Decision
+
+Ship P1, then P2, then P3 — each phase independently reversible.
+
+## Context
+
+A single big-bang cutover couples three unrelated risk surfaces.
+
+## Options Considered
+
+- Big-bang all three phases at once — rejected; couples risk.
+- Phased P1 → P2 → P3 — chosen; each phase reverts independently.
+
+## Consequences
+
+Slower to full feature, but each phase de-risks the next.
+"""
+
 
 # ─── pure-transformation tests ────────────────────────────────────────────
 
@@ -131,10 +163,22 @@ Mostly positive.
 class TestComposeDecisionFromAdr:
     """`compose_decision_from_adr` is pure — text in, Decision dict out. No I/O."""
 
-    def test_reuses_change_id_from_frontmatter_when_present(self) -> None:
+    def test_mints_a_fresh_ulid_id_even_when_change_id_present(self) -> None:
+        # WP-012 collision fix: the @id used to be derived from `change_id`
+        # (`dna:decision:{change_id}`), so two decisions in the same change
+        # collapsed to the same @id and overwrote each other on disk. Each
+        # emitted decision now gets its OWN fresh ULID — distinctness is the
+        # invariant, change-traceability moves off the primary id.
         d = compose_decision_from_adr(_ADR_WITH_CHANGE_ID)
 
-        assert d["id"] == "dna:decision:01KSQNPBPN7W74QVAZ25F79RNH"
+        # The @id is a fresh ULID, NOT the change_id verbatim.
+        assert d["id"] != "dna:decision:01KSQNPBPN7W74QVAZ25F79RNH"
+        # Schema pattern: dna:decision:<26 Crockford-base32 chars>
+        import re
+
+        assert re.fullmatch(
+            r"^dna:decision:[0-9A-HJKMNP-TV-Z]{26}$", d["id"]
+        ), f"id failed schema pattern: {d['id']}"
 
     def test_generates_fresh_ulid_when_change_id_missing(self) -> None:
         d = compose_decision_from_adr(_ADR_NO_CHANGE_ID)
@@ -212,17 +256,22 @@ class TestEmitDecisionFromAdr:
 
         decision = emit_decision_from_adr(adr_path, adapter)
 
-        # Returned decision dict matches what got persisted.
-        assert decision["id"] == "dna:decision:01KSQNPBPN7W74QVAZ25F79RNH"
+        # The @id is a fresh ULID (WP-012 collision fix), not the change_id.
+        import re
 
-        # And the file is on disk under the canonical path.
+        assert re.fullmatch(
+            r"^dna:decision:[0-9A-HJKMNP-TV-Z]{26}$", decision["id"]
+        ), f"id failed schema pattern: {decision['id']}"
+
+        # And the file is on disk under the canonical path derived from that id.
+        ulid = decision["id"].rsplit(":", 1)[-1]
         written = (
             tmp_path
             / ".brain"
             / "instances"
             / "product-development"
             / "decision"
-            / "01KSQNPBPN7W74QVAZ25F79RNH.jsonld"
+            / f"{ulid}.jsonld"
         )
         assert written.exists(), f"expected file at {written}"
 
@@ -249,3 +298,113 @@ Something.
 
         # The error must surface that the required `decision` field is missing.
         assert "decision" in str(exc_info.value).lower()
+
+
+# ─── WP-012 — ADR/BDR kind discriminator (FR-17, ADR-006) ──────────────────
+
+
+class TestKindDiscriminator:
+    """A decision carries `kind ∈ {adr, bdr}`; absent reads as `adr` (§9.1)."""
+
+    def test_emit_bdr_carries_kind_bdr(self) -> None:
+        # SC-17 core: a business decision composed with kind=bdr carries
+        # `kind: bdr`, distinct from a technical ADR (kind defaults to adr).
+        bdr = compose_decision_from_adr(_BDR_BODY, kind="bdr")
+        adr = compose_decision_from_adr(_ADR_WITH_CHANGE_ID)
+
+        assert bdr["kind"] == "bdr"
+        assert adr["kind"] == "adr"
+        assert bdr["kind"] != adr["kind"]
+
+    def test_explicit_kind_adr_round_trips(self) -> None:
+        adr = compose_decision_from_adr(_ADR_WITH_CHANGE_ID, kind="adr")
+
+        assert adr["kind"] == "adr"
+
+    def test_absent_kind_reads_as_adr(self) -> None:
+        # Migration §9.1: a decision composed without a kind defaults to `adr`,
+        # so existing decision/*.jsonld need no rewrite.
+        d = compose_decision_from_adr(_ADR_WITH_CHANGE_ID)
+
+        assert d["kind"] == "adr"
+
+    def test_out_of_enum_kind_is_rejected(self) -> None:
+        with pytest.raises(ValueError, match="kind must be one of"):
+            compose_decision_from_adr(_ADR_WITH_CHANGE_ID, kind="strategy")
+
+    def test_emitted_bdr_persists_and_validates_against_schema(
+        self, tmp_path: Path
+    ) -> None:
+        # The additive-optional `kind` enum must pass the vendored compiled
+        # schema's validation (the validating adapter reads it on save).
+        adapter = LocalFileEntityAdapter(
+            base_dir=tmp_path / ".brain" / "instances",
+            domain="product-development",
+        )
+        bdr_path = tmp_path / "BDR-001.md"
+        bdr_path.write_text(_BDR_BODY)
+
+        decision = emit_decision_from_adr(bdr_path, adapter, kind="bdr")
+
+        assert decision["kind"] == "bdr"
+        ulid = decision["id"].rsplit(":", 1)[-1]
+        written = (
+            tmp_path
+            / ".brain"
+            / "instances"
+            / "product-development"
+            / "decision"
+            / f"{ulid}.jsonld"
+        )
+        assert written.exists(), f"expected persisted BDR at {written}"
+
+
+class TestMultiDecisionNoIdCollision:
+    """The bundled fix: ≥2 decisions in one run get distinct `@id`s."""
+
+    def test_multi_decision_emit_no_id_collision(self, tmp_path: Path) -> None:
+        # Two ADRs sharing the SAME change_id used to collapse to one @id
+        # (`dna:decision:{change_id}`) and overwrite each other on disk. After
+        # the fix each emission mints its own ULID, so both persist distinctly.
+        adapter = LocalFileEntityAdapter(
+            base_dir=tmp_path / ".brain" / "instances",
+            domain="product-development",
+        )
+
+        # Both ADRs carry the SAME change_id frontmatter (a change that
+        # produced two ADRs) — the exact pre-fix collision trigger.
+        shared_change_id_adr_a = _ADR_WITH_CHANGE_ID
+        shared_change_id_adr_b = _ADR_WITH_CHANGE_ID.replace(
+            "title: Decouple integration from release via changesets",
+            "title: A second decision in the same change",
+        )
+        assert "01KSQNPBPN7W74QVAZ25F79RNH" in shared_change_id_adr_b
+
+        adr_a = tmp_path / "ADR-A.md"
+        adr_a.write_text(shared_change_id_adr_a)
+        adr_b = tmp_path / "ADR-B.md"
+        adr_b.write_text(shared_change_id_adr_b)
+
+        d_a = emit_decision_from_adr(adr_a, adapter)
+        d_b = emit_decision_from_adr(adr_b, adapter)
+
+        # Distinct @ids.
+        assert d_a["id"] != d_b["id"], "two decisions collided on the same @id"
+
+        # Both files survive on disk (no overwrite).
+        decision_dir = (
+            tmp_path / ".brain" / "instances" / "product-development" / "decision"
+        )
+        persisted = sorted(decision_dir.glob("*.jsonld"))
+        assert len(persisted) == 2, (
+            f"expected 2 distinct decision files, found {len(persisted)}: "
+            f"{[p.name for p in persisted]}"
+        )
+
+    def test_compose_twice_same_source_yields_distinct_ids(self) -> None:
+        # Even composing the identical ADR text twice yields distinct @ids —
+        # id minting is per-emission, never a function of the source content.
+        first = compose_decision_from_adr(_ADR_WITH_CHANGE_ID)
+        second = compose_decision_from_adr(_ADR_WITH_CHANGE_ID)
+
+        assert first["id"] != second["id"]

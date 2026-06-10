@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:Q42DK37AJNDCDT6Z7T4BHXNYMX",
+  "initial_steps": [
+    "nnq39n2s-produce-the-comprehensive-document-for-a-1"
+  ],
+  "name": "SC-05: NFR section is always present with measurable targets",
+  "state": "draft",
+  "steps": [
+    "nnq39n2s-produce-the-comprehensive-document-for-a-1",
+    "nnq39n2s-assert-the-nfr-section-carries-at-least-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "nnq39n2s-assert-the-nfr-section-carries-at-least-2"
+  ],
+  "transitions": [
+    "nnq39n2s-produce-the-comprehensive-document-for-a-1 -> nnq39n2s-assert-the-nfr-section-carries-at-least-2"
+  ],
+  "type": "review"
+}

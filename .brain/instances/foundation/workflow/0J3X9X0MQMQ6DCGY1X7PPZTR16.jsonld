@@ -1,0 +1,21 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:0J3X9X0MQMQ6DCGY1X7PPZTR16",
+  "initial_steps": [
+    "dg6zkaan-run-the-tool-surface-walk-on-a-fixture-w-1"
+  ],
+  "name": "SC-09: A tool handler without a ServiceSpec binding is a GAP, not EXISTS",
+  "state": "draft",
+  "steps": [
+    "dg6zkaan-run-the-tool-surface-walk-on-a-fixture-w-1"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "dg6zkaan-run-the-tool-surface-walk-on-a-fixture-w-1"
+  ],
+  "transitions": [
+    "dg6zkaan-run-the-tool-surface-walk-on-a-fixture-w-1 -> end"
+  ],
+  "type": "review"
+}

@@ -242,6 +242,32 @@ describe("POST /start-from-intent — confirm gate (FR-N6) + start at Recon (FR-
     expect(runner.startCalls[0]?.slug).toBeTruthy();
   });
 
+  it("the confirm forwards the founder's intent to the runner VERBATIM (no rewrite)", async () => {
+    // The intent-contamination lock: the runner is the `--intent` carrier, so
+    // the value it receives MUST be the founder's words byte-for-byte — never a
+    // paraphrase or the agent's turn-state spliced in. The cockpit hook carries
+    // the intent onto the confirm turn (useStartFromIntent.confirm); the route +
+    // orchestrator forward it to runner.start unchanged.
+    const VERBATIM = "fix the wobbly login redirect FOUNDER_VERBATIM_SENTINEL";
+    const runner = fakeRunner();
+    const app = appWith({ runner });
+    const proposeRes = await request(app)
+      .post(ENDPOINT)
+      .send({ phase: "propose", productId: PRODUCT_ID, intent: VERBATIM });
+    const token = tokenFromProposal(proposeRes.text);
+    await request(app)
+      .post(ENDPOINT)
+      .send({
+        phase: "confirm",
+        productId: PRODUCT_ID,
+        confirmToken: token,
+        intent: VERBATIM,
+      });
+
+    expect(runner.startCalls.length).toBe(1);
+    expect(runner.startCalls[0]?.intent).toBe(VERBATIM);
+  });
+
   it("a confirm with a STALE token ⇒ 422 START_CONFIRM_STALE, starts nothing (FR-N6)", async () => {
     const runner = fakeRunner();
     const app = appWith({ runner });

@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:JQ891MRHK53T1ZJ9RWN6545T7J",
+  "initial_steps": [
+    "x8jbk3yx-produce-the-comprehensive-document-and-t-1"
+  ],
+  "name": "SC-19: The tool-surface walk's operations are a subset of the interface contract (contract-first)",
+  "state": "draft",
+  "steps": [
+    "x8jbk3yx-produce-the-comprehensive-document-and-t-1",
+    "x8jbk3yx-assert-every-operation-in-the-tool-walk-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "x8jbk3yx-assert-every-operation-in-the-tool-walk-2"
+  ],
+  "transitions": [
+    "x8jbk3yx-produce-the-comprehensive-document-and-t-1 -> x8jbk3yx-assert-every-operation-in-the-tool-walk-2"
+  ],
+  "type": "review"
+}

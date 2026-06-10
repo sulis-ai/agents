@@ -96,7 +96,8 @@ literal path at each `"$SCRIPTS_DIR/sulis-change"` call — environment
 variables do NOT persist between Bash tool invocations in Claude Code.
 
 The Python helpers `launch_change_terminal` (in `_terminal_launcher.py`),
-`resolve_current_change` + `back_integrate_change_branch` (in `_wpxlib.py`)
+`resolve_current_change` + `back_integrate_change_branch` (in `_wpxlib.py`),
+and `has_resumable_transcript` (in `_change_session.py`, used by `focus`)
 are invoked via a `python3 -c` one-liner with `sys.path` pointed at
 `$SCRIPTS_DIR` (examples in each subcommand below).
 
@@ -160,6 +161,22 @@ before running anything:
   --intent "fix the login bug" \
   --spawn
 ```
+
+> **`--intent` MUST be the founder's own words, copied VERBATIM (MUST).**
+> `--intent` is the literal text the founder typed when asking to start the
+> change — copied exactly, trimmed only of surrounding whitespace. It is the
+> brief the spawned session opens on and the record it self-orients from, so it
+> MUST be the founder's words and **never** the agent's. **Do NOT** put a
+> paraphrase, a summary, a derived sentence, the plan sentence from step 4, a
+> greeting, an acknowledgement, or ANY other model-generated text into
+> `--intent` — and never concatenate the founder's words with your own
+> turn-state (greeting + plan + reply). If your reply this turn contained a
+> greeting or a plan, none of that belongs in `--intent`: only the founder's
+> request does. **If you have no founder text to copy** (e.g. the founder said
+> only "start a change"), ask the founder for one line describing the work and
+> use that verbatim — do **not** synthesize an intent. The `--slug` and
+> `--primitive` are agent-*derived* (steps 1-2) and stay so; `--intent` alone
+> is the founder's verbatim copy.
 
 `--spawn` is what opens the desktop window: the tool creates the
 `change/{primitive}-{slug}` branch + a dedicated worktree, writes the
@@ -262,8 +279,12 @@ say so plainly and offer `list`:
   > terminal (started 12 min ago). Switch to that window to pick up where
   > you left off."*
 
-- **No live session** (no `session.json`, or the `pid` is dead): re-spawn
-  with the same change context. Echo first (Rule 3), then call
+- **No live session** (no `session.json`, or the `pid` is dead): re-open
+  with the same change context. **If you worked on this before, it picks up
+  right where you left off** — the same conversation, history and all —
+  instead of starting over. The first time round (or if there's nothing to
+  pick up from), it starts fresh and orients itself from the change's notes.
+  This happens automatically; you don't choose. Echo first (Rule 3), then call
   `launch_change_terminal` directly:
 
   ```bash
@@ -287,7 +308,35 @@ say so plainly and offer `list`:
   a richer brief, which still wins. If you ever want a custom reopen brief,
   pass `pre_prompt="…"`; otherwise the default auto-start is the floor.
 
-  Then:
+  **Resume happens automatically when there's a prior conversation.** The
+  reopened window resumes the change's previous conversation when one exists
+  on disk, so the founder picks up where they left off (full history); when
+  there's none, it's the fresh self-orienting start above. This is decided by
+  the desktop viewer at attach time (it sets the resume handle on the session
+  it spawns), so the focus path does not pass anything extra — the same call
+  covers both cases.
+
+  To choose which message to show, check whether there's a prior conversation
+  to resume (the same signal the viewer uses):
+
+  ```bash
+  python3 -c "
+  import sys; sys.path.insert(0, '$SCRIPTS_DIR')
+  import _change_session as cs
+  print(cs.has_resumable_transcript('01HQ8XQM8G5KZGZQXPZD8H6PJ7', '/abs/path/to/worktree'))
+  "
+  ```
+
+  `True` → resuming; `False` → fresh start. (The viewer makes the real
+  decision at attach time on the same signal; this check is only so the
+  founder-facing line matches what's about to happen.)
+
+  Then, when it's resuming a prior conversation:
+
+  > *"Picking up **fix the login bug** (`CH-01HQ8X`) right where you left
+  > off — your last conversation is coming back up."*
+
+  …or, the first time round (nothing to resume):
 
   > *"Reopening **fix the login bug** (`CH-01HQ8X`) — a fresh terminal is
   > coming up, focused on this work."*
@@ -779,16 +828,26 @@ git -C "$(git worktree list --porcelain | awk '/^worktree /{p=$2} /^branch refs\
   || { git checkout main && git pull origin main; }
 ```
 
-**6. Mark the change as shipped, and tidy the workspace (#38/#56).** Flips
-`stage='shipped'`, pins `shipped_sha` (the branch tip — "the state it was in
-when we shipped"), and **removes the now-redundant worktree** (kept if a live
-session is bound or if there's uncommitted work). The branch + record stay;
+**6. Mark the change as shipped, and tidy the workspace (#38/#56/#111).** First
+the tool **confirms the change actually merged to `main`** — it looks for the
+merged PR from step 5 (`gh pr list --head <branch> --base main --state merged`)
+and pins `shipped_sha` to the **merge commit on `main`** (the true shipped
+state, not the local branch tip — a squash-merge orphans the branch tip). Then
+it flips `stage='shipped'` and **removes the now-redundant worktree** (kept if a
+live session is bound or if there's uncommitted work). The branch + record stay;
 `recreate` brings the worktree back on demand:
 
 ```bash
 "$SCRIPTS_DIR/sulis-change" mark-shipped --handle CH-01HQ8X \
   --repo-root <main-repo-root>
 ```
+
+If the merge can't be confirmed (no merged PR), the tool **refuses** and exits
+non-zero — it will not mark a change shipped that never landed (the #110 harm:
+a change marked shipped + branch deleted while the merge never landed). For a
+**manual** merge with no PR, pass `--merge-sha <the merge commit on main>` (it's
+verified to be an ancestor of `origin/main`). Only for genuine edge cases,
+`--force` overrides the guard and records the override on the change record.
 
 **7. Report** (include the lessons captured at step 4.6 and the release note
 recorded at step 4.7, if any):
@@ -977,6 +1036,15 @@ them the dashboard updates on its own as work progresses, and point them at
 
 ## Gotchas
 
+- **`--intent` is the founder's VERBATIM words — never your own.** At `start`,
+  `--intent` carries the literal text the founder typed, trimmed only of
+  surrounding whitespace. Never splice your turn-state into it: a greeting
+  ("I'm ready to help…"), the plan sentence you echoed in step 4, an
+  acknowledgement, or any paraphrase must NOT end up in `--intent`. The classic
+  leak is the agent's own reply getting concatenated into the middle of the
+  brief — the spawned session then opens on a contaminated intent. The slug and
+  primitive are agent-derived and correct; only the intent is a verbatim copy.
+  If there's no founder text to copy, ask for one line — don't synthesize.
 - **Operator vocabulary must not leak into what the founder reads.** The
   tools emit `branch`, `worktree_path`, `base_sha`, `change_id`,
   `spawn_result.status`. Translate at the seam: lead with the readable name
@@ -1057,6 +1125,13 @@ them the dashboard updates on its own as work progresses, and point them at
   founder sees a change.
 - **Slug** — the short kebab-case name a founder recognises
   (`fix-login-bug`); part of the branch name.
+- **Intent** — the founder's own one-line description of the work, copied
+  VERBATIM into `--intent` at `start` (trimmed only of surrounding whitespace).
+  It is the brief the change's session opens on. It is **always the founder's
+  words, never the agent's** — never a paraphrase, plan sentence, greeting, or
+  any model-generated text. When no founder text is available, ask for one line
+  rather than synthesizing one. (Unlike the slug and primitive, which the agent
+  derives, the intent is a faithful copy.)
 - **Primitive** — the kind of change, from the 22-primitive vocabulary
   (`../../references/change-primitives.md`); translated to a plain noun in
   founder-mode ("bug fix", "new feature", "restructuring").

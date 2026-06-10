@@ -682,6 +682,113 @@ def validate_cross_kind_contract_wiring(wps: list[dict]) -> list[str]:
     return violations
 
 
+def _fixture_logical_name(path: str) -> str:
+    """Normalise a fixture path to its LOGICAL name so dir-vs-file forms of
+    the same fixture compare equal.
+
+    The fixture-shape-collision class (#106): one WP authors `x/` (a
+    directory + manifest), another authors `x.json` (a flat file) — the same
+    logical fixture under divergent conventions. To detect the collision we
+    strip a trailing slash and a single file extension, so
+    ``sample-tool-surface/`` and ``sample-tool-surface.json`` both normalise
+    to ``.../sample-tool-surface``. Directory separators are preserved, so two
+    fixtures of the same basename in different directories do NOT collide.
+    """
+    name = path.strip().rstrip("/")
+    base = name.rsplit("/", 1)[-1]
+    if "." in base:
+        # Strip exactly ONE trailing extension (the dir-vs-file equaliser);
+        # a leading-dot dotfile (no name before the dot) keeps its name.
+        stem, _, _ext = base.rpartition(".")
+        if stem:
+            prefix = name[: len(name) - len(base)]
+            name = prefix + stem
+    return name
+
+
+def validate_fixture_collisions(wps: list[dict]) -> list[str]:
+    """Return a list of shared-fixture collision violations for a WP set
+    (empty = pass). Pure; operates on WP frontmatter dicts ({id, dependsOn,
+    fixtures_created}).
+
+    The peer-collision check for TEST FIXTURES — the same structural defect as
+    the contract-seam check (two parallel WPs independently authoring one
+    logical thing), but with the contract seam removed: same-kind WPs, no
+    producer/consumer contract. Anchor case #106 / CH-01KTRJ: WP-001 authored
+    ``tests/fixtures/methodology/sample-tool-surface/`` (dir + manifest) while
+    WP-002 authored ``tests/fixtures/methodology/sample-tool-surface.json``
+    (flat file); the loader silently resolved the dir form and broke WP-002's
+    test at bundled-tip CI.
+
+    Two WPs COLLIDE on a fixture when:
+      1. both declare a ``fixtures_created`` path that normalises to the same
+         logical name (``_fixture_logical_name`` strips a trailing slash + a
+         single extension, so dir-vs-file forms compare equal), AND
+      2. neither WP (transitively) ``dependsOn`` the other — i.e. they are
+         parallel-batch peers, not a serialised author→consumer pair.
+
+    Remedy (surfaced in the rubric): serialize (one WP ``dependsOn`` the
+    other) or hoist a single fixture-authoring upstream WP both consumers
+    ``dependsOn``.
+    """
+    # Build id -> fixtures and id -> direct deps.
+    fixtures_by_id: dict[str, set[str]] = {}
+    deps_by_id: dict[str, list[str]] = {}
+    for wp in wps:
+        wid = str(wp.get("id", "")).strip()
+        if not wid:
+            continue
+        deps_by_id[wid] = _as_str_list(wp.get("dependsOn"))
+        logical = {
+            _fixture_logical_name(p)
+            for p in _as_str_list(wp.get("fixtures_created"))
+            if _fixture_logical_name(p)
+        }
+        if logical:
+            fixtures_by_id[wid] = logical
+
+    def _reachable(start: str) -> set[str]:
+        """Transitive dependency closure of ``start`` (the WPs it waits on)."""
+        seen: set[str] = set()
+        stack = list(deps_by_id.get(start, []))
+        while stack:
+            dep = stack.pop()
+            if dep in seen:
+                continue
+            seen.add(dep)
+            stack.extend(deps_by_id.get(dep, []))
+        return seen
+
+    def _serialised(a: str, b: str) -> bool:
+        return b in _reachable(a) or a in _reachable(b)
+
+    # logical fixture name -> WP ids that author it.
+    authors_by_fixture: dict[str, list[str]] = {}
+    for wid, logical in fixtures_by_id.items():
+        for name in logical:
+            authors_by_fixture.setdefault(name, []).append(wid)
+
+    violations: list[str] = []
+    for name, authors in authors_by_fixture.items():
+        if len(authors) < 2:
+            continue
+        ordered = sorted(authors)
+        for i, a in enumerate(ordered):
+            for b in ordered[i + 1:]:
+                if _serialised(a, b):
+                    continue
+                violations.append(
+                    f"{a} and {b} both author the fixture `{name}` under "
+                    f"divergent conventions (dir-vs-file forms resolve to the "
+                    f"same logical name) and neither dependsOn the other. Two "
+                    f"parallel WPs MUST NOT independently author one logical "
+                    f"fixture (#106). Remedy: serialize (one dependsOn the "
+                    f"other) or hoist a single fixture-authoring upstream WP "
+                    f"both consumers dependsOn."
+                )
+    return violations
+
+
 # ─── Repository contract (RC v0.3.0 profile model) — L-05 ───────────────
 #
 # Promoted from wpx-arrival-check._read_contract so the pipeline, the train,
@@ -702,12 +809,15 @@ def read_repo_contract(repo_root: Path) -> dict:
     """Parse `.sulis/repo-contract.yml` into a normalised dict.
 
     Returns {profile, contribution_model, artifacts: [{name, type}],
-    deploy_target}. A missing file returns the all-None/empty shape (callers
-    treat that as the strict deployable default).
+    deploy_target, branch_convention}. A missing file returns the
+    all-None/empty shape (callers treat that as the strict deployable
+    default; an absent ``branch_convention`` means the change tooling
+    composes the byte-for-byte ``change/{primitive}-{slug}`` default — #112).
     """
     result: dict = {
         "profile": None, "contribution_model": None,
         "artifacts": [], "deploy_target": None,
+        "branch_convention": None,
     }
     contract = Path(repo_root) / ".sulis" / "repo-contract.yml"
     if not contract.is_file():
@@ -728,6 +838,10 @@ def read_repo_contract(repo_root: Path) -> dict:
                 result["contribution_model"] = _rc_strip_value(stripped.split(":", 1)[1]) or None
             elif stripped.startswith("deploy_target:"):
                 result["deploy_target"] = _rc_strip_value(stripped.split(":", 1)[1]) or None
+            elif stripped.startswith("branch_convention:"):
+                result["branch_convention"] = (
+                    _rc_strip_value(stripped.split(":", 1)[1]) or None
+                )
             elif stripped.startswith("artifacts:"):
                 in_artifacts = True
             continue
@@ -1968,21 +2082,42 @@ def _wp_slug_from_file(wp_dir: Path, wp_id: str) -> str | None:
     return name[len(prefix):]
 
 
-def _branch_name(wp_id: str, slug: str) -> str:
-    """Compose the feature-branch name from WP id + slug.
+def _branch_name(wp_id: str, slug: str, change_scope: str | None = None) -> str:
+    """Compose the WP feature-branch name from WP id + slug.
 
-    Convention: `feat/wp-{id-lower}-{slug}`.
+    With ``change_scope`` (the change's ``"{primitive}-{slug}"``, e.g.
+    ``"fix-wp-branch-collision"``) the branch is namespaced under the change
+    so WP numbers cannot collide across changes (the #105/#106 root cause):
+
+        wp/{change_scope}/wp-{id-lower}-{slug}     ← ADR-001 scoped scheme
+
+    Without it (change identity unresolvable, or a caller that hasn't been
+    threaded yet) the byte-for-byte legacy shape is returned, which the
+    dual-prefix resolver still matches for one release:
+
+        feat/wp-{id-lower}-{slug}                  ← legacy fallback
+
+    The ``wp/`` prefix is a disjoint top-level segment chosen to avoid a git
+    directory/file ref conflict with the change branch ``change/{scope}`` —
+    see ``adrs/ADR-001-wp-branch-naming-scheme.md``.
     """
-    return f"feat/wp-{wp_id.lower().removeprefix('wp-')}-{slug}"
+    nnn = wp_id.lower().removeprefix("wp-")
+    if change_scope:
+        return f"wp/{change_scope}/wp-{nnn}-{slug}"
+    return f"feat/wp-{nnn}-{slug}"
 
 
 # Matches a Step-7 trace Outcome that records the exact pushed branch, e.g.:
-#   "Pushed to feat/wp-002-dark-token-block at SHA abc1234 (commit: ...)"
+#   "Pushed to wp/fix-x/wp-002-dark-token-block at SHA abc1234 (commit: ...)"
 # Tolerant of casing ("Pushed"/"pushed") and the "to" being optional, so it
-# also catches "success — pushed feat/wp-5-... after rebase". The branch token
-# is the first ``feat/...`` run of non-whitespace following "push(ed)".
+# also catches "success — pushed wp/fix-x/wp-5-... after rebase". The branch
+# token is the first matching run of non-whitespace following "push(ed)".
+# Three prefixes are accepted:
+#   wp/      — the ADR-001 per-change WP-branch scheme (the new default mint)
+#   change/  — the change branch itself, occasionally recorded as a push target
+#   feat/    — the retained legacy WP-branch shape (one-release fallback)
 _JOURNAL_PUSHED_BRANCH_RE = re.compile(
-    r"push(?:ed)?\s+(?:to\s+)?(feat/\S+)",
+    r"push(?:ed)?\s+(?:to\s+)?((?:feat|wp|change)/\S+)",
     re.IGNORECASE,
 )
 
@@ -2053,14 +2188,64 @@ def _gh_list_matching_branches(
     return _resolve_gh(gh).list_matching_branches(repo, pattern)
 
 
+def _select_fuzzy_branch(
+    wp_id: str,
+    repo: str,
+    pattern: str,
+    expected_literal: str,
+    *,
+    gh: GHClient | None = None,
+) -> str | None:
+    """List origin branches matching ``pattern`` and pick the WP's branch.
+
+    Shared by the scoped (``wp/{scope}/wp-NNN-*``) and legacy
+    (``feat/wp-NNN-*``) globs in ``resolve_wp_branch`` so the single/multi
+    selection + drift-warning logic lives in one place (EP-02). Returns the
+    most-recent-by-``committerdate`` match, or ``None`` when nothing matches.
+
+    Preserves the historical ``gh=None`` shim routing: forward ``gh`` only when
+    the caller supplied one, so test monkeypatches with a 2-positional stub
+    keep working.
+    """
+    if gh is None:
+        matches = _gh_list_matching_branches(repo, pattern)
+    else:
+        matches = _gh_list_matching_branches(repo, pattern, gh=gh)
+    if not matches:
+        return None
+
+    # Pick most-recent by committerdate. Empty/missing dates sort first
+    # so any branch with a real date wins (the typical case is one
+    # branch with a date and zero without).
+    chosen = max(matches, key=lambda m: m.get("committerdate", ""))
+    chosen_name = chosen["name"]
+
+    if len(matches) == 1:
+        _log(
+            f"resolve_wp_branch: {wp_id} — expected '{expected_literal}' on origin "
+            f"but found '{chosen_name}' (fuzzy match). Using '{chosen_name}'. "
+            f"Rename the WP file or the branch to silence this warning."
+        )
+    else:
+        names = ", ".join(m["name"] for m in matches)
+        _log(
+            f"resolve_wp_branch: {wp_id} — expected '{expected_literal}' but found "
+            f"{len(matches)} candidates [{names}]; picked '{chosen_name}' "
+            f"(most recent by committerdate). Choice may be ambiguous; "
+            f"rename to disambiguate."
+        )
+    return chosen_name
+
+
 def resolve_wp_branch(
     wp_id: str,
     repo: str,
     wp_dir: Path,
     *,
     gh: GHClient | None = None,
+    change_scope: str | None = None,
 ) -> str | None:
-    """Resolve the feat-branch on origin that belongs to ``wp_id``.
+    """Resolve the WP branch on origin that belongs to ``wp_id``.
 
     The historical contract (literal slug → branch name) breaks when the
     executor pushes a branch with a SHORTER slug than the WP filename
@@ -2068,27 +2253,38 @@ def resolve_wp_branch(
     cases from the release-train-as-entities run). This helper restores
     eligibility on the READ side without forcing executors to use full slugs.
 
+    Dual-prefix resolution (ADR-001). With ``change_scope`` set (the change's
+    ``"{primitive}-{slug}"``), resolution is confined to this change's
+    ``wp/{scope}/`` namespace so a WP can never resolve to a foreign change's
+    recycled-number branch (the #105/#106 collision). Without it, the legacy
+    ``feat/...`` behaviour is preserved byte-for-byte for legacy callers.
+
     Resolution order:
 
       0. **Journal-recorded branch (#229).** If the executor journal
          (``wp_dir/.executor-NNN.md``) records an exact pushed branch in its
-         Step-7 trace AND that branch exists on origin, return it. This scopes
-         resolution to what THIS change's executor actually pushed, eliminating
-         the cross-change ambiguity that arises when WP numbers are recycled
-         (the glob below would otherwise match unrelated past changes' branches
-         and pick the wrong one by recency). A missing/malformed journal, or a
-         recorded branch no longer on origin, falls through to step 1.
-      1. **Slug-literal match.** If ``feat/wp-NNN-<slug-from-file>`` exists
-         on origin, return it. Byte-for-byte preservation of the
-         historical happy path.
-      2. **Fuzzy single match.** If exactly one ``feat/wp-NNN-*`` branch
-         exists on origin (NNN being ``wp_id`` minus the WP- prefix,
-         lowercased), return it. A warning is emitted to stderr naming
-         the WP, the expected literal, and the actual branch so the
-         operator can see the drift.
-      3. **Fuzzy multi-match.** Two or more ``feat/wp-NNN-*`` candidates →
-         most-recent-by-``committerdate`` wins. The same warning fires,
-         plus an explicit "ambiguous" note listing all candidates.
+         Step-7 trace AND that branch exists on origin, return it. This is the
+         authoritative, prefix-agnostic scope to what THIS change's executor
+         actually pushed — including an in-flight branch minted the legacy
+         ``feat/...`` way during the one-release compat window. A missing /
+         malformed journal, or a recorded branch no longer on origin, falls
+         through to step 1.
+      1. **Slug-literal match.** ``_branch_name(wp_id, slug, change_scope)`` —
+         the scoped ``wp/{scope}/wp-NNN-<slug>`` literal when a scope is set,
+         else the legacy ``feat/wp-NNN-<slug>`` literal. If it exists on
+         origin, return it.
+      2. **Scoped fuzzy glob (only when ``change_scope`` is set).** Glob
+         ``wp/{scope}/wp-NNN-*``; single → use; multi → most-recent by
+         ``committerdate`` with a drift warning. **If empty → return None.**
+         The repo-wide legacy glob is DELIBERATELY suppressed under a scope:
+         any ``feat/wp-NNN-*`` hit would, by construction, be a foreign
+         change's branch (this change's own legacy branch is resolved by
+         Step 0 above). Falling through would re-open #105/#106; ``None`` is
+         strictly safer than guessing a foreign ref. This also closes the
+         #106 deleted-branch case.
+      3. **Legacy fuzzy glob (only when ``change_scope`` is None).** Glob
+         ``feat/wp-NNN-*``; same single/multi handling + warning. Retained for
+         one release for truly legacy callers; removal tracked as a follow-up.
       4. **Zero candidates.** Return ``None``. The caller falls through
          to whatever "branch missing" handling it already had.
 
@@ -2117,12 +2313,14 @@ def resolve_wp_branch(
             f"slug-literal / fuzzy match."
         )
 
-    literal = _branch_name(wp_id, slug)
-    # Only forward ``gh`` when the caller explicitly supplied one; passing
-    # ``gh=None`` to the shims would break test monkeypatches that don't
-    # accept the kw-arg (the existing test_wpx_train_eligibility.py stubs
-    # use a 2-positional signature, and the shim's ``gh=None`` default
+    # Step 1 — slug-literal match. With change_scope set this is the scoped
+    # wp/{scope}/... literal; without it the byte-for-byte legacy feat/...
+    # literal. Only forward ``gh`` when the caller explicitly supplied one;
+    # passing ``gh=None`` to the shims would break test monkeypatches that
+    # don't accept the kw-arg (the existing test_wpx_train_eligibility.py
+    # stubs use a 2-positional signature, and the shim's ``gh=None`` default
     # already routes to the module singleton).
+    literal = _branch_name(wp_id, slug, change_scope)
     if gh is None:
         if _gh_branch_exists(repo, literal):
             return literal
@@ -2132,35 +2330,40 @@ def resolve_wp_branch(
 
     # Fuzzy lookup. Strip the WP- prefix and lowercase per _branch_name.
     nnn = wp_id.lower().removeprefix("wp-")
-    pattern = f"feat/wp-{nnn}-*"
-    if gh is None:
-        matches = _gh_list_matching_branches(repo, pattern)
-    else:
-        matches = _gh_list_matching_branches(repo, pattern, gh=gh)
-    if not matches:
+
+    # Step 2 — scoped fuzzy glob (ADR-001). Only when change identity is
+    # known: this is what closes the #105/#106 cross-change collision —
+    # resolution is confined to THIS change's wp/{scope}/ namespace and can
+    # never select a foreign change's feat/wp-NNN-* branch. When a scope is
+    # set, this is the LAST glob consulted: the repo-wide legacy glob is
+    # SUPPRESSED (see below) because it can only ever match a foreign branch.
+    if change_scope:
+        scoped = _select_fuzzy_branch(
+            wp_id, repo, f"wp/{change_scope}/wp-{nnn}-*", literal, gh=gh,
+        )
+        if scoped is not None:
+            return scoped
+        # Scope set but no scoped branch found. The repo-wide
+        # feat/wp-{nnn}-* glob is DELIBERATELY NOT run here. With a scope in
+        # play, any feat/wp-NNN-* hit is — by construction — a *foreign*
+        # change's recycled-number branch (this change's own in-flight
+        # old-shape branch, if any, is resolved authoritatively by the
+        # journal Step-0 above, which records the exact branch the executor
+        # pushed regardless of prefix). Falling through to the legacy glob
+        # here is exactly the #105/#106 bug: it would return another change's
+        # branch. Return None instead — a WP with no journal record and no
+        # scoped branch is unresolvable under its own scope, and None is
+        # strictly safer than guessing a foreign ref. This also closes the
+        # #106 deleted-branch case: Step-0 found the journal entry but the
+        # branch is gone from origin → None, not a foreign glob hit.
         return None
 
-    # Pick most-recent by committerdate. Empty/missing dates sort first
-    # so any branch with a real date wins (the typical case is one
-    # branch with a date and zero without).
-    chosen = max(matches, key=lambda m: m.get("committerdate", ""))
-    chosen_name = chosen["name"]
-
-    if len(matches) == 1:
-        _log(
-            f"resolve_wp_branch: {wp_id} — expected '{literal}' on origin "
-            f"but found '{chosen_name}' (fuzzy match). Using '{chosen_name}'. "
-            f"Rename the WP file or the branch to silence this warning."
-        )
-    else:
-        names = ", ".join(m["name"] for m in matches)
-        _log(
-            f"resolve_wp_branch: {wp_id} — expected '{literal}' but found "
-            f"{len(matches)} candidates [{names}]; picked '{chosen_name}' "
-            f"(most recent by committerdate). Choice may be ambiguous; "
-            f"rename to disambiguate."
-        )
-    return chosen_name
+    # Step 3 — legacy fuzzy glob (fallback). Reached ONLY when there is no
+    # change_scope at all (truly legacy callers). Byte-for-byte today's
+    # behaviour: literal feat/... miss → repo-wide feat/wp-NNN-* glob → None.
+    return _select_fuzzy_branch(
+        wp_id, repo, f"feat/wp-{nnn}-*", literal, gh=gh,
+    )
 
 
 def _gh_branch_ci_green(repo: str, branch: str) -> bool:
@@ -2212,6 +2415,7 @@ def find_eligible_branches(
     *,
     paths: "WpxPaths | None" = None,
     base_branch: str = "main",
+    change_scope: str | None = None,
 ) -> list[EligibilityResult]:
     """Discover which WPs are eligible for the next train.
 
@@ -2253,6 +2457,16 @@ def find_eligible_branches(
       (``test_wpx_train_eligibility.py``) which stubs WPRow.status
       directly and doesn't need network access.
 
+    Scoped resolution (ADR-001):
+
+      Pass ``change_scope`` (the change's ``"{primitive}-{slug}"``) to confine
+      branch resolution to this change's ``wp/{scope}/`` namespace, so a WP can
+      never be false-eligibled onto a foreign change's recycled-number branch
+      (#105/#106). It is threaded into ``compute_wp_status``, the reported
+      ``_branch_name``, and ``resolve_wp_branch``. ``change_scope=None`` (the
+      default) is byte-for-byte the legacy ``feat/...`` behaviour, so existing
+      callers and the in-memory eligibility test suite are unaffected.
+
     Returns one EligibilityResult per WP — both eligible and ineligible
     are returned so the caller (queue-list / status / doctor) can show
     the founder the full picture.
@@ -2271,6 +2485,7 @@ def find_eligible_branches(
             wp.id: compute_wp_status(
                 wp.id, paths, repo, base_branch,
                 stored_status=wp.status,
+                change_scope=change_scope,
             )
             for wp in wps
         }
@@ -2303,7 +2518,7 @@ def find_eligible_branches(
         # Reported branch defaults to the slug-literal for messaging; the
         # actual resolved branch (which may be fuzzy-matched) replaces it
         # once we know we have a hit on origin.
-        branch = _branch_name(wp.id, slug)
+        branch = _branch_name(wp.id, slug, change_scope)
 
         if is_held:
             results.append(EligibilityResult(
@@ -2326,7 +2541,7 @@ def find_eligible_branches(
         # the literal when it exists on origin, or a fuzzy ``feat/wp-NNN-*``
         # match (single → use; multi → most-recent-by-committerdate with
         # a warning), or None when no branch matches.
-        resolved = resolve_wp_branch(wp.id, repo, wp_dir)
+        resolved = resolve_wp_branch(wp.id, repo, wp_dir, change_scope=change_scope)
         if resolved is None:
             results.append(EligibilityResult(
                 wp=wp.id, branch=branch, eligible=False,
@@ -3657,6 +3872,7 @@ def compute_wp_status(
     *,
     gh: GHClient | None = None,
     stored_status: str | None = None,
+    change_scope: str | None = None,
 ) -> str:
     """Return the computed status for ``wp_id``.
 
@@ -3704,6 +3920,11 @@ def compute_wp_status(
         stored_status: The INDEX.md cell value to fall back to when no
             authoritative signal is present. Pass the parsed cell from
             ``parse_index_md``; defaults to ``None`` → ``"pending"``.
+        change_scope: The change's ``"{primitive}-{slug}"`` (ADR-001).
+            Threaded to ``resolve_wp_branch`` so the step-7-complete check is
+            confined to this change's ``wp/{scope}/`` namespace and never
+            matches a foreign change's branch. ``None`` (default) = legacy
+            ``feat/...`` resolution, byte-for-byte.
 
     Returns:
         One of: ``"done"``, ``"step-7-shipping"``, ``"step-7-complete"``,
@@ -3723,7 +3944,9 @@ def compute_wp_status(
     # Case 3: step-7-complete — origin branch exists, no train signal.
     # Use resolve_wp_branch so a fuzzy-matched (short-slug) push counts
     # as step-7-complete just the same as a literal-slug push.
-    if resolve_wp_branch(wp_id, repo, paths.wp_dir, gh=gh) is not None:
+    if resolve_wp_branch(
+        wp_id, repo, paths.wp_dir, gh=gh, change_scope=change_scope,
+    ) is not None:
         return "step-7-complete"
 
     # Case 4: fall-through — defer to the stored cell (operator intent).
@@ -4029,8 +4252,41 @@ def validate_change_primitive(primitive: str) -> tuple[bool, str]:
     return True, ""
 
 
-def compose_change_branch(primitive: str, slug: str) -> str:
-    """Compose a CW-02 branch name: change/{primitive}-{slug}.
+# The legacy, byte-for-byte branch convention. Used as the default when a repo
+# declares no ``branch_convention`` in its contract (#112) — zero behaviour
+# change for every repo that does not opt in.
+LEGACY_CHANGE_BRANCH_CONVENTION = "change/{primitive}-{slug}"
+
+
+def _normalise_branch_convention(convention: str | None) -> str:
+    """Resolve a raw ``branch_convention`` value to a usable template.
+
+    - ``None``/empty/whitespace → the legacy ``change/{primitive}-{slug}``.
+    - A bare prefix (no ``{...}`` placeholder, ends in ``/``) → composes
+      ``<prefix>{slug}`` (e.g. ``feature/`` → ``feature/{slug}``).
+    - Anything else is taken verbatim as a template.
+    """
+    if convention is None:
+        return LEGACY_CHANGE_BRANCH_CONVENTION
+    conv = convention.strip()
+    if not conv:
+        return LEGACY_CHANGE_BRANCH_CONVENTION
+    if "{" not in conv:
+        # Bare prefix → compose <prefix>{slug}. Tolerate a missing trailing /.
+        return (conv if conv.endswith("/") else conv + "/") + "{slug}"
+    return conv
+
+
+def compose_change_branch(primitive: str, slug: str, *,
+                          convention: str | None = None) -> str:
+    """Compose a change branch name from the host repo's convention (#112).
+
+    With ``convention=None`` (the default — the key absent from the repo
+    contract) the result is the legacy CW-02 ``change/{primitive}-{slug}``
+    byte-for-byte. A repo MAY declare a ``branch_convention`` template
+    supporting ``{primitive}`` and ``{slug}`` placeholders (e.g.
+    ``feature/{slug}``), or a bare prefix (``feature/``) which composes
+    ``<prefix>{slug}``.
 
     Raises ValueError on invalid primitive or slug.
     """
@@ -4040,11 +4296,68 @@ def compose_change_branch(primitive: str, slug: str) -> str:
     ok, reason = validate_change_slug(slug)
     if not ok:
         raise ValueError(reason)
-    return f"change/{primitive.lower()}-{slug.lower()}"
+    template = _normalise_branch_convention(convention)
+    # Substitute the supported placeholders only; an unrecognised placeholder
+    # (e.g. {ticket}, out of scope for slice 1) is left verbatim rather than
+    # raising KeyError — degrading loudly-but-safely instead of crashing
+    # cmd_start. The minimum supported set is {primitive} and {slug}.
+    return (template
+            .replace("{primitive}", primitive.lower())
+            .replace("{slug}", slug.lower()))
 
 
-def parse_change_branch(branch: str) -> tuple[str, str] | None:
-    """Inverse of compose_change_branch. Returns (primitive, slug) or None."""
+def _parse_with_convention(branch: str, convention: str) -> tuple[str, str] | None:
+    """Try to recover (primitive, slug) from ``branch`` under one template.
+
+    Supports the two placeholder shapes the composer emits:
+    ``<prefix>{slug}`` and ``<prefix>{primitive}-{slug}``. Returns None when
+    the branch does not match the template's prefix/shape.
+    """
+    template = _normalise_branch_convention(convention)
+    # Split the template on its first placeholder to recover the literal prefix.
+    brace = template.find("{")
+    if brace == -1:
+        return None
+    prefix = template[:brace]
+    if not branch.startswith(prefix):
+        return None
+    rest = branch[len(prefix):]
+    tail = template[brace:]
+    if tail == "{primitive}-{slug}":
+        if "-" not in rest:
+            return None
+        first, _, slug = rest.partition("-")
+        if first not in ALLOWED_CHANGE_PRIMITIVES:
+            return None
+        return (first, slug)
+    if tail == "{slug}":
+        # No primitive encoded in the branch — the slug is the whole tail.
+        # The primitive is not recoverable from the name; the store-backed
+        # record holds it. Return a sentinel primitive so callers that need
+        # (primitive, slug) for a worktree path still function; the change's
+        # recorded manifest is authoritative.
+        if not rest:
+            return None
+        return ("feat", rest)
+    # Unrecognised template shape → not parseable here.
+    return None
+
+
+def parse_change_branch(branch: str, *,
+                        convention: str | None = None) -> tuple[str, str] | None:
+    """Inverse of compose_change_branch. Returns (primitive, slug) or None.
+
+    Dual-prefix (#112): when a ``convention`` is supplied, the configured
+    template is tried FIRST, then the legacy ``change/{primitive}-{slug}`` is
+    UNIONED in — so a renamed ``feature/...`` change parses AND every existing
+    ``change/*`` branch keeps resolving. Mirrors ``resolve_wp_branch``'s
+    dual-prefix tolerance.
+    """
+    if convention is not None and convention.strip():
+        parsed = _parse_with_convention(branch, convention)
+        if parsed is not None:
+            return parsed
+    # Legacy change/ prefix (always honoured — the union half).
     if not branch.startswith("change/"):
         return None
     rest = branch[len("change/"):]
@@ -4594,49 +4907,83 @@ def adopt_local_commits_into_change(
     )
 
 
-def find_change_branches(repo_root: Path) -> list[dict]:
-    """List all change/* branches in the local repo with basic state.
+def _convention_glob(convention: str | None) -> str | None:
+    """Return the ``git branch --list`` glob for a configured convention.
+
+    e.g. ``feature/{slug}`` → ``feature/*``. Returns None when the convention
+    is absent/legacy (the ``change/*`` glob already covers it) so callers don't
+    double-glob the legacy prefix.
+    """
+    if convention is None or not convention.strip():
+        return None
+    template = _normalise_branch_convention(convention)
+    brace = template.find("{")
+    prefix = template[:brace] if brace != -1 else template
+    if not prefix or prefix == "change/":
+        return None
+    return prefix.rstrip("/") + "/*"
+
+
+def find_change_branches(repo_root: Path, *,
+                         convention: str | None = None) -> list[dict]:
+    """List change branches in the local + origin repo with basic state.
+
+    Dual-prefix (#112): globs the legacy ``change/*`` UNION the configured
+    ``branch_convention`` prefix (e.g. ``feature/*``), so a renamed change is
+    discoverable by ``cmd_nuke`` / ``resolve_current_change`` AND existing
+    ``change/*`` changes keep resolving.
 
     Returns a list of dicts:
       [{"branch": str, "primitive": str, "slug": str, "current": bool}, ...]
     """
-    rc, out, _ = _run(["git", "branch", "--list", "change/*"],
-                     cwd=repo_root, timeout=10)
-    if rc != 0:
-        return []
+    # Local globs: legacy change/* always, plus the configured prefix if any.
+    local_globs = ["change/*"]
+    conv_glob = _convention_glob(convention)
+    if conv_glob is not None:
+        local_globs.append(conv_glob)
 
     result: list[dict] = []
     seen: set[str] = set()
-    for raw in out.splitlines():
-        line = raw.rstrip()
-        if not line:
+    for glob in local_globs:
+        rc, out, _ = _run(["git", "branch", "--list", glob],
+                          cwd=repo_root, timeout=10)
+        if rc != 0:
             continue
-        # git branch output: "* branch" (current), "+ branch" (other
-        # worktree), "  branch" (uncheckout). Strip the marker.
-        is_current = line.startswith("* ")
-        branch = line.lstrip("*+ \t").strip()
-        if not branch:
-            continue
-        parsed = parse_change_branch(branch)
-        if parsed is None:
-            continue
-        primitive, slug = parsed
-        seen.add(branch)
-        result.append({
-            "branch": branch,
-            "primitive": primitive,
-            "slug": slug,
-            "current": is_current,
-        })
+        for raw in out.splitlines():
+            line = raw.rstrip()
+            if not line:
+                continue
+            # git branch output: "* branch" (current), "+ branch" (other
+            # worktree), "  branch" (uncheckout). Strip the marker.
+            is_current = line.startswith("* ")
+            branch = line.lstrip("*+ \t").strip()
+            if not branch or branch in seen:
+                continue
+            parsed = parse_change_branch(branch, convention=convention)
+            if parsed is None:
+                continue
+            primitive, slug = parsed
+            seen.add(branch)
+            result.append({
+                "branch": branch,
+                "primitive": primitive,
+                "slug": slug,
+                "current": is_current,
+            })
 
     # Also surface origin-only change branches (a teammate's change pulled but
     # not checked out locally). Strip the `origin/` prefix to the logical
     # branch name; skip any already listed as a local branch. (L-01)
-    rrc, rout, _ = _run(
-        ["git", "branch", "--list", "--remotes", "origin/change/*"],
-        cwd=repo_root, timeout=10,
-    )
-    if rrc == 0:
+    remote_globs = ["origin/change/*"]
+    if conv_glob is not None:
+        remote_globs.append("origin/" + conv_glob)
+    for glob in remote_globs:
+        rrc, rout, _ = _run(
+            ["git", "branch", "--list", "--remotes", glob],
+            cwd=repo_root, timeout=10,
+        )
+        if rrc != 0:
+            continue
         for raw in rout.splitlines():
             line = raw.strip()
             if not line or "->" in line:  # skip "origin/HEAD -> origin/dev"
@@ -4647,7 +4994,7 @@ def find_change_branches(repo_root: Path) -> list[dict]:
                 continue
             if branch in seen:
                 continue
-            parsed = parse_change_branch(branch)
+            parsed = parse_change_branch(branch, convention=convention)
             if parsed is None:
                 continue
             primitive, slug = parsed
@@ -4707,6 +5054,11 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
     else:
         repo_root = Path(repo_root).resolve()
 
+    # #112 — honour the host branch convention for dual-prefix discovery, so a
+    # change renamed off change/ (e.g. feature/...) still resolves. Absent →
+    # None → legacy change/* behaviour byte-for-byte.
+    convention = read_repo_contract(repo_root).get("branch_convention")
+
     checked: list[str] = []
 
     # 1. Self: current branch + metadata committed at repo_root/.changes/.
@@ -4714,7 +5066,7 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
         ["git", "branch", "--show-current"], cwd=repo_root, timeout=10,
     )
     if rc == 0:
-        parsed = parse_change_branch(branch_out.strip())
+        parsed = parse_change_branch(branch_out.strip(), convention=convention)
         if parsed is not None:
             primitive, slug = parsed
             self_meta = repo_root / ".changes" / f"{primitive}-{slug}.yaml"
@@ -4723,6 +5075,25 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
                 metadata = read_change_metadata(self_meta)
                 if metadata.get("change_id") == change_id:
                     return metadata
+                # #244 — the cwd IS a change worktree (current branch is a
+                # change/* branch with a committed manifest), but its change_id
+                # DISAGREES with the inherited SULIS_CHANGE_ID (a stale shell
+                # value left over from another change). The worktree — branch +
+                # committed manifest — is the reliable signal; the env var is
+                # the stale one. Prefer the worktree's change and warn loudly,
+                # rather than silently resolving the env var's UNRELATED change
+                # from a sibling worktree at step 3 (which would let stage/ship
+                # act on the wrong change).
+                print(
+                    f"resolve_current_change: SULIS_CHANGE_ID={change_id} "
+                    f"disagrees with the worktree's change "
+                    f"{metadata.get('change_id')} (branch "
+                    f"{branch_out.strip()!r}). The env var is stale; using the "
+                    f"worktree's change. Run `unset SULIS_CHANGE_ID` (or "
+                    f"re-spawn the session) to clear it.",
+                    file=sys.stderr,
+                )
+                return metadata
 
     # 2. Scan repo_root/.changes/ for any manifest matching this change_id.
     changes_dir = repo_root / ".changes"
@@ -4752,7 +5123,7 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
 
     # 3. Sibling worktree iteration (driving from the main repo; includes
     #    origin-only change branches via find_change_branches).
-    for entry in find_change_branches(repo_root):
+    for entry in find_change_branches(repo_root, convention=convention):
         primitive = entry["primitive"]
         slug = entry["slug"]
         worktree_dest = change_worktree_path(repo_root, primitive, slug)
@@ -4771,6 +5142,62 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
         file=sys.stderr,
     )
     return None
+
+
+def current_change_scope(repo_root: Path | None = None) -> str | None:
+    """Return ``"{primitive}-{slug}"`` for the current change, or ``None``.
+
+    The single derivation point for the ADR-001 branch-naming scope (EP-03):
+    CLI entrypoints call this once and thread the result into
+    ``find_eligible_branches`` / ``compute_wp_status`` as ``change_scope``.
+    Returns ``None`` when no change context is resolvable (``SULIS_CHANGE_ID``
+    unset, or set with no matching manifest), so callers fall back to the
+    byte-for-byte legacy ``feat/...`` behaviour. No CLI command should
+    hand-build ``"{primitive}-{slug}"`` inline.
+    """
+    meta = resolve_current_change(repo_root)
+    if not meta:
+        return None
+    primitive = meta.get("primitive")
+    slug = meta.get("slug")
+    if not primitive or not slug:
+        return None
+    return f"{primitive}-{slug}"
+
+
+def is_change_context(base_branch: str | None = None,
+                      repo_root: Path | None = None) -> bool:
+    """True iff the current run is operating on a CHANGE branch (#112).
+
+    Prefix-INDEPENDENT change-context test for the wpx-train back-integration
+    gates. The previous gates literal-tested ``base_branch.startswith("change/")``
+    — which silently STOPS auto-back-integrating a change branch renamed under
+    a host ``branch_convention`` (e.g. ``feature/...``). This restores the gate
+    on a store-backed / env signal instead of the annotation prefix:
+
+      1. ``SULIS_CHANGE_ID`` set → unambiguously a change context.
+      2. ``base_branch`` is a legacy ``change/*`` branch → backward-compat
+         signal (the prefix itself, when present, still means "change").
+      3. ``base_branch`` matches the recorded ``branch`` field of any change in
+         the store (``list_all_changes``) → covers a renamed branch with no
+         env var set (driving from the main repo).
+
+    Returns False when none hold (a plain dev/main/feature branch with no
+    change context) — the gate then skips, exactly as before for non-changes.
+    """
+    if os.environ.get(SULIS_CHANGE_ID_ENV_VAR):
+        return True
+    if base_branch:
+        if base_branch.startswith("change/"):
+            return True
+        try:
+            from _change_state import list_all_changes  # lazy: import coupling
+            for record in list_all_changes():
+                if str(record.get("branch") or "") == base_branch:
+                    return True
+        except Exception:
+            pass  # best-effort; store unavailable → fall through
+    return False
 
 
 def back_integrate_change_branch(

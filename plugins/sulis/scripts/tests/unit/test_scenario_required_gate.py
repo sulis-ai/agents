@@ -168,3 +168,20 @@ def test_exemption_blank_marker_is_none(tmp_path):
     d.mkdir(parents=True, exist_ok=True)
     (d / "feat-x.scenarios-exempt").write_text("   \n", encoding="utf-8")
     assert exemption_reason_for_change(tmp_path, "feat-x") is None
+
+
+def test_scenarios_present_detects_canonical_scenarios_key(tmp_path):
+    """Regression (#104): the authored file shape is {"scenarios":[{"id":"SC-01",...}]}
+    with SC-NN ids (no dna:scenario @id). A non-empty scenarios list IS 'present' —
+    the gate previously only matched @graph/top-list and missed every real file."""
+    from _scenario_required_gate import scenarios_present_for_change
+    changes = tmp_path / ".changes"
+    changes.mkdir()
+    (changes / "harden-x.scenarios.jsonld").write_text(
+        '{"slug":"x","scenarios":[{"id":"SC-01","name":"do X observe Y","steps":[]}]}',
+        encoding="utf-8",
+    )
+    assert scenarios_present_for_change(tmp_path, "harden-x") is True
+    # empty scenarios list ⇒ absent
+    (changes / "harden-y.scenarios.jsonld").write_text('{"scenarios":[]}', encoding="utf-8")
+    assert scenarios_present_for_change(tmp_path, "harden-y") is False

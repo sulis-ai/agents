@@ -1,0 +1,13 @@
+{
+  "scope": {"commit_type_spread": ["docs"], "module_fan_out": 1, "severity": "none"},
+  "size": {"lines_added": 67, "lines_removed": 11, "total": 78, "files_changed": 1, "new_test_files": 1, "severity": "none"},
+  "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+  "completeness": {"new_source_without_test": 0, "api_change_without_schema": false, "severity": "none"},
+  "build_verification": {"pr_introduced_errors": 0},
+  "lenses": {
+    "architecture": {"findings": 0, "note": "doc + test only; no imports/boundaries/resilience surfaces"},
+    "security": {"findings": 0, "note": "no auth/injection/secrets/deps; test reads file relative to own location"},
+    "quality": {"findings": 0, "note": "tests present for the behaviour; no dead surface, contract drift, or CR-10 perf patterns"}
+  },
+  "verdict": "PASS"
+}

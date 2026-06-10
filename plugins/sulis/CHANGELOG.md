@@ -1,3 +1,75 @@
+## v0.137.1 — 2026-06-10
+
+**Patch — release-train batch.**
+
+- Add CW-09 to the Change Work Standard: three rigour tiers (Methodical / Batched / Bounded-fix) as presets over dials, with a tier-invariant verification floor and a written-plan floor (plan mode -> write the plan naming the critical scenarios -> build). Guidance only (SHOULD, calibrating) — no workflow steps hard-coded yet.
+
+## v0.137.0 — 2026-06-10
+
+**Minor — release-train batch.**
+
+- Vendored brain schemas updated for the deploy-topology ontology (DR-034 in sulis-brain): Workflow.for_environment_ref, Trigger branch-push kind, Project.release_model — additive optional fields so the brain can express how a branch promotes to an environment and by what mechanism.
+
+## v0.136.0 — 2026-06-10
+
+**Minor — release-train batch.**
+
+- sulis-change now honours the host repo branch convention: an optional branch_convention key in the repo-contract shapes new change branch names (e.g. feature/{slug}); with no key it stays byte-for-byte change/{primitive}-{slug}. Change identity is store-backed so dual-prefix discovery keeps in-flight change/* changes resolving, the back-integration gates no longer key off the change/ prefix, and Work-Package branches stay under wp/.
+
+## v0.135.0 — 2026-06-10
+
+**Minor — release-train batch.**
+
+- sulis-change mark-shipped now refuses to flip a change to shipped unless the merge to main is confirmed (merged-PR signal, or an explicit --merge-sha verified against origin/main), pins shipped_sha to the real merge commit, and records any --force override. Shipped can no longer mean not-actually-on-main.
+
+## v0.134.1 — 2026-06-10
+
+**Patch — release-train batch.**
+
+- A change brief is no longer contaminated by the assistant own reply at interactive change-creation: the start contract now requires --intent to be the founder verbatim words (never the agent paraphrase/greeting/turn-state). The already-clean pipeline + cockpit web path are now test-locked so they cannot silently regress.
+
+## v0.134.0 — 2026-06-10
+
+**Minor — release-train batch.**
+
+- Decompose validation now catches when two parallel Work Packages would author the same test fixture under divergent conventions (dir-vs-file logical-name match), failing at planning time with a serialize-or-hoist remedy instead of only surfacing at integration. Adds the one-upstream-author fixtures convention and the gate that enforces it.
+
+## v0.133.0 — 2026-06-10
+
+**Minor — release-train batch.**
+
+- /sulis:change focus now resumes the change prior conversation when one exists (deterministic pinned session id per change), instead of always starting fresh — and a janitor-reaped session is resumable because it keys off the persisted transcript, not the live daemon. Falls back to the fresh self-orienting spawn when there is nothing to resume.
+
+## v0.132.4 — 2026-06-10
+
+**Patch — release-train batch.**
+
+- Scope Work Package branch refs per-change (wp/{primitive}-{slug}/wp-NNN) so cross-change WP-id collisions can no longer misroute the integration train (root cause of #105/#106).
+
+## v0.132.3 — 2026-06-10
+
+**Patch — release-train batch.**
+
+- Session daemon no longer idle-evicts in-use change sessions: a session with an attached window (or a turn in flight) is exempt from the 10-minute idle reaper, so a spawned change window survives a long quiet step (recon, tests) instead of being killed mid-work. Adds an eviction log line and routes daemon stderr to a log file.
+
+## v0.132.2 — 2026-06-10
+
+**Patch — release-train batch.**
+
+- Spawned change sessions no longer bind to a stale SULIS_CHANGE_ID: the launcher sets the new id authoritatively on the launched process (env on exec + unset-before-export) so an inherited cockpit/parent value cannot shadow it, and the agent now trusts the worktree over the env when they disagree.
+
+## v0.132.1 — 2026-06-10
+
+**Patch — release-train batch.**
+
+- Scope Work Package branch refs per-change (wp/{primitive}-{slug}/wp-NNN) so cross-change WP-id collisions can no longer misroute the integration train (root cause of #105/#106).
+
+## v0.132.0 — 2026-06-09
+
+**Minor — release-train batch.**
+
+- Always produce a comprehensive design document (use cases with flows, NFR, threat model, layered architecture) regardless of depth; walk both the UI and API/SDK/MCP-tool consumer surfaces at design time; derive verifiable scenarios from use-case flows for both surfaces; enforce flow-level coverage as a gate; make the interface contract a first-class design-doc section.
+
 ## v0.131.0 — 2026-06-09
 
 **Minor — release-train batch.**

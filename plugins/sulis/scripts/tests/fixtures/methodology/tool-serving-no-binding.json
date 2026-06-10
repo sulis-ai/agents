@@ -1,0 +1,13 @@
+{
+  "journey": "agent creates an order via the tool surface (unbound handler)",
+  "scenarios": [
+    {
+      "id": "SC-09",
+      "surface": "tool",
+      "hops": [
+        {"name": "create_order operation", "handler": "services/orders/handlers.py#create", "binding": "orders.servicespec.yaml#createOrder"},
+        {"name": "cancel_order operation (serves, but no ServiceSpec binding)", "handler": "services/orders/handlers.py#cancel"}
+      ]
+    }
+  ]
+}

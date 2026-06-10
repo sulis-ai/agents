@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:MRFWDBKZSHADWHRCGW0YJ69EGN",
+  "initial_steps": [
+    "4spt36x8-produce-the-comprehensive-document-for-a-1"
+  ],
+  "name": "SC-16: The produced document carries architecture at three C4 levels",
+  "state": "draft",
+  "steps": [
+    "4spt36x8-produce-the-comprehensive-document-for-a-1",
+    "4spt36x8-assert-the-solution-design-section-carri-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "4spt36x8-assert-the-solution-design-section-carri-2"
+  ],
+  "transitions": [
+    "4spt36x8-produce-the-comprehensive-document-for-a-1 -> 4spt36x8-assert-the-solution-design-section-carri-2"
+  ],
+  "type": "review"
+}

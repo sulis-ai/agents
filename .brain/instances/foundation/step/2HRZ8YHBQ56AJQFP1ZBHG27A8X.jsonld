@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Run /sulis:specify at lite depth on a fixture whose intake cannot populate the dependencies section",
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:step:2HRZ8YHBQ56AJQFP1ZBHG27A8X",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "deterministic",
+  "mechanism_detail": "{\"cmd\": \"python3 plugins/sulis/scripts/_drive_specify.py --fixture no-dependencies --depth lite --out /tmp/sc03-doc.md\", \"expect_exit\": 0}",
+  "name": "n69np4fd-run-sulis-specify-at-lite-depth-on-a-fix-1",
+  "output_artifacts": [
+    "n69np4fd-run-sulis-specify-at-lite-depth-on-a-fix-1-result"
+  ],
+  "postconditions": [
+    "the document is produced"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:6XBZ93FSHN5TRX8MCS5R66FNCM",
+  "for_process": "verification",
+  "id": "dna:workflow:58KRTE30RCWZYVZDDX7N2SHWR2",
+  "initial_steps": [
+    "ca1rnprv-drive-the-design-stage-on-a-fixture-that-1"
+  ],
+  "name": "SC-17: A business decision is recorded as a BDR, distinct from an ADR",
+  "state": "draft",
+  "steps": [
+    "ca1rnprv-drive-the-design-stage-on-a-fixture-that-1",
+    "ca1rnprv-assert-the-business-decision-is-recorded-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "ca1rnprv-assert-the-business-decision-is-recorded-2"
+  ],
+  "transitions": [
+    "ca1rnprv-drive-the-design-stage-on-a-fixture-that-1 -> ca1rnprv-assert-the-business-decision-is-recorded-2"
+  ],
+  "type": "review"
+}

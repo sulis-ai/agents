@@ -14,8 +14,11 @@ Flow (TDD §2.3, the WP Contract):
 1. ``ensure_daemon`` → the stable socket with a live shared daemon (WP-002).
 2. ``connect`` one socket; the wire is request-id multiplexed (the
    ``socketWsTransport.ts`` shape): unary ``request`` + a streaming ``attach``.
-3. ``open {key:change_id, spec:{provider:"pty", cwd:worktree, io_mode:"pty"}}`` —
-   get-or-spawn (idempotent; the first view creates, later views attach).
+3. ``open {key:change_id, spec:_build_open_spec(change_id, worktree)}`` —
+   get-or-spawn (idempotent; the first view creates, later views attach). The
+   spec is a pty session briefed for the change, plus ``resume_ref`` when a prior
+   conversation transcript exists (focus picks up where the founder left off);
+   absent → a fresh self-orienting spawn (the #93 default).
 4. ``resize {key, rows, cols}`` from ``os.get_terminal_size`` (sent at startup).
 5. ``attach {key}``; for each streamed ``term`` line, base64-decode ``data`` and
    write the raw bytes to stdout. The first chunk is the scrollback snapshot
@@ -67,7 +70,41 @@ _SCRIPTS = Path(__file__).resolve().parent
 if str(_SCRIPTS) not in sys.path:  # pragma: no cover - cwd-dependent import guard
     sys.path.insert(0, str(_SCRIPTS))
 
+import _change_session  # noqa: E402
 from _session_manager import daemon_client  # noqa: E402
+
+
+def _build_open_spec(change_id: str, worktree: str) -> dict:
+    """Build the ``open`` spec for the change's shared pty session.
+
+    The base spec is unchanged: a pty session in the worktree, briefed for the
+    change it is FOR (``brief_change_id`` = the same key, WP-002/ADR-001).
+
+    **Resume-when-available (focus-resumes-prior-session).** When a prior
+    transcript exists for this change's pinned conversation
+    (``_change_session.has_resumable_transcript`` — a pure check on the persisted
+    ``~/.claude/projects`` transcript, independent of any daemon/session state),
+    the spec carries ``resume_ref`` = the change's deterministic pinned session
+    id, so the daemon resumes that conversation rather than spawning fresh. When
+    none exists (a never-opened change — today's fresh-spawn case) ``resume_ref``
+    is omitted and the session self-orients from the brief (the #93 default,
+    unchanged).
+
+    ``open`` is get-or-spawn/idempotent: when a session is already live the
+    existing spec wins, so ``resume_ref`` only takes effect when the daemon
+    actually spawns — the focus / janitor-reaped / recreate case. Because the
+    resumability signal is the persisted transcript (not the daemon's session
+    table), a session the janitor reaped is still resumed here (Step 3).
+    """
+    spec = {
+        "provider": "pty",
+        "cwd": worktree,
+        "io_mode": "pty",
+        "brief_change_id": change_id,
+    }
+    if _change_session.has_resumable_transcript(change_id, worktree):
+        spec["resume_ref"] = _change_session.change_session_id(change_id)
+    return spec
 
 #: How long to wait for a unary request (open/resize) ack before giving up. The
 #: socket is local IPC — a healthy daemon answers in microseconds; this bound
@@ -397,12 +434,9 @@ def main(
             "open",
             {
                 "key": change_id,
-                "spec": {
-                    "provider": "pty",
-                    "cwd": worktree,
-                    "io_mode": "pty",
-                    "brief_change_id": change_id,
-                },
+                # Resume the prior conversation when one exists; else a fresh
+                # self-orienting spawn (the #93 default). _build_open_spec.
+                "spec": _build_open_spec(change_id, worktree),
             },
             timeout=_REQUEST_TIMEOUT,
         )

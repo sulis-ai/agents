@@ -478,6 +478,57 @@ def test_audit_contracts_noop_for_single_kind(
     assert result.ok, f"single-kind set should pass: {result.error}"
 
 
+# ─── #106: audit-contracts also gates shared-fixture collisions (P6.07) ─────
+
+
+def test_audit_contracts_flags_dir_vs_file_fixture_collision(
+    tmp_project, seed_index, run_tool,
+):
+    """Two parallel same-kind WPs authoring the same logical fixture under
+    divergent dir-vs-file conventions must fail the audit (#106 / P6.07).
+    The dir/file normalisation is the crux: `sample-tool-surface/` and
+    `sample-tool-surface.json` resolve to the same logical fixture."""
+    seed_index("INDEX-minimal.md")
+    _write_wp(tmp_project.wp_dir, "WP-201", "fixture-dir", [
+        "id: WP-201", "title: Tool-surface fixture (dir)", "kind: backend",
+        "primitive: create", "status: pending",
+        "fixtures_created:",
+        "  - tests/fixtures/methodology/sample-tool-surface/",
+    ])
+    _write_wp(tmp_project.wp_dir, "WP-202", "fixture-file", [
+        "id: WP-202", "title: Tool-surface fixture (file)", "kind: backend",
+        "primitive: create", "status: pending",
+        "fixtures_created:",
+        "  - tests/fixtures/methodology/sample-tool-surface.json",
+    ])
+    result = run_tool("wpx-index", "audit-contracts", *_common(tmp_project))
+    assert not result.ok, "dir-vs-file fixture collision must fail the audit"
+    assert "sample-tool-surface" in (result.error or "")
+
+
+def test_audit_contracts_serialised_fixture_authoring_passes(
+    tmp_project, seed_index, run_tool,
+):
+    """When the consumer WP dependsOn the fixture-authoring WP, the fixture is
+    serialised (one author) — not a parallel-batch collision. Passes."""
+    seed_index("INDEX-minimal.md")
+    _write_wp(tmp_project.wp_dir, "WP-201", "fixture-dir", [
+        "id: WP-201", "title: Tool-surface fixture (dir)", "kind: backend",
+        "primitive: create", "status: pending",
+        "fixtures_created:",
+        "  - tests/fixtures/methodology/sample-tool-surface/",
+    ])
+    _write_wp(tmp_project.wp_dir, "WP-202", "fixture-consumer", [
+        "id: WP-202", "title: Consumes the fixture", "kind: backend",
+        "primitive: create", "status: pending", "dependsOn: [WP-201]",
+        "fixtures_created:",
+        "  - tests/fixtures/methodology/sample-tool-surface.json",
+    ])
+    result = run_tool("wpx-index", "audit-contracts", *_common(tmp_project))
+    assert result.ok, f"serialised fixture authoring should pass: {result.error}"
+    assert result.data["fixture_violations"] == []
+
+
 # ─── #60: lint — decompose-time canonical-header gate ─────────────────────
 
 

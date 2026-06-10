@@ -916,8 +916,16 @@ loop:
               --wp <wp> --project <slug> \
               --branch <branch> \
               --pipeline-result @<batch deploy/verify result JSON> \
-              --worktree-path <worktree>
+              --worktree-path <worktree> \
+              --from-gate-handoff
             git branch -D <branch>   # merged to main; safe to delete
+
+        **Pass `--from-gate-handoff` (#267).** On this path the WPs were
+        flipped to `step-7-complete` before the train (not `in_progress`),
+        so the wrap's INDEX flip must expect `step-7-complete`. Without the
+        flag the wrap fails (`status is 'step-7-complete', expected
+        'in_progress'`) and you end up doing its three jobs — flip,
+        worktree-remove, branch-delete — by hand for every WP.
 
         Only the calling run-all session has the per-WP worktree paths,
         so this step lives here, not in `mark-gates-complete`. Skip it on
@@ -963,6 +971,15 @@ loop:
        security_model, dev-sha-at-creation (from the sidecar at
        .architecture/{project}/work-packages/.executor-WP-NNN-dev-sha).
 
+       **Resolve the branch from the canonical emitter — do NOT
+       hand-template it (ADR-001).** In a change this yields the scoped
+       `wp/{primitive}-{slug}/wp-NNN-<slug>` shape; outside one, the legacy
+       `feat/wp-NNN-<slug>`. The emitter is what makes newly minted branches
+       collision-safe (#105/#106). Use `"$BRANCH"` for every `--branch` below.
+
+           BRANCH=$("$WPX_DIR/wpx-wp" branch-name --wp WP-NNN \
+             --project <slug> --repo-root <repo-root> | jq -r '.data.branch')
+
        **Step 8-10: invoke wpx-pipeline via top-level
        Bash(run_in_background:true).** This is the load-bearing
        v0.9.0 change — the wait happens in a deterministic Python
@@ -971,7 +988,7 @@ loop:
            Bash({
              command: """"$WPX_DIR/wpx-pipeline" run \
                 --wp WP-NNN --project <slug> \
-                --branch feat/wp-NNN-<slug> \
+                --branch "$BRANCH" \
                 --worktree-path ../wp-NNN-worktree \
                 --dev-sha-at-creation <sha-from-sidecar> \
                 --deploy-workflow "<workflow name from frontmatter>" \
@@ -1082,7 +1099,7 @@ loop:
 
            "$WPX_DIR/wpx-step12" wrap \
              --wp WP-NNN --project <slug> \
-             --branch feat/wp-NNN-<slug> \
+             --branch "$BRANCH" \
              --pipeline-result @/tmp/pipeline-result-WP-NNN.json \
              --worktree-path ../wp-NNN-worktree
 

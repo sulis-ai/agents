@@ -1,0 +1,11 @@
+{
+  "exercises": "dna:design:EEDCDTT7F40JPMXZBV2KRP1ARS",
+  "id": "dna:scenario:YR5R8PV2TTWFVBBG76FR8WMGTG",
+  "journey": "dna:workflow:3FVCRN0TWRMSSQZBPATFSQZ79H",
+  "name": "SC-08: Tool surface walk produces a second table covering every operation",
+  "state": "draft",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:7QDVYZYB1M1C17B2JSNPDJ30DR"
+  ]
+}
