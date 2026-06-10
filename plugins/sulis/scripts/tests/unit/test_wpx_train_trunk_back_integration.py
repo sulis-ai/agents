@@ -128,6 +128,95 @@ def test_step_12_5_back_integration_targets_trunk_not_dev(
     assert "origin/main" in err
 
 
+# ─── #112: change-context gate is prefix-INDEPENDENT ──────────────────────
+
+
+def _make_fire_tracker(monkeypatch, wpx_train):
+    """Patch back_integrate_change_branch to record whether the gate fired."""
+    fired: dict = {"called": False}
+
+    def fake_back_integrate(worktree, branch, dev_ref="origin/main", **kw):
+        fired["called"] = True
+        return {"status": "already_current", "change_branch": branch}
+
+    monkeypatch.setattr(
+        wpx_train, "back_integrate_change_branch", fake_back_integrate,
+    )
+    return fired
+
+
+def test_step_0_gate_fires_for_renamed_change_branch(
+    wpx_train, tmp_path, monkeypatch,
+):
+    """A change branch renamed off the change/ prefix (e.g. feature/...) must
+    STILL trigger Step 0 back-integration when in a change context — else a
+    renamed change silently stops auto-back-integrating from main (#112)."""
+    monkeypatch.setenv("SULIS_CHANGE_ID", "01HCHANGEID000000000000000")
+    fired = _make_fire_tracker(monkeypatch, wpx_train)
+
+    args = SimpleNamespace(change_worktree_path=str(tmp_path / "wt"))
+    record: dict = {}
+    wpx_train._step_0_arrival_check(
+        args, _fake_paths(tmp_path), "train-x",
+        "feature/dark-mode", record,  # NON-change/ prefix
+    )
+    assert fired["called"] is True, (
+        "Step 0 must fire for a renamed change branch in a change context."
+    )
+    assert record.get("step_0_arrival_check") != "skipped"
+
+
+def test_step_0_gate_does_not_fire_for_plain_branch(
+    wpx_train, tmp_path, monkeypatch,
+):
+    """A plain (non-change) branch with no change context must NOT trigger
+    back-integration — the gate is a change-context test, not 'any branch'."""
+    monkeypatch.delenv("SULIS_CHANGE_ID", raising=False)
+    fired = _make_fire_tracker(monkeypatch, wpx_train)
+
+    args = SimpleNamespace(change_worktree_path=str(tmp_path / "wt"))
+    record: dict = {}
+    wpx_train._step_0_arrival_check(
+        args, _fake_paths(tmp_path), "train-x",
+        "some-feature-branch", record,
+    )
+    assert fired["called"] is False
+    assert record.get("step_0_arrival_check") == "skipped"
+
+
+def test_step_12_5_gate_fires_for_renamed_change_branch(
+    wpx_train, tmp_path, monkeypatch,
+):
+    """Step 12.5 mirror of the Step 0 prefix-independence guarantee."""
+    monkeypatch.setenv("SULIS_CHANGE_ID", "01HCHANGEID000000000000000")
+    fired = _make_fire_tracker(monkeypatch, wpx_train)
+
+    args = SimpleNamespace(change_worktree_path=str(tmp_path / "wt"))
+    record: dict = {}
+    wpx_train._step_12_5_back_integration(
+        args, "train-x", "feature/dark-mode", record,
+    )
+    assert fired["called"] is True
+    assert record.get("step_12_5_back_integration") != "skipped"
+
+
+def test_step_0_gate_still_fires_for_legacy_change_prefix(
+    wpx_train, tmp_path, monkeypatch,
+):
+    """Backward-compat: a legacy change/* branch still fires the gate even with
+    no SULIS_CHANGE_ID (the prefix itself is a change-context signal)."""
+    monkeypatch.delenv("SULIS_CHANGE_ID", raising=False)
+    fired = _make_fire_tracker(monkeypatch, wpx_train)
+
+    args = SimpleNamespace(change_worktree_path=str(tmp_path / "wt"))
+    record: dict = {}
+    wpx_train._step_0_arrival_check(
+        args, _fake_paths(tmp_path), "train-x",
+        "change/feat-dark-mode", record,
+    )
+    assert fired["called"] is True
+
+
 # ─── default base-branch target + source-level guard ─────────────────────
 
 

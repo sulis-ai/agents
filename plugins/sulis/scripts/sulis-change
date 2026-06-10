@@ -80,6 +80,7 @@ from _wpxlib import (  # noqa: E402
     git_worktree_remove,
     parse_change_branch,
     read_change_metadata,
+    read_repo_contract,
     ulid_handle,
     validate_change_primitive,
     validate_change_slug,
@@ -486,6 +487,29 @@ def _metadata_path(repo_root: Path, primitive: str, slug: str) -> Path:
     return repo_root / ".changes" / f"{primitive}-{slug}.yaml"
 
 
+def _resolve_change_branch(repo_root: Path, primitive: str, slug: str) -> str:
+    """Resolve the branch for an EXISTING change (#112).
+
+    Change identity is store-backed: the recorded ``branch`` field is the
+    source of truth, so a change started under a host ``branch_convention``
+    (e.g. ``feature/...``) resolves to the SAME branch it was created on — not
+    a freshly-recomposed (possibly-different) name. Falls back to composing
+    with the repo's convention when no stored record matches (e.g. a brand-new
+    change before its record is written, or a legacy change predating the
+    record), which still yields the byte-for-byte legacy default when the
+    contract declares no convention.
+    """
+    for record in list_all_changes():
+        if (str(record.get("primitive") or "") == primitive
+                and str(record.get("slug") or "") == slug):
+            stored = record.get("branch")
+            if stored:
+                return str(stored)
+            break
+    convention = read_repo_contract(repo_root).get("branch_convention")
+    return compose_change_branch(primitive, slug, convention=convention)
+
+
 def _build_change_pre_prompt(
     change_id: str,
     handle: str,
@@ -581,7 +605,11 @@ def _push_change_branch_to_origin(repo_root: Path, branch: str) -> bool:
 def cmd_start(args: argparse.Namespace) -> None:
     repo_root = _resolve_repo_root(args)
     primitive, slug = _resolve_primitive_and_slug(args)
-    branch = compose_change_branch(primitive, slug)
+    # #112 — honour the host repo's branch convention if it declares one.
+    # Absent → compose_change_branch returns the byte-for-byte legacy
+    # change/{primitive}-{slug}.
+    convention = read_repo_contract(repo_root).get("branch_convention")
+    branch = compose_change_branch(primitive, slug, convention=convention)
     base_ref = args.base or "main"
 
     # Check the branch doesn't already exist
@@ -766,7 +794,10 @@ def cmd_start(args: argparse.Namespace) -> None:
 def cmd_adopt(args: argparse.Namespace) -> None:
     repo_root = _resolve_repo_root(args)
     primitive, slug = _resolve_primitive_and_slug(args)
-    branch = compose_change_branch(primitive, slug)
+    # #112 — adopt MINTS a new change branch, so honour the host convention
+    # (like cmd_start). Absent → byte-for-byte change/{primitive}-{slug}.
+    convention = read_repo_contract(repo_root).get("branch_convention")
+    branch = compose_change_branch(primitive, slug, convention=convention)
     base_ref = args.base or "main"
     mode = (args.mode or "forward").lower()
     remote_ref = args.remote_ref or "origin/dev"
@@ -931,7 +962,9 @@ def cmd_adopt(args: argparse.Namespace) -> None:
 def cmd_finish(args: argparse.Namespace) -> None:
     repo_root = _resolve_repo_root(args)
     primitive, slug = _resolve_primitive_and_slug(args)
-    branch = compose_change_branch(primitive, slug)
+    # #112 — resolve the EXISTING change's recorded branch (store-backed), so a
+    # change started under a host convention finishes on the SAME branch.
+    branch = _resolve_change_branch(repo_root, primitive, slug)
     base_ref = args.base or "main"
 
     # Verify the branch exists
@@ -1168,7 +1201,8 @@ def cmd_list(args: argparse.Namespace) -> None:
 def cmd_status(args: argparse.Namespace) -> None:
     repo_root = _resolve_repo_root(args)
     primitive, slug = _resolve_primitive_and_slug(args)
-    branch = compose_change_branch(primitive, slug)
+    # #112 — resolve the EXISTING change's recorded branch (store-backed).
+    branch = _resolve_change_branch(repo_root, primitive, slug)
     base_ref = args.base or "main"
 
     rc, _, _ = _run(["git", "rev-parse", "--verify", f"refs/heads/{branch}"],
@@ -1487,7 +1521,11 @@ def _resolve_nuke_target(repo_root: Path, args: argparse.Namespace) -> dict:
             context={"hint": "Run `sulis-change list` to see active changes."},
         )
 
-    candidates = find_change_branches(repo_root)
+    # #112 — dual-prefix discovery: a change renamed under the host's
+    # branch_convention (e.g. feature/...) is still nuke-targetable, and
+    # legacy change/* changes keep resolving.
+    convention = read_repo_contract(repo_root).get("branch_convention")
+    candidates = find_change_branches(repo_root, convention=convention)
     matches = []
     for c in candidates:
         dest = change_worktree_path(repo_root, c["primitive"], c["slug"])
@@ -1987,7 +2025,9 @@ def cmd_recreate(args: argparse.Namespace) -> None:
         if not args.slug:
             emit_error("--handle or --slug is required")
         primitive, slug = _resolve_primitive_and_slug(args)
-        branch = compose_change_branch(primitive, slug)
+        # #112 — resolve the stored branch (store-backed) so a change started
+        # under a host convention recreates on the SAME branch.
+        branch = _resolve_change_branch(repo_root, primitive, slug)
         for r in list_all_changes():
             if str(r.get("branch", "")) == branch:
                 record = r

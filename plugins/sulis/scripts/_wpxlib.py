@@ -809,12 +809,15 @@ def read_repo_contract(repo_root: Path) -> dict:
     """Parse `.sulis/repo-contract.yml` into a normalised dict.
 
     Returns {profile, contribution_model, artifacts: [{name, type}],
-    deploy_target}. A missing file returns the all-None/empty shape (callers
-    treat that as the strict deployable default).
+    deploy_target, branch_convention}. A missing file returns the
+    all-None/empty shape (callers treat that as the strict deployable
+    default; an absent ``branch_convention`` means the change tooling
+    composes the byte-for-byte ``change/{primitive}-{slug}`` default — #112).
     """
     result: dict = {
         "profile": None, "contribution_model": None,
         "artifacts": [], "deploy_target": None,
+        "branch_convention": None,
     }
     contract = Path(repo_root) / ".sulis" / "repo-contract.yml"
     if not contract.is_file():
@@ -835,6 +838,10 @@ def read_repo_contract(repo_root: Path) -> dict:
                 result["contribution_model"] = _rc_strip_value(stripped.split(":", 1)[1]) or None
             elif stripped.startswith("deploy_target:"):
                 result["deploy_target"] = _rc_strip_value(stripped.split(":", 1)[1]) or None
+            elif stripped.startswith("branch_convention:"):
+                result["branch_convention"] = (
+                    _rc_strip_value(stripped.split(":", 1)[1]) or None
+                )
             elif stripped.startswith("artifacts:"):
                 in_artifacts = True
             continue
@@ -4245,8 +4252,41 @@ def validate_change_primitive(primitive: str) -> tuple[bool, str]:
     return True, ""
 
 
-def compose_change_branch(primitive: str, slug: str) -> str:
-    """Compose a CW-02 branch name: change/{primitive}-{slug}.
+# The legacy, byte-for-byte branch convention. Used as the default when a repo
+# declares no ``branch_convention`` in its contract (#112) — zero behaviour
+# change for every repo that does not opt in.
+LEGACY_CHANGE_BRANCH_CONVENTION = "change/{primitive}-{slug}"
+
+
+def _normalise_branch_convention(convention: str | None) -> str:
+    """Resolve a raw ``branch_convention`` value to a usable template.
+
+    - ``None``/empty/whitespace → the legacy ``change/{primitive}-{slug}``.
+    - A bare prefix (no ``{...}`` placeholder, ends in ``/``) → composes
+      ``<prefix>{slug}`` (e.g. ``feature/`` → ``feature/{slug}``).
+    - Anything else is taken verbatim as a template.
+    """
+    if convention is None:
+        return LEGACY_CHANGE_BRANCH_CONVENTION
+    conv = convention.strip()
+    if not conv:
+        return LEGACY_CHANGE_BRANCH_CONVENTION
+    if "{" not in conv:
+        # Bare prefix → compose <prefix>{slug}. Tolerate a missing trailing /.
+        return (conv if conv.endswith("/") else conv + "/") + "{slug}"
+    return conv
+
+
+def compose_change_branch(primitive: str, slug: str, *,
+                          convention: str | None = None) -> str:
+    """Compose a change branch name from the host repo's convention (#112).
+
+    With ``convention=None`` (the default — the key absent from the repo
+    contract) the result is the legacy CW-02 ``change/{primitive}-{slug}``
+    byte-for-byte. A repo MAY declare a ``branch_convention`` template
+    supporting ``{primitive}`` and ``{slug}`` placeholders (e.g.
+    ``feature/{slug}``), or a bare prefix (``feature/``) which composes
+    ``<prefix>{slug}``.
 
     Raises ValueError on invalid primitive or slug.
     """
@@ -4256,11 +4296,68 @@ def compose_change_branch(primitive: str, slug: str) -> str:
     ok, reason = validate_change_slug(slug)
     if not ok:
         raise ValueError(reason)
-    return f"change/{primitive.lower()}-{slug.lower()}"
+    template = _normalise_branch_convention(convention)
+    # Substitute the supported placeholders only; an unrecognised placeholder
+    # (e.g. {ticket}, out of scope for slice 1) is left verbatim rather than
+    # raising KeyError — degrading loudly-but-safely instead of crashing
+    # cmd_start. The minimum supported set is {primitive} and {slug}.
+    return (template
+            .replace("{primitive}", primitive.lower())
+            .replace("{slug}", slug.lower()))
 
 
-def parse_change_branch(branch: str) -> tuple[str, str] | None:
-    """Inverse of compose_change_branch. Returns (primitive, slug) or None."""
+def _parse_with_convention(branch: str, convention: str) -> tuple[str, str] | None:
+    """Try to recover (primitive, slug) from ``branch`` under one template.
+
+    Supports the two placeholder shapes the composer emits:
+    ``<prefix>{slug}`` and ``<prefix>{primitive}-{slug}``. Returns None when
+    the branch does not match the template's prefix/shape.
+    """
+    template = _normalise_branch_convention(convention)
+    # Split the template on its first placeholder to recover the literal prefix.
+    brace = template.find("{")
+    if brace == -1:
+        return None
+    prefix = template[:brace]
+    if not branch.startswith(prefix):
+        return None
+    rest = branch[len(prefix):]
+    tail = template[brace:]
+    if tail == "{primitive}-{slug}":
+        if "-" not in rest:
+            return None
+        first, _, slug = rest.partition("-")
+        if first not in ALLOWED_CHANGE_PRIMITIVES:
+            return None
+        return (first, slug)
+    if tail == "{slug}":
+        # No primitive encoded in the branch — the slug is the whole tail.
+        # The primitive is not recoverable from the name; the store-backed
+        # record holds it. Return a sentinel primitive so callers that need
+        # (primitive, slug) for a worktree path still function; the change's
+        # recorded manifest is authoritative.
+        if not rest:
+            return None
+        return ("feat", rest)
+    # Unrecognised template shape → not parseable here.
+    return None
+
+
+def parse_change_branch(branch: str, *,
+                        convention: str | None = None) -> tuple[str, str] | None:
+    """Inverse of compose_change_branch. Returns (primitive, slug) or None.
+
+    Dual-prefix (#112): when a ``convention`` is supplied, the configured
+    template is tried FIRST, then the legacy ``change/{primitive}-{slug}`` is
+    UNIONED in — so a renamed ``feature/...`` change parses AND every existing
+    ``change/*`` branch keeps resolving. Mirrors ``resolve_wp_branch``'s
+    dual-prefix tolerance.
+    """
+    if convention is not None and convention.strip():
+        parsed = _parse_with_convention(branch, convention)
+        if parsed is not None:
+            return parsed
+    # Legacy change/ prefix (always honoured — the union half).
     if not branch.startswith("change/"):
         return None
     rest = branch[len("change/"):]
@@ -4810,49 +4907,83 @@ def adopt_local_commits_into_change(
     )
 
 
-def find_change_branches(repo_root: Path) -> list[dict]:
-    """List all change/* branches in the local repo with basic state.
+def _convention_glob(convention: str | None) -> str | None:
+    """Return the ``git branch --list`` glob for a configured convention.
+
+    e.g. ``feature/{slug}`` → ``feature/*``. Returns None when the convention
+    is absent/legacy (the ``change/*`` glob already covers it) so callers don't
+    double-glob the legacy prefix.
+    """
+    if convention is None or not convention.strip():
+        return None
+    template = _normalise_branch_convention(convention)
+    brace = template.find("{")
+    prefix = template[:brace] if brace != -1 else template
+    if not prefix or prefix == "change/":
+        return None
+    return prefix.rstrip("/") + "/*"
+
+
+def find_change_branches(repo_root: Path, *,
+                         convention: str | None = None) -> list[dict]:
+    """List change branches in the local + origin repo with basic state.
+
+    Dual-prefix (#112): globs the legacy ``change/*`` UNION the configured
+    ``branch_convention`` prefix (e.g. ``feature/*``), so a renamed change is
+    discoverable by ``cmd_nuke`` / ``resolve_current_change`` AND existing
+    ``change/*`` changes keep resolving.
 
     Returns a list of dicts:
       [{"branch": str, "primitive": str, "slug": str, "current": bool}, ...]
     """
-    rc, out, _ = _run(["git", "branch", "--list", "change/*"],
-                     cwd=repo_root, timeout=10)
-    if rc != 0:
-        return []
+    # Local globs: legacy change/* always, plus the configured prefix if any.
+    local_globs = ["change/*"]
+    conv_glob = _convention_glob(convention)
+    if conv_glob is not None:
+        local_globs.append(conv_glob)
 
     result: list[dict] = []
     seen: set[str] = set()
-    for raw in out.splitlines():
-        line = raw.rstrip()
-        if not line:
+    for glob in local_globs:
+        rc, out, _ = _run(["git", "branch", "--list", glob],
+                          cwd=repo_root, timeout=10)
+        if rc != 0:
             continue
-        # git branch output: "* branch" (current), "+ branch" (other
-        # worktree), "  branch" (uncheckout). Strip the marker.
-        is_current = line.startswith("* ")
-        branch = line.lstrip("*+ \t").strip()
-        if not branch:
-            continue
-        parsed = parse_change_branch(branch)
-        if parsed is None:
-            continue
-        primitive, slug = parsed
-        seen.add(branch)
-        result.append({
-            "branch": branch,
-            "primitive": primitive,
-            "slug": slug,
-            "current": is_current,
-        })
+        for raw in out.splitlines():
+            line = raw.rstrip()
+            if not line:
+                continue
+            # git branch output: "* branch" (current), "+ branch" (other
+            # worktree), "  branch" (uncheckout). Strip the marker.
+            is_current = line.startswith("* ")
+            branch = line.lstrip("*+ \t").strip()
+            if not branch or branch in seen:
+                continue
+            parsed = parse_change_branch(branch, convention=convention)
+            if parsed is None:
+                continue
+            primitive, slug = parsed
+            seen.add(branch)
+            result.append({
+                "branch": branch,
+                "primitive": primitive,
+                "slug": slug,
+                "current": is_current,
+            })
 
     # Also surface origin-only change branches (a teammate's change pulled but
     # not checked out locally). Strip the `origin/` prefix to the logical
     # branch name; skip any already listed as a local branch. (L-01)
-    rrc, rout, _ = _run(
-        ["git", "branch", "--list", "--remotes", "origin/change/*"],
-        cwd=repo_root, timeout=10,
-    )
-    if rrc == 0:
+    remote_globs = ["origin/change/*"]
+    if conv_glob is not None:
+        remote_globs.append("origin/" + conv_glob)
+    for glob in remote_globs:
+        rrc, rout, _ = _run(
+            ["git", "branch", "--list", "--remotes", glob],
+            cwd=repo_root, timeout=10,
+        )
+        if rrc != 0:
+            continue
         for raw in rout.splitlines():
             line = raw.strip()
             if not line or "->" in line:  # skip "origin/HEAD -> origin/dev"
@@ -4863,7 +4994,7 @@ def find_change_branches(repo_root: Path) -> list[dict]:
                 continue
             if branch in seen:
                 continue
-            parsed = parse_change_branch(branch)
+            parsed = parse_change_branch(branch, convention=convention)
             if parsed is None:
                 continue
             primitive, slug = parsed
@@ -4923,6 +5054,11 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
     else:
         repo_root = Path(repo_root).resolve()
 
+    # #112 — honour the host branch convention for dual-prefix discovery, so a
+    # change renamed off change/ (e.g. feature/...) still resolves. Absent →
+    # None → legacy change/* behaviour byte-for-byte.
+    convention = read_repo_contract(repo_root).get("branch_convention")
+
     checked: list[str] = []
 
     # 1. Self: current branch + metadata committed at repo_root/.changes/.
@@ -4930,7 +5066,7 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
         ["git", "branch", "--show-current"], cwd=repo_root, timeout=10,
     )
     if rc == 0:
-        parsed = parse_change_branch(branch_out.strip())
+        parsed = parse_change_branch(branch_out.strip(), convention=convention)
         if parsed is not None:
             primitive, slug = parsed
             self_meta = repo_root / ".changes" / f"{primitive}-{slug}.yaml"
@@ -4968,7 +5104,7 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
 
     # 3. Sibling worktree iteration (driving from the main repo; includes
     #    origin-only change branches via find_change_branches).
-    for entry in find_change_branches(repo_root):
+    for entry in find_change_branches(repo_root, convention=convention):
         primitive = entry["primitive"]
         slug = entry["slug"]
         worktree_dest = change_worktree_path(repo_root, primitive, slug)
@@ -5008,6 +5144,41 @@ def current_change_scope(repo_root: Path | None = None) -> str | None:
     if not primitive or not slug:
         return None
     return f"{primitive}-{slug}"
+
+
+def is_change_context(base_branch: str | None = None,
+                      repo_root: Path | None = None) -> bool:
+    """True iff the current run is operating on a CHANGE branch (#112).
+
+    Prefix-INDEPENDENT change-context test for the wpx-train back-integration
+    gates. The previous gates literal-tested ``base_branch.startswith("change/")``
+    — which silently STOPS auto-back-integrating a change branch renamed under
+    a host ``branch_convention`` (e.g. ``feature/...``). This restores the gate
+    on a store-backed / env signal instead of the annotation prefix:
+
+      1. ``SULIS_CHANGE_ID`` set → unambiguously a change context.
+      2. ``base_branch`` is a legacy ``change/*`` branch → backward-compat
+         signal (the prefix itself, when present, still means "change").
+      3. ``base_branch`` matches the recorded ``branch`` field of any change in
+         the store (``list_all_changes``) → covers a renamed branch with no
+         env var set (driving from the main repo).
+
+    Returns False when none hold (a plain dev/main/feature branch with no
+    change context) — the gate then skips, exactly as before for non-changes.
+    """
+    if os.environ.get(SULIS_CHANGE_ID_ENV_VAR):
+        return True
+    if base_branch:
+        if base_branch.startswith("change/"):
+            return True
+        try:
+            from _change_state import list_all_changes  # lazy: import coupling
+            for record in list_all_changes():
+                if str(record.get("branch") or "") == base_branch:
+                    return True
+        except Exception:
+            pass  # best-effort; store unavailable → fall through
+    return False
 
 
 def back_integrate_change_branch(
