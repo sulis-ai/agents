@@ -1,3 +1,9 @@
+## v0.137.0 — 2026-06-10
+
+**Minor — release-train batch.**
+
+- Vendored brain schemas updated for the deploy-topology ontology (DR-034 in sulis-brain): Workflow.for_environment_ref, Trigger branch-push kind, Project.release_model — additive optional fields so the brain can express how a branch promotes to an environment and by what mechanism.
+
 ## v0.136.0 — 2026-06-10
 
 **Minor — release-train batch.**

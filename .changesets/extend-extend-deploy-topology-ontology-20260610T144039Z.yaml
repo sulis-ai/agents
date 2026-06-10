@@ -1,7 +1,0 @@
-change_id: extend-deploy-topology-ontology
-primitive: extend
-tier: minor
-touches_plugin: true
-summary: |
-  Vendored brain schemas updated for the deploy-topology ontology (DR-034 in sulis-brain): Workflow.for_environment_ref, Trigger branch-push kind, Project.release_model — additive optional fields so the brain can express how a branch promotes to an environment and by what mechanism.
-created_at: 2026-06-10T14:40:39Z
