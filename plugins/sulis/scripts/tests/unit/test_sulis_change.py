@@ -405,6 +405,44 @@ def test_resolve_from_inside_worktree_via_self_branch(monkeypatch, tmp_path):
     assert result["branch"] == branch
 
 
+def test_resolve_prefers_worktree_over_stale_env_var(monkeypatch, tmp_path, capsys):
+    """#244 — cwd is INSIDE change worktree B (branch + committed manifest for
+    B), but SULIS_CHANGE_ID points at a DIFFERENT change A (a stale shell
+    value). The worktree is the reliable signal: resolve must return B's
+    metadata (not silently chase A in a sibling worktree at step 3) and warn
+    loudly that the env var is stale."""
+    # Env var points at an unrelated change A; the worktree is change B.
+    stale_other_change = "01HZZZZZZZZZZZZZZZZZZZZZZZZ"
+    monkeypatch.setenv("SULIS_CHANGE_ID", stale_other_change)
+    branch = _seed_change_metadata(tmp_path)  # seeds change B == _CHANGE_ID
+
+    sibling_iterated = {"n": 0}
+
+    def fake_run(cmd, cwd=None, timeout=None, **kwargs):
+        if cmd[:3] == ["git", "branch", "--show-current"]:
+            return (0, branch + "\n", "")
+        # If resolution reaches step 3's sibling iteration, that's the bug.
+        if cmd[:4] == ["git", "branch", "--list", "change/*"]:
+            sibling_iterated["n"] += 1
+            return (0, "", "")
+        return (1, "", "unexpected")
+
+    monkeypatch.setattr("_wpxlib._run", fake_run)
+    from _wpxlib import resolve_current_change
+    result = resolve_current_change(repo_root=tmp_path)
+
+    # Returns the WORKTREE's change (B), never the stale env var's change (A).
+    assert result is not None
+    assert result["change_id"] == _CHANGE_ID
+    assert result["branch"] == branch
+    # And it warned loudly about the stale env var.
+    err = capsys.readouterr().err
+    assert "disagrees with the worktree's change" in err
+    assert stale_other_change in err
+    # It did NOT fall through to silently chase A in a sibling worktree.
+    assert sibling_iterated["n"] == 0
+
+
 def test_resolve_via_changes_scan_when_branch_unhelpful(monkeypatch, tmp_path):
     """Detached HEAD / odd branch name, but committed metadata is present →
     the .changes/ scan finds it by change_id."""
