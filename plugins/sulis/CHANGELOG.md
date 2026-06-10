@@ -1,3 +1,9 @@
+## v0.133.0 — 2026-06-10
+
+**Minor — release-train batch.**
+
+- /sulis:change focus now resumes the change prior conversation when one exists (deterministic pinned session id per change), instead of always starting fresh — and a janitor-reaped session is resumable because it keys off the persisted transcript, not the live daemon. Falls back to the fresh self-orienting spawn when there is nothing to resume.
+
 ## v0.132.4 — 2026-06-10
 
 **Patch — release-train batch.**
