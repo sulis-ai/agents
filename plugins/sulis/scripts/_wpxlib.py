@@ -4939,6 +4939,25 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
                 metadata = read_change_metadata(self_meta)
                 if metadata.get("change_id") == change_id:
                     return metadata
+                # #244 — the cwd IS a change worktree (current branch is a
+                # change/* branch with a committed manifest), but its change_id
+                # DISAGREES with the inherited SULIS_CHANGE_ID (a stale shell
+                # value left over from another change). The worktree — branch +
+                # committed manifest — is the reliable signal; the env var is
+                # the stale one. Prefer the worktree's change and warn loudly,
+                # rather than silently resolving the env var's UNRELATED change
+                # from a sibling worktree at step 3 (which would let stage/ship
+                # act on the wrong change).
+                print(
+                    f"resolve_current_change: SULIS_CHANGE_ID={change_id} "
+                    f"disagrees with the worktree's change "
+                    f"{metadata.get('change_id')} (branch "
+                    f"{branch_out.strip()!r}). The env var is stale; using the "
+                    f"worktree's change. Run `unset SULIS_CHANGE_ID` (or "
+                    f"re-spawn the session) to clear it.",
+                    file=sys.stderr,
+                )
+                return metadata
 
     # 2. Scan repo_root/.changes/ for any manifest matching this change_id.
     changes_dir = repo_root / ".changes"
