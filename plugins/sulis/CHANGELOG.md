@@ -1,3 +1,9 @@
+## v0.135.0 — 2026-06-10
+
+**Minor — release-train batch.**
+
+- sulis-change mark-shipped now refuses to flip a change to shipped unless the merge to main is confirmed (merged-PR signal, or an explicit --merge-sha verified against origin/main), pins shipped_sha to the real merge commit, and records any --force override. Shipped can no longer mean not-actually-on-main.
+
 ## v0.134.1 — 2026-06-10
 
 **Patch — release-train batch.**

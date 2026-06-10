@@ -29,6 +29,7 @@ Specification: plugins/sulis/references/change-work-standard.md
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import sys
@@ -365,16 +366,80 @@ def _change_own_commit_count(repo_root: Path, base_sha: str,
         return None
 
 
+def _confirm_merged_to_main(
+    repo_root: Path,
+    branch: str,
+    *,
+    merge_sha: str | None,
+    run=None,
+) -> str | None:
+    """Confirm ``branch`` actually landed on ``main`` (#111 ship-integrity).
+
+    Returns the MERGE COMMIT sha on ``main`` (the true shipped state) when the
+    merge is confirmed, else ``None``. Never raises and never mutates anything —
+    a pure confirmation probe.
+
+    Why not ``git merge-base --is-ancestor <branchtip> origin/main``: the ship
+    flow squash-merges (``gh pr merge --squash``), which creates a brand-new
+    commit on ``main`` with NO ancestry link back to the change-branch tip. So
+    the branch tip is never an ancestor of ``main`` even when the work landed —
+    that check would reject every squash-merged change. Two reliable signals:
+
+    1. Primary (authoritative): a merged PR for this branch into ``main``
+       (``gh pr list --head <branch> --base main --state merged``). GitHub
+       records the real merge; its ``mergeCommit.oid`` IS the shipped state.
+    2. Alternate (manual merges): an explicit ``--merge-sha`` that is an
+       ancestor of ``origin/main`` (``git merge-base --is-ancestor``). Here the
+       caller supplies the merge commit directly, so the ancestry check is
+       valid (a real merge/ff commit, not a squashed branch tip).
+
+    The ``run`` seam (default ``_run``) is injectable so tests stub it without
+    touching the network. Resolved at call time (not bound as a default) so a
+    monkeypatched module-level ``_run`` is honoured.
+    """
+    if run is None:
+        run = _run
+    # 1. Authoritative: a merged PR for this branch into main.
+    rc, out, _err = run(
+        ["gh", "pr", "list", "--head", branch, "--base", "main",
+         "--state", "merged", "--json", "number,mergeCommit,mergedAt"],
+        cwd=repo_root, timeout=30,
+    )
+    if rc == 0 and out.strip():
+        try:
+            prs = json.loads(out)
+        except (json.JSONDecodeError, ValueError):
+            prs = []
+        for pr in prs if isinstance(prs, list) else []:
+            oid = ((pr or {}).get("mergeCommit") or {}).get("oid")
+            if oid:
+                return str(oid)
+
+    # 2. Alternate: an explicit merge sha that landed on origin/main.
+    if merge_sha:
+        rc, _out, _err = run(
+            ["git", "merge-base", "--is-ancestor", merge_sha, "origin/main"],
+            cwd=repo_root, timeout=10,
+        )
+        if rc == 0:
+            return merge_sha
+
+    return None
+
+
 def _archive_after_ship(repo_root: Path, change_id: str, branch: str,
-                        worktree_dest: Path, *, remove_worktree: bool) -> dict:
+                        worktree_dest: Path, *, remove_worktree: bool,
+                        shipped_sha_override: str | None = None) -> dict:
     """Mark a change shipped (+ pin shipped_sha) and optionally remove its
     worktree. The SINGLE source both ship paths share — `finish --merge`
     (this script) and `mark-shipped` (the gh-based `/sulis:change ship`
     skill) — so the post-ship state can never drift between them.
 
     Pins ``shipped_sha`` = the change-branch tip ("the state it was in when
-    we shipped"). Keeps the branch + record (the audit trail). Returns the
-    ``archived`` dict for the command's JSON output.
+    we shipped"), UNLESS ``shipped_sha_override`` is given — then it pins that
+    (the merge commit on ``main``, the true shipped state; #111). Keeps the
+    branch + record (the audit trail). Returns the ``archived`` dict for the
+    command's JSON output.
     """
     # #272 — refuse to ship an EMPTY change. A change whose branch carries zero
     # commits of its own beyond its base built nothing; marking it shipped (and
@@ -395,9 +460,14 @@ def _archive_after_ship(repo_root: Path, change_id: str, branch: str,
                      "base_sha": base_sha, "own_commits": own_commits},
         )
 
-    rc, sha_out, _ = _run(["git", "rev-parse", f"refs/heads/{branch}"],
-                          cwd=repo_root, timeout=10)
-    shipped_sha = sha_out.strip() if rc == 0 else ""
+    if shipped_sha_override:
+        # #111 — pin the MERGE COMMIT on main (the true shipped state), not the
+        # local branch tip (which a squash-merge orphans).
+        shipped_sha = shipped_sha_override.strip()
+    else:
+        rc, sha_out, _ = _run(["git", "rev-parse", f"refs/heads/{branch}"],
+                              cwd=repo_root, timeout=10)
+        shipped_sha = sha_out.strip() if rc == 0 else ""
     record_path = mark_change_shipped(str(change_id),
                                       shipped_sha=shipped_sha or None)
     archived = {
@@ -1741,6 +1811,16 @@ def build_parser() -> argparse.ArgumentParser:
                                 help="Change handle (e.g. CH-01HYQC) to resolve the ULID")
     p_mark_shipped.add_argument("--repo-root", default=os.getcwd(),
                                 help="Path to the repo root (default: cwd)")
+    p_mark_shipped.add_argument(
+        "--merge-sha", default=None,
+        help="The merge commit on main (for a manual merge with no PR). "
+             "Verified to be an ancestor of origin/main before shipping (#111).")
+    p_mark_shipped.add_argument(
+        "--force", action="store_true",
+        help="Override the #111 ship-integrity guard and mark shipped even "
+             "without a confirmed merge to main. Records the override on the "
+             "change record + stderr. For genuine edge cases only; never the "
+             "default.")
 
     p_nuke = sub.add_parser(
         "nuke",
@@ -1813,8 +1893,47 @@ def cmd_mark_shipped(args: argparse.Namespace) -> None:
     worktree_dest = Path(record.get("worktree_path")
                          or change_worktree_path(repo_root, primitive, slug))
 
+    # #111 — ship-integrity guard. 'shipped' MUST be impossible without a
+    # confirmed merge to `main`. This guard lives INSIDE the tool so it holds
+    # regardless of caller (a flailing/reaped session can't mark a non-merged
+    # change shipped + delete its branch, as happened to CH-7BF1VZ in #110).
+    force = bool(getattr(args, "force", False))
+    merge_sha = getattr(args, "merge_sha", None)
+    confirmed_sha = _confirm_merged_to_main(
+        repo_root, branch, merge_sha=merge_sha)
+    if confirmed_sha is None and not force:
+        emit_error(
+            f"change {change_id} is not merged to main — refusing to mark "
+            f"shipped. The squash-merge into main could not be confirmed "
+            f"(no merged PR for branch {branch!r}). If you merged manually, "
+            f"re-run with --merge-sha <the merge commit on main>; to override "
+            f"the guard anyway, pass --force.",
+            context={"change_id": change_id, "branch": branch,
+                     "merge_sha": merge_sha},
+        )
+        return  # for type checker (emit_error exits)
+
+    # The state we PIN as shipped: the confirmed merge commit on main (the
+    # true shipped state). On a --force override with no confirmation we have
+    # no merge commit, so _archive_after_ship falls back to the branch tip.
+    override_note = None
+    if confirmed_sha is None and force:
+        override_note = (
+            f"--force override: marked shipped WITHOUT a confirmed merge to "
+            f"main (branch {branch!r}). No merged PR was found and no valid "
+            f"--merge-sha was supplied. This bypasses the #111 ship-integrity "
+            f"guard — use only for genuine edge cases."
+        )
+        print(f"WARNING: {override_note}", file=sys.stderr)
+
     archived = _archive_after_ship(repo_root, str(change_id), branch,
-                                   worktree_dest, remove_worktree=True)
+                                   worktree_dest, remove_worktree=True,
+                                   shipped_sha_override=confirmed_sha)
+    # Record the override on the change record for the audit trail.
+    if override_note is not None:
+        rec_for_note = read_change_record(str(change_id)) or {}
+        rec_for_note["ship_override"] = override_note
+        write_change_record(str(change_id), rec_for_note)
     record = read_change_record(str(change_id)) or {}
 
     # Brain emission — LifecycleRun for the ship event. Best-effort
