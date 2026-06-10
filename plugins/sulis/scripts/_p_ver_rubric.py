@@ -48,6 +48,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from _wpxlib import is_wp_id_filename
+
 _CANONICAL_REL_PATH = "plugins/sulis/references/standards/VERIFICATION_QUESTIONS.md"
 
 _PLACEHOLDER_TOKENS = ("TBD", "tbd", "TODO", "todo", "…", "FIXME")
@@ -107,8 +109,11 @@ def run_p_ver(fixture_dir: Path) -> Verdict:
     # ----- Per-artifact checks: SRD + TDD (9.01, 9.02, 9.03, 9.06, 9.04) -----
     for artifact in sorted(fixture_dir.glob("*.md")):
         name = artifact.name
-        # WPs run their own check set; skip them here.
-        if name.startswith("WP-"):
+        # WPs run their own check set; skip them here. is_wp_id_filename
+        # recognises prefixed `CH-…-WP-NNN-*.md` files too (they start with
+        # `CH-`, so the old `startswith("WP-")` mis-classified them as
+        # SRD/TDD artifacts) — ADR-001 single-source matcher.
+        if is_wp_id_filename(name):
             continue
         text = artifact.read_text(encoding="utf-8")
         for check in (
