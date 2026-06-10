@@ -1,3 +1,9 @@
+## v0.134.0 — 2026-06-10
+
+**Minor — release-train batch.**
+
+- Decompose validation now catches when two parallel Work Packages would author the same test fixture under divergent conventions (dir-vs-file logical-name match), failing at planning time with a serialize-or-hoist remedy instead of only surfacing at integration. Adds the one-upstream-author fixtures convention and the gate that enforces it.
+
 ## v0.133.0 — 2026-06-10
 
 **Minor — release-train batch.**
