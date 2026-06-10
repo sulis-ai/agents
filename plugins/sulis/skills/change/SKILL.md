@@ -162,6 +162,22 @@ before running anything:
   --spawn
 ```
 
+> **`--intent` MUST be the founder's own words, copied VERBATIM (MUST).**
+> `--intent` is the literal text the founder typed when asking to start the
+> change — copied exactly, trimmed only of surrounding whitespace. It is the
+> brief the spawned session opens on and the record it self-orients from, so it
+> MUST be the founder's words and **never** the agent's. **Do NOT** put a
+> paraphrase, a summary, a derived sentence, the plan sentence from step 4, a
+> greeting, an acknowledgement, or ANY other model-generated text into
+> `--intent` — and never concatenate the founder's words with your own
+> turn-state (greeting + plan + reply). If your reply this turn contained a
+> greeting or a plan, none of that belongs in `--intent`: only the founder's
+> request does. **If you have no founder text to copy** (e.g. the founder said
+> only "start a change"), ask the founder for one line describing the work and
+> use that verbatim — do **not** synthesize an intent. The `--slug` and
+> `--primitive` are agent-*derived* (steps 1-2) and stay so; `--intent` alone
+> is the founder's verbatim copy.
+
 `--spawn` is what opens the desktop window: the tool creates the
 `change/{primitive}-{slug}` branch + a dedicated worktree, writes the
 recon `CONTEXT.md`, and opens a desktop window that shows a **live view of
@@ -1010,6 +1026,15 @@ them the dashboard updates on its own as work progresses, and point them at
 
 ## Gotchas
 
+- **`--intent` is the founder's VERBATIM words — never your own.** At `start`,
+  `--intent` carries the literal text the founder typed, trimmed only of
+  surrounding whitespace. Never splice your turn-state into it: a greeting
+  ("I'm ready to help…"), the plan sentence you echoed in step 4, an
+  acknowledgement, or any paraphrase must NOT end up in `--intent`. The classic
+  leak is the agent's own reply getting concatenated into the middle of the
+  brief — the spawned session then opens on a contaminated intent. The slug and
+  primitive are agent-derived and correct; only the intent is a verbatim copy.
+  If there's no founder text to copy, ask for one line — don't synthesize.
 - **Operator vocabulary must not leak into what the founder reads.** The
   tools emit `branch`, `worktree_path`, `base_sha`, `change_id`,
   `spawn_result.status`. Translate at the seam: lead with the readable name
@@ -1090,6 +1115,13 @@ them the dashboard updates on its own as work progresses, and point them at
   founder sees a change.
 - **Slug** — the short kebab-case name a founder recognises
   (`fix-login-bug`); part of the branch name.
+- **Intent** — the founder's own one-line description of the work, copied
+  VERBATIM into `--intent` at `start` (trimmed only of surrounding whitespace).
+  It is the brief the change's session opens on. It is **always the founder's
+  words, never the agent's** — never a paraphrase, plan sentence, greeting, or
+  any model-generated text. When no founder text is available, ask for one line
+  rather than synthesizing one. (Unlike the slug and primitive, which the agent
+  derives, the intent is a faithful copy.)
 - **Primitive** — the kind of change, from the 22-primitive vocabulary
   (`../../references/change-primitives.md`); translated to a plain noun in
   founder-mode ("bug fix", "new feature", "restructuring").
