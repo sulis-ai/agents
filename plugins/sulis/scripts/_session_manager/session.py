@@ -526,6 +526,20 @@ class Session:
             self.last_activity = time.monotonic()
         self.start_pumps()
 
+    def mark_active(self) -> None:
+        """Bump ``last_activity`` to now under the session lock (§2.3).
+
+        The single, lock-guarded place a non-output activity signal touches the
+        idle clock. ``last_activity`` is otherwise bumped only when the manager
+        *submits* a turn or a pump *appends output* — but a pty session bumps it
+        purely on output bytes, so a turn that produces no output for longer than
+        the idle timeout (claude thinking, a long quiet tool) looks idle even
+        though work is in flight (#108). Keystroke feed and the periodic liveness
+        signal call this so genuine in-use activity that the output clock misses
+        still resets the idle timer — without forking a second activity field."""
+        with self._lock:
+            self.last_activity = time.monotonic()
+
     # ── submit side: the decoupling invariant (§2.2) ───────────────────────
 
     def submit(self, command: str) -> int:

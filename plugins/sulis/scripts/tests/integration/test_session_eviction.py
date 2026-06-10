@@ -47,6 +47,14 @@ from _session_manager.maintenance import (
 )
 from _session_manager.manager import SessionManager
 
+# A real pty-backed child + adapter (no mocks) so the viewer-exemption test
+# drives an attach against a real ``os.openpty()`` session — the same trio
+# tests/unit/test_viewer.py uses (EP-03, single home under tests/lib).
+_SCRIPTS_DIR = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(_SCRIPTS_DIR / "tests" / "lib"))
+import fake_claude_child  # noqa: E402
+from session_child_adapters import PtyChildAdapter as _PtyChildAdapter  # noqa: E402
+
 # Bounded wait for the few genuinely-threaded assertions (a child that kills
 # itself): long enough never to flake on a loaded runner, short enough that a
 # real hang fails fast.
@@ -225,6 +233,98 @@ def test_active_session_not_evicted(tmp_path):
 
         assert "k" in mgr.status_keys()
         assert mgr.is_alive(session)
+    finally:
+        mgr.close("k")
+
+
+def test_in_use_session_with_viewer_not_idle_evicted(tmp_path):
+    """An in-use pty session with an ATTACHED viewer is NEVER idle-evicted, even
+    when its ``last_activity`` is well past the idle timeout (#108).
+
+    A pty session bumps ``last_activity`` only on output bytes, so a turn that is
+    quiet for longer than the idle timeout (claude thinking, a long quiet tool)
+    looks idle to the tick — but an attached desktop window is definitionally
+    in-use, so the tick must exempt it. A second, viewer-less pty session that is
+    equally idle is still reaped, proving the exemption is scoped to in-use
+    sessions and the genuine-idle reap is intact.
+    """
+    child = fake_claude_child.write_child(tmp_path)
+    mgr = SessionManager(
+        {"pty": _PtyChildAdapter(child)},
+        idle_timeout=10.0,
+        start_maintenance=False,
+    )
+    try:
+        spec = SessionSpec(provider="pty", cwd=str(tmp_path), io_mode="pty")
+        watched = mgr.open("watched", spec)
+        headless = mgr.open("headless", spec)
+
+        # Attach a viewer to "watched" — it is now visible/in-use.
+        viewer = mgr.attach("watched")
+        assert mgr.health("watched").viewer_count == 1
+        assert mgr.health("headless").viewer_count == 0
+
+        # Make BOTH look idle: last activity well past the timeout, on the clock
+        # the tick actually uses (no sleep-based flakiness).
+        idle = mgr._maintenance.clock() - 100.0
+        watched.last_activity = idle
+        headless.last_activity = idle
+
+        mgr._maintenance_tick()
+
+        # The watched (attached) session survives; the headless idle one is reaped.
+        keys = mgr.status_keys()
+        assert "watched" in keys, (
+            "an in-use session with an attached viewer must not be idle-evicted (#108)"
+        )
+        assert mgr.is_alive(watched)
+        assert "headless" not in keys, (
+            "a viewer-less idle session must still be reaped (genuine-idle reap intact)"
+        )
+        viewer.detach()
+    finally:
+        for k in ("watched", "headless"):
+            mgr.close(k)
+
+
+def test_in_flight_turn_not_idle_evicted(tmp_path):
+    """A session with a turn IN FLIGHT is never idle-evicted, even past the idle
+    timeout and with no attached viewer (#108).
+
+    A pty session bumps ``last_activity`` only on output bytes, so a turn that is
+    actively working but quiet (claude thinking, a long quiet tool) looks idle.
+    The in-flight slot (``turn_in_flight()``) is the liveness signal the output
+    clock misses: an actively-working session is in-use and must not be reaped
+    mid-work. Once the turn completes (slot freed) and it is genuinely idle, the
+    same session is eligible again — the exemption is scoped, not permanent.
+    """
+    child = _write_child(tmp_path)
+    mgr = _manager(child, idle_timeout=10.0)
+    try:
+        session = mgr.open("k", _spec(tmp_path))
+
+        # Simulate a turn in flight (the stdin pump clears _turn_done when a turn
+        # enters EXECUTING) and an idle-looking output clock.
+        session._turn_done.clear()
+        assert session.turn_in_flight()
+        session.last_activity = mgr._maintenance.clock() - 100.0
+
+        mgr._maintenance_tick()
+
+        assert "k" in mgr.status_keys(), (
+            "a session with a turn in flight must not be idle-evicted mid-work (#108)"
+        )
+        assert mgr.is_alive(session)
+
+        # The turn completes: the slot frees and the now-genuinely-idle session is
+        # eligible again — proving the exemption is scoped to in-flight work.
+        session._turn_done.set()
+        assert not session.turn_in_flight()
+        session.last_activity = mgr._maintenance.clock() - 100.0
+        mgr._maintenance_tick()
+        assert "k" not in mgr.status_keys(), (
+            "a genuinely-idle session (turn done, no viewer) must still be reaped"
+        )
     finally:
         mgr.close("k")
 
