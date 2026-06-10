@@ -1767,6 +1767,48 @@ honestly and offer three paths:
 > 2. Start a new change with `/sulis:change start` (when it ships)
 > 3. List in-flight changes with `/sulis:changes` (when it ships)"*
 
+### When `SULIS_CHANGE_ID` points at a different change than this worktree
+
+Sometimes the env var is set to one change, but the worktree you're sitting in
+belongs to **another**. This happens when a new terminal inherits a leftover
+`SULIS_CHANGE_ID` from a previous session (the cockpit's background service, or
+the terminal app's retained environment, carries the old value into the new
+window). The new window's folder and git branch are correct for the change you
+were just opened on — only the inherited id is stale.
+
+**The worktree is the truth; the env var is only a hint.** What you are sitting
+in — the current folder, its git branch, and the change manifest committed
+inside it at `.changes/{primitive}-{slug}.yaml` — is physical fact. The env var
+is just a pointer that something upstream can leave pointing at the wrong place.
+
+When the change the env var names is **different** from the change this worktree
+belongs to, **bind to the worktree's change automatically** — don't stop to ask:
+
+1. Read the change the worktree's own branch + manifest describe (that's what
+   `resolve_current_change()` returns when you run it from here — it reads the
+   current branch and the committed manifest first).
+2. Correct the environment for the rest of the session so everything downstream
+   sees the right change:
+   ```bash
+   export SULIS_CHANGE_ID="<the worktree's change id>"
+   ```
+3. Record the correction in the Working Set log so the switch is durable:
+   ```bash
+   "$SCRIPTS_DIR/sulis-working-set" log --stem {primitive}-{slug} --repo-root <worktree> \
+     --message "Corrected a stale change binding inherited from a previous session."
+   ```
+4. Then carry on with the normal change-context greeting for the **worktree's**
+   change — with one plain-English line noting the correction. For example:
+
+   > *"Quick note — this window opened pointing at the wrong piece of work, so
+   > I've switched to the one this folder actually belongs to: 'fix the auth
+   > bug'. Picking it up now."*
+
+Do **not** hand the founder a menu or ask them to confirm the switch — the
+worktree settles it. The only time you should pause and ask is when the worktree
+itself is genuinely ambiguous (no branch match and no manifest to read) — then
+fall back to the null-resolution paths below.
+
 ### When `SULIS_CHANGE_ID` is unset
 
 No special behaviour. Proceed with the normal greeting and journey routing
