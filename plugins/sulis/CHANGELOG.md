@@ -1,3 +1,9 @@
+## v0.134.1 — 2026-06-10
+
+**Patch — release-train batch.**
+
+- A change brief is no longer contaminated by the assistant own reply at interactive change-creation: the start contract now requires --intent to be the founder verbatim words (never the agent paraphrase/greeting/turn-state). The already-clean pipeline + cockpit web path are now test-locked so they cannot silently regress.
+
 ## v0.134.0 — 2026-06-10
 
 **Minor — release-train batch.**

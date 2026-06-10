@@ -1,7 +1,0 @@
-change_id: 01KTRR73SNJ60MFVNEGJTW0S0P
-primitive: fix
-tier: patch
-touches_plugin: true
-summary: |
-  A change brief is no longer contaminated by the assistant own reply at interactive change-creation: the start contract now requires --intent to be the founder verbatim words (never the agent paraphrase/greeting/turn-state). The already-clean pipeline + cockpit web path are now test-locked so they cannot silently regress.
-created_at: 2026-06-10T12:43:24Z
