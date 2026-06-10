@@ -38,6 +38,7 @@ from _wpxlib import (  # noqa: E402
     read_frontmatter,
     resolve_wp_columns,
     validate_cross_kind_contract_wiring,
+    validate_fixture_collisions,
     validate_frontend_wp_visual_contract,
     validate_wp_index_header,
     validate_wp_status,
@@ -818,13 +819,23 @@ def cmd_audit_contracts(args: argparse.Namespace) -> None:
             wps.append(fm)
 
     violations = validate_cross_kind_contract_wiring(wps)
-    if violations:
+    # #106 / Phase 6.07 — shared-fixture collision: two parallel WPs that each
+    # author one logical fixture under divergent dir-vs-file conventions. Same
+    # WP-graph check, contract seam removed (test fixtures, same-kind WPs).
+    fixture_violations = validate_fixture_collisions(wps)
+    if violations or fixture_violations:
+        all_violations = violations + fixture_violations
         emit_error(
-            "data-contract wiring violations (#48 / CF-05):\n  - "
-            + "\n  - ".join(violations),
-            context={"violations": violations, "wp_count": len(wps)},
+            "data-contract / shared-fixture wiring violations "
+            "(#48 / CF-05; #106 / P6.07):\n  - "
+            + "\n  - ".join(all_violations),
+            context={
+                "violations": violations,
+                "fixture_violations": fixture_violations,
+                "wp_count": len(wps),
+            },
         )
-    emit_ok(data={"violations": [], "wp_count": len(wps)})
+    emit_ok(data={"violations": [], "fixture_violations": [], "wp_count": len(wps)})
 
 
 def _roundtrip_accounting(

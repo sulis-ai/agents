@@ -15,7 +15,7 @@ SDK validation rubric pattern — explicit phases, severity convention,
 verdict computation, output report alongside `INDEX.md`.
 <!-- /summary -->
 
-> **Version:** 0.4.0
+> **Version:** 0.5.0
 > **Status:** Active — Calibration Period (90 days from 2026-05-22)
 > **Applies to:** `/sulis:plan-work` (SEA v0.19.0+). Designed to be invoked
 > automatically by the decompose skill at the end of its workflow.
@@ -156,7 +156,7 @@ The validating agent attests:
 - [✓] **P3 Module naming.** WP file names + Contract module names scanned for jargon. <K> findings.
 - [✓] **P4 Dependency graph.** Built dependency DAG from INDEX.md. Cycles: <count>. Orphans: <count>.
 - [✓] **P5 Performance + non-functional.** Per-WP performance-constraint scan. <K> WPs in request-handler primitives without stated SLA.
-- [✓] **P6 Peer-collision risk.** Cross-WP file-create scan. <K> collision pairs detected.
+- [✓] **P6 Peer-collision risk.** Cross-WP file-create scan. <K> collision pairs detected. Shared-fixture scan (6.07): <K> logical-fixture collisions (dir-vs-file normalised) — `wpx-index audit-contracts`.
 - [✓] **P7 ServiceSpec compliance.** <N> manifests parsed via `sulis-validate-servicespec`. Lovable Test: <K> manifests PASS, <M> PASS-WITH-RATIONALE, <B> FAIL. Aggregate MUST failures: <count>.
 - [✓] **P8 Cross-WP identifier canonicalisation.** <K> cross-WP shared identifiers extracted from WP Contracts. <M> resolve to an authoritative upstream source (TDD section / ADR / instance file). <N> inline identifiers flagged — see /sulis:plan-work step 7c for the remediation path.
 - [✓] **P9 P-VER (Verification Plan).** <N> artifacts checked (SRD + TDD + WP set). Section presence: <K> pass / <M> fail. Placeholder scan: <K> pass / <M> fail. Citation presence: <K> pass / <M> fail. Per-WP `verification:` field: <K> pass / <M> fail. Grandfather: <N> grandfathered changes skipped.
@@ -276,6 +276,28 @@ or auto-resolve (poorly).
 | **6.04** | SHOULD | Each WP's `Contract` explicitly distinguishes `files.create` from `files.modify` | Sections structured per the contract template | Contract template check |
 | **6.05** | MAY | The Recommended Implementation Order surfaces peer-collision-risk WPs sequentially (not in parallel) | Cross-check 6.01/6.02 results against the order | Order analysis |
 | **6.06** | MUST | When ≥2 producer WPs emit into the **same logical artifact** (manifest, registry, codegen output), the artifact's identity — filename, path, and merge semantics — is pinned as an **explicit shared constant in the contract WP** they all `dependsOn`. Producers reference the constant verbatim; they do NOT independently choose a filename. (CF-11, anchor #107.) | Scan producer Contracts for shared logical outputs; assert each is sourced from a single named constant declared in the contract WP | Contract parse + cross-WP constant-import audit |
+| **6.07** | MUST | When ≥2 WPs `Create` a **test fixture** that resolves to the **same logical name**, they MUST be serialised — one upstream WP authors the fixture and every consumer `dependsOn` it. Two non-dependent WPs that each author the same logical fixture FAIL. **The contract-seam precondition of 6.06 does NOT apply** — this fires for same-kind WPs with no contract between them. **Normalise dir-vs-file forms before comparing**: strip a trailing slash and a single file extension, so `sample-tool-surface/` (dir + manifest) and `sample-tool-surface.json` (flat file) compare EQUAL. Remedy: serialize (add a dep) or hoist a single fixture-authoring upstream WP both consumers `dependsOn`. (#106, anchor CH-01KTRJ.) | Parse each WP's `fixtures_created:` / `**Files created:**` fixture paths; normalise to logical names; FAIL any logical name authored by ≥2 WPs with no dependency between them. Mechanically: `wpx-index audit-contracts` (runs `validate_fixture_collisions`). | Contract parse + `wpx-index audit-contracts` |
+
+Anchor case (`CH-01KTRJ`, fixture-shape-collision lesson #106): during a
+parallel build, two non-dependent same-batch WPs each authored the same
+logical fixture under divergent conventions — WP-001 created
+`tests/fixtures/methodology/sample-tool-surface/` (a directory + a
+`manifest.json`) while WP-002 created
+`tests/fixtures/methodology/sample-tool-surface.json` (a flat file). No
+layer treated a shared fixture as a serialise-or-hoist point, so it only
+blew up at bundled-tip CI: the loader silently resolved the directory form,
+breaking WP-002's test. This is the SAME structural defect as 6.06
+(`#107` — two parallel WPs independently authoring one logical thing) but
+with the contract seam removed (test fixtures, same-kind WPs). 6.07 drops
+the contract-seam precondition and adds the dir-vs-file normalisation so the
+two forms compare equal. Check 6.07 catches this class; `wpx-index
+audit-contracts` enforces it mechanically via `validate_fixture_collisions`.
+
+> **Fixture loaders SHOULD fail loud on ambiguous resolution.** A loader
+> that finds both a directory form and a flat-file form of the same logical
+> fixture SHOULD error rather than silently pick one — defence in depth
+> behind 6.07's decompose-time gate. (SHOULD, not built here; 6.07 is the
+> primary control.)
 
 ---
 
@@ -641,4 +663,5 @@ where two parallel WPs both created `apps/api/sulis/shared/workflows/loader/__in
 | 0.1.0 | 2026-05-22 | Initial release. 6 phases. ~30 checks. Anchor case: platform-repo loader/__init__.py collision. |
 | 0.2.0 | 2026-06-01 | Added Phase 8 — Cross-WP identifier canonicalisation. Anchor case: CH-01KSZ4 release-train wave-1 tenant-ULID divergence between WP-003 and WP-004. Mechanical analog of `/sulis:plan-work` step 7c. |
 | 0.3.0 | <date filled at merge> | Added Phase 9 — P-VER (Verification Plan). 8 failure-mode checks (9.01..9.08) + grandfather sub-phase + `verification_required_from:` merge-date constant in front matter. Anchor cases: release-train + discovery dogfood — both shipped without end-to-end verification, surfacing two latent defects post-merge. (CH-01KT2B verification-by-design.) |
+| 0.5.0 | 2026-06-10 | Added Phase 6 check 6.07 — shared-fixture collision. Two non-dependent WPs that `Create` a test fixture resolving to the same LOGICAL name FAIL. Drops 6.06's contract-seam precondition (test fixtures, same-kind WPs, no contract between them) and normalises dir-vs-file forms before comparing (strip trailing slash + a single extension, so `sample-tool-surface/` and `sample-tool-surface.json` compare equal). Remedy: serialize (add a dep) or hoist a single fixture-authoring upstream WP. Enforced mechanically by `wpx-index audit-contracts` (`validate_fixture_collisions`), unit + integration tested. Added a SHOULD note that fixture loaders fail loud on ambiguous resolution (defence in depth, not built). Anchor case: CH-01KTRJ / lesson #106 — WP-001 `sample-tool-surface/` (dir+manifest) vs WP-002 `sample-tool-surface.json` (flat file); loader silently resolved the dir form, breaking WP-002's test at bundled-tip CI. |
 | 0.4.0 | <date filled at merge> | Added Phase 10 — P-PLAT (Platform Contract). 7 checks (10.01..10.07) — 6 MUST schema/provenance gates + 1 SHOULD freshness flag — + grandfather sub-phase + `platform_contract_required_from:` merge-date constant. Detection via the `platform:` / `touch-class:` WP-frontmatter field (emitted by plan-work). Mechanical enforcement leg of the defence-in-depth platform-contract gate (prose front leg in specify + draft-architecture). Anchor case: the v0.87.0 release broke because a reusable workflow was placed in an unsupported location — a GitHub Actions platform behaviour we assumed instead of grounding (#137). (platform-contract-standard change; ADR-006.) |
