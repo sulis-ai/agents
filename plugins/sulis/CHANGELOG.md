@@ -1,3 +1,9 @@
+## v0.132.4 — 2026-06-10
+
+**Patch — release-train batch.**
+
+- Scope Work Package branch refs per-change (wp/{primitive}-{slug}/wp-NNN) so cross-change WP-id collisions can no longer misroute the integration train (root cause of #105/#106).
+
 ## v0.132.3 — 2026-06-10
 
 **Patch — release-train batch.**
