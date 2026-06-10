@@ -454,6 +454,124 @@ work sees them.
 
 ---
 
+## CW-09: Rigour Tiers — Methodical / Batched / Bounded-fix (SHOULD)
+
+> **Status: SHOULD, calibrating.** This section *describes* a pattern
+> in prose so it can start informing real changes. It deliberately does
+> **not** encode conditional workflow steps yet (see "Why describe, not
+> encode" below). Promotion to MUST — and any hard-coding of per-tier
+> step-skipping — waits on the calibration window.
+
+A change can warrant very different amounts of up-front ceremony. The
+same lifecycle (CW-05) runs in every case, but *how much* of the
+upstream planning runs — and how deeply — flexes with the work. Two
+production cases drove this: a full methodical 13-WP build that was
+slow and hit a cross-project branch collision, versus ~8 bounded fixes
+that each landed cleanly and fast. Both extremes have failure modes:
+methodical is slow and heavy and can miss a deadline; a fast path that
+defers *all* verification to the end surfaces real bugs late and forces
+improvisation under pressure.
+
+The fix is **not** to fork the workflow into separate fast and slow
+flows (they would drift apart, and the operator would still be picking
+risk under pressure). The fix is to name the common **rigour tiers** as
+presets over a few orthogonal dials, declared up front, with an
+explicit owned trade-off — so the operator selects a pre-designed mode
+rather than improvising the risk decision mid-crisis.
+
+### The three tiers
+
+| Stage | **Methodical** | **Batched** | **Bounded-fix** |
+|---|---|---|---|
+| Specify (write it down) | Full | Coarse | Skipped |
+| Design (blueprint) | Full | Light / inline | Skipped |
+| Plan | Full decompose (many WPs) | One coarse pass | Lightweight — plan mode → written plan |
+| Build | Per-WP, isolated worktrees | Direct, bundled | Direct, test-first |
+| **Verify (the floor)** | **Same** | **Same** | **Same** |
+
+- **Methodical** — the full flow. For genuinely large, multi-context,
+  or hard-to-reverse work. Maximum isolation and gates.
+- **Batched** — one coarse planning pass, build bundled, verify in one
+  real pass at the end. For coherent medium work under time pressure —
+  the founder's own "execute directly + bundled verification"
+  improvisation, formalised so it is a *chosen* mode, not a panic move.
+- **Bounded-fix** — no heavy upstream artifacts, but **not zero
+  planning**. The three upstream stages collapse into one cheap step:
+  **initialise plan mode, scope the fix, then execute by writing the
+  plan down** (into the Working Set, or a short plan note for a true
+  one-off) — *then* build test-first → verify → ship. The written plan
+  is the floor that makes the fast path safe to use under pressure:
+  even here the approach is committed to text before any code is
+  touched, so the operator is never improvising the whole fix in their
+  head against a clock. For a known, bounded fix (the CW-05 trivial
+  carve-out is the smallest instance of this tier — small enough that
+  even the written plan is a sentence).
+
+### The tier is a preset over dials, not an atomic switch
+
+The dials that move are: design depth, decomposition granularity,
+verification timing, and worktree isolation. They usually co-vary —
+big work wants all of them high — but not always: a one-line security
+fix wants *light design but strict verification*. So the tier **names**
+a common preset and the dials remain individually overridable for the
+odd case. A single fast/slow toggle could not express that edge; three
+forked workflows could not either.
+
+### The two floors are one contract: scenarios named up front == scenarios driven at the end (MUST)
+
+Every tier carries two non-negotiable floors, and they are the two ends
+of the **same** contract:
+
+1. **The plan names the critical scenarios.** Before any code is
+   touched, the written plan (full scenario entities at the specify
+   stage in Methodical; a short list in the plan-mode note in
+   Bounded-fix) names the load-bearing scenarios that define "working"
+   — the user-journey round-trips *and* the production mechanisms whose
+   failure means it doesn't really work. This is the acceptance bar,
+   declared up front.
+2. **Verification drives exactly those scenarios.** A **real** bundled
+   verification — the full test suite plus the end-to-end walk of what
+   was built — drives the scenarios the plan named, under the
+   **observed-or-blocked** discipline (a scenario is green only when a
+   real run produced the correct observed output; otherwise it is
+   blocked, never silently "done").
+
+The invariant that ties them: **the scenarios named in the plan are the
+scenarios driven at verification.** Without floor 1, floor 2 has no
+defined target and silently degrades into "it ran without error" —
+which is exactly how late-surfacing bugs slip through a fast path
+(a contract mismatch or a field-mapping bug caught only at the very
+end, because no one named "drive a real round-trip" as required up
+front). Tiers flex the *upstream ceremony between these two floors*;
+they never flex the floors themselves. This is the scenarios-first +
+observed-or-blocked discipline (already enforced upstream by the
+journey-rigor gates and the `prove` skill) reaching down into every
+tier — which is what makes describing the rest as a SHOULD safe: the
+dangerous part is already locked and is not on the table.
+
+### How the operator declares / switches it
+
+The tier is declared up front (the explicit owned trade-off removes the
+anxiety — the operator picks a pre-designed mode with a stated cost
+instead of improvising risk under a deadline). A change may switch tier
+mid-flight (e.g. a methodical change that hits a deadline drops to
+batched) — the switch is explicit and logged, and the verification
+floor still applies at the end.
+
+### Why describe, not encode (yet)
+
+At the time of writing only two real changes have exercised this, and
+both moved their dials in lockstep — which may simply be because they
+were cleanly large or cleanly small. Hard-coding per-tier step-skipping
+off two data points would bake in an abstraction that the edges
+(independent dials) may later contradict. The disciplined path: let the
+next ~5 real changes record which tier they ran and which dials they
+actually moved independently; *then* encode the conditional steps that
+survive. Until then this is guidance, and the floor — the only part
+whose absence is dangerous — is already enforced.
+
+---
+
 ## Calibration (CC + FR disclosure)
 
 ### Confidence tier
@@ -529,4 +647,5 @@ change, and what CW-NN rule(s) it exercised or stressed.
 |---------|------|--------|
 | 0.1.0 | 2026-05-21 | Initial standard. CW-01..CW-08 synthesised from OpenSpec, Conventional Commits, SEA change primitives, GIT-01..GIT-10. Greenfield — no anchor cases yet; 90-day calibration begins. |
 | 0.2.0 | 2026-05-25 | **CW-04 amended (additive).** Auto back-integration subsection added — codifies the merge-not-rebase mechanism with two trigger points (post-WP-merge active driver + pre-WP-start safety net) and structured conflict handling (interactive resolve / defer / abort options). Operationalises what CW-04's two-level worktree hierarchy makes possible. Phase 4 of the change-as-primitive build; pairs with lifecycle.md Step 0 + Step 12.5 amendments. Backwards-compatible — existing change branches without auto back-integration continue to work; the new mechanism activates only via the Phase 5 executor implementation. |
+| 0.4.0 | 2026-06-10 | **CW-09 added (SHOULD, calibrating).** Names three rigour tiers — Methodical / Batched / Bounded-fix — as presets over orthogonal dials (design depth, decomposition granularity, verification timing, isolation), declared up front so the operator picks a pre-designed risk trade-off instead of improvising under deadline pressure. The verification floor (real bundled verification + observed-or-blocked) is explicitly tier-invariant (MUST). Bounded-fix is *not* zero-planning — it carries a written-plan floor (plan mode → write the plan down → build), the cheap anti-anxiety step that keeps the fast path safe under pressure. Deliberately describes the pattern in prose rather than encoding conditional workflow steps — promotion + hard-coding waits on a ~5-change calibration window (only n=2 at authoring, both moved dials in lockstep). Synthesised from two converged critical-thinking spirals on fast-vs-methodical change handling; CW-05 trivial carve-out is the smallest instance of the Bounded-fix tier. |
 | 0.3.0 | 2026-06-10 | **CW-04 amended (additive).** Added the **WP branch refs (MUST)** subsection — a WP's branch ref is `wp/{primitive}-{slug}/wp-{nnn}-{slug}`, nesting under `wp/` (not under the `change/{primitive}-{slug}` prefix, which would be a git directory/file ref conflict). Scopes the train resolver's branch glob per-change so it cannot match a foreign change's recycled WP number (change `wp-branch-collision`, root cause of #105/#106; see ADR-001). Backwards-compatible — legacy bare `feat/wp-{nnn}-{slug}` branches still resolve via the executor journal + a one-release glob fallback for no-scope callers; fallback removal is a tracked follow-up. |
