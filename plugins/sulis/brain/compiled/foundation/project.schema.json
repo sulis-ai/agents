@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sulis.co/dna/schema/project/1.0.0",
+  "$id": "https://sulis.co/dna/schema/project/1.1.0",
   "title": "Project",
   "description": "the release unit \u2014 the foundation-cross-cutting reification of the thing that gets tagged, versioned, and shipped. Scopes a Workflow's execution to a specific repo + path location with declared version files, branch policy, and dependency edges. A Project comprises one or more Components \u2014 PD-domain implementation units \u2014 and is released by a Workflow referenced via release_workflow_ref. Projects optionally link to an external Product via belongs_to_product_ref string until cross-artifact ref resolution lands in v0.7. Three scenarios it enables: monorepo with multiple Projects under different Products each with its own release Workflow scoped via source.path; multi-repo with multiple Projects each its own repo composing one Product; shared library where a Project library is consumed by Projects in other Products and dependency edges drive orchestration. Backstage Catalog Component / System, Nx project, Lerna package, Bazel package, Cargo workspace member all model this primitive \u2014 adopted as the convention per CP-01.",
   "type": "object",
@@ -84,6 +84,15 @@
         "gitlab-pre-prod",
         "custom"
       ]
+    },
+    "release_model": {
+      "enum": [
+        "semver-tag",
+        "branch-promotion",
+        "rolling",
+        "other"
+      ],
+      "description": "how the Project ships \u2014 ORTHOGONAL to branch_policy which is the branching STYLE; semver-tag = the release-train of version bump + git tag + release PR; branch-promotion = promote a branch into an env-bound branch with no version bump and no tag; rolling = continuous deploy off a tracked ref; other = escape hatch; defaults to semver-tag for back-compat; release_workflow_ref binds the SemVer release-train Workflow when semver-tag, a promotion Workflow when branch-promotion; added in foundation v0.7.0 / Project v1.1.0 per DR-034"
     },
     "belongs_to_product_ref": {
       "type": "string",
