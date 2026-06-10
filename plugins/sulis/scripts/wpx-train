@@ -72,6 +72,8 @@ from _wpxlib import (  # noqa: E402
     WPRow,
     _gh_branch_sha,
     _gh_ref_sha,
+    _run,
+    ff_local_change_branch_from_origin,
     _join_health_url,
     _log,
     _merge_squash,
@@ -1665,6 +1667,8 @@ def _verify_phase_health_smoke(
 
 def _finalise_success(
     *,
+    args,
+    base_branch: str,
     paths,
     train_id: str,
     batch: list,
@@ -1681,6 +1685,12 @@ def _finalise_success(
     update_train_phase(
         train_state_path(paths.train_runs_dir, train_id), "success",
     )
+    # #266 — the squash-merges were pushed to origin's change branch, but the
+    # LOCAL change worktree HEAD still sits at the pre-batch tip. Gate
+    # reviewers read the local worktree, so without this they see stale state
+    # (batch-1 security review literally reported 'code not present'). Sync the
+    # local worktree to the pushed tip before declaring success.
+    _sync_local_change_worktree_after_train(args, base_branch, train_id, record)
     record["outcome"] = "success"
     record["completed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     write_train_run_record(paths.train_runs_dir / f"{train_id}.yaml", record)
@@ -1720,6 +1730,8 @@ def _finalise_success(
 
 def _finalise_awaiting_gates(
     *,
+    args,
+    base_branch: str,
     paths,
     train_id: str,
     batch: list,
@@ -1734,6 +1746,11 @@ def _finalise_awaiting_gates(
 
     Exit code 0 — this is success-pending-gates, not failure.
     """
+    # #266 — sync the local change worktree to the pushed origin tip BEFORE
+    # the gate handoff: the gate reviewers (Step 10.5 code-review + Step 11
+    # security review) read the local worktree, so they must see the merged
+    # batch, not the pre-batch tip.
+    _sync_local_change_worktree_after_train(args, base_branch, train_id, record)
     bundle_start_sha = plan.bundle[0].get("pre_train_sha") if plan.bundle else None
     update_train_phase(
         train_state_path(paths.train_runs_dir, train_id), "verifying_gates",
@@ -1832,6 +1849,30 @@ def _step_0_arrival_check(
         emit_result(record, exit_code=1)
     elif arrival["status"] == "merged_ok":
         _log(f"{train_id}: Step 0: merged {arrival.get('merged_commits', '?')} commits from origin/main into {base_branch}")
+        # #265 — Step 0's back-integration is a LOCAL merge commit. The commit
+        # phase rebases WP branches onto `origin/{base_branch}` (read via the
+        # GitHub API), so if the back-integration is never pushed, the
+        # squash-merges build off the OLD origin tip and the local branch
+        # (which carries the back-integration) diverges from origin (neither a
+        # descendant of the other — recovery needed a manual reset). Push the
+        # back-integration now so origin's tip carries it: the rebase base then
+        # includes it, the squash-merges land on top, and the post-train
+        # fast-forward (#266) syncs the local worktree cleanly. This is a
+        # fast-forward push (local is ahead by the merge commit); non-fatal on
+        # failure — the train still works, it just may diverge as before.
+        rc, _, push_err = _run(
+            ["git", "-C", str(change_worktree_path), "push", "origin", base_branch],
+        )
+        if rc == 0:
+            record["step_0_back_integration_pushed"] = True
+            _log(f"{train_id}: Step 0: pushed back-integrated {base_branch} to origin "
+                 f"(so the rebase base includes it)")
+        else:
+            record["step_0_back_integration_pushed"] = False
+            _log(f"WARNING: {train_id}: Step 0: could not push back-integrated "
+                 f"{base_branch} to origin ({push_err.strip()}). The train will "
+                 f"proceed, but the local change branch may diverge from origin "
+                 f"(see #265) — reconcile with a manual fetch + reset if so.")
     else:
         _log(f"{train_id}: Step 0: {base_branch} already current with origin/main")
 
@@ -1880,6 +1921,48 @@ def _step_12_5_back_integration(
         _log(f"{train_id}: Step 12.5: merged {post_batch.get('merged_commits', '?')} commits from origin/main into {base_branch}")
     else:
         _log(f"{train_id}: Step 12.5: {base_branch} already current with origin/main")
+
+
+def _sync_local_change_worktree_after_train(
+    args: argparse.Namespace,
+    base_branch: str,
+    train_id: str,
+    record: dict,
+) -> None:
+    """#266 — fast-forward the LOCAL change worktree to the pushed origin tip.
+
+    The commit phase squash-merges each WP into origin's change branch via the
+    GitHub API and records `final_merge_sha`, but the local change worktree
+    HEAD stays at the pre-batch tip. The run-all session's gate reviewers read
+    that local worktree, so without this sync they see stale state (observed:
+    batch-1 security review reported 'code not present'). Fast-forward-only —
+    never a destructive reset, so uncommitted work is safe; if the local
+    branch has genuinely diverged (the #265 case, now prevented at Step 0)
+    this logs a clear recovery hint and continues (non-fatal).
+
+    Mutates record; never raises. Skipped when not in a change context.
+    """
+    change_worktree_path = getattr(args, "change_worktree_path", None)
+    if not (change_worktree_path and base_branch.startswith("change/")):
+        record["local_worktree_sync"] = "skipped"
+        return
+
+    res = ff_local_change_branch_from_origin(Path(change_worktree_path), base_branch)
+    record["local_worktree_sync"] = res["status"]
+    if res["status"] == "fast_forwarded":
+        _log(f"{train_id}: synced local change worktree → origin/{base_branch} "
+             f"(+{res.get('advanced_commits', '?')} commit(s))")
+    elif res["status"] == "already_current":
+        _log(f"{train_id}: local change worktree already current with origin/{base_branch}")
+    else:
+        _log(
+            f"WARNING: {train_id}: could not fast-forward local change worktree "
+            f"({res['status']}: {res.get('error', '')}). The batch is safely "
+            f"merged on origin/{base_branch}; reviewers reading the local "
+            f"worktree may see stale state until you run "
+            f"`git -C {change_worktree_path} fetch origin {base_branch} && "
+            f"git -C {change_worktree_path} merge --ff-only origin/{base_branch}`."
+        )
 
 
 # Phases an abandoned-on-error train can be sitting in before any merge
@@ -2060,11 +2143,13 @@ def cmd_run(args: argparse.Namespace) -> None:
         )
         if verify.ready_for_gates:
             _finalise_awaiting_gates(
+                args=args, base_branch=base_branch,
                 paths=paths, train_id=train_id, batch=batch,
                 plan=plan, commit=commit, verify=verify, record=record,
             )
         else:
             _finalise_success(
+                args=args, base_branch=base_branch,
                 paths=paths, train_id=train_id, batch=batch,
                 plan=plan, commit=commit, verify=verify, record=record,
             )
