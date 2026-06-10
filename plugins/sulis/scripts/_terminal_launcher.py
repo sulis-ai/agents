@@ -224,8 +224,13 @@ def _build_viewer_exec_line(
     the caller resolves ``scripts_dir`` and ``worktree_path``.
     """
     viewer = scripts_dir / _VIEWER_SCRIPT
+    # `env SULIS_CHANGE_ID=<id>` sets the id on the viewer's OWN process (#107):
+    # an inherited stale value (cockpit service env / Terminal.app retained env)
+    # can re-shadow a shell `export` inside the daemon-attached session, binding
+    # it to the WRONG change. Setting it directly on the exec'd process is
+    # authoritative — nothing inherited can win.
     return (
-        "exec python3 "
+        f"exec env SULIS_CHANGE_ID={shlex.quote(change_id)} python3 "
         f"{shlex.quote(str(viewer))} "
         f"--change-id {shlex.quote(change_id)} "
         f"--worktree {shlex.quote(str(worktree_path))}"
@@ -312,15 +317,24 @@ def _build_launch_script(
         # ~/.sulis would escape as a raw OSError instead of the structured
         # _failed dict.)
         sidecar = Path.home() / ".sulis" / "changes" / change_id / _PRE_PROMPT_SIDECAR
-        exec_line = f'exec {entry_command} "$(cat {shlex.quote(str(sidecar))})"'
+        exec_line = (
+            f"exec env SULIS_CHANGE_ID={shlex.quote(change_id)} {entry_command} "
+            f'"$(cat {shlex.quote(str(sidecar))})"'
+        )
     else:
-        exec_line = f"exec {entry_command}"
+        exec_line = (
+            f"exec env SULIS_CHANGE_ID={shlex.quote(change_id)} {entry_command}"
+        )
 
     lines = [
         "#!/usr/bin/env bash",
         "set -euo pipefail",
         "# Carry-over env: only PATH, HOME, USER, TERM, LANG, LC_*.",
         _ENV_SCRUB_LINE,
+        # Belt-and-braces (#107): drop any inherited stale SULIS_CHANGE_ID before
+        # the authoritative export, so a re-shadowed parent value can't survive.
+        # The exec line also sets it directly on the spawned process via `env`.
+        "unset SULIS_CHANGE_ID",
         f'export SULIS_CHANGE_ID="{change_id}"',
     ]
     if enable_origin_hook:

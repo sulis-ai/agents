@@ -99,6 +99,22 @@ def resolve_default_socket() -> str:
 DEFAULT_SOCKET: str = resolve_default_socket()
 
 
+def resolve_daemon_log(socket_path: str) -> str:
+    """The daemon stderr log path for ``socket_path``.
+
+    ``<socket-dir>/session-manager-daemon.log`` by default (beside the socket
+    under ``~/.sulis``), overridable by ``SULIS_SESSION_MANAGER_LOG`` (the
+    test/CI injection seam, mirroring the socket override). Routing the detached
+    daemon's stderr here — rather than ``DEVNULL`` — means a daemon-side
+    traceback (e.g. an idle-eviction reaping a window, #108) is preserved for
+    diagnosis instead of silently lost. Stdlib-only (``os`` + ``pathlib``), so
+    ``daemon_client`` stays terminal-only/self-contained (ADR-003)."""
+    override = os.environ.get("SULIS_SESSION_MANAGER_LOG")
+    if override:
+        return override
+    return str(Path(socket_path).resolve().parent / "session-manager-daemon.log")
+
+
 def _status_reply(socket_path: str, timeout: float) -> "dict | None":
     """One ``status`` round-trip → the parsed reply dict, or ``None`` on any
     transport failure (missing socket, refused connect, timeout, malformed
@@ -358,13 +374,33 @@ def _spawn_and_wait(
 
     # 2. Spawn detached. stdout is piped only to read the READY line; the daemon
     # is a new session leader (start_new_session=True) so it outlives this caller.
-    proc = subprocess.Popen(  # noqa: S603 - argv is contract-controlled, not shell
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        text=True,
-        start_new_session=True,
-    )
+    # stderr is appended to a log file beside the socket (NOT DEVNULL) so a
+    # daemon-side traceback — e.g. an idle-eviction reaping a window mid-work
+    # (#108) — is preserved for diagnosis instead of silently lost. Best-effort:
+    # if the log cannot be opened (a read-only home, an odd platform) fall back
+    # to DEVNULL rather than failing the spawn — diagnosability must never block
+    # the daemon coming up.
+    log_path = resolve_daemon_log(socket_path)
+    try:
+        stderr_sink: "object" = open(log_path, "ab")  # noqa: SIM115 - handed to the child; closed below
+    except OSError:
+        stderr_sink = subprocess.DEVNULL
+    try:
+        proc = subprocess.Popen(  # noqa: S603 - argv is contract-controlled, not shell
+            command,
+            stdout=subprocess.PIPE,
+            stderr=stderr_sink,
+            text=True,
+            start_new_session=True,
+        )
+    finally:
+        # The child has inherited (dup'd) the fd; close our copy so we do not
+        # hold the log file open. DEVNULL is an int sentinel, not a file object.
+        if hasattr(stderr_sink, "close"):
+            try:
+                stderr_sink.close()  # type: ignore[union-attr]
+            except OSError:  # pragma: no cover - best-effort
+                pass
 
     ready = _await_ready(proc, socket_path, deadline)
     # Release our hold on the pipe regardless — the detached daemon keeps running;

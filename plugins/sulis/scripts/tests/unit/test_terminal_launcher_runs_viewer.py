@@ -180,7 +180,13 @@ def test_explicit_entry_command_still_supported(tmp_path):
         _GOOD_ULID, tmp_path,
         entry_command="claude --dangerously-skip-permissions --agent sulis",
     )
-    assert "exec claude --dangerously-skip-permissions --agent sulis" in script
+    # The id is set on claude's OWN process via `env` (#107) so an inherited
+    # stale SULIS_CHANGE_ID can't re-shadow it; the claude command itself is
+    # otherwise unchanged.
+    assert (
+        f"exec env SULIS_CHANGE_ID={_GOOD_ULID} "
+        "claude --dangerously-skip-permissions --agent sulis"
+    ) in script
     assert "session_viewer.py" not in script
 
 

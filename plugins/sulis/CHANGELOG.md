@@ -1,3 +1,21 @@
+## v0.132.3 — 2026-06-10
+
+**Patch — release-train batch.**
+
+- Session daemon no longer idle-evicts in-use change sessions: a session with an attached window (or a turn in flight) is exempt from the 10-minute idle reaper, so a spawned change window survives a long quiet step (recon, tests) instead of being killed mid-work. Adds an eviction log line and routes daemon stderr to a log file.
+
+## v0.132.2 — 2026-06-10
+
+**Patch — release-train batch.**
+
+- Spawned change sessions no longer bind to a stale SULIS_CHANGE_ID: the launcher sets the new id authoritatively on the launched process (env on exec + unset-before-export) so an inherited cockpit/parent value cannot shadow it, and the agent now trusts the worktree over the env when they disagree.
+
+## v0.132.1 — 2026-06-10
+
+**Patch — release-train batch.**
+
+- Scope Work Package branch refs per-change (wp/{primitive}-{slug}/wp-NNN) so cross-change WP-id collisions can no longer misroute the integration train (root cause of #105/#106).
+
 ## v0.132.0 — 2026-06-09
 
 **Minor — release-train batch.**
