@@ -963,6 +963,15 @@ loop:
        security_model, dev-sha-at-creation (from the sidecar at
        .architecture/{project}/work-packages/.executor-WP-NNN-dev-sha).
 
+       **Resolve the branch from the canonical emitter — do NOT
+       hand-template it (ADR-001).** In a change this yields the scoped
+       `wp/{primitive}-{slug}/wp-NNN-<slug>` shape; outside one, the legacy
+       `feat/wp-NNN-<slug>`. The emitter is what makes newly minted branches
+       collision-safe (#105/#106). Use `"$BRANCH"` for every `--branch` below.
+
+           BRANCH=$("$WPX_DIR/wpx-wp" branch-name --wp WP-NNN \
+             --project <slug> --repo-root <repo-root> | jq -r '.data.branch')
+
        **Step 8-10: invoke wpx-pipeline via top-level
        Bash(run_in_background:true).** This is the load-bearing
        v0.9.0 change — the wait happens in a deterministic Python
@@ -971,7 +980,7 @@ loop:
            Bash({
              command: """"$WPX_DIR/wpx-pipeline" run \
                 --wp WP-NNN --project <slug> \
-                --branch feat/wp-NNN-<slug> \
+                --branch "$BRANCH" \
                 --worktree-path ../wp-NNN-worktree \
                 --dev-sha-at-creation <sha-from-sidecar> \
                 --deploy-workflow "<workflow name from frontmatter>" \
@@ -1082,7 +1091,7 @@ loop:
 
            "$WPX_DIR/wpx-step12" wrap \
              --wp WP-NNN --project <slug> \
-             --branch feat/wp-NNN-<slug> \
+             --branch "$BRANCH" \
              --pipeline-result @/tmp/pipeline-result-WP-NNN.json \
              --worktree-path ../wp-NNN-worktree
 

@@ -1968,21 +1968,42 @@ def _wp_slug_from_file(wp_dir: Path, wp_id: str) -> str | None:
     return name[len(prefix):]
 
 
-def _branch_name(wp_id: str, slug: str) -> str:
-    """Compose the feature-branch name from WP id + slug.
+def _branch_name(wp_id: str, slug: str, change_scope: str | None = None) -> str:
+    """Compose the WP feature-branch name from WP id + slug.
 
-    Convention: `feat/wp-{id-lower}-{slug}`.
+    With ``change_scope`` (the change's ``"{primitive}-{slug}"``, e.g.
+    ``"fix-wp-branch-collision"``) the branch is namespaced under the change
+    so WP numbers cannot collide across changes (the #105/#106 root cause):
+
+        wp/{change_scope}/wp-{id-lower}-{slug}     ← ADR-001 scoped scheme
+
+    Without it (change identity unresolvable, or a caller that hasn't been
+    threaded yet) the byte-for-byte legacy shape is returned, which the
+    dual-prefix resolver still matches for one release:
+
+        feat/wp-{id-lower}-{slug}                  ← legacy fallback
+
+    The ``wp/`` prefix is a disjoint top-level segment chosen to avoid a git
+    directory/file ref conflict with the change branch ``change/{scope}`` —
+    see ``adrs/ADR-001-wp-branch-naming-scheme.md``.
     """
-    return f"feat/wp-{wp_id.lower().removeprefix('wp-')}-{slug}"
+    nnn = wp_id.lower().removeprefix("wp-")
+    if change_scope:
+        return f"wp/{change_scope}/wp-{nnn}-{slug}"
+    return f"feat/wp-{nnn}-{slug}"
 
 
 # Matches a Step-7 trace Outcome that records the exact pushed branch, e.g.:
-#   "Pushed to feat/wp-002-dark-token-block at SHA abc1234 (commit: ...)"
+#   "Pushed to wp/fix-x/wp-002-dark-token-block at SHA abc1234 (commit: ...)"
 # Tolerant of casing ("Pushed"/"pushed") and the "to" being optional, so it
-# also catches "success — pushed feat/wp-5-... after rebase". The branch token
-# is the first ``feat/...`` run of non-whitespace following "push(ed)".
+# also catches "success — pushed wp/fix-x/wp-5-... after rebase". The branch
+# token is the first matching run of non-whitespace following "push(ed)".
+# Three prefixes are accepted:
+#   wp/      — the ADR-001 per-change WP-branch scheme (the new default mint)
+#   change/  — the change branch itself, occasionally recorded as a push target
+#   feat/    — the retained legacy WP-branch shape (one-release fallback)
 _JOURNAL_PUSHED_BRANCH_RE = re.compile(
-    r"push(?:ed)?\s+(?:to\s+)?(feat/\S+)",
+    r"push(?:ed)?\s+(?:to\s+)?((?:feat|wp|change)/\S+)",
     re.IGNORECASE,
 )
 
@@ -2053,14 +2074,64 @@ def _gh_list_matching_branches(
     return _resolve_gh(gh).list_matching_branches(repo, pattern)
 
 
+def _select_fuzzy_branch(
+    wp_id: str,
+    repo: str,
+    pattern: str,
+    expected_literal: str,
+    *,
+    gh: GHClient | None = None,
+) -> str | None:
+    """List origin branches matching ``pattern`` and pick the WP's branch.
+
+    Shared by the scoped (``wp/{scope}/wp-NNN-*``) and legacy
+    (``feat/wp-NNN-*``) globs in ``resolve_wp_branch`` so the single/multi
+    selection + drift-warning logic lives in one place (EP-02). Returns the
+    most-recent-by-``committerdate`` match, or ``None`` when nothing matches.
+
+    Preserves the historical ``gh=None`` shim routing: forward ``gh`` only when
+    the caller supplied one, so test monkeypatches with a 2-positional stub
+    keep working.
+    """
+    if gh is None:
+        matches = _gh_list_matching_branches(repo, pattern)
+    else:
+        matches = _gh_list_matching_branches(repo, pattern, gh=gh)
+    if not matches:
+        return None
+
+    # Pick most-recent by committerdate. Empty/missing dates sort first
+    # so any branch with a real date wins (the typical case is one
+    # branch with a date and zero without).
+    chosen = max(matches, key=lambda m: m.get("committerdate", ""))
+    chosen_name = chosen["name"]
+
+    if len(matches) == 1:
+        _log(
+            f"resolve_wp_branch: {wp_id} — expected '{expected_literal}' on origin "
+            f"but found '{chosen_name}' (fuzzy match). Using '{chosen_name}'. "
+            f"Rename the WP file or the branch to silence this warning."
+        )
+    else:
+        names = ", ".join(m["name"] for m in matches)
+        _log(
+            f"resolve_wp_branch: {wp_id} — expected '{expected_literal}' but found "
+            f"{len(matches)} candidates [{names}]; picked '{chosen_name}' "
+            f"(most recent by committerdate). Choice may be ambiguous; "
+            f"rename to disambiguate."
+        )
+    return chosen_name
+
+
 def resolve_wp_branch(
     wp_id: str,
     repo: str,
     wp_dir: Path,
     *,
     gh: GHClient | None = None,
+    change_scope: str | None = None,
 ) -> str | None:
-    """Resolve the feat-branch on origin that belongs to ``wp_id``.
+    """Resolve the WP branch on origin that belongs to ``wp_id``.
 
     The historical contract (literal slug → branch name) breaks when the
     executor pushes a branch with a SHORTER slug than the WP filename
@@ -2068,27 +2139,38 @@ def resolve_wp_branch(
     cases from the release-train-as-entities run). This helper restores
     eligibility on the READ side without forcing executors to use full slugs.
 
+    Dual-prefix resolution (ADR-001). With ``change_scope`` set (the change's
+    ``"{primitive}-{slug}"``), resolution is confined to this change's
+    ``wp/{scope}/`` namespace so a WP can never resolve to a foreign change's
+    recycled-number branch (the #105/#106 collision). Without it, the legacy
+    ``feat/...`` behaviour is preserved byte-for-byte for legacy callers.
+
     Resolution order:
 
       0. **Journal-recorded branch (#229).** If the executor journal
          (``wp_dir/.executor-NNN.md``) records an exact pushed branch in its
-         Step-7 trace AND that branch exists on origin, return it. This scopes
-         resolution to what THIS change's executor actually pushed, eliminating
-         the cross-change ambiguity that arises when WP numbers are recycled
-         (the glob below would otherwise match unrelated past changes' branches
-         and pick the wrong one by recency). A missing/malformed journal, or a
-         recorded branch no longer on origin, falls through to step 1.
-      1. **Slug-literal match.** If ``feat/wp-NNN-<slug-from-file>`` exists
-         on origin, return it. Byte-for-byte preservation of the
-         historical happy path.
-      2. **Fuzzy single match.** If exactly one ``feat/wp-NNN-*`` branch
-         exists on origin (NNN being ``wp_id`` minus the WP- prefix,
-         lowercased), return it. A warning is emitted to stderr naming
-         the WP, the expected literal, and the actual branch so the
-         operator can see the drift.
-      3. **Fuzzy multi-match.** Two or more ``feat/wp-NNN-*`` candidates →
-         most-recent-by-``committerdate`` wins. The same warning fires,
-         plus an explicit "ambiguous" note listing all candidates.
+         Step-7 trace AND that branch exists on origin, return it. This is the
+         authoritative, prefix-agnostic scope to what THIS change's executor
+         actually pushed — including an in-flight branch minted the legacy
+         ``feat/...`` way during the one-release compat window. A missing /
+         malformed journal, or a recorded branch no longer on origin, falls
+         through to step 1.
+      1. **Slug-literal match.** ``_branch_name(wp_id, slug, change_scope)`` —
+         the scoped ``wp/{scope}/wp-NNN-<slug>`` literal when a scope is set,
+         else the legacy ``feat/wp-NNN-<slug>`` literal. If it exists on
+         origin, return it.
+      2. **Scoped fuzzy glob (only when ``change_scope`` is set).** Glob
+         ``wp/{scope}/wp-NNN-*``; single → use; multi → most-recent by
+         ``committerdate`` with a drift warning. **If empty → return None.**
+         The repo-wide legacy glob is DELIBERATELY suppressed under a scope:
+         any ``feat/wp-NNN-*`` hit would, by construction, be a foreign
+         change's branch (this change's own legacy branch is resolved by
+         Step 0 above). Falling through would re-open #105/#106; ``None`` is
+         strictly safer than guessing a foreign ref. This also closes the
+         #106 deleted-branch case.
+      3. **Legacy fuzzy glob (only when ``change_scope`` is None).** Glob
+         ``feat/wp-NNN-*``; same single/multi handling + warning. Retained for
+         one release for truly legacy callers; removal tracked as a follow-up.
       4. **Zero candidates.** Return ``None``. The caller falls through
          to whatever "branch missing" handling it already had.
 
@@ -2117,12 +2199,14 @@ def resolve_wp_branch(
             f"slug-literal / fuzzy match."
         )
 
-    literal = _branch_name(wp_id, slug)
-    # Only forward ``gh`` when the caller explicitly supplied one; passing
-    # ``gh=None`` to the shims would break test monkeypatches that don't
-    # accept the kw-arg (the existing test_wpx_train_eligibility.py stubs
-    # use a 2-positional signature, and the shim's ``gh=None`` default
+    # Step 1 — slug-literal match. With change_scope set this is the scoped
+    # wp/{scope}/... literal; without it the byte-for-byte legacy feat/...
+    # literal. Only forward ``gh`` when the caller explicitly supplied one;
+    # passing ``gh=None`` to the shims would break test monkeypatches that
+    # don't accept the kw-arg (the existing test_wpx_train_eligibility.py
+    # stubs use a 2-positional signature, and the shim's ``gh=None`` default
     # already routes to the module singleton).
+    literal = _branch_name(wp_id, slug, change_scope)
     if gh is None:
         if _gh_branch_exists(repo, literal):
             return literal
@@ -2132,35 +2216,40 @@ def resolve_wp_branch(
 
     # Fuzzy lookup. Strip the WP- prefix and lowercase per _branch_name.
     nnn = wp_id.lower().removeprefix("wp-")
-    pattern = f"feat/wp-{nnn}-*"
-    if gh is None:
-        matches = _gh_list_matching_branches(repo, pattern)
-    else:
-        matches = _gh_list_matching_branches(repo, pattern, gh=gh)
-    if not matches:
+
+    # Step 2 — scoped fuzzy glob (ADR-001). Only when change identity is
+    # known: this is what closes the #105/#106 cross-change collision —
+    # resolution is confined to THIS change's wp/{scope}/ namespace and can
+    # never select a foreign change's feat/wp-NNN-* branch. When a scope is
+    # set, this is the LAST glob consulted: the repo-wide legacy glob is
+    # SUPPRESSED (see below) because it can only ever match a foreign branch.
+    if change_scope:
+        scoped = _select_fuzzy_branch(
+            wp_id, repo, f"wp/{change_scope}/wp-{nnn}-*", literal, gh=gh,
+        )
+        if scoped is not None:
+            return scoped
+        # Scope set but no scoped branch found. The repo-wide
+        # feat/wp-{nnn}-* glob is DELIBERATELY NOT run here. With a scope in
+        # play, any feat/wp-NNN-* hit is — by construction — a *foreign*
+        # change's recycled-number branch (this change's own in-flight
+        # old-shape branch, if any, is resolved authoritatively by the
+        # journal Step-0 above, which records the exact branch the executor
+        # pushed regardless of prefix). Falling through to the legacy glob
+        # here is exactly the #105/#106 bug: it would return another change's
+        # branch. Return None instead — a WP with no journal record and no
+        # scoped branch is unresolvable under its own scope, and None is
+        # strictly safer than guessing a foreign ref. This also closes the
+        # #106 deleted-branch case: Step-0 found the journal entry but the
+        # branch is gone from origin → None, not a foreign glob hit.
         return None
 
-    # Pick most-recent by committerdate. Empty/missing dates sort first
-    # so any branch with a real date wins (the typical case is one
-    # branch with a date and zero without).
-    chosen = max(matches, key=lambda m: m.get("committerdate", ""))
-    chosen_name = chosen["name"]
-
-    if len(matches) == 1:
-        _log(
-            f"resolve_wp_branch: {wp_id} — expected '{literal}' on origin "
-            f"but found '{chosen_name}' (fuzzy match). Using '{chosen_name}'. "
-            f"Rename the WP file or the branch to silence this warning."
-        )
-    else:
-        names = ", ".join(m["name"] for m in matches)
-        _log(
-            f"resolve_wp_branch: {wp_id} — expected '{literal}' but found "
-            f"{len(matches)} candidates [{names}]; picked '{chosen_name}' "
-            f"(most recent by committerdate). Choice may be ambiguous; "
-            f"rename to disambiguate."
-        )
-    return chosen_name
+    # Step 3 — legacy fuzzy glob (fallback). Reached ONLY when there is no
+    # change_scope at all (truly legacy callers). Byte-for-byte today's
+    # behaviour: literal feat/... miss → repo-wide feat/wp-NNN-* glob → None.
+    return _select_fuzzy_branch(
+        wp_id, repo, f"feat/wp-{nnn}-*", literal, gh=gh,
+    )
 
 
 def _gh_branch_ci_green(repo: str, branch: str) -> bool:
@@ -2212,6 +2301,7 @@ def find_eligible_branches(
     *,
     paths: "WpxPaths | None" = None,
     base_branch: str = "main",
+    change_scope: str | None = None,
 ) -> list[EligibilityResult]:
     """Discover which WPs are eligible for the next train.
 
@@ -2253,6 +2343,16 @@ def find_eligible_branches(
       (``test_wpx_train_eligibility.py``) which stubs WPRow.status
       directly and doesn't need network access.
 
+    Scoped resolution (ADR-001):
+
+      Pass ``change_scope`` (the change's ``"{primitive}-{slug}"``) to confine
+      branch resolution to this change's ``wp/{scope}/`` namespace, so a WP can
+      never be false-eligibled onto a foreign change's recycled-number branch
+      (#105/#106). It is threaded into ``compute_wp_status``, the reported
+      ``_branch_name``, and ``resolve_wp_branch``. ``change_scope=None`` (the
+      default) is byte-for-byte the legacy ``feat/...`` behaviour, so existing
+      callers and the in-memory eligibility test suite are unaffected.
+
     Returns one EligibilityResult per WP — both eligible and ineligible
     are returned so the caller (queue-list / status / doctor) can show
     the founder the full picture.
@@ -2271,6 +2371,7 @@ def find_eligible_branches(
             wp.id: compute_wp_status(
                 wp.id, paths, repo, base_branch,
                 stored_status=wp.status,
+                change_scope=change_scope,
             )
             for wp in wps
         }
@@ -2303,7 +2404,7 @@ def find_eligible_branches(
         # Reported branch defaults to the slug-literal for messaging; the
         # actual resolved branch (which may be fuzzy-matched) replaces it
         # once we know we have a hit on origin.
-        branch = _branch_name(wp.id, slug)
+        branch = _branch_name(wp.id, slug, change_scope)
 
         if is_held:
             results.append(EligibilityResult(
@@ -2326,7 +2427,7 @@ def find_eligible_branches(
         # the literal when it exists on origin, or a fuzzy ``feat/wp-NNN-*``
         # match (single → use; multi → most-recent-by-committerdate with
         # a warning), or None when no branch matches.
-        resolved = resolve_wp_branch(wp.id, repo, wp_dir)
+        resolved = resolve_wp_branch(wp.id, repo, wp_dir, change_scope=change_scope)
         if resolved is None:
             results.append(EligibilityResult(
                 wp=wp.id, branch=branch, eligible=False,
@@ -3657,6 +3758,7 @@ def compute_wp_status(
     *,
     gh: GHClient | None = None,
     stored_status: str | None = None,
+    change_scope: str | None = None,
 ) -> str:
     """Return the computed status for ``wp_id``.
 
@@ -3704,6 +3806,11 @@ def compute_wp_status(
         stored_status: The INDEX.md cell value to fall back to when no
             authoritative signal is present. Pass the parsed cell from
             ``parse_index_md``; defaults to ``None`` → ``"pending"``.
+        change_scope: The change's ``"{primitive}-{slug}"`` (ADR-001).
+            Threaded to ``resolve_wp_branch`` so the step-7-complete check is
+            confined to this change's ``wp/{scope}/`` namespace and never
+            matches a foreign change's branch. ``None`` (default) = legacy
+            ``feat/...`` resolution, byte-for-byte.
 
     Returns:
         One of: ``"done"``, ``"step-7-shipping"``, ``"step-7-complete"``,
@@ -3723,7 +3830,9 @@ def compute_wp_status(
     # Case 3: step-7-complete — origin branch exists, no train signal.
     # Use resolve_wp_branch so a fuzzy-matched (short-slug) push counts
     # as step-7-complete just the same as a literal-slug push.
-    if resolve_wp_branch(wp_id, repo, paths.wp_dir, gh=gh) is not None:
+    if resolve_wp_branch(
+        wp_id, repo, paths.wp_dir, gh=gh, change_scope=change_scope,
+    ) is not None:
         return "step-7-complete"
 
     # Case 4: fall-through — defer to the stored cell (operator intent).
@@ -4771,6 +4880,27 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
         file=sys.stderr,
     )
     return None
+
+
+def current_change_scope(repo_root: Path | None = None) -> str | None:
+    """Return ``"{primitive}-{slug}"`` for the current change, or ``None``.
+
+    The single derivation point for the ADR-001 branch-naming scope (EP-03):
+    CLI entrypoints call this once and thread the result into
+    ``find_eligible_branches`` / ``compute_wp_status`` as ``change_scope``.
+    Returns ``None`` when no change context is resolvable (``SULIS_CHANGE_ID``
+    unset, or set with no matching manifest), so callers fall back to the
+    byte-for-byte legacy ``feat/...`` behaviour. No CLI command should
+    hand-build ``"{primitive}-{slug}"`` inline.
+    """
+    meta = resolve_current_change(repo_root)
+    if not meta:
+        return None
+    primitive = meta.get("primitive")
+    slug = meta.get("slug")
+    if not primitive or not slug:
+        return None
+    return f"{primitive}-{slug}"
 
 
 def back_integrate_change_branch(

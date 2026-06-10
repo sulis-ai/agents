@@ -26,6 +26,7 @@ from _wpxlib import (  # noqa: E402
     add_common_args,
     cli_main,
     compute_wp_status,
+    current_change_scope,
     emit_error,
     emit_ok,
     interaction_flow_exercised,
@@ -964,6 +965,7 @@ def _build_status_entry(
     repo: str,
     base_branch: str,
     mode: str,
+    change_scope: str | None = None,
 ) -> dict:
     """Build one {wp, stored, computed, drift} entry per mode.
 
@@ -971,6 +973,12 @@ def _build_status_entry(
       - "stored"   → returns {wp, stored} (no network).
       - "computed" → returns {wp, computed} (uses compute_wp_status).
       - "both"     → returns {wp, stored, computed, drift}.
+
+    ``change_scope`` (ADR-001) is threaded to ``compute_wp_status`` so the
+    branch-existence check is confined to this change's ``wp/{scope}/``
+    namespace; ``None`` = legacy ``feat/...`` resolution. Resolved once by the
+    caller (``cmd_status``) and passed in, so a per-WP loop makes no repeated
+    change-context lookups.
     """
     entry: dict = {"wp": wp_id}
     if mode == "stored":
@@ -978,6 +986,7 @@ def _build_status_entry(
         return entry
     computed = compute_wp_status(
         wp_id, paths, repo, base_branch, stored_status=stored,
+        change_scope=change_scope,
     )
     if mode == "computed":
         entry["computed"] = computed
@@ -1019,6 +1028,11 @@ def cmd_status(args: argparse.Namespace) -> None:
     wps = parse_index_md(paths.index_md)
     by_id = {wp.id: wp for wp in wps}
 
+    # ADR-001: resolve the branch-naming scope once for the whole command, so
+    # the per-WP loop below makes no repeated change-context lookups. None when
+    # run outside a change → legacy feat/... resolution.
+    change_scope = current_change_scope(paths.repo_root)
+
     if args.wp:
         if args.wp not in by_id:
             emit_error(f"WP {args.wp} not found in INDEX.md")
@@ -1026,6 +1040,7 @@ def cmd_status(args: argparse.Namespace) -> None:
         entry = _build_status_entry(
             wp.id, wp.status,
             paths=paths, repo=repo, base_branch=base_branch, mode=mode,
+            change_scope=change_scope,
         )
         emit_ok(data=entry)
         return
@@ -1036,6 +1051,7 @@ def cmd_status(args: argparse.Namespace) -> None:
         entry = _build_status_entry(
             wp.id, wp.status,
             paths=paths, repo=repo, base_branch=base_branch, mode=mode,
+            change_scope=change_scope,
         )
         if args.show_disagreements_only and not entry.get("drift", False):
             continue

@@ -325,3 +325,57 @@ def test_in_flight_skips_corrupt_state_files(tmp_path):
     _write_state_json(runs, "train-001", phase="rebasing",
                       bundle=[{"wp": "WP-001"}])
     assert _in_flight_train_has_wp(runs, "WP-001") is True
+
+
+# ─── WP-004: change_scope threading + current_change_scope helper ──────────
+
+
+def test_compute_status_threads_scope(tmp_path):
+    """compute_wp_status threads change_scope to resolve_wp_branch: a scoped
+    branch yields step-7-complete; a foreign-only feat/ branch is suppressed
+    under a scope and falls through to the stored cell."""
+    import _wpxlib
+    paths = _make_paths(tmp_path)
+    _make_wp_file(paths.wp_dir, "WP-005", "mine")
+
+    def fake_branch_exists(repo, branch, *, gh=None):
+        return False  # no literal hit
+
+    # Scenario A — scoped branch exists → step-7-complete.
+    def list_scoped(repo, pattern, *, gh=None):
+        return {"wp/change-a/wp-005-*": [
+            {"name": "wp/change-a/wp-005-mine",
+             "committerdate": "2026-06-02T00:00:00Z"}]}.get(pattern, [])
+
+    with patch("_wpxlib._gh_branch_exists", fake_branch_exists), \
+         patch("_wpxlib._gh_list_matching_branches", list_scoped):
+        result = compute_wp_status(
+            "WP-005", paths, "acme/repo", "dev",
+            stored_status="pending", change_scope="change-a",
+        )
+    assert result == "step-7-complete"
+
+    # Scenario B — only a foreign feat/ branch exists → suppressed → stored.
+    def list_foreign_only(repo, pattern, *, gh=None):
+        return {
+            "wp/change-a/wp-005-*": [],
+            "feat/wp-005-*": [
+                {"name": "feat/wp-005-foreign",
+                 "committerdate": "2026-06-09T00:00:00Z"}],
+        }.get(pattern, [])
+
+    with patch("_wpxlib._gh_branch_exists", fake_branch_exists), \
+         patch("_wpxlib._gh_list_matching_branches", list_foreign_only):
+        result = compute_wp_status(
+            "WP-005", paths, "acme/repo", "dev",
+            stored_status="pending", change_scope="change-a",
+        )
+    assert result == "pending"
+
+
+def test_current_change_scope_none_when_unset(tmp_path, monkeypatch):
+    """current_change_scope returns None when SULIS_CHANGE_ID is unset, so
+    callers fall back to legacy feat/... resolution."""
+    from _wpxlib import current_change_scope
+    monkeypatch.delenv("SULIS_CHANGE_ID", raising=False)
+    assert current_change_scope(tmp_path) is None

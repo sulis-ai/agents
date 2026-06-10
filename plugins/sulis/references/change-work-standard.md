@@ -210,6 +210,27 @@ it.
   ~/repo-wp-002-payments-handler    ← branched off change/create-payments
 ```
 
+The diagram above shows *worktree paths*; the *branch ref* shape is a
+separate concern, stated next.
+
+### WP branch refs (MUST)
+
+A WP's *branch ref* is `wp/{primitive}-{slug}/wp-{nnn}-{slug}` — it nests
+under `wp/`, NOT under the change branch's `change/{primitive}-{slug}`
+prefix. Nesting a WP ref under the change branch is a git directory/file
+conflict: `refs/heads/` cannot hold a ref at `change/foo` and a ref under
+`change/foo/...` simultaneously. The `wp/` prefix carries the same change
+identity without the conflict, so the train resolver scopes its branch glob
+per-change and never matches a foreign change's recycled WP number. See
+ADR-001 (change `wp-branch-collision`).
+
+In-flight branches minted the old bare `feat/wp-{nnn}-{slug}` way during the
+one-release compat window still resolve via the executor journal (which
+records the exact pushed branch, any prefix); a WP under a change scope never
+resolves to a foreign change's `feat/wp-{nnn}-*` branch. The bare `feat/`
+glob survives one release only for legacy callers that supply no change
+scope; its removal is a tracked follow-up.
+
 ### What this means for the executor
 
 The executor's `wpx-pipeline` and `wpx-train` are unchanged in
@@ -508,3 +529,4 @@ change, and what CW-NN rule(s) it exercised or stressed.
 |---------|------|--------|
 | 0.1.0 | 2026-05-21 | Initial standard. CW-01..CW-08 synthesised from OpenSpec, Conventional Commits, SEA change primitives, GIT-01..GIT-10. Greenfield — no anchor cases yet; 90-day calibration begins. |
 | 0.2.0 | 2026-05-25 | **CW-04 amended (additive).** Auto back-integration subsection added — codifies the merge-not-rebase mechanism with two trigger points (post-WP-merge active driver + pre-WP-start safety net) and structured conflict handling (interactive resolve / defer / abort options). Operationalises what CW-04's two-level worktree hierarchy makes possible. Phase 4 of the change-as-primitive build; pairs with lifecycle.md Step 0 + Step 12.5 amendments. Backwards-compatible — existing change branches without auto back-integration continue to work; the new mechanism activates only via the Phase 5 executor implementation. |
+| 0.3.0 | 2026-06-10 | **CW-04 amended (additive).** Added the **WP branch refs (MUST)** subsection — a WP's branch ref is `wp/{primitive}-{slug}/wp-{nnn}-{slug}`, nesting under `wp/` (not under the `change/{primitive}-{slug}` prefix, which would be a git directory/file ref conflict). Scopes the train resolver's branch glob per-change so it cannot match a foreign change's recycled WP number (change `wp-branch-collision`, root cause of #105/#106; see ADR-001). Backwards-compatible — legacy bare `feat/wp-{nnn}-{slug}` branches still resolve via the executor journal + a one-release glob fallback for no-scope callers; fallback removal is a tracked follow-up. |

@@ -30,6 +30,30 @@ The fix:
        "origin branch missing" path).
 
 The tests below cover all four branches plus the warning surface.
+
+Dual-prefix fixture inventory (WP-006, change wp-branch-collision)
+-----------------------------------------------------------------
+The branch-namespacing fix retains the legacy ``feat/wp-NNN-*`` path for one
+release AND adds the scoped ``wp/{scope}/wp-NNN-*`` path. Both must stay
+covered. Test roles across the ~16 files that carry ``feat/wp-`` fixtures:
+
+* SCOPED-PATH coverage (assert ``wp/{scope}/`` resolution; pass change_scope):
+    - test_wpx_train_branch_resolution.py — ``test_resolve_scoped_*`` +
+      ``test_scoped_glob_does_not_match_foreign_change_branch`` (#105/#106 repro)
+    - test_wpx_train_eligibility.py — ``test_eligibility_uses_scoped_resolution``
+    - test_compute_wp_status.py — ``test_compute_status_threads_scope``
+    - test_wpx_wp.py — ``test_branch_name_subcommand_emits_scoped_then_legacy``
+* LEGACY-PATH characterisation (no change_scope; assert ``feat/wp-NNN-*``;
+  KEEP byte-for-byte — they are the oracle for the retained fallback):
+    every other ``feat/wp-`` fixture (eligibility no-scope cases, failure-paths,
+    patch-id, inspect, run, state-machine, paused-state, drift-detection,
+    worktree, change). None migrated; none deleted.
+
+Follow-up (legacy-fallback removal, next release): the suppress-when-scoped
+behaviour means scoped callers never touch ``feat/``. When the legacy glob is
+removed, the no-scope ``feat/`` characterisation tests are what to delete;
+they are greppable by their lack of ``change_scope`` + their ``feat/wp-``
+assertions. The scoped tests (``_scoped_`` / ``change_scope=``) stay.
 """
 
 from __future__ import annotations
@@ -533,3 +557,179 @@ def test_resolve_malformed_journal_falls_through(tmp_project, monkeypatch):
         wp_dir=tmp_project.wp_dir,
     )
     assert branch == "feat/wp-008-wire-drift-detector"
+
+
+# ─── WP-001: _branch_name change-identity threading (ADR-001) ──────────────
+
+
+def test_branch_name_scoped_and_legacy():
+    """_branch_name composes the ADR-001 scoped shape when a change_scope is
+    given, and the byte-for-byte legacy shape when it is not.
+
+    Scoped:  wp/{change_scope}/wp-{id-lower}-{slug}
+    Legacy:  feat/wp-{id-lower}-{slug}   (change_scope None/empty)
+    The WP- prefix strip + lowercase are preserved in both shapes.
+    """
+    # Scoped — change identity known
+    assert _wpxlib._branch_name("WP-001", "foo", "fix-x") == "wp/fix-x/wp-001-foo"
+    # Legacy — change identity unresolvable (default arg)
+    assert _wpxlib._branch_name("WP-001", "foo") == "feat/wp-001-foo"
+    # Legacy — prefix-strip + lowercase preserved for a bare numeric id
+    assert _wpxlib._branch_name("wp-7", "bar") == "feat/wp-7-bar"
+
+
+# ─── WP-002: journal pushed-branch regex widening (wp/ + change/) ───────────
+
+
+def test_journal_regex_matches_wp_and_change_prefixes(tmp_project):
+    """_JOURNAL_PUSHED_BRANCH_RE accepts the new wp/... and change/... pushed
+    branch tokens in a Step-7 trace, not just legacy feat/... — otherwise #229
+    Step-0 resolution silently falls through for namespaced branches.
+    """
+    cases = [
+        ("WP-001", "Pushed to wp/fix-x/wp-001-foo at SHA abc1234 (commit: x)",
+         "wp/fix-x/wp-001-foo"),
+        ("WP-002", "pushed change/fix-x at SHA def5678",
+         "change/fix-x"),
+        ("WP-003", "Pushed to feat/wp-003-bar at SHA 9999abc",
+         "feat/wp-003-bar"),
+    ]
+    for wp_id, outcome, expected in cases:
+        _seed_journal(tmp_project.wp_dir, wp_id, None, step7_outcome=outcome)
+        assert (
+            _wpxlib._journal_pushed_branch(tmp_project.wp_dir, wp_id) == expected
+        ), f"{outcome!r} should parse to {expected!r}"
+
+
+# ─── WP-003: dual-prefix resolution (scoped glob + legacy fallback) ─────────
+
+
+def test_resolve_scoped_literal_match(tmp_project, monkeypatch):
+    """With change_scope set, the scoped literal wp/{scope}/wp-NNN-{slug} is
+    returned directly when it exists on origin — no glob consulted."""
+    wp_id = "WP-001"
+    _seed_wp_file(tmp_project.wp_dir, wp_id, "foo")
+    _stub_gh(
+        monkeypatch,
+        branches_present={"wp/change-a/wp-001-foo"},
+        # A foreign legacy branch exists but must never be reached.
+        matching_branches={"feat/wp-001-*": [
+            {"name": "feat/wp-001-foreign", "committerdate": "2026-06-01T00:00:00Z"},
+        ]},
+    )
+    branch = _wpxlib.resolve_wp_branch(
+        wp_id, repo="acme/x", wp_dir=tmp_project.wp_dir, change_scope="change-a",
+    )
+    assert branch == "wp/change-a/wp-001-foo"
+
+
+def test_scoped_glob_does_not_match_foreign_change_branch(tmp_project, monkeypatch):
+    """The #105/#106 reproduction: a foreign change's feat/wp-001-* branch must
+    NEVER be selected for this change's WP-001 when a change_scope is supplied.
+
+    Variant A: scoped branch exists → it is chosen.
+    Variant B: scoped branch absent → None, NOT the foreign feat/ branch.
+    """
+    wp_id = "WP-001"
+    _seed_wp_file(tmp_project.wp_dir, wp_id, "mine")
+
+    # Variant A — scoped branch present.
+    _stub_gh(
+        monkeypatch,
+        matching_branches={
+            "wp/change-a/wp-001-*": [
+                {"name": "wp/change-a/wp-001-mine", "committerdate": "2026-06-02T00:00:00Z"},
+            ],
+            "feat/wp-001-*": [
+                {"name": "feat/wp-001-change-B-branch", "committerdate": "2026-06-09T00:00:00Z"},
+            ],
+        },
+    )
+    branch = _wpxlib.resolve_wp_branch(
+        wp_id, repo="acme/x", wp_dir=tmp_project.wp_dir, change_scope="change-a",
+    )
+    assert branch == "wp/change-a/wp-001-mine"
+    assert branch != "feat/wp-001-change-B-branch"
+
+    # Variant B — scoped branch absent; foreign legacy branch must not leak.
+    _stub_gh(
+        monkeypatch,
+        matching_branches={
+            "wp/change-a/wp-001-*": [],
+            "feat/wp-001-*": [
+                {"name": "feat/wp-001-change-B-branch", "committerdate": "2026-06-09T00:00:00Z"},
+            ],
+        },
+    )
+    branch = _wpxlib.resolve_wp_branch(
+        wp_id, repo="acme/x", wp_dir=tmp_project.wp_dir, change_scope="change-a",
+    )
+    assert branch is None
+
+
+def test_resolve_scoped_inflight_legacy_branch_resolves_via_journal(
+    tmp_project, monkeypatch
+):
+    """One-release compat window — discharged by Step-0, NOT by the legacy glob.
+
+    When a scope is supplied and this change's in-flight branch was minted the
+    OLD way (feat/wp-NNN-...) during the compat window, it still resolves —
+    because the executor journal records the exact pushed branch (any prefix,
+    after WP-002's regex widening) and Step-0 returns it after confirming it is
+    on origin. The repo-wide legacy glob is NOT consulted under a scope; it
+    cannot tell this change's own old branch from a foreign collision, so
+    relying on it would re-open #105/#106. The journal can — it is per-change
+    by construction.
+    """
+    wp_id = "WP-001"
+    _seed_wp_file(tmp_project.wp_dir, wp_id, "drifted-slug")
+    inflight = "feat/wp-001-drifted"  # minted the old way, this change's own
+    _seed_journal(tmp_project.wp_dir, wp_id, inflight)
+    _stub_gh(
+        monkeypatch,
+        branches_present={inflight},  # journal branch IS on origin
+        matching_branches={
+            # Scoped glob empty (nothing minted the new way), and a FOREIGN
+            # feat/wp-001-* exists. Neither is consulted: Step-0 short-circuits.
+            "wp/change-a/wp-001-*": [],
+            "feat/wp-001-*": [
+                {"name": "feat/wp-001-foreign", "committerdate": "2026-06-09T00:00:00Z"},
+            ],
+        },
+    )
+    branch = _wpxlib.resolve_wp_branch(
+        wp_id, repo="acme/x", wp_dir=tmp_project.wp_dir, change_scope="change-a",
+    )
+    assert branch == inflight
+    assert branch != "feat/wp-001-foreign"
+
+
+def test_resolve_scoped_suppresses_legacy_glob_when_no_journal(
+    tmp_project, monkeypatch
+):
+    """With a scope set, the repo-wide legacy feat/wp-NNN-* glob is suppressed.
+
+    No journal record, no scoped branch, but a foreign feat/wp-001-* exists on
+    origin. The resolver MUST return None — never the foreign branch. This is
+    the direct guard against #105/#106: under a scope, any feat/ glob hit is a
+    foreign change's recycled-number branch, so the legacy step is skipped
+    entirely. (A built WP would have a journal entry resolving via Step-0; a WP
+    with neither journal nor scoped branch is unresolvable under its own scope,
+    and None is strictly safer than guessing a foreign ref.)
+    """
+    wp_id = "WP-001"
+    _seed_wp_file(tmp_project.wp_dir, wp_id, "mine")
+    _stub_gh(
+        monkeypatch,
+        branches_present=set(),  # no journal branch (none seeded), nothing literal
+        matching_branches={
+            "wp/change-a/wp-001-*": [],
+            "feat/wp-001-*": [
+                {"name": "feat/wp-001-foreign", "committerdate": "2026-06-09T00:00:00Z"},
+            ],
+        },
+    )
+    branch = _wpxlib.resolve_wp_branch(
+        wp_id, repo="acme/x", wp_dir=tmp_project.wp_dir, change_scope="change-a",
+    )
+    assert branch is None

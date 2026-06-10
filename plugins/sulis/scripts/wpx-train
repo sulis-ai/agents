@@ -85,6 +85,7 @@ from _wpxlib import (  # noqa: E402
     cli_main,
     clone_repo_to_temp,
     compute_culprit_heuristic,
+    current_change_scope,
     deploy_is_applicable,
     emit_error,
     emit_internal_error,
@@ -164,6 +165,7 @@ def cmd_queue_list(args: argparse.Namespace) -> None:
         strict_ci=getattr(args, "strict_ci", False),
         paths=paths,
         base_branch=getattr(args, "base_branch", None) or "main",
+        change_scope=current_change_scope(paths.repo_root),
     )
 
     eligible = [r for r in results if r.eligible]
@@ -281,6 +283,7 @@ def cmd_status(args: argparse.Namespace) -> None:
         strict_ci=getattr(args, "strict_ci", False),
         paths=paths,
         base_branch=getattr(args, "base_branch", None) or "main",
+        change_scope=current_change_scope(paths.repo_root),
     )
 
     eligible = [r for r in results if r.eligible]
@@ -1974,6 +1977,7 @@ def cmd_run(args: argparse.Namespace) -> None:
         strict_ci=getattr(args, "strict_ci", False),
         paths=paths,
         base_branch=getattr(args, "base_branch", None) or "main",
+        change_scope=current_change_scope(paths.repo_root),
     )
     eligible = [r for r in results if r.eligible]
 
