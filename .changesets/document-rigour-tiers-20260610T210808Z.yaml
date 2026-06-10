@@ -1,7 +1,0 @@
-change_id: 5358WXXQKW3Y8ZD0GE9E9RN43F
-primitive: document
-tier: patch
-touches_plugin: true
-summary: |
-  Add CW-09 to the Change Work Standard: three rigour tiers (Methodical / Batched / Bounded-fix) as presets over dials, with a tier-invariant verification floor and a written-plan floor (plan mode -> write the plan naming the critical scenarios -> build). Guidance only (SHOULD, calibrating) — no workflow steps hard-coded yet.
-created_at: 2026-06-10T21:08:08Z
