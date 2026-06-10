@@ -34,6 +34,18 @@ your peers. If you observe a file-system collision anyway (rare —
 indicates a SEA-decomposed scope misdeclaration), treat it as out-
 of-scope and escalate via BLOCKER.
 
+## A note on WP id shape
+
+WP ids are now minted as the prefixed, globally-unique shape
+`{CH-HANDLE}-WP-NNN` (e.g. `CH-5DMB1N-WP-001`) — the prefix is the parent
+change's handle; `NNN` is the per-change sequence. Legacy bare `WP-NNN` ids
+stay valid and parseable for one release (back-compat per ADR-002). You don't
+mint ids — you receive a WP id and run its lifecycle. The `WP-NNN` placeholders
+throughout this file (the WP-file glob `WP-NNN-*.md`, the `--wp WP-NNN` CLI arg,
+the `.executor-WP-NNN.md` journal name) are the bare stand-in for whichever
+shape a real id takes; substitute the actual id — prefixed or bare — at each
+invocation. The wpx-* tooling and the widened matcher accept both shapes.
+
 ## Required reading (every WP start)
 
 Before doing any work on a WP, read these in this order:
