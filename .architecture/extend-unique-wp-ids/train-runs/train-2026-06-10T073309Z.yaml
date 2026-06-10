@@ -1,0 +1,26 @@
+train_id: "train-2026-06-10T073309Z"
+started_at: "2026-06-10T07:33:09Z"
+completed_at: null
+outcome: "aborted"
+outcome_reason: "founder-initiated abort at phase ci_running"
+batch_size: 3
+deploy_url: null
+deploy_workflow_run: null
+health_status: null
+smoke_verdict: null
+bundle:
+  - wp: WP-001
+    branch: feat/wp-001-shared-wp-id-matcher
+    pre_train_sha: null
+    rebased_to_sha: null
+    merge_sha_on_dev: null
+  - wp: WP-002
+    branch: wp/extend-unique-wp-ids/wp-002-mint-path-canonical-id-rows
+    pre_train_sha: null
+    rebased_to_sha: null
+    merge_sha_on_dev: null
+  - wp: WP-003
+    branch: wp/extend-unique-wp-ids/wp-003-reconcile-standards-and-supersede-parked
+    pre_train_sha: null
+    rebased_to_sha: null
+    merge_sha_on_dev: null
