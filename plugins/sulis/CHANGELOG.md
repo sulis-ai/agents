@@ -1,3 +1,9 @@
+## v0.132.3 — 2026-06-10
+
+**Patch — release-train batch.**
+
+- Session daemon no longer idle-evicts in-use change sessions: a session with an attached window (or a turn in flight) is exempt from the 10-minute idle reaper, so a spawned change window survives a long quiet step (recon, tests) instead of being killed mid-work. Adds an eviction log line and routes daemon stderr to a log file.
+
 ## v0.132.2 — 2026-06-10
 
 **Patch — release-train batch.**
