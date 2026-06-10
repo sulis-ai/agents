@@ -74,6 +74,75 @@ def test_start_creates_branch_and_worktree(local_git_repo, run_tool):
     assert metadata["primitive"] == "create"
 
 
+def _write_branch_convention(repo: Path, convention: str) -> None:
+    """Write a minimal .sulis/repo-contract.yml declaring branch_convention."""
+    sulis = repo / ".sulis"
+    sulis.mkdir(parents=True, exist_ok=True)
+    (sulis / "repo-contract.yml").write_text(
+        f"profile: published-artifact\n"
+        f"branch_convention: {convention}\n",
+        encoding="utf-8",
+    )
+
+
+def test_start_honours_host_branch_convention_end_to_end(
+    local_git_repo, run_tool,
+):
+    """#112 — a repo declaring `branch_convention: feature/{slug}` gets a
+    `feature/<slug>` change branch, and that change still LISTS, STATUSES, and
+    is NUKE-targetable (store-backed identity + dual-prefix discovery)."""
+    _write_branch_convention(local_git_repo, "feature/{slug}")
+
+    start = run_tool(
+        "sulis-change", "start",
+        "--repo-root", str(local_git_repo),
+        "--slug", "dark-mode", "--primitive", "feat",
+    )
+    assert start.ok, f"start failed: stderr={start.stderr}"
+    # Branch honours the convention (NOT change/feat-dark-mode).
+    assert start.data["branch"] == "feature/dark-mode"
+    change_id = start.data["change_id"]
+
+    # The branch is a real local ref.
+    branch_ref = _git(local_git_repo, "branch", "--list", "feature/dark-mode")
+    assert "feature/dark-mode" in branch_ref
+
+    # list resolves it (store-backed enumeration).
+    listed = run_tool("sulis-change", "list",
+                      "--repo-root", str(local_git_repo))
+    assert listed.ok
+    branches = {c["branch"]: c for c in listed.data["changes"]}
+    assert "feature/dark-mode" in branches
+    assert branches["feature/dark-mode"]["slug"] == "dark-mode"
+
+    # status resolves the recorded branch (not a recomposed change/ name).
+    status = run_tool("sulis-change", "status",
+                      "--repo-root", str(local_git_repo),
+                      "--slug", "dark-mode", "--primitive", "feat")
+    assert status.ok, f"status failed: stderr={status.stderr}"
+    assert status.data["branch"] == "feature/dark-mode"
+
+    # nuke is able to target it via --slug (dual-prefix discovery).
+    nuke = run_tool("sulis-change", "nuke",
+                    "--repo-root", str(local_git_repo),
+                    "--slug", "dark-mode")  # dry-run (no --force)
+    assert nuke.ok, f"nuke failed: stderr={nuke.stderr}"
+    assert nuke.data["change_id"] == change_id
+    assert nuke.data["branch"] == "feature/dark-mode"
+
+
+def test_start_no_convention_is_byte_for_byte_legacy(local_git_repo, run_tool):
+    """#112 regression — with NO branch_convention key (the marketplace's own
+    case), the branch is byte-for-byte change/{primitive}-{slug}."""
+    start = run_tool(
+        "sulis-change", "start",
+        "--repo-root", str(local_git_repo),
+        "--slug", "legacy-default", "--primitive", "feat",
+    )
+    assert start.ok, f"start failed: stderr={start.stderr}"
+    assert start.data["branch"] == "change/feat-legacy-default"
+
+
 def test_start_pushes_change_branch_to_origin(local_git_repo, run_tool):
     """`sulis-change start` publishes the change branch to origin (#61).
 

@@ -1,0 +1,7 @@
+change_id: 01KTRW7RNFYJCZD96GRCNFP1MR
+primitive: feat
+tier: minor
+touches_plugin: true
+summary: |
+  sulis-change now honours the host repo branch convention: an optional branch_convention key in the repo-contract shapes new change branch names (e.g. feature/{slug}); with no key it stays byte-for-byte change/{primitive}-{slug}. Change identity is store-backed so dual-prefix discovery keeps in-flight change/* changes resolving, the back-integration gates no longer key off the change/ prefix, and Work-Package branches stay under wp/.
+created_at: 2026-06-10T14:01:26Z

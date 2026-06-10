@@ -132,6 +132,83 @@ def test_parse_change_branch_rejects_unknown_primitive():
     assert parse_change_branch("change/notaprimitive-payments") is None
 
 
+# ─── #112: host branch convention — compose ──────────────────────────────
+
+
+def test_compose_change_branch_no_convention_is_byte_for_byte_default():
+    """When no convention is supplied, the result is identical to today's
+    hardcoded change/{primitive}-{slug} — zero behaviour change."""
+    assert (compose_change_branch("feat", "dark-mode", convention=None) ==
+            "change/feat-dark-mode")
+    # Default arg path (no kwarg at all) must match too.
+    assert (compose_change_branch("feat", "dark-mode") ==
+            "change/feat-dark-mode")
+
+
+def test_compose_change_branch_slug_template():
+    """A `feature/{slug}` convention composes feature/<slug>."""
+    assert (compose_change_branch("feat", "dark-mode",
+                                  convention="feature/{slug}") ==
+            "feature/dark-mode")
+
+
+def test_compose_change_branch_primitive_and_slug_template():
+    """Both {primitive} and {slug} placeholders are supported."""
+    assert (compose_change_branch("fix", "login-bug",
+                                  convention="work/{primitive}-{slug}") ==
+            "work/fix-login-bug")
+
+
+def test_compose_change_branch_bare_prefix_composes_slug():
+    """A bare prefix (ends in `/`, no placeholder) composes prefix{slug}."""
+    assert (compose_change_branch("feat", "dark-mode",
+                                  convention="feature/") ==
+            "feature/dark-mode")
+
+
+def test_compose_change_branch_convention_lowercases():
+    """Primitive case is normalised inside a templated convention too."""
+    assert (compose_change_branch("Feat", "dark-mode",
+                                  convention="work/{primitive}-{slug}") ==
+            "work/feat-dark-mode")
+
+
+def test_compose_change_branch_empty_convention_falls_back_to_default():
+    """An empty/whitespace convention is treated as absent (default)."""
+    assert (compose_change_branch("feat", "dark-mode", convention="") ==
+            "change/feat-dark-mode")
+    assert (compose_change_branch("feat", "dark-mode", convention="   ") ==
+            "change/feat-dark-mode")
+
+
+# ─── #112: host branch convention — dual-prefix parse ─────────────────────
+
+
+def test_parse_change_branch_accepts_configured_convention():
+    """A renamed `feature/<slug>` branch parses under the configured
+    convention, returning (primitive, slug)."""
+    parsed = parse_change_branch("feature/dark-mode",
+                                 convention="feature/{slug}")
+    assert parsed is not None
+    primitive, slug = parsed
+    assert slug == "dark-mode"
+
+
+def test_parse_change_branch_legacy_change_prefix_still_resolves():
+    """Even with a non-change/ convention configured, legacy change/* branches
+    must still parse (dual-prefix union)."""
+    parsed = parse_change_branch("change/feat-dark-mode",
+                                 convention="feature/{slug}")
+    assert parsed == ("feat", "dark-mode")
+
+
+def test_parse_change_branch_template_with_primitive():
+    """A `work/{primitive}-{slug}` convention recovers both fields."""
+    parsed = parse_change_branch("work/fix-login-bug",
+                                 convention="work/{primitive}-{slug}")
+    assert parsed == ("fix", "login-bug")
+
+
 # ─── change_worktree_path ────────────────────────────────────────────────
 
 
@@ -511,6 +588,42 @@ def test_find_change_branches_includes_origin_only(monkeypatch, tmp_path):
     # de-duped: only one entry for the local branch
     assert sum(1 for b in find_change_branches(tmp_path)
                if b["branch"] == "change/fix-local-one") == 1
+
+
+def test_find_change_branches_dual_prefix(monkeypatch, tmp_path):
+    """#112: with a `feature/{slug}` convention, find_change_branches globs the
+    configured prefix UNION legacy change/* — so a renamed feature/<slug>
+    change is discoverable AND existing change/* changes still appear."""
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, cwd=None, timeout=None, **kwargs):
+        calls.append(list(cmd))
+        # Local globs
+        if cmd[:3] == ["git", "branch", "--list"] and "--remotes" not in cmd:
+            pattern = cmd[3]
+            if pattern == "change/*":
+                return (0, "  change/feat-legacy-one\n", "")
+            if pattern == "feature/*":
+                return (0, "  feature/renamed-two\n", "")
+            return (0, "", "")
+        # Remote globs
+        if cmd[:4] == ["git", "branch", "--list", "--remotes"]:
+            return (0, "", "")
+        return (1, "", "unexpected")
+
+    monkeypatch.setattr("_wpxlib._run", fake_run)
+    from _wpxlib import find_change_branches
+    branches = {b["branch"]: b for b in
+                find_change_branches(tmp_path, convention="feature/{slug}")}
+    # Legacy change/* still discovered
+    assert "change/feat-legacy-one" in branches
+    # Renamed feature/<slug> discovered under the configured prefix
+    assert "feature/renamed-two" in branches
+    # Both prefixes were globbed
+    globbed = {c[3] for c in calls
+               if c[:3] == ["git", "branch", "--list"] and "--remotes" not in c}
+    assert "change/*" in globbed
+    assert "feature/*" in globbed
 
 
 # ─── back_integrate_change_branch (Phase 5 #2: Step 0 / Step 12.5 mechanic) ─

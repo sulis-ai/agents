@@ -98,6 +98,7 @@ from _wpxlib import (  # noqa: E402
     find_wp_merge_sha,
     is_sha_on_branch,
     flip_index_status_via_cli,
+    is_change_context,
     pack_batches,
     parse_index_md,
     paths_from_args,
@@ -1808,14 +1809,20 @@ def _step_0_arrival_check(
     Per lifecycle.md Step 0 + CW-04 auto back-integration. Defence in depth
     — the active driver is Step 12.5 after the batch lands. Skipped when not
     in a change context (--change-worktree-path unset, or --base-branch is
-    not a change/* branch — CW-05 trivial carve-out OR direct-to-dev).
+    not a change branch — CW-05 trivial carve-out OR direct-to-dev).
+
+    The change-context test is PREFIX-INDEPENDENT (#112): a change branch
+    renamed under a host ``branch_convention`` (e.g. ``feature/...``) must
+    still back-integrate. ``is_change_context`` keys off SULIS_CHANGE_ID / the
+    store, not the literal ``change/`` prefix — else a renamed change silently
+    stops auto-back-integrating from main.
 
     On conflict / fetch-fail / internal-error this writes the run record and
     terminates via emit_result(exit_code=1) (SystemExit), exactly as the
     pre-extraction inline block did. Returns None on success or skip.
     """
     change_worktree_path = getattr(args, "change_worktree_path", None)
-    if not (change_worktree_path and base_branch.startswith("change/")):
+    if not (change_worktree_path and is_change_context(base_branch)):
         record["step_0_arrival_check"] = "skipped"
         return
 
@@ -1889,10 +1896,11 @@ def _step_12_5_back_integration(
     Active driver — keeps the change branch within one batch of dev. Conflict
     here is NON-blocking: the batch already merged, so we log a warning and
     let the founder resolve at the next Step 0. Mutates record; never raises
-    or terminates. Skipped when not in a change context.
+    or terminates. Skipped when not in a change context (prefix-independent —
+    #112; see _step_0_arrival_check).
     """
     change_worktree_path = getattr(args, "change_worktree_path", None)
-    if not (change_worktree_path and base_branch.startswith("change/")):
+    if not (change_worktree_path and is_change_context(base_branch)):
         record["step_12_5_back_integration"] = "skipped"
         return
 
@@ -1940,10 +1948,11 @@ def _sync_local_change_worktree_after_train(
     branch has genuinely diverged (the #265 case, now prevented at Step 0)
     this logs a clear recovery hint and continues (non-fatal).
 
-    Mutates record; never raises. Skipped when not in a change context.
+    Mutates record; never raises. Skipped when not in a change context
+    (prefix-independent — #112; see _step_0_arrival_check).
     """
     change_worktree_path = getattr(args, "change_worktree_path", None)
-    if not (change_worktree_path and base_branch.startswith("change/")):
+    if not (change_worktree_path and is_change_context(base_branch)):
         record["local_worktree_sync"] = "skipped"
         return
 
