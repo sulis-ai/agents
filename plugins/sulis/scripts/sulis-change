@@ -1523,6 +1523,14 @@ def _resolve_nuke_target(repo_root: Path, args: argparse.Namespace) -> dict:
             context={"hint": "Run `sulis-change list` to see active changes."},
         )
 
+    # Validate an explicit --change-id up front (symmetry with recreate): a
+    # malformed id can never name a real change, so fail early with a precise
+    # reason rather than fall through to the generic "no match".
+    if change_id_arg:
+        ok, reason = validate_change_ulid(change_id_arg)
+        if not ok:
+            emit_error(f"invalid --change-id {change_id_arg!r}: {reason}")
+
     # #112 — dual-prefix discovery: a change renamed under the host's
     # branch_convention (e.g. feature/...) is still nuke-targetable, and
     # legacy change/* changes keep resolving. Build one descriptor per branch,

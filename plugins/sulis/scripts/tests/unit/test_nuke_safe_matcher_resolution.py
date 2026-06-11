@@ -299,3 +299,27 @@ def test_nuke_resolves_by_change_id_flag(
     assert target is not None, f"resolution failed: {captured.get('error')}"
     assert target["change_id"] == _ULID_A
     assert target["branch"] == meta["branch"]
+
+
+# ─── 5. nuke --change-id validates the id up front (symmetry with recreate) ─
+
+
+def test_nuke_malformed_change_id_clean_validated_error(
+    local_git_repo, tmp_path, monkeypatch,
+):
+    """A malformed `nuke --change-id` is rejected up front with a clean
+    validated error (`invalid --change-id ...`), symmetric with `recreate` —
+    never a fall-through to the generic "no active change matches". A
+    malformed id can never name a real change, so failing early with a precise
+    reason is the honest behaviour."""
+    home = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home))
+
+    captured, patches = _capture_emit()
+    _resolve_target(
+        _target_args(local_git_repo, change_id="not-a-valid-ulid"),
+        captured, patches, local_git_repo,
+    )
+    assert captured["ok"] is False, captured
+    err = captured["error"].lower()
+    assert "invalid" in err and "change-id" in err
