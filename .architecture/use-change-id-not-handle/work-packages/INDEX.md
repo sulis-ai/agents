@@ -6,8 +6,8 @@
 
 | ID | Title | Primitive | Status | Depends On | Blocks | Delta | Sev |
 |---|---|---|---|---|---|---|---|
-| WP-001 | CLI `recreate --change-id` resolves the exact change; handle stays display | Fix | step-7-complete | — | WP-003, WP-004, WP-005 | HD-001 | high |
-| WP-002 | `nuke` resolves via the safe matcher; retire the dead head-prefix rung; readable name in candidates | Fix | step-7-complete | — | WP-004 | HD-002 | medium |
+| WP-001 | CLI `recreate --change-id` resolves the exact change; handle stays display | Fix | done | — | WP-003, WP-004, WP-005 | HD-001 | high |
+| WP-002 | `nuke` resolves via the safe matcher; retire the dead head-prefix rung; readable name in candidates | Fix | done | — | WP-004 | HD-002 | medium |
 | WP-003 | Cockpit drives recreate by `record.changeId`, not the handle (port + adapters + serving path + HD-004 test) | Fix | pending | WP-001 | — | HD-001, HD-004 | high |
 | WP-004 | 26-collision regression fixture: every change resolves to itself across all four verbs | Fix | pending | WP-001, WP-002 | — | HD-003 | medium |
 | WP-005 | DiD: recreate fallback worktree keyed by change_id (opportunistic) | Harden | pending | WP-001 | — | HD-005 | low |
