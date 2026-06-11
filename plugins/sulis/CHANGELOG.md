@@ -1,3 +1,9 @@
+## v0.140.2 — 2026-06-11
+
+**Patch — release-train batch.**
+
+- Identify a change by its unique id, not the non-unique 6-char handle, across recreate/focus/ship/nuke (with safe disambiguation); add a Hypothesis property-test layer.
+
 ## v0.140.1 — 2026-06-11
 
 **Patch — release-train batch.**
