@@ -808,6 +808,30 @@ the founder always owns the proceed-anyway decision. Block-by-default
 applies only to verdict=fail (zero coverage), which is genuinely
 broken state.
 
+**4.9.5. Observed-verdict gate — the hard PRE-merge check (MUST, #122).**
+Gates 4.8/4.9 above *produce* the verdict (drive scenarios / check
+requirements, depositing TestResults). This step *enforces* it at the merge
+boundary: run `sulis-change verify-verdict`, which reads the **recorded**
+verdict (deposited TestResults — both the SRD route and the scenario route,
+no re-drive) and **refuses the merge** if it's unmet. This is what makes the
+verdict gate the *merge* (and therefore the release the robot cuts on merge),
+not just the post-merge `shipped` flag — `mark-shipped` keeps the same check
+as the post-merge backstop (defense-in-depth).
+
+```bash
+"$SCRIPTS_DIR/sulis-change" verify-verdict --handle CH-01HQ8X \
+  --repo-root <main-repo-root>
+```
+
+- **Exit 0** → the verdict is met; proceed to the squash-merge.
+- **Exit 1** → STOP. Do **not** squash-merge. Surface the reason in plain
+  English (the unverified requirements/scenarios) and route back to driving
+  the verification — mirrors the review gate's block. A genuinely conscious
+  override is the founder's call (the same shape as a review CONCERN), never
+  an automatic `--force`.
+- **Exit 3** → resolution/tooling error; treat as advisory (like 4.9's
+  WORST=error) — the founder owns proceed-anyway.
+
 **5. Squash-merge** (only after green + confirmation):
 
 ```bash
