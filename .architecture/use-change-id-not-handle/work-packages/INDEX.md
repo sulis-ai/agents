@@ -14,8 +14,8 @@
 | WP-004 | 26-collision regression fixture: every change resolves to itself across all four verbs | Fix | done | WP-001, WP-002 | — | HD-003 | medium |
 | WP-005 | DiD: recreate fallback worktree keyed by change_id (opportunistic) | Harden | done | WP-001 | — | HD-005 | low |
 | WP-006 | Hypothesis strategies module + dev-dependency wiring (property-layer foundation) | Create | done | — | WP-007, WP-008 | — | low |
-| WP-007 | Phase 1 — pure-core property tests (handle/match/resolve/refuse/path invariants, universal) | Test | pending | WP-006 | — | — | low |
-| WP-008 | Phase 2 — stateful model-based test (lifecycle never acts on wrong id; ambiguous always refuses) | Test | pending | WP-006 | — | — | low |
+| WP-007 | Phase 1 — pure-core property tests (handle/match/resolve/refuse/path invariants, universal) | Test | done | WP-006 | — | — | low |
+| WP-008 | Phase 2 — stateful model-based test (lifecycle never acts on wrong id; ambiguous always refuses) | Test | done | WP-006 | — | — | low |
 
 ## Dependency graph
 
