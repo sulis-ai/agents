@@ -431,6 +431,19 @@ Change B is consistently blocked on Change A landing), CW-07 becomes
 wrong and a future v0.2.0 adds a change-level dependency layer.
 That's a deferred concern.
 
+**Partial breakage observed (#123).** A recurring case did surface: a change
+started *from inside another change's session* (an idea spun out, or a
+dependency) lost the link + context, forcing a human to relay between the two
+sessions. The first coordination primitive is now in: `sulis-change start`,
+when launched with a parent `SULIS_CHANGE_ID`, records a **durable link**
+(`parent_change` + `relationship: builds_on | depends_on`) on the new change
+and carries the parent's Working-Set context into its `CONTEXT.md`. This is
+deliberately **durable shared state, not live inter-session messaging** (a
+critical-thinking spiral found Agent Teams a topology mismatch — ephemeral,
+lead-fixed, no resumption — for independent human-paced change peers). The full
+change-level dependency DAG (blocked-on edges, absorb-vs-spawn) remains the
+v0.2 concern (#97).
+
 ---
 
 ## CW-08: Composition with Marketplace Standards (MUST)

@@ -775,9 +775,105 @@ def _push_change_branch_to_origin(repo_root: Path, branch: str) -> bool:
 
 # ─── Subcommand: start ────────────────────────────────────────────────────
 
+# ─── #123 — cross-session context-carry ─────────────────────────────────────
+# When change B is started from inside change A's session (a parent
+# SULIS_CHANGE_ID is set), the LINK + A's reasoning travel into B as durable
+# state — B discovers them through the CONTEXT.md it already reads at startup.
+# No live inter-session wire (the critical-thinking call: a state gap, not a
+# transport gap; Agent Teams was wrong-fit). Best-effort throughout: a carry
+# problem must never block `start`.
+
+_CARRY_RELATIONSHIPS = ("builds_on", "depends_on")
+
+
+def _excerpt_working_set(text, *, max_chars: int = 1500) -> str:
+    """A capped excerpt of a parent Working Set for carry. Its most useful
+    sections (Problem / Current best solution) sit at the top, so the leading
+    slice captures them. Empty / whitespace / None → ``''``."""
+    if not text or not str(text).strip():
+        return ""
+    t = str(text).strip()
+    if len(t) <= max_chars:
+        return t
+    return t[:max_chars].rstrip() + "\n\n…(excerpt truncated — follow the link to read the rest)"
+
+
+def _carried_context_section(parent: dict, relationship: str,
+                             working_set_text) -> str:
+    """The 'Carried from {parent}' CONTEXT.md section (#123): the durable link
+    + an excerpt of the parent's Working Set. The link is ALWAYS present (B can
+    follow it to read the parent's full Working Set + brain); the excerpt is a
+    starting point, not the whole picture."""
+    handle = parent.get("handle") or parent.get("change_id", "?")
+    slug = str(parent.get("slug", "") or "")
+    cid = str(parent.get("change_id", "") or "")
+    rel = relationship if relationship in _CARRY_RELATIONSHIPS else "builds_on"
+    excerpt = _excerpt_working_set(working_set_text)
+    out = [
+        "",
+        f"## Carried from {handle} ({rel})",
+        "",
+        ("This change was started from change **" + str(handle) + "**"
+         + (f" — *{slug}*" if slug else "")
+         + (f" (`{cid}`)" if cid else "")
+         + f". Relationship: `{rel}`. Read that change's full reasoning in its "
+           "Working Set and the brain — the excerpt below is a starting point, "
+           "not the whole picture."),
+        "",
+    ]
+    if excerpt:
+        out += ["### Carried Working Set excerpt", "", excerpt, ""]
+    else:
+        out += [
+            "_The parent change had no populated Working Set at spawn time — "
+            "follow the link above and read its artifacts (SPEC / brain "
+            "Opportunity + Decision) directly._",
+            "",
+        ]
+    return "\n".join(out)
+
+
+def _resolve_parent_carry(relationship):
+    """If a parent change is bound in the env (`SULIS_CHANGE_ID`), resolve its
+    record + Working Set and build the carried-context section.
+
+    Returns ``(parent_id | None, section | None, relationship)``. Best-effort:
+    any resolution/read failure degrades to ``(parent_id or None, None, rel)``
+    so a carry problem never blocks `start`. The link is recorded even when the
+    Working Set can't be read (the section's fallback tells B to follow it)."""
+    parent_id = (os.environ.get("SULIS_CHANGE_ID") or "").strip()
+    rel = relationship if relationship in _CARRY_RELATIONSHIPS else "builds_on"
+    if not parent_id:
+        return (None, None, rel)
+    try:
+        parent = read_change_record(parent_id)
+    except Exception:
+        parent = None
+    if not parent:
+        return (parent_id, None, rel)
+    ws_text = None
+    try:
+        pw = parent.get("worktree_path")
+        p_prim = str(parent.get("primitive", "") or "")
+        p_slug = str(parent.get("slug", "") or "")
+        if pw and p_prim and p_slug:
+            ws = Path(pw) / ".changes" / f"{p_prim}-{p_slug}.WORKING-SET.md"
+            if ws.exists():
+                ws_text = ws.read_text(encoding="utf-8")
+    except Exception:
+        ws_text = None
+    return (parent_id, _carried_context_section(parent, rel, ws_text), rel)
+
+
 def cmd_start(args: argparse.Namespace) -> None:
     repo_root = _resolve_repo_root(args)
     primitive, slug = _resolve_primitive_and_slug(args)
+    # #123 — if launched from INSIDE a parent change session (SULIS_CHANGE_ID
+    # set), carry its durable link + a Working-Set excerpt into this change.
+    # Resolved up front so the link lands in the manifest + record and the
+    # excerpt is appended to CONTEXT.md below. Best-effort (never blocks start).
+    parent_change, carried_section, carry_relationship = _resolve_parent_carry(
+        getattr(args, "relationship", "builds_on"))
     # #112 — honour the host repo's branch convention if it declares one.
     # Absent → compose_change_branch returns the byte-for-byte legacy
     # change/{primitive}-{slug}.
@@ -855,6 +951,11 @@ def cmd_start(args: argparse.Namespace) -> None:
         "base_sha": base_sha,
         "started_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
+    if parent_change:
+        # #123 — the durable link the founder was hand-relaying becomes a
+        # first-class field on the change (manifest + record below).
+        metadata["parent_change"] = parent_change
+        metadata["relationship"] = carry_relationship
     write_change_metadata(_metadata_path(worktree_dest, primitive, slug),
                           metadata)
 
@@ -871,6 +972,16 @@ def cmd_start(args: argparse.Namespace) -> None:
     if context_path is None:
         _log("Pre-spawn recon could not be written (path unwritable); "
              "continuing without CONTEXT.md")
+    elif carried_section:
+        # #123 — append the 'Carried from {parent}' section so the spawned
+        # session DISCOVERS the link + the parent's reasoning through the
+        # CONTEXT.md it already reads at startup. Best-effort: an append
+        # failure must not block start.
+        try:
+            with open(context_path, "a", encoding="utf-8") as _fh:
+                _fh.write(carried_section)
+        except OSError:
+            _log("Carried-context section could not be appended to CONTEXT.md")
 
     # Stamp the initial workflow stage (recon) into the per-change local
     # state.json. The stage skills advance it later (slice B); here we just
@@ -900,6 +1011,10 @@ def cmd_start(args: argparse.Namespace) -> None:
         "base_sha": base_sha,
         "created_at": metadata["started_at"],
         "stage": "recon",
+        # #123 — the durable parent link, also on the global record the
+        # dashboard / `list` read (omitted entirely when there's no parent).
+        **({"parent_change": parent_change,
+            "relationship": carry_relationship} if parent_change else {}),
     })
     if record_path is None:
         _log("Global change record could not be written (path unwritable); "
@@ -1993,6 +2108,16 @@ def build_parser() -> argparse.ArgumentParser:
              "a HERE-DOC pre-prompt briefing the agent on the change. "
              "Default off. See plugins/sulis/docs/change-as-primitive-design.md "
              "§ Session binding.",
+    )
+    p_start.add_argument(
+        "--relationship", default="builds_on",
+        choices=["builds_on", "depends_on"],
+        help="When started from inside a parent change session "
+             "(SULIS_CHANGE_ID set), how this change relates to the parent: "
+             "`builds_on` (default — extends the parent's idea) or "
+             "`depends_on` (the parent is a dependency). Records a durable link "
+             "+ carries the parent's context into this change's CONTEXT.md "
+             "(#123).",
     )
 
     p_adopt = sub.add_parser("adopt", help="Retrofit in-flight work into a change")

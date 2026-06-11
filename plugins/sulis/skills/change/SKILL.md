@@ -192,6 +192,21 @@ one session, always in sync. Closing the desktop window just **detaches**
 that view — the session keeps running, and you can reopen it (or pick it up
 in the cockpit) any time. Closing a window never ends the work.
 
+**Context-carry when started FROM another change (#123).** If you run `start`
+from inside a change-bound session (the env has a parent `SULIS_CHANGE_ID` —
+e.g. an idea surfaced mid-change, or a dependency), the tool **automatically**
+(a) records a durable link on the new change (`parent_change` +
+`relationship: builds_on | depends_on`, in both the manifest and the global
+record) and (b) seeds the new change's `CONTEXT.md` with a **"Carried from
+{parent}"** section drawn from the parent's Working Set — so the spawned
+session *discovers* the link + the parent's reasoning through the CONTEXT.md it
+already reads at startup, with no manual relaying between the two sessions. Use
+`--relationship depends_on` for the dependency case (default `builds_on`). This
+is durable carry, not a live wire (the critical-thinking call: a state gap, not
+a transport gap). It's best-effort — a carry failure never blocks `start` — and
+the carry is only as rich as the parent's Working Set, so keep that populated
+as you work.
+
 **6. Report (Rule 1 + Rule 2).** Parse the JSON on stdout. Lead with the
 outcome; carry the handle in parentheses:
 
