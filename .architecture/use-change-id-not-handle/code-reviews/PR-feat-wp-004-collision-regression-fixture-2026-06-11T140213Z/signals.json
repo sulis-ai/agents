@@ -1,0 +1,30 @@
+{
+  "review": {
+    "target": "feat/wp-004-collision-regression-fixture",
+    "base": "change/fix-use-change-id-not-handle",
+    "timestamp": "2026-06-11T140213Z",
+    "files_changed": 1,
+    "verdict": "PASS"
+  },
+  "build_verification": {
+    "errors_introduced": 0,
+    "commands": ["python3 -m ruff check tests/unit/test_collision_regression.py"],
+    "coverage_gaps": ["no mypy/pyright configured for plugins/sulis/scripts — type-check floor not run (none exists in repo)"]
+  },
+  "pr_hygiene": {
+    "scope": {"commit_type_spread": ["test"], "module_fan_out": 1, "severity": "none"},
+    "size": {"lines_added": 367, "lines_removed": 0, "files_changed": 1, "severity": "none"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+    "completeness": {"new_source_without_test": 0, "new_tests": 1, "api_change_without_schema": false, "severity": "none"}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "note": "test-only diff; no domain imports, singletons, circular imports, ports, or external calls. Fixture seeds via real record/worktree writers (MEA-09 real-adapter, not mock)."},
+    "security": {"findings": 0, "primitives_checked": ["SEC-01..07", "SC-01..04"], "note": "no secrets, no auth boundary, no injection surface. git worktree add uses fixed argv (no shell, no untrusted interpolation)."},
+    "quality": {"findings": 0, "cr10": "no anti-pattern matches — list_all_changes() hoisted out of the 26-iter loop; git worktree add per change is the WP's explicit real-worktree requirement, not an N+1. No dead surface, no unused imports (ruff F401/F811/F841 clean)."}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"total": 0},
+    "draft_deltas": 0
+  }
+}

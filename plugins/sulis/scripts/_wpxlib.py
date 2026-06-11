@@ -4370,12 +4370,28 @@ def parse_change_branch(branch: str, *,
     return (first, slug)
 
 
-def change_worktree_path(repo_root: Path, primitive: str, slug: str) -> Path:
+def change_worktree_path(repo_root: Path, primitive: str, slug: str,
+                         change_id: str | None = None) -> Path:
     """Compose the worktree path for a change.
 
-    Convention: sibling of the main repo at
-    `<repo-parent>/<repo-name>-change-<primitive>-<slug>/`.
+    With ``change_id`` (the preferred, id-keyed form): the per-change
+    co-located worktree dir ``change_worktree_dir(change_id)`` —
+    ``{state_base}/changes/{change_id}/worktree``. This is unique per change
+    by construction, so two changes that share ``{primitive}-{slug}`` can
+    never resolve to the same fallback worktree (HD-005, Scenario 3
+    defence-in-depth: the last structural way two changes could share a
+    working tree).
+
+    Without ``change_id`` (or with a blank one — the legacy form): the
+    sibling of the main repo at
+    ``<repo-parent>/<repo-name>-change-<primitive>-<slug>/``. Preserved
+    byte-for-byte for callers that don't yet have an id in hand and for
+    legacy slug-keyed changes that predate id-keyed worktrees.
     """
+    if change_id:
+        # Lazy import: avoid a module-load coupling to _change_state.
+        from _change_state import change_worktree_dir
+        return change_worktree_dir(change_id)
     return repo_root.parent / f"{repo_root.name}-change-{primitive}-{slug}"
 
 

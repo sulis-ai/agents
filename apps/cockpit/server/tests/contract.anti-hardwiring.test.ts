@@ -7,8 +7,9 @@
 // (multiple changes in the fixture, each resolving to its own artifacts).
 //
 // It also pins the security shape-guard at the serving boundary: a malformed
-// change handle (the argparse flag-confusion vector) must yield a typed
-// failure WITHOUT ever spawning recreate.
+// change_id — the key carried across the recreate seam (ADR-001), the argparse
+// flag-confusion vector — must yield a typed failure WITHOUT ever spawning
+// recreate.
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import request from "supertest";
@@ -132,16 +133,17 @@ describe("anti-hard-wiring acceptance (walk every change → own contracts)", ()
     }
   });
 
-  it("shape-guard: a malformed handle (leading '-') yields a typed failure and NEVER spawns recreate", async () => {
+  it("shape-guard: a malformed change_id (leading '-') yields a typed failure and NEVER spawns recreate", async () => {
     // The worktree is absent → the serving path would normally try recreate.
-    // But the handle is a flag-confusion shape, so the guard must reject it
-    // BEFORE any spawn.
+    // But the change_id — the key carried across the recreate seam (ADR-001) —
+    // is a flag-confusion shape, so the guard must reject it BEFORE any spawn.
+    const malformedId = "-rf"; // flag-confusion vector, on the carried key
     const runner = new FakeRecreateRunner({ ok: true, alreadyPresent: false });
     const rec = record({
-      changeId: "01MALFORMED00000000000000A",
-      handle: "-rf", // flag-confusion vector
+      changeId: malformedId,
+      handle: "feat-demo", // a safe display handle; irrelevant to the seam now
       worktreePath: join(tmpRoot, "absent-wt"),
-      shippedSha: "deadbeefcafe", // would be recreatable IF the handle were safe
+      shippedSha: "deadbeefcafe", // would be recreatable IF the id were safe
       stage: "shipped",
     });
     const reader = new FakeChangeStoreReader([rec]);
@@ -153,14 +155,14 @@ describe("anti-hard-wiring acceptance (walk every change → own contracts)", ()
     });
 
     const res = await request(app).get(
-      "/api/changes/01MALFORMED00000000000000A/contract",
+      `/api/changes/${encodeURIComponent(malformedId)}/contract`,
     );
 
     // Typed failure surfaced to the client; never a raw 500, never a spawn.
     expect(res.status).toBe(200);
     const body = res.body as { status: string; note?: string };
     expect(body.status).toBe("unavailable");
-    // The guard refused to spawn on the malformed handle.
+    // The guard refused to spawn on the malformed change_id.
     expect(runner.calls).toEqual([]);
   });
 });

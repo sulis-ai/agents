@@ -1,0 +1,16 @@
+id: use-change-id-not-handle
+change_id: 01KTV4SS9N8BP0XN8GCQAXT6PC
+handle: CH-8BP0XN
+primitive: fix
+status: decomposed
+sourced_from: .changes/fix-use-change-id-not-handle.SPEC.md
+kind: backend
+mode: brownfield-audit
+created: 2026-06-11
+summary: >
+  Make every code path that ACTS on a change resolve to a single change by its
+  full unique change_id, not the non-unique 6-character handle. The handle stays
+  a display label. Covers the sulis-change CLI verbs (recreate / mark-shipped /
+  nuke / focus-binding) and the cockpit recreate-on-demand path, reconciles the
+  ulid_handle mint/lookup mismatch, and adds a disambiguation prompt plus a
+  regression fixture reproducing the live 26-collision store state.

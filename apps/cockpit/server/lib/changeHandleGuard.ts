@@ -1,19 +1,24 @@
-// WP-003 — change-handle shape-guard (security hardening; TDD §3 Armor).
+// change-key shape-guard (security hardening; TDD §3 Armor; ADR-001).
 //
-// WP-003 is where request input first reaches the recreate path: a tidied
-// change is re-materialised by spawning `sulis-change recreate --handle
-// <handle>` (SulisChangeRecreator). The handle is sourced off the change
-// record (ADR-003), not directly off the URL — but defence-in-depth says
-// validate its SHAPE before it crosses the spawn boundary. A malformed
-// handle must yield a typed failure, never a spawn.
+// This is where a change identifier first reaches the recreate path: a
+// tidied change is re-materialised by spawning `sulis-change recreate
+// --change-id <changeId>` (SulisChangeRecreator). Per ADR-001 the seam is
+// keyed by the UNIQUE change_id, not the non-unique display handle — so the
+// value guarded here is the change_id that crosses the spawn boundary. It is
+// sourced off the change record (ADR-003), not directly off the URL — but
+// defence-in-depth says validate its SHAPE before it spawns. A malformed key
+// must yield a typed failure, never a spawn.
 //
-// The pattern mirrors SulisChangeStoreReader's CHANGE_ID_PATTERN
-// (alphanumerics + underscore + hyphen — tight enough to refuse `..`, `/`,
-// glob chars, whitespace, and shell metacharacters) and ADDS an explicit
-// rejection of a LEADING hyphen. A leading hyphen is the argparse / getopt
-// flag-confusion vector: a handle like `-x` could otherwise be parsed by
-// the spawned CLI as a flag rather than a positional value. spawn-with-argv
-// already forecloses shell injection; this forecloses flag-confusion too.
+// The exported predicate keeps its `isSafeChangeHandle` name (the charset is
+// identical for the handle and the ULID change_id, so one guard serves both;
+// renaming would ripple beyond this seam for no behavioural gain). The
+// pattern mirrors SulisChangeStoreReader's CHANGE_ID_PATTERN (alphanumerics +
+// underscore + hyphen — tight enough to refuse `..`, `/`, glob chars,
+// whitespace, and shell metacharacters) and ADDS an explicit rejection of a
+// LEADING hyphen. A leading hyphen is the argparse / getopt flag-confusion
+// vector: a key like `-x` could otherwise be parsed by the spawned CLI as a
+// flag rather than a positional value. spawn-with-argv already forecloses
+// shell injection; this forecloses flag-confusion too.
 //
 // This is a pure predicate + a throwing assertion — no I/O, no spawn — so
 // it composes cleanly into the serving path before `resolveContractWorktree`

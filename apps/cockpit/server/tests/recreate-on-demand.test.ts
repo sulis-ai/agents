@@ -101,7 +101,7 @@ describe("resolveContractWorktree (recreate-on-demand)", () => {
   });
 
   // ── (b) absent-but-recreatable → recreate THEN render ─────────────────
-  it("absent-but-recreatable → invokes recreate with the handle, then resolves the root", async () => {
+  it("absent-but-recreatable → invokes recreate with the change_id, then resolves the root", async () => {
     const worktree = join(tmpRoot, "recreatable-wt");
     // Worktree absent at first. The fake recreate MATERIALISES it (the real
     // `sulis-change recreate` checks out the worktree) so the resolver can
@@ -123,9 +123,40 @@ describe("resolveContractWorktree (recreate-on-demand)", () => {
     if (result.status === "ready") {
       expect(result.worktreeRoot).toBe(await realpath(worktree));
     }
-    // Recreate invoked exactly once, with the change's own handle (ADR-003
-    // generic resolution — the handle comes off the record, not hard-wired).
-    expect(runner.calls).toEqual([record.handle]);
+    // Recreate invoked exactly once, with the change's own UNIQUE id (ADR-001:
+    // the seam is keyed by change_id; ADR-003 generic resolution — the id comes
+    // off the record, not hard-wired).
+    expect(runner.calls).toEqual([record.changeId]);
+  });
+
+  // ── HD-004: drives recreate by the UNIQUE change_id, never the handle ──
+  // The 6-char handle is shared by 2–4 changes (live collision state). The
+  // cockpit reads the record by its unique id, so it MUST carry that id across
+  // the recreate seam — passing the non-unique handle is the cockpit half of
+  // "session works on the wrong change" (ADR-001). This pins the carried key.
+  it("recreates a tidied colliding change by its change_id, not its handle", async () => {
+    const worktree = join(tmpRoot, "colliding-wt"); // absent → forces recreate
+    const runner = new FakeRecreateRunner(
+      { ok: true, alreadyPresent: false },
+      {
+        onRecreate: async () => {
+          await mkdir(worktree, { recursive: true });
+        },
+      },
+    );
+
+    // A colliding change: a unique id distinct from the non-unique handle.
+    const record = makeRecord({
+      changeId: "01KTV4SS9N8BP0XN8GCQAXT6PC",
+      handle: "feat-colliding-handle",
+      worktreePath: worktree,
+    });
+    const result = await resolveContractWorktree({ record, runner });
+
+    expect(result.status).toBe("ready");
+    // The carried argument is the unique id, never the shared handle.
+    expect(runner.lastArg).toBe(record.changeId);
+    expect(runner.lastArg).not.toBe(record.handle);
   });
 
   // ── idempotent: already-present recreate → no-op success ──────────────
@@ -202,7 +233,7 @@ describe("resolveContractWorktree (recreate-on-demand)", () => {
       );
     }
     // We did attempt recreate (it was recreatable) before degrading.
-    expect(runner.calls).toEqual([record.handle]);
+    expect(runner.calls).toEqual([record.changeId]);
   });
 
   // ── recreate EXEC_FAIL degrades, does not hang/throw ──────────────────
@@ -241,7 +272,7 @@ describe("resolveContractWorktree (recreate-on-demand)", () => {
         /couldn't reach this shipped change's contracts/i,
       );
     }
-    expect(runner.calls).toEqual([record.handle]);
+    expect(runner.calls).toEqual([record.changeId]);
   });
 
   // ── recreatable via shippedSha alone (no branch) ──────────────────────
@@ -263,7 +294,7 @@ describe("resolveContractWorktree (recreate-on-demand)", () => {
     const result = await resolveContractWorktree({ record, runner });
 
     expect(result.status).toBe("ready");
-    expect(runner.calls).toEqual([record.handle]);
+    expect(runner.calls).toEqual([record.changeId]);
   });
 });
 
@@ -296,6 +327,10 @@ describe("SulisChangeRecreator source hygiene", () => {
     expect(code).not.toMatch(/spawn\s*\(\s*[`'"]\s*sulis-change\s/);
     // It MUST carry the recreate verb as a quoted argv token.
     expect(code).toMatch(/["']recreate["']/);
+    // It MUST drive recreate by the UNIQUE change_id, via the --change-id
+    // selector (ADR-001 — never the non-unique --handle across this seam).
+    expect(code).toMatch(/["']--change-id["']/);
+    expect(code).not.toMatch(/["']--handle["']/);
     // It MUST NOT carry any mutating git verb (read-only gate parity).
     expect(code).not.toMatch(
       /["'](add|commit|reset|checkout|push|pull|merge|rebase)["']/,
@@ -383,5 +418,20 @@ describe("SulisChangeRecreator behaviour (against a real fake CLI)", () => {
     }).recreate("feat-x");
     expect(outcome.ok).toBe(false);
     if (!outcome.ok) expect(outcome.reason).toBe("TIMEOUT");
+  });
+
+  it("malformed change_id (leading '-') → { ok: false, reason: 'SPAWN_FAIL' }, NEVER spawns", async () => {
+    // A corrupt record could carry a flag-confusion id. The adapter's
+    // pre-spawn shape-guard (ADR-001 + TDD §3 Armor) refuses it with a typed
+    // outcome rather than handing `-rf` to the CLI as a flag. We point at a
+    // REAL executable so a spawn WOULD succeed if the guard were absent —
+    // proving the guard, not a missing binary, is what refuses.
+    const binPath = await writeFakeCli(`echo "recreated"; exit 0`);
+    const outcome = await new SulisChangeRecreator({ binPath }).recreate("-rf");
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) {
+      expect(outcome.reason).toBe("SPAWN_FAIL");
+      expect(outcome.detail).toMatch(/unsafe change_id/i);
+    }
   });
 });

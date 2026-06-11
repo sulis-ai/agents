@@ -239,9 +239,10 @@ describe("GET /api/changes/:id/contract endpoints", () => {
 
     expect(res.status).toBe(200);
     expect(res.text).toContain("What it does");
-    // Recreate was invoked exactly once, with the change's OWN handle
-    // (ADR-003 — off the record, never hard-wired).
-    expect(runner.calls).toEqual([rec.handle]);
+    // Recreate was invoked exactly once, with the change's OWN unique id
+    // (ADR-001 — the seam is keyed by change_id, off the record, never
+    // hard-wired nor the non-unique handle).
+    expect(runner.calls).toEqual([rec.changeId]);
   });
 
   it("degrades to a typed note when the worktree is gone and not recreatable", async () => {

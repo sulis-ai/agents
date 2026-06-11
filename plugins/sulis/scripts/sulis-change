@@ -84,6 +84,7 @@ from _wpxlib import (  # noqa: E402
     ulid_handle,
     validate_change_primitive,
     validate_change_slug,
+    validate_change_ulid,
     write_change_metadata,
 )
 
@@ -1478,52 +1479,29 @@ def _local_state_base() -> Path:
     return changes_base()
 
 
-def _scan_state_dir_by_prefix(prefix: str) -> tuple[str, str | None]:
-    """Resolve a change_id by scanning ~/.sulis/changes/* for a dir whose name
-    starts with the 6-char handle prefix.
-
-    `prefix` is the first 6 chars of the ULID (the part after "CH-"). The
-    local state dir is named with the full ULID, so a unique prefix match
-    yields the change_id. Returns (resolution_note, change_id_or_None):
-
-      - exactly one match  → (matched-via-prefix, <change_id>)
-      - zero matches       → (no-prefix-match, None)
-      - >1 match           → ("AMBIGUOUS:...", None)  (caller surfaces error)
-
-    Best-effort: an unreadable base dir yields (no-prefix-match, None).
-    """
-    base = _local_state_base()
-    try:
-        candidates = [d for d in base.iterdir()
-                      if d.is_dir() and d.name.startswith(prefix)]
-    except OSError:
-        return "no-prefix-match", None
-    if len(candidates) == 1:
-        return "matched-via-prefix", candidates[0].name
-    if len(candidates) > 1:
-        names = ", ".join(sorted(d.name for d in candidates))
-        return f"AMBIGUOUS:{names}", None
-    return "no-prefix-match", None
-
-
 def _resolve_change_id(repo_root: Path, primitive: str, slug: str,
-                       worktree_dest: Path,
-                       handle: str | None) -> tuple[str, str]:
-    """Resolve a change's change_id via the fallback chain (stop at first hit).
+                       worktree_dest: Path) -> tuple[str, str]:
+    """Resolve a change's change_id from its slug, via the fallback chain.
+
+    This is the SLUG-path resolver: it maps a (primitive, slug) branch to its
+    change_id. Handle resolution does NOT live here — it goes through the shared
+    safe matcher (``_changes_matching_handle`` over ``list_all_changes()``),
+    which refuses on ambiguity rather than silently picking a first match (#101).
+    The former head-prefix rung (scan {state_base}/changes/* for a dir whose
+    name starts with the handle's 6-char prefix) was dead post-#101 — handles
+    are minted from the ULID's random TAIL, but state dirs are named by the full
+    ULID whose HEAD is the timestamp, so a tail-minted prefix never matched a
+    head-named dir. WP-002 retired it.
 
     0. Local record → scan {state_base}/changes/*/change.json for one whose
-       slug matches (or whose handle matches, when --handle was given). This
-       is the preferred, branch-independent resolver: the record is the global
-       index and doesn't depend on a manifest living in a worktree.
-    1. --handle CH-XXXXXX given → scan {state_base}/changes/* for a dir whose
-       name starts with the 6-char prefix. Unique in practice; >1 match is an
-       error the caller surfaces (returned as a "AMBIGUOUS:" resolution note).
-    2. Worktree manifest → read {worktree}/.changes/{primitive}-{slug}.yaml
+       slug matches. The preferred, branch-independent resolver: the record is
+       the global index and doesn't depend on a manifest living in a worktree.
+    1. Worktree manifest → read {worktree}/.changes/{primitive}-{slug}.yaml
        (the manifest is committed on the change branch, so it lives in the
        WORKTREE, not the dev checkout where nuke runs).
-    3. Dev-checkout manifest → read <repo-root>/.changes/{primitive}-{slug}.yaml
+    2. Dev-checkout manifest → read <repo-root>/.changes/{primitive}-{slug}.yaml
        (rare — only if a copy happens to exist locally, e.g. on dev).
-    4. Honest-degrade → "" (state_dir stays null; the caller reports it
+    3. Honest-degrade → "" (state_dir stays null; the caller reports it
        truthfully and removes branch + worktree + manifest only).
 
     Returns (change_id_or_empty, resolution_note). resolution_note records
@@ -1535,23 +1513,7 @@ def _resolve_change_id(repo_root: Path, primitive: str, slug: str,
         if record.get("slug") == slug and len(record.get("change_id", "")) == 26:
             return record["change_id"], "matched-via-record"
 
-    # 1. Handle-prefix scan of local state dirs.
-    if handle and handle.startswith("CH-") and len(handle) == 9:
-        prefix = handle[len("CH-"):]
-        note, change_id = _scan_state_dir_by_prefix(prefix)
-        if change_id:
-            return change_id, note
-        if note.startswith("AMBIGUOUS:"):
-            matches = note[len("AMBIGUOUS:"):]
-            emit_error(
-                f"Handle {handle} matches more than one local change state "
-                f"dir under ~/.sulis/changes/ ({matches}). Disambiguate with "
-                f"--slug, or remove the stale dir(s) by hand.",
-                context={"handle": handle, "matches": matches},
-            )
-        # else: no prefix match — fall through to the manifest rungs.
-
-    # 2. Worktree manifest (the common case — manifest committed on the branch).
+    # 1. Worktree manifest (the common case — manifest committed on the branch).
     wt_manifest = _metadata_path(worktree_dest, primitive, slug)
     meta = read_change_metadata(wt_manifest)
     change_id = meta.get("change_id", "") or ""
@@ -1593,12 +1555,25 @@ def _changes_matching_handle(handle: str, records: list) -> list:
     return out
 
 
+def _candidate_name(record: dict) -> str:
+    """The readable name for an ambiguity candidate: the record's ``intent``
+    (the founder's own words for the change), falling back to the slug.
+
+    Lets a founder choosing between colliding handles see WHICH change is which
+    (SPEC Scenario 5) rather than just two opaque ULIDs.
+    """
+    intent = str(record.get("intent") or "").strip()
+    return intent or str(record.get("slug") or "")
+
+
 def _emit_ambiguous_match(selector: str, matches: list) -> None:
     """REFUSE rather than guess when a selector matches >1 change (#101).
 
     The whole point of the safe-resolution fix: never silently act on one of
-    several candidates. Surface the candidates (full id / branch / stage) and
-    make the operator disambiguate.
+    several candidates. Surface the candidates (full id / readable name / branch
+    / stage) and make the operator disambiguate. The readable ``name`` (off the
+    record's intent/slug) lets the founder tell colliding handles apart (SPEC
+    Scenario 5).
     """
     emit_error(
         f"{selector} matches {len(matches)} changes — refusing to guess which "
@@ -1608,6 +1583,7 @@ def _emit_ambiguous_match(selector: str, matches: list) -> None:
             "candidates": [
                 {
                     "change_id": m.get("change_id"),
+                    "name": _candidate_name(m),
                     "branch": m.get("branch"),
                     "slug": m.get("slug"),
                     "stage": m.get("stage"),
@@ -1616,6 +1592,26 @@ def _emit_ambiguous_match(selector: str, matches: list) -> None:
             ],
         },
     )
+
+
+def _resolve_record_by_id(change_id: str) -> "dict | None":
+    """Resolve a change's full record by its exact 26-char ULID.
+
+    The single record-lookup-by-id authority shared by the unambiguous
+    selectors (``recreate --change-id`` and ``mark-shipped`` — ADR-001).
+    Tries the direct per-change store read first (``change.json`` under
+    ``{state_base}/changes/{change_id}/``), then falls back to scanning
+    ``list_all_changes()`` for a record whose ``change_id`` matches exactly
+    — robust to a record whose store dir name diverges from its id. Returns
+    the record dict, or ``None`` when no change carries that id.
+    """
+    record = read_change_record(change_id)
+    if record is not None:
+        return record
+    for r in list_all_changes():
+        if str(r.get("change_id") or "") == change_id:
+            return r
+    return None
 
 
 def _select_change_id_refusing_conflict(
@@ -1665,21 +1661,25 @@ def _select_change_id_refusing_conflict(
 
 
 def _resolve_nuke_target(repo_root: Path, args: argparse.Namespace) -> dict:
-    """Resolve --slug or --handle to a change-branch descriptor.
+    """Resolve --slug, --handle, or --change-id to a change-branch descriptor.
 
     Reuses find_change_branches (the same enumeration list/status use) to find
-    the branch + worktree. The change_id (hence the local state dir) is then
-    resolved via the _resolve_change_id fallback chain — robust to the manifest
+    the branch + worktree. Each branch's change_id (hence the local state dir)
+    is resolved by slug via the _resolve_change_id chain — robust to the manifest
     living only in the worktree (the production case) rather than the dev
     checkout where nuke runs.
 
     Matching:
-      --slug  → match the branch slug.
-      --handle → match a change whose change_id (resolved via the fallback
-                 chain) has handle CH-<first-6-of-ULID> == the given handle.
-                 The handle-prefix scan of local state dirs is the primary
-                 resolver; for branches whose state dir is gone we still match
-                 on the handle prefix against the branch's resolved change_id.
+      --slug      → match the branch slug.
+      --handle    → resolve the handle through the SHARED safe matcher
+                    (_changes_matching_handle over list_all_changes()); a handle
+                    shared by >1 change REFUSES (lists handle + readable name +
+                    branch) rather than nuking the wrong one (#101). The matched
+                    record change_id(s) are then matched against the enumerated
+                    branches. This is the same matcher recreate / mark-shipped
+                    use, so all four verbs resolve a handle identically.
+      --change-id → match the exact ULID directly (symmetry with recreate /
+                    mark-shipped). No ambiguity is possible — a full id is unique.
 
     Returns a dict {branch, primitive, slug, current, change_id,
     change_id_resolution, worktree_path, manifest_path}. Calls emit_error
@@ -1687,57 +1687,89 @@ def _resolve_nuke_target(repo_root: Path, args: argparse.Namespace) -> dict:
     """
     slug = getattr(args, "slug", None)
     handle = getattr(args, "handle", None)
-    if not slug and not handle:
+    change_id_arg = getattr(args, "change_id", None)
+    if not slug and not handle and not change_id_arg:
         emit_error(
-            "Pass a selector: --slug SLUG or --handle CH-XXXXXX.",
+            "Pass a selector: --slug SLUG, --handle CH-XXXXXX, or "
+            "--change-id <full ULID>.",
             context={"hint": "Run `sulis-change list` to see active changes."},
         )
 
+    # Validate an explicit --change-id up front (symmetry with recreate): a
+    # malformed id can never name a real change, so fail early with a precise
+    # reason rather than fall through to the generic "no match".
+    if change_id_arg:
+        ok, reason = validate_change_ulid(change_id_arg)
+        if not ok:
+            emit_error(f"invalid --change-id {change_id_arg!r}: {reason}")
+
     # #112 — dual-prefix discovery: a change renamed under the host's
     # branch_convention (e.g. feature/...) is still nuke-targetable, and
-    # legacy change/* changes keep resolving.
+    # legacy change/* changes keep resolving. Build one descriptor per branch,
+    # resolving its change_id by slug (record → worktree/dev manifest) so the
+    # safe matcher (below) has a change_id even when no global change.json
+    # exists (the manifest-only production case).
     convention = read_repo_contract(repo_root).get("branch_convention")
     candidates = find_change_branches(repo_root, convention=convention)
-    matches = []
+    # Readable name per change_id, off the global record's intent (Scenario 5).
+    intents = {str(r.get("change_id") or ""): str(r.get("intent") or "")
+               for r in list_all_changes()}
+    descriptors = []
     for c in candidates:
         dest = change_worktree_path(repo_root, c["primitive"], c["slug"])
         change_id, resolution = _resolve_change_id(
-            repo_root, c["primitive"], c["slug"], dest, handle,
+            repo_root, c["primitive"], c["slug"], dest,
         )
-        change_handle = ulid_handle(change_id) if len(change_id) == 26 else ""
+        descriptors.append({
+            "branch": c["branch"],
+            "primitive": c["primitive"],
+            "slug": c["slug"],
+            "current": c["current"],
+            "change_id": change_id,
+            "change_id_resolution": resolution,
+            # The readable name lets a founder tell colliding handles apart.
+            "intent": intents.get(change_id, ""),
+            # The state dir lives under ~/.sulis/changes/, NOT in the worktree;
+            # nuke removes the dev-side manifest copy if present.
+            "worktree_path": dest,
+            "manifest_path": _metadata_path(repo_root, c["primitive"],
+                                            c["slug"]),
+        })
 
-        matched = False
-        if slug and c["slug"] == slug.lower():
-            matched = True
-        if handle and change_handle and change_handle == handle.strip().upper():
-            matched = True
-        if matched:
-            matches.append({
-                "branch": c["branch"],
-                "primitive": c["primitive"],
-                "slug": c["slug"],
-                "current": c["current"],
-                "change_id": change_id,
-                "change_id_resolution": resolution,
-                # The state dir lives under ~/.sulis/changes/, NOT in the
-                # worktree; nuke removes the dev-side manifest copy if present.
-                "worktree_path": dest,
-                "manifest_path": _metadata_path(repo_root, c["primitive"],
-                                                c["slug"]),
-            })
+    # Select the matching descriptor(s) per selector. The handle path goes
+    # through the SHARED safe matcher (_changes_matching_handle), the same one
+    # recreate / mark-shipped use — so all four verbs resolve a handle
+    # identically and REFUSE on a colliding handle rather than guessing (#101).
+    if handle:
+        matches = _changes_matching_handle(handle, descriptors)
+    elif change_id_arg:
+        target = str(change_id_arg).strip()
+        matches = [d for d in descriptors if d["change_id"] == target]
+    else:
+        target = slug.lower()
+        matches = [d for d in descriptors if d["slug"] == target]
+
+    def _selector_label(*, handle_as_flag: bool) -> str:
+        """Human label for the active selector. ``handle_as_flag`` chooses the
+        CLI-flag form (``--handle CH-X``, for a 'not found' error) vs the
+        readable form (``Handle CH-X``, for the ambiguity refusal message)."""
+        if slug:
+            return f"--slug {slug}"
+        if handle:
+            return (f"--handle {handle}" if handle_as_flag
+                    else f"Handle {handle.strip().upper()}")
+        return f"--change-id {change_id_arg}"
 
     # REFUSE on ambiguity rather than nuking the WRONG change (#101). A handle
-    # collision (or a slug shared across primitives) must never resolve to a
+    # collision — or a slug shared across primitives — must never resolve to a
     # silent first-match for a destructive op.
     if len(matches) > 1:
-        selector = f"--slug {slug}" if slug else f"Handle {handle.strip().upper()}"
-        _emit_ambiguous_match(selector, matches)
+        _emit_ambiguous_match(_selector_label(handle_as_flag=False), matches)
     if matches:
         return matches[0]
 
-    selector = f"--slug {slug}" if slug else f"--handle {handle}"
     emit_error(
-        f"No active change matches {selector}.",
+        f"No active change matches {_selector_label(handle_as_flag=True)}.",
         context={"hint": "Run `sulis-change list` to see active changes."},
     )
 
@@ -2042,7 +2074,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_nuke.add_argument("--slug", default=None,
                         help="Change slug to nuke (e.g. introduce-payments)")
     p_nuke.add_argument("--handle", default=None,
-                        help="Change handle to nuke (e.g. CH-01HYQC)")
+                        help="Change handle to nuke (e.g. CH-01HYQC). Resolved "
+                             "through the safe matcher; a colliding handle "
+                             "refuses + lists candidates rather than guessing.")
+    p_nuke.add_argument("--change-id", default=None,
+                        help="Exact change ULID to nuke (unambiguous; symmetry "
+                             "with recreate / mark-shipped).")
     p_nuke.add_argument(
         "--force", action="store_true",
         help="Actually delete. Without --force, nuke dry-runs: it lists the "
@@ -2061,8 +2098,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_recreate.add_argument("--repo-root", default=os.getcwd(),
                             help="Path to the repo root (default: cwd)")
+    p_recreate.add_argument("--change-id", default=None,
+                            help="Change ULID — the unambiguous selector "
+                                 "(matches nuke/mark-shipped; the cockpit "
+                                 "passes the id it already holds)")
     p_recreate.add_argument("--handle", default=None,
-                            help="Change handle (e.g. CH-01HYQC)")
+                            help="Change handle (e.g. CH-01HYQC) — a display "
+                                 "label; ambiguous handles refuse + disambiguate")
     p_recreate.add_argument("--slug", default=None,
                             help="Change slug (alternative to --handle)")
     p_recreate.add_argument(
@@ -2092,7 +2134,10 @@ def cmd_mark_shipped(args: argparse.Namespace) -> None:
         env_change_id=os.environ.get("SULIS_CHANGE_ID"),
         records=list_all_changes(),
     )
-    record = read_change_record(str(change_id))
+    # Shared record-lookup-by-id authority (ADR-001) — the same helper
+    # `recreate --change-id` uses, so both unambiguous selectors resolve a
+    # record identically (the #56-style scan fallback included).
+    record = _resolve_record_by_id(str(change_id))
     if record is None:
         emit_error(f"no change record found for change_id={change_id!r}")
         return  # for type checker
@@ -2200,12 +2245,37 @@ def cmd_recreate(args: argparse.Namespace) -> None:
     (with the pinned ``shipped_sha``) are kept. This brings the worktree
     back — ON the branch if it still exists (founder resumes work), else
     DETACHED at the pinned ``shipped_sha`` (view the exact shipped state).
-    Resolved by ``--handle`` (preferred) or ``--slug [--primitive]``.
+
+    Resolved by ``--change-id`` (the unambiguous selector — the cockpit
+    passes the id it already holds, ADR-001), or ``--handle``, or
+    ``--slug [--primitive]``. The handle is a non-unique display label; an
+    ambiguous handle refuses + disambiguates via the safe matcher (#101).
+    The id path is first-class and mirrors ``nuke``/``mark-shipped``.
     """
     repo_root = _resolve_repo_root(args)
 
     record: dict | None = None
-    if args.handle:
+    change_id = getattr(args, "change_id", None)
+    if change_id:
+        # Unambiguous resolution: the full ULID names exactly one change. The
+        # cockpit drives this path (WP-003) with record.changeId in hand.
+        ok, reason = validate_change_ulid(change_id)
+        if not ok:
+            emit_error(f"invalid --change-id {change_id!r}: {reason}")
+            return  # for type checker
+        record = _resolve_record_by_id(change_id)
+        if record is None:
+            emit_error(
+                f"no change found for change-id {change_id!r}",
+                context={"hint": "Run `sulis-change list` to see active "
+                                 "changes (the `change_id` column)."},
+            )
+            return  # for type checker
+        primitive = str(record.get("primitive") or "feat")
+        slug = str(record.get("slug") or "")
+        branch = str(record.get("branch")
+                     or compose_change_branch(primitive, slug))
+    elif args.handle:
         # Safe resolution (#101): refuse on ambiguity rather than recreating the
         # WRONG change's workspace from a silent first-match.
         matches = _changes_matching_handle(args.handle, list_all_changes())

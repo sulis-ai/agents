@@ -1,0 +1,31 @@
+reason: >
+  The user-facing surface this change touches is a one-line re-key of the
+  cockpit's reopen call — it now passes the change's unique id instead of the
+  non-unique 6-char handle. There is no new screen, flow, or interaction
+  surface to drive; the behaviour is a backend identity-resolution change with
+  a single-line cockpit consumer.
+
+  The user-observable outcome — reopening a tidied change whose handle is
+  shared rebuilds ITS OWN workspace, never a sibling's, and an ambiguous
+  handle refuses with a candidate list — is already verified comprehensively in
+  test form:
+    - the cockpit unit test asserts the reopen request carries the exact
+      change_id and never the handle (recreate-on-demand HD-004);
+    - the collision regression drives all four act-on verbs (recreate / focus /
+      ship / nuke) against the live 26-collision shape (one handle shared by
+      four changes), asserting each resolves to itself and the shared handle
+      refuses with a four-candidate list;
+    - the Hypothesis property suite proves the resolution invariants
+      universally over generated collision shapes (each proven to catch the
+      original bug when re-injected);
+    - the stateful lifecycle model drives random start/ship/nuke/recreate/focus
+      sequences and asserts after every step that no verb ever acts on the
+      wrong id.
+
+  Authoring and browser-driving a full cockpit user-journey scenario is
+  disproportionate for a one-line consumer change with no new flow, and would
+  land as manual-attest (no standing cockpit in CI). Exemption recorded by the
+  founder at the ship gate.
+exempted_by: founder
+exempted_at: "2026-06-11"
+change_id: 01KTV4SS9N8BP0XN8GCQAXT6PC

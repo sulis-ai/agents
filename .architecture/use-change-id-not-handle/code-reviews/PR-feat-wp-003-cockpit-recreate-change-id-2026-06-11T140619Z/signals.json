@@ -1,0 +1,22 @@
+{
+  "pr": "feat/wp-003-cockpit-recreate-change-id",
+  "project": "use-change-id-not-handle",
+  "build_verification": { "pr_introduced_errors": 0, "typecheck": "clean", "eslint": "clean" },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["fix"], "module_fan_out": 1, "severity": "low" },
+    "size": { "lines_added": 166, "lines_removed": 64, "files_changed": 9, "severity": "low" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "low" },
+    "completeness": { "new_source_without_test": 0, "api_change_without_schema": false, "severity": "low" }
+  },
+  "findings": {
+    "in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+    "in_neighbours": { "total": 0 }
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "note": "Ports&Adapters preserved; read-only-by-composition intact (gate clean, 240 files); pre-spawn guard is defence-in-depth, no new infra import / singleton / timeout gap" },
+    "security": { "findings": 0, "note": "Shape-guard now guards the value that actually crosses the spawn seam (record.changeId) — strengthens vs prior handle-guard; argv-array spawn + leading-hyphen rejection retained; JSON.stringify in log detail is safe" },
+    "quality": { "findings": 0, "note": "typecheck+eslint clean; no dead surface (lastArg used by HD-004 test); contract change applied consistently across port+adapters+call-site+guard; new behaviour fully tested; no CR-10 perf anti-patterns" }
+  },
+  "verdict": "PASS",
+  "auto_downgrades_fired": []
+}

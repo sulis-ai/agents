@@ -122,8 +122,10 @@ export async function resolveContractWorktree(
     return unavailable("not-recreatable");
   }
 
-  // (b) absent-but-recreatable → recreate, then resolve.
-  const outcome = await runner.recreate(record.handle);
+  // (b) absent-but-recreatable → recreate, then resolve. Drive recreate by
+  // the UNIQUE change_id the record was read by, NOT the non-unique handle
+  // (ADR-001 — the cockpit half of "session works on the wrong change").
+  const outcome = await runner.recreate(record.changeId);
   if (!outcome.ok) {
     // TIMEOUT / EXEC_FAIL / SPAWN_FAIL — degrade, never hang or throw raw.
     return unavailable("recreate-failed");

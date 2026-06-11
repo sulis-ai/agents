@@ -1,0 +1,21 @@
+{
+  "pr": "feat/wp-007-pure-core-property-tests",
+  "base": "change/fix-use-change-id-not-handle",
+  "timestamp": "2026-06-11T145659Z",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0, "ruff": "all checks passed", "py_compile": "ok" },
+  "hygiene": {
+    "scope": { "commit_types": ["test"], "module_fan_out": 1, "severity": "none" },
+    "size": { "lines_added": 246, "lines_removed": 0, "files_changed": 1, "severity": "low" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none" },
+    "completeness": { "new_source_without_test": 0, "note": "diff is itself a test file; no production source added", "severity": "none" }
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "note": "test-only diff; no production code, no new domain imports, no singletons, no resilience surface" },
+    "security": { "findings": 0, "primitives_checked": ["SEC-01..07", "SC-01..04"], "note": "synthetic generated ULIDs only; no secrets, no auth/injection/SSRF surface; no new deps (hypothesis vendored by WP-006)" },
+    "quality": { "findings": 0, "dead_surface": 0, "contract_drift": 0, "test_coverage": "diff is the test layer", "cr10_performance": "bounded test loops (max_size=12, <=150 examples); not production hot path; benign" }
+  },
+  "findings_in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+  "findings_in_neighbours": 0,
+  "draft_fixes": 0
+}
