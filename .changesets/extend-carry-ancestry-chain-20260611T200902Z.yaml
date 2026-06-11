@@ -1,0 +1,7 @@
+change_id: F9ZXJ7DANCGE9W6K9S8TN6VSC7
+primitive: extend
+tier: minor
+touches_plugin: true
+summary: |
+  Carry the full ancestry chain to origin, not just one hop (#124). When a change is started two-plus hops deep, the 'Carried from' section now walks parent_change to the origin and lists the full lineage (each ancestor + link) plus the origin's Working-Set excerpt — so context from changes further back than the immediate parent is surfaced + navigable, not lost. Cycle/depth-bounded; extends #123.
+created_at: 2026-06-11T20:09:02Z
