@@ -1,0 +1,7 @@
+change_id: 01KTV4SS9N8BP0XN8GCQAXT6PC
+primitive: fix
+tier: patch
+touches_plugin: true
+summary: |
+  Identify a change by its unique id, not the non-unique 6-char handle, across recreate/focus/ship/nuke (with safe disambiguation); add a Hypothesis property-test layer.
+created_at: 2026-06-11T00:00:00Z
