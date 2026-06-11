@@ -211,3 +211,64 @@ def test_mark_shipped_force_overrides_and_records_note(tmp_path, monkeypatch, ca
     # The override is recorded — on the record and/or stderr.
     err = capsys.readouterr().err
     assert rec.get("ship_override") or "force" in err.lower()
+
+
+# ─── #118 — the observed-verdict guard at the SAME ship chokepoint ─────────
+# The merge guard (#111) is satisfied in these (a merged PR is confirmed), so
+# the refusal is unambiguously the #118 Definition-of-Done guard firing.
+
+
+def test_mark_shipped_refuses_when_dod_unmet(tmp_path, monkeypatch):
+    """Merged to main (so #111 passes) but the DoD verdict is unmet → refuse,
+    non-zero, stage NOT flipped. The #118 guard is the one that fires."""
+    cid, cs = _seed_change(tmp_path, monkeypatch, with_repo=True)
+    pr_json = json.dumps([{"number": 9, "mergeCommit": {"oid": "MERGEsha999"},
+                           "mergedAt": "2026-06-09T10:00:00Z"}])
+    monkeypatch.setattr(_mod, "_run",
+                        _passthrough_except(_mod, [("gh pr list", (0, pr_json, ""))]))
+    monkeypatch.setattr(_mod, "_remove_shipped_worktree", lambda *a, **k: {})
+    monkeypatch.setattr(_mod, "_confirm_observed_verdict",
+                        lambda *a, **k: (False, "FR-01 has no observed verdict"))
+    with pytest.raises(SystemExit) as ei:
+        _mod.cmd_mark_shipped(_args(tmp_path / "repo"))
+    assert ei.value.code != 0
+    rec = cs.read_change_record(cid) or {}
+    assert rec.get("stage") != "shipped"
+
+
+def test_mark_shipped_force_overrides_unmet_dod_and_records(tmp_path, monkeypatch, capsys):
+    """--force ships despite an unmet DoD, and RECORDS the dod override
+    (audit trail), mirroring the #111 force-override behaviour."""
+    cid, cs = _seed_change(tmp_path, monkeypatch, with_repo=True)
+    pr_json = json.dumps([{"number": 9, "mergeCommit": {"oid": "MERGEsha999"},
+                           "mergedAt": "2026-06-09T10:00:00Z"}])
+    monkeypatch.setattr(_mod, "_run",
+                        _passthrough_except(_mod, [("gh pr list", (0, pr_json, ""))]))
+    monkeypatch.setattr(_mod, "_remove_shipped_worktree", lambda *a, **k: {})
+    monkeypatch.setattr(_mod, "_confirm_observed_verdict",
+                        lambda *a, **k: (False, "FR-01 has no observed verdict"))
+    with pytest.raises(SystemExit) as ei:
+        _mod.cmd_mark_shipped(_args(tmp_path / "repo", force=True))
+    assert ei.value.code == 0
+    rec = cs.read_change_record(cid) or {}
+    assert rec.get("stage") == "shipped"
+    err = capsys.readouterr().err
+    assert rec.get("dod_override") or "definition of done" in err.lower()
+
+
+def test_mark_shipped_proceeds_when_dod_met(tmp_path, monkeypatch):
+    """DoD verdict ok (verifier returns observed) → ships normally. Guards the
+    no-false-block direction: the gate must not block a verified change."""
+    cid, cs = _seed_change(tmp_path, monkeypatch, with_repo=True)
+    pr_json = json.dumps([{"number": 9, "mergeCommit": {"oid": "MERGEsha999"},
+                           "mergedAt": "2026-06-09T10:00:00Z"}])
+    monkeypatch.setattr(_mod, "_run",
+                        _passthrough_except(_mod, [("gh pr list", (0, pr_json, ""))]))
+    monkeypatch.setattr(_mod, "_remove_shipped_worktree", lambda *a, **k: {})
+    monkeypatch.setattr(_mod, "_confirm_observed_verdict",
+                        lambda *a, **k: (True, "all touched SRDs verified (DoD pass)"))
+    with pytest.raises(SystemExit) as ei:
+        _mod.cmd_mark_shipped(_args(tmp_path / "repo"))
+    assert ei.value.code == 0
+    rec = cs.read_change_record(cid) or {}
+    assert rec.get("stage") == "shipped"

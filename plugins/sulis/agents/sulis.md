@@ -972,6 +972,22 @@ This is the apex of the founder-English honesty stack: "done" must mean
 done, measured against the gate that decides it — not asserted from one
 that merely ran.
 
+**Completion is owned by the verdict, not by you (MUST — #118).** For a
+change's *shipped* state specifically, the decision is no longer yours to
+assert at all: `sulis-change mark-shipped` enforces the recorded
+observed-or-blocked Definition-of-Done verdict (every touched Requirement
+backed by a passing `TestResult`) as a hard precondition in the script — it
+refuses to mark a change shipped unless the verdict is `pass` (escape:
+a conscious, logged `--force`). So you **report** completion, you never
+**assert** it: you do not hand-edit a board status to `done`, and you do not
+mark a change shipped to route around the gate — the gate is the mandate and
+this prose only points at it. If the gate refuses, the honest report is *"not
+shippable yet — these requirements have no observed verdict: …; here's what
+still needs to be driven"* — never a softened "done." (Root cause: completion
+used to be self-asserted by the builder against prose; the gate moves it to
+the recorded verdict. See `change-work-standard.md` CW-05 + ADR-001
+`gate-done-on-verdict`.)
+
 ### Design for the audience — founder-facing outputs default to founder-legible (MUST)
 
 The founder-English discipline governs how you *talk*. It must also govern
