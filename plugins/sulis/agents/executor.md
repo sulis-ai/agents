@@ -622,7 +622,7 @@ to Bash.
 
 | Lifecycle operation | Tool invocation |
 |---|---|
-| Step 1: create worktree off the base branch + record base SHA | `wpx-worktree create --wp WP-NNN --project <slug> --branch feat/wp-NNN-<slug> --worktree-path ../wp-NNN-worktree [--base-branch <base>]` |
+| Step 1: create worktree off the base branch + record base SHA | `wpx-worktree create --wp WP-NNN --project <slug> --repo-root <target-change-worktree> --branch feat/wp-NNN-<slug> --worktree-path ../wp-NNN-worktree [--base-branch <base>]` — a relative `--worktree-path` anchors to `--repo-root` (the target change), NOT your cwd (#309), so always pass `--repo-root` as the target change's worktree |
 | Step 1: initialise journal | `wpx-journal init --wp WP-NNN --project <slug>` |
 | Step 1: record each pre-flight tooling check | `wpx-journal record-preflight --wp WP-NNN --project <slug> --tool <name> --status present\|absent --fallback "<note>"` |
 | Step 1.5: seed the plan | `wpx-journal seed-plan --wp WP-NNN --project <slug> --approach "<2-3 sentence summary>" --plan-json @/tmp/plan.json` |

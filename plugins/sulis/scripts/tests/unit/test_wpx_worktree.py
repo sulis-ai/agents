@@ -263,3 +263,43 @@ def test_create_uses_origin_when_origin_change_branch_is_ahead(
     assert _head_sha(wt, "HEAD") == _head_sha(
         local_git_repo, "origin/change/create-other-foo",
     )
+
+
+def test_create_relative_worktree_path_anchors_to_repo_root_not_cwd(
+    local_git_repo, run_tool, monkeypatch, tmp_path,
+):
+    """#309 — a RELATIVE --worktree-path must resolve against --repo-root (the
+    TARGET change's repo), NOT the process cwd. A run-all executor passes
+    `../wp-NNN-worktree`; if it anchored to the calling session's cwd (bound to
+    a DIFFERENT change), the worktree would land under the wrong change's
+    parent. Run from an unrelated deep cwd and assert the worktree lands beside
+    the repo-root, never beside the cwd."""
+    # Simulate the calling session's cwd bound to a different change, at a
+    # different depth so the right/wrong resolutions are distinct paths.
+    other_cwd = tmp_path / "_other_change" / "deep" / "cwd"
+    other_cwd.mkdir(parents=True)
+    monkeypatch.chdir(other_cwd)
+
+    result = run_tool(
+        "wpx-worktree", "create",
+        "--wp", "WP-009",
+        "--project", "p",
+        "--branch", "feat/wp-009-rel",
+        "--worktree-path", "../wp-009-rel-worktree",  # RELATIVE
+        "--repo-root", str(local_git_repo),
+    )
+    assert result.ok, f"create failed: {result.error}; stderr={result.stderr}"
+
+    # Correct: anchored to repo-root → local_git_repo.parent / wp-009-rel-worktree
+    expected = (local_git_repo.parent / "wp-009-rel-worktree").resolve()
+    # Wrong (pre-fix): anchored to cwd → other_cwd.parent / wp-009-rel-worktree
+    wrong = (other_cwd.parent / "wp-009-rel-worktree").resolve()
+
+    assert Path(result.data["worktree_path"]).resolve() == expected, (
+        f"relative worktree path must anchor to repo-root; got "
+        f"{result.data['worktree_path']}"
+    )
+    assert expected.exists()
+    assert not wrong.exists(), (
+        f"worktree leaked under the cwd-anchored path {wrong} (the #309 bug)"
+    )

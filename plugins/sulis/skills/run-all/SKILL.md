@@ -1251,9 +1251,14 @@ defaults are unchanged from v0.7.1.
 ## Per-executor isolation
 
 Each parallel executor uses its own `git worktree` per GIT-07. Worktree
-paths use the WP ID: `../wp-NNN-worktree/`. Concurrent worktrees do
-not share working files; they share only the bare repository's git
-objects + refs (which git handles thread-safely).
+paths use the WP ID: `../wp-NNN-worktree/`. A relative `--worktree-path`
+anchors to the executor's `--repo-root` (the **target change's**
+worktree), NOT the calling session's cwd (#309) — so each executor must
+pass `--repo-root <target-change-worktree>`, or the worktree lands under
+the wrong change's parent when the calling session is bound to a
+different change. Concurrent worktrees do not share working files; they
+share only the bare repository's git objects + refs (which git handles
+thread-safely).
 
 Per-executor journals live at `.architecture/{project}/work-packages/
 .executor-WP-NNN.md` — one per WP, no cross-WP collisions.
