@@ -17,6 +17,7 @@ it. The decision is the load-bearing, fixture-able part — tested here.
 from __future__ import annotations
 
 import importlib.util
+import json
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
@@ -33,6 +34,8 @@ def _load_sulis_change():
 
 _mod = _load_sulis_change()
 evaluate_observed_verdict = _mod.evaluate_observed_verdict
+evaluate_scenario_verdict = _mod.evaluate_scenario_verdict
+_scenario_ids_for_change = _mod._scenario_ids_for_change
 
 
 # ─── no SRD touched → out of scope, never blocks ───────────────────────────
@@ -81,3 +84,73 @@ def test_one_pass_one_fail_blocks_and_names_the_failing_one():
     assert ok is False
     assert "bad" in reason
     assert "ok/SRD.md" not in reason  # only the unverified one is named
+
+
+# ─── Phase 2: the scenario route (founder-facing changes with scenarios, no ─
+#     SRD). A change's emitted scenarios must each have a passing TestResult
+#     (observed) before it ships. The authored .scenarios.jsonld records each
+#     scenario's emitted dna:scenario id directly — no seed/journey resolution.
+
+
+def test_scenario_verdict_no_emitted_scenarios_is_ok():
+    ok, reason = evaluate_scenario_verdict([], observed_fn=lambda sid: True)
+    assert ok is True
+    assert "not applicable" in reason.lower() or "no emitted" in reason.lower()
+
+
+def test_scenario_verdict_all_observed_is_ok():
+    ids = ["dna:scenario:AAA", "dna:scenario:BBB"]
+    ok, reason = evaluate_scenario_verdict(ids, observed_fn=lambda sid: True)
+    assert ok is True
+
+
+def test_scenario_verdict_unobserved_blocks_and_names_it():
+    ids = ["dna:scenario:AAA", "dna:scenario:BBB"]
+    observed = {"dna:scenario:AAA": True, "dna:scenario:BBB": False}
+    ok, reason = evaluate_scenario_verdict(ids, observed_fn=lambda sid: observed[sid])
+    assert ok is False
+    assert "dna:scenario:BBB" in reason
+    assert "dna:scenario:AAA" not in reason  # only the unobserved one is named
+
+
+def test_scenario_verdict_none_observed_blocks():
+    ids = ["dna:scenario:AAA"]
+    ok, reason = evaluate_scenario_verdict(ids, observed_fn=lambda sid: False)
+    assert ok is False
+
+
+# ─── _scenario_ids_for_change — read the emitted dna:scenario ids ──────────
+
+
+def _write_scen(tmp_path, stem, payload):
+    d = tmp_path / ".changes"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{stem}.scenarios.jsonld").write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_scenario_ids_reads_emitted_dna_ids(tmp_path):
+    _write_scen(tmp_path, "feat-x", {"scenarios": [
+        {"id": "dna:scenario:Y6Z1", "name": "a"},
+        {"id": "dna:scenario:Q33B", "name": "b"},
+    ]})
+    assert _scenario_ids_for_change(tmp_path, "feat-x") == [
+        "dna:scenario:Y6Z1", "dna:scenario:Q33B"]
+
+
+def test_scenario_ids_ignores_pre_emit_sc_ids(tmp_path):
+    # An authored-but-not-emitted file (SC-NN ids) has no emitted scenarios to
+    # gate on — returns [] (scenario route N/A; the #301 presence gate + SRD
+    # route cover those cases). Authored-not-emitted is a separate state.
+    _write_scen(tmp_path, "feat-x", {"scenarios": [{"id": "SC-01", "name": "a"}]})
+    assert _scenario_ids_for_change(tmp_path, "feat-x") == []
+
+
+def test_scenario_ids_missing_file_is_empty(tmp_path):
+    assert _scenario_ids_for_change(tmp_path, "feat-x") == []
+
+
+def test_scenario_ids_malformed_is_empty(tmp_path):
+    d = tmp_path / ".changes"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "feat-x.scenarios.jsonld").write_text("{not json", encoding="utf-8")
+    assert _scenario_ids_for_change(tmp_path, "feat-x") == []

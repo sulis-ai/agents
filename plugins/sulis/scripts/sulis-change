@@ -471,6 +471,32 @@ def evaluate_observed_verdict(touched_srds, *, verify_fn):
     return (True, "all touched SRDs verified (DoD pass)")
 
 
+def evaluate_scenario_verdict(scenario_ids, *, observed_fn):
+    """Pure decision (Phase 2): the scenario route, for founder-facing changes
+    whose verification lives in Scenarios rather than (or as well as) an SRD's
+    FR-NN blocks. Given the change's EMITTED scenario ids and an observed
+    function (``dna:scenario:<ulid> -> bool``, "has a passing TestResult"),
+    decide whether the change may ship.
+
+    Observed-or-blocked: ship proceeds only when EVERY emitted scenario is
+    observed green. Any unobserved scenario BLOCKS — the conscious escape is
+    ``--force``. No emitted scenarios → scenario route not applicable (the SRD
+    route + the #301 presence gate cover those cases) → ``ok``. Returns
+    ``(ok: bool, reason: str)``."""
+    if not scenario_ids:
+        return (True, "no emitted scenarios — scenario route not applicable")
+    unobserved = [s for s in scenario_ids if not observed_fn(s)]
+    if unobserved:
+        return (
+            False,
+            "Definition of Done not met — these scenarios have no observed "
+            f"verdict (no passing TestResult): {', '.join(unobserved)}. Drive "
+            "them for real (sulis-verify-acceptance) or attest them "
+            "(sulis-attest-scenario), or override consciously with --force.",
+        )
+    return (True, "all emitted scenarios observed")
+
+
 def _touched_srds(repo_root: Path, base: str = "origin/main", *, run=None) -> list[str]:
     """SRD paths changed on this branch vs ``base`` (three-dot — the branch's
     own work). Best-effort: an unresolvable base / git error returns ``[]``
@@ -492,13 +518,52 @@ def _touched_srds(repo_root: Path, base: str = "origin/main", *, run=None) -> li
     return srds
 
 
-def _confirm_observed_verdict(repo_root: Path, *, base: str = "origin/main",
-                              run=None):
-    """Wire git-diff + ``verify_requirements`` into ``evaluate_observed_verdict``.
+def _scenario_ids_for_change(repo_root: Path, stem: str) -> list[str]:
+    """The EMITTED scenario ids for a change, read from
+    ``{repo_root}/.changes/{stem}.scenarios.jsonld``. The authored file records
+    each scenario's emitted ``dna:scenario:<ulid>`` id directly (the brain id
+    the acceptance run's TestResults back-link to), so the scenario route needs
+    no seed recomputation or journey resolution.
+
+    Returns only ``dna:scenario:`` ids — a pre-emit file carrying bare ``SC-NN``
+    ids has no emitted scenarios to gate on (those are covered by the SRD route
+    + the #301 presence gate; authored-not-emitted is a separate state).
+    Missing / malformed file → ``[]``."""
+    f = Path(repo_root) / ".changes" / f"{stem}.scenarios.jsonld"
+    if not f.exists():
+        return []
+    try:
+        data = json.loads(f.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return []
+    nodes = data.get("scenarios") if isinstance(data, dict) else data
+    if not isinstance(nodes, list):
+        return []
+    ids = []
+    for n in nodes:
+        if isinstance(n, dict):
+            sid = str(n.get("id", "") or n.get("@id", ""))
+            if sid.startswith("dna:scenario:"):
+                ids.append(sid)
+    return ids
+
+
+def _confirm_observed_verdict(repo_root: Path, *, stem: str | None = None,
+                              base: str = "origin/main", run=None):
+    """The combined ship-time observed-verdict gate. Two routes, blocked if
+    EITHER blocks:
+
+    - **SRD route** — git-diff for touched SRDs → ``verify_requirements`` →
+      ``evaluate_observed_verdict``.
+    - **Scenario route (#118 Phase 2)** — the change's emitted scenarios →
+      passing-TestResult check → ``evaluate_scenario_verdict``. Requires
+      ``stem`` ({primitive}-{slug}); skipped when ``stem`` is None.
+
     Returns ``(ok: bool, reason: str)``. Degrades open only when the gate
-    genuinely cannot evaluate (no touched SRDs, or a git/brain error) — it never
-    fabricates a pass it did not verify."""
+    genuinely cannot evaluate (no touched SRDs / no emitted scenarios / a
+    git/brain error) — it never fabricates a pass it did not verify."""
     from _verify_requirements import verify_requirements
+    from _brain_query import find_passing_testresults_for_scenario
 
     base_dir = Path(repo_root) / ".brain" / "instances"
 
@@ -511,8 +576,28 @@ def _confirm_observed_verdict(repo_root: Path, *, base: str = "origin/main",
             # verify against; out of scope for that file.
             return "pass"
 
-    return evaluate_observed_verdict(
+    srd_ok, srd_reason = evaluate_observed_verdict(
         _touched_srds(repo_root, base, run=run), verify_fn=_verify)
+    if not srd_ok:
+        return (srd_ok, srd_reason)
+
+    if stem is None:
+        return (srd_ok, srd_reason)
+
+    def _observed(scenario_id: str) -> bool:
+        try:
+            return bool(find_passing_testresults_for_scenario(base_dir, scenario_id))
+        except (ValueError, OSError):
+            return False
+
+    scen_ok, scen_reason = evaluate_scenario_verdict(
+        _scenario_ids_for_change(repo_root, stem), observed_fn=_observed)
+    if not scen_ok:
+        return (scen_ok, scen_reason)
+    # Both routes ok — report whichever was the substantive one.
+    if not srd_reason.startswith("no SRD"):
+        return (True, srd_reason)
+    return (True, scen_reason)
 
 
 def _archive_after_ship(repo_root: Path, change_id: str, branch: str,
@@ -2044,7 +2129,8 @@ def cmd_mark_shipped(args: argparse.Namespace) -> None:
     # an agent that skips the SKILL's gate-4.9 prose, or a hand-merge that
     # bypasses the skill entirely, cannot mark a change shipped with unverified
     # requirements. Completion is owned by the recorded verdict, not asserted.
-    verdict_ok, verdict_reason = _confirm_observed_verdict(repo_root)
+    verdict_ok, verdict_reason = _confirm_observed_verdict(
+        repo_root, stem=f"{primitive}-{slug}")
     verdict_override_note = None
     if not verdict_ok:
         if not force:

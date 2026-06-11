@@ -352,8 +352,12 @@ that skips the prose, or a hand-merge that bypasses the skill, still cannot
 ship unverified work. The gate is the mandate; agent-body prose only points at
 it. See ADR-001 (`gate-done-on-verdict`) for the full decision, including why
 the verdict is read from deposited brain evidence (not a self-stampable
-frontmatter field) and the Phase-1 scope (SRD-keyed; scenario-coverage and the
-per-WP done-transition are the captured follow-on).
+frontmatter field). The gate covers **two routes**, blocked if either blocks:
+the **SRD route** (every touched Requirement has a passing `TestResult`) and
+the **scenario route** (every emitted Scenario the change authored is observed
+green — a passing `TestResult` back-links to it). The per-WP done-transition
+sibling (so the mid-flight board can't show `done` without the verdict) remains
+the captured follow-on.
 
 ### Trivial-change carve-out (SHOULD)
 
