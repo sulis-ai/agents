@@ -1538,7 +1538,20 @@ def _preflight_ci_conclusion(
     extract a shared ``_classify_check_runs`` then — not now (two callers,
     deliberate independence).
     """
-    runs = _gh_check_runs(repo, branch, gh=gh)["check_runs"]
+    try:
+        runs = _gh_check_runs(repo, branch, gh=gh)["check_runs"]
+    except RuntimeError as exc:
+        # #310 — a fresh change branch with no CI yet (or a commit GitHub has
+        # no check-runs ref for) makes `gh api .../check-runs` return 404. That
+        # is "no CI recorded", NOT a red: the same advisory verdict as an empty
+        # runs list. Map it to `unknown` so the pre-flight returns its advisory
+        # envelope rather than crashing the run-all loop with an unhandled
+        # RuntimeError. Only the not-found case degrades to advisory; any other
+        # gh failure (auth, rate-limit, network) still surfaces.
+        msg = str(exc)
+        if "404" in msg or "Not Found" in msg:
+            return "unknown", []
+        raise
     if not runs:
         return "unknown", []
     statuses = [(r["name"], r["status"], r["conclusion"]) for r in runs]
