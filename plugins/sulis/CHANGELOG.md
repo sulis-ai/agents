@@ -1,3 +1,9 @@
+## v0.141.0 — 2026-06-11
+
+**Minor — release-train batch.**
+
+- Gate the merge on the observed verdict, not just the shipped flag (#122). #118 checked the verdict at mark-shipped (post-merge), so unverified work could merge + release before the flag was refused. New sulis-change verify-verdict runs as a hard PRE-merge gate in the ship flow (refusing the merge on an unmet verdict, read-only); mark-shipped keeps the check as the post-merge backstop. Now the verdict gates the merge/release itself.
+
 ## v0.140.2 — 2026-06-11
 
 **Patch — release-train batch.**
