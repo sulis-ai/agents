@@ -1,3 +1,9 @@
+## v0.142.0 — 2026-06-11
+
+**Minor — release-train batch.**
+
+- Carry link + context when a change is started from another (#123). When `sulis-change start` runs from inside a parent change session, it records a durable link (parent_change + builds_on/depends_on) and seeds the new change's CONTEXT.md with a 'Carried from {parent}' section from the parent's Working Set — so the spawned session discovers the context it already reads, with no manual relaying between sessions. Durable carry, not a live wire (Agent Teams was a topology mismatch). Best-effort; never blocks start.
+
 ## v0.141.0 — 2026-06-11
 
 **Minor — release-train batch.**
