@@ -1,3 +1,9 @@
+## v0.138.0 — 2026-06-11
+
+**Minor — release-train batch.**
+
+- Gate scenarios at the specify->design boundary (#301): a founder-facing SPEC can no longer reach design without verifiable scenarios. The scenario-required gate now triggers on the SPEC's founder_facing flag (not just touched UI paths), and /sulis:design hard-stops on a founder-facing spec with none — mirroring the #45 visual-contract gate. Completes the specify-side of #103.
+
 ## v0.137.1 — 2026-06-10
 
 **Patch — release-train batch.**
