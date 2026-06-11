@@ -33,11 +33,14 @@ browser = [
 
 
 [dependency-groups]
-# Dev-only — test runner. Separated from runtime so a future packaged
-# distribution (if we ever ship the scripts as a Python package) doesn't
-# carry pytest as a runtime requirement.
+# Dev-only — test runner + property-based testing engine. Separated from
+# runtime so a future packaged distribution (if we ever ship the scripts as a
+# Python package) doesn't carry these as runtime requirements. `hypothesis`
+# powers the change-identity property layer (WP-006..008); the runtime CLI
+# scripts stay stdlib-only — hypothesis is imported ONLY from test modules.
 dev = [
     "pytest>=7.4",
+    "hypothesis>=6.100",
 ]
 
 
