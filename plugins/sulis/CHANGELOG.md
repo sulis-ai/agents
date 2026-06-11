@@ -1,3 +1,9 @@
+## v0.140.0 — 2026-06-11
+
+**Minor — release-train batch.**
+
+- Ship-time verdict gate gains the scenario route (#118 Phase 2). mark-shipped now blocks if EITHER the SRD route (touched Requirements verified) OR the scenario route (every emitted Scenario the change authored observed green) is unmet — covering founder-facing changes whose verification lives in Scenarios rather than an SRD. The authored scenarios file records each scenario's emitted brain id directly, so the check reads the ids and confirms a passing TestResult for each. Conscious --force escape unchanged.
+
 ## v0.139.0 — 2026-06-11
 
 **Minor — release-train batch.**
