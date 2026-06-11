@@ -333,6 +333,28 @@ Rebases the change branch onto latest `dev`. Merges (or opens a PR;
 configurable). On clean merge, removes the worktree, deletes the
 local branch, optionally archives metadata.
 
+### Completion is owned by a recorded verdict, enforced in the ship mechanism (MUST — #118)
+
+A change MUST NOT be marked `shipped` without a recorded observed verdict.
+`sulis-change mark-shipped` enforces the Definition-of-Done verdict — every
+touched Requirement has a passing `TestResult` — as a **hard precondition in
+the script**, a sibling of the #111 merge guard. It refuses to flip to
+`shipped` unless every touched SRD verifies `pass`; the only escape is a
+conscious, logged `--force` (recorded as `dod_override`).
+
+This is the structural fix for false-completions: completion stops being
+*self-asserted by the builder against a prose bar* and becomes *owned by the
+recorded verdict the ship mechanism checks*. The observed-or-blocked logic
+itself is unchanged (it already existed as `gate_decision` / `_verify_requirements`,
+#83/#95/#98); what changed is that its invocation at ship moved from a
+skippable SKILL.md instruction (gates 4.8/4.9) into the mechanism — so an agent
+that skips the prose, or a hand-merge that bypasses the skill, still cannot
+ship unverified work. The gate is the mandate; agent-body prose only points at
+it. See ADR-001 (`gate-done-on-verdict`) for the full decision, including why
+the verdict is read from deposited brain evidence (not a self-stampable
+frontmatter field) and the Phase-1 scope (SRD-keyed; scenario-coverage and the
+per-WP done-transition are the captured follow-on).
+
 ### Trivial-change carve-out (SHOULD)
 
 For changes too small to justify a branch — a typo fix, a one-line

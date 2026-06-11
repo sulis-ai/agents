@@ -428,6 +428,93 @@ def _confirm_merged_to_main(
     return None
 
 
+# ─── #118 — ship-time observed-verdict gate ─────────────────────────────────
+# The Definition-of-Done verdict (every touched Requirement has a passing
+# TestResult) was enforced ONLY as prose in change/SKILL.md gate 4.9 — the ship
+# script ran it zero times. So a change could be marked *shipped* with no
+# observed verdict: an agent skipping the prose step, or a hand-merge bypassing
+# the skill entirely. This moves the check from prose into the ship MECHANISM —
+# `mark-shipped` refuses unless every touched SRD's DoD verdict is `pass`,
+# escapable only by a conscious, logged `--force` (sibling of the #111 merge
+# guard above). Completion stops being self-asserted: the recorded verdict, not
+# the agent, decides whether a change may ship.
+
+
+def evaluate_observed_verdict(touched_srds, *, verify_fn):
+    """Pure decision: given the SRDs a change touched and a verdict function
+    (``srd_path -> 'pass' | 'partial' | 'fail'``), decide whether the change may
+    be marked shipped w.r.t. the Definition of Done.
+
+    Observed-or-blocked: ship proceeds only when EVERY touched SRD verifies
+    ``pass`` (every FR/NFR has a passing TestResult). Any ``partial`` / ``fail``
+    (an unverified requirement) BLOCKS — the conscious escape is ``--force`` at
+    the call site. No SRD touched → out of scope (lite/standard specs + trivial
+    changes carry no FR-NN blocks) → ``ok``, never blocks. Returns
+    ``(ok: bool, reason: str)``."""
+    if not touched_srds:
+        return (True, "no SRD touched — DoD verdict not applicable")
+    unverified = []
+    for srd in touched_srds:
+        verdict = verify_fn(srd)
+        if verdict != "pass":
+            unverified.append((srd, verdict))
+    if unverified:
+        detail = "; ".join(f"{srd} ({v})" for srd, v in unverified)
+        return (
+            False,
+            "Definition of Done not met — these touched requirements have no "
+            f"observed verdict: {detail}. Every FR/NFR needs a passing "
+            "TestResult (a @verifies unit test or a green Scenario run) before "
+            "this ships. Drive the verification, or override consciously with "
+            "--force.",
+        )
+    return (True, "all touched SRDs verified (DoD pass)")
+
+
+def _touched_srds(repo_root: Path, base: str = "origin/main", *, run=None) -> list[str]:
+    """SRD paths changed on this branch vs ``base`` (three-dot — the branch's
+    own work). Best-effort: an unresolvable base / git error returns ``[]``
+    (the gate degrades open on inability-to-evaluate, never fabricates a
+    block). The ``run`` seam (default ``_run``) is injectable for tests."""
+    if run is None:
+        run = _run
+    rc, out, _err = run(
+        ["git", "diff", "--name-only", f"{base}...HEAD"],
+        cwd=repo_root, timeout=30,
+    )
+    if rc != 0:
+        return []
+    srds = []
+    for line in out.splitlines():
+        p = line.strip()
+        if p.startswith(".specifications/") and p.endswith("/SRD.md"):
+            srds.append(p)
+    return srds
+
+
+def _confirm_observed_verdict(repo_root: Path, *, base: str = "origin/main",
+                              run=None):
+    """Wire git-diff + ``verify_requirements`` into ``evaluate_observed_verdict``.
+    Returns ``(ok: bool, reason: str)``. Degrades open only when the gate
+    genuinely cannot evaluate (no touched SRDs, or a git/brain error) — it never
+    fabricates a pass it did not verify."""
+    from _verify_requirements import verify_requirements
+
+    base_dir = Path(repo_root) / ".brain" / "instances"
+
+    def _verify(srd_path: str) -> str:
+        try:
+            res = verify_requirements(Path(repo_root) / srd_path, base_dir=base_dir)
+            return res.verdict
+        except FileNotFoundError:
+            # Listed in the diff but absent at HEAD (deleted SRD) — nothing to
+            # verify against; out of scope for that file.
+            return "pass"
+
+    return evaluate_observed_verdict(
+        _touched_srds(repo_root, base, run=run), verify_fn=_verify)
+
+
 def _archive_after_ship(repo_root: Path, change_id: str, branch: str,
                         worktree_dest: Path, *, remove_worktree: bool,
                         shipped_sha_override: str | None = None) -> dict:
@@ -1951,6 +2038,28 @@ def cmd_mark_shipped(args: argparse.Namespace) -> None:
         )
         return  # for type checker (emit_error exits)
 
+    # #118 — observed-verdict gate. 'shipped' MUST be impossible without a
+    # recorded Definition-of-Done verdict for every touched SRD. Like the merge
+    # guard above, it lives INSIDE the tool so it holds regardless of caller —
+    # an agent that skips the SKILL's gate-4.9 prose, or a hand-merge that
+    # bypasses the skill entirely, cannot mark a change shipped with unverified
+    # requirements. Completion is owned by the recorded verdict, not asserted.
+    verdict_ok, verdict_reason = _confirm_observed_verdict(repo_root)
+    verdict_override_note = None
+    if not verdict_ok:
+        if not force:
+            emit_error(
+                f"change {change_id} has not met its Definition of Done — "
+                f"refusing to mark shipped. {verdict_reason}",
+                context={"change_id": change_id, "branch": branch},
+            )
+            return  # for type checker (emit_error exits)
+        verdict_override_note = (
+            f"--force override: marked shipped despite an unmet Definition of "
+            f"Done — {verdict_reason}"
+        )
+        print(f"WARNING: {verdict_override_note}", file=sys.stderr)
+
     # The state we PIN as shipped: the confirmed merge commit on main (the
     # true shipped state). On a --force override with no confirmation we have
     # no merge commit, so _archive_after_ship falls back to the branch tip.
@@ -1967,10 +2076,13 @@ def cmd_mark_shipped(args: argparse.Namespace) -> None:
     archived = _archive_after_ship(repo_root, str(change_id), branch,
                                    worktree_dest, remove_worktree=True,
                                    shipped_sha_override=confirmed_sha)
-    # Record the override on the change record for the audit trail.
-    if override_note is not None:
+    # Record any override(s) on the change record for the audit trail.
+    if override_note is not None or verdict_override_note is not None:
         rec_for_note = read_change_record(str(change_id)) or {}
-        rec_for_note["ship_override"] = override_note
+        if override_note is not None:
+            rec_for_note["ship_override"] = override_note
+        if verdict_override_note is not None:
+            rec_for_note["dod_override"] = verdict_override_note
         write_change_record(str(change_id), rec_for_note)
     record = read_change_record(str(change_id)) or {}
 
