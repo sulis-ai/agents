@@ -849,6 +849,26 @@ a change marked shipped + branch deleted while the merge never landed). For a
 verified to be an ancestor of `origin/main`). Only for genuine edge cases,
 `--force` overrides the guard and records the override on the change record.
 
+**6.5. Confirm the release the robot cut — by the merge commit, never "the
+latest run" (#121).** Merging to `main` fires the release robot
+(`release-on-merge.yml`), which bumps the version + tags. Before reporting a
+release, confirm it landed — but the run for THIS merge is **not created the
+instant the merge lands**, so `gh run list --workflow=release-on-merge
+--limit 1` *races*: it can return the PREVIOUS merge's run and report success
+against a stale release (caught only by noticing no new `release:` commit
+appeared on `main`). Use the race-free helper, which polls for the run whose
+`headSha` IS this merge commit:
+
+```bash
+MERGE_SHA=$(gh pr view <PR#> --json mergeCommit -q .mergeCommit.oid)
+"$SCRIPTS_DIR/wpx-confirm-release" --repo <org/repo> --merge-sha "$MERGE_SHA"
+```
+
+Exit 0 = the version was cut — report it. Exit 2 = no run for this commit
+appeared, so the cut could **not** be confirmed; do NOT report it released
+(cross-check: a fresh `release: sulis v…` commit on `origin/main`). **Never
+confirm a release off `--limit 1`** — match the run to the merge commit.
+
 **7. Report** (include the lessons captured at step 4.6 and the release note
 recorded at step 4.7, if any):
 
