@@ -123,3 +123,33 @@ def test_preflight_no_runs_recorded_returns_unknown(fake_gh_no_runs):
         "sulis-ai/agents", "dev", gh=fake_gh_no_runs)
     assert verdict == "unknown"
     assert failed == []
+
+
+class _CheckRuns404Stub:
+    """GHClient double whose ``check_runs`` raises the 404 RuntimeError that
+    the real client raises for a branch/commit with no check-runs ref (a
+    fresh change branch with no CI yet)."""
+
+    def __init__(self, message: str) -> None:
+        self._message = message
+
+    def check_runs(self, repo: str, branch: str) -> dict:
+        raise RuntimeError(self._message)
+
+
+def test_preflight_no_runs_404_returns_unknown_not_crash():
+    """#310 — a fresh change branch with no CI yet makes `gh api .../check-runs`
+    return 404. That is 'no CI recorded' (advisory unknown), not a crash."""
+    gh = _CheckRuns404Stub("gh check-runs failed: gh: Not Found (HTTP 404)")
+    verdict, failed = _wpxlib._preflight_ci_conclusion(
+        "sulis-ai/agents", "change/fix-fresh-branch", gh=gh)
+    assert verdict == "unknown"
+    assert failed == []
+
+
+def test_preflight_non_404_gh_error_still_raises():
+    """A non-not-found gh failure (auth / rate-limit / network) must still
+    surface — only the 404 'no runs' case degrades to advisory."""
+    gh = _CheckRuns404Stub("gh check-runs failed: gh: HTTP 403 rate limit exceeded")
+    with pytest.raises(RuntimeError):
+        _wpxlib._preflight_ci_conclusion("sulis-ai/agents", "dev", gh=gh)
