@@ -1,0 +1,7 @@
+change_id: DX53Q6H46JE2MYHG9V7Q3V0S46
+primitive: gate
+tier: minor
+touches_plugin: true
+summary: |
+  Gate ship on a recorded observed verdict, not prose (#118). mark-shipped now enforces the Definition-of-Done verdict (every touched Requirement backed by a passing TestResult) as a hard precondition in the script — refusing to mark a change shipped without it (conscious --force escape). Moves the completion gate from skippable SKILL prose into the ship mechanism: completion is owned by the recorded verdict, not self-asserted. Root-cause fix for work reported 'completed' when it wasn't.
+created_at: 2026-06-11T14:49:58Z
