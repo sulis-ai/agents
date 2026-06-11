@@ -1,3 +1,9 @@
+## v0.143.0 — 2026-06-11
+
+**Minor — release-train batch.**
+
+- Carry the full ancestry chain to origin, not just one hop (#124). When a change is started two-plus hops deep, the 'Carried from' section now walks parent_change to the origin and lists the full lineage (each ancestor + link) plus the origin's Working-Set excerpt — so context from changes further back than the immediate parent is surfaced + navigable, not lost. Cycle/depth-bounded; extends #123.
+
 ## v0.142.0 — 2026-06-11
 
 **Minor — release-train batch.**
