@@ -1,12 +1,18 @@
 // WP-004 — SulisChangeRecreator: the production RecreateRunner adapter
-// (TDD §3, §5; ADR-004).
+// (TDD §3, §5; ADR-001/004).
 //
-// Composes the already-shipped `sulis-change recreate --handle <handle>`
-// CLI to re-materialise a tidied change's worktree. It does NOT
-// re-implement worktree materialisation — `cmd_recreate` (#56) already
+// Composes the already-shipped `sulis-change recreate --change-id
+// <changeId>` CLI to re-materialise a tidied change's worktree. It does
+// NOT re-implement worktree materialisation — `cmd_recreate` (#56) already
 // attaches to the branch if it still exists, else checks out detached at
 // `shipped_sha`, and is idempotent ("worktree already exists" → no-op
 // success). This adapter only drives it.
+//
+// The seam is keyed by the UNIQUE `change_id`, not the non-unique 6-char
+// handle (ADR-001 — the `--change-id` selector WP-001 added). The cockpit
+// reads the record by its id and carries that id straight across the seam,
+// so the recreate resolves the exact change rather than re-resolving a
+// collision-prone handle.
 //
 // CONTRACT (the cockpit's subprocess discipline — TDD §3, mirrors
 // SulisChangeStoreReader / gitShow):
@@ -15,6 +21,10 @@
 //     command line, never shell-wrapped. `shell: false` is set
 //     explicitly (the recreate-on-demand source-hygiene test greps for
 //     the absence of `shell: true`).
+//   - The change_id is SHAPE-GUARDED (`isSafeChangeHandle`) before the
+//     spawn — defence-in-depth against a corrupt record carrying a
+//     leading-hyphen (argparse flag-confusion) or traversal/glob shape. A
+//     malformed id degrades to a typed SPAWN_FAIL, never a spawn.
 //   - The ONLY subcommand is `recreate` (the source-hygiene test asserts
 //     no mutating git verb token — add/commit/reset/checkout — appears,
 //     keeping read-only-gate parity).
@@ -33,6 +43,7 @@
 
 import { spawn } from "node:child_process";
 
+import { isSafeChangeHandle } from "../lib/changeHandleGuard";
 import type { RecreateOutcome, RecreateRunner } from "../ports/RecreateRunner";
 
 export type SulisChangeRecreatorConfig = {
@@ -63,10 +74,22 @@ export class SulisChangeRecreator implements RecreateRunner {
     this.timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
-  recreate(handle: string): Promise<RecreateOutcome> {
-    // argv array ONLY — no string command line, no shell. The handle is a
-    // structured argument git/the-CLI parses, not a shell would.
-    const args: string[] = ["recreate", "--handle", handle];
+  recreate(changeId: string): Promise<RecreateOutcome> {
+    // Shape-guard the id BEFORE the spawn (defence-in-depth — a corrupt
+    // record could carry a leading-hyphen flag-confusion shape or a
+    // traversal/glob/metachar id). The guard's charset already matches the
+    // ULID; a malformed id degrades to a typed failure, never a spawn.
+    if (!isSafeChangeHandle(changeId)) {
+      return Promise.resolve({
+        ok: false,
+        reason: "SPAWN_FAIL",
+        detail: `refused to recreate: unsafe change_id ${JSON.stringify(changeId)}`,
+      });
+    }
+
+    // argv array ONLY — no string command line, no shell. The change_id is
+    // a structured argument the CLI parses, not a shell would.
+    const args: string[] = ["recreate", "--change-id", changeId];
 
     return new Promise<RecreateOutcome>((resolve) => {
       const child = spawn(this.binPath, args, {
