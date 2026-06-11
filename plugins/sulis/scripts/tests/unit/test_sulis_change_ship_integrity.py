@@ -272,3 +272,31 @@ def test_mark_shipped_proceeds_when_dod_met(tmp_path, monkeypatch):
     assert ei.value.code == 0
     rec = cs.read_change_record(cid) or {}
     assert rec.get("stage") == "shipped"
+
+
+# ─── #122 — verify-verdict as a PRE-merge gate (gate the merge, not just the ─
+#     post-merge shipped flag). cmd_verify_verdict is the read-only check the
+#     ship flow runs BEFORE `gh pr merge`; mark-shipped keeps its check as the
+#     post-merge backstop (defense-in-depth).
+
+
+def test_verify_verdict_exits_nonzero_when_blocked(tmp_path, monkeypatch):
+    """Unmet verdict → non-zero exit so the ship flow refuses the merge. This
+    is the pre-merge half: the merge never happens on an unmet verdict."""
+    _seed_change(tmp_path, monkeypatch, with_repo=True)
+    monkeypatch.setattr(_mod, "_confirm_observed_verdict",
+                        lambda *a, **k: (False, "FR-01 has no observed verdict"))
+    with pytest.raises(SystemExit) as ei:
+        _mod.cmd_verify_verdict(_args(tmp_path / "repo"))
+    assert ei.value.code != 0
+
+
+def test_verify_verdict_returns_ok_when_met(tmp_path, monkeypatch, capsys):
+    """Met verdict → exit 0 (returns without emit_error), so the merge proceeds.
+    Read-only: it must NOT flip stage or touch the record."""
+    cid, cs = _seed_change(tmp_path, monkeypatch, with_repo=True)
+    monkeypatch.setattr(_mod, "_confirm_observed_verdict",
+                        lambda *a, **k: (True, "all emitted scenarios observed"))
+    _mod.cmd_verify_verdict(_args(tmp_path / "repo"))  # no SystemExit on ok
+    rec = cs.read_change_record(cid) or {}
+    assert rec.get("stage") != "shipped"  # pure check — never flips state

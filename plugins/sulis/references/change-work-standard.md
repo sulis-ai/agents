@@ -335,12 +335,17 @@ local branch, optionally archives metadata.
 
 ### Completion is owned by a recorded verdict, enforced in the ship mechanism (MUST — #118)
 
-A change MUST NOT be marked `shipped` without a recorded observed verdict.
-`sulis-change mark-shipped` enforces the Definition-of-Done verdict — every
-touched Requirement has a passing `TestResult` — as a **hard precondition in
-the script**, a sibling of the #111 merge guard. It refuses to flip to
-`shipped` unless every touched SRD verifies `pass`; the only escape is a
-conscious, logged `--force` (recorded as `dod_override`).
+A change MUST NOT be **merged** (and therefore released) without a recorded
+observed verdict. Enforcement is **pre-merge, with a post-merge backstop**
+(#122): `sulis-change verify-verdict` runs as a hard gate **before the
+squash-merge** and refuses the merge unless the Definition-of-Done verdict is
+met; `sulis-change mark-shipped` re-checks the same verdict **after** the merge
+as the backstop (a sibling of the #111 merge guard), refusing to flip to
+`shipped` if it's somehow unmet. The only escape at either point is a
+conscious, logged `--force` / founder override. Pre-merge placement matters:
+#118 first wired the check at `mark-shipped` (post-merge), which gated the
+`shipped` *flag* but let unverified work merge + release first; #122 moved the
+primary gate ahead of the merge so the *merge itself* is gated.
 
 This is the structural fix for false-completions: completion stops being
 *self-asserted by the builder against a prose bar* and becomes *owned by the

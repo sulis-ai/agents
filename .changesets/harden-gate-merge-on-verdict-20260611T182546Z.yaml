@@ -1,0 +1,7 @@
+change_id: SGRTBP2KS7CRM0E9QJT6DTZEDH
+primitive: harden
+tier: minor
+touches_plugin: true
+summary: |
+  Gate the merge on the observed verdict, not just the shipped flag (#122). #118 checked the verdict at mark-shipped (post-merge), so unverified work could merge + release before the flag was refused. New sulis-change verify-verdict runs as a hard PRE-merge gate in the ship flow (refusing the merge on an unmet verdict, read-only); mark-shipped keeps the check as the post-merge backstop. Now the verdict gates the merge/release itself.
+created_at: 2026-06-11T18:25:46Z

@@ -2088,6 +2088,21 @@ def build_parser() -> argparse.ArgumentParser:
              "commits.",
     )
 
+    # `verify-verdict` (#122) is the PRE-merge observed-verdict gate the ship
+    # flow runs before `gh pr merge` (read-only; mark-shipped is the post-merge
+    # backstop). Same selectors as mark-shipped/recreate.
+    p_verify_verdict = sub.add_parser(
+        "verify-verdict",
+        help="Pre-merge gate: refuse (exit 1) unless the change's Definition "
+             "of Done verdict is met (read-only; #122).",
+    )
+    p_verify_verdict.add_argument("--change-id", default=None,
+                                  help="Change ULID — the unambiguous selector")
+    p_verify_verdict.add_argument("--handle", default=None,
+                                  help="Change handle (e.g. CH-01HYQC)")
+    p_verify_verdict.add_argument("--repo-root", default=os.getcwd(),
+                                  help="Path to the repo root (default: cwd)")
+
     # `recreate` re-materialises a shipped change's worktree on demand (#56
     # Part 2). After ship the worktree is removed but the branch + record
     # (with the pinned shipped_sha) are kept; this brings the worktree back.
@@ -2112,6 +2127,46 @@ def build_parser() -> argparse.ArgumentParser:
         help="Change primitive (used with --slug; default: feat)")
 
     return parser
+
+
+def cmd_verify_verdict(args: argparse.Namespace) -> None:
+    """#122 — the PRE-merge observed-verdict gate. Read-only.
+
+    The ship flow runs this BEFORE `gh pr merge`, and refuses the merge on a
+    non-zero exit. This gates the *merge* (and therefore the release the robot
+    cuts on merge), not just the post-merge `shipped` flag — closing the seam
+    where #118's mark-shipped check (post-merge) let unverified work merge +
+    release before refusing the flag. `mark-shipped` keeps the same check as
+    the post-merge backstop (defense-in-depth).
+
+    Reads the *recorded* verdict (deposited TestResults) — it does NOT re-drive
+    scenarios, so it needs no standing app. Exit: 0 ok (merge may proceed),
+    1 blocked (refuse the merge — surface the reason; the founder owns any
+    conscious override at the ship step), 3 invocation/resolution error.
+    """
+    repo_root = Path(getattr(args, "repo_root", None) or os.getcwd()).resolve()
+    change_id = _select_change_id_refusing_conflict(
+        explicit_change_id=getattr(args, "change_id", None),
+        explicit_handle=getattr(args, "handle", None),
+        env_change_id=os.environ.get("SULIS_CHANGE_ID"),
+        records=list_all_changes(),
+    )
+    record = _resolve_record_by_id(str(change_id))
+    if record is None:
+        emit_error(f"no change record found for change_id={change_id!r}")
+        return  # for type checker (emit_error exits)
+    primitive = str(record.get("primitive") or "feat")
+    slug = str(record.get("slug") or "")
+
+    ok, reason = _confirm_observed_verdict(repo_root, stem=f"{primitive}-{slug}")
+    if not ok:
+        emit_error(
+            f"change {change_id} has not met its Definition of Done — refusing "
+            f"the merge. {reason}",
+            context={"change_id": change_id},
+        )
+        return  # for type checker (emit_error exits)
+    print(f"OK: {change_id} — {reason}")
 
 
 def cmd_mark_shipped(args: argparse.Namespace) -> None:
@@ -2359,6 +2414,7 @@ HANDLERS = {
     "status": cmd_status,
     "stage": cmd_stage,
     "mark-shipped": cmd_mark_shipped,
+    "verify-verdict": cmd_verify_verdict,
     "nuke": cmd_nuke,
     "recreate": cmd_recreate,
 }
