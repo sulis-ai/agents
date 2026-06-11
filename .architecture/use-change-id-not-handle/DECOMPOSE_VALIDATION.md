@@ -30,3 +30,39 @@
 | Contradictions with SPEC plan surfaced | PASS — none | The TDD concretion (test seam = `RecreateRunner` port; behavioural tests on real temp store / in-memory adapter) is consistent with the SPEC's plan (the SPEC named the same files + the behavioural-test + state-assertion + idempotency-check adapter). No load-bearing contradiction; no founder escalation needed. |
 
 ## Verdict: **PASS** — ready for execution (WPs left `pending` per the design-only brief).
+
+---
+
+# Amendment — property-based testing layer (WP-006..008)
+
+> 2026-06-11 · 3 appended WPs · founder-approved fold-in (Phase 1 + Phase 2).
+> WP-001..005 unchanged.
+
+## Rubric
+
+| Check | Verdict | Evidence |
+|---|---|---|
+| **Atomic** | PASS | WP-006 (strategies + dep wiring), WP-007 (pure-core properties), WP-008 (stateful model) each carry own Context + Contract + DoD. Cross-WP need is only `dependsOn: WP-006` (real data dep: both consume the strategies module). |
+| **No bundling** | PASS | Foundation / Phase-1 / Phase-2 are three distinct logical changes — split rather than one "add property tests" WP, per the no-bundling rule. |
+| **Red/Green/Blue present** | PASS | All three carry all three sub-checklists with named tests. WP-006/007/008 are EXPAND-Create / REINFORCE-Test — no REORGANISE, so no characterisation-test-before-refactor obligation (these ADD test-only code; they do not restructure production code). |
+| **Change primitive named** | PASS | WP-006 EXPAND-Create (new strategies module + new dev-dep; an additive net-new artifact, not a wrap). WP-007/008 REINFORCE-Test. Groups set. |
+| **Ports&Adapters not Wrapper** | PASS | No wrappers. WP-006 creates a new test-support module; it does not wrap internal code. The property tests call the existing pure functions directly. |
+| **change_id frontmatter** | PASS | All three carry `change_id: 01KTV4SS9N8BP0XN8GCQAXT6PC`. |
+| **kind + verification adapter** | PASS | All `kind: backend`; all `verification.adapter: backend` + concrete `artifact` pytest nodeid (Shape 1). |
+| **Dependency graph acyclic** | PASS | WP-006 → {WP-007, WP-008}; WP-007 and WP-008 independent. No cycle; no back-edge into the `done` WP-001..005. |
+| **MEA-09 (no mocks in integration)** | PASS | No mocks. Phase 1 drives the real pure functions over generated inputs. Phase 2 uses an in-memory store MODEL (a real dict-backed adapter shape, the documented design decision), not an ad-hoc mock; refusal is observed by patching `emit_error`/`_emit_ambiguous_match` to raise — the same in-process technique the shipped example-based suite uses, not a substitute for the function under test. |
+| **Distinct test files per WP** | PASS | WP-006 → `test_change_identity_strategies_selftest.py` (+ owns `_change_identity_strategies.py` via `fixtures_created:`). WP-007 → `test_change_identity_properties.py`. WP-008 → `test_change_lifecycle_stateful.py`. All three NEW + mutually disjoint and distinct from the WP-001..005 files (`test_change_identity_resolution.py`, `test_collision_regression.py`, etc.). No add/add conflict — the earlier parallel-batch failure mode is closed by the `fixtures_created:` ownership declaration the existing `validate_fixture_collisions` check reads. |
+| **Canonical INDEX header preserved** | PASS | Appended to the existing table under `\| ID \| Title \| Primitive \| Status \| Depends On \| Blocks \| Delta \| Sev \|` — the run-all-parsed prefix is byte-identical; trailing `Delta`/`Sev` columns are the pre-existing extra columns (allowed). |
+
+## P-VER (verification design-time check)
+
+| P-VER check | Verdict | Evidence |
+|---|---|---|
+| `## Verification Plan` heading present in TDD | PASS | Unchanged; the property layer note was added INSIDE §5, heading untouched. |
+| Canonical citation present | PASS | `<!-- VERIFICATION_QUESTIONS source: …v1.0.0 -->` left in place (grep count = 1); not duplicated, not moved. |
+| Six subsections still populated + concretised | PASS | §5 now names the property-based method with concrete artifact paths for Phase 1, Phase 2, the shared strategies module, and the dep-wiring location; §6 updated (`hypothesis` dev-group, nothing external). |
+| Per-WP `verification:` shape declared | PASS | All three Shape 1 (concrete): WP-006 `…test_change_identity_strategies_selftest.py::test_colliding_ulid_group_shares_handle`; WP-007 `…test_change_identity_properties.py::test_matching_handle_is_sound_and_complete`; WP-008 `…test_change_lifecycle_stateful.py::ChangeLifecycleStateMachine`. |
+| Cited symbols/paths resolve at design time | PASS | Repo-grep confirmed `ulid_handle`, `validate_change_ulid`, `_CROCKFORD_BASE32`, `_changes_matching_handle`, `_select_change_id_refusing_conflict`, `change_worktree_path` all present; `pytest` declared in `pyproject.toml [dependency-groups].dev`; `hypothesis` is the one NEW dev-dep WP-006 adds (declared, not yet installed — correct for design-time). No hallucinated infrastructure. |
+| Contradictions with SPEC plan surfaced | PASS — none | The property layer strengthens evidence for the SPEC's existing safety scenarios; it opens no new scenario and contradicts nothing in the SPEC or original TDD plan. |
+
+## Verdict: **PASS** — WP-006..008 ready for execution, left `pending` (design-only brief).

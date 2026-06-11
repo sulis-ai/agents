@@ -147,9 +147,35 @@ worktree materialised) + an idempotency check on recreate. Concrete artifacts
 - TypeScript: `apps/cockpit/server/tests/recreate-on-demand.test.ts` (extend) —
   vitest spec.
 
+**Added verification method — property-based testing (Hypothesis).** The
+example-based artifacts above prove the safe-resolution invariants on fixed
+inputs. A property-based layer (WP-006..008) proves the SAME invariants
+UNIVERSALLY over generated inputs, complementing — not replacing — the
+example-based suite:
+
+- Phase 1 (per-call, pure-core) —
+  `plugins/sulis/scripts/tests/unit/test_change_identity_properties.py`: handle
+  purity, `_changes_matching_handle` soundness+completeness, exact by-id
+  resolution, ambiguity-always-refuses, and id-keyed worktree-path injectivity,
+  each over arbitrary generated change-sets. The functions under test are pure
+  (records/ids passed as arguments), so no store/git seeding is required.
+- Phase 2 (per-sequence, stateful) —
+  `plugins/sulis/scripts/tests/unit/test_change_lifecycle_stateful.py`: a
+  `RuleBasedStateMachine` over `start`/`ship`/`nuke`/`recreate`/`focus` asserting
+  after every step that no operation acts on a change whose id ≠ the requested
+  id and an ambiguous handle always refuses (in-memory store model for speed).
+- Shared generators —
+  `plugins/sulis/scripts/tests/unit/_change_identity_strategies.py` (owned by
+  WP-006). `hypothesis` is wired as a dev-only dependency in
+  `plugins/sulis/scripts/pyproject.toml` `[dependency-groups].dev`, exactly as
+  `pytest` is, so CI's `uv run pytest` installs it; the runtime scripts stay
+  stdlib-only.
+
 Multi-adapter (Q18): spans the Python CLI and the Node cockpit; each verified by
-its own behavioural suite. No `frontend` adapter (no new visual surface). Infra
-(Q19): existing pytest + vitest harnesses; nothing new.
+its own behavioural suite, with the Python side additionally covered by the
+property-based layer above. No `frontend` adapter (no new visual surface). Infra
+(Q19): existing pytest + vitest harnesses + `hypothesis` (dev-group); nothing
+external.
 
 ### 6. Infrastructure needs surfaced (deferred)
 
