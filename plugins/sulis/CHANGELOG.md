@@ -1,3 +1,9 @@
+## v0.140.1 — 2026-06-11
+
+**Patch — release-train batch.**
+
+- Fix the release-confirm race (#121): confirming a release by 'the latest release-on-merge run' (--limit 1) can grab the PREVIOUS merge's run and report success against a stale release. New wpx-confirm-release matches the run by the merge commit's sha (race-free), reporting an honest 'unconfirmed' if no run for the commit appeared yet — never a stale-run false success.
+
 ## v0.140.0 — 2026-06-11
 
 **Minor — release-train batch.**
