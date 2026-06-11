@@ -798,12 +798,58 @@ def _excerpt_working_set(text, *, max_chars: int = 1500) -> str:
     return t[:max_chars].rstrip() + "\n\n…(excerpt truncated — follow the link to read the rest)"
 
 
+def _read_working_set(record) -> str | None:
+    """Read a change's Working Set from its record (worktree_path +
+    {primitive}-{slug}.WORKING-SET.md). Best-effort: any miss → None."""
+    try:
+        pw = record.get("worktree_path")
+        prim = str(record.get("primitive", "") or "")
+        slug = str(record.get("slug", "") or "")
+        if pw and prim and slug:
+            ws = Path(pw) / ".changes" / f"{prim}-{slug}.WORKING-SET.md"
+            if ws.exists():
+                return ws.read_text(encoding="utf-8")
+    except Exception:
+        return None
+    return None
+
+
+def _walk_ancestry(immediate_id, read_record_fn, *, max_depth: int = 12) -> list:
+    """Follow ``parent_change`` from the immediate parent to the origin change
+    (#124). Returns ``[immediate_record, …, origin_record]`` (only records that
+    resolve), immediate-first. Cycle- and depth-bounded so a malformed loop or
+    a very deep chain can never hang `start`. ``read_record_fn(id) -> record |
+    None`` is injectable for tests."""
+    chain: list = []
+    seen: set = set()
+    cur = (immediate_id or "").strip() or None
+    while cur and cur not in seen and len(chain) < max_depth:
+        seen.add(cur)
+        try:
+            rec = read_record_fn(cur)
+        except Exception:
+            rec = None
+        if not rec:
+            break
+        chain.append(rec)
+        cur = str(rec.get("parent_change") or "").strip() or None
+    return chain
+
+
 def _carried_context_section(parent: dict, relationship: str,
-                             working_set_text) -> str:
+                             working_set_text, *, ancestry=None,
+                             origin_working_set=None) -> str:
     """The 'Carried from {parent}' CONTEXT.md section (#123): the durable link
     + an excerpt of the parent's Working Set. The link is ALWAYS present (B can
     follow it to read the parent's full Working Set + brain); the excerpt is a
-    starting point, not the whole picture."""
+    starting point, not the whole picture.
+
+    ``ancestry`` (#124) is the chain BEYOND the immediate parent, origin-ward
+    (i.e. the immediate parent's parent … the origin). When non-empty, the
+    section also renders the full **lineage to origin** (each ancestor's
+    handle + id, so the session can navigate back any number of hops) and the
+    **origin's** Working-Set excerpt — because context two-plus changes back
+    was being lost, and the origin idea is often the one that matters most."""
     handle = parent.get("handle") or parent.get("change_id", "?")
     slug = str(parent.get("slug", "") or "")
     cid = str(parent.get("change_id", "") or "")
@@ -830,6 +876,29 @@ def _carried_context_section(parent: dict, relationship: str,
             "Opportunity + Decision) directly._",
             "",
         ]
+
+    # #124 — render the full lineage to origin when this change is more than
+    # one hop deep, so the session can navigate back to the original idea.
+    if ancestry:
+        def _lbl(rec):
+            h = rec.get("handle") or rec.get("change_id", "?")
+            c = str(rec.get("change_id", "") or "")
+            return f"{h}" + (f" (`{c}`)" if c and c != h else "")
+        full_chain = [parent] + list(ancestry)  # immediate → origin
+        lineage = " ← ".join(_lbl(r) for r in full_chain)
+        origin = ancestry[-1]
+        out += [
+            "### Lineage to origin",
+            "",
+            f"This change is {len(full_chain)} hops deep. Full chain "
+            f"(this change's parent ← … ← origin): {lineage}. Follow any link "
+            "to read that change's Working Set / brain.",
+            "",
+        ]
+        origin_excerpt = _excerpt_working_set(origin_working_set)
+        if origin_excerpt and origin is not parent:
+            out += [f"### Origin ({_lbl(origin)}) Working Set excerpt",
+                    "", origin_excerpt, ""]
     return "\n".join(out)
 
 
@@ -845,24 +914,22 @@ def _resolve_parent_carry(relationship):
     rel = relationship if relationship in _CARRY_RELATIONSHIPS else "builds_on"
     if not parent_id:
         return (None, None, rel)
-    try:
-        parent = read_change_record(parent_id)
-    except Exception:
-        parent = None
-    if not parent:
+    # #124 — walk the full ancestry chain to origin (immediate → … → origin),
+    # so a change two-plus hops deep surfaces its whole lineage, not just one
+    # hop. Cycle/depth-bounded; degrades to (parent_id, None) if the immediate
+    # parent's record can't even be read.
+    chain = _walk_ancestry(parent_id, read_change_record)
+    if not chain:
         return (parent_id, None, rel)
-    ws_text = None
-    try:
-        pw = parent.get("worktree_path")
-        p_prim = str(parent.get("primitive", "") or "")
-        p_slug = str(parent.get("slug", "") or "")
-        if pw and p_prim and p_slug:
-            ws = Path(pw) / ".changes" / f"{p_prim}-{p_slug}.WORKING-SET.md"
-            if ws.exists():
-                ws_text = ws.read_text(encoding="utf-8")
-    except Exception:
-        ws_text = None
-    return (parent_id, _carried_context_section(parent, rel, ws_text), rel)
+    immediate = chain[0]
+    ancestry = chain[1:]                       # beyond the immediate parent
+    origin = chain[-1] if len(chain) > 1 else None
+    section = _carried_context_section(
+        immediate, rel, _read_working_set(immediate),
+        ancestry=ancestry,
+        origin_working_set=_read_working_set(origin) if origin is not None else None,
+    )
+    return (parent_id, section, rel)
 
 
 def cmd_start(args: argparse.Namespace) -> None:

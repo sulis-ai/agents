@@ -200,7 +200,11 @@ e.g. an idea surfaced mid-change, or a dependency), the tool **automatically**
 record) and (b) seeds the new change's `CONTEXT.md` with a **"Carried from
 {parent}"** section drawn from the parent's Working Set — so the spawned
 session *discovers* the link + the parent's reasoning through the CONTEXT.md it
-already reads at startup, with no manual relaying between the two sessions. Use
+already reads at startup, with no manual relaying between the two sessions. For
+a change **more than one hop deep**, the section also walks the chain to the
+**origin** and lists the full **lineage** (each ancestor + link) plus the
+origin's Working-Set excerpt — so context two-plus changes back is reachable,
+not lost (#124). Use
 `--relationship depends_on` for the dependency case (default `builds_on`). This
 is durable carry, not a live wire (the critical-thinking call: a state gap, not
 a transport gap). It's best-effort — a carry failure never blocks `start` — and

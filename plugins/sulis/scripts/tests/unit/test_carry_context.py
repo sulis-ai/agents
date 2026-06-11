@@ -126,3 +126,79 @@ def test_resolve_degrades_when_parent_record_missing(monkeypatch):
     monkeypatch.setattr(_mod, "read_change_record", lambda cid: None)
     pid, section, rel = _mod._resolve_parent_carry("builds_on")
     assert pid == "01JGHOST000000000000000000" and section is None
+
+
+# ─── #124: walk the ancestry chain to origin (multi-hop back-nav) ──────────
+
+
+def _chain_reader(records_by_id):
+    return lambda cid: records_by_id.get(cid)
+
+
+def test_walk_ancestry_follows_parent_change_to_origin():
+    # C -> B -> A (A is origin, no parent_change).
+    recs = {
+        "C": {"change_id": "C", "handle": "CH-C", "parent_change": "B"},
+        "B": {"change_id": "B", "handle": "CH-B", "parent_change": "A"},
+        "A": {"change_id": "A", "handle": "CH-A"},
+    }
+    chain = _mod._walk_ancestry("C", _chain_reader(recs))
+    assert [r["change_id"] for r in chain] == ["C", "B", "A"]  # immediate→origin
+
+
+def test_walk_ancestry_is_cycle_safe():
+    recs = {"X": {"change_id": "X", "parent_change": "Y"},
+            "Y": {"change_id": "Y", "parent_change": "X"}}  # cycle
+    chain = _mod._walk_ancestry("X", _chain_reader(recs))
+    ids = [r["change_id"] for r in chain]
+    assert ids == ["X", "Y"]  # each visited once, no infinite loop
+
+
+def test_walk_ancestry_stops_at_missing_record():
+    recs = {"C": {"change_id": "C", "parent_change": "GONE"}}
+    chain = _mod._walk_ancestry("C", _chain_reader(recs))
+    assert [r["change_id"] for r in chain] == ["C"]  # GONE doesn't resolve
+
+
+def test_section_with_ancestry_lists_lineage_and_origin_excerpt():
+    immediate = {"change_id": "B", "handle": "CH-B", "slug": "mid"}
+    origin = {"change_id": "A", "handle": "CH-A", "slug": "the-origin-idea"}
+    s = _carried_context_section(
+        immediate, "builds_on", "B's working set.",
+        ancestry=[origin], origin_working_set="A: the original idea was X.")
+    assert "CH-B" in s and "B's working set." in s        # immediate hop
+    assert "lineage" in s.lower()                          # the chain is shown
+    assert "CH-A" in s                                     # origin link
+    assert "A: the original idea was X." in s              # origin excerpt carried
+
+
+def test_section_no_ancestry_is_unchanged_single_hop():
+    # Backward-compat: ancestry omitted → the #123 single-hop section, no lineage.
+    s = _carried_context_section(_PARENT, "builds_on", "body")
+    assert "lineage" not in s.lower()
+
+
+def test_resolve_carries_full_chain_for_a_two_hop_change(monkeypatch, tmp_path):
+    # B started from A; C started from B. From C, the carry should surface the
+    # lineage to A (origin) + A's Working Set, not just B.
+    pwa = tmp_path / "wt-a"
+    (pwa / ".changes").mkdir(parents=True)
+    (pwa / ".changes" / "feat-origin.WORKING-SET.md").write_text(
+        "Origin idea: the whole thing started here.", encoding="utf-8")
+    pwb = tmp_path / "wt-b"
+    (pwb / ".changes").mkdir(parents=True)
+    (pwb / ".changes" / "feat-mid.WORKING-SET.md").write_text(
+        "Mid hop reasoning.", encoding="utf-8")
+    recs = {
+        "B": {"change_id": "B", "handle": "CH-B", "slug": "mid",
+              "primitive": "feat", "worktree_path": str(pwb), "parent_change": "A"},
+        "A": {"change_id": "A", "handle": "CH-A", "slug": "origin",
+              "primitive": "feat", "worktree_path": str(pwa)},
+    }
+    monkeypatch.setenv("SULIS_CHANGE_ID", "B")  # C is launched from B
+    monkeypatch.setattr(_mod, "read_change_record", _chain_reader(recs))
+    pid, section, rel = _mod._resolve_parent_carry("builds_on")
+    assert pid == "B"
+    assert "Mid hop reasoning." in section                 # immediate parent
+    assert "Origin idea: the whole thing started here." in section  # origin carried
+    assert "CH-A" in section and "lineage" in section.lower()       # lineage to origin
