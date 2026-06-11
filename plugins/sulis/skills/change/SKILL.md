@@ -960,8 +960,11 @@ footprint before touching anything:
 "$SCRIPTS_DIR/sulis-change" nuke --handle CH-01HQ8X
 ```
 
-(Use `--slug <slug>` instead of `--handle` when you resolved the change by
-slug — the tool accepts either.)
+(Use `--slug <slug>` or `--change-id <full ULID>` instead of `--handle` when
+you resolved the change another way — the tool accepts any of the three. When a
+handle is shared by more than one change, `nuke` **refuses** and lists the
+candidates — each with its readable name + branch — so you pick the right one
+with `--change-id` rather than risking the wrong change.)
 
 **3. Echo the footprint + the irreversible step, and require an explicit
 yes** (MUC-F3 — never act on vague phrasing like "get rid of this"):
