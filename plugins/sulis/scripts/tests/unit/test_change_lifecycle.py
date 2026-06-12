@@ -20,7 +20,8 @@ if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
 from _change_lifecycle import (  # noqa: E402
-    STAGES, WORKFLOW_ID, author, step_instances, workflow_instance)
+    STAGES, WORKFLOW_ID, author, is_transition_allowed, step_instances,
+    workflow_instance)
 from _entity_adapter_local import LocalFileEntityAdapter  # noqa: E402
 
 _REPO = Path(__file__).resolve().parents[5]
@@ -56,9 +57,11 @@ def test_workflow_is_the_six_stage_journey():
     assert wf["steps"] == ["recon", "specify", "design", "implement", "review", "ship"]
     assert wf["initial_steps"] == ["recon"]
     assert wf["terminal_steps"] == ["ship"]
-    assert wf["transitions"] == [
-        "recon -> specify", "specify -> design", "design -> implement",
-        "implement -> review", "review -> ship"]
+    # The five forward edges are present (the bounded reverse edges added in
+    # B4/#96 are asserted separately in test_workflow_has_bounded_reverse_edges).
+    for fwd in ["recon -> specify", "specify -> design", "design -> implement",
+                "implement -> review", "review -> ship"]:
+        assert fwd in wf["transitions"]
 
 
 def test_workflow_id_is_stable():
@@ -90,6 +93,37 @@ def test_change_rejects_a_malformed_journey():
 
 
 # ─── author() persists them through the real adapter ────────────────────────
+
+
+# ─── bounded spiral-back transitions (#96 / B4) ──────────────────────────────
+
+
+def test_workflow_has_bounded_reverse_edges():
+    t = workflow_instance()["transitions"]
+    assert "recon -> specify" in t                          # forward kept
+    assert "specify -> recon [via spiral-back]" in t        # bounded reverse
+    assert "ship -> review [via spiral-back]" in t
+
+
+def test_transition_forward_and_same_allowed():
+    assert is_transition_allowed("recon", "specify")
+    assert is_transition_allowed("recon", "ship")           # forward, any distance
+    assert is_transition_allowed("design", "design")        # idempotent
+
+
+def test_transition_single_stage_spiral_back_allowed():
+    assert is_transition_allowed("design", "specify")       # one back
+    assert is_transition_allowed("ship", "review")          # one back
+
+
+def test_transition_big_backward_jump_disallowed():
+    assert not is_transition_allowed("ship", "recon")       # 5 stages back
+    assert not is_transition_allowed("implement", "recon")  # >1 back
+
+
+def test_transition_unknown_stage_fails_closed():
+    assert not is_transition_allowed("recon", "frobnicate")
+    assert not is_transition_allowed("nope", "ship")
 
 
 def test_author_persists_workflow_and_steps(tmp_path):
