@@ -92,16 +92,35 @@ from _session_manager.socket_server import SocketServer  # noqa: E402
 #: (the test/CI injection seam, mirroring the socket override).
 DEFAULT_IDLE_EXIT_SECS = 1800.0
 
+#: Default wedge-grace window in seconds (HD-003): in the race-loser branch the
+#: daemon polls this long for the singleton holder's socket to come live. A
+#: holder whose socket comes live *within* this window is mid-boot (reused); a
+#: holder still without a live socket *past* it is wedged (escalated to reclaim).
+#: 10s — deliberately **longer** than the legacy 5s mid-boot poll so a slow-but-
+#: legitimate boot the old code already tolerated is strictly preserved; the
+#: breaker only trips beyond the legitimate window. Overridable via
+#: ``SULIS_DAEMON_WEDGE_GRACE_SECS`` (the test/CI injection seam, mirroring the
+#: idle-exit + socket overrides).
+DEFAULT_WEDGE_GRACE_SECS = 10.0
+
 #: How often the idle-empty watcher samples the manager, in seconds. Small
 #: relative to the window so the daemon exits promptly after it crosses the
 #: threshold, but not so small it busy-spins.
 _IDLE_WATCH_INTERVAL_SECS = 30.0
+
+#: Bounded SIGTERM→SIGKILL wait when reclaiming a wedged holder (HD-003). The
+#: verified holder is given this long to stop cleanly on SIGTERM (it unlinks its
+#: own socket + releases its lock) before the reclaim escalates to SIGKILL.
+#: ``_reclaim_wedged_holder`` floors this at 5.0s internally, matching
+#: ``daemon_client._stop_stale_daemon``'s teardown budget.
+_RECLAIM_TERM_WAIT_SECS = 5.0
 
 #: Env seams (test/CI injection). ``SULIS_DAEMON_PTY_CHILD`` points the pty
 #: provider at the shared fake child (a real subprocess, not a mock — MEA-09) so
 #: the integration suite runs without the real ``claude`` binary; production
 #: leaves it unset and the real interactive adapter is wired.
 _ENV_IDLE_EXIT = "SULIS_DAEMON_IDLE_EXIT_SECS"
+_ENV_WEDGE_GRACE = "SULIS_DAEMON_WEDGE_GRACE_SECS"
 _ENV_PTY_CHILD = "SULIS_DAEMON_PTY_CHILD"
 
 #: The stable singleton lock path (ADR-001), parallel to the stable socket the
@@ -156,6 +175,22 @@ def resolve_idle_exit_secs() -> float:
     except ValueError:
         return DEFAULT_IDLE_EXIT_SECS
     return value if value > 0 else DEFAULT_IDLE_EXIT_SECS
+
+
+def resolve_wedge_grace_secs() -> float:
+    """The wedge grace window in seconds (``SULIS_DAEMON_WEDGE_GRACE_SECS`` or the
+    default). A non-positive or unparseable override falls back to the default —
+    a bad tuning value must degrade to the safe bound, not crash the daemon, and
+    never shrink the window so far it mistakes a slow boot for a wedge. Mirrors
+    :func:`resolve_idle_exit_secs` exactly (HD-003)."""
+    raw = os.environ.get(_ENV_WEDGE_GRACE)
+    if not raw:
+        return DEFAULT_WEDGE_GRACE_SECS
+    try:
+        value = float(raw)
+    except ValueError:
+        return DEFAULT_WEDGE_GRACE_SECS
+    return value if value > 0 else DEFAULT_WEDGE_GRACE_SECS
 
 
 # ── the identity pidfile (HD-001): durable on-disk process identity ──────────
@@ -614,49 +649,35 @@ def _release_singleton_lock(lock_fd: int) -> None:
         pass
 
 
-def main(argv: "list[str] | None" = None) -> int:
-    parser = argparse.ArgumentParser(description="The shared session-manager daemon")
-    parser.add_argument(
-        "--socket",
-        default=daemon_client.resolve_default_socket(),
-        help="stable AF_UNIX socket path to serve on (default: the stable socket)",
-    )
-    parser.add_argument(
-        "--lock",
-        default=resolve_default_lock(),
-        help="singleton flock path (default: the stable lock beside the socket)",
-    )
-    parser.add_argument(
-        "--pidfile",
-        default=resolve_default_pidfile(),
-        help="identity pidfile path (default: the stable pidfile beside the lock)",
-    )
-    args = parser.parse_args(argv)
+def _poll_socket_live(socket_path: str, *, window_secs: float) -> bool:
+    """Poll up to ``window_secs`` for ``socket_path`` to answer a ``status`` ping.
 
-    # 1. Singleton arbitration: take the flock BEFORE binding so only the holder
-    #    reaches SocketServer.start's unlink+bind (closes the race, ADR-001).
-    lock_fd = _acquire_singleton_lock(args.lock)
-    if lock_fd is None:
-        # Lost the race. The winner is (or is becoming) the daemon. If its socket
-        # already answers, this is the normal "another daemon won" path: print
-        # READY and exit 0. Else the winner is mid-boot — briefly poll, then exit
-        # 0 if it comes up (the caller's ensure-daemon also polls) or non-zero if
-        # the lock is held with no live socket (a genuinely wedged daemon).
-        deadline = time.monotonic() + 5.0
-        while time.monotonic() < deadline:
-            if daemon_client.daemon_is_live(args.socket):
-                sys.stdout.write(f"READY {args.socket}\n")
-                sys.stdout.flush()
-                return 0
-            time.sleep(0.05)
-        sys.stderr.write(
-            f"singleton lock held but no live socket at {args.socket} — "
-            "a daemon is mid-boot or wedged; ensure-daemon will retry\n"
-        )
-        return 1
+    The shared "is the singleton holder serving yet?" probe used by the race-
+    loser branch (both the initial mid-boot/wedge grace window AND the brief
+    post-reclaim peer-race poll). Returns ``True`` the instant the socket goes
+    live, ``False`` if the window elapses with it still dark. Extracted at the
+    two-consumer threshold (EP-03) so the poll cadence + liveness check live in
+    one place."""
+    deadline = time.monotonic() + window_secs
+    while time.monotonic() < deadline:
+        if daemon_client.daemon_is_live(socket_path):
+            return True
+        time.sleep(0.05)
+    return False
 
-    # 2. This process is THE daemon. Ensure the socket's parent dir exists 0o700
-    #    (the §2.8.1 gate; the engine chmods the socket itself 0o600 at bind).
+
+def _boot_and_serve(args: argparse.Namespace, lock_fd: int) -> int:
+    """Boot THE daemon: bind the socket, write the identity pidfile, run the idle-
+    empty watcher, print READY, serve until stopped, then tear down cleanly.
+
+    The single composition root for "this process holds the lock and is the
+    daemon" (WPB-07). Reached by **both** the first-acquire path and the post-
+    reclaim re-acquire path in :func:`main`, so the bind→serve→teardown sequence
+    exists exactly once (no duplicated boot code). ``lock_fd`` is the held
+    singleton flock; it is released as part of the clean teardown. Always returns
+    0 (a clean stop)."""
+    # Ensure the socket's parent dir exists 0o700 (the §2.8.1 gate; the engine
+    # chmods the socket itself 0o600 at bind).
     Path(args.socket).resolve().parent.mkdir(parents=True, exist_ok=True, mode=0o700)
 
     stop = threading.Event()
@@ -677,15 +698,15 @@ def main(argv: "list[str] | None" = None) -> int:
     server, manager = _build_server(args.socket)
     server.start()  # only the lock-holder reaches the engine's unlink+bind
 
-    # 2a. Write the identity pidfile now — only once genuinely bound + holding
-    #     the flock, so the on-disk record always names a process that is THE
-    #     daemon (HD-001). Best-effort: a failed write degrades the later reclaim
-    #     to fail-closed, it never crashes the boot.
+    # Write the identity pidfile now — only once genuinely bound + holding the
+    # flock, so the on-disk record always names a process that is THE daemon
+    # (HD-001). Best-effort: a failed write degrades the later reclaim to fail-
+    # closed, it never crashes the boot.
     _write_pidfile(args.pidfile, os.getpid())
 
-    # 3. Idle-empty auto-exit watcher on a background daemon thread. When the
-    #    manager has been empty for the window, it sets the stop Event — the same
-    #    clean teardown SIGTERM drives (one stop path, ADR-001).
+    # Idle-empty auto-exit watcher on a background daemon thread. When the manager
+    # has been empty for the window, it sets the stop Event — the same clean
+    # teardown SIGTERM drives (one stop path, ADR-001).
     watcher = IdleEmptyExitWatcher(
         status_keys=manager.status_keys,
         idle_exit_secs=resolve_idle_exit_secs(),
@@ -702,8 +723,8 @@ def main(argv: "list[str] | None" = None) -> int:
     )
     idle_thread.start()
 
-    # 4. Signal readiness (both views wait for this before connecting). By now the
-    #    socket is bound AND the signal handlers are installed.
+    # Signal readiness (both views wait for this before connecting). By now the
+    # socket is bound AND the signal handlers are installed.
     sys.stdout.write(f"READY {args.socket}\n")
     sys.stdout.flush()
 
@@ -715,6 +736,99 @@ def main(argv: "list[str] | None" = None) -> int:
         _remove_pidfile(args.pidfile)  # the pidfile records a *live* identity only
         _release_singleton_lock(lock_fd)
     return 0
+
+
+def _fail_closed_retry(socket_path: str) -> int:
+    """Emit today's exact race-loser give-up line and return 1. The fail-closed
+    terminus of :func:`_handle_lost_race` — reached when the holder cannot be
+    verified for a reclaim, or when a peer won the reclaim race and never came
+    live. Byte-for-byte the message the pre-HD-003 branch wrote (the #131
+    ``DaemonStartError`` cause-folding reads it), in exactly one place (EP-03)."""
+    sys.stderr.write(
+        f"singleton lock held but no live socket at {socket_path} — "
+        "a daemon is mid-boot or wedged; ensure-daemon will retry\n"
+    )
+    return 1
+
+
+def _handle_lost_race(args: argparse.Namespace) -> int:
+    """The race-loser branch: this process lost the singleton flock. Distinguish a
+    **mid-boot** holder (reuse) from a **wedged** holder (reclaim) and act (HD-003).
+
+    1. Poll up to :func:`resolve_wedge_grace_secs` for the holder's socket to come
+       live. A holder whose socket comes live *within* the window is mid-boot —
+       reuse it: print READY, exit 0 (today's legitimate race-loser path, now
+       generously windowed so a slow boot is never mistaken for a wedge).
+    2. The window elapses with the lock still held and no live socket → the holder
+       is **wedged**. Call the PID-reuse-safe reclaim (WP-002), which verifies the
+       holder is still our daemon before any kill and fails closed otherwise.
+    3. Reclaim succeeded → re-acquire the flock and fall through to the normal
+       boot path (one composition root, :func:`_boot_and_serve`). If a peer won
+       the reclaim race (re-acquire fails), poll briefly for *their* socket and
+       exit 0 if it comes live.
+    4. Reclaim failed (verification fell closed / no pidfile) → today's exact
+       behaviour: the 'mid-boot or wedged; ensure-daemon will retry' stderr line +
+       ``return 1``. Fail closed — a recycled PID is never killed."""
+    # 1. Mid-boot grace window: a holder whose socket comes live in time is reused.
+    if _poll_socket_live(args.socket, window_secs=resolve_wedge_grace_secs()):
+        sys.stdout.write(f"READY {args.socket}\n")
+        sys.stdout.flush()
+        return 0
+
+    # 2. Window elapsed, lock held, no live socket → wedged. Escalate to the
+    #    PID-reuse-safe reclaim (it fails closed if it cannot verify the holder).
+    reclaimed = _reclaim_wedged_holder(
+        args.pidfile, args.socket, term_wait_secs=_RECLAIM_TERM_WAIT_SECS
+    )
+    if not reclaimed:
+        # 4. Verification failed closed (no/torn pidfile, identity mismatch, dead
+        #    probes) → today's exact behaviour. Fail closed; never kill a PID we
+        #    cannot prove is our daemon.
+        return _fail_closed_retry(args.socket)
+
+    # 3. Reclaimed. Re-acquire the now-free flock and boot a fresh daemon via the
+    #    single composition root. If a peer won the reclaim race, re-acquire fails
+    #    — poll briefly for their socket and exit 0 if it comes live.
+    lock_fd = _acquire_singleton_lock(args.lock)
+    if lock_fd is None:
+        if _poll_socket_live(args.socket, window_secs=resolve_wedge_grace_secs()):
+            sys.stdout.write(f"READY {args.socket}\n")
+            sys.stdout.flush()
+            return 0
+        return _fail_closed_retry(args.socket)
+    return _boot_and_serve(args, lock_fd)
+
+
+def main(argv: "list[str] | None" = None) -> int:
+    parser = argparse.ArgumentParser(description="The shared session-manager daemon")
+    parser.add_argument(
+        "--socket",
+        default=daemon_client.resolve_default_socket(),
+        help="stable AF_UNIX socket path to serve on (default: the stable socket)",
+    )
+    parser.add_argument(
+        "--lock",
+        default=resolve_default_lock(),
+        help="singleton flock path (default: the stable lock beside the socket)",
+    )
+    parser.add_argument(
+        "--pidfile",
+        default=resolve_default_pidfile(),
+        help="identity pidfile path (default: the stable pidfile beside the lock)",
+    )
+    args = parser.parse_args(argv)
+
+    # Singleton arbitration: take the flock BEFORE binding so only the holder
+    # reaches SocketServer.start's unlink+bind (closes the race, ADR-001).
+    lock_fd = _acquire_singleton_lock(args.lock)
+    if lock_fd is None:
+        # Lost the race → distinguish a mid-boot holder (reuse) from a wedged one
+        # (reclaim + boot fresh), failing closed when the holder cannot be
+        # verified (HD-003).
+        return _handle_lost_race(args)
+
+    # This process is THE daemon — boot + serve via the single composition root.
+    return _boot_and_serve(args, lock_fd)
 
 
 if __name__ == "__main__":

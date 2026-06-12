@@ -100,6 +100,33 @@ would otherwise open.
 > probe-first, spawn-at-most-once-per-caller, and poll-until-live when another
 > caller's daemon wins the race.
 
+### Mid-boot vs wedged (grace-window self-heal, HD-003)
+
+A process that loses the lock race does **not** give up the instant the socket
+is dark. It polls up to a **grace window** (`SULIS_DAEMON_WEDGE_GRACE_SECS`,
+default `10s` — deliberately longer than the legacy 5s mid-boot poll so a slow-
+but-legitimate boot is never mistaken for a wedge) for the holder's socket to
+come live:
+
+- **Mid-boot holder** — the socket comes live *within* the window: reuse it,
+  print `READY`, exit `0` (the normal race-loser path, just generously
+  windowed). The holder is **never** touched.
+- **Wedged holder** — the window elapses with the lock still held and no live
+  socket: the holder is declared **wedged** and escalated to the PID-reuse-safe
+  reclaim. The reclaim reads the holder's identity pidfile, verifies it is
+  *still our daemon* (cmdline marker **and** start-token match — fail-closed),
+  and only then `SIGTERM`→bounded-wait→`SIGKILL`s it, clears the stale
+  pidfile + socket, re-acquires the flock, and boots a fresh daemon through the
+  same composition root. A recycled PID whose identity cannot be proven is
+  **never** killed — verification failing closed degrades to today's exact
+  behaviour: the *"singleton lock held but no live socket … ensure-daemon will
+  retry"* line and `exit 1`.
+
+This makes a wedged daemon **self-recover** on the spawn that hits it, rather
+than blocking every spawn until the wedged process happens to die. The reclaim
+lives entirely in the daemon-presence layer; the frozen engine is unmodified
+(ADR-001), and the daemon stays stdlib-only / terminal-only (ADR-003).
+
 ## Lifecycle: idle-empty auto-exit
 
 The daemon persists across views and across sessions — it is **not** tied to any
