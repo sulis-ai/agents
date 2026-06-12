@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from _change_lifecycle import WORKFLOW_ID as _LIFECYCLE_WORKFLOW_ID
 from _entity_repository import EntityRepository
 
 
@@ -34,6 +35,7 @@ def compose_change(
     primitive: str,
     started_at: str,
     for_product: str | None = None,
+    journey: str | None = None,
     state: str = "in-flight",
     parent_change: str | None = None,
     relationship: str | None = None,
@@ -60,6 +62,10 @@ def compose_change(
         "started_at": started_at,
         "sys_status": "active",
     }
+    # journey → the change-lifecycle Workflow every change runs (#129 B1). Every
+    # change links to it by default; the session executes it + deposits the
+    # per-stage LifecycleRuns (B2). An explicit value (a custom lifecycle) wins.
+    change["journey"] = journey or _LIFECYCLE_WORKFLOW_ID
     # for_product is an OPTIONAL link — a change can precede or sit outside a
     # product (infra / methodology work, or the change that creates the first
     # product). Omitted when absent, never set to null.
