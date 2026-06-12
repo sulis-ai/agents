@@ -77,6 +77,31 @@ def test_nuke_transitions_entity_to_nuked(tmp_path):
     assert e["state"] == "nuked" and "valid_to" in e
 
 
+def test_nuke_rolls_back_the_produced_set(tmp_path):
+    # #67 3c: nuking a change soft-deletes the entities it produced (audit kept).
+    _make_product(tmp_path)
+    _mod._emit_change_entity(tmp_path, _metadata())
+    # An entity the change produced, stamped via the same brain.
+    from _provenance_stamp import stamping_repo
+    from _entity_adapter_local import LocalFileEntityAdapter
+    repo = stamping_repo(LocalFileEntityAdapter(
+        base_dir=tmp_path / ".brain" / "instances", domain="product-development"),
+        change_id=_ULID)
+    repo.save("scenario", {
+        "id": f"dna:scenario:{_ULID}", "name": "n", "verifies": [f"dna:requirement:{_ULID}"],
+        "exercises": f"dna:design:{_ULID}", "journey": f"dna:workflow:{_ULID}",
+        "state": "draft", "sys_status": "active"})
+
+    _mod._transition_change_entity(tmp_path, _ULID, "nuked")
+
+    scen = json.loads((tmp_path / ".brain" / "instances" / "product-development"
+                       / "scenario" / f"{_ULID}.jsonld").read_text())
+    assert scen["sys_status"] == "deleted"     # rolled back (soft)
+    change = json.loads((tmp_path / ".brain" / "instances" / "product-development"
+                         / "change" / f"{_ULID}.jsonld").read_text())
+    assert change["state"] == "nuked"
+
+
 def test_transition_is_noop_for_a_change_with_no_entity(tmp_path):
     # A change started on an older plugin has no entity → transition no-ops,
     # never raises (non-fatal).

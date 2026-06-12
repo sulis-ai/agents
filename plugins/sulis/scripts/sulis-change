@@ -980,9 +980,10 @@ def _transition_change_entity(repo_root: Path, change_id: str, to_state: str) ->
     try:
         svc = _change_service_for(repo_root)
         if to_state == "shipped":
-            svc.ship(str(change_id))
+            svc.ship(str(change_id))      # commit: the produced entities stay live
         elif to_state == "nuked":
-            svc.nuke(str(change_id))
+            svc.nuke(str(change_id))      # the Change entity → nuked
+            svc.rollback(str(change_id))  # #67 3c: soft-delete the entities it produced
     except Exception:  # noqa: BLE001 — best-effort; never block ship/nuke
         _log(f"Change entity could not be transitioned to {to_state}; continuing")
 

@@ -81,3 +81,36 @@ class ChangeService:
         entity.pop("shipped_at", None)  # never shipped
         self._repo.save(_TYPE, entity)
         return entity
+
+    # ─── transaction set (#67 slice 3c) ─────────────────────────────────────
+
+    def produced(self, change_id: str) -> list:
+        """Entities this change CREATED (produced_by_change == this change) —
+        the change's transaction set. Live + already-deleted both returned;
+        callers filter sys_status if they want only live ones."""
+        ref = _full_id(change_id)
+        return [e for e in self._repo.iter_entities()
+                if e.get("produced_by_change") == ref]
+
+    def evolved(self, change_id: str) -> list:
+        """Entities this change REVISED (pre-existed; not created by it)."""
+        ref = _full_id(change_id)
+        return [e for e in self._repo.iter_entities()
+                if ref in (e.get("evolved_by_change") or [])
+                and e.get("produced_by_change") != ref]
+
+    def rollback(self, change_id: str) -> list:
+        """nuke=rollback: SOFT-delete the entities this change produced —
+        sys_status=deleted, the record kept as audit (the way nuke keeps the
+        branch). Entities the change merely EVOLVED pre-existed, so they are
+        left untouched. Returns the rolled-back entities. Idempotent: an
+        already-deleted entity is re-saved deleted (no error)."""
+        rolled = []
+        for entity in self.produced(change_id):
+            # entity_type from the canonical id (dna:{type}:{ulid}) — reliable,
+            # unlike @type which may be a vocab IRI.
+            etype = str(entity["id"]).split(":")[1]
+            entity["sys_status"] = "deleted"
+            self._repo.save(etype, entity)
+            rolled.append(entity)
+        return rolled
