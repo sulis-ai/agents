@@ -1,3 +1,9 @@
+## v0.159.1 — 2026-06-12
+
+**Patch — release-train batch.**
+
+- Close 4 WP/CI tooling-friction items surfaced by the daemon-wedge change: branch-ci triggers on canonical wp/** branches; executor + architect emit/lint the canonical names + INDEX header; wpx-step12 force-removes worktrees. Plus harden the daemon grace/idle parsers against non-finite (inf) overrides.
+
 ## v0.159.0 — 2026-06-12
 
 **Minor — release-train batch.**
