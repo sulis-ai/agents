@@ -502,6 +502,93 @@ def test_reclaim_escalates_to_sigkill_when_holder_outlives_term_wait(
     assert not socket_path.exists()
 
 
+def test_sigkill_escalation_reverifies_identity_and_skips_on_pid_reuse(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """WP-005 — close the verify→SIGKILL TOCTOU wrong-kill window (ADVISORY-2).
+
+    The holder passes the **initial** verify and is sent SIGTERM, then outlives
+    the bounded wait — but in that wait its PID is **recycled** onto an unrelated
+    process (the verified daemon died under SIGTERM and the OS reused its PID).
+    ``_is_our_daemon`` flips: True for the first (gate) call, False for the
+    second (the new pre-SIGKILL re-verify). The reclaim MUST NOT escalate to
+    SIGKILL — sending it would land on the wrong process, the exact wrong kill
+    this change exists to prevent. ``_pid_alive`` is held True so the wait runs
+    to its deadline (otherwise the loop would ``break`` before the escalation and
+    never reach the guard); the monotonic clock is advanced so the test does not
+    sleep out the 5s floor.
+
+    Asserts: ``os.kill(pid, SIGKILL)`` is **never** called; SIGTERM may have been
+    sent (the holder *was* our daemon when we gated the SIGTERM); the stale
+    pidfile + socket are still cleared and the reclaim returns True (the holder
+    is gone — a recycled PID means the original process died, so this is a
+    completed reclaim, fail-closed identically to a holder that died during the
+    wait).
+    """
+    import signal as _signal
+
+    pidfile = tmp_path / "session-manager.pid"
+    socket_path = tmp_path / "session-manager.sock"
+    socket_path.write_text("")
+    pidfile.write_text(
+        json.dumps(
+            {
+                "pid": 4242,
+                "start_token": "Tue Jun 10 11:22:33 2026",
+                "cmdline_marker": "session_manager_daemon.py",
+            }
+        )
+    )
+
+    # Identity is provable on the FIRST call (the SIGTERM gate) and NOT on the
+    # SECOND (the pre-SIGKILL re-verify) — the PID was recycled mid-wait.
+    verify_calls = {"n": 0}
+
+    def _flipping_is_our_daemon(*_a, **_k) -> bool:
+        verify_calls["n"] += 1
+        return verify_calls["n"] == 1
+
+    monkeypatch.setattr(
+        session_manager_daemon, "_is_our_daemon", _flipping_is_our_daemon
+    )
+    # The PID stays "alive" throughout the wait (signal-0 liveness can't tell the
+    # recycled process from the original) → the loop runs to its deadline and
+    # reaches the escalation branch where the new guard lives.
+    monkeypatch.setattr(session_manager_daemon, "_pid_alive", lambda _pid: True)
+
+    sent: list[tuple] = []
+    monkeypatch.setattr(
+        session_manager_daemon.os,
+        "kill",
+        lambda pid, sig: sent.append((pid, sig)),
+    )
+
+    ticks = iter([0.0, 0.0, 100.0, 100.0, 100.0])
+    monkeypatch.setattr(session_manager_daemon.time, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(session_manager_daemon.time, "sleep", lambda _s: None)
+
+    result = session_manager_daemon._reclaim_wedged_holder(
+        str(pidfile),
+        str(socket_path),
+        term_wait_secs=0.5,
+    )
+
+    assert (4242, int(_signal.SIGKILL)) not in sent, (
+        f"SIGKILL was sent {sent!r} after the PID was recycled mid-wait — the "
+        "load-bearing 'never kill the wrong PID' invariant is violated; the "
+        "pre-SIGKILL re-verify guard must skip the kill on identity mismatch"
+    )
+    assert verify_calls["n"] >= 2, (
+        "the SIGKILL escalation must re-verify identity (a second _is_our_daemon "
+        f"call) before killing; saw only {verify_calls['n']} verify call(s)"
+    )
+    # The holder is gone (its PID was recycled → the original died); the reclaim
+    # completes fail-closed: stale files cleared, returns True.
+    assert result is True
+    assert not pidfile.exists(), "stale pidfile not cleared after skipped SIGKILL"
+    assert not socket_path.exists(), "stale socket not cleared after skipped SIGKILL"
+
+
 def test_reclaim_breaks_wait_when_holder_dies_within_term_wait(
     tmp_path: Path, monkeypatch
 ) -> None:
