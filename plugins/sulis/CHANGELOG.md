@@ -1,3 +1,9 @@
+## v0.154.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- Tool-level guard against cross-change worktree removal (#130, SAFETY). within_change_scope refuses any removal path outside the named change dir (cross-change/out-of-scope/path-traversal/symlink-escape/cwd/missing-change-id all blocked, fail-closed). Wired into git_worktree_remove (the primitive) + wpx-worktree remove (the per-WP tool, now --change-id-scoped). The prior prose warning (#211) failed twice — this makes the destructive glob-sweep structurally impossible on the sanctioned path. Hypothesis property pins the safety invariant: no out-of-scope path is ever allowed.
+
 ## v0.153.0 — 2026-06-12
 
 **Minor — release-train batch.**
