@@ -1,3 +1,9 @@
+## v0.159.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- Self-heal a wedged session daemon: detect a wedged (vs mid-boot) singleton-lock holder, PID-reuse-safely verify and kill it, reclaim the lock and boot fresh — so a wedged daemon no longer blocks every change spawn.
+
 ## v0.158.0 — 2026-06-12
 
 **Minor — release-train batch.**
