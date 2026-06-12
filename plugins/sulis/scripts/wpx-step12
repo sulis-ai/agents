@@ -196,7 +196,10 @@ def cmd_wrap(args: argparse.Namespace) -> None:
             "message": seam_close["reason"],
         }
 
-    # Step 12.3 — remove worktree (tolerate-missing for idempotency)
+    # Step 12.3 — remove worktree (tolerate-missing for idempotency; force so
+    # executor-left untracked sidecars — journal/code-review bundles under the
+    # worktree — don't strand the wrap at step-7-held: the WP is already merged,
+    # so those artifacts are disposable and must not block teardown. #337)
     if args.worktree_path:
         result_3 = _call_tool("wpx-worktree", [
             "remove",
@@ -205,6 +208,7 @@ def cmd_wrap(args: argparse.Namespace) -> None:
             "--repo-root", str(paths.repo_root),
             "--worktree-path", args.worktree_path,
             "--tolerate-missing",
+            "--force",
         ])
         summary["steps"]["worktree_remove"] = result_3.get("data", {})
     else:
