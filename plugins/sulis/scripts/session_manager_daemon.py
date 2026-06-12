@@ -50,8 +50,10 @@ stale-socket unlink so only the lock-holder binds — no engine edit needed
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import signal
+import subprocess
 import sys
 import threading
 import time
@@ -107,6 +109,19 @@ _ENV_PTY_CHILD = "SULIS_DAEMON_PTY_CHILD"
 #: an isolated lock + socket pair.
 _LOCK_FILENAME = "session-manager.lock"
 
+#: The stable identity-pidfile path (HD-001), beside the lock + socket. The
+#: daemon writes its PID + process-start-token + cmdline marker here once it
+#: holds the flock, so a later reclaim (WP-002) can verify a kill target PID-
+#: reuse-safely. Overridable via ``--pidfile`` to mirror the ``--lock`` /
+#: ``--socket`` test-isolation seams.
+_PIDFILE_FILENAME = "session-manager.pid"
+
+#: The cmdline marker recorded in the pidfile — the constant the daemon entry
+#: point is named by. WP-002 matches this against a live process's command line
+#: (one half of the PID-reuse-safe identity check; the other half is the
+#: start-token).
+_CMDLINE_MARKER = "session_manager_daemon.py"
+
 
 def resolve_default_lock() -> str:
     """The stable singleton-lock path: ``~/.sulis/session-manager.lock``.
@@ -116,6 +131,17 @@ def resolve_default_lock() -> str:
     absolute path.
     """
     return str(Path.home() / ".sulis" / _LOCK_FILENAME)
+
+
+def resolve_default_pidfile() -> str:
+    """The stable identity-pidfile path: ``~/.sulis/session-manager.pid``.
+
+    Lives beside the lock + stable socket; the daemon writes its durable
+    identity (PID + process-start-token + cmdline marker) here once it holds the
+    flock, so a later reclaim can verify a kill target PID-reuse-safely (HD-001).
+    Mirrors :func:`resolve_default_lock`. Always an absolute path.
+    """
+    return str(Path.home() / ".sulis" / _PIDFILE_FILENAME)
 
 
 def resolve_idle_exit_secs() -> float:
@@ -130,6 +156,92 @@ def resolve_idle_exit_secs() -> float:
     except ValueError:
         return DEFAULT_IDLE_EXIT_SECS
     return value if value > 0 else DEFAULT_IDLE_EXIT_SECS
+
+
+# ── the identity pidfile (HD-001): durable on-disk process identity ──────────
+
+
+def _process_start_token(pid: int) -> str | None:
+    """The OS process start-time for ``pid``, the start-token that pins this
+    exact process.
+
+    Read via ``ps -o lstart= -p <pid>`` — portable across the daemon's two
+    targets (macOS + Linux), unlike Linux-only ``/proc``. A recycled PID cannot
+    reproduce this value, so it is the safety anchor for a later PID-reuse-safe
+    reclaim (WP-002). Best-effort: returns the trimmed start-time string, or
+    ``None`` if ``ps`` is unreadable / the PID is gone — never raises.
+    """
+    try:
+        completed = subprocess.run(
+            ["ps", "-o", "lstart=", "-p", str(pid)],
+            capture_output=True,
+            text=True,
+            timeout=5.0,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if completed.returncode != 0:
+        return None
+    token = completed.stdout.strip()
+    return token or None
+
+
+def _write_pidfile(pidfile_path: str, pid: int) -> None:
+    """Atomically write the daemon's identity record to ``pidfile_path``.
+
+    The record is ``{"pid", "start_token", "cmdline_marker"}`` —
+    ``start_token`` is :func:`_process_start_token` for ``pid``,
+    ``cmdline_marker`` the daemon entrypoint constant. Written via a tmp file +
+    :func:`os.replace` so a reader never sees a half-written record. The tmp is
+    opened ``0o600`` with ``O_EXCL | O_NOFOLLOW`` — matching the singleton lock's
+    ``0o600`` (this file feeds a later kill decision, so it is never more
+    permissively scoped than the lock beside it, and the open never follows a
+    pre-planted symlink). Best-effort: a failed write is caught + logged to
+    stderr; the daemon still boots (a missing pidfile degrades reclaim to today's
+    fail-closed exit-1, it never crashes the boot). Mirrors the env-seam / best-
+    effort voice of the lock helpers.
+    """
+    record = {
+        "pid": pid,
+        "start_token": _process_start_token(pid),
+        "cmdline_marker": _CMDLINE_MARKER,
+    }
+    tmp_path = f"{pidfile_path}.{pid}.tmp"
+    try:
+        # 0o600 + O_EXCL|O_NOFOLLOW: confidentiality/integrity parity with the
+        # lock (``_acquire_singleton_lock``), and a refusal to follow / clobber a
+        # pre-existing symlink or file at the predictable tmp path.
+        fd = os.open(
+            tmp_path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+            0o600,
+        )
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(record, fh)
+        os.replace(tmp_path, pidfile_path)
+    except OSError as exc:
+        # Best-effort: never crash the boot on identity-record I/O. Clean up the
+        # tmp file if it was left behind by a mid-write failure.
+        try:
+            os.unlink(tmp_path)
+        except OSError:  # pragma: no cover - best-effort cleanup
+            pass
+        sys.stderr.write(
+            f"could not write identity pidfile at {pidfile_path}: {exc} — "
+            "continuing without a durable identity record\n"
+        )
+
+
+def _remove_pidfile(pidfile_path: str) -> None:
+    """Best-effort removal of the identity pidfile (the daemon records a *live*
+    identity only). Catches ``OSError`` (which covers the already-gone
+    ``FileNotFoundError`` case) so a clean shutdown never crashes on teardown
+    I/O. Mirrors :func:`_release_singleton_lock`'s idempotent best-effort shape.
+    """
+    try:
+        os.unlink(pidfile_path)
+    except OSError:  # pragma: no cover - best-effort (already gone / unreadable)
+        pass
 
 
 # ── the idle-empty auto-exit watcher (the daemon's lifecycle policy) ──────────
@@ -297,6 +409,11 @@ def main(argv: "list[str] | None" = None) -> int:
         default=resolve_default_lock(),
         help="singleton flock path (default: the stable lock beside the socket)",
     )
+    parser.add_argument(
+        "--pidfile",
+        default=resolve_default_pidfile(),
+        help="identity pidfile path (default: the stable pidfile beside the lock)",
+    )
     args = parser.parse_args(argv)
 
     # 1. Singleton arbitration: take the flock BEFORE binding so only the holder
@@ -343,6 +460,12 @@ def main(argv: "list[str] | None" = None) -> int:
     server, manager = _build_server(args.socket)
     server.start()  # only the lock-holder reaches the engine's unlink+bind
 
+    # 2a. Write the identity pidfile now — only once genuinely bound + holding
+    #     the flock, so the on-disk record always names a process that is THE
+    #     daemon (HD-001). Best-effort: a failed write degrades the later reclaim
+    #     to fail-closed, it never crashes the boot.
+    _write_pidfile(args.pidfile, os.getpid())
+
     # 3. Idle-empty auto-exit watcher on a background daemon thread. When the
     #    manager has been empty for the window, it sets the stop Event — the same
     #    clean teardown SIGTERM drives (one stop path, ADR-001).
@@ -372,6 +495,7 @@ def main(argv: "list[str] | None" = None) -> int:
     finally:
         server.stop()  # shuts the server down + unlinks the socket
         manager.shutdown()  # stops engine maintenance + closes every session
+        _remove_pidfile(args.pidfile)  # the pidfile records a *live* identity only
         _release_singleton_lock(lock_fd)
     return 0
 
