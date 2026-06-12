@@ -1,7 +1,0 @@
-change_id: 01KB3Q1KDNSZSJH15SQQS75BG2
-primitive: create
-tier: minor
-touches_plugin: true
-summary: |
-  Change is now a first-class brain entity (prov:Activity, sibling to LifecycleRun). Adds the compiled change.schema.json, the _change_emission helper + sulis-emit-change CLI (backfill), and wires sulis-change start to emit a Change node into the brain (best-effort, non-fatal). Mint admitted (DR-031). Provenance edges + transaction commit/rollback ride on #67.
-created_at: 2026-06-12T12:59:29Z

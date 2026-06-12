@@ -1,3 +1,9 @@
+## v0.146.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- Change is now a first-class brain entity (prov:Activity, sibling to LifecycleRun). Adds the compiled change.schema.json, the _change_emission helper + sulis-emit-change CLI (backfill), and wires sulis-change start to emit a Change node into the brain (best-effort, non-fatal). Mint admitted (DR-031). Provenance edges + transaction commit/rollback ride on #67.
+
 ## v0.145.0 — 2026-06-12
 
 **Minor — release-train batch.**
