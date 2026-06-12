@@ -82,9 +82,18 @@ def _try_adapter(repo_root: Path, domain: str) -> Any:
         return None
     try:
         base_dir = _brain_base_dir(repo_root)
-        return LocalFileEntityAdapter(base_dir=base_dir, domain=domain)
+        adapter = LocalFileEntityAdapter(base_dir=base_dir, domain=domain)
     except Exception:
         return None
+    # #67 slice 3b — when a change is active (SULIS_CHANGE_ID), wrap the adapter
+    # so every entity this emits is stamped with the change that produced/revised
+    # it. No active change → the plain adapter, unchanged. Best-effort: a
+    # stamping-import failure degrades to the unwrapped adapter (emission works).
+    try:
+        from _provenance_stamp import stamping_repo
+        return stamping_repo(adapter)
+    except Exception:
+        return adapter
 
 
 def _safely(fn, *args, **kwargs) -> dict | None:
