@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""sulis-version-skew — nudge a session that's running a STALE plugin (#125).
+
+The failure this catches
+------------------------
+A session loads the Sulis plugin at version X and keeps running. A newer
+version Y then lands in the cache (a `claude plugin update`, or another
+session pulled it). The long-running session goes on silently serving X — so
+freshly-shipped fixes are NOT active in it. That is exactly why the CH-Y09VFN
+cross-session carry didn't fire: the session ran a pre-#123 plugin, the carry
+code simply wasn't loaded. The fix is built and correct; it just never ran.
+
+This tool compares the LOADED version (the version of the plugin THIS script
+belongs to — and the hook invokes it via ``${CLAUDE_PLUGIN_ROOT}``, so "this
+script's version" IS "the session's loaded version") against the NEWEST version
+present in the cache, and — when behind — emits a SessionStart nudge telling
+the agent to surface a "reload" prompt to the founder in plain English.
+
+Honest boundary (do NOT over-claim)
+-----------------------------------
+A ``SessionStart`` hook fires only at session boundaries — startup, resume,
+clear, compact (verified against the Claude Code hooks docs). It does NOT fire
+inside an already-running session, so a session that was open BEFORE the newer
+version landed won't be nudged until its next boundary (resume/clear/compact).
+This tool catches every fresh / resumed / spawned session — the broad net and
+the cross-session-spawn case — not the mid-flight in-place update. That residual
+gap is documented, not hidden.
+
+Non-fatal by construction (mirrors the prepare-commit-msg hook): in ``--hook``
+mode ANY error → exit 0 with no output, so a version check can never break a
+session start. Human mode is scriptable: exit 0 current · 1 behind · 2 can't
+determine.
+
+Usage:
+  sulis-version-skew            # human: print status, exit per skew
+  sulis-version-skew --hook     # SessionStart: emit nudge JSON iff behind, always exit 0
+  sulis-version-skew --cache-root P   # compare against an alternate cache root (testing)
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _prune_cache import _SULIS_SUBPATH, default_cache_root  # noqa: E402
+from _plugin_version import plugin_version  # noqa: E402
+from _version_pick import version_skew  # noqa: E402
+
+
+def cached_versions(cache_root: Path) -> list[str]:
+    """The directory names under the cached sulis plugin dir (version + junk).
+
+    Returns ``[]`` if the cache (or the sulis subdir) is absent — a fresh
+    machine or a non-cache (dev) layout. ``version_skew`` treats an empty /
+    all-junk set as undeterminable, so this never nudges spuriously.
+    """
+    sulis_dir = cache_root.joinpath(*_SULIS_SUBPATH)
+    if not sulis_dir.is_dir():
+        return []
+    return [p.name for p in sulis_dir.iterdir() if p.is_dir()]
+
+
+def compute(cache_root: Path, start: str | None = None) -> dict:
+    """Gather the loaded + cached versions and return the ``version_skew`` dict.
+
+    ``start`` overrides where the loaded version is read from (defaults to this
+    script's location → its own plugin.json → the session's loaded version).
+    """
+    loaded = plugin_version(start)
+    return version_skew(loaded, cached_versions(cache_root))
+
+
+_NUDGE = (
+    "Sulis version-skew: this session loaded plugin v{loaded}, but v{newest} is "
+    "installed in the cache — so this session is running STALE code and recently "
+    "shipped fixes are NOT active in it. Before relying on any recent change "
+    "(and especially before creating or spawning a new change, where the loaded "
+    "version is the one that runs), tell the founder in plain English that their "
+    "loaded Sulis is behind v{newest} and to reload the plugin (or restart this "
+    "session) to pick up the latest. Keep it to one short sentence."
+)
+
+
+def hook_output(skew: dict) -> str:
+    """The SessionStart stdout JSON, or ``""`` to inject nothing.
+
+    Emits an ``additionalContext`` nudge only when the comparison is
+    determinable AND the session is behind. Current / ahead / undeterminable →
+    empty string → the hook injects nothing (stays silent).
+    """
+    if not (skew.get("determinable") and skew.get("behind")):
+        return ""
+    return json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "SessionStart",
+            "additionalContext": _NUDGE.format(
+                loaded=skew["loaded"], newest=skew["newest"]),
+        }
+    })
+
+
+def human_line(skew: dict) -> str:
+    if not skew.get("determinable"):
+        return ("version-skew: can't determine (loaded={loaded}, cached newest={newest}) "
+                "— dev layout or empty cache; no nudge.").format(**skew)
+    if skew["behind"]:
+        return ("version-skew: BEHIND — loaded v{loaded}, newest cached v{newest}. "
+                "Reload the plugin / restart the session.").format(**skew)
+    return "version-skew: current — loaded v{loaded} is the newest cached.".format(**skew)
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description="Nudge a session running a stale Sulis plugin.")
+    ap.add_argument("--hook", action="store_true",
+                    help="SessionStart mode: emit nudge JSON iff behind; always exit 0.")
+    ap.add_argument("--cache-root", type=Path, default=None,
+                    help="Alternate plugin-cache root (default: ~/.claude/plugins/cache).")
+    args = ap.parse_args(argv)
+    cache_root = args.cache_root or default_cache_root()
+
+    if args.hook:
+        # Strictly non-fatal: a version check must never break a session start.
+        try:
+            out = hook_output(compute(cache_root))
+            if out:
+                print(out)
+        except Exception:  # noqa: BLE001 — any failure degrades to a silent no-op
+            pass
+        return 0
+
+    skew = compute(cache_root)
+    print(human_line(skew))
+    if not skew.get("determinable"):
+        return 2
+    return 1 if skew["behind"] else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
