@@ -940,11 +940,12 @@ def _change_service_for(repo_root: Path):
     global-store direction). Raises only on a genuine import/IO failure; the
     callers wrap it best-effort so entity handling never blocks the command.
     """
+    from _brain_location import brain_base_dir
     from _change_service import ChangeService
     from _entity_adapter_local import LocalFileEntityAdapter
 
     return ChangeService(LocalFileEntityAdapter(
-        base_dir=repo_root / ".brain" / "instances",
+        base_dir=brain_base_dir(repo_root),       # #127: user-configurable location
         domain="product-development",
     ))
 

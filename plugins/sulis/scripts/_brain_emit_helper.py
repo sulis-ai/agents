@@ -56,14 +56,14 @@ def _brain_emit_enabled() -> bool:
 
 
 def _brain_base_dir(repo_root: Path) -> Path:
-    """Resolve the brain instances directory.
-
-    `SULIS_BRAIN_BASE_DIR` overrides; otherwise `<repo_root>/.brain/instances`.
-    """
-    explicit = os.environ.get("SULIS_BRAIN_BASE_DIR", "").strip()
-    if explicit:
-        return Path(explicit).resolve()
-    return Path(repo_root) / ".brain" / "instances"
+    """Resolve the brain instances directory via the shared resolver (#127):
+    SULIS_BRAIN_BASE_DIR > repo-contract `brain_location` > `<repo>/.brain/instances`.
+    Best-effort: any import failure degrades to the default (emission never breaks)."""
+    try:
+        from _brain_location import brain_base_dir
+        return brain_base_dir(repo_root)
+    except Exception:
+        return Path(repo_root) / ".brain" / "instances"
 
 
 def _try_adapter(repo_root: Path, domain: str) -> Any:

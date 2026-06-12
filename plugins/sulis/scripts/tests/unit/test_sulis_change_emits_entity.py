@@ -111,6 +111,23 @@ def test_transition_is_noop_for_a_change_with_no_entity(tmp_path):
     assert not change_dir.exists() or not list(change_dir.glob("*.jsonld"))
 
 
+def test_emit_honors_configured_brain_location(tmp_path, monkeypatch):
+    # #127: the change-entity wiring writes to the USER-CONFIGURED location, not
+    # the hard-coded <repo>/.brain — both the write AND product-resolution route
+    # through the shared resolver.
+    brain = tmp_path / "elsewhere" / "instances"
+    monkeypatch.setenv("SULIS_BRAIN_BASE_DIR", str(brain))
+    pd = brain / "product-development" / "product"
+    pd.mkdir(parents=True)
+    (pd / f"{_ULID}.jsonld").write_text(json.dumps(
+        {"id": _PRODUCT, "name": "P", "state": "active", "sys_status": "active"}))
+
+    _mod._emit_change_entity(tmp_path, _metadata())
+
+    assert (brain / "product-development" / "change" / f"{_ULID}.jsonld").exists()
+    assert not (tmp_path / ".brain").exists()   # nothing in the default location
+
+
 def test_emit_writes_product_less_change_when_no_product(tmp_path):
     # for_product is optional — with no product to resolve, start still emits a
     # Change entity (without the product link), so product-less changes are in
