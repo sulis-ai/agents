@@ -1,3 +1,9 @@
+## v0.153.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- User-configurable brain location (#127): one brain_base_dir resolver honoured by every call site — explicit > SULIS_BRAIN_BASE_DIR env > repo-contract brain_location field > default <repo>/.brain/instances (unchanged, non-disruptive). Closes the gap where emitters honoured the env but the change-entity wiring hard-coded <repo>/.brain. The brain is the user data; they set where it lives (a dir or their own repo). Server-side stays deferred (the spiral call).
+
 ## v0.152.0 — 2026-06-12
 
 **Minor — release-train batch.**
