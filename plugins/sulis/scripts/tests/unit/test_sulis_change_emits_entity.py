@@ -58,6 +58,34 @@ def test_start_emits_change_entity_when_a_product_exists(tmp_path):
     assert e["for_product"] == _PRODUCT
 
 
+def test_mark_shipped_transitions_entity_to_shipped(tmp_path):
+    # start opens in-flight; mark-shipped ships it (slice 2 lifecycle wiring).
+    _make_product(tmp_path)
+    _mod._emit_change_entity(tmp_path, _metadata())
+    _mod._transition_change_entity(tmp_path, _ULID, "shipped")
+    e = json.loads((tmp_path / ".brain" / "instances" / "product-development"
+                    / "change" / f"{_ULID}.jsonld").read_text())
+    assert e["state"] == "shipped" and "shipped_at" in e
+
+
+def test_nuke_transitions_entity_to_nuked(tmp_path):
+    _make_product(tmp_path)
+    _mod._emit_change_entity(tmp_path, _metadata())
+    _mod._transition_change_entity(tmp_path, _ULID, "nuked")
+    e = json.loads((tmp_path / ".brain" / "instances" / "product-development"
+                    / "change" / f"{_ULID}.jsonld").read_text())
+    assert e["state"] == "nuked" and "valid_to" in e
+
+
+def test_transition_is_noop_for_a_change_with_no_entity(tmp_path):
+    # A change started on an older plugin has no entity → transition no-ops,
+    # never raises (non-fatal).
+    _make_product(tmp_path)
+    _mod._transition_change_entity(tmp_path, _ULID, "shipped")  # nothing emitted first
+    change_dir = tmp_path / ".brain" / "instances" / "product-development" / "change"
+    assert not change_dir.exists() or not list(change_dir.glob("*.jsonld"))
+
+
 def test_emit_writes_product_less_change_when_no_product(tmp_path):
     # for_product is optional — with no product to resolve, start still emits a
     # Change entity (without the product link), so product-less changes are in
