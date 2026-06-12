@@ -932,32 +932,59 @@ def _resolve_parent_carry(relationship):
     return (parent_id, section, rel)
 
 
+def _change_service_for(repo_root: Path):
+    """A ChangeService bound to the MAIN repo's brain (#128 slice 2).
+
+    The single handler the lifecycle commands route through — start→open,
+    mark-shipped→ship, nuke→nuke. Writes off the change branch (the #127
+    global-store direction). Raises only on a genuine import/IO failure; the
+    callers wrap it best-effort so entity handling never blocks the command.
+    """
+    from _change_service import ChangeService
+    from _entity_adapter_local import LocalFileEntityAdapter
+
+    return ChangeService(LocalFileEntityAdapter(
+        base_dir=repo_root / ".brain" / "instances",
+        domain="product-development",
+    ))
+
+
 def _emit_change_entity(repo_root: Path, metadata: dict) -> None:
-    """Best-effort: emit the change as a first-class brain entity (#128, DR-031).
+    """Best-effort: open the change as a first-class brain entity (#128, DR-031).
 
     A change becomes a NODE in the brain (a prov:Activity, sibling to
-    LifecycleRun), not just a manifest beside it. Writes to the MAIN repo's
-    ``.brain/`` — off the change branch, the global-store direction (#127) —
-    resolving the product from the repo's brain. No single product → no-op
-    (never an invalid entity, since ``for_product`` is required). NON-FATAL by
-    construction: any failure (incl. an import error) is logged and swallowed —
-    entity emission must never block change creation. The transaction lifecycle
-    (ship=commit / nuke=rollback + the provenance edges) is #67.
+    LifecycleRun), not just a manifest beside it — routed through ChangeService
+    (slice 2). ``for_product`` is an OPTIONAL link: set when a single product
+    resolves, omitted otherwise (product-less changes still land in the brain).
+    NON-FATAL by construction: any failure (incl. an import error) is logged and
+    swallowed — entity handling must never block change creation.
     """
     try:
-        from _change_emission import emit_change, resolve_for_product
-        from _entity_adapter_local import LocalFileEntityAdapter
+        from _change_emission import resolve_for_product
 
-        adapter = LocalFileEntityAdapter(
-            base_dir=repo_root / ".brain" / "instances",
-            domain="product-development",
-        )
-        # for_product is an OPTIONAL link — set when a single product resolves,
-        # omitted otherwise (product-less changes still land in the brain).
-        emit_change({**metadata, "state": "in-flight"}, adapter,
-                    for_product=resolve_for_product(repo_root))
-    except Exception:  # noqa: BLE001 — best-effort; entity emission never blocks start
-        _log("Change entity could not be emitted; continuing without it")
+        _change_service_for(repo_root).open(
+            metadata, for_product=resolve_for_product(repo_root))
+    except Exception:  # noqa: BLE001 — best-effort; entity handling never blocks start
+        _log("Change entity could not be opened; continuing without it")
+
+
+def _transition_change_entity(repo_root: Path, change_id: str, to_state: str) -> None:
+    """Best-effort: transition the Change entity on ship/nuke (#128 slice 2).
+
+    ``mark-shipped`` → ship (state=shipped, the commit point); ``nuke`` → nuke
+    (state=nuked + valid_to, the rollback point). A change with no emitted
+    entity (started on an older plugin) → the transition finds nothing and
+    no-ops. NON-FATAL: any failure is logged and swallowed — the entity state is
+    an audit record, never a gate on the git-side command.
+    """
+    try:
+        svc = _change_service_for(repo_root)
+        if to_state == "shipped":
+            svc.ship(str(change_id))
+        elif to_state == "nuked":
+            svc.nuke(str(change_id))
+    except Exception:  # noqa: BLE001 — best-effort; never block ship/nuke
+        _log(f"Change entity could not be transitioned to {to_state}; continuing")
 
 
 def cmd_start(args: argparse.Namespace) -> None:
@@ -2149,6 +2176,13 @@ def cmd_nuke(args: argparse.Namespace) -> None:
         removed["manifest"] = False
         removed["manifest_detail"] = "manifest already absent"
 
+    # #128 slice 2 — transition the Change ENTITY to nuked (the transaction
+    # rollback point). The entity lives in the MAIN repo's brain, so it SURVIVES
+    # the branch/worktree teardown above — leaving a nuked-state audit record.
+    # Best-effort; a change with no emitted entity simply no-ops.
+    if change_id:
+        _transition_change_entity(repo_root, str(change_id), "nuked")
+
     _log(f"Change nuked: {branch} ({change_id or 'no-id'})")
     nuke_warnings = []
     if state_dir is None:
@@ -2508,6 +2542,10 @@ def cmd_mark_shipped(args: argparse.Namespace) -> None:
         )
     except Exception:
         pass
+
+    # #128 slice 2 — transition the Change ENTITY to shipped (the transaction
+    # commit point). Best-effort; the git-side ship already succeeded above.
+    _transition_change_entity(repo_root, str(change_id), "shipped")
 
     emit_ok(data={
         "change_id": change_id,
