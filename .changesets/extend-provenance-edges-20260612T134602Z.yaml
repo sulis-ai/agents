@@ -1,7 +1,0 @@
-change_id: 01K8PJF4YDZG9AB0V6MD92DHCH
-primitive: extend
-tier: minor
-touches_plugin: true
-summary: |
-  Provenance edges on every product-development entity (#67 slice 3a): produced_by_change (prov:wasGeneratedBy) + evolved_by_change (prov:wasRevisionOf), both optional + additive. The reverse side of Change — what a change produced/revised becomes queryable (the transaction set for ship=commit / nuke=rollback). Uniform across all 18 PD entities; Change itself excluded (its lineage is parent_change). Pre-existing instances stay valid.
-created_at: 2026-06-12T13:46:02Z

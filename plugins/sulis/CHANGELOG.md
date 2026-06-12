@@ -1,3 +1,9 @@
+## v0.149.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- Provenance edges on every product-development entity (#67 slice 3a): produced_by_change (prov:wasGeneratedBy) + evolved_by_change (prov:wasRevisionOf), both optional + additive. The reverse side of Change — what a change produced/revised becomes queryable (the transaction set for ship=commit / nuke=rollback). Uniform across all 18 PD entities; Change itself excluded (its lineage is parent_change). Pre-existing instances stay valid.
+
 ## v0.148.1 — 2026-06-12
 
 **Patch — release-train batch.**
