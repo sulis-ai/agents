@@ -1,0 +1,7 @@
+change_id: 01KTYV40PPWBXZPKCBG4ZM021Z
+primitive: fix
+tier: patch
+touches_plugin: true
+summary: |
+  Close 4 WP/CI tooling-friction items surfaced by the daemon-wedge change: branch-ci triggers on canonical wp/** branches; executor + architect emit/lint the canonical names + INDEX header; wpx-step12 force-removes worktrees. Plus harden the daemon grace/idle parsers against non-finite (inf) overrides.
+created_at: 2026-06-12T21:30:21Z
