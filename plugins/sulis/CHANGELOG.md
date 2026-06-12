@@ -1,3 +1,9 @@
+## v0.145.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- Version-skew nudge: a SessionStart hook detects when a session loaded a Sulis plugin version older than the newest in the cache (stale code) and prompts a reload. New sulis-version-skew detector (pure version_skew() in _version_pick + CLI). Catches every fresh/resumed/spawned session; documents the honest limit that an already-running session is only caught at its next boundary (#125).
+
 ## v0.144.0 — 2026-06-12
 
 **Minor — release-train batch.**
