@@ -58,11 +58,16 @@ def test_start_emits_change_entity_when_a_product_exists(tmp_path):
     assert e["for_product"] == _PRODUCT
 
 
-def test_emit_is_noop_without_a_product(tmp_path):
-    # No product → resolve returns None → no file, no exception (non-fatal).
+def test_emit_writes_product_less_change_when_no_product(tmp_path):
+    # for_product is optional — with no product to resolve, start still emits a
+    # Change entity (without the product link), so product-less changes are in
+    # the brain too.
     _mod._emit_change_entity(tmp_path, _metadata())
-    change_dir = tmp_path / ".brain" / "instances" / "product-development" / "change"
-    assert not change_dir.exists() or not list(change_dir.glob("*.jsonld"))
+    out = (tmp_path / ".brain" / "instances" / "product-development" / "change"
+           / f"{_ULID}.jsonld")
+    assert out.exists()
+    e = json.loads(out.read_text())
+    assert "for_product" not in e and e["state"] == "in-flight"
 
 
 def test_emit_never_raises_on_bad_metadata(tmp_path):

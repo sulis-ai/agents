@@ -58,7 +58,7 @@ optional run-grouping fields where they apply), per the brief's directive.
 | `intent` | string | ✅ | one-line statement of the work. |
 | `primitive` | enum (22 values — see §2) | ✅ | the change vocabulary (create/feat/fix/refactor/harden/decompose/delete/replace/extend/…). Closed controlled vocabulary; the L2-convention part baked in as an enum, NOT a separate entity. |
 | `state` | enum `in-flight\|shipped\|nuked` | ✅ | the TRANSACTION state. ship=commit, nuke=rollback (Task #67). ORTHOGONAL to `sys_status` (the record-lifecycle axis) — the three-axis pattern DR-030 ratified (bitemporal ⟂ transaction-state ⟂ record-status). |
-| `for_product` | `^dna:product:[0-9A-HJKMNP-TV-Z]{26}$` | ✅ | → Product. The product this change contributes to. Resolves to an existing PD entity. Like `LifecycleRun.step`, this is the required upstream anchor. |
+| `for_product` | `^dna:product:[0-9A-HJKMNP-TV-Z]{26}$`, nullable | — | → Product. The product this change contributes to. **OPTIONAL link (founder decision, slice 1):** a change can precede or sit outside a product — infra/methodology work, or the change that *creates* the first product. Set when a single product resolves; omitted otherwise. |
 | `parent_change` | `^dna:change:[0-9A-HJKMNP-TV-Z]{26}$`, nullable | — | → Change (SELF-EDGE). The durable carry link (#123) + ancestry (#124). Nullable: a root change has no parent. ABox invariant: the ancestry graph must be acyclic (a DAG) — JT-7 cycle-tolerance; not schema-enforceable, a ref-integrity concern. |
 | `relationship` | enum `builds_on\|depends_on`, nullable | — | qualifies `parent_change` (#124 ancestry). Null when `parent_change` is null. |
 | `base_sha` | string, nullable | — | git provenance — the commit the change branched from (Task #44 — base_sha was the missing field that killed cockpit diffs). |
@@ -68,7 +68,8 @@ optional run-grouping fields where they apply), per the brief's directive.
 | `shipped_at` | date-time, nullable | — | lifecycle timestamp — when the change shipped (or was nuked). Null while in-flight. |
 
 ### Required set (Change)
-`id`, `handle`, `slug`, `intent`, `primitive`, `state`, `for_product`, `started_at`.
+`id`, `handle`, `slug`, `intent`, `primitive`, `state`, `started_at`.
+(`for_product` is OPTIONAL — founder decision, slice 1: product-less changes are real.)
 (All hold at the earliest lifecycle state `state=in-flight` — verified in Phase 5 attack B. `shipped_at` is
 correctly NOT required; it is set only at ship/nuke.)
 

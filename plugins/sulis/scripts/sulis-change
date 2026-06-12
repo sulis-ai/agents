@@ -948,14 +948,14 @@ def _emit_change_entity(repo_root: Path, metadata: dict) -> None:
         from _change_emission import emit_change, resolve_for_product
         from _entity_adapter_local import LocalFileEntityAdapter
 
-        fp = resolve_for_product(repo_root)
-        if not fp:
-            return
         adapter = LocalFileEntityAdapter(
             base_dir=repo_root / ".brain" / "instances",
             domain="product-development",
         )
-        emit_change({**metadata, "state": "in-flight"}, adapter, for_product=fp)
+        # for_product is an OPTIONAL link — set when a single product resolves,
+        # omitted otherwise (product-less changes still land in the brain).
+        emit_change({**metadata, "state": "in-flight"}, adapter,
+                    for_product=resolve_for_product(repo_root))
     except Exception:  # noqa: BLE001 — best-effort; entity emission never blocks start
         _log("Change entity could not be emitted; continuing without it")
 

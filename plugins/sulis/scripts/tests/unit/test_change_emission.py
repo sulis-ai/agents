@@ -152,9 +152,21 @@ def test_started_at_falls_back_when_null(tmp_path):
     assert saved["started_at"] == "2026-05-27T19:00:00Z"
 
 
-def test_emit_returns_none_without_a_product(tmp_path):
-    # No for_product arg + none in the record → never write an invalid entity.
-    assert emit_change(_record(), _adapter(tmp_path)) is None
+def test_emit_writes_a_product_less_change(tmp_path):
+    # for_product is an optional link now — a change with no resolvable product
+    # still becomes a Change entity (just without the product link).
+    saved = emit_change(_record(), _adapter(tmp_path))   # no for_product anywhere
+    assert saved is not None
+    assert "for_product" not in saved
+    out = (tmp_path / ".brain" / "instances" / "product-development" / "change"
+           / f"{_ULID}.jsonld")
+    assert out.exists()
+
+
+def test_compose_omits_for_product_when_absent():
+    c = compose_change(change_id=_ULID, handle="CH-X", slug="s", intent="i",
+                       primitive="fix", started_at="2026-06-12T09:00:00Z")
+    assert "for_product" not in c
 
 
 def test_emit_is_idempotent_same_ulid_overwrites(tmp_path):
