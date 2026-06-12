@@ -1,3 +1,9 @@
+## v0.144.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- Reframe Sulis's Brevity Discipline as Progressive Disclosure, grounded in the Cognitive Load Standard (CL-01/02/04): default to a minimal payload, OFFER depth as a one-line pointer rather than dumping it, and expand freely on demand — the discipline must never block getting more. Length targets become the default payload (lift on request), not a cap; brevity governs extraneous bloat, never requested/intrinsic depth.
+
 ## v0.143.0 — 2026-06-11
 
 **Minor — release-train batch.**
