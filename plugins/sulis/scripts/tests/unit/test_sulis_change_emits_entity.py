@@ -77,6 +77,14 @@ def test_nuke_transitions_entity_to_nuked(tmp_path):
     assert e["state"] == "nuked" and "valid_to" in e
 
 
+def test_main_repo_root_resolves_repo_root(tmp_path):
+    # #129 B2: the per-stage LifecycleRun co-locates with the Change entity by
+    # resolving the MAIN repo root. From a plain repo it's the repo root.
+    import subprocess
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    assert _mod._main_repo_root(tmp_path) == tmp_path.resolve()
+
+
 def test_nuke_rolls_back_the_produced_set(tmp_path):
     # #67 3c: nuking a change soft-deletes the entities it produced (audit kept).
     _make_product(tmp_path)

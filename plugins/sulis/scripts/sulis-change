@@ -989,6 +989,21 @@ def _transition_change_entity(repo_root: Path, change_id: str, to_state: str) ->
         _log(f"Change entity could not be transitioned to {to_state}; continuing")
 
 
+def _main_repo_root(cwd: Path) -> Path:
+    """The MAIN worktree root (git-common-dir's parent), so a brain write from a
+    change-WORKTREE session co-locates with the Change entity in the main repo's
+    brain (#129 B2). From the main repo itself this is just the repo root; on any
+    git error it degrades to ``cwd``."""
+    rc, out, _ = _run(["git", "rev-parse", "--git-common-dir"], cwd=str(cwd), timeout=10)
+    if rc != 0 or not out.strip():
+        return Path(cwd)
+    common = Path(out.strip())
+    if not common.is_absolute():
+        common = Path(cwd) / common
+    common = common.resolve()
+    return common.parent if common.name == ".git" else Path(cwd)
+
+
 def cmd_start(args: argparse.Namespace) -> None:
     repo_root = _resolve_repo_root(args)
     primitive, slug = _resolve_primitive_and_slug(args)
@@ -1704,6 +1719,21 @@ def cmd_stage(args: argparse.Namespace) -> None:
             f"(state store not writable).",
             context={"change_id": change_id, "stage": stage},
         )
+
+    # #129 B2 — the session executing the change's workflow leaves a durable
+    # trace: a LifecycleRun per stage transition, written to the SAME brain as
+    # the Change entity (the main repo's, resolved from this worktree session).
+    # 3b stamps it produced_by_change, so the run-sequence IS the change's
+    # progress. Best-effort: a trace failure never blocks the stage stamp.
+    try:
+        from _brain_emit_helper import emit_lifecycle_step_event
+        emit_lifecycle_step_event(
+            _main_repo_root(Path.cwd()),
+            step_name=f"change-stage:{stage}",
+            outcome="completed",
+        )
+    except Exception:  # noqa: BLE001 — the trace is best-effort, never a gate
+        _log(f"Stage LifecycleRun for {stage!r} could not be emitted; continuing")
 
     emit_ok(data={
         "change_id": change_id,

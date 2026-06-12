@@ -163,6 +163,21 @@ def test_emit_writes_a_product_less_change(tmp_path):
     assert out.exists()
 
 
+def test_compose_defaults_journey_to_the_lifecycle_workflow():
+    # #129 B2: every change links to the change-lifecycle Workflow by default.
+    from _change_lifecycle import WORKFLOW_ID
+    c = compose_change(change_id=_ULID, handle="CH-X", slug="s", intent="i",
+                       primitive="fix", started_at="2026-06-12T09:00:00Z")
+    assert c["journey"] == WORKFLOW_ID
+
+
+def test_compose_honors_an_explicit_journey():
+    custom = "dna:workflow:" + ("A" * 26)
+    c = compose_change(change_id=_ULID, handle="CH-X", slug="s", intent="i",
+                       primitive="fix", started_at="2026-06-12T09:00:00Z", journey=custom)
+    assert c["journey"] == custom
+
+
 def test_compose_omits_for_product_when_absent():
     c = compose_change(change_id=_ULID, handle="CH-X", slug="s", intent="i",
                        primitive="fix", started_at="2026-06-12T09:00:00Z")
