@@ -1,3 +1,9 @@
+## v0.152.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- The change-lifecycle is now a first-class Workflow (#129 B1): authored the canonical change-lifecycle Workflow instance (six Steps recon→specify→design→implement→review→ship, initial=recon, terminal=ship, forward transitions; each Step mechanism=mixed — the session is the human+agent executor) + added the additive Change.journey → Workflow link (the Scenario.journey precedent; no new entity). The Workflow is the durable definition; a session executes it; the per-stage LifecycleRuns (B2) become its progress trace.
+
 ## v0.151.0 — 2026-06-12
 
 **Minor — release-train batch.**
