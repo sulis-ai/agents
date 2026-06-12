@@ -1,0 +1,74 @@
+"""WP-003 (harden-daemon-wedge-self-heal) — the wedge-grace window resolver.
+
+Contract: ``WP-003-grace-window-wedge-detection.md`` Definition of Done > Red
++ spec §Constraints (a bad override degrades to the safe default, never crashes
+— mirror ``resolve_idle_exit_secs``) + ADR-001. HD-003.
+
+The grace window distinguishes a **mid-boot** holder (slow-but-legitimate boot,
+socket comes live within the window → reused) from a **wedged** holder (lock
+held, no live socket past the window → reclaimed). The window must be long
+enough that a genuinely slow boot is never mistaken for a wedge, and a bad
+tuning value (empty / non-numeric / non-positive) must degrade to the
+conservative default rather than crash the daemon — exactly the contract
+``resolve_idle_exit_secs`` already meets, cloned here for the new seam.
+
+Verification posture (MEA-09, deterministic): pure config resolution driven by
+``SULIS_DAEMON_WEDGE_GRACE_SECS`` via ``monkeypatch.setenv`` — no real process,
+no sleeping. These mirror the existing ``resolve_idle_exit_secs`` tests
+one-for-one so the two env seams stay behaviourally identical.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+import session_manager_daemon
+
+
+def test_resolve_wedge_grace_secs_default_when_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unset → the conservative ``DEFAULT_WEDGE_GRACE_SECS`` (ADR-001). Fails
+    today: the symbol does not exist yet."""
+    monkeypatch.delenv("SULIS_DAEMON_WEDGE_GRACE_SECS", raising=False)
+    assert (
+        session_manager_daemon.resolve_wedge_grace_secs()
+        == session_manager_daemon.DEFAULT_WEDGE_GRACE_SECS
+    )
+
+
+def test_resolve_wedge_grace_secs_honours_a_valid_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A positive override is honoured (the test/CI injection seam) — so the
+    integration suite can shrink the window without waiting the production
+    default. Fails today: the symbol does not exist yet."""
+    monkeypatch.setenv("SULIS_DAEMON_WEDGE_GRACE_SECS", "2.5")
+    assert session_manager_daemon.resolve_wedge_grace_secs() == 2.5
+
+
+@pytest.mark.parametrize("bad", ["", "not-a-number", "0", "-5"])
+def test_resolve_wedge_grace_secs_falls_back_on_bad_override(
+    monkeypatch: pytest.MonkeyPatch, bad: str
+) -> None:
+    """THE LOAD-BEARING CONFIG TEST (WP verification artifact).
+
+    An empty / non-numeric / non-positive override degrades to the conservative
+    ``DEFAULT_WEDGE_GRACE_SECS`` — a bad tuning value must not crash the daemon
+    or shrink the window so far it mistakes a slow boot for a wedge (spec
+    §Constraints, mirroring ``resolve_idle_exit_secs``). Fails today: the symbol
+    does not exist yet."""
+    monkeypatch.setenv("SULIS_DAEMON_WEDGE_GRACE_SECS", bad)
+    assert (
+        session_manager_daemon.resolve_wedge_grace_secs()
+        == session_manager_daemon.DEFAULT_WEDGE_GRACE_SECS
+    )
+
+
+def test_default_wedge_grace_exceeds_the_legacy_mid_boot_poll() -> None:
+    """The conservative default must be **longer** than the existing 5s mid-boot
+    poll the old race-loser path used, so a slow-but-legitimate boot the old
+    code already tolerated is strictly preserved — the breaker only trips
+    *beyond* the legitimate window (WP Notes). Fails today: the symbol does not
+    exist yet."""
+    assert session_manager_daemon.DEFAULT_WEDGE_GRACE_SECS > 5.0
