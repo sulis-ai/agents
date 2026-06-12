@@ -79,7 +79,7 @@ budget per `executor-loop-standard.md`.
 
 | # | Step | Success criterion |
 |---|---|---|
-| 1 | Worktree + branch | `wpx-worktree create` cuts a branch `feat/wp-NNN-<slug>` off `origin/dev`; dev SHA recorded in sidecar; `wpx-journal init` runs; pre-flight tooling checks recorded |
+| 1 | Worktree + branch | `wpx-worktree create` cuts a branch `wp/{primitive-slug}/wp-NNN-<slug>` off the base branch (the change branch, or `origin/main`); dev SHA recorded in sidecar; `wpx-journal init` runs; pre-flight tooling checks recorded |
 | 1.5 | **Plan generation (NEW, v0.10.0)** | `wpx-journal seed-plan` populates the journal's `## Plan` section with an approach paragraph + a structured item list (one row per test, implementation target, conditional refactor, docs, lint, commit). The plan is the agent's "here's what I'm about to do" surface — readable by the calling session + concierge before substantive work begins. |
 | 2 | RED — write failing tests | Tests written per WP Contract (happy path + edge cases + hardening assertions); all fail for the right reason; plan items for Step 2 marked `done` via `wpx-journal mark-plan-item` |
 | 3 | GREEN — minimum code | All new tests pass; full suite green; ≥90% coverage on new files; internal prior art checked before new code; plan items for Step 3 marked `done` |
@@ -111,7 +111,7 @@ the subagent entirely.
 
 Step 5 (docs) is a no-op if no docs apply. Step 7 is the boundary
 where you hand off: write the push outcome to the journal via
-`wpx-journal complete-step --step 7 --outcome "Pushed to feat/wp-NNN
+`wpx-journal complete-step --step 7 --outcome "Pushed to wp/{primitive-slug}/wp-NNN
 at SHA ..."`, then return cleanly. The journal is the calling
 session's read-only contract.
 
@@ -404,7 +404,7 @@ wpx-journal start-step --wp WP-NNN --project <slug> --step 6.5
 #     signals.json       — machine-readable PH-06 signal table
 #     hardening-deltas/  — draft fixes (if any findings)
 #     tool-outputs/      — raw typecheck/lint/scanner logs
-/code-review feat/wp-NNN-<slug> <project-name>
+/code-review wp/{primitive-slug}/wp-NNN-<slug> <project-name>
 
 # 6.5.c — VERIFY THE BUNDLE WAS PRODUCED (otherwise → BLOCKER)
 # This guards against the v0.16.0–v0.20.0 failure mode where executors
@@ -421,7 +421,7 @@ if [ -z "$BUNDLE_DIR" ] || [ ! -f "$BUNDLE_DIR/REVIEW.md" ]; then
     --observation "No bundle at .architecture/<project>/code-reviews/PR-feat-wp-NNN-*/" \
     --root-cause "/code-review was not invoked OR exited without writing REVIEW.md" \
     --scope in-scope \
-    --suggested-next "Re-invoke /code-review feat/wp-NNN-<slug> <project>; then resume Step 6.5"
+    --suggested-next "Re-invoke /code-review wp/{primitive-slug}/wp-NNN-<slug> <project>; then resume Step 6.5"
   wpx-index flip-status --wp WP-NNN --project <slug> \
     --to step-7-blocked --expected in_progress
   exit 1
@@ -622,7 +622,8 @@ to Bash.
 
 | Lifecycle operation | Tool invocation |
 |---|---|
-| Step 1: create worktree off the base branch + record base SHA | `wpx-worktree create --wp WP-NNN --project <slug> --repo-root <target-change-worktree> --branch feat/wp-NNN-<slug> --worktree-path ../wp-NNN-worktree [--base-branch <base>]` — a relative `--worktree-path` anchors to `--repo-root` (the target change), NOT your cwd (#309), so always pass `--repo-root` as the target change's worktree |
+| Step 1: resolve the canonical branch name (MUST — do NOT hand-template) | `wpx-wp branch-name --wp WP-NNN --project <slug> --repo-root <target-change-worktree>` → `.data.branch`. Inside a change this yields the canonical `wp/{primitive-slug}/wp-NNN-<slug>`; outside one, the legacy `feat/wp-NNN-<slug>`. Use this resolved value for `--branch` everywhere below — never hand-spell `feat/wp-NNN-*` (#336/#105/#106): the train's `queue-list` looks the WP up by the canonical name, and `branch-ci` now triggers on `wp/**` (#334), so a hand-templated `feat/` branch is both unfindable by the train AND a name the migration is retiring (#284). |
+| Step 1: create worktree off the base branch + record base SHA | `wpx-worktree create --wp WP-NNN --project <slug> --repo-root <target-change-worktree> --branch <resolved-canonical-branch> --worktree-path ../wp-NNN-worktree [--base-branch <base>]` — `<resolved-canonical-branch>` is the `wpx-wp branch-name` value from the row above. A relative `--worktree-path` anchors to `--repo-root` (the target change), NOT your cwd (#309), so always pass `--repo-root` as the target change's worktree |
 | Step 1: initialise journal | `wpx-journal init --wp WP-NNN --project <slug>` |
 | Step 1: record each pre-flight tooling check | `wpx-journal record-preflight --wp WP-NNN --project <slug> --tool <name> --status present\|absent --fallback "<note>"` |
 | Step 1.5: seed the plan | `wpx-journal seed-plan --wp WP-NNN --project <slug> --approach "<2-3 sentence summary>" --plan-json @/tmp/plan.json` |
@@ -682,7 +683,7 @@ WP=WP-007
 # Create the worktree (records dev SHA in sidecar automatically)
 "$WPX_DIR/wpx-worktree" create \
   --wp $WP --project $PROJECT \
-  --branch feat/wp-007-cancel-flow \
+  --branch wp/feat-add-cancel/wp-007-cancel-flow \
   --worktree-path ../wp-007-worktree
 
 # Initialise the journal
@@ -792,7 +793,7 @@ Returning at any of these transitions is a violation:
   in memory doesn't count.
 
 **After Step 7 with journal recorded (`wpx-journal complete-step
---step 7 --outcome "Pushed to feat/wp-NNN at SHA <sha>"`), you exit
+--step 7 --outcome "Pushed to wp/{primitive-slug}/wp-NNN at SHA <sha>"`), you exit
 cleanly.** That is not a Continuation Discipline violation; that is
 your contract completing. The calling session reads your journal,
 invokes `wpx-pipeline run`, and takes over.
@@ -956,14 +957,14 @@ records breaks the concierge's translation step.
 
 On successful completion (Step 7 — commit + push journal-recorded):
 
-- **Branch on remote** — `feat/wp-NNN-<slug>` pushed; CI triggered.
+- **Branch on remote** — `wp/{primitive-slug}/wp-NNN-<slug>` pushed; CI triggered.
 - **Journal at `.executor-WP-NNN.md`** with:
   - `## Pre-flight checks` table populated.
   - `## Step trace` table with Steps 1-7 all `Completed`, Step 7's
     Outcome containing the pushed branch + SHA.
   - `## Self-heal attempts` table with any in-scope fixes applied.
 - **Plain-English exit line** like:
-  *"WP-NNN Step 7 complete — pushed to feat/wp-NNN-<slug> at SHA
+  *"WP-NNN Step 7 complete — pushed to wp/{primitive-slug}/wp-NNN-<slug> at SHA
   <sha>. Calling session can proceed with Step 8+."*
 
 The calling session reads the journal and proceeds with Steps 8-12

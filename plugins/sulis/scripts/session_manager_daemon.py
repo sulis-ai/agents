@@ -51,6 +51,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import signal
 import subprocess
@@ -165,8 +166,13 @@ def resolve_default_pidfile() -> str:
 
 def resolve_idle_exit_secs() -> float:
     """The idle-empty window in seconds (``SULIS_DAEMON_IDLE_EXIT_SECS`` or the
-    default). A non-positive or unparseable override falls back to the default —
-    a bad tuning value must degrade to the safe bound, not crash the daemon."""
+    default). A non-positive, non-finite, or unparseable override falls back to
+    the default — a bad tuning value must degrade to the safe bound, not crash
+    the daemon. Non-finite is rejected on purpose: ``float('inf')`` /
+    ``float('1e400')`` parse cleanly and pass ``> 0``, so without the finite
+    check an ``inf`` override would be accepted as an *infinite* window — the
+    daemon would never time out. ``nan`` is already caught by ``> 0`` (always
+    False), but the explicit finite check states the intent."""
     raw = os.environ.get(_ENV_IDLE_EXIT)
     if not raw:
         return DEFAULT_IDLE_EXIT_SECS
@@ -174,14 +180,18 @@ def resolve_idle_exit_secs() -> float:
         value = float(raw)
     except ValueError:
         return DEFAULT_IDLE_EXIT_SECS
-    return value if value > 0 else DEFAULT_IDLE_EXIT_SECS
+    return value if math.isfinite(value) and value > 0 else DEFAULT_IDLE_EXIT_SECS
 
 
 def resolve_wedge_grace_secs() -> float:
     """The wedge grace window in seconds (``SULIS_DAEMON_WEDGE_GRACE_SECS`` or the
-    default). A non-positive or unparseable override falls back to the default —
-    a bad tuning value must degrade to the safe bound, not crash the daemon, and
-    never shrink the window so far it mistakes a slow boot for a wedge. Mirrors
+    default). A non-positive, non-finite, or unparseable override falls back to
+    the default — a bad tuning value must degrade to the safe bound, not crash
+    the daemon, and never shrink the window so far it mistakes a slow boot for a
+    wedge. Non-finite is rejected on purpose: an ``inf`` / ``1e400`` override
+    parses cleanly and passes ``> 0``, so without the finite check it would be
+    accepted as an *infinite* grace window — the daemon would then never declare
+    a wedge, silently defeating the whole self-heal. Mirrors
     :func:`resolve_idle_exit_secs` exactly (HD-003)."""
     raw = os.environ.get(_ENV_WEDGE_GRACE)
     if not raw:
@@ -190,7 +200,7 @@ def resolve_wedge_grace_secs() -> float:
         value = float(raw)
     except ValueError:
         return DEFAULT_WEDGE_GRACE_SECS
-    return value if value > 0 else DEFAULT_WEDGE_GRACE_SECS
+    return value if math.isfinite(value) and value > 0 else DEFAULT_WEDGE_GRACE_SECS
 
 
 # ── the identity pidfile (HD-001): durable on-disk process identity ──────────

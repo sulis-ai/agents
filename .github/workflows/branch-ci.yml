@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - 'feat/wp-*'
+      - 'wp/**'          # canonical WP branch shape (wp/{primitive-slug}/wp-NNN-*) — #334
       - 'change/*'
 concurrency:
   group: branch-ci-${{ github.ref }}
