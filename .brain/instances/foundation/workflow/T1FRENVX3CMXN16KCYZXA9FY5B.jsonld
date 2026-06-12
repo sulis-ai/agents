@@ -1,0 +1,31 @@
+{
+  "description": "The six-stage journey every change runs, executed by its session: recon \u2192 specify \u2192 design \u2192 implement \u2192 review \u2192 ship.",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "change-lifecycle",
+  "id": "dna:workflow:T1FRENVX3CMXN16KCYZXA9FY5B",
+  "initial_steps": [
+    "recon"
+  ],
+  "name": "change-lifecycle",
+  "state": "active",
+  "steps": [
+    "recon",
+    "specify",
+    "design",
+    "implement",
+    "review",
+    "ship"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "ship"
+  ],
+  "transitions": [
+    "recon -> specify",
+    "specify -> design",
+    "design -> implement",
+    "implement -> review",
+    "review -> ship"
+  ],
+  "type": "delivery"
+}

@@ -1,0 +1,16 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "change-lifecycle",
+  "id": "dna:step:Y7A8VPM6CQ2M620YQK55ZBRN5T",
+  "input_artifacts": [
+    "work-packages"
+  ],
+  "mechanism": "mixed",
+  "name": "implement",
+  "output_artifacts": [
+    "code",
+    "tests"
+  ],
+  "state": "active",
+  "sys_status": "active"
+}

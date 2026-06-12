@@ -108,6 +108,11 @@
       ],
       "description": "qualifies parent_change (the ancestry edge); null when parent_change is null"
     },
+    "journey": {
+      "type": "string",
+      "pattern": "^dna:(workflow):[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "→ Workflow — the change-lifecycle this change runs (recon→ship), executed by its session; mirrors Scenario.journey (#129 B1)"
+    },
     "base_sha": {
       "type": "string",
       "description": "git provenance — the commit the change branched from"
