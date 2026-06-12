@@ -1,3 +1,9 @@
+## v0.155.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- The session executing a change leaves a durable per-stage trace (#129 B2): every change links to the change-lifecycle Workflow (Change.journey defaults to it on emit), and each stage transition (sulis-change stage) emits a LifecycleRun (step_name=change-stage:<stage>) — auto-stamped produced_by_change via the #67 stamping seam, written to the MAIN repo brain (resolved from the worktree) so it co-locates with the Change entity. The run-sequence IS the change progress; the cockpit can read it instead of a stage-string. B3 (derive stage/history from the trace) + B4 (#96 spiral-back) next.
+
 ## v0.154.0 — 2026-06-12
 
 **Minor — release-train batch.**
