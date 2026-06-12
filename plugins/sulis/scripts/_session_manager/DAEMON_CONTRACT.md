@@ -18,6 +18,17 @@ against in parallel.
 |---|---|---|
 | **Socket** (stable, `0o600`, one per user) | `~/.sulis/session-manager.sock` | env `SULIS_SESSION_MANAGER_SOCKET` |
 | **Lock** (singleton arbiter) | `~/.sulis/session-manager.lock` | the daemon's `--lock` flag (CI/test isolation) |
+| **Pidfile** (identity record) | `~/.sulis/session-manager.pid` | the daemon's `--pidfile` flag (CI/test isolation) |
+
+The **pidfile** is the daemon's durable on-disk identity (HD-001): once it holds
+the flock and binds the socket, it writes `{"pid", "start_token",
+"cmdline_marker"}` — where `start_token` is the OS process start-time (via `ps
+-o lstart=`, portable across macOS + Linux), the value a recycled PID cannot
+reproduce. It is removed on a clean shutdown, so the file's presence names a
+*live* daemon. This is the identity a later PID-reuse-safe reclaim verifies a
+kill target against (both `start_token` **and** `cmdline_marker` must match).
+Writing/removing it is **best-effort**: a failed write degrades the reclaim to
+the fail-closed path, it never crashes the daemon's boot.
 
 The parent directory (`~/.sulis/`) is created `0o700` if absent. The socket is
 chmod `0o600` by the engine's `SocketServer.start` (the established local-IPC

@@ -1,0 +1,37 @@
+{
+  "pr": "feat/wp-001-daemon-writes-identity-pidfile",
+  "base": "change/harden-daemon-wedge-self-heal",
+  "kind": "backend",
+  "verdict": "PASS",
+  "build_verification": {"pr_introduced_errors": 0, "ruff": "clean", "ruff_format": "clean", "mypy_new_errors": 0, "mypy_baseline_errors": 2, "pytest": "36 passed"},
+  "pr_hygiene": {
+    "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "none"},
+    "size": {"lines_added": 152, "files_changed": 4, "severity": "low"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+    "completeness": {"new_source_without_test": 0, "api_change_without_schema": false, "severity": "none"}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 3},
+    "in_neighbours": {"critical": 0, "high": 0, "medium": 0, "low": 0}
+  },
+  "findings_detail": [
+    {"id": "F-01", "severity": "low", "lens": "security + architecture", "file": "session_manager_daemon.py", "rule": "access-control / path-handling / TOCTOU", "status": "addressed-inline", "resolution": "tmp pidfile now opened 0o600 with O_EXCL|O_NOFOLLOW, matching the sibling lock's 0o600"},
+    {"id": "F-02", "severity": "low", "lens": "quality", "file": "session_manager_daemon.py", "rule": "doc-accuracy", "status": "addressed-inline", "resolution": "_remove_pidfile docstring corrected to name only the OSError it catches"},
+    {"id": "F-03", "severity": "low", "lens": "architecture (observability/WPB-10)", "file": "session_manager_daemon.py", "rule": "structured-logging", "status": "deferred-by-convention", "resolution": "best-effort failure uses raw stderr.write, matching the module's existing lock-helper convention; deferred under WPB-12 bounded boy-scout (a logging refactor across the module is out of this WP's scope)"}
+  ],
+  "wp002_traceability_notes": [
+    "WP-002 kill decision must treat null/empty/malformed start_token as fail-closed (no token -> no PID-reuse anchor)",
+    "WP-002 must use exact-equality (not substring) for both start_token and cmdline_marker when deciding to kill"
+  ],
+  "draft_hardening_deltas": 0,
+  "methodology": {
+    "cr01_mechanical_baseline": true,
+    "cr02_parallel_dispatch": true,
+    "cr03_full_file_reads": true,
+    "cr05_severity_rubric": true,
+    "cr06_verdict_computed": true,
+    "cr07_three_lenses": true,
+    "cr09_pr_hygiene": true,
+    "neighbour_cap_hit": false
+  }
+}
