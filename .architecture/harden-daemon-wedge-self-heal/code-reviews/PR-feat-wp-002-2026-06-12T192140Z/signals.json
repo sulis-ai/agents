@@ -1,0 +1,38 @@
+{
+  "review": {
+    "wp": "WP-002",
+    "project": "harden-daemon-wedge-self-heal",
+    "branch": "wp/harden-daemon-wedge-self-heal/wp-002-pid-reuse-safe-identity-verify-and-reclaim",
+    "base": "change/harden-daemon-wedge-self-heal",
+    "timestamp": "2026-06-12T192140Z",
+    "verdict": "PASS",
+    "outcome_plain": "Ready to merge"
+  },
+  "build_verification": {
+    "ruff_check": "pass",
+    "ruff_format": "pass",
+    "mypy_base_errors": 32,
+    "mypy_head_errors": 32,
+    "mypy_new_errors_on_wp_surface": 0,
+    "pr_introduced_errors": 0
+  },
+  "hygiene": {
+    "scope": {"severity": "none", "commit_types": ["feat"], "module_fan_out": 1},
+    "size": {"severity": "none", "files_changed": 2, "lines_added": 800, "lines_removed": 12},
+    "safety": {"severity": "none", "migrations": 0, "schemas": 0, "secrets": 0, "infra": 0},
+    "completeness": {"severity": "none", "new_source_without_test": 0, "tests_added": 21}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "ran": true},
+    "security": {"findings": 0, "ran": true, "primitives_checked": ["SEC-02", "SEC-03", "SEC-07"]},
+    "quality": {"findings": 0, "ran": true, "cr10_perf_matches": 0}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"total": 0},
+    "total": 0
+  },
+  "hardening_deltas": [],
+  "auto_downgrade_triggers": [],
+  "addressed": true
+}
