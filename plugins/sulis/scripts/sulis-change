@@ -1731,6 +1731,23 @@ def cmd_stage(args: argparse.Namespace) -> None:
             context={"stage": stage},
         )
 
+    # #96 / B4 — bounded spiral-back check. The new stage must be a valid
+    # transition from the CURRENT one (derived from the trace BEFORE this stamp):
+    # forward to any later stage, or a single-stage spiral-back. A bigger backward
+    # jump (ship → recon) isn't a spiral-back — surface it as a warning. Advisory,
+    # not a hard gate: the stamp is recorded either way (best-effort).
+    transition_warning = None
+    try:
+        from _change_lifecycle import is_transition_allowed
+        prior = _change_service_for(_main_repo_root(Path.cwd())).current_stage(change_id)
+        if prior and not is_transition_allowed(prior, stage):
+            transition_warning = (
+                f"stage transition {prior!r} → {stage!r} is neither a forward step "
+                f"nor a single-stage spiral-back (#96) — recorded, but it jumps the "
+                f"workflow graph; an adjacent move was expected.")
+    except Exception:  # noqa: BLE001 — advisory check; never block the stamp
+        pass
+
     state_path = write_change_stage(change_id, stage)
     if state_path is None:
         # Best-effort write failed (unwritable state dir) — surface honestly
@@ -1760,7 +1777,7 @@ def cmd_stage(args: argparse.Namespace) -> None:
         "change_id": change_id,
         "stage": stage,
         "state_path": str(state_path),
-    })
+    }, warnings=[transition_warning] if transition_warning else None)
 
 
 # ─── Subcommand: nuke ─────────────────────────────────────────────────────
