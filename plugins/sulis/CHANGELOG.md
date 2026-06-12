@@ -1,3 +1,9 @@
+## v0.157.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- Derive a change current-stage + history from the run-trace (#129 B3): ChangeService.stage_history/current_stage read the change-stage:* LifecycleRuns the change produced (B2), time-ordered — the run-sequence IS the authoritative progress, not a hand-written stage string. sulis-change stage --show reads it. The dashboard/status consumer-switch (retire the stage-string as source-of-truth) is the fast-follow.
+
 ## v0.156.0 — 2026-06-12
 
 **Minor — release-train batch.**
