@@ -1694,6 +1694,27 @@ def cmd_stage(args: argparse.Namespace) -> None:
     `SULIS_CHANGE_ID` environment variable (set in every change-bound
     session). Validates the stage against WORKFLOW_STAGES before writing.
     """
+    # #129 B3 — read mode: the change's current stage + history DERIVED from the
+    # run-trace (the change-stage:* LifecycleRuns it produced), not the local
+    # stage string. The run-sequence IS the authoritative progress.
+    if getattr(args, "show", False):
+        change_id = args.change_id or os.environ.get("SULIS_CHANGE_ID")
+        if not change_id:
+            emit_error("No change to read: pass --change-id, or run inside a "
+                       "change-bound session (SULIS_CHANGE_ID is unset).")
+            return
+        try:
+            history = _change_service_for(_main_repo_root(Path.cwd())).stage_history(change_id)
+        except Exception:  # noqa: BLE001 — read is best-effort; never raise to the caller
+            history = []
+        emit_ok(data={
+            "change_id": change_id,
+            "current_stage": history[-1]["stage"] if history else None,
+            "history": history,
+            "source": "run-trace",
+        })
+        return
+
     stage = args.stage
     if not is_valid_stage(stage):
         emit_error(
@@ -2320,13 +2341,18 @@ def build_parser() -> argparse.ArgumentParser:
              "(recon/specify/design/implement/review/ship)",
     )
     p_stage.add_argument(
-        "stage",
+        "stage", nargs="?",
         help="The workflow stage now reached: "
-             + " / ".join(WORKFLOW_STAGES),
+             + " / ".join(WORKFLOW_STAGES) + " (omit with --show to read instead)",
     )
     p_stage.add_argument(
         "--change-id", default=None,
         help="Change ULID to stamp (default: the SULIS_CHANGE_ID env var)",
+    )
+    p_stage.add_argument(
+        "--show", action="store_true",
+        help="Read the change's current stage + history DERIVED from the "
+             "run-trace (#129 B3) instead of stamping a new stage.",
     )
 
     # `mark-shipped` is the terminal-stage transition (#38). Called by the
