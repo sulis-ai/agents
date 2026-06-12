@@ -161,19 +161,23 @@ def resolve_idle_exit_secs() -> float:
 # ── the identity pidfile (HD-001): durable on-disk process identity ──────────
 
 
-def _process_start_token(pid: int) -> str | None:
-    """The OS process start-time for ``pid``, the start-token that pins this
-    exact process.
+def _ps_field(pid: int, field: str) -> str | None:
+    """Best-effort single-field ``ps`` probe: ``ps -o <field> -p <pid>``.
 
-    Read via ``ps -o lstart= -p <pid>`` — portable across the daemon's two
-    targets (macOS + Linux), unlike Linux-only ``/proc``. A recycled PID cannot
-    reproduce this value, so it is the safety anchor for a later PID-reuse-safe
-    reclaim (WP-002). Best-effort: returns the trimmed start-time string, or
-    ``None`` if ``ps`` is unreadable / the PID is gone — never raises.
+    The shared subprocess guard behind both :func:`_process_start_token`
+    (``lstart=``) and :func:`_process_cmdline` (``command=``) — extracted at the
+    two-consumer threshold (EP-03 / Non-Negotiable #2) so the ``ps`` probe's
+    portability + best-effort contract live in exactly one place. ``ps`` is
+    portable across the daemon's two targets (macOS + Linux), unlike Linux-only
+    ``/proc``. Returns the trimmed field value, or ``None`` if ``ps`` is
+    unreadable / the PID is gone / the field is empty. **Never raises.**
+
+    ``field`` is the literal ``ps -o`` spec including the trailing ``=`` that
+    suppresses the header (e.g. ``"lstart="``, ``"command="``).
     """
     try:
         completed = subprocess.run(
-            ["ps", "-o", "lstart=", "-p", str(pid)],
+            ["ps", "-o", field, "-p", str(pid)],
             capture_output=True,
             text=True,
             timeout=5.0,
@@ -182,8 +186,22 @@ def _process_start_token(pid: int) -> str | None:
         return None
     if completed.returncode != 0:
         return None
-    token = completed.stdout.strip()
-    return token or None
+    value = completed.stdout.strip()
+    return value or None
+
+
+def _process_start_token(pid: int) -> str | None:
+    """The OS process start-time for ``pid``, the start-token that pins this
+    exact process.
+
+    Read via ``ps -o lstart= -p <pid>`` (through :func:`_ps_field`, the shared
+    best-effort probe) — portable across the daemon's two targets (macOS +
+    Linux), unlike Linux-only ``/proc``. A recycled PID cannot reproduce this
+    value, so it is the safety anchor for the PID-reuse-safe reclaim (WP-002).
+    Best-effort: returns the trimmed start-time string, or ``None`` if ``ps`` is
+    unreadable / the PID is gone — never raises.
+    """
+    return _ps_field(pid, "lstart=")
 
 
 def _write_pidfile(pidfile_path: str, pid: int) -> None:
@@ -240,6 +258,205 @@ def _remove_pidfile(pidfile_path: str) -> None:
     """
     try:
         os.unlink(pidfile_path)
+    except OSError:  # pragma: no cover - best-effort (already gone / unreadable)
+        pass
+
+
+# ── the PID-reuse-safe reclaim (HD-002): verify identity, then kill ──────────
+#
+# A *wedged* holder holds the singleton flock but never answers ``status`` —
+# so ``daemon_client._stop_stale_daemon`` (which reads the kill-target PID from
+# a live status reply) cannot be used. The kill target's identity comes from the
+# WP-001 pidfile instead, and is verified to *still be our daemon* before any
+# kill. **Verification fails CLOSED**: if identity cannot be proven (no pidfile,
+# torn record, unreadable ps, cmdline mismatch, start-token mismatch), we do NOT
+# kill — the caller (WP-003) falls back to today's exit-1. This is the
+# load-bearing safety invariant of the change: a recycled PID is never killed.
+
+
+def _read_pidfile(pidfile_path: str) -> "dict | None":
+    """Best-effort parse of the WP-001 identity record at ``pidfile_path``.
+
+    Returns the parsed ``{"pid", "start_token", "cmdline_marker"}`` mapping, or
+    ``None`` on a missing / torn / unparseable / non-mapping file. **Never
+    raises** — a missing or torn record means 'no durable identity recorded', and
+    the reclaim must then **fail closed** (it does not kill). The complement of
+    :func:`_write_pidfile`.
+    """
+    try:
+        with open(pidfile_path, encoding="utf-8") as fh:
+            record = json.load(fh)
+    except (OSError, ValueError):
+        # OSError: missing / unreadable. ValueError: torn / non-JSON (covers
+        # json.JSONDecodeError). Either way → no durable identity → fail closed.
+        return None
+    if not isinstance(record, dict):
+        return None
+    return record
+
+
+def _process_cmdline(pid: int) -> str | None:
+    """The live command line of ``pid`` via ``ps -o command= -p <pid>``.
+
+    Portable across the daemon's two targets (macOS + Linux), unlike Linux-only
+    ``/proc``. Mirrors :func:`_process_start_token`'s best-effort ``ps`` probe
+    (both go through :func:`_ps_field`, the shared subprocess guard). Returns the
+    trimmed command-line string, or ``None`` if the PID is gone / ``ps`` is
+    unreadable. **Never raises.** One half of the PID-reuse-safe identity check
+    (the daemon's recorded ``cmdline_marker`` must be a substring of this); the
+    other half is :func:`_process_start_token`.
+    """
+    return _ps_field(pid, "command=")
+
+
+def _is_our_daemon(
+    record: dict,
+    pid: int,
+    *,
+    start_token_of: "Callable[[int], str | None] | None" = None,
+    cmdline_of: "Callable[[int], str | None] | None" = None,
+) -> bool:
+    """FAIL-CLOSED verifier — a **pure decision function**, no side effects.
+
+    Returns ``True`` IFF **all** of the following hold for the live process at
+    ``pid``:
+
+    * the process exists and its command line is readable
+      (``cmdline_of(pid)`` is not ``None``), **and**
+    * that command line contains the record's ``cmdline_marker``, **and**
+    * the process's start-token (``start_token_of(pid)``) is non-``None`` and
+      **equals** the record's ``start_token`` — the PID-reuse anchor: a recycled
+      PID cannot reproduce the original process's start time.
+
+    **Any** missing / unprovable input → ``False``. This is non-negotiable: do
+    not weaken it to "match on PID alone" or "match if the start-token is
+    unavailable". The kill in :func:`_reclaim_wedged_holder` is gated entirely on
+    this; the probes are injected so every branch is unit-tested without ever
+    touching a real process.
+
+    The probes default to the module-level :func:`_process_start_token` /
+    :func:`_process_cmdline`, resolved **at call time** (via ``None`` sentinels)
+    so a test can swap the module attributes and have the default path pick them
+    up — the same probe the production caller (:func:`_reclaim_wedged_holder`,
+    which passes no probes) goes through.
+    """
+    if start_token_of is None:
+        start_token_of = _process_start_token
+    if cmdline_of is None:
+        cmdline_of = _process_cmdline
+
+    recorded_marker = record.get("cmdline_marker")
+    recorded_token = record.get("start_token")
+    # No recorded identity at all → cannot prove → fail closed.
+    if not recorded_marker or not recorded_token:
+        return False
+
+    live_cmdline = cmdline_of(pid)
+    if live_cmdline is None:  # process gone / ps unreadable
+        return False
+    if recorded_marker not in live_cmdline:  # cmdline marker mismatch
+        return False
+
+    live_token = start_token_of(pid)
+    if live_token is None:  # start-token unreadable → cannot pin → fail closed
+        return False
+    return live_token == recorded_token  # PID-reuse anchor: must match exactly
+
+
+def _reclaim_wedged_holder(
+    pidfile_path: str,
+    socket_path: str,
+    *,
+    term_wait_secs: float,
+) -> bool:
+    """Reclaim a **verified-ours** wedged daemon holder, PID-reuse-safely.
+
+    Read the identity pidfile → verify it is *still our daemon*
+    (:func:`_is_our_daemon`, fail-closed). If verification fails (no pidfile,
+    torn record, cmdline mismatch, start-token mismatch, unreadable probes) →
+    return ``False`` and **make no destructive change** — DO NOT KILL; the
+    caller (WP-003) falls back to today's exit-1. This is the load-bearing safety
+    invariant: a recycled PID is never killed.
+
+    On a verified holder: ``SIGTERM`` → bounded wait (``term_wait_secs``, with
+    the same ``deadline = time.monotonic() + max(...)`` floor as
+    :func:`daemon_client._stop_stale_daemon`) → ``SIGKILL`` if still alive →
+    unlink the stale pidfile + socket (best-effort). Returns ``True`` on a
+    completed reclaim. A kill racing the holder's natural death
+    (``ProcessLookupError``) is a *completed* reclaim (the holder is gone), not a
+    failure. **Never raises out of the function** — best-effort recovery I/O.
+
+    Mirrors :func:`daemon_client._stop_stale_daemon`'s
+    SIGTERM→bounded-wait→unlink shape (EP-03); the only difference is the
+    identity source (the pidfile, not a live status reply).
+    """
+    record = _read_pidfile(pidfile_path)
+    if record is None:
+        return False  # no durable identity → fail closed
+    pid = record.get("pid")
+    if not isinstance(pid, int):
+        return False  # malformed record → fail closed
+    if not _is_our_daemon(record, pid):
+        return False  # NOT our daemon (or unprovable) → DO NOT KILL
+
+    # Verified ours. SIGTERM and give it a bounded window to stop cleanly (it
+    # unlinks its own socket + releases its lock on SIGTERM); SIGKILL only if it
+    # outlives the wait. Best-effort throughout — a kill racing a natural death
+    # is a completed reclaim.
+    if not _signal_pid(pid, signal.SIGTERM):
+        # The holder was already gone when we tried to SIGTERM it — it died
+        # between verify and signal. A completed reclaim; clear the stale files.
+        _clear_stale_files(pidfile_path, socket_path)
+        return True
+
+    deadline = time.monotonic() + max(term_wait_secs, 5.0)
+    while time.monotonic() < deadline:
+        if not _pid_alive(pid):
+            break
+        time.sleep(0.1)
+    else:
+        # Outlived the wait → escalate to SIGKILL (best-effort).
+        _signal_pid(pid, signal.SIGKILL)
+
+    _clear_stale_files(pidfile_path, socket_path)
+    return True
+
+
+def _signal_pid(pid: int, sig: int) -> bool:
+    """Best-effort ``os.kill(pid, sig)``. Returns ``True`` if the signal was
+    delivered, ``False`` if the process was already gone
+    (``ProcessLookupError`` — a kill racing a natural death). Other ``OSError``
+    (e.g. ``PermissionError``) is swallowed as ``False`` too; the reclaim never
+    crashes on a signal it cannot deliver."""
+    try:
+        os.kill(pid, sig)
+    except ProcessLookupError:
+        return False  # already gone — the holder died first
+    except OSError:  # pragma: no cover - e.g. EPERM; best-effort
+        return False
+    return True
+
+
+def _pid_alive(pid: int) -> bool:
+    """Best-effort liveness check via signal 0 (``os.kill(pid, 0)`` — the
+    portable 'does this process exist and can I signal it' probe). ``True`` if
+    the process exists, ``False`` if it is gone. Never raises."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except OSError:  # pragma: no cover - e.g. EPERM (exists but not signalable)
+        return True
+    return True
+
+
+def _clear_stale_files(pidfile_path: str, socket_path: str) -> None:
+    """Best-effort unlink of the stale pidfile + socket left by a reclaimed
+    holder. Reuses :func:`_remove_pidfile`'s idempotent best-effort shape for
+    the pidfile; the socket unlink is the same shape. Never raises."""
+    _remove_pidfile(pidfile_path)
+    try:
+        os.unlink(socket_path)
     except OSError:  # pragma: no cover - best-effort (already gone / unreadable)
         pass
 
