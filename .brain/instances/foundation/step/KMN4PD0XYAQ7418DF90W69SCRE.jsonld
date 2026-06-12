@@ -1,0 +1,15 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "change-lifecycle",
+  "id": "dna:step:KMN4PD0XYAQ7418DF90W69SCRE",
+  "input_artifacts": [
+    "review-verdict"
+  ],
+  "mechanism": "mixed",
+  "name": "ship",
+  "output_artifacts": [
+    "merge-to-main"
+  ],
+  "state": "active",
+  "sys_status": "active"
+}
