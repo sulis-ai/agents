@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+"""sulis-emit-change — emit a Change entity from a change record (#128, DR-031).
+
+The manual / backfill sibling to the automatic emission `sulis-change start`
+now does: point it at a change record (`~/.sulis/changes/<id>/change.json` or
+any JSON with the manifest fields) and it writes the canonical Change entity
+(a prov:Activity) through the EntityRepository port. Idempotent — the entity id
+reuses the manifest ULID, so a re-emit overwrites in place.
+
+Usage:
+  sulis-emit-change --from-record ~/.sulis/changes/<id>/change.json
+  sulis-emit-change --from-record <path> --repo-root <repo> --for-product dna:product:<ulid>
+
+`for_product` resolves from --for-product, else the record's `for_product`, else
+the repo's single Product instance. With zero or many products and no explicit
+flag, it can't choose and exits with a clear error (never writes an invalid entity).
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+from _change_emission import emit_change, resolve_for_product  # noqa: E402
+from _entity_adapter_local import LocalFileEntityAdapter  # noqa: E402
+from _entity_repository import EntityValidationError  # noqa: E402
+
+
+def _resolve_repo_root(explicit: str | None) -> Path:
+    if explicit:
+        return Path(explicit).resolve()
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, check=True, timeout=10,
+        )
+        return Path(out.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        return Path.cwd()
+
+
+def _ok(data: dict) -> int:
+    print(json.dumps({"ok": True, "data": data}, indent=2))
+    return 0
+
+
+def _err(message: str) -> int:
+    print(json.dumps({"ok": False, "error": message}, indent=2))
+    return 1
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Emit a Change entity from a change record.")
+    parser.add_argument("--from-record", required=True, help="path to a change.json record")
+    parser.add_argument("--repo-root", help="repo whose .brain/ the entity is written to")
+    parser.add_argument("--for-product", help="explicit Product id (dna:product:<ulid>)")
+    args = parser.parse_args(argv)
+
+    rec_path = Path(args.from_record).resolve()
+    if not rec_path.exists():
+        return _err(f"change record not found: {rec_path}")
+    try:
+        record = json.loads(rec_path.read_text(encoding="utf-8"))
+    except ValueError as exc:
+        return _err(f"change record is not valid JSON: {exc}")
+    if not record.get("change_id"):
+        return _err("change record has no change_id")
+
+    repo_root = _resolve_repo_root(args.repo_root)
+    for_product = args.for_product or record.get("for_product") or resolve_for_product(repo_root)
+    if not for_product:
+        return _err(
+            "could not resolve for_product — pass --for-product (the repo has zero "
+            "or several Product entities, so I won't guess)")
+
+    adapter = LocalFileEntityAdapter(
+        base_dir=repo_root / ".brain" / "instances", domain="product-development")
+    try:
+        change = emit_change(record, adapter, for_product=for_product)
+    except EntityValidationError as exc:
+        return _err(str(exc))
+    if change is None:
+        return _err("nothing emitted — for_product unresolved")
+
+    ulid = change["id"].rsplit(":", 1)[-1]
+    out = repo_root / ".brain" / "instances" / "product-development" / "change" / f"{ulid}.jsonld"
+    return _ok({"id": change["id"], "handle": change.get("handle"),
+                "state": change["state"], "path": str(out)})
+
+
+if __name__ == "__main__":
+    sys.exit(main())
