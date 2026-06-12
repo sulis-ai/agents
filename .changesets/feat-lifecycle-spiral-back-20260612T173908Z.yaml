@@ -1,7 +1,0 @@
-change_id: 01KWKGPAVSTB89F29APF69MV95
-primitive: feat
-tier: minor
-touches_plugin: true
-summary: |
-  Bounded spiral-back on the change-lifecycle Workflow (tracker task #96 / B4, completes Phase B): the Workflow now carries reverse edges (each stage can step BACK one, [via spiral-back]); is_transition_allowed encodes the checkable rule (forward any distance / same / single-stage back allowed; a bigger backward jump is not a spiral-back); sulis-change stage consults it against the trace-derived current stage (B3) and WARNS on a graph-jumping transition (advisory, not a hard gate). The change-lifecycle is now a real graph the stage-machine reasons over.
-created_at: 2026-06-12T17:39:08Z
