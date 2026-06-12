@@ -1,3 +1,9 @@
+## v0.156.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- DaemonStartError now surfaces the CAUSE (#131): the daemon stderr log tail + the spawned process exit code are folded into the error, instead of a bare 30s timeout. Root cause of the founder incident: a wedged-but-alive daemon holds the singleton flock (flock only auto-releases on death) so spawns defer + time out — the real reason (singleton lock held but no live socket) sat only in a log. Now it is in the error itself, so the next occurrence is diagnosable. The wedge self-heal (kill the wedged holder + retry) is a captured follow-on.
+
 ## v0.155.0 — 2026-06-12
 
 **Minor — release-train batch.**
