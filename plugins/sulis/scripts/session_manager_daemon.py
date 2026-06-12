@@ -415,11 +415,15 @@ def _reclaim_wedged_holder(
 
     On a verified holder: ``SIGTERM`` → bounded wait (``term_wait_secs``, with
     the same ``deadline = time.monotonic() + max(...)`` floor as
-    :func:`daemon_client._stop_stale_daemon`) → ``SIGKILL`` if still alive →
-    unlink the stale pidfile + socket (best-effort). Returns ``True`` on a
-    completed reclaim. A kill racing the holder's natural death
-    (``ProcessLookupError``) is a *completed* reclaim (the holder is gone), not a
-    failure. **Never raises out of the function** — best-effort recovery I/O.
+    :func:`daemon_client._stop_stale_daemon`) → ``SIGKILL`` only if it outlives
+    the wait **and re-verifies as still ours** (a fresh :func:`_is_our_daemon`
+    call immediately before SIGKILL — liveness alone can't tell our daemon from
+    an unrelated process that recycled its PID mid-wait, so a re-verify failure
+    skips the kill and fails closed) → unlink the stale pidfile + socket
+    (best-effort). Returns ``True`` on a completed reclaim. A kill racing the
+    holder's natural death (``ProcessLookupError``) is a *completed* reclaim (the
+    holder is gone), not a failure. **Never raises out of the function** —
+    best-effort recovery I/O.
 
     Mirrors :func:`daemon_client._stop_stale_daemon`'s
     SIGTERM→bounded-wait→unlink shape (EP-03); the only difference is the
@@ -450,8 +454,19 @@ def _reclaim_wedged_holder(
             break
         time.sleep(0.1)
     else:
-        # Outlived the wait → escalate to SIGKILL (best-effort).
-        _signal_pid(pid, signal.SIGKILL)
+        # Outlived the wait → escalate to SIGKILL — but RE-VERIFY identity first.
+        # ``_pid_alive`` is a signal-0 liveness probe: it cannot tell our daemon
+        # from an unrelated process that recycled its PID while we waited (the
+        # verified holder may have died under SIGTERM and the OS reused its PID).
+        # Re-call the fail-closed identity check immediately before SIGKILL and
+        # only escalate if it STILL proves ours; if it no longer matches, the
+        # holder is already gone — do NOT SIGKILL (that would land on the wrong
+        # process) and fall through to clear the stale files, fail-closed exactly
+        # like a holder that died within the wait. This closes the verify→SIGKILL
+        # TOCTOU wrong-kill window (the change's load-bearing invariant: never
+        # kill the wrong PID).
+        if _is_our_daemon(record, pid):
+            _signal_pid(pid, signal.SIGKILL)
 
     _clear_stale_files(pidfile_path, socket_path)
     return True
