@@ -1,3 +1,9 @@
+## v0.147.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- for_product is now an OPTIONAL link on the Change entity — a change can precede or sit outside a product (infra/methodology work, or the change that creates the first product) and still become a Change entity in the brain. Schema drops for_product from required; emission + start-wiring emit product-less changes.
+
 ## v0.146.0 — 2026-06-12
 
 **Minor — release-train batch.**

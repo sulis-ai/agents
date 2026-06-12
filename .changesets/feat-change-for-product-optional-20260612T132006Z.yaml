@@ -1,7 +1,0 @@
-change_id: 01KX2HSP4Z8AYEF5Q3TQWYDB69
-primitive: feat
-tier: minor
-touches_plugin: true
-summary: |
-  for_product is now an OPTIONAL link on the Change entity — a change can precede or sit outside a product (infra/methodology work, or the change that creates the first product) and still become a Change entity in the brain. Schema drops for_product from required; emission + start-wiring emit product-less changes.
-created_at: 2026-06-12T13:20:06Z
