@@ -1,3 +1,9 @@
+## v0.148.1 — 2026-06-12
+
+**Patch — release-train batch.**
+
+- Property-based (hypothesis) test on compose_change: for ANY well-formed input across the 22-primitive x 3-state x optional-field space, the composed Change entity is schema-valid and the invariants hold (in-flight has no shipped_at; a parent link always carries a relationship; id reuses the ULID; absent for_product omitted not null). The regression guard for the defect class proving caught by hand. Folds under #119.
+
 ## v0.148.0 — 2026-06-12
 
 **Minor — release-train batch.**
