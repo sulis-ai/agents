@@ -1,3 +1,9 @@
+## v0.151.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- Change-as-transaction (#67 slice 3c, closes #67): ChangeService.produced/evolved query the change transaction set; rollback SOFT-deletes the entities a change produced (sys_status=deleted, record kept as audit) leaving evolved-only + other changes untouched; ship=commit leaves them live. Wired into nuke (state->nuked + rollback). Adds iter_entities to the EntityRepository port + LocalFileEntityAdapter + the stamping wrapper.
+
 ## v0.150.0 — 2026-06-12
 
 **Minor — release-train batch.**
