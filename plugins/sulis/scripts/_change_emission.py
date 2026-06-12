@@ -32,8 +32,8 @@ def compose_change(
     slug: str,
     intent: str,
     primitive: str,
-    for_product: str,
     started_at: str,
+    for_product: str | None = None,
     state: str = "in-flight",
     parent_change: str | None = None,
     relationship: str | None = None,
@@ -57,10 +57,14 @@ def compose_change(
         "intent": " ".join(str(intent).split()),
         "primitive": primitive,
         "state": state,
-        "for_product": for_product,
         "started_at": started_at,
         "sys_status": "active",
     }
+    # for_product is an OPTIONAL link — a change can precede or sit outside a
+    # product (infra / methodology work, or the change that creates the first
+    # product). Omitted when absent, never set to null.
+    if for_product:
+        change["for_product"] = for_product
     # parent_change + relationship travel together (the #123/#124 carry); a
     # relationship without a parent is meaningless, so gate it on the parent.
     if parent_change:
@@ -109,17 +113,15 @@ def emit_change(
     repo: EntityRepository,
     *,
     for_product: str | None = None,
-) -> dict | None:
+) -> dict:
     """Compose a Change entity from a change manifest/record dict and save it.
 
-    `for_product` is taken from the argument when given, else resolved from the
-    record's `for_product`, else left to the caller (returns None if absent —
-    the schema requires it, so we never write an invalid entity). Returns the
-    saved entity dict, or None when `for_product` can't be determined.
+    `for_product` is taken from the argument when given, else the record's
+    `for_product`, else omitted — it is an OPTIONAL link, so a product-less
+    change still becomes a Change entity (just without the product edge).
+    Returns the saved entity dict.
     """
     fp = for_product or record.get("for_product")
-    if not fp:
-        return None
     # Derive state when the record doesn't carry one (manifests don't today):
     # a record with a shipped_at is a shipped change, else in-flight. This keeps
     # a backfilled historical (shipped) change consistent instead of emitting it

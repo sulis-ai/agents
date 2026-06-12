@@ -90,10 +90,17 @@ def test_nuked_state_validates(schema):
     assert _validator(schema).is_valid(c)
 
 
+def test_product_less_change_validates(schema):
+    # for_product is an OPTIONAL link — a change can precede or sit outside a
+    # product (infra, methodology, the change that creates the first product).
+    c = _base_change()
+    c.pop("for_product")
+    assert _validator(schema).is_valid(c)
+
+
 @pytest.mark.parametrize("mutate", [
     lambda c: c.update({"id": "dna:change:not-a-ulid"}),
     lambda c: c.pop("intent"),
-    lambda c: c.pop("for_product"),
     lambda c: c.update({"primitive": "frobnicate"}),     # not in the 22-value enum
     lambda c: c.update({"state": "merged"}),             # not in-flight|shipped|nuked
     lambda c: c.update({"for_product": "dna:product:bad"}),
