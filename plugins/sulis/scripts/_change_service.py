@@ -114,3 +114,28 @@ class ChangeService:
             self._repo.save(etype, entity)
             rolled.append(entity)
         return rolled
+
+    # ─── stage derived from the run-trace (#129 B3) ──────────────────────────
+
+    _STAGE_PREFIX = "change-stage:"
+
+    def stage_history(self, change_id: str) -> list:
+        """The change's stage journey, DERIVED from the run-trace — the ordered
+        list of `change-stage:<stage>` LifecycleRuns this change produced (B2),
+        newest last. Each entry: {stage, at}. The run-sequence IS the progress;
+        no hand-written stage string is consulted."""
+        runs = [
+            e for e in self.produced(change_id)
+            if str(e.get("step_name", "")).startswith(self._STAGE_PREFIX)
+        ]
+        runs.sort(key=lambda e: str(e.get("at") or ""))
+        return [
+            {"stage": str(e["step_name"])[len(self._STAGE_PREFIX):], "at": e.get("at")}
+            for e in runs
+        ]
+
+    def current_stage(self, change_id: str) -> "str | None":
+        """The stage the change has reached, derived from the trace — the latest
+        `change-stage:*` run, or None if it has produced no stage runs yet."""
+        history = self.stage_history(change_id)
+        return history[-1]["stage"] if history else None

@@ -106,3 +106,41 @@ def test_rollback_accepts_full_change_id(tmp_path):
     a = _adapter(tmp_path)
     stamping_repo(a, change_id=_CH1).save("scenario", _scenario(_U1))
     assert len(ChangeService(a).rollback(f"dna:change:{_CH1}")) == 1
+
+
+# ─── stage derived from the run-trace (#129 B3) ──────────────────────────────
+
+
+def _stage_run(adapter, change_id, stage, at, ulid):
+    adapter.save("lifecyclerun", {
+        "id": f"dna:lifecyclerun:{ulid}", "step_name": f"change-stage:{stage}",
+        "at": at, "outcome": "completed", "sys_status": "active",
+        "produced_by_change": f"dna:change:{change_id}"})
+
+
+def test_stage_history_derives_from_the_run_trace(tmp_path):
+    a = _adapter(tmp_path)
+    _stage_run(a, _CH1, "recon", "2026-06-12T09:00:00Z", _U1)
+    _stage_run(a, _CH1, "specify", "2026-06-12T09:30:00Z", _U2)
+    _stage_run(a, _CH1, "design", "2026-06-12T10:00:00Z", "2" + "A" * 25)
+    svc = ChangeService(a)
+    assert [h["stage"] for h in svc.stage_history(_CH1)] == ["recon", "specify", "design"]
+    assert svc.current_stage(_CH1) == "design"
+
+
+def test_stage_history_orders_by_time_not_insertion(tmp_path):
+    a = _adapter(tmp_path)
+    _stage_run(a, _CH1, "design", "2026-06-12T10:00:00Z", _U1)   # inserted first
+    _stage_run(a, _CH1, "recon", "2026-06-12T09:00:00Z", _U2)    # earlier time
+    assert [h["stage"] for h in ChangeService(a).stage_history(_CH1)] == ["recon", "design"]
+
+
+def test_current_stage_none_when_no_stage_runs(tmp_path):
+    assert ChangeService(_adapter(tmp_path)).current_stage(_CH1) is None
+
+
+def test_stage_history_ignores_other_changes_runs(tmp_path):
+    a = _adapter(tmp_path)
+    _stage_run(a, _CH1, "recon", "2026-06-12T09:00:00Z", _U1)
+    _stage_run(a, _CH2, "ship", "2026-06-12T09:00:00Z", _U2)   # a different change
+    assert [h["stage"] for h in ChangeService(a).stage_history(_CH1)] == ["recon"]
