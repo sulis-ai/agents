@@ -1,7 +1,0 @@
-change_id: 01K76H0046R9MGMEWMQ883NPPJ
-primitive: feat
-tier: minor
-touches_plugin: true
-summary: |
-  Stamp-on-emit (#67 slice 3b): when a change is active (SULIS_CHANGE_ID), every entity emitted is tagged with the change that produced it (produced_by_change) or, when a different change revises it, appended to evolved_by_change. A ProvenanceStampingRepository decorator over the EntityRepository port, wired at the single _try_adapter choke point so all design-stage + event emissions stamp through one seam. No change active -> plain adapter, unchanged. Now what a change produced is queryable.
-created_at: 2026-06-12T13:55:00Z
