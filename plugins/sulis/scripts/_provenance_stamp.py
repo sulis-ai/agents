@@ -77,6 +77,9 @@ class ProvenanceStampingRepository:
     def validate(self, entity_type: str, instance: dict) -> None:
         self._inner.validate(entity_type, instance)
 
+    def iter_entities(self, entity_type: "str | None" = None):
+        return self._inner.iter_entities(entity_type)
+
 
 def stamping_repo(inner: EntityRepository, change_id: "str | None" = None) -> EntityRepository:
     """Wrap ``inner`` to stamp the active change, or return it unchanged when no
