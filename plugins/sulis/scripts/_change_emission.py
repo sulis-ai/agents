@@ -94,7 +94,8 @@ def resolve_for_product(repo_root: Path) -> str | None:
     one product); None when zero or many (the caller decides — never guess
     between several products). Best-effort: any read error → None.
     """
-    product_dir = repo_root / ".brain" / "instances" / "product-development" / "product"
+    from _brain_location import brain_base_dir
+    product_dir = brain_base_dir(repo_root) / "product-development" / "product"
     if not product_dir.is_dir():
         return None
     ids: list[str] = []

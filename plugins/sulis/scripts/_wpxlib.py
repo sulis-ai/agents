@@ -817,7 +817,7 @@ def read_repo_contract(repo_root: Path) -> dict:
     result: dict = {
         "profile": None, "contribution_model": None,
         "artifacts": [], "deploy_target": None,
-        "branch_convention": None,
+        "branch_convention": None, "brain_location": None,
     }
     contract = Path(repo_root) / ".sulis" / "repo-contract.yml"
     if not contract.is_file():
@@ -838,6 +838,10 @@ def read_repo_contract(repo_root: Path) -> dict:
                 result["contribution_model"] = _rc_strip_value(stripped.split(":", 1)[1]) or None
             elif stripped.startswith("deploy_target:"):
                 result["deploy_target"] = _rc_strip_value(stripped.split(":", 1)[1]) or None
+            elif stripped.startswith("brain_location:"):
+                result["brain_location"] = (
+                    _rc_strip_value(stripped.split(":", 1)[1]) or None
+                )
             elif stripped.startswith("branch_convention:"):
                 result["branch_convention"] = (
                     _rc_strip_value(stripped.split(":", 1)[1]) or None

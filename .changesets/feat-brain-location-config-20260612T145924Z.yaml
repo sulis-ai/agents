@@ -1,0 +1,7 @@
+change_id: 01KWD0GXBR5PT58ZFQ8C2NNPWP
+primitive: feat
+tier: minor
+touches_plugin: true
+summary: |
+  User-configurable brain location (#127): one brain_base_dir resolver honoured by every call site — explicit > SULIS_BRAIN_BASE_DIR env > repo-contract brain_location field > default <repo>/.brain/instances (unchanged, non-disruptive). Closes the gap where emitters honoured the env but the change-entity wiring hard-coded <repo>/.brain. The brain is the user data; they set where it lives (a dir or their own repo). Server-side stays deferred (the spiral call).
+created_at: 2026-06-12T14:59:24Z
