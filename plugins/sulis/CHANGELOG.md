@@ -1,3 +1,9 @@
+## v0.148.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- ChangeService — a programmatic handler owning the Change-entity lifecycle (open/ship/nuke/get) over the EntityRepository port, importable as the SDK and called by the CLI. sulis-change start now routes through it (open=in-flight); mark-shipped transitions the entity to shipped; nuke transitions it to nuked. Moves the lifecycle from scattered prose to one code path.
+
 ## v0.147.0 — 2026-06-12
 
 **Minor — release-train batch.**
