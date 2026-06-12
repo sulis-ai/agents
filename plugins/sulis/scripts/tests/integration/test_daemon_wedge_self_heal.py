@@ -1,14 +1,22 @@
-"""WP-003 (harden-daemon-wedge-self-heal) — the grace-window wedge detection
-wired into ``main()``'s race-loser branch.
+"""WP-004 (harden-daemon-wedge-self-heal) — the **headline end-to-end self-heal
+acceptance proof**, plus the two guard scenarios it shares the substrate with.
 
-Contract: ``WP-003-grace-window-wedge-detection.md`` Definition of Done > Red
-+ spec §Acceptance (mid-boot protected; wedge self-heals) + ADR-001 / ADR-003.
-HD-003. This is the unit/structural half of the self-heal; the full end-to-end
-``ensure_daemon`` proof is WP-004.
+Contract: ``WP-004-wedge-self-heal-integration-test.md`` Definition of Done > Red
++ spec §Acceptance + §Verification Plan ("The wedge scenario") + ADR-001 /
+ADR-003. HD-003. This is the load-bearing observable proof of the whole
+WP-001→WP-002→WP-003 chain: a real wedged daemon (a fake holder that takes the
+flock + writes a matching identity pidfile but never serves the socket) is
+detected past the grace window, verified-as-ours, killed, the lock reclaimed,
+and a **fresh daemon boots and answers a real ``status`` round-trip** — i.e. a
+spawn that previously raised ``DaemonStartError`` / exited 1 now returns a live
+socket. The pass condition is the spec's explicit one: ``daemon_is_live`` true
+(a real round-trip), **not** "the function ran". (The file was first authored
+under WP-003's structural rewire; WP-004 owns the end-to-end ``daemon_is_live``
+acceptance assertion.)
 
-The race-loser branch (``main()``'s ``lock_fd is None`` path) must now
-distinguish a **mid-boot** holder (slow-but-legitimate boot, socket comes live
-inside ``resolve_wedge_grace_secs()`` → reused, exit 0, **never killed**) from a
+The race-loser branch (``main()``'s ``lock_fd is None`` path) distinguishes a
+**mid-boot** holder (slow-but-legitimate boot, socket comes live inside
+``resolve_wedge_grace_secs()`` → reused, exit 0, **never killed**) from a
 **wedged** holder (flock held, no live socket past the window → the holder is
 declared wedged, the WP-002 verified reclaim is called, the lock is re-acquired,
 and a fresh daemon boots).
@@ -17,8 +25,10 @@ Verification posture (MEA-09, no mocks): the wedged / mid-boot holder is a
 **real** test-owned subprocess that takes the real ``fcntl.flock`` via the real
 daemon helper and writes a real identity pidfile via the real daemon helper, so
 ``_is_our_daemon`` verifies it the same way production would. The second daemon
-is the **real** daemon process. A short ``SULIS_DAEMON_WEDGE_GRACE_SECS`` keeps
-the suite fast without changing the path under test.
+is the **real** daemon process, observed over a **real** AF_UNIX socket via the
+real ``daemon_client.daemon_is_live`` probe. A short
+``SULIS_DAEMON_WEDGE_GRACE_SECS`` keeps the suite fast without changing the path
+under test.
 
 Tests (RED first, per the WP Definition of Done):
     test_daemon_wedge_self_heal.py::test_mid_boot_holder_inside_grace_window_is_not_killed
@@ -45,6 +55,14 @@ _DAEMON_SCRIPT = _SCRIPTS_DIR / "session_manager_daemon.py"
 
 sys.path.insert(0, str(_SCRIPTS_DIR / "tests" / "lib"))
 import fake_claude_child  # noqa: E402
+
+# The real daemon-presence liveness probe (stdlib-only, terminal-only; ADR-003).
+# WP-004's observable pass condition is a real ``status`` round-trip through this
+# exact probe — the same one production callers use — not an inference from
+# READY/flock/pidfile. (Spec §Verification Plan: "a live socket, not 'the
+# function ran'".) The scripts dir is on sys.path via the root tests/conftest.py,
+# so this resolves ambiently — matching the sibling ``test_ensure_daemon.py``.
+from _session_manager import daemon_client  # noqa: E402
 
 # Bounded wait for a process/thread assertion (matches the sibling daemon
 # suites' _WAIT): long enough never to flake on a loaded CI runner, short enough
@@ -282,14 +300,20 @@ def test_wedged_holder_is_reclaimed_and_a_fresh_daemon_comes_up(
     pidfile_path: str,
     tmp_path: Path,
 ) -> None:
-    """WEDGE SELF-HEAL (spec §Acceptance).
+    """WEDGE SELF-HEAL — the headline acceptance proof (spec §Acceptance +
+    §Verification Plan).
 
     A holder that takes the flock + writes a valid identity pidfile but **never**
     serves the socket is wedged. Past the grace window the second daemon declares
     it wedged, reclaims it (kills the verified holder), re-acquires the lock,
     boots a fresh daemon, prints READY, and serves a live socket — instead of
     exiting 1 after the timeout. The wedged holder is dead afterwards. Fails
-    today: the race-loser branch only polls then returns 1, it never reclaims."""
+    today: the race-loser branch only polls then returns 1, it never reclaims.
+
+    **The observable pass condition (WP-004) is a real ``daemon_is_live`` round-
+    trip** against the fresh daemon's socket — a genuine ``status`` request/reply
+    over the AF_UNIX socket, the spec's "a live socket, not 'the function ran'".
+    READY/flock/pidfile are corroborating evidence; the round-trip is the proof."""
     holder_script = _write_holder(tmp_path)
     holder = _spawn_holder(
         holder_script,
@@ -319,6 +343,18 @@ def test_wedged_holder_is_reclaimed_and_a_fresh_daemon_comes_up(
                 ready = True
                 break
         assert ready, "fresh daemon never printed READY after reclaiming the wedge"
+
+        # ── THE observable acceptance: a real ``status`` round-trip ──────────────
+        # The spec's pass condition (WP-004): a previously-blocked spawn now
+        # returns a *live socket*. We prove it the way a production caller would —
+        # ``daemon_client.daemon_is_live`` connects to the socket and exchanges a
+        # real ``status`` request/reply. This is "a live socket", NOT "the function
+        # ran": if the fresh daemon were not genuinely serving, this is False.
+        assert daemon_client.daemon_is_live(socket_path, timeout=_WAIT), (
+            "the fresh daemon did not answer a real `status` round-trip after the "
+            "wedge self-heal — the reclaim printed READY but the socket is not "
+            "live (spec §Verification Plan: a live socket, not 'the function ran')"
+        )
 
         # The wedged holder must be DEAD (the reclaim killed the verified holder).
         holder.wait(timeout=_WAIT)
