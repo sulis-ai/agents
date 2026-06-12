@@ -4501,11 +4501,23 @@ def git_worktree_add(repo_root: Path, branch: str, dest: Path,
 
 
 def git_worktree_remove(repo_root: Path, dest: Path,
-                        force: bool = False) -> tuple[bool, str]:
+                        force: bool = False, *,
+                        change_id: "str | None" = None) -> tuple[bool, str]:
     """Remove a worktree at `dest`. Tolerates a missing worktree.
+
+    When `change_id` is given, the removal is SCOPE-GUARDED (#130): `dest` must
+    resolve to within that change's own dir, or the removal is REFUSED — so a
+    cross-change / out-of-scope path (the destructive glob-sweep incident) can
+    never land here, regardless of how the caller found the path. Callers that
+    own a change SHOULD always pass it.
 
     Returns (ok, message).
     """
+    if change_id is not None:
+        from _worktree_safety import within_change_scope
+        ok, reason = within_change_scope(dest, change_id, cwd=Path.cwd())
+        if not ok:
+            return False, f"scope-guard refused removal: {reason}"
     if not dest.exists():
         # Try `git worktree prune` in case the worktree was deleted manually
         _run(["git", "worktree", "prune"], cwd=repo_root, timeout=10)

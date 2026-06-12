@@ -932,24 +932,31 @@ loop:
         a `--critical-found` finalise — those WPs got BLOCKERs, not a
         clean ship.
 
-   14.7. **Worktree cleanup safety — scope to THIS change only (#211/#253 — MUST).**
+   14.7. **Worktree cleanup safety — scope to THIS change only (#211/#253/#130 — MUST).**
         Remove ONLY the worktrees this run-all batch created for the
         current change. Each is an explicit path you already hold (the
         `--worktree-path` you passed to `wpx-step12 wrap` / `wpx-worktree
         create`, co-located under the current change's worktree parent
-        `~/.sulis/changes/<this-change-id>/`). Always remove by **explicit
-        path**, via `wpx-worktree remove --worktree-path <path>` or
-        `git worktree remove <explicit-path>`.
+        `~/.sulis/changes/<this-change-id>/`).
 
-        **NEVER** clean up by enumerating + name-globbing the worktree
-        list. A `git worktree list | grep …`-style sweep matched and
-        removed **4 worktrees belonging to other in-flight changes**
-        (different change IDs) in CH-01KT61 — uncommitted work in them
-        would have been lost (#211). Other changes' worktrees live under
-        their own `~/.sulis/changes/<other-id>/` parents and are never
-        yours to remove.
+        Always remove via the **scope-guarded tool**, passing the owning
+        change so the guard can enforce the boundary (#130):
 
-        ✓ `wpx-worktree remove --wp <wp> --project <slug> --worktree-path <path>`
+        ✓ `wpx-worktree remove --change-id <this-change-id> --worktree-path <path>`
+
+        The tool now **refuses** any `--worktree-path` outside
+        `~/.sulis/changes/<this-change-id>/` — cross-change / out-of-scope
+        removal is structurally blocked, not just discouraged. (`--change-id`
+        defaults to `SULIS_CHANGE_ID`; pass it explicitly to be safe.)
+
+        **NEVER** use raw git for cleanup — raw `git worktree remove` BYPASSES
+        the guard, and `git worktree list | grep …` is the exact move that has
+        now twice matched + removed **worktrees belonging to OTHER in-flight
+        changes** (#211, then again #130 — WP numbers restart per change, so a
+        name/number glob in the shared repo crosses change boundaries and
+        discards the only unique key, the change-id in the path):
+
+        ✗ `git worktree remove <path>`  (bypasses the #130 guard)
         ✗ `for w in $(git worktree list | grep wp- | awk …); do git worktree remove "$w"; done`
 
         If a worktree path you expect is already gone, that's fine
