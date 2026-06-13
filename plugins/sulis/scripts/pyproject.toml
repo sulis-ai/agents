@@ -30,6 +30,7 @@ dependencies = [
     # The in-house catalogue stays as the supplementary layer (private-IP +
     # env-assignment + slack/jwt/long-token); the anonymiser is catalogue-only.
     "detect-secrets>=1.5",
+    "trafilatura>=2.1.0",
 ]
 
 [project.optional-dependencies]
