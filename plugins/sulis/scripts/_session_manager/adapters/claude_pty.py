@@ -14,6 +14,18 @@ Stripe-rule discriminator). A new io-model for a provider is a new adapter
 file, leaving the frozen :class:`ClaudeAdapter` untouched — the two coexist,
 one per (provider, io-model), exactly the contract's shape.
 
+**Remote Control is ON by default (this change's SPEC).** The spawned
+interactive session comes up with Claude Code's Remote Control already enabled
+(``claude --remote-control [name]``, interactive-only per ``claude --help``
+v2.1.177), named after the change (its ``CH-XXXXXX`` handle) so the founder can
+identify it in their Remote Control list — they no longer enable it by hand each
+spawn. An env-var opt-out (``SULIS_SESSION_REMOTE_CONTROL`` set to a falsey
+value) removes the flag; this mirrors the launcher's ``SULIS_TERMINAL_OS_WINDOW``
+override-knob convention with **inverted polarity** (default-ON / opt-out, not
+the launcher's default-OFF / opt-in). The headless chat adapter
+(:mod:`~_session_manager.adapters.claude`) deliberately does NOT carry the flag —
+Remote Control is an interactive-only feature.
+
 **The pty io-model has no decode seam.** A pty session is a terminal view, not
 a structured-chat stream: the manager reads the pty master as raw bytes and
 feeds a scrollback buffer (§2.11). So ``encode`` / ``decode`` / ``turn_complete``
@@ -62,6 +74,7 @@ real-pty round-trip is **observed-done** in WP-007.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import _change_session
@@ -70,7 +83,7 @@ from _session_manager.adapter import Capabilities, SessionSpec
 from _session_manager.classifier import RecoveryClass
 from _session_manager.events import Event, EventError
 from _session_manager.recovery import ReauthTicket
-from _wpxlib import validate_change_ulid
+from _wpxlib import ulid_handle, validate_change_ulid
 
 # The interactive argv (§2.4 / ADR-004). cwd is NOT here — the CLI is launched
 # *in* cwd by the manager's spawn, so cwd is a process attribute, not a flag.
@@ -84,6 +97,32 @@ _BASE_ARGV: tuple[str, ...] = (
     "--agent",
     "sulis",
 )
+
+# ─── Remote Control opt-out knob (this change's SPEC; default-ON) ────────────
+# Claude Code's Remote Control (``claude --remote-control [name]``,
+# interactive-only per ``claude --help`` v2.1.177) is ON by default for a
+# spawned interactive change session so the founder never enables it by hand.
+# This mirrors the launcher's ``SULIS_TERMINAL_OS_WINDOW`` override-knob
+# convention but **inverts the polarity**: the launcher knob is default-OFF /
+# opt-IN (a truthy value turns it ON); this knob is default-ON / opt-OUT (a
+# falsey value turns it OFF). An unset/empty var is NOT falsey → enabled.
+_REMOTE_CONTROL_FLAG = "SULIS_SESSION_REMOTE_CONTROL"
+_REMOTE_CONTROL_FALSEY = frozenset({"0", "false", "no", "off"})
+
+
+def _remote_control_enabled() -> bool:
+    """Return True unless the opt-out knob is set to a falsey value.
+
+    Remote Control is ON by default; set ``SULIS_SESSION_REMOTE_CONTROL`` to a
+    falsey value (``0``/``false``/``no``/``off``, case-insensitive) to opt a
+    spawn out. An unset/empty value is NOT in the falsey set → enabled. This is
+    the default-ON inversion of the launcher's ``_os_window_enabled`` opt-in
+    knob.
+    """
+    return (
+        os.environ.get(_REMOTE_CONTROL_FLAG, "").strip().lower()
+        not in _REMOTE_CONTROL_FALSEY
+    )
 
 
 class InteractiveClaudePtyAdapter:
@@ -135,6 +174,8 @@ class InteractiveClaudePtyAdapter:
         a shell that is not in this spawn path."""
         argv = list(_BASE_ARGV)
         argv.extend(self._conversation_flags(spec))
+        if _remote_control_enabled():
+            argv.extend(self._remote_control_flags(spec))
         pre_prompt = self._read_pre_prompt(spec)
         if pre_prompt is not None:
             argv.append(pre_prompt)
@@ -216,6 +257,36 @@ class InteractiveClaudePtyAdapter:
             # Malformed change id — degrade to a fresh, un-pinned session rather
             # than crash the spawn (mirrors _read_pre_prompt's ignore-on-bad-id).
             return []
+
+    # ── internal: Remote Control fragment (default-ON; named after change) ──
+
+    def _remote_control_flags(self, spec: SessionSpec) -> list[str]:
+        """Return the ``--remote-control [name]`` argv fragment.
+
+        When ``spec.brief_change_id`` is a valid change ULID, name the Remote
+        Control session after the change (``["--remote-control", <handle>]``)
+        so it is identifiable in the founder's Remote Control list — the handle
+        is the same ``CH-XXXXXX`` display id surfaced everywhere else
+        (:func:`_wpxlib.ulid_handle`). Otherwise return the bare
+        ``["--remote-control"]`` (the CLI auto-names with its hostname prefix).
+
+        Reuses the established ``(spec.brief_change_id or "").strip()`` +
+        :func:`validate_change_ulid` guard that :meth:`_conversation_flags` /
+        :meth:`_read_pre_prompt` already use — the ULID validation is NOT
+        re-implemented here. The name is an ``execv`` literal token (the manager
+        spawns this adapter's argv **directly**, no ``shell=True``, §2.12), so
+        the handle's uppercase ``CH-`` prefix is safe — the launcher's
+        ``^[a-z][a-z0-9 \\-]+$`` entry-command whitelist applies to the shelled
+        launcher path, NOT this directly-spawned argv, so no lowercasing is
+        needed.
+        """
+        change_id = (spec.brief_change_id or "").strip()
+        if not change_id:
+            return ["--remote-control"]
+        ok, _reason = validate_change_ulid(change_id)
+        if not ok:
+            return ["--remote-control"]
+        return ["--remote-control", ulid_handle(change_id)]
 
     # ── internal: pre-prompt sidecar resolution ───────────────────────────
 
