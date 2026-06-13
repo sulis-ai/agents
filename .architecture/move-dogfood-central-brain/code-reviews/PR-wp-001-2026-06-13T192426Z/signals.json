@@ -1,0 +1,25 @@
+{
+  "pr": "wp-001-multi-root-read-seam",
+  "branch": "wp/extend/wp-001-multi-root-read-seam",
+  "base": "change/move-dogfood-central-brain",
+  "verdict": "PASS",
+  "build_verification": {
+    "ruff_check_head": "all checks passed",
+    "pytest_head": "18 passed",
+    "pr_introduced_errors": 0
+  },
+  "hygiene": {
+    "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "none"},
+    "size": {"lines_added": 160, "lines_removed": 17, "files_changed": 2, "severity": "none"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+    "completeness": {"new_source_without_test": 0, "api_change_without_schema": false, "tests_added": 3, "severity": "none"}
+  },
+  "lenses": {
+    "architecture": {"in_changes": 0, "in_neighbours": 0, "top_concern": null},
+    "security": {"in_changes": 0, "in_neighbours": 0, "top_concern": null},
+    "quality": {"in_changes": 0, "in_neighbours": 0, "top_concern": null}
+  },
+  "findings": [],
+  "draft_deltas": [],
+  "dispatch": "single-reader (carve-out: 160 lines / 2 files, within CR-02 threshold)"
+}

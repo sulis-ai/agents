@@ -36,28 +36,21 @@ _INSTANCE_FILE_GLOB: Final[str] = "*.jsonld"
 _ENTITY_ID_RE: Final = re.compile(r"^dna:[a-z]+:[0-9A-HJKMNP-TV-Z]{26}$")
 
 
-def iter_entities(
+def _iter_one_root(
     base_dir: Path,
     *,
-    domain: str | None = None,
-    entity_type: str | None = None,
+    domain: str | None,
+    entity_type: str | None,
 ) -> Iterator[dict]:
-    """Yield every entity instance under `base_dir`, optionally scoped by
-    domain and/or entity_type.
+    """Yield every entity instance under a SINGLE root.
 
-    Args:
-        base_dir: the `.brain/instances/` root.
-        domain: limit to one domain (foundation / product-development /
-            insurance-broking). None = walk all domains.
-        entity_type: limit to one entity type (decision / requirement /
-            testresult / …). None = walk all entity types in scope.
+    The on-disk walk: `base_dir/{domain}/{entity_type}/*.jsonld`. The one and
+    only tree-walk in this module — both the single-root and multi-root public
+    paths route through here, so there is no duplicated traversal (ADR-001).
 
-    Yields:
-        Each entity instance as a dict (the parsed JSON-LD).
-
-    Performance: file-system walk + JSON parse per file. O(N) where N is
-    total instance count. Acceptable for N < ~5000; revisit when that
-    ceiling matters.
+    A missing root yields nothing (the degradation contract callers rely on);
+    a malformed instance file is skipped silently (the write path validates,
+    so corruption at rest means something else touched the store).
     """
     base = Path(base_dir)
     if not base.exists():
@@ -85,6 +78,74 @@ def iter_entities(
                     # path validates; corruption at rest means something
                     # else touched the store.
                     continue
+
+
+def iter_entities(
+    base_dir: Path,
+    *,
+    domain: str | None = None,
+    entity_type: str | None = None,
+    library_root: Path | None = None,
+) -> Iterator[dict]:
+    """Yield every entity instance, optionally unioning a read-only library root.
+
+    The Brain read seam is multi-root (ADR-001): it can read the union of
+    (a) the **captures root** (`base_dir`, the live record) and (b) an
+    optional read-only **library root** (`library_root`, the shipped
+    foundation baseline, read plugin-relative). Writes never touch the
+    library root — it is read-only by construction.
+
+    Union is by entity id; on collision the captures root **wins** (it is the
+    live record, the library is the immutable shipped baseline that must never
+    shadow a capture). In practice the two roots are disjoint by entity type
+    (the library ships `foundation/workflow|step|tool`; captures hold
+    `product-development/*` and identity stamps), so the collision case is
+    defensive, not expected.
+
+    When `library_root` is None this is a plain single-root read of `base_dir`
+    — the historical behaviour, byte-for-byte, so existing callers are
+    unaffected.
+
+    Args:
+        base_dir: the captures `.brain/instances/` root (the primary, live
+            record; wins on id collision).
+        domain: limit to one domain (foundation / product-development /
+            insurance-broking). None = walk all domains in each root.
+        entity_type: limit to one entity type (decision / requirement /
+            testresult / …). None = walk all entity types in scope.
+        library_root: optional read-only library `.brain/instances/` root to
+            union beneath the captures root. None = single-root read.
+
+    Yields:
+        Each entity instance as a dict (the parsed JSON-LD). Captures-root
+        entities are yielded first, then library-root entities whose ids did
+        not appear in the captures root.
+
+    Performance: file-system walk + JSON parse per file. O(N) where N is the
+    total instance count across both roots. Acceptable for N < ~5000; revisit
+    when that ceiling matters.
+    """
+    if library_root is None:
+        yield from _iter_one_root(
+            base_dir, domain=domain, entity_type=entity_type
+        )
+        return
+
+    # Multi-root union, captures-win: yield every captures entity, recording
+    # its id; then yield only the library entities whose ids were not already
+    # contributed by captures.
+    seen_ids: set[str] = set()
+    for inst in _iter_one_root(base_dir, domain=domain, entity_type=entity_type):
+        entity_id = inst.get("id")
+        if isinstance(entity_id, str):
+            seen_ids.add(entity_id)
+        yield inst
+    for inst in _iter_one_root(
+        library_root, domain=domain, entity_type=entity_type
+    ):
+        if inst.get("id") in seen_ids:
+            continue
+        yield inst
 
 
 def find_entities(
