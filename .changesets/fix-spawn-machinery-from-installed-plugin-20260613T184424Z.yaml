@@ -1,7 +1,0 @@
-change_id: 01KV0WE0CH3FNT3361WGPB2HBZ
-primitive: fix
-tier: patch
-touches_plugin: true
-summary: |
-  Spawned change windows now run the viewer, daemon, and git hooks from the installed plugin (newest cached version) instead of the spawning change worktree copy; adds a SULIS_SPAWN_SCRIPTS_DIR dev override and a graceful no-install fallback.
-created_at: 2026-06-13T18:44:24Z

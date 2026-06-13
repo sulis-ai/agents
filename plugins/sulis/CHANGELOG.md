@@ -1,3 +1,9 @@
+## v0.163.1 — 2026-06-13
+
+**Patch — release-train batch.**
+
+- Spawned change windows now run the viewer, daemon, and git hooks from the installed plugin (newest cached version) instead of the spawning change worktree copy; adds a SULIS_SPAWN_SCRIPTS_DIR dev override and a graceful no-install fallback.
+
 ## v0.163.0 — 2026-06-13
 
 **Minor — release-train batch.**
