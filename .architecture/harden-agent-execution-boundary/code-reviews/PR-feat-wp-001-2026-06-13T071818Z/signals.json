@@ -1,0 +1,41 @@
+{
+  "review": {
+    "target": "feat/wp-001-l1-contract-ports-and-secret-pattern-extract",
+    "base": "change/harden-agent-execution-boundary",
+    "project": "harden-agent-execution-boundary",
+    "timestamp": "2026-06-13T071818Z",
+    "wp": "WP-001"
+  },
+  "verdict": "PASS",
+  "verdict_plain": "Ready to merge",
+  "auto_downgrade_triggers": [],
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "commands": ["python3 -m py_compile", "ruff check"],
+    "type_checker": "none configured (matches CI)"
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "total": 0
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "status": "nothing-surfaced"},
+    "security": {"findings": 0, "status": "nothing-surfaced"},
+    "quality": {"findings": 0, "status": "nothing-surfaced"}
+  },
+  "hygiene": {
+    "scope": "note",
+    "size": "note",
+    "safety": "clean",
+    "completeness": "clean"
+  },
+  "hardening_deltas": [],
+  "watch_list": [
+    "Secret catalogue is format-based; novel shapes can pass. Documented in _secret_patterns.py + ADR-002; real L1 control is Rule-of-Two exclusion (WP-002/003)."
+  ],
+  "notes": [
+    ".coverage test artifact present in worktree — must be excluded from commit (housekeeping, not a code finding).",
+    "59 pre-existing ruff errors in unrelated tests/unit/ files — neighbour ring, not PR-introduced, out of WP scope."
+  ]
+}
