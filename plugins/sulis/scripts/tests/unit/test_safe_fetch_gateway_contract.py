@@ -146,3 +146,19 @@ def test_outbound_fetcher_is_runtime_checkable():
         pass
 
     assert not isinstance(_NotAFetcher(), OutboundFetcher)
+
+
+# ─── Production adapter conforms to the same FetchGateway contract (WP-002) ───
+
+
+def test_production_proxy_satisfies_fetch_gateway_protocol():
+    """MEA-09: the production adapter (``SafeFetchProxy``, WP-002) must satisfy
+    the SAME ``FetchGateway`` contract the in-memory fake does. Wired with an
+    in-memory ``OutboundFetcher`` so this stays network-free."""
+    from _safe_fetch.proxy import SafeFetchProxy
+
+    proxy: FetchGateway = SafeFetchProxy(_FakeFetcher())
+    assert isinstance(proxy, FetchGateway)
+    result = proxy.fetch(FetchRequest(url="https://example.com/never-listed"))
+    assert isinstance(result, FetchResult)
+    assert result.content_is_untrusted_data is True

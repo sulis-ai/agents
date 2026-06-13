@@ -1,0 +1,36 @@
+{
+  "wp": "WP-002",
+  "branch": "feat/wp-002-l1-proxy-scrub-and-data-framing",
+  "base": "change/harden-agent-execution-boundary",
+  "timestamp": "2026-06-13T095201Z",
+  "verdict": "PASS",
+  "build_verification": {
+    "ruff_check": "pass",
+    "type_checker": "none configured (coverage gap, matches repo baseline)",
+    "introduced_errors": 0
+  },
+  "hygiene": {
+    "scope": "low",
+    "size": {"severity": "low", "lines": 457, "files": 4},
+    "safety": {"severity": "low", "migrations": 0, "schemas": 0, "infra": 0, "secret_pattern_hits": 0},
+    "completeness": {"severity": "low", "new_source_without_test": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "note": "nothing surfaced"},
+    "security": {"findings": 1, "addressed_inline": 1, "note": "header-name scrub gap fixed inline + tested"},
+    "quality": {"findings": 0, "note": "100% coverage on new modules; no CR-10 perf anti-patterns"}
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "lens": "security",
+      "location": "_safe_fetch/proxy.py:_refuse_if_secret",
+      "status": "addressed-inline",
+      "summary": "Scrub scanned header values but not header names; now scans both. Backed by test_secret_in_header_name_is_refused_before_dns.",
+      "rule": "SEC (defence-in-depth on a security control)"
+    }
+  ],
+  "draft_deltas": 0,
+  "auto_downgrade_triggers": []
+}
