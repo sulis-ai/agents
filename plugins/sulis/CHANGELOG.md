@@ -1,3 +1,9 @@
+## v0.161.0 — 2026-06-13
+
+**Minor — release-train batch.**
+
+- Safe-fetch proxy now returns clean extracted content (trafilatura) instead of raw HTML: a format parameter (raw|text|markdown|structured, default markdown) with a structured JSON contract {url,title,content,links,fetched_at}. Active/hidden content (scripts/comments/hidden nodes) stripped as defence-in-depth; visible-prose injection honestly survives (the control stays treat-as-data + no-raw-egress). Content stays framed as untrusted data.
+
 ## v0.160.0 — 2026-06-13
 
 **Minor — release-train batch.**
