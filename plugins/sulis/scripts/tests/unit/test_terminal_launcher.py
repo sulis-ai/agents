@@ -921,3 +921,40 @@ def test_module_un_deprecated_for_change_start():
     # The launcher's purpose statement should describe the sanctioned spawn,
     # not a deprecated-in-favour-of-cockpit posture.
     assert "launch_change_terminal" in src
+
+
+# ─── WP-001 (CH-3FNT33): origin-hook exports target the INSTALLED scripts ───
+# The origin-hook block (enable_origin_hook=True) used to export
+# SULIS_SCRIPTS_DIR / GIT_CONFIG_VALUE_0 from the launcher's OWN dir. WP-001
+# redirects it at the installed cache scripts dir via
+# `_resolve_installed_scripts_dir()`, with a fake cache under tmp_path.
+
+
+def _make_fake_cache(tmp_path, versions):
+    """Materialise `<tmp>/sulis-ai-agents/sulis/<ver>/scripts` for each version
+    and return the cache ROOT (the value `default_cache_root` is patched to)."""
+    cache_root = tmp_path / "cache"
+    sulis_dir = cache_root.joinpath(*tl._prune_cache._SULIS_SUBPATH)
+    for ver in versions:
+        (sulis_dir / ver / "scripts").mkdir(parents=True, exist_ok=True)
+    return cache_root
+
+
+def test_origin_hook_targets_installed_cache_scripts(tmp_path, monkeypatch):
+    """(AC-2) With a fake cache, the origin-hook exports point at the CACHE
+    scripts dir: `export SULIS_SCRIPTS_DIR=<cache>/…/<max>/scripts` and
+    `GIT_CONFIG_VALUE_0=<cache>/…/<max>/scripts/hooks` — NOT the module dir."""
+    monkeypatch.delenv("SULIS_SPAWN_SCRIPTS_DIR", raising=False)
+    cache_root = _make_fake_cache(tmp_path, ["0.98.0", "0.126.0"])
+    monkeypatch.setattr(tl._prune_cache, "default_cache_root", lambda: cache_root)
+    sulis_dir = cache_root.joinpath(*tl._prune_cache._SULIS_SUBPATH)
+    cache_scripts = (sulis_dir / "0.126.0" / "scripts").resolve()
+
+    script = tl._build_launch_script(_GOOD_ULID, tmp_path, enable_origin_hook=True)
+    assert f"export SULIS_SCRIPTS_DIR={shlex.quote(str(cache_scripts))}" in script
+    assert (
+        f"GIT_CONFIG_VALUE_0={shlex.quote(str(cache_scripts / 'hooks'))}" in script
+    )
+    # The launcher's own dir must NOT be what's exported.
+    module_dir = Path(tl.__file__).resolve().parent
+    assert f"export SULIS_SCRIPTS_DIR={shlex.quote(str(module_dir))}" not in script
