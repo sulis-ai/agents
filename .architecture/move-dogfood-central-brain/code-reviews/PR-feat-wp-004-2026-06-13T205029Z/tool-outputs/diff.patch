@@ -1,0 +1,95 @@
+diff --git a/.sulis/repo-contract.yml b/.sulis/repo-contract.yml
+index 76463bf6..37f4db25 100644
+--- a/.sulis/repo-contract.yml
++++ b/.sulis/repo-contract.yml
+@@ -4,16 +4,7 @@
+ repo: sulis-ai/agents
+ owner: iainn
+ 
+-# --- Brain location (orphan-nothing pin) -------------------------------------
+-# The brain's default home moved to the user-level settings store
+-# (`{sulis_state_base}/.brain/instances`) so end-user captures are no longer
+-# trapped on a change branch (de-branch-scope-the-brain). This repo dogfoods a
+-# COMMITTED in-repo brain (version-controlled dev entities that travel with the
+-# branch), so it pins the old per-repo location explicitly. The value is
+-# relative, so it resolves against the repo/worktree root — keeping the
+-# committed brain exactly where it has always lived. See
+-# plugins/sulis/scripts/_brain_location.py for the resolver.
+-brain_location: .brain/instances
++# Brain location is the user-level central default (dogfood: behave like installed users). See ADR-001.
+ 
+ # --- Profile + contribution model (RC v0.3.0) --------------------------------
+ # This is a Claude Code plugin MARKETPLACE — a published artifact, not a
+diff --git a/plugins/sulis/scripts/tests/unit/test_dogfood_resolves_central.py b/plugins/sulis/scripts/tests/unit/test_dogfood_resolves_central.py
+index 16e792ee..bc57cc13 100644
+--- a/plugins/sulis/scripts/tests/unit/test_dogfood_resolves_central.py
++++ b/plugins/sulis/scripts/tests/unit/test_dogfood_resolves_central.py
+@@ -1,28 +1,21 @@
+ """Dogfood proof: Sulis's OWN captures resolve to the central user-level home.
+ 
+-This is the test-first RED that gates the in-repo `brain_location` pin removal.
+-Unlike `test_brain_location.py` — which characterises the *resolver's capability*
+-against synthetic tmp contracts — this test reads **Sulis's real
++This is the behavioural proof that gated the in-repo `brain_location` pin
++removal. Unlike `test_brain_location.py` — which characterises the *resolver's
++capability* against synthetic tmp contracts — this test reads **Sulis's real
+ `.sulis/repo-contract.yml`** and asserts what its actual configuration produces.
+-It is the behavioural proof that Sulis itself de-branch-scopes its brain: a
+-capture made anywhere in the repo (including a throwaway change worktree) lands
+-in the shared user-level settings home (`sulis_state_base()/.brain/instances`)
+-and survives the worktree being removed at ship — NOT trapped under `repo_root`.
+-
+-WHY xfail (strict) RIGHT NOW
+-----------------------------
+-Sulis's repo-contract still pins the legacy in-repo location
+-(`brain_location: .brain/instances`), so the resolver correctly honours that
+-pin and resolves *under the repo root* today. The pin is removed in the next
+-piece of work, after which this assertion holds. We mark the test
+-`xfail(strict=True)` so:
+-
+-  * the suite stays GREEN now (the failure is the *expected* outcome while the
+-    pin is present), and
+-  * once the pin is removed the test PASSES — and strict-xfail then turns a
+-    now-passing xfail into a FAILURE ("XPASS"), forcing the pin-removal work to
+-    delete this marker. That is the built-in safety that keeps the two pieces of
+-    work in lockstep: this test cannot silently rot.
++It is the proof that Sulis itself de-branch-scopes its brain: a capture made
++anywhere in the repo (including a throwaway change worktree) lands in the shared
++user-level settings home (`sulis_state_base()/.brain/instances`) and survives
++the worktree being removed at ship — NOT trapped under `repo_root`.
++
++This test was introduced `xfail(strict=True)` while Sulis's repo-contract still
++pinned the legacy in-repo location (`brain_location: .brain/instances`): the
++resolver honoured the pin and resolved under the repo root, so the assertion
++expectedly failed. Removing the pin made the resolver fall through to the
++central default — the assertion now holds, and strict-xfail forced the pin
++removal to delete the marker (an unexpected XPASS would otherwise have failed
++the suite). With the pin gone this asserts as a normal GREEN test.
+ 
+ The kept resolver-capability tests in `test_brain_location.py` (the precedence
+ chain + the relative-pin escape hatch) are deliberately untouched — they test
+@@ -39,8 +32,6 @@ import sys  # noqa: E402
+ if str(_SCRIPTS) not in sys.path:
+     sys.path.insert(0, str(_SCRIPTS))
+ 
+-import pytest  # noqa: E402
+-
+ from _brain_location import brain_base_dir  # noqa: E402
+ from _change_state import sulis_state_base  # noqa: E402
+ 
+@@ -61,15 +52,6 @@ def _sulis_repo_root() -> Path:
+     )
+ 
+ 
+-@pytest.mark.xfail(
+-    strict=True,
+-    reason=(
+-        "Sulis's in-repo brain_location pin is still present; it is removed in "
+-        "the pin-removal work, after which Sulis's captures resolve to the "
+-        "central user-level home and this test passes. strict=True forces the "
+-        "pin-removal work to delete this marker (XPASS would otherwise fail)."
+-    ),
+-)
+ def test_sulis_captures_resolve_central(tmp_path, monkeypatch):
+     # Isolate the settings home so the test never touches the real ~/.sulis
+     # (tmp_path is pytest's per-test, auto-cleaned dir — matching the isolation
