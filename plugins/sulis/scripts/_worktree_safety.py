@@ -20,38 +20,50 @@ The change-id in the path is the unique key; a name/number glob throws it away.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 from _change_state import change_dir
 
-_ULID_RE = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
-
-
-def _is_within(child: Path, parent: Path) -> bool:
-    try:
-        child.relative_to(parent)
-        return True
-    except ValueError:
-        return False
+# REUSE — not fork — the L2 scope-resolver's safety core (ADR-004).
+# `within_change_scope` is the SINGLE-ROOT, exclude-cwd, exclude-base special
+# case of the same canonical-resolution + fail-closed containment primitive that
+# the multi-root `within_allowed_scope` is built on. One copy of the #130
+# invariant: a fix to the containment check (a new traversal/symlink case)
+# lands in `_file_scope.resolve_within_roots` and both resolvers inherit it.
+from _file_scope import (
+    _is_within,
+    canonical,
+    is_valid_change_id,
+    resolve_within_roots,
+)
 
 
 def within_change_scope(target, change_id, *, cwd=None) -> "tuple[bool, str]":
     """(ok, reason). True ONLY when `target` resolves to strictly within change
-    `change_id`'s scoped dir and isn't the cwd/an ancestor. Fail-closed on a
-    missing/invalid change_id. See module docstring for the threat model."""
+    `change_id`'s scoped dir and isn't the change dir itself, the cwd, or an
+    ancestor of the cwd. Fail-closed on a missing/invalid change_id. See module
+    docstring for the threat model.
+
+    This is the single-root (`change_dir(cid)`), exclude-cwd, exclude-base
+    special case of `_file_scope.within_allowed_scope` — expressed via the same
+    shared `resolve_within_roots` core so the #130 invariant lives in one place.
+    """
     cid = str(change_id or "").strip()
-    if not _ULID_RE.match(cid):
+    if not is_valid_change_id(cid):
         return False, ("no valid change scope — refusing removal. A removal must "
                        "name the change it owns; never enumerate-and-match by name.")
     base = change_dir(cid).resolve()
-    try:
-        resolved = Path(target).resolve()
-    except (OSError, RuntimeError) as exc:  # pragma: no cover - exotic FS error
-        return False, f"cannot resolve target path {target!r}: {exc}"
-    if resolved == base or not _is_within(resolved, base):
-        return False, (f"refusing: {resolved} is outside change {cid}'s scope "
-                       f"({base}) — cross-change / out-of-scope removal blocked.")
+    # Shared containment decision (canonical resolve + fail-closed) over the
+    # single allowed root.
+    ok, _reason = resolve_within_roots(target, cid, [base])
+    resolved = canonical(target)
+    # Refuse anything outside the root OR the root itself: removing the whole
+    # change dir via a worktree-remove is not a worktree op (strictly-within).
+    if not ok or resolved is None or resolved == base:
+        return False, (f"refusing: {resolved if resolved is not None else target} "
+                       f"is outside change {cid}'s scope ({base}) — "
+                       f"cross-change / out-of-scope removal blocked.")
+    # Exclude the cwd / an ancestor of it: don't delete the floor you stand on.
     if cwd is not None:
         cwdr = Path(cwd).resolve()
         if resolved == cwdr or _is_within(cwdr, resolved):
