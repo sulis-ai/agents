@@ -1,0 +1,30 @@
+{
+  "pr": "feat/wp-003-l1-tool-spawn-wiring-and-egress-scenarios",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["feat"], "module_fan_out": 2, "severity": "low" },
+    "size": { "lines_added": 856, "lines_removed": 0, "files_changed": 8, "severity": "medium",
+              "note": "mostly tests + docstrings; production source delta ~55 lines across tool.py + spawn_env.py + manager.py" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "low" },
+    "completeness": { "new_source_without_test": 0, "api_change_without_schema": false, "severity": "low",
+                      "note": "every new source file has a dedicated test; test-first per EP-02" }
+  },
+  "findings": {
+    "in_changes": [
+      { "id": "F-01", "severity": "medium", "lens": "security",
+        "file": "plugins/sulis/scripts/_session_manager/spawn_env.py",
+        "rule": "SEC-secrets-exposure",
+        "summary": "Credential-name exclusion used a suffix-only convention; AWS_ACCESS_KEY_ID / GOOGLE_APPLICATION_CREDENTIALS / SSH_AUTH_SOCK passed through (would reach the agent's fetch-path env).",
+        "status": "fixed-inline",
+        "resolution": "Added _CREDENTIAL_EXACT_NAMES allowlist + tests; the Rule-of-Two primary control now excludes these well-known credential vars." }
+    ],
+    "in_neighbours": []
+  },
+  "draft_deltas": [],
+  "lenses": {
+    "architecture": "nothing surfaced — tool.py is dependency-inward (imports only _safe_fetch.ports); spawn_env.py is pure; no new timeouts/circuit-breakers needed (proxy owns timeout per WP-002); no new circular imports.",
+    "security": "1 finding (F-01, fixed inline). No hardcoded secrets (test fixtures use pat_ catalogue shape). The shim is test-only + asserted un-importable from prod.",
+    "quality": "no dead surface; no contract drift; CR-10 performance: no anti-pattern matches (child_spawn_env is one dict-comp over a small env map; no loops-with-IO/N+1). Test coverage: every new behaviour tested (test-first)."
+  }
+}

@@ -60,4 +60,5 @@ package = false
 markers = [
     "dogfood: end-to-end test that exercises the discover-project skill against the marketplace's own repo (the n=2 acceptance per ADR-001). May be skipped in offline CI via `-m 'not dogfood'`.",
     "contract_suite: the SESSION_MANAGER_CONTRACT §2.10 conformance stubs (WP-008). The shared fixture set Phase-2's cockpit socket-client `runSessionBridgeContract` points at (§2.8.3); selectable as one suite via `-m contract_suite`.",
+    "live_network: L1 safe-fetch leg that hits the real network (SC-L1.1 deferred need `safe-fetch-live-url`). Opt-in only — skipped in CI via the default `-m 'not live_network'` selection; run locally with `-m live_network`.",
 ]
