@@ -77,15 +77,33 @@ def test_relocated_brain_added(tmp_path, monkeypatch):
 
 
 def test_in_worktree_brain_adds_no_root(tmp_path, monkeypatch):
-    """The DEFAULT brain resolves INSIDE the worktree (<worktree>/.brain/
-    instances) → brain_dir stays None (already covered by the worktree root)."""
-    # The default brain_base_dir is repo_root/.brain/instances. Point repo_root
-    # at the change worktree so the default brain lands inside it.
+    """An IN-WORKTREE brain → brain_dir stays None (already covered by the worktree
+    root). NOTE: since #346 the DEFAULT brain is the user-level home (OUTSIDE the
+    worktree — see test_default_user_level_brain_added); this test explicitly
+    configures an in-worktree brain to exercise the containment branch."""
     worktree = _mk(change_worktree_dir(_CID))
+    # Force an in-worktree brain via the env override (#127 resolution order).
+    monkeypatch.setenv("SULIS_BRAIN_BASE_DIR", str(worktree / ".brain" / "instances"))
     roots = resolve_allowed_roots(_CID, repo_root=worktree)
     assert roots.brain_dir is None, (
         "an in-worktree brain must add no extra root (worktree already covers it)"
     )
+
+
+def test_default_user_level_brain_added(tmp_path):
+    """Since #346 the DEFAULT brain is the user-level home
+    ({SULIS_STATE_DIR}/.brain/instances), which is OUTSIDE the change worktree, so
+    it MUST be added as a writable root — the brain-out-of-worktree case (D5/D7),
+    now the live default. (No SULIS_BRAIN_BASE_DIR set: the autouse fixture clears
+    it, so brain_base_dir falls to the user-level default under SULIS_STATE_DIR.)"""
+    worktree = _mk(change_worktree_dir(_CID))
+    roots = resolve_allowed_roots(_CID, repo_root=worktree)
+    assert roots.brain_dir is not None, (
+        "the user-level default brain is outside the worktree and must be a writable root"
+    )
+    ok, _ = within_allowed_scope(roots.brain_dir / "x.jsonld", _CID,
+                                 operation="write", roots=roots)
+    assert ok, "a write under the default user-level brain must be allowed"
 
 
 def test_brain_dir_permitted_for_all_ops(tmp_path):
