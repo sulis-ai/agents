@@ -9,7 +9,7 @@
 
 | ID | Title | Primitive | Status | Depends On | Blocks |
 |----|-------|-----------|--------|------------|--------|
-| WP-001 | Resolve the installed-plugin scripts dir for the spawned viewer exec line + origin hook | fix | in_progress | — | — |
+| WP-001 | Resolve the installed-plugin scripts dir for the spawned viewer exec line + origin hook | fix | done | — | — |
 
 ## Detail (extra columns — second table, non-canonical by design)
 
