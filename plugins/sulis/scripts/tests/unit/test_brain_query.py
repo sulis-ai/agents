@@ -108,6 +108,88 @@ class TestIterEntities:
         assert len(reqs) == 3
 
 
+# ─── Multi-root read seam (WP-001 / ADR-001) ─────────────────────────────────
+# The read seam unions a read-only LIBRARY root (the shipped foundation
+# instances, read plugin-relative) with the CAPTURES root (the live record).
+# Union is by entity id; on collision the captures root wins (it is the live
+# record; the library is the immutable shipped baseline that must never shadow
+# a capture). The single-root call delegates to the multi-root path — there is
+# no duplicated walk.
+
+
+def _write_entity(base: Path, domain: str, entity_type: str, entity: dict) -> None:
+    """Write one entity instance under `base/{domain}/{entity_type}/<ulid>.jsonld`."""
+    ulid = entity["id"].split(":")[-1]
+    p = base / domain / entity_type / f"{ulid}.jsonld"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(entity))
+
+
+_FWF_A = "dna:workflow:01WF0000000000000000000001"
+_FWF_B = "dna:workflow:01WF0000000000000000000002"
+
+
+class TestMultiRootRead:
+    def test_iter_entities_reads_only_one_root(self, tmp_path: Path) -> None:
+        """Gap proof: a single-root call cannot reach a foundation entity that
+        lives ONLY at a separate library root. This is the failure the
+        multi-root seam exists to fix — captures-only reads miss the shipped
+        library."""
+        captures = tmp_path / "captures" / "instances"
+        library = tmp_path / "library" / "instances"
+        # The library ships a foundation workflow; captures has none.
+        _write_entity(
+            library, "foundation", "workflow",
+            {"id": _FWF_A, "title": "shipped workflow"},
+        )
+        captures.mkdir(parents=True, exist_ok=True)
+
+        # A captures-only read genuinely cannot see the library entity.
+        captures_only = list(iter_entities(captures, domain="foundation"))
+        assert captures_only == []
+
+    def test_multi_root_unions_library_and_captures(self, tmp_path: Path) -> None:
+        """With a library_root supplied, the read is the union of both roots."""
+        captures = tmp_path / "captures" / "instances"
+        library = tmp_path / "library" / "instances"
+        # Library ships one foundation workflow.
+        _write_entity(
+            library, "foundation", "workflow",
+            {"id": _FWF_A, "title": "shipped workflow"},
+        )
+        # Captures has a (distinct) foundation workflow + a product requirement.
+        _write_entity(
+            captures, "foundation", "workflow",
+            {"id": _FWF_B, "title": "captured workflow"},
+        )
+        _write_entity(
+            captures, "product-development", "requirement",
+            {"id": _REQ_A, "title": "captured req"},
+        )
+
+        unioned = list(iter_entities(captures, library_root=library))
+        ids = {e["id"] for e in unioned}
+        assert ids == {_FWF_A, _FWF_B, _REQ_A}
+
+    def test_captures_win_on_id_collision(self, tmp_path: Path) -> None:
+        """When the same id appears in both roots, the captures copy wins —
+        the library baseline must never shadow a live capture."""
+        captures = tmp_path / "captures" / "instances"
+        library = tmp_path / "library" / "instances"
+        _write_entity(
+            library, "foundation", "workflow",
+            {"id": _FWF_A, "title": "library version", "origin": "library"},
+        )
+        _write_entity(
+            captures, "foundation", "workflow",
+            {"id": _FWF_A, "title": "captures version", "origin": "captures"},
+        )
+
+        unioned = list(iter_entities(captures, library_root=library))
+        assert len(unioned) == 1
+        assert unioned[0]["origin"] == "captures"
+
+
 class TestPredicates:
     def test_where_field_equals(self, tmp_path: Path) -> None:
         base = _seed(tmp_path)
