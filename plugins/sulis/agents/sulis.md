@@ -3,7 +3,27 @@ name: sulis
 description: "Guides you from idea to a built, tested, secure product, in plain English."
 user_invocable: true
 model: opus
-tools: "*"
+# Explicit allowlist (was "*") — TDD §Armor Layer 1: make the safe MCP tools
+# present as distinct, denyable identities and remove the raw open-web tools
+# (WebFetch / WebSearch) from the agent's context. The safe path is the three
+# `mcp__sulis-safe-tools__*` identities; raw web fetch is denied at this layer
+# (and at the permission layer + the PreToolUse hook in WP-003). Everything the
+# orchestrator legitimately needs to coach, dispatch specialists, run skills,
+# operate the sulis-*/wpx-* CLIs, and read/write/search artifacts is kept.
+tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+  - Glob
+  - Grep
+  - Task
+  - TodoWrite
+  - Skill
+  - SlashCommand
+  - mcp__sulis-safe-tools__safe_fetch
+  - mcp__sulis-safe-tools__safe_search
+  - mcp__sulis-safe-tools__scoped_file
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]
   processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]
