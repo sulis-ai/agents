@@ -1,3 +1,9 @@
+## v0.162.0 — 2026-06-13
+
+**Minor — release-train batch.**
+
+- Spawned interactive change sessions start with Claude Code Remote Control enabled by default (named after the change), with a SULIS_SESSION_REMOTE_CONTROL opt-out.
+
 ## v0.161.1 — 2026-06-13
 
 **Patch — release-train batch.**
