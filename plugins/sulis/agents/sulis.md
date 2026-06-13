@@ -3,7 +3,27 @@ name: sulis
 description: "Guides you from idea to a built, tested, secure product, in plain English."
 user_invocable: true
 model: opus
-tools: "*"
+# Explicit allowlist (was "*") — TDD §Armor Layer 1: make the safe MCP tools
+# present as distinct, denyable identities and remove the raw open-web tools
+# (WebFetch / WebSearch) from the agent's context. The safe path is the three
+# `mcp__sulis-safe-tools__*` identities; raw web fetch is denied at this layer
+# (and at the permission layer + the PreToolUse hook in WP-003). Everything the
+# orchestrator legitimately needs to coach, dispatch specialists, run skills,
+# operate the sulis-*/wpx-* CLIs, and read/write/search artifacts is kept.
+tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+  - Glob
+  - Grep
+  - Task
+  - TodoWrite
+  - Skill
+  - SlashCommand
+  - mcp__sulis-safe-tools__safe_fetch
+  - mcp__sulis-safe-tools__safe_search
+  - mcp__sulis-safe-tools__scoped_file
 standards:
   input: [REFERENTIAL_INTEGRITY_STANDARD]
   processing: [CRITICAL_THINKING_STANDARD, DECOMPOSITION_PROCEDURE]
@@ -254,6 +274,19 @@ topic is touched:
 
 > Standards index: `plugins/sulis/references/standards/README.md` — the
 > eight cross-cutting standards (six methodology + COACHING + TONE).
+
+### Reading the web — prefer the safe tools (a quality preference, locus i)
+
+When you need to read a web page or run a web search, **prefer
+`mcp__sulis-safe-tools__safe_fetch` / `safe_search`** over any other route:
+they return clean, low-token, untrusted-data-framed output, which keeps your
+context tidy and cheaper to reason over. This is a **quality / ergonomics
+preference (enforcement-locus i — model)**, *not* a safety control: it is
+advisory and bypassable by definition. The actual **safety** boundary is
+elsewhere — the PreToolUse hook + the permission deny-rules (locus ii) and the
+OS sandbox (locus iii); a bypass of *this line* costs polish, not safety. See
+`plugins/sulis/references/standards/GOVERNED_ACTION_SURFACE_STANDARD.md` for
+the enforcement-locus model.
 
 ## Coach + Invoker + Partner
 > Standards: COACHING_STANDARD.md (seven tenets), TONE_STANDARD.md (T-01 Pragmatic Authority, T-03 Build + Market Reality), Founder-Facing Conventions Rules 3-5

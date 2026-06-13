@@ -31,6 +31,12 @@ dependencies = [
     # env-assignment + slack/jwt/long-token); the anonymiser is catalogue-only.
     "detect-secrets>=1.5",
     "trafilatura>=2.1.0",
+    # Official Python MCP SDK — the transport the safe-tools server (ADR-002)
+    # runs over stdio. The server WRAPS the existing `_safe_fetch`/`_file_tools`
+    # libraries (D6: no logic reimplementation); the SDK is *called by* the
+    # adapter, not re-exported. stdio (not npx, not HTTP) is the convention for
+    # a co-located, plugin-shipped Python server.
+    "mcp>=1.0",
 ]
 
 [project.optional-dependencies]

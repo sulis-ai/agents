@@ -1,0 +1,26 @@
+#!/usr/bin/env python3
+"""sulis-safe-tools-mcp — thin launcher for the safe-tools MCP server (WP-001).
+
+Resolves this ``scripts/`` directory onto ``sys.path`` so the server's imports
+(``_safe_tools_mcp`` → ``_safe_fetch`` / ``_file_tools``) resolve, then runs the
+server over stdio. It carries NO logic of its own — it is the ``command`` entry
+``plugins/sulis/.mcp.json`` invokes (ADR-002: Python stdio, on the plugin's own
+env; NOT npx).
+
+The server reads its scope (``SULIS_CHANGE_ID`` / ``SULIS_REPO_ROOT``) from the
+launch environment the agent session sets, never from agent call args.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+_SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+
+from _safe_tools_mcp import main  # noqa: E402
+
+if __name__ == "__main__":
+    main()

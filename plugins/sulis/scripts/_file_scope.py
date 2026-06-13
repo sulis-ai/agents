@@ -16,6 +16,16 @@ The four file-tools (read / write / move / remove — WP-005) all call
 ``within_allowed_scope``, so the #130 invariant is enforced in ONE place, not
 in four drifting copies — the incident's drifted-copy root cause cannot recur.
 
+**One source, two consumers (ADR-004 / SC-E5).** The same canonical
+``AllowedRoots`` value feeds BOTH the L2 file-tools scope check (this module's
+``within_allowed_scope``) AND the L3 OS-sandbox config: ``sandbox_write_roots``
+emits the rw roots as sandbox ``allowWrite`` path strings, reading the one
+``AllowedRoots.writable_roots`` accessor the scope check also uses — so the two
+layers cannot drift. The *resolved* brain dir (via ``brain_base_dir`` — #127,
+never a hardcoded ``~/.sulis``) joins the rw roots **only when it is outside the
+worktree** (a relocated brain); narrowest-root throughout (the specific resolved
+subtree, never all of ``~/.sulis/``, which holds other changes' state).
+
 **Canonical paths everywhere.** Every allowlist root is ``.resolve()``-d at
 construction (``resolve_allowed_roots``) AND defensively re-resolved inside the
 containment check; the target is ``.resolve()``-d before comparison. So a path
@@ -44,7 +54,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from _change_state import change_dir, change_worktree_dir
+from _brain_location import brain_base_dir
+from _change_state import change_dir, change_worktree_dir, changes_base
 
 # Operations the resolver knows about. The credentials root permits only the
 # first; every other populated root permits all four.
@@ -121,9 +132,18 @@ def resolve_within_roots(
 class AllowedRoots:
     """Canonical (``.resolve()``-d) per-change allowlist roots + per-op policy.
 
-    ``tools_cache_dir`` and ``creds_dir`` are optional: a deployment that has
-    not configured them contributes no allowlist entry for them (a None root is
-    never a match — fail-closed). ``creds_dir`` permits ``read`` only.
+    ``tools_cache_dir``, ``creds_dir`` and ``brain_dir`` are optional: a
+    deployment (or a default-brain layout) that has not populated one
+    contributes no allowlist entry for it (a None root is never a match —
+    fail-closed). ``creds_dir`` permits ``read`` only; ``brain_dir`` — the
+    *resolved* brain dir, set ONLY when the brain lives outside the worktree
+    (a relocated brain; the default in-worktree brain is already covered by
+    ``worktree``) — is shared rw and permits all four operations.
+
+    The rw roots (``write``/``move``/``remove``) are the SINGLE SOURCE the
+    sandbox config consumes via :func:`sandbox_write_roots`; both that emit and
+    this scope check derive from :meth:`writable_roots`, so they cannot drift
+    (ADR-004 single-source-of-truth, SC-E5).
     """
 
     worktree: Path
@@ -131,16 +151,32 @@ class AllowedRoots:
     change_state_dir: Path
     tools_cache_dir: Path | None
     creds_dir: Path | None
+    brain_dir: Path | None = None
 
-    def permitted_for(self, operation: str) -> "list[Path]":
-        """The allowlist roots that permit ``operation`` (already-validated).
+    def writable_roots(self) -> "list[Path]":
+        """The roots that permit mutation (``write``/``move``/``remove``).
 
-        Every populated root permits all operations EXCEPT ``creds_dir``, which
-        permits ``read`` only. None roots contribute nothing.
+        This is the ONE rw root-set. ``permitted_for`` for a mutating op and
+        :func:`sandbox_write_roots` both read it — the file-tools scope check
+        and the sandbox ``allowWrite`` emit can therefore never drift.
+        ``creds_dir`` is excluded (read-only — never mutated via a scoped
+        file-tool). ``None`` roots contribute nothing (fail-closed).
         """
         roots: list[Path] = [self.worktree, self.git_common_dir, self.change_state_dir]
         if self.tools_cache_dir is not None:
             roots.append(self.tools_cache_dir)
+        if self.brain_dir is not None:
+            roots.append(self.brain_dir)
+        return roots
+
+    def permitted_for(self, operation: str) -> "list[Path]":
+        """The allowlist roots that permit ``operation`` (already-validated).
+
+        Mutating ops (``write``/``move``/``remove``) get :meth:`writable_roots`.
+        ``read`` gets the same set plus ``creds_dir`` (read-only secret). None
+        roots contribute nothing.
+        """
+        roots = self.writable_roots()
         if self.creds_dir is not None and operation == "read":
             roots.append(self.creds_dir)
         return roots
@@ -195,13 +231,43 @@ def resolve_allowed_roots(
             f"invalid change_id {change_id!r}: a scope must name the change it "
             f"owns (a valid ULID)."
         )
+    worktree = change_worktree_dir(change_id).resolve()
     return AllowedRoots(
-        worktree=change_worktree_dir(change_id).resolve(),
+        worktree=worktree,
         git_common_dir=_git_common_dir(Path(repo_root)),
         change_state_dir=change_dir(change_id).resolve(),
         tools_cache_dir=tools_cache_dir.resolve() if tools_cache_dir is not None else None,
         creds_dir=creds_dir.resolve() if creds_dir is not None else None,
+        brain_dir=_resolve_brain_root(Path(repo_root), worktree),
     )
+
+
+def _resolve_brain_root(repo_root: Path, worktree: Path) -> "Path | None":
+    """The canonical brain dir as a shared-rw root, or ``None``.
+
+    Resolves via ``brain_base_dir`` (the single #127 resolver — NEVER hardcode
+    ``~/.sulis``). Returns the resolved brain subtree ONLY when it is *outside*
+    the worktree (a relocated brain — e.g. ``~/.sulis/brain``); the default
+    in-worktree brain (``<repo>/.brain/instances``) is already covered by the
+    worktree root, so it adds no extra entry. Narrowest-root: the specific
+    resolved subtree, never all of ``~/.sulis/`` (which holds OTHER changes'
+    state — that would reopen the #130 cross-change risk). Fail-closed: an
+    unresolvable brain path contributes no root.
+    """
+    brain = canonical(brain_base_dir(repo_root))
+    if brain is None:
+        return None
+    if _is_within(brain, worktree):
+        return None
+    # Reject a too-broad brain: one that IS or CONTAINS the per-change state
+    # tree would let a write reach sibling changes (the #130 cross-change risk
+    # the narrowest-root rule exists to prevent). brain_base_dir faithfully
+    # returns whatever is configured, so this guard ENFORCES narrowest-root
+    # rather than merely documenting it. Fail-closed.
+    changes_root = canonical(changes_base())
+    if changes_root is not None and _is_within(changes_root, brain):
+        return None
+    return brain
 
 
 def within_allowed_scope(
@@ -252,3 +318,47 @@ def within_allowed_scope(
                 f"written/moved/removed via a scoped file-tool."
             )
     return ok, reason
+
+
+# ─── the sandbox-config emit (the SECOND consumer of the SAME rw root-set) ───
+
+
+def _sandbox_path_string(root: Path) -> str:
+    """One canonical rw root → a sandbox ``allowWrite`` path string.
+
+    The sandbox ``allowWrite`` grammar (per the Claude Code sandboxing docs)
+    accepts ``/abs``, ``~/`` and ``./`` prefixes — NOT the ``//abs`` *permission*
+    syntax. We emit an absolute path, collapsed to ``~/…`` when it lives under
+    the user's home (the docs' tilde form), else the plain ``/abs`` form. The
+    root is already ``.resolve()``-d (canonical) by ``resolve_allowed_roots``.
+    """
+    root = root.resolve()
+    home = Path.home().resolve()
+    if root == home or _is_within(root, home):
+        rel = root.relative_to(home)
+        # "~" for home itself; "~/<rel>" otherwise.
+        return "~" if str(rel) == "." else f"~/{rel.as_posix()}"
+    return root.as_posix()
+
+
+def sandbox_write_roots(roots: AllowedRoots) -> "list[str]":
+    """Emit the rw roots as sandbox ``allowWrite`` path strings (ADR-004).
+
+    The ONE adapter from the canonical :class:`AllowedRoots` to the sandbox
+    config shape (WP-004's recipe pastes this into
+    ``sandbox.filesystem.allowWrite``). It reads :meth:`AllowedRoots.writable_roots`
+    — the SAME set the file-tools scope check uses for a mutating op — so the L2
+    decision layer and the L3 sandbox config are structurally one source of
+    truth and cannot drift (SC-E5). Order is deterministic and dedup-stable.
+
+    Redundancy note (ADR-004): the sandbox auto-allows a linked worktree's
+    shared ``.git``, so emitting ``git_common_dir`` here is partly redundant
+    *under the sandbox* — but the L2 file-tools check still needs that root, and
+    emitting it keeps both consumers reading one set. We keep it (and document
+    the redundancy) rather than special-casing it out, which would reintroduce a
+    second, divergent list.
+    """
+    seen: dict[str, None] = {}
+    for root in roots.writable_roots():
+        seen.setdefault(_sandbox_path_string(root), None)
+    return list(seen)
