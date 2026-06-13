@@ -32,6 +32,7 @@ class _RecordingGateway:
             fetched_at="2026-06-13T00:00:00+00:00",
             content_is_untrusted_data=True,
             content=f"<<<UNTRUSTED>>>body for {req.url}<<<END>>>",
+            format=req.format,
         )
 
 
@@ -47,6 +48,24 @@ def test_safe_fetch_delegates_to_gateway_and_returns_framed_result() -> None:
     assert len(gateway.requests) == 1
     assert gateway.requests[0].url == "https://example.com/page"
     assert gateway.requests[0].method == "GET"
+
+
+def test_safe_fetch_defaults_to_markdown_format() -> None:
+    """CH-9SYSNE: with no ``format`` the tool requests clean markdown — the new
+    default — through the gateway seam."""
+    gateway = _RecordingGateway()
+    result = safe_fetch("https://example.com/page", gateway=gateway)
+    assert gateway.requests[0].format == "markdown"
+    assert result.format == "markdown"
+
+
+def test_safe_fetch_passes_format_through_to_the_gateway() -> None:
+    """CH-9SYSNE: ``format`` is a passthrough param — it reaches the gateway
+    unchanged so the proxy can shape the extracted content."""
+    gateway = _RecordingGateway()
+    result = safe_fetch("https://example.com/page", gateway=gateway, format="raw")
+    assert gateway.requests[0].format == "raw"
+    assert result.format == "raw"
 
 
 def test_safe_fetch_returns_the_gateways_result_unchanged() -> None:

@@ -38,18 +38,25 @@ from .ports import FetchGateway, FetchRequest, FetchResult
 _SEARCH_ENDPOINT = "https://duckduckgo.com/html/"
 
 
-def safe_fetch(url: str, *, gateway: FetchGateway) -> FetchResult:
+def safe_fetch(
+    url: str, *, gateway: FetchGateway, format: str = "markdown"
+) -> FetchResult:
     """Fetch ``url`` through the sanctioned gateway and return framed content.
 
     The agent's only told-about way to reach the open web. The returned
-    ``FetchResult`` is the gateway's verbatim reply: content wrapped as
-    untrusted **data** (ADR-003), ``content_is_untrusted_data=True``. The
-    gateway (the proxy in production) runs the outbound secret scrub before any
-    DNS resolution (WP-002); this tool adds no policy of its own and imposes no
-    URL allowlist — arbitrary public URLs are fetched, so open-web research is
+    ``FetchResult`` is the gateway's reply: content wrapped as untrusted
+    **data** (ADR-003), ``content_is_untrusted_data=True``. The gateway (the
+    proxy in production) runs the outbound secret scrub before any DNS
+    resolution (WP-002); this tool adds no policy of its own and imposes no URL
+    allowlist — arbitrary public URLs are fetched, so open-web research is
     preserved (SC-L1.1).
+
+    ``format`` is a passthrough (CH-9SYSNE): one of ``raw | text | markdown |
+    structured``, defaulting to clean ``markdown``. The proxy shapes the fetched
+    content accordingly AFTER the fetch and BEFORE framing — the tool itself
+    owns no extraction policy, it only forwards the caller's choice.
     """
-    return gateway.fetch(FetchRequest(url=url))
+    return gateway.fetch(FetchRequest(url=url, format=format))
 
 
 def safe_search(query: str, *, gateway: FetchGateway) -> FetchResult:
