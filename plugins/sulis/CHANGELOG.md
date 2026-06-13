@@ -1,3 +1,9 @@
+## v0.163.0 — 2026-06-13
+
+**Minor — release-train batch.**
+
+- Embed the safe tools into the agent governed action-surface: a Python stdio MCP server (safe_fetch/safe_search/scoped_file) the agent uses instead of raw WebFetch/file ops; a PreToolUse governance hook (within_change_scope on Write/Edit/Bash, allow sulis-*/wpx-*, deny raw curl/wget + WebFetch); one write-roots resolver (brain-location-aware, narrowest-root) shared by file-tools + the sandbox; the OS-sandbox enable recipe; and the governed-action-surface standard. Each rule labelled by enforcement-locus; adversarial subprocess egress (GAP-beta) deferred to a TLS-aware proxy.
+
 ## v0.162.0 — 2026-06-13
 
 **Minor — release-train batch.**
