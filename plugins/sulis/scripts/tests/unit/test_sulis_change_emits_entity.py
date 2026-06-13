@@ -13,9 +13,27 @@ import json
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
+import pytest
+
 _SCRIPTS = Path(__file__).resolve().parents[2]
 _ULID = "0123456789ABCDEFGHJKMNPQRS"
 _PRODUCT = f"dna:product:{_ULID}"
+
+
+@pytest.fixture(autouse=True)
+def _pin_brain_at_tmp(tmp_path, monkeypatch):
+    """Pin the brain at `tmp_path/.brain/instances` for these tests.
+
+    The brain's default location is now `{sulis_state_base}/.brain/instances`
+    (de-branch-scoped — no longer `<repo>/.brain`), and the repo-wide conftest
+    points SULIS_STATE_DIR at its own separate tmp dir. These tests pass
+    `tmp_path` as the repo root and seed/assert the brain at
+    `tmp_path/.brain/instances`, so pin the brain there explicitly via
+    SULIS_BRAIN_BASE_DIR (precedence-2 override — always wins over the default,
+    independent of state-dir isolation). Tests that set SULIS_BRAIN_BASE_DIR to
+    a different path override this per-test.
+    """
+    monkeypatch.setenv("SULIS_BRAIN_BASE_DIR", str(tmp_path / ".brain" / "instances"))
 
 
 def _load_sulis_change():

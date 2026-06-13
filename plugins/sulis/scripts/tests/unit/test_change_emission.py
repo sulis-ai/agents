@@ -27,6 +27,20 @@ _ULID = "0123456789ABCDEFGHJKMNPQRS"
 _PRODUCT = f"dna:product:{_ULID}"
 
 
+@pytest.fixture(autouse=True)
+def _pin_brain_at_tmp(tmp_path, monkeypatch):
+    """Pin the brain at `tmp_path/.brain/instances` for these tests.
+
+    The brain default is now `{sulis_state_base}/.brain/instances`
+    (de-branch-scoped), and the repo-wide conftest points SULIS_STATE_DIR at its
+    own separate tmp dir. Tests here call `resolve_for_product(tmp_path)` and
+    seed a product under `tmp_path/.brain`, so pin the brain there explicitly via
+    SULIS_BRAIN_BASE_DIR (precedence-2 override — always wins over the default,
+    independent of state-dir isolation).
+    """
+    monkeypatch.setenv("SULIS_BRAIN_BASE_DIR", str(tmp_path / ".brain" / "instances"))
+
+
 def _record(**over) -> dict:
     r = {
         "change_id": _ULID,
