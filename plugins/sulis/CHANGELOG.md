@@ -1,3 +1,9 @@
+## v0.161.1 — 2026-06-13
+
+**Patch — release-train batch.**
+
+- De-branch-scope the brain: its default home moves to the user-level settings store so captures made inside a change survive the change shipping, instead of being trapped in the throwaway workspace.
+
 ## v0.161.0 — 2026-06-13
 
 **Minor — release-train batch.**

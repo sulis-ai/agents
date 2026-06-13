@@ -1,7 +1,0 @@
-change_id: 01KV0C44PQ6XVHA0BNN4AP2DBX
-primitive: refactor
-tier: patch
-touches_plugin: true
-summary: |
-  De-branch-scope the brain: its default home moves to the user-level settings store so captures made inside a change survive the change shipping, instead of being trapped in the throwaway workspace.
-created_at: 2026-06-13T13:04:30Z

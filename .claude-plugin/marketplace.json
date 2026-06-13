@@ -4,7 +4,7 @@
     "name": "Iain"
   },
   "metadata": {
-    "version": "1.206.0",
+    "version": "1.206.1",
     "description": "Sulis AI helps non-technical founders build viable software end-to-end, with autonomous engineering handling the specification, design, build, review, and ship. See plugins/sulis/CHANGELOG.md for release detail."
   },
   "plugins": [
@@ -17,7 +17,7 @@
     {
       "name": "sulis",
       "source": "./plugins/sulis",
-      "version": "0.161.0",
+      "version": "0.161.1",
       "description": "Your AI engineering team in a plugin. Talk through what you want to build, and Sulis takes it end-to-end — gathering requirements, designing the architecture, writing and reviewing the code, and shipping it. Start with `claude --agent sulis`."
     }
   ]
