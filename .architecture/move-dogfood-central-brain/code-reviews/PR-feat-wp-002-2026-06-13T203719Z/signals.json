@@ -1,0 +1,32 @@
+{
+  "pr": "feat/wp-002-library-read-plugin-relative",
+  "base": "change/move-dogfood-central-brain",
+  "verdict": "PASS",
+  "build_verification": {
+    "ruff_check": "clean",
+    "py_compile": "ok",
+    "mypy_changed_file": "clean",
+    "pr_introduced_errors": 0
+  },
+  "hygiene": {
+    "scope": {"severity": "low", "commit_types": ["feat"], "module_fan_out": 1},
+    "size": {"severity": "note", "lines_added": 252, "lines_removed": 11, "files_changed": 2},
+    "safety": {"severity": "low", "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0},
+    "completeness": {"severity": "low", "new_source_without_test": 0, "tests_added": 5}
+  },
+  "lenses": {
+    "architecture": {"in_changes": 1, "top_concern": "existing TestLoadFromStore relied on default LIBRARY_ROOT - test isolation (FIXED inline)"},
+    "security": {"in_changes": 0, "note": "path traversal mitigated by LocalFileEntityAdapter._reject_unsafe_segment; local-fs reads only; no secrets"},
+    "quality": {"in_changes": 1, "top_concern": "N+1 adapter construction in tool-resolution loop (FIXED inline - adapters built once)"}
+  },
+  "findings_resolution": {
+    "inline_fixes": 2,
+    "remediation_wps": 0,
+    "exceptions": 0,
+    "details": [
+      "F-01 (architecture HIGH): TestLoadFromStore now passes library_root=None to preserve single-root isolation. Inline fix applied.",
+      "F-02 (quality MEDIUM-LOW, CR-10): _find_foundation_entity refactored to take pre-built adapters; captures+library foundation adapters constructed once per load_scenario_journey and reused across workflow + tool lookups. Inline fix applied."
+    ]
+  },
+  "post_fix": {"tests": "11 passed", "coverage_pct": 97, "ruff": "clean", "mypy_changed_file": "clean"}
+}
