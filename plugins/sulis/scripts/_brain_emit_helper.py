@@ -57,13 +57,17 @@ def _brain_emit_enabled() -> bool:
 
 def _brain_base_dir(repo_root: Path) -> Path:
     """Resolve the brain instances directory via the shared resolver (#127):
-    SULIS_BRAIN_BASE_DIR > repo-contract `brain_location` > `<repo>/.brain/instances`.
-    Best-effort: any import failure degrades to the default (emission never breaks)."""
+    SULIS_BRAIN_BASE_DIR > repo-contract `brain_location` > the user-level
+    settings home `{sulis_state_base}/.brain/instances` (de-branch-scoped).
+    Best-effort: any import failure degrades to the same user-level default
+    (emission never breaks AND never re-traps the brain in a change worktree)."""
     try:
         from _brain_location import brain_base_dir
         return brain_base_dir(repo_root)
     except Exception:
-        return Path(repo_root) / ".brain" / "instances"
+        import os
+        base = os.environ.get("SULIS_STATE_DIR") or (Path.home() / ".sulis")
+        return Path(base) / ".brain" / "instances"
 
 
 def _try_adapter(repo_root: Path, domain: str) -> Any:

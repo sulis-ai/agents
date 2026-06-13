@@ -1,9 +1,12 @@
-"""The user-configurable brain-location resolver (#127).
+"""The user-configurable brain-location resolver (#127, de-branch-scoped).
 
 One resolver, honoured everywhere: explicit > SULIS_BRAIN_BASE_DIR env >
-repo-contract `brain_location` > default `<repo>/.brain/instances`. The default
-is unchanged (non-disruptive); a user sets the location via env (transient) or
-the contract field (persistent — may point at a dir or their own repo).
+repo-contract `brain_location` > default. The default is the **user-level
+settings home** (`{sulis_state_base}/.brain/instances`), NOT the per-repo
+worktree — so a brain captured inside a change worktree survives the worktree
+being removed at ship, and lives next to where the product/project settings
+already are. A user sets the location via env (transient) or the contract field
+(persistent — may point at a dir, the repo, or their own brain repo).
 """
 
 from __future__ import annotations
@@ -16,6 +19,7 @@ if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
 from _brain_location import brain_base_dir  # noqa: E402
+from _change_state import sulis_state_base  # noqa: E402
 
 
 def _write_contract(repo: Path, brain_location: str | None) -> None:
@@ -27,9 +31,26 @@ def _write_contract(repo: Path, brain_location: str | None) -> None:
     (d / "repo-contract.yml").write_text(body, encoding="utf-8")
 
 
-def test_default_is_repo_brain_unchanged(tmp_path, monkeypatch):
+def test_default_is_user_level_settings_home(tmp_path, monkeypatch):
+    # The default no longer lives in the repo/worktree — it lives in the
+    # user-level settings home (de-branch-scoped). SULIS_STATE_DIR isolates
+    # the home so the test never touches the real ~/.sulis.
     monkeypatch.delenv("SULIS_BRAIN_BASE_DIR", raising=False)
-    assert brain_base_dir(tmp_path) == tmp_path / ".brain" / "instances"
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path / "home-sulis"))
+    repo = tmp_path / "some-repo"
+    assert brain_base_dir(repo) == sulis_state_base() / ".brain" / "instances"
+
+
+def test_default_is_independent_of_worktree(tmp_path, monkeypatch):
+    # The de-branch-scoping property: two different repo roots (e.g. a repo
+    # and one of its per-change worktrees) with no override resolve to the
+    # SAME brain dir — so captures aren't trapped in a throwaway worktree.
+    monkeypatch.delenv("SULIS_BRAIN_BASE_DIR", raising=False)
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path / "home-sulis"))
+    main_repo = tmp_path / "repo"
+    worktree = tmp_path / "repo-change-fix-thing" / "worktree"
+    assert brain_base_dir(main_repo) == brain_base_dir(worktree)
+    assert brain_base_dir(worktree) == sulis_state_base() / ".brain" / "instances"
 
 
 def test_env_override_absolute(tmp_path, monkeypatch):
@@ -73,5 +94,16 @@ def test_tilde_expands(tmp_path, monkeypatch):
 
 def test_absent_contract_field_falls_to_default(tmp_path, monkeypatch):
     monkeypatch.delenv("SULIS_BRAIN_BASE_DIR", raising=False)
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path / "home-sulis"))
     _write_contract(tmp_path, None)   # contract exists but no brain_location
+    assert brain_base_dir(tmp_path) == sulis_state_base() / ".brain" / "instances"
+
+
+def test_relative_contract_brain_location_can_pin_in_repo(tmp_path, monkeypatch):
+    # Orphan-nothing escape hatch: a repo that wants its committed in-repo brain
+    # (e.g. Sulis dogfooding its own brain) pins it with a relative
+    # brain_location, which still resolves against the repo root.
+    monkeypatch.delenv("SULIS_BRAIN_BASE_DIR", raising=False)
+    monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path / "home-sulis"))
+    _write_contract(tmp_path, ".brain/instances")
     assert brain_base_dir(tmp_path) == tmp_path / ".brain" / "instances"
