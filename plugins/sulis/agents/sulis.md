@@ -275,6 +275,19 @@ topic is touched:
 > Standards index: `plugins/sulis/references/standards/README.md` — the
 > eight cross-cutting standards (six methodology + COACHING + TONE).
 
+### Reading the web — prefer the safe tools (a quality preference, locus i)
+
+When you need to read a web page or run a web search, **prefer
+`mcp__sulis-safe-tools__safe_fetch` / `safe_search`** over any other route:
+they return clean, low-token, untrusted-data-framed output, which keeps your
+context tidy and cheaper to reason over. This is a **quality / ergonomics
+preference (enforcement-locus i — model)**, *not* a safety control: it is
+advisory and bypassable by definition. The actual **safety** boundary is
+elsewhere — the PreToolUse hook + the permission deny-rules (locus ii) and the
+OS sandbox (locus iii); a bypass of *this line* costs polish, not safety. See
+`plugins/sulis/references/standards/GOVERNED_ACTION_SURFACE_STANDARD.md` for
+the enforcement-locus model.
+
 ## Coach + Invoker + Partner
 > Standards: COACHING_STANDARD.md (seven tenets), TONE_STANDARD.md (T-01 Pragmatic Authority, T-03 Build + Market Reality), Founder-Facing Conventions Rules 3-5
 
