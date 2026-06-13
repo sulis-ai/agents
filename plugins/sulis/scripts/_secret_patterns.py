@@ -1,30 +1,40 @@
-"""Shared secret-pattern catalogue — one source of truth, two policies.
+"""Shared secret-detection module — one seam, two named policies (ADR-002/006).
 
-This module is the single, pure catalogue of known-format secret detectors,
-extracted from ``_anonymiser`` (WP-001 / ADR-002). It has **no I/O and no global
-state**: ``find_secrets(text) -> list[SecretHit]`` scans text and returns the
-located secrets, leaving the *policy* to the caller. There are exactly two
-consumers, with deliberately different policies over the same catalogue:
+This module owns the marketplace's secret detectors. It is pure (no I/O of its
+own beyond detect-secrets' in-process plugin scan, no mutable global state) and
+exposes ``SecretHit`` + three named functions so the two consumers can pick
+*different* detection policies over a shared seam:
 
-  - ``_anonymiser`` (the /sulis:feedback redaction path) — **redact policy**:
-    replace each hit with a placeholder, preserve the env-var name for
-    operational context, let the founder opt strings back in.
-  - the L1 safe-fetch proxy (WP-002/003) — **refuse policy**: any hit in an
-    outbound request line (method + URL + headers + body) → fail closed, refuse
-    the fetch before DNS resolution (ADR-002, SC-L1.3).
+  - ``find_catalogue_secrets(text)`` — the in-house, prefix-anchored / format-
+    based catalogue (env-assignment, JWT, Slack, long-token, private-IP). This
+    is the **supplementary** layer: it owns detections detect-secrets does not
+    cover (private/loopback IPs via the ``ipaddress`` stdlib, env-var-named
+    assignments, the slack/jwt/long-token hardening lessons #39/#40/#42).
 
-One catalogue means a new secret format is added once and both consumers inherit
-it (Non-Negotiable #2 — extract the shared primitive before a second copy is
-written). The catalogue is **prefix-anchored / format-based, not entropy-based**:
-ADR-002 rejected entropy heuristics precisely because they false-positive on
-commit SHAs and ULIDs/UUIDs, which the format-based catalogue leaves alone.
+  - ``find_secrets(text)`` — the **OUTBOUND-SCRUB policy** (WP-006 / ADR-006):
+    the UNION of ``detect-secrets`` (Yelp — the established detector, adopted as
+    PRIMARY per CP-01) and the in-house catalogue. The L1 safe-fetch proxy
+    (WP-002/003) calls this unchanged; any hit in an outbound request line →
+    fail closed, refuse the fetch before DNS (SC-L1.3). It leans fail-closed: a
+    false-positive costs one blocked fetch (acceptable); a false-negative leaks
+    a secret (not). ADR-006 supersedes ADR-002's entropy-rejection for THIS
+    policy only — detect-secrets' entropy plugins use a quote/assignment
+    heuristic, so commit SHAs / ULIDs / UUIDs in prose stay clean while
+    quoted/assigned high-entropy provider tokens are caught.
 
-A residual honest limit (recorded, not hidden — ADR-002): the catalogue is
-format-based, so a novel secret shape it does not recognise can pass. For L1 the
-real control is the Rule-of-Two credential exclusion (the secret is not in the
-fetch path at all); this scrub is defence-in-depth on top.
+  - ``_anonymiser`` does NOT call either function above — it imports the raw
+    compiled catalogue patterns directly and applies its own **redact policy**.
+    Its posture is unchanged by WP-006 (catalogue-only, ADR-002 entropy-
+    rejection still applies there — low false positives so the founder preview
+    is not noise). The detect-secrets union is the outbound-scrub's alone.
 
-Categories detected:
+One catalogue means a new in-house secret format is added once and the redact +
+scrub consumers both inherit it (Non-Negotiable #2). Adopting detect-secrets as
+the scrub's PRIMARY detector means the scrub also inherits Yelp's maintained
+provider catalogue (AWS keys, Google API keys, high-entropy tokens, …) without
+re-encoding it here (CP-01 — adopt the convention, don't reinvent).
+
+Catalogue categories (the supplementary layer):
 
   - ``env-secret``  — env-var-named assignment (``*_KEY``/``*_SECRET``/
                       ``*_TOKEN``/``*_PASSWORD`` ``= value``); the value is the
@@ -36,6 +46,11 @@ Categories detected:
   - ``private-ip``  — private / loopback / link-local IP (RFC 1918/4193/3927/
                       4291 + loopback), classified via the ``ipaddress`` stdlib;
                       globally-routable IPs are NOT secrets and are not returned.
+
+detect-secrets categories (the primary layer) are prefixed ``ds:`` so a hit's
+provenance is legible in the proxy's refusal message (e.g. ``ds:AWS Access
+Key``, ``ds:Base64 High Entropy String``). The proxy refuses on ANY category,
+so the exact label is for the human-readable refusal, not control flow.
 """
 
 from __future__ import annotations
@@ -43,6 +58,13 @@ from __future__ import annotations
 import ipaddress
 import re
 from dataclasses import dataclass
+
+# detect-secrets (Yelp) — the PRIMARY outbound-scrub detector (WP-006 / ADR-006).
+# ``default_settings`` populates the plugin registry with Yelp's default plugin
+# set; ``get_plugins`` returns the configured plugin instances we run per line.
+# In-process plugin API — no shell-out (the WP constraint), portable.
+from detect_secrets.core.scan import get_plugins
+from detect_secrets.settings import default_settings
 
 # ─── Public type ──────────────────────────────────────────────────────────────
 
@@ -147,17 +169,19 @@ def _is_private_ip(candidate: str) -> bool:
     return addr.is_private or addr.is_loopback or addr.is_link_local
 
 
-# ─── Public API ───────────────────────────────────────────────────────────────
+# ─── Catalogue layer (supplementary) ──────────────────────────────────────────
 
 
-def find_secrets(text: str) -> list[SecretHit]:
-    """Scan ``text`` and return every catalogued secret, in left-to-right order.
+def find_catalogue_secrets(text: str) -> list[SecretHit]:
+    """Scan ``text`` with the in-house catalogue, left-to-right.
 
-    Pure: same input → same output, no mutation, no I/O. The caller decides the
-    policy (redact vs refuse). Overlapping hits from different catalogue entries
-    are each reported — the catalogue does not de-duplicate across categories;
-    consumers apply their own precedence (``_anonymiser`` runs its passes in a
-    fixed precision order; the L1 proxy refuses on *any* hit so order is moot).
+    Pure: same input → same output, no mutation, no I/O. This is the
+    **supplementary** layer of the outbound-scrub union AND the sole detector
+    the redact consumers reach (indirectly, via the raw patterns). Overlapping
+    hits from different catalogue entries are each reported — the catalogue does
+    not de-duplicate across categories; consumers apply their own precedence
+    (``_anonymiser`` runs its passes in a fixed precision order; the L1 proxy
+    refuses on *any* hit so order is moot).
     """
     if not text:
         return []
@@ -187,5 +211,105 @@ def find_secrets(text: str) -> list[SecretHit]:
                 end=match.end(),
             ))
 
+    hits.sort(key=lambda h: (h.start, h.end))
+    return hits
+
+
+# ─── detect-secrets layer (primary) ───────────────────────────────────────────
+
+# Build detect-secrets' default plugin set ONCE and cache it. The plugins are
+# stateless analyzers (each call to ``analyze_line`` is pure over its input), so
+# the instances are safe to reuse across calls — and rebuilding the registry per
+# request part (the proxy scans method + url + every header + body) is wasted
+# work in the scrub-before-DNS path. Lazily initialised so importing the module
+# is cheap and the detect-secrets settings context is entered exactly once.
+_DETECT_SECRETS_PLUGINS: tuple = ()
+
+
+def _detect_secrets_plugins() -> tuple:
+    """Return the cached detect-secrets plugin instances, building them once."""
+    global _DETECT_SECRETS_PLUGINS
+    if not _DETECT_SECRETS_PLUGINS:
+        with default_settings():
+            _DETECT_SECRETS_PLUGINS = tuple(get_plugins())
+    return _DETECT_SECRETS_PLUGINS
+
+
+def _find_detect_secrets(text: str) -> list[SecretHit]:
+    """Scan ``text`` with detect-secrets' default plugin set (the PRIMARY
+    outbound-scrub detector, WP-006 / ADR-006).
+
+    Uses detect-secrets' programmatic plugin API in-process (no shell-out): the
+    ``default_settings()`` context populates the plugin registry, ``get_plugins``
+    returns the configured plugin instances, and each plugin's ``analyze_line``
+    is run over the single line of ``text``. ``analyze_line`` (NOT ``scan_line``)
+    is deliberate: ``scan_line`` aggressively word-splits and over-reports on
+    ordinary URLs; ``analyze_line`` applies each plugin's own extraction
+    (entropy plugins use a quote/assignment heuristic), which keeps benign
+    URLs / bodies / prose SHAs clean while catching quoted/assigned provider
+    tokens.
+
+    The character offsets detect-secrets reports are line-relative and it does
+    not expose a stable start/end for the matched substring, so we locate the
+    reported ``secret_value`` within ``text`` (best-effort, ``find``); the
+    offsets are advisory. The L1 proxy refuse policy uses only the category, so
+    advisory offsets are sufficient. Categories are prefixed ``ds:`` to record
+    detect-secrets provenance in the refusal message.
+    """
+    if not text:
+        return []
+
+    # detect-secrets scans line-by-line; a request part may contain newlines
+    # (multi-line body), so scan each line and offset back into ``text``.
+    hits: list[SecretHit] = []
+    line_offset = 0
+    plugins = _detect_secrets_plugins()
+    for line in text.splitlines(keepends=True):
+        stripped = line.rstrip("\n")
+        for plugin in plugins:
+            for secret in plugin.analyze_line(
+                filename="<outbound-request>",
+                line=stripped,
+                line_number=1,
+            ):
+                value = secret.secret_value or ""
+                local = stripped.find(value) if value else -1
+                start = line_offset + local if local >= 0 else line_offset
+                end = start + len(value) if local >= 0 else line_offset
+                hits.append(SecretHit(
+                    category=f"ds:{secret.type}",
+                    value=value,
+                    start=start,
+                    end=end,
+                ))
+        line_offset += len(line)
+
+    return hits
+
+
+# ─── Outbound-scrub policy (union: detect-secrets ∪ catalogue) ─────────────────
+
+
+def find_secrets(text: str) -> list[SecretHit]:
+    """Scan ``text`` with the OUTBOUND-SCRUB policy: the UNION of detect-secrets
+    (primary) and the in-house catalogue (supplementary). (WP-006 / ADR-006.)
+
+    This is the stable seam the L1 safe-fetch proxy calls (SC-L1.3) — the
+    signature and ``SecretHit`` return are unchanged, so the proxy is an
+    unchanged caller; only the *detection surface* widens. Leans fail-closed:
+    any hit from EITHER detector is reported, so the proxy refuses the fetch
+    before DNS. Pure apart from detect-secrets' in-process plugin scan; same
+    input → same output.
+
+    The two detectors are composed here as one named union (not entangled): the
+    catalogue layer (``find_catalogue_secrets``) and the detect-secrets layer
+    (``_find_detect_secrets``) each scan independently; their hits are
+    concatenated and sorted by span. ``_anonymiser`` deliberately does NOT call
+    this — it stays catalogue-only (ADR-002 redact posture).
+    """
+    if not text:
+        return []
+
+    hits = find_catalogue_secrets(text) + _find_detect_secrets(text)
     hits.sort(key=lambda h: (h.start, h.end))
     return hits
