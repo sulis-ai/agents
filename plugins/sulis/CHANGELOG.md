@@ -1,3 +1,9 @@
+## v0.160.0 — 2026-06-13
+
+**Minor — release-train batch.**
+
+- Agent execution-boundary hardening, layers 1-2: a mediated safe-fetch/search proxy (no raw agent egress; content returned as untrusted data; outbound secret-scrub via detect-secrets + the in-house catalogue) and scoped file-tools (read/write/move/remove refused outside the per-change scope, fail-closed, extending within_change_scope). 14 scenarios; L3 OS-sandbox is the next phase.
+
 ## v0.159.1 — 2026-06-12
 
 **Patch — release-train batch.**
