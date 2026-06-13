@@ -100,9 +100,14 @@ def test_absent_contract_field_falls_to_default(tmp_path, monkeypatch):
 
 
 def test_relative_contract_brain_location_can_pin_in_repo(tmp_path, monkeypatch):
-    # Orphan-nothing escape hatch: a repo that wants its committed in-repo brain
-    # (e.g. Sulis dogfooding its own brain) pins it with a relative
-    # brain_location, which still resolves against the repo root.
+    # KEPT (resolver-capability test, NOT Sulis's own config). This pins the
+    # resolver's *capability*: any repo that wants a committed in-repo brain can
+    # opt in with a relative brain_location, which still resolves against the
+    # repo root. It uses a synthetic tmp contract precisely so it stays true
+    # regardless of what Sulis's own .sulis/repo-contract.yml says — Sulis's
+    # actual de-branch-scoped behaviour is proved separately in
+    # test_dogfood_resolves_central.py. Removing Sulis's own in-repo pin does
+    # NOT change this escape-hatch contract, so this test is unchanged.
     monkeypatch.delenv("SULIS_BRAIN_BASE_DIR", raising=False)
     monkeypatch.setenv("SULIS_STATE_DIR", str(tmp_path / "home-sulis"))
     _write_contract(tmp_path, ".brain/instances")
