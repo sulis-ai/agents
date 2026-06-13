@@ -41,11 +41,19 @@ class FetchRequest:
     Frozen value object — the proxy scrubs and inspects it without risk of
     mutation. The proxy runs the secret scrub over ``method`` + ``url`` + every
     ``headers`` value + ``body`` before any DNS resolution (ADR-002, SC-L1.3).
+
+    ``format`` selects the *shape* of the content the proxy returns AFTER it has
+    fetched the page (CH-9SYSNE). Additive, frozen-safe, and defaulted — one of
+    ``raw | text | markdown | structured`` (see ``FetchResult.format``). The
+    default is ``markdown``: clean, readable, token-cheap extracted main
+    content. Extraction runs after the fetch and before framing, so the
+    scrub-before-DNS path is unaffected by this field.
     """
     url: str
     method: str = "GET"
     headers: dict[str, str] = field(default_factory=dict)
     body: str | None = None
+    format: str = "markdown"
 
 
 @dataclass(frozen=True)
@@ -54,14 +62,22 @@ class FetchResult:
 
     ``content_is_untrusted_data`` is always ``True`` from a real fetch — fetched
     content is data, never instructions. ``content`` is the framed envelope
-    (deterministic delimiter-wrapping, spotlighting); the page text inside it is
-    verbatim, NOT sanitised (SPEC non-goal — framing is the control, not
-    cleaning).
+    (deterministic delimiter-wrapping, spotlighting) around the *processed*
+    content (CH-9SYSNE: extracted-and-shaped per the request's ``format``, or
+    the verbatim source when ``format="raw"`` or extraction fell back). The
+    framing is the injection control — extraction is defence-in-depth that
+    strips active/hidden content, NOT injection-removal (a visible-prose
+    injection survives extraction; SPEC non-goal).
+
+    ``format`` reports the shape actually returned (``raw | text | markdown |
+    structured``) so the caller knows how to read ``content`` inside the
+    envelope.
     """
     source_url: str
     fetched_at: str                   # ISO 8601
     content_is_untrusted_data: bool   # always True from a real fetch
     content: str                      # framed envelope (ADR-003)
+    format: str                       # shape returned (CH-9SYSNE)
 
 
 # ─── Ports ────────────────────────────────────────────────────────────────────

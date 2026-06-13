@@ -35,6 +35,15 @@ def test_fetch_request_defaults():
     assert req.method == "GET"
     assert req.headers == {}
     assert req.body is None
+    # CH-9SYSNE: the content-extraction format defaults to clean markdown.
+    assert req.format == "markdown"
+
+
+def test_fetch_request_carries_explicit_format():
+    """CH-9SYSNE: ``format`` is an additive, frozen-safe, defaulted field
+    selecting the extracted shape (raw | text | markdown | structured)."""
+    req = FetchRequest(url="https://example.com", format="raw")
+    assert req.format == "raw"
 
 
 def test_fetch_request_is_frozen():
@@ -67,11 +76,14 @@ def test_fetch_result_shape():
         fetched_at="2026-06-13T00:00:00Z",
         content_is_untrusted_data=True,
         content="<<<UNTRUSTED…>>>hello<<<END…>>>",
+        format="markdown",
     )
     assert res.source_url == "https://example.com"
     assert res.fetched_at == "2026-06-13T00:00:00Z"
     assert res.content_is_untrusted_data is True
     assert "hello" in res.content
+    # CH-9SYSNE: the result reports the format actually returned.
+    assert res.format == "markdown"
 
 
 def test_fetch_result_is_frozen():
@@ -80,6 +92,7 @@ def test_fetch_result_is_frozen():
         fetched_at="2026-06-13T00:00:00Z",
         content_is_untrusted_data=True,
         content="x",
+        format="markdown",
     )
     try:
         res.content = "tampered"  # type: ignore[misc]
@@ -101,6 +114,7 @@ class _FakeGateway:
             fetched_at="2026-06-13T00:00:00Z",
             content_is_untrusted_data=True,
             content=f"<<<UNTRUSTED>>>page for {req.url}<<<END>>>",
+            format=req.format,
         )
 
 

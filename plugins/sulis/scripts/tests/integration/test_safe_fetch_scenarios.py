@@ -107,7 +107,9 @@ def test_sc_l1_1_open_web_research_preserved_for_fresh_url() -> None:
     proxy = SafeFetchProxy(fetcher)
 
     fresh_url = "https://news.example.org/never-pre-listed/article-2026"
-    result = safe_fetch(fresh_url, gateway=proxy)
+    # CH-9SYSNE: pin the L1 verbatim path (the default is now clean markdown);
+    # SC-L1.1 is about open-web reach, so the raw body is the relevant assertion.
+    result = safe_fetch(fresh_url, gateway=proxy, format="raw")
 
     assert isinstance(result, FetchResult)
     assert result.content_is_untrusted_data is True
@@ -209,7 +211,11 @@ def test_sc_l1_2_proxy_path_fetches_while_raw_egress_denied() -> None:
     proxy = SafeFetchProxy(fetcher)
 
     with deny_raw_egress(allow_loopback=True):
-        result = safe_fetch("https://fresh.example/under-confinement", gateway=proxy)
+        # CH-9SYSNE: ``format="raw"`` pins the verbatim body for this egress
+        # scenario (the default is now clean markdown).
+        result = safe_fetch(
+            "https://fresh.example/under-confinement", gateway=proxy, format="raw"
+        )
 
     assert "reachable via the door" in result.content
 
@@ -232,7 +238,10 @@ def test_sc_l1_4_injection_in_content_produces_zero_attacker_egress() -> None:
     proxy = SafeFetchProxy(fetcher)
 
     with deny_raw_egress(allow_loopback=True) as egress:
-        result = safe_fetch("https://blog.example/post", gateway=proxy)
+        # CH-9SYSNE: ``format="raw"`` pins the verbatim payload for this egress
+        # scenario. (The honest limit — that a visible-prose injection also
+        # survives the markdown extraction path — is proven by SC-X.5.)
+        result = safe_fetch("https://blog.example/post", gateway=proxy, format="raw")
 
         # The injection is in the data channel, verbatim — framing != cleaning.
         assert _INJECTION in result.content
@@ -251,7 +260,7 @@ def test_sc_l1_4_framing_is_not_sanitisation_docstring_honesty() -> None:
     verbatim — the framing layer never claims to have cleaned it."""
     fetcher = _RecordedFetcher(body=f"<p>{_INJECTION}</p>")
     proxy = SafeFetchProxy(fetcher)
-    result = safe_fetch("https://x.example/y", gateway=proxy)
+    result = safe_fetch("https://x.example/y", gateway=proxy, format="raw")
     assert _INJECTION in result.content
 
 

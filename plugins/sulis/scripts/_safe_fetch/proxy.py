@@ -39,6 +39,7 @@ from datetime import datetime, timezone
 
 from _secret_patterns import find_secrets
 
+from .extraction import extract
 from .framing import frame_as_untrusted_data
 from .ports import FetchRequest, FetchResult, OutboundFetcher
 
@@ -72,12 +73,23 @@ class SafeFetchProxy:
         # 2. No secret → perform the bounded fetch via the injected seam.
         raw = self._fetcher.get(req.url, timeout=self._timeout)
 
-        # 3. Frame the verbatim content as untrusted data (ADR-003).
+        # 3. Stamp provenance, then shape the fetched content per the requested
+        #    format (CH-9SYSNE). Extraction sits AFTER the fetch and BEFORE
+        #    framing — the scrub-before-DNS path above is untouched. It strips
+        #    active/hidden content (defence-in-depth), degrades gracefully to
+        #    raw text on failure, and never raises (SC-X.6). It is NOT an
+        #    injection-removal control: visible-prose injection survives (SPEC
+        #    non-goal). The framing envelope wraps the PROCESSED content.
+        fetched_at = datetime.now(timezone.utc).isoformat()
+        processed = extract(raw, req.format, url=req.url, fetched_at=fetched_at)
+
+        # 4. Frame the processed content as untrusted data (ADR-003 — unchanged).
         return FetchResult(
             source_url=req.url,
-            fetched_at=datetime.now(timezone.utc).isoformat(),
+            fetched_at=fetched_at,
             content_is_untrusted_data=True,
-            content=frame_as_untrusted_data(raw, req.url),
+            content=frame_as_untrusted_data(processed, req.url),
+            format=req.format,
         )
 
     def _refuse_if_secret(self, req: FetchRequest) -> None:
