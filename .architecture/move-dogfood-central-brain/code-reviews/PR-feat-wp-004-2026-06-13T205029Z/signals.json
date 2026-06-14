@@ -1,0 +1,35 @@
+{
+  "review": {
+    "target": "feat/wp-004-remove-sulis-brain-pin",
+    "base": "change/move-dogfood-central-brain",
+    "project": "move-dogfood-central-brain",
+    "timestamp": "2026-06-13T205029Z",
+    "verdict": "PASS",
+    "outcome_plain": "Ready to merge",
+    "depth_mode": "standard",
+    "dispatch_shape": "single-reader (CR-02 carve-out: 59 lines, 2 files)"
+  },
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "tools": [
+      {"name": "ruff", "version": "0.15.14", "base": "clean", "head": "clean"},
+      {"name": "compileall", "head": "ok"}
+    ],
+    "coverage_gaps": ["no type-checker configured (stdlib-only tooling per repo-contract type_check empty); ruff F401/F821 cover the load-bearing checks"]
+  },
+  "pr_hygiene": {
+    "scope": {"severity": "clean", "commit_type_spread": ["delete"], "module_fan_out": 2},
+    "size": {"severity": "clean", "lines_added": 16, "lines_removed": 43, "files_changed": 2},
+    "safety": {"severity": "clean", "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0},
+    "completeness": {"severity": "clean", "new_source_without_test": 0, "api_change_without_schema": false}
+  },
+  "lenses": {
+    "architecture": {"in_changes": 0, "in_neighbours": 0, "status": "nothing surfaced"},
+    "security": {"in_changes": 0, "in_neighbours": 0, "status": "nothing surfaced"},
+    "quality": {"in_changes": 0, "in_neighbours": 0, "status": "nothing surfaced"}
+  },
+  "findings": [],
+  "draft_hardening_deltas": [],
+  "auto_downgrade_triggers_fired": [],
+  "neighbour_ring": {"considered": 1, "excluded_by_cap": 0, "files": ["plugins/sulis/scripts/_brain_location.py"]}
+}

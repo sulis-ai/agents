@@ -1,0 +1,211 @@
+diff --git a/plugins/sulis/scripts/_brain_query.py b/plugins/sulis/scripts/_brain_query.py
+index 9b5112f2..ec3cf1ec 100644
+--- a/plugins/sulis/scripts/_brain_query.py
++++ b/plugins/sulis/scripts/_brain_query.py
+@@ -36,28 +36,21 @@ _INSTANCE_FILE_GLOB: Final[str] = "*.jsonld"
+ _ENTITY_ID_RE: Final = re.compile(r"^dna:[a-z]+:[0-9A-HJKMNP-TV-Z]{26}$")
+ 
+ 
+-def iter_entities(
++def _iter_one_root(
+     base_dir: Path,
+     *,
+-    domain: str | None = None,
+-    entity_type: str | None = None,
++    domain: str | None,
++    entity_type: str | None,
+ ) -> Iterator[dict]:
+-    """Yield every entity instance under `base_dir`, optionally scoped by
+-    domain and/or entity_type.
++    """Yield every entity instance under a SINGLE root.
+ 
+-    Args:
+-        base_dir: the `.brain/instances/` root.
+-        domain: limit to one domain (foundation / product-development /
+-            insurance-broking). None = walk all domains.
+-        entity_type: limit to one entity type (decision / requirement /
+-            testresult / …). None = walk all entity types in scope.
+-
+-    Yields:
+-        Each entity instance as a dict (the parsed JSON-LD).
++    The on-disk walk: `base_dir/{domain}/{entity_type}/*.jsonld`. The one and
++    only tree-walk in this module — both the single-root and multi-root public
++    paths route through here, so there is no duplicated traversal (ADR-001).
+ 
+-    Performance: file-system walk + JSON parse per file. O(N) where N is
+-    total instance count. Acceptable for N < ~5000; revisit when that
+-    ceiling matters.
++    A missing root yields nothing (the degradation contract callers rely on);
++    a malformed instance file is skipped silently (the write path validates,
++    so corruption at rest means something else touched the store).
+     """
+     base = Path(base_dir)
+     if not base.exists():
+@@ -87,6 +80,74 @@ def iter_entities(
+                     continue
+ 
+ 
++def iter_entities(
++    base_dir: Path,
++    *,
++    domain: str | None = None,
++    entity_type: str | None = None,
++    library_root: Path | None = None,
++) -> Iterator[dict]:
++    """Yield every entity instance, optionally unioning a read-only library root.
++
++    The Brain read seam is multi-root (ADR-001): it can read the union of
++    (a) the **captures root** (`base_dir`, the live record) and (b) an
++    optional read-only **library root** (`library_root`, the shipped
++    foundation baseline, read plugin-relative). Writes never touch the
++    library root — it is read-only by construction.
++
++    Union is by entity id; on collision the captures root **wins** (it is the
++    live record, the library is the immutable shipped baseline that must never
++    shadow a capture). In practice the two roots are disjoint by entity type
++    (the library ships `foundation/workflow|step|tool`; captures hold
++    `product-development/*` and identity stamps), so the collision case is
++    defensive, not expected.
++
++    When `library_root` is None this is a plain single-root read of `base_dir`
++    — the historical behaviour, byte-for-byte, so existing callers are
++    unaffected.
++
++    Args:
++        base_dir: the captures `.brain/instances/` root (the primary, live
++            record; wins on id collision).
++        domain: limit to one domain (foundation / product-development /
++            insurance-broking). None = walk all domains in each root.
++        entity_type: limit to one entity type (decision / requirement /
++            testresult / …). None = walk all entity types in scope.
++        library_root: optional read-only library `.brain/instances/` root to
++            union beneath the captures root. None = single-root read.
++
++    Yields:
++        Each entity instance as a dict (the parsed JSON-LD). Captures-root
++        entities are yielded first, then library-root entities whose ids did
++        not appear in the captures root.
++
++    Performance: file-system walk + JSON parse per file. O(N) where N is the
++    total instance count across both roots. Acceptable for N < ~5000; revisit
++    when that ceiling matters.
++    """
++    if library_root is None:
++        yield from _iter_one_root(
++            base_dir, domain=domain, entity_type=entity_type
++        )
++        return
++
++    # Multi-root union, captures-win: yield every captures entity, recording
++    # its id; then yield only the library entities whose ids were not already
++    # contributed by captures.
++    seen_ids: set[str] = set()
++    for inst in _iter_one_root(base_dir, domain=domain, entity_type=entity_type):
++        entity_id = inst.get("id")
++        if isinstance(entity_id, str):
++            seen_ids.add(entity_id)
++        yield inst
++    for inst in _iter_one_root(
++        library_root, domain=domain, entity_type=entity_type
++    ):
++        if inst.get("id") in seen_ids:
++            continue
++        yield inst
++
++
+ def find_entities(
+     base_dir: Path,
+     *,
+diff --git a/plugins/sulis/scripts/tests/unit/test_brain_query.py b/plugins/sulis/scripts/tests/unit/test_brain_query.py
+index 72826351..e16425a6 100644
+--- a/plugins/sulis/scripts/tests/unit/test_brain_query.py
++++ b/plugins/sulis/scripts/tests/unit/test_brain_query.py
+@@ -108,6 +108,88 @@ class TestIterEntities:
+         assert len(reqs) == 3
+ 
+ 
++# ─── Multi-root read seam (WP-001 / ADR-001) ─────────────────────────────────
++# The read seam unions a read-only LIBRARY root (the shipped foundation
++# instances, read plugin-relative) with the CAPTURES root (the live record).
++# Union is by entity id; on collision the captures root wins (it is the live
++# record; the library is the immutable shipped baseline that must never shadow
++# a capture). The single-root call delegates to the multi-root path — there is
++# no duplicated walk.
++
++
++def _write_entity(base: Path, domain: str, entity_type: str, entity: dict) -> None:
++    """Write one entity instance under `base/{domain}/{entity_type}/<ulid>.jsonld`."""
++    ulid = entity["id"].split(":")[-1]
++    p = base / domain / entity_type / f"{ulid}.jsonld"
++    p.parent.mkdir(parents=True, exist_ok=True)
++    p.write_text(json.dumps(entity))
++
++
++_FWF_A = "dna:workflow:01WF0000000000000000000001"
++_FWF_B = "dna:workflow:01WF0000000000000000000002"
++
++
++class TestMultiRootRead:
++    def test_iter_entities_reads_only_one_root(self, tmp_path: Path) -> None:
++        """Gap proof: a single-root call cannot reach a foundation entity that
++        lives ONLY at a separate library root. This is the failure the
++        multi-root seam exists to fix — captures-only reads miss the shipped
++        library."""
++        captures = tmp_path / "captures" / "instances"
++        library = tmp_path / "library" / "instances"
++        # The library ships a foundation workflow; captures has none.
++        _write_entity(
++            library, "foundation", "workflow",
++            {"id": _FWF_A, "title": "shipped workflow"},
++        )
++        captures.mkdir(parents=True, exist_ok=True)
++
++        # A captures-only read genuinely cannot see the library entity.
++        captures_only = list(iter_entities(captures, domain="foundation"))
++        assert captures_only == []
++
++    def test_multi_root_unions_library_and_captures(self, tmp_path: Path) -> None:
++        """With a library_root supplied, the read is the union of both roots."""
++        captures = tmp_path / "captures" / "instances"
++        library = tmp_path / "library" / "instances"
++        # Library ships one foundation workflow.
++        _write_entity(
++            library, "foundation", "workflow",
++            {"id": _FWF_A, "title": "shipped workflow"},
++        )
++        # Captures has a (distinct) foundation workflow + a product requirement.
++        _write_entity(
++            captures, "foundation", "workflow",
++            {"id": _FWF_B, "title": "captured workflow"},
++        )
++        _write_entity(
++            captures, "product-development", "requirement",
++            {"id": _REQ_A, "title": "captured req"},
++        )
++
++        unioned = list(iter_entities(captures, library_root=library))
++        ids = {e["id"] for e in unioned}
++        assert ids == {_FWF_A, _FWF_B, _REQ_A}
++
++    def test_captures_win_on_id_collision(self, tmp_path: Path) -> None:
++        """When the same id appears in both roots, the captures copy wins —
++        the library baseline must never shadow a live capture."""
++        captures = tmp_path / "captures" / "instances"
++        library = tmp_path / "library" / "instances"
++        _write_entity(
++            library, "foundation", "workflow",
++            {"id": _FWF_A, "title": "library version", "origin": "library"},
++        )
++        _write_entity(
++            captures, "foundation", "workflow",
++            {"id": _FWF_A, "title": "captures version", "origin": "captures"},
++        )
++
++        unioned = list(iter_entities(captures, library_root=library))
++        assert len(unioned) == 1
++        assert unioned[0]["origin"] == "captures"
++
++
+ class TestPredicates:
+     def test_where_field_equals(self, tmp_path: Path) -> None:
+         base = _seed(tmp_path)
