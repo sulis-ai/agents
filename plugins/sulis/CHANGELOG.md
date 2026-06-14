@@ -1,3 +1,9 @@
+## v0.164.1 — 2026-06-14
+
+**Patch — release-train batch.**
+
+- Dogfood the central Brain: Sulis stores its own working memory in the user-level central brain like an installed user (no in-repo forking). Multi-root read (plugin-relative library + central captures); removed the in-repo brain_location pin; migrated existing dogfood records to central and merged duplicate product entities; repo now ships only the foundation library.
+
 ## v0.164.0 — 2026-06-14
 
 **Minor — release-train batch.**
