@@ -1,17 +1,28 @@
 # Work Package Template
 
-The required structure for `.architecture/{project}/work-packages/WP-NNN-{slug}.md`.
+The required structure for
+`.architecture/{project}/work-packages/{CH-HANDLE}-WP-NNN-{slug}.md`.
 Every WP SEA produces uses this exact shape. Sections may grow; they may
 not be omitted.
+
+> **WP id shape — prefixed and globally unique.** A minted WP id is
+> `{CH-HANDLE}-WP-NNN` (e.g. `CH-5DMB1N-WP-001`): the prefix is the parent
+> change's handle, and `NNN` is the per-change `001`/`002`/`003` sequence
+> (the sequencing is unchanged — only the rendered label gains the prefix,
+> so ids no longer collide across changes). Legacy bare `WP-NNN` ids stay
+> valid and parseable for one release — see the id-shape rules in
+> [WORK_PACKAGE_STANDARD](../../../references/standards/WORK_PACKAGE_STANDARD.md)
+> (back-compat window per ADR-002). The example rows below show `WP-NNN` as
+> the bare placeholder; a real minted id carries the `{CH-HANDLE}-` prefix.
 
 ---
 
 ```markdown
 ---
-id: WP-NNN
+id: CH-HANDLE-WP-NNN                     # prefixed + globally unique — {CH-HANDLE}-WP-NNN, e.g. CH-5DMB1N-WP-001 (legacy bare WP-NNN still parseable for one release — ADR-002)
 title: {Imperative, < 70 chars — e.g. "Implement Postgres OrderRepository adapter"}
 status: pending                          # pending | in_progress | done | blocked
-sequence_id: WP-NNN
+sequence_id: CH-HANDLE-WP-NNN            # same prefixed shape; NNN is the per-change 001/002/003 sequence (unchanged)
 dependsOn: [WP-XXX, WP-YYY]              # WPs that must merge before this one
 blocks: [WP-ZZZ]                          # WPs unlocked by this one
 estimated_token_cost:

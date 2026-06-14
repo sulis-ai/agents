@@ -1,0 +1,27 @@
+train_id: "train-2026-06-10T081954Z"
+started_at: "2026-06-10T08:19:54Z"
+completed_at: "2026-06-10T08:31:24Z"
+outcome: "success"
+batch_size: 3
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-10T08:25:20Z"
+gate_findings_path: ".architecture/extend-unique-wp-ids/gate-reviews/GATE-REVIEW-train-2026-06-10T081954Z.md"
+bundle:
+  - wp: WP-001
+    branch: feat/wp-001-shared-wp-id-matcher
+    pre_train_sha: 3b6c18c249d8fcfba2ec2f6529d1106cc9afb0dd
+    rebased_to_sha: 74f93e99a2629c01c0b700f004a7f118ba839db2
+    merge_sha_on_dev: a9d830c8de3c92b2ef86d803acbd5c62edd93496
+  - wp: WP-002
+    branch: wp/extend-unique-wp-ids/wp-002-mint-path-canonical-id-rows
+    pre_train_sha: 6c30d2dd356766d8a68b963b2e72fc0e30bc3532
+    rebased_to_sha: c2984d6074fb9700032778ea661cf58ec4d82137
+    merge_sha_on_dev: 3bdadfb2717050bb8346058162657dbde7c3b1dd
+  - wp: WP-003
+    branch: wp/extend-unique-wp-ids/wp-003-reconcile-standards-and-supersede-parked
+    pre_train_sha: b3fc8fce1d3ad301578845d325d93e023e705d64
+    rebased_to_sha: 29fc89779619f85e863433e8975c5363a3ddf6ca
+    merge_sha_on_dev: 1110fe5cf662c47b457dc084a3c4d62787c138d0

@@ -231,6 +231,25 @@ resolves to a foreign change's `feat/wp-{nnn}-*` branch. The bare `feat/`
 glob survives one release only for legacy callers that supply no change
 scope; its removal is a tracked follow-up.
 
+### WP id labels (MUST)
+
+A WP's *id label* is `{CH-HANDLE}-WP-NNN` (e.g., `CH-5DMB1N-WP-001`) — the
+id-label twin of the branch-ref scoping above. The per-change `NNN` sequence is
+unchanged (still the human-friendly 1/2/3 within a change); the `CH-HANDLE`
+prefix makes the id globally unique across changes, so two changes can no longer
+both mint a colliding bare `WP-001`. This closes for the *id* the same collision
+class #283 closed for the *branch* — the two together retire cross-change WP
+collisions for good.
+
+Legacy bare `WP-NNN` ids minted before this change stay **understood for one
+release**: the WP-id matcher recognises the prefixed shape, the legacy bare
+shape, and the existing source-tagged `WP-{SOURCE}-{NNN}` shape from the same
+parse, and there is **no migration pass** rewriting any existing committed id.
+Dropping bare-id support is a tracked follow-up — the back-compat window closes
+deliberately once the in-flight bare ids have drained, mirroring how the bare
+`feat/` branch glob's removal is tracked above. See `WORK_PACKAGE_STANDARD.md`
+WP-01 (the `id` row) and ADR-002 (change `unique-wp-ids`).
+
 ### What this means for the executor
 
 The executor's `wpx-pipeline` and `wpx-train` are unchanged in
@@ -693,3 +712,4 @@ change, and what CW-NN rule(s) it exercised or stressed.
 | 0.2.0 | 2026-05-25 | **CW-04 amended (additive).** Auto back-integration subsection added — codifies the merge-not-rebase mechanism with two trigger points (post-WP-merge active driver + pre-WP-start safety net) and structured conflict handling (interactive resolve / defer / abort options). Operationalises what CW-04's two-level worktree hierarchy makes possible. Phase 4 of the change-as-primitive build; pairs with lifecycle.md Step 0 + Step 12.5 amendments. Backwards-compatible — existing change branches without auto back-integration continue to work; the new mechanism activates only via the Phase 5 executor implementation. |
 | 0.4.0 | 2026-06-10 | **CW-09 added (SHOULD, calibrating).** Names three rigour tiers — Methodical / Batched / Bounded-fix — as presets over orthogonal dials (design depth, decomposition granularity, verification timing, isolation), declared up front so the operator picks a pre-designed risk trade-off instead of improvising under deadline pressure. The verification floor (real bundled verification + observed-or-blocked) is explicitly tier-invariant (MUST). Bounded-fix is *not* zero-planning — it carries a written-plan floor (plan mode → write the plan down → build), the cheap anti-anxiety step that keeps the fast path safe under pressure. Deliberately describes the pattern in prose rather than encoding conditional workflow steps — promotion + hard-coding waits on a ~5-change calibration window (only n=2 at authoring, both moved dials in lockstep). Synthesised from two converged critical-thinking spirals on fast-vs-methodical change handling; CW-05 trivial carve-out is the smallest instance of the Bounded-fix tier. |
 | 0.3.0 | 2026-06-10 | **CW-04 amended (additive).** Added the **WP branch refs (MUST)** subsection — a WP's branch ref is `wp/{primitive}-{slug}/wp-{nnn}-{slug}`, nesting under `wp/` (not under the `change/{primitive}-{slug}` prefix, which would be a git directory/file ref conflict). Scopes the train resolver's branch glob per-change so it cannot match a foreign change's recycled WP number (change `wp-branch-collision`, root cause of #105/#106; see ADR-001). Backwards-compatible — legacy bare `feat/wp-{nnn}-{slug}` branches still resolve via the executor journal + a one-release glob fallback for no-scope callers; fallback removal is a tracked follow-up. |
+| 0.4.0 | 2026-06-10 | **CW-04 amended (additive).** Added the **WP id labels (MUST)** subsection — the id-label twin of the WP branch-ref scoping: a WP's id label is `{CH-HANDLE}-WP-NNN`, the `CH-HANDLE` prefix making the id globally unique across changes while the per-change `NNN` sequence is unchanged. Closes for the id label the same cross-change collision class #283 closed for branches (change `unique-wp-ids`, CH-5DMB1N; see ADR-002). Backwards-compatible — legacy bare `WP-NNN` and source-tagged `WP-{SOURCE}-{NNN}` ids stay understood for one release (no migration); bare-id-support removal is a tracked follow-up. |

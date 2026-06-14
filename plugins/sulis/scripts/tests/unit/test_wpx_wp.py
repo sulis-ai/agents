@@ -73,6 +73,29 @@ def test_branch_name_subcommand_emits_scoped_then_legacy(tmp_path, monkeypatch):
     assert res["data"]["branch"] == "feat/wp-001-foo"
 
 
+def test_branch_name_subcommand_prefixed_id_clean_tail(tmp_path, monkeypatch):
+    """WP-001 (CH-5DMB1N): branch-name emits a CLEAN tail for a prefixed id.
+
+    A prefixed `CH-…-WP-NNN` WP file resolves to `wp/{scope}/wp-NNN-{slug}`,
+    NOT the doubled `wp/{scope}/wp-ch-5dmb1n-wp-001-{slug}` — the shared
+    `wp_nnn_suffix` strips the change-handle prefix. Retained alongside the
+    legacy bare-id `test_branch_name_subcommand_emits_scoped_then_legacy`.
+    """
+    wp_dir = tmp_path / ".architecture" / "p" / "work-packages"
+    _seed_wp(wp_dir, "CH-5DMB1N-WP-001", "foo")
+    argv = ["branch-name", "--wp", "CH-5DMB1N-WP-001", "--project", "p",
+            "--repo-root", str(tmp_path)]
+
+    monkeypatch.setattr(wpx, "current_change_scope", lambda repo_root: "fix-x")
+    res = _run(argv)
+    assert res.get("ok") is True
+    assert res["data"]["branch"] == "wp/fix-x/wp-001-foo"
+
+    monkeypatch.setattr(wpx, "current_change_scope", lambda repo_root: None)
+    res = _run(argv)
+    assert res["data"]["branch"] == "feat/wp-001-foo"
+
+
 def test_branch_name_subcommand_missing_wp_file_errors(tmp_path, monkeypatch):
     """No WP file → structured error, non-zero exit."""
     monkeypatch.setattr(wpx, "current_change_scope", lambda repo_root: None)

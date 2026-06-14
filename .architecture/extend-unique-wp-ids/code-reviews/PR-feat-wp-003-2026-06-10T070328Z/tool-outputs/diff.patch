@@ -1,0 +1,375 @@
+diff --git a/.architecture/canonicalise-cross-wp-ids/SUPERSEDED.md b/.architecture/canonicalise-cross-wp-ids/SUPERSEDED.md
+new file mode 100644
+index 00000000..3864d5ab
+--- /dev/null
++++ b/.architecture/canonicalise-cross-wp-ids/SUPERSEDED.md
+@@ -0,0 +1,14 @@
++# SUPERSEDED — canonicalise-cross-wp-ids
++
++This effort was parked with no real design (only a stray executor journal and a
++code-review bundle — no spec, no TDD, no work package). Its intent — making Work
++Package ids unique across changes — is now realised canonically by the change
++**`unique-wp-ids` (CH-5DMB1N)**, which mints ids as `{CH-HANDLE}-WP-NNN`,
++mirroring the per-change branch namespacing PR #283 introduced.
++
++There is exactly one canonical effort for unique WP ids; this stub is retired so
++no work is duplicated. See:
++
++- `.architecture/extend-unique-wp-ids/adrs/ADR-002-additive-backcompat-and-supersession.md` (§4 — supersession)
++- `plugins/sulis/references/standards/WORK_PACKAGE_STANDARD.md` (WP-01 `id` row)
++- `plugins/sulis/references/change-work-standard.md` (CW-04 — WP id labels)
+diff --git a/.architecture/canonicalise-cross-wp-ids/code-reviews/PR-feat-wp-001-canonicalise-cross-wp-ids-2026-06-01T145136Z/REVIEW.md b/.architecture/canonicalise-cross-wp-ids/code-reviews/PR-feat-wp-001-canonicalise-cross-wp-ids-2026-06-01T145136Z/REVIEW.md
+deleted file mode 100644
+index 47bb98f3..00000000
+--- a/.architecture/canonicalise-cross-wp-ids/code-reviews/PR-feat-wp-001-canonicalise-cross-wp-ids-2026-06-01T145136Z/REVIEW.md
++++ /dev/null
+@@ -1,164 +0,0 @@
+-# Code Review: feat/wp-001-canonicalise-cross-wp-ids — Pre-mint cross-WP shared identifiers
+-
+-> **Timestamp:** 2026-06-01T145136Z (ISO 8601 UTC)
+-> **Author:** Sulis executor (subagent)
+-> **Branch:** feat/wp-001-canonicalise-cross-wp-ids → change/extend-canonicalise-cross-wp-ids
+-> **Files changed:** 4 (3 modified + 1 new test)
+-> **WP kind:** docs (methodology prose extension)
+->
+-> **Outcome:** Ready to merge
+-
+----
+-
+-## At a glance
+-
+-This change extends the `/sulis:plan-work` skill and the Decompose Validation
+-Rubric with a new methodology check: parallel-dispatched work packages that
+-cross-reference a shared identifier (ULID, slug, version literal, namespace)
+-must have that identifier pre-minted in an authoritative upstream source.
+-The new rule is captured as a workflow step in the skill, a phase in the
+-rubric, and is pinned by 4 structural tests that fail if either artifact's
+-new sections drift.
+-
+-The build is clean, the full unit suite is green (1306 passed), and the
+-4 new tests cover every assertion the change makes. No findings.
+-
+-## What to fix
+-
+-No issues that need attention.
+-
+-## How this pull request is shaped
+-
+-**Size — clean.** 307 lines across 4 files (3 modified, 1 new). Well within
+-the comfortable-review band.
+-
+-**Scope — clean.** Single primitive (`extend`), single concern (methodology
+-refinement). Commit-type spread is one (`extend:`); module fan-out is two
+-(skills + references + tests in one logical area).
+-
+-**Safety — clean.** No migrations, no schema changes, no infra files, no
+-secret patterns. Pure prose + test additions.
+-
+-**Completeness — clean.** Tests added alongside the prose changes. The
+-structural tests pin the new sections in place so future heading drift
+-surfaces as a failing test rather than a silent methodology regression.
+-
+-## Things to take away
+-
+-Skipped — the PR is clean and the WP shipped its provenance (CH-01KSZ4
+-anchor case) clearly in both artifacts. Nothing specific to take away
+-that the PR doesn't already model.
+-
+----
+-
+-## Technical detail
+-
+-> Below this point the report uses internal taxonomy (CR-NN, PH-NN, lens IDs)
+-> for engineers and for downstream agents like `/sulis:harden-codebase`. The
+-> author tier above contains everything the author needs to act.
+-
+-### Verdict
+-
+-`PASS` per CR-06. Computed from:
+-- Build Verification empty (0 PR-introduced errors)
+-- No critical/high/medium/low findings in the diff
+-- All 4 changed files read end-to-end (none > 250 lines)
+-- All three lenses produced output
+-
+-### Summary
+-
+-- **Build Verification:** 0 PR-introduced errors (CR-01)
+-- **PR Hygiene:** 0 findings (all four PH primitives at `low`) (CR-09 / PH-01..PH-04)
+-- **In the changes:** 0 findings
+-- **In the neighbours:** 0 findings
+-- **Draft fixes:** 0
+-
+-| Lens | In changes | In neighbours | Top concern |
+-|---|---|---|---|
+-| Architecture | 0 | 0 | nothing surfaced — methodology prose + structural test, no architectural surfaces |
+-| Security | 0 | 0 | nothing surfaced — no auth, no secrets, no I/O |
+-| Quality | 0 | 0 | nothing surfaced — ruff clean, tests pass, full suite green |
+-
+-### Build Verification (CR-01)
+-
+-No PR-introduced errors.
+-
+-Tools run:
+-- `ruff check tests/unit/test_plan_work_canonicalise_section.py` → exit 0, all checks passed
+-- `ruff format --check tests/unit/test_plan_work_canonicalise_section.py` → exit 0, 1 file already formatted
+-- `pytest tests/unit/` (full suite) → 1306 passed in 34.42s
+-- `pytest tests/unit/test_plan_work_canonicalise_section.py -v` → 4 passed (the new tests)
+-
+-Raw outputs in `tool-outputs/ruff-check.log`, `tool-outputs/ruff-format-check.log`,
+-`tool-outputs/pytest.log`.
+-
+-### PR Hygiene signal table (CR-09 — PH-06)
+-
+-```
+-Scope (PH-01):
+-  commit_type_spread: {extend}                 → clean
+-  module_fan_out: 2 (skills + references + scripts/tests)  → clean
+-  severity: low
+-
+-Size (PH-02):
+-  lines_added: 306, lines_removed: 1, total: 307
+-  files_changed: 4
+-  generated_ratio: 0.00
+-  lock_file_ratio: 0.00
+-  severity: low (well below 500-line band)
+-
+-Safety (PH-03):
+-  migration_count: 0
+-  schema_idl_count: 0
+-  infra_files: 0
+-  secret_pattern_hits: 0
+-  severity: low
+-
+-Completeness (PH-04):
+-  new_source_without_test: 0 (the new test IS the test)
+-  api_change_without_schema: false
+-  severity: low
+-```
+-
+-### Findings in the Changes
+-
+-None.
+-
+-### Findings in the Neighbours
+-
+-None — methodology prose has no neighbours in the call-graph sense.
+-The 4 files form a self-contained methodology unit (skill cites rubric;
+-rubric cites skill; test pins both).
+-
+-### Watch List
+-
+-None.
+-
+-### Cross-Reference
+-
+-- **Existing Hardening Deltas covered:** none applicable (this WP authors
+-  the methodology refinement; deltas would only apply to code touched by it)
+-- **Existing security report:** none applicable
+-- **Pattern suggesting full audit:** none
+-
+-### Methodology
+-
+-#### Code Review Standard self-attestation (CR-08)
+-
+-- [✓] **CR-01 Mechanical baseline ran.** Commands: `ruff check`, `ruff format --check`, `pytest tests/unit/`. Base: 0 errors (would be unchanged). Head: 0 new errors. Coverage gap: none.
+-- [✓] **CR-02 Single-reader pass justified.** Diff: 307 lines / 4 files. Above the 200-line carve-out but `kind: docs` with a single concern (methodology prose + structural test pinning it). The 4 files form a tightly-coupled unit; parallel dispatch across 3 lenses would produce identical findings (none). Single-reader pass recorded.
+-- [✓] **CR-03 Full-file reads.** All 4 changed files read end-to-end (largest is the new test at 209 lines). No file > 250 lines. Unread files: none.
+-- [✓] **CR-04 Evidence discipline.** No findings, so no claims to evidence. The verdict cites the tool exit codes and the test-pass count as evidence.
+-- [✓] **CR-05 Severity rubric.** Applied. 0 critical, 0 high, 0 medium, 0 low.
+-- [✓] **CR-06 Verdict computed.** Verdict: PASS. Auto-downgrade triggers: none fired (Build Verification empty; all files read end-to-end; all lenses produced output).
+-- [✓] **CR-07 Lens completion.** Architecture: nothing surfaced (no architectural surfaces — pure prose + test). Security: nothing surfaced (no secrets, no auth, no external calls, no I/O). Quality: nothing surfaced (ruff clean, full suite green, new tests cover the new prose, tests assert at the right granularity).
+-- [✓] **CR-09 PR Hygiene applied.** PH-01 Scope: low (single primitive). PH-02 Size: low (307 lines, 4 files). PH-03 Safety: low (no migrations, schemas, infra, or secrets). PH-04 Completeness: low (tests included). PH-03 high → CR-06 auto-downgrade fired: no.
+-
+-#### Run details
+-
+-- **Diff source:** local working tree vs `change/extend-canonicalise-cross-wp-ids`
+-- **Neighbour expansion:** N/A (prose has no call-graph neighbours; the 4 files are the unit)
+-- **Neighbour cap:** N/A
+-- **Scanners run:** ruff (check + format), pytest
+-- **Scanners unavailable:** none required for `kind: docs`
+-- **Lenses dispatched in parallel:** no — single-reader pass per CR-02 carve-out reasoning above
+diff --git a/.architecture/canonicalise-cross-wp-ids/code-reviews/PR-feat-wp-001-canonicalise-cross-wp-ids-2026-06-01T145136Z/signals.json b/.architecture/canonicalise-cross-wp-ids/code-reviews/PR-feat-wp-001-canonicalise-cross-wp-ids-2026-06-01T145136Z/signals.json
+deleted file mode 100644
+index 1d0786c3..00000000
+--- a/.architecture/canonicalise-cross-wp-ids/code-reviews/PR-feat-wp-001-canonicalise-cross-wp-ids-2026-06-01T145136Z/signals.json
++++ /dev/null
+@@ -1,64 +0,0 @@
+-{
+-  "timestamp": "2026-06-01T145136Z",
+-  "target": "feat/wp-001-canonicalise-cross-wp-ids",
+-  "base": "change/extend-canonicalise-cross-wp-ids",
+-  "project": "canonicalise-cross-wp-ids",
+-  "wp": "WP-001",
+-  "kind": "docs",
+-  "verdict": "PASS",
+-  "diff": {
+-    "lines_added": 306,
+-    "lines_removed": 1,
+-    "total": 307,
+-    "files_changed": 4,
+-    "files": [
+-      "plugins/sulis/references/decompose-validation-rubric.md",
+-      "plugins/sulis/skills/draft-architecture/SKILL.md",
+-      "plugins/sulis/skills/plan-work/SKILL.md",
+-      "plugins/sulis/scripts/tests/unit/test_plan_work_canonicalise_section.py"
+-    ]
+-  },
+-  "build_verification": {
+-    "checks_run": ["ruff check", "ruff format --check", "pytest tests/unit/"],
+-    "pr_introduced_errors": 0,
+-    "full_suite": "1306 passed"
+-  },
+-  "hygiene": {
+-    "scope": {
+-      "commit_type_spread": ["extend"],
+-      "module_fan_out": 2,
+-      "severity": "low"
+-    },
+-    "size": {
+-      "lines_added": 306,
+-      "lines_removed": 1,
+-      "files_changed": 4,
+-      "severity": "low"
+-    },
+-    "safety": {
+-      "migration_count": 0,
+-      "schema_idl_count": 0,
+-      "infra_files": 0,
+-      "secret_pattern_hits": 0,
+-      "severity": "low"
+-    },
+-    "completeness": {
+-      "new_source_without_test": 0,
+-      "api_change_without_schema": false,
+-      "severity": "low"
+-    }
+-  },
+-  "findings": {
+-    "critical": [],
+-    "high": [],
+-    "medium": [],
+-    "low": [],
+-    "neighbour": []
+-  },
+-  "lenses": {
+-    "architecture": {"status": "nothing surfaced", "findings": 0},
+-    "security": {"status": "nothing surfaced", "findings": 0},
+-    "quality": {"status": "nothing surfaced", "findings": 0}
+-  },
+-  "draft_deltas": 0
+-}
+diff --git a/.architecture/canonicalise-cross-wp-ids/work-packages/.executor-WP-001.md b/.architecture/canonicalise-cross-wp-ids/work-packages/.executor-WP-001.md
+deleted file mode 100644
+index 1e296c0a..00000000
+--- a/.architecture/canonicalise-cross-wp-ids/work-packages/.executor-WP-001.md
++++ /dev/null
+@@ -1,55 +0,0 @@
+-# Executor journal — WP-001
+-
+-> Started: 2026-06-01T14:44:32Z
+-> Lifecycle step: 7
+-> Status: in_progress
+-
+-## Pre-flight checks
+-
+-| Tool / Check | Status | Fallback |
+-|---|---|---|
+-| uv | present | — |
+-| pytest | present | — |
+-| git | present | — |
+-
+-## Plan
+-
+-**Approach.** Extend primitive (kind: docs). Add a 'pre-mint cross-WP shared identifiers in an upstream canonical source' methodology check to /sulis:plan-work (new workflow step + Decompose Validation Rubric P8) + cross-link from /sulis:draft-architecture. Worked example: CH-01KSZ4 release-train wave-1 minted two divergent tenant ULIDs (WP-003 placeholder vs WP-004 deterministic SHA256→Crockford), caught at post-train audit. Key risk: low — methodology refinement; only mechanical risks are markdown well-formedness + the structural test pinning sections that don't drift between heading edits.
+-
+-| # | Item | Step | Status | Notes |
+-|---:|---|---|---|---|
+-| 1 | Write structural test test_plan_work_canonicalise_section.py with 4 assertions (heading present, rubric P7 section, cross-reference, CH-01KSZ4 provenance) in plugins/sulis/scripts/tests/unit/ | 2 (RED) | done | — |
+-| 2 | Verify all 4 new tests fail for the right reason (sections don't exist yet) | 2 (RED) | done | — |
+-| 3 | Edit plugins/sulis/skills/plan-work/SKILL.md to add new 'Audit cross-WP identifiers' step between current step 5 and step 8 (Write WPs) | 3 (GREEN) | done | — |
+-| 4 | Edit plugins/sulis/references/decompose-validation-rubric.md to add P8 'Cross-WP identifier canonicalisation' phase with check rows | 3 (GREEN) | done | — |
+-| 5 | Add the cross-reference line in plan-work SKILL.md step 11 (Validate) so it names the new P8 | 3 (GREEN) | done | — |
+-| 6 | Add a one-line cross-reference in plugins/sulis/skills/draft-architecture/SKILL.md noting pre-mint canonical identifiers when parallel cross-references foreseen | 3 (GREEN) | done | — |
+-| 7 | Run all 4 new tests; verify pass | 3 (GREEN) | done | — |
+-| 8 | Run full unit suite from plugins/sulis/scripts (uv run pytest tests/unit/ -q); confirm green | 3 (GREEN) | done | — |
+-| 9 | Review wording for plain-English clarity + 30-second scannability (FE-04); concrete CH-01KSZ4 / WP-003-vs-WP-004 tenant ULID worked example | 4 (BLUE) | skipped | Prose reads as scannable in 30 seconds; concrete CH-01KSZ4 worked example present with WP-003/WP-004 + recipe; no rewording needed. |
+-| 10 | Run lint (no lint script for SKILL.md prose; verify markdown well-formed by reading); confirm test file passes any ruff/flake config | 6 (LINT) | done | — |
+-| 11 | Stage all edits + new test + journal explicitly; commit with conventional-commits header; push | 7 (COMMIT) | pending | — |
+-
+-## Step trace
+-
+-| Step | Started | Completed | Outcome |
+-|---:|---|---|---|
+-| 2 | 2026-06-01T14:45:11Z | 2026-06-01T14:46:29Z | 3 of 4 new tests fail for the right reason (sections don't exist); 4th passes because skill already file-path-references the rubric — satisfies cross-reference assertion ambiently. |
+-| 3 | 2026-06-01T14:46:34Z | 2026-06-01T14:50:13Z | 4 of 4 new tests pass. Full unit suite green (1306 passed). plan-work SKILL.md step 7c + Phase-list extended; rubric Phase 8 + per-phase row + methodology line + version-history row added; draft-architecture TDD section 8 (Canonical Identifiers) cross-link added. |
+-| 4 | 2026-06-01T14:50:17Z | 2026-06-01T14:50:34Z | Blue refactor skipped: prose is scannable in 30 seconds, concrete CH-01KSZ4 worked example present with WP-003/WP-004 + Crockford recipe + reconciliation commit pointer. |
+-| 5 | 2026-06-01T14:50:39Z | 2026-06-01T14:50:46Z | No-op. This WP IS the docs (methodology prose extension); version-history row in rubric covers the in-file changelog. No external README/CHANGELOG references the rubric phase list. |
+-| 6 | 2026-06-01T14:50:50Z | 2026-06-01T14:51:05Z | ruff check + ruff format check both clean on new test file. Markdown edits to SKILL.md / rubric / draft-architecture are prose — no lint applies. |
+-| 6.5 | 2026-06-01T14:51:09Z | 2026-06-01T14:52:50Z | addressed: 0 findings. /code-review verdict PASS. Bundle at .architecture/canonicalise-cross-wp-ids/code-reviews/PR-feat-wp-001-canonicalise-cross-wp-ids-2026-06-01T145136Z/ with REVIEW.md + signals.json + tool-outputs/. |
+-| 7 | 2026-06-01T14:52:55Z | (in flight) | — |
+-
+-## Self-heal attempts
+-
+-| Step | Attempt | Failure (1-line summary) | Root cause | Change applied | Outcome |
+-|---:|---:|---|---|---|---|
+-
+-## Post-deploy verification
+-
+-(Not yet recorded — Step 11 fills this in.)
+-
+-## Notes
+-
+diff --git a/plugins/sulis/references/change-work-standard.md b/plugins/sulis/references/change-work-standard.md
+index f33f1e48..44793786 100644
+--- a/plugins/sulis/references/change-work-standard.md
++++ b/plugins/sulis/references/change-work-standard.md
+@@ -231,6 +231,25 @@ resolves to a foreign change's `feat/wp-{nnn}-*` branch. The bare `feat/`
+ glob survives one release only for legacy callers that supply no change
+ scope; its removal is a tracked follow-up.
+ 
++### WP id labels (MUST)
++
++A WP's *id label* is `{CH-HANDLE}-WP-NNN` (e.g., `CH-5DMB1N-WP-001`) — the
++id-label twin of the branch-ref scoping above. The per-change `NNN` sequence is
++unchanged (still the human-friendly 1/2/3 within a change); the `CH-HANDLE`
++prefix makes the id globally unique across changes, so two changes can no longer
++both mint a colliding bare `WP-001`. This closes for the *id* the same collision
++class #283 closed for the *branch* — the two together retire cross-change WP
++collisions for good.
++
++Legacy bare `WP-NNN` ids minted before this change stay **understood for one
++release**: the WP-id matcher recognises the prefixed shape, the legacy bare
++shape, and the existing source-tagged `WP-{SOURCE}-{NNN}` shape from the same
++parse, and there is **no migration pass** rewriting any existing committed id.
++Dropping bare-id support is a tracked follow-up — the back-compat window closes
++deliberately once the in-flight bare ids have drained, mirroring how the bare
++`feat/` branch glob's removal is tracked above. See `WORK_PACKAGE_STANDARD.md`
++WP-01 (the `id` row) and ADR-002 (change `unique-wp-ids`).
++
+ ### What this means for the executor
+ 
+ The executor's `wpx-pipeline` and `wpx-train` are unchanged in
+@@ -530,3 +549,4 @@ change, and what CW-NN rule(s) it exercised or stressed.
+ | 0.1.0 | 2026-05-21 | Initial standard. CW-01..CW-08 synthesised from OpenSpec, Conventional Commits, SEA change primitives, GIT-01..GIT-10. Greenfield — no anchor cases yet; 90-day calibration begins. |
+ | 0.2.0 | 2026-05-25 | **CW-04 amended (additive).** Auto back-integration subsection added — codifies the merge-not-rebase mechanism with two trigger points (post-WP-merge active driver + pre-WP-start safety net) and structured conflict handling (interactive resolve / defer / abort options). Operationalises what CW-04's two-level worktree hierarchy makes possible. Phase 4 of the change-as-primitive build; pairs with lifecycle.md Step 0 + Step 12.5 amendments. Backwards-compatible — existing change branches without auto back-integration continue to work; the new mechanism activates only via the Phase 5 executor implementation. |
+ | 0.3.0 | 2026-06-10 | **CW-04 amended (additive).** Added the **WP branch refs (MUST)** subsection — a WP's branch ref is `wp/{primitive}-{slug}/wp-{nnn}-{slug}`, nesting under `wp/` (not under the `change/{primitive}-{slug}` prefix, which would be a git directory/file ref conflict). Scopes the train resolver's branch glob per-change so it cannot match a foreign change's recycled WP number (change `wp-branch-collision`, root cause of #105/#106; see ADR-001). Backwards-compatible — legacy bare `feat/wp-{nnn}-{slug}` branches still resolve via the executor journal + a one-release glob fallback for no-scope callers; fallback removal is a tracked follow-up. |
++| 0.4.0 | 2026-06-10 | **CW-04 amended (additive).** Added the **WP id labels (MUST)** subsection — the id-label twin of the WP branch-ref scoping: a WP's id label is `{CH-HANDLE}-WP-NNN`, the `CH-HANDLE` prefix making the id globally unique across changes while the per-change `NNN` sequence is unchanged. Closes for the id label the same cross-change collision class #283 closed for branches (change `unique-wp-ids`, CH-5DMB1N; see ADR-002). Backwards-compatible — legacy bare `WP-NNN` and source-tagged `WP-{SOURCE}-{NNN}` ids stay understood for one release (no migration); bare-id-support removal is a tracked follow-up. |
+diff --git a/plugins/sulis/references/standards/WORK_PACKAGE_STANDARD.md b/plugins/sulis/references/standards/WORK_PACKAGE_STANDARD.md
+index df0387aa..e58f652d 100644
+--- a/plugins/sulis/references/standards/WORK_PACKAGE_STANDARD.md
++++ b/plugins/sulis/references/standards/WORK_PACKAGE_STANDARD.md
+@@ -44,7 +44,7 @@ Every WP MUST have:
+ 
+ | Field | Required | Notes |
+ |-------|----------|-------|
+-| `id` | yes | Globally unique within the project. Format: `WP-NNN` (sequential within a change) or `WP-{SOURCE}-{NNN}` (e.g., `WP-HD-AA-001`). Conventional, not enforced — IDs in the same project just have to be unique. With `change_id:` populated, WP-NNN sequencing is per-change; cross-change collisions don't matter because the change_id disambiguates. The branch ref realises this disambiguation: a WP's feature branch is `wp/{primitive}-{slug}/wp-{nnn}-{slug}`, scoping the branch to its change so the train resolver cannot match a foreign change's recycled WP number. See `change-work-standard.md` CW-04 and ADR-001 (change `wp-branch-collision`). |
++| `id` | yes | Globally unique within the project. **Minted shape: `{CH-HANDLE}-WP-NNN`** (e.g., `CH-5DMB1N-WP-001`) — the per-change `NNN` sequence is unchanged (still the human-friendly 1/2/3 within a change), but the `CH-HANDLE` prefix makes the id globally unique across changes, so two changes can no longer both mint a colliding bare `WP-001`. Legacy/source-tagged shapes — bare `WP-NNN` and `WP-{SOURCE}-{NNN}` (e.g., `WP-HD-AA-001`) — stay **understood for one release** (the matcher recognises all three shapes; no migration rewrites any existing committed id). Dropping bare-id support is a tracked follow-up. Conventional, not enforced — IDs in the same project just have to be unique. With `change_id:` populated, WP-NNN sequencing is per-change; cross-change collisions don't matter because the change_id disambiguates — and the `CH-HANDLE` id prefix now realises that disambiguation in the rendered id label itself, the twin of the branch-ref scoping. The branch ref realises the same disambiguation for branches: a WP's feature branch is `wp/{primitive}-{slug}/wp-{nnn}-{slug}`, scoping the branch to its change so the train resolver cannot match a foreign change's recycled WP number. See `change-work-standard.md` CW-04, ADR-001 (change `wp-branch-collision`, the #283 branch scheme) and ADR-002 (change `unique-wp-ids`, the id-label twin + additive one-release back-compat). |
+ | `title` | yes | One-line plain-English summary. Founder-readable. |
+ | `kind` | yes | One of: `backend` / `frontend` / `async` / `docs` / `infra` / `contract` / `composite`. Determines which executor + which verification gates apply. (`contract` is the producer/consumer seam — see WP-08.5.) |
+ | `source` | yes | Where this WP came from: `hardening` / `feature` / `migration` / `refactor` / `observability` / `bug` / `manual`. Determines where the WP file lives within `.architecture/{project}/`. |
+@@ -519,4 +519,5 @@ The chain is the empirical proof. No human attestation needed at any step — th
+ | 1.1.0 | 2026-05-25 | Added the `change_id:` field to WP-01 Identity as part of Phase 4 of the change-as-primitive build (sulis v0.41.0). Optional for backwards-compat with legacy WPs; required for WPs created via `/sulis:change start` post-Phase 5. Field is a 26-character Crockford-base32 ULID linking the WP to its parent change. Per-change WP-NNN sequencing now disambiguated by change_id (cross-change collisions OK). |
+ | 1.2.0 | 2026-05-26 | Wired CONTRACT_FIRST_STANDARD into decomposition. Added `contract` to the `kind:` enum + its WP-05 gates row (schema lints, examples cover happy/error/empty, ≥1 consumer mock). Added WP-08.5 — contract-first cross-kind decomposition: cross-kind composites MUST emit a `kind: contract` child first, kind-specific children depend on it (parallel, not sequential), integration child closes with the conformance check. User-facing seams pair the data contract with the visual contract (design artifact per UX_VISUAL_DESIGN_STANDARD UXD-14). Single-kind + `--prototype` exempt. |
+ | 1.4.0 | 2026-06-10 | Branch-ref realisation of change_id disambiguation (change `wp-branch-collision`, #105/#106). The `id` row now states the WP feature-branch shape `wp/{primitive}-{slug}/wp-{nnn}-{slug}` and cross-references CW-04 + ADR-001. Backward-compatible: documents the implemented branch hierarchy; legacy `feat/wp-{nnn}-{slug}` branches still resolve via the journal + a one-release glob fallback. |
++| 1.5.0 | 2026-06-10 | Prefixed WP-id shape (change `unique-wp-ids`, CH-5DMB1N). The `id` row now documents the minted shape `{CH-HANDLE}-WP-NNN` (the id-label twin of #283's per-change branch namespacing): the per-change `NNN` sequence is unchanged, the `CH-HANDLE` prefix makes the id globally unique across changes. Legacy bare `WP-NNN` and source-tagged `WP-{SOURCE}-{NNN}` shapes stay understood for one release (no migration; the matcher recognises all three); fallback removal is a tracked follow-up. Cross-references CW-04 + ADR-002 alongside the existing ADR-001 (#283 branch scheme). Additive only — no existing requirement changed in meaning. |
+ | 1.3.0 | 2026-06-09 | Seam-close DoD gate (CH-01KTP7). Added the seam-close DoD wording to WP-05: a seam-spanning (`kind: contract` / integration `kind: composite`) WP is not `done` until the seam-close gate reports `observed` (or a conscious `--allow-deferred` was recorded); a seam with no covering Scenario, or one needing a tier not yet live, is blocked (per CONTRACT_FIRST_STANDARD CF-12). Added the contract-WP `implements: [dna:requirement:…]` SHOULD field to WP-08.5 (the requirement bridge, ADR-004) — the seam-close gate resolves the seam to its covering Scenarios directly, with a journey-filtered fallback when the field is absent (SHOULD-not-MUST keeps legacy WPs working; `/sulis:plan-work` populates it going forward). Worked-shape contract child gains an `implements:` example line. Additive only — no existing requirement changed in meaning. |

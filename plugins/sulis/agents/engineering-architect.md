@@ -678,7 +678,17 @@ A WP has exactly these fields:
 1. **Context** — which TDD section / architecture component this WP touches.
 2. **Contract** — the public interfaces, types, and ports the WP introduces or modifies.
 3. **Definition of Done** — three sub-checklists (Red, Green, Blue) with named tests.
-4. **Sequence ID** — `WP-NNN`, plus `dependsOn: [WP-NNN, ...]` to prevent merge conflicts.
+4. **Sequence ID** — you mint each id as the prefixed, globally-unique shape
+   `{CH-HANDLE}-WP-NNN` (e.g. `CH-5DMB1N-WP-001`): the prefix is the parent
+   change's handle, `NNN` is the per-change `001`/`002`/`003` sequence
+   (sequencing unchanged — only the rendered label gains the prefix, so ids
+   no longer collide across changes). `dependsOn: [{CH-HANDLE}-WP-NNN, ...]`
+   references the same shape. Legacy bare `WP-NNN` ids stay parseable for one
+   release (back-compat per ADR-002 / `WORK_PACKAGE_STANDARD`). **Carve-out:**
+   the id-prefixing change's *own* WPs stay bare `WP-NNN` — the parser and
+   run-all loop can't understand prefixed ids until that change ships
+   (chicken-and-egg); prefixed minting switches on for the next change after
+   it merges.
 5. **Estimated Token Cost** — rough budget (`input: ~Nk / output: ~Nk`) so orchestrators can route to the right model tier.
 6. **Primitive + Group** — `primitive: <one of 22>`, `group: <expand|reorganise|substitute|contract|reinforce>`. Composite WPs also carry `composite_of:`. SUBSTITUTE-Wrap WPs additionally carry `subject_ownership` and (when transitional) `removal_plan`. REORGANISE WPs additionally carry `characterisation_test`. SUBSTITUTE-Strangle WPs carry `removal_plan` with a target date.
 

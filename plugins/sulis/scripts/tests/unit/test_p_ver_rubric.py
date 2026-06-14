@@ -194,3 +194,39 @@ def test_grandfather_verdict_skips_checks() -> None:
         f"PASS_GRANDFATHERED, got {verdict.verdict!r}."
     )
     assert verdict.failed_check is None
+
+
+# ─── WP-001 (CH-5DMB1N): prefixed WP files are skipped by the filename filter ─
+
+
+def test_prefixed_wp_file_is_skipped_not_treated_as_srd(tmp_path) -> None:
+    """Site 5: the rubric's per-artifact SRD/TDD filename filter must skip a
+    prefixed `CH-…-WP-NNN-*.md` file just as it skips a legacy `WP-*.md`.
+
+    A WP file has no `## Verification Plan` section, so if it were run through
+    the per-artifact checks it would FAIL 9.01. Today the `startswith("WP-")`
+    filter does NOT skip a `CH-…-WP-NNN` file (it starts with `CH-`), so a
+    prefixed WP file is mis-classified as an SRD/TDD artifact and the fixture
+    FAILS 9.01. After the rewire it is recognised as a WP and skipped → PASS.
+
+    We copy a known-PASS documentation fixture and drop a prefixed WP file into
+    it; the verdict must stay PASS.
+    """
+    import shutil
+
+    src = _FIXTURES_ROOT / "pass_d_complete_documentation"
+    dst = tmp_path / "fixture"
+    shutil.copytree(src, dst)
+    # A prefixed WP file with NO Verification Plan section — would trip 9.01
+    # if mis-classified as an SRD/TDD artifact.
+    (dst / "CH-5DMB1N-WP-001-prefixed.md").write_text(
+        "---\nid: CH-5DMB1N-WP-001\ntitle: Prefixed mint\n---\n# Prefixed WP\n",
+        encoding="utf-8",
+    )
+
+    verdict = run_p_ver(dst)
+    assert verdict.verdict == "PASS", (
+        f"Prefixed WP file mis-classified as SRD/TDD artifact — expected PASS "
+        f"(skipped), got {verdict.verdict!r} (failed_check="
+        f"{verdict.failed_check!r}, message={verdict.message!r})."
+    )

@@ -1,0 +1,1 @@
+compileall clean (CI lint gate); ruff not in CI, 4 pre-existing ruff findings out-of-scope

@@ -1786,6 +1786,73 @@ CANONICAL_WP_INDEX_HEADER = (
 )
 
 
+# Single source of truth for "is this string a WP id?" and "what's its NNN
+# tail?". Sited next to _WP_TABLE_HEADER_RE so the WP-id matcher lives beside
+# the WP-table matcher, and for the same reason: five call sites used to
+# open-code `startswith("WP-")` / `removeprefix("wp-")`, and widening each
+# independently is exactly how a matcher and its consumers drift (#60, EP-03 —
+# the lesson already learned for the table-header regex). ADR-001/ADR-002.
+#
+# Recognises three shapes for one release (ADR-002 back-compat window):
+#   CH-<HANDLE>-WP-<TAIL>    prefixed     (the new mint, e.g. CH-5DMB1N-WP-001)
+#   WP-<TAIL>                legacy bare  (e.g. WP-001)
+#   WP-<SOURCE>-<NNN>        source-tagged (e.g. WP-HD-AA-001) — already valid
+# where <TAIL> is the non-empty `NNN` or `{SOURCE}-{NNN}` suffix. The optional
+# `CH-<HANDLE>-` group is what `wp_nnn_suffix` strips so the #283 per-change
+# branch scheme stays clean (without it, `removeprefix("wp-")` is a no-op on
+# `ch-5dmb1n-wp-001` and the branch leaks a doubled id).
+_WP_ID_RE = re.compile(
+    r"^(?:CH-[0-9A-Za-z]+-)?WP-[0-9A-Za-z][0-9A-Za-z-]*$"
+)
+
+# A WP filename's id prefix: the same three shapes, anchored at the start, with
+# the `{slug}` tail allowed to follow after the id (the id ends at its NNN run).
+_WP_ID_FILENAME_RE = re.compile(
+    r"^(?:CH-[0-9A-Za-z]+-)?WP-[0-9A-Za-z][0-9A-Za-z-]*"
+)
+
+
+def is_wp_id(s: str) -> bool:
+    """True when ``s`` names a Work Package id (any of the three shapes).
+
+    Reuses ``_WP_ID_RE`` — the SAME definition every caller reads — so the
+    row-filter (``parse_index_md``), the full-id detection
+    (``_normalise_wp_reference``), and the rubric filename filter
+    (``_p_ver_rubric``) can never disagree about what a WP id is.
+    """
+    return _WP_ID_RE.match(s) is not None
+
+
+def wp_nnn_suffix(s: str) -> str:
+    """Return the lowercased ``wp-NNN`` tail used to compose / resolve branches.
+
+    For a prefixed id the ``CH-<HANDLE>-`` prefix is stripped so the branch
+    stays clean (``wp/{scope}/wp-001-{slug}``, not the doubled
+    ``wp/{scope}/wp-ch-5dmb1n-wp-001-{slug}``). For a bare / source-tagged id
+    the result is byte-for-byte what ``removeprefix("wp-")`` produced before
+    this change (the legacy ``WP-`` strip + lowercase).
+    """
+    lowered = s.lower()
+    # Strip a leading change-handle prefix (`ch-<handle>-`) if present, so the
+    # tail begins at the `wp-...` segment for every shape.
+    match = re.match(r"^ch-[0-9a-z]+-(wp-.*)$", lowered)
+    if match:
+        lowered = match.group(1)
+    return lowered.removeprefix("wp-")
+
+
+def is_wp_id_filename(name: str) -> bool:
+    """True when a filename names a WP file of any shape.
+
+    WP files are ``{wp_id}-{slug}.md``; the recogniser tests the stem's id
+    prefix. Used by the rubric's fixture-dir filename filter so a prefixed
+    ``CH-…-WP-NNN-*.md`` (which starts with ``CH-``) is recognised as a WP and
+    skipped, not mis-classified as an SRD/TDD artifact.
+    """
+    stem = name[:-3] if name.endswith(".md") else name
+    return _WP_ID_FILENAME_RE.match(stem) is not None
+
+
 def validate_wp_index_header(index_text: str) -> str | None:
     """Decompose-time lint: does INDEX.md contain a recognisable WP table?
 
@@ -1858,9 +1925,11 @@ def _normalise_wp_reference(
     """
     if ref in known_wps:
         return (ref, "passthrough")
-    if ref.startswith("WP-"):
+    if is_wp_id(ref):
         # Full-looking ID that isn't in known_wps — treat as unknown
-        # but pass through (likely a typo or WP not yet added)
+        # but pass through (likely a typo or WP not yet added). is_wp_id
+        # recognises prefixed `CH-…-WP-NNN` too, so a prefixed ref is not
+        # mistaken for a short suffix to resolve.
         return (ref, "unknown")
     # Short name — look for unique suffix match
     candidates = [
@@ -1928,8 +1997,11 @@ def parse_index_md(
             if not row or not row[0].strip():
                 continue
             wp_id = row[0].strip()
-            # Skip rows that aren't actually WPs (e.g. summary rows)
-            if not wp_id.startswith("WP-"):
+            # Skip rows that aren't actually WPs (e.g. summary rows). is_wp_id
+            # recognises prefixed `CH-…-WP-NNN` rows too, so a prefixed row is
+            # KEPT, not silently dropped (the load-bearing back-compat seam —
+            # ADR-002).
+            if not is_wp_id(wp_id):
                 continue
 
             extras: dict[str, str] = {}
@@ -2118,7 +2190,7 @@ def _branch_name(wp_id: str, slug: str, change_scope: str | None = None) -> str:
     directory/file ref conflict with the change branch ``change/{scope}`` —
     see ``adrs/ADR-001-wp-branch-naming-scheme.md``.
     """
-    nnn = wp_id.lower().removeprefix("wp-")
+    nnn = wp_nnn_suffix(wp_id)
     if change_scope:
         return f"wp/{change_scope}/wp-{nnn}-{slug}"
     return f"feat/wp-{nnn}-{slug}"
@@ -2345,8 +2417,10 @@ def resolve_wp_branch(
         if _gh_branch_exists(repo, literal, gh=gh):
             return literal
 
-    # Fuzzy lookup. Strip the WP- prefix and lowercase per _branch_name.
-    nnn = wp_id.lower().removeprefix("wp-")
+    # Fuzzy lookup. Extract the clean wp-NNN tail per _branch_name (the shared
+    # wp_nnn_suffix strips any CH-<HANDLE>- prefix so the glob matches the
+    # clean tail, not the doubled prefixed id).
+    nnn = wp_nnn_suffix(wp_id)
 
     # Step 2 — scoped fuzzy glob (ADR-001). Only when change identity is
     # known: this is what closes the #105/#106 cross-change collision —
