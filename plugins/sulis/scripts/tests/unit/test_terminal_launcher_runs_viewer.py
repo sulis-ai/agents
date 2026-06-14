@@ -180,7 +180,13 @@ def test_explicit_entry_command_still_supported(tmp_path):
         _GOOD_ULID, tmp_path,
         entry_command="claude --dangerously-skip-permissions --agent sulis",
     )
-    assert "exec claude --dangerously-skip-permissions --agent sulis" in script
+    # The id is set on claude's OWN process via `env` (#107) so an inherited
+    # stale SULIS_CHANGE_ID can't re-shadow it; the claude command itself is
+    # otherwise unchanged.
+    assert (
+        f"exec env SULIS_CHANGE_ID={_GOOD_ULID} "
+        "claude --dangerously-skip-permissions --agent sulis"
+    ) in script
     assert "session_viewer.py" not in script
 
 
@@ -250,3 +256,161 @@ def test_module_docstring_describes_view_onto_shared_session():
     assert "viewer" in head or "view onto" in head, (
         "module docstring must describe the desktop-viewer re-point"
     )
+
+
+# ─── WP-001 (CH-3FNT33): resolve the INSTALLED scripts dir for the spawn ───
+#
+# `_terminal_launcher.py` used to self-locate the spawned window's sibling
+# scripts from its OWN file (`Path(__file__).resolve().parent`) at two sites —
+# the viewer exec line (line 303) and the origin-hook exports (line 350). When
+# the launcher runs from a change WORKTREE (the dogfood case), `__file__` is the
+# worktree copy, so the spawned window execs worktree code. WP-001 redirects both
+# sites at the INSTALLED plugin scripts dir via one named resolver
+# `_resolve_installed_scripts_dir()`. These tests build a FAKE cache under
+# `tmp_path` and monkeypatch `default_cache_root` at it — the developer's real
+# ~/.claude is never touched.
+
+
+def _make_fake_cache(tmp_path, versions):
+    """Materialise `<tmp>/sulis-ai-agents/sulis/<ver>/scripts` for each version.
+
+    Mirrors the real plugin-cache layout (`_prune_cache._SULIS_SUBPATH` =
+    ("sulis-ai-agents", "sulis")). Returns the cache ROOT (the dir
+    `default_cache_root` should be monkeypatched to return). Each version gets a
+    concrete `scripts` subdir, so the resolver's "scripts dir exists" guard is
+    satisfied.
+    """
+    cache_root = tmp_path / "cache"
+    sulis_dir = cache_root.joinpath(*tl._prune_cache._SULIS_SUBPATH)
+    for ver in versions:
+        (sulis_dir / ver / "scripts").mkdir(parents=True, exist_ok=True)
+    return cache_root
+
+
+def test_explicit_scripts_dir_equals_install_on_single_version_machine(
+    tmp_path, monkeypatch
+):
+    """Characterisation (EP-07 — pin behaviour before the refactor).
+
+    On a single-version installed machine the EXPLICITLY-resolved scripts dir
+    EQUALS the install: with a fake cache holding exactly one version whose
+    `scripts` dir exists (and no override), `_resolve_installed_scripts_dir()`
+    returns that `…/<ver>/scripts`. This is the "no behavioural change other than
+    explicit resolution" Constraint — on such a machine the resolution and the
+    install coincide."""
+    monkeypatch.delenv("SULIS_SPAWN_SCRIPTS_DIR", raising=False)
+    cache_root = _make_fake_cache(tmp_path, ["0.42.0"])
+    monkeypatch.setattr(tl._prune_cache, "default_cache_root", lambda: cache_root)
+    resolved = tl._resolve_installed_scripts_dir()
+    expected = cache_root.joinpath(*tl._prune_cache._SULIS_SUBPATH) / "0.42.0" / "scripts"
+    assert resolved == expected.resolve()
+
+
+def test_resolver_picks_numerically_newest_cached_install(tmp_path, monkeypatch):
+    """(AC-3) With several versions cached the resolver returns the NUMERICALLY
+    newest `…/<max>/scripts` — `0.126.0` over `0.98.0`, NOT the lexical winner.
+    Proves `_version_pick` (numeric) is used, never a text sort."""
+    monkeypatch.delenv("SULIS_SPAWN_SCRIPTS_DIR", raising=False)
+    cache_root = _make_fake_cache(tmp_path, ["0.98.0", "0.126.0"])
+    monkeypatch.setattr(tl._prune_cache, "default_cache_root", lambda: cache_root)
+    resolved = tl._resolve_installed_scripts_dir()
+    sulis_dir = cache_root.joinpath(*tl._prune_cache._SULIS_SUBPATH)
+    assert resolved == (sulis_dir / "0.126.0" / "scripts").resolve()
+    # The lexical winner (0.98.0 — '9' > '1') must NOT be chosen.
+    assert resolved != (sulis_dir / "0.98.0" / "scripts").resolve()
+
+
+def test_resolver_honours_spawn_scripts_dir_override(tmp_path, monkeypatch):
+    """(AC-4) `SULIS_SPAWN_SCRIPTS_DIR` set to an EXISTING dir wins over the cache
+    pick. A set-but-MISSING override falls through to the cache pick (not a hard
+    fail)."""
+    cache_root = _make_fake_cache(tmp_path, ["0.126.0"])
+    monkeypatch.setattr(tl._prune_cache, "default_cache_root", lambda: cache_root)
+    sulis_dir = cache_root.joinpath(*tl._prune_cache._SULIS_SUBPATH)
+
+    # (a) override points at an existing dir → it wins over the cache pick.
+    override = tmp_path / "dev-scripts"
+    override.mkdir()
+    monkeypatch.setenv("SULIS_SPAWN_SCRIPTS_DIR", str(override))
+    assert tl._resolve_installed_scripts_dir() == override.resolve()
+
+    # (b) override set but the dir is MISSING → fall through to the cache pick.
+    monkeypatch.setenv("SULIS_SPAWN_SCRIPTS_DIR", str(tmp_path / "does-not-exist"))
+    assert tl._resolve_installed_scripts_dir() == (
+        sulis_dir / "0.126.0" / "scripts"
+    ).resolve()
+
+
+def test_resolver_falls_back_to_module_dir_with_no_install_no_override(
+    tmp_path, monkeypatch
+):
+    """(AC-5) No override + no cached install → resolver returns
+    `Path(tl.__file__).resolve().parent` (today's behaviour). Never raises,
+    never returns an empty path."""
+    monkeypatch.delenv("SULIS_SPAWN_SCRIPTS_DIR", raising=False)
+    # Empty cache root (no sulis-ai-agents/sulis tree at all).
+    empty_root = tmp_path / "empty-cache"
+    empty_root.mkdir()
+    monkeypatch.setattr(tl._prune_cache, "default_cache_root", lambda: empty_root)
+    resolved = tl._resolve_installed_scripts_dir()
+    assert resolved == Path(tl.__file__).resolve().parent
+    assert str(resolved)  # non-empty
+
+
+def test_resolver_falls_back_when_cache_present_but_scripts_dir_missing(
+    tmp_path, monkeypatch
+):
+    """(AC-5, guard) A cache version dir can be mid-install with NO `scripts`
+    subdir; requiring the concrete `scripts` dir to exist keeps the resolver from
+    baking a non-existent path into the spawn — it falls through to `__file__`."""
+    monkeypatch.delenv("SULIS_SPAWN_SCRIPTS_DIR", raising=False)
+    cache_root = tmp_path / "cache"
+    sulis_dir = cache_root.joinpath(*tl._prune_cache._SULIS_SUBPATH)
+    (sulis_dir / "0.126.0").mkdir(parents=True)  # version dir but NO scripts/
+    monkeypatch.setattr(tl._prune_cache, "default_cache_root", lambda: cache_root)
+    resolved = tl._resolve_installed_scripts_dir()
+    assert resolved == Path(tl.__file__).resolve().parent
+
+
+def test_viewer_exec_line_targets_installed_cache_scripts(tmp_path, monkeypatch):
+    """(AC-1) The DEFAULT launch script's viewer exec line runs
+    `python3 <cache>/…/<max>/scripts/session_viewer.py` — the CACHE path, NOT
+    `Path(tl.__file__).parent/session_viewer.py`."""
+    monkeypatch.delenv("SULIS_SPAWN_SCRIPTS_DIR", raising=False)
+    cache_root = _make_fake_cache(tmp_path, ["0.98.0", "0.126.0"])
+    monkeypatch.setattr(tl._prune_cache, "default_cache_root", lambda: cache_root)
+    sulis_dir = cache_root.joinpath(*tl._prune_cache._SULIS_SUBPATH)
+    cache_viewer = sulis_dir / "0.126.0" / "scripts" / "session_viewer.py"
+
+    script = tl._build_launch_script(_GOOD_ULID, tmp_path)
+    assert str(cache_viewer.resolve()) in script, (
+        f"viewer exec line must target the installed cache scripts; script:\n{script}"
+    )
+    # The module-dir viewer path must NOT be what's exec'd.
+    module_viewer = Path(tl.__file__).resolve().parent / "session_viewer.py"
+    assert str(module_viewer) not in script
+
+
+def test_resolved_path_still_shlex_quoted_in_script(tmp_path, monkeypatch):
+    """(AC-6) Point the override at a dir whose name contains shell
+    metacharacters; the emitted viewer exec line and the origin-hook exports
+    single-quote it, and the generated script parses under `bash -n`. The
+    resolver changes WHICH path is quoted, not the quoting."""
+    monkeypatch.delenv("SULIS_SPAWN_SCRIPTS_DIR", raising=False)
+    nasty = tmp_path / "a dir; $(echo evil)"
+    nasty.mkdir()
+    monkeypatch.setenv("SULIS_SPAWN_SCRIPTS_DIR", str(nasty))
+
+    script = tl._build_launch_script(_GOOD_ULID, tmp_path, enable_origin_hook=True)
+    # The dangerous path is single-quoted everywhere it appears (viewer exec +
+    # SULIS_SCRIPTS_DIR + GIT_CONFIG_VALUE_0 hooks dir).
+    assert f"'{nasty.resolve()}/session_viewer.py'" in script
+    assert f"export SULIS_SCRIPTS_DIR='{nasty.resolve()}'" in script
+    assert f"GIT_CONFIG_VALUE_0='{nasty.resolve()}/hooks'" in script
+
+    bash = shutil.which("bash")
+    if bash is not None:
+        sh = tmp_path / "launch.sh"
+        sh.write_text(script)
+        r = subprocess.run([bash, "-n", str(sh)], capture_output=True, text=True)
+        assert r.returncode == 0, f"generated script is not parseable: {r.stderr}"

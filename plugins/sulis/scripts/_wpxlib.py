@@ -682,6 +682,113 @@ def validate_cross_kind_contract_wiring(wps: list[dict]) -> list[str]:
     return violations
 
 
+def _fixture_logical_name(path: str) -> str:
+    """Normalise a fixture path to its LOGICAL name so dir-vs-file forms of
+    the same fixture compare equal.
+
+    The fixture-shape-collision class (#106): one WP authors `x/` (a
+    directory + manifest), another authors `x.json` (a flat file) — the same
+    logical fixture under divergent conventions. To detect the collision we
+    strip a trailing slash and a single file extension, so
+    ``sample-tool-surface/`` and ``sample-tool-surface.json`` both normalise
+    to ``.../sample-tool-surface``. Directory separators are preserved, so two
+    fixtures of the same basename in different directories do NOT collide.
+    """
+    name = path.strip().rstrip("/")
+    base = name.rsplit("/", 1)[-1]
+    if "." in base:
+        # Strip exactly ONE trailing extension (the dir-vs-file equaliser);
+        # a leading-dot dotfile (no name before the dot) keeps its name.
+        stem, _, _ext = base.rpartition(".")
+        if stem:
+            prefix = name[: len(name) - len(base)]
+            name = prefix + stem
+    return name
+
+
+def validate_fixture_collisions(wps: list[dict]) -> list[str]:
+    """Return a list of shared-fixture collision violations for a WP set
+    (empty = pass). Pure; operates on WP frontmatter dicts ({id, dependsOn,
+    fixtures_created}).
+
+    The peer-collision check for TEST FIXTURES — the same structural defect as
+    the contract-seam check (two parallel WPs independently authoring one
+    logical thing), but with the contract seam removed: same-kind WPs, no
+    producer/consumer contract. Anchor case #106 / CH-01KTRJ: WP-001 authored
+    ``tests/fixtures/methodology/sample-tool-surface/`` (dir + manifest) while
+    WP-002 authored ``tests/fixtures/methodology/sample-tool-surface.json``
+    (flat file); the loader silently resolved the dir form and broke WP-002's
+    test at bundled-tip CI.
+
+    Two WPs COLLIDE on a fixture when:
+      1. both declare a ``fixtures_created`` path that normalises to the same
+         logical name (``_fixture_logical_name`` strips a trailing slash + a
+         single extension, so dir-vs-file forms compare equal), AND
+      2. neither WP (transitively) ``dependsOn`` the other — i.e. they are
+         parallel-batch peers, not a serialised author→consumer pair.
+
+    Remedy (surfaced in the rubric): serialize (one WP ``dependsOn`` the
+    other) or hoist a single fixture-authoring upstream WP both consumers
+    ``dependsOn``.
+    """
+    # Build id -> fixtures and id -> direct deps.
+    fixtures_by_id: dict[str, set[str]] = {}
+    deps_by_id: dict[str, list[str]] = {}
+    for wp in wps:
+        wid = str(wp.get("id", "")).strip()
+        if not wid:
+            continue
+        deps_by_id[wid] = _as_str_list(wp.get("dependsOn"))
+        logical = {
+            _fixture_logical_name(p)
+            for p in _as_str_list(wp.get("fixtures_created"))
+            if _fixture_logical_name(p)
+        }
+        if logical:
+            fixtures_by_id[wid] = logical
+
+    def _reachable(start: str) -> set[str]:
+        """Transitive dependency closure of ``start`` (the WPs it waits on)."""
+        seen: set[str] = set()
+        stack = list(deps_by_id.get(start, []))
+        while stack:
+            dep = stack.pop()
+            if dep in seen:
+                continue
+            seen.add(dep)
+            stack.extend(deps_by_id.get(dep, []))
+        return seen
+
+    def _serialised(a: str, b: str) -> bool:
+        return b in _reachable(a) or a in _reachable(b)
+
+    # logical fixture name -> WP ids that author it.
+    authors_by_fixture: dict[str, list[str]] = {}
+    for wid, logical in fixtures_by_id.items():
+        for name in logical:
+            authors_by_fixture.setdefault(name, []).append(wid)
+
+    violations: list[str] = []
+    for name, authors in authors_by_fixture.items():
+        if len(authors) < 2:
+            continue
+        ordered = sorted(authors)
+        for i, a in enumerate(ordered):
+            for b in ordered[i + 1:]:
+                if _serialised(a, b):
+                    continue
+                violations.append(
+                    f"{a} and {b} both author the fixture `{name}` under "
+                    f"divergent conventions (dir-vs-file forms resolve to the "
+                    f"same logical name) and neither dependsOn the other. Two "
+                    f"parallel WPs MUST NOT independently author one logical "
+                    f"fixture (#106). Remedy: serialize (one dependsOn the "
+                    f"other) or hoist a single fixture-authoring upstream WP "
+                    f"both consumers dependsOn."
+                )
+    return violations
+
+
 # ─── Repository contract (RC v0.3.0 profile model) — L-05 ───────────────
 #
 # Promoted from wpx-arrival-check._read_contract so the pipeline, the train,
@@ -702,12 +809,15 @@ def read_repo_contract(repo_root: Path) -> dict:
     """Parse `.sulis/repo-contract.yml` into a normalised dict.
 
     Returns {profile, contribution_model, artifacts: [{name, type}],
-    deploy_target}. A missing file returns the all-None/empty shape (callers
-    treat that as the strict deployable default).
+    deploy_target, branch_convention}. A missing file returns the
+    all-None/empty shape (callers treat that as the strict deployable
+    default; an absent ``branch_convention`` means the change tooling
+    composes the byte-for-byte ``change/{primitive}-{slug}`` default — #112).
     """
     result: dict = {
         "profile": None, "contribution_model": None,
         "artifacts": [], "deploy_target": None,
+        "branch_convention": None, "brain_location": None,
     }
     contract = Path(repo_root) / ".sulis" / "repo-contract.yml"
     if not contract.is_file():
@@ -728,6 +838,14 @@ def read_repo_contract(repo_root: Path) -> dict:
                 result["contribution_model"] = _rc_strip_value(stripped.split(":", 1)[1]) or None
             elif stripped.startswith("deploy_target:"):
                 result["deploy_target"] = _rc_strip_value(stripped.split(":", 1)[1]) or None
+            elif stripped.startswith("brain_location:"):
+                result["brain_location"] = (
+                    _rc_strip_value(stripped.split(":", 1)[1]) or None
+                )
+            elif stripped.startswith("branch_convention:"):
+                result["branch_convention"] = (
+                    _rc_strip_value(stripped.split(":", 1)[1]) or None
+                )
             elif stripped.startswith("artifacts:"):
                 in_artifacts = True
             continue
@@ -1424,7 +1542,20 @@ def _preflight_ci_conclusion(
     extract a shared ``_classify_check_runs`` then — not now (two callers,
     deliberate independence).
     """
-    runs = _gh_check_runs(repo, branch, gh=gh)["check_runs"]
+    try:
+        runs = _gh_check_runs(repo, branch, gh=gh)["check_runs"]
+    except RuntimeError as exc:
+        # #310 — a fresh change branch with no CI yet (or a commit GitHub has
+        # no check-runs ref for) makes `gh api .../check-runs` return 404. That
+        # is "no CI recorded", NOT a red: the same advisory verdict as an empty
+        # runs list. Map it to `unknown` so the pre-flight returns its advisory
+        # envelope rather than crashing the run-all loop with an unhandled
+        # RuntimeError. Only the not-found case degrades to advisory; any other
+        # gh failure (auth, rate-limit, network) still surfaces.
+        msg = str(exc)
+        if "404" in msg or "Not Found" in msg:
+            return "unknown", []
+        raise
     if not runs:
         return "unknown", []
     statuses = [(r["name"], r["status"], r["conclusion"]) for r in runs]
@@ -4212,8 +4343,41 @@ def validate_change_primitive(primitive: str) -> tuple[bool, str]:
     return True, ""
 
 
-def compose_change_branch(primitive: str, slug: str) -> str:
-    """Compose a CW-02 branch name: change/{primitive}-{slug}.
+# The legacy, byte-for-byte branch convention. Used as the default when a repo
+# declares no ``branch_convention`` in its contract (#112) — zero behaviour
+# change for every repo that does not opt in.
+LEGACY_CHANGE_BRANCH_CONVENTION = "change/{primitive}-{slug}"
+
+
+def _normalise_branch_convention(convention: str | None) -> str:
+    """Resolve a raw ``branch_convention`` value to a usable template.
+
+    - ``None``/empty/whitespace → the legacy ``change/{primitive}-{slug}``.
+    - A bare prefix (no ``{...}`` placeholder, ends in ``/``) → composes
+      ``<prefix>{slug}`` (e.g. ``feature/`` → ``feature/{slug}``).
+    - Anything else is taken verbatim as a template.
+    """
+    if convention is None:
+        return LEGACY_CHANGE_BRANCH_CONVENTION
+    conv = convention.strip()
+    if not conv:
+        return LEGACY_CHANGE_BRANCH_CONVENTION
+    if "{" not in conv:
+        # Bare prefix → compose <prefix>{slug}. Tolerate a missing trailing /.
+        return (conv if conv.endswith("/") else conv + "/") + "{slug}"
+    return conv
+
+
+def compose_change_branch(primitive: str, slug: str, *,
+                          convention: str | None = None) -> str:
+    """Compose a change branch name from the host repo's convention (#112).
+
+    With ``convention=None`` (the default — the key absent from the repo
+    contract) the result is the legacy CW-02 ``change/{primitive}-{slug}``
+    byte-for-byte. A repo MAY declare a ``branch_convention`` template
+    supporting ``{primitive}`` and ``{slug}`` placeholders (e.g.
+    ``feature/{slug}``), or a bare prefix (``feature/``) which composes
+    ``<prefix>{slug}``.
 
     Raises ValueError on invalid primitive or slug.
     """
@@ -4223,11 +4387,68 @@ def compose_change_branch(primitive: str, slug: str) -> str:
     ok, reason = validate_change_slug(slug)
     if not ok:
         raise ValueError(reason)
-    return f"change/{primitive.lower()}-{slug.lower()}"
+    template = _normalise_branch_convention(convention)
+    # Substitute the supported placeholders only; an unrecognised placeholder
+    # (e.g. {ticket}, out of scope for slice 1) is left verbatim rather than
+    # raising KeyError — degrading loudly-but-safely instead of crashing
+    # cmd_start. The minimum supported set is {primitive} and {slug}.
+    return (template
+            .replace("{primitive}", primitive.lower())
+            .replace("{slug}", slug.lower()))
 
 
-def parse_change_branch(branch: str) -> tuple[str, str] | None:
-    """Inverse of compose_change_branch. Returns (primitive, slug) or None."""
+def _parse_with_convention(branch: str, convention: str) -> tuple[str, str] | None:
+    """Try to recover (primitive, slug) from ``branch`` under one template.
+
+    Supports the two placeholder shapes the composer emits:
+    ``<prefix>{slug}`` and ``<prefix>{primitive}-{slug}``. Returns None when
+    the branch does not match the template's prefix/shape.
+    """
+    template = _normalise_branch_convention(convention)
+    # Split the template on its first placeholder to recover the literal prefix.
+    brace = template.find("{")
+    if brace == -1:
+        return None
+    prefix = template[:brace]
+    if not branch.startswith(prefix):
+        return None
+    rest = branch[len(prefix):]
+    tail = template[brace:]
+    if tail == "{primitive}-{slug}":
+        if "-" not in rest:
+            return None
+        first, _, slug = rest.partition("-")
+        if first not in ALLOWED_CHANGE_PRIMITIVES:
+            return None
+        return (first, slug)
+    if tail == "{slug}":
+        # No primitive encoded in the branch — the slug is the whole tail.
+        # The primitive is not recoverable from the name; the store-backed
+        # record holds it. Return a sentinel primitive so callers that need
+        # (primitive, slug) for a worktree path still function; the change's
+        # recorded manifest is authoritative.
+        if not rest:
+            return None
+        return ("feat", rest)
+    # Unrecognised template shape → not parseable here.
+    return None
+
+
+def parse_change_branch(branch: str, *,
+                        convention: str | None = None) -> tuple[str, str] | None:
+    """Inverse of compose_change_branch. Returns (primitive, slug) or None.
+
+    Dual-prefix (#112): when a ``convention`` is supplied, the configured
+    template is tried FIRST, then the legacy ``change/{primitive}-{slug}`` is
+    UNIONED in — so a renamed ``feature/...`` change parses AND every existing
+    ``change/*`` branch keeps resolving. Mirrors ``resolve_wp_branch``'s
+    dual-prefix tolerance.
+    """
+    if convention is not None and convention.strip():
+        parsed = _parse_with_convention(branch, convention)
+        if parsed is not None:
+            return parsed
+    # Legacy change/ prefix (always honoured — the union half).
     if not branch.startswith("change/"):
         return None
     rest = branch[len("change/"):]
@@ -4240,12 +4461,28 @@ def parse_change_branch(branch: str) -> tuple[str, str] | None:
     return (first, slug)
 
 
-def change_worktree_path(repo_root: Path, primitive: str, slug: str) -> Path:
+def change_worktree_path(repo_root: Path, primitive: str, slug: str,
+                         change_id: str | None = None) -> Path:
     """Compose the worktree path for a change.
 
-    Convention: sibling of the main repo at
-    `<repo-parent>/<repo-name>-change-<primitive>-<slug>/`.
+    With ``change_id`` (the preferred, id-keyed form): the per-change
+    co-located worktree dir ``change_worktree_dir(change_id)`` —
+    ``{state_base}/changes/{change_id}/worktree``. This is unique per change
+    by construction, so two changes that share ``{primitive}-{slug}`` can
+    never resolve to the same fallback worktree (HD-005, Scenario 3
+    defence-in-depth: the last structural way two changes could share a
+    working tree).
+
+    Without ``change_id`` (or with a blank one — the legacy form): the
+    sibling of the main repo at
+    ``<repo-parent>/<repo-name>-change-<primitive>-<slug>/``. Preserved
+    byte-for-byte for callers that don't yet have an id in hand and for
+    legacy slug-keyed changes that predate id-keyed worktrees.
     """
+    if change_id:
+        # Lazy import: avoid a module-load coupling to _change_state.
+        from _change_state import change_worktree_dir
+        return change_worktree_dir(change_id)
     return repo_root.parent / f"{repo_root.name}-change-{primitive}-{slug}"
 
 
@@ -4338,11 +4575,23 @@ def git_worktree_add(repo_root: Path, branch: str, dest: Path,
 
 
 def git_worktree_remove(repo_root: Path, dest: Path,
-                        force: bool = False) -> tuple[bool, str]:
+                        force: bool = False, *,
+                        change_id: "str | None" = None) -> tuple[bool, str]:
     """Remove a worktree at `dest`. Tolerates a missing worktree.
+
+    When `change_id` is given, the removal is SCOPE-GUARDED (#130): `dest` must
+    resolve to within that change's own dir, or the removal is REFUSED — so a
+    cross-change / out-of-scope path (the destructive glob-sweep incident) can
+    never land here, regardless of how the caller found the path. Callers that
+    own a change SHOULD always pass it.
 
     Returns (ok, message).
     """
+    if change_id is not None:
+        from _worktree_safety import within_change_scope
+        ok, reason = within_change_scope(dest, change_id, cwd=Path.cwd())
+        if not ok:
+            return False, f"scope-guard refused removal: {reason}"
     if not dest.exists():
         # Try `git worktree prune` in case the worktree was deleted manually
         _run(["git", "worktree", "prune"], cwd=repo_root, timeout=10)
@@ -4777,49 +5026,83 @@ def adopt_local_commits_into_change(
     )
 
 
-def find_change_branches(repo_root: Path) -> list[dict]:
-    """List all change/* branches in the local repo with basic state.
+def _convention_glob(convention: str | None) -> str | None:
+    """Return the ``git branch --list`` glob for a configured convention.
+
+    e.g. ``feature/{slug}`` → ``feature/*``. Returns None when the convention
+    is absent/legacy (the ``change/*`` glob already covers it) so callers don't
+    double-glob the legacy prefix.
+    """
+    if convention is None or not convention.strip():
+        return None
+    template = _normalise_branch_convention(convention)
+    brace = template.find("{")
+    prefix = template[:brace] if brace != -1 else template
+    if not prefix or prefix == "change/":
+        return None
+    return prefix.rstrip("/") + "/*"
+
+
+def find_change_branches(repo_root: Path, *,
+                         convention: str | None = None) -> list[dict]:
+    """List change branches in the local + origin repo with basic state.
+
+    Dual-prefix (#112): globs the legacy ``change/*`` UNION the configured
+    ``branch_convention`` prefix (e.g. ``feature/*``), so a renamed change is
+    discoverable by ``cmd_nuke`` / ``resolve_current_change`` AND existing
+    ``change/*`` changes keep resolving.
 
     Returns a list of dicts:
       [{"branch": str, "primitive": str, "slug": str, "current": bool}, ...]
     """
-    rc, out, _ = _run(["git", "branch", "--list", "change/*"],
-                     cwd=repo_root, timeout=10)
-    if rc != 0:
-        return []
+    # Local globs: legacy change/* always, plus the configured prefix if any.
+    local_globs = ["change/*"]
+    conv_glob = _convention_glob(convention)
+    if conv_glob is not None:
+        local_globs.append(conv_glob)
 
     result: list[dict] = []
     seen: set[str] = set()
-    for raw in out.splitlines():
-        line = raw.rstrip()
-        if not line:
+    for glob in local_globs:
+        rc, out, _ = _run(["git", "branch", "--list", glob],
+                          cwd=repo_root, timeout=10)
+        if rc != 0:
             continue
-        # git branch output: "* branch" (current), "+ branch" (other
-        # worktree), "  branch" (uncheckout). Strip the marker.
-        is_current = line.startswith("* ")
-        branch = line.lstrip("*+ \t").strip()
-        if not branch:
-            continue
-        parsed = parse_change_branch(branch)
-        if parsed is None:
-            continue
-        primitive, slug = parsed
-        seen.add(branch)
-        result.append({
-            "branch": branch,
-            "primitive": primitive,
-            "slug": slug,
-            "current": is_current,
-        })
+        for raw in out.splitlines():
+            line = raw.rstrip()
+            if not line:
+                continue
+            # git branch output: "* branch" (current), "+ branch" (other
+            # worktree), "  branch" (uncheckout). Strip the marker.
+            is_current = line.startswith("* ")
+            branch = line.lstrip("*+ \t").strip()
+            if not branch or branch in seen:
+                continue
+            parsed = parse_change_branch(branch, convention=convention)
+            if parsed is None:
+                continue
+            primitive, slug = parsed
+            seen.add(branch)
+            result.append({
+                "branch": branch,
+                "primitive": primitive,
+                "slug": slug,
+                "current": is_current,
+            })
 
     # Also surface origin-only change branches (a teammate's change pulled but
     # not checked out locally). Strip the `origin/` prefix to the logical
     # branch name; skip any already listed as a local branch. (L-01)
-    rrc, rout, _ = _run(
-        ["git", "branch", "--list", "--remotes", "origin/change/*"],
-        cwd=repo_root, timeout=10,
-    )
-    if rrc == 0:
+    remote_globs = ["origin/change/*"]
+    if conv_glob is not None:
+        remote_globs.append("origin/" + conv_glob)
+    for glob in remote_globs:
+        rrc, rout, _ = _run(
+            ["git", "branch", "--list", "--remotes", glob],
+            cwd=repo_root, timeout=10,
+        )
+        if rrc != 0:
+            continue
         for raw in rout.splitlines():
             line = raw.strip()
             if not line or "->" in line:  # skip "origin/HEAD -> origin/dev"
@@ -4830,7 +5113,7 @@ def find_change_branches(repo_root: Path) -> list[dict]:
                 continue
             if branch in seen:
                 continue
-            parsed = parse_change_branch(branch)
+            parsed = parse_change_branch(branch, convention=convention)
             if parsed is None:
                 continue
             primitive, slug = parsed
@@ -4890,6 +5173,11 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
     else:
         repo_root = Path(repo_root).resolve()
 
+    # #112 — honour the host branch convention for dual-prefix discovery, so a
+    # change renamed off change/ (e.g. feature/...) still resolves. Absent →
+    # None → legacy change/* behaviour byte-for-byte.
+    convention = read_repo_contract(repo_root).get("branch_convention")
+
     checked: list[str] = []
 
     # 1. Self: current branch + metadata committed at repo_root/.changes/.
@@ -4897,7 +5185,7 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
         ["git", "branch", "--show-current"], cwd=repo_root, timeout=10,
     )
     if rc == 0:
-        parsed = parse_change_branch(branch_out.strip())
+        parsed = parse_change_branch(branch_out.strip(), convention=convention)
         if parsed is not None:
             primitive, slug = parsed
             self_meta = repo_root / ".changes" / f"{primitive}-{slug}.yaml"
@@ -4906,6 +5194,25 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
                 metadata = read_change_metadata(self_meta)
                 if metadata.get("change_id") == change_id:
                     return metadata
+                # #244 — the cwd IS a change worktree (current branch is a
+                # change/* branch with a committed manifest), but its change_id
+                # DISAGREES with the inherited SULIS_CHANGE_ID (a stale shell
+                # value left over from another change). The worktree — branch +
+                # committed manifest — is the reliable signal; the env var is
+                # the stale one. Prefer the worktree's change and warn loudly,
+                # rather than silently resolving the env var's UNRELATED change
+                # from a sibling worktree at step 3 (which would let stage/ship
+                # act on the wrong change).
+                print(
+                    f"resolve_current_change: SULIS_CHANGE_ID={change_id} "
+                    f"disagrees with the worktree's change "
+                    f"{metadata.get('change_id')} (branch "
+                    f"{branch_out.strip()!r}). The env var is stale; using the "
+                    f"worktree's change. Run `unset SULIS_CHANGE_ID` (or "
+                    f"re-spawn the session) to clear it.",
+                    file=sys.stderr,
+                )
+                return metadata
 
     # 2. Scan repo_root/.changes/ for any manifest matching this change_id.
     changes_dir = repo_root / ".changes"
@@ -4935,7 +5242,7 @@ def resolve_current_change(repo_root: Path | None = None) -> dict | None:
 
     # 3. Sibling worktree iteration (driving from the main repo; includes
     #    origin-only change branches via find_change_branches).
-    for entry in find_change_branches(repo_root):
+    for entry in find_change_branches(repo_root, convention=convention):
         primitive = entry["primitive"]
         slug = entry["slug"]
         worktree_dest = change_worktree_path(repo_root, primitive, slug)
@@ -4975,6 +5282,41 @@ def current_change_scope(repo_root: Path | None = None) -> str | None:
     if not primitive or not slug:
         return None
     return f"{primitive}-{slug}"
+
+
+def is_change_context(base_branch: str | None = None,
+                      repo_root: Path | None = None) -> bool:
+    """True iff the current run is operating on a CHANGE branch (#112).
+
+    Prefix-INDEPENDENT change-context test for the wpx-train back-integration
+    gates. The previous gates literal-tested ``base_branch.startswith("change/")``
+    — which silently STOPS auto-back-integrating a change branch renamed under
+    a host ``branch_convention`` (e.g. ``feature/...``). This restores the gate
+    on a store-backed / env signal instead of the annotation prefix:
+
+      1. ``SULIS_CHANGE_ID`` set → unambiguously a change context.
+      2. ``base_branch`` is a legacy ``change/*`` branch → backward-compat
+         signal (the prefix itself, when present, still means "change").
+      3. ``base_branch`` matches the recorded ``branch`` field of any change in
+         the store (``list_all_changes``) → covers a renamed branch with no
+         env var set (driving from the main repo).
+
+    Returns False when none hold (a plain dev/main/feature branch with no
+    change context) — the gate then skips, exactly as before for non-changes.
+    """
+    if os.environ.get(SULIS_CHANGE_ID_ENV_VAR):
+        return True
+    if base_branch:
+        if base_branch.startswith("change/"):
+            return True
+        try:
+            from _change_state import list_all_changes  # lazy: import coupling
+            for record in list_all_changes():
+                if str(record.get("branch") or "") == base_branch:
+                    return True
+        except Exception:
+            pass  # best-effort; store unavailable → fall through
+    return False
 
 
 def back_integrate_change_branch(

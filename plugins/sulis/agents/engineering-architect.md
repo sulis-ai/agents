@@ -700,6 +700,38 @@ WPs are atomic. If a proposed WP cannot be implemented without first
 implementing another change, that other change is a separate WP. Bundle
 nothing. The Sequence ID and `dependsOn` graph express ordering.
 
+### The WP INDEX table MUST use the canonical header (MUST — #60/#335)
+
+The `work-packages/INDEX.md` you produce is read by the run-all tooling
+(`wpx-index` / `parse_index_md`), which only recognises a WP table whose
+header begins **exactly**:
+
+```
+| ID | Title | Primitive | Status | Depends On | Blocks |
+```
+
+First column `ID` (never `WP`); a single `Primitive` column (never a separate
+`kind` column — `kind` aliases to `primitive` and silently wins first-match).
+A drifted header like `| WP | Title | kind | primitive / group | dependsOn | … |`
+is **invisible** to the loop: `flip-status` / `list-ready` fail with "no | ID |
+header", and the failure surfaces mid-run-all, not at decompose. Put any extra
+columns you want (source delta, verification artifact, token cost) in a
+**second** table with a different header — the canonical table must be the
+first WP-shaped table in the file.
+
+**After writing INDEX.md, run the lint and treat a non-zero exit as a blocker
+(MUST).** This is a deterministic gate — do not rely on emitting the header
+correctly by hand:
+
+```bash
+"$WPX_DIR/wpx-index" lint --project {project} --repo-root {repo-root}
+```
+
+Exit 0 → the INDEX parses; decompose may report done. Non-zero → read the
+error (it names the canonical header), fix the table, and re-run until it
+exits 0. An INDEX that fails this lint is **not done** — never report a WP set
+ready for execution while the lint is red.
+
 ---
 
 ## How You Choose a Change Primitive

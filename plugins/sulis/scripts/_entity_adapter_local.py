@@ -101,6 +101,29 @@ class LocalFileEntityAdapter(EntityRepository):
             return None
         return json.loads(path.read_text())
 
+    def iter_entities(self, entity_type: str | None = None) -> "Iterator[dict]":
+        """Yield every stored instance (optionally just one entity_type).
+
+        Walks ``base_dir/domain/{type}/*.jsonld``. A missing store yields
+        nothing; an unreadable/corrupt file is skipped (a scan never aborts).
+        Backs the change-as-transaction reads (produced/evolved sets, #67).
+        """
+        domain_dir = self.base_dir / self.domain
+        if not domain_dir.is_dir():
+            return
+        if entity_type is not None:
+            type_dirs = [domain_dir / entity_type]
+        else:
+            type_dirs = sorted(d for d in domain_dir.iterdir() if d.is_dir())
+        for td in type_dirs:
+            if not td.is_dir():
+                continue
+            for f in sorted(td.glob("*.jsonld")):
+                try:
+                    yield json.loads(f.read_text())
+                except (ValueError, OSError):
+                    continue
+
     def validate(self, entity_type: str, instance: dict) -> None:
         schema = self._load_schema(entity_type)
         validator = jsonschema.Draft202012Validator(schema)

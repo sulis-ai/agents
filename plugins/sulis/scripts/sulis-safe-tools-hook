@@ -1,0 +1,24 @@
+#!/usr/bin/env python3
+"""sulis-safe-tools-hook — the registered PreToolUse command entry (WP-003).
+
+Thin executable wrapper over ``_safe_tools_hook.main``. ``hooks.json`` registers
+this under a ``PreToolUse`` matcher for ``Write|Edit|Bash``; Claude Code pipes
+the PreToolUse JSON on stdin and reads the decision from stdout / the exit code.
+
+All logic lives in the importable ``_safe_tools_hook`` module (so it is unit-
+testable without a subprocess); this file is just the entry point the plugin
+config can name. Fail-closed semantics (exit 2 on unparseable input / no change
+scope / internal error) live in ``main``.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _safe_tools_hook import main  # noqa: E402
+
+if __name__ == "__main__":
+    raise SystemExit(main())

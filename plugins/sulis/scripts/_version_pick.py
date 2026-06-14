@@ -75,3 +75,34 @@ def max_version(versions: Iterable[str]) -> str | None:
     """
     ordered = sorted_versions_desc(versions)
     return ordered[0] if ordered else None
+
+
+def version_skew(loaded: str | None, cached_names: Iterable[str]) -> dict:
+    """Compare the LOADED plugin version against the NEWEST version cached (#125).
+
+    A long-running session loads the plugin at one version, then a newer one
+    can land in the cache while the session keeps running — so it silently
+    serves stale code. This is the pure compare behind the session-start
+    version-skew nudge; the CLI supplies ``loaded`` (the running script's own
+    ``plugin.json`` version) and ``cached_names`` (the cache dir entries).
+
+    Returns ``{loaded, newest, behind, determinable}``:
+
+    - ``determinable`` is ``False`` — and ``behind`` always ``False`` — when we
+      cannot make an honest comparison: ``loaded`` is ``None`` (dev / non-cache
+      layout, mirrors ``_version_ok``'s conservative None handling), ``loaded``
+      doesn't parse, or no cached name parses to a version. Never nudge on a
+      guess.
+    - ``behind`` is ``True`` only when both parse AND ``newest`` is strictly
+      greater than ``loaded`` (numeric tuple compare — never lexical). Loaded
+      equal-to or ahead-of the newest cached (the dev tree, a freshly-built
+      version) is ``behind: False``.
+    """
+    newest = max_version(cached_names)
+    loaded_v = parse_semver(loaded) if loaded else None
+    if loaded_v is None or newest is None:
+        return {"loaded": loaded, "newest": newest,
+                "behind": False, "determinable": False}
+    behind = parse_semver(newest) > loaded_v  # both parse here (newest from max_version)
+    return {"loaded": loaded, "newest": newest,
+            "behind": behind, "determinable": True}

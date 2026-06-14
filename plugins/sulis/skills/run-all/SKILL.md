@@ -916,32 +916,47 @@ loop:
               --wp <wp> --project <slug> \
               --branch <branch> \
               --pipeline-result @<batch deploy/verify result JSON> \
-              --worktree-path <worktree>
+              --worktree-path <worktree> \
+              --from-gate-handoff
             git branch -D <branch>   # merged to main; safe to delete
+
+        **Pass `--from-gate-handoff` (#267).** On this path the WPs were
+        flipped to `step-7-complete` before the train (not `in_progress`),
+        so the wrap's INDEX flip must expect `step-7-complete`. Without the
+        flag the wrap fails (`status is 'step-7-complete', expected
+        'in_progress'`) and you end up doing its three jobs — flip,
+        worktree-remove, branch-delete — by hand for every WP.
 
         Only the calling run-all session has the per-WP worktree paths,
         so this step lives here, not in `mark-gates-complete`. Skip it on
         a `--critical-found` finalise — those WPs got BLOCKERs, not a
         clean ship.
 
-   14.7. **Worktree cleanup safety — scope to THIS change only (#211/#253 — MUST).**
+   14.7. **Worktree cleanup safety — scope to THIS change only (#211/#253/#130 — MUST).**
         Remove ONLY the worktrees this run-all batch created for the
         current change. Each is an explicit path you already hold (the
         `--worktree-path` you passed to `wpx-step12 wrap` / `wpx-worktree
         create`, co-located under the current change's worktree parent
-        `~/.sulis/changes/<this-change-id>/`). Always remove by **explicit
-        path**, via `wpx-worktree remove --worktree-path <path>` or
-        `git worktree remove <explicit-path>`.
+        `~/.sulis/changes/<this-change-id>/`).
 
-        **NEVER** clean up by enumerating + name-globbing the worktree
-        list. A `git worktree list | grep …`-style sweep matched and
-        removed **4 worktrees belonging to other in-flight changes**
-        (different change IDs) in CH-01KT61 — uncommitted work in them
-        would have been lost (#211). Other changes' worktrees live under
-        their own `~/.sulis/changes/<other-id>/` parents and are never
-        yours to remove.
+        Always remove via the **scope-guarded tool**, passing the owning
+        change so the guard can enforce the boundary (#130):
 
-        ✓ `wpx-worktree remove --wp <wp> --project <slug> --worktree-path <path>`
+        ✓ `wpx-worktree remove --change-id <this-change-id> --worktree-path <path>`
+
+        The tool now **refuses** any `--worktree-path` outside
+        `~/.sulis/changes/<this-change-id>/` — cross-change / out-of-scope
+        removal is structurally blocked, not just discouraged. (`--change-id`
+        defaults to `SULIS_CHANGE_ID`; pass it explicitly to be safe.)
+
+        **NEVER** use raw git for cleanup — raw `git worktree remove` BYPASSES
+        the guard, and `git worktree list | grep …` is the exact move that has
+        now twice matched + removed **worktrees belonging to OTHER in-flight
+        changes** (#211, then again #130 — WP numbers restart per change, so a
+        name/number glob in the shared repo crosses change boundaries and
+        discards the only unique key, the change-id in the path):
+
+        ✗ `git worktree remove <path>`  (bypasses the #130 guard)
         ✗ `for w in $(git worktree list | grep wp- | awk …); do git worktree remove "$w"; done`
 
         If a worktree path you expect is already gone, that's fine
@@ -1243,9 +1258,14 @@ defaults are unchanged from v0.7.1.
 ## Per-executor isolation
 
 Each parallel executor uses its own `git worktree` per GIT-07. Worktree
-paths use the WP ID: `../wp-NNN-worktree/`. Concurrent worktrees do
-not share working files; they share only the bare repository's git
-objects + refs (which git handles thread-safely).
+paths use the WP ID: `../wp-NNN-worktree/`. A relative `--worktree-path`
+anchors to the executor's `--repo-root` (the **target change's**
+worktree), NOT the calling session's cwd (#309) — so each executor must
+pass `--repo-root <target-change-worktree>`, or the worktree lands under
+the wrong change's parent when the calling session is bound to a
+different change. Concurrent worktrees do not share working files; they
+share only the bare repository's git objects + refs (which git handles
+thread-safely).
 
 Per-executor journals live at `.architecture/{project}/work-packages/
 .executor-WP-NNN.md` — one per WP, no cross-WP collisions.

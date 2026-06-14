@@ -1,0 +1,33 @@
+id: harden-embed-safe-tools
+change_id: 01KV0GW39Q522P6PMFTTXH9T2E
+handle: CH-522P6P
+primitive: harden
+status: designed          # draft → designed → decomposed → implemented → verified
+tier: M
+base_sha: 2da4d842
+
+sourced_from:
+  spec: .changes/harden-embed-safe-tools.SPEC.md
+  working_set: .changes/harden-embed-safe-tools.WORKING-SET.md
+  builds_on: .architecture/harden-agent-execution-boundary/TDD.md   # the L1+L2 this embeds
+
+# This change embeds the shipped L1 (safe-fetch) + L2 (scoped file-tools) into
+# the agent's governed action-surface via the Claude Code harness — NOT prose,
+# NOT a CLI→MCP migration. A bounded MCP carve-out + one governance hook + one
+# shared write-roots resolver. Decisions D1–D8 are LOCKED upstream.
+
+components:
+  - safe-tools-mcp-server   # Phase 1 — Python stdio MCP wrapping _safe_fetch + _file_tools
+  - pretooluse-hook         # Phase 2 — write-roots scope deny + Bash-family governance
+  - write-roots-resolver    # Phase 3 — one resolver, shared by file-tools + sandbox recipe
+  - sandbox-recipe          # Phase 4 — doc/config (locus iii backstop)
+  - governed-action-surface-standard  # Phase 5 — the D8 2-axis criterion + quality nudge
+
+enforcement_loci:           # the honesty primitive — every rule names exactly one
+  i_model:   prose (advisory, bypassable) — quality nudge only
+  ii_harness: permission deny-rules + PreToolUse hook (deterministic; deny overrides allow)
+  iii_os:    the shipped Seatbelt/bubblewrap sandbox (covers spawned subprocesses)
+
+deferred:
+  - GAP-β: TLS-aware safe-fetch-only egress proxy (domain-fronting exfil) — roadmap
+  - SC-E7 sandbox-blocks half / SC-E8 real-session / SC-E9 operator-proof — consumer-config + attested

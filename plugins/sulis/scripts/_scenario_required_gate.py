@@ -82,6 +82,7 @@ def scenario_gate(
     touched_paths: list[str],
     scenarios_present: bool,
     exemption_reason: str | None = None,
+    spec_founder_facing: bool = False,
 ) -> ScenarioGateVerdict:
     """Decide whether a change may ship w.r.t. verifiable-scenario coverage.
 
@@ -95,9 +96,17 @@ def scenario_gate(
     - no scenarios + no exemption → ``required_missing`` (BLOCK).
 
     Not user-facing AND no NFRs → ``ok`` (tooling/library — unit tests cover it).
+
+    ``spec_founder_facing`` (#301) is the SPEC's own ``founder_facing: true``
+    flag. It is a user-facing trigger in its own right, so the gate fires at the
+    **specify/design boundary** — where the SPEC exists but no UI code is in the
+    diff yet, so ``touched_paths`` can't reveal user-facing-ness. The ship-time
+    call site leaves it at the default ``False`` and keeps relying on the path
+    signal (by then the UI is in the diff); the specify/design call site passes
+    the flag so the requirement bites three stages earlier.
     """
     paths = list(touched_paths)
-    user_facing = paths_touch_founder_surface(paths)
+    user_facing = paths_touch_founder_surface(paths) or spec_founder_facing
     nfr_scope = paths_declare_nfrs(paths)
     in_scope = user_facing or nfr_scope
     exempted = bool(exemption_reason and exemption_reason.strip())
@@ -178,6 +187,41 @@ def scenarios_present_for_change(repo_root: Path, stem: str) -> bool:
         typ_s = " ".join(typ) if isinstance(typ, list) else str(typ)
         if "scenario" in ident.lower() or "scenario" in typ_s.lower():
             return True
+    return False
+
+
+def spec_declares_founder_facing(repo_root: Path, stem: str) -> bool:
+    """True if the change's SPEC stamps ``founder_facing: true`` in its YAML
+    frontmatter (#301).
+
+    The SPEC at ``{repo_root}/.changes/{stem}.SPEC.md`` opens with a tiny
+    frontmatter block carrying the ``founder_facing`` value the specify
+    classifier computed (specify SKILL.md "Record the founder-facing flag").
+    This is the user-facing signal available at the specify/design boundary —
+    before any UI code is written — so the scenario gate can require scenarios
+    there, not only at ship. Stdlib-only frontmatter scan (no pyyaml, matching
+    the rest of ``plugins/sulis/scripts``): read the leading ``--- … ---`` block
+    and look for a ``founder_facing:`` key whose value coerces to true.
+    Missing file / no frontmatter / flag absent or false → ``False``."""
+    f = repo_root / ".changes" / f"{stem}.SPEC.md"
+    if not f.exists():
+        return False
+    try:
+        text = f.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return False
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break  # end of frontmatter
+        key, sep, value = line.partition(":")
+        if not sep or key.strip() != "founder_facing":
+            continue
+        # Strip an inline ``# comment`` and surrounding quotes/space.
+        val = value.split("#", 1)[0].strip().strip("'\"").lower()
+        return val == "true"
     return False
 
 

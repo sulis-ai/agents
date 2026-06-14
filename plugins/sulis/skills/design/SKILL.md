@@ -160,6 +160,42 @@ spec:
   three-field shape: What this should do / How we'll know / What to avoid) or
   a fuller standard / deep spec. That distinction drives Step 2.
 
+## Step 1.5 — scenarios-required gate (MUST for a user-facing spec — #301)
+
+A user-facing change must arrive at design with its **verifiable scenarios
+already authored** — the journeys that define "working", produced at specify
+(scenarios-first). If specify skipped them, design must not paper over the
+gap: the scenarios are the acceptance bar the whole build (and the eventual
+verification) is measured against, so a missing set has to be caught here, at
+the specify→design boundary — not three stages later at ship.
+
+This is the sibling of the Step 3.5 visual-contract gate: same `founder_facing`
+signal, same hard-stop shape. Run the gate (using the `$SCRIPTS_DIR` resolved
+above). It keys on the SPEC's `founder_facing: true` flag, so it fires even
+though no UI code exists in the diff yet:
+
+```bash
+"$SCRIPTS_DIR/sulis-verify-scenarios-required" \
+  --repo-root {worktree_path} \
+  --stem {primitive}-{slug}
+```
+
+- **Exit 0 (`ok`)** → scenarios present, or the change isn't user-facing, or a
+  logged exemption exists. Proceed to Step 2.
+- **Exit 1 (`required_missing`)** → STOP. Do **not** start designing. The spec
+  is `founder_facing` but has no verifiable scenarios. Route back to specify to
+  author them (FE-09 — name the outcome, not the gate):
+
+  > *"Before I design this, we're missing the part that says how we'll know
+  > it works — the handful of journeys we'll actually check (e.g. the button
+  > shows in the top bar → clicking it opens the start screen → starting
+  > creates the change and lands you in it). Let's capture those first: run
+  > `/sulis:specify` to add them, then I'll pick the design back up."*
+
+  A genuinely non-functional surface misdetected as needing scenarios → the
+  founder records an explicit exemption (`.changes/{primitive}-{slug}
+  .scenarios-exempt` with a reason). Rare, logged, never silent.
+
 ## Step 2 — is this small enough to skip design? (the lite shortcut)
 
 Per the design, decomposition is usually obvious for a small change — it's

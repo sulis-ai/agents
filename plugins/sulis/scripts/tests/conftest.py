@@ -31,6 +31,35 @@ if str(_SCRIPTS_DIR) not in sys.path:
 # ─── Global state isolation (repo-wide) ───────────────────────────────────
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _brain_real_home_floor(tmp_path_factory):
+    """Session-start safety FLOOR: guarantee SULIS_STATE_DIR points at a tmp dir
+    from the very start of the test session, so the brain can never touch the
+    developer's real ~/.sulis during tests — even at collection/import time, or
+    if a future test in this suite somehow runs brain code outside the per-test
+    `_isolate_sulis_state` override below.
+
+    This became load-bearing with de-branch-scope-the-brain: the brain's default
+    location is now `sulis_state_base()/.brain/instances` (was the per-repo
+    worktree), so it resolves through SULIS_STATE_DIR just like the change-state
+    store. That means the per-test fixture below now isolates the BRAIN for free
+    — and this session floor is the belt to its braces, closing the window
+    before the first per-test fixture runs. Only acts when SULIS_STATE_DIR is
+    unset (respects a deliberate override); restored on teardown.
+    """
+    import os
+
+    if os.environ.get("SULIS_STATE_DIR"):
+        yield
+        return
+    floor = tmp_path_factory.mktemp("sulis-state-session-floor")
+    os.environ["SULIS_STATE_DIR"] = str(floor)
+    try:
+        yield
+    finally:
+        os.environ.pop("SULIS_STATE_DIR", None)
+
+
 @pytest.fixture(autouse=True)
 def _isolate_sulis_state(tmp_path_factory, monkeypatch):
     """Point SULIS_STATE_DIR at a per-test tmp dir, and clear SULIS_CHANGE_ID,
@@ -45,6 +74,12 @@ def _isolate_sulis_state(tmp_path_factory, monkeypatch):
     dashboard's global cross-change view. Living at the root conftest, this
     covers unit tests too (the integration-only fixture left that gap, which
     leaked a test-fixture ULID into the real store).
+
+    Post de-branch-scope-the-brain this fixture ALSO isolates the brain: the
+    brain default `sulis_state_base()/.brain/instances` now resolves through the
+    same SULIS_STATE_DIR, so a per-test tmp dir walls off both the change-state
+    store AND the brain in one move. (The `_brain_real_home_floor` session
+    fixture above is the belt to these braces.)
 
     SULIS_CHANGE_ID is the second half of the same isolation gap: when the
     suite runs inside a change-bound session (a terminal spawned by

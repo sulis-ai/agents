@@ -1,0 +1,20 @@
+{
+  "target": "feat/wp-006-hypothesis-strategies",
+  "base": "change/fix-use-change-id-not-handle",
+  "kind": "backend",
+  "verdict": "PASS",
+  "build_verification": {"pr_introduced_errors": 0},
+  "pr_hygiene": {
+    "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "none"},
+    "size": {"lines_added": 354, "lines_removed": 4, "authored_lines": 322, "generated_lock_lines": 28, "files_changed": 4, "severity": "none"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+    "completeness": {"new_source_without_test": 0, "api_change_without_schema": false, "severity": "none"}
+  },
+  "lenses": {
+    "architecture": {"in_changes": 0, "in_neighbours": 0, "note": "nothing surfaced; test-only module, runtime stays stdlib-only"},
+    "security": {"in_changes": 0, "in_neighbours": 0, "note": "nothing surfaced; dev-only test dependency, no secrets/auth/injection/network surface"},
+    "quality": {"in_changes": 1, "resolved_inline": 1, "in_neighbours": 0, "note": "change_record export not pinned by a self-test -> added test_change_record_shape_and_handle_agree inline"}
+  },
+  "draft_fixes": 0,
+  "auto_downgrade_triggers": []
+}

@@ -1,0 +1,21 @@
+E402 Module level import not at top of file
+    --> plugins/sulis/scripts/_wpxlib.py:4154:1
+     |
+4152 | # timestamp + 80 bits of randomness, Crockford-base32 encoded.
+4153 |
+4154 | import secrets as _secrets
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+4155 | import time as _time
+     |
+
+E402 Module level import not at top of file
+    --> plugins/sulis/scripts/_wpxlib.py:4155:1
+     |
+4154 | import secrets as _secrets
+4155 | import time as _time
+     | ^^^^^^^^^^^^^^^^^^^^
+4156 |
+4157 | _CROCKFORD_BASE32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+     |
+
+Found 2 errors.

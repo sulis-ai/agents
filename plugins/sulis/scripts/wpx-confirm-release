@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""wpx-confirm-release — race-free confirm of the release-on-merge run for a
+just-merged commit (#121).
+
+After a change merges to `main`, the release robot (`release-on-merge.yml`)
+cuts the version. Confirming that by "the latest release run" races: the run
+for the merge commit isn't created the instant the merge lands, so the most
+recent run can belong to a PREVIOUS merge — reporting success against a stale
+release. This polls until the run whose `headSha` IS the merge commit appears
+and completes, then reports ITS conclusion. Never "the latest".
+
+  --repo        org/repo (e.g. sulis-ai/agents)
+  --merge-sha   the merge commit on main (full or short) to confirm the cut for
+
+Exit codes:
+  0  the release run for this commit completed `success`
+  1  it completed but NOT success (failure/cancelled) — the cut did not happen
+  2  no run for this commit appeared within the budget — could NOT confirm
+     (honest "unconfirmed", never a stale-run false success)
+  3  invocation error
+
+Stdlib only. 3.11-safe.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _release_confirm import poll_release_run  # noqa: E402
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description="Race-free release-on-merge confirm (#121).")
+    ap.add_argument("--repo", required=True, help="org/repo")
+    ap.add_argument("--merge-sha", required=True, help="merge commit on main (full or short)")
+    ap.add_argument("--attempts", type=int, default=20)
+    ap.add_argument("--sleep", type=float, default=6.0)
+    args = ap.parse_args(argv)
+
+    if not args.merge_sha.strip():
+        print("ERROR: --merge-sha is empty", file=sys.stderr)
+        return 3
+
+    found, conclusion, run = poll_release_run(
+        args.repo, args.merge_sha, attempts=args.attempts, sleep_s=args.sleep)
+
+    if not found:
+        print(
+            f"UNCONFIRMED: no release run for {args.merge_sha} appeared within "
+            f"the budget. The release for this commit could NOT be confirmed — "
+            f"do not report it shipped. Check: gh run list --repo {args.repo} "
+            f"--workflow release-on-merge.yml",
+            file=sys.stderr,
+        )
+        return 2
+
+    if conclusion == "success":
+        rid = (run or {}).get("databaseId")
+        print(f"CONFIRMED: release run {rid} for {args.merge_sha} completed success.")
+        return 0
+
+    print(
+        f"FAILED: the release run for {args.merge_sha} completed "
+        f"{conclusion!r}, not success — the version was NOT cut.",
+        file=sys.stderr,
+    )
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

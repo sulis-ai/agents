@@ -45,6 +45,19 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 
+# The secret-detection catalogue is the single shared source of truth
+# (``_secret_patterns``, ADR-002 — one catalogue, two policies). ``_anonymiser``
+# applies the *redact* policy over it; the L1 proxy applies the *refuse* policy.
+# The compiled patterns are imported here (not re-encoded) so a new secret
+# format is added once and both consumers inherit it (Non-Negotiable #2).
+from _secret_patterns import (
+    _ENV_SECRET_ASSIGNMENT,
+    _IP_ADDRESS,
+    _JWT,
+    _LONG_TOKEN,
+    _SLACK_TOKEN,
+)
+
 
 # ─── Public types ────────────────────────────────────────────────────────────
 
@@ -143,61 +156,11 @@ _EMAIL = re.compile(
     r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,24}\b"
 )
 
-# Env-var-style secret assignments (e.g. STRIPE_SECRET_KEY=sk_live_...,
-# DB_PASSWORD: "..."). Captures the value irrespective of quoting style.
-_ENV_SECRET_ASSIGNMENT = re.compile(
-    r"""
-    (?P<name>\b[A-Z][A-Z0-9_]*                 # an env-var-shaped name...
-        (?:KEY|SECRET|TOKEN|PASSWORD|PASSWD|API_?KEY)\b)
-    \s*[:=]\s*                                  # ... assignment glue ...
-    (?P<value>
-        " [^"\n]+ "                             # ... a quoted value ...
-        | ' [^'\n]+ '
-        | [^\s'"]+                              # ... or a bareword
-    )
-    """,
-    re.VERBOSE,
-)
-
-# JWT — full ``header.payload.signature`` shape. Specific to JWTs because
-# bare ``eyJ...`` segments alone don't always meet the long-token threshold,
-# and the period-separator means the bare-token regex (which has word
-# boundaries) only captures the first segment.
-_JWT = re.compile(
-    r"\beyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\b"
-)
-
-# Slack tokens — distinct shape (#42). Real tokens look like
-# ``xoxp-1234567890-1234567890-1234567890-{20+ alphanumerics}`` — at
-# least three hyphen-separated numeric blocks then an alphanumeric
-# tail. Casual prose like ``xoxp-token-style-identifiers`` doesn't
-# have the numeric blocks and falls through to no match.
-_SLACK_TOKEN = re.compile(
-    r"\b(?:xox[abprs])-[0-9]+-[0-9]+-[0-9]+-[A-Za-z0-9]{20,}\b"
-)
-
-# Bare opaque tokens — long opaque-looking strings (≥ 20 chars after the
-# prefix) of the shape an API key takes (sk_..., ghp_..., pat_..., AKIA...,
-# AIza..., etc.). Specific prefix-list to reduce false positives on
-# normal identifiers + commit SHAs (which would risk being stripped as
-# "high-entropy" though they're useful for debugging — we leave them).
-#
-# Suffix excludes ``-`` (#42): real tokens after these prefixes are
-# alphanumeric + underscore, not hyphenated. Allowing hyphens caused
-# false positives on casual references like ``xoxp-token-style-…``;
-# Slack tokens (which DO have hyphens) are now caught by the dedicated
-# ``_SLACK_TOKEN`` pattern above.
-_LONG_TOKEN = re.compile(
-    r"""
-    \b
-    (?:sk_live_|sk_test_|ghp_|gho_|ghr_|gha_|ghs_|github_pat_|pat_|
-       AKIA|AIza|ya29\.|nrn_|
-       npm_|pypi-)
-    [A-Za-z0-9_]{20,}                            # high-entropy suffix, no hyphens
-    \b
-    """,
-    re.VERBOSE,
-)
+# Secret patterns (``_ENV_SECRET_ASSIGNMENT``, ``_JWT``, ``_SLACK_TOKEN``,
+# ``_LONG_TOKEN``) and the IP regex (``_IP_ADDRESS``) are imported from the
+# shared ``_secret_patterns`` catalogue at the top of this module — one source
+# of truth (ADR-002). ``_anonymiser`` applies the *redact* policy below; the L1
+# proxy applies the *refuse* policy over the same catalogue.
 
 # Other-repo refs: ``org/repo#N`` (issue/PR ref) — ``#N`` is REQUIRED to
 # disambiguate from ordinary path segments. A bare ``Users/iain`` in a
@@ -237,21 +200,10 @@ _DOMAIN = re.compile(
     re.IGNORECASE,
 )
 
-# IP addresses (v4 dotted-quad + v6 compact/full). Whether a match is
-# REDACTED depends on `ipaddress` stdlib classification — see
-# ``_replace_ip``. The regex over-matches (e.g. could grab version-string-
-# shaped quads); the replacer parses each candidate via the stdlib and
-# returns it unchanged when it's not a real IP or when it's globally
-# routable. (#40)
-_IPV4 = r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b"
-# IPv6 is permissive — full + compressed forms + the common
-# loopback/ULA/link-local shapes. We rely on
-# ``ipaddress.ip_address`` to reject false positives.
-_IPV6 = (r"\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b"
-         r"|::1\b"
-         r"|\bfe80::[0-9a-fA-F:]+\b"
-         r"|\bfc[0-9a-fA-F]{2}:[0-9a-fA-F:]+\b")
-_IP_ADDRESS = re.compile(rf"(?:{_IPV4})|(?:{_IPV6})")
+# The IP regex (``_IP_ADDRESS``) is imported from ``_secret_patterns``. Whether a
+# match is REDACTED depends on the ``ipaddress`` stdlib classification in
+# ``_replace_ip`` below (regex over-matches; the replacer preserves non-IPs and
+# globally-routable IPs — #40).
 
 
 # ─── Pass implementations ────────────────────────────────────────────────────

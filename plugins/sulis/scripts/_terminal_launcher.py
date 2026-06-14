@@ -66,6 +66,9 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).parent))
+import _change_session  # noqa: E402
+import _prune_cache  # noqa: E402
+import _version_pick  # noqa: E402
 from _wpxlib import validate_change_ulid  # noqa: E402
 
 logger = logging.getLogger("sulis.terminal_launcher")
@@ -117,6 +120,67 @@ _PRE_PROMPT_MAX_BYTES = 50_000
 # to the change's shared session over the daemon's stable socket — instead of a
 # standalone `claude` (change CH-01KTKB ADR-003). Co-located with this module.
 _VIEWER_SCRIPT = "session_viewer.py"
+
+# Dev-escape override env var for the spawned-scripts resolver (WP-001 / DD-1).
+# Deliberately NOT `SULIS_SCRIPTS_DIR`: that name is already an OUTPUT of this
+# launcher (the origin-hook `export SULIS_SCRIPTS_DIR=...` line), so reusing it
+# as an INPUT here would be ambiguous (one name, two roles) and risk an
+# inherited output value silently steering resolution. `SPAWN` names the intent:
+# "what scripts dir to bake into the spawn".
+_SPAWN_SCRIPTS_DIR_ENV = "SULIS_SPAWN_SCRIPTS_DIR"
+
+
+# ─── Installed-scripts-dir resolver (WP-001 / CH-3FNT33) ───────────────────
+
+
+def _resolve_installed_scripts_dir() -> Path:
+    """Scripts dir to bake into the spawned launch script (viewer exec + hooks).
+
+    The spawned window's sibling scripts (``session_viewer.py``, the origin
+    hook) must come from the INSTALLED plugin, not the spawning worktree — when
+    ``sulis-change start`` runs from a change worktree, ``__file__`` is the
+    worktree copy, so self-locating from it forks the running (worktree) code
+    into the spawn. This resolver redirects both launcher call sites at the
+    install.
+
+    Resolution order (DESIGN §2 / DD-2):
+
+      1. ``SULIS_SPAWN_SCRIPTS_DIR`` (dev escape hatch, DD-1) — when set AND it
+         points at an existing directory, return it resolved. A developer
+         intentionally exercising launcher/viewer/daemon changes from a worktree
+         wins over the cache. A set-but-missing value falls through (it does not
+         hard-fail the spawn). The var is ``SULIS_SPAWN_SCRIPTS_DIR``, NOT
+         ``SULIS_SCRIPTS_DIR`` (that name is already an output of this launcher).
+      2. Newest cached install — ``_prune_cache.default_cache_root()`` joined
+         with ``_prune_cache._SULIS_SUBPATH`` ("sulis-ai-agents", "sulis"), then
+         the ``_version_pick.max_version(...)`` version (NUMERIC newest, never
+         lexical, #49-safe), then ``"scripts"`` — returned only when that
+         ``scripts`` dir exists (a mid-install version dir without it falls
+         through, so a non-existent path is never baked into the spawn).
+      3. Fallback — ``Path(__file__).resolve().parent`` (today's behaviour), so
+         a pure-dev machine with no install still spawns successfully (AC-5).
+         Never crashes, never returns an empty path.
+
+    Composition only (EP-03 / NFR-5): reuses the stdlib-only leaf helpers
+    ``_prune_cache`` + ``_version_pick`` rather than re-deriving the cache path
+    or re-implementing version ordering.
+    """
+    override = os.environ.get(_SPAWN_SCRIPTS_DIR_ENV, "").strip()
+    if override:
+        override_path = Path(override)
+        if override_path.is_dir():
+            return override_path.resolve()
+
+    sulis_dir = _prune_cache.default_cache_root().joinpath(*_prune_cache._SULIS_SUBPATH)
+    if sulis_dir.is_dir():
+        names = [p.name for p in sulis_dir.iterdir() if p.is_dir()]
+        newest = _version_pick.max_version(names)
+        if newest is not None:
+            scripts = sulis_dir / newest / "scripts"
+            if scripts.is_dir():
+                return scripts.resolve()
+
+    return Path(__file__).resolve().parent
 
 
 # ─── OS-window override knob ────────────────────────────────────────────────
@@ -224,8 +288,13 @@ def _build_viewer_exec_line(
     the caller resolves ``scripts_dir`` and ``worktree_path``.
     """
     viewer = scripts_dir / _VIEWER_SCRIPT
+    # `env SULIS_CHANGE_ID=<id>` sets the id on the viewer's OWN process (#107):
+    # an inherited stale value (cockpit service env / Terminal.app retained env)
+    # can re-shadow a shell `export` inside the daemon-attached session, binding
+    # it to the WRONG change. Setting it directly on the exec'd process is
+    # authoritative — nothing inherited can win.
     return (
-        "exec python3 "
+        f"exec env SULIS_CHANGE_ID={shlex.quote(change_id)} python3 "
         f"{shlex.quote(str(viewer))} "
         f"--change-id {shlex.quote(change_id)} "
         f"--worktree {shlex.quote(str(worktree_path))}"
@@ -292,9 +361,10 @@ def _build_launch_script(
         # daemon's interactive pty adapter reads the sidecar and briefs the
         # session's claude on its first turn. The viewer line is path-/flag-
         # shaped, so it is built outside the chat-style whitelist with each arg
-        # shlex.quote-d (like the sidecar `cat`). scripts_dir is resolved from
-        # this module's location — session_viewer.py is co-located here.
-        scripts_dir = Path(__file__).resolve().parent
+        # shlex.quote-d (like the sidecar `cat`). scripts_dir is resolved at the
+        # INSTALLED plugin (WP-001) so the spawned window execs the installed
+        # session_viewer.py, not the spawning worktree copy.
+        scripts_dir = _resolve_installed_scripts_dir()
         exec_line = _build_viewer_exec_line(change_id, worktree_path, scripts_dir)
     elif pre_prompt is not None:
         # Chat-style path with a brief: deliver the pre_prompt via a SIDECAR
@@ -312,15 +382,24 @@ def _build_launch_script(
         # ~/.sulis would escape as a raw OSError instead of the structured
         # _failed dict.)
         sidecar = Path.home() / ".sulis" / "changes" / change_id / _PRE_PROMPT_SIDECAR
-        exec_line = f'exec {entry_command} "$(cat {shlex.quote(str(sidecar))})"'
+        exec_line = (
+            f"exec env SULIS_CHANGE_ID={shlex.quote(change_id)} {entry_command} "
+            f'"$(cat {shlex.quote(str(sidecar))})"'
+        )
     else:
-        exec_line = f"exec {entry_command}"
+        exec_line = (
+            f"exec env SULIS_CHANGE_ID={shlex.quote(change_id)} {entry_command}"
+        )
 
     lines = [
         "#!/usr/bin/env bash",
         "set -euo pipefail",
         "# Carry-over env: only PATH, HOME, USER, TERM, LANG, LC_*.",
         _ENV_SCRUB_LINE,
+        # Belt-and-braces (#107): drop any inherited stale SULIS_CHANGE_ID before
+        # the authoritative export, so a re-shadowed parent value can't survive.
+        # The exec line also sets it directly on the spawned process via `env`.
+        "unset SULIS_CHANGE_ID",
         f'export SULIS_CHANGE_ID="{change_id}"',
     ]
     if enable_origin_hook:
@@ -332,7 +411,10 @@ def _build_launch_script(
         # `_origin_stamp`. The hook itself is a no-op unless SULIS_ORIGIN is set
         # at commit time (the run-ulid + confidence the executor supplies for
         # the autonomous stamp), so wiring it is harmless when no origin is set.
-        scripts_dir = Path(__file__).resolve().parent
+        # scripts_dir is resolved at the INSTALLED plugin (WP-001) so the hook
+        # (and the _origin_stamp it locates) come from the install, not the
+        # spawning worktree copy.
+        scripts_dir = _resolve_installed_scripts_dir()
         hooks_dir = scripts_dir / "hooks"
         lines.append(f"export SULIS_SCRIPTS_DIR={shlex.quote(str(scripts_dir))}")
         lines.append("export GIT_CONFIG_COUNT=1")
@@ -551,8 +633,19 @@ def _write_session_json(
     consumer should fall back to ``tty`` (``ps -t <tty>``) if present, or treat
     the session as unknown rather than dead.
     """
+    # The change's deterministic pinned Claude session id (focus-resumes-prior-
+    # session). The pty adapter pins it via ``--session-id`` at first spawn and
+    # the focus path resumes it via ``--resume``; it is a pure function of the
+    # change id, so recording it is a discoverable/auditable mirror of the
+    # binding, not a separate source of truth. A malformed change id (cannot
+    # derive an id) records ``None`` rather than failing the session.json write.
+    try:
+        claude_session_id = _change_session.change_session_id(change_id)
+    except ValueError:
+        claude_session_id = None
     payload = {
         "change_id": change_id,
+        "claude_session_id": claude_session_id,
         "pid": pid,
         "pid_kind": pid_kind,
         "tty": tty,

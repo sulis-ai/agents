@@ -60,3 +60,9 @@ class EntityRepository(Protocol):
         """Validate without persisting. Raise `EntityValidationError` on
         failure; return `None` on success."""
         ...
+
+    def iter_entities(self, entity_type: "str | None" = None) -> "Iterator[dict]":
+        """Yield stored instances — all, or just one `entity_type`. A missing
+        store yields nothing. Backs cross-entity reads (e.g. the change-as-
+        transaction produced/evolved sets, #67)."""
+        ...

@@ -30,6 +30,7 @@ def test_missing_contract_returns_empty_shape(tmp_path):
     assert c == {
         "profile": None, "contribution_model": None,
         "artifacts": [], "deploy_target": None,
+        "branch_convention": None, "brain_location": None,
     }
 
 
@@ -51,6 +52,38 @@ def test_reads_deployable_profile(tmp_path):
     c = read_repo_contract(tmp_path)
     assert c["profile"] == "deployable-web-app"
     assert c["deploy_target"] is None
+
+
+# ─── #112: branch_convention key ──────────────────────────────────────────
+
+
+def test_branch_convention_absent_is_none(tmp_path):
+    """When the key is absent the convention is None — callers then default to
+    change/{primitive}-{slug} byte-for-byte (zero behaviour change)."""
+    _write(tmp_path, "profile: published-artifact\n")
+    c = read_repo_contract(tmp_path)
+    assert c["branch_convention"] is None
+
+
+def test_missing_contract_includes_branch_convention_none(tmp_path):
+    """The empty shape gains a branch_convention: None field."""
+    c = read_repo_contract(tmp_path)
+    assert c["branch_convention"] is None
+
+
+def test_reads_branch_convention_template(tmp_path):
+    _write(tmp_path, (
+        "profile: deployable-web-app\n"
+        "branch_convention: feature/{slug}\n"
+    ))
+    c = read_repo_contract(tmp_path)
+    assert c["branch_convention"] == "feature/{slug}"
+
+
+def test_reads_branch_convention_bare_prefix(tmp_path):
+    _write(tmp_path, "branch_convention: feature/   # bare prefix\n")
+    c = read_repo_contract(tmp_path)
+    assert c["branch_convention"] == "feature/"  # inline comment stripped
 
 
 def test_reads_multi_artifact_list(tmp_path):

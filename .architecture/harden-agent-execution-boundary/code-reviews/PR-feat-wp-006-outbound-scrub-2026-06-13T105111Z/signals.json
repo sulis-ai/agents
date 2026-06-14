@@ -1,0 +1,47 @@
+{
+  "review": {
+    "target": "feat/wp-006-outbound-scrub-adopt-detect-secrets",
+    "base": "change/harden-agent-execution-boundary",
+    "project": "harden-agent-execution-boundary",
+    "timestamp": "2026-06-13T105111Z",
+    "verdict": "PASS",
+    "outcome_plain": "Ready to merge"
+  },
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "ruff_check": "clean",
+    "regression_tests": {"passed": 143, "failed": 0},
+    "typechecker": "none configured (ruff is the floor)"
+  },
+  "pr_hygiene": {
+    "scope": {"severity": "low", "commit_types": ["feat"], "module_fan_out": 1},
+    "size": {"severity": "low", "lines_added": 295, "lines_removed": 35, "files_changed": 6, "generated_ratio": 0.5},
+    "safety": {"severity": "low", "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "new_dependency": "detect-secrets>=1.5"},
+    "completeness": {"severity": "low", "new_source_without_test": 0, "api_change_without_schema": false}
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "lens": "quality",
+      "rule": "CR-10 #7 repeated-invariant-computation",
+      "file": "plugins/sulis/scripts/_secret_patterns.py",
+      "summary": "detect-secrets plugin registry rebuilt on every find_secrets call (per request part)",
+      "status": "addressed-inline",
+      "resolution": "module-level lazy cache _detect_secrets_plugins(); 0.42ms -> 0.08ms per call; 143 tests green",
+      "ring": "changes"
+    }
+  ],
+  "lens_output": {
+    "architecture": {"findings": 0, "note": "nothing surfaced — no domain->infra import, pure functions, intentional plugin cache only"},
+    "security": {"findings": 0, "note": "nothing surfaced — in-process, no shell-out, no network, no secret-value logging, fail-closed widens detection"},
+    "quality": {"findings": 1, "note": "1 low CR-10 fixed inline; 11 new tests present; no dead surface; find_secrets signature stable"}
+  },
+  "neighbours": {
+    "considered": ["plugins/sulis/scripts/_safe_fetch/proxy.py", "plugins/sulis/scripts/_anonymiser.py"],
+    "findings": 0,
+    "cap_reached": false
+  },
+  "draft_deltas": 0,
+  "auto_downgrade_triggers": []
+}

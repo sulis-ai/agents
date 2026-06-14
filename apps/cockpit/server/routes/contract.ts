@@ -24,9 +24,10 @@
 // (worktreePath, handle, shippedSha, branch) comes off the record — nothing
 // is hard-wired to a specific change.
 //
-// Security (TDD §3 Armor): the change handle is shape-guarded
-// (`assertSafeChangeHandle`) before it can reach the recreate spawn. A
-// malformed handle degrades to the typed "unavailable" note WITHOUT spawning.
+// Security (TDD §3 Armor): the change_id — the key that crosses the recreate
+// seam (ADR-001) — is shape-guarded (`isSafeChangeHandle`) before it can reach
+// the spawn. A malformed id degrades to the typed "unavailable" note WITHOUT
+// spawning.
 
 import { Router } from "express";
 
@@ -71,18 +72,20 @@ export interface ContractRouterDeps {
 }
 
 /**
- * Resolve a change's worktree for contract serving: shape-guard the handle,
- * then recreate-on-demand if the worktree was tidied. Returns the WP-004
- * resolution, with the malformed-handle case mapped to the same
+ * Resolve a change's worktree for contract serving: shape-guard the
+ * change_id, then recreate-on-demand if the worktree was tidied. Returns the
+ * WP-004 resolution, with the malformed-id case mapped to the same
  * "unavailable" degrade (never a spawn, never a throw into the request).
  */
 async function resolveForServing(
   record: ChangeStoreRecord,
   runner: RecreateRunner | undefined,
 ): Promise<ContractWorktreeResolution> {
-  // Defence-in-depth: refuse a malformed handle before it can reach the
+  // Defence-in-depth: refuse a malformed change_id before it can reach the
   // recreate spawn (the argparse flag-confusion vector + traversal shapes).
-  if (!isSafeChangeHandle(record.handle)) {
+  // The change_id is the key carried across the seam (ADR-001), so it — not
+  // the display handle — is what the serving boundary guards.
+  if (!isSafeChangeHandle(record.changeId)) {
     return {
       status: "unavailable",
       note: "couldn't reach this shipped change's contracts",

@@ -79,8 +79,19 @@ from _session_manager.recovery import (
     RecoveryDriver,
 )
 from _session_manager.session import Session
+from _session_manager.spawn_env import PROXY_ENDPOINT_ENV, child_spawn_env
 from _session_manager.state import Health, SessionState, SessionStatus
 from _session_manager.viewer import Viewer, ViewerRegistry
+
+# The sanctioned safe-fetch proxy endpoint a spawned agent session is pointed at
+# (WP-003 / SPEC §L1(d)). The agent-facing ``_safe_fetch.tool`` reads
+# ``PROXY_ENDPOINT_ENV`` to find this door. A deployment that runs the proxy on a
+# non-default port exports ``SULIS_SAFE_FETCH_PROXY`` in the manager's own
+# environment and it is honoured; otherwise the conventional loopback default is
+# used. Loopback by design: the proxy is co-located, and the test-harness
+# no-egress shim (ADR-005) — and, in production, the L3 sandbox — allow loopback
+# as the single sanctioned egress.
+DEFAULT_SAFE_FETCH_PROXY_ENDPOINT = "http://127.0.0.1:8080"
 
 # Default per-session scrollback ceiling for a pty session (contract §2.11.3,
 # the Armor ceiling — bounded memory is a MUST): 1 MiB is generous for a terminal
@@ -752,7 +763,10 @@ class SessionManager:
           routes it through :meth:`_on_process_death` (recovery is WP-005's —
           this WP only *detects in the tick*); else
         - **idle-evicts** a session idle past the timeout via :meth:`close`
-          (graceful: SIGTERM→SIGKILL, log closed, registry entry removed).
+          (graceful: SIGTERM→SIGKILL, log closed, registry entry removed) —
+          **unless it has an attached viewer**, in which case it is in-use by
+          definition and exempt (#108). The in-use signal is the WP-004-owned
+          :meth:`_viewer_count`, injected the same way :meth:`is_alive` is.
 
         Called on the background maintenance thread, and directly by tests for
         deterministic, sleep-free verification (MEA-09)."""
@@ -763,6 +777,7 @@ class SessionManager:
             is_alive=self.is_alive,
             on_death=self._on_process_death,
             evict=self.close,
+            viewer_count=self._viewer_count,
         )
 
     def _enforce_cap_for_new(self, key: str) -> None:
@@ -832,6 +847,28 @@ class SessionManager:
 
     # ── internal helpers ────────────────────────────────────────────────────
 
+    def _child_env(self) -> dict[str, str]:
+        """The environment a spawned agent session is launched with (WP-003).
+
+        Applies the Rule-of-Two credential exclusion (SPEC §L1(d), ADR-001):
+        the child inherits the manager's environment **minus** every
+        credential-bearing variable, **plus** the sanctioned safe-fetch proxy
+        endpoint the agent-facing tool reads. The exclusion is the *primary*
+        control — the credential is not in the fetch path's scope — and WP-002's
+        outbound scrub is defence-in-depth on top.
+
+        Honoured override: a deployment that exports ``SULIS_SAFE_FETCH_PROXY``
+        in the manager's own environment points sessions at that endpoint;
+        otherwise the conventional loopback default is used. (Reading it before
+        the exclusion is fine — the endpoint var is not credential-named, and it
+        is re-set explicitly afterwards regardless.)
+
+        Previously ``Popen`` was called with no ``env=`` and inherited the full
+        parent environment; this makes the child environment explicit so the
+        exclusion is enforced. The pipe/pty branch logic is untouched."""
+        endpoint = os.environ.get(PROXY_ENDPOINT_ENV, DEFAULT_SAFE_FETCH_PROXY_ENDPOINT)
+        return child_spawn_env(os.environ, proxy_endpoint=endpoint)
+
     def _spawn_process(
         self, adapter: ProviderAdapter, spec: SessionSpec
     ) -> tuple[subprocess.Popen, int | None]:
@@ -862,6 +899,7 @@ class SessionManager:
             process = subprocess.Popen(
                 argv,
                 cwd=spec.cwd,
+                env=self._child_env(),
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -903,6 +941,7 @@ class SessionManager:
             process = subprocess.Popen(
                 argv,
                 cwd=spec.cwd,
+                env=self._child_env(),
                 stdin=slave_fd,
                 stdout=slave_fd,
                 stderr=slave_fd,

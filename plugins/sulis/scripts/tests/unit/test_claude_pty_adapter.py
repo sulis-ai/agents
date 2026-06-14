@@ -51,13 +51,16 @@ def adapter() -> InteractiveClaudePtyAdapter:
     return InteractiveClaudePtyAdapter()
 
 
-def _spec(brief_change_id: str | None = None) -> SessionSpec:
+def _spec(
+    brief_change_id: str | None = None, resume_ref: str | None = None
+) -> SessionSpec:
     """A pty :class:`SessionSpec` with the given brief target (default none)."""
     return SessionSpec(
         provider="pty",
         cwd="/tmp/worktree",
         io_mode="pty",
         brief_change_id=brief_change_id,
+        resume_ref=resume_ref,
     )
 
 
@@ -111,10 +114,15 @@ def test_spawn_argv_is_interactive(adapter):
     assert "stream-json" not in argv
 
 
-def test_spawn_argv_omits_positional_when_no_brief_change_id(adapter):
+def test_spawn_argv_omits_positional_when_no_brief_change_id(adapter, monkeypatch):
     """With ``spec.brief_change_id is None`` (the frozen-caller default) there
     is no sidecar to resolve — the argv is the bare interactive invocation, no
-    positional."""
+    positional.
+
+    Remote Control (default-ON) is opted out here so this test stays focused on
+    the positional/brief concern; the default-on flag is covered by
+    test_pty_remote_control.py."""
+    monkeypatch.setenv("SULIS_SESSION_REMOTE_CONTROL", "0")
     argv = adapter.spawn_argv(_spec(brief_change_id=None))
     assert not any("cat " in token for token in argv)
     assert argv[-1] == "sulis"
@@ -124,11 +132,21 @@ def test_spawn_argv_omits_positional_when_sidecar_absent(
     adapter, monkeypatch, tmp_path
 ):
     """``spec.brief_change_id`` set but the sidecar file does not exist — no
-    positional is appended (a session with no briefed pre-prompt)."""
+    pre-prompt brief positional is appended (a session with no briefed
+    pre-prompt). The change id is still valid, so the deterministic
+    ``--session-id`` pin IS present — the only trailing token is the pinned
+    uuid, never a brief body."""
+    import _change_session as cs
+
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    # Opt Remote Control out so the trailing-token assertion stays focused on
+    # the session-id pin (the default-on flag is covered separately).
+    monkeypatch.setenv("SULIS_SESSION_REMOTE_CONTROL", "0")
     argv = adapter.spawn_argv(_spec(brief_change_id=_CHANGE_ID))
     assert not any("cat " in token for token in argv)
-    assert argv[-1] == "sulis"
+    # No brief positional: the trailing token is the pinned session id, which is
+    # the flag VALUE for --session-id (the last two tokens are the flag + uuid).
+    assert argv[-2:] == ["--session-id", cs.change_session_id(_CHANGE_ID)]
 
 
 def test_spawn_argv_appends_preprompt_brief_when_present(
@@ -183,12 +201,62 @@ def test_spawn_argv_rejects_malformed_change_id(adapter, monkeypatch, tmp_path):
     a path from it — ULID validation is retained as defence-in-depth before the
     path join."""
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    # Opt Remote Control out so this stays focused on malformed-id rejection
+    # (the default-on flag is covered by test_pty_remote_control.py).
+    monkeypatch.setenv("SULIS_SESSION_REMOTE_CONTROL", "0")
     # 26 chars but not Crockford-base32 (contains 'I', 'L', 'O', 'U') -> not a
     # valid ULID, yet it has no leading '-' and no control chars so it passes
     # __post_init__ and reaches the resolver.
     argv = adapter.spawn_argv(_spec(brief_change_id="ILOU" + "0" * 22))
     assert not any("cat " in token for token in argv)
     assert argv[-1] == "sulis"
+
+
+# ── session-id pinning (first spawn) + resume (focus) ──────────────────────
+
+
+def test_spawn_argv_pins_deterministic_session_id_at_first_spawn(adapter):
+    """FIRST spawn (no ``resume_ref``) of a real change pins a deterministic
+    ``--session-id <uuid>`` derived from the change ULID, so focus can later
+    resume that exact conversation by the SAME derived id — no need to scrape
+    the id claude assigned."""
+    import _change_session as cs
+
+    argv = adapter.spawn_argv(_spec(brief_change_id=_CHANGE_ID))
+    assert "--session-id" in argv
+    assert argv[argv.index("--session-id") + 1] == cs.change_session_id(_CHANGE_ID)
+    # First spawn pins, it does NOT resume.
+    assert "--resume" not in argv
+
+
+def test_spawn_argv_resumes_when_resume_ref_set(adapter):
+    """On FOCUS the consumer sets ``spec.resume_ref`` to the change's pinned
+    session id; the adapter resumes that conversation with ``--resume <ref>``
+    instead of pinning a fresh one (so the founder picks up where they left
+    off)."""
+    import _change_session as cs
+
+    ref = cs.change_session_id(_CHANGE_ID)
+    argv = adapter.spawn_argv(_spec(brief_change_id=_CHANGE_ID, resume_ref=ref))
+    assert "--resume" in argv
+    assert argv[argv.index("--resume") + 1] == ref
+    # Resuming and pinning are mutually exclusive — claude rejects both.
+    assert "--session-id" not in argv
+
+
+def test_spawn_argv_no_session_id_without_change(adapter):
+    """No ``brief_change_id`` and no ``resume_ref`` (a frozen non-change caller)
+    → neither flag; the bare interactive argv is unchanged."""
+    argv = adapter.spawn_argv(_spec(brief_change_id=None))
+    assert "--session-id" not in argv
+    assert "--resume" not in argv
+
+
+def test_spawn_argv_no_session_id_for_malformed_change(adapter):
+    """A malformed (non-ULID) ``brief_change_id`` cannot derive a valid uuid →
+    no ``--session-id`` is pinned (degrade, don't crash)."""
+    argv = adapter.spawn_argv(_spec(brief_change_id="ILOU" + "0" * 22))
+    assert "--session-id" not in argv
 
 
 # ── unused pty methods ────────────────────────────────────────────────────

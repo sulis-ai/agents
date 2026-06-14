@@ -293,6 +293,15 @@ These standards shape the WP set's *shape*, not just the content:
       picked their own name (`CONTRACT.manifest.json` vs `manifest.json`),
       one clobbered the other, the shared manifest split silently.
       Decompose-validation rubric P6 check **6.06** enforces it.
+    - **Shared test fixtures hoist the same way (#106, WP-08.6 MUST).** A test
+      fixture consumed by >1 WP is authored by exactly ONE upstream WP every
+      consumer `dependsOn` — even with no contract seam (same-kind WPs). Each
+      WP lists its new fixture paths under `**Files created:**` (and a
+      `fixtures_created:` frontmatter list) so the overlap is visible. Two
+      parallel WPs MUST NOT independently author one logical fixture under
+      divergent dir-vs-file conventions (`x/` vs `x.json`). Decompose-
+      validation rubric P6 check **6.07** enforces it (`wpx-index
+      audit-contracts`); the dir-vs-file forms are normalised before comparison.
     - **Emit an integration WP last.** `kind: composite` (or `kind: docs`
       with `produces: integration-check`) that `dependsOn` all the per-kind
       siblings and runs the conformance check (CF-07) — swap mock for real
@@ -548,6 +557,15 @@ These standards shape the WP set's *shape*, not just the content:
     error, fix the INDEX, and re-run lint. Only proceed to Step 10
     (Report) when lint exits 0.
 
+    **Re-run the lint after ANY later INDEX amend (#307).** The gate
+    covers the initial emit, but if you hand-edit the table or re-emit it
+    after this point (a mid-session WP addition, a header tweak), re-run
+    `wpx-index lint` before returning — a drifted header reintroduced on
+    an amend is just as invisible to run-all. (`wpx-index add-wp` now also
+    validates the header on every amend, so an amend through the tooling
+    fails surgically rather than silently — but a raw hand-edit is only
+    caught by re-running the lint.)
+
     The gate runs two checks. First it checks the WP table's **header
     shape** — a list-shape or drifted-header INDEX (the #103 class) is
     invisible to the run-all loop and would otherwise surface as a
@@ -599,7 +617,11 @@ These standards shape the WP set's *shape*, not just the content:
       have a `## Performance` section with measurable bounds
     - **P6 Peer-collision risk** — no two WPs `Create` the same file
       (catches the `loader/__init__.py` collision class at breakdown
-      time, before any executor dispatches)
+      time, before any executor dispatches). **Includes the shared-fixture
+      check (6.07, #106): run `wpx-index audit-contracts` — two
+      non-dependent WPs that author one logical test fixture under divergent
+      dir-vs-file conventions (`x/` vs `x.json`) is a MUST failure. Remedy:
+      serialize (add a dep) or hoist a single fixture-authoring upstream WP.**
     - **P7 ServiceSpec compliance** — every service the design names
       has a paired `service-specs/<name>.servicespec.yaml` manifest
       that passes the Lovable Test (a fresh AI agent can build a

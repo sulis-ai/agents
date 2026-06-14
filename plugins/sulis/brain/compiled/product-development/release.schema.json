@@ -37,6 +37,19 @@
       "maximum": 1,
       "description": "reliability score for this instance; 1.0 = certain, 0 = no confidence"
     },
+    "produced_by_change": {
+      "type": "string",
+      "pattern": "^dna:change:[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "the Change that created this entity (prov:wasGeneratedBy); reverse-query gives a change's creation set (#67)"
+    },
+    "evolved_by_change": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^dna:change:[0-9A-HJKMNP-TV-Z]{26}$"
+      },
+      "description": "the Changes that revised this entity, in order (prov:wasRevisionOf); reverse-query gives a change's revision set (#67)"
+    },
     "id": {
       "type": "string",
       "pattern": "^dna:release:[0-9A-HJKMNP-TV-Z]{26}$"

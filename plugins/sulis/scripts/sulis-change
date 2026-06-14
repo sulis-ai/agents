@@ -29,6 +29,7 @@ Specification: plugins/sulis/references/change-work-standard.md
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import sys
@@ -79,9 +80,11 @@ from _wpxlib import (  # noqa: E402
     git_worktree_remove,
     parse_change_branch,
     read_change_metadata,
+    read_repo_contract,
     ulid_handle,
     validate_change_primitive,
     validate_change_slug,
+    validate_change_ulid,
     write_change_metadata,
 )
 
@@ -365,16 +368,252 @@ def _change_own_commit_count(repo_root: Path, base_sha: str,
         return None
 
 
+def _confirm_merged_to_main(
+    repo_root: Path,
+    branch: str,
+    *,
+    merge_sha: str | None,
+    run=None,
+) -> str | None:
+    """Confirm ``branch`` actually landed on ``main`` (#111 ship-integrity).
+
+    Returns the MERGE COMMIT sha on ``main`` (the true shipped state) when the
+    merge is confirmed, else ``None``. Never raises and never mutates anything —
+    a pure confirmation probe.
+
+    Why not ``git merge-base --is-ancestor <branchtip> origin/main``: the ship
+    flow squash-merges (``gh pr merge --squash``), which creates a brand-new
+    commit on ``main`` with NO ancestry link back to the change-branch tip. So
+    the branch tip is never an ancestor of ``main`` even when the work landed —
+    that check would reject every squash-merged change. Two reliable signals:
+
+    1. Primary (authoritative): a merged PR for this branch into ``main``
+       (``gh pr list --head <branch> --base main --state merged``). GitHub
+       records the real merge; its ``mergeCommit.oid`` IS the shipped state.
+    2. Alternate (manual merges): an explicit ``--merge-sha`` that is an
+       ancestor of ``origin/main`` (``git merge-base --is-ancestor``). Here the
+       caller supplies the merge commit directly, so the ancestry check is
+       valid (a real merge/ff commit, not a squashed branch tip).
+
+    The ``run`` seam (default ``_run``) is injectable so tests stub it without
+    touching the network. Resolved at call time (not bound as a default) so a
+    monkeypatched module-level ``_run`` is honoured.
+    """
+    if run is None:
+        run = _run
+    # 1. Authoritative: a merged PR for this branch into main.
+    rc, out, _err = run(
+        ["gh", "pr", "list", "--head", branch, "--base", "main",
+         "--state", "merged", "--json", "number,mergeCommit,mergedAt"],
+        cwd=repo_root, timeout=30,
+    )
+    if rc == 0 and out.strip():
+        try:
+            prs = json.loads(out)
+        except (json.JSONDecodeError, ValueError):
+            prs = []
+        for pr in prs if isinstance(prs, list) else []:
+            oid = ((pr or {}).get("mergeCommit") or {}).get("oid")
+            if oid:
+                return str(oid)
+
+    # 2. Alternate: an explicit merge sha that landed on origin/main.
+    if merge_sha:
+        rc, _out, _err = run(
+            ["git", "merge-base", "--is-ancestor", merge_sha, "origin/main"],
+            cwd=repo_root, timeout=10,
+        )
+        if rc == 0:
+            return merge_sha
+
+    return None
+
+
+# ─── #118 — ship-time observed-verdict gate ─────────────────────────────────
+# The Definition-of-Done verdict (every touched Requirement has a passing
+# TestResult) was enforced ONLY as prose in change/SKILL.md gate 4.9 — the ship
+# script ran it zero times. So a change could be marked *shipped* with no
+# observed verdict: an agent skipping the prose step, or a hand-merge bypassing
+# the skill entirely. This moves the check from prose into the ship MECHANISM —
+# `mark-shipped` refuses unless every touched SRD's DoD verdict is `pass`,
+# escapable only by a conscious, logged `--force` (sibling of the #111 merge
+# guard above). Completion stops being self-asserted: the recorded verdict, not
+# the agent, decides whether a change may ship.
+
+
+def evaluate_observed_verdict(touched_srds, *, verify_fn):
+    """Pure decision: given the SRDs a change touched and a verdict function
+    (``srd_path -> 'pass' | 'partial' | 'fail'``), decide whether the change may
+    be marked shipped w.r.t. the Definition of Done.
+
+    Observed-or-blocked: ship proceeds only when EVERY touched SRD verifies
+    ``pass`` (every FR/NFR has a passing TestResult). Any ``partial`` / ``fail``
+    (an unverified requirement) BLOCKS — the conscious escape is ``--force`` at
+    the call site. No SRD touched → out of scope (lite/standard specs + trivial
+    changes carry no FR-NN blocks) → ``ok``, never blocks. Returns
+    ``(ok: bool, reason: str)``."""
+    if not touched_srds:
+        return (True, "no SRD touched — DoD verdict not applicable")
+    unverified = []
+    for srd in touched_srds:
+        verdict = verify_fn(srd)
+        if verdict != "pass":
+            unverified.append((srd, verdict))
+    if unverified:
+        detail = "; ".join(f"{srd} ({v})" for srd, v in unverified)
+        return (
+            False,
+            "Definition of Done not met — these touched requirements have no "
+            f"observed verdict: {detail}. Every FR/NFR needs a passing "
+            "TestResult (a @verifies unit test or a green Scenario run) before "
+            "this ships. Drive the verification, or override consciously with "
+            "--force.",
+        )
+    return (True, "all touched SRDs verified (DoD pass)")
+
+
+def evaluate_scenario_verdict(scenario_ids, *, observed_fn):
+    """Pure decision (Phase 2): the scenario route, for founder-facing changes
+    whose verification lives in Scenarios rather than (or as well as) an SRD's
+    FR-NN blocks. Given the change's EMITTED scenario ids and an observed
+    function (``dna:scenario:<ulid> -> bool``, "has a passing TestResult"),
+    decide whether the change may ship.
+
+    Observed-or-blocked: ship proceeds only when EVERY emitted scenario is
+    observed green. Any unobserved scenario BLOCKS — the conscious escape is
+    ``--force``. No emitted scenarios → scenario route not applicable (the SRD
+    route + the #301 presence gate cover those cases) → ``ok``. Returns
+    ``(ok: bool, reason: str)``."""
+    if not scenario_ids:
+        return (True, "no emitted scenarios — scenario route not applicable")
+    unobserved = [s for s in scenario_ids if not observed_fn(s)]
+    if unobserved:
+        return (
+            False,
+            "Definition of Done not met — these scenarios have no observed "
+            f"verdict (no passing TestResult): {', '.join(unobserved)}. Drive "
+            "them for real (sulis-verify-acceptance) or attest them "
+            "(sulis-attest-scenario), or override consciously with --force.",
+        )
+    return (True, "all emitted scenarios observed")
+
+
+def _touched_srds(repo_root: Path, base: str = "origin/main", *, run=None) -> list[str]:
+    """SRD paths changed on this branch vs ``base`` (three-dot — the branch's
+    own work). Best-effort: an unresolvable base / git error returns ``[]``
+    (the gate degrades open on inability-to-evaluate, never fabricates a
+    block). The ``run`` seam (default ``_run``) is injectable for tests."""
+    if run is None:
+        run = _run
+    rc, out, _err = run(
+        ["git", "diff", "--name-only", f"{base}...HEAD"],
+        cwd=repo_root, timeout=30,
+    )
+    if rc != 0:
+        return []
+    srds = []
+    for line in out.splitlines():
+        p = line.strip()
+        if p.startswith(".specifications/") and p.endswith("/SRD.md"):
+            srds.append(p)
+    return srds
+
+
+def _scenario_ids_for_change(repo_root: Path, stem: str) -> list[str]:
+    """The EMITTED scenario ids for a change, read from
+    ``{repo_root}/.changes/{stem}.scenarios.jsonld``. The authored file records
+    each scenario's emitted ``dna:scenario:<ulid>`` id directly (the brain id
+    the acceptance run's TestResults back-link to), so the scenario route needs
+    no seed recomputation or journey resolution.
+
+    Returns only ``dna:scenario:`` ids — a pre-emit file carrying bare ``SC-NN``
+    ids has no emitted scenarios to gate on (those are covered by the SRD route
+    + the #301 presence gate; authored-not-emitted is a separate state).
+    Missing / malformed file → ``[]``."""
+    f = Path(repo_root) / ".changes" / f"{stem}.scenarios.jsonld"
+    if not f.exists():
+        return []
+    try:
+        data = json.loads(f.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return []
+    nodes = data.get("scenarios") if isinstance(data, dict) else data
+    if not isinstance(nodes, list):
+        return []
+    ids = []
+    for n in nodes:
+        if isinstance(n, dict):
+            sid = str(n.get("id", "") or n.get("@id", ""))
+            if sid.startswith("dna:scenario:"):
+                ids.append(sid)
+    return ids
+
+
+def _confirm_observed_verdict(repo_root: Path, *, stem: str | None = None,
+                              base: str = "origin/main", run=None):
+    """The combined ship-time observed-verdict gate. Two routes, blocked if
+    EITHER blocks:
+
+    - **SRD route** — git-diff for touched SRDs → ``verify_requirements`` →
+      ``evaluate_observed_verdict``.
+    - **Scenario route (#118 Phase 2)** — the change's emitted scenarios →
+      passing-TestResult check → ``evaluate_scenario_verdict``. Requires
+      ``stem`` ({primitive}-{slug}); skipped when ``stem`` is None.
+
+    Returns ``(ok: bool, reason: str)``. Degrades open only when the gate
+    genuinely cannot evaluate (no touched SRDs / no emitted scenarios / a
+    git/brain error) — it never fabricates a pass it did not verify."""
+    from _verify_requirements import verify_requirements
+    from _brain_query import find_passing_testresults_for_scenario
+
+    base_dir = Path(repo_root) / ".brain" / "instances"
+
+    def _verify(srd_path: str) -> str:
+        try:
+            res = verify_requirements(Path(repo_root) / srd_path, base_dir=base_dir)
+            return res.verdict
+        except FileNotFoundError:
+            # Listed in the diff but absent at HEAD (deleted SRD) — nothing to
+            # verify against; out of scope for that file.
+            return "pass"
+
+    srd_ok, srd_reason = evaluate_observed_verdict(
+        _touched_srds(repo_root, base, run=run), verify_fn=_verify)
+    if not srd_ok:
+        return (srd_ok, srd_reason)
+
+    if stem is None:
+        return (srd_ok, srd_reason)
+
+    def _observed(scenario_id: str) -> bool:
+        try:
+            return bool(find_passing_testresults_for_scenario(base_dir, scenario_id))
+        except (ValueError, OSError):
+            return False
+
+    scen_ok, scen_reason = evaluate_scenario_verdict(
+        _scenario_ids_for_change(repo_root, stem), observed_fn=_observed)
+    if not scen_ok:
+        return (scen_ok, scen_reason)
+    # Both routes ok — report whichever was the substantive one.
+    if not srd_reason.startswith("no SRD"):
+        return (True, srd_reason)
+    return (True, scen_reason)
+
+
 def _archive_after_ship(repo_root: Path, change_id: str, branch: str,
-                        worktree_dest: Path, *, remove_worktree: bool) -> dict:
+                        worktree_dest: Path, *, remove_worktree: bool,
+                        shipped_sha_override: str | None = None) -> dict:
     """Mark a change shipped (+ pin shipped_sha) and optionally remove its
     worktree. The SINGLE source both ship paths share — `finish --merge`
     (this script) and `mark-shipped` (the gh-based `/sulis:change ship`
     skill) — so the post-ship state can never drift between them.
 
     Pins ``shipped_sha`` = the change-branch tip ("the state it was in when
-    we shipped"). Keeps the branch + record (the audit trail). Returns the
-    ``archived`` dict for the command's JSON output.
+    we shipped"), UNLESS ``shipped_sha_override`` is given — then it pins that
+    (the merge commit on ``main``, the true shipped state; #111). Keeps the
+    branch + record (the audit trail). Returns the ``archived`` dict for the
+    command's JSON output.
     """
     # #272 — refuse to ship an EMPTY change. A change whose branch carries zero
     # commits of its own beyond its base built nothing; marking it shipped (and
@@ -395,9 +634,14 @@ def _archive_after_ship(repo_root: Path, change_id: str, branch: str,
                      "base_sha": base_sha, "own_commits": own_commits},
         )
 
-    rc, sha_out, _ = _run(["git", "rev-parse", f"refs/heads/{branch}"],
-                          cwd=repo_root, timeout=10)
-    shipped_sha = sha_out.strip() if rc == 0 else ""
+    if shipped_sha_override:
+        # #111 — pin the MERGE COMMIT on main (the true shipped state), not the
+        # local branch tip (which a squash-merge orphans).
+        shipped_sha = shipped_sha_override.strip()
+    else:
+        rc, sha_out, _ = _run(["git", "rev-parse", f"refs/heads/{branch}"],
+                              cwd=repo_root, timeout=10)
+        shipped_sha = sha_out.strip() if rc == 0 else ""
     record_path = mark_change_shipped(str(change_id),
                                       shipped_sha=shipped_sha or None)
     archived = {
@@ -414,6 +658,29 @@ def _archive_after_ship(repo_root: Path, change_id: str, branch: str,
 
 def _metadata_path(repo_root: Path, primitive: str, slug: str) -> Path:
     return repo_root / ".changes" / f"{primitive}-{slug}.yaml"
+
+
+def _resolve_change_branch(repo_root: Path, primitive: str, slug: str) -> str:
+    """Resolve the branch for an EXISTING change (#112).
+
+    Change identity is store-backed: the recorded ``branch`` field is the
+    source of truth, so a change started under a host ``branch_convention``
+    (e.g. ``feature/...``) resolves to the SAME branch it was created on — not
+    a freshly-recomposed (possibly-different) name. Falls back to composing
+    with the repo's convention when no stored record matches (e.g. a brand-new
+    change before its record is written, or a legacy change predating the
+    record), which still yields the byte-for-byte legacy default when the
+    contract declares no convention.
+    """
+    for record in list_all_changes():
+        if (str(record.get("primitive") or "") == primitive
+                and str(record.get("slug") or "") == slug):
+            stored = record.get("branch")
+            if stored:
+                return str(stored)
+            break
+    convention = read_repo_contract(repo_root).get("branch_convention")
+    return compose_change_branch(primitive, slug, convention=convention)
 
 
 def _build_change_pre_prompt(
@@ -508,10 +775,249 @@ def _push_change_branch_to_origin(repo_root: Path, branch: str) -> bool:
 
 # ─── Subcommand: start ────────────────────────────────────────────────────
 
+# ─── #123 — cross-session context-carry ─────────────────────────────────────
+# When change B is started from inside change A's session (a parent
+# SULIS_CHANGE_ID is set), the LINK + A's reasoning travel into B as durable
+# state — B discovers them through the CONTEXT.md it already reads at startup.
+# No live inter-session wire (the critical-thinking call: a state gap, not a
+# transport gap; Agent Teams was wrong-fit). Best-effort throughout: a carry
+# problem must never block `start`.
+
+_CARRY_RELATIONSHIPS = ("builds_on", "depends_on")
+
+
+def _excerpt_working_set(text, *, max_chars: int = 1500) -> str:
+    """A capped excerpt of a parent Working Set for carry. Its most useful
+    sections (Problem / Current best solution) sit at the top, so the leading
+    slice captures them. Empty / whitespace / None → ``''``."""
+    if not text or not str(text).strip():
+        return ""
+    t = str(text).strip()
+    if len(t) <= max_chars:
+        return t
+    return t[:max_chars].rstrip() + "\n\n…(excerpt truncated — follow the link to read the rest)"
+
+
+def _read_working_set(record) -> str | None:
+    """Read a change's Working Set from its record (worktree_path +
+    {primitive}-{slug}.WORKING-SET.md). Best-effort: any miss → None."""
+    try:
+        pw = record.get("worktree_path")
+        prim = str(record.get("primitive", "") or "")
+        slug = str(record.get("slug", "") or "")
+        if pw and prim and slug:
+            ws = Path(pw) / ".changes" / f"{prim}-{slug}.WORKING-SET.md"
+            if ws.exists():
+                return ws.read_text(encoding="utf-8")
+    except Exception:
+        return None
+    return None
+
+
+def _walk_ancestry(immediate_id, read_record_fn, *, max_depth: int = 12) -> list:
+    """Follow ``parent_change`` from the immediate parent to the origin change
+    (#124). Returns ``[immediate_record, …, origin_record]`` (only records that
+    resolve), immediate-first. Cycle- and depth-bounded so a malformed loop or
+    a very deep chain can never hang `start`. ``read_record_fn(id) -> record |
+    None`` is injectable for tests."""
+    chain: list = []
+    seen: set = set()
+    cur = (immediate_id or "").strip() or None
+    while cur and cur not in seen and len(chain) < max_depth:
+        seen.add(cur)
+        try:
+            rec = read_record_fn(cur)
+        except Exception:
+            rec = None
+        if not rec:
+            break
+        chain.append(rec)
+        cur = str(rec.get("parent_change") or "").strip() or None
+    return chain
+
+
+def _carried_context_section(parent: dict, relationship: str,
+                             working_set_text, *, ancestry=None,
+                             origin_working_set=None) -> str:
+    """The 'Carried from {parent}' CONTEXT.md section (#123): the durable link
+    + an excerpt of the parent's Working Set. The link is ALWAYS present (B can
+    follow it to read the parent's full Working Set + brain); the excerpt is a
+    starting point, not the whole picture.
+
+    ``ancestry`` (#124) is the chain BEYOND the immediate parent, origin-ward
+    (i.e. the immediate parent's parent … the origin). When non-empty, the
+    section also renders the full **lineage to origin** (each ancestor's
+    handle + id, so the session can navigate back any number of hops) and the
+    **origin's** Working-Set excerpt — because context two-plus changes back
+    was being lost, and the origin idea is often the one that matters most."""
+    handle = parent.get("handle") or parent.get("change_id", "?")
+    slug = str(parent.get("slug", "") or "")
+    cid = str(parent.get("change_id", "") or "")
+    rel = relationship if relationship in _CARRY_RELATIONSHIPS else "builds_on"
+    excerpt = _excerpt_working_set(working_set_text)
+    out = [
+        "",
+        f"## Carried from {handle} ({rel})",
+        "",
+        ("This change was started from change **" + str(handle) + "**"
+         + (f" — *{slug}*" if slug else "")
+         + (f" (`{cid}`)" if cid else "")
+         + f". Relationship: `{rel}`. Read that change's full reasoning in its "
+           "Working Set and the brain — the excerpt below is a starting point, "
+           "not the whole picture."),
+        "",
+    ]
+    if excerpt:
+        out += ["### Carried Working Set excerpt", "", excerpt, ""]
+    else:
+        out += [
+            "_The parent change had no populated Working Set at spawn time — "
+            "follow the link above and read its artifacts (SPEC / brain "
+            "Opportunity + Decision) directly._",
+            "",
+        ]
+
+    # #124 — render the full lineage to origin when this change is more than
+    # one hop deep, so the session can navigate back to the original idea.
+    if ancestry:
+        def _lbl(rec):
+            h = rec.get("handle") or rec.get("change_id", "?")
+            c = str(rec.get("change_id", "") or "")
+            return f"{h}" + (f" (`{c}`)" if c and c != h else "")
+        full_chain = [parent] + list(ancestry)  # immediate → origin
+        lineage = " ← ".join(_lbl(r) for r in full_chain)
+        origin = ancestry[-1]
+        out += [
+            "### Lineage to origin",
+            "",
+            f"This change is {len(full_chain)} hops deep. Full chain "
+            f"(this change's parent ← … ← origin): {lineage}. Follow any link "
+            "to read that change's Working Set / brain.",
+            "",
+        ]
+        origin_excerpt = _excerpt_working_set(origin_working_set)
+        if origin_excerpt and origin is not parent:
+            out += [f"### Origin ({_lbl(origin)}) Working Set excerpt",
+                    "", origin_excerpt, ""]
+    return "\n".join(out)
+
+
+def _resolve_parent_carry(relationship):
+    """If a parent change is bound in the env (`SULIS_CHANGE_ID`), resolve its
+    record + Working Set and build the carried-context section.
+
+    Returns ``(parent_id | None, section | None, relationship)``. Best-effort:
+    any resolution/read failure degrades to ``(parent_id or None, None, rel)``
+    so a carry problem never blocks `start`. The link is recorded even when the
+    Working Set can't be read (the section's fallback tells B to follow it)."""
+    parent_id = (os.environ.get("SULIS_CHANGE_ID") or "").strip()
+    rel = relationship if relationship in _CARRY_RELATIONSHIPS else "builds_on"
+    if not parent_id:
+        return (None, None, rel)
+    # #124 — walk the full ancestry chain to origin (immediate → … → origin),
+    # so a change two-plus hops deep surfaces its whole lineage, not just one
+    # hop. Cycle/depth-bounded; degrades to (parent_id, None) if the immediate
+    # parent's record can't even be read.
+    chain = _walk_ancestry(parent_id, read_change_record)
+    if not chain:
+        return (parent_id, None, rel)
+    immediate = chain[0]
+    ancestry = chain[1:]                       # beyond the immediate parent
+    origin = chain[-1] if len(chain) > 1 else None
+    section = _carried_context_section(
+        immediate, rel, _read_working_set(immediate),
+        ancestry=ancestry,
+        origin_working_set=_read_working_set(origin) if origin is not None else None,
+    )
+    return (parent_id, section, rel)
+
+
+def _change_service_for(repo_root: Path):
+    """A ChangeService bound to the MAIN repo's brain (#128 slice 2).
+
+    The single handler the lifecycle commands route through — start→open,
+    mark-shipped→ship, nuke→nuke. Writes off the change branch (the #127
+    global-store direction). Raises only on a genuine import/IO failure; the
+    callers wrap it best-effort so entity handling never blocks the command.
+    """
+    from _brain_location import brain_base_dir
+    from _change_service import ChangeService
+    from _entity_adapter_local import LocalFileEntityAdapter
+
+    return ChangeService(LocalFileEntityAdapter(
+        base_dir=brain_base_dir(repo_root),       # #127: user-configurable location
+        domain="product-development",
+    ))
+
+
+def _emit_change_entity(repo_root: Path, metadata: dict) -> None:
+    """Best-effort: open the change as a first-class brain entity (#128, DR-031).
+
+    A change becomes a NODE in the brain (a prov:Activity, sibling to
+    LifecycleRun), not just a manifest beside it — routed through ChangeService
+    (slice 2). ``for_product`` is an OPTIONAL link: set when a single product
+    resolves, omitted otherwise (product-less changes still land in the brain).
+    NON-FATAL by construction: any failure (incl. an import error) is logged and
+    swallowed — entity handling must never block change creation.
+    """
+    try:
+        from _change_emission import resolve_for_product
+
+        _change_service_for(repo_root).open(
+            metadata, for_product=resolve_for_product(repo_root))
+    except Exception:  # noqa: BLE001 — best-effort; entity handling never blocks start
+        _log("Change entity could not be opened; continuing without it")
+
+
+def _transition_change_entity(repo_root: Path, change_id: str, to_state: str) -> None:
+    """Best-effort: transition the Change entity on ship/nuke (#128 slice 2).
+
+    ``mark-shipped`` → ship (state=shipped, the commit point); ``nuke`` → nuke
+    (state=nuked + valid_to, the rollback point). A change with no emitted
+    entity (started on an older plugin) → the transition finds nothing and
+    no-ops. NON-FATAL: any failure is logged and swallowed — the entity state is
+    an audit record, never a gate on the git-side command.
+    """
+    try:
+        svc = _change_service_for(repo_root)
+        if to_state == "shipped":
+            svc.ship(str(change_id))      # commit: the produced entities stay live
+        elif to_state == "nuked":
+            svc.nuke(str(change_id))      # the Change entity → nuked
+            svc.rollback(str(change_id))  # #67 3c: soft-delete the entities it produced
+    except Exception:  # noqa: BLE001 — best-effort; never block ship/nuke
+        _log(f"Change entity could not be transitioned to {to_state}; continuing")
+
+
+def _main_repo_root(cwd: Path) -> Path:
+    """The MAIN worktree root (git-common-dir's parent), so a brain write from a
+    change-WORKTREE session co-locates with the Change entity in the main repo's
+    brain (#129 B2). From the main repo itself this is just the repo root; on any
+    git error it degrades to ``cwd``."""
+    rc, out, _ = _run(["git", "rev-parse", "--git-common-dir"], cwd=str(cwd), timeout=10)
+    if rc != 0 or not out.strip():
+        return Path(cwd)
+    common = Path(out.strip())
+    if not common.is_absolute():
+        common = Path(cwd) / common
+    common = common.resolve()
+    return common.parent if common.name == ".git" else Path(cwd)
+
+
 def cmd_start(args: argparse.Namespace) -> None:
     repo_root = _resolve_repo_root(args)
     primitive, slug = _resolve_primitive_and_slug(args)
-    branch = compose_change_branch(primitive, slug)
+    # #123 — if launched from INSIDE a parent change session (SULIS_CHANGE_ID
+    # set), carry its durable link + a Working-Set excerpt into this change.
+    # Resolved up front so the link lands in the manifest + record and the
+    # excerpt is appended to CONTEXT.md below. Best-effort (never blocks start).
+    parent_change, carried_section, carry_relationship = _resolve_parent_carry(
+        getattr(args, "relationship", "builds_on"))
+    # #112 — honour the host repo's branch convention if it declares one.
+    # Absent → compose_change_branch returns the byte-for-byte legacy
+    # change/{primitive}-{slug}.
+    convention = read_repo_contract(repo_root).get("branch_convention")
+    branch = compose_change_branch(primitive, slug, convention=convention)
     base_ref = args.base or "main"
 
     # Check the branch doesn't already exist
@@ -584,6 +1090,11 @@ def cmd_start(args: argparse.Namespace) -> None:
         "base_sha": base_sha,
         "started_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
+    if parent_change:
+        # #123 — the durable link the founder was hand-relaying becomes a
+        # first-class field on the change (manifest + record below).
+        metadata["parent_change"] = parent_change
+        metadata["relationship"] = carry_relationship
     write_change_metadata(_metadata_path(worktree_dest, primitive, slug),
                           metadata)
 
@@ -600,6 +1111,16 @@ def cmd_start(args: argparse.Namespace) -> None:
     if context_path is None:
         _log("Pre-spawn recon could not be written (path unwritable); "
              "continuing without CONTEXT.md")
+    elif carried_section:
+        # #123 — append the 'Carried from {parent}' section so the spawned
+        # session DISCOVERS the link + the parent's reasoning through the
+        # CONTEXT.md it already reads at startup. Best-effort: an append
+        # failure must not block start.
+        try:
+            with open(context_path, "a", encoding="utf-8") as _fh:
+                _fh.write(carried_section)
+        except OSError:
+            _log("Carried-context section could not be appended to CONTEXT.md")
 
     # Stamp the initial workflow stage (recon) into the per-change local
     # state.json. The stage skills advance it later (slice B); here we just
@@ -629,10 +1150,19 @@ def cmd_start(args: argparse.Namespace) -> None:
         "base_sha": base_sha,
         "created_at": metadata["started_at"],
         "stage": "recon",
+        # #123 — the durable parent link, also on the global record the
+        # dashboard / `list` read (omitted entirely when there's no parent).
+        **({"parent_change": parent_change,
+            "relationship": carry_relationship} if parent_change else {}),
     })
     if record_path is None:
         _log("Global change record could not be written (path unwritable); "
              "continuing without change.json")
+
+    # Emit the change as a first-class brain entity (#128) — best-effort,
+    # non-fatal. Starting a change now creates a Change node in the brain, not
+    # just a manifest beside it.
+    _emit_change_entity(repo_root, metadata)
 
     # Optional terminal spawn (WP-004). Spawn failure does NOT unwind the
     # change-creation work — the JSON surfaces spawn_result.status so the
@@ -696,7 +1226,10 @@ def cmd_start(args: argparse.Namespace) -> None:
 def cmd_adopt(args: argparse.Namespace) -> None:
     repo_root = _resolve_repo_root(args)
     primitive, slug = _resolve_primitive_and_slug(args)
-    branch = compose_change_branch(primitive, slug)
+    # #112 — adopt MINTS a new change branch, so honour the host convention
+    # (like cmd_start). Absent → byte-for-byte change/{primitive}-{slug}.
+    convention = read_repo_contract(repo_root).get("branch_convention")
+    branch = compose_change_branch(primitive, slug, convention=convention)
     base_ref = args.base or "main"
     mode = (args.mode or "forward").lower()
     remote_ref = args.remote_ref or "origin/dev"
@@ -861,7 +1394,9 @@ def cmd_adopt(args: argparse.Namespace) -> None:
 def cmd_finish(args: argparse.Namespace) -> None:
     repo_root = _resolve_repo_root(args)
     primitive, slug = _resolve_primitive_and_slug(args)
-    branch = compose_change_branch(primitive, slug)
+    # #112 — resolve the EXISTING change's recorded branch (store-backed), so a
+    # change started under a host convention finishes on the SAME branch.
+    branch = _resolve_change_branch(repo_root, primitive, slug)
     base_ref = args.base or "main"
 
     # Verify the branch exists
@@ -1098,7 +1633,8 @@ def cmd_list(args: argparse.Namespace) -> None:
 def cmd_status(args: argparse.Namespace) -> None:
     repo_root = _resolve_repo_root(args)
     primitive, slug = _resolve_primitive_and_slug(args)
-    branch = compose_change_branch(primitive, slug)
+    # #112 — resolve the EXISTING change's recorded branch (store-backed).
+    branch = _resolve_change_branch(repo_root, primitive, slug)
     base_ref = args.base or "main"
 
     rc, _, _ = _run(["git", "rev-parse", "--verify", f"refs/heads/{branch}"],
@@ -1158,6 +1694,27 @@ def cmd_stage(args: argparse.Namespace) -> None:
     `SULIS_CHANGE_ID` environment variable (set in every change-bound
     session). Validates the stage against WORKFLOW_STAGES before writing.
     """
+    # #129 B3 — read mode: the change's current stage + history DERIVED from the
+    # run-trace (the change-stage:* LifecycleRuns it produced), not the local
+    # stage string. The run-sequence IS the authoritative progress.
+    if getattr(args, "show", False):
+        change_id = args.change_id or os.environ.get("SULIS_CHANGE_ID")
+        if not change_id:
+            emit_error("No change to read: pass --change-id, or run inside a "
+                       "change-bound session (SULIS_CHANGE_ID is unset).")
+            return
+        try:
+            history = _change_service_for(_main_repo_root(Path.cwd())).stage_history(change_id)
+        except Exception:  # noqa: BLE001 — read is best-effort; never raise to the caller
+            history = []
+        emit_ok(data={
+            "change_id": change_id,
+            "current_stage": history[-1]["stage"] if history else None,
+            "history": history,
+            "source": "run-trace",
+        })
+        return
+
     stage = args.stage
     if not is_valid_stage(stage):
         emit_error(
@@ -1174,6 +1731,23 @@ def cmd_stage(args: argparse.Namespace) -> None:
             context={"stage": stage},
         )
 
+    # #96 / B4 — bounded spiral-back check. The new stage must be a valid
+    # transition from the CURRENT one (derived from the trace BEFORE this stamp):
+    # forward to any later stage, or a single-stage spiral-back. A bigger backward
+    # jump (ship → recon) isn't a spiral-back — surface it as a warning. Advisory,
+    # not a hard gate: the stamp is recorded either way (best-effort).
+    transition_warning = None
+    try:
+        from _change_lifecycle import is_transition_allowed
+        prior = _change_service_for(_main_repo_root(Path.cwd())).current_stage(change_id)
+        if prior and not is_transition_allowed(prior, stage):
+            transition_warning = (
+                f"stage transition {prior!r} → {stage!r} is neither a forward step "
+                f"nor a single-stage spiral-back (#96) — recorded, but it jumps the "
+                f"workflow graph; an adjacent move was expected.")
+    except Exception:  # noqa: BLE001 — advisory check; never block the stamp
+        pass
+
     state_path = write_change_stage(change_id, stage)
     if state_path is None:
         # Best-effort write failed (unwritable state dir) — surface honestly
@@ -1184,11 +1758,26 @@ def cmd_stage(args: argparse.Namespace) -> None:
             context={"change_id": change_id, "stage": stage},
         )
 
+    # #129 B2 — the session executing the change's workflow leaves a durable
+    # trace: a LifecycleRun per stage transition, written to the SAME brain as
+    # the Change entity (the main repo's, resolved from this worktree session).
+    # 3b stamps it produced_by_change, so the run-sequence IS the change's
+    # progress. Best-effort: a trace failure never blocks the stage stamp.
+    try:
+        from _brain_emit_helper import emit_lifecycle_step_event
+        emit_lifecycle_step_event(
+            _main_repo_root(Path.cwd()),
+            step_name=f"change-stage:{stage}",
+            outcome="completed",
+        )
+    except Exception:  # noqa: BLE001 — the trace is best-effort, never a gate
+        _log(f"Stage LifecycleRun for {stage!r} could not be emitted; continuing")
+
     emit_ok(data={
         "change_id": change_id,
         "stage": stage,
         "state_path": str(state_path),
-    })
+    }, warnings=[transition_warning] if transition_warning else None)
 
 
 # ─── Subcommand: nuke ─────────────────────────────────────────────────────
@@ -1202,52 +1791,29 @@ def _local_state_base() -> Path:
     return changes_base()
 
 
-def _scan_state_dir_by_prefix(prefix: str) -> tuple[str, str | None]:
-    """Resolve a change_id by scanning ~/.sulis/changes/* for a dir whose name
-    starts with the 6-char handle prefix.
-
-    `prefix` is the first 6 chars of the ULID (the part after "CH-"). The
-    local state dir is named with the full ULID, so a unique prefix match
-    yields the change_id. Returns (resolution_note, change_id_or_None):
-
-      - exactly one match  → (matched-via-prefix, <change_id>)
-      - zero matches       → (no-prefix-match, None)
-      - >1 match           → ("AMBIGUOUS:...", None)  (caller surfaces error)
-
-    Best-effort: an unreadable base dir yields (no-prefix-match, None).
-    """
-    base = _local_state_base()
-    try:
-        candidates = [d for d in base.iterdir()
-                      if d.is_dir() and d.name.startswith(prefix)]
-    except OSError:
-        return "no-prefix-match", None
-    if len(candidates) == 1:
-        return "matched-via-prefix", candidates[0].name
-    if len(candidates) > 1:
-        names = ", ".join(sorted(d.name for d in candidates))
-        return f"AMBIGUOUS:{names}", None
-    return "no-prefix-match", None
-
-
 def _resolve_change_id(repo_root: Path, primitive: str, slug: str,
-                       worktree_dest: Path,
-                       handle: str | None) -> tuple[str, str]:
-    """Resolve a change's change_id via the fallback chain (stop at first hit).
+                       worktree_dest: Path) -> tuple[str, str]:
+    """Resolve a change's change_id from its slug, via the fallback chain.
+
+    This is the SLUG-path resolver: it maps a (primitive, slug) branch to its
+    change_id. Handle resolution does NOT live here — it goes through the shared
+    safe matcher (``_changes_matching_handle`` over ``list_all_changes()``),
+    which refuses on ambiguity rather than silently picking a first match (#101).
+    The former head-prefix rung (scan {state_base}/changes/* for a dir whose
+    name starts with the handle's 6-char prefix) was dead post-#101 — handles
+    are minted from the ULID's random TAIL, but state dirs are named by the full
+    ULID whose HEAD is the timestamp, so a tail-minted prefix never matched a
+    head-named dir. WP-002 retired it.
 
     0. Local record → scan {state_base}/changes/*/change.json for one whose
-       slug matches (or whose handle matches, when --handle was given). This
-       is the preferred, branch-independent resolver: the record is the global
-       index and doesn't depend on a manifest living in a worktree.
-    1. --handle CH-XXXXXX given → scan {state_base}/changes/* for a dir whose
-       name starts with the 6-char prefix. Unique in practice; >1 match is an
-       error the caller surfaces (returned as a "AMBIGUOUS:" resolution note).
-    2. Worktree manifest → read {worktree}/.changes/{primitive}-{slug}.yaml
+       slug matches. The preferred, branch-independent resolver: the record is
+       the global index and doesn't depend on a manifest living in a worktree.
+    1. Worktree manifest → read {worktree}/.changes/{primitive}-{slug}.yaml
        (the manifest is committed on the change branch, so it lives in the
        WORKTREE, not the dev checkout where nuke runs).
-    3. Dev-checkout manifest → read <repo-root>/.changes/{primitive}-{slug}.yaml
+    2. Dev-checkout manifest → read <repo-root>/.changes/{primitive}-{slug}.yaml
        (rare — only if a copy happens to exist locally, e.g. on dev).
-    4. Honest-degrade → "" (state_dir stays null; the caller reports it
+    3. Honest-degrade → "" (state_dir stays null; the caller reports it
        truthfully and removes branch + worktree + manifest only).
 
     Returns (change_id_or_empty, resolution_note). resolution_note records
@@ -1259,23 +1825,7 @@ def _resolve_change_id(repo_root: Path, primitive: str, slug: str,
         if record.get("slug") == slug and len(record.get("change_id", "")) == 26:
             return record["change_id"], "matched-via-record"
 
-    # 1. Handle-prefix scan of local state dirs.
-    if handle and handle.startswith("CH-") and len(handle) == 9:
-        prefix = handle[len("CH-"):]
-        note, change_id = _scan_state_dir_by_prefix(prefix)
-        if change_id:
-            return change_id, note
-        if note.startswith("AMBIGUOUS:"):
-            matches = note[len("AMBIGUOUS:"):]
-            emit_error(
-                f"Handle {handle} matches more than one local change state "
-                f"dir under ~/.sulis/changes/ ({matches}). Disambiguate with "
-                f"--slug, or remove the stale dir(s) by hand.",
-                context={"handle": handle, "matches": matches},
-            )
-        # else: no prefix match — fall through to the manifest rungs.
-
-    # 2. Worktree manifest (the common case — manifest committed on the branch).
+    # 1. Worktree manifest (the common case — manifest committed on the branch).
     wt_manifest = _metadata_path(worktree_dest, primitive, slug)
     meta = read_change_metadata(wt_manifest)
     change_id = meta.get("change_id", "") or ""
@@ -1317,12 +1867,25 @@ def _changes_matching_handle(handle: str, records: list) -> list:
     return out
 
 
+def _candidate_name(record: dict) -> str:
+    """The readable name for an ambiguity candidate: the record's ``intent``
+    (the founder's own words for the change), falling back to the slug.
+
+    Lets a founder choosing between colliding handles see WHICH change is which
+    (SPEC Scenario 5) rather than just two opaque ULIDs.
+    """
+    intent = str(record.get("intent") or "").strip()
+    return intent or str(record.get("slug") or "")
+
+
 def _emit_ambiguous_match(selector: str, matches: list) -> None:
     """REFUSE rather than guess when a selector matches >1 change (#101).
 
     The whole point of the safe-resolution fix: never silently act on one of
-    several candidates. Surface the candidates (full id / branch / stage) and
-    make the operator disambiguate.
+    several candidates. Surface the candidates (full id / readable name / branch
+    / stage) and make the operator disambiguate. The readable ``name`` (off the
+    record's intent/slug) lets the founder tell colliding handles apart (SPEC
+    Scenario 5).
     """
     emit_error(
         f"{selector} matches {len(matches)} changes — refusing to guess which "
@@ -1332,6 +1895,7 @@ def _emit_ambiguous_match(selector: str, matches: list) -> None:
             "candidates": [
                 {
                     "change_id": m.get("change_id"),
+                    "name": _candidate_name(m),
                     "branch": m.get("branch"),
                     "slug": m.get("slug"),
                     "stage": m.get("stage"),
@@ -1340,6 +1904,26 @@ def _emit_ambiguous_match(selector: str, matches: list) -> None:
             ],
         },
     )
+
+
+def _resolve_record_by_id(change_id: str) -> "dict | None":
+    """Resolve a change's full record by its exact 26-char ULID.
+
+    The single record-lookup-by-id authority shared by the unambiguous
+    selectors (``recreate --change-id`` and ``mark-shipped`` — ADR-001).
+    Tries the direct per-change store read first (``change.json`` under
+    ``{state_base}/changes/{change_id}/``), then falls back to scanning
+    ``list_all_changes()`` for a record whose ``change_id`` matches exactly
+    — robust to a record whose store dir name diverges from its id. Returns
+    the record dict, or ``None`` when no change carries that id.
+    """
+    record = read_change_record(change_id)
+    if record is not None:
+        return record
+    for r in list_all_changes():
+        if str(r.get("change_id") or "") == change_id:
+            return r
+    return None
 
 
 def _select_change_id_refusing_conflict(
@@ -1389,21 +1973,25 @@ def _select_change_id_refusing_conflict(
 
 
 def _resolve_nuke_target(repo_root: Path, args: argparse.Namespace) -> dict:
-    """Resolve --slug or --handle to a change-branch descriptor.
+    """Resolve --slug, --handle, or --change-id to a change-branch descriptor.
 
     Reuses find_change_branches (the same enumeration list/status use) to find
-    the branch + worktree. The change_id (hence the local state dir) is then
-    resolved via the _resolve_change_id fallback chain — robust to the manifest
+    the branch + worktree. Each branch's change_id (hence the local state dir)
+    is resolved by slug via the _resolve_change_id chain — robust to the manifest
     living only in the worktree (the production case) rather than the dev
     checkout where nuke runs.
 
     Matching:
-      --slug  → match the branch slug.
-      --handle → match a change whose change_id (resolved via the fallback
-                 chain) has handle CH-<first-6-of-ULID> == the given handle.
-                 The handle-prefix scan of local state dirs is the primary
-                 resolver; for branches whose state dir is gone we still match
-                 on the handle prefix against the branch's resolved change_id.
+      --slug      → match the branch slug.
+      --handle    → resolve the handle through the SHARED safe matcher
+                    (_changes_matching_handle over list_all_changes()); a handle
+                    shared by >1 change REFUSES (lists handle + readable name +
+                    branch) rather than nuking the wrong one (#101). The matched
+                    record change_id(s) are then matched against the enumerated
+                    branches. This is the same matcher recreate / mark-shipped
+                    use, so all four verbs resolve a handle identically.
+      --change-id → match the exact ULID directly (symmetry with recreate /
+                    mark-shipped). No ambiguity is possible — a full id is unique.
 
     Returns a dict {branch, primitive, slug, current, change_id,
     change_id_resolution, worktree_path, manifest_path}. Calls emit_error
@@ -1411,53 +1999,89 @@ def _resolve_nuke_target(repo_root: Path, args: argparse.Namespace) -> dict:
     """
     slug = getattr(args, "slug", None)
     handle = getattr(args, "handle", None)
-    if not slug and not handle:
+    change_id_arg = getattr(args, "change_id", None)
+    if not slug and not handle and not change_id_arg:
         emit_error(
-            "Pass a selector: --slug SLUG or --handle CH-XXXXXX.",
+            "Pass a selector: --slug SLUG, --handle CH-XXXXXX, or "
+            "--change-id <full ULID>.",
             context={"hint": "Run `sulis-change list` to see active changes."},
         )
 
-    candidates = find_change_branches(repo_root)
-    matches = []
+    # Validate an explicit --change-id up front (symmetry with recreate): a
+    # malformed id can never name a real change, so fail early with a precise
+    # reason rather than fall through to the generic "no match".
+    if change_id_arg:
+        ok, reason = validate_change_ulid(change_id_arg)
+        if not ok:
+            emit_error(f"invalid --change-id {change_id_arg!r}: {reason}")
+
+    # #112 — dual-prefix discovery: a change renamed under the host's
+    # branch_convention (e.g. feature/...) is still nuke-targetable, and
+    # legacy change/* changes keep resolving. Build one descriptor per branch,
+    # resolving its change_id by slug (record → worktree/dev manifest) so the
+    # safe matcher (below) has a change_id even when no global change.json
+    # exists (the manifest-only production case).
+    convention = read_repo_contract(repo_root).get("branch_convention")
+    candidates = find_change_branches(repo_root, convention=convention)
+    # Readable name per change_id, off the global record's intent (Scenario 5).
+    intents = {str(r.get("change_id") or ""): str(r.get("intent") or "")
+               for r in list_all_changes()}
+    descriptors = []
     for c in candidates:
         dest = change_worktree_path(repo_root, c["primitive"], c["slug"])
         change_id, resolution = _resolve_change_id(
-            repo_root, c["primitive"], c["slug"], dest, handle,
+            repo_root, c["primitive"], c["slug"], dest,
         )
-        change_handle = ulid_handle(change_id) if len(change_id) == 26 else ""
+        descriptors.append({
+            "branch": c["branch"],
+            "primitive": c["primitive"],
+            "slug": c["slug"],
+            "current": c["current"],
+            "change_id": change_id,
+            "change_id_resolution": resolution,
+            # The readable name lets a founder tell colliding handles apart.
+            "intent": intents.get(change_id, ""),
+            # The state dir lives under ~/.sulis/changes/, NOT in the worktree;
+            # nuke removes the dev-side manifest copy if present.
+            "worktree_path": dest,
+            "manifest_path": _metadata_path(repo_root, c["primitive"],
+                                            c["slug"]),
+        })
 
-        matched = False
-        if slug and c["slug"] == slug.lower():
-            matched = True
-        if handle and change_handle and change_handle == handle.strip().upper():
-            matched = True
-        if matched:
-            matches.append({
-                "branch": c["branch"],
-                "primitive": c["primitive"],
-                "slug": c["slug"],
-                "current": c["current"],
-                "change_id": change_id,
-                "change_id_resolution": resolution,
-                # The state dir lives under ~/.sulis/changes/, NOT in the
-                # worktree; nuke removes the dev-side manifest copy if present.
-                "worktree_path": dest,
-                "manifest_path": _metadata_path(repo_root, c["primitive"],
-                                                c["slug"]),
-            })
+    # Select the matching descriptor(s) per selector. The handle path goes
+    # through the SHARED safe matcher (_changes_matching_handle), the same one
+    # recreate / mark-shipped use — so all four verbs resolve a handle
+    # identically and REFUSE on a colliding handle rather than guessing (#101).
+    if handle:
+        matches = _changes_matching_handle(handle, descriptors)
+    elif change_id_arg:
+        target = str(change_id_arg).strip()
+        matches = [d for d in descriptors if d["change_id"] == target]
+    else:
+        target = slug.lower()
+        matches = [d for d in descriptors if d["slug"] == target]
+
+    def _selector_label(*, handle_as_flag: bool) -> str:
+        """Human label for the active selector. ``handle_as_flag`` chooses the
+        CLI-flag form (``--handle CH-X``, for a 'not found' error) vs the
+        readable form (``Handle CH-X``, for the ambiguity refusal message)."""
+        if slug:
+            return f"--slug {slug}"
+        if handle:
+            return (f"--handle {handle}" if handle_as_flag
+                    else f"Handle {handle.strip().upper()}")
+        return f"--change-id {change_id_arg}"
 
     # REFUSE on ambiguity rather than nuking the WRONG change (#101). A handle
-    # collision (or a slug shared across primitives) must never resolve to a
+    # collision — or a slug shared across primitives — must never resolve to a
     # silent first-match for a destructive op.
     if len(matches) > 1:
-        selector = f"--slug {slug}" if slug else f"Handle {handle.strip().upper()}"
-        _emit_ambiguous_match(selector, matches)
+        _emit_ambiguous_match(_selector_label(handle_as_flag=False), matches)
     if matches:
         return matches[0]
 
-    selector = f"--slug {slug}" if slug else f"--handle {handle}"
     emit_error(
-        f"No active change matches {selector}.",
+        f"No active change matches {_selector_label(handle_as_flag=True)}.",
         context={"hint": "Run `sulis-change list` to see active changes."},
     )
 
@@ -1622,6 +2246,13 @@ def cmd_nuke(args: argparse.Namespace) -> None:
         removed["manifest"] = False
         removed["manifest_detail"] = "manifest already absent"
 
+    # #128 slice 2 — transition the Change ENTITY to nuked (the transaction
+    # rollback point). The entity lives in the MAIN repo's brain, so it SURVIVES
+    # the branch/worktree teardown above — leaving a nuked-state audit record.
+    # Best-effort; a change with no emitted entity simply no-ops.
+    if change_id:
+        _transition_change_entity(repo_root, str(change_id), "nuked")
+
     _log(f"Change nuked: {branch} ({change_id or 'no-id'})")
     nuke_warnings = []
     if state_dir is None:
@@ -1682,6 +2313,16 @@ def build_parser() -> argparse.ArgumentParser:
              "Default off. See plugins/sulis/docs/change-as-primitive-design.md "
              "§ Session binding.",
     )
+    p_start.add_argument(
+        "--relationship", default="builds_on",
+        choices=["builds_on", "depends_on"],
+        help="When started from inside a parent change session "
+             "(SULIS_CHANGE_ID set), how this change relates to the parent: "
+             "`builds_on` (default — extends the parent's idea) or "
+             "`depends_on` (the parent is a dependency). Records a durable link "
+             "+ carries the parent's context into this change's CONTEXT.md "
+             "(#123).",
+    )
 
     p_adopt = sub.add_parser("adopt", help="Retrofit in-flight work into a change")
     _common(p_adopt)
@@ -1717,13 +2358,18 @@ def build_parser() -> argparse.ArgumentParser:
              "(recon/specify/design/implement/review/ship)",
     )
     p_stage.add_argument(
-        "stage",
+        "stage", nargs="?",
         help="The workflow stage now reached: "
-             + " / ".join(WORKFLOW_STAGES),
+             + " / ".join(WORKFLOW_STAGES) + " (omit with --show to read instead)",
     )
     p_stage.add_argument(
         "--change-id", default=None,
         help="Change ULID to stamp (default: the SULIS_CHANGE_ID env var)",
+    )
+    p_stage.add_argument(
+        "--show", action="store_true",
+        help="Read the change's current stage + history DERIVED from the "
+             "run-trace (#129 B3) instead of stamping a new stage.",
     )
 
     # `mark-shipped` is the terminal-stage transition (#38). Called by the
@@ -1741,6 +2387,16 @@ def build_parser() -> argparse.ArgumentParser:
                                 help="Change handle (e.g. CH-01HYQC) to resolve the ULID")
     p_mark_shipped.add_argument("--repo-root", default=os.getcwd(),
                                 help="Path to the repo root (default: cwd)")
+    p_mark_shipped.add_argument(
+        "--merge-sha", default=None,
+        help="The merge commit on main (for a manual merge with no PR). "
+             "Verified to be an ancestor of origin/main before shipping (#111).")
+    p_mark_shipped.add_argument(
+        "--force", action="store_true",
+        help="Override the #111 ship-integrity guard and mark shipped even "
+             "without a confirmed merge to main. Records the override on the "
+             "change record + stderr. For genuine edge cases only; never the "
+             "default.")
 
     p_nuke = sub.add_parser(
         "nuke",
@@ -1752,7 +2408,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_nuke.add_argument("--slug", default=None,
                         help="Change slug to nuke (e.g. introduce-payments)")
     p_nuke.add_argument("--handle", default=None,
-                        help="Change handle to nuke (e.g. CH-01HYQC)")
+                        help="Change handle to nuke (e.g. CH-01HYQC). Resolved "
+                             "through the safe matcher; a colliding handle "
+                             "refuses + lists candidates rather than guessing.")
+    p_nuke.add_argument("--change-id", default=None,
+                        help="Exact change ULID to nuke (unambiguous; symmetry "
+                             "with recreate / mark-shipped).")
     p_nuke.add_argument(
         "--force", action="store_true",
         help="Actually delete. Without --force, nuke dry-runs: it lists the "
@@ -1760,6 +2421,21 @@ def build_parser() -> argparse.ArgumentParser:
              "--force is also required to discard a branch with unmerged "
              "commits.",
     )
+
+    # `verify-verdict` (#122) is the PRE-merge observed-verdict gate the ship
+    # flow runs before `gh pr merge` (read-only; mark-shipped is the post-merge
+    # backstop). Same selectors as mark-shipped/recreate.
+    p_verify_verdict = sub.add_parser(
+        "verify-verdict",
+        help="Pre-merge gate: refuse (exit 1) unless the change's Definition "
+             "of Done verdict is met (read-only; #122).",
+    )
+    p_verify_verdict.add_argument("--change-id", default=None,
+                                  help="Change ULID — the unambiguous selector")
+    p_verify_verdict.add_argument("--handle", default=None,
+                                  help="Change handle (e.g. CH-01HYQC)")
+    p_verify_verdict.add_argument("--repo-root", default=os.getcwd(),
+                                  help="Path to the repo root (default: cwd)")
 
     # `recreate` re-materialises a shipped change's worktree on demand (#56
     # Part 2). After ship the worktree is removed but the branch + record
@@ -1771,8 +2447,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_recreate.add_argument("--repo-root", default=os.getcwd(),
                             help="Path to the repo root (default: cwd)")
+    p_recreate.add_argument("--change-id", default=None,
+                            help="Change ULID — the unambiguous selector "
+                                 "(matches nuke/mark-shipped; the cockpit "
+                                 "passes the id it already holds)")
     p_recreate.add_argument("--handle", default=None,
-                            help="Change handle (e.g. CH-01HYQC)")
+                            help="Change handle (e.g. CH-01HYQC) — a display "
+                                 "label; ambiguous handles refuse + disambiguate")
     p_recreate.add_argument("--slug", default=None,
                             help="Change slug (alternative to --handle)")
     p_recreate.add_argument(
@@ -1780,6 +2461,46 @@ def build_parser() -> argparse.ArgumentParser:
         help="Change primitive (used with --slug; default: feat)")
 
     return parser
+
+
+def cmd_verify_verdict(args: argparse.Namespace) -> None:
+    """#122 — the PRE-merge observed-verdict gate. Read-only.
+
+    The ship flow runs this BEFORE `gh pr merge`, and refuses the merge on a
+    non-zero exit. This gates the *merge* (and therefore the release the robot
+    cuts on merge), not just the post-merge `shipped` flag — closing the seam
+    where #118's mark-shipped check (post-merge) let unverified work merge +
+    release before refusing the flag. `mark-shipped` keeps the same check as
+    the post-merge backstop (defense-in-depth).
+
+    Reads the *recorded* verdict (deposited TestResults) — it does NOT re-drive
+    scenarios, so it needs no standing app. Exit: 0 ok (merge may proceed),
+    1 blocked (refuse the merge — surface the reason; the founder owns any
+    conscious override at the ship step), 3 invocation/resolution error.
+    """
+    repo_root = Path(getattr(args, "repo_root", None) or os.getcwd()).resolve()
+    change_id = _select_change_id_refusing_conflict(
+        explicit_change_id=getattr(args, "change_id", None),
+        explicit_handle=getattr(args, "handle", None),
+        env_change_id=os.environ.get("SULIS_CHANGE_ID"),
+        records=list_all_changes(),
+    )
+    record = _resolve_record_by_id(str(change_id))
+    if record is None:
+        emit_error(f"no change record found for change_id={change_id!r}")
+        return  # for type checker (emit_error exits)
+    primitive = str(record.get("primitive") or "feat")
+    slug = str(record.get("slug") or "")
+
+    ok, reason = _confirm_observed_verdict(repo_root, stem=f"{primitive}-{slug}")
+    if not ok:
+        emit_error(
+            f"change {change_id} has not met its Definition of Done — refusing "
+            f"the merge. {reason}",
+            context={"change_id": change_id},
+        )
+        return  # for type checker (emit_error exits)
+    print(f"OK: {change_id} — {reason}")
 
 
 def cmd_mark_shipped(args: argparse.Namespace) -> None:
@@ -1802,7 +2523,10 @@ def cmd_mark_shipped(args: argparse.Namespace) -> None:
         env_change_id=os.environ.get("SULIS_CHANGE_ID"),
         records=list_all_changes(),
     )
-    record = read_change_record(str(change_id))
+    # Shared record-lookup-by-id authority (ADR-001) — the same helper
+    # `recreate --change-id` uses, so both unambiguous selectors resolve a
+    # record identically (the #56-style scan fallback included).
+    record = _resolve_record_by_id(str(change_id))
     if record is None:
         emit_error(f"no change record found for change_id={change_id!r}")
         return  # for type checker
@@ -1813,8 +2537,73 @@ def cmd_mark_shipped(args: argparse.Namespace) -> None:
     worktree_dest = Path(record.get("worktree_path")
                          or change_worktree_path(repo_root, primitive, slug))
 
+    # #111 — ship-integrity guard. 'shipped' MUST be impossible without a
+    # confirmed merge to `main`. This guard lives INSIDE the tool so it holds
+    # regardless of caller (a flailing/reaped session can't mark a non-merged
+    # change shipped + delete its branch, as happened to CH-7BF1VZ in #110).
+    force = bool(getattr(args, "force", False))
+    merge_sha = getattr(args, "merge_sha", None)
+    confirmed_sha = _confirm_merged_to_main(
+        repo_root, branch, merge_sha=merge_sha)
+    if confirmed_sha is None and not force:
+        emit_error(
+            f"change {change_id} is not merged to main — refusing to mark "
+            f"shipped. The squash-merge into main could not be confirmed "
+            f"(no merged PR for branch {branch!r}). If you merged manually, "
+            f"re-run with --merge-sha <the merge commit on main>; to override "
+            f"the guard anyway, pass --force.",
+            context={"change_id": change_id, "branch": branch,
+                     "merge_sha": merge_sha},
+        )
+        return  # for type checker (emit_error exits)
+
+    # #118 — observed-verdict gate. 'shipped' MUST be impossible without a
+    # recorded Definition-of-Done verdict for every touched SRD. Like the merge
+    # guard above, it lives INSIDE the tool so it holds regardless of caller —
+    # an agent that skips the SKILL's gate-4.9 prose, or a hand-merge that
+    # bypasses the skill entirely, cannot mark a change shipped with unverified
+    # requirements. Completion is owned by the recorded verdict, not asserted.
+    verdict_ok, verdict_reason = _confirm_observed_verdict(
+        repo_root, stem=f"{primitive}-{slug}")
+    verdict_override_note = None
+    if not verdict_ok:
+        if not force:
+            emit_error(
+                f"change {change_id} has not met its Definition of Done — "
+                f"refusing to mark shipped. {verdict_reason}",
+                context={"change_id": change_id, "branch": branch},
+            )
+            return  # for type checker (emit_error exits)
+        verdict_override_note = (
+            f"--force override: marked shipped despite an unmet Definition of "
+            f"Done — {verdict_reason}"
+        )
+        print(f"WARNING: {verdict_override_note}", file=sys.stderr)
+
+    # The state we PIN as shipped: the confirmed merge commit on main (the
+    # true shipped state). On a --force override with no confirmation we have
+    # no merge commit, so _archive_after_ship falls back to the branch tip.
+    override_note = None
+    if confirmed_sha is None and force:
+        override_note = (
+            f"--force override: marked shipped WITHOUT a confirmed merge to "
+            f"main (branch {branch!r}). No merged PR was found and no valid "
+            f"--merge-sha was supplied. This bypasses the #111 ship-integrity "
+            f"guard — use only for genuine edge cases."
+        )
+        print(f"WARNING: {override_note}", file=sys.stderr)
+
     archived = _archive_after_ship(repo_root, str(change_id), branch,
-                                   worktree_dest, remove_worktree=True)
+                                   worktree_dest, remove_worktree=True,
+                                   shipped_sha_override=confirmed_sha)
+    # Record any override(s) on the change record for the audit trail.
+    if override_note is not None or verdict_override_note is not None:
+        rec_for_note = read_change_record(str(change_id)) or {}
+        if override_note is not None:
+            rec_for_note["ship_override"] = override_note
+        if verdict_override_note is not None:
+            rec_for_note["dod_override"] = verdict_override_note
+        write_change_record(str(change_id), rec_for_note)
     record = read_change_record(str(change_id)) or {}
 
     # Brain emission — LifecycleRun for the ship event. Best-effort
@@ -1828,6 +2617,10 @@ def cmd_mark_shipped(args: argparse.Namespace) -> None:
         )
     except Exception:
         pass
+
+    # #128 slice 2 — transition the Change ENTITY to shipped (the transaction
+    # commit point). Best-effort; the git-side ship already succeeded above.
+    _transition_change_entity(repo_root, str(change_id), "shipped")
 
     emit_ok(data={
         "change_id": change_id,
@@ -1845,12 +2638,37 @@ def cmd_recreate(args: argparse.Namespace) -> None:
     (with the pinned ``shipped_sha``) are kept. This brings the worktree
     back — ON the branch if it still exists (founder resumes work), else
     DETACHED at the pinned ``shipped_sha`` (view the exact shipped state).
-    Resolved by ``--handle`` (preferred) or ``--slug [--primitive]``.
+
+    Resolved by ``--change-id`` (the unambiguous selector — the cockpit
+    passes the id it already holds, ADR-001), or ``--handle``, or
+    ``--slug [--primitive]``. The handle is a non-unique display label; an
+    ambiguous handle refuses + disambiguates via the safe matcher (#101).
+    The id path is first-class and mirrors ``nuke``/``mark-shipped``.
     """
     repo_root = _resolve_repo_root(args)
 
     record: dict | None = None
-    if args.handle:
+    change_id = getattr(args, "change_id", None)
+    if change_id:
+        # Unambiguous resolution: the full ULID names exactly one change. The
+        # cockpit drives this path (WP-003) with record.changeId in hand.
+        ok, reason = validate_change_ulid(change_id)
+        if not ok:
+            emit_error(f"invalid --change-id {change_id!r}: {reason}")
+            return  # for type checker
+        record = _resolve_record_by_id(change_id)
+        if record is None:
+            emit_error(
+                f"no change found for change-id {change_id!r}",
+                context={"hint": "Run `sulis-change list` to see active "
+                                 "changes (the `change_id` column)."},
+            )
+            return  # for type checker
+        primitive = str(record.get("primitive") or "feat")
+        slug = str(record.get("slug") or "")
+        branch = str(record.get("branch")
+                     or compose_change_branch(primitive, slug))
+    elif args.handle:
         # Safe resolution (#101): refuse on ambiguity rather than recreating the
         # WRONG change's workspace from a silent first-match.
         matches = _changes_matching_handle(args.handle, list_all_changes())
@@ -1868,7 +2686,9 @@ def cmd_recreate(args: argparse.Namespace) -> None:
         if not args.slug:
             emit_error("--handle or --slug is required")
         primitive, slug = _resolve_primitive_and_slug(args)
-        branch = compose_change_branch(primitive, slug)
+        # #112 — resolve the stored branch (store-backed) so a change started
+        # under a host convention recreates on the SAME branch.
+        branch = _resolve_change_branch(repo_root, primitive, slug)
         for r in list_all_changes():
             if str(r.get("branch", "")) == branch:
                 record = r
@@ -1932,6 +2752,7 @@ HANDLERS = {
     "status": cmd_status,
     "stage": cmd_stage,
     "mark-shipped": cmd_mark_shipped,
+    "verify-verdict": cmd_verify_verdict,
     "nuke": cmd_nuke,
     "recreate": cmd_recreate,
 }

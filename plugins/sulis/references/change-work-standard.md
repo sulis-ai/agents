@@ -352,6 +352,37 @@ Rebases the change branch onto latest `dev`. Merges (or opens a PR;
 configurable). On clean merge, removes the worktree, deletes the
 local branch, optionally archives metadata.
 
+### Completion is owned by a recorded verdict, enforced in the ship mechanism (MUST — #118)
+
+A change MUST NOT be **merged** (and therefore released) without a recorded
+observed verdict. Enforcement is **pre-merge, with a post-merge backstop**
+(#122): `sulis-change verify-verdict` runs as a hard gate **before the
+squash-merge** and refuses the merge unless the Definition-of-Done verdict is
+met; `sulis-change mark-shipped` re-checks the same verdict **after** the merge
+as the backstop (a sibling of the #111 merge guard), refusing to flip to
+`shipped` if it's somehow unmet. The only escape at either point is a
+conscious, logged `--force` / founder override. Pre-merge placement matters:
+#118 first wired the check at `mark-shipped` (post-merge), which gated the
+`shipped` *flag* but let unverified work merge + release first; #122 moved the
+primary gate ahead of the merge so the *merge itself* is gated.
+
+This is the structural fix for false-completions: completion stops being
+*self-asserted by the builder against a prose bar* and becomes *owned by the
+recorded verdict the ship mechanism checks*. The observed-or-blocked logic
+itself is unchanged (it already existed as `gate_decision` / `_verify_requirements`,
+#83/#95/#98); what changed is that its invocation at ship moved from a
+skippable SKILL.md instruction (gates 4.8/4.9) into the mechanism — so an agent
+that skips the prose, or a hand-merge that bypasses the skill, still cannot
+ship unverified work. The gate is the mandate; agent-body prose only points at
+it. See ADR-001 (`gate-done-on-verdict`) for the full decision, including why
+the verdict is read from deposited brain evidence (not a self-stampable
+frontmatter field). The gate covers **two routes**, blocked if either blocks:
+the **SRD route** (every touched Requirement has a passing `TestResult`) and
+the **scenario route** (every emitted Scenario the change authored is observed
+green — a passing `TestResult` back-links to it). The per-WP done-transition
+sibling (so the mid-flight board can't show `done` without the verdict) remains
+the captured follow-on.
+
 ### Trivial-change carve-out (SHOULD)
 
 For changes too small to justify a branch — a typo fix, a one-line
@@ -419,6 +450,19 @@ Change B is consistently blocked on Change A landing), CW-07 becomes
 wrong and a future v0.2.0 adds a change-level dependency layer.
 That's a deferred concern.
 
+**Partial breakage observed (#123).** A recurring case did surface: a change
+started *from inside another change's session* (an idea spun out, or a
+dependency) lost the link + context, forcing a human to relay between the two
+sessions. The first coordination primitive is now in: `sulis-change start`,
+when launched with a parent `SULIS_CHANGE_ID`, records a **durable link**
+(`parent_change` + `relationship: builds_on | depends_on`) on the new change
+and carries the parent's Working-Set context into its `CONTEXT.md`. This is
+deliberately **durable shared state, not live inter-session messaging** (a
+critical-thinking spiral found Agent Teams a topology mismatch — ephemeral,
+lead-fixed, no resumption — for independent human-paced change peers). The full
+change-level dependency DAG (blocked-on edges, absorb-vs-spawn) remains the
+v0.2 concern (#97).
+
 ---
 
 ## CW-08: Composition with Marketplace Standards (MUST)
@@ -470,6 +514,124 @@ review happens before merging the change to `dev`.
 SRD and SEA write to their existing directories, unchanged. The change
 branch is where those writes happen; the merge to `dev` is when other
 work sees them.
+
+---
+
+## CW-09: Rigour Tiers — Methodical / Batched / Bounded-fix (SHOULD)
+
+> **Status: SHOULD, calibrating.** This section *describes* a pattern
+> in prose so it can start informing real changes. It deliberately does
+> **not** encode conditional workflow steps yet (see "Why describe, not
+> encode" below). Promotion to MUST — and any hard-coding of per-tier
+> step-skipping — waits on the calibration window.
+
+A change can warrant very different amounts of up-front ceremony. The
+same lifecycle (CW-05) runs in every case, but *how much* of the
+upstream planning runs — and how deeply — flexes with the work. Two
+production cases drove this: a full methodical 13-WP build that was
+slow and hit a cross-project branch collision, versus ~8 bounded fixes
+that each landed cleanly and fast. Both extremes have failure modes:
+methodical is slow and heavy and can miss a deadline; a fast path that
+defers *all* verification to the end surfaces real bugs late and forces
+improvisation under pressure.
+
+The fix is **not** to fork the workflow into separate fast and slow
+flows (they would drift apart, and the operator would still be picking
+risk under pressure). The fix is to name the common **rigour tiers** as
+presets over a few orthogonal dials, declared up front, with an
+explicit owned trade-off — so the operator selects a pre-designed mode
+rather than improvising the risk decision mid-crisis.
+
+### The three tiers
+
+| Stage | **Methodical** | **Batched** | **Bounded-fix** |
+|---|---|---|---|
+| Specify (write it down) | Full | Coarse | Skipped |
+| Design (blueprint) | Full | Light / inline | Skipped |
+| Plan | Full decompose (many WPs) | One coarse pass | Lightweight — plan mode → written plan |
+| Build | Per-WP, isolated worktrees | Direct, bundled | Direct, test-first |
+| **Verify (the floor)** | **Same** | **Same** | **Same** |
+
+- **Methodical** — the full flow. For genuinely large, multi-context,
+  or hard-to-reverse work. Maximum isolation and gates.
+- **Batched** — one coarse planning pass, build bundled, verify in one
+  real pass at the end. For coherent medium work under time pressure —
+  the founder's own "execute directly + bundled verification"
+  improvisation, formalised so it is a *chosen* mode, not a panic move.
+- **Bounded-fix** — no heavy upstream artifacts, but **not zero
+  planning**. The three upstream stages collapse into one cheap step:
+  **initialise plan mode, scope the fix, then execute by writing the
+  plan down** (into the Working Set, or a short plan note for a true
+  one-off) — *then* build test-first → verify → ship. The written plan
+  is the floor that makes the fast path safe to use under pressure:
+  even here the approach is committed to text before any code is
+  touched, so the operator is never improvising the whole fix in their
+  head against a clock. For a known, bounded fix (the CW-05 trivial
+  carve-out is the smallest instance of this tier — small enough that
+  even the written plan is a sentence).
+
+### The tier is a preset over dials, not an atomic switch
+
+The dials that move are: design depth, decomposition granularity,
+verification timing, and worktree isolation. They usually co-vary —
+big work wants all of them high — but not always: a one-line security
+fix wants *light design but strict verification*. So the tier **names**
+a common preset and the dials remain individually overridable for the
+odd case. A single fast/slow toggle could not express that edge; three
+forked workflows could not either.
+
+### The two floors are one contract: scenarios named up front == scenarios driven at the end (MUST)
+
+Every tier carries two non-negotiable floors, and they are the two ends
+of the **same** contract:
+
+1. **The plan names the critical scenarios.** Before any code is
+   touched, the written plan (full scenario entities at the specify
+   stage in Methodical; a short list in the plan-mode note in
+   Bounded-fix) names the load-bearing scenarios that define "working"
+   — the user-journey round-trips *and* the production mechanisms whose
+   failure means it doesn't really work. This is the acceptance bar,
+   declared up front.
+2. **Verification drives exactly those scenarios.** A **real** bundled
+   verification — the full test suite plus the end-to-end walk of what
+   was built — drives the scenarios the plan named, under the
+   **observed-or-blocked** discipline (a scenario is green only when a
+   real run produced the correct observed output; otherwise it is
+   blocked, never silently "done").
+
+The invariant that ties them: **the scenarios named in the plan are the
+scenarios driven at verification.** Without floor 1, floor 2 has no
+defined target and silently degrades into "it ran without error" —
+which is exactly how late-surfacing bugs slip through a fast path
+(a contract mismatch or a field-mapping bug caught only at the very
+end, because no one named "drive a real round-trip" as required up
+front). Tiers flex the *upstream ceremony between these two floors*;
+they never flex the floors themselves. This is the scenarios-first +
+observed-or-blocked discipline (already enforced upstream by the
+journey-rigor gates and the `prove` skill) reaching down into every
+tier — which is what makes describing the rest as a SHOULD safe: the
+dangerous part is already locked and is not on the table.
+
+### How the operator declares / switches it
+
+The tier is declared up front (the explicit owned trade-off removes the
+anxiety — the operator picks a pre-designed mode with a stated cost
+instead of improvising risk under a deadline). A change may switch tier
+mid-flight (e.g. a methodical change that hits a deadline drops to
+batched) — the switch is explicit and logged, and the verification
+floor still applies at the end.
+
+### Why describe, not encode (yet)
+
+At the time of writing only two real changes have exercised this, and
+both moved their dials in lockstep — which may simply be because they
+were cleanly large or cleanly small. Hard-coding per-tier step-skipping
+off two data points would bake in an abstraction that the edges
+(independent dials) may later contradict. The disciplined path: let the
+next ~5 real changes record which tier they ran and which dials they
+actually moved independently; *then* encode the conditional steps that
+survive. Until then this is guidance, and the floor — the only part
+whose absence is dangerous — is already enforced.
 
 ---
 
@@ -548,5 +710,6 @@ change, and what CW-NN rule(s) it exercised or stressed.
 |---------|------|--------|
 | 0.1.0 | 2026-05-21 | Initial standard. CW-01..CW-08 synthesised from OpenSpec, Conventional Commits, SEA change primitives, GIT-01..GIT-10. Greenfield — no anchor cases yet; 90-day calibration begins. |
 | 0.2.0 | 2026-05-25 | **CW-04 amended (additive).** Auto back-integration subsection added — codifies the merge-not-rebase mechanism with two trigger points (post-WP-merge active driver + pre-WP-start safety net) and structured conflict handling (interactive resolve / defer / abort options). Operationalises what CW-04's two-level worktree hierarchy makes possible. Phase 4 of the change-as-primitive build; pairs with lifecycle.md Step 0 + Step 12.5 amendments. Backwards-compatible — existing change branches without auto back-integration continue to work; the new mechanism activates only via the Phase 5 executor implementation. |
+| 0.4.0 | 2026-06-10 | **CW-09 added (SHOULD, calibrating).** Names three rigour tiers — Methodical / Batched / Bounded-fix — as presets over orthogonal dials (design depth, decomposition granularity, verification timing, isolation), declared up front so the operator picks a pre-designed risk trade-off instead of improvising under deadline pressure. The verification floor (real bundled verification + observed-or-blocked) is explicitly tier-invariant (MUST). Bounded-fix is *not* zero-planning — it carries a written-plan floor (plan mode → write the plan down → build), the cheap anti-anxiety step that keeps the fast path safe under pressure. Deliberately describes the pattern in prose rather than encoding conditional workflow steps — promotion + hard-coding waits on a ~5-change calibration window (only n=2 at authoring, both moved dials in lockstep). Synthesised from two converged critical-thinking spirals on fast-vs-methodical change handling; CW-05 trivial carve-out is the smallest instance of the Bounded-fix tier. |
 | 0.3.0 | 2026-06-10 | **CW-04 amended (additive).** Added the **WP branch refs (MUST)** subsection — a WP's branch ref is `wp/{primitive}-{slug}/wp-{nnn}-{slug}`, nesting under `wp/` (not under the `change/{primitive}-{slug}` prefix, which would be a git directory/file ref conflict). Scopes the train resolver's branch glob per-change so it cannot match a foreign change's recycled WP number (change `wp-branch-collision`, root cause of #105/#106; see ADR-001). Backwards-compatible — legacy bare `feat/wp-{nnn}-{slug}` branches still resolve via the executor journal + a one-release glob fallback for no-scope callers; fallback removal is a tracked follow-up. |
 | 0.4.0 | 2026-06-10 | **CW-04 amended (additive).** Added the **WP id labels (MUST)** subsection — the id-label twin of the WP branch-ref scoping: a WP's id label is `{CH-HANDLE}-WP-NNN`, the `CH-HANDLE` prefix making the id globally unique across changes while the per-change `NNN` sequence is unchanged. Closes for the id label the same cross-change collision class #283 closed for branches (change `unique-wp-ids`, CH-5DMB1N; see ADR-002). Backwards-compatible — legacy bare `WP-NNN` and source-tagged `WP-{SOURCE}-{NNN}` ids stay understood for one release (no migration); bare-id-support removal is a tracked follow-up. |

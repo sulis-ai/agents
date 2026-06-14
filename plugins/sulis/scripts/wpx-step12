@@ -165,14 +165,22 @@ def cmd_wrap(args: argparse.Namespace) -> None:
     ])
     summary["steps"]["append_evidence"] = result_1.get("data", {})
 
-    # Step 12.2 — flip INDEX status (atomic with --expected in_progress)
+    # Step 12.2 — flip INDEX status to done, atomic with --expected.
+    # #267: the gate-handoff train path (`--enable-gate-handoff`) flips WPs to
+    # `step-7-complete` before the train, so the wrap's prior status is
+    # step-7-complete, not the legacy per-WP `in_progress`. Without the right
+    # --expected, flip-status rejected the transition and the calling session
+    # had to do the wrap's three jobs by hand for every WP. Pick the expected
+    # prior status from the path. (flip-status is idempotent when already at
+    # `done` per #142, so a replay is still safe either way.)
+    expected_prior = "step-7-complete" if args.from_gate_handoff else "in_progress"
     result_2 = _call_tool("wpx-index", [
         "flip-status",
         "--wp", args.wp,
         "--project", paths.project,
         "--repo-root", str(paths.repo_root),
         "--to", "done",
-        "--expected", "in_progress",
+        "--expected", expected_prior,
     ])
     summary["steps"]["flip_status"] = result_2.get("data", {})
 
@@ -188,7 +196,10 @@ def cmd_wrap(args: argparse.Namespace) -> None:
             "message": seam_close["reason"],
         }
 
-    # Step 12.3 — remove worktree (tolerate-missing for idempotency)
+    # Step 12.3 — remove worktree (tolerate-missing for idempotency; force so
+    # executor-left untracked sidecars — journal/code-review bundles under the
+    # worktree — don't strand the wrap at step-7-held: the WP is already merged,
+    # so those artifacts are disposable and must not block teardown. #337)
     if args.worktree_path:
         result_3 = _call_tool("wpx-worktree", [
             "remove",
@@ -197,6 +208,7 @@ def cmd_wrap(args: argparse.Namespace) -> None:
             "--repo-root", str(paths.repo_root),
             "--worktree-path", args.worktree_path,
             "--tolerate-missing",
+            "--force",
         ])
         summary["steps"]["worktree_remove"] = result_3.get("data", {})
     else:
@@ -235,6 +247,14 @@ def build_parser() -> argparse.ArgumentParser:
                              "seam as passing (recorded) instead of blocking. "
                              "Default OFF = observed-or-blocked. Mirrors "
                              "sulis-verify-acceptance's conscious, logged escape.")
+    p_wrap.add_argument("--from-gate-handoff", action="store_true", default=False,
+                        help="The WP's prior status is `step-7-complete`, not "
+                             "`in_progress` (#267). The `--enable-gate-handoff` "
+                             "train path flips WPs to step-7-complete before the "
+                             "train, and mark-gates-complete's pending_step12 "
+                             "checklist drives the wrap from there. With this "
+                             "flag the 12.2 flip expects step-7-complete; "
+                             "without it, in_progress (the legacy per-WP path).")
 
     return parser
 

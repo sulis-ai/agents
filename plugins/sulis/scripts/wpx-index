@@ -38,6 +38,7 @@ from _wpxlib import (  # noqa: E402
     read_frontmatter,
     resolve_wp_columns,
     validate_cross_kind_contract_wiring,
+    validate_fixture_collisions,
     validate_frontend_wp_visual_contract,
     validate_wp_index_header,
     validate_wp_status,
@@ -681,6 +682,18 @@ def cmd_add_wp(args: argparse.Namespace) -> None:
     paths = paths_from_args(args)
     text = _read_index(args)
 
+    # #307 — refuse to amend an INDEX whose WP-table header has drifted from
+    # canonical. The decompose-time lint (plan-work Step 9.5 / #103) covers the
+    # INITIAL emit, but an architect that hand-edits or re-emits the table can
+    # reintroduce a non-canonical header (`| WP | Purpose | Delta | ... |`)
+    # that the run-all loop can't parse. Validating here turns the "and amends"
+    # path into a surgical amend-time error naming the canonical header, rather
+    # than a cryptic "Could not find WP table" mid-run. (add-wp appends into an
+    # existing canonical table, so this never blocks a legitimate first row.)
+    header_err = validate_wp_index_header(text)
+    if header_err is not None:
+        emit_error(header_err)
+
     # Reject duplicates
     if _index_has_wp(text, args.wp):
         emit_error(
@@ -818,13 +831,23 @@ def cmd_audit_contracts(args: argparse.Namespace) -> None:
             wps.append(fm)
 
     violations = validate_cross_kind_contract_wiring(wps)
-    if violations:
+    # #106 / Phase 6.07 — shared-fixture collision: two parallel WPs that each
+    # author one logical fixture under divergent dir-vs-file conventions. Same
+    # WP-graph check, contract seam removed (test fixtures, same-kind WPs).
+    fixture_violations = validate_fixture_collisions(wps)
+    if violations or fixture_violations:
+        all_violations = violations + fixture_violations
         emit_error(
-            "data-contract wiring violations (#48 / CF-05):\n  - "
-            + "\n  - ".join(violations),
-            context={"violations": violations, "wp_count": len(wps)},
+            "data-contract / shared-fixture wiring violations "
+            "(#48 / CF-05; #106 / P6.07):\n  - "
+            + "\n  - ".join(all_violations),
+            context={
+                "violations": violations,
+                "fixture_violations": fixture_violations,
+                "wp_count": len(wps),
+            },
         )
-    emit_ok(data={"violations": [], "wp_count": len(wps)})
+    emit_ok(data={"violations": [], "fixture_violations": [], "wp_count": len(wps)})
 
 
 def _roundtrip_accounting(

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sulis.co/dna/schema/trigger/1.0.0",
+  "$id": "https://sulis.co/dna/schema/trigger/1.1.0",
   "title": "Trigger",
-  "description": "what initiates a Workflow run \u2014 a timer firing, an event arriving, an entity entering or exiting a state, a manual invocation, or an external webhook. Carries the condition (CRON expression, event name, state predicate, etc.) and the target Workflow.",
+  "description": "what initiates a Workflow run \u2014 a timer firing, an event arriving, an entity entering or exiting a state, a manual invocation, an external webhook, or a git branch push. Carries the condition (CRON expression, event name, state predicate, git-ref pattern, etc.) and the target Workflow.",
   "type": "object",
   "unevaluatedProperties": false,
   "required": [
@@ -64,12 +64,13 @@
         "state-entry",
         "state-exit",
         "manual",
-        "external-webhook"
+        "external-webhook",
+        "branch-push"
       ]
     },
     "condition": {
       "type": "string",
-      "description": "kind-specific \u2014 for timer: a CRON expression or RFC 5545 RRULE; for event: the event name; for state-entry or state-exit: an entity.state predicate; for manual: a user-facing label; for external-webhook: a URL pattern with auth"
+      "description": "kind-specific \u2014 for timer: a CRON expression or RFC 5545 RRULE; for event: the event name; for state-entry or state-exit: an entity.state predicate; for manual: a user-facing label; for external-webhook: a URL pattern with auth; for branch-push: the git-ref pattern that fires the Workflow, e.g. 'develop' or 'refs/heads/develop' or a glob like 'release/*'"
     },
     "description": {
       "type": "string"
