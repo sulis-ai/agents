@@ -1,3 +1,9 @@
+## v0.164.0 — 2026-06-14
+
+**Minor — release-train batch.**
+
+- Work Package ids are now globally unique — minted as {CH-HANDLE}-WP-NNN (e.g. CH-5DMB1N-WP-001) — with legacy bare WP-NNN ids understood for one release. A single shared id matcher feeds all callers; the integration train, branch resolution, and INDEX parsing read both shapes.
+
 ## v0.163.1 — 2026-06-13
 
 **Patch — release-train batch.**
