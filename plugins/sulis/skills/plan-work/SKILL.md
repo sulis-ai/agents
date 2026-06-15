@@ -533,7 +533,39 @@ These standards shape the WP set's *shape*, not just the content:
     The mechanical analog lives in the Decompose Validation Rubric as
     **P9 — Journey scenario coverage** (step 11 below).
 
-8. **Write WPs** — one file per WP, using the template above.
+8. **Author each WP body through the grounding chain (fan-out, MUST).** Do not
+   write WP bodies freehand. For each WP from the decomposition: write the
+   **frontmatter** you decided in steps 3-7 (id/kind/primitive/dependsOn/status/
+   verification/estimated_token_cost), then **dispatch the `design-work-package`
+   meta-flow** to author the body — it grounds every claim in the design and
+   refuses to invent frontmatter (that stays yours):
+
+   ```
+   /sulis-brain:execute-workflow   # against the design-work-package instance
+   ```
+
+   Pass the WP's five plug-ins — its **TDD slice** (the sections this WP
+   implements), the design's **WHY** (for the Intent / commander's-intent
+   field), its **scope boundary** (what sibling WPs own), the **executor
+   audience**, the **WP landing format**. Capture the grounded body (Intent +
+   Contract + Definition of Done + Sequence) and **both run_ids**; marry body to
+   frontmatter and write the run_ids into the WP's `provenance:` frontmatter.
+
+   - **Parallelise by the dependency graph (step 5)** — independent WPs fan out
+     in the same wave; never serialise them.
+   - **Tier-gate by `SIZING.md`** — S/M: fan out the whole set; L/XL: fan out in
+     dependency waves to bound concurrency (the chain is ~2 sub-runs per WP).
+   - **A `partial-unattributed` body is a SIGNAL, not a silent pass** — that
+     WP's TDD slice was thin (the design under-specified it); surface it in the
+     Report (step 10).
+   - **Unresolvable chain → BLOCKER, never hand-author** — a hand-authored WP
+     carries no provenance, which defeats the grounding. Requires
+     **sulis-brain >= 0.18.0** (the `design-work-package` meta-flow); if absent,
+     BLOCKER naming the missing dependency.
+
+   *(plan-work owns decomposition + frontmatter; the chain grounds the body.
+   Validated by the design-work-package loop test — sulis-brain DR-038, the
+   WP-004 + WP-001 runs.)*
 9. **Write `INDEX.md`** — list all WPs, their statuses, primitive
    distribution, the dependency graph (as a markdown table and a Mermaid
    `graph TD` diagram), the recommended implementation order (topological
