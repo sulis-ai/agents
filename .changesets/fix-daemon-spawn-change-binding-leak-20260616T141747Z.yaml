@@ -1,7 +1,0 @@
-change_id: 01KV8A5PZQZP31WH7F5XCXWBHR
-primitive: fix
-tier: patch
-touches_plugin: true
-summary: |
-  Fix the session-manager daemon leaking its own change id into spawned sessions; each session is now stamped with its own target change, and the daemon clears its own binding at startup.
-created_at: 2026-06-16T14:17:47Z

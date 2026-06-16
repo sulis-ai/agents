@@ -1,3 +1,9 @@
+## v0.165.1 — 2026-06-16
+
+**Patch — release-train batch.**
+
+- Fix the session-manager daemon leaking its own change id into spawned sessions; each session is now stamped with its own target change, and the daemon clears its own binding at startup.
+
 ## v0.165.0 — 2026-06-16
 
 **Minor — release-train batch.**
