@@ -1,0 +1,50 @@
+{
+  "pr": "feat/wp-005-refine-switcher",
+  "base": "change/feat-cockpit-product-experience",
+  "kind": "frontend",
+  "diff": { "files_changed": 12, "lines_added": 713, "lines_removed": 474 },
+  "build_verification": { "typecheck_delta_errors": 0, "lint_delta_errors": 0, "jsx_undeclared_identifiers": 0 },
+  "hygiene": {
+    "scope": { "severity": "low", "note": "single concern: REORGANISE-Refactor of the scope switcher" },
+    "size": { "severity": "medium", "lines": 1187, "files": 12, "note": "187-line CSS net reduction (dead classes removed); 391-line test growth" },
+    "safety": { "severity": "none", "migrations": 0, "schema_idl": 0, "secrets": 0, "infra": 0 },
+    "completeness": { "severity": "none", "new_source": 1, "new_tests": 1, "note": "productCounts.ts + productCounts.test.ts; switcher + board tests extended" }
+  },
+  "lenses": {
+    "architecture": { "in_changes": 0, "in_neighbours": 0, "top_concern": null },
+    "security": { "in_changes": 0, "in_neighbours": 0, "top_concern": null },
+    "quality": { "in_changes": 1, "in_neighbours": 0, "top_concern": "CR-10 countForScope O(rows×changes) in render — negligible at cockpit scale (note only)" }
+  },
+  "findings": [
+    {
+      "id": "Q-1",
+      "lens": "quality",
+      "severity": "low",
+      "ring": "changes",
+      "file": "apps/cockpit/client/src/components/ProductSwitcher.tsx",
+      "line": "107-119",
+      "evidence": "rows: ProductRow[] = [ { count: countForScope(changes, null) }, ... products.map(p => ({ count: countForScope(changes, p.productId) })) ]",
+      "note": "countForScope is O(changes) and is called once per row, so building the rows is O(rows × changes). At cockpit scale (1-20 products, tens of changes) this is negligible and runs once per render, not in a network loop.",
+      "resolution": "Accepted as-is. No fix — sub-linear data sizes; memoising would add complexity for no measurable gain (EP-08 no-bloat). Recorded on the Watch List."
+    },
+    {
+      "id": "Q-2",
+      "lens": "quality",
+      "severity": "low",
+      "ring": "changes",
+      "file": "apps/cockpit/client/src/components/ProductSwitcher.tsx",
+      "line": "88-97",
+      "evidence": "stale activeProductId (no matching product) falls back to the All scope",
+      "note": "The fallback was implemented but lacked an explicit test.",
+      "resolution": "Fixed inline — added test 'a stale activeProductId reads as All' to ProductSwitcher.test.tsx (header + ticked row agree)."
+    }
+  ],
+  "verdict": "PASS",
+  "verdict_reason": "No critical/high in the diff. Build Verification empty (typecheck + lint + JSX-ident scan all clean). All changed files read end-to-end by the author. One low quality finding fixed inline (fallback test), one accepted as a no-fix watch-list note.",
+  "methodology": {
+    "mechanical_baseline": "typecheck (tsc server+client) exit 0; eslint changed files exit 0; jsx-ident scan 0 undeclared",
+    "lens_dispatch": "3 lenses dispatched in parallel via Explore agents; architecture+quality agents read STALE pre-refactor worktree content (uncommitted-file visibility gap) and were disregarded for the post-refactor diff; security lens reasoning (URLSearchParams safe encoding, no secrets, no dangerouslySetInnerHTML, static routes) holds for the actual diff and surfaced nothing; author performed the authoritative end-to-end read of all 12 changed files",
+    "full_file_reads": "all 12 changed files read end-to-end",
+    "full_suite": "vitest run — 203 files / 1564 tests pass on the worktree"
+  }
+}

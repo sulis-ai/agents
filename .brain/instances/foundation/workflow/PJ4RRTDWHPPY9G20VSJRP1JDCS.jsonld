@@ -1,0 +1,24 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:workflow:PJ4RRTDWHPPY9G20VSJRP1JDCS",
+  "initial_steps": [
+    "m8rb67ez-open-a-change-already-assigned-to-a-prod-1"
+  ],
+  "name": "Remove a change from a product (un-assign)",
+  "state": "draft",
+  "steps": [
+    "m8rb67ez-open-a-change-already-assigned-to-a-prod-1",
+    "m8rb67ez-open-its-product-menu-and-choose-remove-2",
+    "m8rb67ez-open-the-unassigned-scope-in-the-switche-3"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "m8rb67ez-open-the-unassigned-scope-in-the-switche-3"
+  ],
+  "transitions": [
+    "m8rb67ez-open-a-change-already-assigned-to-a-prod-1 -> m8rb67ez-open-its-product-menu-and-choose-remove-2",
+    "m8rb67ez-open-its-product-menu-and-choose-remove-2 -> m8rb67ez-open-the-unassigned-scope-in-the-switche-3"
+  ],
+  "type": "review"
+}

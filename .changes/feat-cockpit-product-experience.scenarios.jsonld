@@ -1,0 +1,449 @@
+{
+  "scenarios": [
+    {
+      "exercises": "dna:design:5N87R76SNG38N8PSJWA5S8BA88",
+      "id": "dna:scenario:RG40ESH02A6743EFNV3DNZAK8M",
+      "journey": "dna:workflow:T77HYHJTGG3FNSH5T53F3ZPSNK",
+      "name": "Switch the board scope and read the counts",
+      "state": "draft",
+      "surface": "ui",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:3Z3RVVKV894S6RKEJX9X53DG09"
+      ]
+    },
+    {
+      "exercises": "dna:design:5N87R76SNG38N8PSJWA5S8BA88",
+      "id": "dna:scenario:ANKJTMW78MMPG99JFVVA49T1K7",
+      "journey": "dna:workflow:H0QN7DN94VC3EREKS9RB23B2ZA",
+      "name": "Assign an unassigned change to a product",
+      "state": "draft",
+      "surface": "ui",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:YECGT850BVK7A0WNE6HZ1A3ME1"
+      ]
+    },
+    {
+      "exercises": "dna:design:5N87R76SNG38N8PSJWA5S8BA88",
+      "id": "dna:scenario:AHAENJQ7XFRDXWW7DYBH147RPM",
+      "journey": "dna:workflow:PJ4RRTDWHPPY9G20VSJRP1JDCS",
+      "name": "Remove a change from a product (un-assign)",
+      "state": "draft",
+      "surface": "ui",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:1TRZV6XQ4KQ7WTZMR7CJWQNK2H"
+      ]
+    },
+    {
+      "exercises": "dna:design:5N87R76SNG38N8PSJWA5S8BA88",
+      "id": "dna:scenario:JCY26TSKZ3JEEVFXVD6XYPAPCM",
+      "journey": "dna:workflow:MP939YDQD7AZJH5TYTB9QRJ4ZS",
+      "name": "Assign a product straight from a board card",
+      "state": "draft",
+      "surface": "ui",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:3CKCSQMGV4D6JHB1HZYR3KKKV8"
+      ]
+    },
+    {
+      "exercises": "dna:design:5N87R76SNG38N8PSJWA5S8BA88",
+      "id": "dna:scenario:B1CZE77DQHA1GDSKZFW01893D8",
+      "journey": "dna:workflow:PQ4X33A89JT8WMFVH3XETHB42D",
+      "name": "Reach product setup from the switcher",
+      "state": "draft",
+      "surface": "ui",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:EER2PSTWS1PXBQKQM66GX9MYQM"
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "agent_instructions": "Open the cockpit board",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:XA6PD625QXYFABDQXZSET60F3C",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "bgead76h-open-the-cockpit-board-1",
+      "output_artifacts": [
+        "bgead76h-open-the-cockpit-board-1-result"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Open the product scope switcher menu",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:TZ29B42F2QHGXMWKZFFESBZHAN",
+      "input_artifacts": [
+        "bgead76h-open-the-cockpit-board-1-result"
+      ],
+      "mechanism": "human",
+      "name": "bgead76h-open-the-product-scope-switcher-menu-2",
+      "output_artifacts": [
+        "bgead76h-open-the-product-scope-switcher-menu-2-result"
+      ],
+      "postconditions": [
+        "see an 'All products' row with a live count",
+        "see an 'Unassigned' row with a live count",
+        "see each product with a count that matches the board's actual change counts"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Pick a product from the menu",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:VVEN5WPQG0JW4AYW609N87WW2C",
+      "input_artifacts": [
+        "bgead76h-open-the-product-scope-switcher-menu-2-result"
+      ],
+      "mechanism": "human",
+      "name": "bgead76h-pick-a-product-from-the-menu-3",
+      "output_artifacts": [
+        "bgead76h-pick-a-product-from-the-menu-3-result"
+      ],
+      "postconditions": [
+        "the board re-scopes to that product in place",
+        "the header reads 'Viewing <product>'"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Click the '\u00d7 clear' control in the header",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:DW1Q195MRXSW22WQG8VKKAHZBZ",
+      "input_artifacts": [
+        "bgead76h-pick-a-product-from-the-menu-3-result"
+      ],
+      "mechanism": "human",
+      "name": "bgead76h-click-the-clear-control-in-the-header-4",
+      "output_artifacts": [
+        "bgead76h-click-the-clear-control-in-the-header-4-result"
+      ],
+      "postconditions": [
+        "the board returns to 'All products'"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Open a change that has no product",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:PAXJ7MV1M5T5CRZD67SR696ZJG",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "0x9a1cek-open-a-change-that-has-no-product-1",
+      "output_artifacts": [
+        "0x9a1cek-open-a-change-that-has-no-product-1-result"
+      ],
+      "postconditions": [
+        "the product control shows a '\uff0b Add to a product' chip"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Click the chip and pick a product from the menu",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:2TTWW03KJM4VDZZ4XGGPMEC90W",
+      "input_artifacts": [
+        "0x9a1cek-open-a-change-that-has-no-product-1-result"
+      ],
+      "mechanism": "human",
+      "name": "0x9a1cek-click-the-chip-and-pick-a-product-from-t-2",
+      "output_artifacts": [
+        "0x9a1cek-click-the-chip-and-pick-a-product-from-t-2-result"
+      ],
+      "postconditions": [
+        "the chip swaps in place to the chosen product's monogram tile and name",
+        "a brief 'Saved' tick confirmation appears"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Open a change already assigned to a product",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:XSBNHP4W647WX1Q3NWNASTBFPD",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "m8rb67ez-open-a-change-already-assigned-to-a-prod-1",
+      "output_artifacts": [
+        "m8rb67ez-open-a-change-already-assigned-to-a-prod-1-result"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Open its product menu and choose 'Remove from product'",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:2JZXZ4XJWVV5Y3WR23WQCTK03E",
+      "input_artifacts": [
+        "m8rb67ez-open-a-change-already-assigned-to-a-prod-1-result"
+      ],
+      "mechanism": "human",
+      "name": "m8rb67ez-open-its-product-menu-and-choose-remove-2",
+      "output_artifacts": [
+        "m8rb67ez-open-its-product-menu-and-choose-remove-2-result"
+      ],
+      "postconditions": [
+        "the chip returns to the '\uff0b Add to a product' state"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Open the 'Unassigned' scope in the switcher",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:9PH4NY6ED7VT5NEBD3DDVZNM5G",
+      "input_artifacts": [
+        "m8rb67ez-open-its-product-menu-and-choose-remove-2-result"
+      ],
+      "mechanism": "human",
+      "name": "m8rb67ez-open-the-unassigned-scope-in-the-switche-3",
+      "output_artifacts": [
+        "m8rb67ez-open-the-unassigned-scope-in-the-switche-3-result"
+      ],
+      "postconditions": [
+        "the change now appears under the Unassigned scope",
+        "the Unassigned count has gone up by one"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Open the board scoped to 'All products'",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:6HQEHNEJQ6ZWC926TQW2RDXT4G",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "mg47g8w3-open-the-board-scoped-to-all-products-1",
+      "output_artifacts": [
+        "mg47g8w3-open-the-board-scoped-to-all-products-1-result"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Move keyboard focus to an unassigned card's '\uff0b Product' affordance",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:J87WXK2MQSRFE47S72DEPE3T83",
+      "input_artifacts": [
+        "mg47g8w3-open-the-board-scoped-to-all-products-1-result"
+      ],
+      "mechanism": "human",
+      "name": "mg47g8w3-move-keyboard-focus-to-an-unassigned-car-2",
+      "output_artifacts": [
+        "mg47g8w3-move-keyboard-focus-to-an-unassigned-car-2-result"
+      ],
+      "postconditions": [
+        "the affordance is present and keyboard-reachable (not hover-only)"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Activate it and pick a product",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:0T2MDKVS68PCJW10XJEFRMA87S",
+      "input_artifacts": [
+        "mg47g8w3-move-keyboard-focus-to-an-unassigned-car-2-result"
+      ],
+      "mechanism": "human",
+      "name": "mg47g8w3-activate-it-and-pick-a-product-3",
+      "output_artifacts": [
+        "mg47g8w3-activate-it-and-pick-a-product-3-result"
+      ],
+      "postconditions": [
+        "the card now carries that product's monogram chip in its foot-meta",
+        "the assignment happened without opening the change"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Open the product scope switcher menu",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:YBN458D6K63BSTPB03WZSGCQKC",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "jr9b4ya4-open-the-product-scope-switcher-menu-1",
+      "output_artifacts": [
+        "jr9b4ya4-open-the-product-scope-switcher-menu-1-result"
+      ],
+      "postconditions": [
+        "see a 'Manage products' item at the menu foot"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Click 'Manage products'",
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:step:S9KNDEMS2MCY1Z6E26K0TWYXJ7",
+      "input_artifacts": [
+        "jr9b4ya4-open-the-product-scope-switcher-menu-1-result"
+      ],
+      "mechanism": "human",
+      "name": "jr9b4ya4-click-manage-products-2",
+      "output_artifacts": [
+        "jr9b4ya4-click-manage-products-2-result"
+      ],
+      "postconditions": [
+        "the Settings page opens"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    }
+  ],
+  "workflows": [
+    {
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:workflow:T77HYHJTGG3FNSH5T53F3ZPSNK",
+      "initial_steps": [
+        "bgead76h-open-the-cockpit-board-1"
+      ],
+      "name": "Switch the board scope and read the counts",
+      "state": "draft",
+      "steps": [
+        "bgead76h-open-the-cockpit-board-1",
+        "bgead76h-open-the-product-scope-switcher-menu-2",
+        "bgead76h-pick-a-product-from-the-menu-3",
+        "bgead76h-click-the-clear-control-in-the-header-4"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "bgead76h-click-the-clear-control-in-the-header-4"
+      ],
+      "transitions": [
+        "bgead76h-open-the-cockpit-board-1 -> bgead76h-open-the-product-scope-switcher-menu-2",
+        "bgead76h-open-the-product-scope-switcher-menu-2 -> bgead76h-pick-a-product-from-the-menu-3",
+        "bgead76h-pick-a-product-from-the-menu-3 -> bgead76h-click-the-clear-control-in-the-header-4"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:workflow:H0QN7DN94VC3EREKS9RB23B2ZA",
+      "initial_steps": [
+        "0x9a1cek-open-a-change-that-has-no-product-1"
+      ],
+      "name": "Assign an unassigned change to a product",
+      "state": "draft",
+      "steps": [
+        "0x9a1cek-open-a-change-that-has-no-product-1",
+        "0x9a1cek-click-the-chip-and-pick-a-product-from-t-2"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "0x9a1cek-click-the-chip-and-pick-a-product-from-t-2"
+      ],
+      "transitions": [
+        "0x9a1cek-open-a-change-that-has-no-product-1 -> 0x9a1cek-click-the-chip-and-pick-a-product-from-t-2"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:workflow:PJ4RRTDWHPPY9G20VSJRP1JDCS",
+      "initial_steps": [
+        "m8rb67ez-open-a-change-already-assigned-to-a-prod-1"
+      ],
+      "name": "Remove a change from a product (un-assign)",
+      "state": "draft",
+      "steps": [
+        "m8rb67ez-open-a-change-already-assigned-to-a-prod-1",
+        "m8rb67ez-open-its-product-menu-and-choose-remove-2",
+        "m8rb67ez-open-the-unassigned-scope-in-the-switche-3"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "m8rb67ez-open-the-unassigned-scope-in-the-switche-3"
+      ],
+      "transitions": [
+        "m8rb67ez-open-a-change-already-assigned-to-a-prod-1 -> m8rb67ez-open-its-product-menu-and-choose-remove-2",
+        "m8rb67ez-open-its-product-menu-and-choose-remove-2 -> m8rb67ez-open-the-unassigned-scope-in-the-switche-3"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:workflow:MP939YDQD7AZJH5TYTB9QRJ4ZS",
+      "initial_steps": [
+        "mg47g8w3-open-the-board-scoped-to-all-products-1"
+      ],
+      "name": "Assign a product straight from a board card",
+      "state": "draft",
+      "steps": [
+        "mg47g8w3-open-the-board-scoped-to-all-products-1",
+        "mg47g8w3-move-keyboard-focus-to-an-unassigned-car-2",
+        "mg47g8w3-activate-it-and-pick-a-product-3"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "mg47g8w3-activate-it-and-pick-a-product-3"
+      ],
+      "transitions": [
+        "mg47g8w3-open-the-board-scoped-to-all-products-1 -> mg47g8w3-move-keyboard-focus-to-an-unassigned-car-2",
+        "mg47g8w3-move-keyboard-focus-to-an-unassigned-car-2 -> mg47g8w3-activate-it-and-pick-a-product-3"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+      "for_process": "verification",
+      "id": "dna:workflow:PQ4X33A89JT8WMFVH3XETHB42D",
+      "initial_steps": [
+        "jr9b4ya4-open-the-product-scope-switcher-menu-1"
+      ],
+      "name": "Reach product setup from the switcher",
+      "state": "draft",
+      "steps": [
+        "jr9b4ya4-open-the-product-scope-switcher-menu-1",
+        "jr9b4ya4-click-manage-products-2"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "jr9b4ya4-click-manage-products-2"
+      ],
+      "transitions": [
+        "jr9b4ya4-open-the-product-scope-switcher-menu-1 -> jr9b4ya4-click-manage-products-2"
+      ],
+      "type": "review"
+    }
+  ]
+}

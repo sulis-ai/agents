@@ -1,0 +1,24 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:workflow:MP939YDQD7AZJH5TYTB9QRJ4ZS",
+  "initial_steps": [
+    "mg47g8w3-open-the-board-scoped-to-all-products-1"
+  ],
+  "name": "Assign a product straight from a board card",
+  "state": "draft",
+  "steps": [
+    "mg47g8w3-open-the-board-scoped-to-all-products-1",
+    "mg47g8w3-move-keyboard-focus-to-an-unassigned-car-2",
+    "mg47g8w3-activate-it-and-pick-a-product-3"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "mg47g8w3-activate-it-and-pick-a-product-3"
+  ],
+  "transitions": [
+    "mg47g8w3-open-the-board-scoped-to-all-products-1 -> mg47g8w3-move-keyboard-focus-to-an-unassigned-car-2",
+    "mg47g8w3-move-keyboard-focus-to-an-unassigned-car-2 -> mg47g8w3-activate-it-and-pick-a-product-3"
+  ],
+  "type": "review"
+}

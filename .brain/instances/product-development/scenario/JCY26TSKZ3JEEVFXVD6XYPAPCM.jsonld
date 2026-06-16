@@ -1,0 +1,12 @@
+{
+  "exercises": "dna:design:5N87R76SNG38N8PSJWA5S8BA88",
+  "id": "dna:scenario:JCY26TSKZ3JEEVFXVD6XYPAPCM",
+  "journey": "dna:workflow:MP939YDQD7AZJH5TYTB9QRJ4ZS",
+  "name": "Assign a product straight from a board card",
+  "state": "draft",
+  "surface": "ui",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:3CKCSQMGV4D6JHB1HZYR3KKKV8"
+  ]
+}

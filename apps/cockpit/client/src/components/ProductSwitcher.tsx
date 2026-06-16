@@ -1,32 +1,56 @@
-// WP-008 — <ProductSwitcher> (FR-38, UC-11; ADR-009).
+// WP-005 — <ProductSwitcher> the board scope switcher (ADR-002, EP-03).
 //
-// Journey K, client half: a top-left active-Product control — a NEUTRAL
-// two-letter monogram tile + the active Product's name + a chevron — opening
-// a menu that lists the Tenant's Products (active one ticked) plus "set up a
-// new product". Selecting another Product re-scopes the board + search/filters
-// to it (the parent owns the active-product state; the switcher emits
-// `onSelect`).
+// REORGANISE-Refactor: the switcher now renders the shared <ProductControl
+// mode="scope"> primitive (WP-002) rather than its own bespoke menu — one
+// product vocabulary across the three homes (switcher, change-nav property,
+// board card). The refinement (signed design, Concerns A1 + C1):
+//   - "All products" is the resting default + the explicit top item, rendered
+//     with an everything (grid) tile — NOT a product called "All";
+//   - "Unassigned" is a first-class scope (dashed tile) just under All — a
+//     CLIENT-derived scope (the server has no "unassigned" value; it's the
+//     All feed filtered to forProduct == null, TDD);
+//   - every row carries a LIVE count, derived client-side from the already-
+//     fetched (All-scoped) change list (productCounts; no new endpoint);
+//   - the header echoes the active scope ("Viewing <scope> · N changes") with
+//     a one-tap "× clear" back to All when scoped away from it.
 //
-// Matches the SIGNED visual contract (sulis-app.html .pswitch/.pmenu): the
-// avatar is a neutral monogram tile (deliberately NOT brand-coloured — chrome,
-// not decoration; a locked decision), consumes tokens.css only.
+// Read-only (FR-38): selecting a scope fires only `onSelect` — it mints
+// nothing, starts no session, performs no write. The board re-scope is the
+// parent's data refetch (or, for Unassigned, a client filter), not a mutation.
 //
-// Read-only (FR-38): selecting a Product fires only `onSelect` — it mints
-// nothing, starts no session, and performs no write. The seam re-scoping is
-// the parent's data refetch, not a mutation.
+// The neutral two-letter monogram() is still exported here (the locked cockpit
+// decision: the tile is chrome, not brand decoration) and reused by
+// ProductControl + OnboardingChat (EP-03) — never re-implemented.
 
-import { useEffect, useRef, useState } from "react";
-import type { Product } from "../../../shared/api-types";
+import type { Change, Product } from "../../../shared/api-types";
+import { ProductControl, type ProductRow } from "./ProductControl";
+import {
+  UNASSIGNED_SCOPE,
+  countForScope,
+  type ProductScope,
+} from "../lib/productCounts";
 import styles from "./ProductSwitcher.module.css";
+
+// The All-products row id. A client sentinel that maps to the `null` scope
+// (every change); kept distinct from a product id and from UNASSIGNED_SCOPE so
+// the synthetic + real rows never collide.
+const ALL_SCOPE_ROW_ID = "__all__";
 
 export interface ProductSwitcherProps {
   products: Product[];
-  /** The active Product id, or null for the "All" scope (the current board scope). */
-  activeProductId: string | null;
-  /** Re-scope: a Product id filters to it; null selects "All" (every change). */
-  onSelect: (productId: string | null) => void;
-  /** Optional "set up a new product" action (deferred surface; UC-07). */
+  /** The active scope: null = All, UNASSIGNED_SCOPE, or a product id. */
+  activeProductId: ProductScope;
+  /** Re-scope: null = All, UNASSIGNED_SCOPE = unassigned, else a product id. */
+  onSelect: (scope: ProductScope) => void;
+  /**
+   * The already-fetched (All-scoped) change list, for the live per-row counts +
+   * the header echo. Derived client-side (TDD); defaults to none.
+   */
+  changes?: Change[];
+  /** "Set up a new product" foot action (routes to settings). */
   onSetUpNew?: () => void;
+  /** "Manage products" foot action (WP-007 wires it; optional here). */
+  onManageProducts?: () => void;
 }
 
 /**
@@ -42,156 +66,108 @@ export function monogram(name: string): string {
   return (first.slice(0, 2) || "?").toUpperCase();
 }
 
+/** The human label for the active scope, for the header echo. */
+function scopeName(scope: ProductScope, products: Product[]): string {
+  if (scope === null) return "All products";
+  if (scope === UNASSIGNED_SCOPE) return "Unassigned";
+  return products.find((p) => p.productId === scope)?.name ?? "All products";
+}
+
 export function ProductSwitcher({
   products,
   activeProductId,
   onSelect,
+  changes = [],
   onSetUpNew,
+  onManageProducts,
 }: ProductSwitcherProps) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  // Close on outside click / Escape — standard menu affordance.
-  useEffect(() => {
-    if (!open) return;
-    function onDocClick(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", onDocClick);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDocClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  // "All" is the default scope (activeProductId === null): every change shows,
-  // and a Product is a filter layered on top. An activeProductId that matches
-  // no known Product also reads as "All" (safe fallback — never a blank header).
-  const activeProduct =
-    products.find((p) => p.productId === activeProductId) ?? null;
-  const isAll = activeProduct === null;
-  const headerName = activeProduct ? activeProduct.name : "All";
-
   // Nothing to switch when the Tenant has no Products at all.
   if (products.length === 0) return null;
 
-  function choose(productId: string | null) {
-    setOpen(false);
-    if (productId !== activeProductId) onSelect(productId);
+  // An activeProductId that matches no known scope reads as "All" (safe
+  // fallback — never a blank header), preserving the old switcher's behaviour.
+  const knownProduct =
+    typeof activeProductId === "string" &&
+    activeProductId !== UNASSIGNED_SCOPE &&
+    products.some((p) => p.productId === activeProductId);
+  const scope: ProductScope =
+    activeProductId === null ||
+    activeProductId === UNASSIGNED_SCOPE ||
+    knownProduct
+      ? activeProductId
+      : null;
+
+  // The scope rows: All (everything-tile) → Unassigned (dashed) → each product
+  // (monogram). Each carries a live count derived from the All-scoped feed.
+  const rows: ProductRow[] = [
+    {
+      productId: ALL_SCOPE_ROW_ID,
+      name: "All products",
+      glyph: "all-grid",
+      count: countForScope(changes, null),
+    },
+    {
+      productId: UNASSIGNED_SCOPE,
+      name: "Unassigned",
+      glyph: "unassigned-dashed",
+      count: countForScope(changes, UNASSIGNED_SCOPE),
+    },
+    ...products.map<ProductRow>((p) => ({
+      productId: p.productId,
+      name: p.name,
+      glyph: "monogram",
+      count: countForScope(changes, p.productId),
+    })),
+  ];
+
+  // ProductControl uses a string `selectedId`; the All scope maps to the All
+  // row sentinel, and a row select maps back to the scope vocabulary.
+  const selectedId = scope === null ? ALL_SCOPE_ROW_ID : scope;
+
+  function onRowSelect(rowId: string | null) {
+    onSelect(rowId === ALL_SCOPE_ROW_ID || rowId === null ? null : rowId);
   }
 
-  return (
-    <div className={styles.pswitch} ref={rootRef}>
-      <button
-        type="button"
-        className={styles.pstrigger}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        data-testid="product-switcher-trigger"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <span
-          className={styles.pavatar}
-          aria-hidden="true"
-          data-testid="product-switcher-avatar"
-        >
-          {monogram(headerName)}
-        </span>
-        <span className={styles.pmeta}>
-          <span className={styles.plabel}>Viewing</span>
-          <span className={styles.pname}>{headerName}</span>
-        </span>
-        <svg
-          className={styles.pchev}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          aria-hidden="true"
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
+  const scopeLabel = scopeName(scope, products);
+  const scopeCount = countForScope(changes, scope);
+  // "× clear" only appears when scoped away from All (there's somewhere to go
+  // back to). At the All scope there is nothing to clear.
+  const showClear = scope !== null;
+  // The trigger's accessible name always carries the active scope + its count
+  // ("Viewing All products, 23 changes"), so a screen reader announces the
+  // scope even at narrow widths where the visible "Viewing <scope>" text folds
+  // to the monogram tile + chevron (IDEAS.md §5 — the name folds, but stays on
+  // the accessible name).
+  const triggerLabel = `Viewing ${scopeLabel}, ${scopeCount} ${
+    scopeCount === 1 ? "change" : "changes"
+  }`;
 
-      {open && (
-        <div
-          className={styles.pmenu}
-          role="menu"
-          aria-label="Switch product"
-          data-testid="product-switcher-menu"
-        >
+  return (
+    <div className={styles.pswitch}>
+      <ProductControl
+        mode="scope"
+        rows={rows}
+        selectedId={selectedId}
+        triggerLabel={triggerLabel}
+        onSelect={onRowSelect}
+        onSetUpNew={onSetUpNew}
+        onManageProducts={onManageProducts}
+      />
+
+      {/* The header echo — the active scope is always named in the chrome so
+          the founder never wonders what they're looking at (Concern A1). The
+          count rides the text; "× clear" returns to All when scoped. */}
+      <div className={styles.scopeHeader} data-testid="product-scope-header">
+        <span>
+          Viewing <strong>{scopeLabel}</strong> · {scopeCount}{" "}
+          {scopeCount === 1 ? "change" : "changes"}
+        </span>
+        {showClear && (
           <button
             type="button"
-            className={isAll ? `${styles.pmitem} ${styles.active}` : styles.pmitem}
-            role="menuitemradio"
-            aria-checked={isAll}
-            data-testid="product-switcher-all"
-            onClick={() => choose(null)}
-          >
-            <span className={styles.pavatar} aria-hidden="true">
-              {monogram("All")}
-            </span>
-            <span className={styles.pmname}>All</span>
-            {isAll && (
-              <svg
-                className={styles.pmcheck}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2.5}
-                aria-hidden="true"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            )}
-          </button>
-          <div className={styles.pmsep} role="separator" />
-          <div className={styles.pmlabel}>Your products</div>
-          {products.map((p) => {
-            const isActive = p.productId === activeProductId;
-            return (
-              <button
-                key={p.productId}
-                type="button"
-                className={isActive ? `${styles.pmitem} ${styles.active}` : styles.pmitem}
-                role="menuitemradio"
-                aria-checked={isActive}
-                onClick={() => choose(p.productId)}
-              >
-                <span className={styles.pavatar} aria-hidden="true">
-                  {monogram(p.name)}
-                </span>
-                <span className={styles.pmname}>{p.name}</span>
-                {isActive && (
-                  <svg
-                    className={styles.pmcheck}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
-                    aria-hidden="true"
-                  >
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                )}
-              </button>
-            );
-          })}
-          <div className={styles.pmsep} role="separator" />
-          <button
-            type="button"
-            className={styles.pmnew}
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              onSetUpNew?.();
-            }}
+            className={styles.clearScope}
+            aria-label="Clear scope, view all products"
+            onClick={() => onSelect(null)}
           >
             <svg
               viewBox="0 0 24 24"
@@ -200,13 +176,13 @@ export function ProductSwitcher({
               strokeWidth={2}
               aria-hidden="true"
             >
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
-            Set up a new product
+            All products
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

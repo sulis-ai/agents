@@ -1,0 +1,12 @@
+{
+  "evidence": "human-attested:cockpit automated UI suite \u2014 ChangeCard.product.test.tsx (green, PR #374); observed=['the affordance is present and keyboard-reachable (not hover-only)', \"the card now carries that product's monogram chip in its foot-meta\", 'the assignment happened without opening the change']; not-observed=[]",
+  "id": "dna:testresult:NJRGCBTYEPRY7YGYSXQSMDFQSV",
+  "of_run": "dna:testrun:H9ZPKKCKRFKXDQW96ZR4Z5C8D5",
+  "outcome": "pass",
+  "scenario": "dna:scenario:JCY26TSKZ3JEEVFXVD6XYPAPCM",
+  "sys_status": "active",
+  "type": "e2e",
+  "verifies": [
+    "dna:requirement:3CKCSQMGV4D6JHB1HZYR3KKKV8"
+  ]
+}

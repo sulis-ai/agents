@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Move keyboard focus to an unassigned card's '\uff0b Product' affordance",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:J87WXK2MQSRFE47S72DEPE3T83",
+  "input_artifacts": [
+    "mg47g8w3-open-the-board-scoped-to-all-products-1-result"
+  ],
+  "mechanism": "human",
+  "name": "mg47g8w3-move-keyboard-focus-to-an-unassigned-car-2",
+  "output_artifacts": [
+    "mg47g8w3-move-keyboard-focus-to-an-unassigned-car-2-result"
+  ],
+  "postconditions": [
+    "the affordance is present and keyboard-reachable (not hover-only)"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

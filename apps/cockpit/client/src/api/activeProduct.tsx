@@ -12,12 +12,17 @@
 // unaffected.
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import type { ProductScope } from "../lib/productCounts";
 
 export interface ActiveProductValue {
-  /** The active Product id, or null for the default (single-Product) scope. */
-  activeProductId: string | null;
-  /** Re-scope to another Product (the switch). */
-  setActiveProductId: (productId: string | null) => void;
+  /**
+   * The active board scope: null = All, the UNASSIGNED_SCOPE sentinel, or a
+   * product id. WP-005 widened this from a bare product id to the scope
+   * vocabulary so "Unassigned" is a first-class, client-derived scope.
+   */
+  activeProductId: ProductScope;
+  /** Re-scope (the switch): null = All, UNASSIGNED_SCOPE, or a product id. */
+  setActiveProductId: (scope: ProductScope) => void;
 }
 
 const ActiveProductContext = createContext<ActiveProductValue>({
@@ -30,9 +35,9 @@ export function ActiveProductProvider({
   initialActiveProductId = null,
 }: {
   children: ReactNode;
-  initialActiveProductId?: string | null;
+  initialActiveProductId?: ProductScope;
 }) {
-  const [activeProductId, setActiveProductId] = useState<string | null>(
+  const [activeProductId, setActiveProductId] = useState<ProductScope>(
     initialActiveProductId,
   );
   const value = useMemo<ActiveProductValue>(

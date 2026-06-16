@@ -53,7 +53,12 @@ import type {
   ProjectWrite,
   RepoAttachWrite,
   SettingsErrorCode,
+  // Change-product write results (the cross-kind un-assign seam; ADR-001)
+  AssignChangeProductResult,
+  ClearChangeProductResult,
 } from "../../shared/api-types";
+
+import type { ChangeProductWriter } from "../routes/changes";
 
 import {
   happySettingsTree,
@@ -549,5 +554,82 @@ describe("shared/api-types — SETTINGS wire shapes (ADR-019/020/021)", () => {
     };
     expect(productNode.projects[0]?.repo).toBeNull();
     assertNoSnakeCase(productNode);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WP-001 — change-product write results (the one cross-kind un-assign seam;
+// ADR-001, CONTRACT_FIRST_STANDARD).
+//
+// The contract WP pins the DELETE /api/changes/:id/product result shape BEFORE
+// the server (WP-003) and the client hook (WP-004) build against it. The
+// existing PUT assign contract is untouched: `assignChangeProduct` still
+// returns `{ ok, id, forProduct: string }`. The new clear path returns the
+// SAME ok/id structure with `forProduct: null` — an explicit ClearChangeProduct‐
+// Result, not a magic-null sentinel on the assign shape (ADR-001 "explicit
+// beats inferred"). Both wire types live in shared/api-types.ts so the producer
+// and the consumer import ONE copy (CF-02), never two divergent ones.
+//
+// The compile is the real gate (tsc --noEmit): if `forProduct` on the clear
+// result were typed `string` (or the port lacked `clearChangeProduct`), these
+// fixtures stop compiling.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("shared/api-types — CHANGE-PRODUCT write results (un-assign seam; ADR-001)", () => {
+  it("AssignChangeProductResult carries a string forProduct; ClearChangeProductResult carries null", () => {
+    // ASSIGN — the existing PUT result: forProduct is the assigned product id.
+    const assigned: AssignChangeProductResult = {
+      ok: true,
+      id: "dna:change:01ABC0000000000000000000AA",
+      forProduct: "dna:product:01XYZ000000000000000000000",
+    };
+    expect(assigned.ok).toBe(true);
+    expect(typeof assigned.forProduct).toBe("string");
+    assertNoSnakeCase(assigned);
+
+    // CLEAR — the new DELETE result: forProduct is null (back to unassigned).
+    const cleared: ClearChangeProductResult = {
+      ok: true,
+      id: "dna:change:01ABC0000000000000000000AA",
+      forProduct: null,
+    };
+    expect(cleared.ok).toBe(true);
+    expect(cleared.forProduct).toBeNull();
+    assertNoSnakeCase(cleared);
+  });
+
+  it("ClearChangeProductResult.forProduct is pinned to null at the type level (not string|null)", () => {
+    // A function that only accepts the literal-null clear result: if the type
+    // widened `forProduct` to `string | null` this assignment would still
+    // compile, so we additionally pin null at the value level above. Here we
+    // assert the contract's intent — the clear result NEVER carries a product.
+    const cleared: ClearChangeProductResult = {
+      ok: true,
+      id: "dna:change:01ABC0000000000000000000AA",
+      forProduct: null,
+    };
+    const bad: ClearChangeProductResult = {
+      ...cleared,
+      // @ts-expect-error — a non-null forProduct is not a valid clear result.
+      forProduct: "dna:product:01X",
+    };
+    expect(bad.forProduct).toBe("dna:product:01X");
+  });
+
+  it("the ChangeProductWriter port declares clearChangeProduct alongside assignChangeProduct", () => {
+    // Type-level contract: a conforming writer implements BOTH methods, and
+    // clearChangeProduct resolves the null-forProduct shape (ADR-001). This is
+    // the port WP-003's adapter implements and WP-004's hook calls through.
+    const writer: ChangeProductWriter = {
+      assignChangeProduct: async (changeId, productId) => ({
+        id: `dna:change:${changeId}`,
+        forProduct: productId,
+      }),
+      clearChangeProduct: async (changeId) => ({
+        id: `dna:change:${changeId}`,
+        forProduct: null,
+      }),
+    };
+    expect(typeof writer.clearChangeProduct).toBe("function");
   });
 });

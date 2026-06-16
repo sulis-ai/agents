@@ -1,0 +1,19 @@
+{
+  "pr": "feat/wp-007-setup-spine-link",
+  "base": "change/feat-cockpit-product-experience",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "hygiene": {
+    "scope": { "severity": "none", "commit_type_spread": ["test"], "module_fan_out": 1 },
+    "size": { "severity": "none", "lines_added": 60, "lines_removed": 0, "files_changed": 1 },
+    "safety": { "severity": "none", "migration_count": 0, "schema_idl_count": 0, "secret_pattern_hits": 0, "infra_files": 0 },
+    "completeness": { "severity": "none", "new_source_without_test": 0, "note": "test-only diff; no new source files" }
+  },
+  "lenses": {
+    "architecture": { "in_changes": 0, "in_neighbours": 0 },
+    "security": { "in_changes": 0, "in_neighbours": 0 },
+    "quality": { "in_changes": 0, "in_neighbours": 0 }
+  },
+  "findings": [],
+  "draft_deltas": 0
+}

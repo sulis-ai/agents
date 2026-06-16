@@ -20,6 +20,7 @@ import { axe } from "jest-axe";
 import type { Change } from "../../../shared/api-types";
 import { Board } from "../pages/Board";
 import { LIVENESS_POLL_MS } from "../config";
+import { withProductsRoute, boardFetch } from "./_productsFetch";
 
 function makeChange(overrides: Partial<Change> = {}): Change {
   return {
@@ -65,7 +66,10 @@ function renderBoard(client: QueryClient) {
       <MemoryRouter initialEntries={["/"]}>
         <Routes>
           <Route path="/" element={<Board />} />
-          <Route path="/c/:changeId" element={<div data-testid="thread-view" />} />
+          <Route
+            path="/c/:changeId"
+            element={<div data-testid="thread-view" />}
+          />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -89,7 +93,9 @@ describe("<Board>", () => {
     const changes: Change[] = [
       makeChange({ changeId: "01D", handle: "CH-01D", stage: "design" }),
     ];
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, changes));
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      boardFetch(changes) as never,
+    );
     const { findAllByTestId } = renderBoard(freshClient());
     const columns = await findAllByTestId("stage-column");
     expect(columns).toHaveLength(6);
@@ -98,11 +104,28 @@ describe("<Board>", () => {
 
   it("places three changes at three stages into their three columns", async () => {
     const changes: Change[] = [
-      makeChange({ changeId: "01R", handle: "CH-01R", intent: "Recon work", stage: "recon" }),
-      makeChange({ changeId: "01D", handle: "CH-01D", intent: "Design work", stage: "design" }),
-      makeChange({ changeId: "01V", handle: "CH-01V", intent: "Review work", stage: "review" }),
+      makeChange({
+        changeId: "01R",
+        handle: "CH-01R",
+        intent: "Recon work",
+        stage: "recon",
+      }),
+      makeChange({
+        changeId: "01D",
+        handle: "CH-01D",
+        intent: "Design work",
+        stage: "design",
+      }),
+      makeChange({
+        changeId: "01V",
+        handle: "CH-01V",
+        intent: "Review work",
+        stage: "review",
+      }),
     ];
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, changes));
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      boardFetch(changes) as never,
+    );
     const { findByTestId } = renderBoard(freshClient());
 
     const reconCol = await findByTestId("stage-column-recon");
@@ -124,7 +147,9 @@ describe("<Board>", () => {
       makeChange({ changeId: "01LIVE", handle: "CH-01LIVE", stage: "review" }),
       makeChange({ changeId: "01DONE", handle: "CH-01DONE", stage: "shipped" }),
     ];
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, changes));
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      boardFetch(changes) as never,
+    );
     const { findByText, queryByText } = renderBoard(freshClient());
     await findByText("CH-01LIVE");
     expect(queryByText("CH-01DONE")).not.toBeInTheDocument();
@@ -137,7 +162,7 @@ describe("<Board>", () => {
   });
 
   it("renders the empty state guiding how to start a change when zero changes (FR-03)", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, []));
+    vi.spyOn(globalThis, "fetch").mockImplementation(boardFetch([]) as never);
     const { findByText } = renderBoard(freshClient());
     expect(await findByText(/nothing in flight/i)).toBeInTheDocument();
   });
@@ -146,13 +171,17 @@ describe("<Board>", () => {
     const changes: Change[] = [
       makeChange({ changeId: "01DONE", handle: "CH-01DONE", stage: "shipped" }),
     ];
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, changes));
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      boardFetch(changes) as never,
+    );
     const { findByText } = renderBoard(freshClient());
     expect(await findByText(/nothing in flight/i)).toBeInTheDocument();
   });
 
   it("renders an error message + retry button on failure (ADR-005 error+retry)", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(500, { error: "boom" }));
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse(500, { error: "boom" }),
+    );
     const { findByText, getByRole } = renderBoard(freshClient());
     await findByText(/something went wrong/i);
     expect(getByRole("button", { name: /retry/i })).toBeInTheDocument();
@@ -163,7 +192,9 @@ describe("<Board>", () => {
       makeChange({ changeId: "01R", handle: "CH-01R", stage: "recon" }),
       makeChange({ changeId: "01I", handle: "CH-01I", stage: "implement" }),
     ];
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, changes));
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      boardFetch(changes) as never,
+    );
     const { container, findByText } = renderBoard(freshClient());
     await findByText("CH-01R");
     const results = await axe(container);
@@ -221,7 +252,9 @@ describe("<Board> — enriched-feed integration seam (WP-007)", () => {
         health: { state: "off-track", reason: "stalled" },
       }),
     ];
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, changes));
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      boardFetch(changes) as never,
+    );
     const { findByTestId, queryByText } = renderBoard(freshClient());
     const card = await findByTestId("change-card");
     expect(within(card).getByText(/waiting on you/i)).toBeInTheDocument();
@@ -239,7 +272,9 @@ describe("<Board> — enriched-feed integration seam (WP-007)", () => {
         health: { state: "off-track", reason: "tests failing" },
       }),
     ];
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, changes));
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      boardFetch(changes) as never,
+    );
     const { findByTestId } = renderBoard(freshClient());
     const card = await findByTestId("change-card");
     // The health badge carries data-health-state from the REAL health.state.
@@ -263,7 +298,9 @@ describe("<Board> — enriched-feed integration seam (WP-007)", () => {
         lastActivityAt: recent,
       }),
     ];
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, changes));
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      boardFetch(changes) as never,
+    );
     const { findByTestId } = renderBoard(freshClient());
     const card = await findByTestId("change-card");
     const probe = card.querySelector("[data-probe-state]");
@@ -280,7 +317,11 @@ describe("<Board> — enriched-feed integration seam (WP-007)", () => {
           makeChange({ changeId: "01R", handle: "CH-01R", stage: "recon" }),
         ]),
       );
-    vi.spyOn(globalThis, "fetch").mockImplementation(fetchMock as never);
+    // products is routed by the wrapper, so the feed sequence (500 → 200) is
+    // unaffected by the board's separate products query (WP-008).
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      withProductsRoute(fetchMock) as never,
+    );
 
     const { findByText, getByRole, queryByTestId } = renderBoard(freshClient());
     await findByText(/something went wrong/i);
@@ -309,7 +350,11 @@ describe("<Board> — enriched-feed integration seam (WP-007)", () => {
           makeChange({ changeId: "01G", handle: "CH-01G", stage: "implement" }),
         ]),
       );
-    vi.spyOn(globalThis, "fetch").mockImplementation(fetchMock as never);
+    // products is routed by the wrapper so the feed-call count (asserted below)
+    // counts ONLY feed fetches, not the board's separate products query.
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      withProductsRoute(fetchMock) as never,
+    );
 
     // retry:false so the failed poll surfaces immediately as the query's error,
     // proving the COMPONENT (not retry) is what keeps the board up.
@@ -354,9 +399,8 @@ describe("<Board> — enriched-feed integration seam (WP-007)", () => {
     });
     vi.spyOn(globalThis, "fetch").mockImplementation(fetchMock as never);
 
-    const { findByText, findAllByTestId, queryByText, getByRole } = renderBoard(
-      freshClient(),
-    );
+    const { findByText, findAllByTestId, queryByText, getByRole } =
+      renderBoard(freshClient());
     // Full board: both cards.
     await findByText("CH-01A");
     expect(await findByText("CH-01B")).toBeInTheDocument();
@@ -391,7 +435,10 @@ describe("<Board> — enriched-feed integration seam (WP-007)", () => {
           makeChange({ changeId: "01S", handle: "CH-01S", stage: "shipped" }),
         ]),
       );
-    vi.spyOn(globalThis, "fetch").mockImplementation(fetchMock as never);
+    // products routed by the wrapper so the feed poll-count is unaffected.
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      withProductsRoute(fetchMock) as never,
+    );
 
     const { getByText, queryByText } = renderBoard(freshClient());
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));

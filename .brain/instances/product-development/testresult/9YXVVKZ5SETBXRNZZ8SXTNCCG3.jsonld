@@ -1,0 +1,12 @@
+{
+  "evidence": "human-attested:cockpit automated UI suite \u2014 ProductSwitcher.test.tsx manage-products (green, PR #374); observed=[\"see a 'Manage products' item at the menu foot\", 'the Settings page opens']; not-observed=[]",
+  "id": "dna:testresult:9YXVVKZ5SETBXRNZZ8SXTNCCG3",
+  "of_run": "dna:testrun:9T9WT1VN3GMK4CCC302VNGWFEP",
+  "outcome": "pass",
+  "scenario": "dna:scenario:B1CZE77DQHA1GDSKZFW01893D8",
+  "sys_status": "active",
+  "type": "e2e",
+  "verifies": [
+    "dna:requirement:EER2PSTWS1PXBQKQM66GX9MYQM"
+  ]
+}

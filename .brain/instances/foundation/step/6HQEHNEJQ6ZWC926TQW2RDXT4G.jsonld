@@ -1,0 +1,16 @@
+{
+  "agent_instructions": "Open the board scoped to 'All products'",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:6HQEHNEJQ6ZWC926TQW2RDXT4G",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "mg47g8w3-open-the-board-scoped-to-all-products-1",
+  "output_artifacts": [
+    "mg47g8w3-open-the-board-scoped-to-all-products-1-result"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

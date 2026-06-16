@@ -17,14 +17,21 @@ import { useQuery } from "@tanstack/react-query";
 import type { Change } from "../../../shared/api-types";
 import { apiGet } from "./client";
 import { LIVENESS_POLL_MS } from "../config";
+import { scopeToProductParam, type ProductScope } from "../lib/productCounts";
 
-export function useChangesWithLiveness(activeProductId: string | null = null) {
+export function useChangesWithLiveness(activeProductId: ProductScope = null) {
+  // WP-005 — the Unassigned scope is CLIENT-derived: the server scopes only by
+  // ?product=<id> and has no "unassigned" value (TDD), so the sentinel is
+  // stripped to null here (fetch the FULL list) and the Unassigned narrowing
+  // happens client-side at the board (filterChangesByScope). All / a real
+  // product behave exactly as before.
+  const productParam = scopeToProductParam(activeProductId);
   return useQuery({
-    queryKey: ["changes", activeProductId],
+    queryKey: ["changes", productParam],
     queryFn: () =>
       apiGet<Change[]>(
         "/api/changes",
-        activeProductId ? { product: activeProductId } : undefined,
+        productParam ? { product: productParam } : undefined,
       ),
     refetchInterval: LIVENESS_POLL_MS,
   });

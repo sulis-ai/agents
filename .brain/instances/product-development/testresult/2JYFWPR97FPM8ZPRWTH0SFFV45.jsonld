@@ -1,0 +1,12 @@
+{
+  "evidence": "human-attested:cockpit automated UI suite \u2014 BoardProductScope.test.tsx (green, PR #374); observed=[\"see an 'All products' row with a live count\", \"see an 'Unassigned' row with a live count\", \"see each product with a count that matches the board's actual change counts\", 'the board re-scopes to that product in place', \"the header reads 'Viewing <product>'\", \"the board returns to 'All products'\"]; not-observed=[]",
+  "id": "dna:testresult:2JYFWPR97FPM8ZPRWTH0SFFV45",
+  "of_run": "dna:testrun:EFSC17ASR7GK34ABAJ5Y3ZJB52",
+  "outcome": "pass",
+  "scenario": "dna:scenario:RG40ESH02A6743EFNV3DNZAK8M",
+  "sys_status": "active",
+  "type": "e2e",
+  "verifies": [
+    "dna:requirement:3Z3RVVKV894S6RKEJX9X53DG09"
+  ]
+}

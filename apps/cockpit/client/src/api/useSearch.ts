@@ -18,6 +18,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Change, WorkflowStage } from "../../../shared/api-types";
 import { apiGet } from "./client";
+import { scopeToProductParam, type ProductScope } from "../lib/productCounts";
 
 export interface SearchArgs {
   /** Free-text content query (FR-10). */
@@ -40,11 +41,14 @@ export function hasActiveFilter(args: SearchArgs): boolean {
 /**
  * Build `/api/search?…` with repeated `stage` params (the FR-11 array). WP-008:
  * when a Product is active the search is scoped to it (`?product=<id>`, ADR-009)
- * so a filter can never surface another Product's change (FR-37).
+ * so a filter can never surface another Product's change (FR-37). WP-005: the
+ * Unassigned sentinel is stripped to null here (the server has no "unassigned"
+ * value) — the board narrows to unassigned changes client-side.
  */
-function buildSearchPath(args: SearchArgs, activeProductId: string | null): string {
+function buildSearchPath(args: SearchArgs, activeProductId: ProductScope): string {
   const params = new URLSearchParams();
-  if (activeProductId) params.set("product", activeProductId);
+  const productParam = scopeToProductParam(activeProductId);
+  if (productParam) params.set("product", productParam);
   const q = args.q.trim();
   if (q.length > 0) params.set("q", q);
   for (const stage of args.stages) params.append("stage", stage);
@@ -53,11 +57,11 @@ function buildSearchPath(args: SearchArgs, activeProductId: string | null): stri
   return qs.length > 0 ? `/api/search?${qs}` : "/api/search";
 }
 
-export function useSearch(args: SearchArgs, activeProductId: string | null = null) {
+export function useSearch(args: SearchArgs, activeProductId: ProductScope = null) {
   return useQuery({
     queryKey: [
       "search",
-      activeProductId,
+      scopeToProductParam(activeProductId),
       args.q.trim(),
       [...args.stages].sort(),
       args.needsAttention,
