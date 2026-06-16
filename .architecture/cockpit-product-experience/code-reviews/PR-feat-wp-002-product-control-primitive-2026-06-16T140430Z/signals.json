@@ -1,0 +1,21 @@
+{
+  "pr": "wp-002-product-control-primitive",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "none" },
+    "size": { "lines_added": 1569, "lines_removed": 0, "files_changed": 4, "generated_ratio": 0.0, "lock_file_ratio": 0.0, "severity": "low", "note": "Single new component (513 LOC) + stylesheet (350) + two test files (706). All-new, single-concern; the line count is mostly tests + a signed-mockup-faithful component." },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none" },
+    "completeness": { "new_source_without_test": 0, "api_change_without_schema": false, "severity": "none", "note": "2 source files shipped with 2 test files (35 tests incl. jest-axe)." }
+  },
+  "findings": {
+    "in_changes": { "critical": 0, "high": 0, "medium": 1, "low": 0 },
+    "in_neighbours": { "critical": 0, "high": 0, "medium": 0, "low": 0 }
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "note": "nothing surfaced; presentation-only confirmed, no network, monogram() reused" },
+    "security": { "findings": 0, "note": "nothing surfaced; no XSS/secrets/injection; zero network (test-enforced)" },
+    "quality": { "findings": 1, "note": "1 medium: role=separator inside role=menu — dispositioned as not-a-defect (spec-permitted + matches axe-clean ProductSwitcher convention)" }
+  },
+  "verdict": "PASS",
+  "draft_deltas": 0
+}
