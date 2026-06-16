@@ -35,13 +35,27 @@ import { toWireChange } from "./_change-lookup";
 import { listScopedChanges, readProductQuery } from "./_product-scope";
 
 /** The sanctioned writer that assigns a change to a Product (sets for_product
- *  on the change's brain record). Implemented by SpineSettingsAdapter — the
- *  single allow-listed brain-write site — so this route does no I/O itself. */
+ *  on the change's brain record) or clears it back to unassigned. Implemented
+ *  by SpineSettingsAdapter — the single allow-listed brain-write site — so this
+ *  route does no I/O itself.
+ *
+ *  `clearChangeProduct` is the new un-assign seam (ADR-001): it resolves a null
+ *  `forProduct`, never an empty string, so the helper's strict validation stays
+ *  unweakened. The contract WP (WP-001) pins the method's SHAPE here; the
+ *  adapter implementation and the DELETE route wiring land in WP-003. It is
+ *  declared OPTIONAL so the existing assign-only call sites (the app wiring and
+ *  the PUT route test) keep type-checking until WP-003 supplies the impl — the
+ *  return shape is pinned regardless, so WP-003/WP-004 build against an exact
+ *  contract (`ClearChangeProductResult` without the `ok` envelope, mirroring
+ *  `assignChangeProduct`'s `{ id, forProduct }`). */
 export interface ChangeProductWriter {
   assignChangeProduct(
     changeId: string,
     productId: string,
   ): Promise<{ id: string; forProduct: string }>;
+  clearChangeProduct?(
+    changeId: string,
+  ): Promise<{ id: string; forProduct: null }>;
 }
 
 export interface ChangesRouterDeps {
