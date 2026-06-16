@@ -1,0 +1,12 @@
+{
+  "exercises": "dna:design:5N87R76SNG38N8PSJWA5S8BA88",
+  "id": "dna:scenario:RG40ESH02A6743EFNV3DNZAK8M",
+  "journey": "dna:workflow:T77HYHJTGG3FNSH5T53F3ZPSNK",
+  "name": "Switch the board scope and read the counts",
+  "state": "draft",
+  "surface": "ui",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:3Z3RVVKV894S6RKEJX9X53DG09"
+  ]
+}

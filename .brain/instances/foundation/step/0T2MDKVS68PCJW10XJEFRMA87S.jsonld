@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Activate it and pick a product",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:0T2MDKVS68PCJW10XJEFRMA87S",
+  "input_artifacts": [
+    "mg47g8w3-move-keyboard-focus-to-an-unassigned-car-2-result"
+  ],
+  "mechanism": "human",
+  "name": "mg47g8w3-activate-it-and-pick-a-product-3",
+  "output_artifacts": [
+    "mg47g8w3-activate-it-and-pick-a-product-3-result"
+  ],
+  "postconditions": [
+    "the card now carries that product's monogram chip in its foot-meta",
+    "the assignment happened without opening the change"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

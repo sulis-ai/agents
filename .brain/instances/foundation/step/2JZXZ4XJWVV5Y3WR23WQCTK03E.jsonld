@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Open its product menu and choose 'Remove from product'",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:2JZXZ4XJWVV5Y3WR23WQCTK03E",
+  "input_artifacts": [
+    "m8rb67ez-open-a-change-already-assigned-to-a-prod-1-result"
+  ],
+  "mechanism": "human",
+  "name": "m8rb67ez-open-its-product-menu-and-choose-remove-2",
+  "output_artifacts": [
+    "m8rb67ez-open-its-product-menu-and-choose-remove-2-result"
+  ],
+  "postconditions": [
+    "the chip returns to the '\uff0b Add to a product' state"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Pick a product from the menu",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:VVEN5WPQG0JW4AYW609N87WW2C",
+  "input_artifacts": [
+    "bgead76h-open-the-product-scope-switcher-menu-2-result"
+  ],
+  "mechanism": "human",
+  "name": "bgead76h-pick-a-product-from-the-menu-3",
+  "output_artifacts": [
+    "bgead76h-pick-a-product-from-the-menu-3-result"
+  ],
+  "postconditions": [
+    "the board re-scopes to that product in place",
+    "the header reads 'Viewing <product>'"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

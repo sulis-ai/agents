@@ -1,0 +1,12 @@
+{
+  "evidence": "human-attested:cockpit automated UI suite \u2014 ChangeNavProduct.test.tsx assign path (green, PR #374); observed=[\"the product control shows a '\uff0b Add to a product' chip\", \"the chip swaps in place to the chosen product's monogram tile and name\", \"a brief 'Saved' tick confirmation appears\"]; not-observed=[]",
+  "id": "dna:testresult:0645K9Z7YJWZFGVNTY458QGZGW",
+  "of_run": "dna:testrun:5AMZ54YN31F58XQXDBQACRPPVW",
+  "outcome": "pass",
+  "scenario": "dna:scenario:ANKJTMW78MMPG99JFVVA49T1K7",
+  "sys_status": "active",
+  "type": "e2e",
+  "verifies": [
+    "dna:requirement:YECGT850BVK7A0WNE6HZ1A3ME1"
+  ]
+}

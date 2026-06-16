@@ -1,0 +1,26 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:workflow:T77HYHJTGG3FNSH5T53F3ZPSNK",
+  "initial_steps": [
+    "bgead76h-open-the-cockpit-board-1"
+  ],
+  "name": "Switch the board scope and read the counts",
+  "state": "draft",
+  "steps": [
+    "bgead76h-open-the-cockpit-board-1",
+    "bgead76h-open-the-product-scope-switcher-menu-2",
+    "bgead76h-pick-a-product-from-the-menu-3",
+    "bgead76h-click-the-clear-control-in-the-header-4"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "bgead76h-click-the-clear-control-in-the-header-4"
+  ],
+  "transitions": [
+    "bgead76h-open-the-cockpit-board-1 -> bgead76h-open-the-product-scope-switcher-menu-2",
+    "bgead76h-open-the-product-scope-switcher-menu-2 -> bgead76h-pick-a-product-from-the-menu-3",
+    "bgead76h-pick-a-product-from-the-menu-3 -> bgead76h-click-the-clear-control-in-the-header-4"
+  ],
+  "type": "review"
+}

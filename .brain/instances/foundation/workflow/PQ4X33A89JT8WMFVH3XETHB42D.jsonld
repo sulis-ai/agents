@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:workflow:PQ4X33A89JT8WMFVH3XETHB42D",
+  "initial_steps": [
+    "jr9b4ya4-open-the-product-scope-switcher-menu-1"
+  ],
+  "name": "Reach product setup from the switcher",
+  "state": "draft",
+  "steps": [
+    "jr9b4ya4-open-the-product-scope-switcher-menu-1",
+    "jr9b4ya4-click-manage-products-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "jr9b4ya4-click-manage-products-2"
+  ],
+  "transitions": [
+    "jr9b4ya4-open-the-product-scope-switcher-menu-1 -> jr9b4ya4-click-manage-products-2"
+  ],
+  "type": "review"
+}

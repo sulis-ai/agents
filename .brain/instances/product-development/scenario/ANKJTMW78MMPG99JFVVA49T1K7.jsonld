@@ -1,0 +1,12 @@
+{
+  "exercises": "dna:design:5N87R76SNG38N8PSJWA5S8BA88",
+  "id": "dna:scenario:ANKJTMW78MMPG99JFVVA49T1K7",
+  "journey": "dna:workflow:H0QN7DN94VC3EREKS9RB23B2ZA",
+  "name": "Assign an unassigned change to a product",
+  "state": "draft",
+  "surface": "ui",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:YECGT850BVK7A0WNE6HZ1A3ME1"
+  ]
+}

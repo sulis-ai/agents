@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Open a change that has no product",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:PAXJ7MV1M5T5CRZD67SR696ZJG",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "0x9a1cek-open-a-change-that-has-no-product-1",
+  "output_artifacts": [
+    "0x9a1cek-open-a-change-that-has-no-product-1-result"
+  ],
+  "postconditions": [
+    "the product control shows a '\uff0b Add to a product' chip"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

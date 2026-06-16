@@ -1,0 +1,12 @@
+{
+  "exercises": "dna:design:5N87R76SNG38N8PSJWA5S8BA88",
+  "id": "dna:scenario:B1CZE77DQHA1GDSKZFW01893D8",
+  "journey": "dna:workflow:PQ4X33A89JT8WMFVH3XETHB42D",
+  "name": "Reach product setup from the switcher",
+  "state": "draft",
+  "surface": "ui",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:EER2PSTWS1PXBQKQM66GX9MYQM"
+  ]
+}

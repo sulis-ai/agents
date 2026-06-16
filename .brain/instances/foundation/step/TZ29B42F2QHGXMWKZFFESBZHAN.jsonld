@@ -1,0 +1,21 @@
+{
+  "agent_instructions": "Open the product scope switcher menu",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:TZ29B42F2QHGXMWKZFFESBZHAN",
+  "input_artifacts": [
+    "bgead76h-open-the-cockpit-board-1-result"
+  ],
+  "mechanism": "human",
+  "name": "bgead76h-open-the-product-scope-switcher-menu-2",
+  "output_artifacts": [
+    "bgead76h-open-the-product-scope-switcher-menu-2-result"
+  ],
+  "postconditions": [
+    "see an 'All products' row with a live count",
+    "see an 'Unassigned' row with a live count",
+    "see each product with a count that matches the board's actual change counts"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}
