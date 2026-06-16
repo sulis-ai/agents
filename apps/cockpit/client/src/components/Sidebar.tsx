@@ -34,6 +34,10 @@ export function Sidebar() {
   const navigate = useNavigate();
   const products = useProducts();
   const query = useChangesWithLiveness(activeProductId);
+  // WP-005 — the switcher counts/header echo are over the FULL (All-scoped)
+  // list; the null scope shares the ["changes", null] cache key, so this reuses
+  // the same All feed rather than issuing another request.
+  const allChanges = useChangesWithLiveness(null);
   const [shippedOpen, setShippedOpen] = useState(false);
 
   const all = query.isSuccess ? query.data : [];
@@ -50,7 +54,9 @@ export function Sidebar() {
           products={productList}
           activeProductId={activeProductId}
           onSelect={setActiveProductId}
+          changes={allChanges.data ?? []}
           onSetUpNew={() => navigate("/settings?new=product")}
+          onManageProducts={() => navigate("/settings")}
         />
       )}
       {/* WP-009 — the concierge front door: the plain-English way to find a

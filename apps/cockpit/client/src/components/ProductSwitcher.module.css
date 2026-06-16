@@ -1,11 +1,11 @@
-/* WP-008 — <ProductSwitcher> styles (FR-38; ADR-009).
+/* WP-005 — <ProductSwitcher> styles (ADR-002).
  *
- * Ported VERBATIM from the SIGNED visual contract (sulis-app.html
- * .pswitch / .pmenu / .pavatar). Consumes tokens.css custom properties only
- * — no hard-coded colours. The avatar is a NEUTRAL monogram tile (not
- * brand-coloured): the switcher reads as chrome, not decoration (a locked
- * decision). The control sits top-left in the sidebar's brand row, above the
- * nav, so the active Product is always in view. */
+ * REORGANISE-Refactor: the trigger + menu are now owned by the shared
+ * <ProductControl> primitive (ProductControl.module.css) — the switcher's own
+ * stylesheet shrinks to the placement wrapper (.pswitch) plus the scope header
+ * echo (.scopeHeader / .clearScope), ported VERBATIM from the SIGNED visual
+ * contract (.design/cockpit-product-experience/MOCKUP.html). Consumes
+ * tokens.css custom properties only — no hard-coded colours. */
 
 .pswitch {
   position: relative;
@@ -18,166 +18,43 @@
   margin: 0 4px;
 }
 
-.pstrigger {
+/* The header echo — the active scope is always named in the chrome (Concern
+ * A1). "× clear" returns to All when scoped to a product / Unassigned. */
+.scopeHeader {
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  /*
-   * Fits the control within the 48px top bar with breathing room; the old
-   * `9px 10px` (vertical-sidebar port) overflowed the bar. (issue 216)
-   */
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-card);
-  text-align: left;
-  cursor: pointer;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
 }
-.pstrigger:hover {
-  background: var(--bg-muted);
-  border-color: var(--input);
+.scopeHeader strong {
+  color: var(--text);
+  font-weight: 600;
 }
-.pstrigger[aria-expanded="true"] {
-  border-color: var(--input);
-  background: var(--bg-muted);
-}
-
-/* the product avatar — a neutral monogram tile, NOT brand-coloured */
-.pavatar {
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius);
-  flex: none;
+.clearScope {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  background: var(--bg-muted);
+  gap: 5px;
+  padding: 3px 9px;
+  min-height: 28px;
   border: 1px solid var(--border);
-  font-weight: 700;
+  border-radius: var(--radius-button);
+  background: var(--card);
+  color: var(--text-secondary);
+  font: inherit;
   font-size: 12px;
-  color: var(--text-secondary);
-  font-family: var(--font);
-}
-.pstrigger:hover .pavatar {
-  background: var(--bg-card);
-}
-
-.pmeta {
-  flex: 1;
-  min-width: 0;
-}
-.plabel {
-  display: block;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  font-weight: 600;
-}
-.pname {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  line-height: 1.3;
-}
-.pchev {
-  width: 15px;
-  height: 15px;
-  flex: none;
-  color: var(--text-muted);
-}
-
-/* the open menu — the Tenant's Products + the active mark + "set up a new one" */
-.pmenu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 30;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  /* Menu drop shadow — derived from --foreground so it reads on both themes
-   * (CH-01KTHP). Was: rgba(28, 28, 28, 0.12). */
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--foreground) 12%, transparent);
-  padding: 6px;
-  overflow: hidden;
-}
-.pmlabel {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  font-weight: 600;
-  padding: 8px 9px 5px;
-}
-.pmitem {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 9px 9px;
-  border-radius: var(--radius);
-  text-align: left;
-  color: var(--text-secondary);
-  font-size: 13px;
-  border: 1px solid transparent;
-  background: none;
   cursor: pointer;
 }
-.pmitem:hover {
-  background: var(--bg-muted);
+.clearScope:hover {
+  background: var(--muted);
   color: var(--text);
 }
-.pmitem.active {
-  background: var(--bg-muted);
-  color: var(--text);
-  font-weight: 500;
+.clearScope:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
-.pmname {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.pmcheck {
-  width: 15px;
-  height: 15px;
-  flex: none;
-  color: var(--accent);
-}
-.pmsep {
-  height: 1px;
-  background: var(--border-light);
-  margin: 6px 4px;
-}
-.pmnew {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 9px 9px;
-  border-radius: var(--radius);
-  text-align: left;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 500;
-  border: 1px solid transparent;
-  background: none;
-  cursor: pointer;
-}
-.pmnew:hover {
-  background: var(--bg-muted);
-}
-.pmnew svg {
-  width: 15px;
-  height: 15px;
-  flex: none;
-  color: var(--text-muted);
+.clearScope svg {
+  width: 12px;
+  height: 12px;
 }

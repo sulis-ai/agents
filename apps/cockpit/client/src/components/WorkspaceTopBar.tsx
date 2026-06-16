@@ -48,6 +48,12 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
   const { activeProductId, setActiveProductId } = useActiveProduct();
   const products = useProducts();
   const changesQuery = useChangesWithLiveness(activeProductId);
+  // WP-005 — the switcher's per-row counts + header echo are derived from the
+  // FULL (All-scoped) change list, not the currently-scoped one (a product
+  // scope would otherwise under-count the other scopes). The null scope shares
+  // the ["changes", null] query key, so this is the same cached All feed —
+  // no extra request beyond the one the board already makes.
+  const allChanges = useChangesWithLiveness(null);
   const { openChangeIds, closeTab } = useOpenTabs();
 
   const productList = products.data?.products ?? [];
@@ -102,7 +108,9 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
             products={productList}
             activeProductId={activeProductId}
             onSelect={setActiveProductId}
+            changes={allChanges.data ?? []}
             onSetUpNew={() => navigate("/settings?new=product")}
+            onManageProducts={() => navigate("/settings")}
           />
         </div>
       )}
