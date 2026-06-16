@@ -179,6 +179,66 @@ describe("<ProductSwitcher> — characterisation (re-scope behaviour preserved)"
   });
 });
 
+// WP-007 — the setup spine: a quiet "Manage products" foot action beside "Set
+// up a new product", routing to Settings (Concern D1). The placement just
+// supplies the onManageProducts handler (the consumers wire it to
+// navigate("/settings")); ProductControl renders the foot item with its menu
+// keyboard model. This pins the named verification scenario "Reach product
+// setup from the switcher": the item is present, reachable, and invokes the
+// route-to-Settings handler.
+describe("<ProductSwitcher> — the 'Manage products' setup-spine foot action (WP-007)", () => {
+  it("offers a 'Manage products' foot item that invokes onManageProducts (routes to Settings)", () => {
+    const onManageProducts = vi.fn();
+    const { getByTestId } = render(
+      <ProductSwitcher
+        products={TWO_PRODUCTS}
+        activeProductId={null}
+        changes={CHANGES}
+        onSelect={() => {}}
+        onSetUpNew={() => {}}
+        onManageProducts={onManageProducts}
+      />,
+    );
+    const menu = openMenu(getByTestId);
+    fireEvent.click(within(menu).getByText(/manage products/i));
+    expect(onManageProducts).toHaveBeenCalledOnce();
+  });
+
+  it("renders 'Manage products' as a real keyboard-reachable menu item with icon AND word (never icon-only)", () => {
+    const { getByTestId } = render(
+      <ProductSwitcher
+        products={TWO_PRODUCTS}
+        activeProductId={null}
+        changes={CHANGES}
+        onSelect={() => {}}
+        onSetUpNew={() => {}}
+        onManageProducts={() => {}}
+      />,
+    );
+    const menu = openMenu(getByTestId);
+    // A real menu item (keyboard-reachable as a <button role="menuitem">), not
+    // a bare icon: it carries the visible word "Manage products" as its
+    // accessible name (icon + word, never icon-only — WP Contract).
+    const item = within(menu).getByRole("menuitem", { name: /manage products/i });
+    expect(item.tagName).toBe("BUTTON");
+    expect(item.textContent).toMatch(/manage products/i);
+  });
+
+  it("omits the 'Manage products' item when onManageProducts is not wired (no dead affordance)", () => {
+    const { getByTestId } = render(
+      <ProductSwitcher
+        products={TWO_PRODUCTS}
+        activeProductId={null}
+        changes={CHANGES}
+        onSelect={() => {}}
+        onSetUpNew={() => {}}
+      />,
+    );
+    const menu = openMenu(getByTestId);
+    expect(within(menu).queryByText(/manage products/i)).not.toBeInTheDocument();
+  });
+});
+
 describe("<ProductSwitcher> — the refined scope rows (All products + Unassigned + counts)", () => {
   it("renders 'All products' with an everything (grid) tile, ticked when active, count = total", () => {
     const { getByTestId } = render(
